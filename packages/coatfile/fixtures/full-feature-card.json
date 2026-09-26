@@ -1,0 +1,120 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "full-feature-card",
+	"name": "Full Feature",
+	"description": "Gradient bg + text + qr + image, with a single variant.",
+	"product": "card_cr80",
+	"width": 1012,
+	"height": 638,
+	"fields": {
+		"type": "object",
+		"properties": {
+			"displayName": {
+				"type": "string",
+				"title": "Display name",
+				"default": "Your Name"
+			},
+			"handle": { "type": "string", "title": "Handle", "default": "@you" },
+			"avatar": { "type": "string", "format": "image", "title": "Avatar" }
+		},
+		"required": ["displayName", "handle"]
+	},
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "front_bg",
+				"type": "rect",
+				"pos": { "x": 0, "y": 0 },
+				"size": { "width": 1012, "height": 638 },
+				"properties": {
+					"fill": {
+						"kind": "linear",
+						"angle": 135,
+						"stops": [
+							{ "offset": 0, "color": "#fbbf24" },
+							{ "offset": 1, "color": "#fb7185" }
+						]
+					}
+				}
+			},
+			"elements": [
+				{
+					"id": "name_text",
+					"type": "text",
+					"pos": { "x": 64, "y": 80 },
+					"size": { "width": 884, "height": 80 },
+					"properties": {
+						"value": "{{displayName}}",
+						"font": { "family": "Comfortaa", "size": 56, "weight": 700 },
+						"color": "#1a1a1a",
+						"align": "left"
+					}
+				},
+				{
+					"id": "handle_text",
+					"type": "text",
+					"pos": { "x": 64, "y": 180 },
+					"size": { "width": 884, "height": 40 },
+					"properties": {
+						"value": "{{handle}}",
+						"font": { "family": "Plus Jakarta Sans", "size": 28 },
+						"color": "#374151",
+						"align": "left"
+					}
+				}
+			]
+		},
+		{
+			"name": "back",
+			"background": {
+				"id": "back_bg",
+				"type": "rect",
+				"pos": { "x": 0, "y": 0 },
+				"size": { "width": 1012, "height": 638 },
+				"properties": { "fill": "#fff" }
+			},
+			"elements": [
+				{
+					"id": "qr",
+					"type": "qr_code",
+					"pos": { "x": 372, "y": 159 },
+					"size": { "width": 320, "height": 320 },
+					"properties": {
+						"value": "https://example.com/{{handle}}",
+						"errorCorrection": "Q"
+					}
+				}
+			]
+		}
+	],
+	"variants": [
+		{
+			"id": "amber",
+			"label": "Amber",
+			"swatch": "#f97316",
+			"overrides": [
+				{
+					"name": "front",
+					"background": {
+						"id": "front_bg",
+						"type": "rect",
+						"pos": { "x": 0, "y": 0 },
+						"size": { "width": 1012, "height": 638 },
+						"properties": {
+							"fill": {
+								"kind": "linear",
+								"angle": 135,
+								"stops": [
+									{ "offset": 0, "color": "#f59e0b" },
+									{ "offset": 1, "color": "#ea580c" }
+								]
+							}
+						}
+					}
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,78 @@
+{
+	"id": "finish-white-clamp",
+	"title": "whiteClamp snaps every channel above the threshold to white",
+	"profile": "raster",
+	"requires": [
+		"finish.whiteClamp"
+	],
+	"width": 160,
+	"height": 120,
+	"compile": {
+		"finish": {
+			"whiteClamp": 248
+		}
+	},
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#fbfbfb"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "251 is above the 248 threshold"
+		}
+	]
+}

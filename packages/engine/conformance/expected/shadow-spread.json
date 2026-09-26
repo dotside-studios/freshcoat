@@ -1,0 +1,68 @@
+{
+	"caseId": "shadow-spread",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 60,
+						"y": 40
+					},
+					"size": {
+						"width": 40,
+						"height": 40
+					},
+					"shadow": {
+						"color": "#000000",
+						"dx": 0,
+						"dy": 0,
+						"blur": 0,
+						"spread": 10
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "c742336b52ed165926615ec7ecdbd5e8241cc0eb0c0d915aeb3e104bcba580a7"
+}

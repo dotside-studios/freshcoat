@@ -1,0 +1,86 @@
+{
+	"id": "bitmap-nearest",
+	"title": "a bitmap scales without resampling its blocks",
+	"profile": "core",
+	"requires": [
+		"draw.bitmap"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "bitmap",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"pixels": {
+					"__u8": "3Cha/x543P/cKFr/Hnjc/x543P/cKFr/Hnjc/9woWv/cKFr/Hnjc/9woWv8eeNz/Hnjc/9woWv8eeNz/3Cha/w=="
+				},
+				"pixelWidth": 4,
+				"pixelHeight": 4
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				50,
+				30
+			],
+			"expect": [
+				220,
+				40,
+				90,
+				255
+			],
+			"why": "the first block, flat"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				70,
+				30
+			],
+			"expect": [
+				30,
+				120,
+				220,
+				255
+			],
+			"why": "its neighbour, flat and different"
+		}
+	]
+}

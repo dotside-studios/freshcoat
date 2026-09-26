@@ -1,0 +1,60 @@
+{
+	"caseId": "bitmap-nearest",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 20
+					},
+					"size": {
+						"width": 80,
+						"height": 80
+					},
+					"op": "drawBitmap",
+					"pixels": {
+						"__u8": "3Cha/x543P/cKFr/Hnjc/x543P/cKFr/Hnjc/9woWv/cKFr/Hnjc/9woWv8eeNz/Hnjc/9woWv8eeNz/3Cha/w=="
+					},
+					"pixelWidth": 4,
+					"pixelHeight": 4
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "7b3cbd3c290f88cfcee2f6390da9294b095edea1d7df739396ad6e3eab140ec1"
+}

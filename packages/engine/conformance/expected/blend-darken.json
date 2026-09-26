@@ -1,0 +1,79 @@
+{
+	"caseId": "blend-darken",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#4080c0"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"blendMode": "darken",
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ff0000"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "95edcdc6a52e7dd33a7049639a1c995f092440e8347d58f7be0dc0c5e3efd77b"
+}

@@ -1,0 +1,90 @@
+{
+	"id": "blur-sigma",
+	"title": "layer blur uses Figma's radius, not the Gaussian sigma",
+	"profile": "core",
+	"requires": [
+		"effect.blur"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 80,
+					"y": 0
+				},
+				"size": {
+					"width": 80,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#000000"
+					}
+				],
+				"blur": 20
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				128,
+				128,
+				128,
+				255
+			],
+			"why": "half intensity at the edge, whatever the sigma",
+			"tolerance": 22
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				71,
+				60
+			],
+			"expect": [
+				216,
+				216,
+				216,
+				255
+			],
+			"why": "one sigma (8.8px) outside: ~85% of the way back to white",
+			"tolerance": 20
+		}
+	]
+}

@@ -1,0 +1,83 @@
+{
+	"caseId": "clip-shapes-the-shadow",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 30,
+						"y": 10
+					},
+					"size": {
+						"width": 100,
+						"height": 100
+					},
+					"shadow": {
+						"color": "#000000",
+						"dx": 14,
+						"dy": 0,
+						"blur": 0
+					},
+					"op": "drawGroup",
+					"clip": {
+						"kind": "ellipse"
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 30,
+								"y": 10
+							},
+							"size": {
+								"width": 100,
+								"height": 100
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "68ee489e952e1fe6ebf3b2ee2152097f33842935f18b9d5c18bd121242fa37c6"
+}

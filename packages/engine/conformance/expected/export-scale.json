@@ -1,0 +1,62 @@
+{
+	"caseId": "export-scale",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120,
+			"scale": 2
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 320,
+	"deviceHeight": 240,
+	"rgbaSha256": "1be455c45f468a3b194252d5d09b8ff6a07c88451df08634e04f63b9ec610a7a"
+}

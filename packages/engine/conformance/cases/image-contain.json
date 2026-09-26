@@ -1,0 +1,99 @@
+{
+	"id": "image-contain",
+	"title": "fit contain letterboxes rather than cropping",
+	"profile": "core",
+	"requires": [
+		"draw.image",
+		"image.contain"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "image",
+				"pos": {
+					"x": 30,
+					"y": 30
+				},
+				"size": {
+					"width": 100,
+					"height": 60
+				},
+				"src": "conformance:checker",
+				"fit": "contain"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				35,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the left letterbox band, untouched ground"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				125,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the right band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				57,
+				37
+			],
+			"expect": [
+				220,
+				40,
+				90,
+				255
+			],
+			"why": "a block of the fitted image (its CENTRE is a four-block junction)",
+			"tolerance": 60
+		}
+	]
+}

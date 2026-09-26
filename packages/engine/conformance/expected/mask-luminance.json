@@ -1,0 +1,109 @@
+{
+	"caseId": "mask-luminance",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 30,
+						"y": 20
+					},
+					"size": {
+						"width": 100,
+						"height": 80
+					},
+					"op": "drawMasked",
+					"mask": {
+						"pos": {
+							"x": 30,
+							"y": 20
+						},
+						"size": {
+							"width": 100,
+							"height": 80
+						},
+						"op": "drawRect",
+						"fills": [
+							{
+								"kind": "linear",
+								"from": {
+									"x": 0,
+									"y": 0
+								},
+								"to": {
+									"x": 1,
+									"y": 0
+								},
+								"stops": [
+									{
+										"offset": 0,
+										"color": "#ffffff"
+									},
+									{
+										"offset": 1,
+										"color": "#000000"
+									}
+								]
+							}
+						]
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 30,
+								"y": 20
+							},
+							"size": {
+								"width": 100,
+								"height": 80
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					],
+					"channel": "luminance"
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "4735669304243a1c0b9d530ee7fee5e23eaae391bff846e4e7e4e1c218cd1749"
+}

@@ -1,0 +1,109 @@
+{
+	"id": "shadow-inset",
+	"title": "an inset shadow falls inward from the shape's edges",
+	"profile": "core",
+	"requires": [
+		"effect.shadow",
+		"shadow.inset"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 40
+				},
+				"size": {
+					"width": 80,
+					"height": 40
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"shadow": {
+					"color": "#000000",
+					"dx": 12,
+					"dy": 0,
+					"blur": 0,
+					"inset": true
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				45,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "inside the left edge, where the inverted silhouette lands"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				100,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the shape's interior, past the band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				130,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "outside the shape: an ordinary shadow would be here"
+		}
+	]
+}

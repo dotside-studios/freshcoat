@@ -1,0 +1,93 @@
+{
+	"caseId": "mask-invert",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 30,
+						"y": 10
+					},
+					"size": {
+						"width": 100,
+						"height": 100
+					},
+					"op": "drawMasked",
+					"mask": {
+						"pos": {
+							"x": 30,
+							"y": 10
+						},
+						"size": {
+							"width": 50,
+							"height": 100
+						},
+						"op": "drawRect",
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#000000"
+							}
+						]
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 30,
+								"y": 10
+							},
+							"size": {
+								"width": 100,
+								"height": 100
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					],
+					"channel": "alpha",
+					"invert": true
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "797db09136a36ff6f7efe6a2f378be4f2a7e2d37e971b95b42572ba7423ce60d"
+}

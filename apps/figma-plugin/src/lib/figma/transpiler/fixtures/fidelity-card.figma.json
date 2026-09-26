@@ -1,0 +1,332 @@
+{
+	"front": {
+		"id": "6:1",
+		"name": "Front",
+		"type": "FRAME",
+		"visible": true,
+		"opacity": 1,
+		"blendMode": "NORMAL",
+		"absoluteBoundingBox": {
+			"x": 0,
+			"y": 0,
+			"width": 1017,
+			"height": 639
+		},
+		"fills": [
+			{
+				"type": "SOLID",
+				"color": {
+					"r": 0.996,
+					"g": 0.953,
+					"b": 0.78,
+					"a": 1
+				}
+			}
+		],
+		"children": [
+			{
+				"id": "6:5",
+				"name": "sheen",
+				"type": "RECTANGLE",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 0,
+					"y": 0,
+					"width": 1017,
+					"height": 40
+				},
+				"relativeTransform": [
+					[
+						1,
+						0,
+						0
+					],
+					[
+						0,
+						1,
+						0
+					]
+				],
+				"width": 1017,
+				"height": 40,
+				"fills": [
+					{
+						"type": "GRADIENT_LINEAR",
+						"visible": true,
+						"gradientHandlePositions": [
+							{
+								"x": 0.1,
+								"y": 0.5
+							},
+							{
+								"x": 0.45,
+								"y": 0.5
+							},
+							{
+								"x": 0.1,
+								"y": 1
+							}
+						],
+						"gradientStops": [
+							{
+								"position": 0,
+								"color": {
+									"r": 0.98,
+									"g": 0.75,
+									"b": 0.14,
+									"a": 1
+								}
+							},
+							{
+								"position": 1,
+								"color": {
+									"r": 0.96,
+									"g": 0.45,
+									"b": 0.09,
+									"a": 0
+								}
+							}
+						]
+					}
+				],
+				"constraints": {
+					"horizontal": "STRETCH",
+					"vertical": "MIN"
+				}
+			},
+			{
+				"id": "6:2",
+				"name": "{{user_avatar}}",
+				"type": "RECTANGLE",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 64,
+					"y": 64,
+					"width": 160,
+					"height": 160
+				},
+				"relativeTransform": [
+					[
+						1,
+						0,
+						64
+					],
+					[
+						0,
+						1,
+						64
+					]
+				],
+				"width": 160,
+				"height": 160,
+				"fills": [
+					{
+						"type": "IMAGE",
+						"scaleMode": "FILL",
+						"imageRef": "ref-avatar"
+					}
+				],
+				"cornerRadius": 80,
+				"constraints": {
+					"horizontal": "MIN",
+					"vertical": "MIN"
+				}
+			},
+			{
+				"id": "6:3",
+				"name": "{{display_name}}",
+				"type": "TEXT",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 256,
+					"y": 96,
+					"width": 600,
+					"height": 64
+				},
+				"relativeTransform": [
+					[
+						1,
+						0,
+						256
+					],
+					[
+						0,
+						1,
+						96
+					]
+				],
+				"characters": "{{display_name}}",
+				"style": {
+					"fontFamily": "Comfortaa",
+					"fontSize": 48,
+					"fontWeight": 700,
+					"italic": false,
+					"textAlignHorizontal": "LEFT",
+					"textAlignVertical": "TOP",
+					"textAutoResize": "NONE",
+					"lineHeightPercentFontSize": 120
+				},
+				"fills": [
+					{
+						"type": "SOLID",
+						"color": {
+							"r": 0.102,
+							"g": 0.102,
+							"b": 0.102,
+							"a": 1
+						}
+					}
+				],
+				"constraints": {
+					"horizontal": "MIN",
+					"vertical": "MIN"
+				}
+			},
+			{
+				"id": "6:4",
+				"name": "decoration",
+				"type": "VECTOR",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 800,
+					"y": 400,
+					"width": 200,
+					"height": 200
+				},
+				"relativeTransform": [
+					[
+						1,
+						0,
+						800
+					],
+					[
+						0,
+						1,
+						400
+					]
+				],
+				"width": 200,
+				"height": 200,
+				"constraints": {
+					"horizontal": "MAX",
+					"vertical": "MAX"
+				},
+				"absoluteRenderBounds": {
+					"x": 800,
+					"y": 400,
+					"width": 200,
+					"height": 200
+				}
+			},
+			{
+				"id": "6:6",
+				"name": "barcode:ean13:{{sku}};text=1",
+				"type": "RECTANGLE",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 640,
+					"y": 520,
+					"width": 300,
+					"height": 90
+				},
+				"relativeTransform": [
+					[
+						1,
+						0,
+						640
+					],
+					[
+						0,
+						1,
+						520
+					]
+				],
+				"width": 300,
+				"height": 90,
+				"fills": [
+					{
+						"type": "SOLID",
+						"color": {
+							"r": 0.1,
+							"g": 0.1,
+							"b": 0.1,
+							"a": 1
+						}
+					}
+				],
+				"constraints": {
+					"horizontal": "MAX",
+					"vertical": "MAX"
+				}
+			}
+		]
+	},
+	"back": {
+		"id": "6:10",
+		"name": "Back",
+		"type": "FRAME",
+		"visible": true,
+		"opacity": 1,
+		"blendMode": "NORMAL",
+		"absoluteBoundingBox": {
+			"x": 0,
+			"y": 700,
+			"width": 1017,
+			"height": 639
+		},
+		"fills": [
+			{
+				"type": "SOLID",
+				"color": {
+					"r": 0.157,
+					"g": 0.157,
+					"b": 0.157,
+					"a": 1
+				}
+			}
+		],
+		"children": [
+			{
+				"id": "6:11",
+				"name": "qr:{{link}}",
+				"type": "RECTANGLE",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": {
+					"x": 408,
+					"y": 969,
+					"width": 200,
+					"height": 200
+				},
+				"width": 200,
+				"height": 200,
+				"fills": [
+					{
+						"type": "SOLID",
+						"color": {
+							"r": 1,
+							"g": 1,
+							"b": 1,
+							"a": 1
+						}
+					}
+				],
+				"constraints": {
+					"horizontal": "CENTER",
+					"vertical": "CENTER"
+				}
+			}
+		]
+	}
+}

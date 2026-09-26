@@ -1,0 +1,151 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/*
+ * Light is the default and lives in @theme, so every utility reads a variable
+ * and [data-theme="dark"] below only has to redefine them. Keep the two sets
+ * complete and in the same order; the contrast test parses both.
+ */
+@theme {
+	--color-fc-app: #eeeef0;
+	--color-fc-panel: #fafafb;
+	--color-fc-raised: #ececef;
+	--color-fc-popover: #ffffff;
+	--color-fc-hover: #e3e3e7;
+	--color-fc-active: #d6d6db;
+	--color-fc-pasteboard: #d2d2d6;
+	--color-fc-border: #dcdce0;
+	--color-fc-border-strong: #c3c3c9;
+	--color-fc-text: #1d1d1f;
+	--color-fc-muted: #5c5c64;
+	--color-fc-faint: #86868e;
+	--color-fc-accent: #1f6fe8;
+	--color-fc-accent-hover: #1a5fcc;
+	--color-fc-accent-soft: rgb(31 111 232 / 0.14);
+	--color-fc-danger: #d93036;
+	--color-fc-danger-hover: #c2272d;
+	--color-fc-danger-text: #b4232a;
+	--color-fc-warning: #a86400;
+	--color-fc-success: #22915c;
+	--color-fc-success-text: #16774a;
+	--color-fc-guide: #ff3d7f;
+	--color-fc-tooltip: #ffffff;
+	--color-fc-scrim: rgb(20 20 24 / 0.32);
+	--color-fc-checker-a: #ffffff;
+	--color-fc-checker-b: #e3e3e6;
+	--color-fc-swatch-ring: rgb(0 0 0 / 0.16);
+
+	--font-fc: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-fc-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+	--text-fc-xs: 10px;
+	--text-fc-sm: 11px;
+	--text-fc-base: 12px;
+
+	--spacing-fc-control: 24px;
+	--spacing-fc-icon: 24px;
+
+	--animate-fc-indeterminate: fc-indeterminate 1.4s ease-in-out infinite;
+
+	@keyframes fc-indeterminate {
+		0% {
+			transform: translateX(-100%);
+		}
+		100% {
+			transform: translateX(250%);
+		}
+	}
+}
+
+/*
+ * Shadows sit outside @theme: Tailwind inlines a theme shadow into the utility
+ * so it can recolour it, which would freeze the light value. Use them as
+ * `shadow-(--shadow-fc-popover)`.
+ */
+:root {
+	--shadow-fc-popover:
+		0 8px 24px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.04);
+	--shadow-fc-dialog: 0 24px 64px rgb(0 0 0 / 0.22);
+	--shadow-fc-sheet: 0 0 32px rgb(0 0 0 / 0.18);
+	--shadow-fc-artboard:
+		0 1px 3px rgb(0 0 0 / 0.14), 0 4px 16px rgb(0 0 0 / 0.1);
+	--shadow-fc-control: 0 1px 2px rgb(0 0 0 / 0.14);
+	--shadow-fc-kbd: inset 0 -1px 0 rgb(0 0 0 / 0.12);
+	--shadow-fc-handle: 0 0 0 1px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+[data-theme="dark"] {
+	color-scheme: dark;
+
+	--color-fc-app: #1d1d1f;
+	--color-fc-panel: #262628;
+	--color-fc-raised: #303033;
+	--color-fc-popover: #303033;
+	--color-fc-hover: #3a3a3e;
+	--color-fc-active: #45454a;
+	--color-fc-pasteboard: #151517;
+	--color-fc-border: #3a3a3d;
+	--color-fc-border-strong: #4d4d52;
+	--color-fc-text: #e3e3e6;
+	--color-fc-muted: #a0a0a8;
+	--color-fc-faint: #74747c;
+	--color-fc-accent: #1f6fe8;
+	--color-fc-accent-hover: #2f7cf6;
+	--color-fc-accent-soft: rgb(47 124 246 / 0.2);
+	--color-fc-danger: #d93036;
+	--color-fc-danger-hover: #e5484d;
+	--color-fc-danger-text: #ff8a8e;
+	--color-fc-warning: #f5a524;
+	--color-fc-success: #30a46c;
+	--color-fc-success-text: #5cd49a;
+	--color-fc-guide: #ff3d7f;
+	--color-fc-tooltip: #111113;
+	--color-fc-scrim: rgb(0 0 0 / 0.55);
+	--color-fc-checker-a: #c4c4c8;
+	--color-fc-checker-b: #8a8a8f;
+	--color-fc-swatch-ring: rgb(255 255 255 / 0.16);
+
+	--shadow-fc-popover:
+		0 10px 30px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(0 0 0 / 0.35);
+	--shadow-fc-dialog: 0 24px 64px rgb(0 0 0 / 0.6);
+	--shadow-fc-sheet: 0 0 32px rgb(0 0 0 / 0.5);
+	--shadow-fc-artboard: 0 2px 12px rgb(0 0 0 / 0.5);
+	--shadow-fc-control: 0 1px 1px rgb(0 0 0 / 0.35);
+	--shadow-fc-kbd: inset 0 -1px 0 rgb(0 0 0 / 0.4);
+	--shadow-fc-handle: 0 0 0 1px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+@media (pointer: coarse) {
+	:root {
+		--spacing-fc-control: 32px;
+		--spacing-fc-icon: 36px;
+	}
+}
+
+@layer base {
+	:root {
+		color-scheme: light;
+		font-family: var(--font-fc);
+		background: var(--color-fc-app);
+		color: var(--color-fc-text);
+		-webkit-font-smoothing: antialiased;
+		scrollbar-color: var(--color-fc-active) transparent;
+		scrollbar-width: thin;
+	}
+
+	/* On body, not :root, so rem (and every Tailwind spacing step) stays 16px-based. */
+	body {
+		font-size: var(--text-fc-base);
+		margin: 0;
+		overscroll-behavior: none;
+	}
+
+	[data-focus-visible] {
+		outline: 1px solid var(--color-fc-accent);
+		outline-offset: -1px;
+	}
+
+	:focus:not([data-focus-visible]) {
+		outline: none;
+	}
+}

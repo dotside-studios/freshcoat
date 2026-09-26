@@ -1,0 +1,280 @@
+{
+	"format_version": "1.4",
+	"version": "1.0.0",
+	"id": "fidelity-card",
+	"name": "Fidelity Card",
+	"description": "Format 1.3 features",
+	"product": "card_cr80",
+	"width": 1017,
+	"height": 639,
+	"fields": {
+		"type": "object",
+		"properties": {
+			"user_avatar": {
+				"type": "string",
+				"title": "User Avatar",
+				"format": "image",
+				"x-image-aspect": [
+					1,
+					1
+				]
+			},
+			"display_name": {
+				"type": "string",
+				"title": "Display Name"
+			},
+			"sku": {
+				"type": "string",
+				"title": "Sku",
+				"x-widget": "barcode"
+			},
+			"link": {
+				"type": "string",
+				"title": "Link",
+				"x-widget": "url"
+			}
+		},
+		"required": [
+			"user_avatar",
+			"display_name",
+			"sku",
+			"link"
+		]
+	},
+	"fonts": [
+		{
+			"kind": "google",
+			"family": "Comfortaa",
+			"url": "https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&display=swap"
+		}
+	],
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "Front",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1017,
+					"height": 639
+				},
+				"properties": {
+					"fill": "#fef3c7"
+				}
+			},
+			"elements": [
+				{
+					"id": "sheen",
+					"type": "rect",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 1017,
+						"height": 40
+					},
+					"properties": {
+						"fill": {
+							"kind": "linear",
+							"angle": 0,
+							"from": [
+								0.1,
+								0.5
+							],
+							"to": [
+								0.45,
+								0.5
+							],
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#fabf24"
+								},
+								{
+									"offset": 1,
+									"color": "#f5731700"
+								}
+							]
+						}
+					},
+					"constraints": {
+						"horizontal": "stretch"
+					}
+				},
+				{
+					"id": "user_avatar",
+					"type": "image",
+					"pos": {
+						"x": 64,
+						"y": 64
+					},
+					"size": {
+						"width": 160,
+						"height": 160
+					},
+					"properties": {
+						"src": "{{user_avatar}}",
+						"fit": "cover"
+					}
+				},
+				{
+					"id": "display_name",
+					"type": "text",
+					"pos": {
+						"x": 256,
+						"y": 96
+					},
+					"size": {
+						"width": 600,
+						"height": 64
+					},
+					"properties": {
+						"font": {
+							"family": "Comfortaa",
+							"size": 48,
+							"weight": 700,
+							"lineHeight": 1.2
+						},
+						"color": "#1a1a1a",
+						"align": "left",
+						"verticalAlign": "top",
+						"value": "{{display_name}}"
+					}
+				},
+				{
+					"id": "flatten_6_4",
+					"type": "image",
+					"pos": {
+						"x": 800,
+						"y": 400
+					},
+					"size": {
+						"width": 200,
+						"height": 200
+					},
+					"properties": {
+						"src": "asset:1825f2763bd894d76e533ea0c9fc84606fe1983df6c71218413a0aeee317a520",
+						"fit": "fill"
+					},
+					"constraints": {
+						"horizontal": "end",
+						"vertical": "end"
+					}
+				},
+				{
+					"id": "sku",
+					"type": "barcode",
+					"pos": {
+						"x": 640,
+						"y": 520
+					},
+					"size": {
+						"width": 300,
+						"height": 90
+					},
+					"properties": {
+						"value": "{{sku}}",
+						"symbology": "ean13",
+						"foreground": "#1a1a1a",
+						"showText": true
+					},
+					"constraints": {
+						"horizontal": "end",
+						"vertical": "end"
+					}
+				}
+			]
+		},
+		{
+			"name": "back",
+			"background": {
+				"id": "Back",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1017,
+					"height": 639
+				},
+				"properties": {
+					"fill": "#282828"
+				}
+			},
+			"elements": [
+				{
+					"id": "link",
+					"type": "qr_code",
+					"pos": {
+						"x": 408,
+						"y": 269
+					},
+					"size": {
+						"width": 200,
+						"height": 200
+					},
+					"properties": {
+						"value": "{{link}}",
+						"foreground": "#ffffff",
+						"background": "transparent"
+					},
+					"constraints": {
+						"horizontal": "center",
+						"vertical": "center"
+					}
+				}
+			]
+		}
+	],
+	"source": {
+		"kind": "figma",
+		"importedAt": "2026-01-01T00:00:00.000Z",
+		"picks": {
+			"front": {
+				"fileKey": "figma",
+				"nodeId": "6:1",
+				"nodeName": "Front",
+				"width": 1017,
+				"height": 639
+			},
+			"back": {
+				"fileKey": "figma",
+				"nodeId": "6:10",
+				"nodeName": "Back",
+				"width": 1017,
+				"height": 639
+			}
+		},
+		"report": {
+			"counts": {
+				"native": 5,
+				"flattened": 1,
+				"skipped": 0
+			},
+			"durationMs": 0,
+			"decisions": [
+				{
+					"nodeId": "6:4",
+					"name": "decoration",
+					"nodeType": "VECTOR",
+					"decision": "flatten",
+					"reason": "vector_flattened",
+					"elementId": "flatten_6_4"
+				}
+			]
+		}
+	},
+	"assets": [
+		{
+			"sha256": "1825f2763bd894d76e533ea0c9fc84606fe1983df6c71218413a0aeee317a520",
+			"base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGM4EaDxH4QZYAwAT/QI/XT94xkAAAAASUVORK5CYII=",
+			"contentType": "image/png"
+		}
+	]
+}

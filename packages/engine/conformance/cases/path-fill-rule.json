@@ -1,0 +1,122 @@
+{
+	"id": "path-fill-rule",
+	"title": "evenodd cuts the hole nonzero fills",
+	"profile": "core",
+	"requires": [
+		"draw.path",
+		"path.fillRule"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "path",
+				"pos": {
+					"x": 20,
+					"y": 20
+				},
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"d": "M0 0 H60 V60 H0 Z M15 15 H45 V45 H15 Z",
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				]
+			},
+			{
+				"kind": "path",
+				"pos": {
+					"x": 90,
+					"y": 20
+				},
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"d": "M0 0 H60 V60 H0 Z M15 15 H45 V45 H15 Z",
+				"fillRule": "evenodd",
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				50,
+				50
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "nonzero: the inner square fills"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				120,
+				50
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "evenodd: the inner square is a hole"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				95,
+				25
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "evenodd: the ring itself fills"
+		}
+	]
+}

@@ -1,0 +1,101 @@
+{
+	"id": "adjust-gamma-lut",
+	"title": "a gamma LUT is a per-channel transfer curve",
+	"profile": "raster",
+	"requires": [
+		"adjust.lut"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#808080"
+					}
+				],
+				"adjust": {
+					"lut": {
+						"r": {
+							"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+						},
+						"g": {
+							"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+						},
+						"b": {
+							"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+						}
+					}
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				64,
+				64,
+				64,
+				255
+			],
+			"why": "128 at gamma 2 is 64",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				10,
+				10
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the ground is outside the adjusted layer"
+		}
+	]
+}

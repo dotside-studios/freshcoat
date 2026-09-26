@@ -1,0 +1,100 @@
+{
+	"id": "image-cover",
+	"title": "an image with fit cover fills the box",
+	"profile": "core",
+	"requires": [
+		"draw.image",
+		"image.cover"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "image",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"src": "conformance:checker",
+				"fit": "cover"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				50,
+				30
+			],
+			"expect": [
+				220,
+				40,
+				90,
+				255
+			],
+			"why": "the first block of the source",
+			"tolerance": 45
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				70,
+				30
+			],
+			"expect": [
+				30,
+				120,
+				220,
+				255
+			],
+			"why": "its neighbour, the other colour",
+			"tolerance": 45
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				10,
+				10
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "outside the image box"
+		}
+	]
+}

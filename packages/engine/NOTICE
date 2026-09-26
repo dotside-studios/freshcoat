@@ -1,0 +1,17 @@
+freshcoat
+Copyright 2026 Dotside Studios
+
+This product includes software developed by Dotside Studios.
+
+This package bundles the following fonts for its tests and conformance suite,
+each under the SIL Open Font License 1.1 and not under the Apache License:
+
+  tests/fonts/Geist-Regular.ttf
+    Copyright 2024 The Geist Project Authors
+    (https://github.com/vercel/geist-font)
+    License: tests/fonts/Geist-OFL.txt
+
+  tests/fonts/VendSans-Variable-latin.woff2
+    Copyright 2025 The Vend Sans Project Authors
+    (https://github.com/ktkm/Vend-Sans)
+    License: tests/fonts/VendSans-OFL.txt

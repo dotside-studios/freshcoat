@@ -1,0 +1,68 @@
+{
+	"caseId": "rotation-rotates-the-shadow",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 55,
+						"y": 35
+					},
+					"size": {
+						"width": 50,
+						"height": 50
+					},
+					"rotation": 90,
+					"shadow": {
+						"color": "#000000",
+						"dx": 0,
+						"dy": 14,
+						"blur": 0
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "c5ae774a96ef99b3c58b0dbacfe7dd10f02c8a7dd59a8e6e2cfff0b313036564"
+}

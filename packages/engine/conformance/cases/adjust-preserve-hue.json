@@ -1,0 +1,151 @@
+{
+	"id": "adjust-preserve-hue",
+	"title": "preserve-hue holds the hue a clipping boost rotates",
+	"profile": "raster",
+	"requires": [
+		"adjust.colorMatrix",
+		"adjust.preserveHue"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 20,
+					"y": 30
+				},
+				"size": {
+					"width": 50,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#6d4fd1"
+					}
+				],
+				"adjust": {
+					"colorMatrix": [
+						1.914172,
+						-0.5578560000000001,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						1.522144,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						-0.5578560000000001,
+						2.0236840000000003,
+						0,
+						-0.15058823529411766,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				}
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 90,
+					"y": 30
+				},
+				"size": {
+					"width": 50,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#6d4fd1"
+					}
+				],
+				"adjust": {
+					"colorMatrix": [
+						1.914172,
+						-0.5578560000000001,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						1.522144,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						-0.5578560000000001,
+						2.0236840000000003,
+						0,
+						-0.15058823529411766,
+						0,
+						0,
+						0,
+						1,
+						0
+					],
+					"gamut": "preserve-hue"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "hue",
+			"at": [
+				115,
+				60
+			],
+			"expect": 253.8,
+			"tolerance": 1.5,
+			"why": "preserve-hue stays on the source hue"
+		},
+		{
+			"kind": "hue",
+			"at": [
+				45,
+				60
+			],
+			"expect": 253.8,
+			"awayBy": 3,
+			"why": "clipping walks the hue off toward magenta"
+		},
+		{
+			"kind": "warning",
+			"warning": "adjust_unsupported",
+			"absent": true
+		}
+	]
+}

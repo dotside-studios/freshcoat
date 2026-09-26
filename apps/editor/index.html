@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="color-scheme" content="light" />
+		<script>
+			// Mirrors src/app/theme.ts, so the first paint is already in the right theme.
+			(() => {
+				let theme = new URLSearchParams(location.search).get("theme");
+				if (theme !== "light" && theme !== "dark") {
+					let pref = null;
+					try {
+						pref = localStorage.getItem("freshcoat.theme");
+					} catch {}
+					theme =
+						pref === "dark" ||
+						(pref === "system" &&
+							matchMedia("(prefers-color-scheme: dark)").matches)
+							? "dark"
+							: "light";
+				}
+				document.documentElement.dataset.theme = theme;
+				document
+					.querySelector('meta[name="color-scheme"]')
+					?.setAttribute("content", theme);
+			})();
+		</script>
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<title>Freshcoat Studio</title>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
+</html>

@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@freshcoat/ui/theme.css";
+
+@source "../../ui/src";
+
+.fc-checkerboard {
+	background-color: var(--color-fc-checker-a);
+	background-image: repeating-conic-gradient(
+		var(--color-fc-checker-b) 0 25%,
+		transparent 0 50%
+	);
+	background-size: 16px 16px;
+}

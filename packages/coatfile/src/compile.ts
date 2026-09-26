@@ -1,0 +1,1185 @@
+import {
+	type BitmapNode,
+	type ChildLayout,
+	FALLBACK_LINE_HEIGHT,
+	type FlexLayout,
+	type GroupNode,
+	type ImageNode,
+	type MaskNode,
+	type Node,
+	type PaintWarning,
+	type PathNode,
+	type RectNode,
+	scalePathData,
+	type TextNode,
+} from "freshcoat";
+import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
+import {
+	defaultQuietZone,
+	getBarcodeEncoder,
+	isLinearSymbology,
+	isSquareSymbology,
+	symbologyLabel,
+} from "./barcode-encoder";
+import { resizeTemplate } from "./constraints";
+import { barcodeFontFamily, defaultFontFamily } from "./fonts";
+import { linearGradientPoints } from "./gradient";
+import { substitute } from "./mustache";
+import { generateMatrix } from "./qr";
+import { childElements } from "./tree";
+import type {
+	Background,
+	CompiledFrame,
+	CompiledTemplate,
+	CompileOptions,
+	CornerRadius,
+	Element,
+	Fill,
+	FontRequest,
+	Layout,
+	LayoutChild,
+	ResolvedFill,
+	ResolvedFont,
+	Shadow,
+	Shadows,
+	ShapeMask,
+	Size,
+	Stroke,
+	Symbology,
+	Template,
+	TemplateFrame,
+	Vec2,
+} from "./types";
+import { validate } from "./validate";
+import { applyVariant } from "./variants";
+import { pruneHiddenElements } from "./visibility";
+
+type TextSpanInput = {
+	text: string;
+	font?: {
+		family?: string;
+		size?: number;
+		weight?: number;
+		style?: string;
+		letterSpacing?: number;
+		lineHeight?: number;
+		decoration?: ResolvedFont["decoration"];
+		variations?: ResolvedFont["variations"];
+	};
+	color?: string;
+};
+
+type ImageMaskInput =
+	| "circle"
+	| "ellipse"
+	| { kind: "rounded-rect"; radius: number }
+	| { kind: "polygon"; sides: number; rotation?: number }
+	| { kind: "squircle"; radius: number };
+
+const ASPECT_TOLERANCE = 0.005;
+
+// compile() turns a Template + values into a per-frame freshcoat Node tree
+// (declarative — auto-layout is expressed via each group's `layout`, positions
+// are parent-relative, {{tokens}} are substituted, text is NOT yet baked). The
+// heavy lifting — resolving auto-layout to absolute geometry, baking glyphs, and
+// lowering to the flat Command IR — is freshcoat's compileScene, driven by
+// coatfile's `render` (compile + paint). A consumer that only needs geometry
+// (e.g. a skeleton preview) lowers the tree with freshcoat's compileScene itself.
+export function compile(
+	inputTemplate: Template,
+	values: Record<string, unknown>,
+	opts: CompileOptions,
+): CompiledTemplate {
+	const v = validate(inputTemplate);
+	if (!v.ok) {
+		throw new Error(
+			`invalid template: ${v.errors.map((e) => e.code).join(", ")}`,
+		);
+	}
+
+	// `asset:<sha256>` srcs address bytes the template carries in `assets`; point
+	// them at data URLs so the painter loads them like any other image. A
+	// template whose images already have URLs carries no assets and is untouched.
+	const withAssets =
+		inputTemplate.assets && inputTemplate.assets.length > 0
+			? resolveAssetSrcs(inputTemplate, inlineAssetUrls(inputTemplate))
+			: inputTemplate;
+
+	// The variant is applied first, so with `resize` its backgrounds and moved
+	// layers are laid out with everything else.
+	const resolved =
+		opts.variantId === undefined
+			? withAssets
+			: applyVariant(withAssets, opts.variantId);
+
+	// With `resize`, the design is then laid out at that size by its
+	// constraints, and the caller has chosen it to have the target's aspect.
+	// `variants` are left behind first: nothing below reads them, and resizing
+	// would lay out every one.
+	const template = opts.resize
+		? resizeTemplate(
+				withoutVariants(resolved),
+				opts.resize.width,
+				opts.resize.height,
+			)
+		: resolved;
+
+	const ratio = opts.width / template.width;
+	const aspectTemplate = template.width / template.height;
+	const aspectTarget = opts.width / opts.height;
+	if (
+		!opts.resize &&
+		Math.abs(aspectTarget - aspectTemplate) >= ASPECT_TOLERANCE
+	) {
+		throw new Error(
+			`aspect ratio mismatch: template ${aspectTemplate.toFixed(3)}, target ${aspectTarget.toFixed(3)}`,
+		);
+	}
+
+	const ctx: Record<string, unknown> = {};
+	for (const [k, def] of Object.entries(template.fields.properties)) {
+		if (def.default !== undefined) ctx[k] = def.default;
+	}
+	for (const [k, val] of Object.entries(values)) {
+		if (val !== undefined && val !== null) ctx[k] = val;
+	}
+
+	const frames = template.template_data.map((frame) =>
+		compileFrame(
+			{
+				...frame,
+				elements: pruneHiddenElements(
+					frame.elements,
+					ctx,
+					template.fields.properties,
+				),
+			},
+			template,
+			ctx,
+			ratio,
+			opts.width,
+			opts.height,
+		),
+	);
+
+	return { width: opts.width, height: opts.height, frames };
+}
+
+function withoutVariants(t: Template): Template {
+	if (t.variants === undefined) return t;
+	const { variants: _variants, ...rest } = t;
+	return rest;
+}
+
+// ─────────────── frame → root group ───────────────
+
+function compileFrame(
+	frame: TemplateFrame,
+	template: Template,
+	ctx: Record<string, unknown>,
+	ratio: number,
+	targetWidth: number,
+	targetHeight: number,
+): CompiledFrame {
+	const declaredFontByFamily = new Map(
+		(template.fonts ?? []).map((f) => [f.family, f] as const),
+	);
+
+	const usedFamilies = new Set<string>();
+	const images = new Set<string>();
+	const fallbackFamily = defaultFontFamily(template);
+	const collectAssets = (el: Element | Background) => {
+		if (el.type === "text") usedFamilies.add(el.properties.font.family);
+		if (el.type === "barcode") {
+			const family = barcodeFontFamily(el, fallbackFamily);
+			if (family) usedFamilies.add(family);
+		}
+		if (el.type === "image") {
+			const src = String(substitute(el.properties.src, ctx) ?? "");
+			if (src) images.add(src);
+		}
+		for (const child of childElements(el)) collectAssets(child);
+	};
+	collectAssets(frame.background);
+	for (const el of frame.elements) collectAssets(el);
+
+	// collectFontRequests in fonts.ts mirrors this resolution — keep in step.
+	const fonts: FontRequest[] = [...usedFamilies].map((family) => {
+		const descriptor = declaredFontByFamily.get(family);
+		return descriptor ? { family, descriptor } : { family };
+	});
+
+	const scope: CompileScope = {
+		fontFamily: fallbackFamily ?? "sans-serif",
+		warnings: [],
+	};
+	const children: Node[] = [
+		compileBackground(frame.background, ctx, targetWidth, targetHeight),
+		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
+	];
+	const root: GroupNode = {
+		kind: "group",
+		pos: { x: 0, y: 0 },
+		size: { width: targetWidth, height: targetHeight },
+		children,
+	};
+
+	return {
+		name: frame.name,
+		assets: { fonts, images: [...images] },
+		root,
+		...(scope.warnings.length > 0 ? { warnings: scope.warnings } : {}),
+	};
+}
+
+// What compiling one frame's elements shares: the family a barcode's text falls
+// back to, and the problems found along the way, which the frame carries out.
+type CompileScope = {
+	fontFamily: string;
+	warnings: PaintWarning[];
+};
+
+function compileBackground(
+	bg: Background,
+	ctx: Record<string, unknown>,
+	targetWidth: number,
+	targetHeight: number,
+): Node {
+	const props = substitute(bg.properties, ctx) as Record<string, unknown>;
+	const pos: Vec2 = { x: 0, y: 0 };
+	const size: Size = { width: targetWidth, height: targetHeight };
+	const transform = {
+		pos,
+		size,
+		rotation: bg.rotation,
+		opacity: bg.opacity,
+		blendMode: bg.blendMode,
+		shadow: scaleShadow(bg.shadow, 1),
+		blur: bg.blur,
+	};
+	if (bg.type === "rect") {
+		return {
+			...transform,
+			kind: "rect",
+			fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+			stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
+			cornerRadius: scaleCorner(props.cornerRadius, 1),
+			cornerSmoothing:
+				typeof props.cornerSmoothing === "number"
+					? props.cornerSmoothing
+					: undefined,
+		};
+	}
+	return {
+		...transform,
+		kind: "image",
+		src: String(props.src ?? ""),
+		fit: (props.fit as ImageNode["fit"]) ?? "cover",
+		stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
+		mask: resolveImageClip(
+			props.cornerRadius as number | undefined,
+			props.mask as ImageMaskInput | undefined,
+			1,
+		),
+	};
+}
+
+// ─────────────── element → node ───────────────
+
+function compileElement(
+	el: Element,
+	ctx: Record<string, unknown>,
+	ratio: number,
+	scope: CompileScope,
+): Node {
+	const pos = scaleVec(el.pos ?? { x: 0, y: 0 }, ratio);
+	const size = scaleSize(el.size ?? { width: 0, height: 0 }, ratio);
+	const transform = {
+		id: el.id,
+		pos,
+		size,
+		rotation: el.rotation,
+		opacity: el.opacity,
+		blendMode: el.blendMode,
+		shadow: scaleShadow(el.shadow, ratio),
+		blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
+		layoutChild: mapLayoutChild(el.layoutChild, ratio),
+	};
+	const props = substituteOwnProperties(el, ctx);
+	switch (el.type) {
+		case "rect":
+			return {
+				...transform,
+				kind: "rect",
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				cornerRadius: scaleCorner(props.cornerRadius, ratio),
+				cornerSmoothing:
+					typeof props.cornerSmoothing === "number"
+						? props.cornerSmoothing
+						: undefined,
+			} satisfies RectNode;
+		case "image":
+			return {
+				...transform,
+				kind: "image",
+				src: String(props.src ?? ""),
+				fit: (props.fit as ImageNode["fit"]) ?? "cover",
+				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				mask: resolveImageClip(
+					props.cornerRadius as number | undefined,
+					props.mask as ImageMaskInput | undefined,
+					ratio,
+				),
+			} satisfies ImageNode;
+		case "vector":
+			return {
+				...transform,
+				kind: "path",
+				d: scalePathString(String(props.d ?? ""), ratio),
+				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
+					? { fillRule: props.fillRule }
+					: {}),
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+			} satisfies PathNode;
+		case "text":
+			return compileText(transform, props, ratio);
+		case "qr_code":
+			return compileQr(transform, props, ratio);
+		case "barcode":
+			return compileBarcode(transform, props, ratio, scope);
+		case "mask":
+			return {
+				...transform,
+				kind: "mask",
+				mask: compileElement(props.mask as Element, ctx, ratio, scope),
+				children: ((props.children as Element[] | undefined) ?? []).map(
+					(child) => compileElement(child, ctx, ratio, scope),
+				),
+				...(props.channel === "luminance" ? { channel: "luminance" } : {}),
+				...(props.invert === true ? { invert: true } : {}),
+			} satisfies MaskNode;
+		case "frame":
+			return compileFrameElement(transform, props, ratio, ctx, scope);
+		default:
+			return unknownElement(el);
+	}
+}
+
+// Every element type has a case above; one added to the schema without one is
+// a type error here rather than a frame that silently draws nothing.
+function unknownElement(el: never): never {
+	throw new Error(
+		`compile: no case for element type ${(el as { type?: unknown }).type}`,
+	);
+}
+
+// Nested elements are substituted by their own compileElement call. Substituting
+// them here as well would run a second pass over text the first pass produced,
+// so a value that itself reads `{{other_field}}` would expand inside a frame.
+function substituteOwnProperties(
+	el: Element,
+	ctx: Record<string, unknown>,
+): Record<string, unknown> {
+	if (el.type === "frame") {
+		const { children, ...own } = el.properties;
+		return { ...(substitute(own, ctx) as object), children };
+	}
+	if (el.type === "mask") {
+		const { children, mask, ...own } = el.properties;
+		return { ...(substitute(own, ctx) as object), children, mask };
+	}
+	return substitute(el.properties, ctx) as Record<string, unknown>;
+}
+
+type Base = {
+	id?: string;
+	pos: Vec2;
+	size: Size;
+	rotation?: number;
+	opacity?: number;
+	blendMode?: Element["blendMode"];
+	shadow?: Shadows;
+	blur?: number;
+	layoutChild?: ChildLayout;
+};
+
+function compileText(
+	base: Base,
+	props: Record<string, unknown>,
+	ratio: number,
+): TextNode {
+	const inputFont = props.font as {
+		family: string;
+		size: number;
+		weight?: number;
+		style?: string;
+		lineHeight?: number | "auto";
+		letterSpacing?: number;
+		decoration?: ResolvedFont["decoration"];
+		variations?: ResolvedFont["variations"];
+	};
+	const font: ResolvedFont = {
+		family: inputFont.family,
+		weight: inputFont.weight ?? 400,
+		style: (inputFont.style as "normal" | "italic" | undefined) ?? "normal",
+		size: inputFont.size * ratio,
+		letterSpacing:
+			typeof inputFont.letterSpacing === "number"
+				? inputFont.letterSpacing * ratio
+				: undefined,
+		...lineHeightOf(inputFont.lineHeight),
+		decoration: inputFont.decoration,
+		...(inputFont.variations ? { variations: inputFont.variations } : {}),
+	};
+
+	// Normalize: `value` is sugar for a single span. Figma "Case" applies to the
+	// already-substituted text (dynamic {{values}} are cased). A single span with
+	// no per-span override lowers as single-style text; anything richer as spans.
+	const spans = applyTextCase(normalizeTextSpans(props), props.case);
+	const single = spans.length === 1 && !hasOverrides(spans[0]);
+
+	const node: TextNode = {
+		...base,
+		kind: "text",
+		font,
+		color: String(props.color ?? "#000"),
+		align: (props.align as TextNode["align"]) ?? "left",
+		verticalAlign: (props.verticalAlign as TextNode["verticalAlign"]) ?? "top",
+		fit: props.fit as TextNode["fit"],
+		maxLines: typeof props.maxLines === "number" ? props.maxLines : undefined,
+		// Figma's "Vertical trim", and its default is STANDARD: the first baseline
+		// sits at half the leading plus the ascent. Cap-height trim is the opt-in
+		// (it lifts every line by ascent − capHeight), so an absent value means
+		// standard — measured against Figma's own absoluteRenderBounds, which
+		// otherwise sits ~0.39em below where this renders in Vend Sans.
+		leadingTrim: props.leadingTrim === true,
+	};
+	if (single) {
+		node.text = spans[0].text;
+	} else {
+		node.spans = spans.map((s) => ({
+			text: s.text,
+			font: s.font ? mapSpanFont(s.font, ratio) : undefined,
+			color: s.color,
+		}));
+	}
+
+	// A gradient text fill (mapped to the box) overrides the solid color.
+	const resolvedFill = resolveFill(props.fill as Fill | undefined);
+	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
+	return node;
+}
+
+function mapSpanFont(
+	f: NonNullable<TextSpanInput["font"]>,
+	ratio: number,
+): Partial<ResolvedFont> {
+	return {
+		family: f.family,
+		size: typeof f.size === "number" ? f.size * ratio : undefined,
+		weight: f.weight,
+		style: f.style as "normal" | "italic" | undefined,
+		letterSpacing:
+			typeof f.letterSpacing === "number" ? f.letterSpacing * ratio : undefined,
+		...(f.lineHeight === undefined ? {} : lineHeightOf(f.lineHeight)),
+		decoration: f.decoration,
+		...(f.variations ? { variations: f.variations } : {}),
+	};
+}
+
+// An authored line height as freshcoat's node carries it. "auto" means the
+// FONT's line box, which only the renderer can resolve (it needs the family's
+// metrics) — so the node keeps the flag plus the same number coatfile has
+// always written, which stands if the family's metrics never turn up.
+function lineHeightOf(authored: number | "auto" | undefined): {
+	lineHeight: number;
+	autoLineHeight?: boolean;
+} {
+	if (authored === "auto")
+		return { lineHeight: FALLBACK_LINE_HEIGHT, autoLineHeight: true };
+	return { lineHeight: authored ?? FALLBACK_LINE_HEIGHT };
+}
+
+// Frame → a group. fill/stroke/cornerRadius lower to a background rect (the
+// group's first child); clipsContent → the group's self-clip. When the frame
+// auto-layouts AND has a background, the background must stay out of the flow,
+// so it wraps in an outer static group [bg, inner layout group]; otherwise the
+// frame is the layout group (or a plain static group) directly — no redundant
+// nesting.
+function compileFrameElement(
+	base: Base,
+	props: Record<string, unknown>,
+	ratio: number,
+	ctx: Record<string, unknown>,
+	scope: CompileScope,
+): GroupNode {
+	const size = base.size;
+	const fills = resolveFills(props.fill as Fill | Fill[] | undefined);
+	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
+	const cornerRadius =
+		typeof props.cornerRadius === "number"
+			? props.cornerRadius * ratio
+			: undefined;
+	const clip = props.clipsContent === true;
+
+	const bg: RectNode | null =
+		fills || stroke
+			? { kind: "rect", pos: { x: 0, y: 0 }, size, fills, stroke, cornerRadius }
+			: null;
+
+	const rawChildren = (props.children as Element[] | undefined) ?? [];
+	const childNodes = rawChildren.map((child) =>
+		compileElement(child, ctx, ratio, scope),
+	);
+
+	const layout = mapLayout(props.layout as Layout | undefined, ratio);
+	const outer = {
+		id: base.id,
+		pos: base.pos,
+		size,
+		rotation: base.rotation,
+		opacity: base.opacity,
+		blendMode: base.blendMode,
+		shadow: base.shadow,
+		blur: base.blur,
+		layoutChild: base.layoutChild,
+		clip,
+		cornerRadius,
+	};
+
+	if (layout && bg) {
+		const inner: GroupNode = {
+			kind: "group",
+			pos: { x: 0, y: 0 },
+			size,
+			layout,
+			children: childNodes,
+		};
+		return { ...outer, kind: "group", children: [bg, inner] };
+	}
+	return {
+		...outer,
+		kind: "group",
+		layout,
+		children: bg ? [bg, ...childNodes] : childNodes,
+	};
+}
+
+// QR → group holding an optional background rect + a bitmap of the module
+// matrix (foreground where a module is set, transparent elsewhere), placed
+// inside the quiet-zone margin. The painter scales it nearest-neighbor.
+function compileQr(
+	base: Base,
+	props: Record<string, unknown>,
+	ratio: number,
+): GroupNode {
+	const value = String(props.value ?? "");
+	const ec =
+		(props.errorCorrection as "L" | "M" | "Q" | "H" | undefined) ?? "M";
+	const modules = generateMatrix(value, ec);
+	const n = modules.length;
+	const margin = typeof props.margin === "number" ? props.margin * ratio : 0;
+	const foreground = String(props.foreground ?? "#000");
+	const background = props.background as string | undefined;
+	const size = base.size;
+
+	const children: Node[] = [];
+	if (background) {
+		children.push({
+			kind: "rect",
+			pos: { x: 0, y: 0 },
+			size,
+			fills: [{ kind: "solid", color: background }],
+		});
+	}
+	const [r, g, b] = parseHexColor(foreground);
+	const pixels = new Uint8Array(n * n * 4);
+	for (let y = 0; y < n; y++) {
+		for (let x = 0; x < n; x++) {
+			if (modules[y][x]) {
+				const i = (y * n + x) * 4;
+				pixels[i] = r;
+				pixels[i + 1] = g;
+				pixels[i + 2] = b;
+				pixels[i + 3] = 255;
+			}
+		}
+	}
+	children.push({
+		kind: "bitmap",
+		pos: { x: margin, y: margin },
+		size: { width: size.width - 2 * margin, height: size.height - 2 * margin },
+		pixels,
+		pixelWidth: n,
+		pixelHeight: n,
+	});
+
+	return {
+		id: base.id,
+		kind: "group",
+		pos: base.pos,
+		size,
+		rotation: base.rotation,
+		opacity: base.opacity,
+		blendMode: base.blendMode,
+		shadow: base.shadow,
+		blur: base.blur,
+		layoutChild: base.layoutChild,
+		children,
+	};
+}
+
+// Barcode → a group like QR's: an optional background rect, then the code as a
+// bitmap of its modules (foreground where set, transparent elsewhere) inside
+// the quiet zone. A 1D code is one row of pixels stretched to the bar height,
+// with its human-readable line under it; a 2D code keeps square modules and sits
+// centred. The bitmap carries `role: "barcode"`, which is what has the painter
+// snap its modules to whole output pixels.
+function compileBarcode(
+	base: Base,
+	props: Record<string, unknown>,
+	ratio: number,
+	scope: CompileScope,
+): GroupNode {
+	const symbology = props.symbology as Symbology;
+	const value = String(props.value ?? "");
+	const foreground = String(props.foreground ?? "#000000");
+	const background = props.background as string | undefined;
+	const size = base.size;
+	const linear = isLinearSymbology(symbology);
+	const quietZone =
+		typeof props.quietZone === "number" && props.quietZone >= 0
+			? props.quietZone
+			: defaultQuietZone(symbology);
+	const showText = linear && props.showText !== false;
+	const textSize =
+		typeof props.textSize === "number" && props.textSize > 0
+			? props.textSize * ratio
+			: Math.max(8 * ratio, size.height * 0.14);
+	const fontFamily =
+		typeof props.fontFamily === "string" && props.fontFamily
+			? props.fontFamily
+			: scope.fontFamily;
+	// The text line's box, and the gap that keeps it off the bars.
+	const textHeight = showText ? textSize * FALLBACK_LINE_HEIGHT : 0;
+	const textGap = showText ? textSize * 0.15 : 0;
+	const barHeight = Math.max(0, size.height - textHeight - textGap);
+
+	const children: Node[] = [];
+	if (background) {
+		children.push({
+			kind: "rect",
+			pos: { x: 0, y: 0 },
+			size,
+			fills: [{ kind: "solid", color: background }],
+		});
+	}
+	const group = (): GroupNode => ({
+		id: base.id,
+		kind: "group",
+		pos: base.pos,
+		size,
+		rotation: base.rotation,
+		opacity: base.opacity,
+		blendMode: base.blendMode,
+		shadow: base.shadow,
+		blur: base.blur,
+		layoutChild: base.layoutChild,
+		children,
+	});
+	const textLine = (text: string, y: number): TextNode => ({
+		kind: "text",
+		pos: { x: 0, y },
+		size: { width: size.width, height: textHeight },
+		text,
+		font: {
+			family: fontFamily,
+			weight: 400,
+			style: "normal",
+			size: textSize,
+			lineHeight: FALLBACK_LINE_HEIGHT,
+		},
+		color: foreground,
+		align: "center",
+		verticalAlign: "top",
+		leadingTrim: false,
+	});
+
+	// An unfilled field in a preview is not a mistake to report: it draws the
+	// outline of the code that will be there, and no warning.
+	if (value === "") {
+		children.push(
+			...barcodeSkeleton(symbology, size, foreground, {
+				barHeight,
+				textY: barHeight + textGap,
+				textHeight: showText ? textSize : 0,
+			}),
+		);
+		return group();
+	}
+
+	const encoder = getBarcodeEncoder();
+	const result = encoder
+		? encoder(symbology, value, {
+				errorCorrection:
+					typeof props.errorCorrection === "number"
+						? props.errorCorrection
+						: undefined,
+			})
+		: null;
+	if (!result || !result.ok) {
+		scope.warnings.push(
+			result
+				? {
+						kind: "barcode_invalid",
+						symbology,
+						value,
+						message: result.message,
+						...(base.id ? { layer: base.id } : {}),
+					}
+				: {
+						kind: "barcode_unavailable",
+						symbology,
+						...(base.id ? { layer: base.id } : {}),
+					},
+		);
+		children.push(
+			barcodePlaceholder(symbologyLabel(symbology), size, foreground, {
+				family: scope.fontFamily,
+				size: placeholderLabelSize(symbologyLabel(symbology), size, ratio),
+			}),
+		);
+		return group();
+	}
+
+	const [r, g, b] = parseHexColor(foreground);
+	const paint = (pixels: Uint8Array, i: number) => {
+		pixels[i * 4] = r;
+		pixels[i * 4 + 1] = g;
+		pixels[i * 4 + 2] = b;
+		pixels[i * 4 + 3] = 255;
+	};
+	const { encoding } = result;
+	if (encoding.kind === "linear") {
+		const n = encoding.modules.length;
+		const module = size.width / (n + 2 * quietZone);
+		const pixels = new Uint8Array(n * 4);
+		encoding.modules.forEach((set, i) => {
+			if (set) paint(pixels, i);
+		});
+		children.push({
+			kind: "bitmap",
+			pos: { x: quietZone * module, y: 0 },
+			size: { width: n * module, height: barHeight },
+			pixels,
+			pixelWidth: n,
+			pixelHeight: 1,
+			role: "barcode",
+		} satisfies BitmapNode);
+		if (showText) children.push(textLine(encoding.text, barHeight + textGap));
+		return group();
+	}
+
+	const rows = encoding.rows.length;
+	const cols = encoding.rows[0]?.length ?? 0;
+	const module = Math.min(
+		size.width / (cols + 2 * quietZone),
+		size.height / (rows + 2 * quietZone),
+	);
+	const pixels = new Uint8Array(rows * cols * 4);
+	encoding.rows.forEach((row, y) => {
+		row.forEach((set, x) => {
+			if (set) paint(pixels, y * cols + x);
+		});
+	});
+	children.push({
+		kind: "bitmap",
+		pos: {
+			x: (size.width - cols * module) / 2,
+			y: (size.height - rows * module) / 2,
+		},
+		size: { width: cols * module, height: rows * module },
+		pixels,
+		pixelWidth: cols,
+		pixelHeight: rows,
+		role: "barcode",
+	} satisfies BitmapNode);
+	return group();
+}
+
+// The shape a barcode will take once its field is filled: the bar area (and the
+// text line under it) of a 1D code, the square of a Data Matrix or Aztec, the
+// box of a PDF417. Drawn faint, in the code's own colour.
+function barcodeSkeleton(
+	symbology: Symbology,
+	size: Size,
+	foreground: string,
+	linear: { barHeight: number; textY: number; textHeight: number },
+): RectNode[] {
+	const faint = (pos: Vec2, box: Size): RectNode => ({
+		kind: "rect",
+		pos,
+		size: box,
+		opacity: 0.15,
+		fills: [{ kind: "solid", color: foreground }],
+	});
+	if (isLinearSymbology(symbology)) {
+		const inset = size.width * 0.08;
+		const out = [
+			faint(
+				{ x: inset, y: 0 },
+				{ width: size.width - 2 * inset, height: linear.barHeight },
+			),
+		];
+		if (linear.textHeight > 0) {
+			const width = size.width * 0.5;
+			out.push(
+				faint(
+					{ x: (size.width - width) / 2, y: linear.textY },
+					{ width, height: linear.textHeight },
+				),
+			);
+		}
+		return out;
+	}
+	if (isSquareSymbology(symbology)) {
+		const side = Math.min(size.width, size.height);
+		return [
+			faint(
+				{ x: (size.width - side) / 2, y: (size.height - side) / 2 },
+				{ width: side, height: side },
+			),
+		];
+	}
+	return [faint({ x: 0, y: 0 }, size)];
+}
+
+// The placeholder's label: a fifth of the box's height, narrowed until the
+// name fits across it, and never under 8 design px. It names what is missing,
+// so it has to read at the zoom the whole card is seen at.
+function placeholderLabelSize(label: string, size: Size, ratio: number) {
+	const across = size.width / (Math.max(1, label.length) * 0.75);
+	return Math.max(8 * ratio, Math.min(size.height * 0.2, across));
+}
+
+// What stands in for a barcode that can't be drawn: a hatched box with the
+// symbology's name, so the gap reads as deliberate and says what belongs there.
+function barcodePlaceholder(
+	label: string,
+	size: Size,
+	foreground: string,
+	font: { family: string; size: number },
+): GroupNode {
+	const spacing = Math.max(4, Math.min(size.width, size.height) / 8);
+	let d = "";
+	for (let x = -size.height; x < size.width; x += spacing) {
+		d += `M${x} ${size.height}L${x + size.height} 0`;
+	}
+	const hairline = Math.max(1, Math.min(size.width, size.height) / 100);
+	return {
+		kind: "group",
+		pos: { x: 0, y: 0 },
+		size,
+		clip: true,
+		children: [
+			{
+				kind: "path",
+				pos: { x: 0, y: 0 },
+				size,
+				d,
+				opacity: 0.25,
+				stroke: { color: foreground, width: hairline },
+			},
+			{
+				kind: "rect",
+				pos: { x: 0, y: 0 },
+				size,
+				opacity: 0.5,
+				stroke: { color: foreground, width: hairline * 2, align: "inside" },
+			},
+			{
+				kind: "text",
+				pos: { x: 0, y: 0 },
+				size,
+				text: label,
+				font: {
+					family: font.family,
+					weight: 600,
+					style: "normal",
+					size: font.size,
+					lineHeight: FALLBACK_LINE_HEIGHT,
+				},
+				color: foreground,
+				align: "center",
+				verticalAlign: "middle",
+				leadingTrim: false,
+			},
+		],
+	};
+}
+
+// #rgb / #rrggbb → [r, g, b]. Unknown formats fall back to black.
+function parseHexColor(hex: string): [number, number, number] {
+	const h = hex.replace(/^#/, "");
+	if (h.length === 3) {
+		const r = parseInt(h[0] + h[0], 16);
+		const g = parseInt(h[1] + h[1], 16);
+		const b = parseInt(h[2] + h[2], 16);
+		return [r, g, b];
+	}
+	if (h.length === 6) {
+		return [
+			parseInt(h.slice(0, 2), 16),
+			parseInt(h.slice(2, 4), 16),
+			parseInt(h.slice(4, 6), 16),
+		];
+	}
+	return [0, 0, 0];
+}
+
+// ─────────────── layout mapping (template Layout → freshcoat FlexLayout) ───────────────
+
+function mapLayout(
+	layout: Layout | undefined,
+	ratio: number,
+): FlexLayout | undefined {
+	if (!layout) return undefined;
+	const out: FlexLayout = { type: "flex", direction: layout.direction };
+	if (layout.gap !== undefined) out.gap = layout.gap * ratio;
+	if (layout.crossGap !== undefined) out.crossGap = layout.crossGap * ratio;
+	if (layout.padding) {
+		const p = layout.padding;
+		out.padding = [
+			(p.top ?? 0) * ratio,
+			(p.right ?? 0) * ratio,
+			(p.bottom ?? 0) * ratio,
+			(p.left ?? 0) * ratio,
+		];
+	}
+	if (layout.primaryAlign) out.justify = layout.primaryAlign;
+	if (layout.crossAlign) out.align = layout.crossAlign;
+	if (layout.wrap) out.wrap = true;
+	return out;
+}
+
+function mapLayoutChild(
+	lc: LayoutChild | undefined,
+	ratio: number,
+): ChildLayout | undefined {
+	if (!lc) return undefined;
+	const out: ChildLayout = {};
+	// "fixed" (or unset) → omit so the resolver uses the node's own size.
+	if (lc.width === "fill" || lc.width === "hug") out.width = lc.width;
+	if (lc.height === "fill" || lc.height === "hug") out.height = lc.height;
+	if (lc.grow !== undefined) out.grow = lc.grow;
+	if (lc.align !== undefined) out.alignSelf = lc.align;
+	if (lc.absolute) out.absolute = true;
+	if (lc.min) {
+		out.min = {
+			width: lc.min.width !== undefined ? lc.min.width * ratio : undefined,
+			height: lc.min.height !== undefined ? lc.min.height * ratio : undefined,
+		};
+	}
+	if (lc.max) {
+		out.max = {
+			width: lc.max.width !== undefined ? lc.max.width * ratio : undefined,
+			height: lc.max.height !== undefined ? lc.max.height * ratio : undefined,
+		};
+	}
+	return Object.keys(out).length > 0 ? out : undefined;
+}
+
+// ─────────────── span normalization ───────────────
+
+function normalizeTextSpans(props: Record<string, unknown>): TextSpanInput[] {
+	const spans = props.spans as TextSpanInput[] | undefined;
+	if (spans && spans.length > 0) return spans;
+	return [{ text: String(props.value ?? "") }];
+}
+
+// Figma "Case": upper/lower/title on the resolved text.
+function applyTextCase(spans: TextSpanInput[], mode: unknown): TextSpanInput[] {
+	if (mode !== "upper" && mode !== "lower" && mode !== "title") return spans;
+	const transform = (t: string): string =>
+		mode === "upper"
+			? t.toUpperCase()
+			: mode === "lower"
+				? t.toLowerCase()
+				: t.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+	return spans.map((s) => ({ ...s, text: transform(s.text) }));
+}
+
+function hasOverrides(span: TextSpanInput): boolean {
+	if (span.color !== undefined) return true;
+	const f = span.font;
+	if (!f) return false;
+	return (
+		f.family !== undefined ||
+		f.size !== undefined ||
+		f.weight !== undefined ||
+		f.style !== undefined ||
+		f.letterSpacing !== undefined ||
+		f.lineHeight !== undefined ||
+		f.variations !== undefined
+	);
+}
+
+// ─────────────── fills / strokes / shadows / clips ───────────────
+
+type StrokeInput = {
+	color: string;
+	width: number;
+	dash?: number[];
+	cap?: Stroke["cap"];
+	join?: Stroke["join"];
+	align?: Stroke["align"];
+};
+
+function resolveStroke(
+	stroke: StrokeInput | undefined,
+	ratio: number,
+): Stroke | undefined {
+	if (!stroke) return undefined;
+	return {
+		color: stroke.color,
+		width: stroke.width * ratio,
+		dash: stroke.dash?.map((d) => d * ratio),
+		cap: stroke.cap,
+		join: stroke.join,
+		align: stroke.align,
+	};
+}
+
+function scaleShadow(
+	shadow: Shadows | undefined,
+	ratio: number,
+): Shadows | undefined {
+	if (!shadow) return undefined;
+	if (Array.isArray(shadow)) return shadow.map((s) => scaleOne(s, ratio));
+	return scaleOne(shadow, ratio);
+}
+
+function scaleOne(shadow: Shadow, ratio: number): Shadow {
+	return {
+		color: shadow.color,
+		dx: shadow.dx * ratio,
+		dy: shadow.dy * ratio,
+		blur: shadow.blur * ratio,
+		...(shadow.spread !== undefined ? { spread: shadow.spread * ratio } : {}),
+		...(shadow.inset ? { inset: true } : {}),
+	};
+}
+
+function resolveImageClip(
+	cornerRadius: number | undefined,
+	mask: ImageMaskInput | undefined,
+	ratio: number,
+): ShapeMask | undefined {
+	if (mask !== undefined) {
+		if (cornerRadius !== undefined) {
+			console.warn(
+				"coatfile: image has both `mask` and `cornerRadius` — using `mask`",
+			);
+		}
+		if (mask === "circle") return { kind: "circle" };
+		if (mask === "ellipse") return { kind: "ellipse" };
+		if (mask.kind === "rounded-rect") {
+			return { kind: "rounded-rect", radius: mask.radius * ratio };
+		}
+		if (mask.kind === "squircle") {
+			return { kind: "squircle", radius: mask.radius * ratio };
+		}
+		return { kind: "polygon", sides: mask.sides, rotation: mask.rotation };
+	}
+	if (typeof cornerRadius === "number") {
+		return { kind: "rounded-rect", radius: cornerRadius * ratio };
+	}
+	return undefined;
+}
+
+// Scales every numeric coordinate in an SVG path string by `ratio`.
+// M/L/H/V/C/Q/Z subset (no arc — A's flag args need command-aware tokenizing).
+// Path data the parser cannot read still renders as far as Skia can take it,
+// scaled the only way available without knowing which numbers are lengths.
+function scalePathString(d: string, ratio: number): string {
+	if (ratio === 1) return d;
+	try {
+		return scalePathData(d, ratio);
+	} catch {
+		return d.replace(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi, (n) => {
+			const val = parseFloat(n) * ratio;
+			return Number.isFinite(val) ? String(val) : n;
+		});
+	}
+}
+
+function scaleCorner(cr: unknown, ratio: number): CornerRadius | undefined {
+	if (typeof cr === "number") return cr * ratio;
+	if (
+		Array.isArray(cr) &&
+		cr.length === 4 &&
+		cr.every((n) => typeof n === "number")
+	)
+		return [cr[0] * ratio, cr[1] * ratio, cr[2] * ratio, cr[3] * ratio];
+	return undefined;
+}
+
+function resolveFills(
+	fill: Fill | Fill[] | undefined,
+): ResolvedFill[] | undefined {
+	if (fill === undefined) return undefined;
+	const arr = Array.isArray(fill) ? fill : [fill];
+	const resolved: ResolvedFill[] = [];
+	for (const f of arr) {
+		const r = resolveFill(f);
+		if (r !== undefined) resolved.push(r);
+	}
+	return resolved.length > 0 ? resolved : undefined;
+}
+
+function resolveFill(fill: Fill | undefined): ResolvedFill | undefined {
+	if (fill === undefined) return undefined;
+	if (typeof fill === "string") return { kind: "solid", color: fill };
+	if (fill.kind === "linear") {
+		// Explicit points place the gradient; `angle` is then only what a reader
+		// that predates them draws.
+		const { from, to } =
+			fill.from && fill.to
+				? { from: fill.from, to: fill.to }
+				: linearGradientPoints(fill.angle);
+		return {
+			kind: "linear",
+			stops: fill.stops,
+			from: { x: from[0], y: from[1] },
+			to: { x: to[0], y: to[1] },
+		};
+	}
+	if (fill.kind === "angular") {
+		const c = fill.center ?? [0.5, 0.5];
+		return {
+			kind: "angular",
+			stops: fill.stops,
+			center: { x: c[0], y: c[1] },
+			rotation: fill.rotation ?? 0,
+		};
+	}
+	const c = fill.center ?? [0.5, 0.5];
+	const radius = fill.radius ?? 0.5;
+	return {
+		kind: "radial",
+		stops: fill.stops,
+		center: { x: c[0], y: c[1] },
+		radius,
+		radiusY: fill.radiusY ?? radius,
+		rotation: fill.rotation ?? 0,
+	};
+}
+
+function scaleVec(v: Vec2, r: number): Vec2 {
+	return { x: v.x * r, y: v.y * r };
+}
+function scaleSize(s: Size, r: number): Size {
+	return { width: s.width * r, height: s.height * r };
+}

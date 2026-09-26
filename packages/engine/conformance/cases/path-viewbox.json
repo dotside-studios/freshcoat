@@ -1,0 +1,93 @@
+{
+	"id": "path-viewbox",
+	"title": "a viewBox scales path data into the node box",
+	"profile": "core",
+	"requires": [
+		"draw.path",
+		"path.viewBox"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "path",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"d": "M0 0 H10 V10 Z",
+				"viewBox": {
+					"width": 10,
+					"height": 10
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				110,
+				30
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "above the hypotenuse, inside the triangle"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				50,
+				90
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below it, outside"
+		}
+	]
+}

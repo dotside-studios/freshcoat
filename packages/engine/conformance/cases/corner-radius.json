@@ -1,0 +1,88 @@
+{
+	"id": "corner-radius",
+	"title": "a corner radius rounds the drawn shape",
+	"profile": "core",
+	"requires": [
+		"shape.cornerRadius"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				],
+				"cornerRadius": 20
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "the centre is filled"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				42,
+				32
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the rounded corner is not"
+		}
+	]
+}

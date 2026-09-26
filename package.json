@@ -1,0 +1,19 @@
+{
+	"name": "freshcoat",
+	"private": true,
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"type": "module",
+	"packageManager": "bun@1.3.13",
+	"workspaces": ["apps/*", "packages/*"],
+	"scripts": {
+		"dev": "bun run --cwd apps/editor dev",
+		"build": "bun run --cwd apps/editor build",
+		"check:boundaries": "bun scripts/check-boundaries.ts",
+		"check:links": "bun scripts/check-links.ts",
+		"check:notices": "bun scripts/third-party-notices.ts --check",
+		"test:scripts": "bun test ./scripts",
+		"test": "bun run --filter '*' test",
+		"typecheck": "bun run --filter '*' typecheck"
+	}
+}

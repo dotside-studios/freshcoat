@@ -1,0 +1,81 @@
+{
+	"caseId": "path-fill-rule",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 20,
+						"y": 20
+					},
+					"size": {
+						"width": 60,
+						"height": 60
+					},
+					"op": "drawPath",
+					"d": "M0 0 H60 V60 H0 Z M15 15 H45 V45 H15 Z",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 90,
+						"y": 20
+					},
+					"size": {
+						"width": 60,
+						"height": 60
+					},
+					"op": "drawPath",
+					"d": "M0 0 H60 V60 H0 Z M15 15 H45 V45 H15 Z",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					],
+					"fillRule": "evenodd"
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "54a8e7d6b1955fb587b1c26f9cb1ebb80db5eef67ddf3ef083cfc6d91016a3d2"
+}

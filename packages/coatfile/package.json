@@ -1,0 +1,43 @@
+{
+	"name": "@freshcoat/coatfile",
+	"private": true,
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dotside-studios/freshcoat.git",
+		"directory": "packages/coatfile"
+	},
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./assets": "./src/assets.ts",
+		"./barcode": "./src/barcode.ts",
+		"./render": "./src/render.ts",
+		"./browser": "./src/browser.ts",
+		"./normalize": "./src/normalize.ts",
+		"./headless": "./src/headless.ts",
+		"./coat": "./src/coat.ts",
+		"./fixtures": "./fixtures/index.ts",
+		"./schema/*": "./schema/*"
+	},
+	"scripts": {
+		"test": "bun test",
+		"schema": "bun run scripts/build-json-schema.ts",
+		"schema:check": "bun run scripts/build-json-schema.ts --check"
+	},
+	"dependencies": {
+		"@freshcoat/for-print": "workspace:*",
+		"bwip-js": "^4.11.4",
+		"fflate": "^0.8.3",
+		"freshcoat": "workspace:*",
+		"qrcode": "^1.5.4",
+		"zod": "^4.1.13"
+	},
+	"devDependencies": {
+		"@types/qrcode": "^1.5.5",
+		"@zxing/library": "^0.23.0",
+		"canvaskit-wasm": "^0.41.1",
+		"vitest": "^4.1.6"
+	}
+}

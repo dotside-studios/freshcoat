@@ -1,0 +1,21 @@
+# The Dockerfile installs the whole workspace from the repository root.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+watchPatterns = [
+	"/apps/editor/**",
+	"/packages/engine/**",
+	"/packages/coatfile/**",
+	"/packages/for-print/**",
+	"/packages/ui/**",
+	"/packages/workspace/**",
+	"/package.json",
+	"/bun.lock",
+	"/tsconfig.base.json",
+]
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

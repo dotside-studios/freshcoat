@@ -1,0 +1,130 @@
+{
+	"id": "adjust-saturation-zero",
+	"title": "saturation 0 collapses a layer to its luma",
+	"profile": "core",
+	"requires": [
+		"adjust.colorMatrix"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 20,
+					"y": 30
+				},
+				"size": {
+					"width": 50,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#cc3333"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 90,
+					"y": 30
+				},
+				"size": {
+					"width": 50,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#cc3333"
+					}
+				],
+				"adjust": {
+					"colorMatrix": [
+						0.2126,
+						0.7152,
+						0.0722,
+						0,
+						0,
+						0.2126,
+						0.7152,
+						0.0722,
+						0,
+						0,
+						0.2126,
+						0.7152,
+						0.0722,
+						0,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				45,
+				60
+			],
+			"expect": [
+				204,
+				51,
+				51,
+				255
+			],
+			"why": "the control keeps its red cast",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				115,
+				60
+			],
+			"expect": [
+				84,
+				84,
+				84,
+				255
+			],
+			"why": "the adjusted layer is neutral at the source luma",
+			"tolerance": 3
+		}
+	]
+}

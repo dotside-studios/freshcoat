@@ -1,0 +1,91 @@
+{
+	"id": "text-max-lines",
+	"title": "maxLines truncates the wrapped paragraph",
+	"profile": "core",
+	"requires": [
+		"draw.text",
+		"text.maxLines"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"pos": {
+					"x": 10,
+					"y": 10
+				},
+				"size": {
+					"width": 140,
+					"height": 100
+				},
+				"text": "Hlm Hlm Hlm Hlm Hlm Hlm Hlm Hlm",
+				"font": {
+					"family": "ConformanceFont",
+					"weight": 400,
+					"style": "normal",
+					"size": 28,
+					"lineHeight": 34
+				},
+				"color": "#000000",
+				"maxLines": 1
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				20,
+				80
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the second line's band is empty"
+		},
+		{
+			"kind": "differ",
+			"at": [
+				14,
+				25
+			],
+			"from": [
+				10,
+				100
+			],
+			"minDelta": 60,
+			"why": "the first line is drawn"
+		}
+	]
+}

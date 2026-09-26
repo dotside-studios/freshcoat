@@ -1,0 +1,47 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "minimal-card",
+	"name": "Minimal",
+	"description": "Solid background, single text element.",
+	"product": "card_cr80",
+	"width": 1012,
+	"height": 638,
+	"fields": {
+		"type": "object",
+		"properties": {
+			"displayName": {
+				"type": "string",
+				"title": "Display name",
+				"default": "You"
+			}
+		},
+		"required": ["displayName"]
+	},
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "front_bg",
+				"type": "rect",
+				"pos": { "x": 0, "y": 0 },
+				"size": { "width": 1012, "height": 638 },
+				"properties": { "fill": "#fef3c7" }
+			},
+			"elements": [
+				{
+					"id": "displayName",
+					"type": "text",
+					"pos": { "x": 64, "y": 80 },
+					"size": { "width": 884, "height": 80 },
+					"properties": {
+						"value": "{{displayName}}",
+						"font": { "family": "Comfortaa", "size": 56, "weight": 700 },
+						"color": "#1a1a1a",
+						"align": "left"
+					}
+				}
+			]
+		}
+	]
+}

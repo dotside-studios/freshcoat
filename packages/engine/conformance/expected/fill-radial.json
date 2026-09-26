@@ -1,0 +1,75 @@
+{
+	"caseId": "fill-radial",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "radial",
+							"center": {
+								"x": 0.5,
+								"y": 0.5
+							},
+							"radius": 0.5,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#ff0000"
+								},
+								{
+									"offset": 1,
+									"color": "#0000ff"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "dd416ceb0ecdd75ba2f7a49033d44db15eaca28d6f941098f92eb3a972a26001"
+}

@@ -1,0 +1,137 @@
+{
+	"id": "mask-luminance",
+	"title": "a luminance mask reads brightness, not alpha",
+	"profile": "core",
+	"requires": [
+		"mask.luminance"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "mask",
+				"mask": {
+					"kind": "rect",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 100,
+						"height": 80
+					},
+					"fills": [
+						{
+							"kind": "linear",
+							"from": {
+								"x": 0,
+								"y": 0
+							},
+							"to": {
+								"x": 1,
+								"y": 0
+							},
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#ffffff"
+								},
+								{
+									"offset": 1,
+									"color": "#000000"
+								}
+							]
+						}
+					]
+				},
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 100,
+							"height": 80
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#2f6fed"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 30,
+					"y": 20
+				},
+				"size": {
+					"width": 100,
+					"height": 80
+				},
+				"channel": "luminance"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				33,
+				60
+			],
+			"expect": [
+				53,
+				115,
+				238,
+				255
+			],
+			"why": "97% coverage 3px into a 100px ramp, over white ground",
+			"tolerance": 3
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				127,
+				60
+			],
+			"expect": [
+				249,
+				250,
+				254,
+				255
+			],
+			"why": "3% coverage 3px from its end",
+			"tolerance": 3
+		}
+	]
+}

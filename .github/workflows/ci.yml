@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: freshcoat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - run: bun run check:boundaries
+      - run: bun run check:links
+      - run: bun run check:notices
+      - run: bun run test:scripts
+      - run: bun run --cwd packages/ui typecheck
+      - run: bun run --cwd packages/workspace typecheck
+      - run: bun run --cwd packages/engine typecheck
+      - run: bun run --cwd apps/editor typecheck
+      - run: bun run --cwd apps/figma-plugin typecheck
+      - run: bun run --cwd packages/ui check
+      - run: bun run --cwd packages/workspace check
+      - run: bun run --cwd apps/editor check
+      - run: bun run --cwd apps/figma-plugin check
+      - run: bun run --cwd packages/engine test
+      - run: bun run --cwd packages/coatfile test
+      - run: bun run --cwd packages/for-print test
+      - run: bun run --cwd packages/ui test
+      - run: bun run --cwd packages/workspace test
+      - run: bun run --cwd apps/editor test
+      - run: bun run --cwd apps/figma-plugin test
+      - run: bun run build
+      - run: bun run --cwd apps/figma-plugin build
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+        working-directory: apps/editor
+      - run: bun run e2e:smoke
+        working-directory: apps/editor
+        env:
+          FRESHCOAT_PREVIEW: "1"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freshcoat-e2e-report
+          path: |
+            apps/editor/playwright-report
+            apps/editor/test-results
+          retention-days: 7

@@ -1,0 +1,82 @@
+{
+	"id": "adjust-sharpen",
+	"title": "sharpen runs as a spatial pass without dropping anything",
+	"profile": "raster",
+	"requires": [
+		"adjust.sharpen"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#cc3333"
+					}
+				],
+				"adjust": {
+					"sharpen": 0.5
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				204,
+				51,
+				51,
+				255
+			],
+			"why": "a flat interior is unchanged by an unsharp mask",
+			"tolerance": 6
+		},
+		{
+			"kind": "warning",
+			"warning": "adjust_unsupported",
+			"absent": true
+		}
+	]
+}

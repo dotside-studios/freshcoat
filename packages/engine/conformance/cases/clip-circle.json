@@ -1,0 +1,117 @@
+{
+	"id": "clip-circle",
+	"title": "a circle mask keeps the centre and drops the corners",
+	"profile": "core",
+	"requires": [
+		"clip.circle"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "mask",
+				"mask": {
+					"kind": "ellipse",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 100,
+						"height": 100
+					},
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#000000"
+						}
+					]
+				},
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 100,
+							"height": 100
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#2f6fed"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 30,
+					"y": 10
+				},
+				"size": {
+					"width": 100,
+					"height": 100
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "the circle's centre"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				33,
+				13
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "a corner of the box the circle does not reach"
+		}
+	]
+}

@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest something Freshcoat should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The job, not the solution. For example, "print name badges for 300 attendees on A4".
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What gets in the way today
+      description: What you tried in Freshcoat, and where it stopped you.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How it could work, if you have an idea. Other tools that do it well are useful too.
+  - type: checkboxes
+    id: format
+    attributes:
+      label: Template format
+      options:
+        - label: This needs something the template format can't express yet

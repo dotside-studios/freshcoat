@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in Freshcoat doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Check the known limits in the README first, and search the open issues. For a security problem, follow SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from a sample or a starter where you can, so we can follow the same steps.
+      placeholder: |
+        1. Open the Membership card sample
+        2. Select the name layer
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: section
+    attributes:
+      label: Section
+      options:
+        - Edit
+        - Data
+        - Export
+        - Welcome screen
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 140 on macOS 15
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The commit you built from, or the URL of the deployment you used.
+  - type: textarea
+    id: files
+    attributes:
+      label: Files, screenshots and console output
+      description: Attach a template or workspace that shows the problem if you can. Remove anything private first.

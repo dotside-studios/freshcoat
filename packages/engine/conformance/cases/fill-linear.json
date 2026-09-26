@@ -1,0 +1,121 @@
+{
+	"id": "fill-linear",
+	"title": "a linear gradient reaches its stop colors at its endpoints",
+	"profile": "core",
+	"requires": [
+		"fill.linear"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "linear",
+						"from": {
+							"x": 0,
+							"y": 0
+						},
+						"to": {
+							"x": 1,
+							"y": 0
+						},
+						"stops": [
+							{
+								"offset": 0,
+								"color": "#000000"
+							},
+							{
+								"offset": 1,
+								"color": "#ffffff"
+							}
+						]
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				0,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the `from` endpoint is the first stop",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				159,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the `to` endpoint is the last stop",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				128,
+				128,
+				128,
+				255
+			],
+			"why": "the midpoint is halfway between them",
+			"tolerance": 4
+		}
+	]
+}

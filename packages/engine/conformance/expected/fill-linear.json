@@ -1,0 +1,78 @@
+{
+	"caseId": "fill-linear",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "linear",
+							"from": {
+								"x": 0,
+								"y": 0
+							},
+							"to": {
+								"x": 1,
+								"y": 0
+							},
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#000000"
+								},
+								{
+									"offset": 1,
+									"color": "#ffffff"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "512dd176c6eaabe22093b01dbbe3ab7b7b0cb80e0bfdb903aa3d6bf726002d76"
+}

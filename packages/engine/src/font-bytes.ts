@@ -1,0 +1,177 @@
+import type { FontDescriptor, FontRequest, FontResolution } from "./types";
+
+// Resolve a request against the env's pre-supplied bytes, else its descriptor.
+// Shared by every runtime — the only per-env input is the pre-supplied map.
+export function resolveFontRequest(
+	req: FontRequest | string,
+	bytesByFamily?: Map<string, Uint8Array[]>,
+): FontResolution {
+	const r: FontRequest = typeof req === "string" ? { family: req } : req;
+	const pre = bytesByFamily?.get(r.family);
+	if (pre) return { kind: "bytes", bytes: pre };
+	if ("descriptor" in r)
+		return { kind: "descriptor", descriptor: r.descriptor };
+	return { kind: "none" };
+}
+
+// Old UA nudges Google Fonts / Fontsource to serve one unsubsetted TTF, which the
+// sfnt metrics reader (readFontMetrics) can parse; it cannot parse WOFF2.
+// Browsers treat user-agent as a forbidden header and ignore it, falling back to
+// WOFF2, which CanvasKit decodes fine.
+const TTF_UA =
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.30 (KHTML, like Gecko)";
+const FONT_FETCH_TIMEOUT_MS = 8000;
+
+// Turn a resolution into raw font-file bytes: stylesheet parsing + fetch. Purely
+// async I/O over data:/http (universal) — local filesystem reads are the env's
+// job, done up-front in its resolveFont (which returns { kind: "bytes" }).
+export async function fontBytes(res: FontResolution): Promise<Uint8Array[]> {
+	if (res.kind === "bytes") return res.bytes;
+	if (res.kind === "none") return [];
+	return descriptorBytes(res.descriptor);
+}
+
+async function descriptorBytes(d: FontDescriptor): Promise<Uint8Array[]> {
+	if (d.kind === "local") {
+		return Promise.all(d.files.map((f) => fileBytes(f.src)));
+	}
+	// google / fontsource carry a CSS stylesheet, not a font file.
+	return stylesheetFontBytes(d.url);
+}
+
+async function fileBytes(src: string): Promise<Uint8Array> {
+	if (src.startsWith("data:")) return dataUrlToBytes(src);
+	if (/^https?:/i.test(src)) return fetchBytes(src);
+	throw new Error(
+		`cannot fetch local font path "${src}"; a runtime must materialize local files in resolveFont`,
+	);
+}
+
+/**
+ * Every font file a Google / Fontsource stylesheet points at, Latin-covering
+ * faces first.
+ *
+ * Taking the stylesheet's *first* url is wrong, and silently so. When the
+ * request carries a modern user-agent — which is every browser, since UA is a
+ * forbidden header there and TTF_UA below is dropped — Google answers with one
+ * `@font-face` per (weight × unicode subset), and it lists `latin-ext` before
+ * `latin`. That first face's range starts at U+0100, so it has no A–Z at all:
+ * every ASCII glyph renders as .notdef, with correct metrics, which reads as a
+ * broken template rather than a wrong font file. Servers never saw it, because
+ * the old UA gets them a single unsubsetted TTF.
+ *
+ * So: parse the faces, sort the ones that cover Basic Latin to the front —
+ * `deriveFontMetrics` reads `faces[0]`, and a subset without Latin would give
+ * the wrong cap height — and load them all, which also picks up the accented
+ * ranges and the other weights the single-face fetch was dropping.
+ */
+async function stylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
+	const css = await fetchText(cssUrl);
+	const faces = parseStylesheetFaces(css);
+	if (faces.length === 0) {
+		throw new Error(`no font file found in stylesheet: ${cssUrl}`);
+	}
+	const ordered = [
+		...faces.filter((f) => f.coversLatin),
+		...faces.filter((f) => !f.coversLatin),
+	];
+	// One URL, one face. A VARIABLE family answers every requested weight with the
+	// same file per subset — `wght@400;600;700` is three @font-face rows pointing
+	// at one woff2 — so without this the same bytes are fetched and registered
+	// three times. The duplicates are not a second weight (the axis is set at
+	// draw time, see paragraph-layout's spanTextStyle); they are only cost, and
+	// they make the family's face list read as if the weights were there.
+	const seen = new Set<string>();
+	const unique: StylesheetFace[] = [];
+	for (const face of ordered) {
+		if (seen.has(face.url)) continue;
+		seen.add(face.url);
+		unique.push(face);
+	}
+	return Promise.all(unique.map((f) => fetchBytes(f.url)));
+}
+
+type StylesheetFace = { url: string; coversLatin: boolean };
+
+const FONT_FILE = /\.(ttf|otf|woff2?)(\?|#|$)/i;
+const LATIN_A = 0x41;
+
+function parseStylesheetFaces(css: string): StylesheetFace[] {
+	const faces: StylesheetFace[] = [];
+	// A CSS @font-face body has no nested braces, so the first `}` ends it.
+	for (const chunk of css.split(/@font-face/i).slice(1)) {
+		const end = chunk.indexOf("}");
+		const body = end === -1 ? chunk : chunk.slice(0, end);
+		const urls = [...body.matchAll(/url\((['"]?)([^'")]+)\1\)/g)].map(
+			(m) => m[2] as string,
+		);
+		const url = urls.find((u) => FONT_FILE.test(u)) ?? urls[0];
+		if (!url) continue;
+		const range = body.match(/unicode-range:\s*([^;}]+)/i)?.[1];
+		// No declared range means the face carries everything it has.
+		faces.push({
+			url,
+			coversLatin: range === undefined || rangeCovers(range, LATIN_A),
+		});
+	}
+	if (faces.length > 0) return faces;
+
+	// A stylesheet with no @font-face at all (or one shaped unexpectedly): fall
+	// back to the old whole-file scan rather than claim the font is unavailable.
+	const urls = [...css.matchAll(/url\((['"]?)([^'")]+)\1\)/g)].map(
+		(m) => m[2] as string,
+	);
+	const url = urls.find((u) => FONT_FILE.test(u)) ?? urls[0];
+	return url ? [{ url, coversLatin: true }] : [];
+}
+
+/** Whether a CSS `unicode-range` value covers a code point. */
+function rangeCovers(spec: string, code: number): boolean {
+	for (const part of spec.split(",")) {
+		const token = part.trim().replace(/^u\+/i, "");
+		if (!token) continue;
+		if (token.includes("?")) {
+			// Wildcard form, e.g. `U+00??` — every code point matching the pattern.
+			const lo = Number.parseInt(token.replace(/\?/g, "0"), 16);
+			const hi = Number.parseInt(token.replace(/\?/g, "F"), 16);
+			if (code >= lo && code <= hi) return true;
+			continue;
+		}
+		const [from, to] = token.split("-");
+		const lo = Number.parseInt(from as string, 16);
+		const hi = to === undefined ? lo : Number.parseInt(to, 16);
+		if (Number.isFinite(lo) && code >= lo && code <= hi) return true;
+	}
+	return false;
+}
+
+async function fetchText(url: string): Promise<string> {
+	const res = await fetch(url, {
+		headers: { "user-agent": TTF_UA },
+		signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT_MS),
+	});
+	if (!res.ok) throw new Error(`fetch ${url} -> ${res.status}`);
+	return res.text();
+}
+
+async function fetchBytes(url: string): Promise<Uint8Array> {
+	const res = await fetch(url, {
+		headers: { "user-agent": TTF_UA },
+		signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT_MS),
+	});
+	if (!res.ok) throw new Error(`fetch ${url} -> ${res.status}`);
+	return new Uint8Array(await res.arrayBuffer());
+}
+
+export function dataUrlToBytes(src: string): Uint8Array {
+	const comma = src.indexOf(",");
+	const meta = src.slice(0, comma);
+	const data = src.slice(comma + 1);
+	if (meta.includes(";base64")) {
+		const bin = atob(data);
+		const out = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+		return out;
+	}
+	return new TextEncoder().encode(decodeURIComponent(data));
+}

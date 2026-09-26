@@ -1,0 +1,2101 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`compile output is stable minimal-card at 1x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fef3c7",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 638,
+              "width": 1012,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 56,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "displayName",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 64,
+              "y": 80,
+            },
+            "size": {
+              "height": 80,
+              "width": 884,
+            },
+            "text": "You",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 638,
+          "width": 1012,
+        },
+      },
+    },
+  ],
+  "height": 638,
+  "width": 1012,
+}
+`;
+
+exports[`compile output is stable minimal-card at 0.5x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fef3c7",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 319,
+              "width": 506,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 28,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "displayName",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 32,
+              "y": 40,
+            },
+            "size": {
+              "height": 40,
+              "width": 442,
+            },
+            "text": "You",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 319,
+          "width": 506,
+        },
+      },
+    },
+  ],
+  "height": 319,
+  "width": 506,
+}
+`;
+
+exports[`compile output is stable full-feature-card at 1x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+          {
+            "family": "Plus Jakarta Sans",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.8535533905932737,
+                  "y": 0.1464466094067262,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#fbbf24",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#fb7185",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.14644660940672627,
+                  "y": 0.8535533905932737,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 638,
+              "width": 1012,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 56,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "name_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 64,
+              "y": 80,
+            },
+            "size": {
+              "height": 80,
+              "width": 884,
+            },
+            "text": "Your Name",
+            "verticalAlign": "top",
+          },
+          {
+            "align": "left",
+            "color": "#374151",
+            "font": {
+              "family": "Plus Jakarta Sans",
+              "lineHeight": 1.2,
+              "size": 28,
+              "style": "normal",
+              "weight": 400,
+            },
+            "id": "handle_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 64,
+              "y": 180,
+            },
+            "size": {
+              "height": 40,
+              "width": 884,
+            },
+            "text": "@you",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 638,
+          "width": 1012,
+        },
+      },
+    },
+    {
+      "assets": {
+        "fonts": [],
+        "images": [],
+      },
+      "name": "back",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 638,
+              "width": 1012,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 29,
+                "pixelWidth": 29,
+                "pixels": "bytes:3364:d88f8b55",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 320,
+                  "width": 320,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 372,
+              "y": 159,
+            },
+            "size": {
+              "height": 320,
+              "width": 320,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 638,
+          "width": 1012,
+        },
+      },
+    },
+  ],
+  "height": 638,
+  "width": 1012,
+}
+`;
+
+exports[`compile output is stable full-feature-card at 0.5x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+          {
+            "family": "Plus Jakarta Sans",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.8535533905932737,
+                  "y": 0.1464466094067262,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#fbbf24",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#fb7185",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.14644660940672627,
+                  "y": 0.8535533905932737,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 319,
+              "width": 506,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 28,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "name_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 32,
+              "y": 40,
+            },
+            "size": {
+              "height": 40,
+              "width": 442,
+            },
+            "text": "Your Name",
+            "verticalAlign": "top",
+          },
+          {
+            "align": "left",
+            "color": "#374151",
+            "font": {
+              "family": "Plus Jakarta Sans",
+              "lineHeight": 1.2,
+              "size": 14,
+              "style": "normal",
+              "weight": 400,
+            },
+            "id": "handle_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 32,
+              "y": 90,
+            },
+            "size": {
+              "height": 20,
+              "width": 442,
+            },
+            "text": "@you",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 319,
+          "width": 506,
+        },
+      },
+    },
+    {
+      "assets": {
+        "fonts": [],
+        "images": [],
+      },
+      "name": "back",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 319,
+              "width": 506,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 29,
+                "pixelWidth": 29,
+                "pixels": "bytes:3364:d88f8b55",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 160,
+                  "width": 160,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 186,
+              "y": 79.5,
+            },
+            "size": {
+              "height": 160,
+              "width": 160,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 319,
+          "width": 506,
+        },
+      },
+    },
+  ],
+  "height": 319,
+  "width": 506,
+}
+`;
+
+exports[`compile output is stable full-feature-card amber at 1x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+          {
+            "family": "Plus Jakarta Sans",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.8535533905932737,
+                  "y": 0.1464466094067262,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#f59e0b",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#ea580c",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.14644660940672627,
+                  "y": 0.8535533905932737,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 638,
+              "width": 1012,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 56,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "name_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 64,
+              "y": 80,
+            },
+            "size": {
+              "height": 80,
+              "width": 884,
+            },
+            "text": "Your Name",
+            "verticalAlign": "top",
+          },
+          {
+            "align": "left",
+            "color": "#374151",
+            "font": {
+              "family": "Plus Jakarta Sans",
+              "lineHeight": 1.2,
+              "size": 28,
+              "style": "normal",
+              "weight": 400,
+            },
+            "id": "handle_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 64,
+              "y": 180,
+            },
+            "size": {
+              "height": 40,
+              "width": 884,
+            },
+            "text": "@you",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 638,
+          "width": 1012,
+        },
+      },
+    },
+    {
+      "assets": {
+        "fonts": [],
+        "images": [],
+      },
+      "name": "back",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 638,
+              "width": 1012,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 29,
+                "pixelWidth": 29,
+                "pixels": "bytes:3364:d88f8b55",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 320,
+                  "width": 320,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 372,
+              "y": 159,
+            },
+            "size": {
+              "height": 320,
+              "width": 320,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 638,
+          "width": 1012,
+        },
+      },
+    },
+  ],
+  "height": 638,
+  "width": 1012,
+}
+`;
+
+exports[`compile output is stable full-feature-card amber at 0.5x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Comfortaa",
+          },
+          {
+            "family": "Plus Jakarta Sans",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.8535533905932737,
+                  "y": 0.1464466094067262,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#f59e0b",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#ea580c",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.14644660940672627,
+                  "y": 0.8535533905932737,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 319,
+              "width": 506,
+            },
+          },
+          {
+            "align": "left",
+            "color": "#1a1a1a",
+            "font": {
+              "family": "Comfortaa",
+              "lineHeight": 1.2,
+              "size": 28,
+              "style": "normal",
+              "weight": 700,
+            },
+            "id": "name_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 32,
+              "y": 40,
+            },
+            "size": {
+              "height": 40,
+              "width": 442,
+            },
+            "text": "Your Name",
+            "verticalAlign": "top",
+          },
+          {
+            "align": "left",
+            "color": "#374151",
+            "font": {
+              "family": "Plus Jakarta Sans",
+              "lineHeight": 1.2,
+              "size": 14,
+              "style": "normal",
+              "weight": 400,
+            },
+            "id": "handle_text",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 32,
+              "y": 90,
+            },
+            "size": {
+              "height": 20,
+              "width": 442,
+            },
+            "text": "@you",
+            "verticalAlign": "top",
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 319,
+          "width": 506,
+        },
+      },
+    },
+    {
+      "assets": {
+        "fonts": [],
+        "images": [],
+      },
+      "name": "back",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 319,
+              "width": 506,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 29,
+                "pixelWidth": 29,
+                "pixels": "bytes:3364:d88f8b55",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 160,
+                  "width": 160,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 186,
+              "y": 79.5,
+            },
+            "size": {
+              "height": 160,
+              "width": 160,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 319,
+          "width": 506,
+        },
+      },
+    },
+  ],
+  "height": 319,
+  "width": 506,
+}
+`;
+
+exports[`compile output is stable kitchen-sink at 1x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Inter",
+          },
+        ],
+        "images": [
+          "https://example.com/p.png",
+        ],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.06698729810778065,
+                  "y": 0.25,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#112233",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#445566",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.9330127018922194,
+                  "y": 0.75,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 250,
+              "width": 400,
+            },
+          },
+          {
+            "fit": "contain",
+            "id": "photo",
+            "kind": "image",
+            "pos": {
+              "x": 10,
+              "y": 10,
+            },
+            "rotation": 12,
+            "size": {
+              "height": 80,
+              "width": 120,
+            },
+            "src": "https://example.com/p.png",
+          },
+          {
+            "align": "left",
+            "color": "#fff",
+            "fill": {
+              "center": {
+                "x": 0.3,
+                "y": 0.4,
+              },
+              "kind": "radial",
+              "radius": 0.6,
+              "radiusY": 0.6,
+              "rotation": 0,
+              "stops": [
+                {
+                  "color": "#fff",
+                  "offset": 0,
+                },
+                {
+                  "color": "#aaa",
+                  "offset": 1,
+                },
+              ],
+            },
+            "font": {
+              "family": "Inter",
+              "lineHeight": 1.2,
+              "size": 18,
+              "style": "normal",
+              "weight": 600,
+            },
+            "id": "title",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 150,
+              "y": 20,
+            },
+            "size": {
+              "height": 40,
+              "width": 220,
+            },
+            "text": "Ada Lovelace",
+            "verticalAlign": "top",
+          },
+          {
+            "children": [
+              {
+                "cornerRadius": 8,
+                "fills": [
+                  {
+                    "color": "#ffffff22",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 100,
+                  "width": 200,
+                },
+              },
+              {
+                "children": [
+                  {
+                    "fills": [
+                      {
+                        "color": "#f00",
+                        "kind": "solid",
+                      },
+                    ],
+                    "id": "stack-a",
+                    "kind": "rect",
+                    "layoutChild": {
+                      "width": "fill",
+                    },
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 20,
+                      "width": 50,
+                    },
+                  },
+                  {
+                    "align": "left",
+                    "color": "#000",
+                    "font": {
+                      "family": "Inter",
+                      "lineHeight": 1.2,
+                      "size": 12,
+                      "style": "normal",
+                      "weight": 400,
+                    },
+                    "id": "stack-b",
+                    "kind": "text",
+                    "leadingTrim": false,
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 20,
+                      "width": 100,
+                    },
+                    "text": "Line",
+                    "verticalAlign": "top",
+                  },
+                ],
+                "kind": "group",
+                "layout": {
+                  "direction": "column",
+                  "gap": 4,
+                  "padding": [
+                    6,
+                    6,
+                    6,
+                    6,
+                  ],
+                  "type": "flex",
+                },
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 100,
+                  "width": 200,
+                },
+              },
+            ],
+            "clip": true,
+            "cornerRadius": 8,
+            "id": "stack",
+            "kind": "group",
+            "pos": {
+              "x": 150,
+              "y": 80,
+            },
+            "size": {
+              "height": 100,
+              "width": 200,
+            },
+          },
+          {
+            "children": [
+              {
+                "d": "M0 0 L40 0 L20 40 Z",
+                "fills": [
+                  {
+                    "center": {
+                      "x": 0.5,
+                      "y": 0.5,
+                    },
+                    "kind": "angular",
+                    "rotation": 45,
+                    "stops": [
+                      {
+                        "color": "#0f0",
+                        "offset": 0,
+                      },
+                      {
+                        "color": "#00f",
+                        "offset": 1,
+                      },
+                    ],
+                  },
+                ],
+                "id": "star",
+                "kind": "path",
+                "pos": {
+                  "x": 5,
+                  "y": 5,
+                },
+                "size": {
+                  "height": 40,
+                  "width": 40,
+                },
+              },
+              {
+                "children": [
+                  {
+                    "fills": [
+                      {
+                        "color": "#fa0",
+                        "kind": "solid",
+                      },
+                    ],
+                    "id": "masked-fill",
+                    "kind": "rect",
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 50,
+                      "width": 50,
+                    },
+                  },
+                ],
+                "id": "masked",
+                "kind": "mask",
+                "mask": {
+                  "cornerRadius": 25,
+                  "fills": [
+                    {
+                      "color": "#000",
+                      "kind": "solid",
+                    },
+                  ],
+                  "id": "mask-shape",
+                  "kind": "rect",
+                  "pos": {
+                    "x": 0,
+                    "y": 0,
+                  },
+                  "size": {
+                    "height": 50,
+                    "width": 50,
+                  },
+                },
+                "pos": {
+                  "x": 50,
+                  "y": 50,
+                },
+                "size": {
+                  "height": 50,
+                  "width": 50,
+                },
+              },
+            ],
+            "clip": false,
+            "id": "group",
+            "kind": "group",
+            "pos": {
+              "x": 20,
+              "y": 120,
+            },
+            "size": {
+              "height": 110,
+              "width": 110,
+            },
+          },
+          {
+            "children": [
+              {
+                "fills": [
+                  {
+                    "color": "#fff",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 50,
+                  "width": 50,
+                },
+              },
+              {
+                "kind": "bitmap",
+                "pixelHeight": 25,
+                "pixelWidth": 25,
+                "pixels": "bytes:2500:417eeea5",
+                "pos": {
+                  "x": 2,
+                  "y": 2,
+                },
+                "size": {
+                  "height": 46,
+                  "width": 46,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 330,
+              "y": 190,
+            },
+            "size": {
+              "height": 50,
+              "width": 50,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 250,
+          "width": 400,
+        },
+      },
+    },
+  ],
+  "height": 250,
+  "width": 400,
+}
+`;
+
+exports[`compile output is stable kitchen-sink at 0.5x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "family": "Inter",
+          },
+        ],
+        "images": [
+          "https://example.com/p.png",
+        ],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "from": {
+                  "x": 0.06698729810778065,
+                  "y": 0.25,
+                },
+                "kind": "linear",
+                "stops": [
+                  {
+                    "color": "#112233",
+                    "offset": 0,
+                  },
+                  {
+                    "color": "#445566",
+                    "offset": 1,
+                  },
+                ],
+                "to": {
+                  "x": 0.9330127018922194,
+                  "y": 0.75,
+                },
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 125,
+              "width": 200,
+            },
+          },
+          {
+            "fit": "contain",
+            "id": "photo",
+            "kind": "image",
+            "pos": {
+              "x": 5,
+              "y": 5,
+            },
+            "rotation": 12,
+            "size": {
+              "height": 40,
+              "width": 60,
+            },
+            "src": "https://example.com/p.png",
+          },
+          {
+            "align": "left",
+            "color": "#fff",
+            "fill": {
+              "center": {
+                "x": 0.3,
+                "y": 0.4,
+              },
+              "kind": "radial",
+              "radius": 0.6,
+              "radiusY": 0.6,
+              "rotation": 0,
+              "stops": [
+                {
+                  "color": "#fff",
+                  "offset": 0,
+                },
+                {
+                  "color": "#aaa",
+                  "offset": 1,
+                },
+              ],
+            },
+            "font": {
+              "family": "Inter",
+              "lineHeight": 1.2,
+              "size": 9,
+              "style": "normal",
+              "weight": 600,
+            },
+            "id": "title",
+            "kind": "text",
+            "leadingTrim": false,
+            "pos": {
+              "x": 75,
+              "y": 10,
+            },
+            "size": {
+              "height": 20,
+              "width": 110,
+            },
+            "text": "Ada Lovelace",
+            "verticalAlign": "top",
+          },
+          {
+            "children": [
+              {
+                "cornerRadius": 4,
+                "fills": [
+                  {
+                    "color": "#ffffff22",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 50,
+                  "width": 100,
+                },
+              },
+              {
+                "children": [
+                  {
+                    "fills": [
+                      {
+                        "color": "#f00",
+                        "kind": "solid",
+                      },
+                    ],
+                    "id": "stack-a",
+                    "kind": "rect",
+                    "layoutChild": {
+                      "width": "fill",
+                    },
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 10,
+                      "width": 25,
+                    },
+                  },
+                  {
+                    "align": "left",
+                    "color": "#000",
+                    "font": {
+                      "family": "Inter",
+                      "lineHeight": 1.2,
+                      "size": 6,
+                      "style": "normal",
+                      "weight": 400,
+                    },
+                    "id": "stack-b",
+                    "kind": "text",
+                    "leadingTrim": false,
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 10,
+                      "width": 50,
+                    },
+                    "text": "Line",
+                    "verticalAlign": "top",
+                  },
+                ],
+                "kind": "group",
+                "layout": {
+                  "direction": "column",
+                  "gap": 2,
+                  "padding": [
+                    3,
+                    3,
+                    3,
+                    3,
+                  ],
+                  "type": "flex",
+                },
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 50,
+                  "width": 100,
+                },
+              },
+            ],
+            "clip": true,
+            "cornerRadius": 4,
+            "id": "stack",
+            "kind": "group",
+            "pos": {
+              "x": 75,
+              "y": 40,
+            },
+            "size": {
+              "height": 50,
+              "width": 100,
+            },
+          },
+          {
+            "children": [
+              {
+                "d": "M0 0 L20 0 L10 20 Z",
+                "fills": [
+                  {
+                    "center": {
+                      "x": 0.5,
+                      "y": 0.5,
+                    },
+                    "kind": "angular",
+                    "rotation": 45,
+                    "stops": [
+                      {
+                        "color": "#0f0",
+                        "offset": 0,
+                      },
+                      {
+                        "color": "#00f",
+                        "offset": 1,
+                      },
+                    ],
+                  },
+                ],
+                "id": "star",
+                "kind": "path",
+                "pos": {
+                  "x": 2.5,
+                  "y": 2.5,
+                },
+                "size": {
+                  "height": 20,
+                  "width": 20,
+                },
+              },
+              {
+                "children": [
+                  {
+                    "fills": [
+                      {
+                        "color": "#fa0",
+                        "kind": "solid",
+                      },
+                    ],
+                    "id": "masked-fill",
+                    "kind": "rect",
+                    "pos": {
+                      "x": 0,
+                      "y": 0,
+                    },
+                    "size": {
+                      "height": 25,
+                      "width": 25,
+                    },
+                  },
+                ],
+                "id": "masked",
+                "kind": "mask",
+                "mask": {
+                  "cornerRadius": 12.5,
+                  "fills": [
+                    {
+                      "color": "#000",
+                      "kind": "solid",
+                    },
+                  ],
+                  "id": "mask-shape",
+                  "kind": "rect",
+                  "pos": {
+                    "x": 0,
+                    "y": 0,
+                  },
+                  "size": {
+                    "height": 25,
+                    "width": 25,
+                  },
+                },
+                "pos": {
+                  "x": 25,
+                  "y": 25,
+                },
+                "size": {
+                  "height": 25,
+                  "width": 25,
+                },
+              },
+            ],
+            "clip": false,
+            "id": "group",
+            "kind": "group",
+            "pos": {
+              "x": 10,
+              "y": 60,
+            },
+            "size": {
+              "height": 55,
+              "width": 55,
+            },
+          },
+          {
+            "children": [
+              {
+                "fills": [
+                  {
+                    "color": "#fff",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 25,
+                  "width": 25,
+                },
+              },
+              {
+                "kind": "bitmap",
+                "pixelHeight": 25,
+                "pixelWidth": 25,
+                "pixels": "bytes:2500:417eeea5",
+                "pos": {
+                  "x": 1,
+                  "y": 1,
+                },
+                "size": {
+                  "height": 23,
+                  "width": 23,
+                },
+              },
+            ],
+            "id": "qr",
+            "kind": "group",
+            "pos": {
+              "x": 165,
+              "y": 95,
+            },
+            "size": {
+              "height": 25,
+              "width": 25,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 125,
+          "width": 200,
+        },
+      },
+    },
+  ],
+  "height": 125,
+  "width": 200,
+}
+`;
+
+exports[`compile output is stable barcodes at 1x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "descriptor": {
+              "family": "Inter",
+              "kind": "google",
+              "url": "https://fonts.googleapis.com/css2?family=Inter",
+            },
+            "family": "Inter",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 250,
+              "width": 400,
+            },
+          },
+          {
+            "children": [
+              {
+                "fills": [
+                  {
+                    "color": "#ffffff",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 80,
+                  "width": 240,
+                },
+              },
+              {
+                "kind": "bitmap",
+                "pixelHeight": 1,
+                "pixelWidth": 123,
+                "pixels": "bytes:492:6fc00ee5",
+                "pos": {
+                  "x": 16.783216783216783,
+                  "y": 0,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 64.88,
+                  "width": 206.43356643356643,
+                },
+              },
+              {
+                "align": "center",
+                "color": "#000000",
+                "font": {
+                  "family": "Inter",
+                  "lineHeight": 1.2,
+                  "size": 11.200000000000001,
+                  "style": "normal",
+                  "weight": 400,
+                },
+                "kind": "text",
+                "leadingTrim": false,
+                "pos": {
+                  "x": 0,
+                  "y": 66.56,
+                },
+                "size": {
+                  "height": 13.440000000000001,
+                  "width": 240,
+                },
+                "text": "TKT-00042",
+                "verticalAlign": "top",
+              },
+            ],
+            "id": "ticket",
+            "kind": "group",
+            "pos": {
+              "x": 20,
+              "y": 20,
+            },
+            "size": {
+              "height": 80,
+              "width": 240,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 1,
+                "pixelWidth": 95,
+                "pixels": "bytes:380:6ef022bc",
+                "pos": {
+                  "x": 9.320388349514563,
+                  "y": 0,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 83.8,
+                  "width": 221.35922330097085,
+                },
+              },
+              {
+                "align": "center",
+                "color": "#112233",
+                "font": {
+                  "family": "Inter",
+                  "lineHeight": 1.2,
+                  "size": 12,
+                  "style": "normal",
+                  "weight": 400,
+                },
+                "kind": "text",
+                "leadingTrim": false,
+                "pos": {
+                  "x": 0,
+                  "y": 85.6,
+                },
+                "size": {
+                  "height": 14.399999999999999,
+                  "width": 240,
+                },
+                "text": "5901234123457",
+                "verticalAlign": "top",
+              },
+            ],
+            "id": "gtin",
+            "kind": "group",
+            "pos": {
+              "x": 20,
+              "y": 120,
+            },
+            "size": {
+              "height": 100,
+              "width": 240,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 14,
+                "pixelWidth": 14,
+                "pixels": "bytes:784:a1624b78",
+                "pos": {
+                  "x": 5.625,
+                  "y": 5.625,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 78.75,
+                  "width": 78.75,
+                },
+              },
+            ],
+            "id": "matrix",
+            "kind": "group",
+            "pos": {
+              "x": 290,
+              "y": 20,
+            },
+            "rotation": 15,
+            "size": {
+              "height": 90,
+              "width": 90,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 24,
+                "pixelWidth": 120,
+                "pixels": "bytes:11520:b79f1805",
+                "pos": {
+                  "x": 1.4516129032258078,
+                  "y": 11.29032258064516,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 17.41935483870968,
+                  "width": 87.09677419354838,
+                },
+              },
+            ],
+            "id": "stacked",
+            "kind": "group",
+            "pos": {
+              "x": 290,
+              "y": 130,
+            },
+            "size": {
+              "height": 40,
+              "width": 90,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 250,
+          "width": 400,
+        },
+      },
+    },
+  ],
+  "height": 250,
+  "width": 400,
+}
+`;
+
+exports[`compile output is stable barcodes at 0.5x 1`] = `
+{
+  "frames": [
+    {
+      "assets": {
+        "fonts": [
+          {
+            "descriptor": {
+              "family": "Inter",
+              "kind": "google",
+              "url": "https://fonts.googleapis.com/css2?family=Inter",
+            },
+            "family": "Inter",
+          },
+        ],
+        "images": [],
+      },
+      "name": "front",
+      "root": {
+        "children": [
+          {
+            "fills": [
+              {
+                "color": "#fff",
+                "kind": "solid",
+              },
+            ],
+            "kind": "rect",
+            "pos": {
+              "x": 0,
+              "y": 0,
+            },
+            "size": {
+              "height": 125,
+              "width": 200,
+            },
+          },
+          {
+            "children": [
+              {
+                "fills": [
+                  {
+                    "color": "#ffffff",
+                    "kind": "solid",
+                  },
+                ],
+                "kind": "rect",
+                "pos": {
+                  "x": 0,
+                  "y": 0,
+                },
+                "size": {
+                  "height": 40,
+                  "width": 120,
+                },
+              },
+              {
+                "kind": "bitmap",
+                "pixelHeight": 1,
+                "pixelWidth": 123,
+                "pixels": "bytes:492:6fc00ee5",
+                "pos": {
+                  "x": 8.391608391608392,
+                  "y": 0,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 32.44,
+                  "width": 103.21678321678321,
+                },
+              },
+              {
+                "align": "center",
+                "color": "#000000",
+                "font": {
+                  "family": "Inter",
+                  "lineHeight": 1.2,
+                  "size": 5.6000000000000005,
+                  "style": "normal",
+                  "weight": 400,
+                },
+                "kind": "text",
+                "leadingTrim": false,
+                "pos": {
+                  "x": 0,
+                  "y": 33.28,
+                },
+                "size": {
+                  "height": 6.720000000000001,
+                  "width": 120,
+                },
+                "text": "TKT-00042",
+                "verticalAlign": "top",
+              },
+            ],
+            "id": "ticket",
+            "kind": "group",
+            "pos": {
+              "x": 10,
+              "y": 10,
+            },
+            "size": {
+              "height": 40,
+              "width": 120,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 1,
+                "pixelWidth": 95,
+                "pixels": "bytes:380:6ef022bc",
+                "pos": {
+                  "x": 4.660194174757281,
+                  "y": 0,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 41.9,
+                  "width": 110.67961165048543,
+                },
+              },
+              {
+                "align": "center",
+                "color": "#112233",
+                "font": {
+                  "family": "Inter",
+                  "lineHeight": 1.2,
+                  "size": 6,
+                  "style": "normal",
+                  "weight": 400,
+                },
+                "kind": "text",
+                "leadingTrim": false,
+                "pos": {
+                  "x": 0,
+                  "y": 42.8,
+                },
+                "size": {
+                  "height": 7.199999999999999,
+                  "width": 120,
+                },
+                "text": "5901234123457",
+                "verticalAlign": "top",
+              },
+            ],
+            "id": "gtin",
+            "kind": "group",
+            "pos": {
+              "x": 10,
+              "y": 60,
+            },
+            "size": {
+              "height": 50,
+              "width": 120,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 14,
+                "pixelWidth": 14,
+                "pixels": "bytes:784:a1624b78",
+                "pos": {
+                  "x": 2.8125,
+                  "y": 2.8125,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 39.375,
+                  "width": 39.375,
+                },
+              },
+            ],
+            "id": "matrix",
+            "kind": "group",
+            "pos": {
+              "x": 145,
+              "y": 10,
+            },
+            "rotation": 15,
+            "size": {
+              "height": 45,
+              "width": 45,
+            },
+          },
+          {
+            "children": [
+              {
+                "kind": "bitmap",
+                "pixelHeight": 24,
+                "pixelWidth": 120,
+                "pixels": "bytes:11520:b79f1805",
+                "pos": {
+                  "x": 0.7258064516129039,
+                  "y": 5.64516129032258,
+                },
+                "role": "barcode",
+                "size": {
+                  "height": 8.70967741935484,
+                  "width": 43.54838709677419,
+                },
+              },
+            ],
+            "id": "stacked",
+            "kind": "group",
+            "pos": {
+              "x": 145,
+              "y": 65,
+            },
+            "size": {
+              "height": 20,
+              "width": 45,
+            },
+          },
+        ],
+        "kind": "group",
+        "pos": {
+          "x": 0,
+          "y": 0,
+        },
+        "size": {
+          "height": 125,
+          "width": 200,
+        },
+      },
+    },
+  ],
+  "height": 125,
+  "width": 200,
+}
+`;

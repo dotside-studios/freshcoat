@@ -1,0 +1,98 @@
+{
+	"id": "adjust-color-matrix",
+	"title": "a colorMatrix is row-major RGBA rows plus bias",
+	"profile": "core",
+	"requires": [
+		"adjust.colorMatrix"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				],
+				"adjust": {
+					"colorMatrix": [
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				237,
+				111,
+				47,
+				255
+			],
+			"why": "(47,111,237) with R and B exchanged",
+			"tolerance": 2
+		}
+	]
+}

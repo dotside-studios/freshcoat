@@ -1,0 +1,158 @@
+import { describe, expect, it } from "vitest";
+import { unwrap, updateElement } from "../doc/ops";
+import {
+	buildLayerRows,
+	flattenRows,
+	isBound,
+	type LayerRow,
+} from "../panels/layers/rows";
+import { frozenDoc } from "./doc-fixture";
+
+const find = (rows: LayerRow[], id: string): LayerRow | undefined => {
+	for (const r of rows) {
+		if (r.id === id) return r;
+		const hit = find(r.children, id);
+		if (hit) return hit;
+	}
+	return undefined;
+};
+
+describe("buildLayerRows", () => {
+	it("lists the topmost layer first and the background last", () => {
+		const rows = buildLayerRows(frozenDoc(), 0);
+		expect(rows.map((r) => [r.id, r.key])).toEqual([
+			["spin", "0/6"],
+			["rot", "0/5"],
+			["title", "0/4"],
+			["row", "0/3"],
+			["m", "0/2"],
+			["f", "0/1"],
+			["a", "0/0"],
+			["bg", "0/bg"],
+		]);
+		expect(rows.at(-1)?.kind).toBe("background");
+		expect(rows.slice(0, -1).every((r) => r.kind === "layer")).toBe(true);
+	});
+
+	it("reverses children too", () => {
+		const f = find(buildLayerRows(frozenDoc(), 0), "f") as LayerRow;
+		expect(f.children.map((r) => r.key)).toEqual(["0/1/2", "0/1/1", "0/1/0"]);
+		expect(f.children[0]?.children.map((r) => r.id)).toEqual(["deep"]);
+	});
+
+	it("shows a mask's source as its last child, marked", () => {
+		const m = find(buildLayerRows(frozenDoc(), 0), "m") as LayerRow;
+		expect(m.children.map((r) => [r.id, r.key, r.kind])).toEqual([
+			["img", "0/2/0", "layer"],
+			["ms", "0/2/-1", "maskSource"],
+		]);
+		expect(m.container).toBe(true);
+		expect(m.children[1]?.container).toBe(false);
+	});
+
+	it("marks containers", () => {
+		const rows = buildLayerRows(frozenDoc(), 0);
+		const containers = flattenRows(rows).filter(
+			(k) => byKey(rows, k)?.container,
+		);
+		expect(containers).toEqual(["0/6", "0/3", "0/2", "0/1", "0/1/2"]);
+	});
+
+	it("badges layers that read a field themselves", () => {
+		const rows = buildLayerRows(frozenDoc(), 0);
+		const bound = (id: string) => find(rows, id)?.bound;
+		expect(bound("t1")).toBe(true); // "Hi {{ name }}"
+		expect(bound("title")).toBe(true); // visibleWhen and a token
+		expect(bound("a")).toBe(false);
+		// A frame holding a bound text is not bound itself.
+		expect(bound("f")).toBe(false);
+		expect(bound("bg")).toBe(false);
+	});
+
+	it("isBound sees visibleWhen alone, and tokens anywhere in properties", () => {
+		expect(
+			isBound({
+				id: "x",
+				type: "rect",
+				visibleWhen: { field: "show" },
+				properties: {},
+			}),
+		).toBe(true);
+		expect(
+			isBound({
+				id: "x",
+				type: "rect",
+				properties: { fill: "{{brand}}" },
+			}),
+		).toBe(true);
+		expect(
+			isBound({
+				id: "x",
+				type: "image",
+				properties: { src: "{{ photo }}", fit: "cover" },
+			}),
+		).toBe(true);
+		expect(
+			isBound({
+				id: "x",
+				type: "text",
+				properties: {
+					value: "{{ not a token }}",
+					font: { family: "Inter", size: 12 },
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("lists another side on its own", () => {
+		expect(buildLayerRows(frozenDoc(), 1).map((r) => r.key)).toEqual([
+			"1/0",
+			"1/bg",
+		]);
+		expect(buildLayerRows(frozenDoc(), 5)).toEqual([]);
+	});
+
+	it("flattens depth first in display order", () => {
+		expect(flattenRows(buildLayerRows(frozenDoc(), 0))).toEqual([
+			"0/6",
+			"0/6/0",
+			"0/5",
+			"0/4",
+			"0/3",
+			"0/3/2",
+			"0/3/1",
+			"0/3/0",
+			"0/2",
+			"0/2/0",
+			"0/2/-1",
+			"0/1",
+			"0/1/2",
+			"0/1/2/0",
+			"0/1/1",
+			"0/1/0",
+			"0/0",
+			"0/bg",
+		]);
+	});
+
+	it("reuses the rows of untouched layers", () => {
+		const t = frozenDoc();
+		const first = buildLayerRows(t, 0);
+		expect(buildLayerRows(t, 0)[5]).toBe(first[5]);
+		const next = unwrap(
+			updateElement(t, "0/0", { properties: { fill: "#ff0000" } }),
+		).template;
+		const second = buildLayerRows(next, 0);
+		expect(second[5]).toBe(first[5]); // f, untouched
+		expect(second[6]).not.toBe(first[6]); // a, edited
+	});
+});
+
+function byKey(rows: LayerRow[], key: string): LayerRow | undefined {
+	for (const r of rows) {
+		if (r.key === key) return r;
+		const hit = byKey(r.children, key);
+		if (hit) return hit;
+	}
+	return undefined;
+}

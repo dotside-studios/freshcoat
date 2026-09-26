@@ -1,0 +1,62 @@
+{
+	"caseId": "blur-sigma",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 80,
+						"y": 0
+					},
+					"size": {
+						"width": 80,
+						"height": 120
+					},
+					"blur": 20,
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#000000"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "936d56d8347be28e4caee70d6a5daa5f8d89c806e57b523f7486ca01885c67e3"
+}

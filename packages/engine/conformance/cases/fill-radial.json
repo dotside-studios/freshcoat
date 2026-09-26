@@ -1,0 +1,103 @@
+{
+	"id": "fill-radial",
+	"title": "a radial gradient is its first stop at the centre",
+	"profile": "core",
+	"requires": [
+		"fill.radial"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "radial",
+						"center": {
+							"x": 0.5,
+							"y": 0.5
+						},
+						"radius": 0.5,
+						"stops": [
+							{
+								"offset": 0,
+								"color": "#ff0000"
+							},
+							{
+								"offset": 1,
+								"color": "#0000ff"
+							}
+						]
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				255,
+				0,
+				0,
+				255
+			],
+			"why": "the centre is the first stop",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				2,
+				2
+			],
+			"expect": [
+				0,
+				0,
+				255,
+				255
+			],
+			"why": "the far corner is past the last stop",
+			"tolerance": 6
+		}
+	]
+}

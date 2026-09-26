@@ -1,0 +1,143 @@
+{
+	"format_version": "1.4",
+	"version": "1.0.0",
+	"id": "pinned-logo",
+	"name": "Pinned Logo",
+	"product": "custom",
+	"width": 1000,
+	"height": 600,
+	"fields": {
+		"type": "object",
+		"properties": {},
+		"required": []
+	},
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "Front",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1000,
+					"height": 600
+				},
+				"properties": {
+					"fill": "#ffffff"
+				}
+			},
+			"elements": [
+				{
+					"id": "banner",
+					"type": "rect",
+					"pos": {
+						"x": 40,
+						"y": 40
+					},
+					"size": {
+						"width": 920,
+						"height": 80
+					},
+					"properties": {
+						"fill": "#1a3366"
+					},
+					"constraints": {
+						"horizontal": "stretch"
+					}
+				},
+				{
+					"id": "logo",
+					"type": "rect",
+					"pos": {
+						"x": 840,
+						"y": 500
+					},
+					"size": {
+						"width": 120,
+						"height": 60
+					},
+					"properties": {
+						"fill": "#e64d1a"
+					},
+					"constraints": {
+						"horizontal": "end",
+						"vertical": "end"
+					}
+				},
+				{
+					"id": "seal",
+					"type": "rect",
+					"pos": {
+						"x": 440,
+						"y": 260
+					},
+					"size": {
+						"width": 120,
+						"height": 120
+					},
+					"properties": {
+						"fill": "#33994d"
+					},
+					"constraints": {
+						"horizontal": "center",
+						"vertical": "center"
+					}
+				},
+				{
+					"id": "mark_a",
+					"type": "rect",
+					"pos": {
+						"x": 40,
+						"y": 520
+					},
+					"size": {
+						"width": 30,
+						"height": 40
+					},
+					"properties": {
+						"fill": "#000000"
+					},
+					"constraints": {
+						"vertical": "end"
+					}
+				},
+				{
+					"id": "mark_b",
+					"type": "rect",
+					"pos": {
+						"x": 90,
+						"y": 520
+					},
+					"size": {
+						"width": 30,
+						"height": 40
+					},
+					"properties": {
+						"fill": "#000000"
+					},
+					"constraints": {
+						"vertical": "end"
+					}
+				},
+				{
+					"id": "footnote",
+					"type": "rect",
+					"pos": {
+						"x": 40,
+						"y": 440
+					},
+					"size": {
+						"width": 200,
+						"height": 40
+					},
+					"properties": {
+						"fill": "#808080"
+					}
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,74 @@
+{
+	"caseId": "adjust-gamma-lut",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"adjust": {
+						"lut": {
+							"r": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							},
+							"g": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							},
+							"b": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							}
+						}
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#808080"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "bde5858fdf0963431ecc199bac3fbca7a251759b80106a5207a73e24c320569d"
+}

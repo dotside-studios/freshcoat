@@ -1,0 +1,74 @@
+{
+	"id": "image-missing",
+	"title": "a failed image warns and paints a placeholder",
+	"profile": "core",
+	"requires": [
+		"draw.image",
+		"image.placeholder"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "image",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"src": "conformance:missing",
+				"fit": "cover"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "warning",
+			"warning": "image_load_failed",
+			"why": "the src could not be loaded"
+		},
+		{
+			"kind": "differ",
+			"at": [
+				80,
+				60
+			],
+			"from": [
+				10,
+				10
+			],
+			"minDelta": 8,
+			"why": "a placeholder is drawn, not nothing"
+		}
+	]
+}

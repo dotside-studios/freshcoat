@@ -1,0 +1,103 @@
+{
+	"id": "text-basic",
+	"title": "baked text paints inside its box",
+	"profile": "core",
+	"requires": [
+		"draw.text"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"pos": {
+					"x": 20,
+					"y": 40
+				},
+				"size": {
+					"width": 120,
+					"height": 40
+				},
+				"text": "Hlm",
+				"font": {
+					"family": "ConformanceFont",
+					"weight": 400,
+					"style": "normal",
+					"size": 32,
+					"lineHeight": 38
+				},
+				"color": "#000000"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				10,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "left of the text box, untouched"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				110
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below it, untouched"
+		},
+		{
+			"kind": "differ",
+			"at": [
+				24,
+				55
+			],
+			"from": [
+				10,
+				60
+			],
+			"minDelta": 60,
+			"why": "the first glyph's stem is darker than the ground"
+		}
+	]
+}

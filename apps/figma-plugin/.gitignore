@@ -1,0 +1,7 @@
+node_modules
+build
+manifest.json
+.env
+.env.local
+.env.*.local
+harness/test-results

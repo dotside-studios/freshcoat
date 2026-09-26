@@ -1,0 +1,81 @@
+{
+	"id": "finish-dither",
+	"title": "dither perturbs a flat field",
+	"profile": "raster",
+	"requires": [
+		"finish.dither"
+	],
+	"width": 160,
+	"height": 120,
+	"compile": {
+		"finish": {
+			"dither": {
+				"amount": 16,
+				"seed": 0,
+				"mode": "monochrome"
+			}
+		}
+	},
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#808080"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "differ",
+			"at": [
+				40,
+				60
+			],
+			"from": [
+				41,
+				60
+			],
+			"minDelta": 1,
+			"why": "adjacent pixels of a flat fill differ once dithered"
+		}
+	]
+}

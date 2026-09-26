@@ -1,0 +1,77 @@
+{
+	"caseId": "clip-circle",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 30,
+						"y": 10
+					},
+					"size": {
+						"width": 100,
+						"height": 100
+					},
+					"op": "drawGroup",
+					"clip": {
+						"kind": "ellipse"
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 30,
+								"y": 10
+							},
+							"size": {
+								"width": 100,
+								"height": 100
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "62c61a93df9018c1025ecefa976f5605d8d2e1451ba2139b87d5b4914c73a4f0"
+}

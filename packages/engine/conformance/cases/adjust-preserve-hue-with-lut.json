@@ -1,0 +1,112 @@
+{
+	"id": "adjust-preserve-hue-with-lut",
+	"title": "preserve-hue composes with a LUT in one pass",
+	"profile": "raster",
+	"requires": [
+		"adjust.colorMatrix",
+		"adjust.lut",
+		"adjust.preserveHue"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#6d4fd1"
+					}
+				],
+				"adjust": {
+					"colorMatrix": [
+						1.914172,
+						-0.5578560000000001,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						1.522144,
+						-0.056316000000000005,
+						0,
+						-0.15058823529411766,
+						-0.16582800000000006,
+						-0.5578560000000001,
+						2.0236840000000003,
+						0,
+						-0.15058823529411766,
+						0,
+						0,
+						0,
+						1,
+						0
+					],
+					"gamut": "preserve-hue",
+					"lut": {
+						"r": {
+							"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+						},
+						"g": {
+							"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+						},
+						"b": {
+							"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+						}
+					}
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "hue",
+			"at": [
+				80,
+				60
+			],
+			"expect": 253.8,
+			"tolerance": 2,
+			"why": "the curve ran after the gamut step, not instead of it"
+		},
+		{
+			"kind": "warning",
+			"warning": "adjust_unsupported",
+			"absent": true
+		}
+	]
+}

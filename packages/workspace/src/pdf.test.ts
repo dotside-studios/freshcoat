@@ -1,0 +1,265 @@
+import {
+	decodePDFRawStream,
+	PDFArray,
+	PDFDocument,
+	type PDFPage,
+	PDFRawStream,
+} from "pdf-lib";
+import { describe, expect, it } from "vitest";
+import { jpegHeader } from "./image-fixtures";
+import { assemblePdf, pageSizePt } from "./pdf";
+import { makePng } from "./test-fixtures";
+import type { PdfPage, SheetLayout } from "./types";
+
+const png = "png" as const;
+
+describe("assemblePdf", () => {
+	it("makes one page per PNG at its physical size", async () => {
+		const pages = [
+			{ bytes: makePng(30, 20), format: png, widthPx: 1012, heightPx: 638 },
+			{ bytes: makePng(20, 30), format: png, widthPx: 638, heightPx: 1012 },
+			{ bytes: makePng(3, 3), format: png, widthPx: 300, heightPx: 300 },
+		];
+		const bytes = await assemblePdf(pages, { dpi: 300, title: "Members" });
+		const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+		expect(doc.getPageCount()).toBe(3);
+		const sizes = doc.getPages().map((p) => {
+			const box = p.getMediaBox();
+			return [box.x, box.y, box.width, box.height];
+		});
+		expect(sizes[0]?.[2]).toBeCloseTo((1012 / 300) * 72, 3);
+		expect(sizes[0]?.[3]).toBeCloseTo((638 / 300) * 72, 3);
+		expect(sizes[1]?.[2]).toBeCloseTo(153.12, 3);
+		expect(sizes[2]).toEqual([0, 0, 72, 72]);
+		expect(doc.getTitle()).toBe("Members");
+		expect(doc.getCreator()).toBe("Freshcoat Studio");
+		expect(doc.getProducer()).toMatch(/Freshcoat/);
+	});
+
+	it("is repeatable with a fixed date", async () => {
+		const pages = [
+			{ bytes: makePng(2, 2), format: png, widthPx: 96, heightPx: 96 },
+		];
+		const date = new Date("2026-01-01T00:00:00Z");
+		const a = await assemblePdf(pages, { dpi: 96, date });
+		const b = await assemblePdf(pages, { dpi: 96, date });
+		expect(b).toEqual(a);
+		expect(pageSizePt(96, 48, 96)).toEqual([72, 36]);
+	});
+
+	it("embeds JPEG pages as JPEGs, each page at its own size", async () => {
+		const jpeg = jpegHeader({ width: 40, height: 30 });
+		const bytes = await assemblePdf(
+			[
+				{ bytes: jpeg, format: "jpeg", widthPx: 4000, heightPx: 3000 },
+				{ bytes: makePng(2, 3), format: png, widthPx: 200, heightPx: 300 },
+			],
+			{ dpi: 100 },
+		);
+		const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+		const sizes = doc.getPages().map((p) => [p.getWidth(), p.getHeight()]);
+		expect(sizes).toEqual([
+			[2880, 2160],
+			[144, 216],
+		]);
+		// the JPEG's own bytes are the stream, with the DCT filter
+		expect(new TextDecoder("latin1").decode(bytes)).toContain("/DCTDecode");
+	});
+
+	it("rejects a non-positive dpi", async () => {
+		await expect(assemblePdf([], { dpi: 0 })).rejects.toThrow(/dpi/);
+	});
+});
+
+/** The operators of a page's content streams, as text. */
+function content(page: PDFPage): string {
+	const contents = page.node.Contents();
+	const streams =
+		contents instanceof PDFArray
+			? contents.asArray().map((ref) => page.doc.context.lookup(ref))
+			: [contents];
+	return streams
+		.map((stream) => {
+			if (!(stream instanceof PDFRawStream)) throw new Error("not a stream");
+			return new TextDecoder("latin1").decode(
+				decodePDFRawStream(stream).decode(),
+			);
+		})
+		.join("\n");
+}
+
+type Matrix = [number, number, number, number, number, number];
+
+/** The transform each `Do` draws with, following `q`, `Q` and `cm`. */
+function placements(page: PDFPage): Matrix[] {
+	const tokens = content(page).split(/\s+/).filter(Boolean);
+	let ctm: Matrix = [1, 0, 0, 1, 0, 0];
+	const stack: Matrix[] = [];
+	const out: Matrix[] = [];
+	tokens.forEach((token, i) => {
+		if (token === "q") stack.push(ctm);
+		else if (token === "Q") ctm = stack.pop() ?? [1, 0, 0, 1, 0, 0];
+		else if (token === "cm") {
+			const [a, b, c, d, e, f] = tokens.slice(i - 6, i).map(Number) as Matrix;
+			const [A, B, C, D, E, F] = ctm;
+			ctm = [
+				a * A + b * C,
+				a * B + b * D,
+				c * A + d * C,
+				c * B + d * D,
+				e * A + f * C + E,
+				e * B + f * D + F,
+			];
+		} else if (token === "Do") out.push(ctm);
+	});
+	return out;
+}
+
+/** Stroked paths: every crop mark is one. */
+const strokes = (page: PDFPage) =>
+	content(page)
+		.split(/\s+/)
+		.filter((t) => t === "S").length;
+
+const K = 72 / 25.4;
+const A4 = [210 * K, 297 * K] as const;
+
+function sheet(overrides: Partial<SheetLayout> = {}): SheetLayout {
+	return {
+		kind: "sheet",
+		paper: "a4",
+		orientation: "portrait",
+		marginMm: 10,
+		gapMm: 0,
+		cropMarks: true,
+		duplex: "none",
+		...overrides,
+	};
+}
+
+function cards(count: number, sides = 1): PdfPage[] {
+	return Array.from({ length: count * sides }, (_, i) => ({
+		bytes: makePng(4, 3, [i * 10, 0, 0]),
+		format: png,
+		widthPx: 1011,
+		heightPx: 638,
+		recordId: `r_${Math.floor(i / sides)}`,
+	}));
+}
+
+const card = { widthMm: 85.6, heightMm: 54 };
+
+function expectPlacement(m: Matrix | undefined, xMm: number, yMm: number) {
+	if (!m) throw new Error("no image");
+	const [a, b, c, d, e, f] = m;
+	expect(a).toBeCloseTo(85.6 * K, 2);
+	expect(d).toBeCloseTo(54 * K, 2);
+	expect(b).toBeCloseTo(0, 2);
+	expect(c).toBeCloseTo(0, 2);
+	expect(e).toBeCloseTo(xMm * K, 2);
+	// from the bottom-left corner, to the card's bottom edge
+	expect(f).toBeCloseTo(A4[1] - (yMm + 54) * K, 2);
+}
+
+describe("assemblePdf on sheets", () => {
+	it("imposes cards on A4 pages at their slots, with crop marks", async () => {
+		const bytes = await assemblePdf(cards(12), {
+			dpi: 300,
+			title: "Members",
+			layout: sheet(),
+			cardMm: card,
+		});
+		const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+		expect(doc.getTitle()).toBe("Members");
+		expect(doc.getPageCount()).toBe(2);
+		for (const page of doc.getPages()) {
+			expect(page.getWidth()).toBeCloseTo(A4[0], 2);
+			expect(page.getHeight()).toBeCloseTo(A4[1], 2);
+			expect(page.getWidth()).toBeCloseTo(595.28, 2);
+			expect(page.getHeight()).toBeCloseTo(841.89, 2);
+		}
+		const [first, second] = doc.getPages() as [PDFPage, PDFPage];
+		const one = placements(first);
+		expect(one).toHaveLength(10);
+		expectPlacement(one[0], 19.4, 13.5);
+		expectPlacement(one[1], 105, 13.5);
+		expectPlacement(one[2], 19.4, 67.5);
+		expectPlacement(one[9], 105, 229.5);
+		const two = placements(second);
+		expect(two).toHaveLength(2);
+		expectPlacement(two[1], 105, 13.5);
+		// 3 vertical cut lines and 6 horizontal, a mark at each end
+		expect(strokes(first)).toBe(18);
+		expect(strokes(second)).toBe(18);
+	});
+
+	it("leaves crop marks off when asked, and off back pages", async () => {
+		const plain = await PDFDocument.load(
+			await assemblePdf(cards(1), {
+				dpi: 300,
+				layout: sheet({ cropMarks: false }),
+				cardMm: card,
+			}),
+		);
+		expect(strokes(plain.getPage(0))).toBe(0);
+		const duplex = await PDFDocument.load(
+			await assemblePdf(cards(3, 2), {
+				dpi: 300,
+				layout: sheet({ duplex: "long-edge", gapMm: 10 }),
+				cardMm: card,
+			}),
+		);
+		expect(duplex.getPageCount()).toBe(2);
+		// 2 × 4 with a 10 mm gap: marks in the margin and in the gaps
+		expect(strokes(duplex.getPage(0))).toBe(4 * 8 + 8 * 4);
+		expect(strokes(duplex.getPage(1))).toBe(0);
+	});
+
+	it("puts duplex backs in the mirrored slots, shifted by the offset", async () => {
+		const bytes = await assemblePdf(cards(3, 2), {
+			dpi: 300,
+			layout: sheet({ duplex: "long-edge", backOffsetMm: { x: 1, y: 2 } }),
+			cardMm: card,
+		});
+		const doc = await PDFDocument.load(bytes);
+		expect(doc.getPageCount()).toBe(2);
+		const front = placements(doc.getPage(0));
+		const back = placements(doc.getPage(1));
+		expectPlacement(front[0], 19.4, 13.5);
+		expectPlacement(front[2], 19.4, 67.5);
+		expectPlacement(back[0], 106, 15.5);
+		expectPlacement(back[1], 20.4, 15.5);
+		expectPlacement(back[2], 106, 69.5);
+	});
+
+	it("sizes cards from the first page when not told", async () => {
+		const pages = cards(1).map((p) => ({ ...p, widthPx: 1200, heightPx: 900 }));
+		const doc = await PDFDocument.load(
+			await assemblePdf(pages, { dpi: 300, layout: sheet() }),
+		);
+		const [m] = placements(doc.getPage(0));
+		expect(m?.[0]).toBeCloseTo(4 * 72, 2);
+		expect(m?.[3]).toBeCloseTo(3 * 72, 2);
+	});
+
+	it("rejects a layout the card doesn't fit", async () => {
+		await expect(
+			assemblePdf(cards(1), {
+				dpi: 300,
+				layout: sheet({ marginMm: 80 }),
+				cardMm: card,
+			}),
+		).rejects.toThrow(/too wide/);
+	});
+
+	it("reads a single layout as one image per page", async () => {
+		const doc = await PDFDocument.load(
+			await assemblePdf(cards(2), { dpi: 300, layout: { kind: "single" } }),
+		);
+		expect(doc.getPageCount()).toBe(2);
+		expect(doc.getPage(0).getWidth()).toBeCloseTo((1011 / 300) * 72, 3);
+		const [m] = placements(doc.getPage(0));
+		expect(m?.[4]).toBe(0);
+		expect(m?.[5]).toBe(0);
+	});
+});

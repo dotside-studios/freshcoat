@@ -1,0 +1,85 @@
+{
+	"caseId": "adjust-color-matrix",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"adjust": {
+						"colorMatrix": [
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							1,
+							0
+						]
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "1ddd77fdd90b8cc2c8781c4d916d12455c68f847791cbc3d0102d9841f4e6d65"
+}

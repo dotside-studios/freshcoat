@@ -1,0 +1,106 @@
+{
+	"id": "group-fills",
+	"title": "a group's own fill paints behind its children",
+	"profile": "core",
+	"requires": [
+		"group.fills"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "group",
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 20,
+							"y": 15
+						},
+						"size": {
+							"width": 40,
+							"height": 30
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#ff0000"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#00ff00"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				255,
+				0,
+				0,
+				255
+			],
+			"why": "the child, on top"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				45,
+				35
+			],
+			"expect": [
+				0,
+				255,
+				0,
+				255
+			],
+			"why": "the group's own fill, behind it"
+		}
+	]
+}

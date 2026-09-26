@@ -1,0 +1,109 @@
+# freshcoat
+
+The 2D rendering engine behind [Freshcoat](../../README.md), named
+`freshcoat` in the workspace. It lays out a scene graph,
+shapes text and paints with CanvasKit (Skia compiled to WASM).
+
+Use it directly when your application supplies its own scene: previews,
+generated images or an interactive canvas. For `.coat` templates and field
+substitution, start with [`@freshcoat/coatfile`](../coatfile), which compiles
+templates into engine nodes.
+
+The scene and command types are independent of the backend; the supplied
+painter uses CanvasKit. Browser and headless environments share that paint
+path. Template fields, variants and frame selection belong to coatfile;
+card-printer correction policy belongs to
+[`@freshcoat/for-print`](../for-print).
+
+## Quick start
+
+With an initialized CanvasKit instance (`ck`), render a scene offscreen:
+
+```ts
+import type { RectNode } from "freshcoat";
+import { renderSceneToPng } from "freshcoat/headless";
+
+const root: RectNode = {
+  kind: "rect",
+  pos: { x: 0, y: 0 },
+  size: { width: 640, height: 360 },
+  fills: [{ kind: "solid", color: "#1f6fe8" }],
+};
+
+const result = await renderSceneToPng(root, { width: 640, height: 360, ck });
+// result.bytes — PNG bytes by default; result.warnings — paint diagnostics
+```
+
+You supply CanvasKit initialization and the WASM file location for your host.
+For text, also supply a `fonts` map of family names to font byte arrays; the
+helper derives font metrics and creates the Paragraph text engine.
+
+## Node IR
+
+Eight node kinds — `rect | ellipse | path | image | bitmap | text | group |
+mask` — describe shapes, assets, text and composition. Nodes share positioning
+and compositing properties, with fills, strokes and other options appropriate
+to each kind. Groups support flex and grid layout.
+
+`compileScene()` lowers a node tree to the flat `Command[]` list the painter
+executes. Use this lower-level path when you need to inspect commands or keep
+a runtime alive across renders. The types in [`src/node.ts`](src/node.ts)
+define the scene model.
+
+```ts
+import { compileScene } from "freshcoat";
+import { createHeadlessEnv } from "freshcoat/headless";
+
+const commands = compileScene(root, { width, height, textEngine });
+const env = createHeadlessEnv({ fonts });
+const result = await env.paint(commands, ck);
+```
+
+## Painting and text
+
+The supplied text engine uses CanvasKit Paragraph for layout and shaping,
+keeping measurement and painting on the same text implementation. On the
+lower-level path, pass a `textEngine` to resolve layout and unbaked text, or
+supply a scene with resolved geometry and baked text.
+
+Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
+table and sharpening) are engine operations. `FrameFinish` applies operations
+after the whole scene is composited. The engine implements these operations;
+the caller decides when and where to use them.
+
+## Subpaths
+
+The barrel stays free of DOM and WASM weight; the paint target lives on its
+own subpath.
+
+| Subpath | What it is |
+|---|---|
+| `freshcoat` | node types, `compileScene`, layout, adjust and export-scale math |
+| `freshcoat/browser` | a runtime backing a live DOM canvas — the editor's preview |
+| `freshcoat/headless` | offscreen painting to PNG, napi-free — server previews, OG images |
+| `freshcoat/runtime` | the backend seam: `Painter` and `makeRuntime` |
+| `freshcoat/path` | SVG path data parsing and maths |
+
+## Staying warm
+
+For repeated renders, reuse a paint runtime with `createPaintCache` and a
+text engine wrapped by `memoizeTextEngine`. The paint cache retains the
+surface, font provider and decoded images; the text cache reuses unchanged
+paragraph layouts. Studio's render session uses both. See
+[performance](../../docs/performance.md) for benchmarks and their conditions.
+
+For exports, `exportPixelSize` resolves density within
+`MAX_EXPORT_DIMENSION`. The headless runtime encodes PNG by default, with
+JPEG and WebP available through its `encode` options. Export scale changes
+the output pixel dimensions; supersampling renders at a higher density and
+reduces to the requested output size.
+
+## Conformance
+
+From this package directory, `bun run conformance` reports the golden-image
+suite, and `bun run conformance:regen` authors cases and regenerates goldens.
+
+## License
+
+Apache-2.0, see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE). Part of
+[Freshcoat](../../README.md).

@@ -1,0 +1,102 @@
+{
+	"id": "shadow-stacked",
+	"title": "every shadow in a stack is painted",
+	"profile": "core",
+	"requires": [
+		"effect.shadow",
+		"shadow.stacked"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 70,
+					"y": 50
+				},
+				"size": {
+					"width": 40,
+					"height": 40
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"shadow": [
+					{
+						"color": "#ff0000",
+						"dx": -20,
+						"dy": 0,
+						"blur": 0
+					},
+					{
+						"color": "#0000ff",
+						"dx": 20,
+						"dy": 0,
+						"blur": 0
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				55,
+				70
+			],
+			"expect": [
+				255,
+				0,
+				0,
+				255
+			],
+			"why": "the first entry, offset left"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				125,
+				70
+			],
+			"expect": [
+				0,
+				0,
+				255,
+				255
+			],
+			"why": "the second entry, offset right"
+		}
+	]
+}

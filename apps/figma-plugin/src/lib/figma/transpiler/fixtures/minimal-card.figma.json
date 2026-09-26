@@ -1,0 +1,62 @@
+{
+	"front": {
+		"id": "1:1",
+		"name": "Front",
+		"type": "FRAME",
+		"visible": true,
+		"opacity": 1,
+		"blendMode": "NORMAL",
+		"absoluteBoundingBox": { "x": 0, "y": 0, "width": 1017, "height": 639 },
+		"fills": [
+			{
+				"type": "SOLID",
+				"color": { "r": 0.996, "g": 0.953, "b": 0.78, "a": 1 }
+			}
+		],
+		"children": [
+			{
+				"id": "1:2",
+				"name": "{{display_name}}",
+				"type": "TEXT",
+				"visible": true,
+				"opacity": 1,
+				"blendMode": "NORMAL",
+				"absoluteBoundingBox": { "x": 64, "y": 80, "width": 884, "height": 80 },
+				"relativeTransform": [[1, 0, 64], [0, 1, 80]],
+				"characters": "{{display_name}}",
+				"style": {
+					"fontFamily": "Comfortaa",
+					"fontSize": 56,
+					"fontWeight": 700,
+					"italic": false,
+					"textAlignHorizontal": "LEFT",
+					"textAlignVertical": "TOP",
+					"textAutoResize": "NONE",
+					"lineHeightPercentFontSize": 120
+				},
+				"fills": [
+					{
+						"type": "SOLID",
+						"color": { "r": 0.102, "g": 0.102, "b": 0.102, "a": 1 }
+					}
+				]
+			}
+		]
+	},
+	"back": {
+		"id": "1:10",
+		"name": "Back",
+		"type": "FRAME",
+		"visible": true,
+		"opacity": 1,
+		"blendMode": "NORMAL",
+		"absoluteBoundingBox": { "x": 0, "y": 0, "width": 1017, "height": 639 },
+		"fills": [
+			{
+				"type": "SOLID",
+				"color": { "r": 0.157, "g": 0.157, "b": 0.157, "a": 1 }
+			}
+		],
+		"children": []
+	}
+}

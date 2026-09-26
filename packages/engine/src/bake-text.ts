@@ -1,0 +1,495 @@
+// bakeText — lay out a TextNode's already-resolved text into a BakedTextLayout
+// (per-line spans with absolute x, baseline, and vertical placement) the painter
+// draws verbatim. Operates purely on the Node IR — concrete strings +
+// ResolvedFont — through the injected TextEngine (the seam compile measures
+// through).
+//
+// Two paths, chosen by content:
+//   • wrappable — one span, no per-span overrides → full wrap + shrink-to-fit
+//     via engine.layoutText.
+//   • inline — multiple spans (or a single span overriding font/color) → one
+//     shaped, wrapped paragraph via engine.layoutInline when available, else an
+//     independent-span single-line fallback.
+import { getFontMetrics } from "./font-metrics";
+import type { TextNode } from "./node";
+import type { TextEngine } from "./text-engine";
+import type {
+	BakedTextLayout,
+	ClipOutset,
+	FontVMetrics,
+	ResolvedFont,
+	Size,
+	TextLine,
+	TextLineSpan,
+	Vec2,
+} from "./types";
+
+export type BakeTextOptions = {
+	textEngine: TextEngine;
+	// Figma "Cap height to baseline": anchor the cap height to the box top,
+	// trimming first-line leading. Figma's default, so this defaults to true.
+	// A node's own `leadingTrim` wins over this.
+	leadingTrim?: boolean;
+	// Per-family vertical metrics; falls back to the global registry, then to
+	// typical ratios. Keyed by font family.
+	fontMetrics?: Record<string, FontVMetrics>;
+	// The export density the scene will be painted at (see ./export-scale). Line
+	// advances are snapped to whole pixels so a paragraph doesn't drift sub-pixel
+	// down the page — and at 2× a whole pixel is half a design unit, so the snap
+	// belongs on the DEVICE grid. Keeping it on the design grid would spend a 2×
+	// export reproducing 1×'s rounding error. Omit/1 = the design grid.
+	deviceScale?: number;
+};
+
+type Span = NonNullable<TextNode["spans"]>[number];
+
+// A node's leadingTrim wins over the compile default; both default to true.
+export function resolveLeadingTrim(
+	node: TextNode,
+	fallback?: boolean,
+): boolean {
+	return (node.leadingTrim ?? fallback) !== false;
+}
+
+// Vertical slack a fit:"clip" rect needs so glyph overshoot isn't sliced.
+// - leadingTrim: the cap line tucks against the box top, so the ascent rises
+//   (ascent − capHeight) above it and descenders drop a full descent below the
+//   last baseline (bottom-align seats it at the box bottom).
+// - line-box model: glyphs are already centered via half-leading, so nothing
+//   spills unless the line height is tighter than ascent + descent.
+export function textClipOutset(
+	font: ResolvedFont,
+	leadingTrim: boolean,
+	metricsMap?: Record<string, FontVMetrics>,
+): ClipOutset {
+	const m = fontMetrics(font, metricsMap);
+	if (leadingTrim) {
+		return { top: Math.max(0, m.ascent - m.capHeight), bottom: m.descent };
+	}
+	const halfLeading =
+		(font.size * font.lineHeight - (m.ascent + m.descent)) / 2;
+	const spill = Math.max(0, -halfLeading);
+	return { top: spill, bottom: spill };
+}
+
+export function bakeText(
+	node: TextNode,
+	opts: BakeTextOptions,
+): BakedTextLayout {
+	const engine = opts.textEngine;
+	const leadingTrim = resolveLeadingTrim(node, opts.leadingTrim);
+	const metricsMap = opts.fontMetrics;
+	const pos: Vec2 = node.pos ?? { x: 0, y: 0 };
+	const size: Size = node.size ?? { width: 0, height: 0 };
+	const color = node.color ?? "#000";
+	const align = node.align ?? "left";
+	const verticalAlign = node.verticalAlign ?? "top";
+	const fit = node.fit;
+	const maxLines = node.maxLines;
+	const defaultFont = node.font;
+	const lineHeight = defaultFont.lineHeight;
+
+	const deviceScale = opts.deviceScale;
+	const spans = normalizeSpans(node);
+	// Wrappable: a single span with no font/color override keeps the full wrap +
+	// shrink path. Anything richer goes through the inline (adjacent) path.
+	const wrappable = spans.length === 1 && !hasOverrides(spans[0]);
+
+	return wrappable
+		? layoutWrappable(
+				spans[0].text,
+				defaultFont,
+				color,
+				pos,
+				size,
+				align,
+				verticalAlign,
+				lineHeight,
+				fit,
+				leadingTrim,
+				maxLines,
+				engine,
+				metricsMap,
+				deviceScale,
+			)
+		: layoutInline(
+				spans,
+				defaultFont,
+				color,
+				pos,
+				size,
+				align,
+				verticalAlign,
+				leadingTrim,
+				engine,
+				metricsMap,
+				deviceScale,
+			);
+}
+
+// ─────────────── span normalization ───────────────
+
+function normalizeSpans(node: TextNode): Span[] {
+	if (node.spans && node.spans.length > 0) return node.spans;
+	return [{ text: node.text ?? "" }];
+}
+
+function hasOverrides(span: Span): boolean {
+	if (span.color !== undefined) return true;
+	const f = span.font;
+	if (!f) return false;
+	return (
+		f.family !== undefined ||
+		f.size !== undefined ||
+		f.weight !== undefined ||
+		f.style !== undefined ||
+		f.letterSpacing !== undefined ||
+		f.lineHeight !== undefined ||
+		f.variations !== undefined
+	);
+}
+
+// ─────────────── metrics + baseline ───────────────
+
+// Font ascent/descent (+ line gap, cap height) in target pixels. Prefers the
+// OS/2 sTypo metrics Figma uses (registered from font bytes); falls back to
+// typical ratios when a family isn't registered.
+function fontMetrics(
+	font: ResolvedFont,
+	metricsMap?: Record<string, FontVMetrics>,
+): { ascent: number; descent: number; lineGap: number; capHeight: number } {
+	const reg = metricsMap?.[font.family] ?? getFontMetrics(font.family);
+	if (reg) {
+		return {
+			ascent: reg.ascent * font.size,
+			descent: reg.descent * font.size,
+			lineGap: reg.lineGap * font.size,
+			capHeight: reg.capHeight * font.size,
+		};
+	}
+	return {
+		ascent: font.size * 0.8,
+		descent: font.size * 0.2,
+		lineGap: 0,
+		capHeight: font.size * 0.7,
+	};
+}
+
+// Distance from a line's top to its alphabetic baseline.
+// - default: Figma centers (ascent + descent) in the line height, so the
+//   baseline sits half a leading below the top, plus the ascent.
+// - leadingTrim: cap height is anchored to the box top, so baseline = capHeight.
+function baselineOffset(
+	font: ResolvedFont,
+	lineHeightPx: number,
+	leadingTrim: boolean,
+	metricsMap?: Record<string, FontVMetrics>,
+): number {
+	const m = fontMetrics(font, metricsMap);
+	if (leadingTrim && m.capHeight > 0) return m.capHeight;
+	const halfLeading = (lineHeightPx - (m.ascent + m.descent)) / 2;
+	return halfLeading + m.ascent;
+}
+
+// ─────────────── wrappable (single-style) path ───────────────
+
+function layoutWrappable(
+	text: string,
+	defaultFont: ResolvedFont,
+	color: string,
+	pos: Vec2,
+	size: Size,
+	align: "left" | "center" | "right",
+	verticalAlign: "top" | "middle" | "bottom",
+	lineHeight: number,
+	fit: "shrink" | "clip" | undefined,
+	leadingTrim: boolean,
+	maxLines: number | undefined,
+	engine: TextEngine,
+	metricsMap?: Record<string, FontVMetrics>,
+	deviceScale?: number,
+): BakedTextLayout {
+	const measured = engine.layoutText({
+		value: text,
+		font: {
+			family: defaultFont.family,
+			size: defaultFont.size,
+			weight: defaultFont.weight,
+			style: defaultFont.style,
+			letterSpacing: defaultFont.letterSpacing,
+			variations: defaultFont.variations,
+		},
+		maxWidth: size.width,
+		maxHeight: size.height,
+		lineHeight,
+		fit,
+	});
+	const effFont: ResolvedFont = {
+		...defaultFont,
+		size: measured.effectiveFontSize,
+	};
+
+	// Figma "Truncate text": keep the first maxLines, ellipsize the last on overflow.
+	let mlines = measured.lines;
+	if (maxLines !== undefined && mlines.length > maxLines) {
+		const kept = mlines.slice(0, maxLines);
+		const last = kept[maxLines - 1];
+		const truncated = ellipsize(last.text, effFont, size.width, engine);
+		kept[maxLines - 1] = {
+			...last,
+			text: truncated,
+			width: engine.measureText(truncated, effFont, null).width,
+		};
+		mlines = kept;
+	}
+
+	const lineHeightPx = measured.effectiveFontSize * lineHeight;
+	// Per-line advance, pixel-rounded like Figma to avoid sub-px drift down a
+	// paragraph — on the grid the export will be painted on. (No authoring ratio
+	// here — the Node IR is already in target px.)
+	const lineAdvance = snapToDevice(lineHeightPx, deviceScale);
+	const baseOffset = baselineOffset(
+		effFont,
+		lineHeightPx,
+		leadingTrim,
+		metricsMap,
+	);
+	const nLines = mlines.length;
+	const contentHeight = leadingTrim
+		? baseOffset + (nLines - 1) * lineAdvance
+		: lineAdvance * nLines;
+	const startY = startYForVAlign(
+		verticalAlign,
+		pos.y,
+		size.height,
+		contentHeight,
+	);
+
+	const lines: TextLine[] = mlines.map((line, i) => {
+		const x = xForAlign(align, pos.x, size.width, line.width);
+		const y = startY + i * lineAdvance;
+		return {
+			text: line.text,
+			y,
+			baseline: y + baseOffset,
+			spans: [{ text: line.text, x, width: line.width, font: effFont, color }],
+		};
+	});
+	return {
+		font: effFont,
+		lines,
+		totalHeight: nLines * lineHeightPx,
+		shrinkApplied: measured.shrinkApplied,
+	};
+}
+
+// Trim `text` so `text + "…"` fits within maxWidth (binary search on length).
+function ellipsize(
+	text: string,
+	font: ResolvedFont,
+	maxWidth: number,
+	engine: TextEngine,
+): string {
+	const ell = "…";
+	if (engine.measureText(`${text}${ell}`, font, null).width <= maxWidth)
+		return `${text}${ell}`;
+	let lo = 0;
+	let hi = text.length;
+	while (lo < hi) {
+		const mid = Math.ceil((lo + hi) / 2);
+		const candidate = `${text.slice(0, mid).trimEnd()}${ell}`;
+		if (engine.measureText(candidate, font, null).width <= maxWidth) lo = mid;
+		else hi = mid - 1;
+	}
+	return `${text.slice(0, lo).trimEnd()}${ell}`;
+}
+
+const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
+
+// Snap to the pixel grid the scene will actually be painted on.
+function snapToDevice(v: number, deviceScale: number | undefined): number {
+	const s = deviceScale && deviceScale > 0 ? deviceScale : 1;
+	return Math.round(v * s) / s;
+}
+
+// ─────────────── inline (multi-style) path ───────────────
+
+function layoutInline(
+	spans: Span[],
+	defaultFont: ResolvedFont,
+	defaultColor: string,
+	pos: Vec2,
+	size: Size,
+	align: "left" | "center" | "right",
+	verticalAlign: "top" | "middle" | "bottom",
+	leadingTrim: boolean,
+	engine: TextEngine,
+	metricsMap?: Record<string, FontVMetrics>,
+	deviceScale?: number,
+): BakedTextLayout {
+	const resolved = spans.map((s) => {
+		const f = s.font ?? {};
+		const font: ResolvedFont = {
+			family: f.family ?? defaultFont.family,
+			size: f.size ?? defaultFont.size,
+			weight: f.weight ?? defaultFont.weight,
+			style: f.style ?? defaultFont.style,
+			letterSpacing: f.letterSpacing ?? defaultFont.letterSpacing,
+			lineHeight: f.lineHeight ?? defaultFont.lineHeight,
+			decoration: f.decoration ?? defaultFont.decoration,
+			// A span's axes adjust the element's rather than replacing them.
+			variations:
+				f.variations || defaultFont.variations
+					? { ...defaultFont.variations, ...f.variations }
+					: undefined,
+		};
+		return { text: s.text, font, color: s.color ?? defaultColor };
+	});
+
+	const dominantFont = resolved.reduce((d, r) =>
+		r.font.size > d.font.size ? r : d,
+	).font;
+	const lineHeightPx = dominantFont.size * dominantFont.lineHeight;
+	const baseOffset = baselineOffset(
+		dominantFont,
+		lineHeightPx,
+		leadingTrim,
+		metricsMap,
+	);
+
+	// Engine path: one shaped, wrappable paragraph across all spans (cross-span
+	// shaping + mixed-style wrapping). This module owns vertical placement (line
+	// advance / baseline / vertical-align); the engine returns per-line fragment
+	// geometry only.
+	if (engine.layoutInline) {
+		const shaped = engine.layoutInline(
+			resolved.map((r) => ({ text: r.text, font: r.font })),
+			size.width,
+		);
+		// Each line gets the box ITS OWN spans ask for, not the node's tallest.
+		// Line height varies within a text node as freely as size does — a
+		// signature block set to 132% on its first line and Auto on the rest is one
+		// node with two different line boxes — and using a single advance stacks
+		// every later line where the first line's box would have put it.
+		const measuredLines = shaped.lines.map((sl) => {
+			const fonts = sl.fragments.map((fr) => resolved[fr.spanIndex].font);
+			const tallest = fonts.reduce(
+				(best, f) =>
+					f.size * f.lineHeight > best.size * best.lineHeight ? f : best,
+				fonts[0] ?? dominantFont,
+			);
+			const boxPx = tallest.size * tallest.lineHeight;
+			return {
+				shaped: sl,
+				font: tallest,
+				boxPx,
+				// Pixel-rounded like Figma, so a paragraph doesn't drift sub-pixel.
+				advance: snapToDevice(boxPx, deviceScale),
+				baseOffset: baselineOffset(tallest, boxPx, leadingTrim, metricsMap),
+			};
+		});
+		const advances = measuredLines.map((l) => l.advance);
+		const firstOffset = measuredLines[0]?.baseOffset ?? baseOffset;
+		const contentHeight = leadingTrim
+			? firstOffset + sum(advances.slice(1))
+			: sum(advances) || snapToDevice(lineHeightPx, deviceScale);
+		const startY = startYForVAlign(
+			verticalAlign,
+			pos.y,
+			size.height,
+			contentHeight,
+		);
+		let cursorY = startY;
+		const lines: TextLine[] = measuredLines.map((ml) => {
+			const sl = ml.shaped;
+			const lineX = xForAlign(align, pos.x, size.width, sl.width);
+			const y = cursorY;
+			cursorY += ml.advance;
+			const spansOut: TextLineSpan[] = sl.fragments.map((fr) => ({
+				text: fr.text,
+				x: lineX + fr.x,
+				width: fr.width,
+				font: resolved[fr.spanIndex].font,
+				color: resolved[fr.spanIndex].color,
+			}));
+			return {
+				text: sl.fragments.map((f) => f.text).join(""),
+				y,
+				baseline: y + ml.baseOffset,
+				spans: spansOut,
+			};
+		});
+		return {
+			font: dominantFont,
+			lines,
+			totalHeight: sum(measuredLines.map((l) => l.boxPx)) || lineHeightPx,
+			shrinkApplied: false,
+		};
+	}
+
+	// Fallback: independent per-span widths, single line, no wrap.
+	const widths = resolved.map((r) => engine.measureSpanWidth(r.text, r.font));
+	const totalWidth = widths.reduce((s, w) => s + w, 0);
+	const startY = startYForVAlign(
+		verticalAlign,
+		pos.y,
+		size.height,
+		lineHeightPx,
+	);
+	const lineX = xForAlign(align, pos.x, size.width, totalWidth);
+
+	let cursor = lineX;
+	const spanLayouts: TextLineSpan[] = resolved.map((r, i) => {
+		const out: TextLineSpan = {
+			text: r.text,
+			x: cursor,
+			width: widths[i],
+			font: r.font,
+			color: r.color,
+		};
+		cursor += widths[i];
+		return out;
+	});
+
+	return {
+		font: dominantFont,
+		lines: [
+			{
+				text: resolved.map((r) => r.text).join(""),
+				y: startY,
+				baseline: startY + baseOffset,
+				spans: spanLayouts,
+			},
+		],
+		totalHeight: lineHeightPx,
+		shrinkApplied: false,
+	};
+}
+
+// ─────────────── alignment ───────────────
+
+function xForAlign(
+	align: "left" | "center" | "right",
+	boxX: number,
+	boxWidth: number,
+	lineWidth: number,
+): number {
+	if (align === "center") return boxX + (boxWidth - lineWidth) / 2;
+	if (align === "right") return boxX + boxWidth - lineWidth;
+	return boxX;
+}
+
+function startYForVAlign(
+	va: "top" | "middle" | "bottom",
+	boxY: number,
+	boxHeight: number,
+	layoutHeight: number,
+): number {
+	// When content overflows the box, aligning would push its start above the box
+	// top (middle/bottom) so a clip shows only the tail. Pin to the top instead so
+	// the START of the text stays visible; alignment applies only when it fits.
+	if (layoutHeight > boxHeight) return boxY;
+	if (va === "middle") return boxY + (boxHeight - layoutHeight) / 2;
+	if (va === "bottom") return boxY + boxHeight - layoutHeight;
+	return boxY;
+}

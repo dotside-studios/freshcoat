@@ -1,0 +1,68 @@
+{
+	"format_version": "1.4",
+	"version": "1.0.0",
+	"id": "full-card",
+	"name": "Full Card",
+	"product": "card_cr80",
+	"width": 1017,
+	"height": 639,
+	"fields": {
+		"type": "object",
+		"properties": {
+			"user_avatar": {
+				"type": "string",
+				"format": "image",
+				"title": "User Avatar",
+				"x-image-aspect": [1, 1]
+			},
+			"display_name": { "type": "string", "title": "Display Name" }
+		},
+		"required": ["user_avatar", "display_name"]
+	},
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "Front",
+				"type": "rect",
+				"pos": { "x": 0, "y": 0 },
+				"size": { "width": 1017, "height": 639 },
+				"properties": { "fill": "#fef3c7" }
+			},
+			"elements": [
+				{
+					"id": "user_avatar",
+					"type": "image",
+					"pos": { "x": 64, "y": 64 },
+					"size": { "width": 160, "height": 160 },
+					"properties": { "src": "{{user_avatar}}", "fit": "cover" }
+				},
+				{
+					"id": "display_name",
+					"type": "text",
+					"pos": { "x": 256, "y": 96 },
+					"size": { "width": 600, "height": 64 },
+					"properties": {
+						"value": "{{display_name}}",
+						"font": {
+							"family": "Comfortaa",
+							"size": 48,
+							"weight": 700,
+							"lineHeight": 1.2
+						},
+						"color": "#1a1a1a",
+						"align": "left",
+						"verticalAlign": "top"
+					}
+				},
+				{
+					"id": "flatten_2_4",
+					"type": "image",
+					"pos": { "x": 800, "y": 400 },
+					"size": { "width": 200, "height": 200 },
+					"properties": { "src": "asset:RASTER_2_4_SHA", "fit": "fill" }
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,108 @@
+{
+	"id": "corner-radius-per-corner",
+	"title": "a per-corner radius rounds only the corners it names",
+	"profile": "core",
+	"requires": [
+		"shape.cornerRadius",
+		"shape.perCornerRadius"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				],
+				"cornerRadius": [
+					0,
+					40,
+					0,
+					0
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				42,
+				22
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "top-left, radius 0, square"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				118,
+				22
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "top-right, radius 40, cut away"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				118,
+				98
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "bottom-right, radius 0, square"
+		}
+	]
+}

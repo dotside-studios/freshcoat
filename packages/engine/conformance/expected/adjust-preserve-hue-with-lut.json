@@ -1,0 +1,97 @@
+{
+	"caseId": "adjust-preserve-hue-with-lut",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"adjust": {
+						"colorMatrix": [
+							1.914172,
+							-0.5578560000000001,
+							-0.056316000000000005,
+							0,
+							-0.15058823529411766,
+							-0.16582800000000006,
+							1.522144,
+							-0.056316000000000005,
+							0,
+							-0.15058823529411766,
+							-0.16582800000000006,
+							-0.5578560000000001,
+							2.0236840000000003,
+							0,
+							-0.15058823529411766,
+							0,
+							0,
+							0,
+							1,
+							0
+						],
+						"gamut": "preserve-hue",
+						"lut": {
+							"r": {
+								"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+							},
+							"g": {
+								"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+							},
+							"b": {
+								"__u8": "AAIDBQYHCQoLDQ4PEBITFBUWFxkaGxwdHiAhIiMkJSYnKCorLC0uLzAxMjM0Njc4OTo7PD0+P0BBQkNERUZHSElLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmJmam5ydnp+goaKjpKWmp6ipqqqrrK2ur7CxsrO0tba3uLm5uru8vb6/wMHCw8TFxsbHyMnKy8zNzs/Q0dLS09TV1tfY2drb3N3d3t/g4eLj5OXm5+fo6err7O3u7/Dx8fLz9PX29/j5+vr7/P3+/w=="
+							}
+						}
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#6d4fd1"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "d6a374a88faef6b53ef093b786644ef832d299b7bf40d0b8c68fe7bee610957d"
+}

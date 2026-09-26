@@ -1,0 +1,63 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
+	"vcs": {
+		"enabled": false,
+		"clientKind": "git",
+		"useIgnoreFile": false
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**/src/**/*",
+			"**/index.html",
+			"**/vite.config.ts",
+			"**/vitest.config.ts",
+			"**/playwright.config.ts",
+			"**/e2e/**/*.ts",
+			"**/scripts/**/*.ts",
+			"!**/src/fonts/google-fonts.json"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"style": {
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"paths": {
+							"lucide-react": "Use ~icons/mingcute/<name>-line (or -fill on solid CTAs only). See CLAUDE.md icon rules.",
+							"react-icons/si": "Use ~icons/simple-icons/<name> via unplugin-icons. See CLAUDE.md icon rules.",
+							"react-icons": "Use ~icons/mingcute/<name>-line or ~icons/simple-icons/<name>. See CLAUDE.md icon rules."
+						}
+					}
+				}
+			},
+			"suspicious": {
+				"noAlert": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	}
+}

@@ -1,0 +1,104 @@
+{
+	"id": "export-scale",
+	"title": "an export scales the raster, not the layout",
+	"profile": "raster",
+	"requires": [
+		"export.scale"
+	],
+	"width": 160,
+	"height": 120,
+	"compile": {
+		"scale": 2
+	},
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				160,
+				120
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "the design-space centre, at 2x"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				78,
+				58
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "just outside the scaled top-left corner"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				82,
+				62
+			],
+			"expect": [
+				47,
+				111,
+				237,
+				255
+			],
+			"why": "just inside it"
+		}
+	]
+}

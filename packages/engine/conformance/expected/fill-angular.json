@@ -1,0 +1,79 @@
+{
+	"caseId": "fill-angular",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "angular",
+							"center": {
+								"x": 0.5,
+								"y": 0.5
+							},
+							"rotation": 0,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#ff0000"
+								},
+								{
+									"offset": 0.5,
+									"color": "#00ff00"
+								},
+								{
+									"offset": 1,
+									"color": "#ff0000"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "84d986c17a499c1f46c77aa0fabd39a78da13d4b3b1b56cd015f3396941d4f9e"
+}
