@@ -32,7 +32,7 @@ describe("readPluginData", () => {
 
 	it("has no fallback for a key that never had a legacy name", () => {
 		expect(
-			readPluginData(node({ "davi:other": "x" }), "davi_template_kit:other"),
+			readPluginData(node({ "davi:other": "x" }), "freshcoat_plugin:other"),
 		).toBe("");
 	});
 

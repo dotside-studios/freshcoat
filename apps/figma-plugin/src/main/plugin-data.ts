@@ -7,9 +7,9 @@
 // for keys added later.
 
 /** Per-node binding: which element property maps to which {{field}}. */
-export const FIELD_KEY = "davi_template_kit:field";
+export const FIELD_KEY = "freshcoat_plugin:field";
 /** Per-slot-frame field metadata: id → label, type, source, required. */
-export const FIELDS_KEY = "davi_template_kit:fields";
+export const FIELDS_KEY = "freshcoat_plugin:fields";
 
 // Keys used before the plugin was renamed. Read-only, and transitional: Figma
 // assigns the real plugin id at publish, and stored data "will become

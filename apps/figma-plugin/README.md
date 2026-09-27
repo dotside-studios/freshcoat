@@ -251,8 +251,8 @@ export in the main thread.
 
 ## Stored data, and publishing
 
-Bindings live in node `pluginData` under `davi_template_kit:field` (per layer)
-and `davi_template_kit:fields` (per slot frame); see
+Bindings live in node `pluginData` under `freshcoat_plugin:field` (per layer)
+and `freshcoat_plugin:fields` (per slot frame); see
 `src/main/plugin-data.ts`. The prefix is cosmetic:
 `setPluginData` is already private to the plugin id, so
 ["Plugins with other IDs won't be able to read this data"](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/).

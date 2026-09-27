@@ -73,7 +73,7 @@ import {
 
 // 2x the thumbnail box in layout.tsx, so previews stay sharp on retina.
 const THUMBNAIL_WIDTH = 128;
-const SETTINGS_KEY = "davi_template_kit_settings";
+const SETTINGS_KEY = "freshcoat_plugin_settings";
 
 /** Author units per design unit for a slot, mirroring how the transpiler settles
  *  the canvas: a custom export takes the design's own measurement (so the two
