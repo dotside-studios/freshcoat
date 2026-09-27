@@ -152,11 +152,14 @@ third-party notices. Download it from a GitHub release, extract it, and import
 its manifest through Figma desktop's development plugin menu. No build is
 needed to use that bundle.
 
-Community publishing remains a separate manual step. Obtain the permanent
-plugin ID from Figma, put it in `apps/figma-plugin/package.json` under
-`figma-plugin.id`, and rebuild before Community publication. Keep that ID
-stable across updates: changing it makes plugin data saved under the old
-identity inaccessible. The current development ID is not a Community ID.
+Community publishing remains a separate manual step. The plugin has been
+submitted and is awaiting Figma's review; it is not yet publicly available
+through Community. Release ZIPs can still be installed as development plugins.
+
+The permanent plugin ID is `1685967766479998641`, configured in
+`apps/figma-plugin/package.json` under `figma-plugin.id`. The build generates
+`manifest.json` from that configuration. Keep the ID stable across updates:
+changing it makes plugin data saved under the old identity inaccessible.
 
 Check the plugin in Figma and submit it through Figma's publishing flow. CI
 does not submit or update a Community listing. See
