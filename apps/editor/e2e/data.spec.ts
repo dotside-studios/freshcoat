@@ -6,7 +6,7 @@ import { mod, openSample, run, state } from "./helpers";
 // SheetJS comes from the workspace package, which owns the dependency.
 type Workbook = { SheetNames: string[]; Sheets: Record<string, unknown> };
 const XLSX = createRequire(
-	new URL("../../workspace/package.json", import.meta.url),
+	new URL("../../../packages/workspace/package.json", import.meta.url),
 )("xlsx") as {
 	read(data: Buffer, opts: { type: "buffer" }): Workbook;
 	utils: { sheet_to_json<T>(sheet: unknown): T[] };
