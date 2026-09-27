@@ -1,6 +1,9 @@
-# Performance
+# Studio performance
 
-How fast Freshcoat is, how it was measured, and what the numbers mean.
+Measurements of Studio's render pipeline, export workers and state layer.
+These are historical measurements from the implementation stages named below,
+not benchmarks of the current release. The software-rendered container results
+should not be treated as timings for GPU-backed browsers.
 
 ## The render pipeline
 
@@ -11,9 +14,8 @@ The editor keeps one render pipeline warm for the whole session:
   width changes;
 - the scheduler renders only the newest edit, one render at a time.
 
-Both caches are new, opt-in APIs in the coat engine, the `freshcoat` render
-package (`createPaintCache`, `memoizeTextEngine`). Without them, the coat
-engine behaves exactly as before.
+Both caches are opt-in APIs in the coat engine, the `freshcoat` render
+package (`createPaintCache`, `memoizeTextEngine`). Callers choose whether to keep these caches between renders.
 
 Measured with `/bench` against the production build, in headless Chromium on a
 4-core container. The median is p50 and the slowest 5% is p95. The uncached
@@ -76,7 +78,7 @@ records scrolls at 33 ms a frame.
 
 The state layer writes with Immer, auto-freeze off, where a recipe costs no
 more than the spreads it replaced. `bunx vitest bench --run src/tests/perf`,
-in `editor/`, measures it. These are the fastest samples; the first two columns ran the
+in `apps/editor/`, measures it. These are the fastest samples; the first two columns ran the
 old and new code in one process, and the last is the finished phase 4 on
 its own:
 
@@ -94,7 +96,7 @@ The template ops are slower in absolute terms and none is on a hot path.
 
 ### Where Immer is used
 
-`editor/src/state/immer.ts` is the only place Immer is configured, and every
+`src/state/immer.ts` is the only place Immer is configured, and every
 recipe imports `produce` from it.
 
 - Auto-freeze is off: freezing 10k-record datasets and the renderer's
@@ -131,7 +133,7 @@ with a barcode opens or the Barcode tool is chosen.
 
 Open `/bench?sample=<id>&frames=<n>` in a running editor to time a bundled
 sample: awaited edits, a drag of `n` frames at the display's rate, and
-typing. From `editor/`,
+typing. From `apps/editor/`,
 `bunx playwright test e2e/bench.spec.ts` with `FRESHCOAT_PREVIEW=1` runs the
 benchmark against the production build. It records the numbers, and fails only
 on gross regressions. In that mode the build is `vite build --mode e2e`, the

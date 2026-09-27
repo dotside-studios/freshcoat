@@ -44,6 +44,20 @@ relative to your stylesheet.
 The studio ([`apps/editor`](../../apps/editor/)) is the only consumer today.
 The kit is maintained in this workspace and is not yet published separately.
 
+## Contributing
+
+Follow the [repository guide](../../CONTRIBUTING.md) for setup and review checks.
+
+1. Add `src/<name>.tsx`, building on a `react-aria-components` primitive where
+   available so keyboard, focus and screen-reader behavior come with it.
+2. Style with Tailwind classes using `src/theme.css` tokens rather than raw
+   colors, so both themes work.
+3. The package's wildcard exports expose components as `@freshcoat/ui/<name>`.
+   Show the component in `src/gallery.tsx`, Studio's `/kit` route, in both themes.
+4. Test behavior beyond markup under `src/tests/`. Run `test`, `typecheck`
+   and `check` from this directory, plus relevant Studio tests when a shared
+   interaction changes.
+
 ## License
 
 Apache-2.0; see the repository's [`LICENSE`](../../LICENSE) and

@@ -14,7 +14,7 @@ Layers, snapping and an inspector handle the design. Typed datasets and field
 bindings handle the changing content. Export presets keep the dimensions,
 formats and file names ready for the next run.
 
-![The Edit section with a membership card open and its name layer selected](../../docs/images/editor.png)
+![The Edit section with a membership card open and its name layer selected](docs/images/editor.png)
 
 A workspace holds templates, their data and export presets. Save the whole
 project as a `.coatworkspace`, or share an individual template as a `.coat`.
@@ -33,7 +33,7 @@ the interface fonts are bundled.
 The canvas and exports use the same reusable packages:
 [`@freshcoat/coatfile`](../../packages/coatfile) compiles templates, and
 [`freshcoat`](../../packages/engine) lays out and paints them with CanvasKit.
-See [performance](../../docs/performance.md) for measurements of live editing
+See [performance](docs/performance.md) for measurements of live editing
 and batch exports.
 
 ## Quick start
@@ -61,8 +61,9 @@ bun run --cwd apps/editor test                 # unit tests (vitest)
 bun run --cwd apps/editor typecheck
 ```
 
-[CONTRIBUTING.md](../../CONTRIBUTING.md) has every script, the end-to-end tests and
-the benchmark.
+The [Studio contribution guide](CONTRIBUTING.md) covers scripts, browser tests,
+benchmarks and copy conventions. The [repository guide](../../CONTRIBUTING.md)
+covers shared checks and pull requests.
 
 ## What it does
 
@@ -102,17 +103,17 @@ the benchmark.
   and dark themes with tested token contrast, and usable on a tablet from
   about 1024px wide.
 
-[docs/features.md](../../docs/features.md) describes each of these in full.
+[docs/features.md](docs/features.md) describes each of these in full.
 
 ## Documentation
 
 | Document | What is in it |
 |---|---|
-| [docs/features.md](../../docs/features.md) | Every feature in detail, the URL scheme and the `.coatworkspace` format |
-| [ARCHITECTURE.md](../../ARCHITECTURE.md) | How it is built: the packages, the data flow and the file layout |
-| [CONTRIBUTING.md](../../CONTRIBUTING.md) | Setup, scripts, tests, code style, the copy guide and the pull request checklist |
-| [docs/good-first-issues.md](../../docs/good-first-issues.md) | Small, concrete tasks to start with |
-| [docs/performance.md](../../docs/performance.md) | Benchmarks and what they show |
+| [docs/features.md](docs/features.md) | Every feature in detail, the URL scheme and the `.coatworkspace` format |
+| [Studio architecture](ARCHITECTURE.md) | Editor data flow, controller, render sessions, workers and routes |
+| [Studio contribution guide](CONTRIBUTING.md) | Editor scripts, browser tests, copy conventions and extension points |
+| [docs/good-first-issues.md](docs/good-first-issues.md) | Small, concrete tasks to start with |
+| [docs/performance.md](docs/performance.md) | Benchmarks and what they show |
 | [SECURITY.md](../../SECURITY.md) | How to report a vulnerability |
 | [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) | How we treat each other |
 
@@ -160,24 +161,32 @@ the benchmark.
 - ITF-14 is drawn without its bearer bars (the frame around the code), which
   some retail scanners expect on corrugated cartons.
 
-## Repository layout
+## Serving Studio
 
-`apps/editor` is the browser application, and `apps/figma-plugin` is the Figma
-exporter and preview tool. Reusable code lives in
-`packages/`: `engine` is named `freshcoat`; `coatfile`, `for-print`,
-`ui` and `workspace` are the corresponding `@freshcoat/*` packages. The
-packages use workspace dependencies while developed together and can be
-published independently when releases are introduced.
+`bun run build` at the repository root builds this app into `apps/editor/dist`.
+The static Bun server at `server.ts` serves that output with an `index.html`
+fallback, so direct links to editor routes load correctly.
+
+```sh
+bun apps/editor/server.ts
+```
+
+Run that command from the repository root; the server defaults to port 3000
+and reads `PORT` when provided. The root [Dockerfile](../../Dockerfile) packages
+the build and server, using the whole repository as its build context.
+The deployment entry files stay at the root for the existing configuration;
+they deploy Studio, not the SDK packages or Figma plugin.
+
+For the other components, see the [repository architecture](../../ARCHITECTURE.md).
 
 ## License
 
 Freshcoat is licensed under the [Apache License 2.0](../../LICENSE). Copyright 2026
 Dotside Studios; see [NOTICE](../../NOTICE).
 
-The kits (`@freshcoat/coatfile`, the `freshcoat` render package and
-`@freshcoat/for-print`) are Apache-2.0 packages in the same repository today,
-each with its own LICENSE and NOTICE. They are currently private workspace
-packages, with no npm releases yet.
+The core SDK packages have their own LICENSE and NOTICE and are prepared
+for npm publication through the [release tooling](../../docs/releases.md).
+Studio itself remains a private workspace application.
 Third-party software and fonts are listed
 in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). The license grants no
 rights in the Freshcoat and Davi names, logos or wordmark: see

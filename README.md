@@ -5,120 +5,85 @@
 <p><strong>Create designs that scale.</strong></p>
 
 Freshcoat is an open-source design and rendering stack for work that repeats:
-cards, badges, certificates, labels and watermarked photos. Design once, fill
-it from your data, and export one file per record, side or variant.
+cards, badges, certificates, labels and watermarked photos. A portable template
+format describes the design; a Skia renderer turns it into pixels; print and
+workspace utilities support production runs.
 
-It brings together a portable template format, a Skia renderer and
-Freshcoat Studio, a browser editor for the whole workflow. The format and
-renderer power [Davi](https://davi.social)'s card production system; the same
-packages can be used independently in your own applications.
+Use the packages in your own application, author templates in Figma, or design
+and export in Freshcoat Studio. Studio is one host for the stack, not a
+requirement for using it. The format and renderer also power
+[Davi](https://davi.social)'s card production system.
 
-Studio runs in your browser without an account or a rendering server.
-Imported files and autosaved work stay in browser storage, and exports run
-in workers. Fonts and images referenced by URL may still be fetched from
-their hosts.
+## Choose your starting point
 
-![The Edit section with a membership card open and its name layer selected](docs/images/editor.png)
+| If you want to | Start with |
+|---|---|
+| Compile and render a design filled from data | [`@freshcoat/coatfile`](packages/coatfile/) |
+| Render your own 2D scene graph with CanvasKit | [`freshcoat`](packages/engine/), the engine package |
+| Analyze images and plan corrections for card printers | [`@freshcoat/for-print`](packages/for-print/) |
+| Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
+| Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
 
-## From one design to a production run
+The three core SDK packages have release builds with compiled ESM,
+declarations and assets. Their source manifests stay private for workspace
+development; publish the generated tarballs. See the
+[release guide](docs/releases.md) for npm setup, release checks and Figma ZIPs.
 
-A membership card is more than a name placed on a background. Names wrap,
-photos need cropping, tiers have different colors, and fronts must line up
-with backs on a printed sheet. Those choices need to hold across hundreds
-of records without turning each card into a separate design file.
+## What the stack shares
 
-Freshcoat keeps the design, data and output settings together:
+- **Templates:** layers, fields, fonts, sides and variants define a reusable
+  design. JSON describes it; a `.coat` archive can carry its assets.
+- **Scenes and rendering:** coatfile compiles a template and values into a
+  scene. The engine lays out and paints that scene through CanvasKit, Skia
+  compiled to WASM. Hosts supply fonts, images and the rendering environment.
+- **Production utilities:** print analysis and correction are separate from
+  authoring. The workspace package adds datasets, bindings, export plans,
+  PDF assembly and sheet imposition for hosts that need batch output.
 
-- **Templates describe the design.** Layers, text, gradients, masks and
-  constraints define its appearance. Fields define what changes between
-  records; variants define versions such as colorways or badge roles. The
-  schema defines the JSON document, and a `.coat` file packages it with
-  embedded assets. Fonts and images can be embedded or referenced by URL.
-- **One renderer handles preview and export.** CanvasKit (Skia compiled to
-  WASM) supplies text measurement and painting in the browser and on
-  servers. Export density can change without changing the layout. Upright
-  barcode modules snap to whole output pixels.
-- **Workspaces describe the run.** Templates, datasets, field bindings and
-  export presets travel in one `.coatworkspace` file. Export images
-  individually or assemble them into PDFs, including sheets with crop marks
-  and duplex backs. Optional correction for dye-sublimation card printers
-  uses profiles measured from printed charts.
+The [workspace](packages/workspace/) and [UI](packages/ui/) packages are
+internal workspace packages, not part of the current npm release set.
+The workspace model is independent of React; the UI kit supplies Studio's
+React controls and themes.
 
-## What it makes
+## Applications
 
-- **Cards and badges** — CR80 membership cards; event badges with ticket
-  barcodes; colorways, roles and tiers as variants; arranged on sheets with
-  crop marks.
-- **Certificates, labels, anything named and numbered** — from a spreadsheet,
-  as images or PDFs, one page per record.
-- **Watermarked photos** — a mark on a few hundred camera photos, each
-  exported at its own size and named after its file, with a bounded queue of
-  renders and finished outputs.
-- **Batch exports** — every selected record, side and variant,
-  written to a zip or a folder as it goes, with a report of what failed.
+[Studio](apps/editor/) combines template editing, typed datasets and worker-based
+exports in a browser. Imported files and autosaved work stay in browser
+storage; URL-referenced fonts and images can still be fetched from their hosts.
+Its feature list, screenshots, limits and development guide live in
+[`apps/editor`](apps/editor/README.md).
 
-Preview real records while designing, then choose the dimensions, density
-and file format for the run.
-
-## How it comes together
-
-- **The studio** ([apps/editor](apps/editor/)) — a browser editor with
-  layers, snapping, an inspector, and a canvas that previews real records
-  while you design. **Data** holds your
-  records and photos; **Export** holds the presets, the progress and the
-  report.
-- **The format** ([packages/coatfile](packages/coatfile/)) — `.coat`
-  templates, their schema, and the compiler that turns a design plus values
-  into a scene.
-- **The engine** ([packages/engine](packages/engine/)) — the coat engine: a
-  2D scene graph painted with CanvasKit (Skia compiled to WASM), fast enough
-  to repaint as you drag.
-- **The print path** ([packages/for-print](packages/for-print/)) — analysis
-  and correction for CR80 dye-sublimation card printers, with profiles a card
-  shop measures from a print chart.
-- **The workspace** ([packages/workspace](packages/workspace/)) — datasets,
-  bindings, export planning and imposition, and the `.coatworkspace` file that
-  carries the lot.
-- **The interface kit** ([packages/ui](packages/ui/)) — Studio's React
-  controls, panels and themes.
-- **Figma in** ([apps/figma-plugin](apps/figma-plugin/)) — name a layer
-  `{{field}}`, and export a template with its bindings, or hand it straight to
-  the studio.
-
-For an application that renders templates, start with `@freshcoat/coatfile`.
-For a renderer built around your own scene model, start with `freshcoat`, the
-engine package. Add `@freshcoat/workspace` for datasets and export planning,
-or `@freshcoat/for-print` for card-printer correction.
-
-The core packages have a release build for compiled JavaScript, declarations
-and bundled assets. Source manifests stay private for workspace development;
-the release tooling produces public npm packages. The format, engine and print
-packages each have their own LICENSE and NOTICE. See the
-[release guide](docs/releases.md) for publishing and download instructions.
+[Freshcoat for Figma](apps/figma-plugin/) exports frames as `.coat` templates
+with optional field bindings and can hand a result to Studio. Its README
+covers layer naming, supported Figma features and installation.
 
 ## Develop
 
-Requires [Bun](https://bun.sh) 1.3.13 or later.
+Requires [Bun](https://bun.sh) 1.3.13 or later. From the repository root:
 
 ```sh
 bun install
-bun run dev
+bun run test
+bun run typecheck
 ```
 
-The editor opens at <http://localhost:3010>. `bun run test` and
-`bun run typecheck` run every package's checks. [CONTRIBUTING.md](CONTRIBUTING.md)
-has the full list of scripts and what a pull request needs.
+Choose the app or package you want to work on and use its README for specific
+commands. For example, `bun run --cwd apps/editor dev` starts Studio, while
+`bun run --cwd apps/figma-plugin build` builds the plugin.
+The root `dev` and `build` aliases target Studio for convenience.
 
 ## Documentation
 
-- [docs/features.md](docs/features.md) — what the studio does, in detail
-- [ARCHITECTURE.md](ARCHITECTURE.md) — how the workspace is built
-- [docs/performance.md](docs/performance.md) — the measurements behind the
-  render pipeline and the libraries
-- [docs/releases.md](docs/releases.md) — npm packages and Figma plugin releases
+- [Architecture](ARCHITECTURE.md): package responsibilities and host boundaries.
+- [Contributing](CONTRIBUTING.md): repository setup, checks and review conventions.
+- [Releases](docs/releases.md): npm publication and Figma release bundles.
+- [Studio](apps/editor/README.md) and [Figma plugin](apps/figma-plugin/README.md):
+  application-specific behavior and guides.
+- Each package README documents its API, runtime requirements and examples.
 
 ## License
 
 Freshcoat is licensed under the [Apache License 2.0](LICENSE). Copyright 2026
-Dotside Studios; see [NOTICE](NOTICE). The name and marks are not licensed;
-see [NAMES-AND-LOGOS.md](NAMES-AND-LOGOS.md).
+Dotside Studios; see [NOTICE](NOTICE) and
+[third-party notices](THIRD_PARTY_NOTICES.md).
+The name and marks are not licensed; see [NAMES-AND-LOGOS.md](NAMES-AND-LOGOS.md).

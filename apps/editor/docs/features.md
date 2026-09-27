@@ -1,6 +1,6 @@
-# Features
+# Studio features
 
-What Freshcoat does, in detail. The [README](../README.md) has the short
+What Freshcoat Studio does, in detail. The [README](../README.md) has the short
 version, and [ARCHITECTURE.md](../ARCHITECTURE.md) explains how it is built.
 
 A workspace holds several templates, the data that fills them and the export
@@ -212,7 +212,7 @@ The rest of the search follows what is shown, for example
 ### Routes
 
 TanStack Router 1.170.33, with code-based routes and browser history. The
-production server (`editor/server.ts`) falls back to `index.html`, so every
+production server (`apps/editor/server.ts`) falls back to `index.html`, so every
 path loads directly.
 
 | Path | Renders | Search |
@@ -455,7 +455,7 @@ face from css2 with `text=<family>`, at most 6 requests at a time, cached
 for the session, falling back to the UI font. Picking a family adds it to
 the template with the weights in use, in one undo step.
 
-The catalog is `editor/src/fonts/google-fonts.json`, a committed snapshot of
+The catalog is `apps/editor/src/fonts/google-fonts.json`, a committed snapshot of
 `fonts.google.com/metadata/fonts` (about 29 KB gzipped), loaded the first
 time the picker opens. `bun run fonts:update` in `apps/editor`
 refreshes it.

@@ -90,7 +90,8 @@ For repeated renders, reuse a paint runtime with `createPaintCache` and a
 text engine wrapped by `memoizeTextEngine`. The paint cache retains the
 surface, font provider and decoded images; the text cache reuses unchanged
 paragraph layouts. Studio's render session uses both. See
-[performance](../../docs/performance.md) for benchmarks and their conditions.
+[Studio performance](../../apps/editor/docs/performance.md) for historical
+integration benchmarks and their conditions.
 
 For exports, `exportPixelSize` resolves density within
 `MAX_EXPORT_DIMENSION`. The headless runtime encodes PNG by default, with
