@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, such as v0.1.0
+        type: string
+        required: true
+      dry_run:
+        description: Validate and package without publishing or uploading release assets
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.tag || github.event.release.tag_name }}
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/releases/
+      - name: Verify tag and publish the tested tarballs
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            node scripts/publish-packages.mjs --dry-run
+          else
+            node scripts/publish-packages.mjs
+          fi
+
+  attach-assets:
+    needs: validate
+    if: github.event_name == 'release' || !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/releases/
+      - name: Attach npm tarballs and the Figma bundle to the release
+        run: gh release upload "$RELEASE_TAG" dist/releases/*.tgz dist/releases/*.zip --clobber

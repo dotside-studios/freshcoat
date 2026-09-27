@@ -249,7 +249,13 @@ export async function buildPackages(tag?: string): Promise<void> {
 export function packPackages(): string[] {
 	rmSync(artifactRoot, { recursive: true, force: true });
 	mkdirSync(artifactRoot, { recursive: true });
-	return packages.map((directory) => {
+	const artifacts: {
+		name: string;
+		version: string;
+		filename: string;
+		integrity: string;
+	}[] = [];
+	const tarballs = packages.map((directory) => {
 		const result = JSON.parse(
 			run(
 				[
@@ -264,9 +270,16 @@ export function packPackages(): string[] {
 			),
 		);
 		const filename = result[0].filename as string;
+		const { name, version, integrity } = result[0];
+		artifacts.push({ name, version, filename, integrity });
 		console.log(`Packed ${filename}`);
 		return join(artifactRoot, filename);
 	});
+	writeFileSync(
+		join(artifactRoot, "packages.json"),
+		`${JSON.stringify(artifacts, null, 2)}\n`,
+	);
+	return tarballs;
 }
 
 if (import.meta.main) {

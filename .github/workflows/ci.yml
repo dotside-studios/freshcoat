@@ -1,6 +1,11 @@
 name: CI
 
 on:
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
   pull_request:
   push:
     branches: [master]
@@ -14,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
@@ -45,6 +52,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
@@ -62,4 +71,28 @@ jobs:
           path: |
             apps/editor/playwright-report
             apps/editor/test-results
+          retention-days: 7
+
+  release-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: bun run release:pack
+      - run: bun run release:check
+      - run: bun run --cwd apps/figma-plugin build
+      - run: bun run release:figma
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/releases/
+          if-no-files-found: error
           retention-days: 7
