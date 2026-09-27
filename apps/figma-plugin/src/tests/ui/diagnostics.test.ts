@@ -169,7 +169,7 @@ describe("buildDiagnostics", () => {
 
 	it("stamps the export it belongs to", () => {
 		const d = build();
-		expect(d.kind).toBe("davi-templatekit-diagnostics");
+		expect(d.kind).toBe("freshcoat-diagnostics");
 		expect(d.template).toEqual(TEMPLATE);
 		expect(d.product).toEqual({ sku: "custom", mode: "custom" });
 		expect(d.counts).toEqual(COUNTS);

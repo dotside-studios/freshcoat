@@ -26,7 +26,7 @@ export type RasterDiagnostic = {
  *  Together with the exported template — the sibling file — that closes the loop
  *  from Figma property to rendered pixel. */
 export type Diagnostics = {
-	kind: "davi-templatekit-diagnostics";
+	kind: "freshcoat-diagnostics";
 	version: 1;
 	exportedAt: string;
 	template: { id: string; name: string; width: number; height: number };
@@ -47,7 +47,7 @@ export function buildDiagnostics(input: {
 }): Diagnostics {
 	const { msg, trace, template, counts, exportedAt } = input;
 	return {
-		kind: "davi-templatekit-diagnostics",
+		kind: "freshcoat-diagnostics",
 		version: 1,
 		exportedAt,
 		template,
