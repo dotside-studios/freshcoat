@@ -11,7 +11,7 @@
 	"type": "module",
 	"figma-plugin": {
 		"name": "Freshcoat for Figma",
-		"id": "davi-card-importer",
+		"id": "freshcoat-figma",
 		"main": "src/main/index.ts",
 		"ui": "src/ui/index.tsx",
 		"editorType": ["figma"],
