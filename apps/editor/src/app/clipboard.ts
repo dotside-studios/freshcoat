@@ -1,10 +1,12 @@
 import type { Element, InlineAsset, Template } from "@freshcoat-js/coatfile";
 import { parseAssetUri } from "@freshcoat-js/coatfile";
+import { svgMarkup } from "./svg";
 
 type Payload = { freshcoat: 1; elements: Element[]; assets: InlineAsset[] };
 
 export type Clip =
 	| { kind: "layers"; elements: Element[]; assets: InlineAsset[] }
+	| { kind: "svg"; svg: string }
 	| { kind: "text"; text: string };
 
 // The system clipboard can be refused (no permission, an insecure context), so
@@ -50,6 +52,8 @@ export async function readClipboard(): Promise<Clip | null> {
 			};
 		if (memory && text === JSON.stringify(memory))
 			return { kind: "layers", ...memory };
+		const svg = svgMarkup(text);
+		if (svg) return { kind: "svg", svg };
 		return { kind: "text", text };
 	}
 	return memory ? { kind: "layers", ...memory } : null;

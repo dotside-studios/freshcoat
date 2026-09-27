@@ -84,6 +84,8 @@ import { readClipboard, writeClipboard } from "./clipboard";
 import { plural } from "./copy";
 import { downloadBytes } from "./download";
 import { exportSidePng } from "./export-png";
+import { rasterizeSvg } from "./raster";
+import { svgMarkup, svgSize } from "./svg";
 
 configureAutosave({
 	onStorageFull: () =>
@@ -432,13 +434,41 @@ export class EditorController {
 		file: File,
 		point?: { x: number; y: number },
 	): Promise<string | null> {
-		const t = this.base;
-		if (!t) return null;
-		const bytes = new Uint8Array(await file.arrayBuffer());
+		if (!this.base) return null;
+		if (file.type === "image/svg+xml") {
+			const svg = svgMarkup(await file.text());
+			if (svg) return this.placeSvg(svg, point);
+		}
 		const size = await imageSize(file).catch(() => ({
 			width: 400,
 			height: 300,
 		}));
+		return this.placeImageBytes(file, size, point);
+	}
+
+	/** The engine cannot decode SVG, so it is placed as a PNG. */
+	async placeSvg(
+		svg: string,
+		point?: { x: number; y: number },
+	): Promise<string | null> {
+		let png: Blob;
+		try {
+			png = await rasterizeSvg(svg);
+		} catch {
+			toast("Couldn't read that SVG", { tone: "danger" });
+			return null;
+		}
+		return this.placeImageBytes(png, svgSize(svg), point);
+	}
+
+	private async placeImageBytes(
+		file: Blob,
+		size: { width: number; height: number },
+		point?: { x: number; y: number },
+	): Promise<string | null> {
+		const t = this.base;
+		if (!t) return null;
+		const bytes = new Uint8Array(await file.arrayBuffer());
 		const attached = await attachImageAsset(t, bytes, file.type || "image/png");
 		const fit = Math.min(
 			1,
@@ -596,6 +626,10 @@ export class EditorController {
 		if (!t) return;
 		const clip = await readClipboard();
 		if (!clip) return;
+		if (clip.kind === "svg") {
+			await this.placeSvg(clip.svg);
+			return;
+		}
 		let base = t;
 		if (clip.kind === "layers" && clip.assets.length) {
 			const have = new Set((t.assets ?? []).map((a) => a.sha256));
