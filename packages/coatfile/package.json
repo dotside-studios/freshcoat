@@ -1,7 +1,8 @@
 {
 	"name": "@freshcoat/coatfile",
 	"private": true,
-	"version": "0.0.0",
+	"version": "0.1.0",
+	"description": "The Freshcoat template format, validator and compiler for data-driven designs",
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
