@@ -1,55 +1,55 @@
 name: Bug report
-description: Something in Freshcoat doesn't work as it should
+description: Something in a Freshcoat package or application does not work as expected
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Check the known limits in the README first, and search the open issues. For a security problem, follow SECURITY.md instead.
+        Check the affected component's README and open issues first. For a security problem, follow SECURITY.md and report privately.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - Engine (freshcoat)
+        - Template format (@freshcoat/coatfile)
+        - Print utilities (@freshcoat/for-print)
+        - Workspace model and export planning
+        - Shared UI kit
+        - Freshcoat Studio
+        - Figma plugin
+        - Build, release tooling or documentation
+        - Not sure
+    validations:
+      required: true
   - type: textarea
     id: what-happened
     attributes:
       label: What happened
-      description: What you saw, and what you expected to see instead.
+      description: What you saw, and what you expected instead.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
-      description: Start from a sample or a starter where you can, so we can follow the same steps.
-      placeholder: |
-        1. Open the Membership card sample
-        2. Select the name layer
-        3. ...
-    validations:
-      required: true
-  - type: dropdown
-    id: section
-    attributes:
-      label: Section
-      options:
-        - Edit
-        - Data
-        - Export
-        - Welcome screen
-        - Other
+      label: Steps or minimal reproduction
+      description: For an SDK issue, include a small code example. For an application issue, include the steps and a sample or starter when useful.
     validations:
       required: true
   - type: input
-    id: browser
+    id: runtime
     attributes:
-      label: Browser and OS
-      placeholder: Chrome 140 on macOS 15
-    validations:
-      required: true
+      label: Runtime and operating system
+      description: Node or Bun for an SDK issue; browser for Studio; Figma desktop or web for the plugin. Include versions when relevant.
   - type: input
     id: version
     attributes:
-      label: Version or commit
-      description: The commit you built from, or the URL of the deployment you used.
+      label: Package version or commit
+      description: The affected package version, repository commit or Studio deployment URL.
+    validations:
+      required: true
   - type: textarea
     id: files
     attributes:
-      label: Files, screenshots and console output
-      description: Attach a template or workspace that shows the problem if you can. Remove anything private first.
+      label: Files, logs or screenshots
+      description: Attach a minimal example, template or workspace if useful. Remove private data first.

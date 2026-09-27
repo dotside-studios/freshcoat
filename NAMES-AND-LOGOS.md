@@ -27,7 +27,7 @@ this repository.
 - Ship the Davi wordmark, or a design that uses it, as your own branding. A
   fork that offers card starters should replace the wordmark with its own.
 - Ship the Freshcoat logo or mark as your fork's icon or branding. A fork that
-  deploys the editor should replace the files in `editor/public/` that come
+  deploys the editor should replace the files in `apps/editor/public/` that come
   from `brand/`.
 - Suggest that Dotside Studios made, endorses or supports your fork.
 

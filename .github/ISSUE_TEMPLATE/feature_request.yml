@@ -1,12 +1,19 @@
 name: Feature request
-description: Suggest something Freshcoat should do
+description: Suggest an improvement to a Freshcoat package or application
 labels: [enhancement]
 body:
+  - type: input
+    id: component
+    attributes:
+      label: Affected component
+      description: Engine, coatfile, for-print, workspace, UI kit, Studio, Figma plugin or repository tooling. Say if it spans several components.
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
       label: What you are trying to do
-      description: The job, not the solution. For example, "print name badges for 300 attendees on A4".
+      description: The job, not the solution. Include API or application context so we know where it belongs.
     validations:
       required: true
   - type: textarea
