@@ -120,6 +120,7 @@ assert.equal(frame.warnings.length, 0);
 setBarcodeEncoder(bwipBarcodeEncoder);
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat/coatfile/schema/coatfile.v1.schema.json"), "utf8"));
 assert.ok(schema.$id);
+assert.equal(schema.$id, "https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@${manifest("packages/coatfile").version}/schema/coatfile.v1.schema.json");
 console.log("All public imports, scene and text rendering, print analysis, archives, fixtures and schema passed in Node");
 `;
 	console.log(

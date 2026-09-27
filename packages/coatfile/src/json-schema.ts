@@ -1,10 +1,11 @@
 import { z } from "zod";
+import packageMetadata from "../package.json" with { type: "json" };
 import { FORMAT_MAJOR } from "./format";
 import { TemplateSchema } from "./schemas";
 
 // Served by the npm CDN from the published package, so the address needs no
-// host of its own and resolves for as long as a 1.x release exists.
-export const TEMPLATE_SCHEMA_ID = `https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@${FORMAT_MAJOR}/schema/coatfile.v${FORMAT_MAJOR}.schema.json`;
+// host of its own. Package versions and format versions are independent.
+export const TEMPLATE_SCHEMA_ID = `https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@${packageMetadata.version}/schema/coatfile.v${FORMAT_MAJOR}.schema.json`;
 
 /** The JSON Schema for a template's shape. See scripts/build-json-schema.ts. */
 export function templateJsonSchema(): Record<string, unknown> {

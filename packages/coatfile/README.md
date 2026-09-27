@@ -276,8 +276,9 @@ what that minor added.
 `schema/coatfile.v1.schema.json` is the JSON Schema derived from the zod schema
 `validate` runs. `bun run schema` regenerates it, and a test fails when it
 drifts. Its `$id` is the copy the npm CDN serves from the published package,
-`https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@1/schema/coatfile.v1.schema.json`,
-which is also what a template's `$schema` should point at. The file is exported
+`https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@0.1.0/schema/coatfile.v1.schema.json`,
+which is also what a template's `$schema` should point at. The package version
+in this URL is independent of the template format version. The file is exported
 as `@freshcoat/coatfile/schema/coatfile.v1.schema.json` for a host that serves
 its own copy.
 
