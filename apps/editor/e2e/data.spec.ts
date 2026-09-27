@@ -186,8 +186,7 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 	await cell(page, ada, "display_name").dblclick();
 	const input = page.getByRole("textbox", { name: "Edit Display name" });
 	await expect(input).toBeFocused();
-	await page.keyboard.press(`${mod}+a`);
-	await page.keyboard.type("Ada King");
+	await input.fill("Ada King");
 	await page.keyboard.press("Enter");
 	await expect(input).toBeHidden();
 	expect((await records(page))[0]?.values.display_name).toBe("Ada King");
@@ -195,8 +194,7 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 
 	// Typing a wrong value into the integer column flags it too.
 	await cell(page, grace, "points").dblclick();
-	await page.keyboard.press(`${mod}+a`);
-	await page.keyboard.type("ninety");
+	await cell(page, grace, "points").getByRole("textbox").fill("ninety");
 	await page.keyboard.press("Enter");
 	expect((await records(page))[1]?.values.points).toBe("ninety");
 	await expect(
