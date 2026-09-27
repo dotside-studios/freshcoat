@@ -4,6 +4,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 watchPatterns = [
 	"/apps/editor/**",
+	"/apps/figma-plugin/package.json",
 	"/packages/engine/**",
 	"/packages/coatfile/**",
 	"/packages/for-print/**",
@@ -12,6 +13,7 @@ watchPatterns = [
 	"/package.json",
 	"/bun.lock",
 	"/tsconfig.base.json",
+	"/Dockerfile",
 ]
 
 [deploy]
