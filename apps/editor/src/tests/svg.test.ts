@@ -158,6 +158,37 @@ describe("pasting SVG", () => {
 		);
 	});
 
+	it("pastes the markup as text when asked to", async () => {
+		clipboardText(ICON);
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		c.setSvgPastePrompt(async () => "text");
+		await c.paste();
+		const placed = (c.template as Template).template_data[0].elements.at(-1);
+		expect(placed?.type).toBe("text");
+		expect(placed?.type === "text" && placed.properties.value).toBe(ICON);
+	});
+
+	it("imports the drawing when asked to", async () => {
+		clipboardText(ICON);
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		c.setSvgPastePrompt(async () => "image");
+		await c.paste();
+		const placed = (c.template as Template).template_data[0].elements.at(-1);
+		expect(placed?.type).toBe("image");
+	});
+
+	it("pastes nothing when the prompt is dismissed", async () => {
+		clipboardText(ICON);
+		const c = new EditorController();
+		const t = doc();
+		c.open(t, "doc.coat");
+		c.setSvgPastePrompt(async () => "cancel");
+		await c.paste();
+		expect(c.template).toEqual(t);
+	});
+
 	it("pastes other text as a text layer", async () => {
 		clipboardText("Hello <svg></svg>");
 		const c = new EditorController();

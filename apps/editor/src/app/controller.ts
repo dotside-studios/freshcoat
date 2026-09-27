@@ -114,6 +114,10 @@ export type NameAnswer = "save" | "skip" | "cancel";
  *  it is saved for the first time. */
 export type NamePrompt = (fileName: string) => Promise<NameAnswer>;
 
+export type SvgPasteAnswer = "image" | "text" | "cancel";
+
+export type SvgPastePrompt = () => Promise<SvgPasteAnswer>;
+
 export type EditOptions = {
 	mergeKey?: string;
 	/** Select the keys the operation reports (inserted, moved) afterwards. */
@@ -143,6 +147,7 @@ export class EditorController {
 	private openedListeners = new Set<() => void>();
 	private issuesListeners = new Set<() => void>();
 	private namePrompt: NamePrompt | undefined;
+	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
 
 	constructor(store: EditorStore = createEditorStore()) {
@@ -624,11 +629,18 @@ export class EditorController {
 	async paste(): Promise<void> {
 		const t = this.base;
 		if (!t) return;
-		const clip = await readClipboard();
+		let clip = await readClipboard();
 		if (!clip) return;
 		if (clip.kind === "svg") {
-			await this.placeSvg(clip.svg);
-			return;
+			const answer = this.svgPastePrompt
+				? await this.svgPastePrompt()
+				: "image";
+			if (answer === "cancel") return;
+			if (answer === "image") {
+				await this.placeSvg(clip.svg);
+				return;
+			}
+			clip = { kind: "text", text: clip.svg };
 		}
 		let base = t;
 		if (clip.kind === "layers" && clip.assets.length) {
@@ -706,6 +718,15 @@ export class EditorController {
 	showIssues(): void {
 		this.dispatch({ type: "setSection", section: "edit" });
 		for (const fn of this.issuesListeners) fn();
+	}
+
+	/** Sets what asks whether pasted SVG is imported or kept as text. Without
+	 *  a prompt, it is imported. */
+	setSvgPastePrompt(prompt: SvgPastePrompt): () => void {
+		this.svgPastePrompt = prompt;
+		return () => {
+			if (this.svgPastePrompt === prompt) this.svgPastePrompt = undefined;
+		};
 	}
 
 	/**

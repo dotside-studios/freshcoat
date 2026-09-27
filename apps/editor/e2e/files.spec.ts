@@ -216,7 +216,7 @@ test("copy and paste duplicates layers with fresh ids", async ({
 	expect(pasted.startsWith(id)).toBe(true);
 });
 
-test("pasting SVG markup places a drawn image, not text", async ({
+test("pasting SVG markup can import it as a drawn image", async ({
 	page,
 	context,
 }) => {
@@ -228,6 +228,7 @@ test("pasting SVG markup places a drawn image, not text", async ({
 	const count = await state<number>(page, "t.template_data[0].elements.length");
 	await page.getByTestId("viewport").click({ position: { x: 5, y: 5 } });
 	await page.keyboard.press(`${mod}+v`);
+	await page.getByRole("button", { name: "Import as image" }).click();
 	await expect
 		.poll(() => state<number>(page, "t.template_data[0].elements.length"))
 		.toBe(count + 1);
@@ -251,6 +252,26 @@ test("pasting SVG markup places a drawn image, not text", async ({
 		contentType: "image/png",
 	});
 	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
+});
+
+test("pasting SVG markup can keep it as text", async ({ page, context }) => {
+	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+	await openSample(page);
+	const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="2"/>';
+	await page.evaluate((text) => navigator.clipboard.writeText(text), svg);
+	const count = await state<number>(page, "t.template_data[0].elements.length");
+	await page.getByTestId("viewport").click({ position: { x: 5, y: 5 } });
+	await page.keyboard.press(`${mod}+v`);
+	await page.getByRole("button", { name: "Paste as text" }).click();
+	await expect
+		.poll(() => state<number>(page, "t.template_data[0].elements.length"))
+		.toBe(count + 1);
+	expect(
+		await state<unknown>(
+			page,
+			"t.template_data[0].elements.at(-1).properties.value",
+		),
+	).toBe(svg);
 });
 
 test("autosave offers to restore unsaved work", async ({ page }) => {
