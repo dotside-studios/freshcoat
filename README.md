@@ -90,9 +90,11 @@ For a renderer built around your own scene model, start with `freshcoat`, the
 engine package. Add `@freshcoat/workspace` for datasets and export planning,
 or `@freshcoat/for-print` for card-printer correction.
 
-The packages currently live in this repository and are marked private; they
-are not yet published to npm. The format, engine and print packages each
-have their own LICENSE and NOTICE.
+The core packages have a release build for compiled JavaScript, declarations
+and bundled assets. Source manifests stay private for workspace development;
+the release tooling produces public npm packages. The format, engine and print
+packages each have their own LICENSE and NOTICE. See the
+[release guide](docs/releases.md) for publishing and download instructions.
 
 ## Develop
 
@@ -113,6 +115,7 @@ has the full list of scripts and what a pull request needs.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — how the workspace is built
 - [docs/performance.md](docs/performance.md) — the measurements behind the
   render pipeline and the libraries
+- [docs/releases.md](docs/releases.md) — npm packages and Figma plugin releases
 
 ## License
 

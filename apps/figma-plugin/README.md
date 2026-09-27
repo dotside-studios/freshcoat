@@ -8,7 +8,15 @@ export a batch, or render it in your own application with
 The plugin reads the open document through Figma's Plugin API; it needs no
 REST API token. Custom export makes no network requests from the plugin.
 Davi card product mode fetches its product catalog. The plugin is currently
-sideloaded and has not been published to Figma Community.
+sideloaded and has not been published to Figma Community. Release builds are
+packaged as downloadable ZIPs; see the [release guide](../../docs/releases.md).
+
+## Install a release bundle
+
+Download the plugin ZIP from a GitHub release and extract it. In Figma desktop,
+choose Plugins → Development → Import plugin from manifest… and select the
+extracted `manifest.json`. The bundle includes the built code, so no Bun install
+or local build is needed.
 
 ## Sideload (one time)
 

@@ -152,6 +152,11 @@ dataset) should show its numbers before and after.
 - **No license headers** in source files. The repository's LICENSE and NOTICE
   cover them.
 
+## Releases
+
+For versioning, package artifacts and publication, see the
+[release guide](docs/releases.md).
+
 ## Copy
 
 Every string a person reads follows this style:
