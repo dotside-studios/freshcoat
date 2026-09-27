@@ -72,7 +72,8 @@ npm publish dist/releases/freshcoat-js-coatfile-0.1.0.tgz --access public
 ```
 
 Those commands publish publicly. The first manual publication does not receive
-CI provenance; subsequent workflow publications do.
+CI provenance. Subsequent trusted workflow publications receive automatic
+provenance only when both the GitHub repository and npm package are public.
 
 Configure a GitHub Actions trusted publisher in each package's npm settings:
 
@@ -84,14 +85,24 @@ Configure a GitHub Actions trusted publisher in each package's npm settings:
 | Environment | `npm` |
 | Allowed action | Direct publishing with `npm publish` |
 
+Explicitly enable direct publishing: new trusted-publisher connections default
+to staged publishing, which this workflow does not use. Configure all three
+scoped packages separately; settings on the old unscoped `freshcoat` package do
+not carry over.
+
 Create the `npm` environment in GitHub repository settings. If you enable
 required reviewers, release publishing waits for their approval. Allow release
 tags through any environment deployment restrictions.
 
 The workflow uses Node 24, npm's OIDC authentication and `id-token: write`.
+It checks that npm is at least 11.5.1 before invoking the publisher.
 No `NPM_TOKEN` secret is needed. See
 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) for setup
 and supported CLI versions.
+
+After a successful trusted publication, set each package's publishing access
+to **Require two-factor authentication and disallow tokens**, and revoke unused
+publishing tokens. Trusted publishing continues to work without those tokens.
 
 ## Run the release workflow
 
@@ -111,8 +122,16 @@ release's prerelease flag for prerelease versions too.
 
 You can also run **Actions → Release → Run workflow** with an existing tag.
 The default is a dry run: CI builds and validates artifacts, and npm checks its
-publish payload without publishing. Set `dry_run` to false only when publishing
-is intended and a GitHub release already exists for the tag.
+publish payload without publishing. A dry run does not verify OIDC
+authentication or the trusted-publisher settings on npm.
+
+For real publication, select the release tag in the workflow's **Use workflow
+from** selector and enter the same tag in the `tag` input. Set `dry_run` to false
+only when publishing is intended and a GitHub release already exists for the
+tag. Before validation or publication, the workflow verifies that its ref is
+that tag and the checked-out commit matches GitHub's triggering SHA. This keeps
+npm provenance tied to the code used to build the packages. Dry runs may still
+be launched from another ref.
 
 For a local npm dry run, after packing:
 

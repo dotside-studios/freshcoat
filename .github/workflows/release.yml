@@ -22,7 +22,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-ref:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify the release ref matches the provenance source
+        run: node scripts/check-release-environment.mjs --ref
+
   validate:
+    needs: release-ref
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ inputs.tag || github.event.release.tag_name }}
@@ -45,6 +61,8 @@ jobs:
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org
+      - name: Check the npm trusted-publishing version requirement
+        run: node scripts/check-release-environment.mjs --npm
       - uses: actions/download-artifact@v4
         with:
           name: release-artifacts
