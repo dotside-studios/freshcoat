@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat/coatfile";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { ToggleButton } from "@freshcoat/ui/toggle";
+import type { Template } from "@freshcoat-js/coatfile";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { resizeTemplate } from "~/doc/ops";

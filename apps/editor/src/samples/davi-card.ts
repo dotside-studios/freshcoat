@@ -1,5 +1,5 @@
-import type { Element, FontDescriptor, Template } from "@freshcoat/coatfile";
-import { FORMAT_VERSION } from "@freshcoat/coatfile";
+import type { Element, FontDescriptor, Template } from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
 import { daviWordmark } from "./davi-wordmark";
 
 // The Davi card as Davi's production card templates draw it (the Vista design

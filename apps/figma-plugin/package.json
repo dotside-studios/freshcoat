@@ -1,5 +1,5 @@
 {
-	"name": "@freshcoat/figma-plugin",
+	"name": "@freshcoat-js/figma-plugin",
 	"private": true,
 	"version": "0.1.0",
 	"license": "Apache-2.0",
@@ -32,9 +32,9 @@
 	"dependencies": {
 		"@create-figma-plugin/ui": "^4.0.3",
 		"@create-figma-plugin/utilities": "^4.0.3",
-		"@freshcoat/coatfile": "workspace:*",
+		"@freshcoat-js/coatfile": "workspace:*",
 		"fflate": "^0.8.3",
-		"freshcoat": "workspace:*",
+		"@freshcoat-js/engine": "workspace:*",
 		"js-sha256": "^0.11.0",
 		"preact": "^10.29.2"
 	},

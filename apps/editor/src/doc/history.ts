@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 
 export const HISTORY_CAP = 200;
 export const MERGE_WINDOW_MS = 1000;

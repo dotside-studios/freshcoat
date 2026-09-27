@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type Binding,
 	type CellIssue,
@@ -17,7 +17,7 @@ import {
 	parseAssetRef,
 	uniqueKey,
 	validateRecord,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 
 /** Grid column ids that are not dataset columns. Neither is a valid key. */
 export const INDEX_COLUMN = "#";

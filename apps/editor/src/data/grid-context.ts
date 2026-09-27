@@ -5,7 +5,7 @@ import type {
 	Dataset,
 	DatasetAsset,
 	RecordStatus,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { createContext, useContext } from "react";
 import type { CellRef, GridUiStore } from "./grid-state";
 

@@ -12,7 +12,7 @@ import {
 	type RectNode,
 	scalePathData,
 	type TextNode,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import {
 	defaultQuietZone,

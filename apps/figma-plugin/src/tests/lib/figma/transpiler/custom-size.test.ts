@@ -1,4 +1,4 @@
-import { compile, validate } from "@freshcoat/coatfile";
+import { compile, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, it, vi } from "vitest";
 import { type TranspileInput, transpile } from "~/lib/figma/transpiler/index";
 import type { FigmaContainerNode } from "~/lib/figma/types";

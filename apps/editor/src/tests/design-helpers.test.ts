@@ -1,5 +1,5 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import { validate } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { beforeEach, describe, expect, it } from "vitest";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";

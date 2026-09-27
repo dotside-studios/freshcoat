@@ -1,6 +1,6 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import type { Node } from "freshcoat";
-import { scalePathData } from "freshcoat";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import type { Node } from "@freshcoat-js/engine";
+import { scalePathData } from "@freshcoat-js/engine";
 import { ellipsePath, isEllipseVector, round2 } from "./factories";
 import {
 	getElement,

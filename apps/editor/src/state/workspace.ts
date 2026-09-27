@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import type {
 	Binding,
 	DataRecord,
@@ -7,7 +7,7 @@ import type {
 	RecordStatus,
 	TemplateEntry,
 	Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
 import { produce, produceAt } from "./immer";
 import type { DocState, EditorState } from "./store";

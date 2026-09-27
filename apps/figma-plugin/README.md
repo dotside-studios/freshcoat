@@ -3,7 +3,7 @@
 Export a Figma design as a Freshcoat template (`.coat`) with fields, named
 frames and variants. Open it in [Freshcoat Studio](../editor/) to add data and
 export a batch, or render it in your own application with
-[`@freshcoat/coatfile`](../../packages/coatfile/).
+[`@freshcoat-js/coatfile`](../../packages/coatfile/).
 
 The plugin reads the open document through Figma's Plugin API; it needs no
 REST API token. Custom export makes no network requests from the plugin.

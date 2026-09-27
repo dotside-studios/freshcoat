@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import {
 	act,
 	cleanup,

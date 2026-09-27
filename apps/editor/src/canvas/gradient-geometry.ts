@@ -1,4 +1,7 @@
-import { linearGradientAngle, linearGradientPoints } from "@freshcoat/coatfile";
+import {
+	linearGradientAngle,
+	linearGradientPoints,
+} from "@freshcoat-js/coatfile";
 import {
 	ancestorRects,
 	centreOf,

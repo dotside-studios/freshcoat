@@ -1,4 +1,4 @@
-import { cn } from "@freshcoat/ui/lib/cn";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 
 /** A variant's swatch, wherever a variant is named: the Variants list, the
  *  canvas bar, the export filmstrip and preview.

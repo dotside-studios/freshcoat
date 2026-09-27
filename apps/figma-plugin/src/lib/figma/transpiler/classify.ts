@@ -1,4 +1,4 @@
-import type { BlendMode } from "@freshcoat/coatfile";
+import type { BlendMode } from "@freshcoat-js/coatfile";
 import type { FigmaBlendMode, FigmaNode, FigmaVectorNode } from "../types";
 import { isContainerNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";

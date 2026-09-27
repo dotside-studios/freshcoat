@@ -1,6 +1,6 @@
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { ToggleButton } from "@freshcoat/ui/toggle";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import RadiusIcon from "~icons/mingcute/border-radius-line";
 import SplitIcon from "~icons/mingcute/fullscreen-line";
 import { Pair, sectionActions } from "./controls";

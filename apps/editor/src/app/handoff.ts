@@ -5,9 +5,9 @@
 // package; the two are held together by the checked-in fixtures in
 // `tests/fixtures/handoff-*`, which each side decodes.
 
-import type { Template } from "@freshcoat/coatfile";
-import { base64ToBytes } from "@freshcoat/coatfile/assets";
-import { COAT_EXTENSION } from "@freshcoat/coatfile/coat";
+import type { Template } from "@freshcoat-js/coatfile";
+import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
+import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
 import { Inflate, strFromU8 } from "fflate";
 import { openFile, saveFileName } from "~/doc/io";
 import { NEWER_FORMAT } from "./controller";

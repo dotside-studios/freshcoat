@@ -1,4 +1,4 @@
-import { validate } from "@freshcoat/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	type ProductRegistryEntry,

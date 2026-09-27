@@ -1,4 +1,4 @@
-import { type Fill, linearGradientAngle } from "@freshcoat/coatfile";
+import { type Fill, linearGradientAngle } from "@freshcoat-js/coatfile";
 import type { Layer } from "./field-helpers";
 
 export type FillKind = "solid" | "linear" | "radial" | "angular";

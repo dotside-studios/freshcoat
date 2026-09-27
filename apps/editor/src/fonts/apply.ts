@@ -1,4 +1,4 @@
-import type { Template, TextElement } from "@freshcoat/coatfile";
+import type { Template, TextElement } from "@freshcoat-js/coatfile";
 import { addFont, type OpResult } from "~/doc/ops";
 import { getElement, walkLayers } from "~/doc/path";
 import { patchLayers } from "~/panels/design/field-helpers";

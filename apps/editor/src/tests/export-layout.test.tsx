@@ -3,8 +3,11 @@ import type {
 	ExportItem,
 	ExportPreset,
 	SheetLayout,
-} from "@freshcoat/workspace";
-import { DEFAULT_SHEET_LAYOUT, SheetLayoutError } from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
+import {
+	DEFAULT_SHEET_LAYOUT,
+	SheetLayoutError,
+} from "@freshcoat-js/workspace";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {

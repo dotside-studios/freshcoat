@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import {
 	begin,

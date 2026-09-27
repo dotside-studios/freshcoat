@@ -3,7 +3,7 @@ import type {
 	DataRecord,
 	Dataset,
 	RecordStatus,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { STATUS_LABEL } from "~/app/copy";
 import { recordIssues } from "./model";
 import type { ThumbWidth } from "./thumbnails";

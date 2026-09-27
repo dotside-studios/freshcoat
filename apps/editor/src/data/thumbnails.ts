@@ -2,7 +2,7 @@ import {
 	type DatasetAsset,
 	orientedSize,
 	parseAssetRef,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { useEffect, useMemo, useState } from "react";
 import { Lru } from "./lru";
 import type { ThumbnailReply, ThumbnailRequest } from "./thumbnail-worker";

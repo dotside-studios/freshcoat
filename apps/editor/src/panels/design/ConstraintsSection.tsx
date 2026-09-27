@@ -1,7 +1,7 @@
-import type { Constraint, Constraints, Element } from "@freshcoat/coatfile";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import type { Constraint, Constraints, Element } from "@freshcoat-js/coatfile";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { isAutoLayoutChild } from "~/doc/geometry";
 import { Row, SharedNotice } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";

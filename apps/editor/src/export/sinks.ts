@@ -1,10 +1,10 @@
-import type { ExportDestination } from "@freshcoat/workspace";
+import type { ExportDestination } from "@freshcoat-js/workspace";
 import {
 	createZipWriter,
 	streamOutput,
 	type ZipOutput,
 	type ZipWriter,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 
 /** A finished file an export hands to the browser. */
 export type JobFile = { blob: Blob; name: string; mediaType: string };

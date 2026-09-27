@@ -1,4 +1,7 @@
-import { resizeTemplate as layOut, type Template } from "@freshcoat/coatfile";
+import {
+	resizeTemplate as layOut,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { type OpResult, ok, resizeTemplate } from "./ops";
 
 /**

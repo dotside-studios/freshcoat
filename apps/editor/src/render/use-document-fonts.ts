@@ -1,4 +1,4 @@
-import { collectFontRequests, type Template } from "@freshcoat/coatfile";
+import { collectFontRequests, type Template } from "@freshcoat-js/coatfile";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveTemplateFonts } from "./fonts";
 

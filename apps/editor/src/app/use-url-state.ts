@@ -1,4 +1,4 @@
-import { toast } from "@freshcoat/ui/toast";
+import { toast } from "@freshcoat-js/ui/toast";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PRESETS } from "~/doc/new-document";

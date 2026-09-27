@@ -1,11 +1,11 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type DatasetAsset,
 	DEFAULT_QUALITY,
 	type ExportItem,
 	type ExportPreset,
 	imageFormat,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { useEffect, useRef, useState } from "react";
 import { resolveTemplateFonts } from "~/render/fonts";
 import { itemSize } from "./job";

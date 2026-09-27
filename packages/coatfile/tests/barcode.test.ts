@@ -4,9 +4,9 @@
 // fails here rather than at a till.
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { planScene } from "@freshcoat/for-print";
-import { type BitmapNode, decodePixels, type Node } from "freshcoat";
-import { createHeadlessEnv } from "freshcoat/headless";
+import { planScene } from "@freshcoat-js/for-print";
+import { type BitmapNode, decodePixels, type Node } from "@freshcoat-js/engine";
+import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import {
 	AztecCodeReader,
 	BarcodeFormat,

@@ -1,13 +1,13 @@
-import type { Template } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { ColorPanel } from "@freshcoat/ui/color";
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
-import { TextField } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { treeRow } from "@freshcoat/ui/tree";
+import type { Template } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { ColorPanel } from "@freshcoat-js/ui/color";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
+import { TextField } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { treeRow } from "@freshcoat-js/ui/tree";
 import { type RefObject, useMemo, useRef, useState } from "react";
 import {
 	ListBox,

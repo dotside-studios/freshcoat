@@ -3,8 +3,8 @@ import type {
 	Element,
 	InlineAsset,
 	Template,
-} from "@freshcoat/coatfile";
-import { applyVariant, base64ToBytes } from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
+import { applyVariant, base64ToBytes } from "@freshcoat-js/coatfile";
 import { childEntries, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {

@@ -1,4 +1,4 @@
-import type { FontDescriptor, Template } from "@freshcoat/coatfile";
+import type { FontDescriptor, Template } from "@freshcoat-js/coatfile";
 
 export const WEIGHTS: [number, string][] = [
 	[100, "Thin"],

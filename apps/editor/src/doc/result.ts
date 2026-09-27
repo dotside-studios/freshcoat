@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 
 export type RefusalCode =
 	| "not_found"

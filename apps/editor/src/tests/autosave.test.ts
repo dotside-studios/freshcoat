@@ -1,6 +1,6 @@
 // @vitest-environment node
 import "fake-indexeddb/auto";
-import type { Dataset, DatasetAsset, Workspace } from "@freshcoat/workspace";
+import type { Dataset, DatasetAsset, Workspace } from "@freshcoat-js/workspace";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAutosaveStore } from "~/app/autosave";
 import { doc as docFixture } from "./doc-fixture";

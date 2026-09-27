@@ -18,7 +18,7 @@ export type BarcodeEncoder = (
 ) => BarcodeEncodeResult;
 
 // The encoder lives behind a registry so the main entry never imports one. The
-// only implementation, `bwipBarcodeEncoder` from `@freshcoat/coatfile/barcode`,
+// only implementation, `bwipBarcodeEncoder` from `@freshcoat-js/coatfile/barcode`,
 // weighs ~87 KB gzipped, and most consumers compile templates without barcodes.
 let registered: BarcodeEncoder | null = null;
 

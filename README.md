@@ -38,9 +38,9 @@ your kind of work, see the [contribution guide](CONTRIBUTING.md).
 
 | If you want to | Start with |
 |---|---|
-| Compile and render a design filled from data | [`@freshcoat/coatfile`](packages/coatfile/) |
-| Render your own 2D scene graph with CanvasKit | [`freshcoat`](packages/engine/), the engine package |
-| Analyze images and plan corrections for card printers | [`@freshcoat/for-print`](packages/for-print/) |
+| Compile and render a design filled from data | [`@freshcoat-js/coatfile`](packages/coatfile/) |
+| Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/), the engine package |
+| Analyze images and plan corrections for card printers | [`@freshcoat-js/for-print`](packages/for-print/) |
 | Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
 | Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
 

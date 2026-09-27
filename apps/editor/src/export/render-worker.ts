@@ -1,7 +1,7 @@
-import { compile, setBarcodeEncoder } from "@freshcoat/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat/coatfile/barcode";
-import { createHeadlessEnv } from "@freshcoat/coatfile/headless";
-import { renderCompiled } from "@freshcoat/coatfile/render";
+import { compile, setBarcodeEncoder } from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
+import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { createImageLru, DEFAULT_IMAGE_CACHE_PIXELS } from "./image-lru";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {

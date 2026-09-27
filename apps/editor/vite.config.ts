@@ -100,7 +100,7 @@ export default defineConfig(({ mode }) => ({
 		exclude: ["canvaskit-wasm"],
 		// qrcode, xlsx and zod are found by the scan of the entries above. They
 		// are not named here: the editor reaches them only through a kit or
-		// @freshcoat/workspace, so from here they resolve only when hoisted.
+		// @freshcoat-js/workspace, so from here they resolve only when hoisted.
 		include: ["react-aria-components", "fflate"],
 	},
 	plugins: [

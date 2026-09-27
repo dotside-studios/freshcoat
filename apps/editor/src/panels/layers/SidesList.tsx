@@ -1,7 +1,7 @@
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat/ui/menu";
-import { treeRow } from "@freshcoat/ui/tree";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { treeRow } from "@freshcoat-js/ui/tree";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { useController } from "~/app/context";

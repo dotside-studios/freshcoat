@@ -1,11 +1,11 @@
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
-import { inputBase } from "@freshcoat/ui/field";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { fieldLabel } from "@freshcoat/ui/lib/styles";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
 	applyMapping,
 	COLUMN_TYPES,
@@ -20,7 +20,7 @@ import {
 	isValidKey,
 	previewMapping,
 	type TableSheet,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { type DragEvent, useEffect, useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
@@ -118,7 +118,7 @@ export function ImportWizard({
 		setLoading(true);
 		setError(null);
 		try {
-			const { readTable } = await import("@freshcoat/workspace/tabular");
+			const { readTable } = await import("@freshcoat-js/workspace/tabular");
 			const bytes = new Uint8Array(await chosen.arrayBuffer());
 			const out = await readTable(bytes, chosen.name);
 			const first = out.sheets.findIndex((s) => s.rows.length > 0);

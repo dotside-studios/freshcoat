@@ -1,4 +1,4 @@
-import type { FontDescriptor } from "@freshcoat/coatfile";
+import type { FontDescriptor } from "@freshcoat-js/coatfile";
 import src from "./fonts/VendSans-Variable-latin.woff2?inline";
 
 export const VEND_SANS_FAMILY = "Vend Sans";

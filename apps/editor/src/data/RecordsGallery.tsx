@@ -1,4 +1,4 @@
-import { cn } from "@freshcoat/ui/lib/cn";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import {
 	type Column,
 	type DataRecord,
@@ -6,7 +6,7 @@ import {
 	type DatasetAsset,
 	orientedSize,
 	parseAssetRef,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	createContext,
 	type KeyboardEvent,

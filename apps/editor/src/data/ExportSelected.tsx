@@ -1,8 +1,8 @@
-import { validate } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { DialogTrigger, Popover } from "@freshcoat/ui/popover";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { planExport } from "@freshcoat/workspace";
+import { validate } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { DialogTrigger, Popover } from "@freshcoat-js/ui/popover";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { planExport } from "@freshcoat-js/workspace";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog as RACDialog } from "react-aria-components";
 import { useController } from "~/app/context";

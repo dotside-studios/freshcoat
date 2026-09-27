@@ -75,7 +75,7 @@ const kitRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: "kit",
 	component: lazyRouteComponent(
-		() => import("@freshcoat/ui/gallery"),
+		() => import("@freshcoat-js/ui/gallery"),
 		"KitGallery",
 	),
 });

@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat/coatfile";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { ToggleButton } from "@freshcoat/ui/toggle";
-import type { DatasetAsset, ExportPreset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import type { DatasetAsset, ExportPreset } from "@freshcoat-js/workspace";
 import {
 	type PointerEvent as ReactPointerEvent,
 	useEffect,

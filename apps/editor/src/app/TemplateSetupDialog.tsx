@@ -1,6 +1,6 @@
-import type { Template } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
+import type { Template } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
 import {
 	type ReactNode,
 	useCallback,

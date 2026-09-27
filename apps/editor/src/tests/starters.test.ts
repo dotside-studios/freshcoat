@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import type { Element, Template } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import {
 	applyVariant,
 	checkVariants,
@@ -10,11 +10,11 @@ import {
 	resizeTemplate,
 	setBarcodeEncoder,
 	validate,
-} from "@freshcoat/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat/coatfile/barcode";
+} from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import type { Node } from "@freshcoat-js/engine";
+import { renderSceneToPng } from "@freshcoat-js/engine/headless";
 import CanvasKitInit from "canvaskit-wasm";
-import type { Node } from "freshcoat";
-import { renderSceneToPng } from "freshcoat/headless";
 import { beforeAll, describe, expect, test } from "vitest";
 import { walkLayers } from "../doc/path";
 import { sampleValues } from "../doc/values";

@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { toast } from "@freshcoat/ui/toast";
+import type { Template } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { toast } from "@freshcoat-js/ui/toast";
 import { useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { addFont, fontReferences, removeFont } from "~/doc/ops";

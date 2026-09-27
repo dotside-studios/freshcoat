@@ -1,6 +1,6 @@
-import type { Template } from "@freshcoat/coatfile";
-import { createHeadlessEnv } from "@freshcoat/coatfile/headless";
-import { render } from "@freshcoat/coatfile/render";
+import type { Template } from "@freshcoat-js/coatfile";
+import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
+import { render } from "@freshcoat-js/coatfile/render";
 import { exportFileName } from "~/doc/io";
 import { getCanvasKit } from "~/render/canvaskit";
 import { downloadBytes } from "./download";

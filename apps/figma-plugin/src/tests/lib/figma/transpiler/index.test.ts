@@ -1,4 +1,4 @@
-import { FORMAT_VERSION } from "@freshcoat/coatfile";
+import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
 import { describe, expect, it, vi } from "vitest";
 import { SizeMismatchError } from "~/lib/figma/transpiler/exact-size";
 import { fixtures } from "~/lib/figma/transpiler/fixtures";

@@ -1,4 +1,4 @@
-import type { Element, Template } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";

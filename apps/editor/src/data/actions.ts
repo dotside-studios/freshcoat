@@ -1,4 +1,4 @@
-import { toast } from "@freshcoat/ui/toast";
+import { toast } from "@freshcoat-js/ui/toast";
 import {
 	type AddAssetsResult,
 	type AssetFile,
@@ -12,7 +12,7 @@ import {
 	photoDataset,
 	prepareAssets,
 	type TableFormat,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
@@ -549,7 +549,7 @@ export async function exportDataset(
 	format: TableFormat,
 ): Promise<void> {
 	try {
-		const { writeTable } = await import("@freshcoat/workspace/tabular");
+		const { writeTable } = await import("@freshcoat-js/workspace/tabular");
 		const out = await writeTable(dataset, format);
 		await downloadBytes(
 			out.bytes,

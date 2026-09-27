@@ -1,6 +1,6 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { Binding, ExportPreset } from "@freshcoat/workspace";
-import { exportSize } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Binding, ExportPreset } from "@freshcoat-js/workspace";
+import { exportSize } from "@freshcoat-js/workspace";
 
 /** What the Export preview shows: the rendered output, the photo it was made
  *  from, both either side of a divider, or a whole sheet of paper. */

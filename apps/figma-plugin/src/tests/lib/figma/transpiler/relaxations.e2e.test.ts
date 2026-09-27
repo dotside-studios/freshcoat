@@ -1,5 +1,9 @@
-import { compile, type Template } from "@freshcoat/coatfile";
-import { approxEngine, compileScene, type DrawCommand } from "freshcoat";
+import { compile, type Template } from "@freshcoat-js/coatfile";
+import {
+	approxEngine,
+	compileScene,
+	type DrawCommand,
+} from "@freshcoat-js/engine";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type ProductRegistryEntry,
@@ -309,7 +313,7 @@ describe("transpile (relaxations e2e)", () => {
 		expect((spans[1]?.font as Record<string, unknown>).weight).toBe(700);
 	});
 
-	it("the transpiled template parses + compiles cleanly through @freshcoat/coatfile", async () => {
+	it("the transpiled template parses + compiles cleanly through @freshcoat-js/coatfile", async () => {
 		const fetchNodeTree = vi.fn(async () => buildTree());
 		const tileBlob = new Blob([new Uint8Array([9, 8, 7])], {
 			type: "image/png",

@@ -1,5 +1,5 @@
-import { Button } from "@freshcoat/ui/button";
-import { NumberField } from "@freshcoat/ui/number-field";
+import { Button } from "@freshcoat-js/ui/button";
+import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Fragment, useEffect, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { PRESETS } from "~/doc/new-document";

@@ -1,4 +1,4 @@
-import { PanelSection } from "@freshcoat/ui/panel";
+import { PanelSection } from "@freshcoat-js/ui/panel";
 import { TEMPLATE_SETUP } from "~/app/copy";
 import { TemplateSizeFields } from "../setup/SizeSection";
 import { Row } from "./controls";

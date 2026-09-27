@@ -9,7 +9,7 @@ Studio or Figma.
 | Component | Owns | Does not own |
 |---|---|---|
 | [`coatfile`](packages/coatfile/) | Template schema, validation, compilation, `.coat` files and rendering helpers | Editor state or batch-job scheduling |
-| [`engine`](packages/engine/) (`freshcoat`) | Scene layout and CanvasKit painting, geometry and render caches | Template fields, datasets or application UI |
+| [`engine`](packages/engine/) (`@freshcoat-js/engine`) | Scene layout and CanvasKit painting, geometry and render caches | Template fields, datasets or application UI |
 | [`for-print`](packages/for-print/) | Image analysis, correction planning and measured card-printer profiles | General ICC color management or printer transport |
 | [`workspace`](packages/workspace/) | Datasets, bindings, archives, export planning, imposition and PDF assembly | Rendering workers or file destinations |
 | [`ui`](packages/ui/) | Shared React controls, themes and accessibility behavior | Template or workspace models |

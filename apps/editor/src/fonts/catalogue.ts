@@ -1,4 +1,4 @@
-import type { FontDescriptor } from "@freshcoat/coatfile";
+import type { FontDescriptor } from "@freshcoat-js/coatfile";
 
 export type FontCategory =
 	| "sans"

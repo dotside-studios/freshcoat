@@ -9,9 +9,9 @@
 // cannot import from here); the two are held together by checked-in fixtures
 // each side decodes.
 
-import type { Template } from "@freshcoat/coatfile";
-import { base64ToBytes, bytesToBase64 } from "@freshcoat/coatfile/assets";
-import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat/coatfile/coat";
+import type { Template } from "@freshcoat-js/coatfile";
+import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/coatfile/assets";
+import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { sha256 } from "js-sha256";
 import type { UiToMain } from "~/shared/protocol";

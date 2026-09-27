@@ -2,7 +2,7 @@ import type {
 	Element,
 	Template,
 	VariantElementDelta,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController } from "~/app/controller";
 import { align, applyRect, translateLayers } from "~/doc/geometry";

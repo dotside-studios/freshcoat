@@ -1,5 +1,5 @@
-import { cn } from "@freshcoat/ui/lib/cn";
-import type { DatasetAsset } from "@freshcoat/workspace";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import type { DatasetAsset } from "@freshcoat-js/workspace";
 import { type ThumbWidth, useThumbnail } from "./thumbnails";
 
 /** A photo's thumbnail, with an empty box of the same size until it is

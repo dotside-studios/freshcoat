@@ -1,22 +1,22 @@
-import type { Template } from "@freshcoat/coatfile";
-import { parsePrintProfile } from "@freshcoat/for-print";
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox, Switch } from "@freshcoat/ui/checkbox";
-import { TextField } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { ChevronRightIcon } from "@freshcoat/ui/icons";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { Slider } from "@freshcoat/ui/slider";
-import { Tooltip, TooltipTrigger } from "@freshcoat/ui/tooltip";
+import type { Template } from "@freshcoat-js/coatfile";
+import { parsePrintProfile } from "@freshcoat-js/for-print";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
+import { TextField } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { Slider } from "@freshcoat-js/ui/slider";
+import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type {
 	ExportDestination,
 	ExportItem,
 	ExportPreset,
 	SheetLayout,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
@@ -24,7 +24,7 @@ import {
 	imageFormat,
 	pdfLayout,
 	sheetSummary,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { Fragment, type ReactNode, useState } from "react";
 import {
 	Disclosure,

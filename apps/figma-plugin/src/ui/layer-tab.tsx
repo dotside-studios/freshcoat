@@ -14,7 +14,7 @@ import {
 	Text,
 	Textbox,
 } from "@create-figma-plugin/ui";
-import { type Symbology, symbologyLabel } from "@freshcoat/coatfile";
+import { type Symbology, symbologyLabel } from "@freshcoat-js/coatfile";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {

@@ -1,4 +1,4 @@
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat/workspace";
+import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import { type JobFile, type JobProgress, runExportJob } from "~/export/job";
@@ -183,8 +183,10 @@ export async function runCancelProbe(count: number) {
  *  and reads the bytes of the one it renders. Returns each output's centre
  *  pixel. */
 export async function runPhotoProbe() {
-	const { FORMAT_VERSION } = await import("@freshcoat/coatfile");
-	const { photoDataset, prepareAssets } = await import("@freshcoat/workspace");
+	const { FORMAT_VERSION } = await import("@freshcoat-js/coatfile");
+	const { photoDataset, prepareAssets } = await import(
+		"@freshcoat-js/workspace"
+	);
 	const photo = async (fill: string) => {
 		const c = new OffscreenCanvas(1200, 800);
 		const g = c.getContext("2d") as OffscreenCanvasRenderingContext2D;

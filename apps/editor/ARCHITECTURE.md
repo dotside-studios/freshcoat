@@ -57,7 +57,7 @@ Paths such as `src/state/store.ts` are relative to `apps/editor/`.
 
 ### Document model and history
 
-A template is a `@freshcoat/coatfile` `Template`: sides, each a tree of layers,
+A template is a `@freshcoat-js/coatfile` `Template`: sides, each a tree of layers,
 plus fields, fonts, variants and metadata. Studio edits it and never
 extends it. History (`doc/history.ts`) is a list of whole templates, which
 structural sharing makes cheap: up to 200 steps, with commits under the same
@@ -90,7 +90,7 @@ apart from the templates and data.
 
 The Data section (`src/data`) edits datasets: typed columns (the
 schema) and records. The table and the gallery run on react-aria's
-`Virtualizer`. Import goes through `@freshcoat/workspace`'s tabular readers
+`Virtualizer`. Import goes through `@freshcoat-js/workspace`'s tabular readers
 and a mapping wizard. Photos stay as the browser's `Blob`s, referenced from
 records as `ws:<sha256>`; thumbnails are made in a worker
 (`thumbnail-worker.ts`) and kept in a bounded LRU, so no grid decodes a whole

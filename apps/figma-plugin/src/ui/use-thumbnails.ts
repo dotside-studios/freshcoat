@@ -1,4 +1,4 @@
-import { bytesToBase64 } from "@freshcoat/coatfile/assets";
+import { bytesToBase64 } from "@freshcoat-js/coatfile/assets";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { MainToUi } from "~/shared/protocol";
 import { postToMain } from "~/ui/post";

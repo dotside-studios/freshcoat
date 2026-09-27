@@ -1,8 +1,8 @@
-import type { MaskElement } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { ToggleGroup, ToggleGroupItem } from "@freshcoat/ui/toggle";
+import type { MaskElement } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 

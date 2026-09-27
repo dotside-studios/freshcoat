@@ -5,7 +5,7 @@ import {
 	type PlanPolicy,
 	planScene,
 	YMCKO_FINISH,
-} from "@freshcoat/for-print";
+} from "@freshcoat-js/for-print";
 import {
 	type Command,
 	compileScene,
@@ -26,7 +26,7 @@ import {
 	resolveExportScale,
 	resolveSupersample,
 	sampleImageNode,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { compile } from "./compile";
 import type { CompiledTemplate, Template } from "./types";
 
@@ -70,7 +70,7 @@ export type RenderRuntime = {
 };
 
 // Print-optimization toggle. When enabled, each frame's node tree is run through
-// @freshcoat/for-print's planner (per-layer print corrections attached as freshcoat
+// @freshcoat-js/for-print's planner (per-layer print corrections attached as freshcoat
 // adjustments) and a whole-frame finish is applied — so cards render print-ready
 // without the caller wiring the planner itself. Off by default; `true` uses the
 // defaults below.

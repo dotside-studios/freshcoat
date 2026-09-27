@@ -1,4 +1,4 @@
-import type { RecordStatus } from "@freshcoat/workspace";
+import type { RecordStatus } from "@freshcoat-js/workspace";
 
 /** Strings more than one part of the editor shows. The rest of the copy
  *  stays inline, beside the control it labels. */

@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FORMAT_VERSION, type Template, validate } from "@freshcoat/coatfile";
-import { base64ToBytes } from "@freshcoat/coatfile/assets";
+import {
+	FORMAT_VERSION,
+	type Template,
+	validate,
+} from "@freshcoat-js/coatfile";
+import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
 import { sha256 } from "js-sha256";
 import { describe, expect, it, vi } from "vitest";
 import {

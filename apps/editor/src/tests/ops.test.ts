@@ -1,5 +1,5 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import { subtleSha256, validate } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { subtleSha256, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import {
 	addField,

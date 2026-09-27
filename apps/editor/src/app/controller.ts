@@ -3,19 +3,19 @@ import {
 	formatVersionStatus,
 	type Template,
 	validate,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import {
 	COAT_EXTENSION,
 	COAT_JSON_EXTENSION,
 	COAT_JSON_MEDIA_TYPE,
 	COAT_MEDIA_TYPE,
-} from "@freshcoat/coatfile/coat";
-import { toast } from "@freshcoat/ui/toast";
+} from "@freshcoat-js/coatfile/coat";
+import { toast } from "@freshcoat-js/ui/toast";
 import {
 	resolveValues,
 	variantFor,
 	type Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
 	type AlignMode,
@@ -807,7 +807,7 @@ export class EditorController {
 		bytes: Uint8Array | Blob,
 		name: string,
 	): Promise<boolean> {
-		const { unpackWorkspace } = await import("@freshcoat/workspace");
+		const { unpackWorkspace } = await import("@freshcoat-js/workspace");
 		const out = await unpackWorkspace(bytes);
 		if (!out.ok) {
 			toast(`Couldn't open ${name}: ${out.message}`, { tone: "danger" });
@@ -858,7 +858,7 @@ export class EditorController {
 			return false;
 		}
 		const { packWorkspace, WORKSPACE_MEDIA_TYPE } = await import(
-			"@freshcoat/workspace"
+			"@freshcoat-js/workspace"
 		);
 		try {
 			const bytes = await packWorkspace(ws);
@@ -879,7 +879,7 @@ export class EditorController {
 	async exportAllTemplates(): Promise<void> {
 		const ws = workspaceSnapshot(this.state);
 		if (!ws) return;
-		const { packTemplates } = await import("@freshcoat/workspace");
+		const { packTemplates } = await import("@freshcoat-js/workspace");
 		try {
 			const bytes = await packTemplates(ws);
 			await downloadBytes(

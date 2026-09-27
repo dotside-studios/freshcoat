@@ -1,8 +1,8 @@
-import { validate } from "@freshcoat/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	unpackTemplate,
-} from "@freshcoat/coatfile/coat";
+} from "@freshcoat-js/coatfile/coat";
 import {
 	strFromU8,
 	strToU8,

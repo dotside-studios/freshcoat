@@ -1,9 +1,9 @@
-import type { QrCodeElement, QrCodeProperties } from "@freshcoat/coatfile";
-import { ColorInput } from "@freshcoat/ui/color";
-import { TextField } from "@freshcoat/ui/field";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { ToggleGroup, ToggleGroupItem } from "@freshcoat/ui/toggle";
+import type { QrCodeElement, QrCodeProperties } from "@freshcoat-js/coatfile";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { TextField } from "@freshcoat-js/ui/field";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 

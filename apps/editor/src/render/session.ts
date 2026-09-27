@@ -1,4 +1,8 @@
-import { compile, getBarcodeEncoder, type Template } from "@freshcoat/coatfile";
+import {
+	compile,
+	getBarcodeEncoder,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import {
 	type Command,
 	compileScene,
@@ -13,8 +17,8 @@ import {
 	prepareScene,
 	resolveExportScale,
 	type TextEngine,
-} from "freshcoat";
-import { createBrowserEnv } from "freshcoat/browser";
+} from "@freshcoat-js/engine";
+import { createBrowserEnv } from "@freshcoat-js/engine/browser";
 import { hasBarcode, loadBarcodeEncoder } from "./barcode";
 
 export type RenderInput<G> = {

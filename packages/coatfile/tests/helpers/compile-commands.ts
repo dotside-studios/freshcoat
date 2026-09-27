@@ -4,7 +4,7 @@ import {
 	compileScene,
 	type FontVMetrics,
 	type TextEngine,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { compile } from "../../src/compile";
 import type { Template } from "../../src/types";
 

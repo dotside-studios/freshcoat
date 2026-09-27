@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import { autoBinding, type Dataset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import { autoBinding, type Dataset } from "@freshcoat-js/workspace";
 import { describe, expect, test, vi } from "vitest";
 import {
 	defaultsOf,

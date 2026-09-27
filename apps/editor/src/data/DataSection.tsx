@@ -1,14 +1,14 @@
-import { Button } from "@freshcoat/ui/button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat/ui/tabs";
-import { toast } from "@freshcoat/ui/toast";
+import { Button } from "@freshcoat-js/ui/button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
+import { toast } from "@freshcoat-js/ui/toast";
 import {
 	type Dataset,
 	jsonSchemaToColumns,
 	type RecordStatus,
 	type TableFormat,
 	templateStem,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	type DragEvent,
 	type ReactNode,

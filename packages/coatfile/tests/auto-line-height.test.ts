@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import CanvasKitInit from "canvaskit-wasm";
-import { createParagraphEngine, FALLBACK_LINE_HEIGHT } from "freshcoat";
+import { createParagraphEngine, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import type { DrawTextCommand, Node, Template, TextNode } from "../src/types";

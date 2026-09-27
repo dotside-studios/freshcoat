@@ -1,5 +1,5 @@
-import { toast } from "@freshcoat/ui/toast";
-import type { ExportPreset } from "@freshcoat/workspace";
+import { toast } from "@freshcoat-js/ui/toast";
+import type { ExportPreset } from "@freshcoat-js/workspace";
 import { useSyncExternalStore } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";

@@ -14,7 +14,7 @@ import {
 	createRect,
 	type GroupNode,
 	type Node,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { CR80_LONG, CR80_SHORT } from "./geometry";
 
 export type RGB = [number, number, number];

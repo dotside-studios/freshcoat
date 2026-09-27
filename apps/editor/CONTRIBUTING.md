@@ -77,7 +77,7 @@ conditions. For a hot-path change, report new before-and-after measurements.
 
 Icons use MingCute Line through `unplugin-icons`
 (`~icons/mingcute/<name>-line`); fill variants are for solid-colored buttons.
-Use shared controls and theme tokens from `@freshcoat/ui`. For a new shared
+Use shared controls and theme tokens from `@freshcoat-js/ui`. For a new shared
 component, follow the [UI package guide](../../packages/ui/README.md#contributing).
 
 ## Copy

@@ -11,9 +11,9 @@ body:
     attributes:
       label: Affected component
       options:
-        - Engine (freshcoat)
-        - Template format (@freshcoat/coatfile)
-        - Print utilities (@freshcoat/for-print)
+        - Engine (@freshcoat-js/engine)
+        - Template format (@freshcoat-js/coatfile)
+        - Print utilities (@freshcoat-js/for-print)
         - Workspace model and export planning
         - Shared UI kit
         - Freshcoat Studio

@@ -1,5 +1,5 @@
 {
-	"name": "@freshcoat/editor",
+	"name": "@freshcoat-js/editor",
 	"private": true,
 	"version": "0.0.0",
 	"license": "Apache-2.0",
@@ -26,11 +26,11 @@
 		"test:scripts": "bun test ../../scripts"
 	},
 	"dependencies": {
-		"@freshcoat/for-print": "workspace:*",
-		"freshcoat": "workspace:*",
-		"@freshcoat/coatfile": "workspace:*",
-		"@freshcoat/ui": "workspace:*",
-		"@freshcoat/workspace": "workspace:*",
+		"@freshcoat-js/for-print": "workspace:*",
+		"@freshcoat-js/engine": "workspace:*",
+		"@freshcoat-js/coatfile": "workspace:*",
+		"@freshcoat-js/ui": "workspace:*",
+		"@freshcoat-js/workspace": "workspace:*",
 		"@tanstack/react-router": "1.170.33",
 		"@tanstack/react-virtual": "^3.14.13",
 		"canvaskit-wasm": "^0.41.1",

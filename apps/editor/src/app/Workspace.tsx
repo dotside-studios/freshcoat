@@ -1,4 +1,4 @@
-import { cn } from "@freshcoat/ui/lib/cn";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useEffect, useState } from "react";
 import { VariantBar } from "~/canvas/VariantBar";
 import { Viewport } from "~/canvas/Viewport";

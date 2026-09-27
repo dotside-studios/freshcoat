@@ -11,13 +11,13 @@
 // A template is read from the path its manifest entry names, so a workspace
 // written with `templates/<entryId>.tkit` entries opens unchanged.
 
-import { healElementIds, subtleSha256, validate } from "@freshcoat/coatfile";
+import { healElementIds, subtleSha256, validate } from "@freshcoat-js/coatfile";
 import {
 	COAT_EXTENSION,
 	decodeTemplate,
 	packTemplate,
-} from "@freshcoat/coatfile/coat";
-import { parsePrintProfile } from "@freshcoat/for-print";
+} from "@freshcoat-js/coatfile/coat";
+import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";

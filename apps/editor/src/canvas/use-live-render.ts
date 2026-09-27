@@ -1,4 +1,4 @@
-import type { Node, PaintWarning } from "freshcoat";
+import type { Node, PaintWarning } from "@freshcoat-js/engine";
 import { useEffect, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { previewEdge, usePreviewImages } from "~/data/thumbnails";

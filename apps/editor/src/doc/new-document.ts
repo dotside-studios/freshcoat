@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import { FORMAT_VERSION } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
 import { VEND_SANS } from "../samples/vend-sans";
 
 export type Preset = {

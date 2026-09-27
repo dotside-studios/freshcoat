@@ -1,4 +1,4 @@
-import type { Element } from "@freshcoat/coatfile";
+import type { Element } from "@freshcoat-js/coatfile";
 import { useRouteContext, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { translateLayers } from "~/doc/geometry";

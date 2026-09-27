@@ -3,11 +3,11 @@ import {
 	type Template,
 	type ValidationError,
 	type VariantIssue,
-} from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { Dialog } from "@freshcoat/ui/dialog";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { DialogTrigger, Popover } from "@freshcoat/ui/popover";
+} from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { Dialog } from "@freshcoat-js/ui/dialog";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { DialogTrigger, Popover } from "@freshcoat-js/ui/popover";
 import {
 	createContext,
 	type ReactNode,

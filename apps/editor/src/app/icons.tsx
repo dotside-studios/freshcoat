@@ -1,4 +1,4 @@
-import type { Element } from "@freshcoat/coatfile";
+import type { Element } from "@freshcoat-js/coatfile";
 import type { ComponentType, SVGProps } from "react";
 import { isEllipseVector } from "~/doc/factories";
 import type { Layer } from "~/doc/path";

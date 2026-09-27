@@ -1,11 +1,11 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import type {
 	Binding,
 	Dataset,
 	FieldSource,
 	VariantSource,
-} from "@freshcoat/workspace";
-import { autoBinding } from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
+import { autoBinding } from "@freshcoat-js/workspace";
 
 export type SourceKind = FieldSource["kind"] | "default";
 

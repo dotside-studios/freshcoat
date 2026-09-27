@@ -1,10 +1,10 @@
-import type { Template, ValidationError } from "@freshcoat/coatfile";
+import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import {
 	formatVersionStatus,
 	healElementIds,
 	validate,
 	verifyAssets,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import {
 	type COAT_EXTENSION,
 	type COAT_JSON_EXTENSION,
@@ -12,7 +12,7 @@ import {
 	decodeTemplate,
 	packTemplate,
 	serializeTemplate,
-} from "@freshcoat/coatfile/coat";
+} from "@freshcoat-js/coatfile/coat";
 import { pruneUnusedAssets } from "./ops";
 
 export type LoadOutcome =

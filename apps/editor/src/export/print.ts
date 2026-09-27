@@ -1,7 +1,7 @@
-import type { PrintRenderOptions } from "@freshcoat/coatfile/render";
-import type { ChannelBalance, PrintProfile } from "@freshcoat/for-print";
-import type { ExportPreset, PresetPrint } from "@freshcoat/workspace";
-import type { PaintWarning } from "freshcoat";
+import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
+import type { PaintWarning } from "@freshcoat-js/engine";
+import type { ChannelBalance, PrintProfile } from "@freshcoat-js/for-print";
+import type { ExportPreset, PresetPrint } from "@freshcoat-js/workspace";
 
 /** What a render request carries when the preset prints: plain data, so it
  *  crosses to the worker as it is. */

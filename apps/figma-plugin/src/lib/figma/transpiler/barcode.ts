@@ -2,8 +2,8 @@ import {
 	errorCorrectionRange,
 	type Symbology,
 	type TemplateWarning,
-} from "@freshcoat/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat/coatfile/barcode";
+} from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import type { FigmaBoundingBox, FigmaNode, FigmaSolidPaint } from "../types";
 import { DEFAULT_SYMBOLOGY, parseBarcodeLayerName } from "./barcode-name";
 import { figmaColorToHex } from "./colors";

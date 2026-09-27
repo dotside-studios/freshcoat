@@ -1,5 +1,5 @@
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat/workspace";
-import { planExport } from "@freshcoat/workspace";
+import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import { planExport } from "@freshcoat-js/workspace";
 import {
 	act,
 	cleanup,

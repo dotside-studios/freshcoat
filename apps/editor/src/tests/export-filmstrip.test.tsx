@@ -1,4 +1,4 @@
-import type { DataRecord, Dataset } from "@freshcoat/workspace";
+import type { DataRecord, Dataset } from "@freshcoat-js/workspace";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";

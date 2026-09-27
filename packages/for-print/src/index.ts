@@ -1,4 +1,4 @@
-// @freshcoat/for-print — an ANALYSIS module. Image statistics + print intent in,
+// @freshcoat-js/for-print — an ANALYSIS module. Image statistics + print intent in,
 // freshcoat adjustments out. It holds no canvas, no rasterizer, and no pixel
 // output: freshcoat applies the per-layer `Adjust`s and the whole-frame
 // `FrameFinish` this module recommends. Pure and engine-agnostic throughout.

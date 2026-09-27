@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { Dataset, ExportPreset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Dataset, ExportPreset } from "@freshcoat-js/workspace";
 import { describe, expect, test } from "vitest";
 import { unwrap, updateElement } from "~/doc/ops";
 import { createEditorStore, isDirty } from "~/state/store";

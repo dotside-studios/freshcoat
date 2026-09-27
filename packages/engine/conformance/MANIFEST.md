@@ -1,6 +1,6 @@
 # Coat engine conformance
 
-The coat engine is the `freshcoat` package, the renderer under the freshcoat
+The coat engine is the `@freshcoat-js/engine` package, the renderer under the freshcoat
 editor.
 
 What a second backend must do, as cases that fail rather than prose that is not

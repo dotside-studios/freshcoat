@@ -1,4 +1,4 @@
-# @freshcoat/coatfile
+# @freshcoat-js/coatfile
 
 The template format, validator and compiler for
 [Freshcoat](../../README.md). A template describes named frames, layers,
@@ -11,7 +11,7 @@ and the Figma plugin both use it, but it has no dependency on either app or
 on a UI framework.
 
 `compile()` resolves fields, variants and template sizing into a
-[`freshcoat`](../engine) node tree. The engine then resolves scene layout,
+[`@freshcoat-js/engine`](../engine) node tree. The engine then resolves scene layout,
 shapes text and paints it. The main entry contains the format and compiler;
 the rendering helpers and runtime environments live on separate subpaths.
 
@@ -25,9 +25,9 @@ These examples assume `template` is already loaded and `initCanvasKit()`
 initializes CanvasKit with the WASM file location for your host.
 
 ```ts
-import { collectFontBytes } from "@freshcoat/coatfile";
-import { render } from "@freshcoat/coatfile/render";
-import { createHeadlessEnv } from "@freshcoat/coatfile/headless"; // napi-free, offscreen
+import { collectFontBytes } from "@freshcoat-js/coatfile";
+import { render } from "@freshcoat-js/coatfile/render";
+import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless"; // napi-free, offscreen
 
 const ck = await initCanvasKit(); // your CanvasKit-WASM init
 const fonts = await collectFontBytes(template); // Map<family, Uint8Array[]>
@@ -48,8 +48,8 @@ Need the node tree first (e.g. to pre-load assets before painting)? Use
 `compile()` for the tree and `renderCompiled()` to paint it:
 
 ```ts
-import { compile } from "@freshcoat/coatfile";
-import { renderCompiled } from "@freshcoat/coatfile/render";
+import { compile } from "@freshcoat-js/coatfile";
+import { renderCompiled } from "@freshcoat-js/coatfile/render";
 
 const compiled = compile(template, { displayName: "Alex" }, { width: 1012, height: 638 });
 // compiled.frames[i].root — a freshcoat GroupNode
@@ -104,10 +104,10 @@ is lowered to fit, and the `scale` on the result is the one actually used.
 
 Runtime environments live on subpaths so the barrel stays light:
 
-- `@freshcoat/coatfile/render` — `render` / `renderCompiled`: compile + paint.
-- `@freshcoat/coatfile/headless` — `createHeadlessEnv`: napi-free, renders
+- `@freshcoat-js/coatfile/render` — `render` / `renderCompiled`: compile + paint.
+- `@freshcoat-js/coatfile/headless` — `createHeadlessEnv`: napi-free, renders
   offscreen to PNG (server previews, OG images).
-- `@freshcoat/coatfile/browser` — `createBrowserEnv`: backs a live DOM canvas for
+- `@freshcoat-js/coatfile/browser` — `createBrowserEnv`: backs a live DOM canvas for
   the CanvasKit surface (the editor preview).
 
 Each env's `paint(frames, ck)` bakes in the CanvasKit painter — there is no
@@ -166,7 +166,7 @@ That is a `Template` — it validates, compiles and renders unchanged, because
 `compile()` resolves `asset:` srcs against `assets` itself:
 
 ```ts
-import { render } from "@freshcoat/coatfile/render";
+import { render } from "@freshcoat-js/coatfile/render";
 const [result] = await render(exported, {}, { width: 1013, height: 638 }, { ck, env, fonts });
 ```
 
@@ -174,7 +174,7 @@ A consumer that wants a template backed by real URLs uploads the bytes and ends
 the inline state:
 
 ```ts
-import { detachAssets, readAssets } from "@freshcoat/coatfile/assets";
+import { detachAssets, readAssets } from "@freshcoat-js/coatfile/assets";
 
 const urlByHash = await upload(readAssets(template));   // [{ sha256, blob, contentType }]
 const stored = detachAssets(template, urlByHash);       // srcs → URLs, `assets` gone
@@ -201,7 +201,7 @@ tool's exporter rather than in the format.
 
 ## Packages (`.coat`)
 
-`@freshcoat/coatfile/coat` reads and writes the packaged form. Base64 makes every
+`@freshcoat-js/coatfile/coat` reads and writes the packaged form. Base64 makes every
 carried image and font about a third larger and forces a full parse to read
 anything; a package holds the same template with its bytes in their own entries.
 It is a zip:
@@ -241,7 +241,7 @@ it by pattern to attach the JSON Schema (VS Code: `json.schemas` with
 minor.
 
 ```ts
-import { decodeTemplate, packTemplate } from "@freshcoat/coatfile/coat";
+import { decodeTemplate, packTemplate } from "@freshcoat-js/coatfile/coat";
 
 const bytes = await packTemplate(template);        // Uint8Array, deterministic
 const read = await decodeTemplate(bytes);          // or JSON text, or JSON bytes
@@ -276,10 +276,10 @@ what that minor added.
 `schema/coatfile.v1.schema.json` is the JSON Schema derived from the zod schema
 `validate` runs. `bun run schema` regenerates it, and a test fails when it
 drifts. Its `$id` is the copy the npm CDN serves from the published package,
-`https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@0.1.0/schema/coatfile.v1.schema.json`,
+`https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@0.1.0/schema/coatfile.v1.schema.json`,
 which is also what a template's `$schema` should point at. The package version
 in this URL is independent of the template format version. The file is exported
-as `@freshcoat/coatfile/schema/coatfile.v1.schema.json` for a host that serves
+as `@freshcoat-js/coatfile/schema/coatfile.v1.schema.json` for a host that serves
 its own copy.
 
 ## Reading a file in
@@ -292,8 +292,8 @@ remaining fix. Both are idempotent, so running them over already-clean input is
 free.
 
 ```ts
-import { healElementIds, validate } from "@freshcoat/coatfile";
-import { decodeTemplate } from "@freshcoat/coatfile/coat";
+import { healElementIds, validate } from "@freshcoat-js/coatfile";
+import { decodeTemplate } from "@freshcoat-js/coatfile/coat";
 
 const read = await decodeTemplate(fileBytes);
 const result = read.ok ? validate(healElementIds(read.document)) : null;
@@ -417,8 +417,8 @@ bwip-js, which is ~87 KB gzipped. A consumer that draws barcodes registers it
 once, before compiling:
 
 ```ts
-import { setBarcodeEncoder } from "@freshcoat/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat/coatfile/barcode";
+import { setBarcodeEncoder } from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 
 setBarcodeEncoder(bwipBarcodeEncoder);
 ```
@@ -532,7 +532,7 @@ returns `VariantIssue`s with the variant id, the side, the element id and a path
 
 The supplied rendering path uses CanvasKit (WASM Skia). Text layout and painting
 use CanvasKit Paragraph, keeping measurement and shaping on the same
-implementation. See [`freshcoat`](../engine) for the scene model and runtimes.
+implementation. See [`@freshcoat-js/engine`](../engine) for the scene model and runtimes.
 
 ## Fonts
 
@@ -603,7 +603,7 @@ the reference check, including the cross-field rules zod alone does not express.
 
 ## Fixtures
 
-`@freshcoat/coatfile/fixtures` exports two canonical templates and their expected
+`@freshcoat-js/coatfile/fixtures` exports two canonical templates and their expected
 compile outputs for snapshot testing in consumers.
 
 ## Test runner

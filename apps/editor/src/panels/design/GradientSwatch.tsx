@@ -1,4 +1,4 @@
-import { cn } from "@freshcoat/ui/lib/cn";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useId } from "react";
 import { linearPoints } from "~/canvas/gradient-geometry";
 import { type Gradient, sortedStops } from "./fills";

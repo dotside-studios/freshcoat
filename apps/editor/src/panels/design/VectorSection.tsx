@@ -1,8 +1,8 @@
-import type { VectorElement } from "@freshcoat/coatfile";
-import { TextArea } from "@freshcoat/ui/field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { scalePathData } from "freshcoat";
+import type { VectorElement } from "@freshcoat-js/coatfile";
+import { scalePathData } from "@freshcoat-js/engine";
+import { TextArea } from "@freshcoat-js/ui/field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useEffect, useState } from "react";
 import { Notice, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";

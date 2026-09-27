@@ -10,16 +10,16 @@ import {
 	substitute,
 	symbologyLabel,
 	type Template,
-} from "@freshcoat/coatfile";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { ColorInput } from "@freshcoat/ui/color";
-import { TextField } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Popover } from "@freshcoat/ui/popover";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+} from "@freshcoat-js/coatfile";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { TextField } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
 import { Header, ListBoxSection, MenuTrigger } from "react-aria-components";
 import { barcodeBoxFor } from "~/doc/factories";

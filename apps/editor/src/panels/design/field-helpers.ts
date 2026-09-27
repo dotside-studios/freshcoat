@@ -1,4 +1,4 @@
-import type { Background, Element, Template } from "@freshcoat/coatfile";
+import type { Background, Element, Template } from "@freshcoat-js/coatfile";
 import type { EditorController } from "~/app/controller";
 import type { LayerGeometry } from "~/doc/geometry";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";

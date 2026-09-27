@@ -1,6 +1,10 @@
-import type { Template } from "@freshcoat/coatfile";
-import { TextArea, TextField, type TextFieldProps } from "@freshcoat/ui/field";
-import { cn } from "@freshcoat/ui/lib/cn";
+import type { Template } from "@freshcoat-js/coatfile";
+import {
+	TextArea,
+	TextField,
+	type TextFieldProps,
+} from "@freshcoat-js/ui/field";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";

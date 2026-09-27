@@ -1,4 +1,4 @@
-import { fitDesignSize, type Template } from "@freshcoat/coatfile";
+import { fitDesignSize, type Template } from "@freshcoat-js/coatfile";
 import type {
 	CardSizeMm,
 	Dataset,
@@ -8,7 +8,7 @@ import type {
 	PdfPage,
 	SheetLayout,
 	Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	assetRef,
 	cardSizeMm,
@@ -20,7 +20,7 @@ import {
 	SheetLayoutError,
 	slug,
 	templateStem,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { gamutPercent, type PrintOutcome, printRequest } from "./print";
 import type { RenderOutput, RenderRequest } from "./protocol";
 import { planSheets, sheetLayout, withSideIndex } from "./sheets";
@@ -95,7 +95,7 @@ export type ExportJobOptions = {
 	pool: JobPool;
 	onProgress?: (progress: JobProgress) => void;
 	signal?: AbortSignal;
-	/** defaults to `@freshcoat/workspace/pdf`, loaded when a PDF is made */
+	/** defaults to `@freshcoat-js/workspace/pdf`, loaded when a PDF is made */
 	assemblePdf?: AssemblePdf;
 	/** where a zip format's files go; defaults to one zip in memory, handed
 	 *  back as `file` */
@@ -112,7 +112,7 @@ export const PDF_CONFIRM_BYTES = 1024 ** 3;
 const PDF_SAMPLE_PAGES = 3;
 
 const loadAssemblePdf: AssemblePdf = async (pages, options) =>
-	(await import("@freshcoat/workspace/pdf")).assemblePdf(pages, options);
+	(await import("@freshcoat-js/workspace/pdf")).assemblePdf(pages, options);
 
 /** The job's output name without an extension: the preset's name, else the
  *  template's file name. */

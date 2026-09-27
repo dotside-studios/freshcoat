@@ -14,7 +14,7 @@ The editor keeps one render pipeline warm for the whole session:
   width changes;
 - the scheduler renders only the newest edit, one render at a time.
 
-Both caches are opt-in APIs in the coat engine, the `freshcoat` render
+Both caches are opt-in APIs in the coat engine, the `@freshcoat-js/engine` render
 package (`createPaintCache`, `memoizeTextEngine`). Callers choose whether to keep these caches between renders.
 
 Measured with `/bench` against the production build, in headless Chromium on a

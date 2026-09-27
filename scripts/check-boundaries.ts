@@ -2,7 +2,7 @@
 // to resolve to one of:
 //   - a relative path that stays inside this repository;
 //   - an npm package declared in the importing package's own package.json;
-//   - one of the three kits (coatfile, freshcoat, for-print), declared;
+//   - one of the three core packages (coatfile, engine, for-print), declared;
 //   - a Node or Bun builtin, or the `~/` and `~icons/` aliases.
 // tsconfig, Vite, Vitest, Playwright and Biome configs, and package.json
 // dependency specs and scripts, are held to the same rule.
@@ -18,9 +18,9 @@ import { isBuiltin } from "node:module";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 export const KITS = [
-	"@freshcoat/coatfile",
-	"freshcoat",
-	"@freshcoat/for-print",
+	"@freshcoat-js/coatfile",
+	"@freshcoat-js/engine",
+	"@freshcoat-js/for-print",
 ] as const;
 
 export type Violation = { file: string; line: number; message: string };

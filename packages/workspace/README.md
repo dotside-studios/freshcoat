@@ -1,4 +1,4 @@
-# @freshcoat/workspace
+# @freshcoat-js/workspace
 
 The data model, archive format and export planning utilities for
 [Freshcoat](../../README.md). A workspace combines templates with datasets,
@@ -31,9 +31,9 @@ scheduling and file destinations.
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by |
 
-Most utilities are exported from `@freshcoat/workspace`. Tabular file I/O
-lives at `@freshcoat/workspace/tabular`, and PDF assembly at
-`@freshcoat/workspace/pdf`, keeping those dependencies off the main entry.
+Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
+lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
+`@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 
 ## The shape of a workspace
 
@@ -57,14 +57,14 @@ on its own again.
 
 `planExport()` turns a workspace and preset into export items with resolved
 values, variants and file names. The host resolves output size from the preset,
-renders those items through [`@freshcoat/coatfile`](../coatfile) and
-[`freshcoat`](../engine),
+renders those items through [`@freshcoat-js/coatfile`](../coatfile) and
+[`@freshcoat-js/engine`](../engine),
 writes the outputs and records successes or failures.
 
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex
 backs. The designs inside the PDF are raster images at the chosen density.
-Card-printer correction options use [`@freshcoat/for-print`](../for-print).
+Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License
 

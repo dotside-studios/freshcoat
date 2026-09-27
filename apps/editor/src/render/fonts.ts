@@ -4,8 +4,8 @@ import {
 	collectFontRequests,
 	type Element,
 	type Template,
-} from "@freshcoat/coatfile";
-import { fontBytes, resolveFontRequest } from "freshcoat";
+} from "@freshcoat-js/coatfile";
+import { fontBytes, resolveFontRequest } from "@freshcoat-js/engine";
 
 export type ResolvedTemplateFonts = {
 	/** Font bytes per family — what the CanvasKit painter shapes and measures with. */

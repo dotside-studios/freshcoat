@@ -1,4 +1,4 @@
-# @freshcoat/for-print
+# @freshcoat-js/for-print
 
 Image analysis, correction planning and calibration for CR80 cards printed
 on YMCKO dye-sublimation ribbon printers. This is the print policy used by
@@ -6,7 +6,7 @@ on YMCKO dye-sublimation ribbon printers. This is the print policy used by
 
 Use this package to recommend corrections from decoded pixels, apply a
 print policy to a scene, or create profiles from measured print charts.
-It returns analysis and [`freshcoat`](../engine) adjustment data; the engine
+It returns analysis and [`@freshcoat-js/engine`](../engine) adjustment data; the engine
 applies those adjustments and produces the image. It does not encode files
 or communicate with a printer.
 
@@ -33,8 +33,8 @@ and frame-finishing operations that implement them.
 ### Plan a scene (per-layer correction)
 
 ```ts
-import { planScene, analyzeScene, YMCKO_FINISH, type ImageSampler } from "@freshcoat/for-print";
-import { sampleImageNode, compileScene } from "freshcoat";
+import { planScene, analyzeScene, YMCKO_FINISH, type ImageSampler } from "@freshcoat-js/for-print";
+import { sampleImageNode, compileScene } from "@freshcoat-js/engine";
 
 // Sync, policy-driven: photos get the YMCKO preset; text/QR/graphics stay pristine.
 const presetScene = planScene(nodeTree);
@@ -61,8 +61,8 @@ based on each photo. Paint the resulting commands through an engine runtime.
 ### Analyze a single image
 
 ```ts
-import { analyzePixels } from "@freshcoat/for-print";
-import { decodePixels } from "freshcoat";
+import { analyzePixels } from "@freshcoat-js/for-print";
+import { decodePixels } from "@freshcoat-js/engine";
 
 const pixels = decodePixels(ck, bytes);
 if (!pixels) throw new Error("Couldn't decode image");

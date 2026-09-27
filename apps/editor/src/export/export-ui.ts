@@ -2,7 +2,7 @@ import {
 	fitDesignSize,
 	resizeTemplate,
 	type Template,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
 	Dataset,
@@ -11,7 +11,7 @@ import type {
 	ExportPreset,
 	RecordStatus,
 	Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
@@ -21,7 +21,7 @@ import {
 	newId,
 	orientedSize,
 	parseAssetRef,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { plural, STATUS_LABEL } from "~/app/copy";
 import type { Action } from "~/state/store";
 import type { JobResult } from "./job";

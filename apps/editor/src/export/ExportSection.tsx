@@ -1,9 +1,9 @@
-import { validate } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat/ui/tabs";
+import { validate } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import {
 	assetRef,
 	type DataRecord,
@@ -15,7 +15,7 @@ import {
 	sheetSummary,
 	variantFor,
 	variantsFor,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";

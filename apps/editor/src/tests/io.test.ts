@@ -1,7 +1,7 @@
 import {
 	COAT_MEDIA_TYPE,
 	LEGACY_TKIT_MEDIA_TYPE,
-} from "@freshcoat/coatfile/coat";
+} from "@freshcoat-js/coatfile/coat";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { describe, expect, test } from "vitest";
 import {

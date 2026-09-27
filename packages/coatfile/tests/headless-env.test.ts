@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import CanvasKitInit from "canvaskit-wasm";
-import { createHeadlessEnv } from "freshcoat/headless";
+import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
 

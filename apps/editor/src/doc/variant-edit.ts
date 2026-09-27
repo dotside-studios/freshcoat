@@ -11,7 +11,7 @@ import {
 	type TemplateFrame,
 	type Variant,
 	type VariantElementDelta,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
 import { childEntries, keyOf, walkLayers } from "./path";
 

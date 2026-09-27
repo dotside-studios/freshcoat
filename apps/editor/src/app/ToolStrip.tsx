@@ -1,6 +1,6 @@
-import { formatShortcut } from "@freshcoat/ui/kbd";
-import { ToggleButton } from "@freshcoat/ui/toggle";
-import { Toolbar, ToolbarSeparator } from "@freshcoat/ui/toolbar";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import { Toolbar, ToolbarSeparator } from "@freshcoat-js/ui/toolbar";
 import { useEditor } from "~/state/hooks";
 import type { Tool } from "~/state/store";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";

@@ -28,16 +28,16 @@ beforeAll(() => {
 	parent = mkdtempSync(join(tmpdir(), "boundaries-"));
 	root = join(parent, "freshcoat");
 	write("app/package.json", {
-		name: "@freshcoat/app",
+		name: "@freshcoat-js/app",
 		dependencies: {
-			"@freshcoat/coatfile": "workspace:*",
-			"@freshcoat/lib": "workspace:*",
+			"@freshcoat-js/coatfile": "workspace:*",
+			"@freshcoat-js/lib": "workspace:*",
 			react: "^19.0.0",
 		},
 		devDependencies: { "@types/bun": "^1.3.0", tailwindcss: "^4.0.0" },
 	});
 	write("lib/package.json", {
-		name: "@freshcoat/lib",
+		name: "@freshcoat-js/lib",
 		dependencies: {
 			"@davi/ui": "workspace:*",
 			"local-thing": "file:../../elsewhere",
@@ -54,8 +54,8 @@ beforeAll(() => {
 import { readFileSync } from "node:fs";
 import { test } from "bun:test";
 import React, { useState } from "react";
-import { compile } from "@freshcoat/coatfile/render";
-import { cn } from "@freshcoat/lib/cn";
+import { compile } from "@freshcoat-js/coatfile/render";
+import { cn } from "@freshcoat-js/lib/cn";
 import { helper } from "~/helper";
 import GiftIcon from "~icons/mingcute/gift-2-line";
 import css from "./style.css?inline";
@@ -236,6 +236,6 @@ export type { T } from "types-only";
 });
 
 test("packageName keeps the scope", () => {
-	expect(packageName("@freshcoat/coatfile/render")).toBe("@freshcoat/coatfile");
+	expect(packageName("@freshcoat-js/coatfile/render")).toBe("@freshcoat-js/coatfile");
 	expect(packageName("react-dom/client")).toBe("react-dom");
 });

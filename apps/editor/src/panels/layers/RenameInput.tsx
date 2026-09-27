@@ -1,5 +1,5 @@
-import { inputBase } from "@freshcoat/ui/field";
-import { cn } from "@freshcoat/ui/lib/cn";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { useEffect, useRef } from "react";
 
 /**

@@ -10,7 +10,7 @@ import {
 	createParagraphEngine,
 	type FontVMetrics,
 	readFontMetrics,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { DrawTextCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";

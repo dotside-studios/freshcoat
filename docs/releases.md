@@ -5,9 +5,9 @@ The first prepared version is `0.1.0`, tagged `v0.1.0`.
 
 | Deliverable | Distribution |
 |---|---|
-| `freshcoat` | npm: the rendering engine |
-| `@freshcoat/for-print` | npm: print analysis and correction planning |
-| `@freshcoat/coatfile` | npm: template files, validation, compilation and rendering helpers |
+| `@freshcoat-js/engine` | npm: the rendering engine |
+| `@freshcoat-js/for-print` | npm: print analysis and correction planning |
+| `@freshcoat-js/coatfile` | npm: template files, validation, compilation and rendering helpers |
 | Freshcoat for Figma | GitHub release ZIP; Figma Community publication is manual |
 
 Studio is deployed separately. The UI and workspace packages remain internal.
@@ -55,8 +55,10 @@ format version. Regenerate it whenever the package version changes.
 
 ## npm account setup
 
-Before publishing, confirm ownership or availability of `freshcoat` and access
-to the `@freshcoat` npm scope. Package names are not reserved by this repository.
+The packages publish under the `@freshcoat-js` npm organization. Before
+publishing, confirm your npm account has permission to create and update
+packages in that organization. GitHub organization membership does not grant
+npm publication rights.
 
 For packages that do not exist on npm yet, make the first publication using an
 authenticated maintainer account. Build and verify the tarballs first, then
@@ -64,9 +66,9 @@ publish them in dependency order:
 
 ```sh
 npm login
-npm publish dist/releases/freshcoat-0.1.0.tgz --access public
-npm publish dist/releases/freshcoat-for-print-0.1.0.tgz --access public
-npm publish dist/releases/freshcoat-coatfile-0.1.0.tgz --access public
+npm publish dist/releases/freshcoat-js-engine-0.1.0.tgz --access public
+npm publish dist/releases/freshcoat-js-for-print-0.1.0.tgz --access public
+npm publish dist/releases/freshcoat-js-coatfile-0.1.0.tgz --access public
 ```
 
 Those commands publish publicly. The first manual publication does not receive

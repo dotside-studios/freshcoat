@@ -1,9 +1,9 @@
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Menu, MenuItem, MenuSeparator } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { Tooltip, TooltipTrigger } from "@freshcoat/ui/tooltip";
-import type { ExportPreset } from "@freshcoat/workspace";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
+import type { ExportPreset } from "@freshcoat-js/workspace";
 import { useState } from "react";
 import { Button, Input, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";

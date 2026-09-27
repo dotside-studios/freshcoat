@@ -1,21 +1,21 @@
-import type { TextElement, TextProperties } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { TextArea } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { ChevronDownIcon } from "@freshcoat/ui/icons";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Popover } from "@freshcoat/ui/popover";
-import { Select, SelectItem, triggerButton } from "@freshcoat/ui/select";
-import { toast } from "@freshcoat/ui/toast";
+import type { TextElement, TextProperties } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { TextArea } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { Select, SelectItem, triggerButton } from "@freshcoat-js/ui/select";
+import { toast } from "@freshcoat-js/ui/toast";
 import {
 	ToggleButton,
 	ToggleGroup,
 	ToggleGroupItem,
-} from "@freshcoat/ui/toggle";
+} from "@freshcoat-js/ui/toggle";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button as AriaButton, MenuTrigger } from "react-aria-components";
 import { plural } from "~/app/copy";

@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import { useMemo, useRef } from "react";
 import { useController } from "~/app/context";
 import { ok, resetOverride } from "~/doc/ops";

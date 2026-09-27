@@ -1,6 +1,6 @@
-import type { BarcodeElement, Template } from "@freshcoat/coatfile";
-import { setBarcodeEncoder, validate } from "@freshcoat/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat/coatfile/barcode";
+import type { BarcodeElement, Template } from "@freshcoat-js/coatfile";
+import { setBarcodeEncoder, validate } from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import {
 	act,
 	cleanup,

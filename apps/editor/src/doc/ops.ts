@@ -6,7 +6,7 @@ import type {
 	Template,
 	TemplateFrame,
 	Variant,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import {
 	applyVariant,
 	assetUri,
@@ -16,7 +16,7 @@ import {
 	parseAssetUri,
 	subtleSha256,
 	type VariantElementDelta,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";
 import { round2 } from "./factories";

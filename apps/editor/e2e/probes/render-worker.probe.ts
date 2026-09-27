@@ -1,6 +1,6 @@
-import { fixtures } from "@freshcoat/coatfile/fixtures";
-import { createHeadlessEnv } from "@freshcoat/coatfile/headless";
-import { render } from "@freshcoat/coatfile/render";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
+import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
+import { render } from "@freshcoat-js/coatfile/render";
 
 async function loadCanvasKit(): Promise<unknown> {
 	const src = await (await fetch("/canvaskit/canvaskit.js")).text();

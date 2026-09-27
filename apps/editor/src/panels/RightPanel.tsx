@@ -1,4 +1,4 @@
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat/ui/tabs";
+import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import { useController } from "~/app/context";
 import { CONTENT } from "~/app/copy";
 import { useEditor } from "~/state/hooks";

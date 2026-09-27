@@ -1,4 +1,4 @@
-import { Button } from "@freshcoat/ui/button";
+import { Button } from "@freshcoat-js/ui/button";
 import {
 	DataBody,
 	DataCell,
@@ -6,12 +6,16 @@ import {
 	DataRow,
 	DataTableHeader,
 	VirtualDataTable,
-} from "@freshcoat/ui/data-table";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
-import type { DataRecord, Dataset, RecordStatus } from "@freshcoat/workspace";
+} from "@freshcoat-js/ui/data-table";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import type {
+	DataRecord,
+	Dataset,
+	RecordStatus,
+} from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import { MenuTrigger, type Selection } from "react-aria-components";
 import { useController } from "~/app/context";

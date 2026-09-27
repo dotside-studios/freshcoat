@@ -1,4 +1,4 @@
-import { fixtures } from "@freshcoat/coatfile/fixtures";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
 import { getCanvasKit } from "~/render/canvaskit";
 import { createRenderSession } from "~/render/session";
 
@@ -51,8 +51,8 @@ export async function runSessionProbe(frames: number) {
 
 /** The tools-site path: a fresh env, surface and text engine every render. */
 export async function runUncachedProbe(frames: number) {
-	const { render } = await import("@freshcoat/coatfile/render");
-	const { createBrowserEnv } = await import("freshcoat/browser");
+	const { render } = await import("@freshcoat-js/coatfile/render");
+	const { createBrowserEnv } = await import("@freshcoat-js/engine/browser");
 	const ck = await getCanvasKit();
 	const template = fixtures.fullFeatureCard;
 	const fonts = new Map<string, Uint8Array[]>();

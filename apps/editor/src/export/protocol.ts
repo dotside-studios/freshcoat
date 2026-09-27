@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import type { GamutNote, RenderPrint } from "./print";
 
 export type OutputFormat = "png" | "jpeg" | "webp";

@@ -14,7 +14,7 @@ import {
 	COAT_EXTENSION,
 	COAT_MEDIA_TYPE,
 	packTemplate,
-} from "@freshcoat/coatfile/coat";
+} from "@freshcoat-js/coatfile/coat";
 import { sha256 } from "js-sha256";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";

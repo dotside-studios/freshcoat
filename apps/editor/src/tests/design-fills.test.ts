@@ -1,5 +1,5 @@
-import type { Fill, Template } from "@freshcoat/coatfile";
-import { validate } from "@freshcoat/coatfile";
+import type { Fill, Template } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import { getElement } from "~/doc/path";
 import { patchLayers } from "~/panels/design/field-helpers";

@@ -104,7 +104,7 @@ The shortcuts sheet (`?`) lists every command with keys, grouped, with no way
 to find one.
 
 - **Files:** `apps/editor/src/app/ShortcutsDialog.tsx`, and a text field from
-  `@freshcoat/ui/field`.
+  `@freshcoat-js/ui/field`.
 - **Done when:**
   - a search field at the top filters by command label, case-insensitively,
     and hides groups left empty;

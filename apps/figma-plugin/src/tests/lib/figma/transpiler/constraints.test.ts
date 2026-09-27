@@ -3,7 +3,7 @@ import {
 	resizeTemplate,
 	type Template,
 	validate,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { describe, expect, it, vi } from "vitest";
 import { transpile } from "~/lib/figma/transpiler";
 import {

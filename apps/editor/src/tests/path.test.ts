@@ -1,4 +1,4 @@
-import { validate } from "@freshcoat/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { collectIds, uniqueId, uniquifyTree } from "../doc/ids";
 import { insertElements, removeElements, unwrap } from "../doc/ops";

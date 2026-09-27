@@ -1,5 +1,5 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import { validate } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { ellipsePath, isEllipseVector } from "../doc/factories";
 import {

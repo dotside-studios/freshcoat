@@ -1,4 +1,4 @@
-import type { Template, Variant } from "@freshcoat/coatfile";
+import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	autoBinding,

@@ -1,6 +1,6 @@
-import { COAT_FILE_ACCEPT } from "@freshcoat/coatfile/coat";
-import { isMac } from "@freshcoat/ui/kbd";
-import { ToastRegion } from "@freshcoat/ui/toast";
+import { COAT_FILE_ACCEPT } from "@freshcoat-js/coatfile/coat";
+import { isMac } from "@freshcoat-js/ui/kbd";
+import { ToastRegion } from "@freshcoat-js/ui/toast";
 import {
 	type ReactNode,
 	useCallback,

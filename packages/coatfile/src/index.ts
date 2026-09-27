@@ -14,7 +14,7 @@ export {
 	resolveSupersample,
 	type SpanFont,
 	type TextEngine,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 export {
 	ASSET_URI_PREFIX,
 	type AssetHashMismatch,

@@ -1,4 +1,4 @@
-import type { Dataset } from "@freshcoat/workspace";
+import type { Dataset } from "@freshcoat-js/workspace";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

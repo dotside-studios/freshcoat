@@ -1,4 +1,4 @@
-import { validate } from "@freshcoat/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { issueMessage, issuePathToKey, pathSegments } from "~/app/issue-path";
 import { unwrap, updateElement } from "~/doc/ops";

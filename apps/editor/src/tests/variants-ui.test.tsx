@@ -1,4 +1,4 @@
-import type { Element, Template } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import {
 	act,
 	cleanup,

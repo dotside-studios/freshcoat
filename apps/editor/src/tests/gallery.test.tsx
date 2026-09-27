@@ -1,4 +1,4 @@
-import type { Column, Dataset, DatasetAsset } from "@freshcoat/workspace";
+import type { Column, Dataset, DatasetAsset } from "@freshcoat-js/workspace";
 import {
 	act,
 	cleanup,

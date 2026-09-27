@@ -5,10 +5,10 @@ import {
 	MenuItem,
 	MenuSeparator,
 	SubmenuTrigger,
-} from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
-import { ToggleButton } from "@freshcoat/ui/toggle";
+} from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useMemo } from "react";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
 import { SAMPLES } from "~/samples";

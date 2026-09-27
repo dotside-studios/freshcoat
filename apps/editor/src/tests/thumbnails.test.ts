@@ -1,4 +1,4 @@
-import type { DatasetAsset } from "@freshcoat/workspace";
+import type { DatasetAsset } from "@freshcoat-js/workspace";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Lru } from "~/data/lru";
 import {

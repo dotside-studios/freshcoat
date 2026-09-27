@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { ExportPreset, Workspace } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { resolveTemplateFonts } from "~/render/fonts";
 import {

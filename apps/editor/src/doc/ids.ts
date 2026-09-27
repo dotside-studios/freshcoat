@@ -1,4 +1,4 @@
-import type { Element, Template } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import { childEntries, walkLayers } from "./path";
 
 /** Every id on a side at any depth, the background's included. */

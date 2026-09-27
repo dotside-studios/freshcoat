@@ -1,14 +1,14 @@
-import { validate } from "@freshcoat/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
 	ExportItem,
 	ExportPreset,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
 	planExport,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,

@@ -1,4 +1,4 @@
-import type { FieldDefinition, Template } from "@freshcoat/coatfile";
+import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
 
 export type FieldEntry = { id: string; field: FieldDefinition };
 

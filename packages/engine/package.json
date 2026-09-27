@@ -1,5 +1,5 @@
 {
-	"name": "freshcoat",
+	"name": "@freshcoat-js/engine",
 	"private": true,
 	"version": "0.1.0",
 	"description": "A composable 2D scene renderer powered by CanvasKit and Skia",

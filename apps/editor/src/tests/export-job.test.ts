@@ -4,7 +4,7 @@ import type {
 	ExportPreset,
 	PdfPage,
 	Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import {

@@ -6,16 +6,16 @@ import {
 	DataTableHeader,
 	useCoarsePointer,
 	VirtualDataTable,
-} from "@freshcoat/ui/data-table";
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
+} from "@freshcoat-js/ui/data-table";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
 import type {
 	Column,
 	ColumnType,
 	DataRecord,
 	Dataset,
 	RecordStatus,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	type KeyboardEvent,
 	memo,

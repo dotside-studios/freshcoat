@@ -1,4 +1,4 @@
-import { base64ToBytes } from "@freshcoat/coatfile/assets";
+import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
 import { collectRasterTargets } from "~/main/raster-targets";
 import type {
 	FieldOverviewItem,

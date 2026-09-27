@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import { autoBinding } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import { autoBinding } from "@freshcoat-js/workspace";
 import {
 	act,
 	cleanup,

@@ -1,5 +1,5 @@
-import type { ExportPreset } from "@freshcoat/workspace";
-import { DEFAULT_SHEET_LAYOUT } from "@freshcoat/workspace";
+import type { ExportPreset } from "@freshcoat-js/workspace";
+import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
 import type { Sample } from "./index";
 
 /** A sample meant to be made your own: listed first, opened by `?starter=`. */

@@ -6,7 +6,7 @@ import {
 	getBarcodeEncoder,
 	setBarcodeEncoder,
 	type Template,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { useEffect, useSyncExternalStore } from "react";
 
 // bwip-js is ~87 KB gzipped and most templates have no barcode, so the encoder
@@ -36,7 +36,7 @@ export function loadBarcodeEncoder(): Promise<BarcodeEncoder> {
 	if (have) return Promise.resolve(have);
 	if (!loading) {
 		failed = false;
-		loading = import("@freshcoat/coatfile/barcode").then(
+		loading = import("@freshcoat-js/coatfile/barcode").then(
 			({ bwipBarcodeEncoder }) => {
 				setBarcodeEncoder(bwipBarcodeEncoder);
 				loading = null;

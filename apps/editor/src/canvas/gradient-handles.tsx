@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import type { Point } from "~/doc/geometry";
 import { updateElement } from "~/doc/ops";
 import { getElement, keyOf, parentKeyOf } from "~/doc/path";

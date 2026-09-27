@@ -10,8 +10,8 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import CanvasKitInit from "canvaskit-wasm";
-import { decodePixels } from "freshcoat";
-import { renderSceneToPng } from "freshcoat/headless";
+import { decodePixels } from "@freshcoat-js/engine";
+import { renderSceneToPng } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import {
 	type ChartSpec,

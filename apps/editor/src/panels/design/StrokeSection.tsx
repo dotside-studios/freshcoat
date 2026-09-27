@@ -1,10 +1,10 @@
-import type { RectProperties } from "@freshcoat/coatfile";
-import { ColorInput } from "@freshcoat/ui/color";
-import { TextField } from "@freshcoat/ui/field";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@freshcoat/ui/toggle";
+import type { RectProperties } from "@freshcoat-js/coatfile";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { TextField } from "@freshcoat-js/ui/field";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { useEffect, useState } from "react";
 import {
 	AddButton,

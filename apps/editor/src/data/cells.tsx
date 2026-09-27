@@ -1,9 +1,9 @@
-import { Button } from "@freshcoat/ui/button";
-import { ColorInput } from "@freshcoat/ui/color";
-import { inputBase } from "@freshcoat/ui/field";
-import { formatShortcut } from "@freshcoat/ui/kbd";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Popover } from "@freshcoat/ui/popover";
+import { Button } from "@freshcoat-js/ui/button";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Popover } from "@freshcoat-js/ui/popover";
 import {
 	assetRef,
 	type Column,
@@ -12,7 +12,7 @@ import {
 	isColor,
 	parseAssetRef,
 	type RecordStatus,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	type KeyboardEvent,
 	type RefObject,

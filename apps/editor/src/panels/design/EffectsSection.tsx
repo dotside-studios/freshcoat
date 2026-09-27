@@ -1,8 +1,8 @@
-import type { Element } from "@freshcoat/coatfile";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { ColorInput } from "@freshcoat/ui/color";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
+import type { Element } from "@freshcoat-js/coatfile";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
 import {
 	AddButton,
 	ItemGroup,

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Template } from "@freshcoat/coatfile";
-import { bytesToBase64 } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
+import { bytesToBase64 } from "@freshcoat-js/coatfile";
 import { zlibSync } from "fflate";
 import type { Dataset, ExportPreset, Workspace } from "./types";
 

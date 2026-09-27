@@ -1,4 +1,4 @@
-# @freshcoat/ui
+# @freshcoat-js/ui
 
 The React component kit used by [Freshcoat](../../README.md) Studio: controls,
 panels, menus, dialogs and data views for a dense editing interface.
@@ -23,9 +23,9 @@ toasts, kbd hints and icons. `src/lib` holds the small shared pieces: `cn`
 composition and helpers.
 
 ```tsx
-import { Button } from "@freshcoat/ui/button";
-import { Panel, PanelHeader } from "@freshcoat/ui/panel";
-import "@freshcoat/ui/theme.css";
+import { Button } from "@freshcoat-js/ui/button";
+import { Panel, PanelHeader } from "@freshcoat-js/ui/panel";
+import "@freshcoat-js/ui/theme.css";
 ```
 
 Import components from their individual subpaths. The host app needs React 19
@@ -52,7 +52,7 @@ Follow the [repository guide](../../CONTRIBUTING.md) for setup and review checks
    available so keyboard, focus and screen-reader behavior come with it.
 2. Style with Tailwind classes using `src/theme.css` tokens rather than raw
    colors, so both themes work.
-3. The package's wildcard exports expose components as `@freshcoat/ui/<name>`.
+3. The package's wildcard exports expose components as `@freshcoat-js/ui/<name>`.
    Show the component in `src/gallery.tsx`, Studio's `/kit` route, in both themes.
 4. Test behavior beyond markup under `src/tests/`. Run `test`, `typecheck`
    and `check` from this directory, plus relevant Studio tests when a shared

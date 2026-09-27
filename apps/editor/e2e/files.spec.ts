@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { LEGACY_TKIT_MEDIA_TYPE } from "@freshcoat/coatfile/coat";
+import { LEGACY_TKIT_MEDIA_TYPE } from "@freshcoat-js/coatfile/coat";
 import { expect, test } from "@playwright/test";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { mod, openSample, run, settle, state } from "./helpers";

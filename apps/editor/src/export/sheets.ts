@@ -1,11 +1,11 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import type {
 	ExportItem,
 	ExportPreset,
 	Imposition,
 	PaperName,
 	SheetLayout,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	cardSizeMm,
 	DEFAULT_SHEET_LAYOUT,
@@ -14,7 +14,7 @@ import {
 	PAPER_SIZES_MM,
 	pdfLayout,
 	SheetLayoutError,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 
 /** A planned item with its place among its card's sides, which pairs a
  *  front with its back under duplex. */

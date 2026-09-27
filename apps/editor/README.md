@@ -31,8 +31,8 @@ to IndexedDB. Fonts and images referenced by URL are fetched from their hosts;
 the interface fonts are bundled.
 
 The canvas and exports use the same reusable packages:
-[`@freshcoat/coatfile`](../../packages/coatfile) compiles templates, and
-[`freshcoat`](../../packages/engine) lays out and paints them with CanvasKit.
+[`@freshcoat-js/coatfile`](../../packages/coatfile) compiles templates, and
+[`@freshcoat-js/engine`](../../packages/engine) lays out and paints them with CanvasKit.
 See [performance](docs/performance.md) for measurements of live editing
 and batch exports.
 
@@ -89,7 +89,7 @@ covers shared checks and pull requests.
   JPEG or WebP zips, or a PDF). A pool of workers renders in parallel, and
   writes to a download, a zip file or a folder as it goes. PDFs can lay cards
   out on sheets of paper with crop marks and duplex backs.
-- **Print:** an optional card printer path through `@freshcoat/for-print`, with measured
+- **Print:** an optional card printer path through `@freshcoat-js/for-print`, with measured
   print profiles and a preview of the file sent to the printer.
 - **Starters:** a Davi card (landscape and portrait), a photo watermark and an
   event badge with Speaker and Staff variants, each with a preset ready to

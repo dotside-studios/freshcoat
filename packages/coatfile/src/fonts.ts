@@ -1,4 +1,4 @@
-import { fontBytes, resolveFontRequest } from "freshcoat";
+import { fontBytes, resolveFontRequest } from "@freshcoat-js/engine";
 import { childElements } from "./tree";
 import type {
 	Background,

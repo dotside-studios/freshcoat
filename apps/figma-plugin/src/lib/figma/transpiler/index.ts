@@ -1,9 +1,9 @@
-import type { TemplateWarning } from "@freshcoat/coatfile";
+import type { TemplateWarning } from "@freshcoat-js/coatfile";
 import {
 	assetUri,
 	type PendingAsset,
 	parseAssetUri,
-} from "@freshcoat/coatfile/assets";
+} from "@freshcoat-js/coatfile/assets";
 import type {
 	FigmaConstraints,
 	FigmaContainerNode,
@@ -1202,7 +1202,7 @@ function dropUnfilledSlots(elements: unknown[]): unknown[] {
 	return elements;
 }
 
-// coatfile's uniquifyElementIds (@freshcoat/coatfile/normalize) only
+// coatfile's uniquifyElementIds (@freshcoat-js/coatfile/normalize) only
 // dedupes the TOP-LEVEL array — it never recurses into a frame element's
 // `properties.children`. Figma auto-names layers ("Text", "Rectangle", …),
 // so a nested element commonly slugs to the same id as a top-level (or

@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { DataRecord, Dataset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { DataRecord, Dataset } from "@freshcoat-js/workspace";
 import { VARIANT_EXPORT } from "~/app/copy";
 
 /** Which records the filmstrip and the stepper walk through. */

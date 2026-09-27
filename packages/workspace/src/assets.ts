@@ -1,4 +1,4 @@
-import { subtleSha256 } from "@freshcoat/coatfile";
+import { subtleSha256 } from "@freshcoat-js/coatfile";
 import { newRecord } from "./columns";
 import { newId } from "./ids";
 import { orientedSize, readImageInfo } from "./image-info";

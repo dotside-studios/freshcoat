@@ -1,7 +1,7 @@
 // Throughput of the state layer, comparing Immer with manual updates. Run with
 // `bunx vitest bench --run src/tests/perf`; `bun run test` leaves it out.
-import type { Template } from "@freshcoat/coatfile";
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { bench, describe } from "vitest";
 import { translateLayers } from "~/doc/geometry";
 import {

@@ -1,6 +1,6 @@
-import { ColorInput } from "@freshcoat/ui/color";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { NumberField } from "@freshcoat/ui/number-field";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { NumberField } from "@freshcoat-js/ui/number-field";
 import {
 	type KeyboardEvent,
 	type PointerEvent,

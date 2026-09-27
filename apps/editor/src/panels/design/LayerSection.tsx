@@ -1,8 +1,8 @@
-import type { Element, LayoutChild, Template } from "@freshcoat/coatfile";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import type { Element, LayoutChild, Template } from "@freshcoat-js/coatfile";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { type ReactNode, useMemo } from "react";
 import {
 	applyRect,

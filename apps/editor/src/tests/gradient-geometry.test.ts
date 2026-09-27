@@ -1,4 +1,4 @@
-import { linearGradientAngle } from "@freshcoat/coatfile";
+import { linearGradientAngle } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import {
 	boxToWorld,

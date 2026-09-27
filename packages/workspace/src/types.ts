@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { PrintProfile } from "@freshcoat/for-print";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { PrintProfile } from "@freshcoat-js/for-print";
 
 export type ColumnType =
 	| "text"

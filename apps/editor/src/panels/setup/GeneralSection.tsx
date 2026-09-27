@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import { useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { isUnnamed } from "~/doc/new-document";

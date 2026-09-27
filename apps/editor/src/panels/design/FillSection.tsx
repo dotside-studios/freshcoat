@@ -1,9 +1,9 @@
-import type { Fill } from "@freshcoat/coatfile";
-import { ColorInput } from "@freshcoat/ui/color";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import type { Fill } from "@freshcoat-js/coatfile";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import ClockwiseIcon from "~icons/mingcute/clockwise-line";
 import ReverseIcon from "~icons/mingcute/transfer-horizontal-line";
 import {

@@ -1,27 +1,27 @@
-# freshcoat
+# @freshcoat-js/engine
 
 The 2D rendering engine behind [Freshcoat](../../README.md), named
-`freshcoat` in the workspace. It lays out a scene graph,
+`@freshcoat-js/engine` in the workspace. It lays out a scene graph,
 shapes text and paints with CanvasKit (Skia compiled to WASM).
 
 Use it directly when your application supplies its own scene: previews,
 generated images or an interactive canvas. For `.coat` templates and field
-substitution, start with [`@freshcoat/coatfile`](../coatfile), which compiles
+substitution, start with [`@freshcoat-js/coatfile`](../coatfile), which compiles
 templates into engine nodes.
 
 The scene and command types are independent of the backend; the supplied
 painter uses CanvasKit. Browser and headless environments share that paint
 path. Template fields, variants and frame selection belong to coatfile;
 card-printer correction policy belongs to
-[`@freshcoat/for-print`](../for-print).
+[`@freshcoat-js/for-print`](../for-print).
 
 ## Quick start
 
 With an initialized CanvasKit instance (`ck`), render a scene offscreen:
 
 ```ts
-import type { RectNode } from "freshcoat";
-import { renderSceneToPng } from "freshcoat/headless";
+import type { RectNode } from "@freshcoat-js/engine";
+import { renderSceneToPng } from "@freshcoat-js/engine/headless";
 
 const root: RectNode = {
   kind: "rect",
@@ -51,8 +51,8 @@ a runtime alive across renders. The types in [`src/node.ts`](src/node.ts)
 define the scene model.
 
 ```ts
-import { compileScene } from "freshcoat";
-import { createHeadlessEnv } from "freshcoat/headless";
+import { compileScene } from "@freshcoat-js/engine";
+import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 
 const commands = compileScene(root, { width, height, textEngine });
 const env = createHeadlessEnv({ fonts });
@@ -78,11 +78,11 @@ own subpath.
 
 | Subpath | What it is |
 |---|---|
-| `freshcoat` | node types, `compileScene`, layout, adjust and export-scale math |
-| `freshcoat/browser` | a runtime backing a live DOM canvas — the editor's preview |
-| `freshcoat/headless` | offscreen painting to PNG, napi-free — server previews, OG images |
-| `freshcoat/runtime` | the backend seam: `Painter` and `makeRuntime` |
-| `freshcoat/path` | SVG path data parsing and maths |
+| `@freshcoat-js/engine` | node types, `compileScene`, layout, adjust and export-scale math |
+| `@freshcoat-js/engine/browser` | a runtime backing a live DOM canvas — the editor's preview |
+| `@freshcoat-js/engine/headless` | offscreen painting to PNG, napi-free — server previews, OG images |
+| `@freshcoat-js/engine/runtime` | the backend seam: `Painter` and `makeRuntime` |
+| `@freshcoat-js/engine/path` | SVG path data parsing and maths |
 
 ## Staying warm
 

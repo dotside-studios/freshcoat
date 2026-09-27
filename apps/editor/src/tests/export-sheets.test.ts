@@ -3,13 +3,13 @@ import type {
 	ExportPreset,
 	SheetLayout,
 	Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import {
 	imposeSheets,
 	planExport,
 	SheetLayoutError,
-} from "@freshcoat/workspace";
-import { assemblePdf } from "@freshcoat/workspace/pdf";
+} from "@freshcoat-js/workspace";
+import { assemblePdf } from "@freshcoat-js/workspace/pdf";
 import {
 	decodePDFRawStream,
 	PDFArray,

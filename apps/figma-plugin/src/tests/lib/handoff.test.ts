@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Template } from "@freshcoat/coatfile";
-import { unpackTemplate } from "@freshcoat/coatfile/coat";
+import type { Template } from "@freshcoat-js/coatfile";
+import { unpackTemplate } from "@freshcoat-js/coatfile/coat";
 import { sha256 } from "js-sha256";
 import { describe, expect, it, vi } from "vitest";
 import {

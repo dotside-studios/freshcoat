@@ -1,10 +1,10 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type Dataset,
 	type DatasetAsset,
 	parseImageInfo,
 	type Workspace,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { singleTemplateWorkspace } from "~/state/workspace";
 import { plural } from "./copy";
 

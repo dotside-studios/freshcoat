@@ -1,11 +1,11 @@
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { ColorInput } from "@freshcoat/ui/color";
-import { inputBase } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { ColorInput } from "@freshcoat-js/ui/color";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
 import {
 	type CellValue,
 	type Column,
@@ -15,7 +15,7 @@ import {
 	orientedSize,
 	parseAssetRef,
 	type RecordStatus,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Dialog, DialogTrigger, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";

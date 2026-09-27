@@ -1,5 +1,5 @@
-import { compile, FORMAT_VERSION, validate } from "@freshcoat/coatfile";
-import { collectAssetRefs, readAssets } from "@freshcoat/coatfile/assets";
+import { compile, FORMAT_VERSION, validate } from "@freshcoat-js/coatfile";
+import { collectAssetRefs, readAssets } from "@freshcoat-js/coatfile/assets";
 import { describe, expect, it } from "vitest";
 import type { FigmaContainerNode } from "~/lib/figma/types";
 import type { ReadDocumentMessage } from "~/shared/protocol";

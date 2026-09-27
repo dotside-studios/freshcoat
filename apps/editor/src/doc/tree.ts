@@ -6,7 +6,7 @@ import type {
 	Element,
 	Template,
 	TemplateFrame,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { getElement, isContainer, MASK_SOURCE } from "./path";
 
 export type Container = Extract<Element, { type: "frame" | "mask" }>;

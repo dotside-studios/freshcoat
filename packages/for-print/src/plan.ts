@@ -11,7 +11,7 @@
 // (PrintOptimizeOptions) down to freshcoat's math (color matrix + LUT + sharpen).
 // freshcoat never learns what "dye-sub" or "K panel" means.
 
-import type { Adjust, ImageNode, Node } from "freshcoat";
+import type { Adjust, ImageNode, Node } from "@freshcoat-js/engine";
 import { analyzePixels, correctionMatrix } from "./analyze";
 import { NO_PROCESSING, YMCKO_PRESET } from "./presets";
 import type {

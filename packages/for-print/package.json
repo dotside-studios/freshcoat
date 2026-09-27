@@ -1,5 +1,5 @@
 {
-	"name": "@freshcoat/for-print",
+	"name": "@freshcoat-js/for-print",
 	"private": true,
 	"version": "0.1.0",
 	"description": "Image analysis, correction planning and calibration for dye-sublimation card printers",
@@ -17,7 +17,7 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"freshcoat": "workspace:*"
+		"@freshcoat-js/engine": "workspace:*"
 	},
 	"devDependencies": {
 		"canvaskit-wasm": "^0.41.1",

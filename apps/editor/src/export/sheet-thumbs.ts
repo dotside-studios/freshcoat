@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { DatasetAsset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { DatasetAsset } from "@freshcoat-js/workspace";
 import { Lru } from "~/data/lru";
 import { previewImage, referencedAssets } from "~/data/thumbnails";
 import { buildPreview, type Preview } from "~/doc/preview";

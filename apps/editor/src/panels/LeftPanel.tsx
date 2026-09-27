@@ -1,4 +1,4 @@
-import { cn } from "@freshcoat/ui/lib/cn";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useId, useState } from "react";
 import { LEFT_PANEL } from "~/app/copy";
 import { LayersTree } from "./layers/LayersTree";

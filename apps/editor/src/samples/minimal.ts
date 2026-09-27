@@ -1,5 +1,5 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import { fixtures } from "@freshcoat/coatfile/fixtures";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
 import { VEND_SANS, VEND_SANS_FAMILY } from "./vend-sans";
 
 /** coatfile's minimal fixture, set in the embedded Vend Sans so it renders

@@ -1,5 +1,5 @@
-import { ChevronRightIcon } from "@freshcoat/ui/icons";
-import { cn } from "@freshcoat/ui/lib/cn";
+import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useCallback, useState } from "react";
 
 /** The left panel's sections, in the order they stack. */

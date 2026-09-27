@@ -4,7 +4,7 @@ import {
 	DEFAULT_SHEET_LAYOUT,
 	imposeSheets,
 	type SheetLayout,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { expect, type Page, test } from "@playwright/test";
 import {
 	decodePDFRawStream,

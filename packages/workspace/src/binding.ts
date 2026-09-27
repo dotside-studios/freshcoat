@@ -1,4 +1,4 @@
-import type { Template, Variant } from "@freshcoat/coatfile";
+import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
 import type { Binding, DataRecord, Dataset, FieldSource } from "./types";

@@ -1,4 +1,4 @@
-import { scalePathData } from "freshcoat/path";
+import { scalePathData } from "@freshcoat-js/engine/path";
 import type {
 	FigmaBoundingBox,
 	FigmaSolidPaint,

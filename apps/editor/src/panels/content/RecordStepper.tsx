@@ -1,7 +1,7 @@
-import { Button } from "@freshcoat/ui/button";
-import { ComboBox, ComboBoxItem } from "@freshcoat/ui/combo-box";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { PanelSection } from "@freshcoat/ui/panel";
+import { Button } from "@freshcoat-js/ui/button";
+import { ComboBox, ComboBoxItem } from "@freshcoat-js/ui/combo-box";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { PanelSection } from "@freshcoat-js/ui/panel";
 import { useMemo } from "react";
 import { useController } from "~/app/context";
 import { CONTENT, plural } from "~/app/copy";

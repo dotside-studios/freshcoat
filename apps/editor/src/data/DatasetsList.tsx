@@ -1,10 +1,15 @@
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { ContextMenu, Menu, MenuItem, MenuSeparator } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { toast } from "@freshcoat/ui/toast";
-import { treeRow } from "@freshcoat/ui/tree";
-import { templateStem } from "@freshcoat/workspace";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import {
+	ContextMenu,
+	Menu,
+	MenuItem,
+	MenuSeparator,
+} from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { toast } from "@freshcoat-js/ui/toast";
+import { treeRow } from "@freshcoat-js/ui/tree";
+import { templateStem } from "@freshcoat-js/workspace";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";

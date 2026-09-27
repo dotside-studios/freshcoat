@@ -1,8 +1,8 @@
-import type { Template } from "@freshcoat/coatfile";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat/ui/menu";
-import { ToggleButton } from "@freshcoat/ui/toggle";
-import { Tree, TreeItem } from "@freshcoat/ui/tree";
+import type { Template } from "@freshcoat-js/coatfile";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import { Tree, TreeItem } from "@freshcoat-js/ui/tree";
 import {
 	createContext,
 	type ReactNode,

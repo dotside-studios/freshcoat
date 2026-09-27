@@ -1,4 +1,4 @@
-import { linearGradientAngle } from "@freshcoat/coatfile";
+import { linearGradientAngle } from "@freshcoat-js/coatfile";
 import type { FigmaColor, FigmaPaint } from "../types";
 
 type SolidFillResult = { kind: "solid"; hex: string; opacity: number };

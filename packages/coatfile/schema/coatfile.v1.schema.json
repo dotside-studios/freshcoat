@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://cdn.jsdelivr.net/npm/@freshcoat/coatfile@0.1.0/schema/coatfile.v1.schema.json",
+	"$id": "https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@0.1.0/schema/coatfile.v1.schema.json",
 	"title": "Coatfile",
 	"description": "A freshcoat template (coatfile), format 1.x. Shape only: validate() also enforces unique ids, resolvable variant overrides and declared mustache fields.",
 	"type": "object",

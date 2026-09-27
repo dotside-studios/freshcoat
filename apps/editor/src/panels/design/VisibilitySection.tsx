@@ -1,8 +1,8 @@
-import type { Element, VisibilityCondition } from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { TextField } from "@freshcoat/ui/field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import type { Element, VisibilityCondition } from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { TextField } from "@freshcoat-js/ui/field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useContext, useMemo } from "react";
 import { VARIANT_UI } from "~/app/copy";
 import { listFields } from "~/doc/values";

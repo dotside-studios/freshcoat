@@ -1,5 +1,5 @@
-import type { Element, Template } from "@freshcoat/coatfile";
-import { compile } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { compile } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { unwrap, updateElement } from "../doc/ops";
 import { getElement, walkLayers } from "../doc/path";
@@ -146,7 +146,7 @@ describe("buildPreview", () => {
 
 describe("buildPreview tolerates a document mid-edit", () => {
 	test("an unknown token and a cleared name still compile", async () => {
-		const { compile } = await import("@freshcoat/coatfile");
+		const { compile } = await import("@freshcoat-js/coatfile");
 		const { buildPreview } = await import("~/doc/preview");
 		const { doc } = await import("./doc-fixture");
 		const { updateElement, unwrap } = await import("~/doc/ops");

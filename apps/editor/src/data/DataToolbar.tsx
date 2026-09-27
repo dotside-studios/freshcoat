@@ -1,22 +1,22 @@
-import { Button } from "@freshcoat/ui/button";
-import { inputBase } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
+import { Button } from "@freshcoat-js/ui/button";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import {
 	Menu,
 	MenuItem,
 	MenuSection,
 	MenuSeparator,
 	SubmenuTrigger,
-} from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
+} from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
 import {
 	ToggleButton,
 	ToggleGroup,
 	ToggleGroupItem,
-} from "@freshcoat/ui/toggle";
-import { Tooltip, TooltipTrigger } from "@freshcoat/ui/tooltip";
-import type { RecordStatus, TableFormat } from "@freshcoat/workspace";
+} from "@freshcoat-js/ui/toggle";
+import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
+import type { RecordStatus, TableFormat } from "@freshcoat-js/workspace";
 import type { ReactNode } from "react";
 import { MenuTrigger } from "react-aria-components";
 import AddIcon from "~icons/mingcute/add-line";

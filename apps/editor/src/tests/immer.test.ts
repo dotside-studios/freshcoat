@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { Binding, Dataset, ExportPreset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Binding, Dataset, ExportPreset } from "@freshcoat-js/workspace";
 import { describe, expect, test } from "vitest";
 import type { LayerGeometry } from "~/doc/geometry";
 import {

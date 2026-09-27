@@ -1,6 +1,6 @@
-import { Menu, MenuItem } from "@freshcoat/ui/menu";
-import { Popover } from "@freshcoat/ui/popover";
-import { Tooltip, TooltipTrigger } from "@freshcoat/ui/tooltip";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { getElement } from "~/doc/path";
 import { activeVariantId } from "~/doc/variant-edit";

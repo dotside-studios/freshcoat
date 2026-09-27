@@ -1,9 +1,9 @@
-import type { FrameElement, Layout } from "@freshcoat/coatfile";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@freshcoat/ui/toggle";
+import type { FrameElement, Layout } from "@freshcoat-js/coatfile";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import ArrowDownIcon from "~icons/mingcute/arrow-down-line";
 import ArrowRightIcon from "~icons/mingcute/arrow-right-line";
 import { AddButton, Notice, Pair, RemoveButton, Row } from "./controls";

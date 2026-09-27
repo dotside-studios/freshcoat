@@ -4,7 +4,7 @@ import {
 	isSquareSymbology,
 	type Symbology,
 	type Template,
-} from "@freshcoat/coatfile";
+} from "@freshcoat-js/coatfile";
 import { uniqueId } from "./ids";
 
 export type ElementKind =

@@ -1,11 +1,11 @@
-import { Button } from "@freshcoat/ui/button";
-import { Checkbox } from "@freshcoat/ui/checkbox";
-import { inputBase } from "@freshcoat/ui/field";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { fieldLabel } from "@freshcoat/ui/lib/styles";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { treeRow } from "@freshcoat/ui/tree";
+import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { treeRow } from "@freshcoat-js/ui/tree";
 import {
 	COLUMN_TYPES,
 	type Column,
@@ -13,7 +13,7 @@ import {
 	coerce,
 	type Dataset,
 	templateStem,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { useController } from "~/app/context";

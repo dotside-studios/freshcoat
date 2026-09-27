@@ -1,5 +1,5 @@
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
-import { Kbd } from "@freshcoat/ui/kbd";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
+import { Kbd } from "@freshcoat-js/ui/kbd";
 import { COMMANDS } from "./commands";
 
 const GROUPS = [

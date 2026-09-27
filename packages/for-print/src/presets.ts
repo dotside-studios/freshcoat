@@ -1,4 +1,4 @@
-import type { FrameFinish } from "freshcoat";
+import type { FrameFinish } from "@freshcoat-js/engine";
 import type { PrintOptimizeOptions } from "./types";
 
 // Tuned for YMCKO dye-sublimation ribbon printers.

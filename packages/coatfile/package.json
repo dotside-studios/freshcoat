@@ -1,5 +1,5 @@
 {
-	"name": "@freshcoat/coatfile",
+	"name": "@freshcoat-js/coatfile",
 	"private": true,
 	"version": "0.1.0",
 	"description": "The Freshcoat template format, validator and compiler for data-driven designs",
@@ -28,10 +28,10 @@
 		"schema:check": "bun run scripts/build-json-schema.ts --check"
 	},
 	"dependencies": {
-		"@freshcoat/for-print": "workspace:*",
+		"@freshcoat-js/for-print": "workspace:*",
 		"bwip-js": "^4.11.4",
 		"fflate": "^0.8.3",
-		"freshcoat": "workspace:*",
+		"@freshcoat-js/engine": "workspace:*",
 		"qrcode": "^1.5.4",
 		"zod": "^4.1.13"
 	},

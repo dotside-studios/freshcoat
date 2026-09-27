@@ -1,14 +1,14 @@
-import type { Template, ValidationError } from "@freshcoat/coatfile";
-import { validate } from "@freshcoat/coatfile";
-import { COAT_EXTENSION } from "@freshcoat/coatfile/coat";
+import type { Template, ValidationError } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
+import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
 import type {
 	Binding,
 	Dataset,
 	ExportPreset,
 	RecordStatus,
 	Workspace,
-} from "@freshcoat/workspace";
-import { templateStem } from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
+import { templateStem } from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
 import {
 	begin,

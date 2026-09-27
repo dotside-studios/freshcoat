@@ -1,6 +1,6 @@
 // @vitest-environment node
-import type { PrintRenderOptions } from "@freshcoat/coatfile/render";
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat/workspace";
+import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
+import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { type JobPool, REPORT_FILE_NAME, runExportJob } from "~/export/job";

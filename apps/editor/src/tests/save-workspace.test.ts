@@ -1,11 +1,11 @@
-import { FORMAT_MAJOR, FORMAT_MINOR } from "@freshcoat/coatfile";
+import { FORMAT_MAJOR, FORMAT_MINOR } from "@freshcoat-js/coatfile";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController, NEWER_FORMAT } from "~/app/controller";
 import * as download from "~/app/download";
 import { doc } from "./doc-fixture";
 
 const toast = vi.hoisted(() => vi.fn());
-vi.mock("@freshcoat/ui/toast", async (actual) => ({
+vi.mock("@freshcoat-js/ui/toast", async (actual) => ({
 	...(await actual<object>()),
 	toast,
 }));

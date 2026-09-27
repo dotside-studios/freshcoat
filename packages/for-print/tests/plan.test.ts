@@ -8,7 +8,7 @@ import {
 	createRect,
 	createText,
 	type Node,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import { analyzePixels } from "../src/analyze";
 import {

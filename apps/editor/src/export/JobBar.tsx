@@ -1,10 +1,10 @@
-import { Button } from "@freshcoat/ui/button";
-import { IconButton } from "@freshcoat/ui/icon-button";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Popover } from "@freshcoat/ui/popover";
-import { ProgressBar } from "@freshcoat/ui/progress";
-import { Tooltip, TooltipTrigger } from "@freshcoat/ui/tooltip";
-import type { ExportPreset } from "@freshcoat/workspace";
+import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { ProgressBar } from "@freshcoat-js/ui/progress";
+import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
+import type { ExportPreset } from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { DialogTrigger, Dialog as RACDialog } from "react-aria-components";
 import { plural } from "~/app/copy";

@@ -1,4 +1,4 @@
-import { autoBinding } from "@freshcoat/workspace";
+import { autoBinding } from "@freshcoat-js/workspace";
 import type { EditorController } from "~/app/controller";
 
 /** Adds a three-record dataset and binds the active template to it. */
@@ -34,8 +34,10 @@ export async function bindPhotoRecords(photos: Blob[]) {
 	const c = (
 		window as unknown as { __freshcoat: { controller: EditorController } }
 	).__freshcoat.controller;
-	const { photoDataset, prepareAssets } = await import("@freshcoat/workspace");
-	const { FORMAT_VERSION } = await import("@freshcoat/coatfile");
+	const { photoDataset, prepareAssets } = await import(
+		"@freshcoat-js/workspace"
+	);
+	const { FORMAT_VERSION } = await import("@freshcoat-js/coatfile");
 	c.open(
 		{
 			format_version: FORMAT_VERSION,

@@ -1,4 +1,4 @@
-import type { Template, TextElement } from "@freshcoat/coatfile";
+import type { Template, TextElement } from "@freshcoat-js/coatfile";
 import {
 	cleanup,
 	fireEvent,

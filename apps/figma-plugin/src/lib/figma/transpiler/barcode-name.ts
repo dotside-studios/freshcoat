@@ -7,7 +7,7 @@
 //   barcode:ean13:5901234123457     a literal value, bound to nothing
 //   barcode:code39:"ID {{id}}"      a template, quoted as in the other markers
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
-import type { Symbology } from "@freshcoat/coatfile";
+import type { Symbology } from "@freshcoat-js/coatfile";
 import { isWholeMustacheToken, parseMustacheTokens } from "./fields";
 
 /** The symbologies a `barcode:` layer can name: coatfile's `SYMBOLOGIES`,

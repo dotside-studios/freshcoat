@@ -1,4 +1,4 @@
-import type { Template, ValidationError } from "@freshcoat/coatfile";
+import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import { getElement, keyOf, MASK_SOURCE } from "~/doc/path";
 import { ISSUE_COPY as C } from "./copy";
 

@@ -1,4 +1,4 @@
-import type { FieldDefinition, Template } from "@freshcoat/coatfile";
+import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
 import { KEY_RULE } from "~/app/copy";
 
 export const FIELD_KEY = /^[a-zA-Z_][a-zA-Z0-9_]*$/;

@@ -1,5 +1,5 @@
-import { Button } from "@freshcoat/ui/button";
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
+import { Button } from "@freshcoat-js/ui/button";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 
 export type ConfirmOptions = {

@@ -327,7 +327,7 @@ modules) and, for PDF417 and Aztec, the error correction.
   could not load the encoder, fails with `Barcode: <message>` and marks its
   record failed. A placeholder is never exported in place of a code.
 - **The encoder:** bwip-js is about 85 KB gzipped, so it is a chunk of its
-  own (`@freshcoat/coatfile/barcode`), fetched the first time a template with
+  own (`@freshcoat-js/coatfile/barcode`), fetched the first time a template with
   a barcode opens or the tool is chosen. Until then, and in any app that
   never registers it, a barcode draws a hatched placeholder with a warning.
   The export workers register it when they start. Any other app using the
@@ -427,7 +427,7 @@ reaches every variant at once.
   share a name. The filmstrip and the preview show each item in its own
   variant.
 
-In the file, variants are coatfile 1.4 deltas. `@freshcoat/coatfile`'s
+In the file, variants are coatfile 1.4 deltas. `@freshcoat-js/coatfile`'s
 README documents them, and `checkVariants`, the lint behind the Issues
 entries.
 
@@ -521,7 +521,7 @@ data/<id>/assets/<sha256>.<ext>   images, referenced from records as ws:<sha256>
 `.coat` and `.coat.json` are coatfile's formats, unchanged by the workspace.
 The manifest names each template's entry, so a workspace saved before the
 rename, with `templates/<id>.tkit` entries, still opens.
-`@freshcoat/workspace` reads and writes the format with no browser APIs, so
+`@freshcoat-js/workspace` reads and writes the format with no browser APIs, so
 it also runs under Bun or Node.
 
 ## Dependencies

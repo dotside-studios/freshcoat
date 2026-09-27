@@ -1,4 +1,4 @@
-import type { Element, Template } from "@freshcoat/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import { rectOf } from "../doc/geometry";
 import { moveElements, unwrap } from "../doc/ops";

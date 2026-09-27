@@ -1,6 +1,6 @@
-import { cn } from "@freshcoat/ui/lib/cn";
-import { Popover } from "@freshcoat/ui/popover";
-import { SegmentedControl, SegmentedItem } from "@freshcoat/ui/segmented";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type CSSProperties,

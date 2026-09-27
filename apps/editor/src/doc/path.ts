@@ -1,4 +1,4 @@
-import type { Background, Element, Template } from "@freshcoat/coatfile";
+import type { Background, Element, Template } from "@freshcoat-js/coatfile";
 
 export type LayerPath =
 	| { side: number; path: number[] }

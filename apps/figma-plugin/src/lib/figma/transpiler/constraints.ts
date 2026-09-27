@@ -1,4 +1,4 @@
-import type { Constraint, Constraints } from "@freshcoat/coatfile";
+import type { Constraint, Constraints } from "@freshcoat-js/coatfile";
 import type {
 	FigmaConstraints,
 	FigmaConstraintType,

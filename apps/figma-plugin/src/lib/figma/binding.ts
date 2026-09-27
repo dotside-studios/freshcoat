@@ -2,7 +2,7 @@
 // run at harvest time (write pluginData) and at export time (live fallback), so
 // the marker grammar lives in exactly one place.
 
-import type { Symbology } from "@freshcoat/coatfile";
+import type { Symbology } from "@freshcoat-js/coatfile";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { titleCase } from "./transpiler/fields";
 import type { FigmaNode } from "./types";

@@ -3,13 +3,13 @@ import {
 	type ImageProperties,
 	parseAssetUri,
 	type Template,
-} from "@freshcoat/coatfile";
-import { Button } from "@freshcoat/ui/button";
-import { TextField } from "@freshcoat/ui/field";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { PanelSection } from "@freshcoat/ui/panel";
-import { Select, SelectItem } from "@freshcoat/ui/select";
-import { toast } from "@freshcoat/ui/toast";
+} from "@freshcoat-js/coatfile";
+import { Button } from "@freshcoat-js/ui/button";
+import { TextField } from "@freshcoat-js/ui/field";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { toast } from "@freshcoat-js/ui/toast";
 import { useEffect, useState } from "react";
 import { FileTrigger } from "react-aria-components";
 import { formatBytes } from "~/app/format";

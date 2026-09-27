@@ -1,4 +1,4 @@
-import { compile, type Template, validate } from "@freshcoat/coatfile";
+import { compile, type Template, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type ColorwayInput,

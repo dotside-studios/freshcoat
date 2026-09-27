@@ -4,7 +4,7 @@ import {
 	contrastMatrix,
 	identityColorMatrix,
 	saturationMatrix,
-} from "freshcoat";
+} from "@freshcoat-js/engine";
 import { detectOrientation } from "./geometry";
 import type {
 	GamutReport,

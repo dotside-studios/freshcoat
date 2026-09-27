@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import { resolveValues, variantsFor } from "./binding";
 import { toTemplateValue } from "./columns";
 import type {

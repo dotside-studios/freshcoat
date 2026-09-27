@@ -1,5 +1,5 @@
-import { Button } from "@freshcoat/ui/button";
-import { Dialog, Modal } from "@freshcoat/ui/dialog";
+import { Button } from "@freshcoat-js/ui/button";
+import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
 
 /** Asks before closing or replacing a workspace with unsaved changes. Dirty
  *  covers every template, the data and the presets, so saving here writes

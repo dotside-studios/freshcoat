@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat/coatfile";
-import { cn } from "@freshcoat/ui/lib/cn";
-import type { DatasetAsset, Imposition } from "@freshcoat/workspace";
-import { cropMarks } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import type { DatasetAsset, Imposition } from "@freshcoat-js/workspace";
+import { cropMarks } from "@freshcoat-js/workspace";
 import {
 	type CSSProperties,
 	useEffect,

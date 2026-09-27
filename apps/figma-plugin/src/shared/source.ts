@@ -1,4 +1,4 @@
-import type { TemplateSource } from "@freshcoat/coatfile";
+import type { TemplateSource } from "@freshcoat-js/coatfile";
 import type {
 	FigmaPick,
 	FigmaVariantPick,

@@ -1,5 +1,5 @@
-import type { Element, InlineAsset, Template } from "@freshcoat/coatfile";
-import { parseAssetUri } from "@freshcoat/coatfile";
+import type { Element, InlineAsset, Template } from "@freshcoat-js/coatfile";
+import { parseAssetUri } from "@freshcoat-js/coatfile";
 
 type Payload = { freshcoat: 1; elements: Element[]; assets: InlineAsset[] };
 

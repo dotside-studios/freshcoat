@@ -1,15 +1,15 @@
-import type { Template } from "@freshcoat/coatfile";
-import { TextField } from "@freshcoat/ui/field";
-import { cn } from "@freshcoat/ui/lib/cn";
-import { NumberField } from "@freshcoat/ui/number-field";
-import { Select, SelectItem } from "@freshcoat/ui/select";
+import type { Template } from "@freshcoat-js/coatfile";
+import { TextField } from "@freshcoat-js/ui/field";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import { NumberField } from "@freshcoat-js/ui/number-field";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
 	type Binding,
 	type Dataset,
 	type FieldSource,
 	isEmptyVariant,
 	type VariantSource,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import { useController } from "~/app/context";
 import { EMPTY, VARIANT_EXPORT } from "~/app/copy";

@@ -3,7 +3,7 @@ import type {
 	Column,
 	DataRecord,
 	Dataset,
-} from "@freshcoat/workspace";
+} from "@freshcoat-js/workspace";
 import { describe, expect, it } from "vitest";
 import { guessDateOrder } from "~/data/ImportWizard";
 import {

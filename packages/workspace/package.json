@@ -1,5 +1,5 @@
 {
-	"name": "@freshcoat/workspace",
+	"name": "@freshcoat-js/workspace",
 	"private": true,
 	"version": "0.0.0",
 	"license": "Apache-2.0",
@@ -21,8 +21,8 @@
 		"check": "biome check"
 	},
 	"dependencies": {
-		"@freshcoat/for-print": "workspace:*",
-		"@freshcoat/coatfile": "workspace:*",
+		"@freshcoat-js/for-print": "workspace:*",
+		"@freshcoat-js/coatfile": "workspace:*",
 		"fflate": "^0.8.3",
 		"pdf-lib": "^1.17.1",
 		"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",

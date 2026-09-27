@@ -1,4 +1,4 @@
-import { IconButton } from "@freshcoat/ui/icon-button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
 import type { Icon } from "~/app/icons";
 import type { AlignMode } from "~/doc/geometry";
 import { useEditor } from "~/state/hooks";

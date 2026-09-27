@@ -1,4 +1,4 @@
-import { ProgressBar } from "@freshcoat/ui/progress";
+import { ProgressBar } from "@freshcoat-js/ui/progress";
 import { usePhotoImportProgress } from "./actions";
 
 /** The running photo import's progress, over the bottom of the section. */

@@ -1,6 +1,6 @@
-import { isMac } from "@freshcoat/ui/kbd";
-import { cn } from "@freshcoat/ui/lib/cn";
-import type { DataRecord, DatasetAsset } from "@freshcoat/workspace";
+import { isMac } from "@freshcoat-js/ui/kbd";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import type { DataRecord, DatasetAsset } from "@freshcoat-js/workspace";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type KeyboardEvent, useEffect, useMemo, useRef } from "react";
 import { VariantSwatch } from "~/app/VariantSwatch";

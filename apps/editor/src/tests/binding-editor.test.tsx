@@ -1,5 +1,5 @@
-import type { Template } from "@freshcoat/coatfile";
-import type { Binding, Dataset } from "@freshcoat/workspace";
+import type { Template } from "@freshcoat-js/coatfile";
+import type { Binding, Dataset } from "@freshcoat-js/workspace";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent, {
 	PointerEventsCheckLevel,

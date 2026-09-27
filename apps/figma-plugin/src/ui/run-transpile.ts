@@ -4,8 +4,8 @@ import {
 	type TemplateWarning,
 	type ValidationError,
 	validate,
-} from "@freshcoat/coatfile";
-import { attachAssets } from "@freshcoat/coatfile/assets";
+} from "@freshcoat-js/coatfile";
+import { attachAssets } from "@freshcoat-js/coatfile/assets";
 import type { FigmaPick, NodeTrace } from "~/lib/figma/transpiler";
 import { transpile } from "~/lib/figma/transpiler";
 import {
