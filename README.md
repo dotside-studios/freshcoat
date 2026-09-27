@@ -14,6 +14,26 @@ and export in Freshcoat Studio. Studio is one host for the stack, not a
 requirement for using it. The format and renderer also power
 [Davi](https://davi.social)'s card production system.
 
+## Why we're open sourcing it
+
+Like many small teams, we've struggled to find a design and rendering solution
+that fits the work we're trying to do. Freshcoat grew out of those needs.
+We're sharing it so others can build on it, adapt it to their own workflows,
+and create designs without being at the mercy of proprietary formats. We
+want the design files and the code that interprets them to be understandable,
+portable and open to change.
+
+We're not experts in graphics engines or compiler design, and most of the
+work on Freshcoat has been AI-assisted. We bring working knowledge of
+compilers, experience with Canvas2D rendering, and an understanding of how
+pixels work. Those foundations, alongside our production needs, inform the
+design decisions we've made. There is still plenty for us to learn.
+
+Opening the source is also an invitation to people with deeper experience
+in these areas. We'd welcome help finding mistakes, questioning assumptions,
+and improving the format, rendering and print paths. If that sounds like
+your kind of work, see the [contribution guide](CONTRIBUTING.md).
+
 ## Choose your starting point
 
 | If you want to | Start with |
