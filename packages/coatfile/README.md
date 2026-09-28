@@ -371,6 +371,11 @@ A `vector` element's `d` is SVG path data with any number of subpaths, arcs
 included. `fillRule: "evenodd"` keeps the hole in a ring drawn as two subpaths
 wound the same way; the default is SVG's nonzero.
 
+`svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
+frame of editable `vector`, `frame` and `mask` elements in design px, and
+returns the features it skipped. An `image` element can also point at an SVG
+source directly; the engine draws it as vector art.
+
 `blendMode` is any of Figma's layer modes except linear burn, which Skia has no
 equivalent for: `multiply`, `screen`, `overlay`, `darken`, `lighten`,
 `color-dodge`, `color-burn`, `hard-light`, `soft-light`, `difference`,

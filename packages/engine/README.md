@@ -71,6 +71,15 @@ table and sharpening) are engine operations. `FrameFinish` applies operations
 after the whole scene is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
+## SVG images
+
+An image node whose bytes are SVG paints as vector art, in the browser,
+workers and headless runtimes alike. The painter reads it with `parseSvg`,
+lowers it with `svgToNode` and draws it with the node's fit, mask and stroke,
+so it stays sharp at every export density. Text, embedded images, patterns,
+filters and markers are not drawn; each one used is reported once per source
+as an `svg_unsupported` warning.
+
 ## Subpaths
 
 The barrel stays free of DOM and WASM weight; the paint target lives on its
@@ -83,6 +92,7 @@ own subpath.
 | `@freshcoat-js/engine/headless` | offscreen painting to PNG, napi-free — server previews, OG images |
 | `@freshcoat-js/engine/runtime` | the backend seam: `Painter` and `makeRuntime` |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
+| `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 
 ## Staying warm
 
