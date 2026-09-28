@@ -4,64 +4,64 @@
 
 <p><strong>Create designs that scale.</strong></p>
 
-Freshcoat is an open-source design and rendering stack for work that repeats:
-cards, badges, certificates, labels and watermarked photos. A portable template
-format describes the design; a Skia renderer turns it into pixels; print and
-workspace utilities support production runs.
+Freshcoat is an open-source design and rendering stack for creating cards,
+badges, certificates, labels and watermarked photos from reusable templates.
+A portable format describes each design, a Skia renderer turns it into pixels,
+and print and workspace utilities help produce the output in batches.
 
-Use the packages in your own application, author templates in Figma, or design
-and export in Freshcoat Studio. Studio is one host for the stack, not a
-requirement for using it. The format and renderer also power
+Use the packages in your own application, create templates in Figma, or design
+and export in Freshcoat Studio. The format and renderer also power
 [Davi](https://davi.social)'s card production system.
 
 ## Why we're open sourcing it
 
-Like many small teams, we've struggled to find a design and rendering solution
-that fits the work we're trying to do. Freshcoat grew out of those needs.
-We're sharing it so others can build on it, adapt it to their own workflows,
-and create designs without being at the mercy of proprietary formats. We
-want the design files and the code that interprets them to be understandable,
-portable and open to change.
+Freshcoat grew out of our own production needs as a small team. We struggled
+to find a design and rendering solution that fit our workflow, so we built one.
+We're sharing it so others can build on it and adapt it to their own needs.
+We want design files to be portable and the code that interprets them to be
+understandable and open to change, without depending on proprietary formats.
 
 We're not experts in graphics engines or compiler design, and most of the
-work on Freshcoat has been AI-assisted. We bring working knowledge of
-compilers, experience with Canvas2D rendering, and an understanding of how
-pixels work. Those foundations, alongside our production needs, inform the
-design decisions we've made. There is still plenty for us to learn.
+work on Freshcoat has been AI-assisted. Our design decisions draw on working
+knowledge of compilers, experience with Canvas2D rendering and the practical
+demands of producing designs at scale. There is still plenty for us to learn.
 
-Opening the source is also an invitation to people with deeper experience
-in these areas. We'd welcome help finding mistakes, questioning assumptions,
-and improving the format, rendering and print paths. If that sounds like
-your kind of work, see the [contribution guide](CONTRIBUTING.md).
+We'd welcome help from people with deeper experience in these areas: finding
+mistakes, questioning assumptions and improving the template format, renderer
+and print workflows. If that sounds like your kind of work, see the
+[contribution guide](CONTRIBUTING.md).
 
 ## Choose your starting point
 
 | If you want to | Start with |
 |---|---|
-| Compile and render a design filled from data | [`@freshcoat-js/coatfile`](packages/coatfile/) |
-| Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/), the engine package |
+| Fill a template with data and render it | [`@freshcoat-js/coatfile`](packages/coatfile/) |
+| Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/) |
 | Analyze images and plan corrections for card printers | [`@freshcoat-js/for-print`](packages/for-print/) |
 | Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
 | Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
 
-The three core SDK packages have release builds with compiled ESM,
-declarations and assets. Their source manifests stay private for workspace
-development; publish the generated tarballs. See the
-[release guide](docs/releases.md) for npm setup, release checks and Figma ZIPs.
+Release builds for the three core SDK packages include compiled ESM,
+TypeScript declarations and assets. Their source manifests are private and
+intended for workspace development; use the generated tarballs for publication.
+See the [release guide](docs/releases.md) for npm setup, release checks and
+Figma plugin bundles.
 
-## What the stack shares
+## How the stack fits together
 
 - **Templates:** layers, fields, fonts, sides and variants define a reusable
-  design. JSON describes it; a `.coat` archive can carry its assets.
+  design. Templates are described in JSON; a `.coat` archive can bundle their
+  assets.
 - **Scenes and rendering:** coatfile compiles a template and values into a
-  scene. The engine lays out and paints that scene through CanvasKit, Skia
-  compiled to WASM. Hosts supply fonts, images and the rendering environment.
+  scene. The engine lays out and paints that scene through CanvasKit, which
+  brings Skia to WebAssembly. Host applications supply fonts, images and the
+  rendering environment.
 - **Production utilities:** print analysis and correction are separate from
   authoring. The workspace package adds datasets, bindings, export plans,
-  PDF assembly and sheet imposition for hosts that need batch output.
+  PDF assembly and sheet imposition for applications that need batch output.
 
 The [workspace](packages/workspace/) and [UI](packages/ui/) packages are
-internal workspace packages, not part of the current npm release set.
+internal packages and are not currently included in npm releases.
 The workspace model is independent of React; the UI kit supplies Studio's
 React controls and themes.
 
@@ -70,12 +70,13 @@ React controls and themes.
 [Studio](apps/editor/) combines template editing, typed datasets and worker-based
 exports in a browser. Imported files and autosaved work stay in browser
 storage; URL-referenced fonts and images can still be fetched from their hosts.
-Its feature list, screenshots, limits and development guide live in
-[`apps/editor`](apps/editor/README.md).
+See the [Studio README](apps/editor/README.md) for features, screenshots,
+limitations and development instructions.
 
 [Freshcoat for Figma](apps/figma-plugin/) exports frames as `.coat` templates
-with optional field bindings and can hand a result to Studio. Its README
-covers layer naming, supported Figma features and installation.
+with optional field bindings and can send them to Studio. See the
+[plugin README](apps/figma-plugin/README.md) for layer naming, supported Figma
+features and installation.
 
 ## Develop
 
@@ -87,8 +88,8 @@ bun run test
 bun run typecheck
 ```
 
-Choose the app or package you want to work on and use its README for specific
-commands. For example, `bun run --cwd apps/editor dev` starts Studio, while
+Each app and package has its own README with development commands.
+For example, `bun run --cwd apps/editor dev` starts Studio, while
 `bun run --cwd apps/figma-plugin build` builds the plugin.
 The root `dev` and `build` aliases target Studio for convenience.
 
