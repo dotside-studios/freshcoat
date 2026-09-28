@@ -15,6 +15,7 @@
 		"./assets": "./src/assets.ts",
 		"./barcode": "./src/barcode.ts",
 		"./render": "./src/render.ts",
+		"./svg": "./src/svg.ts",
 		"./browser": "./src/browser.ts",
 		"./normalize": "./src/normalize.ts",
 		"./headless": "./src/headless.ts",
