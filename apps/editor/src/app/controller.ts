@@ -10,6 +10,7 @@ import {
 	COAT_JSON_MEDIA_TYPE,
 	COAT_MEDIA_TYPE,
 } from "@freshcoat-js/coatfile/coat";
+import { type SvgElements, svgToElements } from "@freshcoat-js/coatfile/svg";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
 	resolveValues,
@@ -25,6 +26,7 @@ import {
 	translateLayers,
 	unionRects,
 } from "~/doc/geometry";
+import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
 import {
@@ -84,7 +86,6 @@ import { readClipboard, writeClipboard } from "./clipboard";
 import { plural } from "./copy";
 import { downloadBytes } from "./download";
 import { exportSidePng } from "./export-png";
-import { rasterizeSvg } from "./raster";
 import { svgMarkup, svgSize } from "./svg";
 
 configureAutosave({
@@ -114,7 +115,7 @@ export type NameAnswer = "save" | "skip" | "cancel";
  *  it is saved for the first time. */
 export type NamePrompt = (fileName: string) => Promise<NameAnswer>;
 
-export type SvgPasteAnswer = "image" | "text" | "cancel";
+export type SvgPasteAnswer = "layers" | "image" | "text" | "cancel";
 
 export type SvgPastePrompt = () => Promise<SvgPasteAnswer>;
 
@@ -451,19 +452,58 @@ export class EditorController {
 		return this.placeImageBytes(file, size, point);
 	}
 
-	/** The engine cannot decode SVG, so it is placed as a PNG. */
 	async placeSvg(
 		svg: string,
 		point?: { x: number; y: number },
 	): Promise<string | null> {
-		let png: Blob;
+		return this.placeImageBytes(
+			new Blob([svg], { type: "image/svg+xml" }),
+			svgSize(svg),
+			point,
+		);
+	}
+
+	/** Converts SVG markup to layers, fitted within half the artboard. */
+	placeSvgLayers(svg: string, point?: { x: number; y: number }): string | null {
+		const t = this.base;
+		if (!t) return null;
+		const side = this.state.side;
+		const taken = new Set<string>();
+		let converted: SvgElements;
 		try {
-			png = await rasterizeSvg(svg);
+			converted = svgToElements(svg, {
+				maxSize: { width: t.width / 2, height: t.height / 2 },
+				uniqueId: (base) => {
+					const id = uniqueId(t, side, base, taken);
+					taken.add(id);
+					return id;
+				},
+			});
 		} catch {
 			toast("Couldn't read that SVG", { tone: "danger" });
 			return null;
 		}
-		return this.placeImageBytes(png, svgSize(svg), point);
+		const { element, warnings } = converted;
+		const at = point ?? { x: t.width / 2, y: t.height / 2 };
+		const size = element.size ?? { width: 0, height: 0 };
+		const placed = {
+			...element,
+			pos: { x: at.x - size.width / 2, y: at.y - size.height / 2 },
+		};
+		const result = this.edit(
+			() =>
+				insertElements(
+					t,
+					{ side },
+					t.template_data[side]?.elements.length ?? 0,
+					[placed],
+				),
+			{ selectResult: true, scope: "base" },
+		);
+		if (warnings.length)
+			toast("Some SVG features were skipped", { tone: "warning" });
+		this.dispatch({ type: "setTool", tool: "move" });
+		return result?.ok ? (result.keys?.[0] ?? null) : null;
 	}
 
 	private async placeImageBytes(
@@ -634,8 +674,12 @@ export class EditorController {
 		if (clip.kind === "svg") {
 			const answer = this.svgPastePrompt
 				? await this.svgPastePrompt()
-				: "image";
+				: "layers";
 			if (answer === "cancel") return;
+			if (answer === "layers") {
+				this.placeSvgLayers(clip.svg);
+				return;
+			}
 			if (answer === "image") {
 				await this.placeSvg(clip.svg);
 				return;
@@ -720,8 +764,8 @@ export class EditorController {
 		for (const fn of this.issuesListeners) fn();
 	}
 
-	/** Sets what asks whether pasted SVG is imported or kept as text. Without
-	 *  a prompt, it is imported. */
+	/** Sets what asks how pasted SVG is imported. Without a prompt, it becomes
+	 *  layers. */
 	setSvgPastePrompt(prompt: SvgPastePrompt): () => void {
 		this.svgPastePrompt = prompt;
 		return () => {

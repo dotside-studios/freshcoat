@@ -216,7 +216,32 @@ test("copy and paste duplicates layers with fresh ids", async ({
 	expect(pasted.startsWith(id)).toBe(true);
 });
 
-test("pasting SVG markup can import it as a drawn image", async ({
+test("pasting SVG markup imports it as layers", async ({ page, context }) => {
+	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+	await openSample(page);
+	const svg =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 40 20"><rect width="40" height="20" fill="#e11d48"/></svg>';
+	await page.evaluate((text) => navigator.clipboard.writeText(text), svg);
+	const count = await state<number>(page, "t.template_data[0].elements.length");
+	await page.getByTestId("viewport").click({ position: { x: 5, y: 5 } });
+	await page.keyboard.press(`${mod}+v`);
+	await page.getByRole("button", { name: "Import as layers" }).click();
+	await expect
+		.poll(() => state<number>(page, "t.template_data[0].elements.length"))
+		.toBe(count + 1);
+	await settle(page);
+	const placed = await state<{ type: string; children: string[] }>(
+		page,
+		`(() => {
+			const el = t.template_data[0].elements.at(-1);
+			return { type: el.type, children: el.properties.children.map((c) => c.type) };
+		})()`,
+	);
+	expect(placed).toEqual({ type: "frame", children: ["vector"] });
+	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
+});
+
+test("pasting SVG markup can import it as an SVG image", async ({
 	page,
 	context,
 }) => {
@@ -249,7 +274,7 @@ test("pasting SVG markup can import it as a drawn image", async ({
 	expect(placed).toEqual({
 		type: "image",
 		size: { width: 40, height: 20 },
-		contentType: "image/png",
+		contentType: "image/svg+xml",
 	});
 	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
 });
