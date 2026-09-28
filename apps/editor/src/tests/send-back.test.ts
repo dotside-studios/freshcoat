@@ -14,7 +14,6 @@ import { doc } from "./doc-fixture";
 
 const ORIGIN = "https://orders.example.com";
 
-/** A window that records what is posted to it. */
 function fakeOpener() {
 	const posted: { message: unknown; origin: string }[] = [];
 	const opener = {
@@ -24,7 +23,6 @@ function fakeOpener() {
 	return { opener, posted };
 }
 
-/** A message as the browser delivers it, from `source` at `origin`. */
 function deliver(
 	host: EventTarget,
 	data: unknown,

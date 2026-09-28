@@ -112,11 +112,9 @@ function toastOpenHint(ctx: CommandContext): void {
 }
 
 /**
- * Opens a template handed over in a link, from Figma or from a page that
- * named itself with `returnTo`. It joins the open workspace; with none open,
- * it joins the autosaved one, restored, so unsaved work is never set aside
- * for it; failing that, it starts a workspace of its own. A `returnTo` page
- * becomes where the template can be sent back to.
+ * Opens a template handed over in a link. It joins the open workspace; with
+ * none open, it joins the autosaved one, restored, so unsaved work is never
+ * set aside for it; failing that, it starts a workspace of its own.
  */
 async function openHandoff(
 	controller: EditorController,

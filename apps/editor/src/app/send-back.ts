@@ -5,29 +5,14 @@ import { sendableTemplate } from "~/doc/io";
 import type { EditorController } from "./controller";
 import { plural } from "./copy";
 
-// A page that hands Studio a template with `#coat=<data>&return=<origin>`
-// and keeps the tab it opened can have the edited template sent back. The
-// template is posted to `window.opener`, addressed to that origin only, so a
-// tab that has since navigated elsewhere never receives it:
-//
-//   Studio → opener  { type: "freshcoat:template", template }
-//   opener → Studio  { type: "freshcoat:received" }
-//                    { type: "freshcoat:rejected", reason }
-//
-// Nothing is saved by sending. The opener decides what to do with what it
-// receives, and Studio has no account to save it with.
-
 export const TEMPLATE_MESSAGE = "freshcoat:template";
 export const RECEIVED_MESSAGE = "freshcoat:received";
 export const REJECTED_MESSAGE = "freshcoat:rejected";
 
-/** How long the opener has to answer before Studio says it did not. */
 export const REPLY_TIMEOUT_MS = 5000;
 
 export type SendBackTarget = {
-	/** The opener's origin, as the link named it. */
 	origin: string;
-	/** The workspace template that came from it. */
 	templateId: string;
 };
 
@@ -35,8 +20,6 @@ export type SendReply =
 	| { kind: "received" }
 	| { kind: "rejected"; reason: string }
 	| { kind: "timeout" };
-
-// ── The target ──────────────────────────────────────────────────────────────
 
 let target: SendBackTarget | null = null;
 const listeners = new Set<() => void>();
@@ -57,7 +40,6 @@ export function getSendBackTarget(): SendBackTarget | null {
 	return target;
 }
 
-/** The target, when `templateId` is the template that came from it. */
 export function useSendBackTarget(
 	templateId: string | undefined,
 ): SendBackTarget | null {
@@ -65,15 +47,10 @@ export function useSendBackTarget(
 	return current && current.templateId === templateId ? current : null;
 }
 
-/** "orders.example.com" for "https://orders.example.com". */
 export function hostOf(origin: string): string {
 	return new URL(origin).host;
 }
 
-// ── Sending ─────────────────────────────────────────────────────────────────
-
-/** Posts `template` to `opener` at `origin` and waits for its answer. Only a
- *  reply from that window and origin counts. */
 export function postTemplate(
 	opener: Window,
 	origin: string,
@@ -108,8 +85,6 @@ export function postTemplate(
 	});
 }
 
-/** Sends the active template back to the tab that opened it, and says how
- *  that went. */
 export async function sendBack(controller: EditorController): Promise<void> {
 	const active = controller.state.workspace?.activeTemplateId;
 	const to = target && target.templateId === active ? target : null;

@@ -9,13 +9,11 @@ export type OpenIntent =
 	| { kind: "starter"; id: string }
 	| { kind: "new"; presetId: string };
 
-/** What a hand-off link asks for, in the fragment rather than the search so
- *  the browser never sends it to a server: a template to open
+/** What a link from the Figma plugin asks for, in the fragment rather than
+ *  the search so the browser never sends it to a server: a template to open
  *  (`#coat=<data>`, see `handoff.ts`), or a pointer at "Open file…" for the
- *  `.coat` the Figma plugin downloaded instead (`#open=1`; older plugins send
- *  `#drop=1`, read the same way). A template may name the origin of the tab
- *  that opened it (`&return=<origin>`), which Studio can send the edited
- *  template back to (see `send-back.ts`). Acted on once and removed, as an
+ *  `.coat` the plugin downloaded instead (`#open=1`; older plugins send
+ *  `#drop=1`, read the same way). Acted on once and removed, as an
  *  `OpenIntent` is. */
 export type HandoffIntent =
 	| { kind: "coat"; data: string; returnTo?: string }
@@ -106,8 +104,6 @@ export function readIntent(search: string): {
 const HANDOFF_PARAMS = ["coat", "open", "drop"] as const;
 const LOOPBACK = new Set(["localhost", "127.0.0.1"]);
 
-/** The origin a `return` value names: https anywhere, or http on this
- *  machine. Null for anything else, a path or a sign-in included. */
 export function returnOrigin(value: string): string | null {
 	let url: URL;
 	try {
