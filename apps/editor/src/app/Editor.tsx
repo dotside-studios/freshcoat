@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import { isTyping } from "~/canvas/Viewport";
+import { useConfirm } from "~/data/ConfirmDialog";
 import { useEditor } from "~/state/hooks";
 import { ConfirmDiscard } from "./ConfirmDiscard";
 import { type CommandContext, findCommand } from "./commands";
@@ -54,6 +55,25 @@ function EditorRoot({
 	const templateInput = useRef<HTMLInputElement>(null);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const setup = useTemplateSetup(controller);
+	const { confirm, element: confirmElement } = useConfirm();
+
+	useEffect(
+		() =>
+			controller.setSvgPastePrompt(async () => {
+				const r = await confirm({
+					title: "Paste SVG",
+					message: "Import the SVG as an image, or paste its code as text?",
+					confirmLabel: "Import as image",
+					alternative: "Paste as text",
+				});
+				return r === "confirm"
+					? "image"
+					: r === "alternative"
+						? "text"
+						: "cancel";
+			}),
+		[controller, confirm],
+	);
 	const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(
 		null,
 	);
@@ -204,6 +224,7 @@ function EditorRoot({
 			/>
 			<ShortcutsDialog isOpen={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 			<TemplateSetupDialog request={setup.request} onClose={setup.close} />
+			{confirmElement}
 			<ConfirmDiscard
 				isOpen={pendingDiscard !== null}
 				onCancel={() => setPendingDiscard(null)}

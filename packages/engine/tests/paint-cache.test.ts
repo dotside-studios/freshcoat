@@ -88,6 +88,28 @@ function scene(size: { width: number; height: number }, srcs: string[]): Node {
 	});
 }
 
+function textScene(text: string, x: number): Node {
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		children: [
+			createText({
+				pos: { x, y: 4 },
+				size: { width: 80, height: 24 },
+				text,
+				font: {
+					family: "Geist",
+					weight: 400,
+					style: "normal",
+					size: 16,
+					lineHeight: 1.2,
+				},
+				color: "#101828",
+			}),
+		],
+	});
+}
+
 function compile(
 	node: Node,
 	size: { width: number; height: number },
@@ -234,6 +256,63 @@ describe("PaintCache", () => {
 			"img://b",
 			"img://b",
 		]);
+		cache.dispose();
+	});
+
+	test("moving text reuses its shaped lines", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(textScene("Shaped once", 4), SIZE, fonts), rt);
+		const built = cache.stats().paragraphBuilds;
+		expect(built).toBeGreaterThan(0);
+		await pixels(compile(textScene("Shaped once", 12), SIZE, fonts), rt);
+		expect(cache.stats().paragraphBuilds).toBe(built);
+		await pixels(compile(textScene("Shaped twice", 12), SIZE, fonts), rt);
+		expect(cache.stats().paragraphBuilds).toBeGreaterThan(built);
+		cache.dispose();
+	});
+
+	test("moved text paints as an uncached paint does", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(textScene("Shaped once", 4), SIZE, fonts), rt);
+		const moved = compile(textScene("Shaped once", 12), SIZE, fonts);
+		const plain = await pixels(moved, runtime(fonts, new Map()).rt);
+		expect(await pixels(moved, rt)).toEqual(plain);
+		cache.dispose();
+	});
+
+	test("lines dropped from the scene are shaped again", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const a = compile(textScene("First", 4), SIZE, fonts);
+		await pixels(a, rt);
+		const built = cache.stats().paragraphBuilds;
+		await pixels(compile(textScene("Second", 4), SIZE, fonts), rt);
+		const after = cache.stats().paragraphBuilds;
+		await pixels(a, rt);
+		expect(after).toBeGreaterThan(built);
+		expect(cache.stats().paragraphBuilds).toBeGreaterThan(after);
+		cache.dispose();
+	});
+
+	test("lines outside the surface are not shaped", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const text = Array.from({ length: 200 }, (_, i) => `line${i}`).join(" ");
+		const commands = compile(textScene(text, 4), SIZE, fonts);
+		const lines = JSON.stringify(commands).match(/"baseline"/g) ?? [];
+		expect(lines.length).toBeGreaterThan(50);
+		await pixels(commands, rt);
+		expect(cache.stats().paragraphBuilds).toBeLessThan(10);
 		cache.dispose();
 	});
 

@@ -1,7 +1,7 @@
 // An opt-in cache a runtime carries across paints of the same scene, for an
-// interactive caller that repaints many times a second. It keeps the three things
-// paintScene would otherwise rebuild on every paint: the font provider, the
-// decoded images and the output surface. A runtime without one paints exactly as
+// interactive caller that repaints many times a second. It keeps what paintScene
+// would otherwise rebuild on every paint: the font provider, the shaped lines of
+// text, the decoded images and the output surface. A runtime without one paints exactly as
 // it always has, building and freeing all three per paint.
 
 import type { CanvasLike } from "./types";
@@ -11,6 +11,7 @@ export type PaintCacheStats = {
 	surfaceCreates: number;
 	fontProviderBuilds: number;
 	imageDecodes: number;
+	paragraphBuilds: number;
 };
 
 export type PaintCache = {
@@ -26,6 +27,8 @@ type CK = any;
 
 type FontKey = { family: string; bytes: Uint8Array }[];
 
+export type ShapedLine = { para: CK; ascent: number };
+
 type CachedSurface = {
 	surface: CK;
 	canvas: CanvasLike;
@@ -39,6 +42,9 @@ export type PaintCacheState = {
 	stats: PaintCacheStats;
 	fonts: { key: FontKey; provider: CK } | null;
 	images: Map<string, CK>;
+	// Freed with the provider whose typefaces they use.
+	lines: Map<string, ShapedLine>;
+	linesUsed: Set<string>;
 	surface: CachedSurface | null;
 	disposed: boolean;
 };
@@ -54,13 +60,17 @@ export function createPaintCache(): PaintCache {
 			surfaceCreates: 0,
 			fontProviderBuilds: 0,
 			imageDecodes: 0,
+			paragraphBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
+		lines: new Map(),
+		linesUsed: new Set(),
 		surface: null,
 		disposed: false,
 	};
 	const clear = () => {
+		freeLines(state);
 		const fonts = state.fonts;
 		state.fonts = null;
 		if (fonts) tryFree(() => fonts.provider.delete());
@@ -110,6 +120,7 @@ export function cachedFontProvider(
 	)
 		return hit.provider;
 	state.fonts = null;
+	freeLines(state);
 	if (hit) tryFree(() => hit.provider.delete());
 	const provider = build();
 	state.stats.fontProviderBuilds++;
@@ -151,6 +162,35 @@ export function evictUnusedImages(
 		state.images.delete(src);
 		tryFree(() => img.delete());
 	}
+}
+
+export function cachedLine(
+	state: PaintCacheState,
+	key: string,
+	build: () => ShapedLine,
+): ShapedLine {
+	state.linesUsed.add(key);
+	const hit = state.lines.get(key);
+	if (hit) return hit;
+	const line = build();
+	state.stats.paragraphBuilds++;
+	state.lines.set(key, line);
+	return line;
+}
+
+export function evictUnusedLines(state: PaintCacheState): void {
+	for (const [key, line] of state.lines) {
+		if (state.linesUsed.has(key)) continue;
+		state.lines.delete(key);
+		tryFree(() => line.para.delete());
+	}
+	state.linesUsed.clear();
+}
+
+function freeLines(state: PaintCacheState): void {
+	for (const line of state.lines.values()) tryFree(() => line.para.delete());
+	state.lines.clear();
+	state.linesUsed.clear();
 }
 
 function releaseSurface(s: CachedSurface): void {

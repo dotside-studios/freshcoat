@@ -12,9 +12,13 @@ import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontBytes } from "./font-bytes";
 import {
 	cachedFontProvider,
+	cachedLine,
 	cachedSurface,
 	evictUnusedImages,
+	evictUnusedLines,
+	type PaintCacheState,
 	paintCacheState,
+	type ShapedLine,
 } from "./paint-cache";
 import {
 	decorationLine,
@@ -397,6 +401,8 @@ function textStyleOf(
 // Render each baked line with a ParagraphBuilder — HarfBuzz shaping applies the
 // kerning Figma uses — aligning the paragraph's baseline to the baked
 // baseline via getLineMetrics.
+const shapedLines = new WeakMap<CK, PaintCacheState>();
+
 function drawText(
 	ck: CK,
 	canvas: CK,
@@ -428,26 +434,47 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	// Gradient paints depend on position, so those lines are not cached.
+	const cache = fgPaint ? undefined : shapedLines.get(provider);
+	const rows = visibleRows(canvas);
 	for (const line of cmd.layout.lines) {
 		const first = line.spans[0];
 		if (!first) continue;
-		const style = new ck.ParagraphStyle({
-			textStyle: textStyleOf(ck, first, cmd, fallback),
-		});
-		const builder = bin.track(
-			ck.ParagraphBuilder.MakeFromFontProvider(style, provider),
-		);
-		for (const span of line.spans) {
-			const ts = ck.TextStyle(textStyleOf(ck, span, cmd, fallback));
-			if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
-			else builder.pushStyle(ts);
-			builder.addText(span.text);
-			builder.pop();
+		if (rows) {
+			const baseline = line.baseline ?? line.y;
+			const reach = 2 * Math.max(...line.spans.map((s) => s.font.size));
+			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
+				continue;
 		}
-		const para = bin.track(builder.build());
-		para.layout(1e6); // single pre-wrapped line; no re-wrapping
-		const lm = para.getLineMetrics();
-		const ascent = lm.length ? lm[0].ascent : 0;
+		const shape = (): ShapedLine => {
+			const style = new ck.ParagraphStyle({
+				textStyle: textStyleOf(ck, first, cmd, fallback),
+			});
+			const builder = ck.ParagraphBuilder.MakeFromFontProvider(
+				style,
+				provider,
+			);
+			for (const span of line.spans) {
+				const ts = ck.TextStyle(textStyleOf(ck, span, cmd, fallback));
+				if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
+				else builder.pushStyle(ts);
+				builder.addText(span.text);
+				builder.pop();
+			}
+			const para = builder.build();
+			builder.delete();
+			para.layout(1e6); // single pre-wrapped line; no re-wrapping
+			const lm = para.getLineMetrics();
+			return { para, ascent: lm.length ? lm[0].ascent : 0 };
+		};
+		let shaped: ShapedLine;
+		if (cache)
+			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
+		else {
+			shaped = shape();
+			bin.track(shaped.para);
+		}
+		const { para, ascent } = shaped;
 		canvas.drawParagraph(para, first.x, (line.baseline ?? line.y) - ascent);
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
@@ -810,6 +837,27 @@ function reportAdjustUnsupported(
 		component,
 		layer,
 	});
+}
+
+// Visible local y range, or null when the transform rotates or skews.
+function visibleRows(canvas: CK): { top: number; bottom: number } | null {
+	const [, b, , d, e, f, g, h, i] = canvas.getTotalMatrix() as number[];
+	if (b !== 0 || d !== 0 || g !== 0 || h !== 0 || i !== 1 || !(e > 0))
+		return null;
+	const clip = canvas.getDeviceClipBounds() as Int32Array;
+	return { top: (clip[1] - f) / e, bottom: (clip[3] - f) / e };
+}
+
+function lineKey(
+	line: DrawTextCommand["layout"]["lines"][number],
+	color: string | undefined,
+	fallback: string[],
+): string {
+	return JSON.stringify([
+		fallback,
+		color,
+		line.spans.map((s) => [s.text, s.font, s.color]),
+	]);
 }
 
 function drawShape(
@@ -1867,6 +1915,7 @@ export async function paintScene(
 	const provider = cache
 		? cachedFontProvider(cache, loaded, () => makeFontProvider(ck, loaded))
 		: makeFontProvider(ck, loaded);
+	if (cache) shapedLines.set(provider, cache);
 
 	const imageMap = new Map<string, CK>();
 	// Images the runtime lent through loadImage: painted, never freed here.
@@ -2048,8 +2097,10 @@ export async function paintScene(
 		// still references the decoded images until the surface is flushed.
 		surface.flush();
 	} finally {
-		if (cache) evictUnusedImages(cache, images);
-		else {
+		if (cache) {
+			evictUnusedImages(cache, images);
+			evictUnusedLines(cache);
+		} else {
 			provider.delete();
 			for (const [src, img] of imageMap)
 				if (!borrowed.has(src)) img.delete();
