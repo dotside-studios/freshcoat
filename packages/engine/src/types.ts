@@ -522,6 +522,8 @@ export type ImageLike = {
 
 export type PaintWarning =
 	| { kind: "image_load_failed"; src: string; error: string }
+	// An SVG source drew without a feature it uses (text, filters, patterns).
+	| { kind: "svg_unsupported"; src: string; feature: string }
 	| { kind: "font_load_failed"; family: string; error: string }
 	| { kind: "qr_generate_failed"; value: string; error: string }
 	// A barcode element compiled with no encoder registered, so it drew as a

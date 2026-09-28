@@ -15,3 +15,4 @@ export {
 } from "./parse";
 export { type Box, normalizePath, pathBounds, type Segment, serializePath, transformPath } from "./path";
 export { SvgError } from "./xml";
+export { svgToNode } from "./node";
