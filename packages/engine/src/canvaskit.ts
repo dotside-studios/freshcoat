@@ -35,7 +35,7 @@ import {
 	encodePng,
 } from "./png";
 import { squircleSvg } from "./squircle";
-import { isSvg, parseSvg, svgToNode } from "./svg";
+import { isSvg, parseSvg, svgToNode } from "./svg/index";
 import type {
 	BlendMode,
 	CanvasLike,
