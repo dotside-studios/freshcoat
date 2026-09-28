@@ -264,6 +264,24 @@ describe("readHandoffIntent", () => {
 		});
 	});
 
+	test("carries a template's return origin and removes it", () => {
+		expect(
+			readHandoffIntent(
+				"#coat=abc&return=https%3A%2F%2Forders.example.com%2Fadmin&x=y",
+			),
+		).toEqual({
+			intent: {
+				kind: "coat",
+				data: "abc",
+				returnTo: "https://orders.example.com",
+			},
+			hash: "#x=y",
+		});
+		expect(
+			readHandoffIntent("#coat=abc&return=http%3A%2F%2Fevil.test"),
+		).toEqual({ intent: { kind: "coat", data: "abc" }, hash: "" });
+	});
+
 	test("reads an older plugin's drop=1 as an open request", () => {
 		expect(readHandoffIntent("drop=1")).toEqual({
 			intent: { kind: "open" },

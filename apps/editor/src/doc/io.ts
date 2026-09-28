@@ -101,6 +101,14 @@ export async function saveCoat(t: Template): Promise<SaveResult<Uint8Array>> {
 	}
 }
 
+/** The template as it leaves the editor, unused assets pruned: what the
+ *  `.coat.json` holds, before it is written as text. */
+export function sendableTemplate(t: Template): SaveResult<Template> {
+	const pruned = pruneUnusedAssets(t);
+	const v = validate(pruned);
+	return v.ok ? { ok: true, data: pruned } : { ok: false, errors: v.errors };
+}
+
 /** The `.coat.json` text, unused assets pruned. */
 export function saveJson(t: Template): SaveResult<string> {
 	const pruned = pruneUnusedAssets(t);

@@ -9,13 +9,17 @@ export type OpenIntent =
 	| { kind: "starter"; id: string }
 	| { kind: "new"; presetId: string };
 
-/** What a link from the Figma plugin asks for, in the fragment rather than
- *  the search so the browser never sends it to a server: a template to open
+/** What a hand-off link asks for, in the fragment rather than the search so
+ *  the browser never sends it to a server: a template to open
  *  (`#coat=<data>`, see `handoff.ts`), or a pointer at "Open file…" for the
- *  `.coat` the plugin downloaded instead (`#open=1`; older plugins send
- *  `#drop=1`, read the same way). Acted on once and removed, as an
+ *  `.coat` the Figma plugin downloaded instead (`#open=1`; older plugins send
+ *  `#drop=1`, read the same way). A template may name the origin of the tab
+ *  that opened it (`&return=<origin>`), which Studio can send the edited
+ *  template back to (see `send-back.ts`). Acted on once and removed, as an
  *  `OpenIntent` is. */
-export type HandoffIntent = { kind: "coat"; data: string } | { kind: "open" };
+export type HandoffIntent =
+	| { kind: "coat"; data: string; returnTo?: string }
+	| { kind: "open" };
 
 /** What is being shown, as the URL carries it. A missing key means the
  *  default: the first template, dataset and preset, the first side, the Edit
@@ -100,6 +104,23 @@ export function readIntent(search: string): {
 }
 
 const HANDOFF_PARAMS = ["coat", "open", "drop"] as const;
+const LOOPBACK = new Set(["localhost", "127.0.0.1"]);
+
+/** The origin a `return` value names: https anywhere, or http on this
+ *  machine. Null for anything else, a path or a sign-in included. */
+export function returnOrigin(value: string): string | null {
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch {
+		return null;
+	}
+	const local = LOOPBACK.has(url.hostname);
+	if (url.protocol !== "https:" && !(url.protocol === "http:" && local))
+		return null;
+	if (url.username || url.password) return null;
+	return url.origin;
+}
 
 /**
  * Splits a fragment into the hand-off it carries and what stays. The first
@@ -115,13 +136,17 @@ export function readHandoffIntent(hash: string): {
 		return { intent: null, hash: raw ? `#${raw}` : "" };
 	const params = new URLSearchParams(raw);
 	let intent: HandoffIntent | null = null;
+	const returnTo = returnOrigin(params.get("return")?.trim() ?? "");
 	for (const key of HANDOFF_PARAMS) {
 		const value = params.get(key)?.trim();
 		if (!intent && value)
 			intent =
-				key === "coat" ? { kind: "coat", data: value } : { kind: "open" };
+				key === "coat"
+					? { kind: "coat", data: value, ...(returnTo ? { returnTo } : {}) }
+					: { kind: "open" };
 		params.delete(key);
 	}
+	params.delete("return");
 	const rest = params.toString().replace(/=(?=&|$)/g, "");
 	return { intent, hash: rest ? `#${rest}` : "" };
 }

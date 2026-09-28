@@ -1,3 +1,4 @@
+import { Button } from "@freshcoat-js/ui/button";
 import {
 	Menu,
 	MenuBar,
@@ -18,10 +19,12 @@ import type { Section } from "~/state/workspace";
 import CheckIcon from "~icons/mingcute/check-line";
 import LeftPanelIcon from "~icons/mingcute/layout-leftbar-open-line";
 import RightPanelIcon from "~icons/mingcute/layout-rightbar-open-line";
+import SendIconFill from "~icons/mingcute/send-fill";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
 import { useController } from "./context";
 import { FreshcoatMark } from "./Logo";
 import { useRenderStats } from "./render-stats";
+import { hostOf, sendBack, useSendBackTarget } from "./send-back";
 import { useThemePreference } from "./theme";
 
 const MENUS: { label: string; items: (string | "-")[] }[] = [
@@ -130,6 +133,9 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	usePrintGuidesVersion();
 	const guides = useEditor((s) =>
 		printGuidesOn(s.workspace?.activeTemplateId, present(s)),
+	);
+	const sendTarget = useSendBackTarget(
+		useEditor((s) => s.workspace?.activeTemplateId),
 	);
 	const togglePanel = (side: "left" | "right") =>
 		ctx.controller.dispatch({
@@ -245,6 +251,16 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 								className="size-2 shrink-0 rounded-full bg-fc-warning"
 								title="Unsaved changes"
 							/>
+						) : null}
+						{sendTarget ? (
+							<Button
+								size="sm"
+								variant="primary"
+								onPress={() => void sendBack(ctx.controller)}
+							>
+								<SendIconFill />
+								Send to {hostOf(sendTarget.origin)}
+							</Button>
 						) : null}
 						<span className="ml-1 flex items-center gap-0.5">
 							<ToggleButton
