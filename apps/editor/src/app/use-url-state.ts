@@ -9,6 +9,7 @@ import type { EditorController } from "./controller";
 import { OPEN_HINT } from "./copy";
 import { readHandoff } from "./handoff";
 import type { AppRouter } from "./router";
+import { hostOf, setSendBackTarget } from "./send-back";
 import {
 	type IntentTarget,
 	parseSearch,
@@ -54,7 +55,11 @@ export function useUrlState(
 				if (controller.state.workspace) toastOpenHint(ctx);
 				else setOpenHint(true);
 			} else if (handoff.intent?.kind === "coat")
-				void openHandoff(controller, handoff.intent.data);
+				void openHandoff(
+					controller,
+					handoff.intent.data,
+					handoff.intent.returnTo,
+				);
 			return;
 		}
 		void (async () => {
@@ -107,20 +112,22 @@ function toastOpenHint(ctx: CommandContext): void {
 }
 
 /**
- * Opens a template handed over from Figma. It joins the open workspace; with
+ * Opens a template handed over in a link. It joins the open workspace; with
  * none open, it joins the autosaved one, restored, so unsaved work is never
  * set aside for it; failing that, it starts a workspace of its own.
  */
 async function openHandoff(
 	controller: EditorController,
 	data: string,
+	returnTo?: string,
 ): Promise<void> {
 	// Read before opening: once the opened document is edited, autosave
 	// writes over what was there.
 	const saved = controller.state.workspace ? null : await readAutosave();
 	const result = await readHandoff(data);
 	if (!result.ok) {
-		toast(`Couldn't open the template from Figma: ${result.reason}`, {
+		const from = returnTo ? hostOf(returnTo) : "Figma";
+		toast(`Couldn't open the template from ${from}: ${result.reason}`, {
 			tone: "danger",
 			timeout: 0,
 		});
@@ -134,6 +141,9 @@ async function openHandoff(
 			restoreNotices(saved),
 		);
 	controller.open(result.template, result.fileName, result.notices);
+	const templateId = controller.state.workspace?.activeTemplateId;
+	if (returnTo && templateId)
+		setSendBackTarget({ origin: returnTo, templateId });
 	if (restored)
 		toast(`Added ${result.template.name} to your unsaved workspace`, {
 			tone: "success",

@@ -146,7 +146,17 @@ joins the open workspace (or the autosaved one, restored, or a new one).
 downloaded instead: the welcome screen rings **Open file…** and says to open
 that file, or, over a workspace, a toast says so with the same action. An older
 plugin's `#drop=1` is read the same way. Both run once and are removed, like
-the search intents. A file is opened only through **Open file…**: a
+the search intents.
+
+Another page can hand a template over the same way and add
+`&return=<its origin>` (https, or http on localhost). Studio then shows
+**Send to <host>** for that template, and `app/send-back.ts` posts the
+validated template to `window.opener`, addressed to that origin only, and
+waits for the page to answer `freshcoat:received` or `freshcoat:rejected`.
+Nothing is saved by sending: the page decides what to do with it, and Studio
+still has no account or server.
+
+A file is opened only through **Open file…**: a
 file dropped on the window is refused, except an image, placed in the open
 template, and the photos and spreadsheets the Data section takes.
 

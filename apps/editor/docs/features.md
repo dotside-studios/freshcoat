@@ -179,6 +179,14 @@ action.
 | `?starter=<id>` | a starter: `davi-card`, `davi-card-portrait`, `photo-watermark`, `event-badge` |
 | `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge` |
 
+A template can also arrive in the fragment, as the Figma plugin sends it:
+`#coat=<data>`, with `#open=1` pointing at **Open file…** when the template
+was too large for a link. A page that opens Studio in a tab it keeps can add
+`&return=<its origin>`; that template then has a **Send to <host>** button in
+the menu bar, which posts it back to that tab. The page answers whether it
+took it, and Studio says so. If the tab is closed or does not answer, export
+a `.coat` and import it there instead.
+
 `?theme=light` or `?theme=dark` sets the theme for this tab without saving
 it, and stays.
 
