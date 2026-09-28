@@ -72,6 +72,21 @@ describe("svgToElements", () => {
 		).toBeUndefined();
 	});
 
+	test("maxSize scales the drawing down to fit, never up", () => {
+		const art = svg(
+			'<rect width="100" height="50" stroke="red" stroke-width="4"/>',
+			'width="200" height="100" viewBox="0 0 100 50"',
+		);
+		const small = svgToElements(art, { maxSize: { width: 100, height: 100 } });
+		expect(small.element.size).toEqual({ width: 100, height: 50 });
+		expect(small.element.properties.children[0]).toMatchObject({
+			size: { width: 100, height: 50 },
+			properties: { stroke: { width: 4 } },
+		});
+		const big = svgToElements(art, { maxSize: { width: 1000, height: 1000 } });
+		expect(big.element.size).toEqual({ width: 200, height: 100 });
+	});
+
 	test("content past the box clips the root", () => {
 		const { element } = svgToElements(svg('<rect x="90" width="20" height="10"/>'));
 		expect(element.properties.clipsContent).toBe(true);

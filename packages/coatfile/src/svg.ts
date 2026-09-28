@@ -28,6 +28,8 @@ export type SvgToElementsOptions = {
 	/** Turns a wanted id into one not yet used. Default: `-2`, `-3` suffixes
 	 *  among the ids this call produces. */
 	uniqueId?: (base: string) => string;
+	/** Scales the drawing down, keeping its aspect, to fit within this size. */
+	maxSize?: { width: number; height: number };
 };
 
 export type SvgElements = { element: FrameElement; warnings: SvgWarning[] };
@@ -62,10 +64,19 @@ export function svgToElements(
 	options: SvgToElementsOptions = {},
 ): SvgElements {
 	const drawing = parseSvg(markup);
+	const fit = options.maxSize
+		? Math.min(
+				1,
+				options.maxSize.width / drawing.width,
+				options.maxSize.height / drawing.height,
+			)
+		: 1;
+	const width = drawing.width * fit;
+	const height = drawing.height * fit;
 	const m: Matrix = viewBoxMatrix(
 		drawing.viewBox,
-		drawing.width,
-		drawing.height,
+		width,
+		height,
 		drawing.preserveAspectRatio,
 	);
 	const [sx, , , sy] = m;
@@ -220,14 +231,14 @@ export function svgToElements(
 		!!bounds &&
 		(bounds.x < -1e-6 ||
 			bounds.y < -1e-6 ||
-			bounds.x + bounds.width > drawing.width + 1e-6 ||
-			bounds.y + bounds.height > drawing.height + 1e-6);
-	const origin = { x: 0, y: 0, width: drawing.width, height: drawing.height };
+			bounds.x + bounds.width > width + 1e-6 ||
+			bounds.y + bounds.height > height + 1e-6);
+	const origin = { x: 0, y: 0, width, height };
 	const element: FrameElement = {
 		id: rootId,
 		type: "frame",
 		pos: { x: 0, y: 0 },
-		size: { width: round(drawing.width), height: round(drawing.height) },
+		size: { width: round(width), height: round(height) },
 		properties: {
 			children: children.map((p) => relative(p, origin)),
 			...(spills ? { clipsContent: true } : {}),
