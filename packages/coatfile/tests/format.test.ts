@@ -153,6 +153,57 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.5");
 	});
 
+	test("1.5: per-corner frame radii, on elements and deltas", () => {
+		const frame = (cornerRadius: unknown) =>
+			({
+				id: "f",
+				type: "frame",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 20 },
+				properties: { cornerRadius, children: [] },
+			}) as Element;
+		const need = (cornerRadius: unknown) =>
+			minimumFormatVersion(withElements(base(), frame(cornerRadius)));
+		expect(need(8)).toBe("1.0");
+		expect(need([8, 0, 8, 0])).toBe("1.5");
+		const perCornerRect = rect("r", {
+			properties: { cornerRadius: [1, 2, 3, 4] },
+		} as never);
+		expect(minimumFormatVersion(withElements(base(), perCornerRect))).toBe(
+			"1.0",
+		);
+
+		const t = withElements(base(), frame(8));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{ id: "f", properties: { cornerRadius: [8, 0, 8, 0] } },
+						],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.5");
+	});
+
+	test("1.5: the linear-burn blend mode", () => {
+		expect(
+			minimumFormatVersion(
+				withElements(base(), rect("r", { blendMode: "multiply" })),
+			),
+		).toBe("1.0");
+		expect(
+			minimumFormatVersion(
+				withElements(base(), rect("r", { blendMode: "linear-burn" })),
+			),
+		).toBe("1.5");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },

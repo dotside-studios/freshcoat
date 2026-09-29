@@ -13,6 +13,7 @@ import { templateStem } from "@freshcoat-js/workspace";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
+import { formatNumber } from "~/app/format";
 import { RenameInput } from "~/panels/layers/RenameInput";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
@@ -220,7 +221,7 @@ export function DatasetsList({ create }: { create: DatasetCreators }) {
 											{item.name}
 										</span>
 										<span className="shrink-0 text-fc-faint text-fc-sm tabular-nums">
-											{item.count.toLocaleString()}
+											{formatNumber(item.count)}
 										</span>
 									</>
 								)}

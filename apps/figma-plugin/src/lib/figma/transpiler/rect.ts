@@ -92,7 +92,7 @@ export function transpileRect(
 const halfPx = (n: number, scale: number): number =>
 	Math.round(n * scale * 2) / 2;
 
-function scaleCorners(
+export function scaleCorners(
 	cornerRadius: number | [number, number, number, number] | undefined,
 	scale: number,
 ): number | [number, number, number, number] | undefined {

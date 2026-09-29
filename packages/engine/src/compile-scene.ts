@@ -11,7 +11,15 @@
 // about templates — the caller delivers final resolved values on the nodes.
 import { bakeText, resolveLeadingTrim, textClipOutset } from "./bake-text";
 import { metricsLookup, resolveAutoLineHeights } from "./line-height";
-import type { GroupNode, MaskNode, Node, RectNode, TextNode } from "./node";
+import type {
+	EllipseNode,
+	GroupNode,
+	MaskNode,
+	Node,
+	RectNode,
+	TextNode,
+} from "./node";
+import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
 import type { TextEngine } from "./text-engine";
 import type { MeasureText } from "./text-types";
@@ -227,6 +235,7 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				d: ellipseSvg(base.size),
 				fills: node.fills,
 				stroke: node.stroke,
+				...ellipseStroke(node, base.size),
 			};
 		case "path":
 			return {
@@ -395,7 +404,7 @@ function solidOrNone(fills: RectNode["fills"]): boolean {
 }
 
 // A group's self-clip: clip children to its box, honoring its corner radius.
-// Per-corner radii and corner smoothing on the clip are a later refinement.
+// Corner smoothing on the clip is a later refinement.
 // A filled group's background, as an ordinary rect drawn first.
 //
 // Lowering it rather than teaching the painter about group fills keeps one
@@ -422,7 +431,12 @@ function groupBackground(
 
 function groupClip(node: GroupNode): ShapeMask | undefined {
 	if (!node.clip) return undefined;
-	const r = typeof node.cornerRadius === "number" ? node.cornerRadius : 0;
+	const cr = node.cornerRadius;
+	if (Array.isArray(cr))
+		return cr.some((r) => r > 0)
+			? { kind: "rounded-rect", radius: cr }
+			: { kind: "rect" };
+	const r = typeof cr === "number" ? cr : 0;
 	return r > 0 ? { kind: "rounded-rect", radius: r } : { kind: "rect" };
 }
 
@@ -434,4 +448,21 @@ function ellipseSvg(size: Size): string {
 	const ry = size.height / 2;
 	const cy = ry;
 	return `M 0 ${cy} A ${rx} ${ry} 0 1 0 ${size.width} ${cy} A ${rx} ${ry} 0 1 0 0 ${cy} Z`;
+}
+
+// An inside/outside stroke on an ellipse follows the ellipse inset or outset
+// by half the stroke width.
+function ellipseStroke(
+	node: EllipseNode,
+	size: Size,
+): { strokeD?: string } {
+	const inset = node.stroke ? strokeInset(node.stroke) : 0;
+	if (inset === 0) return {};
+	const cx = size.width / 2;
+	const cy = size.height / 2;
+	const rx = Math.max(0, cx - inset);
+	const ry = Math.max(0, cy - inset);
+	return {
+		strokeD: `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`,
+	};
 }

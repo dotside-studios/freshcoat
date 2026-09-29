@@ -36,6 +36,7 @@ export const BlendModeSchema = z.enum([
 	"color",
 	"luminosity",
 	"plus",
+	"linear-burn",
 ]);
 
 export const FontWeightSchema = z.union([
@@ -256,7 +257,7 @@ export const ImageMaskSchema = z.union([
 
 // Shared stroke definition. `align` positions the stroke inside / outside /
 // centered on the shape edge (Figma's stroke position); default center (Skia's
-// native alignment). align currently renders for rects; other shapes use center.
+// native alignment). Every stroked element honors it.
 export const StrokeSchema = z.object({
 	color: z.string(),
 	width: z.number(),
@@ -558,9 +559,9 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 	z.object({
 		fill: FillsSchema.optional(),
 		stroke: StrokeSchema.optional(),
-		cornerRadius: z.number().optional(),
-		// Figma's `clipsContent`. When true, children are clipped to the frame
-		// (rounded-rect if cornerRadius set, plain rect otherwise).
+		cornerRadius: CornerRadiusSchema.optional(),
+		// Figma's `clipsContent`. When true, children are clipped to the frame,
+		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
 		layout: LayoutSchema.optional(),
 		children: z.array(ElementSchema),
@@ -1124,35 +1125,8 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 		});
 	}
 
-	tpl.template_data.forEach((frame, fi) => {
-		const bg = frame.background as {
-			type?: string;
-			properties?: { fill?: unknown };
-		};
-		if (bg.type === "rect" && bg.properties?.fill !== undefined) {
-			check(bg.properties.fill, [
-				"template_data",
-				fi,
-				"background",
-				"properties",
-				"fill",
-			]);
-		}
-		frame.elements.forEach((el, ei) => {
-			if (el.type === "rect") {
-				const props = el.properties as { fill?: unknown };
-				if (props.fill !== undefined) {
-					check(props.fill, [
-						"template_data",
-						fi,
-						"elements",
-						ei,
-						"properties",
-						"fill",
-					]);
-				}
-			}
-		});
+	walkObjects(tpl, (obj, path) => {
+		if ("fill" in obj) check(obj.fill, [...path, "fill"]);
 	});
 }
 
@@ -1160,13 +1134,8 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 // along. Every fill in the document is reached, nested or overridden, since
 // the check only ever fires on points a writer set.
 function enforceGradientPoints(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
-	function walk(value: unknown, path: (string | number)[]) {
-		if (Array.isArray(value)) {
-			value.forEach((v, i) => walk(v, [...path, i]));
-			return;
-		}
-		if (value === null || typeof value !== "object") return;
-		const f = value as { kind?: unknown; from?: unknown; to?: unknown };
+	walkObjects(tpl, (obj, path) => {
+		const f = obj as { kind?: unknown; from?: unknown; to?: unknown };
 		if (
 			f.kind === "linear" &&
 			Array.isArray(f.from) &&
@@ -1181,7 +1150,22 @@ function enforceGradientPoints(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				[...path, "to"],
 			);
 		}
-		for (const [k, v] of Object.entries(value)) walk(v, [...path, k]);
+	});
+}
+
+function walkObjects(
+	tpl: ParsedTemplate,
+	visit: (obj: Record<string, unknown>, path: (string | number)[]) => void,
+) {
+	function walk(value: unknown, path: (string | number)[]) {
+		if (Array.isArray(value)) {
+			value.forEach((v, i) => walk(v, [...path, i]));
+			return;
+		}
+		if (value === null || typeof value !== "object") return;
+		const obj = value as Record<string, unknown>;
+		visit(obj, path);
+		for (const [k, v] of Object.entries(obj)) walk(v, [...path, k]);
 	}
 	walk(tpl.template_data, ["template_data"]);
 	if (tpl.variants) walk(tpl.variants, ["variants"]);

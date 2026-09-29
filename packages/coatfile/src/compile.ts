@@ -562,7 +562,8 @@ function lineHeightOf(authored: number | "auto" | undefined): {
 }
 
 // Frame → a group. fill/stroke/cornerRadius lower to a background rect (the
-// group's first child); clipsContent → the group's self-clip. When the frame
+// group's first child); clipsContent → the group's self-clip, with an outside
+// stroke moved to a rect beside the clipped group. When the frame
 // auto-layouts AND has a background, the background must stay out of the flow,
 // so it wraps in an outer static group [bg, inner layout group]; otherwise the
 // frame is the layout group (or a plain static group) directly — no redundant
@@ -577,15 +578,23 @@ function compileFrameElement(
 	const size = base.size;
 	const fills = resolveFills(props.fill as Fill | Fill[] | undefined);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
-	const cornerRadius =
-		typeof props.cornerRadius === "number"
-			? props.cornerRadius * ratio
-			: undefined;
+	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	const clip = props.clipsContent === true;
+	// An outside stroke lies wholly beyond the box, so a clipping frame draws it
+	// outside its clip.
+	const strokeOutside = clip && stroke?.align === "outside";
+	const bgStroke = strokeOutside ? undefined : stroke;
 
 	const bg: RectNode | null =
-		fills || stroke
-			? { kind: "rect", pos: { x: 0, y: 0 }, size, fills, stroke, cornerRadius }
+		fills || bgStroke
+			? {
+					kind: "rect",
+					pos: { x: 0, y: 0 },
+					size,
+					fills,
+					stroke: bgStroke,
+					cornerRadius,
+				}
 			: null;
 
 	const rawChildren = (props.children as Element[] | undefined) ?? [];
@@ -609,21 +618,58 @@ function compileFrameElement(
 		cornerRadius,
 	};
 
-	if (layout && bg) {
-		const inner: GroupNode = {
-			kind: "group",
-			pos: { x: 0, y: 0 },
-			size,
-			layout,
-			children: childNodes,
-		};
-		return { ...outer, kind: "group", children: [bg, inner] };
-	}
+	const frame: GroupNode =
+		layout && bg
+			? {
+					...outer,
+					kind: "group",
+					children: [
+						bg,
+						{
+							kind: "group",
+							pos: { x: 0, y: 0 },
+							size,
+							layout,
+							children: childNodes,
+						},
+					],
+				}
+			: {
+					...outer,
+					kind: "group",
+					layout,
+					children: bg ? [bg, ...childNodes] : childNodes,
+				};
+	if (!strokeOutside) return frame;
+
+	const {
+		id,
+		pos,
+		rotation,
+		opacity,
+		blendMode,
+		shadow,
+		blur,
+		adjust,
+		layoutChild,
+		...content
+	} = frame;
 	return {
-		...outer,
+		id,
+		pos,
+		size,
+		rotation,
+		opacity,
+		blendMode,
+		shadow,
+		blur,
+		adjust,
+		layoutChild,
 		kind: "group",
-		layout,
-		children: bg ? [bg, ...childNodes] : childNodes,
+		children: [
+			{ ...content, pos: { x: 0, y: 0 } },
+			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, cornerRadius },
+		],
 	};
 }
 

@@ -284,7 +284,8 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
 	strokeAlign?: string;
-	cornerRadius?: number;
+	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].
+	cornerRadius?: number | [number, number, number, number];
 	clipsContent?: boolean;
 	componentProperties?: Record<string, { value: string; type: string }>;
 	componentId?: string;

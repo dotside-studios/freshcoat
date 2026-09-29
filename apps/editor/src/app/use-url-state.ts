@@ -1,6 +1,7 @@
 import { toast } from "@freshcoat-js/ui/toast";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
 import { findSample } from "~/samples";
 import { readAutosave, restoreNotices } from "./autosave";
@@ -77,7 +78,7 @@ export function useUrlState(
 			}
 			if (askOpen) toastOpenHint(ctx);
 			if (!saved) return;
-			toast(`Unsaved work from ${new Date(saved.savedAt).toLocaleString()}`, {
+			toast(`Unsaved work from ${formatDate(new Date(saved.savedAt))}`, {
 				timeout: 0,
 				action: {
 					label: "Restore",

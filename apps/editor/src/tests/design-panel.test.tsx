@@ -214,6 +214,36 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
+	it("positions an image's stroke outside", () => {
+		const c = setup(["0/2/0"]);
+		fireEvent.click(screen.getByRole("button", { name: "Add stroke" }));
+		fireEvent.click(screen.getByRole("radio", { name: "Outside" }));
+		expect(
+			(el(c, "0/2/0").properties as { stroke?: { align?: string } }).stroke
+				?.align,
+		).toBe("outside");
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("splits a frame's corners and writes one", () => {
+		const c = setup(["0/1"]);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Independent corners" }),
+		);
+		typeInto(screen.getByRole("spinbutton", { name: "TL radius" }), "12");
+		expect(
+			(el(c, "0/1").properties as { cornerRadius?: unknown }).cornerRadius,
+		).toEqual([12, 0, 0, 0]);
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("keeps an image's corners uniform", () => {
+		setup(["0/2/0"]);
+		expect(
+			screen.queryByRole("button", { name: "Independent corners" }),
+		).toBeNull();
+	});
+
 	it("switches a frame to a grid and edits its tracks and gaps", () => {
 		const c = setup(["0/3"]);
 		fireEvent.click(screen.getByRole("radio", { name: "Grid" }));
