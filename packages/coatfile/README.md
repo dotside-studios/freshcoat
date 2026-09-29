@@ -427,8 +427,14 @@ included. `fillRule: "evenodd"` keeps the hole in a ring drawn as two subpaths
 wound the same way; the default is SVG's nonzero.
 
 `svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
-frame of editable `vector`, `frame` and `mask` elements in design px, and
-returns the features it skipped. An `image` element can also point at an SVG
+frame of editable `vector`, `frame`, `mask`, `image` and `text` elements in
+design px, and returns the features it skipped. Images embedded as `data:`
+URLs (directly or through a same-document reference) become `image`
+elements; `<text>` and `<tspan>` become `text` elements with the SVG's font
+family, size, weight, style, fill and anchor, and spans where the styles
+differ. A text box is sized from an estimate of the line's width, placed so
+the baseline lands where the SVG put it. Markers become vectors, and a pattern
+fill becomes a mask of its tiles. An `image` element can also point at an SVG
 source directly; the engine draws it as vector art.
 
 `blendMode` is any of Figma's layer modes except linear burn, which Skia has no

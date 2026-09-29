@@ -209,6 +209,24 @@ describe("SVG image sources", () => {
 		cache.dispose();
 	});
 
+	test("embedded images draw, raster and SVG alike", async () => {
+		const surface = ck.MakeSurface(2, 2);
+		surface.getCanvas().clear(ck.Color(0, 0, 255, 1));
+		const snapshot = surface.makeImageSnapshot();
+		const png = snapshot.encodeToBytes() as Uint8Array;
+		snapshot.delete();
+		surface.delete();
+		const pngUrl = `data:image/png;base64,${Buffer.from(png).toString("base64")}`;
+		const svgUrl = `data:image/svg+xml,${encodeURIComponent(
+			'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="red"/></svg>',
+		)}`;
+		const markup = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><image href="${svgUrl}" width="5" height="10" preserveAspectRatio="none"/><image href="${pngUrl}" x="5" width="5" height="10" preserveAspectRatio="none"/></svg>`;
+		const { at, warnings } = await paint(markup, {}, { width: 10, height: 10 });
+		expect(at(2, 5)).toEqual(RED);
+		expect(at(7, 5)).toEqual(BLUE);
+		expect(warnings).toEqual([]);
+	});
+
 	test("malformed SVG paints the placeholder and reports the load", async () => {
 		const { warnings } = await paint(
 			'<svg xmlns="http://www.w3.org/2000/svg"><g></svg>',

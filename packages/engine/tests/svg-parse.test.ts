@@ -386,17 +386,18 @@ describe("clips and masks", () => {
 });
 
 describe("unsupported content and limits", () => {
-	test("text, image and filters warn once each", () => {
+	test("foreignObject, media and filters warn once each", () => {
 		const d = parseSvg(
 			svg(
-				'<text>a</text><text>b</text><image href="x.png"/><filter id="f"/><path d="M0 0H1V1Z" filter="url(#f)"/>',
+				'<foreignObject/><foreignObject/><video/><audio/><filter id="f"/><path d="M0 0H1V1Z" filter="url(#f)"/>',
 			),
 		);
 		expect(shapes(d.children)).toHaveLength(1);
 		expect(d.warnings.map((w) => w.feature).sort()).toEqual([
+			"audio",
 			"filter",
-			"image",
-			"text",
+			"foreignObject",
+			"video",
 		]);
 	});
 	test("deep nesting stops at the depth limit", () => {

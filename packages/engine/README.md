@@ -105,9 +105,16 @@ region `cover` keeps centred in the box, held inside the source's edges.
 An image node whose bytes are SVG paints as vector art, in the browser,
 workers and headless runtimes alike. The painter reads it with `parseSvg`,
 lowers it with `svgToNode` and draws it with the node's fit, mask and stroke,
-so it stays sharp at every export density. Text, embedded images, patterns,
-filters and markers are not drawn; each one used is reported once per source
-as an `svg_unsupported` warning.
+so it stays sharp at every export density. Markers and pattern fills are
+expanded into ordinary paths, and images embedded as `data:` URLs are drawn,
+raster or SVG. Text, `foreignObject`, video, audio and filters are not drawn;
+each one used is reported once per source as an `svg_unsupported` warning.
+
+`parseSvg` itself reads `<text>` and `<tspan>` as lines of styled runs (font
+family, size, weight, style and fill, anchored at the baseline) for callers
+that can shape them, such as coatfile's `svgToElements`. A pattern's tiles are
+not clipped to the tile, and a pattern of more than 1,000 tiles uses its
+fallback color.
 
 ## Subpaths
 
