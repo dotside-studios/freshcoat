@@ -35,6 +35,19 @@ export const STATUS_LABEL: Record<RecordStatus, string> = {
 };
 
 /** Why a variant op refused, fit for a toast. */
+export const BOOLEAN = {
+	union: "Union selection",
+	subtract: "Subtract selection",
+	intersect: "Intersect selection",
+	exclude: "Exclude selection",
+	toolbar: "Boolean",
+	tooFew: "Select two or more shapes",
+	notShape: "Only rectangles, ellipses and vectors can be combined",
+	autoLayout: "Layers in auto layout can't be combined",
+	empty: "Nothing would be left of the shapes",
+	couldNotLoad: "Couldn't load the path engine",
+} as const;
+
 export const VARIANT_COPY = {
 	unknown: "That variant no longer exists",
 	emptyLabel: "A variant needs a name",

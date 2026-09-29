@@ -1,11 +1,12 @@
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
+import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
 import { loadBarcodeEncoder } from "~/render/barcode";
 import type { EditorState, Tool } from "~/state/store";
 import type { Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
-import { TEMPLATE_SETUP } from "./copy";
+import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
 import { toggleRenderStats } from "./render-stats";
 import { setThemePreference, type ThemePreference } from "./theme";
 
@@ -53,6 +54,16 @@ const tool = (t: Tool, label: string, key: string): Command => ({
 		else controller.dispatch({ type: "setTool", tool: t });
 		// Fetched now so the first code drawn is not a placeholder.
 		if (t === "barcode") void loadBarcodeEncoder().catch(() => {});
+	},
+});
+const booleanCommand = (op: BooleanOp, key: string): Command => ({
+	id: `object.${op}`,
+	label: BOOLEAN[op],
+	keys: [key],
+	group: "Object",
+	enabled: (s) => s.selection.filter((k) => !k.endsWith("/bg")).length > 1,
+	run: ({ controller }) => {
+		void controller.booleanSelection(op);
 	},
 });
 const themeCommand = (pref: ThemePreference, label: string): Command => ({
@@ -302,6 +313,10 @@ export const COMMANDS: Command[] = [
 		enabled: hasSelection,
 		run: ({ controller }) => controller.ungroupSelection(),
 	},
+	booleanCommand("union", "Alt+Shift+U"),
+	booleanCommand("subtract", "Alt+Shift+S"),
+	booleanCommand("intersect", "Alt+Shift+I"),
+	booleanCommand("exclude", "Alt+Shift+X"),
 	{
 		id: "object.forward",
 		label: "Bring forward",

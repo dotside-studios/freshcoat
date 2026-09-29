@@ -129,6 +129,13 @@ the records, and **Export** turns templates and records into files.
     the path, press Enter or Esc to finish an open one, and Backspace to take
     back the last point. The path becomes a vector layer, stroked when open
     and filled when closed, whose path data the inspector edits.
+  - Boolean operations: select two or more sibling rectangles, ellipses or
+    vectors and choose Union, Subtract, Intersect or Exclude selection from
+    the Object menu, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
+    X. The shapes become one vector layer in the bottom-most one's place,
+    with its fill, stroke and effects, as in Figma: Subtract takes the upper
+    shapes away from the bottom-most. Each is one undo step. Rotation and
+    corner radius are part of the result, and corner smoothing is not.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
     radial one's center and two radii, an angular one's center and rotation,
     and a dot per stop. Shift snaps directions to 15 degrees, and a click on

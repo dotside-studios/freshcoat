@@ -29,6 +29,8 @@ export type RefusalCode =
 	| "unknown_font"
 	| "font_in_use"
 	| "too_few"
+	| "not_a_shape"
+	| "empty_result"
 	| "unknown_variant"
 	| "empty_label"
 	| "invalid_variant_id"

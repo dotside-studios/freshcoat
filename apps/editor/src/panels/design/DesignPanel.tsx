@@ -1,6 +1,7 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { useMemo, useRef } from "react";
 import { useController } from "~/app/context";
+import { isBooleanShape } from "~/doc/boolean";
 import { ok, resetOverride } from "~/doc/ops";
 import { getElement, isBackgroundPath, keyOf, parseKey } from "~/doc/path";
 import { activeVariantId, overriddenKeys } from "~/doc/variant-edit";
@@ -9,6 +10,7 @@ import { working } from "~/state/store";
 import { AdjustSection } from "./AdjustSection";
 import { AlignSection } from "./AlignSection";
 import { BarcodeSection } from "./BarcodeSection";
+import { BooleanSection } from "./BooleanSection";
 import { ConstraintsSection, takesConstraints } from "./ConstraintsSection";
 import { CornersSection } from "./CornersSection";
 import { type Overrides, OverridesContext } from "./controls";
@@ -210,6 +212,9 @@ function sections(ins: Inspect) {
 	return (
 		<div data-testid="design-inspector" data-mode="layers">
 			<AlignSection ins={ins} />
+			{layers.length > 1 && layers.every(isBooleanShape) && (
+				<BooleanSection ins={ins} />
+			)}
 			<LayerSection ins={ins} />
 			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			{every((t) => t === "text") && <TextSection ins={ins} />}

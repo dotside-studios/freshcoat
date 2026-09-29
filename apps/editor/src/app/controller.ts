@@ -17,6 +17,8 @@ import {
 	variantFor,
 	type Workspace,
 } from "@freshcoat-js/workspace";
+import type { CanvasKit } from "canvaskit-wasm";
+import type { BooleanOp } from "~/doc/boolean";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
 	type AlignMode,
@@ -43,6 +45,7 @@ import {
 	type AddVariantResult,
 	addVariant,
 	attachImageAsset,
+	booleanElements,
 	changeVariantId,
 	duplicateElements,
 	groupElements,
@@ -75,6 +78,7 @@ import {
 	isStructuralEdit,
 } from "~/doc/variant-edit";
 import { newPreset } from "~/export/export-ui";
+import { getCanvasKit } from "~/render/canvaskit";
 import { findSample } from "~/samples";
 import { findStarter } from "~/samples/starters";
 import {
@@ -95,7 +99,7 @@ import {
 } from "~/state/workspace";
 import { clearAutosave, configureAutosave, writeAutosave } from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
-import { plural } from "./copy";
+import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { exportSidePng } from "./export-png";
 import { svgMarkup, svgSize } from "./svg";
@@ -380,6 +384,28 @@ export class EditorController {
 			quiet: true,
 			scope: "base",
 		});
+	}
+
+	/** Combines the selected shapes into one vector layer, as one undo step.
+	 *  `ck` stands in for the session's CanvasKit. */
+	async booleanSelection(op: BooleanOp, ck?: CanvasKit): Promise<boolean> {
+		const keys = this.selectedLayers();
+		if (keys.length < 2) {
+			toast(BOOLEAN.tooFew, { tone: "warning" });
+			return false;
+		}
+		let kit = ck;
+		try {
+			kit ??= (await getCanvasKit()) as CanvasKit;
+		} catch {
+			toast(BOOLEAN.couldNotLoad, { tone: "warning" });
+			return false;
+		}
+		const result = this.edit((t) => booleanElements(t, keys, op, kit), {
+			scope: "base",
+			selectResult: true,
+		});
+		return result?.ok ?? false;
 	}
 
 	alignSelection(mode: AlignMode): void {
