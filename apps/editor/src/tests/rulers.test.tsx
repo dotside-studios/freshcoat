@@ -10,7 +10,7 @@ import {
 	rulerLabel,
 	rulerTicks,
 	selectionExtent,
-} from "~/canvas/rulers";
+} from "~/canvas/ruler-geometry";
 import { doc, geometryOf } from "./doc-fixture";
 
 function open(t: Template = doc()) {

@@ -4,7 +4,7 @@ import type { EditorController } from "~/app/controller";
 import { type GuideAxis, sideGuides } from "~/doc/guides";
 import { useEditor } from "~/state/hooks";
 import { present } from "~/state/store";
-import { RULER_SIZE } from "./rulers";
+import { RULER_SIZE } from "./ruler-geometry";
 
 const HIT = 7;
 

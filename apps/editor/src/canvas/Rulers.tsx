@@ -10,7 +10,12 @@ import {
 import { useController } from "~/app/context";
 import { useEditor } from "~/state/hooks";
 import { dragGuide, focusGuide, viewportOf } from "./Guides";
-import { RULER_SIZE, rulerLabel, rulerTicks, selectionExtent } from "./rulers";
+import {
+	RULER_SIZE,
+	rulerLabel,
+	rulerTicks,
+	selectionExtent,
+} from "./ruler-geometry";
 
 type Axis = "x" | "y";
 
