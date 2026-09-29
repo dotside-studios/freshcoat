@@ -610,9 +610,13 @@ type AnyRectNode = AnySceneNode & {
  *  still exposes each corner on its own and coatfile takes a
  *  [topLeft, topRight, bottomRight, bottomLeft] tuple, so read them
  *  individually and collapse to one number only when they agree. */
-function readCornerRadius(
-	node: AnyRectNode,
-): number | [number, number, number, number] | undefined {
+function readCornerRadius(node: {
+	cornerRadius?: unknown;
+	topLeftRadius?: number;
+	topRightRadius?: number;
+	bottomRightRadius?: number;
+	bottomLeftRadius?: number;
+}): number | [number, number, number, number] | undefined {
 	if (typeof node.cornerRadius === "number") return node.cornerRadius;
 	const corners = [
 		node.topLeftRadius,
@@ -725,7 +729,11 @@ type AnyContainerNode = AnySceneNode & {
 	strokes?: readonly AnyPaint[];
 	strokeWeight?: number;
 	strokeAlign?: unknown;
-	cornerRadius?: number;
+	cornerRadius?: unknown;
+	topLeftRadius?: number;
+	topRightRadius?: number;
+	bottomRightRadius?: number;
+	bottomLeftRadius?: number;
 	clipsContent?: boolean;
 	variantProperties?: Record<string, string> | null;
 	layoutMode?: string;
@@ -793,8 +801,7 @@ function readContainer(node: AnyContainerNode): FigmaContainerNode {
 		strokeWeight:
 			typeof node.strokeWeight === "number" ? node.strokeWeight : undefined,
 		strokeAlign: readStrokeEnum(node.strokeAlign),
-		cornerRadius:
-			typeof node.cornerRadius === "number" ? node.cornerRadius : undefined,
+		cornerRadius: readCornerRadius(node),
 		clipsContent: node.clipsContent,
 		layoutMode: node.layoutMode as never,
 		itemSpacing: node.itemSpacing,
