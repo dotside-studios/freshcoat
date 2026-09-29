@@ -15,6 +15,8 @@ export type RenderRequest = {
 	images: [ref: string, blob: Blob][];
 	/** lay the design out at this size by its constraints first */
 	resize?: { width: number; height: number };
+	/** include the template's bleed around the trim */
+	bleed?: boolean;
 	format: OutputFormat;
 	/** JPEG and WebP, 0..100 */
 	quality?: number;

@@ -47,6 +47,8 @@ export type ExportedAs = {
 	suffix?: string;
 	width: number;
 	height: number;
+	/** Where the trim lies in the pixels, when the render includes bleed. */
+	trim?: { x: number; y: number; width: number; height: number };
 };
 
 // A painted side. Kept/Encoded variants mirror the disposal policy of the env
@@ -113,6 +115,9 @@ export type RenderOptions = ExportOptions & {
 	width: number;
 	height: number;
 	variantId?: string;
+	/** Include the template's bleed around the trim. Off by default, so the
+	 *  output is the trim alone. */
+	bleed?: boolean;
 };
 
 type ResolvedPrint = {
@@ -191,6 +196,18 @@ function atExport(
 	);
 }
 
+function scaleBox(
+	box: NonNullable<CompiledTemplate["trim"]>,
+	scale: number,
+): NonNullable<ExportedAs["trim"]> {
+	return {
+		x: box.x * scale,
+		y: box.y * scale,
+		width: box.width * scale,
+		height: box.height * scale,
+	};
+}
+
 // Compile a template AND paint it — the one call a consumer needs. compile()
 // builds the freshcoat node tree; freshcoat's compileScene resolves layout +
 // bakes text + lowers; env.paint rasterizes. Returns one result per rendered
@@ -205,6 +222,7 @@ export async function render(
 		width: opts.width,
 		height: opts.height,
 		variantId: opts.variantId,
+		...(opts.bleed ? { bleed: true } : {}),
 	});
 	return renderCompiled(
 		compiled,
@@ -309,6 +327,7 @@ export async function renderCompiled(
 					supersample,
 					suffix: setting.suffix,
 					...exportPixelSize(design, scale),
+					...(compiled.trim ? { trim: scaleBox(compiled.trim, scale) } : {}),
 				});
 			}
 		}

@@ -117,6 +117,7 @@ async function renderSide(req: RenderRequest) {
 			height: design.height,
 			variantId,
 			...(req.resize ? { resize: req.resize } : {}),
+			...(req.bleed ? { bleed: true } : {}),
 		});
 		const painted = await withPrintFallback(req.print, async (print) => {
 			const [result] = await renderCompiled(

@@ -1,6 +1,6 @@
 import { PanelSection } from "@freshcoat-js/ui/panel";
-import { TEMPLATE_SETUP } from "~/app/copy";
-import { TemplateSizeFields } from "../setup/SizeSection";
+import { INSETS, TEMPLATE_SETUP } from "~/app/copy";
+import { TemplateInsetField, TemplateSizeFields } from "../setup/SizeSection";
 import { Row } from "./controls";
 import type { Inspect } from "./field-helpers";
 
@@ -25,6 +25,15 @@ export function SideSection({ ins }: { ins: Inspect }) {
 			<p className="m-0 pl-[60px] text-fc-faint text-fc-sm">
 				{TEMPLATE_SETUP.sharedSize}
 			</p>
+			{(["bleed", "safeArea"] as const).map((key) => (
+				<Row key={key} label={INSETS[key]}>
+					<TemplateInsetField
+						template={t}
+						inset={key}
+						className="min-w-0 flex-1"
+					/>
+				</Row>
+			))}
 		</PanelSection>
 	);
 }

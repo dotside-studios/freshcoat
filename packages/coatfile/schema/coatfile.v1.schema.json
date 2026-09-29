@@ -49,6 +49,66 @@
 		"height": {
 			"type": "number"
 		},
+		"bleed": {
+			"anyOf": [
+				{
+					"type": "number"
+				},
+				{
+					"type": "object",
+					"properties": {
+						"top": {
+							"type": "number"
+						},
+						"right": {
+							"type": "number"
+						},
+						"bottom": {
+							"type": "number"
+						},
+						"left": {
+							"type": "number"
+						}
+					},
+					"required": [
+						"top",
+						"right",
+						"bottom",
+						"left"
+					]
+				}
+			]
+		},
+		"safeArea": {
+			"anyOf": [
+				{
+					"type": "number"
+				},
+				{
+					"type": "object",
+					"properties": {
+						"top": {
+							"type": "number"
+						},
+						"right": {
+							"type": "number"
+						},
+						"bottom": {
+							"type": "number"
+						},
+						"left": {
+							"type": "number"
+						}
+					},
+					"required": [
+						"top",
+						"right",
+						"bottom",
+						"left"
+					]
+				}
+			]
+		},
 		"fields": {
 			"type": "object",
 			"properties": {

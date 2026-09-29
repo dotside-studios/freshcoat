@@ -1,10 +1,11 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { resolveInsets, type Template } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { resizeTemplate } from "~/doc/ops";
+import { INSETS } from "~/app/copy";
+import { resizeTemplate, setTemplateInsets } from "~/doc/ops";
 import { resizeWithConstraints } from "~/doc/resize";
 import LinkIcon from "~icons/mingcute/link-line";
 import UnlinkIcon from "~icons/mingcute/unlink-line";
@@ -49,7 +50,55 @@ export function SizeSection({ template }: { template: Template }) {
 			>
 				Resize with constraints
 			</Checkbox>
+			{(["bleed", "safeArea"] as const).map((key) => (
+				<div key={key} className="flex items-center gap-2">
+					<span className="w-16 shrink-0 truncate text-fc-muted text-fc-sm">
+						{INSETS[key]}
+					</span>
+					<TemplateInsetField
+						template={template}
+						inset={key}
+						className="min-w-0 flex-1"
+					/>
+				</div>
+			))}
 		</div>
+	);
+}
+
+/** One value for every side of the template's bleed or safe area. Sides set
+ *  apart in the file show as mixed until a value is typed. */
+export function TemplateInsetField({
+	template,
+	inset,
+	className,
+}: {
+	template: Template;
+	inset: "bleed" | "safeArea";
+	className?: string;
+}) {
+	const controller = useController();
+	const sides = resolveInsets(template[inset]);
+	const uniform =
+		sides.top === sides.right &&
+		sides.top === sides.bottom &&
+		sides.top === sides.left;
+	return (
+		<NumberField
+			aria-label={inset === "bleed" ? INSETS.bleedLabel : INSETS.safeAreaLabel}
+			className={className}
+			value={uniform ? sides.top : null}
+			placeholder={INSETS.mixed}
+			min={0}
+			max={MAX_SIDE}
+			precision={2}
+			onChange={(n) =>
+				controller.edit((t) => setTemplateInsets(t, inset, n), {
+					mergeKey: inset,
+					scope: "base",
+				})
+			}
+		/>
 	);
 }
 

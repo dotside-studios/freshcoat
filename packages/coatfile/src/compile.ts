@@ -24,6 +24,13 @@ import {
 	isSquareSymbology,
 	symbologyLabel,
 } from "./barcode-encoder";
+import {
+	extendIntoBleed,
+	hasInsets,
+	NO_INSETS,
+	offsetElements,
+	templateBleed,
+} from "./bleed";
 import { resizeTemplate } from "./constraints";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
@@ -152,25 +159,49 @@ export function compile(
 		if (val !== undefined && val !== null) ctx[k] = val;
 	}
 
-	const frames = template.template_data.map((frame) =>
-		compileFrame(
+	const bleed = opts.bleed ? templateBleed(template) : NO_INSETS;
+	const withBleed = hasInsets(bleed);
+	const width = opts.width + (bleed.left + bleed.right) * ratio;
+	const height = opts.height + (bleed.top + bleed.bottom) * ratio;
+	const trim = { width: template.width, height: template.height };
+
+	const frames = template.template_data.map((frame) => {
+		const elements = pruneHiddenElements(
+			frame.elements,
+			ctx,
+			template.fields.properties,
+		);
+		return compileFrame(
 			{
 				...frame,
-				elements: pruneHiddenElements(
-					frame.elements,
-					ctx,
-					template.fields.properties,
-				),
+				elements: withBleed
+					? offsetElements(
+							extendIntoBleed(elements, trim, bleed),
+							bleed.left,
+							bleed.top,
+						)
+					: elements,
 			},
 			template,
 			ctx,
 			ratio,
-			opts.width,
-			opts.height,
-		),
-	);
+			width,
+			height,
+		);
+	});
 
-	return { width: opts.width, height: opts.height, frames };
+	if (!withBleed) return { width, height, frames };
+	return {
+		width,
+		height,
+		trim: {
+			x: bleed.left * ratio,
+			y: bleed.top * ratio,
+			width: opts.width,
+			height: opts.height,
+		},
+		frames,
+	};
 }
 
 function withoutVariants(t: Template): Template {

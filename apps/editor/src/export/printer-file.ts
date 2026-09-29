@@ -51,6 +51,7 @@ export function printerFileRequest(
 		scale: size.scale * cap,
 		images,
 		...(size.resize ? { resize: size.resize } : {}),
+		...(size.bleed ? { bleed: true } : {}),
 		// A PDF's pages are PNG unless it embeds JPEG, and the preview shows
 		// the pixels the file holds.
 		format: preset.format === "pdf" ? "png" : format,

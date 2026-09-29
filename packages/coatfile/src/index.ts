@@ -50,6 +50,14 @@ export {
 	setBarcodeEncoder,
 	symbologyLabel,
 } from "./barcode-encoder";
+export {
+	bleedSize,
+	extendIntoBleed,
+	hasInsets,
+	resolveInsets,
+	templateBleed,
+	templateSafeArea,
+} from "./bleed";
 export { compile } from "./compile";
 export {
 	constrainBox,
@@ -132,6 +140,7 @@ export type {
 	ImageLike,
 	ImageProperties,
 	InlineAsset,
+	Insets,
 	KeptPaintResult,
 	Layout,
 	LayoutChild,
@@ -151,6 +160,7 @@ export type {
 	SetupCommand,
 	Shadow,
 	ShapeMask,
+	Sides,
 	Size,
 	Stroke,
 	Symbology,

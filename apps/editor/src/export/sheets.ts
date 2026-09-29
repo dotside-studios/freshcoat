@@ -1,4 +1,9 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import {
+	hasInsets,
+	type Sides,
+	type Template,
+	templateBleed,
+} from "@freshcoat-js/coatfile";
 import type {
 	ExportItem,
 	ExportPreset,
@@ -7,6 +12,7 @@ import type {
 	SheetLayout,
 } from "@freshcoat-js/workspace";
 import {
+	bleedMm,
 	cardSizeMm,
 	DEFAULT_SHEET_LAYOUT,
 	exportSize,
@@ -37,6 +43,31 @@ export function withSideIndex(plan: readonly ExportItem[]): SheetItem[] {
 		});
 	});
 	return out;
+}
+
+const NO_BLEED: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/** Why a preset sized from each photo can't include bleed: the photo's
+ *  pixels are the trim. */
+export const BLEED_NEEDS_TEMPLATE_SIZE = "Bleed needs Template size";
+
+/** The bleed each item renders with, in design units: the template's, when
+ *  the preset includes it at template size. */
+export function presetBleed(
+	template: Pick<Template, "bleed">,
+	preset: Pick<ExportPreset, "bleed" | "size">,
+): Sides {
+	if (!preset.bleed || exportSize(preset).kind === "image") return NO_BLEED;
+	return templateBleed(template);
+}
+
+/** The preset's bleed in millimetres at its DPI, when there is any. */
+export function presetBleedMm(
+	template: Pick<Template, "bleed">,
+	preset: Pick<ExportPreset, "bleed" | "size" | "dpi">,
+) {
+	const bleed = presetBleed(template, preset);
+	return hasInsets(bleed) ? bleedMm(bleed, preset.dpi) : undefined;
 }
 
 /** The preset's sheet layout, when it is a PDF laid out on sheets. */
@@ -83,7 +114,7 @@ export function shortSheetError(e: SheetLayoutError): string {
  *  preset is not on sheets. */
 export function planSheets(
 	plan: readonly ExportItem[],
-	template: Pick<Template, "width" | "height"> | undefined,
+	template: Pick<Template, "width" | "height" | "bleed"> | undefined,
 	preset: ExportPreset,
 ): SheetPlan | null {
 	const layout = sheetLayout(preset);
@@ -99,6 +130,7 @@ export function planSheets(
 			withSideIndex(plan),
 			cardSizeMm(template.width, template.height, preset.dpi),
 			layout,
+			{ bleedMm: presetBleedMm(template, preset) },
 		);
 		return { layout, imposition };
 	} catch (e) {

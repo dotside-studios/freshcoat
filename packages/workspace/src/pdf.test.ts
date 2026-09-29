@@ -7,6 +7,7 @@ import {
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { jpegHeader } from "./image-fixtures";
+import { imposeSheets } from "./impose";
 import { assemblePdf, pageSizePt } from "./pdf";
 import { makePng } from "./test-fixtures";
 import type { PdfPage, SheetLayout } from "./types";
@@ -250,6 +251,69 @@ describe("assemblePdf on sheets", () => {
 				cardMm: card,
 			}),
 		).rejects.toThrow(/too wide/);
+	});
+
+	it("draws each card with its bleed around the trim", async () => {
+		const bleed = 3;
+		const doc = await PDFDocument.load(
+			await assemblePdf(cards(2), {
+				dpi: 300,
+				layout: sheet(),
+				cardMm: card,
+				bleedMm: bleed,
+			}),
+		);
+		const imposition = imposeSheets(cards(2), card, sheet(), {
+			bleedMm: bleed,
+		});
+		const [a, b] = placements(doc.getPage(0));
+		for (const [m, slot] of [
+			[a, imposition.pages[0]?.slots[0]],
+			[b, imposition.pages[0]?.slots[1]],
+		] as const) {
+			if (!m || !slot) throw new Error("no image");
+			expect(m[0]).toBeCloseTo((85.6 + 2 * bleed) * K, 2);
+			expect(m[3]).toBeCloseTo((54 + 2 * bleed) * K, 2);
+			expect(m[4]).toBeCloseTo((slot.xMm - bleed) * K, 2);
+			expect(m[5]).toBeCloseTo(A4[1] - (slot.yMm + 54 + bleed) * K, 2);
+		}
+		// 2 × 4 with the gap widened to 6 mm: marks in the margin only
+		expect(strokes(doc.getPage(0))).toBe(4 * 2 + 8 * 2);
+	});
+
+	it("takes the bleed off the first page's size when not told the card", async () => {
+		const pages = cards(1).map((p) => ({ ...p, widthPx: 1200, heightPx: 900 }));
+		const doc = await PDFDocument.load(
+			await assemblePdf(pages, {
+				dpi: 300,
+				layout: sheet(),
+				bleedMm: 25.4 / 6,
+			}),
+		);
+		const [m] = placements(doc.getPage(0));
+		expect(m?.[0]).toBeCloseTo(4 * 72, 2);
+		expect(m?.[3]).toBeCloseTo(3 * 72, 2);
+	});
+
+	it("gives a single page with bleed a trim box inside its bleed box", async () => {
+		const doc = await PDFDocument.load(
+			await assemblePdf(cards(1), {
+				dpi: 300,
+				bleedMm: { top: 1, right: 2, bottom: 3, left: 4 },
+			}),
+		);
+		const page = doc.getPage(0);
+		const media = page.getMediaBox();
+		const bleedBox = page.getBleedBox();
+		const trim = page.getTrimBox();
+		expect([bleedBox.width, bleedBox.height]).toEqual([
+			media.width,
+			media.height,
+		]);
+		expect(trim.x).toBeCloseTo(4 * K, 3);
+		expect(trim.y).toBeCloseTo(3 * K, 3);
+		expect(trim.width).toBeCloseTo(media.width - 6 * K, 3);
+		expect(trim.height).toBeCloseTo(media.height - 4 * K, 3);
 	});
 
 	it("reads a single layout as one image per page", async () => {

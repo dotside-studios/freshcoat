@@ -3,6 +3,7 @@ import type {
 	Element,
 	FieldDefinition,
 	FontDescriptor,
+	Insets,
 	Template,
 	TemplateFrame,
 	Variant,
@@ -13,11 +14,16 @@ import {
 	bytesToBase64,
 	checkVariants,
 	collectAssetRefs,
+	FORMAT_MINOR,
+	FORMAT_VERSION,
+	formatVersionStatus,
+	hasInsets,
 	parseAssetUri,
+	resolveInsets,
 	subtleSha256,
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
-import { KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
+import { INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";
 import { round2 } from "./factories";
 import {
@@ -616,6 +622,8 @@ export function resizeTemplate(t: Template, w: number, h: number): OpResult {
 			"invalid_size",
 			`Width and height must be whole numbers from 1 to ${MAX_SIDE}`,
 		);
+	if (!safeAreaFits(t.safeArea, w, h))
+		return refuse("safe_area_too_large", INSETS.safeAreaTooLarge);
 	const follow = (bg: Draft<Background> | undefined) => {
 		if (bg?.size && (bg.size.width !== w || bg.size.height !== h))
 			bg.size = { width: w, height: h };
@@ -627,6 +635,47 @@ export function resizeTemplate(t: Template, w: number, h: number): OpResult {
 		for (const ov of overridesOf(d)) follow(ov.background);
 	});
 	return ok(next, []);
+}
+
+function safeAreaFits(
+	safeArea: Insets | undefined,
+	width: number,
+	height: number,
+): boolean {
+	const s = resolveInsets(safeArea);
+	return s.left + s.right < width && s.top + s.bottom < height;
+}
+
+/** Sets the template's bleed or safe area; all zero removes it. A template
+ *  that gains one is stamped with the format version that reads it. */
+export function setTemplateInsets(
+	t: Template,
+	key: "bleed" | "safeArea",
+	value: Insets | undefined,
+): OpResult {
+	const sides = resolveInsets(value);
+	if (!Object.values(sides).every((n) => Number.isFinite(n) && n >= 0))
+		return refuse("invalid_inset", INSETS.negative);
+	if (key === "safeArea" && !safeAreaFits(value, t.width, t.height))
+		return refuse("safe_area_too_large", INSETS.safeAreaTooLarge);
+	const next = hasInsets(sides) ? value : undefined;
+	if (sameJson(t[key], next)) return ok(t, []);
+	return ok(
+		produce(t, (d) => {
+			if (next === undefined) delete d[key];
+			else {
+				d[key] = next;
+				if (olderMinor(d.format_version)) d.format_version = FORMAT_VERSION;
+			}
+		}),
+		[],
+	);
+}
+
+function olderMinor(formatVersion: string): boolean {
+	if (formatVersionStatus(formatVersion) !== "current") return false;
+	const minor = Number(/^\s*\d+\.(\d+)/.exec(formatVersion)?.[1] ?? 0);
+	return minor < FORMAT_MINOR;
 }
 
 // ── Fields ───────────────────────────────────────────────────────────────────

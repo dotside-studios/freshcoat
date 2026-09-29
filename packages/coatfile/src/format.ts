@@ -14,7 +14,8 @@ import type { Template } from "./types";
 //   1.2  linear fill `from` / `to`; element `constraints`
 //   1.3  barcode element
 //   1.4  variant deltas: pos, size, rotation, opacity, hidden
-//   1.5  grid layout; element `adjust`; image `focus` and `crop`
+//   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
+//        `bleed` and `safeArea`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 5;

@@ -331,6 +331,21 @@ describe("packWorkspace", () => {
 		expect(imposed).toEqual(sheets);
 	});
 
+	it("keeps a preset's bleed and reads an older preset as trim only", async () => {
+		const bled: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_bleed",
+			bleed: true,
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [...ws.presets, bled] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		const [older, kept] = result.workspace.presets;
+		expect(older?.bleed).toBeUndefined();
+		expect(kept).toEqual(bled);
+	});
+
 	it("refuses a preset whose sheet layout is malformed", async () => {
 		const bad = {
 			...(ws.presets[0] as ExportPreset),

@@ -1,9 +1,11 @@
 import {
+	type BleedMm,
 	type CardSizeMm,
 	cardSizeMm,
 	cropMarks,
 	imposeSheets,
 	MM_PER_INCH,
+	resolveBleedMm,
 } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
@@ -15,9 +17,13 @@ export type AssemblePdfOptions = {
 	date?: Date;
 	/** default one image per page */
 	layout?: PdfLayout;
-	/** on sheets, the size every image is drawn at; defaults to the first
-	 *  page's pixels at `dpi` */
+	/** on sheets, the trim size every card is drawn at; defaults to the first
+	 *  page's pixels at `dpi`, less any bleed */
 	cardMm?: CardSizeMm;
+	/** the bleed every image carries around its trim. On sheets, each card is
+	 *  placed by its trim with the bleed outside it; one per page, each page
+	 *  gets a trim box inside its bleed box */
+	bleedMm?: number | BleedMm;
 };
 
 const CROP_MARK_WIDTH_PT = 0.25;
@@ -40,7 +46,8 @@ export function pageSizePt(
 /** One page per image, each filled edge to edge by it and sized by its own
  *  image, so pages of different sizes can share a document. With a sheet
  *  layout, the images are imposed on sheets of paper instead, each drawn at
- *  the card's size, with crop marks on the pages that aren't backs. */
+ *  the card's size, with crop marks at the trim on the pages that aren't
+ *  backs. */
 export async function assemblePdf(
 	pages: readonly PdfPage[],
 	options: AssemblePdfOptions,
@@ -56,14 +63,13 @@ export async function assemblePdf(
 	doc.setProducer("Freshcoat Studio (pdf-lib)");
 	doc.setCreationDate(date);
 	doc.setModificationDate(date);
+	const bleed = resolveBleedMm(options.bleedMm);
 	if (options.layout?.kind === "sheet") {
 		const first = pages[0];
-		const card =
-			options.cardMm ??
-			(first
-				? cardSizeMm(first.widthPx, first.heightPx, options.dpi)
-				: { widthMm: 1, heightMm: 1 });
-		const imposition = imposeSheets(pages, card, options.layout);
+		const card = options.cardMm ?? trimOf(first, options.dpi, bleed);
+		const imposition = imposeSheets(pages, card, options.layout, {
+			bleedMm: bleed,
+		});
 		const width = imposition.paper.widthMm * PT_PER_MM;
 		const height = imposition.paper.heightMm * PT_PER_MM;
 		const marks = options.layout.cropMarks ? cropMarks(imposition) : [];
@@ -77,10 +83,10 @@ export async function assemblePdf(
 						: await doc.embedPng(page.bytes);
 				// pdf-lib measures up from the bottom-left corner.
 				out.drawImage(image, {
-					x: slot.xMm * PT_PER_MM,
-					y: height - (slot.yMm + card.heightMm) * PT_PER_MM,
-					width: card.widthMm * PT_PER_MM,
-					height: card.heightMm * PT_PER_MM,
+					x: (slot.xMm - bleed.left) * PT_PER_MM,
+					y: height - (slot.yMm + card.heightMm + bleed.bottom) * PT_PER_MM,
+					width: (card.widthMm + bleed.left + bleed.right) * PT_PER_MM,
+					height: (card.heightMm + bleed.top + bleed.bottom) * PT_PER_MM,
 				});
 			}
 			if (sheet.side === "back") continue;
@@ -105,12 +111,30 @@ export async function assemblePdf(
 			page.heightPx,
 			options.dpi,
 		);
-		doc.addPage([width, height]).drawImage(image, {
-			x: 0,
-			y: 0,
-			width,
-			height,
-		});
+		const out = doc.addPage([width, height]);
+		out.drawImage(image, { x: 0, y: 0, width, height });
+		if (Object.values(bleed).some((n) => n > 0)) {
+			out.setBleedBox(0, 0, width, height);
+			out.setTrimBox(
+				bleed.left * PT_PER_MM,
+				bleed.bottom * PT_PER_MM,
+				width - (bleed.left + bleed.right) * PT_PER_MM,
+				height - (bleed.top + bleed.bottom) * PT_PER_MM,
+			);
+		}
 	}
 	return doc.save();
+}
+
+function trimOf(
+	page: PdfPage | undefined,
+	dpi: number,
+	bleed: BleedMm,
+): CardSizeMm {
+	if (!page) return { widthMm: 1, heightMm: 1 };
+	const full = cardSizeMm(page.widthPx, page.heightPx, dpi);
+	return {
+		widthMm: full.widthMm - bleed.left - bleed.right,
+		heightMm: full.heightMm - bleed.top - bleed.bottom,
+	};
 }
