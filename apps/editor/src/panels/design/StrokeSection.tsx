@@ -34,7 +34,6 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 	const strokes = ins.layers.map(strokeOf);
 	const all = strokes.every(Boolean);
 	const none = strokes.every((s) => !s);
-	const rectOnly = ins.layers.every((l) => l.type === "rect");
 
 	const set = (field: string, patch: Partial<Stroke>) =>
 		ins.setProps(field, (el) => {
@@ -89,25 +88,23 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 							onChange={(v) => set("stroke-width", { width: v })}
 						/>
 					</div>
-					{rectOnly && (
-						<Row label="Position">
-							<ToggleGroup
-								aria-label="Stroke position"
-								className="flex-1"
-								selectedKeys={align ? [align] : []}
-								onSelectionChange={(keys) => {
-									const v = [...keys][0] as Stroke["align"];
-									set("stroke-align", {
-										align: v === "center" ? undefined : v,
-									});
-								}}
-							>
-								<ToggleGroupItem id="inside">Inside</ToggleGroupItem>
-								<ToggleGroupItem id="center">Center</ToggleGroupItem>
-								<ToggleGroupItem id="outside">Outside</ToggleGroupItem>
-							</ToggleGroup>
-						</Row>
-					)}
+					<Row label="Position">
+						<ToggleGroup
+							aria-label="Stroke position"
+							className="flex-1"
+							selectedKeys={align ? [align] : []}
+							onSelectionChange={(keys) => {
+								const v = [...keys][0] as Stroke["align"];
+								set("stroke-align", {
+									align: v === "center" ? undefined : v,
+								});
+							}}
+						>
+							<ToggleGroupItem id="inside">Inside</ToggleGroupItem>
+							<ToggleGroupItem id="center">Center</ToggleGroupItem>
+							<ToggleGroupItem id="outside">Outside</ToggleGroupItem>
+						</ToggleGroup>
+					</Row>
 					<DashField
 						value={commonValue(strokes.map((s) => s?.dash ?? []))}
 						onCommit={(dash) => set("stroke-dash", { dash })}

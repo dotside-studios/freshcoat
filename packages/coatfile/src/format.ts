@@ -16,7 +16,8 @@ import type { Template } from "./types";
 //   1.4  variant deltas: pos, size, rotation, opacity, hidden
 //   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
-//        `alignLast`, `direction`, `paragraphSpacing` and font `features`
+//        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
+//        per-corner frame `cornerRadius`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 5;
@@ -57,6 +58,7 @@ export function minimumFormatVersion(template: Template): string {
 	)
 		need(1);
 
+	const frameIds = new Set<string>();
 	const visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
 			for (const item of node) visit(item);
@@ -70,6 +72,10 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
+			if (o.type === "frame") {
+				frameIds.add(o.id);
+				if (usesPerCornerRadius(o.properties)) need(5);
+			}
 		}
 		for (const value of Object.values(o)) visit(value);
 	};
@@ -88,11 +94,21 @@ export function minimumFormatVersion(template: Template): string {
 				)
 					need(4);
 				if (usesTextLayout(delta.properties)) need(5);
+				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
+					need(5);
 			}
 		}
 	}
 
 	return `${FORMAT_MAJOR}.${minor}`;
+}
+
+function usesPerCornerRadius(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		Array.isArray((properties as Record<string, unknown>).cornerRadius)
+	);
 }
 
 const TEXT_ALIGN_1_5 = new Set(["justify", "start", "end"]);

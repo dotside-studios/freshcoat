@@ -138,7 +138,7 @@ export type Adjust = {
 
 export type ShapeMask =
 	| { kind: "rect"; outset?: ClipOutset }
-	| { kind: "rounded-rect"; radius: number }
+	| { kind: "rounded-rect"; radius: CornerRadius }
 	| { kind: "circle" }
 	| { kind: "ellipse" }
 	| { kind: "polygon"; sides: number; rotation?: number }
@@ -168,7 +168,7 @@ export type Stroke = {
 	cap?: "butt" | "round" | "square";
 	join?: "round" | "bevel" | "miter";
 	// Stroke position relative to the shape edge (Figma). Omitted = center (the
-	// native canvas/Skia alignment). Currently honored for rects.
+	// native canvas/Skia alignment). Honored by every stroked drawable.
 	align?: "inside" | "outside" | "center";
 };
 
@@ -373,6 +373,10 @@ export type DrawPathCommand = DrawCommandBase & {
 	// When set, scale the path from this authored box into `size` (see ViewBox).
 	viewBox?: ViewBox;
 	fillRule?: FillRule;
+	// The outline the stroke is centered on, in place of `d`, when the aligned
+	// stroke is an exact offset of the shape (an ellipse). `stroke.align` is
+	// already applied to it.
+	strokeD?: string;
 };
 
 export type DrawGroupCommand = DrawCommandBase & {

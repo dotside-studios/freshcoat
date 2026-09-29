@@ -128,6 +128,10 @@ the records, and **Export** turns templates and records into files.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
+  - A stroke sits inside, centered on or outside the edge of any stroked
+    layer: rectangle, frame, image or vector.
+  - Rectangles and frames can set each corner's radius on its own. A frame
+    applies its corners to its fill, its stroke and its clip.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text aligns left, center, right or justified; a justified layer also

@@ -7,6 +7,7 @@ import type {
 } from "../types";
 import { figmaColorToHex, figmaPaintToFill, mapStrokeAlign } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
+import { scaleCorners } from "./rect";
 
 const PRIMARY_ALIGN: Record<string, string> = {
 	MIN: "start",
@@ -167,7 +168,7 @@ export function transpileFrame(
 				width: number;
 				align?: "inside" | "outside";
 			};
-			cornerRadius?: number;
+			cornerRadius?: number | [number, number, number, number];
 			clipsContent?: boolean;
 			layout?: unknown;
 			children: unknown[];
@@ -196,10 +197,8 @@ export function transpileFrame(
 		});
 	}
 
-	if (node.cornerRadius !== undefined && node.cornerRadius > 0) {
-		out.properties.cornerRadius =
-			Math.round(node.cornerRadius * ctx.scale * 2) / 2;
-	}
+	const corners = scaleCorners(node.cornerRadius, ctx.scale);
+	if (corners !== undefined) out.properties.cornerRadius = corners;
 
 	if (
 		node.strokes &&

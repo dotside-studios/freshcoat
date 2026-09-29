@@ -1,0 +1,71 @@
+{
+	"caseId": "stroke-inside-image-mask",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"op": "loadImages",
+			"srcs": [
+				"conformance:checker"
+			]
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 20
+					},
+					"size": {
+						"width": 80,
+						"height": 80
+					},
+					"op": "drawImage",
+					"src": "conformance:checker",
+					"fit": "cover",
+					"stroke": {
+						"color": "#000000",
+						"width": 8,
+						"align": "inside"
+					},
+					"clip": {
+						"kind": "circle"
+					}
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "6a7fb8f1b6476f6c9f68aee220cf86af3382bc4157507cb31bee07b86f62dcb2"
+}

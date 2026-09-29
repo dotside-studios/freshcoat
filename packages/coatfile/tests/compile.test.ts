@@ -526,6 +526,71 @@ describe("compile (frame → group)", () => {
 		expect(bg.size).toEqual({ width: 60, height: 40 });
 	});
 
+	test("per-corner radii reach the background and the clip", () => {
+		const cmds = getCommands(
+			withFrame({
+				fill: "#000",
+				cornerRadius: [4, 0, 2, 0],
+				clipsContent: true,
+				children: [],
+			}),
+			{},
+			{ width: 200, height: 120 },
+		);
+		const group = findDraw(cmds, "drawGroup")!;
+		expect(group.clip).toEqual({ kind: "rounded-rect", radius: [8, 0, 4, 0] });
+		expect((group.children[0] as DrawRectCommand).cornerRadius).toEqual([
+			8, 0, 4, 0,
+		]);
+	});
+
+	test("a clipping frame draws an outside stroke beyond its clip", () => {
+		const stroke = { color: "#000", width: 4, align: "outside" };
+		const cmds = getCommands(
+			withFrame({
+				fill: "#fff",
+				stroke,
+				cornerRadius: 6,
+				clipsContent: true,
+				children: [],
+			}),
+			{},
+			{ width: 100, height: 60 },
+		);
+		const outer = findDraws(cmds, "drawGroup")[0]!;
+		expect(outer.clip).toBeUndefined();
+		const [content, border] = outer.children;
+		expect(content!.op).toBe("drawGroup");
+		expect(content!.clip).toEqual({ kind: "rounded-rect", radius: 6 });
+		const bg = (content as { children: DrawCommand[] })
+			.children[0] as DrawRectCommand;
+		expect(bg.stroke).toBeUndefined();
+		expect(border).toMatchObject({
+			op: "drawRect",
+			pos: { x: 20, y: 10 },
+			size: { width: 60, height: 40 },
+			cornerRadius: 6,
+			stroke: { width: 4, align: "outside" },
+		});
+	});
+
+	test("an inside stroke stays on the clipped background", () => {
+		const cmds = getCommands(
+			withFrame({
+				stroke: { color: "#000", width: 4, align: "inside" },
+				clipsContent: true,
+				children: [],
+			}),
+			{},
+			{ width: 100, height: 60 },
+		);
+		const group = findDraw(cmds, "drawGroup")!;
+		expect(group.clip).toEqual({ kind: "rect" });
+		expect((group.children[0] as DrawRectCommand).stroke?.align).toBe(
+			"inside",
+		);
+	});
+
 	test("no fill + no stroke = no synthetic bg child", () => {
 		const cmds = getCommands(
 			withFrame({

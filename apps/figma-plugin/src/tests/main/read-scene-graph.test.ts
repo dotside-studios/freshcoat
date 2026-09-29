@@ -546,6 +546,31 @@ describe("readRectangleNode (corner radius)", () => {
 	});
 });
 
+test("readNode reads a frame's four corners when cornerRadius is mixed", () => {
+	const out = readNode({
+		id: "1:9",
+		name: "card",
+		type: "FRAME",
+		visible: true,
+		opacity: 1,
+		blendMode: "NORMAL",
+		absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 40 },
+		effects: [],
+		fills: [],
+		strokes: [],
+		children: [],
+		cornerRadius: Symbol("figma.mixed"),
+		topLeftRadius: 12,
+		topRightRadius: 0,
+		bottomRightRadius: 6,
+		bottomLeftRadius: 0,
+	} as never);
+	expect(out?.type).toBe("FRAME");
+	expect((out as { cornerRadius?: unknown }).cornerRadius).toEqual([
+		12, 0, 6, 0,
+	]);
+});
+
 test("readContainer copies auto-layout container + child fields", () => {
 	const node = {
 		id: "1:2",

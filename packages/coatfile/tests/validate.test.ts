@@ -33,6 +33,35 @@ describe("validate (top-level)", () => {
 		if (r.ok) expect(r.value.id).toBe("minimal");
 	});
 
+	test("a frame's cornerRadius is one number or four", () => {
+		const withFrame = (cornerRadius: unknown) => ({
+			...minimalValid,
+			format_version: "1.5",
+			template_data: [
+				{
+					...minimalValid.template_data[0],
+					elements: [
+						{
+							id: "f",
+							type: "frame",
+							properties: { cornerRadius, children: [] },
+						},
+					],
+				},
+			],
+		});
+		expect(validate(withFrame(8)).ok).toBe(true);
+		const r = validate(withFrame([8, 0, 8, 0]));
+		expect(r.ok).toBe(true);
+		if (r.ok)
+			expect(
+				(r.value.template_data[0].elements[0].properties as {
+					cornerRadius: unknown;
+				}).cornerRadius,
+			).toEqual([8, 0, 8, 0]);
+		expect(validate(withFrame([8, 0])).ok).toBe(false);
+	});
+
 	test("rejects unknown format_version", () => {
 		const r = validate({ ...minimalValid, format_version: "2.0" });
 		expect(r.ok).toBe(false);

@@ -323,6 +323,8 @@ function maskSvg(
 			return `M ${x} ${y0} H ${x + w} V ${y1} H ${x} Z`;
 		}
 		case "rounded-rect": {
+			if (Array.isArray(clip.radius))
+				return perCornerRectSvg(clip.radius, x, y, w, h);
 			const r = Math.min(clip.radius, Math.min(w, h) / 2);
 			return `M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w} ${y + r} V ${y + h - r} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} H ${x + r} A ${r} ${r} 0 0 1 ${x} ${y + h - r} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
 		}
@@ -361,6 +363,67 @@ function maskSvg(
 		default:
 			return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
 	}
+}
+
+// Radii that overflow a side scale down together, as Skia's RRect does.
+function perCornerRectSvg(
+	radius: [number, number, number, number],
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+): string {
+	const [a, b, c, d] = radius.map((r) => Math.max(0, r));
+	const k = Math.min(
+		1,
+		a + b > 0 ? w / (a + b) : 1,
+		d + c > 0 ? w / (d + c) : 1,
+		a + d > 0 ? h / (a + d) : 1,
+		b + c > 0 ? h / (b + c) : 1,
+	);
+	const [tl, tr, br, bl] = [a * k, b * k, c * k, d * k];
+	return `M ${x + tl} ${y} H ${x + w - tr} A ${tr} ${tr} 0 0 1 ${x + w} ${y + tr} V ${y + h - br} A ${br} ${br} 0 0 1 ${x + w - br} ${y + h} H ${x + bl} A ${bl} ${bl} 0 0 1 ${x} ${y + h - bl} V ${y + tl} A ${tl} ${tl} 0 0 1 ${x + tl} ${y} Z`;
+}
+
+// The mask shape an inside/outside stroke follows once the box is inset, or
+// null when insetting the box is not an offset of the outline (a polygon).
+function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
+	switch (clip.kind) {
+		case "rect":
+			return clip.outset ? null : clip;
+		case "rounded-rect":
+			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
+		case "squircle":
+			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
+		case "circle":
+		case "ellipse":
+			return clip;
+		default:
+			return null;
+	}
+}
+
+// An inside/outside stroke along an arbitrary outline: twice the width,
+// clipped to the path's interior (inside) or its exterior (outside). The
+// path's fill type decides what the interior is.
+function drawClippedStroke(
+	ck: CK,
+	canvas: CK,
+	bin: Bin,
+	path: CK,
+	stroke: Stroke,
+) {
+	canvas.save();
+	canvas.clipPath(
+		path,
+		stroke.align === "inside" ? ck.ClipOp.Intersect : ck.ClipOp.Difference,
+		true,
+	);
+	canvas.drawPath(
+		path,
+		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
+	);
+	canvas.restore();
 }
 
 function maskPath(
@@ -601,14 +664,22 @@ function drawImagePlaceholder(
 function drawImageStroke(ck: CK, canvas: CK, bin: Bin, cmd: DrawImageCommand) {
 	if (!cmd.stroke) return;
 	const { pos, size } = cmd;
+	const clip = cmd.clip ?? { kind: "rect" };
+	const inset = strokeInset(cmd.stroke);
+	const shape = inset === 0 ? clip : insetMask(clip, inset);
+	if (!shape) {
+		const path = maskPath(ck, bin, clip, pos.x, pos.y, size.width, size.height);
+		drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
+		return;
+	}
 	const path = maskPath(
 		ck,
 		bin,
-		cmd.clip ?? { kind: "rect" },
-		pos.x,
-		pos.y,
-		size.width,
-		size.height,
+		shape,
+		pos.x + inset,
+		pos.y + inset,
+		Math.max(0, size.width - 2 * inset),
+		Math.max(0, size.height - 2 * inset),
 	);
 	canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
 }
@@ -930,7 +1001,15 @@ function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
-	if (cmd.stroke) canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
+	if (cmd.stroke) {
+		const outline = cmd.strokeD
+			? bin.track(ck.Path.MakeFromSVGString(cmd.strokeD))
+			: null;
+		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
+		else if (strokeInset(cmd.stroke) !== 0)
+			drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
+		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
+	}
 	canvas.restore();
 }
 

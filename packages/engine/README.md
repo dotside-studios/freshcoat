@@ -45,6 +45,12 @@ mask` — describe shapes, assets, text and composition. Nodes share positioning
 and compositing properties, with fills, strokes and other options appropriate
 to each kind. Groups support flex and grid layout.
 
+A stroke's `align` (`center`, `inside` or `outside`) is honored on every
+stroked node. Rects, ellipses and masked images stroke their outline inset or
+outset by half the width; a path strokes at twice the width, clipped to its
+own interior or exterior under its `fillRule`. A clipping group's
+`cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
+
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter
 executes. Use this lower-level path when you need to inspect commands or keep
 a runtime alive across renders. The types in [`src/node.ts`](src/node.ts)

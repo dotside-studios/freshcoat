@@ -1,0 +1,67 @@
+{
+	"caseId": "stroke-inside-path",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 20
+					},
+					"size": {
+						"width": 80,
+						"height": 80
+					},
+					"op": "drawPath",
+					"d": "M 0 0 L 80 40 L 0 80 Z",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					],
+					"stroke": {
+						"color": "#000000",
+						"width": 8,
+						"align": "inside"
+					}
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "6cdbc9208b12630b2f9ac250902190c8133213cea7749f7e2acfa95da6b33497"
+}
