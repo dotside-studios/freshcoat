@@ -8,6 +8,7 @@ import type {
 	BlendMode,
 	CornerRadius,
 	FillRule,
+	ImageCrop,
 	ResolvedFill,
 	ResolvedFont,
 	Shadows,
@@ -121,6 +122,13 @@ export type ImageNode = Transform & {
 	kind: "image";
 	src: string;
 	fit: "cover" | "contain" | "fill" | "tile";
+	// The point of the source, as fractions of the (cropped) source, that `cover`
+	// keeps in the middle of the box, as near as the source's edges allow.
+	// Default the centre.
+	focus?: Vec2;
+	// The part of the source that is drawn, before `fit` places it. Not applied
+	// to `tile`, which repeats the whole source.
+	crop?: ImageCrop;
 	stroke?: Stroke;
 	mask?: ShapeMask; // cheap shape clip (avatar); a MaskNode for anything richer
 };

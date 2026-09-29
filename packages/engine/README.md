@@ -71,6 +71,15 @@ table and sharpening) are engine operations. `FrameFinish` applies operations
 after the whole scene is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
+A node holds one `Adjust`. `composeAdjust(first, second)` folds a second one
+onto a layer that already has its own, baking the second into a 3D lookup
+table so the result matches applying them in turn.
+
+An image node's `crop` selects a region of its source, in fractions of the
+source's width and height, before `fit` places it. `focus` is the point of that
+region `cover` keeps centred in the box, held inside the source's edges.
+`crop` does not apply to `tile`, which repeats the whole source.
+
 ## SVG images
 
 An image node whose bytes are SVG paints as vector art, in the browser,

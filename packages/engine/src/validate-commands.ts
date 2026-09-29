@@ -248,6 +248,29 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 		case "drawImage":
 			if (!cmd.src)
 				add("empty_image_src", "image src is empty", `${path}.src`, id);
+			if (
+				cmd.crop &&
+				!(
+					[cmd.crop.x, cmd.crop.y].every((v) => finite(v) && v >= 0) &&
+					cmd.crop.width > 0 &&
+					cmd.crop.height > 0 &&
+					cmd.crop.x + cmd.crop.width <= 1 + 1e-9 &&
+					cmd.crop.y + cmd.crop.height <= 1 + 1e-9
+				)
+			)
+				add(
+					"bad_image_crop",
+					"image crop must be a non-empty region inside [0, 1]",
+					`${path}.crop`,
+					id,
+				);
+			if (cmd.focus && !(finite(cmd.focus.x) && finite(cmd.focus.y)))
+				add(
+					"bad_image_focus",
+					"image focus must be finite",
+					`${path}.focus`,
+					id,
+				);
 			break;
 		case "drawText":
 			if (!cmd.layout?.lines)
