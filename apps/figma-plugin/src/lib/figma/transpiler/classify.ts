@@ -1,7 +1,6 @@
 import type { BlendMode } from "@freshcoat-js/coatfile";
 import type {
 	FigmaBlendMode,
-	FigmaColor,
 	FigmaEffect,
 	FigmaNode,
 	FigmaPaint,
@@ -48,6 +47,7 @@ const BLEND_MODES: Partial<
 	DARKEN: "darken",
 	LIGHTEN: "lighten",
 	LINEAR_DODGE: "plus",
+	LINEAR_BURN: "linear-burn",
 	COLOR_DODGE: "color-dodge",
 	COLOR_BURN: "color-burn",
 	HARD_LIGHT: "hard-light",
@@ -66,7 +66,6 @@ type ElementBlendMode = Exclude<BlendMode, "normal"> | undefined;
  *  normal compositing. Only ever called for a node classify already accepted,
  *  so an unrecognized mode reads as normal rather than inventing one. */
 export function elementBlendMode(n: FigmaNode): ElementBlendMode {
-	if (n.blendMode === "LINEAR_BURN") return "multiply";
 	const mode = BLEND_MODES[n.blendMode ?? "NORMAL"];
 	return mode === "normal" ? undefined : mode;
 }
@@ -74,36 +73,6 @@ export function elementBlendMode(n: FigmaNode): ElementBlendMode {
 function isBlended(n: FigmaNode): boolean {
 	const blend = n.blendMode ?? "NORMAL";
 	return blend !== "NORMAL" && blend !== "PASS_THROUGH";
-}
-
-// Linear burn (s + d - 1) and multiply (s * d) agree wherever every channel of
-// the source is 0 or 1, so a layer painted only in such colours (black, white,
-// pure primaries) burns exactly as it multiplies.
-function isBinaryColor(c: FigmaColor): boolean {
-	return [c.r, c.g, c.b].every((v) => {
-		const byte = Math.round(v * 255);
-		return byte === 0 || byte === 255;
-	});
-}
-
-function paintsAreBinary(paints: FigmaPaint[] | undefined): boolean {
-	return (paints ?? []).every(
-		(p) =>
-			p.visible === false || (p.type === "SOLID" && isBinaryColor(p.color)),
-	);
-}
-
-function linearBurnIsMultiply(n: FigmaNode): boolean {
-	if (isContainerNode(n)) return false;
-	const shadows = (n.effects ?? []).every(
-		(e) => e.visible === false || !e.color || isBinaryColor(e.color),
-	);
-	if (!shadows || !paintsAreBinary(n.fills)) return false;
-	if (n.type === "TEXT")
-		return Object.values(n.styleOverrideTable ?? {}).every((o) =>
-			paintsAreBinary(o.fills),
-		);
-	return paintsAreBinary(n.strokes);
 }
 
 function hasVisibleEffects(n: FigmaNode): boolean {
@@ -141,9 +110,7 @@ function isolationDiffers(n: FigmaNode): boolean {
 }
 
 function blendFlattens(n: FigmaNode): boolean {
-	const blend = n.blendMode ?? "NORMAL";
-	if (blend === "LINEAR_BURN") return !linearBurnIsMultiply(n);
-	if (!BLEND_MODES[blend]) return true;
+	if (!BLEND_MODES[n.blendMode ?? "NORMAL"]) return true;
 	return isolationDiffers(n);
 }
 

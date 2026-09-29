@@ -283,7 +283,7 @@ describe("classify", () => {
 		if (c.kind === "flatten") expect(c.reason).toBe("effect_flattened");
 	});
 
-	it("RECTANGLE with linear burn over a mid-tone → flatten", () => {
+	it("RECTANGLE with linear burn → native-rect", () => {
 		const n: FigmaNode = {
 			...baseAttrs,
 			id: "1",
@@ -292,9 +292,7 @@ describe("classify", () => {
 			blendMode: "LINEAR_BURN",
 			fills: [{ type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } }],
 		};
-		const c = classify(n);
-		expect(c.kind).toBe("flatten");
-		if (c.kind === "flatten") expect(c.reason).toBe("blend_mode_flattened");
+		expect(classify(n).kind).toBe("native-rect");
 	});
 
 	it("plain FRAME with no own fill / clip → native-frame (nested, not flattened away)", () => {

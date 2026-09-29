@@ -2499,10 +2499,10 @@ describe("transpile (blend modes)", () => {
 		expect((await transpileCard("LINEAR_DODGE")).el.blendMode).toBe("plus");
 	});
 
-	it("carries linear burn as multiply on a layer painted in pure primaries", async () => {
+	it("carries linear burn", async () => {
 		const { el, report } = await transpileCard("LINEAR_BURN");
 		expect(report.counts.flattened).toBe(0);
-		expect(el.blendMode).toBe("multiply");
+		expect(el.blendMode).toBe("linear-burn");
 	});
 });
 

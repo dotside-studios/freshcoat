@@ -342,17 +342,18 @@ describe("fill stacks", () => {
 });
 
 describe("blend modes", () => {
-	it("maps linear burn to multiply on a layer painted in 0-or-1 channels", () => {
+	it("keeps linear burn native on any layer", () => {
 		expect(
-			classify(text({ blendMode: "LINEAR_BURN", fills: [solid(0, 0, 0)] }))
+			classify(text({ blendMode: "LINEAR_BURN", fills: [solid(0.5, 0.2, 0)] }))
 				.kind,
 		).toBe("native-text");
 		expect(
-			classify(rect({ blendMode: "LINEAR_BURN", fills: [solid(1, 1, 0)] }))
-				.kind,
+			classify(
+				rect({ blendMode: "LINEAR_BURN", fills: [solid(0.3, 0.3, 0.3)] }),
+			).kind,
 		).toBe("native-rect");
-		expect(flattenReason(frame([], { blendMode: "LINEAR_BURN" }))).toBe(
-			"blend_mode_flattened",
+		expect(classify(frame([], { blendMode: "LINEAR_BURN" })).kind).toBe(
+			"native-frame",
 		);
 	});
 

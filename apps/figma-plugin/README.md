@@ -123,11 +123,8 @@ layers were kept, flattened or skipped.
   angular ones, paints with their own blend mode, and image fills outside a
   single-image rectangle are rasterized (`paint_flattened`, or
   `multi_fill_flattened` for an image inside a stack).
-- **Blend modes.** Every Figma layer blend mode with a coatfile equivalent is
-  carried as `blendMode`, linear dodge as `plus`. Linear burn becomes
-  `multiply` on a layer painted only in colours whose channels are each 0 or 1
-  (black, white, pure primaries), where the two agree; elsewhere, and on a
-  frame or group, it is rasterized. Pass through is how the renderer composites
+- **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
+  linear dodge as `plus`. Pass through is how the renderer composites
   a frame already. A frame set to Normal isolates its content in Figma, which
   the renderer does only when the frame has opacity, an effect or a blend of
   its own, so one holding a blended layer without those is rasterized

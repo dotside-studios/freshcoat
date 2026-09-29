@@ -13,7 +13,7 @@ import type { FigmaContainerNode } from "~/lib/figma/types";
 //   slot 400×300, upright
 //     panel  100×200 in its own space, rotated −90° → 200×100 at (50, 60)
 //       under  RECTANGLE, native
-//       over   RECTANGLE with a LINEAR_BURN blend → flattened, rendering at
+//       over   RECTANGLE with a background blur → flattened, rendering at
 //              (100, 80) 40×20 in world
 const PRODUCT: ProductRegistryEntry = {
 	sku: "test",
@@ -84,7 +84,8 @@ function buildTree(): FigmaContainerNode {
 						type: "RECTANGLE",
 						visible: true,
 						opacity: 1,
-						blendMode: "LINEAR_BURN",
+						blendMode: "NORMAL",
+						effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
 						width: 20,
 						height: 40,
 						absoluteBoundingBox: { x: 100, y: 80, width: 40, height: 20 },
@@ -97,7 +98,7 @@ function buildTree(): FigmaContainerNode {
 							[0, 1, 110],
 							[-1, 0, 140],
 						],
-						fills: [{ type: "SOLID", color: { r: 0.2, g: 0.4, b: 1, a: 1 } }],
+						fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 } }],
 					},
 				],
 			},
