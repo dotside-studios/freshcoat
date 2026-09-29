@@ -1858,7 +1858,32 @@ const SKIA_BLEND_MODE: Record<BlendMode, string> = {
 	color: "Color",
 	luminosity: "Luminosity",
 	plus: "Plus",
+	"linear-burn": "SrcOver",
 };
+
+// Linear burn, max(0, s + d - 1), in the separable-blend form on premultiplied
+// color. Skia has no native mode for it.
+const LINEAR_BURN_SKSL = `
+	half4 main(half4 src, half4 dst) {
+		half3 burn = max(src.rgb * dst.a + dst.rgb * src.a - src.a * dst.a, 0.0);
+		return half4(
+			src.rgb * (1.0 - dst.a) + dst.rgb * (1.0 - src.a) + burn,
+			src.a + dst.a * (1.0 - src.a));
+	}`;
+
+function linearBurnBlender(ck: CK, bin: Bin): CK | null {
+	let byVariant = effectCache.get(ck);
+	if (!byVariant) {
+		byVariant = new Map();
+		effectCache.set(ck, byVariant);
+	}
+	let eff = byVariant.get("linear-burn");
+	if (eff === undefined) {
+		eff = ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL) ?? null;
+		byVariant.set("linear-burn", eff);
+	}
+	return eff ? bin.track(eff.makeBlender([])) : null;
+}
 
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
@@ -1876,7 +1901,10 @@ function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
 	// after.
 	if (colorFilter) paint.setColorFilter(colorFilter);
 	if (hasOpacity) paint.setAlphaf(opacity);
-	if (blendMode && blendMode !== "normal") {
+	const blender =
+		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
+	if (blender) paint.setBlender(blender);
+	else if (blendMode && blendMode !== "normal") {
 		paint.setBlendMode(
 			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
 		);
