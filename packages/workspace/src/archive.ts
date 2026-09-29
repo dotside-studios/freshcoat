@@ -168,6 +168,14 @@ const PresetSchema = z.object({
 	bleed: z.boolean().optional(),
 });
 
+const GuidesSchema = z.record(
+	z.string(),
+	z.object({
+		x: z.array(z.number().finite()),
+		y: z.array(z.number().finite()),
+	}),
+);
+
 const ManifestSchema = z.object({
 	format: z.literal(WORKSPACE_FORMAT),
 	formatVersion: z.string(),
@@ -179,6 +187,7 @@ const ManifestSchema = z.object({
 				fileName: z.string(),
 				path: z.string(),
 				binding: BindingSchema.optional(),
+				guides: GuidesSchema.optional(),
 			}),
 		)
 		.min(1),
@@ -241,6 +250,7 @@ function manifestOf(ws: Workspace): WorkspaceManifest {
 			fileName: entry.fileName,
 			path: templatePath(entry),
 			...(entry.binding !== undefined ? { binding: entry.binding } : {}),
+			...(entry.guides !== undefined ? { guides: entry.guides } : {}),
 		})),
 		datasets: ws.datasets.map((dataset) => ({
 			id: dataset.id,
@@ -463,6 +473,7 @@ async function readTemplate(
 		fileName: item.fileName,
 		template: result.value,
 		...(item.binding !== undefined ? { binding: item.binding } : {}),
+		...(item.guides !== undefined ? { guides: item.guides } : {}),
 	};
 }
 
