@@ -71,7 +71,8 @@ covers shared checks and pull requests.
   EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix, Aztec). Move, resize
   and rotate with snapping, edit gradients with handles on the canvas, set
   constraints for resizing, and choose fonts from the bundled Google Fonts
-  catalog snapshot. Pasted SVG becomes editable layers, an SVG image or
+  catalog snapshot. Pasted SVG becomes editable layers (paths, groups, clips,
+  masks, embedded images, text, markers and pattern fills), an SVG image or
   text; SVG files stay vector as images.
 - **Variants:** one design in several versions, such as a card in three
   colors or a badge for speakers and staff. Pick a variant in the left panel,

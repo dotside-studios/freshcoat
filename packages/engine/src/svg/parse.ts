@@ -1,10 +1,15 @@
 import { parseColor, type Rgba, toHex } from "./color";
 import {
+	applyMatrix,
+	decompose,
 	IDENTITY,
+	invert,
 	lengthScale,
 	type Matrix,
 	multiply,
 	parseTransform,
+	rotate,
+	scale,
 	translate,
 } from "./matrix";
 import {
@@ -73,7 +78,45 @@ export type SvgGroup = {
 	children: SvgItem[];
 };
 
-export type SvgItem = SvgShape | SvgGroup;
+export type SvgImage = {
+	kind: "image";
+	id?: string;
+	/** A `data:` URL. */
+	href: string;
+	/** The image's viewport in drawing space, before `rotation` turns it about
+	 *  its centre. */
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	rotation?: number;
+	fit: "contain" | "cover" | "fill";
+	opacity?: number;
+};
+
+export type SvgFont = {
+	family: string;
+	size: number;
+	weight: number;
+	style: "normal" | "italic";
+};
+
+export type SvgTextRun = { text: string; font: SvgFont; color: string };
+
+export type SvgText = {
+	kind: "text";
+	id?: string;
+	/** The start of the baseline in drawing space, which `anchor` aligns the
+	 *  line to and `rotation` turns it about. */
+	x: number;
+	y: number;
+	anchor: "start" | "middle" | "end";
+	rotation?: number;
+	runs: SvgTextRun[];
+	opacity?: number;
+};
+
+export type SvgItem = SvgShape | SvgGroup | SvgImage | SvgText;
 
 export type SvgWarning = { feature: string; message: string };
 
@@ -88,6 +131,7 @@ export type SvgDrawing = {
 
 const MAX_DEPTH = 64;
 const MAX_ITEMS = 20000;
+const MAX_TILES = 1000;
 
 const INHERITED = new Set([
 	"fill",
@@ -102,6 +146,14 @@ const INHERITED = new Set([
 	"visibility",
 	"color",
 	"clip-rule",
+	"font-family",
+	"font-size",
+	"font-weight",
+	"font-style",
+	"text-anchor",
+	"marker-start",
+	"marker-mid",
+	"marker-end",
 ]);
 
 const PRESENTATION = new Set([
@@ -113,15 +165,11 @@ const PRESENTATION = new Set([
 	"filter",
 	"stop-color",
 	"stop-opacity",
-	"marker-start",
-	"marker-mid",
-	"marker-end",
 	"marker",
+	"overflow",
 ]);
 
 const UNSUPPORTED: Record<string, string> = {
-	text: "text",
-	image: "image",
 	foreignObject: "foreignObject",
 	video: "video",
 	audio: "audio",
@@ -155,6 +203,27 @@ const UNITS: Record<string, number> = {
 	em: 16,
 	ex: 8,
 };
+
+const FONT_SIZES: Record<string, number> = {
+	"xx-small": 9,
+	"x-small": 10,
+	small: 13,
+	medium: 16,
+	large: 18,
+	"x-large": 24,
+	"xx-large": 32,
+};
+
+// A rough advance per character, in ems, for sizing a line before it is shaped.
+const AVERAGE_ADVANCE = 0.6;
+
+/** A rough width for a line of runs, before any font has shaped it. */
+export function estimateTextWidth(runs: SvgTextRun[]): number {
+	let width = 0;
+	for (const run of runs)
+		width += [...run.text].length * run.font.size * AVERAGE_ADVANCE;
+	return width;
+}
 
 type Axis = "x" | "y" | "d";
 
@@ -269,13 +338,25 @@ function boundsOf(items: SvgItem[]): Box | null {
 			height: Math.max(box.y + box.height, b.y + b.height) - y,
 		};
 	};
-	for (const item of items)
-		add(
-			item.kind === "shape"
-				? pathBounds(normalizePath(item.d))
-				: boundsOf(item.children),
-		);
+	for (const item of items) add(itemBounds(item));
 	return box;
+}
+
+function itemBounds(item: SvgItem): Box | null {
+	switch (item.kind) {
+		case "shape":
+			return pathBounds(normalizePath(item.d));
+		case "group":
+			return boundsOf(item.children);
+		case "image":
+			return item;
+		case "text": {
+			const size = Math.max(...item.runs.map((r) => r.font.size));
+			const width = estimateTextWidth(item.runs);
+			const shift = item.anchor === "middle" ? width / 2 : item.anchor === "end" ? width : 0;
+			return { x: item.x - shift, y: item.y - size, width, height: size * 1.2 };
+		}
+	}
 }
 
 const bboxMatrix = (b: Box): Matrix => [b.width, 0, 0, b.height, b.x, b.y];
@@ -356,6 +437,7 @@ export function parseSvg(markup: string): SvgDrawing {
 			}
 		return out;
 	};
+	const rootStyle = computeStyle(root, {});
 
 	const currentColor = (style: Declarations): Rgba => {
 		const c = parseColor(style.color ?? "black");
@@ -370,19 +452,25 @@ export function parseSvg(markup: string): SvgDrawing {
 		return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
 	};
 
-	const gradientChain = (el: XmlElement): XmlElement[] => {
+	const hrefChain = (
+		el: XmlElement,
+		follows: (name: string) => boolean,
+	): XmlElement[] => {
 		const chain = [el];
 		const seen = new Set([el]);
 		for (;;) {
 			const last = chain[chain.length - 1] as XmlElement;
 			const href = last.attrs.href ?? last.attrs["xlink:href"];
 			const next = href?.startsWith("#") ? byId.get(href.slice(1)) : undefined;
-			if (!next || seen.has(next) || !localName(next.name).endsWith("Gradient"))
+			if (!next || seen.has(next) || !follows(localName(next.name)))
 				return chain;
 			chain.push(next);
 			seen.add(next);
 		}
 	};
+
+	const gradientChain = (el: XmlElement) =>
+		hrefChain(el, (name) => name.endsWith("Gradient"));
 
 	const gradientStops = (
 		chain: XmlElement[],
@@ -565,6 +653,365 @@ export function parseSvg(markup: string): SvgDrawing {
 		return stroke;
 	};
 
+	const fontOf = (style: Declarations, k: number): SvgFont => {
+		const family =
+			(style["font-family"] ?? "")
+				.split(",")
+				.map((f) => f.trim().replace(/^['"]|['"]$/g, ""))
+				.find(Boolean) ?? "sans-serif";
+		const rawSize = (style["font-size"] ?? "medium").trim();
+		let size: number | undefined = FONT_SIZES[rawSize];
+		if (size === undefined)
+			size = rawSize.endsWith("%")
+				? (Number.parseFloat(rawSize) / 100) * 16
+				: parseLength(rawSize, "d", { width: 0, height: 0 });
+		if (!(size !== undefined && size > 0)) size = 16;
+		const rawWeight = (style["font-weight"] ?? "normal").trim();
+		const numeric = Number(rawWeight);
+		const weight =
+			rawWeight === "bold" || rawWeight === "bolder"
+				? 700
+				: rawWeight === "lighter"
+					? 300
+					: Number.isFinite(numeric) && rawWeight !== ""
+						? Math.min(900, Math.max(100, Math.round(numeric / 100) * 100))
+						: 400;
+		const fontStyle = style["font-style"]?.trim();
+		return {
+			family,
+			size: size * k,
+			weight,
+			style: fontStyle === "italic" || fontStyle === "oblique" ? "italic" : "normal",
+		};
+	};
+
+	const buildText = (
+		el: XmlElement,
+		style: Declarations,
+		ctx: Context,
+		m: Matrix,
+	): SvgText[] => {
+		const { sx, sy, rotation, similar } = decompose(m);
+		if (!similar || Math.abs(sx - sy) > 1e-9 * Math.max(1, sx))
+			warn("text-transform", "skewed, mirrored or stretched text is drawn upright");
+		const k = Math.sqrt(sx * sy);
+		type Line = { x: number; y: number; anchor: SvgText["anchor"]; runs: SvgTextRun[] };
+		const lines: Line[] = [];
+		let line: Line | null = null;
+		const first = (node: XmlElement, attr: string, axis: Axis) => {
+			const values = (node.attrs[attr] ?? "").trim().split(/[\s,]+/).filter(Boolean);
+			if (values.length > 1)
+				warn("text-glyph-position", "per-character positions use the first only");
+			return values[0] === undefined ? undefined : parseLength(values[0], axis, ctx.viewport);
+		};
+		const anchorOf = (s: Declarations): SvgText["anchor"] => {
+			const a = s["text-anchor"];
+			return a === "middle" || a === "end" ? a : "start";
+		};
+		const visit = (node: XmlElement, own: Declarations, depth: number) => {
+			if (depth > MAX_DEPTH) return;
+			const x = first(node, "x", "x");
+			const y = first(node, "y", "y");
+			const dx = first(node, "dx", "x") ?? 0;
+			const dy = first(node, "dy", "y") ?? 0;
+			const moved = x !== undefined || y !== undefined || dx !== 0 || dy !== 0;
+			if (!line || moved) {
+				const drawn = line?.runs.some((r) => r.text.trim()) ?? false;
+				if (line && drawn && x === undefined)
+					warn("text-position", "a tspan placed after text on its line starts at the line's x");
+				const next: Line = {
+					x: (x ?? line?.x ?? 0) + dx,
+					y: (y ?? line?.y ?? 0) + dy,
+					anchor: anchorOf(own),
+					runs: [],
+				};
+				if (line && !drawn) lines[lines.length - 1] = next;
+				else lines.push(next);
+				line = next;
+			}
+			for (const c of node.children) {
+				if ("text" in c) {
+					if (own.visibility === "hidden" || own.visibility === "collapse") continue;
+					const paint = resolvePaint(
+						own.fill ?? "black",
+						opacityOf(own["fill-opacity"]),
+						own,
+						m,
+						() => null,
+						ctx.viewport,
+					);
+					if (own.stroke && own.stroke !== "none")
+						warn("text-stroke", "text strokes are not drawn");
+					if (!paint) continue;
+					let color: string;
+					if (paint.kind === "solid") color = paint.color;
+					else {
+						warn("text-gradient", "gradient text uses its first stop color");
+						color = (paint.stops[0] as SvgStop).color;
+					}
+					line.runs.push({ text: c.text, font: fontOf(own, k), color });
+					continue;
+				}
+				const name = localName(c.name);
+				if (name === "textPath") {
+					warn("textPath", "<textPath> is not supported");
+					continue;
+				}
+				if (name !== "tspan" && name !== "a") continue;
+				const childStyle = computeStyle(c, own);
+				if (childStyle.display === "none") continue;
+				visit(c, childStyle, depth + 1);
+			}
+		};
+		visit(el, style, ctx.depth);
+
+		const out: SvgText[] = [];
+		for (const l of lines) {
+			const runs: SvgTextRun[] = [];
+			let spaced = true;
+			for (const r of l.runs) {
+				let text = r.text.replace(/\s+/g, " ");
+				if (spaced) text = text.replace(/^ /, "");
+				if (!text) continue;
+				spaced = text.endsWith(" ");
+				runs.push({ ...r, text });
+			}
+			while (runs.length) {
+				const last = runs[runs.length - 1] as SvgTextRun;
+				const text = last.text.replace(/ $/, "");
+				if (text) {
+					last.text = text;
+					break;
+				}
+				runs.pop();
+			}
+			if (runs.length === 0) continue;
+			const [x, y] = applyMatrix(m, l.x, l.y);
+			const text: SvgText = { kind: "text", x, y, anchor: l.anchor, runs };
+			if (el.attrs.id) text.id = el.attrs.id;
+			if (similar && rotation) text.rotation = rotation;
+			out.push(text);
+		}
+		return out;
+	};
+
+	const imageHref = (el: XmlElement, depth: number): string | undefined => {
+		const href = (el.attrs.href ?? el.attrs["xlink:href"])?.trim();
+		if (!href) return undefined;
+		if (/^data:image\//i.test(href))
+			return href.includes(";base64,") ? href.replace(/\s+/g, "") : href;
+		if (href.startsWith("#")) {
+			const target = byId.get(href.slice(1));
+			if (target && target !== el && depth < MAX_DEPTH && localName(target.name) === "image")
+				return imageHref(target, depth + 1);
+			warn("image-missing", `"${href}" is not an image in the document`);
+			return undefined;
+		}
+		warn("image-external", "images from other files are skipped");
+		return undefined;
+	};
+
+	const buildImage = (
+		el: XmlElement,
+		style: Declarations,
+		ctx: Context,
+		m: Matrix,
+	): SvgImage | null => {
+		if (style.visibility === "hidden" || style.visibility === "collapse")
+			return null;
+		const w = parseLength(el.attrs.width, "x", ctx.viewport);
+		const h = parseLength(el.attrs.height, "y", ctx.viewport);
+		if (w === undefined || h === undefined) {
+			warn("image-size", "images without a width and height are skipped");
+			return null;
+		}
+		if (!(w > 0 && h > 0)) return null;
+		const href = imageHref(el, 0);
+		if (!href) return null;
+		const x = parseLength(el.attrs.x, "x", ctx.viewport) ?? 0;
+		const y = parseLength(el.attrs.y, "y", ctx.viewport) ?? 0;
+		const { sx, sy, rotation, similar } = decompose(m);
+		let [cx, cy] = applyMatrix(m, x + w / 2, y + h / 2);
+		let width = w * sx;
+		let height = h * sy;
+		if (!similar) {
+			warn("image-transform", "skewed or mirrored images are drawn upright in their bounds");
+			const b = pathBounds(
+				transformPath(normalizePath(`M${x} ${y}H${x + w}V${y + h}H${x}Z`), m),
+			) as Box;
+			[cx, cy, width, height] = [b.x + b.width / 2, b.y + b.height / 2, b.width, b.height];
+		}
+		const [align = "xMidYMid", meetOrSlice = "meet"] = (el.attrs.preserveAspectRatio ?? "")
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean);
+		if (align !== "none" && align !== "xMidYMid")
+			warn("image-align", "images are centred in their viewport");
+		const image: SvgImage = {
+			kind: "image",
+			href,
+			x: cx - width / 2,
+			y: cy - height / 2,
+			width,
+			height,
+			fit: align === "none" ? "fill" : meetOrSlice === "slice" ? "cover" : "contain",
+		};
+		if (el.attrs.id) image.id = el.attrs.id;
+		if (similar && rotation) image.rotation = rotation;
+		return image;
+	};
+
+	const patternFill = (
+		el: XmlElement,
+		style: Declarations,
+		ctx: Context,
+		m: Matrix,
+		local: Segment[],
+	): SvgGroup | null => {
+		const chain = hrefChain(el, (name) => name === "pattern");
+		const attr = (name: string) => {
+			for (const p of chain) if (p.attrs[name] !== undefined) return p.attrs[name];
+			return undefined;
+		};
+		const content = chain.find((p) => p.children.some((c) => !("text" in c)));
+		const box = pathBounds(local);
+		if (!content || !box) return null;
+		const bbox = attr("patternUnits") !== "userSpaceOnUse";
+		if (bbox && !(box.width > 0 && box.height > 0)) return null;
+		const len = (name: string, axis: "x" | "y") => {
+			const raw = attr(name) ?? "0";
+			if (!bbox) return parseLength(raw, axis, ctx.viewport) ?? 0;
+			const f = raw.trim().endsWith("%")
+				? Number.parseFloat(raw) / 100
+				: (numberOf(raw) ?? 0);
+			return f * (axis === "x" ? box.width : box.height);
+		};
+		const x = len("x", "x") + (bbox ? box.x : 0);
+		const y = len("y", "y") + (bbox ? box.y : 0);
+		const w = len("width", "x");
+		const h = len("height", "y");
+		if (!(w > 0 && h > 0)) return null;
+		const transform = attr("patternTransform");
+		const pt = transform ? parseTransform(transform) : IDENTITY;
+		const inverse = invert(pt);
+		if (!inverse) return null;
+		const vb = parseViewBox(attr("viewBox"));
+		const contentMatrix = vb
+			? viewBoxMatrix(vb, w, h, attr("preserveAspectRatio"))
+			: attr("patternContentUnits") === "objectBoundingBox"
+				? scale(box.width, box.height)
+				: IDENTITY;
+		const corners = [
+			applyMatrix(inverse, box.x, box.y),
+			applyMatrix(inverse, box.x + box.width, box.y),
+			applyMatrix(inverse, box.x, box.y + box.height),
+			applyMatrix(inverse, box.x + box.width, box.y + box.height),
+		];
+		const xs = corners.map((c) => c[0]);
+		const ys = corners.map((c) => c[1]);
+		const i0 = Math.floor((Math.min(...xs) - x) / w);
+		const i1 = Math.ceil((Math.max(...xs) - x) / w);
+		const j0 = Math.floor((Math.min(...ys) - y) / h);
+		const j1 = Math.ceil((Math.max(...ys) - y) / h);
+		if ((i1 - i0) * (j1 - j0) > MAX_TILES) {
+			warn("pattern-tiles", `patterns of more than ${MAX_TILES} tiles use their fallback color`);
+			return null;
+		}
+		const contentStyle = computeStyle(content, rootStyle);
+		const children: SvgItem[] = [];
+		for (let j = j0; j < j1; j++)
+			for (let i = i0; i < i1; i++)
+				children.push(
+					...walkChildren(content, {
+						...ctx,
+						m: multiply(m, multiply(pt, multiply(translate(x + i * w, y + j * h), contentMatrix))),
+						style: contentStyle,
+						depth: ctx.depth + 1,
+						viewport: vb ?? ctx.viewport,
+					}),
+				);
+		if (children.length === 0) return null;
+		const clip: SvgShape = {
+			kind: "shape",
+			d: serializePath(transformPath(local, m)),
+			fillRule: style["fill-rule"] === "evenodd" ? "evenodd" : "nonzero",
+			fill: { kind: "solid", color: "#000000ff" },
+		};
+		const group: SvgGroup = { kind: "group", clip: [clip], children };
+		const opacity = opacityOf(style["fill-opacity"]);
+		if (opacity < 1) group.opacity = opacity;
+		return group;
+	};
+
+	const markers = (
+		style: Declarations,
+		ctx: Context,
+		m: Matrix,
+		local: Segment[],
+	): SvgItem[] => {
+		const vertices = markerVertices(local);
+		if (vertices.length === 0) return [];
+		const strokeWidth = parseLength(style["stroke-width"] ?? "1", "d", ctx.viewport) ?? 1;
+		const out: SvgItem[] = [];
+		const place = (position: "start" | "mid" | "end", at: MarkerVertex[]) => {
+			const ref = urlRef(style[`marker-${position}`] ?? style.marker);
+			if (!ref?.id || at.length === 0) return;
+			const marker = byId.get(ref.id);
+			if (!marker || localName(marker.name) !== "marker") return;
+			const key = `marker:${ref.id}`;
+			if (ctx.uses.has(key)) return;
+			const markerWidth = parseLength(marker.attrs.markerWidth ?? "3", "x", ctx.viewport) ?? 3;
+			const markerHeight = parseLength(marker.attrs.markerHeight ?? "3", "y", ctx.viewport) ?? 3;
+			if (!(markerWidth > 0 && markerHeight > 0)) return;
+			const vb = parseViewBox(marker.attrs.viewBox);
+			const vbm = vb
+				? viewBoxMatrix(vb, markerWidth, markerHeight, marker.attrs.preserveAspectRatio)
+				: IDENTITY;
+			const markerViewport = vb ?? { width: markerWidth, height: markerHeight };
+			const [refX, refY] = applyMatrix(
+				vbm,
+				parseLength(marker.attrs.refX, "x", markerViewport) ?? 0,
+				parseLength(marker.attrs.refY, "y", markerViewport) ?? 0,
+			);
+			const units = marker.attrs.markerUnits === "userSpaceOnUse" ? 1 : strokeWidth;
+			const orient = (marker.attrs.orient ?? "0").trim();
+			const fixed = parseAngle(orient);
+			const markerStyle = computeStyle(marker, rootStyle);
+			const uses = new Set(ctx.uses).add(key);
+			for (const v of at) {
+				const angle =
+					orient === "auto"
+						? v.angle
+						: orient === "auto-start-reverse"
+							? position === "start"
+								? v.angle + 180
+								: v.angle
+							: fixed;
+				const mm = multiply(
+					m,
+					multiply(
+						translate(v.x, v.y),
+						multiply(rotate(angle), multiply(scale(units), multiply(translate(-refX, -refY), vbm))),
+					),
+				);
+				out.push(
+					...walkChildren(marker, {
+						...ctx,
+						m: mm,
+						style: markerStyle,
+						uses,
+						depth: ctx.depth + 1,
+						viewport: markerViewport,
+					}),
+				);
+			}
+		};
+		place("start", vertices.slice(0, 1));
+		place("mid", vertices.slice(1, -1));
+		place("end", vertices.length > 1 ? vertices.slice(-1) : vertices);
+		return out;
+	};
+
 	const shapeSegments = (
 		el: XmlElement,
 		name: string,
@@ -635,18 +1082,26 @@ export function parseSvg(markup: string): SvgDrawing {
 		style: Declarations,
 		ctx: Context,
 		m: Matrix,
-	): SvgShape | null => {
+	): SvgItem[] => {
 		if (style.visibility === "hidden" || style.visibility === "collapse")
-			return null;
+			return [];
 		const local = shapeSegments(el, name, ctx.viewport);
-		if (!local.some((s) => s.op !== "M")) return null;
+		if (!local.some((s) => s.op !== "M")) return [];
 		let box: Box | null | undefined;
 		const localBox = () => {
 			if (box === undefined) box = pathBounds(local);
 			return box;
 		};
+		const out: SvgItem[] = [];
+		const fillRef = urlRef(style.fill);
+		const fillTarget = fillRef?.id ? byId.get(fillRef.id) : undefined;
+		const pattern =
+			name !== "line" && fillTarget && localName(fillTarget.name) === "pattern"
+				? patternFill(fillTarget, style, ctx, m, local)
+				: null;
+		if (pattern) out.push(pattern);
 		const fill =
-			name === "line"
+			name === "line" || pattern
 				? undefined
 				: resolvePaint(
 						style.fill ?? "black",
@@ -657,23 +1112,19 @@ export function parseSvg(markup: string): SvgDrawing {
 						ctx.viewport,
 					);
 		const stroke = resolveStroke(style, m, localBox, ctx.viewport);
-		if (!fill && !stroke) return null;
-		if (
-			style["marker-start"] ||
-			style["marker-mid"] ||
-			style["marker-end"] ||
-			style.marker
-		)
-			warn("marker", "markers are not drawn");
-		const shape: SvgShape = {
-			kind: "shape",
-			d: serializePath(transformPath(local, m)),
-			fillRule: style["fill-rule"] === "evenodd" ? "evenodd" : "nonzero",
-		};
-		if (el.attrs.id) shape.id = el.attrs.id;
-		if (fill) shape.fill = fill;
-		if (stroke) shape.stroke = stroke;
-		return shape;
+		if (fill || stroke) {
+			const shape: SvgShape = {
+				kind: "shape",
+				d: serializePath(transformPath(local, m)),
+				fillRule: style["fill-rule"] === "evenodd" ? "evenodd" : "nonzero",
+			};
+			if (el.attrs.id) shape.id = el.attrs.id;
+			if (fill) shape.fill = fill;
+			if (stroke) shape.stroke = stroke;
+			out.push(shape);
+		}
+		if (MARKABLE.has(name)) out.push(...markers(style, ctx, m, local));
+		return out;
 	};
 
 	const clipShapes = (
@@ -711,6 +1162,10 @@ export function parseSvg(markup: string): SvgDrawing {
 			}
 			if (name in UNSUPPORTED) {
 				warn(UNSUPPORTED[name] as string, `<${name}> is not supported`);
+				return;
+			}
+			if (name === "text" || name === "image") {
+				warn(`clip-${name}`, `<${name}> in a clip path is skipped`);
 				return;
 			}
 			const local = shapeSegments(el, name, ctx.viewport);
@@ -762,7 +1217,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		const mask = maskItems(style.mask, ctx, m, content);
 		if (clip && clip.length === 0) return [];
 		const only = content[0] as SvgItem;
-		if (!group && content.length === 1 && only.kind === "shape") {
+		if (!group && content.length === 1 && only.kind !== "group") {
 			if (opacity < 1) only.opacity = opacity;
 			if (!clip && !mask) return content;
 			return [{ kind: "group", ...(clip ? { clip } : {}), ...(mask ? { mask } : {}), children: content }];
@@ -883,15 +1338,20 @@ export function parseSvg(markup: string): SvgDrawing {
 				return decorate(el, style, ctx, m, content, false);
 			}
 		}
-		const shape = buildShape(el, name, style, ctx, m);
-		if (!shape) return [];
+		const drawn =
+			name === "text"
+				? buildText(el, style, inner, m)
+				: name === "image"
+					? [buildImage(el, style, ctx, m)].filter((i): i is SvgImage => !!i)
+					: buildShape(el, name, style, ctx, m);
+		if (drawn.length === 0) return [];
 		items++;
-		return decorate(el, style, ctx, m, [shape], false);
+		return decorate(el, style, ctx, m, drawn, false);
 	};
 
 	const children = walkChildren(root, {
 		m: IDENTITY,
-		style: computeStyle(root, {}),
+		style: rootStyle,
 		depth: 0,
 		uses: new Set(),
 		viewport: viewBox,
@@ -906,6 +1366,79 @@ export function parseSvg(markup: string): SvgDrawing {
 	if (root.attrs.preserveAspectRatio)
 		drawing.preserveAspectRatio = root.attrs.preserveAspectRatio;
 	return drawing;
+}
+
+const MARKABLE = new Set(["path", "line", "polyline", "polygon"]);
+
+type MarkerVertex = { x: number; y: number; angle: number };
+
+// Every vertex a marker can sit on, with the direction SVG gives it: the
+// bisector of the incoming and outgoing tangents, or whichever one exists.
+function markerVertices(segs: Segment[]): MarkerVertex[] {
+	type Vertex = { x: number; y: number; in?: [number, number]; out?: [number, number] };
+	const vertices: Vertex[] = [];
+	let cx = 0;
+	let cy = 0;
+	let start: Vertex | null = null;
+	const nonzero = (...dirs: [number, number][]) =>
+		dirs.find(([dx, dy]) => Math.hypot(dx, dy) > 1e-12) ?? dirs[dirs.length - 1];
+	const to = (x: number, y: number, out: [number, number], inDir: [number, number]) => {
+		const last = vertices[vertices.length - 1];
+		if (last && !last.out) last.out = out;
+		const v: Vertex = { x, y, in: inDir };
+		vertices.push(v);
+		cx = x;
+		cy = y;
+		return v;
+	};
+	for (const s of segs) {
+		if (s.op === "M") {
+			start = { x: s.x, y: s.y };
+			vertices.push(start);
+			cx = s.x;
+			cy = s.y;
+		} else if (s.op === "L") {
+			const d: [number, number] = [s.x - cx, s.y - cy];
+			to(s.x, s.y, d, d);
+		} else if (s.op === "C") {
+			const out = nonzero([s.x1 - cx, s.y1 - cy], [s.x2 - cx, s.y2 - cy], [s.x - cx, s.y - cy]) as [number, number];
+			const inDir = nonzero([s.x - s.x2, s.y - s.y2], [s.x - s.x1, s.y - s.y1], [s.x - cx, s.y - cy]) as [number, number];
+			to(s.x, s.y, out, inDir);
+		} else if (start) {
+			const d: [number, number] = [start.x - cx, start.y - cy];
+			const end = to(start.x, start.y, d, d);
+			end.out = start.out;
+			start.in = d;
+		}
+	}
+	const angle = ([dx, dy]: [number, number]) => Math.atan2(dy, dx);
+	return vertices.map((v) => {
+		let a = 0;
+		if (v.in && v.out) {
+			const a1 = angle(v.in);
+			const a2 = angle(v.out);
+			a = (a1 + a2) / 2;
+			if (Math.abs(a2 - a1) > Math.PI) a += Math.PI;
+		} else if (v.in || v.out) a = angle((v.in ?? v.out) as [number, number]);
+		return { x: v.x, y: v.y, angle: (a * 180) / Math.PI };
+	});
+}
+
+// An SVG <angle>: degrees unless it names rad, grad or turn.
+function parseAngle(value: string): number {
+	const m = /^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(deg|rad|grad|turn)?$/i.exec(value);
+	if (!m) return 0;
+	const n = Number(m[1]);
+	switch ((m[2] ?? "deg").toLowerCase()) {
+		case "rad":
+			return (n * 180) / Math.PI;
+		case "grad":
+			return n * 0.9;
+		case "turn":
+			return n * 360;
+		default:
+			return n;
+	}
 }
 
 function contains(ancestor: XmlElement, el: XmlElement): boolean {

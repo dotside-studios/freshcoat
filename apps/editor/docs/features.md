@@ -182,6 +182,13 @@ the records, and **Export** turns templates and records into files.
   being counted. A save that fails validation opens it.
 - **Undo and redo:** every command has one undo step. A drag, a burst of typing
   or a run of nudges is a single step.
+- **SVG paste:** pasted SVG markup can become layers, an image or text.
+  As layers, paths and shapes become vectors, groups frames, and clips and
+  masks mask layers; embedded images become image layers, `<text>` and
+  `<tspan>` become text layers, markers become vectors, and a pattern fill
+  becomes a mask of its tiles. Anything skipped (filters, `foreignObject`,
+  video, audio, external images) raises one "Some SVG features were
+  skipped" toast.
 - **Keyboard:** everything has a shortcut; press `?` to list them.
 - **Themes:** light (the default), dark, or following the system, from
   View > Theme and remembered per browser under `freshcoat.theme`. The

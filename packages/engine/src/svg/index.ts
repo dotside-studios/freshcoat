@@ -1,15 +1,20 @@
 export { type Rgba, parseColor } from "./color";
 export { type Matrix, parseTransform } from "./matrix";
 export {
+	estimateTextWidth,
 	isSvg,
 	parseSvg,
 	type SvgDrawing,
+	type SvgFont,
 	type SvgGroup,
+	type SvgImage,
 	type SvgItem,
 	type SvgPaint,
 	type SvgShape,
 	type SvgStop,
 	type SvgStroke,
+	type SvgText,
+	type SvgTextRun,
 	type SvgWarning,
 	viewBoxMatrix,
 } from "./parse";
