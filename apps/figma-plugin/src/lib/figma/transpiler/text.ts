@@ -129,6 +129,7 @@ export function transpileText(
 			? { letterSpacing: node.style.letterSpacing * ctx.scale }
 			: {}),
 		lineHeight,
+		...fontFeatures(node.style.openTypeFeatures),
 	};
 
 	const spans = buildSpans(node, ctx.scale);
@@ -176,6 +177,21 @@ export function transpileText(
 		size,
 		...(rotation !== 0 ? { rotation } : {}),
 		properties,
+	};
+}
+
+/** Figma's explicitly set OpenType features, as coatfile's lowercase tags. */
+function fontFeatures(
+	features: Record<string, boolean> | undefined,
+): { features?: Record<string, number> } {
+	const entries = Object.entries(features ?? {}).filter(([tag]) =>
+		/^[A-Za-z0-9]{4}$/.test(tag),
+	);
+	if (entries.length === 0) return {};
+	return {
+		features: Object.fromEntries(
+			entries.map(([tag, on]) => [tag.toLowerCase(), on ? 1 : 0]),
+		),
 	};
 }
 

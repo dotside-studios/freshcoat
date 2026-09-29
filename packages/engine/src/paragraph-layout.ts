@@ -12,7 +12,7 @@
 // punctuation (em dash etc.); astral/emoji (surrogate pairs) and CJK line-break
 // rules are untested.
 
-import { fontVariationList } from "./paint-helpers";
+import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	InlineShapedLine,
 	InlineSpan,
@@ -102,6 +102,7 @@ export function createParagraphEngine(
 			// would otherwise shape a 700 span as the 400 instance under synthetic
 			// bold: lighter strokes and 400's advances, so thin and mis-wrapped.
 			fontVariations: fontVariationList(font.weight, font.variations),
+			...(font.features ? { fontFeatures: fontFeatureList(font.features) } : {}),
 			...(font.letterSpacing ? { letterSpacing: font.letterSpacing } : {}),
 		};
 	}

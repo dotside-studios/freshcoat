@@ -153,7 +153,8 @@ function hasOverrides(span: Span): boolean {
 		f.style !== undefined ||
 		f.letterSpacing !== undefined ||
 		f.lineHeight !== undefined ||
-		f.variations !== undefined
+		f.variations !== undefined ||
+		f.features !== undefined
 	);
 }
 
@@ -226,6 +227,7 @@ function layoutWrappable(
 			style: defaultFont.style,
 			letterSpacing: defaultFont.letterSpacing,
 			variations: defaultFont.variations,
+			...(defaultFont.features ? { features: defaultFont.features } : {}),
 		},
 		maxWidth: size.width,
 		maxHeight: size.height,
@@ -368,6 +370,9 @@ function layoutInline(
 				f.variations || defaultFont.variations
 					? { ...defaultFont.variations, ...f.variations }
 					: undefined,
+			...(f.features || defaultFont.features
+				? { features: { ...defaultFont.features, ...f.features } }
+				: {}),
 		};
 		return { text: s.text, font, color: s.color ?? defaultColor };
 	});

@@ -1200,6 +1200,44 @@ add(
 	],
 );
 
+// tnum gives Geist's narrow "1" a figure-wide advance, so four of them run
+// much further right than the proportional four would.
+add(
+	"text-font-features",
+	"OpenType features are applied when the line is shaped",
+	"core",
+	["draw.text", "text.fontFeatures"],
+	frame([
+		createText({
+			...box(20, 40, 120, 40),
+			text: "1111",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 32,
+				lineHeight: 1.2,
+				features: { tnum: 1 },
+			},
+			color: "#000000",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [86, 55],
+			from: [10, 60],
+			minDelta: 200,
+			why: "the fourth tabular 1 stands at 86; the proportional four end near 63",
+		},
+		px(
+			[40, 55],
+			[255, 255, 255, 255],
+			"where the second proportional 1 would be",
+		),
+	],
+);
+
 // maxLines truncates after wrapping, so the second line's band stays ground.
 add(
 	"text-max-lines",

@@ -65,6 +65,7 @@ type TextSpanInput = {
 		lineHeight?: number;
 		decoration?: ResolvedFont["decoration"];
 		variations?: ResolvedFont["variations"];
+		features?: ResolvedFont["features"];
 	};
 	color?: string;
 };
@@ -419,6 +420,7 @@ function compileText(
 		letterSpacing?: number;
 		decoration?: ResolvedFont["decoration"];
 		variations?: ResolvedFont["variations"];
+		features?: ResolvedFont["features"];
 	};
 	const font: ResolvedFont = {
 		family: inputFont.family,
@@ -432,6 +434,7 @@ function compileText(
 		...lineHeightOf(inputFont.lineHeight),
 		decoration: inputFont.decoration,
 		...(inputFont.variations ? { variations: inputFont.variations } : {}),
+		...(inputFont.features ? { features: inputFont.features } : {}),
 	};
 
 	// Normalize: `value` is sugar for a single span. Figma "Case" applies to the
@@ -494,6 +497,7 @@ function mapSpanFont(
 		...(f.lineHeight === undefined ? {} : lineHeightOf(f.lineHeight)),
 		decoration: f.decoration,
 		...(f.variations ? { variations: f.variations } : {}),
+		...(f.features ? { features: f.features } : {}),
 	};
 }
 
@@ -1030,7 +1034,8 @@ function hasOverrides(span: TextSpanInput): boolean {
 		f.style !== undefined ||
 		f.letterSpacing !== undefined ||
 		f.lineHeight !== undefined ||
-		f.variations !== undefined
+		f.variations !== undefined ||
+		f.features !== undefined
 	);
 }
 

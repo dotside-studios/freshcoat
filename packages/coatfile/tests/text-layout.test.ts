@@ -66,4 +66,22 @@ describe("text layout properties", () => {
 		expect(plain.direction).toBeUndefined();
 		expect(plain.align).toBe("left");
 	});
+
+	test("font features reach the node and its spans", () => {
+		const node = textNode({
+			font: { family: "Inter", size: 20, features: { tnum: 1, liga: 0 } },
+			value: undefined,
+			spans: [{ text: "10" }, { text: "11", font: { features: { tnum: 0 } } }],
+		});
+		expect(node.font.features).toEqual({ tnum: 1, liga: 0 });
+		expect(node.spans?.[1].font?.features).toEqual({ tnum: 0 });
+	});
+
+	test("a feature tag is four characters and its value a whole number", () => {
+		const bad = (features: Record<string, number>) =>
+			validate(template({ font: { family: "Inter", size: 20, features } })).ok;
+		expect(bad({ tnum: 1.5 })).toBe(false);
+		expect(bad({ tabular: 1 })).toBe(false);
+		expect(bad({ ss01: 1 })).toBe(true);
+	});
 });

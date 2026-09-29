@@ -112,7 +112,8 @@ the records, and **Export** turns templates and records into files.
     effects and conditional visibility.
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to
-    left, or taken from the text.
+    left, or taken from the text. OpenType features are typed as tags
+    (`tnum, -liga, salt=2`).
   - A font picker over the whole Google Fonts catalog: search, category
     chips, sort by popularity or name, the template's own families first, and
     each family previewed in its own face. Picking one adds it to the

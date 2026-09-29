@@ -402,6 +402,7 @@ type AnyTextNode = AnySceneNode & {
 	textAutoResize?: unknown;
 	textCase?: unknown;
 	leadingTrim?: unknown;
+	openTypeFeatures?: unknown;
 	fills: readonly AnyPaint[];
 	getStyledTextSegments: (fields: string[]) => AnyTextSegment[];
 };
@@ -426,6 +427,15 @@ function plainLetterSpacing(value: unknown): AnyLetterSpacing | undefined {
 	return typeof ls.value === "number" && typeof ls.unit === "string"
 		? (ls as AnyLetterSpacing)
 		: undefined;
+}
+
+/** openTypeFeatures is an object of booleans; `mixed` is a symbol. */
+function plainFeatures(value: unknown): Record<string, boolean> | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const out: Record<string, boolean> = {};
+	for (const [tag, on] of Object.entries(value))
+		if (typeof on === "boolean") out[tag] = on;
+	return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function plainLineHeight(value: unknown): AnyLineHeight | undefined {
@@ -480,6 +490,9 @@ function baseTextStyle(
 		// — both read as unset, which is Figma's own default (STANDARD).
 		...(plainString(node.leadingTrim)
 			? { leadingTrim: node.leadingTrim as FigmaTextStyle["leadingTrim"] }
+			: {}),
+		...(plainFeatures(node.openTypeFeatures)
+			? { openTypeFeatures: plainFeatures(node.openTypeFeatures) }
 			: {}),
 		...lineHeightFields(lineHeight, fontSize),
 	};

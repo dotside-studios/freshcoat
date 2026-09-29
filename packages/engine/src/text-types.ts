@@ -1,7 +1,7 @@
 // Text-layout vocabulary shared by every TextEngine (the CanvasKit Paragraph
 // engine, the dependency-free approx engine, and compile). Kept impl-free so it
 // carries no CanvasKit weight.
-import type { FontVariations, ResolvedFont } from "./types";
+import type { FontFeatures, FontVariations, ResolvedFont } from "./types";
 
 // Wrapped/natural width + height of a run (maxWidth null = single line).
 export type MeasureText = (
@@ -20,6 +20,7 @@ export type TextLayoutInput = {
 		// Extra tracking (target px) between glyphs. Honored by engines that can.
 		letterSpacing?: number;
 		variations?: FontVariations;
+		features?: FontFeatures;
 	};
 	maxWidth: number;
 	maxHeight: number;

@@ -574,6 +574,13 @@ written: the step stays as the value a static face is picked by. A span's
 and the stylesheet a `google` descriptor points at must request the axes a
 template uses.
 
+### OpenType features
+
+`features` sets OpenType features by tag, on the element's `font` or a span's:
+`{ "tnum": 1, "liga": 0, "ss01": 1, "salt": 2 }`. 1 turns a feature on, 0 off,
+and a larger whole number picks an alternate. A span's `features` are merged
+over the element's. A feature the face doesn't have is ignored.
+
 ### Vertical trim
 
 `leadingTrim: true` on a text element is Figma's "Vertical trim: cap height to

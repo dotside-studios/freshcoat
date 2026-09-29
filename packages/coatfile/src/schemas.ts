@@ -57,6 +57,12 @@ export const FontVariationsSchema = z.record(
 	z.number(),
 );
 
+// OpenType feature settings by tag: 1 on, 0 off, or an alternate's index.
+export const FontFeaturesSchema = z.record(
+	z.string().regex(/^[A-Za-z0-9 ]{4}$/),
+	z.number().int().min(0),
+);
+
 export const FontFileSchema = z.object({
 	weight: FontWeightSchema,
 	style: z.enum(["normal", "italic"]).optional(),
@@ -169,6 +175,8 @@ const FontDescriptorObjectSchema = z.object({
 	decoration: z.enum(["underline", "line-through"]).optional(),
 	// Merged over the element's own axes.
 	variations: FontVariationsSchema.optional(),
+	// Merged over the element's own features.
+	features: FontFeaturesSchema.optional(),
 });
 
 // One styled segment within a mixed-style text element. Only the fields
@@ -196,6 +204,7 @@ export const TextPropertiesSchema = z.object({
 		lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 		decoration: z.enum(["underline", "line-through"]).optional(),
 		variations: FontVariationsSchema.optional(),
+		features: FontFeaturesSchema.optional(),
 	}),
 	// Solid color; optional when a gradient `fill` is provided (compile defaults
 	// to #000 when neither is set).

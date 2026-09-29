@@ -115,6 +115,15 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
+	it("writes OpenType features from the features field", () => {
+		const c = setup(["0/1/1"]);
+		typeInto(screen.getByLabelText("OpenType features"), "tnum, -liga");
+		const font = (el(c, "0/1/1").properties as { font: { features?: unknown } })
+			.font;
+		expect(font.features).toEqual({ tnum: 1, liga: 0 });
+		expect(validate(c.template).ok).toBe(true);
+	});
+
 	it("shows a rect's geometry, fill, stroke and corners, and writes X", () => {
 		const c = setup(["0/0"]);
 		const x = screen.getByRole("spinbutton", { name: "X" });

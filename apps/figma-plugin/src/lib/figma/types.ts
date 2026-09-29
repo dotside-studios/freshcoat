@@ -97,6 +97,8 @@ export type FigmaTextStyle = {
 	leadingTrim?: "NONE" | "CAP_HEIGHT";
 	// Figma "Case" (textCase). SMALL_CAPS variants aren't a plain string
 	// transform, so they fall back to original.
+	// Figma "OpenType features" the layer explicitly sets, by uppercase tag.
+	openTypeFeatures?: Record<string, boolean>;
 	textCase?:
 		| "ORIGINAL"
 		| "UPPER"

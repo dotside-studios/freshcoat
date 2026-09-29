@@ -7,7 +7,9 @@ import {
 	commonValue,
 	documentSwatches,
 	mergeKeyOf,
+	formatFeatures,
 	parseDash,
+	parseFeatures,
 	patchLayers,
 } from "~/panels/design/field-helpers";
 import { googleFontUrls, verifyGoogleFamily } from "~/panels/design/fonts";
@@ -164,5 +166,16 @@ describe("font families", () => {
 			throw new Error("offline");
 		});
 		expect(none).toBeNull();
+	});
+});
+
+describe("parseFeatures", () => {
+	it("reads tags on, off and with values, and round-trips", () => {
+		const f = parseFeatures("tnum, -liga ss01 salt=2");
+		expect(f).toEqual({ tnum: 1, liga: 0, ss01: 1, salt: 2 });
+		expect(parseFeatures(formatFeatures(f!))).toEqual(f);
+		expect(parseFeatures("  ")).toBeUndefined();
+		expect(parseFeatures("tabular")).toBeNull();
+		expect(parseFeatures("-salt=2")).toBeNull();
 	});
 });

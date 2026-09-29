@@ -1,7 +1,7 @@
 import type { TextElement, TextProperties } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
-import { TextArea } from "@freshcoat-js/ui/field";
+import { TextArea, TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -38,7 +38,13 @@ import LineHeightIcon from "~icons/mingcute/line-height-line";
 import StrikeIcon from "~icons/mingcute/strikethrough-line";
 import UnderlineIcon from "~icons/mingcute/underline-line";
 import { OverrideMarker, Row } from "./controls";
-import { commonValue, type Inspect, patchLayers } from "./field-helpers";
+import {
+	commonValue,
+	formatFeatures,
+	type Inspect,
+	parseFeatures,
+	patchLayers,
+} from "./field-helpers";
 import { isDeclared, verifyGoogleFamily, WEIGHTS } from "./fonts";
 
 type Font = TextProperties["font"];
@@ -310,6 +316,12 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					<StrikeIcon />
 				</ToggleButton>
 			</Row>
+			<Row label="Features" keys={FONT}>
+				<FeaturesField
+					value={pickFont((f) => formatFeatures(f.features ?? {}))}
+					onCommit={(features) => setFont("font-features", { features })}
+				/>
+			</Row>
 			<Row label="Case" keys={["case"]}>
 				<Select
 					aria-label="Case"
@@ -375,6 +387,50 @@ export function TextSection({ ins }: { ins: Inspect }) {
 				</Checkbox>
 			</Row>
 		</PanelSection>
+	);
+}
+
+function FeaturesField({
+	value,
+	onCommit,
+}: {
+	value: string | null;
+	onCommit: (features: Font["features"]) => void;
+}) {
+	const shown = value ?? "";
+	const [draft, setDraft] = useState(shown);
+	const [invalid, setInvalid] = useState(false);
+	useEffect(() => {
+		setDraft(shown);
+		setInvalid(false);
+	}, [shown]);
+	const commit = () => {
+		if (draft === shown) return;
+		const features = parseFeatures(draft);
+		if (features === null) {
+			setInvalid(true);
+			return;
+		}
+		setInvalid(false);
+		onCommit(features);
+	};
+	return (
+		<TextField
+			aria-label="OpenType features"
+			className="flex-1"
+			placeholder={value === null ? "Mixed" : "e.g. tnum, -liga"}
+			value={draft}
+			isInvalid={invalid}
+			onChange={(v) => {
+				setDraft(v);
+				setInvalid(false);
+			}}
+			onBlur={commit}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") commit();
+				if (e.key === "Escape") setDraft(shown);
+			}}
+		/>
 	);
 }
 

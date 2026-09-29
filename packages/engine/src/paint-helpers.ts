@@ -1,4 +1,9 @@
-import type { CornerRadius, FontVariations, Stroke } from "./types";
+import type {
+	CornerRadius,
+	FontFeatures,
+	FontVariations,
+	Stroke,
+} from "./types";
 
 // The variation axes a text style instantiates its face at. The weight goes
 // first as `wght`: `fontStyle.weight` only PICKS among registered faces, and a
@@ -12,6 +17,15 @@ export function fontVariationList(
 ): { axis: string; value: number }[] {
 	const axes: Record<string, number> = { wght: weight || 400, ...variations };
 	return Object.entries(axes).map(([axis, value]) => ({ axis, value }));
+}
+
+export function fontFeatureList(
+	features: FontFeatures | undefined,
+): { name: string; value: number }[] {
+	return Object.entries(features ?? {}).map(([name, value]) => ({
+		name,
+		value,
+	}));
 }
 
 // Source/dest rects for object-fit.

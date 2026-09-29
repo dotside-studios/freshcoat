@@ -24,6 +24,7 @@ import {
 import {
 	decorationLine,
 	fitRect,
+	fontFeatureList,
 	fontVariationList,
 	insetCorner,
 	strokeInset,
@@ -395,6 +396,9 @@ function textStyleOf(
 		// drawing its default instance under synthetic bold — see paragraph-layout's
 		// spanTextStyle, which measures with the identical style.
 		fontVariations: fontVariationList(span.font.weight, span.font.variations),
+		...(span.font.features
+			? { fontFeatures: fontFeatureList(span.font.features) }
+			: {}),
 		...(span.font.letterSpacing
 			? { letterSpacing: span.font.letterSpacing }
 			: {}),
