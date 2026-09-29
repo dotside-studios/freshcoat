@@ -1,4 +1,9 @@
-import type { Background, Element, Template } from "@freshcoat-js/coatfile";
+import type {
+	Background,
+	Element,
+	GridTrack,
+	Template,
+} from "@freshcoat-js/coatfile";
 import type { EditorController } from "~/app/controller";
 import type { LayerGeometry } from "~/doc/geometry";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";
@@ -106,4 +111,47 @@ export function parseDash(text: string): number[] | undefined | null {
 	const parts = s.split(/[\s,]+/).map(Number);
 	if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
 	return parts;
+}
+
+const TRACK = /^(?:\d+(?:\.\d+)?|\.\d+)(?:fr)?$|^auto$/;
+
+/** Parses "120 1fr auto" into grid tracks; empty is undefined, a typo null. */
+export function parseTracks(text: string): GridTrack[] | undefined | null {
+	const s = text.trim();
+	if (!s) return undefined;
+	const parts = s.split(/[\s,]+/);
+	if (!parts.every((p) => TRACK.test(p))) return null;
+	return parts.map((p) =>
+		p === "auto" || p.endsWith("fr") ? (p as GridTrack) : Number(p),
+	);
+}
+
+export function formatTracks(tracks: readonly GridTrack[] | undefined): string {
+	return (tracks ?? []).map(String).join(" ");
+}
+
+type GridLine = number | [number, number];
+
+/** Parses a grid placement: "2" is one track, "1-3" a span, empty or "auto"
+ *  flows. Null for a typo. */
+export function parseGridLine(text: string): GridLine | undefined | null {
+	const s = text.trim().toLowerCase();
+	if (!s || s === "auto") return undefined;
+	const m = /^(\d+)(?:\s*[-–/]\s*(\d+))?$/.exec(s);
+	if (!m) return null;
+	const first = Number(m[1]);
+	const last = m[2] === undefined ? first : Number(m[2]);
+	if (first < 1 || last < first) return null;
+	return first === last ? first : [first, last];
+}
+
+export function formatGridLine(line: GridLine | undefined): string {
+	if (line === undefined) return "";
+	return typeof line === "number" ? String(line) : `${line[0]}-${line[1]}`;
+}
+
+/** The field an image's focus is bound to, from "{{key}}", or undefined. */
+export function focusFieldOf(focus: unknown): string | undefined {
+	if (typeof focus !== "string") return undefined;
+	return /^\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}$/.exec(focus)?.[1];
 }

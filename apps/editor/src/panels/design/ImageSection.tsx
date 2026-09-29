@@ -1,10 +1,13 @@
 import {
+	type ImageCrop,
 	type ImageElement,
 	type ImageProperties,
 	parseAssetUri,
+	parseImageFocus,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
+import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
@@ -17,7 +20,12 @@ import { attachImageAsset } from "~/doc/ops";
 import { getElement } from "~/doc/path";
 import UploadIcon from "~icons/mingcute/upload-2-line";
 import { Pair, Row, sectionActions } from "./controls";
-import { commonValue, type Inspect, patchLayers } from "./field-helpers";
+import {
+	commonValue,
+	focusFieldOf,
+	type Inspect,
+	patchLayers,
+} from "./field-helpers";
 
 type Mask = NonNullable<ImageProperties["mask"]>;
 type MaskKind =
@@ -57,6 +65,49 @@ export function defaultMask(kind: MaskKind): Mask | undefined {
 		case "polygon":
 			return { kind, sides: 6 };
 	}
+}
+
+const FIXED_FOCUS = "__fixed";
+
+/** A focal point in percent, the centre when unset or bound to a field. */
+export function focusPercent(focus: ImageProperties["focus"]): {
+	x: number;
+	y: number;
+} {
+	const f = parseImageFocus(focus) ?? { x: 0.5, y: 0.5 };
+	return { x: Math.round(f.x * 1000) / 10, y: Math.round(f.y * 1000) / 10 };
+}
+
+/** The focus a percent point writes: none at the centre. */
+export function focusFromPercent(
+	x: number,
+	y: number,
+): [number, number] | undefined {
+	if (x === 50 && y === 50) return undefined;
+	const clamp = (v: number) => Math.min(Math.max(v, 0), 100) / 100;
+	return [clamp(x), clamp(y)];
+}
+
+export const FULL_CROP: ImageCrop = { x: 0, y: 0, width: 1, height: 1 };
+
+/** The crop with one edge moved, kept inside the image: an offset pulls the
+ *  size in, and a size stops at the far edge. */
+export function setCropValue(
+	crop: ImageCrop,
+	key: keyof ImageCrop,
+	percent: number,
+): ImageCrop {
+	const v = Math.min(Math.max(percent, 0), 100) / 100;
+	const next = { ...crop, [key]: v };
+	if (key === "x") next.width = Math.min(next.width, 1 - v);
+	if (key === "y") next.height = Math.min(next.height, 1 - v);
+	if (key === "width") next.width = Math.max(0.01, Math.min(v, 1 - next.x));
+	if (key === "height") next.height = Math.max(0.01, Math.min(v, 1 - next.y));
+	if (next.width <= 0) next.width = 0.01;
+	if (next.height <= 0) next.height = 0.01;
+	if (next.x + next.width > 1) next.x = 1 - next.width;
+	if (next.y + next.height > 1) next.y = 1 - next.height;
+	return next;
 }
 
 /** "Embedded · PNG · 24 kB" for an `asset:` src, or null for anything else. */
@@ -166,6 +217,8 @@ export function ImageSection({
 					))}
 				</Select>
 			</Row>
+			{fit === "cover" && <FocusRows ins={ins} />}
+			{fit !== null && fit !== "tile" && <CropRows ins={ins} />}
 			{!background && (
 				<>
 					<Row label="Mask" keys={["mask"]}>
@@ -194,6 +247,125 @@ export function ImageSection({
 				</>
 			)}
 		</PanelSection>
+	);
+}
+
+function FocusRows({ ins }: { ins: Inspect }) {
+	const props = (ins.layers as ImageElement[]).map((e) => e.properties);
+	const focuses = props.map((p) => p.focus);
+	const source = commonValue(
+		focuses.map((f) => focusFieldOf(f) ?? FIXED_FOCUS),
+	);
+	const point = commonValue(focuses.map(focusPercent));
+	const fields = Object.entries(ins.template.fields.properties);
+	const write = (x: number, y: number) =>
+		ins.setProps("focus", () => ({ focus: focusFromPercent(x, y) }));
+
+	return (
+		<>
+			<Row label="Focus" keys={["focus"]}>
+				<Select
+					aria-label="Focus source"
+					className="min-w-0 flex-1"
+					placeholder="Mixed"
+					value={source}
+					onChange={(v) =>
+						ins.setProps("focus-source", () => ({
+							focus: v === FIXED_FOCUS ? undefined : `{{${String(v)}}}`,
+						}))
+					}
+				>
+					<SelectItem id={FIXED_FOCUS}>Fixed point</SelectItem>
+					{fields.map(([key, def]) => (
+						<SelectItem key={key} id={key}>
+							{def.title ?? key}
+						</SelectItem>
+					))}
+				</Select>
+			</Row>
+			{source === FIXED_FOCUS && (
+				<Row label="">
+					<Pair className="flex-1">
+						<NumberField
+							label="X"
+							aria-label="Focus X"
+							unit="%"
+							min={0}
+							max={100}
+							precision={1}
+							value={point?.x ?? null}
+							onChange={(v) => write(v, point?.y ?? 50)}
+						/>
+						<NumberField
+							label="Y"
+							aria-label="Focus Y"
+							unit="%"
+							min={0}
+							max={100}
+							precision={1}
+							value={point?.y ?? null}
+							onChange={(v) => write(point?.x ?? 50, v)}
+						/>
+					</Pair>
+				</Row>
+			)}
+		</>
+	);
+}
+
+const CROP_FIELDS: [keyof ImageCrop, string, string][] = [
+	["x", "X", "Crop X"],
+	["y", "Y", "Crop Y"],
+	["width", "W", "Crop width"],
+	["height", "H", "Crop height"],
+];
+
+function CropRows({ ins }: { ins: Inspect }) {
+	const crops = (ins.layers as ImageElement[]).map((e) => e.properties.crop);
+	const on = commonValue(crops.map((c) => c !== undefined));
+	const common = commonValue(crops);
+	return (
+		<>
+			<Row label="Crop" keys={["crop"]}>
+				<Checkbox
+					isSelected={on === true}
+					isIndeterminate={on === null}
+					onChange={(v) =>
+						ins.setProps("crop-toggle", (el) => {
+							const current = (el as ImageElement).properties.crop;
+							if (v) return current ? null : { crop: FULL_CROP };
+							return { crop: undefined };
+						})
+					}
+				>
+					Crop image
+				</Checkbox>
+			</Row>
+			{on === true && (
+				<Row label="">
+					<Pair cols={4} className="flex-1">
+						{CROP_FIELDS.map(([key, label, aria]) => (
+							<NumberField
+								key={key}
+								label={label}
+								aria-label={aria}
+								unit="%"
+								min={key === "width" || key === "height" ? 1 : 0}
+								max={100}
+								precision={1}
+								value={common ? Math.round(common[key] * 1000) / 10 : null}
+								onChange={(v) =>
+									ins.setProps(`crop-${key}`, (el) => {
+										const c = (el as ImageElement).properties.crop;
+										return c ? { crop: setCropValue(c, key, v) } : null;
+									})
+								}
+							/>
+						))}
+					</Pair>
+				</Row>
+			)}
+		</>
 	);
 }
 

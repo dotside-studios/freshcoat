@@ -6,6 +6,7 @@ import { getElement, isBackgroundPath, keyOf, parseKey } from "~/doc/path";
 import { activeVariantId, overriddenKeys } from "~/doc/variant-edit";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
+import { AdjustSection } from "./AdjustSection";
 import { AlignSection } from "./AlignSection";
 import { BarcodeSection } from "./BarcodeSection";
 import { ConstraintsSection, takesConstraints } from "./ConstraintsSection";
@@ -198,6 +199,7 @@ function sections(ins: Inspect) {
 				) : (
 					<ImageSection ins={ins} background />
 				)}
+				<AdjustSection ins={ins} />
 			</div>
 		);
 	}
@@ -221,6 +223,7 @@ function sections(ins: Inspect) {
 			{every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
 			{every((t) => CORNERED.has(t)) && <CornersSection ins={ins} />}
 			<EffectsSection ins={ins} />
+			<AdjustSection ins={ins} />
 			<VisibilitySection ins={ins} />
 		</div>
 	);

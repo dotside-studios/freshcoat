@@ -144,13 +144,17 @@ function copyIn(path: string): Found[] {
 const COPY = ROOTS.flatMap(sourceFiles).flatMap(copyIn);
 
 // Where a forbidden word is the right one: a spreadsheet's own rows in the
-// import wizard, and auto layout's row direction.
+// import wizard, and auto layout's row direction and grid rows.
 const ALLOWED: { file: RegExp; text: RegExp }[] = [
 	{
 		file: /data\/ImportWizard\.tsx$/,
 		text: /^(No header row|Header row|Row)$/,
 	},
-	{ file: /panels\/design\/FrameSection\.tsx$/, text: /^Row$/ },
+	{
+		file: /panels\/design\/FrameSection\.tsx$/,
+		text: /^(Row|Rows|Grid rows|Row gap)$/,
+	},
+	{ file: /panels\/design\/LayerSection\.tsx$/, text: /^(Row|Grid row)$/ },
 ];
 
 const FORBIDDEN: { word: string; pattern: RegExp }[] = [

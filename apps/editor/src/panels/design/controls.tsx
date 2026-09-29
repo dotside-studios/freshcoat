@@ -1,9 +1,16 @@
+import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
-import { createContext, type ReactNode, useContext } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useState,
+} from "react";
 import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { VARIANT_UI } from "~/app/copy";
 import AddIcon from "~icons/mingcute/add-line";
@@ -213,5 +220,43 @@ export function ItemGroup({ children }: { children: ReactNode }) {
 		<div className="flex flex-col gap-1.5 border-fc-border border-t pt-1.5 first:border-t-0 first:pt-0">
 			{children}
 		</div>
+	);
+}
+
+/** A text field that commits on Enter or blur. `onCommit` returns false to
+ *  refuse the text, which then reverts; Escape reverts too. */
+export function CommitField({
+	value,
+	onCommit,
+	placeholder,
+	className = "min-w-0 flex-1",
+	"aria-label": ariaLabel,
+}: {
+	value: string | null;
+	onCommit: (text: string) => boolean;
+	placeholder?: string;
+	className?: string;
+	"aria-label": string;
+}) {
+	const shown = value ?? "";
+	const [draft, setDraft] = useState(shown);
+	useEffect(() => setDraft(shown), [shown]);
+	const commit = () => {
+		if (draft.trim() === shown.trim()) return setDraft(shown);
+		if (!onCommit(draft)) setDraft(shown);
+	};
+	return (
+		<TextField
+			aria-label={ariaLabel}
+			className={className}
+			placeholder={value === null ? "Mixed" : placeholder}
+			value={draft}
+			onChange={setDraft}
+			onBlur={commit}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") commit();
+				if (e.key === "Escape") setDraft(shown);
+			}}
+		/>
 	);
 }
