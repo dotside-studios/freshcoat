@@ -1,5 +1,6 @@
 import { classify } from "~/lib/figma/transpiler/classify";
 import { isWholeMustacheToken } from "~/lib/figma/transpiler/fields";
+import { withoutGuides } from "~/lib/figma/transpiler/guides";
 import type { FigmaContainerNode, FigmaNode } from "~/lib/figma/types";
 import { isContainerNode } from "~/lib/figma/types";
 
@@ -24,6 +25,6 @@ export function collectRasterTargets(frame: FigmaContainerNode): string[] {
 			for (const child of n.children) walk(child);
 		}
 	};
-	for (const child of frame.children ?? []) walk(child);
+	for (const child of withoutGuides(frame.children ?? [])) walk(child);
 	return ids;
 }

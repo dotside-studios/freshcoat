@@ -64,6 +64,12 @@ import {
 } from "./exact-size";
 import { collectFontDescriptors } from "./fonts";
 import { layoutChildFromNode, transpileFrame } from "./frame";
+import {
+	combineGuides,
+	readSlotGuides,
+	type SlotGuides,
+	withoutGuides,
+} from "./guides";
 import { transpileImage } from "./image";
 import { transpileQr } from "./qr";
 import { rasterScaleFor } from "./raster-scale";
@@ -999,7 +1005,7 @@ async function buildSideElements(
 		rotation: 0,
 	};
 	walkChildren(
-		frame.children ?? [],
+		withoutGuides(frame.children ?? []),
 		slotFrame,
 		elements,
 		{
@@ -1535,6 +1541,7 @@ export async function transpile(
 	}
 
 	// Pass 2 — produce each slot's elements on the settled canvas.
+	const slotGuides: Array<{ slot: string; guides: SlotGuides }> = [];
 	for (const slot of input.product.frames) {
 		const pick = input.picks[slot.name];
 		const frame = trees.get(slot.name);
@@ -1549,6 +1556,10 @@ export async function transpile(
 		baseSideFrames[slot.name] = frame;
 		slotScale[slot.name] = scale;
 		slotFileKey[slot.name] = pick.fileKey;
+		slotGuides.push({
+			slot: slot.name,
+			guides: readSlotGuides(frame, slot.name, scale, warnings),
+		});
 
 		const { background, elements } = await buildSideElements(frame, slot.name, {
 			scale,
@@ -1569,6 +1580,11 @@ export async function transpile(
 
 		templateData.push({ name: slot.name, background, elements });
 	}
+	const { bleed, safeArea } = combineGuides(
+		slotGuides,
+		{ width: authorWidth, height: authorHeight },
+		warnings,
+	);
 
 	const variants: unknown[] = [];
 	const variantPicks: Record<string, FigmaVariantPick> = {};
@@ -1808,6 +1824,8 @@ export async function transpile(
 		product: input.product.sku,
 		width: authorWidth,
 		height: authorHeight,
+		...(bleed !== undefined ? { bleed } : {}),
+		...(safeArea !== undefined ? { safeArea } : {}),
 		fields,
 		...(fonts.length > 0 ? { fonts } : {}),
 		template_data: templateData,
