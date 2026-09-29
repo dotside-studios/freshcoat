@@ -921,3 +921,94 @@ describe("readBaseFields (figma.mixed)", () => {
 		expect(node({}).mixed).toBeUndefined();
 	});
 });
+
+test("readContainer copies a grid's tracks, gaps and each child's cell", () => {
+	const out = readFrameTree({
+		id: "2:1",
+		name: "grid",
+		type: "FRAME",
+		absoluteBoundingBox: { x: 0, y: 0, width: 300, height: 200 },
+		layoutMode: "GRID",
+		gridRowGap: 4,
+		gridColumnGap: 8,
+		gridColumnSizes: [
+			{ type: "FIXED", value: 100 },
+			{ type: "FLEX", value: 2 },
+		],
+		gridRowSizes: [{ type: "HUG" }],
+		children: [
+			{
+				...leaf("2:2", "cell"),
+				gridRowAnchorIndex: 0,
+				gridColumnAnchorIndex: 1,
+				gridRowSpan: 2,
+				gridColumnSpan: 1,
+			},
+		],
+	} as never);
+	expect(out.layoutMode).toBe("GRID");
+	expect(out.gridRowGap).toBe(4);
+	expect(out.gridColumnGap).toBe(8);
+	expect(out.gridColumnSizes).toEqual([
+		{ type: "FIXED", value: 100 },
+		{ type: "FLEX", value: 2 },
+	]);
+	expect(out.gridRowSizes).toEqual([{ type: "HUG" }]);
+	expect(out.children[0]).toMatchObject({
+		gridRowAnchorIndex: 0,
+		gridColumnAnchorIndex: 1,
+		gridRowSpan: 2,
+		gridColumnSpan: 1,
+	});
+});
+
+test("readContainer leaves grid fields off a flex frame's children", () => {
+	const out = readFrameTree({
+		id: "3:1",
+		name: "row",
+		type: "FRAME",
+		absoluteBoundingBox: { x: 0, y: 0, width: 300, height: 200 },
+		layoutMode: "HORIZONTAL",
+		children: [{ ...leaf("3:2", "cell"), gridRowAnchorIndex: 0 }],
+	} as never);
+	expect(out.children[0]).not.toHaveProperty("gridRowAnchorIndex");
+	expect(out).not.toHaveProperty("gridColumnSizes");
+});
+
+describe("readPaint (image)", () => {
+	it("keeps a crop's transform and any image filters", () => {
+		const p = readPaint({
+			type: "IMAGE",
+			scaleMode: "CROP",
+			imageHash: "h",
+			imageTransform: [
+				[0.5, 0, 0.25],
+				[0, 0.5, 0],
+			],
+			filters: { saturation: -1, exposure: 0 },
+		});
+		expect(p).toMatchObject({
+			scaleMode: "STRETCH",
+			imageTransform: [
+				[0.5, 0, 0.25],
+				[0, 0.5, 0],
+			],
+			filters: { saturation: -1, exposure: 0 },
+		});
+	});
+
+	it("drops all-zero filters and a transform outside crop mode", () => {
+		const p = readPaint({
+			type: "IMAGE",
+			scaleMode: "FILL",
+			imageHash: "h",
+			imageTransform: [
+				[1, 0, 0],
+				[0, 1, 0],
+			],
+			filters: { exposure: 0, contrast: 0 },
+		});
+		expect(p).not.toHaveProperty("imageTransform");
+		expect(p).not.toHaveProperty("filters");
+	});
+});
