@@ -283,14 +283,14 @@ describe("classify", () => {
 		if (c.kind === "flatten") expect(c.reason).toBe("effect_flattened");
 	});
 
-	it("RECTANGLE with unsupported blend mode → flatten", () => {
+	it("RECTANGLE with linear burn over a mid-tone → flatten", () => {
 		const n: FigmaNode = {
 			...baseAttrs,
 			id: "1",
 			name: "x",
 			type: "RECTANGLE",
 			blendMode: "LINEAR_BURN",
-			fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
+			fills: [{ type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } }],
 		};
 		const c = classify(n);
 		expect(c.kind).toBe("flatten");

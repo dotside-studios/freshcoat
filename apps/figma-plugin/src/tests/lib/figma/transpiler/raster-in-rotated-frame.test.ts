@@ -97,7 +97,7 @@ function buildTree(): FigmaContainerNode {
 							[0, 1, 110],
 							[-1, 0, 140],
 						],
-						fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 } }],
+						fills: [{ type: "SOLID", color: { r: 0.2, g: 0.4, b: 1, a: 1 } }],
 					},
 				],
 			},

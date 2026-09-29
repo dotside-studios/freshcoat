@@ -1,7 +1,16 @@
 import type { BlendMode } from "@freshcoat-js/coatfile";
-import type { FigmaBlendMode, FigmaNode, FigmaVectorNode } from "../types";
+import type {
+	FigmaBlendMode,
+	FigmaColor,
+	FigmaEffect,
+	FigmaNode,
+	FigmaPaint,
+	FigmaTextNode,
+	FigmaVectorNode,
+} from "../types";
 import { isContainerNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";
+import { compositeSolids, isMappablePaint, type PaintBox } from "./paint";
 import { decomposeTransform, nodeExtent } from "./transform";
 
 export type Classification =
@@ -23,14 +32,11 @@ export type FlattenReason =
 	| "vector_flattened"
 	| "clip_overflow_flattened"
 	| "transform_undecomposable_flattened"
-	| "multi_fill_flattened";
+	| "multi_fill_flattened"
+	| "paint_flattened";
 
-// Blend modes coatfile's element shell can carry, so a layer using one is
-// emitted natively instead of rasterized. Everything else flattens.
-// PASS_THROUGH is a group/frame's "no isolation", which is normal compositing
-// for a single element; NORMAL and PASS_THROUGH both map to no blend at all.
-// The coatfile blend mode for each Figma mode it can express. Linear burn
-// has no Skia equivalent, so a layer using it is rasterized.
+// PASS_THROUGH is a container's "no isolation", which is how the painter
+// composites a frame already; on anything else it is plain normal.
 const BLEND_MODES: Partial<
 	Record<FigmaBlendMode, NonNullable<ElementBlendMode> | "normal">
 > = {
@@ -54,20 +60,93 @@ const BLEND_MODES: Partial<
 	LUMINOSITY: "luminosity",
 };
 
+type ElementBlendMode = Exclude<BlendMode, "normal"> | undefined;
+
 /** The coatfile blend mode a node composites with, or undefined for plain
  *  normal compositing. Only ever called for a node classify already accepted,
  *  so an unrecognized mode reads as normal rather than inventing one. */
-type ElementBlendMode = Exclude<BlendMode, "normal"> | undefined;
-
 export function elementBlendMode(n: FigmaNode): ElementBlendMode {
+	if (n.blendMode === "LINEAR_BURN") return "multiply";
 	const mode = BLEND_MODES[n.blendMode ?? "NORMAL"];
 	return mode === "normal" ? undefined : mode;
 }
 
-// DROP_SHADOW, INNER_SHADOW and LAYER_BLUR lower to native coatfile
-// primitives (Drawable.shadow — inset or not, with spread, stacked —
-// and Drawable.blur). BACKGROUND_BLUR still flattens: it samples what is
-// BEHIND the layer, which a per-drawable filter cannot see.
+function isBlended(n: FigmaNode): boolean {
+	const blend = n.blendMode ?? "NORMAL";
+	return blend !== "NORMAL" && blend !== "PASS_THROUGH";
+}
+
+// Linear burn (s + d - 1) and multiply (s * d) agree wherever every channel of
+// the source is 0 or 1, so a layer painted only in such colours (black, white,
+// pure primaries) burns exactly as it multiplies.
+function isBinaryColor(c: FigmaColor): boolean {
+	return [c.r, c.g, c.b].every((v) => {
+		const byte = Math.round(v * 255);
+		return byte === 0 || byte === 255;
+	});
+}
+
+function paintsAreBinary(paints: FigmaPaint[] | undefined): boolean {
+	return (paints ?? []).every(
+		(p) =>
+			p.visible === false || (p.type === "SOLID" && isBinaryColor(p.color)),
+	);
+}
+
+function linearBurnIsMultiply(n: FigmaNode): boolean {
+	if (isContainerNode(n)) return false;
+	const shadows = (n.effects ?? []).every(
+		(e) => e.visible === false || !e.color || isBinaryColor(e.color),
+	);
+	if (!shadows || !paintsAreBinary(n.fills)) return false;
+	if (n.type === "TEXT")
+		return Object.values(n.styleOverrideTable ?? {}).every((o) =>
+			paintsAreBinary(o.fills),
+		);
+	return paintsAreBinary(n.strokes);
+}
+
+function hasVisibleEffects(n: FigmaNode): boolean {
+	return (n.effects ?? []).some((e) => e.visible !== false);
+}
+
+// Whether a layer inside a container blends with what lies beneath it, seen
+// from the container: a blended child counts, and so does one inside a
+// pass-through container that does not isolate it on the way up.
+function hasBlendedDescendant(n: FigmaNode): boolean {
+	if (!isContainerNode(n)) return false;
+	return n.children.some((c) => {
+		if (c.visible === false || c.opacity === 0) return false;
+		if (isBlended(c)) return true;
+		const passesThrough =
+			(c.blendMode ?? "PASS_THROUGH") === "PASS_THROUGH" &&
+			(c.opacity ?? 1) >= 1 &&
+			!hasVisibleEffects(c);
+		return passesThrough && hasBlendedDescendant(c);
+	});
+}
+
+// Figma draws a container set to Normal into a layer of its own, so a blended
+// layer inside mixes only with the container's own content. The painter gives
+// a frame a layer only for opacity, an effect or a blend of its own; without
+// one, the blended layer would mix with whatever lies behind the container.
+function isolationDiffers(n: FigmaNode): boolean {
+	return (
+		isContainerNode(n) &&
+		n.blendMode === "NORMAL" &&
+		(n.opacity ?? 1) >= 1 &&
+		!hasVisibleEffects(n) &&
+		hasBlendedDescendant(n)
+	);
+}
+
+function blendFlattens(n: FigmaNode): boolean {
+	const blend = n.blendMode ?? "NORMAL";
+	if (blend === "LINEAR_BURN") return !linearBurnIsMultiply(n);
+	if (!BLEND_MODES[blend]) return true;
+	return isolationDiffers(n);
+}
+
 /** The one fill rule every region of a vector's geometry shares: undefined for
  *  nonzero (the default), "evenodd", or null when regions disagree. */
 export function vectorFillRule(
@@ -78,17 +157,23 @@ export function vectorFillRule(
 	return rules.has("EVENODD") ? "evenodd" : undefined;
 }
 
-const SUPPORTED_EFFECT_TYPES = new Set([
-	"DROP_SHADOW",
-	"INNER_SHADOW",
-	"LAYER_BLUR",
-]);
+// DROP_SHADOW, INNER_SHADOW and LAYER_BLUR lower to the element's shadow stack
+// and blur. BACKGROUND_BLUR samples what is behind the layer, which a filter on
+// the layer cannot see. A progressive blur ramps its radius and a shadow with
+// its own blend mode composites apart from its layer, neither of which the
+// element's blur and shadow can say. Newer kinds (noise, texture, glass) have
+// no equivalent.
+function isUnsupportedEffect(e: FigmaEffect): boolean {
+	if (e.visible === false) return false;
+	if (e.type === "LAYER_BLUR") return e.blurType === "PROGRESSIVE";
+	if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW")
+		return e.blendMode !== undefined && e.blendMode !== "NORMAL";
+	return true;
+}
 
 function hasUnsupportedEffects(n: FigmaNode): boolean {
 	if (!Array.isArray(n.effects)) return false;
-	return n.effects.some(
-		(e) => e.visible !== false && !SUPPORTED_EFFECT_TYPES.has(e.type),
-	);
+	return n.effects.some(isUnsupportedEffect);
 }
 
 // A node whose transform can't be decomposed into rotation + translation
@@ -116,6 +201,43 @@ function hasUndecomposableTransform(n: FigmaNode): boolean {
 	return false;
 }
 
+function paintBox(n: FigmaNode): PaintBox {
+	return {
+		width: n.width ?? n.absoluteBoundingBox.width,
+		height: n.height ?? n.absoluteBoundingBox.height,
+	};
+}
+
+// An image fill has no place in a fill stack, and some paints (a diamond
+// gradient, an unevenly swept angular one, a paint with its own blend mode)
+// have no coatfile fill at all.
+function fillsFlattenReason(
+	fills: FigmaPaint[] | undefined,
+	box: PaintBox,
+): FlattenReason | undefined {
+	const visible = (fills ?? []).filter((f) => f.visible !== false);
+	if (visible.length > 1 && visible.some((f) => f.type === "IMAGE"))
+		return "multi_fill_flattened";
+	if (visible.some((f) => !isMappablePaint(f, box))) return "paint_flattened";
+	return undefined;
+}
+
+// coatfile carries a colour per span but a gradient only for the whole
+// element, so each run's paints must come down to one colour, or the whole
+// text must share one gradient.
+function textIsNative(n: FigmaTextNode): boolean {
+	const runFills = Object.values(n.styleOverrideTable ?? {})
+		.map((o) => o.fills)
+		.filter((f): f is FigmaPaint[] => f !== undefined);
+	if (compositeSolids(n.fills) !== null)
+		return runFills.every((f) => compositeSolids(f) !== null);
+	const visible = n.fills.filter((f) => f.visible !== false);
+	if (visible.length !== 1 || visible[0].type === "IMAGE") return false;
+	if (!isMappablePaint(visible[0], paintBox(n))) return false;
+	const base = JSON.stringify(n.fills);
+	return runFills.every((f) => JSON.stringify(f) === base);
+}
+
 export function isQrLayerName(name: string): boolean {
 	return /^qr:.+/.test(name);
 }
@@ -136,8 +258,7 @@ export function classify(n: FigmaNode): Classification {
 	if (isBarcodeLayerName(n.name)) return { kind: "native-barcode" };
 	if (isQrLayerName(n.name)) return { kind: "native-qr" };
 
-	const blend = n.blendMode ?? "NORMAL";
-	if (!BLEND_MODES[blend])
+	if (blendFlattens(n))
 		return { kind: "flatten", reason: "blend_mode_flattened" };
 	if (hasUnsupportedEffects(n))
 		return { kind: "flatten", reason: "effect_flattened" };
@@ -145,18 +266,8 @@ export function classify(n: FigmaNode): Classification {
 		return { kind: "flatten", reason: "transform_undecomposable_flattened" };
 
 	if (n.type === "TEXT") {
-		// Per-element fill must still be a single SOLID — coatfile text
-		// has one base color (spans inherit it; per-character color overrides
-		// aren't in our Figma type model yet).
-		if (
-			!Array.isArray(n.fills) ||
-			n.fills.length !== 1 ||
-			n.fills[0].type !== "SOLID"
-		) {
+		if (!textIsNative(n))
 			return { kind: "flatten", reason: "text_mixed_styling_flattened" };
-		}
-		// characterStyleOverrides → spans (coatfile handles font family /
-		// size / weight / style / letterSpacing / lineHeight per span).
 		return { kind: "native-text" };
 	}
 
@@ -166,37 +277,15 @@ export function classify(n: FigmaNode): Classification {
 		// as an image (the Layer-tab "Image" button writes this marker).
 		if (isImageLayerName(n.name)) return { kind: "native-image" };
 
-		const fills = n.fills ?? [];
-		const visibleFills = fills.filter((f) => f.visible !== false);
-		if (visibleFills.length === 0) return { kind: "native-rect" };
-
-		// A single image fill is its own shape (native-image). Multiple image
-		// fills, or an image fill mixed with other fills, still flatten — the
-		// coatfile rect.fills array doesn't include image fills as a Fill
-		// kind in v1.
-		const imageFills = visibleFills.filter((f) => f.type === "IMAGE");
-		if (
-			imageFills.length === visibleFills.length &&
-			visibleFills.length === 1
-		) {
-			const fill = visibleFills[0];
-			if (fill.type === "IMAGE") {
-				if (
-					fill.scaleMode === "FILL" ||
-					fill.scaleMode === "FIT" ||
-					fill.scaleMode === "TILE"
-				) {
-					return { kind: "native-image" };
-				}
-				return { kind: "flatten", reason: "multi_fill_flattened" };
-			}
+		const visibleFills = (n.fills ?? []).filter((f) => f.visible !== false);
+		if (visibleFills.length === 1 && visibleFills[0].type === "IMAGE") {
+			const blend = visibleFills[0].blendMode;
+			if (blend && blend !== "NORMAL")
+				return { kind: "flatten", reason: "paint_flattened" };
+			return { kind: "native-image" };
 		}
-		if (imageFills.length > 0) {
-			return { kind: "flatten", reason: "multi_fill_flattened" };
-		}
-
-		// All paint types here are SOLID / GRADIENT_LINEAR / GRADIENT_RADIAL —
-		// multiple of these stack natively as fills[].
+		const reason = fillsFlattenReason(n.fills, paintBox(n));
+		if (reason) return { kind: "flatten", reason };
 		return { kind: "native-rect" };
 	}
 
@@ -216,6 +305,8 @@ export function classify(n: FigmaNode): Classification {
 		if (vectorFillRule(n.fillGeometry) === null) {
 			return { kind: "flatten", reason: "vector_flattened" };
 		}
+		const reason = fillsFlattenReason(n.fills, paintBox(n));
+		if (reason) return { kind: "flatten", reason };
 		return { kind: "native-vector" };
 	}
 
@@ -229,6 +320,8 @@ export function classify(n: FigmaNode): Classification {
 	// nest as frame elements and the painter composes transforms through them.
 	if (isContainerNode(n)) {
 		if (n.type === "GROUP") return { kind: "container" };
+		const reason = fillsFlattenReason(n.fills, paintBox(n));
+		if (reason) return { kind: "flatten", reason };
 		return { kind: "native-frame" };
 	}
 	return { kind: "container" };

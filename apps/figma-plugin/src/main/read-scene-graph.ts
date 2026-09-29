@@ -93,6 +93,7 @@ type AnyPaint = {
 	type: string;
 	visible?: boolean;
 	opacity?: number;
+	blendMode?: string;
 	color?: { r: number; g: number; b: number };
 	gradientTransform?: FigmaTransform;
 	gradientStops?: Array<{
@@ -105,12 +106,19 @@ type AnyPaint = {
 	filters?: FigmaImageFilters;
 };
 
+function paintBlend(paint: AnyPaint): { blendMode?: FigmaBlendMode } {
+	return paint.blendMode && paint.blendMode !== "NORMAL"
+		? { blendMode: paint.blendMode as FigmaBlendMode }
+		: {};
+}
+
 export function readPaint(paint: AnyPaint): FigmaPaint {
 	if (paint.type === "SOLID") {
 		return {
 			type: "SOLID",
 			visible: paint.visible,
 			opacity: paint.opacity,
+			...paintBlend(paint),
 			color: rgbaFrom({ ...(paint.color ?? { r: 0, g: 0, b: 0 }), a: 1 }),
 		};
 	}
@@ -121,6 +129,7 @@ export function readPaint(paint: AnyPaint): FigmaPaint {
 			type: "IMAGE",
 			visible: paint.visible,
 			opacity: paint.opacity,
+			...paintBlend(paint),
 			scaleMode: mode as "FILL" | "FIT" | "TILE" | "STRETCH",
 			imageRef: paint.imageHash ?? "",
 			...(paint.scaleMode === "CROP" && paint.imageTransform
@@ -138,6 +147,7 @@ export function readPaint(paint: AnyPaint): FigmaPaint {
 		type: paint.type as "GRADIENT_LINEAR" | "GRADIENT_RADIAL",
 		visible: paint.visible,
 		opacity: paint.opacity,
+		...paintBlend(paint),
 		...(paint.gradientTransform
 			? { gradientTransform: paint.gradientTransform }
 			: {}),
@@ -169,6 +179,8 @@ type AnyEffect = {
 	spread?: number;
 	offset?: { x: number; y: number };
 	color?: { r: number; g: number; b: number; a: number };
+	blendMode?: string;
+	blurType?: string;
 };
 
 type AnySceneNode = {
@@ -281,6 +293,12 @@ function readEffects(
 		spread: e.spread,
 		offset: e.offset,
 		color: e.color,
+		...(e.blendMode && e.blendMode !== "NORMAL"
+			? { blendMode: e.blendMode as FigmaBlendMode }
+			: {}),
+		...(e.blurType === "PROGRESSIVE"
+			? { blurType: "PROGRESSIVE" as const }
+			: {}),
 	}));
 }
 
@@ -394,6 +412,8 @@ type AnyTextSegment = {
 	fontWeight: number;
 	letterSpacing?: AnyLetterSpacing;
 	lineHeight?: AnyLineHeight;
+	fills?: readonly AnyPaint[];
+	textDecoration?: string;
 };
 
 // Every font property below is typed `unknown` on purpose: Figma returns
@@ -414,7 +434,8 @@ type AnyTextNode = AnySceneNode & {
 	leadingTrim?: unknown;
 	openTypeFeatures?: unknown;
 	paragraphSpacing?: unknown;
-	fills: readonly AnyPaint[];
+	textDecoration?: unknown;
+	fills: readonly AnyPaint[] | typeof figma.mixed;
 	getStyledTextSegments: (fields: string[]) => AnyTextSegment[];
 };
 
@@ -508,8 +529,19 @@ function baseTextStyle(
 		...(plainFeatures(node.openTypeFeatures)
 			? { openTypeFeatures: plainFeatures(node.openTypeFeatures) }
 			: {}),
+		...decorationField(
+			plainString(node.textDecoration) ?? primary?.textDecoration,
+		),
 		...lineHeightFields(lineHeight, fontSize),
 	};
+}
+
+function decorationField(
+	value: string | undefined,
+): Pick<FigmaTextStyle, "textDecoration"> {
+	return value === "UNDERLINE" || value === "STRIKETHROUGH"
+		? { textDecoration: value }
+		: {};
 }
 
 /** A stable signature for a segment's style, used to allocate override keys. */
@@ -526,12 +558,13 @@ function segSignature(s: AnyTextSegment): string {
 		// text node with two line boxes.
 		s.lineHeight?.unit ?? "AUTO",
 		s.lineHeight && s.lineHeight.unit !== "AUTO" ? s.lineHeight.value : 0,
+		s.textDecoration ?? "NONE",
+		readPaints(s.fills),
 	]);
 }
 
 export function readTextNode(node: AnyTextNode): FigmaTextNode {
 	const base = readBaseFields(node);
-	const fills = readPaints(node.fills);
 
 	// Segments come first: they're what the base style falls back to when the
 	// node reports a font property as mixed.
@@ -541,8 +574,15 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 		"fontWeight",
 		"letterSpacing",
 		"lineHeight",
+		"fills",
+		"textDecoration",
 	]);
 	const style = baseTextStyle(node, segments[0]);
+	// Fills that vary across the string read back as mixed; the first run's are
+	// the base, as its font is.
+	const fills = readPaints(
+		Array.isArray(node.fills) ? node.fills : segments[0]?.fills,
+	);
 	const charCount = [...node.characters].length;
 	const overrides = new Array<number>(charCount).fill(0);
 	const table: Record<string, Partial<FigmaTextStyle>> = {};
@@ -565,6 +605,12 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 				fontWeight: seg.fontWeight,
 				italic: isItalic(seg.fontName.style),
 				letterSpacing: letterSpacingPx(seg.letterSpacing, seg.fontSize),
+				textDecoration:
+					seg.textDecoration === "UNDERLINE" ||
+					seg.textDecoration === "STRIKETHROUGH"
+						? seg.textDecoration
+						: "NONE",
+				...(seg.fills ? { fills: readPaints(seg.fills) } : {}),
 				// AUTO contributes no fields, exactly as it does on the base style,
 				// and the transpiler reads that absence as "auto".
 				...lineHeightFields(seg.lineHeight, seg.fontSize),

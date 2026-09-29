@@ -272,6 +272,7 @@ describe("transpileText", () => {
 	it("characterStyleOverrides → emits spans grouped by override key", () => {
 		const node = baseText({
 			characters: "PLAN: PRO",
+			style: { ...baseText().style, fontWeight: 400 },
 			characterStyleOverrides: [0, 0, 0, 0, 0, 0, 1, 1, 1],
 			styleOverrideTable: { "1": { fontWeight: 700 } },
 		});
