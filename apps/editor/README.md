@@ -163,8 +163,9 @@ covers shared checks and pull requests.
   draw well inside its box (a module of 1.9 pixels draws as 1). At print
   density a module is many pixels, and the code fills its box within a few
   percent.
-- ITF-14 is drawn without its bearer bars (the frame around the code), which
-  some retail scanners expect on corrugated cartons.
+- ITF-14 bearer bars are off unless the Bearers control turns them on. They
+  are drawn 5 modules thick and take room from the box like the quiet zone
+  does, so turning them on narrows the bars rather than growing the layer.
 
 ## Serving Studio
 

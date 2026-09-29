@@ -313,6 +313,8 @@ export const SymbologySchema = z.enum([
 	"aztec",
 ]);
 
+export const BearerBarsSchema = z.enum(["none", "frame", "horizontal"]);
+
 export const BarcodePropertiesSchema = z.object({
 	value: z.string(),
 	symbology: SymbologySchema,
@@ -328,6 +330,8 @@ export const BarcodePropertiesSchema = z.object({
 	quietZone: z.number().min(0).optional(),
 	// pdf417: level 0 to 8. aztec: percent 5 to 95. Ignored elsewhere.
 	errorCorrection: z.number().optional(),
+	// itf14 only. Default "none".
+	bearerBars: BearerBarsSchema.optional(),
 });
 
 // Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].

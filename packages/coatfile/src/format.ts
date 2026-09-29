@@ -17,7 +17,7 @@ import type { Template } from "./types";
 //   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
-//        per-corner frame `cornerRadius`
+//        per-corner frame `cornerRadius`; barcode `bearerBars`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 5;
@@ -71,6 +71,12 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
+			if (
+				o.type === "barcode" &&
+				(o.properties as Record<string, unknown> | undefined)?.bearerBars !==
+					undefined
+			)
+				need(5);
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 			if (o.type === "frame") {
 				frameIds.add(o.id);

@@ -18,6 +18,8 @@ import {
 } from "@freshcoat-js/engine";
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import {
+	BEARER_BAR_MODULES,
+	bearerBarsOf,
 	defaultQuietZone,
 	getBarcodeEncoder,
 	isLinearSymbology,
@@ -40,6 +42,7 @@ import { generateMatrix } from "./qr";
 import { childElements } from "./tree";
 import type {
 	Background,
+	BearerBars,
 	CompiledFrame,
 	CompiledTemplate,
 	CompileOptions,
@@ -872,20 +875,30 @@ function compileBarcode(
 	const { encoding } = result;
 	if (encoding.kind === "linear") {
 		const n = encoding.modules.length;
-		const module = size.width / (n + 2 * quietZone);
+		const bearers = bearerBarsOf(
+			symbology,
+			props.bearerBars as BearerBars | undefined,
+		);
+		const sideBearers = bearers === "frame" ? BEARER_BAR_MODULES : 0;
+		const module = size.width / (n + 2 * quietZone + 2 * sideBearers);
+		const bearer = bearers === "none" ? 0 : BEARER_BAR_MODULES * module;
 		const pixels = new Uint8Array(n * 4);
 		encoding.modules.forEach((set, i) => {
 			if (set) paint(pixels, i);
 		});
 		children.push({
 			kind: "bitmap",
-			pos: { x: quietZone * module, y: 0 },
-			size: { width: n * module, height: barHeight },
+			pos: { x: (sideBearers + quietZone) * module, y: bearer },
+			size: { width: n * module, height: Math.max(0, barHeight - 2 * bearer) },
 			pixels,
 			pixelWidth: n,
 			pixelHeight: 1,
 			role: "barcode",
 		} satisfies BitmapNode);
+		if (bearers !== "none")
+			children.push(
+				...bearerBarRects(bearers, size.width, barHeight, bearer, foreground),
+			);
 		if (showText) children.push(textLine(encoding.text, barHeight + textGap));
 		return group();
 	}
@@ -915,6 +928,34 @@ function compileBarcode(
 		role: "barcode",
 	} satisfies BitmapNode);
 	return group();
+}
+
+// ITF-14's bearer bars: across the top and bottom of the bars, and for a frame
+// down both sides too, outside the quiet zone.
+function bearerBarRects(
+	bearers: "frame" | "horizontal",
+	width: number,
+	height: number,
+	thickness: number,
+	color: string,
+): RectNode[] {
+	const bar = (x: number, y: number, w: number, h: number): RectNode => ({
+		kind: "rect",
+		pos: { x, y },
+		size: { width: w, height: h },
+		fills: [{ kind: "solid", color }],
+	});
+	const out = [
+		bar(0, 0, width, thickness),
+		bar(0, height - thickness, width, thickness),
+	];
+	const inner = Math.max(0, height - 2 * thickness);
+	if (bearers === "frame")
+		out.push(
+			bar(0, thickness, thickness, inner),
+			bar(width - thickness, thickness, thickness, inner),
+		);
+	return out;
 }
 
 // The shape a barcode will take once its field is filled: the bar area (and the

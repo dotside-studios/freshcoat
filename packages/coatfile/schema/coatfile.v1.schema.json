@@ -5376,6 +5376,14 @@
 										},
 										"errorCorrection": {
 											"type": "number"
+										},
+										"bearerBars": {
+											"type": "string",
+											"enum": [
+												"none",
+												"frame",
+												"horizontal"
+											]
 										}
 									},
 									"required": [

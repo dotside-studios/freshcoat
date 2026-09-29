@@ -349,7 +349,8 @@ The Barcode tool (B, after QR in the tool strip) draws a 360 × 120 Code 128
 reading "FRESHCOAT". Its inspector section sets the type, the value (with
 the same field-insert menu as a text layer), the human-readable line and its
 size, the bar and background colors, the margin (the quiet zone, in
-modules) and, for PDF417 and Aztec, the error correction.
+modules), for ITF-14 the bearer bars (none, a frame, or top and bottom) and,
+for PDF417 and Aztec, the error correction.
 
 | Type | Kind | Takes |
 |---|---|---|

@@ -191,6 +191,19 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.5");
 	});
 
+	test("1.5: barcode bearer bars", () => {
+		const code = (properties: Record<string, unknown>) =>
+			({
+				id: "b",
+				type: "barcode",
+				properties: { value: "1", symbology: "itf14", ...properties },
+			}) as Element;
+		expect(minimumFormatVersion(withElements(base(), code({})))).toBe("1.3");
+		expect(
+			minimumFormatVersion(withElements(base(), code({ bearerBars: "frame" }))),
+		).toBe("1.5");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },

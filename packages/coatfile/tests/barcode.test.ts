@@ -348,6 +348,16 @@ describe("decode round trip", () => {
 		});
 	}
 
+	for (const bearerBars of ["frame", "horizontal"] as const) {
+		test(`itf14 with ${bearerBars} bearer bars`, async () => {
+			setBarcodeEncoder(bwipBarcodeEncoder);
+			const tpl = barcodeTemplate({ symbology: "itf14", bearerBars });
+			const { frame, pixels } = await paint(tpl, { code: "1234567890123" }, 3);
+			expect(frame.warnings).toEqual([]);
+			expect(scan(pixels, "itf14")).toBe("12345678901231");
+		});
+	}
+
 	test("a 1D code still scans with its text line under it", async () => {
 		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate({ symbology: "ean13" });
@@ -413,6 +423,59 @@ describe("compile", () => {
 		const bitmap = findBitmap(compiledGroup(tpl, { code: "hello" }).group);
 		expect(bitmap?.size).toEqual({ width: 120, height: 120 });
 		expect(bitmap?.pos).toEqual({ x: 90, y: 10 });
+	});
+
+	test("ITF-14's bearer frame sits outside the quiet zone, 5 modules thick", () => {
+		setBarcodeEncoder(bwipBarcodeEncoder);
+		// 135 modules, 10 of quiet zone and 5 of bearer each side: 165 modules
+		// across 330 px, so 2 px a module and a 10 px bar.
+		const tpl = barcodeTemplate(
+			{ symbology: "itf14", showText: false, bearerBars: "frame" },
+			{ x: 0, y: 0, width: 330, height: 100 },
+		);
+		const { group } = compiledGroup(tpl, { code: "1234567890123" });
+		const bitmap = findBitmap(group);
+		expect(bitmap?.pos).toEqual({ x: 30, y: 10 });
+		expect(bitmap?.size).toEqual({ width: 270, height: 80 });
+		const bars = group.children
+			.filter((c) => c.kind === "rect")
+			.map((c) => ({ ...c.pos, ...c.size }));
+		expect(bars).toEqual([
+			{ x: 0, y: 0, width: 330, height: 10 },
+			{ x: 0, y: 90, width: 330, height: 10 },
+			{ x: 0, y: 10, width: 10, height: 80 },
+			{ x: 320, y: 10, width: 10, height: 80 },
+		]);
+	});
+
+	test("horizontal bearer bars span the quiet zone above and below", () => {
+		setBarcodeEncoder(bwipBarcodeEncoder);
+		const tpl = barcodeTemplate(
+			{ symbology: "itf14", showText: false, bearerBars: "horizontal" },
+			{ x: 0, y: 0, width: 310, height: 100 },
+		);
+		const { group } = compiledGroup(tpl, { code: "1234567890123" });
+		const bitmap = findBitmap(group);
+		expect(bitmap?.pos).toEqual({ x: 20, y: 10 });
+		expect(bitmap?.size).toEqual({ width: 270, height: 80 });
+		const bars = group.children
+			.filter((c) => c.kind === "rect")
+			.map((c) => ({ ...c.pos, ...c.size }));
+		expect(bars).toEqual([
+			{ x: 0, y: 0, width: 310, height: 10 },
+			{ x: 0, y: 90, width: 310, height: 10 },
+		]);
+	});
+
+	test("bearer bars apply to ITF-14 only", () => {
+		setBarcodeEncoder(bwipBarcodeEncoder);
+		const tpl = barcodeTemplate(
+			{ symbology: "code128", showText: false, bearerBars: "frame" },
+			{ x: 0, y: 0, width: 363, height: 100 },
+		);
+		const { group } = compiledGroup(tpl, { code: "LC 0001" });
+		expect(group.children.some((c) => c.kind === "rect")).toBe(false);
+		expect(findBitmap(group)?.pos).toEqual({ x: 30, y: 0 });
 	});
 
 	test("draws the background behind the quiet zone", () => {

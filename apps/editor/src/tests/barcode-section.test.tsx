@@ -185,6 +185,35 @@ describe("BarcodeSection", () => {
 		expect(code(c).properties.errorCorrection).toBe(8);
 	}, 20_000);
 
+	it("offers ITF-14 bearer bars, and only for ITF-14", async () => {
+		const user = userEvent.setup();
+		const c = setup(
+			withBarcode({ symbology: "itf14", value: "1234567890123" }),
+		);
+		const bearers = screen.getByRole("button", { name: /Bearer bars/ });
+		expect(bearers.textContent).toContain("None");
+		await chooseOption(user, bearers, "Frame");
+		expect(code(c).properties.bearerBars).toBe("frame");
+		await chooseOption(
+			user,
+			screen.getByRole("button", { name: /Bearer bars/ }),
+			"None",
+		);
+		expect(code(c).properties.bearerBars).toBeUndefined();
+		await chooseOption(
+			user,
+			screen.getByRole("button", { name: /Bearer bars/ }),
+			"Top and bottom",
+		);
+		await chooseOption(
+			user,
+			screen.getByRole("button", { name: /Barcode type/ }),
+			"Code 128",
+		);
+		expect(code(c).properties.bearerBars).toBeUndefined();
+		expect(screen.queryByRole("button", { name: /Bearer bars/ })).toBeNull();
+	});
+
 	it("gives Aztec a percentage", () => {
 		setup(withBarcode({ symbology: "aztec", errorCorrection: 33 }));
 		expect(

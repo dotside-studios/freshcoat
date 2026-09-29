@@ -307,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; barcode `bearerBars` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -467,6 +467,12 @@ like `qr_code` does:
   }
 }
 ```
+
+An `itf14` code takes `bearerBars` (1.5): `"none"` (the default), `"frame"`, or
+`"horizontal"` for bars above and below only. The bars are 5 modules thick,
+GS1's recommended 4.8 mm at the nominal 1.016 mm module and more than the two
+narrow bars it requires. They sit outside the quiet zone and inside the box, so
+the modules get narrower to make room. Other symbologies ignore the property.
 
 A GS1 number (EAN-13, UPC-A, ITF-14) may leave its check digit off, and gets it
 added, in the bars and the text. One with the wrong check digit is refused with
