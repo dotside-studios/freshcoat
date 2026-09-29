@@ -445,9 +445,14 @@ function compileText(
 		kind: "text",
 		font,
 		color: String(props.color ?? "#000"),
-		align: (props.align as TextNode["align"]) ?? "left",
+		align:
+			(props.align as TextNode["align"]) ??
+			(props.direction ? "start" : "left"),
 		...(props.alignLast
 			? { alignLast: props.alignLast as TextNode["alignLast"] }
+			: {}),
+		...(props.direction
+			? { direction: props.direction as TextNode["direction"] }
 			: {}),
 		verticalAlign: (props.verticalAlign as TextNode["verticalAlign"]) ?? "top",
 		fit: props.fit as TextNode["fit"],

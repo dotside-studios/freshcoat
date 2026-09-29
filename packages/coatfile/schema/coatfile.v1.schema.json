@@ -3372,7 +3372,9 @@
 												"left",
 												"center",
 												"right",
-												"justify"
+												"justify",
+												"start",
+												"end"
 											]
 										},
 										"alignLast": {
@@ -3381,7 +3383,17 @@
 												"left",
 												"center",
 												"right",
-												"justify"
+												"justify",
+												"start",
+												"end"
+											]
+										},
+										"direction": {
+											"type": "string",
+											"enum": [
+												"ltr",
+												"rtl",
+												"auto"
 											]
 										},
 										"verticalAlign": {

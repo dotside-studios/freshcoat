@@ -1,0 +1,106 @@
+{
+	"id": "text-direction-rtl",
+	"title": "an RTL line orders its runs right to left",
+	"profile": "core",
+	"requires": [
+		"draw.text",
+		"text.direction"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"pos": {
+					"x": 20,
+					"y": 40
+				},
+				"size": {
+					"width": 120,
+					"height": 40
+				},
+				"text": "Hl!",
+				"font": {
+					"family": "ConformanceFont",
+					"weight": 400,
+					"style": "normal",
+					"size": 32,
+					"lineHeight": 1.2
+				},
+				"color": "#000000",
+				"direction": "rtl",
+				"align": "left"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "differ",
+			"at": [
+				23,
+				45
+			],
+			"from": [
+				10,
+				60
+			],
+			"minDelta": 200,
+			"why": "the reordered ! stands at the line's left"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				23,
+				57
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the gap between the ! and its dot"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				27,
+				51
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "between the ! and the H, where a left-to-right line has the H's crossbar"
+		}
+	]
+}

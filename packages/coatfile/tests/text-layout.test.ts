@@ -56,4 +56,14 @@ describe("text layout properties", () => {
 		expect(node.alignLast).toBe("center");
 		expect(textNode({ align: "justify" }).alignLast).toBeUndefined();
 	});
+
+	test("direction reaches the node, and aligns to its start by default", () => {
+		const rtl = textNode({ value: "שלום", direction: "rtl" });
+		expect(rtl.direction).toBe("rtl");
+		expect(rtl.align).toBe("start");
+		expect(textNode({ direction: "auto", align: "end" }).align).toBe("end");
+		const plain = textNode({});
+		expect(plain.direction).toBeUndefined();
+		expect(plain.align).toBe("left");
+	});
 });

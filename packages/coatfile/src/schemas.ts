@@ -203,9 +203,17 @@ export const TextPropertiesSchema = z.object({
 	// Optional gradient fill for the text (mapped to the element box). `color`
 	// remains the solid fallback.
 	fill: FillSchema.optional(),
-	align: z.enum(["left", "center", "right", "justify"]).optional(),
-	// How a justified paragraph sets its last line. Default left.
-	alignLast: z.enum(["left", "center", "right", "justify"]).optional(),
+	// start and end follow `direction`.
+	align: z
+		.enum(["left", "center", "right", "justify", "start", "end"])
+		.optional(),
+	// How a justified paragraph sets its last line. Default start.
+	alignLast: z
+		.enum(["left", "center", "right", "justify", "start", "end"])
+		.optional(),
+	// Base direction for bidi ordering; auto takes the first strong character
+	// of the resolved text. Default ltr.
+	direction: z.enum(["ltr", "rtl", "auto"]).optional(),
 	verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
 	fit: z.enum(["shrink", "clip"]).optional(),
 	// Figma "Case": transform applied to the RESOLVED text (after token

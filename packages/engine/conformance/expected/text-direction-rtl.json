@@ -1,0 +1,98 @@
+{
+	"caseId": "text-direction-rtl",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"op": "loadFonts",
+			"requests": [
+				{
+					"family": "ConformanceFont"
+				}
+			]
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 20,
+						"y": 40
+					},
+					"size": {
+						"width": 120,
+						"height": 40
+					},
+					"op": "drawText",
+					"layout": {
+						"font": {
+							"family": "ConformanceFont",
+							"weight": 400,
+							"style": "normal",
+							"size": 32,
+							"lineHeight": 1.2
+						},
+						"lines": [
+							{
+								"text": "Hl!",
+								"y": 40,
+								"baseline": 62.72,
+								"direction": "rtl",
+								"spans": [
+									{
+										"text": "Hl!",
+										"x": 20,
+										"width": 37.86000061035156,
+										"font": {
+											"family": "ConformanceFont",
+											"weight": 400,
+											"style": "normal",
+											"size": 32,
+											"lineHeight": 1.2
+										},
+										"color": "#000000"
+									}
+								]
+							}
+						],
+						"totalHeight": 38.4,
+						"shrinkApplied": false
+					},
+					"color": "#000000"
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "c510239221adc72ac2e253a0920e1dcd3c7422eeaf8f44cef1a72b0b1238d07b"
+}

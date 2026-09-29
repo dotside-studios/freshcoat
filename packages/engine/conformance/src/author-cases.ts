@@ -1160,6 +1160,46 @@ add(
 	],
 );
 
+// A right-to-left line is shaped in that direction: the trailing "!" is
+// reordered to the line's left, ahead of "Hl".
+add(
+	"text-direction-rtl",
+	"an RTL line orders its runs right to left",
+	"core",
+	["draw.text", "text.direction"],
+	frame([
+		createText({
+			...box(20, 40, 120, 40),
+			text: "Hl!",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 32,
+				lineHeight: 1.2,
+			},
+			color: "#000000",
+			direction: "rtl",
+			align: "left",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [23, 45],
+			from: [10, 60],
+			minDelta: 200,
+			why: "the reordered ! stands at the line's left",
+		},
+		px([23, 57], [255, 255, 255, 255], "the gap between the ! and its dot"),
+		px(
+			[27, 51],
+			[255, 255, 255, 255],
+			"between the ! and the H, where a left-to-right line has the H's crossbar",
+		),
+	],
+);
+
 // maxLines truncates after wrapping, so the second line's band stays ground.
 add(
 	"text-max-lines",

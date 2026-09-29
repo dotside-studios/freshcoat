@@ -23,6 +23,7 @@ export { approxEngine } from "./approx-layout";
 export {
 	type BakeTextOptions,
 	bakeText,
+	resolveDirection,
 	resolveLeadingTrim,
 	textClipOutset,
 } from "./bake-text";

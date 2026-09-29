@@ -43,6 +43,7 @@ export type TextEngine = {
 	layoutInline?: (
 		spans: InlineSpan[],
 		maxWidth: number,
+		direction?: "ltr" | "rtl",
 	) => { lines: InlineShapedLine[] };
 	// Optional: a family's vertical metrics as the engine's own backend reads
 	// them. The sfnt reader (readFontMetrics) parses ttf/otf only, so a family

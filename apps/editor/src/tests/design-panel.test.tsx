@@ -7,11 +7,13 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
+import { chooseOption } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 function setup(selection: string[], t: Template = doc()) {
@@ -42,6 +44,12 @@ function typeInto(input: HTMLElement, value: string) {
 	fireEvent.keyDown(input, { key: "Enter" });
 }
 
+beforeAll(() => {
+	// jsdom has no CSS.escape, which react-aria uses to find items by key.
+	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
+	g.CSS ??= {};
+	g.CSS.escape ??= (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
+});
 afterEach(cleanup);
 
 describe("DesignPanel", () => {
@@ -91,6 +99,19 @@ describe("DesignPanel", () => {
 			"justify",
 		);
 		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("sets the text direction", async () => {
+		const c = setup(["0/1/1"]);
+		await chooseOption(
+			userEvent.setup(),
+			screen.getByRole("button", { name: /Text direction/ }),
+			"Right to left",
+		);
+		expect(
+			(el(c, "0/1/1").properties as { direction?: string }).direction,
+		).toBe("rtl");
 		expect(validate(c.template).ok).toBe(true);
 	});
 

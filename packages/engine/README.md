@@ -66,10 +66,14 @@ keeping measurement and painting on the same text implementation. On the
 lower-level path, pass a `textEngine` to resolve layout and unbaked text, or
 supply a scene with resolved geometry and baked text.
 
-A text node's `align` is `left`, `center`, `right` or `justify`. Justified lines
-are baked with a per-line `wordSpacing` that the painter shapes with, so every
-line but a paragraph's last meets both edges of the box; `alignLast` sets that
-last line.
+A text node's `align` is `left`, `center`, `right`, `justify`, `start` or
+`end`, and its `direction` (`ltr`, `rtl` or `auto`, from the first letter) sets
+the base direction the paragraph is shaped in and what `start` and `end` mean.
+Justified lines are baked with a per-line `wordSpacing` that the painter shapes
+with, so every line but a paragraph's last meets both edges of the box;
+`alignLast` sets that last line. A right-to-left line is baked with
+`direction: "rtl"`, and the painter shapes it in that direction so bidi runs
+land where the baked span boxes say.
 
 Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations

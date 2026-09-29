@@ -25,6 +25,7 @@ export type TextLayoutInput = {
 	maxHeight: number;
 	lineHeight: number;
 	fit: "shrink" | "clip" | undefined;
+	direction?: "ltr" | "rtl";
 };
 
 // hardBreak: the line ends its paragraph (a newline, or the end of the text).

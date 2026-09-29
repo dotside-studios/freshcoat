@@ -603,10 +603,16 @@ renders exactly as it did before.
 
 ## Text layout
 
-`align` is `left` (the default), `center`, `right` or `justify`. A justified
-paragraph stretches the spaces of every line but its last, which `alignLast`
-sets (`left` by default, or `center`, `right`, `justify`). A line with no space
-to stretch stays at its natural width.
+`direction` is the paragraph's base direction for bidirectional text: `ltr`
+(the default), `rtl`, or `auto`, which takes the first letter of the resolved
+text (after `{{field}}` substitution), as HTML's `dir="auto"` does.
+
+`align` is `left`, `center`, `right`, `justify`, `start` or `end`. `start` and
+`end` follow the direction; `left` and `right` never flip. Without `align`, text
+sets to `left`, or to `start` when a `direction` is given. A justified paragraph
+stretches the spaces of every line but its last, which `alignLast` sets
+(`start` by default, or any other `align` value). A line with no space to
+stretch stays at its natural width.
 
 ## Spec
 

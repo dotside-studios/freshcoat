@@ -228,6 +228,9 @@ export type TextLine = {
 	// Extra advance after each space (U+0020), in target px: how a justified
 	// line fills the box. The painter shapes the line with it.
 	wordSpacing?: number;
+	// The paragraph's base direction when it is right-to-left; the painter
+	// orders the line's runs by it. Span x/width stay visual.
+	direction?: "rtl";
 	spans: TextLineSpan[];
 };
 

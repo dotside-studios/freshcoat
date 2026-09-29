@@ -52,7 +52,15 @@ const CASES = [
 	["title", "Title Case"],
 ] as const;
 
+const DIRECTIONS = [
+	["ltr", "Left to right"],
+	["rtl", "Right to left"],
+	["auto", "From the text"],
+] as const;
+
 const LAST_LINE = [
+	["start", "Start"],
+	["end", "End"],
 	["left", "Left"],
 	["center", "Center"],
 	["right", "Right"],
@@ -230,11 +238,13 @@ export function TextSection({ ins }: { ins: Inspect }) {
 						aria-label="Last line alignment"
 						className="min-w-0 flex-1"
 						placeholder="Mixed"
-						value={pick((p) => p.alignLast ?? "left")}
+						value={pick((p) => p.alignLast ?? "start")}
 						onChange={(v) =>
 							setText("align-last", () => ({
 								alignLast:
-									v === "left" ? undefined : (v as TextProperties["alignLast"]),
+									v === "start"
+										? undefined
+										: (v as TextProperties["alignLast"]),
 							}))
 						}
 					>
@@ -246,6 +256,26 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					</Select>
 				</Row>
 			)}
+			<Row label="Direction" keys={["direction"]}>
+				<Select
+					aria-label="Text direction"
+					className="min-w-0 flex-1"
+					placeholder="Mixed"
+					value={pick((p) => p.direction ?? "ltr")}
+					onChange={(v) =>
+						setText("direction", () => ({
+							direction:
+								v === "ltr" ? undefined : (v as TextProperties["direction"]),
+						}))
+					}
+				>
+					{DIRECTIONS.map(([id, name]) => (
+						<SelectItem key={id} id={id}>
+							{name}
+						</SelectItem>
+					))}
+				</Select>
+			</Row>
 			<Row label="Style" keys={FONT}>
 				<ToggleButton
 					aria-label="Italic"

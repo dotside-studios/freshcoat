@@ -82,9 +82,15 @@ export function bakeText(
 	const pos: Vec2 = node.pos ?? { x: 0, y: 0 };
 	const size: Size = node.size ?? { width: 0, height: 0 };
 	const color = node.color ?? "#000";
+	const spans = normalizeSpans(node);
+	const rtl =
+		(node.direction === "auto"
+			? resolveDirection(spans.map((s) => s.text).join(""))
+			: node.direction) === "rtl";
 	const align: LineAlign = {
-		align: node.align ?? "left",
-		last: node.alignLast ?? "left",
+		align: physicalAlign(node.align ?? "left", rtl),
+		last: physicalAlign(node.alignLast ?? "start", rtl),
+		rtl,
 	};
 	const verticalAlign = node.verticalAlign ?? "top";
 	const fit = node.fit;
@@ -93,7 +99,6 @@ export function bakeText(
 	const lineHeight = defaultFont.lineHeight;
 
 	const deviceScale = opts.deviceScale;
-	const spans = normalizeSpans(node);
 	// Wrappable: a single span with no font/color override keeps the full wrap +
 	// shrink path. Anything richer goes through the inline (adjacent) path.
 	const wrappable = spans.length === 1 && !hasOverrides(spans[0]);
@@ -226,6 +231,7 @@ function layoutWrappable(
 		maxHeight: size.height,
 		lineHeight,
 		fit,
+		...(align.rtl ? { direction: "rtl" as const } : {}),
 	});
 	const effFont: ResolvedFont = {
 		...defaultFont,
@@ -283,6 +289,7 @@ function layoutWrappable(
 			y,
 			baseline: y + baseOffset,
 			...(placed.wordSpacing ? { wordSpacing: placed.wordSpacing } : {}),
+			...(align.rtl ? { direction: "rtl" as const } : {}),
 			spans: [
 				{
 					text: line.text,
@@ -381,10 +388,16 @@ function layoutInline(
 	// advance / baseline / vertical-align); the engine returns per-line fragment
 	// geometry only.
 	if (engine.layoutInline) {
-		const shaped = engine.layoutInline(
-			resolved.map((r) => ({ text: r.text, font: r.font })),
-			size.width,
-		);
+		const shaped = align.rtl
+			? engine.layoutInline(
+					resolved.map((r) => ({ text: r.text, font: r.font })),
+					size.width,
+					"rtl",
+				)
+			: engine.layoutInline(
+					resolved.map((r) => ({ text: r.text, font: r.font })),
+					size.width,
+				);
 		// Each line gets the box ITS OWN spans ask for, not the node's tallest.
 		// Line height varies within a text node as freely as size does — a
 		// signature block set to 132% on its first line and Auto on the rest is one
@@ -447,6 +460,7 @@ function layoutInline(
 				y,
 				baseline: y + ml.baseOffset,
 				...(ws ? { wordSpacing: ws } : {}),
+				...(align.rtl ? { direction: "rtl" as const } : {}),
 				spans: spansOut,
 			};
 		});
@@ -504,14 +518,36 @@ function layoutInline(
 
 // ─────────────── alignment ───────────────
 
+type PhysicalAlign = "left" | "center" | "right" | "justify";
+
 type LineAlign = {
-	align: NonNullable<TextNode["align"]>;
-	last: NonNullable<TextNode["alignLast"]>;
+	align: PhysicalAlign;
+	last: PhysicalAlign;
+	rtl: boolean;
 };
+
+function physicalAlign(
+	align: NonNullable<TextNode["align"]>,
+	rtl: boolean,
+): PhysicalAlign {
+	if (align === "start") return rtl ? "right" : "left";
+	if (align === "end") return rtl ? "left" : "right";
+	return align;
+}
+
+const RTL_SCRIPT =
+	/[\p{Script=Hebrew}\p{Script=Arabic}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Samaritan}\p{Script=Mandaic}\p{Script=Adlam}\p{Script=Hanifi_Rohingya}]/u;
+
+// The direction of the first strong (letter) character, as HTML's dir="auto"
+// picks it. Text with no letters is ltr.
+export function resolveDirection(text: string): "ltr" | "rtl" {
+	const first = text.match(/\p{L}/u)?.[0];
+	return first && RTL_SCRIPT.test(first) ? "rtl" : "ltr";
+}
 
 // A line's left edge and painted width, plus the word spacing that stretches a
 // justified line to the box. A justified paragraph's last line takes `last`,
-// and a line with no space to stretch falls back to left.
+// and a line with no space to stretch falls back to start.
 function placeLine(
 	align: LineAlign,
 	endsParagraph: boolean,
@@ -530,7 +566,10 @@ function placeLine(
 				width: boxWidth,
 				wordSpacing: (boxWidth - lineWidth) / gaps,
 			};
-		return { x: boxX, width: lineWidth };
+		return {
+			x: xForAlign(align.rtl ? "right" : "left", boxX, boxWidth, lineWidth),
+			width: lineWidth,
+		};
 	}
 	return { x: xForAlign(mode, boxX, boxWidth, lineWidth), width: lineWidth };
 }

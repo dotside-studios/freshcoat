@@ -453,6 +453,12 @@ function drawText(
 		const shape = (): ShapedLine => {
 			const style = new ck.ParagraphStyle({
 				textStyle: textStyleOf(ck, first, cmd, fallback, line.wordSpacing),
+				...(line.direction === "rtl"
+					? {
+							textDirection: ck.TextDirection.RTL,
+							textAlign: ck.TextAlign.Left,
+						}
+					: {}),
 			});
 			const builder = ck.ParagraphBuilder.MakeFromFontProvider(
 				style,
@@ -481,7 +487,11 @@ function drawText(
 			bin.track(shaped.para);
 		}
 		const { para, ascent } = shaped;
-		canvas.drawParagraph(para, first.x, (line.baseline ?? line.y) - ascent);
+		const left =
+			line.direction === "rtl"
+				? Math.min(...line.spans.map((s) => s.x))
+				: first.x;
+		canvas.drawParagraph(para, left, (line.baseline ?? line.y) - ascent);
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
 		const baseline = line.baseline ?? line.y;
@@ -964,6 +974,7 @@ function lineKey(
 		color,
 		line.spans.map((s) => [s.text, s.font, s.color]),
 		...(line.wordSpacing ? [line.wordSpacing] : []),
+		...(line.direction ? [line.direction] : []),
 	]);
 }
 

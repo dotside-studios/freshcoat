@@ -50,7 +50,7 @@ function collapse(text: string): string {
 	return text.replace(/\s+/g, " ");
 }
 
-type Line = { text: string; width: number };
+type Line = { text: string; width: number; hardBreak?: boolean };
 
 export function createParagraphEngine(
 	ck: CK,
@@ -106,8 +106,24 @@ export function createParagraphEngine(
 		};
 	}
 
-	function build(text: string, font: SpanFont): { para: CK; builder: CK } {
-		const style = new ck.ParagraphStyle({ textStyle: spanTextStyle(font) });
+	function paragraphStyle(font: SpanFont, direction?: "ltr" | "rtl"): CK {
+		return new ck.ParagraphStyle({
+			textStyle: spanTextStyle(font),
+			...(direction === "rtl"
+				? {
+						textDirection: ck.TextDirection.RTL,
+						textAlign: ck.TextAlign.Left,
+					}
+				: {}),
+		});
+	}
+
+	function build(
+		text: string,
+		font: SpanFont,
+		direction?: "ltr" | "rtl",
+	): { para: CK; builder: CK } {
+		const style = paragraphStyle(font, direction);
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
 		builder.addText(text);
 		return { para: builder.build(), builder };
@@ -122,11 +138,10 @@ export function createParagraphEngine(
 	function layoutInline(
 		spans: InlineSpan[],
 		maxWidth: number,
+		direction?: "ltr" | "rtl",
 	): { lines: InlineShapedLine[] } {
 		if (spans.length === 0) return { lines: [] };
-		const pstyle = new ck.ParagraphStyle({
-			textStyle: spanTextStyle(spans[0]!.font),
-		});
+		const pstyle = paragraphStyle(spans[0]!.font, direction);
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(pstyle, provider);
 		const ranges: { start: number; end: number; spanIndex: number }[] = [];
 		let cursor = 0;
@@ -187,9 +202,14 @@ export function createParagraphEngine(
 		}
 	}
 
-	function breakLines(text: string, font: SpanFont, maxWidth: number): Line[] {
+	function breakLines(
+		text: string,
+		font: SpanFont,
+		maxWidth: number,
+		direction?: "ltr" | "rtl",
+	): Line[] {
 		const norm = collapse(text);
-		const { para, builder } = build(norm, font);
+		const { para, builder } = build(norm, font, direction);
 		try {
 			para.layout(maxWidth);
 			return para
@@ -258,6 +278,7 @@ export function createParagraphEngine(
 				input.value,
 				{ ...input.font, size },
 				input.maxWidth,
+				input.direction,
 			);
 			return {
 				lines,
