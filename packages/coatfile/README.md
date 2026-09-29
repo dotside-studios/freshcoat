@@ -272,6 +272,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop` |
 
 `schema/coatfile.v1.schema.json` is the JSON Schema derived from the zod schema
 `validate` runs. `bun run schema` regenerates it, and a test fails when it
@@ -466,6 +467,74 @@ A single opaque rect or ellipse renders as a clip. Anything else (a path, an
 image's alpha, a gradient, text, luminance, `invert`) renders through an
 offscreen layer. The figma plugin emits one for every Figma "Use as mask" layer
 and the layers above it.
+
+## Grid layout
+
+A frame's `layout` is a flex layout (`direction`, as before) or a grid:
+
+```jsonc
+"layout": {
+  "type": "grid",
+  "columns": [120, "1fr", "2fr"],   // px, "auto" or "<n>fr"
+  "rows": ["auto", 80],             // optional; extra rows are "auto"
+  "gap": [8, 12],                   // one number, or [row gap, column gap]
+  "padding": { "top": 16, "left": 16 }
+}
+```
+
+Children fill cells row by row. A child's `layoutChild.column` and
+`layoutChild.row` pin it to a 1-based track, or span an inclusive
+`[first, last]` range. A column span has to lie within `columns`; rows are
+added as needed. A child with `width` or `height` set to `fill` stretches to
+its cell, `hug` takes its content's size, and otherwise it keeps its own size
+at the cell's top left. `fr` tracks need the frame's size on that axis, and
+`auto` tracks size to their largest single-track child.
+
+## Adjustments
+
+Any element, and the background, can carry `adjust`: per-layer tone applied as
+the layer composites. On a frame or mask it adjusts the composited result.
+
+```jsonc
+"adjust": {
+  "saturation": 1.2,   // 1 = unchanged, 0 = grey
+  "contrast": 1.1,     // 1 = unchanged, about the mid grey
+  "brightness": 0.95,  // 1 = unchanged, a multiplier
+  "gamma": 0.9,        // 1 = unchanged, below 1 lifts the mid tones
+  "sharpen": 0.5,      // 0 = none
+  "preserveHue": true  // give up saturation rather than hue when a boost clips
+}
+```
+
+It compiles through the engine's `buildAdjust`. A print render composes its
+correction after it rather than replacing it.
+
+## Image focus and crop
+
+`crop` selects part of an image's source before `fit` places it, as fractions of
+the source's width and height; it has to lie inside the image. `focus` is the
+point, as `[x, y]` fractions, that `cover` keeps centred, as near as the
+source's edges allow. `tile` repeats the whole source and ignores `crop`.
+
+```jsonc
+"properties": {
+  "src": "{{photo}}", "fit": "cover",
+  "focus": "{{photo_focus}}",                           // or [0.4, 0.3]
+  "crop": { "x": 0.1, "y": 0, "width": 0.8, "height": 1 }
+}
+```
+
+Photos differ per record, so `focus` also takes an `"x,y"` string, which is how a
+field supplies it. A value that does not read as a point in `[0, 1]` falls back
+to the centre; `parseImageFocus` and `formatImageFocus` convert between the two
+forms.
+
+## Ellipses
+
+There is no ellipse element. An ellipse is a `vector` whose `d` is two arcs
+across its box, which the engine draws exactly as it would an ellipse node, and
+which every 1.x reader already renders. A separate element would add nothing
+to the picture and would make those files unreadable to older kits.
 
 ## Conditional visibility
 

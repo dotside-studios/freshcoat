@@ -126,7 +126,16 @@ export async function sampleImageNode(
 		// and rendering it as fill gives analysis the same pixels without allocating
 		// a potentially enormous repeated surface.
 		const fit = node.fit === "tile" ? "fill" : node.fit;
-		const r = fitRect(img.width(), img.height(), 0, 0, width, height, fit);
+		const r = fitRect(
+			img.width(),
+			img.height(),
+			0,
+			0,
+			width,
+			height,
+			fit,
+			node.fit === "tile" ? undefined : node,
+		);
 		return drawImageToPixels(
 			c,
 			img,

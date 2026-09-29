@@ -4,13 +4,30 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import {
+	gridGaps,
+	makeTrack,
+	packGap,
+	resizeTracks,
+	switchLayout,
+	trackAmount,
+	trackKind,
+} from "~/panels/design/FrameSection";
+import {
 	commonValue,
 	documentSwatches,
+	focusFieldOf,
+	formatGridLine,
 	mergeKeyOf,
 	parseDash,
+	parseGridLine,
 	patchLayers,
 } from "~/panels/design/field-helpers";
 import { googleFontUrls, verifyGoogleFamily } from "~/panels/design/fonts";
+import {
+	focusFromPercent,
+	focusPercent,
+	setCropValue,
+} from "~/panels/design/ImageSection";
 import { liveRect, setAxis } from "~/panels/design/LayerSection";
 import { pathDataError } from "~/panels/design/VectorSection";
 import { doc, geometryOf } from "./doc-fixture";
@@ -164,5 +181,97 @@ describe("font families", () => {
 			throw new Error("offline");
 		});
 		expect(none).toBeNull();
+	});
+});
+
+describe("grid helpers", () => {
+	it("reads and builds tracks by kind", () => {
+		expect([120, "1.5fr", "auto"].map((t) => trackKind(t))).toEqual([
+			"fixed",
+			"fill",
+			"hug",
+		]);
+		expect([120, "1.5fr", "auto"].map((t) => trackAmount(t))).toEqual([
+			120,
+			1.5,
+			null,
+		]);
+		expect(makeTrack("fill")).toBe("1fr");
+		expect(makeTrack("fill", 2)).toBe("2fr");
+		expect(makeTrack("fixed")).toBe(100);
+		expect(makeTrack("hug", 40)).toBe("auto");
+	});
+
+	it("adds and drops tracks at the end", () => {
+		expect(resizeTracks([80], 3, "columns")).toEqual([80, "1fr", "1fr"]);
+		expect(resizeTracks([], 2, "rows")).toEqual(["auto", "auto"]);
+		expect(resizeTracks([80, "2fr", "auto"], 1, "columns")).toEqual([80]);
+	});
+
+	it("parses and formats grid lines", () => {
+		expect(parseGridLine("2")).toBe(2);
+		expect(parseGridLine("1-3")).toEqual([1, 3]);
+		expect(parseGridLine("2 / 2")).toBe(2);
+		expect(parseGridLine("auto")).toBeUndefined();
+		expect(parseGridLine("")).toBeUndefined();
+		expect(parseGridLine("3-1")).toBeNull();
+		expect(parseGridLine("0")).toBeNull();
+		expect(formatGridLine([1, 3])).toBe("1-3");
+		expect(formatGridLine(2)).toBe("2");
+	});
+
+	it("switches between flex and grid, keeping spacing", () => {
+		const grid = switchLayout(
+			{ direction: "column", gap: 6, padding: { top: 4 } },
+			"grid",
+		);
+		expect(grid).toEqual({
+			type: "grid",
+			columns: ["1fr", "1fr"],
+			gap: 6,
+			padding: { top: 4 },
+		});
+		expect(
+			switchLayout({ type: "grid", columns: [10], gap: [2, 9] }, "flex"),
+		).toEqual({ direction: "row", gap: 9 });
+	});
+
+	it("packs gaps into their shortest form", () => {
+		expect(packGap([0, 0])).toBeUndefined();
+		expect(packGap([4, 4])).toBe(4);
+		expect(packGap([4, 8])).toEqual([4, 8]);
+		expect(gridGaps({ type: "grid", columns: [1], gap: 3 })).toEqual([3, 3]);
+		expect(gridGaps({ type: "grid", columns: [1] })).toEqual([0, 0]);
+	});
+});
+
+describe("image framing helpers", () => {
+	it("reads and writes focal points in percent", () => {
+		expect(focusPercent(undefined)).toEqual({ x: 50, y: 50 });
+		expect(focusPercent([0.25, 1])).toEqual({ x: 25, y: 100 });
+		expect(focusPercent("{{photo_focus}}")).toEqual({ x: 50, y: 50 });
+		expect(focusFromPercent(50, 50)).toBeUndefined();
+		expect(focusFromPercent(20, 120)).toEqual([0.2, 1]);
+		expect(focusFieldOf("{{ photo_focus }}")).toBe("photo_focus");
+		expect(focusFieldOf("0.2,0.3")).toBeUndefined();
+	});
+
+	it("keeps a crop inside the image", () => {
+		const full = { x: 0, y: 0, width: 1, height: 1 };
+		expect(setCropValue(full, "x", 40)).toEqual({
+			x: 0.4,
+			y: 0,
+			width: 0.6,
+			height: 1,
+		});
+		expect(setCropValue({ ...full, x: 0.5, width: 0.5 }, "width", 80)).toEqual({
+			x: 0.5,
+			y: 0,
+			width: 0.5,
+			height: 1,
+		});
+		const edge = setCropValue(full, "y", 100);
+		expect(edge.y + edge.height).toBeLessThanOrEqual(1);
+		expect(edge.height).toBeGreaterThan(0);
 	});
 });

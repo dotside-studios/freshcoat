@@ -152,6 +152,10 @@ export type CornerRadius = number | [number, number, number, number];
 // viewBox, so they map onto the full scaled box.
 export type ViewBox = { x?: number; y?: number; width: number; height: number };
 
+// A region of an image source, each field a fraction of the source's width or
+// height, so the same crop holds whatever resolution the file is loaded at.
+export type ImageCrop = { x: number; y: number; width: number; height: number };
+
 export type Stroke = {
 	color: string;
 	width: number;
@@ -314,6 +318,9 @@ export type DrawImageCommand = DrawCommandBase & {
 	op: "drawImage";
 	src: string;
 	fit: "cover" | "contain" | "fill" | "tile";
+	// See ImageNode.
+	focus?: Vec2;
+	crop?: ImageCrop;
 	stroke?: Stroke;
 };
 

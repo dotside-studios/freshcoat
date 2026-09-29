@@ -1,4 +1,10 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
+import type {
+	Element,
+	FrameElement,
+	ImageProperties,
+	MaskElement,
+	Template,
+} from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
 import {
 	act,
@@ -6,6 +12,7 @@ import {
 	fireEvent,
 	render,
 	screen,
+	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
@@ -151,6 +158,99 @@ describe("DesignPanel", () => {
 			width: 1,
 		});
 		expect(e.shadow).toMatchObject({ dx: 0, dy: 4 });
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("switches a frame to a grid and edits its tracks and gaps", () => {
+		const c = setup(["0/3"]);
+		fireEvent.click(screen.getByRole("radio", { name: "Grid" }));
+		const layout = () =>
+			(el(c, "0/3").properties as { layout?: unknown }).layout;
+		expect(layout()).toEqual({
+			type: "grid",
+			columns: ["1fr", "1fr"],
+			gap: 10,
+			padding: { top: 10, right: 10, bottom: 10, left: 10 },
+		});
+		typeInto(screen.getByRole("spinbutton", { name: "Column count" }), "3");
+		expect(layout()).toMatchObject({ columns: ["1fr", "1fr", "1fr"] });
+		const first = screen.getByRole("radiogroup", { name: "Column 1 size" });
+		fireEvent.click(within(first).getByRole("radio", { name: "Fixed" }));
+		typeInto(screen.getByRole("spinbutton", { name: "Column 1 size" }), "80");
+		typeInto(screen.getByRole("spinbutton", { name: "Column 2 share" }), "2");
+		const third = screen.getByRole("radiogroup", { name: "Column 3 size" });
+		fireEvent.click(within(third).getByRole("radio", { name: "Hug" }));
+		expect(layout()).toMatchObject({ columns: [80, "2fr", "auto"] });
+		expect(screen.getByText("Added as children need them")).toBeTruthy();
+		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "2");
+		expect(layout()).toMatchObject({ rows: ["auto", "auto"] });
+		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "0");
+		expect(layout()).not.toHaveProperty("rows");
+		typeInto(screen.getByRole("spinbutton", { name: "Row gap" }), "4");
+		expect(layout()).toMatchObject({ gap: [4, 10] });
+		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("radio", { name: "Flex" }));
+		expect(layout()).toMatchObject({ direction: "row", gap: 10 });
+	});
+
+	it("places a grid child by column and row", () => {
+		const t = doc();
+		const row = t.template_data[0].elements[3] as FrameElement;
+		row.properties.layout = { type: "grid", columns: ["1fr", "1fr"] };
+		const c = setup(["0/3/0"], t);
+		expect(screen.queryByRole("checkbox", { name: "Grow" })).toBeNull();
+		typeInto(screen.getByLabelText("Grid column"), "1-2");
+		typeInto(screen.getByLabelText("Grid row"), "2");
+		expect(el(c, "0/3/0").layoutChild).toEqual({ column: [1, 2], row: 2 });
+		typeInto(screen.getByLabelText("Grid row"), "0");
+		expect(el(c, "0/3/0").layoutChild).toEqual({ column: [1, 2], row: 2 });
+		typeInto(screen.getByLabelText("Grid column"), "");
+		expect(el(c, "0/3/0").layoutChild).toEqual({ row: 2 });
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("adds adjustments and writes each factor", () => {
+		const c = setup(["0/0"]);
+		fireEvent.click(screen.getByRole("button", { name: "Add adjustments" }));
+		expect(el(c, "0/0").adjust).toEqual({});
+		typeInto(screen.getByRole("spinbutton", { name: "Saturation" }), "50");
+		typeInto(screen.getByRole("spinbutton", { name: "Gamma" }), "0.8");
+		fireEvent.click(screen.getByRole("checkbox", { name: "Preserve hue" }));
+		expect(el(c, "0/0").adjust).toEqual({
+			saturation: 0.5,
+			gamma: 0.8,
+			preserveHue: true,
+		});
+		typeInto(screen.getByRole("spinbutton", { name: "Saturation" }), "100");
+		expect(el(c, "0/0").adjust).toEqual({ gamma: 0.8, preserveHue: true });
+		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Remove adjustments" }));
+		expect(el(c, "0/0").adjust).toBeUndefined();
+	});
+
+	it("sets an image's focal point and crop", () => {
+		const c = setup(["0/2/0"]);
+		const props = () => el(c, "0/2/0").properties as ImageProperties;
+		typeInto(screen.getByRole("spinbutton", { name: "Focus X" }), "20");
+		expect(props().focus).toEqual([0.2, 0.5]);
+		fireEvent.click(screen.getByRole("checkbox", { name: "Crop image" }));
+		expect(props().crop).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+		typeInto(screen.getByRole("spinbutton", { name: "Crop X" }), "30");
+		expect(props().crop).toEqual({ x: 0.3, y: 0, width: 0.7, height: 1 });
+		typeInto(screen.getByRole("spinbutton", { name: "Crop width" }), "90");
+		expect(props().crop).toEqual({ x: 0.3, y: 0, width: 0.7, height: 1 });
+		expect(validate(c.template).ok).toBe(true);
+
+		cleanup();
+		const t = doc();
+		const mask = t.template_data[0].elements[2] as MaskElement;
+		(mask.properties.children[0].properties as ImageProperties).focus =
+			"{{name}}";
+		setup(["0/2/0"], t);
+		expect(
+			screen.getByRole("button", { name: /Focus source/ }).textContent,
+		).toContain("Name");
+		expect(screen.queryByRole("spinbutton", { name: "Focus X" })).toBeNull();
 		expect(validate(c.template).ok).toBe(true);
 	});
 });

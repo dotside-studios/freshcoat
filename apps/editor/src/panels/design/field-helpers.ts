@@ -107,3 +107,29 @@ export function parseDash(text: string): number[] | undefined | null {
 	if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
 	return parts;
 }
+
+type GridLine = number | [number, number];
+
+/** Parses a grid placement: "2" is one track, "1-3" a span, empty or "auto"
+ *  flows. Null for a typo. */
+export function parseGridLine(text: string): GridLine | undefined | null {
+	const s = text.trim().toLowerCase();
+	if (!s || s === "auto") return undefined;
+	const m = /^(\d+)(?:\s*[-–/]\s*(\d+))?$/.exec(s);
+	if (!m) return null;
+	const first = Number(m[1]);
+	const last = m[2] === undefined ? first : Number(m[2]);
+	if (first < 1 || last < first) return null;
+	return first === last ? first : [first, last];
+}
+
+export function formatGridLine(line: GridLine | undefined): string {
+	if (line === undefined) return "";
+	return typeof line === "number" ? String(line) : `${line[0]}-${line[1]}`;
+}
+
+/** The field an image's focus is bound to, from "{{key}}", or undefined. */
+export function focusFieldOf(focus: unknown): string | undefined {
+	if (typeof focus !== "string") return undefined;
+	return /^\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}$/.exec(focus)?.[1];
+}

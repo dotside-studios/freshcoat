@@ -66,7 +66,24 @@ export type FigmaImagePaint = {
 	opacity?: number;
 	scaleMode: "FILL" | "FIT" | "TILE" | "STRETCH";
 	imageRef: string;
+	// STRETCH (the Plugin API's CROP) only: maps the layer's unit square into
+	// the image's, so its translation and scale are the visible region.
+	imageTransform?: FigmaTransform;
+	filters?: FigmaImageFilters;
 };
+
+// Figma's image adjustments, each in [-1, 1] with 0 unchanged.
+export type FigmaImageFilters = {
+	exposure?: number;
+	contrast?: number;
+	saturation?: number;
+	temperature?: number;
+	tint?: number;
+	highlights?: number;
+	shadows?: number;
+};
+
+export type FigmaGridTrack = { type: "FLEX" | "FIXED" | "HUG"; value?: number };
 
 export type FigmaPaint = FigmaSolidPaint | FigmaGradientPaint | FigmaImagePaint;
 
@@ -164,6 +181,11 @@ type FigmaBaseNode = {
 	layoutSizingHorizontal?: "FIXED" | "HUG" | "FILL";
 	layoutSizingVertical?: "FIXED" | "HUG" | "FILL";
 	layoutPositioning?: "AUTO" | "ABSOLUTE";
+	// Grid child fields, read only inside a GRID parent. Indices are 0-based.
+	gridRowAnchorIndex?: number;
+	gridColumnAnchorIndex?: number;
+	gridRowSpan?: number;
+	gridColumnSpan?: number;
 	// Absent on a GROUP and a BOOLEAN_OPERATION, which the Plugin API gives
 	// none: resizing a frame applies their children's constraints instead.
 	constraints?: FigmaConstraints;
@@ -260,7 +282,11 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	mainComponentId?: string | null;
 	// Auto-layout container fields. layoutMode NONE (or absent) = not an
 	// auto-layout frame (today's absolute behavior).
-	layoutMode?: "NONE" | "HORIZONTAL" | "VERTICAL";
+	layoutMode?: "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID";
+	gridRowGap?: number;
+	gridColumnGap?: number;
+	gridRowSizes?: FigmaGridTrack[];
+	gridColumnSizes?: FigmaGridTrack[];
 	itemSpacing?: number;
 	counterAxisSpacing?: number | null;
 	paddingTop?: number;

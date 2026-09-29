@@ -11,7 +11,12 @@
 // (PrintOptimizeOptions) down to freshcoat's math (color matrix + LUT + sharpen).
 // freshcoat never learns what "dye-sub" or "K panel" means.
 
-import type { Adjust, ImageNode, Node } from "@freshcoat-js/engine";
+import {
+	type Adjust,
+	composeAdjust,
+	type ImageNode,
+	type Node,
+} from "@freshcoat-js/engine";
 import { analyzePixels, correctionMatrix } from "./analyze";
 import { NO_PROCESSING, YMCKO_PRESET } from "./presets";
 import type {
@@ -191,7 +196,10 @@ function withAdjust(
 			: null;
 	if (!merged) return node;
 	const adjust = printAdjust(merged);
-	return Object.keys(adjust).length > 0 ? { ...node, adjust } : node;
+	if (Object.keys(adjust).length === 0) return node;
+	// A layer's own adjustment is part of its design; the correction applies to
+	// what it produces.
+	return { ...node, adjust: composeAdjust(node.adjust, adjust) };
 }
 
 // Walk a tree, mapping every node through `leaf` (for drawables) while recursing
@@ -249,10 +257,11 @@ export async function analyzeScene(
 	// Cache the in-flight PROMISE, not the resolved value: children walk
 	// concurrently (Promise.all), so identical layers would otherwise both miss a
 	// value-cache and sample twice. Key on the rendered appearance (src + fit +
-	// size), since the same src cropped differently analyzes differently.
+	// size + focus + crop), since the same src cropped differently analyzes
+	// differently.
 	const cache = new Map<string, Promise<ImageAnalysis>>();
 	const sampleKey = (n: ImageNode) =>
-		`${n.src}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}`;
+		`${n.src}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
 
 	function photoOptions(node: ImageNode): Promise<PrintOptimizeOptions | null> {
 		if (!analyzePhotos) return Promise.resolve(policy.photo ?? null);
