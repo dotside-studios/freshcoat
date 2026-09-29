@@ -13,6 +13,7 @@ import type {
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
+	BearerBarsSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
 	CornerRadiusSchema,
@@ -68,6 +69,7 @@ export type ImageProperties = z.infer<typeof ImagePropertiesSchema>;
 export type QrCodeProperties = z.infer<typeof QrCodePropertiesSchema>;
 export type BarcodeProperties = z.infer<typeof BarcodePropertiesSchema>;
 export type Symbology = z.infer<typeof SymbologySchema>;
+export type BearerBars = z.infer<typeof BearerBarsSchema>;
 export type RectProperties = z.infer<typeof RectPropertiesSchema>;
 export type VectorProperties = z.infer<typeof VectorPropertiesSchema>;
 

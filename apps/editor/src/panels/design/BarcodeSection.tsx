@@ -1,6 +1,7 @@
 import {
 	type BarcodeElement,
 	type BarcodeProperties,
+	type BearerBars,
 	defaultQuietZone,
 	errorCorrectionRange,
 	getBarcodeEncoder,
@@ -33,6 +34,12 @@ import { commonValue, type Inspect } from "./field-helpers";
 const GROUPS: [string, Symbology[]][] = [
 	["1D", SYMBOLOGIES.filter(isLinearSymbology)],
 	["2D", SYMBOLOGIES.filter((s) => !isLinearSymbology(s))],
+];
+
+const BEARER_BARS: [BearerBars, string][] = [
+	["none", "None"],
+	["frame", "Frame"],
+	["horizontal", "Top and bottom"],
 ];
 
 const EC_HINT: Partial<Record<Symbology, string>> = {
@@ -91,6 +98,8 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 	const background = pick((p) => p.background ?? null);
 	const quietZone = pick((p) => p.quietZone ?? defaultQuietZone(p.symbology));
 	const anyBackground = props.some((p) => p.background);
+	const itf14 = props.every((p) => p.symbology === "itf14");
+	const bearerBars = pick((p) => p.bearerBars ?? "none");
 
 	const chooseSymbology = (next: Symbology) =>
 		ins.set("barcode-symbology", (el) => {
@@ -110,6 +119,7 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 					symbology: next,
 					quietZone: undefined,
 					errorCorrection: undefined,
+					bearerBars: undefined,
 				},
 			};
 		});
@@ -232,6 +242,27 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 					}
 				/>
 			</Row>
+			{itf14 ? (
+				<Row label="Bearers">
+					<Select
+						aria-label="Bearer bars"
+						className="min-w-0 flex-1"
+						placeholder="Mixed"
+						value={bearerBars}
+						onChange={(v) =>
+							set("barcode-bearers", {
+								bearerBars: v === "none" ? undefined : (v as BearerBars),
+							})
+						}
+					>
+						{BEARER_BARS.map(([id, label]) => (
+							<SelectItem key={id} id={id}>
+								{label}
+							</SelectItem>
+						))}
+					</Select>
+				</Row>
+			) : null}
 			{range && symbology ? (
 				<>
 					<Row label="Recovery">
