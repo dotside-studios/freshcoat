@@ -341,30 +341,31 @@ function CropRows({ ins }: { ins: Inspect }) {
 					Crop image
 				</Checkbox>
 			</Row>
-			{on === true && (
-				<Row label="">
-					<Pair cols={4} className="flex-1">
-						{CROP_FIELDS.map(([key, label, aria]) => (
-							<NumberField
-								key={key}
-								label={label}
-								aria-label={aria}
-								unit="%"
-								min={key === "width" || key === "height" ? 1 : 0}
-								max={100}
-								precision={1}
-								value={common ? Math.round(common[key] * 1000) / 10 : null}
-								onChange={(v) =>
-									ins.setProps(`crop-${key}`, (el) => {
-										const c = (el as ImageElement).properties.crop;
-										return c ? { crop: setCropValue(c, key, v) } : null;
-									})
-								}
-							/>
-						))}
-					</Pair>
-				</Row>
-			)}
+			{on === true &&
+				[CROP_FIELDS.slice(0, 2), CROP_FIELDS.slice(2)].map((pair) => (
+					<Row key={pair[0][0]} label="">
+						<Pair className="flex-1">
+							{pair.map(([key, label, aria]) => (
+								<NumberField
+									key={key}
+									label={label}
+									aria-label={aria}
+									unit="%"
+									min={key === "width" || key === "height" ? 1 : 0}
+									max={100}
+									precision={1}
+									value={common ? Math.round(common[key] * 1000) / 10 : null}
+									onChange={(v) =>
+										ins.setProps(`crop-${key}`, (el) => {
+											const c = (el as ImageElement).properties.crop;
+											return c ? { crop: setCropValue(c, key, v) } : null;
+										})
+									}
+								/>
+							))}
+						</Pair>
+					</Row>
+				))}
 		</>
 	);
 }

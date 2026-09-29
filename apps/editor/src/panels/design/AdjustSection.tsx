@@ -2,7 +2,14 @@ import type { Element, ElementAdjust } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
-import { AddButton, Notice, RemoveButton, Row, SharedNotice } from "./controls";
+import {
+	AddButton,
+	Notice,
+	Pair,
+	RemoveButton,
+	Row,
+	SharedNotice,
+} from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 
 type Factor = "saturation" | "contrast" | "brightness";
@@ -66,22 +73,25 @@ export function AdjustSection({ ins }: { ins: Inspect }) {
 			{all && (
 				<>
 					<SharedNotice />
-					{FACTORS.map(([key, label]) => (
-						<Row key={key} label={label}>
-							<NumberField
-								aria-label={label}
-								className="min-w-0 flex-1"
-								unit="%"
-								min={0}
-								max={400}
-								precision={0}
-								value={pick((a) => percent(a[key]))}
-								onChange={(v) =>
-									update(key, { [key]: v === 100 ? undefined : v / 100 })
-								}
-							/>
-						</Row>
-					))}
+					<Row label="Tone">
+						<Pair cols={3} className="flex-1">
+							{FACTORS.map(([key, label]) => (
+								<NumberField
+									key={key}
+									label={label[0]}
+									aria-label={label}
+									unit="%"
+									min={0}
+									max={400}
+									precision={0}
+									value={pick((a) => percent(a[key]))}
+									onChange={(v) =>
+										update(key, { [key]: v === 100 ? undefined : v / 100 })
+									}
+								/>
+							))}
+						</Pair>
+					</Row>
 					<Row label="Gamma">
 						<NumberField
 							aria-label="Gamma"
