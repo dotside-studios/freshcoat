@@ -110,31 +110,103 @@ type Written = {
 	offset: number;
 };
 
+// A 32-bit field holds values up to this; the value itself means "see the
+// zip64 extra field", so it is never written as a size or offset of its own.
+const MAX32 = 0xffffffff;
+const MAX16 = 0xffff;
+const ZIP64_VERSION = 45;
+
+// A zip64 extra field carrying `values`, which are the header fields that
+// read MAX32, in the order the format fixes: size, compressed size, offset.
+function zip64Extra(values: number[]): Uint8Array {
+	if (values.length === 0) return new Uint8Array(0);
+	const out = new Uint8Array(4 + 8 * values.length);
+	const view = new DataView(out.buffer);
+	view.setUint16(0, 0x0001, true);
+	view.setUint16(2, 8 * values.length, true);
+	values.forEach((v, i) => {
+		view.setBigUint64(4 + 8 * i, BigInt(v), true);
+	});
+	return out;
+}
+
 function header(entry: Written, time: number, central: boolean): Uint8Array {
-	const out = new Uint8Array((central ? 46 : 30) + entry.name.length);
+	// A local header has no offset, and when either size overflows it marks
+	// and carries both, as readers expect.
+	const wideSizes = entry.size >= MAX32 || entry.compressed >= MAX32;
+	const size = central || !wideSizes ? Math.min(entry.size, MAX32) : MAX32;
+	const compressed =
+		central || !wideSizes ? Math.min(entry.compressed, MAX32) : MAX32;
+	const offset = Math.min(entry.offset, MAX32);
+	const extra = zip64Extra(
+		central
+			? [
+					...(size === MAX32 ? [entry.size] : []),
+					...(compressed === MAX32 ? [entry.compressed] : []),
+					...(offset === MAX32 ? [entry.offset] : []),
+				]
+			: wideSizes
+				? [entry.size, entry.compressed]
+				: [],
+	);
+	const version = extra.length ? ZIP64_VERSION : 20;
+	const out = new Uint8Array(
+		(central ? 46 : 30) + entry.name.length + extra.length,
+	);
 	const view = new DataView(out.buffer);
 	let at = 0;
 	view.setUint32(at, central ? 0x02014b50 : 0x04034b50, true);
 	at += 4;
 	if (central) {
-		view.setUint16(at, 20, true);
+		view.setUint16(at, version, true);
 		at += 2;
 	}
-	view.setUint16(at, 20, true);
+	view.setUint16(at, version, true);
 	view.setUint16(at + 2, entry.utf8 ? 0x0800 : 0, true);
 	view.setUint16(at + 4, entry.compression, true);
 	view.setUint32(at + 6, time, true);
 	view.setUint32(at + 10, entry.crc, true);
-	view.setUint32(at + 14, entry.compressed, true);
-	view.setUint32(at + 18, entry.size, true);
+	view.setUint32(at + 14, compressed, true);
+	view.setUint32(at + 18, size, true);
 	view.setUint16(at + 22, entry.name.length, true);
+	view.setUint16(at + 24, extra.length, true);
 	at += 26;
 	if (central) {
-		// extra, comment, disk, internal and external attributes: all zero
-		view.setUint32(at + 10, entry.offset, true);
+		// comment, disk, internal and external attributes: all zero
+		view.setUint32(at + 10, offset, true);
 		at += 14;
 	}
 	out.set(entry.name, at);
+	out.set(extra, at + entry.name.length);
+	return out;
+}
+
+// The end of the central directory, preceded by the zip64 record and its
+// locator when a count, size or offset does not fit the classic record.
+function endRecords(entries: number, size: number, start: number): Uint8Array {
+	const zip64 = entries >= MAX16 || size >= MAX32 || start >= MAX32;
+	const out = new Uint8Array((zip64 ? 56 + 20 : 0) + 22);
+	const view = new DataView(out.buffer);
+	let at = 0;
+	if (zip64) {
+		view.setUint32(0, 0x06064b50, true);
+		view.setBigUint64(4, 44n, true);
+		view.setUint16(12, ZIP64_VERSION, true);
+		view.setUint16(14, ZIP64_VERSION, true);
+		view.setBigUint64(24, BigInt(entries), true);
+		view.setBigUint64(32, BigInt(entries), true);
+		view.setBigUint64(40, BigInt(size), true);
+		view.setBigUint64(48, BigInt(start), true);
+		view.setUint32(56, 0x07064b50, true);
+		view.setBigUint64(64, BigInt(start + size), true);
+		view.setUint32(72, 1, true);
+		at = 76;
+	}
+	view.setUint32(at, 0x06054b50, true);
+	view.setUint16(at + 8, Math.min(entries, MAX16), true);
+	view.setUint16(at + 10, Math.min(entries, MAX16), true);
+	view.setUint32(at + 12, Math.min(size, MAX32), true);
+	view.setUint32(at + 16, Math.min(start, MAX32), true);
 	return out;
 }
 
@@ -148,13 +220,12 @@ export type ZipWriter = {
 	readonly entries: number;
 };
 
-const ZIP32_LIMIT = 0xffffffff;
-
 /**
  * An incremental zip writer. A stored Blob entry is read twice, once for its
  * CRC and once into the output; a deflated one is read into memory, which
- * suits the small text entries it is used for. There is no zip64: a zip that
- * would pass 4 GB or 65535 entries throws instead of writing a broken file.
+ * suits the small text entries it is used for. Zip64 records are written only
+ * where a size, offset or count needs them, so a zip under 4 GB and 65,535
+ * entries is the same classic zip it always was.
  */
 export function createZipWriter(out: ZipOutput, mtime: Date): ZipWriter {
 	const time = dosTime(mtime);
@@ -199,11 +270,6 @@ export function createZipWriter(out: ZipOutput, mtime: Date): ZipWriter {
 				offset,
 			};
 			const local = header(record, time, false);
-			if (
-				offset + local.length + compressed > ZIP32_LIMIT ||
-				written.length >= 0xffff
-			)
-				throw new Error("the zip would pass 4 GB or 65535 files");
 			await out.write(local);
 			await out.write(body);
 			offset += local.length + compressed;
@@ -219,13 +285,7 @@ export function createZipWriter(out: ZipOutput, mtime: Date): ZipWriter {
 				directory += central.length;
 				await out.write(central);
 			}
-			const end = new Uint8Array(22);
-			const view = new DataView(end.buffer);
-			view.setUint32(0, 0x06054b50, true);
-			view.setUint16(8, written.length, true);
-			view.setUint16(10, written.length, true);
-			view.setUint32(12, directory, true);
-			view.setUint32(16, start, true);
+			const end = endRecords(written.length, directory, start);
 			await out.write(end);
 			offset += directory + end.length;
 		},
