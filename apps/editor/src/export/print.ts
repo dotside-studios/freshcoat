@@ -2,6 +2,7 @@ import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
 import type { PaintWarning } from "@freshcoat-js/engine";
 import type { ChannelBalance, PrintProfile } from "@freshcoat-js/for-print";
 import type { ExportPreset, PresetPrint } from "@freshcoat-js/workspace";
+import { formatDate } from "~/app/format";
 
 /** What a render request carries when the preset prints: plain data, so it
  *  crosses to the worker as it is. */
@@ -108,7 +109,7 @@ export function profileLabel(profile: PrintProfile): {
 	const at = profile.measuredAt ? new Date(profile.measuredAt) : null;
 	const date =
 		at && !Number.isNaN(at.getTime())
-			? at.toLocaleDateString("en-US", {
+			? formatDate(at, {
 					year: "numeric",
 					month: "short",
 					day: "numeric",

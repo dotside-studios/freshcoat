@@ -1,4 +1,5 @@
 import { ProgressBar } from "@freshcoat-js/ui/progress";
+import { formatNumber } from "~/app/format";
 import { usePhotoImportProgress } from "./actions";
 
 /** The running photo import's progress, over the bottom of the section. */
@@ -15,7 +16,7 @@ export function PhotoImportBar() {
 					label={progress.label}
 					value={progress.done}
 					maxValue={Math.max(1, progress.total)}
-					valueLabel={`${progress.done.toLocaleString()} of ${progress.total.toLocaleString()}`}
+					valueLabel={`${formatNumber(progress.done)} of ${formatNumber(progress.total)}`}
 				/>
 			</div>
 		</div>

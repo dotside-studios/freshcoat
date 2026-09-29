@@ -559,6 +559,11 @@ spelling, "Couldn't …" for failures, and one vocabulary (template, side,
 layer, field, dataset, record, column, preset, export). Shared strings live
 in `src/app/copy.ts`, and a guard test keeps the retired words out.
 
+The words are English everywhere, but numbers, sizes, dates and times are
+written in the browser's language (`navigator.language`): 2,400 records in
+the US, 2.400 records in Germany. They all go through `src/app/format.ts`, and
+the unit tests pin it to en-US.
+
 ## Render stats
 
 The status bar shows user facts: the side, the size, the selection, issues

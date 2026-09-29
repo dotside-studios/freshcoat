@@ -24,6 +24,7 @@ import {
 import { type DragEvent, useEffect, useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
+import { formatNumber } from "~/app/format";
 import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
@@ -222,7 +223,7 @@ export function ImportWizard({
 		const rowsWithIssues = new Set(result.issues.map((i) => i.row)).size;
 		onImported(
 			result.dataset.id,
-			`Imported ${plural(result.added, "record")}${result.updated ? `, updated ${result.updated.toLocaleString("en-US")}` : ""} into ${result.dataset.name}${rowsWithIssues ? ` · ${rowsWithIssues.toLocaleString("en-US")} with issues` : ""}`,
+			`Imported ${plural(result.added, "record")}${result.updated ? `, updated ${formatNumber(result.updated)}` : ""} into ${result.dataset.name}${rowsWithIssues ? ` · ${formatNumber(rowsWithIssues)} with issues` : ""}`,
 		);
 	};
 
@@ -414,12 +415,12 @@ export function ImportWizard({
 				) : step === 3 && result ? (
 					<div className="flex flex-col gap-2 p-3">
 						<p data-testid="import-totals" className="tabular-nums">
-							<strong>{result.added.toLocaleString()}</strong> to add ·{" "}
-							<strong>{result.updated.toLocaleString()}</strong> to update ·{" "}
+							<strong>{formatNumber(result.added)}</strong> to add ·{" "}
+							<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
 							<strong
 								className={result.issues.length ? "text-fc-danger" : undefined}
 							>
-								{new Set(result.issues.map((i) => i.row)).size.toLocaleString()}
+								{formatNumber(new Set(result.issues.map((i) => i.row)).size)}
 							</strong>{" "}
 							with issues
 						</p>
@@ -430,8 +431,7 @@ export function ImportWizard({
 						/>
 						{samples.length > preview.length ? (
 							<p className="text-fc-faint text-fc-sm">
-								Showing {preview.length} of{" "}
-								{samples.length.toLocaleString("en-US")}
+								Showing {preview.length} of {formatNumber(samples.length)}
 							</p>
 						) : null}
 					</div>
