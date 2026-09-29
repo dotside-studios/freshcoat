@@ -523,23 +523,25 @@ export type Guide = { x1: number; y1: number; x2: number; y2: number };
 export type SnapResult = { dx: number; dy: number; guides: Guide[] };
 
 /**
- * The artboard's edges and centre lines, plus the edges and centres of every
- * layer that is not moving, not inside a moving layer, not hidden and not a
- * mask source. Rotated layers offer their painted bounds.
+ * The artboard's edges and centre lines, the side's ruler guides, plus the
+ * edges and centres of every layer that is not moving, not inside a moving
+ * layer, not hidden and not a mask source. Rotated layers offer their painted
+ * bounds.
  */
 export function snapCandidates(
 	geometry: LayerGeometry,
 	artboard: { width: number; height: number },
 	moving: Iterable<string>,
 	hidden: ReadonlySet<string> = new Set(),
+	guides: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] },
 ): SnapCandidates {
 	const movingKeys = [...moving];
 	const hiddenKeys = [...hidden];
 	const W = artboard.width;
 	const H = artboard.height;
 	const out: SnapCandidates = {
-		x: [0, W / 2, W].map((value) => ({ value, from: 0, to: H })),
-		y: [0, H / 2, H].map((value) => ({ value, from: 0, to: W })),
+		x: [0, W / 2, W, ...guides.x].map((value) => ({ value, from: 0, to: H })),
+		y: [0, H / 2, H, ...guides.y].map((value) => ({ value, from: 0, to: W })),
 	};
 	for (const key of geometry.keys()) {
 		const p = parseKey(key);

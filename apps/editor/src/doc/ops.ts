@@ -23,10 +23,13 @@ import {
 	subtleSha256,
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
-import { INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
+import type { CanvasKit } from "canvaskit-wasm";
+import { BOOLEAN, INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";
+import { type BooleanOp, combineShapes, isBooleanShape } from "./boolean";
 import { round2 } from "./factories";
 import {
+	isAutoLayoutChild,
 	type LayerGeometry,
 	parentOrigin,
 	type Rect,
@@ -426,6 +429,81 @@ export function groupElements(
 		grouped,
 		t.template_data[side]?.name ?? "",
 		shifts,
+	);
+	return ok(next, [keyOf({ side, path: [...parentPath, at] })]);
+}
+
+/**
+ * Combines sibling shapes into one vector layer with `op`, in the bottom-most
+ * one's place, keeping its fill, stroke and effects, as Figma does.
+ */
+export function booleanElements(
+	t: Template,
+	keys: string[],
+	op: BooleanOp,
+	ck: CanvasKit,
+): OpResult {
+	const targets = targetsOf(t, keys);
+	if (!Array.isArray(targets)) return targets;
+	if (targets.length < 2) return refuse("too_few", BOOLEAN.tooFew);
+	const parentPath = targets[0].path.slice(0, -1);
+	const side = targets[0].side;
+	const siblings = targets.every(
+		(tg) =>
+			tg.side === side &&
+			tg.path.length === parentPath.length + 1 &&
+			parentPath.every((v, i) => tg.path[i] === v),
+	);
+	if (!siblings) return refuse("not_siblings", "Layers must share a parent");
+	const elements = targets.map((tg) => getElement(t, tg.key) as Element);
+	const odd = targets.filter((_, i) => !isBooleanShape(elements[i]));
+	if (odd.length)
+		return refuse(
+			"not_a_shape",
+			BOOLEAN.notShape,
+			odd.map((tg) => tg.key),
+		);
+	if (targets.some((tg) => isAutoLayoutChild(t, tg.key)))
+		return refuse("auto_layout", BOOLEAN.autoLayout);
+	const shape = combineShapes(ck, elements, op);
+	if (!shape) return refuse("empty_result", BOOLEAN.empty);
+
+	const bottom = elements[0] as Exclude<
+		Element,
+		{ type: "frame" | "mask" | "text" | "image" | "qr_code" | "barcode" }
+	>;
+	const {
+		id: _id,
+		type: _type,
+		pos: _pos,
+		size: _size,
+		rotation: _rotation,
+		properties,
+		...shell
+	} = bottom;
+	const combined: Element = {
+		...shell,
+		id: nextFreeId(usedIds(t, side), op),
+		type: "vector",
+		pos: { x: shape.box.x, y: shape.box.y },
+		size: { width: shape.box.width, height: shape.box.height },
+		properties: {
+			d: shape.d,
+			...(shape.fillRule ? { fillRule: shape.fillRule } : {}),
+			...(properties.fill !== undefined ? { fill: properties.fill } : {}),
+			...(properties.stroke !== undefined ? { stroke: properties.stroke } : {}),
+		},
+	};
+	const indexes = targets.map((tg) => tg.path.at(-1) as number);
+	const at = Math.min(...indexes);
+	const replaced = updateList(t, side, parentPath, (list) => {
+		const rest = list.filter((_, i) => !indexes.includes(i));
+		return [...rest.slice(0, at), combined, ...rest.slice(at)];
+	});
+	const ids = new Set<string>();
+	for (const el of elements) subtreeIds(el, ids);
+	const next = editDeltas(replaced, t.template_data[side]?.name ?? "", (d) =>
+		ids.has(d.id) ? [] : [d],
 	);
 	return ok(next, [keyOf({ side, path: [...parentPath, at] })]);
 }

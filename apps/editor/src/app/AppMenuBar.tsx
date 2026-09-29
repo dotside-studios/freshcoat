@@ -72,6 +72,11 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"object.group",
 			"object.ungroup",
 			"-",
+			"object.union",
+			"object.subtract",
+			"object.intersect",
+			"object.exclude",
+			"-",
 			"object.front",
 			"object.forward",
 			"object.backward",
@@ -103,6 +108,8 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"view.inspector",
 			"view.panels",
 			"-",
+			"view.rulers",
+			"view.clearGuides",
 			"view.printGuides",
 			"view.renderStats",
 			"theme",
@@ -130,6 +137,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const panels = useEditor((s) => s.panels);
 	const theme = useThemePreference();
 	const renderStats = useRenderStats();
+	const rulers = useEditor((s) => s.rulers);
 	usePrintGuidesVersion();
 	const guides = useEditor((s) =>
 		printGuidesOn(s.workspace?.activeTemplateId, present(s)),
@@ -224,6 +232,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 										shortcut={c.keys?.[0]}
 										destructive={id === "edit.delete"}
 										icon={
+											(id === "view.rulers" && rulers) ||
 											(id === "view.printGuides" && guides) ||
 											(id === "view.renderStats" && renderStats) ? (
 												<CheckIcon />

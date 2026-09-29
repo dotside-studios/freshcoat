@@ -98,6 +98,14 @@ export type Binding = {
 	variant?: VariantSource;
 };
 
+/** Ruler guides on one side, in template units: vertical guides at `x`,
+ *  horizontal ones at `y`. */
+export type SideGuides = { x: number[]; y: number[] };
+
+/** Guides by side name. Editor state: the workspace keeps them, the template
+ *  never does, so rendering and exports cannot see them. */
+export type TemplateGuides = Readonly<Record<string, SideGuides>>;
+
 export type TemplateEntry = {
 	/** "t_xxxxxxxx", workspace-local, not the template's own id */
 	id: string;
@@ -105,6 +113,7 @@ export type TemplateEntry = {
 	fileName: string;
 	template: Template;
 	binding?: Binding;
+	guides?: TemplateGuides;
 };
 
 export type ExportFormat = "png-zip" | "jpeg-zip" | "webp-zip" | "pdf";

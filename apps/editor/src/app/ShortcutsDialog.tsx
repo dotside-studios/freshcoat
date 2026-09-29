@@ -42,6 +42,18 @@ export function ShortcutsDialog({
 											<Kbd shortcut={(c.keys as string[])[0] as string} />
 										</li>
 									))}
+									{group === "Tools" ? (
+										<>
+											<li className="flex items-center justify-between gap-3">
+												<span className="truncate">Finish path</span>
+												<Kbd shortcut="Enter" />
+											</li>
+											<li className="flex items-center justify-between gap-3">
+												<span className="truncate">Remove last point</span>
+												<Kbd shortcut="Backspace" />
+											</li>
+										</>
+									) : null}
 									{group === "Edit" ? (
 										<li className="flex items-center justify-between gap-3">
 											<span className="truncate">Nudge (×10 with Shift)</span>

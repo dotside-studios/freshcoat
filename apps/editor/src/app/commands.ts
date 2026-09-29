@@ -1,11 +1,12 @@
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
+import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
 import { loadBarcodeEncoder } from "~/render/barcode";
 import type { EditorState, Tool } from "~/state/store";
 import type { Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
-import { TEMPLATE_SETUP } from "./copy";
+import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
 import { toggleRenderStats } from "./render-stats";
 import { setThemePreference, type ThemePreference } from "./theme";
 
@@ -53,6 +54,16 @@ const tool = (t: Tool, label: string, key: string): Command => ({
 		else controller.dispatch({ type: "setTool", tool: t });
 		// Fetched now so the first code drawn is not a placeholder.
 		if (t === "barcode") void loadBarcodeEncoder().catch(() => {});
+	},
+});
+const booleanCommand = (op: BooleanOp, key: string): Command => ({
+	id: `object.${op}`,
+	label: BOOLEAN[op],
+	keys: [key],
+	group: "Object",
+	enabled: (s) => s.selection.filter((k) => !k.endsWith("/bg")).length > 1,
+	run: ({ controller }) => {
+		void controller.booleanSelection(op);
 	},
 });
 const themeCommand = (pref: ThemePreference, label: string): Command => ({
@@ -302,6 +313,10 @@ export const COMMANDS: Command[] = [
 		enabled: hasSelection,
 		run: ({ controller }) => controller.ungroupSelection(),
 	},
+	booleanCommand("union", "Alt+Shift+U"),
+	booleanCommand("subtract", "Alt+Shift+S"),
+	booleanCommand("intersect", "Alt+Shift+I"),
+	booleanCommand("exclude", "Alt+Shift+X"),
 	{
 		id: "object.forward",
 		label: "Bring forward",
@@ -364,6 +379,7 @@ export const COMMANDS: Command[] = [
 	tool("rect", "Rectangle", "R"),
 	tool("ellipse", "Ellipse", "O"),
 	tool("text", "Text", "T"),
+	tool("pen", "Pen", "P"),
 	tool("image", "Image…", "I"),
 	tool("qr", "QR code", "Q"),
 	tool("barcode", "Barcode", "B"),
@@ -441,6 +457,30 @@ export const COMMANDS: Command[] = [
 				type: "setPanels",
 				panels: { right: !controller.state.panels.right },
 			}),
+	},
+	{
+		id: "view.rulers",
+		label: "Rulers",
+		keys: ["Shift+R"],
+		group: "View",
+		enabled: hasDoc,
+		run: ({ controller }) =>
+			controller.dispatch({
+				type: "setRulers",
+				on: !controller.state.rulers,
+			}),
+	},
+	{
+		id: "view.clearGuides",
+		label: "Remove guides",
+		group: "View",
+		enabled: (s) => {
+			const t = s.doc?.history.present;
+			const name = t?.template_data[s.side]?.name;
+			const g = name === undefined ? undefined : s.doc?.history.guides[name];
+			return !!g && g.x.length + g.y.length > 0;
+		},
+		run: ({ controller }) => controller.clearGuides(),
 	},
 	{
 		id: "view.printGuides",

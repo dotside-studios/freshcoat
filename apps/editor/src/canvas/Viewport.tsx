@@ -31,8 +31,10 @@ import {
 } from "~/doc/geometry";
 import { duplicateElements } from "~/doc/ops";
 import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
+import { constrain45, type PenPath, smoothPoint } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { Tool } from "~/state/store";
+import { Guides } from "./Guides";
 import { parseGradientHandle } from "./gradient-geometry";
 import {
 	draggedGradient,
@@ -42,17 +44,19 @@ import {
 	gradientWithStopAt,
 	withGradient,
 } from "./gradient-handles";
-import { Overlay, type OverlayDraft } from "./Overlay";
+import { Overlay, type OverlayDraft, type PenDraft } from "./Overlay";
 import {
 	printGuidesFor,
 	printGuidesOn,
 	usePrintGuidesVersion,
 } from "./print-guides";
+import { Rulers } from "./Rulers";
 import { TextEditor } from "./TextEditor";
 import { useLiveRender } from "./use-live-render";
 
 const DRAG_THRESHOLD = { mouse: 3, touch: 6 };
 const SNAP_PX = 6;
+const CLOSE_PX = 8;
 
 const CREATE_KIND: Partial<Record<Tool, ElementKind>> = {
 	frame: "frame",
@@ -118,6 +122,13 @@ type Gesture =
 			pointerType: string;
 	  }
 	| { kind: "marquee"; startWorld: Point; additive: boolean; before: string[] }
+	| {
+			kind: "pen";
+			start: Point;
+			anchor: Point;
+			index: number;
+			pointerType: string;
+	  }
 	| { kind: "create"; tool: ElementKind; startWorld: Point; parent?: string };
 
 export function Viewport() {
@@ -143,6 +154,41 @@ export function Viewport() {
 	const [spaceHeld, setSpaceHeld] = useState(false);
 	const [draft, setDraft] = useState<OverlayDraft>({});
 	const [cursor, setCursor] = useState<string | undefined>();
+	const penRef = useRef<PenPath | null>(null);
+	const [pen, setPenState] = useState<PenDraft | null>(null);
+	const setPen = useCallback((next: PenDraft | null) => {
+		penRef.current = next?.path ?? null;
+		setPenState(next);
+	}, []);
+	const finishPen = useCallback(
+		(path: PenPath | null) => {
+			setPen(null);
+			if (path && path.points.length >= 2) controller.createPath(path);
+		},
+		[controller, setPen],
+	);
+
+	// Enter or Esc finishes the path being drawn; Backspace takes back its
+	// last point. Leaving the tool keeps what was drawn.
+	useEffect(() => {
+		if (tool !== "pen") {
+			if (penRef.current) finishPen(penRef.current);
+			return;
+		}
+		const onKey = (e: KeyboardEvent) => {
+			const path = penRef.current;
+			if (!path || isTyping(e.target)) return;
+			if (e.key === "Enter" || e.key === "Escape") finishPen(path);
+			else if (e.key === "Backspace" || e.key === "Delete") {
+				const points = path.points.slice(0, -1);
+				setPen(points.length ? { path: { ...path, points } } : null);
+			} else return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, [tool, finishPen, setPen]);
 
 	// Mount the session's canvas; it is replaced when the painted size changes.
 	useLayoutEffect(() => {
@@ -275,6 +321,35 @@ export function Viewport() {
 			return;
 		}
 
+		if (state.tool === "pen") {
+			const path = penRef.current ?? { points: [], closed: false };
+			const first = path.points[0];
+			const last = path.points.at(-1);
+			const v = state.view;
+			if (
+				first &&
+				path.points.length >= 2 &&
+				Math.hypot(
+					v.x + first.x * v.zoom - p.x,
+					v.y + first.y * v.zoom - p.y,
+				) <= CLOSE_PX
+			) {
+				finishPen({ ...path, closed: true });
+				return;
+			}
+			const anchor = e.shiftKey && last ? constrain45(last, world) : world;
+			const points = [...path.points, { x: anchor.x, y: anchor.y }];
+			setPen({ path: { ...path, points } });
+			gesture.current = {
+				kind: "pen",
+				start: p,
+				anchor,
+				index: points.length - 1,
+				pointerType: e.pointerType,
+			};
+			return;
+		}
+
 		const kind = CREATE_KIND[state.tool];
 		if (kind) {
 			gesture.current = {
@@ -336,7 +411,13 @@ export function Viewport() {
 			.filter((k) => canTransform(k, state.geometry));
 		if (keys.length === 0) return;
 		const geometry = state.geometry;
-		const candidates = snapCandidates(geometry, t, keys, state.hidden);
+		const candidates = snapCandidates(
+			geometry,
+			t,
+			keys,
+			state.hidden,
+			controller.sideGuides(),
+		);
 		if (name === "rotate") {
 			const key = keys[0] as string;
 			const rect = geometry.get(key)?.rect;
@@ -383,6 +464,15 @@ export function Viewport() {
 		const world = toWorld(p);
 
 		if (!g) {
+			const path = penRef.current;
+			if (state.tool === "pen" && path) {
+				const last = path.points.at(-1);
+				setPen({
+					path,
+					cursor: e.shiftKey && last ? constrain45(last, world) : world,
+				});
+				return;
+			}
 			if (e.pointerType === "mouse" && state.tool === "move" && template) {
 				const onHandle = (e.target as Element).closest?.("[data-handle]");
 				const hit = onHandle ? null : controller.hitTest(world);
@@ -548,6 +638,19 @@ export function Viewport() {
 				);
 				return;
 			}
+			case "pen": {
+				const path = penRef.current;
+				const limit =
+					g.pointerType === "mouse"
+						? DRAG_THRESHOLD.mouse
+						: DRAG_THRESHOLD.touch;
+				if (!path || Math.hypot(p.x - g.start.x, p.y - g.start.y) < limit)
+					return;
+				const points = path.points.slice();
+				points[g.index] = smoothPoint(g.anchor, world);
+				setPen({ path: { ...path, points } });
+				return;
+			}
 			case "create": {
 				let box = rectFrom(g.startWorld, world, {
 					square: e.shiftKey,
@@ -594,7 +697,13 @@ export function Viewport() {
 			base: t,
 			geometry,
 			bounds,
-			candidates: snapCandidates(geometry, t, keys, state.hidden),
+			candidates: snapCandidates(
+				geometry,
+				t,
+				keys,
+				state.hidden,
+				controller.sideGuides(),
+			),
 		};
 	};
 
@@ -679,7 +788,7 @@ export function Viewport() {
 		cursor ??
 		(spaceHeld || tool === "hand"
 			? "grab"
-			: CREATE_KIND[tool] || tool === "image"
+			: CREATE_KIND[tool] || tool === "image" || tool === "pen"
 				? "crosshair"
 				: "default");
 
@@ -735,8 +844,10 @@ export function Viewport() {
 							</div>
 						) : null}
 					</div>
-					<Overlay draft={draft} />
+					<Overlay draft={draft} pen={pen} />
 					<TextEditor />
+					<Guides />
+					<Rulers />
 				</>
 			) : null}
 		</div>

@@ -8,7 +8,7 @@ import { TOOL_ICONS } from "./icons";
 
 const GROUPS: Tool[][] = [
 	["move", "hand"],
-	["frame", "rect", "ellipse", "text", "image", "qr", "barcode"],
+	["frame", "rect", "ellipse", "pen", "text", "image", "qr", "barcode"],
 ];
 
 export function ToolStrip({ ctx }: { ctx: CommandContext }) {

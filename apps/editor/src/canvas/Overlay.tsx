@@ -12,6 +12,7 @@ import {
 	unionRects,
 	worldCorners,
 } from "~/doc/geometry";
+import { type PenPath, penPathData } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { View } from "~/state/store";
 import { GradientHandles } from "./gradient-handles";
@@ -26,6 +27,9 @@ export type OverlayDraft = {
 	gradient?: boolean;
 };
 
+/** The path the pen tool is drawing, and where the pointer is. */
+export type PenDraft = { path: PenPath; cursor?: Point };
+
 const HANDLE_CURSOR: Record<Handle, string> = {
 	n: "ns-resize",
 	s: "ns-resize",
@@ -37,7 +41,13 @@ const HANDLE_CURSOR: Record<Handle, string> = {
 	se: "nwse-resize",
 };
 
-export function Overlay({ draft }: { draft: OverlayDraft }) {
+export function Overlay({
+	draft,
+	pen,
+}: {
+	draft: OverlayDraft;
+	pen?: PenDraft | null;
+}) {
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const selection = useEditor((s) => s.selection);
@@ -142,6 +152,7 @@ export function Overlay({ draft }: { draft: OverlayDraft }) {
 					/>
 				</>
 			) : null}
+			{pen ? <PenOverlay pen={pen} view={view} /> : null}
 			{draft.angle ? (
 				<Label
 					at={{
@@ -152,6 +163,93 @@ export function Overlay({ draft }: { draft: OverlayDraft }) {
 				/>
 			) : null}
 		</svg>
+	);
+}
+
+function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
+	const toScreen = (p: Point) => ({
+		x: view.x + p.x * view.zoom,
+		y: view.y + p.y * view.zoom,
+	});
+	const screen: PenPath = {
+		closed: false,
+		points: pen.path.points.map((p) => ({
+			...toScreen(p),
+			...(p.in ? { in: toScreen(p.in) } : {}),
+			...(p.out ? { out: toScreen(p.out) } : {}),
+		})),
+	};
+	const first = screen.points[0];
+	const last = screen.points.at(-1);
+	const cursor = pen.cursor ? toScreen(pen.cursor) : null;
+	const closing =
+		!!first &&
+		!!cursor &&
+		screen.points.length >= 2 &&
+		Math.hypot(cursor.x - first.x, cursor.y - first.y) <= 8;
+	return (
+		<g data-testid="pen-draft" data-points={pen.path.points.length}>
+			<path
+				d={penPathData(screen)}
+				className="fill-none stroke-fc-accent"
+				strokeWidth={1.5}
+			/>
+			{last && cursor ? (
+				<path
+					d={penPathData({
+						closed: false,
+						points: [
+							last,
+							closing && first ? { ...first, out: undefined } : cursor,
+						],
+					})}
+					className="fill-none stroke-fc-accent"
+					strokeWidth={1}
+					strokeDasharray="4 3"
+				/>
+			) : null}
+			{last?.in && last.out ? (
+				<>
+					<line
+						x1={last.in.x}
+						y1={last.in.y}
+						x2={last.out.x}
+						y2={last.out.y}
+						className="stroke-fc-accent"
+						strokeWidth={1}
+					/>
+					{[last.in, last.out].map((h) => (
+						<circle
+							key={`${h.x},${h.y}`}
+							cx={h.x}
+							cy={h.y}
+							r={3}
+							className="fill-white stroke-fc-accent"
+							strokeWidth={1}
+						/>
+					))}
+				</>
+			) : null}
+			{screen.points.map((p, i) => {
+				const size = i === 0 && closing ? 10 : 7;
+				return (
+					<rect
+						// biome-ignore lint/suspicious/noArrayIndexKey: anchors are ordered points
+						key={i}
+						x={p.x - size / 2}
+						y={p.y - size / 2}
+						width={size}
+						height={size}
+						className={
+							i === screen.points.length - 1
+								? "fill-fc-accent stroke-fc-accent"
+								: "fill-white stroke-fc-accent"
+						}
+						strokeWidth={1}
+					/>
+				);
+			})}
+		</g>
 	);
 }
 

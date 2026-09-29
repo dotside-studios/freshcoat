@@ -9,6 +9,7 @@ import type {
 	Workspace,
 } from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
+import { hasGuides, type TemplateGuides } from "~/doc/guides";
 import { produce, produceAt } from "./immer";
 import type { DocState, EditorState } from "./store";
 
@@ -28,6 +29,8 @@ export type TemplateSlot = {
 	/** The template as last parked. Stale for the active slot, whose live
 	 *  state is `EditorState.doc`. */
 	template: Template;
+	/** The guides as opened, until the slot is first activated. */
+	guides?: TemplateGuides;
 	parked?: ParkedEditor;
 };
 
@@ -80,6 +83,7 @@ export function workspaceState(
 			fileName: e.fileName,
 			binding: e.binding,
 			template: e.template,
+			...(e.guides ? { guides: e.guides } : {}),
 		})),
 		activeTemplateId: ws.templates[0]?.id ?? "",
 		datasets: ws.datasets,
@@ -108,21 +112,22 @@ export function singleTemplateWorkspace(
 export function workspaceSnapshot(state: EditorState): Workspace | null {
 	const ws = state.workspace;
 	if (!ws) return null;
-	const live = state.doc?.history.present;
+	const live = state.doc?.history;
 	return {
 		formatVersion: "1.0",
 		name: ws.name,
-		templates: ws.templates.map(
-			(s): TemplateEntry => ({
+		templates: ws.templates.map((s): TemplateEntry => {
+			const history =
+				s.id === ws.activeTemplateId && live ? live : s.parked?.doc.history;
+			const guides = history ? history.guides : s.guides;
+			return {
 				id: s.id,
 				fileName: s.fileName,
-				template:
-					s.id === ws.activeTemplateId && live
-						? live
-						: (s.parked?.doc.history.present ?? s.template),
+				template: history?.present ?? s.template,
 				...(s.binding ? { binding: s.binding } : {}),
-			}),
-		),
+				...(guides && hasGuides(guides) ? { guides } : {}),
+			};
+		}),
 		datasets: ws.datasets,
 		presets: ws.presets,
 	};
@@ -145,9 +150,17 @@ export function workspaceDirty(state: EditorState): boolean {
 			s.id !== t.id ||
 			s.fileName !== t.fileName ||
 			s.template !== t.template ||
-			s.binding !== t.binding
+			s.binding !== t.binding ||
+			!sameGuides(s.guides, t.guides)
 		);
 	});
+}
+
+export function sameGuides(
+	a: TemplateGuides | undefined,
+	b: TemplateGuides | undefined,
+): boolean {
+	return a === b || (!hasGuides(a) && !hasGuides(b));
 }
 
 export function activeSlot(state: EditorState): TemplateSlot | undefined {
@@ -164,7 +177,11 @@ export function activeDataset(state: EditorState): Dataset | undefined {
 export function switchTo(
 	state: EditorState,
 	id: string,
-	fresh: (template: Template, fileName: string) => ParkedEditor,
+	fresh: (
+		template: Template,
+		fileName: string,
+		guides?: TemplateGuides,
+	) => ParkedEditor,
 ): EditorState {
 	const ws = state.workspace;
 	if (!ws || ws.activeTemplateId === id) return state;
@@ -177,6 +194,7 @@ export function switchTo(
 	if (doc)
 		templates = produceAt(templates, from, (slot) => {
 			slot.template = doc.history.present;
+			delete slot.guides;
 			slot.parked = {
 				doc,
 				side: state.side,
@@ -190,7 +208,8 @@ export function switchTo(
 	templates = produceAt(templates, to, (slot) => {
 		delete slot.parked;
 	});
-	const next = target.parked ?? fresh(target.template, target.fileName);
+	const next =
+		target.parked ?? fresh(target.template, target.fileName, target.guides);
 	return {
 		...state,
 		...next,

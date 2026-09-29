@@ -17,6 +17,8 @@ import {
 	variantFor,
 	type Workspace,
 } from "@freshcoat-js/workspace";
+import type { CanvasKit } from "canvaskit-wasm";
+import type { BooleanOp } from "~/doc/boolean";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
 	type AlignMode,
@@ -26,6 +28,16 @@ import {
 	translateLayers,
 	unionRects,
 } from "~/doc/geometry";
+import {
+	addGuide,
+	clearGuides,
+	type GuideAxis,
+	moveGuide,
+	removeGuide,
+	type SideGuides,
+	sideGuides,
+	type TemplateGuides,
+} from "~/doc/guides";
 import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
@@ -33,6 +45,7 @@ import {
 	type AddVariantResult,
 	addVariant,
 	attachImageAsset,
+	booleanElements,
 	changeVariantId,
 	duplicateElements,
 	groupElements,
@@ -57,6 +70,7 @@ import {
 	siblingsOf,
 	walkLayers,
 } from "~/doc/path";
+import { type PenPath, penElement } from "~/doc/pen";
 import {
 	activeVariantId,
 	geometryForBase,
@@ -64,6 +78,7 @@ import {
 	isStructuralEdit,
 } from "~/doc/variant-edit";
 import { newPreset } from "~/export/export-ui";
+import { getCanvasKit } from "~/render/canvaskit";
 import { findSample } from "~/samples";
 import { findStarter } from "~/samples/starters";
 import {
@@ -84,7 +99,7 @@ import {
 } from "~/state/workspace";
 import { clearAutosave, configureAutosave, writeAutosave } from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
-import { plural } from "./copy";
+import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { exportSidePng } from "./export-png";
 import { svgMarkup, svgSize } from "./svg";
@@ -371,6 +386,28 @@ export class EditorController {
 		});
 	}
 
+	/** Combines the selected shapes into one vector layer, as one undo step.
+	 *  `ck` stands in for the session's CanvasKit. */
+	async booleanSelection(op: BooleanOp, ck?: CanvasKit): Promise<boolean> {
+		const keys = this.selectedLayers();
+		if (keys.length < 2) {
+			toast(BOOLEAN.tooFew, { tone: "warning" });
+			return false;
+		}
+		let kit = ck;
+		try {
+			kit ??= (await getCanvasKit()) as CanvasKit;
+		} catch {
+			toast(BOOLEAN.couldNotLoad, { tone: "warning" });
+			return false;
+		}
+		const result = this.edit((t) => booleanElements(t, keys, op, kit), {
+			scope: "base",
+			selectResult: true,
+		});
+		return result?.ok ?? false;
+	}
+
 	alignSelection(mode: AlignMode): void {
 		const keys = this.selectedLayers();
 		if (keys.length === 0) return;
@@ -388,6 +425,68 @@ export class EditorController {
 		this.edit((t) => translateLayers(t, keys, dx, dy, geometry), {
 			mergeKey: "nudge",
 		});
+	}
+
+	// ── Guides ───────────────────────────────────────────────────────────────
+
+	/** The active side's guides. */
+	sideGuides(): SideGuides {
+		const h = this.state.doc?.history;
+		const name = this.base?.template_data[this.state.side]?.name;
+		return h && name !== undefined
+			? sideGuides(h.guides, name)
+			: { x: [], y: [] };
+	}
+
+	private withSideGuides(
+		change: (g: TemplateGuides, side: string) => TemplateGuides,
+		opts: { preview?: boolean; mergeKey?: string } = {},
+	): void {
+		const h = this.state.doc?.history;
+		const name = this.base?.template_data[this.state.side]?.name;
+		if (!h || name === undefined) return;
+		const guides = change(h.guides, name);
+		if (guides !== h.guides) this.dispatch({ type: "guides", guides, ...opts });
+	}
+
+	/** Adds a guide on the active side; returns its index on `axis`. */
+	addGuide(
+		axis: GuideAxis,
+		value: number,
+		opts: { preview?: boolean } = {},
+	): number {
+		let index = -1;
+		this.withSideGuides((g, side) => {
+			const out = addGuide(g, side, axis, value);
+			index = out.index;
+			return out.guides;
+		}, opts);
+		return index;
+	}
+
+	moveGuide(
+		axis: GuideAxis,
+		index: number,
+		value: number,
+		opts: { preview?: boolean; mergeKey?: string } = {},
+	): void {
+		this.withSideGuides(
+			(g, side) => moveGuide(g, side, axis, index, value),
+			opts,
+		);
+	}
+
+	removeGuide(
+		axis: GuideAxis,
+		index: number,
+		opts: { preview?: boolean } = {},
+	): void {
+		this.withSideGuides((g, side) => removeGuide(g, side, axis, index), opts);
+	}
+
+	/** Removes every guide on the active side, as one undo step. */
+	clearGuides(): void {
+		this.withSideGuides(clearGuides);
 	}
 
 	toggleHidden(keys = this.state.selection): void {
@@ -477,6 +576,18 @@ export class EditorController {
 		});
 		const key = this.insert(element, opts.parent);
 		this.dispatch({ type: "setTool", tool: "move" });
+		return key;
+	}
+
+	/** Adds a drawn path as a vector layer on the side, selected, and goes
+	 *  from the pen back to the move tool. */
+	createPath(path: PenPath): string | null {
+		const t = this.template;
+		if (!t) return null;
+		const element = penElement(path, t, this.state.side);
+		const key = element ? this.insert(element) : null;
+		if (this.state.tool === "pen")
+			this.dispatch({ type: "setTool", tool: "move" });
 		return key;
 	}
 

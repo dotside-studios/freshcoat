@@ -231,6 +231,34 @@ describe("packWorkspace", () => {
 		}
 	});
 
+	it("keeps guides in the manifest and leaves the template alone", async () => {
+		const [member, plain] = ws.templates;
+		const guides = {
+			front: { x: [12, 500.5], y: [] },
+			back: { x: [], y: [40] },
+		};
+		const w: Workspace = { ...ws, templates: [{ ...member, guides }, plain] };
+		const files = unzipSync(await packed(w));
+		const manifest = manifestOf(files);
+		expect(manifest.templates[0].guides).toEqual(guides);
+		expect(manifest.templates[1].guides).toBeUndefined();
+		const pkg = unzipSync(files[manifest.templates[0].path] as Uint8Array);
+		for (const bytes of Object.values(pkg))
+			expect(strFromU8(bytes, true)).not.toContain("500.5");
+		const result = await unpackWorkspace(zipSync(files));
+		expect(result.ok && result.workspace.templates[0].guides).toEqual(guides);
+		expect(result.ok && "guides" in result.workspace.templates[1]).toBe(false);
+	});
+
+	it("refuses guides that are not numbers", async () => {
+		const result = await repack((f) => {
+			const manifest = manifestOf(f);
+			manifest.templates[0].guides = { front: { x: ["a"], y: [] } };
+			f["workspace.json"] = strToU8(JSON.stringify(manifest));
+		});
+		expect(codeOf(result)).toBe("invalid_manifest");
+	});
+
 	it("refuses a variant source of an unknown kind", async () => {
 		const result = await repack((f) => {
 			const manifest = manifestOf(f);

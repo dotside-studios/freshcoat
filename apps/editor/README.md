@@ -67,13 +67,14 @@ covers shared checks and pull requests.
 
 ## What it does
 
-- **Design:** frames, shapes, text, images, QR codes and barcodes (Code 128,
-  EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix, Aztec). Move, resize
-  and rotate with snapping, edit gradients with handles on the canvas, set
-  constraints for resizing, and choose fonts from the bundled Google Fonts
-  catalog snapshot. Pasted SVG becomes editable layers (paths, groups, clips,
-  masks, embedded images, text, markers and pattern fills), an SVG image or
-  text; SVG files stay vector as images.
+- **Design:** frames, shapes, pen paths, text, images, QR codes and barcodes
+  (Code 128, EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix, Aztec).
+  Move, resize and rotate with snapping, measure with rulers and guides,
+  combine shapes with boolean operations, edit gradients with handles on the
+  canvas, set constraints for resizing, and choose fonts from the bundled
+  Google Fonts catalog snapshot. Pasted SVG becomes editable layers (paths,
+  groups, clips, masks, embedded images, text, markers and pattern fills), an
+  SVG image or text; SVG files stay vector as images.
 - **Variants:** one design in several versions, such as a card in three
   colors or a badge for speakers and staff. Pick a variant in the left panel,
   below Sides, and edit it on the canvas and in the inspector as you would the
@@ -130,6 +131,10 @@ covers shared checks and pull requests.
   dataset per template.
 - A layer whose ancestor is rotated can be selected and edited in the
   inspector, but it cannot be dragged on the canvas.
+- A path drawn with the pen can't have its points edited on the canvas
+  afterwards; its path data is edited in the inspector.
+- Boolean operations bake their result into one vector layer. The shapes
+  can't be edited separately afterwards, and corner smoothing is left out.
 - Holding Alt while dragging duplicates the selection. The copies show in the
   layer tree only when the drag ends.
 - The Zip file and Folder destinations need the File System Access API.

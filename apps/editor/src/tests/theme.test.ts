@@ -89,6 +89,14 @@ describe.each([
 	test("white on accent is at least 4.5:1", () =>
 		expect(contrast("#ffffff", c("accent"))).toBeGreaterThanOrEqual(4.5));
 
+	test("ruler labels, ticks and selection marks read on the ruler", () => {
+		expect(contrast(c("muted"), c("panel"))).toBeGreaterThanOrEqual(4.5);
+		expect(contrast(c("faint"), c("panel"))).toBeGreaterThanOrEqual(3);
+		expect(contrast(c("accent"), c("panel"))).toBeGreaterThanOrEqual(3);
+		expect(contrast(c("guide"), c("panel"))).toBeGreaterThanOrEqual(3);
+		expect(contrast("#ffffff", c("accent"))).toBeGreaterThanOrEqual(4.5);
+	});
+
 	test("text on tooltip is at least 7:1", () =>
 		expect(contrast(c("text"), c("tooltip"))).toBeGreaterThanOrEqual(7));
 });

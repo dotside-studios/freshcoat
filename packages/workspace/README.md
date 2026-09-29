@@ -42,7 +42,7 @@ with it:
 
 ```text
 mimetype                          application/vnd.freshcoat.workspace+zip, stored, first
-workspace.json                    name, template entries and bindings, presets
+workspace.json                    name, template entries, bindings and guides, presets
 templates/<id>.coat               each template, in coatfile's own format
 data/<id>/schema.json             the dataset's columns as JSON Schema
 data/<id>/records.json            its records and their export status
@@ -51,7 +51,9 @@ data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
 
 Templates inside are ordinary `.coat` files: a template opened on its own
 becomes a one-template workspace, and a workspace's template can be exported
-on its own again.
+on its own again. Editor state that is not part of the design, such as a
+template's ruler guides, stays in the manifest's template entry, so the
+template format and its renders are unchanged.
 
 ## Where it sits
 
