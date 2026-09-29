@@ -47,6 +47,9 @@ export type FontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 // Variable-font axis values keyed by OpenType tag ("wdth", "opsz", "slnt", or a
 // custom axis). The weight is its own field; a `wght` here overrides it.
 export type FontVariations = Record<string, number>;
+// OpenType feature settings by tag: 1 on, 0 off, or an alternate's index
+// (salt, cvXX).
+export type FontFeatures = Record<string, number>;
 
 export type FontFile = {
 	weight: FontWeight;
@@ -209,6 +212,7 @@ export type ResolvedFont = {
 	// Figma text decoration; absent = none.
 	decoration?: "underline" | "line-through";
 	variations?: FontVariations;
+	features?: FontFeatures;
 };
 
 export type BakedTextLayout = {
@@ -229,6 +233,12 @@ export type TextLine = {
 	// line-box model graphic tools (Figma) use: the font's ascent + half of the
 	// line's leading. The painter draws at this baseline.
 	baseline?: number;
+	// Extra advance after each space (U+0020), in target px: how a justified
+	// line fills the box. The painter shapes the line with it.
+	wordSpacing?: number;
+	// The paragraph's base direction when it is right-to-left; the painter
+	// orders the line's runs by it. Span x/width stay visual.
+	direction?: "rtl";
 	spans: TextLineSpan[];
 };
 

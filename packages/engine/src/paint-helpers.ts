@@ -1,5 +1,6 @@
 import type {
 	CornerRadius,
+	FontFeatures,
 	FontVariations,
 	ImageCrop,
 	Stroke,
@@ -18,6 +19,15 @@ export function fontVariationList(
 ): { axis: string; value: number }[] {
 	const axes: Record<string, number> = { wght: weight || 400, ...variations };
 	return Object.entries(axes).map(([axis, value]) => ({ axis, value }));
+}
+
+export function fontFeatureList(
+	features: FontFeatures | undefined,
+): { name: string; value: number }[] {
+	return Object.entries(features ?? {}).map(([name, value]) => ({
+		name,
+		value,
+	}));
 }
 
 export type FitOptions = { focus?: Vec2; crop?: ImageCrop };

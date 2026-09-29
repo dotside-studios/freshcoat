@@ -53,7 +53,10 @@ Paths such as `src/state/store.ts` are relative to `apps/editor/`.
   (`doc/preview.ts`), requests a render, and writes the laid-out layer boxes
   back to the store. The selection, handles, snap guides and gradient handles
   are SVG in screen space over the canvas: they follow the pointer at once,
-  while the paint catches up.
+  while the paint catches up. Editing text in place (`canvas/TextEditor.tsx`)
+  sets the store's `textEdit`: a textarea stands over the layer, the render
+  leaves the layer out, and the controller holds the edit in one history
+  transaction.
 
 ### Document model and history
 

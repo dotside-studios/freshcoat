@@ -307,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -697,6 +697,13 @@ written: the step stays as the value a static face is picked by. A span's
 and the stylesheet a `google` descriptor points at must request the axes a
 template uses.
 
+### OpenType features
+
+`features` sets OpenType features by tag, on the element's `font` or a span's:
+`{ "tnum": 1, "liga": 0, "ss01": 1, "salt": 2 }`. 1 turns a feature on, 0 off,
+and a larger whole number picks an alternate. A span's `features` are merged
+over the element's. A feature the face doesn't have is ignored.
+
 ### Vertical trim
 
 `leadingTrim: true` on a text element is Figma's "Vertical trim: cap height to
@@ -723,6 +730,29 @@ Sans is 1.48 — so it can only be resolved once the font is known, which the
 render does. `compile()` marks the node and leaves `1.2` on it as the value a
 consumer that ignores the mark will use, so a family whose metrics never arrive
 renders exactly as it did before.
+
+## Text layout
+
+A newline in `value` or a span's `text` is a hard line break; other runs of
+whitespace collapse to one space (CSS `white-space: pre-line`).
+`paragraphSpacing` adds that much space after each hard break, in the same units
+as `size`, and shrink-to-fit and a hug height both count it.
+
+`fit: "shrink"` lowers the font size, in whole pixels down to 8, until the text
+fits the box's height. With `spans`, every span's size and letter spacing scale
+by the same factor, searched on the largest span's size, so their proportions
+hold.
+
+`direction` is the paragraph's base direction for bidirectional text: `ltr`
+(the default), `rtl`, or `auto`, which takes the first letter of the resolved
+text (after `{{field}}` substitution), as HTML's `dir="auto"` does.
+
+`align` is `left`, `center`, `right`, `justify`, `start` or `end`. `start` and
+`end` follow the direction; `left` and `right` never flip. Without `align`, text
+sets to `left`, or to `start` when a `direction` is given. A justified paragraph
+stretches the spaces of every line but its last, which `alignLast` sets
+(`start` by default, or any other `align` value). A line with no space to
+stretch stays at its natural width.
 
 ## Spec
 

@@ -24,6 +24,7 @@ import {
 import {
 	decorationLine,
 	fitRect,
+	fontFeatureList,
 	fontVariationList,
 	insetCorner,
 	strokeInset,
@@ -379,6 +380,7 @@ function textStyleOf(
 	span: DrawTextCommand["layout"]["lines"][number]["spans"][number],
 	cmd: DrawTextCommand,
 	fallbackFamilies: string[] = [],
+	wordSpacing?: number,
 ) {
 	const weight =
 		WEIGHTS[Math.round((span.font.weight || 400) / 100) * 100] ?? "Normal";
@@ -394,9 +396,13 @@ function textStyleOf(
 		// drawing its default instance under synthetic bold — see paragraph-layout's
 		// spanTextStyle, which measures with the identical style.
 		fontVariations: fontVariationList(span.font.weight, span.font.variations),
+		...(span.font.features
+			? { fontFeatures: fontFeatureList(span.font.features) }
+			: {}),
 		...(span.font.letterSpacing
 			? { letterSpacing: span.font.letterSpacing }
 			: {}),
+		...(wordSpacing ? { wordSpacing } : {}),
 	};
 }
 
@@ -450,14 +456,22 @@ function drawText(
 		}
 		const shape = (): ShapedLine => {
 			const style = new ck.ParagraphStyle({
-				textStyle: textStyleOf(ck, first, cmd, fallback),
+				textStyle: textStyleOf(ck, first, cmd, fallback, line.wordSpacing),
+				...(line.direction === "rtl"
+					? {
+							textDirection: ck.TextDirection.RTL,
+							textAlign: ck.TextAlign.Left,
+						}
+					: {}),
 			});
 			const builder = ck.ParagraphBuilder.MakeFromFontProvider(
 				style,
 				provider,
 			);
 			for (const span of line.spans) {
-				const ts = ck.TextStyle(textStyleOf(ck, span, cmd, fallback));
+				const ts = ck.TextStyle(
+					textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
+				);
 				if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
 				else builder.pushStyle(ts);
 				builder.addText(span.text);
@@ -477,7 +491,11 @@ function drawText(
 			bin.track(shaped.para);
 		}
 		const { para, ascent } = shaped;
-		canvas.drawParagraph(para, first.x, (line.baseline ?? line.y) - ascent);
+		const left =
+			line.direction === "rtl"
+				? Math.min(...line.spans.map((s) => s.x))
+				: first.x;
+		canvas.drawParagraph(para, left, (line.baseline ?? line.y) - ascent);
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
 		const baseline = line.baseline ?? line.y;
@@ -961,6 +979,8 @@ function lineKey(
 		fallback,
 		color,
 		line.spans.map((s) => [s.text, s.font, s.color]),
+		...(line.wordSpacing ? [line.wordSpacing] : []),
+		...(line.direction ? [line.direction] : []),
 	]);
 }
 

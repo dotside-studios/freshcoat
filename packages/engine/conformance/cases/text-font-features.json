@@ -1,0 +1,93 @@
+{
+	"id": "text-font-features",
+	"title": "OpenType features are applied when the line is shaped",
+	"profile": "core",
+	"requires": [
+		"draw.text",
+		"text.fontFeatures"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"pos": {
+					"x": 20,
+					"y": 40
+				},
+				"size": {
+					"width": 120,
+					"height": 40
+				},
+				"text": "1111",
+				"font": {
+					"family": "ConformanceFont",
+					"weight": 400,
+					"style": "normal",
+					"size": 32,
+					"lineHeight": 1.2,
+					"features": {
+						"tnum": 1
+					}
+				},
+				"color": "#000000"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "differ",
+			"at": [
+				86,
+				55
+			],
+			"from": [
+				10,
+				60
+			],
+			"minDelta": 200,
+			"why": "the fourth tabular 1 stands at 86; the proportional four end near 63"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				40,
+				55
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "where the second proportional 1 would be"
+		}
+	]
+}

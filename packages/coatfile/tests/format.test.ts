@@ -109,6 +109,50 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.4");
 	});
 
+	test("1.5: the text layout properties, on elements, spans and deltas", () => {
+		const text = (properties: Record<string, unknown>) =>
+			({
+				id: "t",
+				type: "text",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 20 },
+				properties: {
+					value: "Hi",
+					font: { family: "Inter", size: 12 },
+					...properties,
+				},
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), text(properties)));
+		expect(need({ align: "right" })).toBe("1.0");
+		expect(need({ align: "justify" })).toBe("1.5");
+		expect(need({ align: "start" })).toBe("1.5");
+		expect(need({ alignLast: "center" })).toBe("1.5");
+		expect(need({ direction: "rtl" })).toBe("1.5");
+		expect(need({ paragraphSpacing: 8 })).toBe("1.5");
+		expect(
+			need({ font: { family: "Inter", size: 12, features: { tnum: 1 } } }),
+		).toBe("1.5");
+		expect(
+			need({ spans: [{ text: "1", font: { features: { tnum: 1 } } }] }),
+		).toBe("1.5");
+
+		const t = withElements(base(), text({}));
+		t.variants = [
+			{
+				id: "rtl",
+				label: "RTL",
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "t", properties: { direction: "rtl" } }],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.5");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },

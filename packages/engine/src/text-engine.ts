@@ -23,7 +23,11 @@ export type InlineFragment = {
 	x: number;
 	width: number;
 };
-export type InlineShapedLine = { fragments: InlineFragment[]; width: number };
+export type InlineShapedLine = {
+	fragments: InlineFragment[];
+	width: number;
+	hardBreak?: boolean;
+};
 
 export type TextEngine = {
 	// Wrapped/natural width + height of a run (maxWidth null = single line).
@@ -39,6 +43,7 @@ export type TextEngine = {
 	layoutInline?: (
 		spans: InlineSpan[],
 		maxWidth: number,
+		direction?: "ltr" | "rtl",
 	) => { lines: InlineShapedLine[] };
 	// Optional: a family's vertical metrics as the engine's own backend reads
 	// them. The sfnt reader (readFontMetrics) parses ttf/otf only, so a family

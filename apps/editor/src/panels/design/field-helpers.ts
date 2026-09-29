@@ -108,6 +108,30 @@ export function parseDash(text: string): number[] | undefined | null {
 	return parts;
 }
 
+/** Parses OpenType features written as "tnum, ss01, -liga, salt=2": a tag
+ *  alone is on, a leading minus is off, `=n` sets a value. Empty clears them;
+ *  anything else is null. */
+export function parseFeatures(
+	text: string,
+): Record<string, number> | undefined | null {
+	const s = text.trim();
+	if (!s) return undefined;
+	const out: Record<string, number> = {};
+	for (const part of s.split(/[\s,]+/)) {
+		const m = /^(-)?([A-Za-z0-9]{4})(?:=(\d+))?$/.exec(part);
+		if (!m || (m[1] && m[3] !== undefined)) return null;
+		out[m[2]] = m[1] ? 0 : m[3] !== undefined ? Number(m[3]) : 1;
+	}
+	return out;
+}
+
+/** The inverse of parseFeatures. */
+export function formatFeatures(features: Record<string, number>): string {
+	return Object.entries(features)
+		.map(([tag, v]) => (v === 0 ? `-${tag}` : v === 1 ? tag : `${tag}=${v}`))
+		.join(", ");
+}
+
 type GridLine = number | [number, number];
 
 /** Parses a grid placement: "2" is one track, "1-3" a span, empty or "auto"

@@ -58,6 +58,12 @@ export const FontVariationsSchema = z.record(
 	z.number(),
 );
 
+// OpenType feature settings by tag: 1 on, 0 off, or an alternate's index.
+export const FontFeaturesSchema = z.record(
+	z.string().regex(/^[A-Za-z0-9 ]{4}$/),
+	z.number().int().min(0),
+);
+
 export const FontFileSchema = z.object({
 	weight: FontWeightSchema,
 	style: z.enum(["normal", "italic"]).optional(),
@@ -170,6 +176,8 @@ const FontDescriptorObjectSchema = z.object({
 	decoration: z.enum(["underline", "line-through"]).optional(),
 	// Merged over the element's own axes.
 	variations: FontVariationsSchema.optional(),
+	// Merged over the element's own features.
+	features: FontFeaturesSchema.optional(),
 });
 
 // One styled segment within a mixed-style text element. Only the fields
@@ -182,7 +190,7 @@ export const TextSpanSchema = z.object({
 });
 
 export const TextPropertiesSchema = z.object({
-	// Single-style text. The only form `fit: "shrink"` applies to.
+	// Single-style text.
 	value: z.string().optional(),
 	// Mixed-style text, per-span font + color, wrapped as one paragraph. When
 	// set, wins over `value`.
@@ -197,6 +205,7 @@ export const TextPropertiesSchema = z.object({
 		lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 		decoration: z.enum(["underline", "line-through"]).optional(),
 		variations: FontVariationsSchema.optional(),
+		features: FontFeaturesSchema.optional(),
 	}),
 	// Solid color; optional when a gradient `fill` is provided (compile defaults
 	// to #000 when neither is set).
@@ -204,8 +213,22 @@ export const TextPropertiesSchema = z.object({
 	// Optional gradient fill for the text (mapped to the element box). `color`
 	// remains the solid fallback.
 	fill: FillSchema.optional(),
-	align: z.enum(["left", "center", "right"]).optional(),
+	// start and end follow `direction`.
+	align: z
+		.enum(["left", "center", "right", "justify", "start", "end"])
+		.optional(),
+	// How a justified paragraph sets its last line. Default start.
+	alignLast: z
+		.enum(["left", "center", "right", "justify", "start", "end"])
+		.optional(),
+	// Extra space after each hard line break (a newline), in design units.
+	paragraphSpacing: z.number().min(0).optional(),
+	// Base direction for bidi ordering; auto takes the first strong character
+	// of the resolved text. Default ltr.
+	direction: z.enum(["ltr", "rtl", "auto"]).optional(),
 	verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
+	// shrink scales the font down until the text fits the box; with spans,
+	// every span's size scales by the same factor.
 	fit: z.enum(["shrink", "clip"]).optional(),
 	// Figma "Case": transform applied to the RESOLVED text (after token
 	// substitution), so it works on dynamic {{values}}. "original" (or absent)

@@ -81,6 +81,44 @@ describe("transpileText", () => {
 		);
 	});
 
+	it("maps justified alignment to justify", () => {
+		const el = transpileText(
+			baseText({
+				style: { ...baseText().style, textAlignHorizontal: "JUSTIFIED" },
+			}),
+			{ frame: FRAME, scale: SCALE },
+		);
+		expect(el.properties.align).toBe("justify");
+	});
+
+	it("maps OpenType features to lowercase tags", () => {
+		const el = transpileText(
+			baseText({
+				style: {
+					...baseText().style,
+					openTypeFeatures: { TNUM: true, LIGA: false },
+				},
+			}),
+			{ frame: FRAME, scale: SCALE },
+		);
+		expect((el.properties.font as { features?: unknown }).features).toEqual({
+			tnum: 1,
+			liga: 0,
+		});
+		const none = transpileText(baseText(), { frame: FRAME, scale: SCALE });
+		expect("features" in (none.properties.font as object)).toBe(false);
+	});
+
+	it("carries paragraph spacing, scaled", () => {
+		const el = transpileText(
+			baseText({ style: { ...baseText().style, paragraphSpacing: 12 } }),
+			{ frame: FRAME, scale: 2 },
+		);
+		expect(el.properties.paragraphSpacing).toBe(24);
+		const none = transpileText(baseText(), { frame: FRAME, scale: SCALE });
+		expect("paragraphSpacing" in none.properties).toBe(false);
+	});
+
 	it("emits leadingTrim only for Figma's cap-height vertical trim", () => {
 		const trim = (leadingTrim?: "NONE" | "CAP_HEIGHT") =>
 			transpileText(

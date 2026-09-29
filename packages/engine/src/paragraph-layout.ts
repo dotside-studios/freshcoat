@@ -2,8 +2,8 @@
 // breaking AND measurement in the same engine the CanvasKit painter shapes with,
 // so layout and paint agree.
 //
-// Whitespace runs are collapsed before shaping (CSS white-space: normal), which
-// Paragraph on its own would preserve. Break opportunities follow Skia's UAX-14
+// Whitespace runs are collapsed before shaping (CSS white-space: pre-line),
+// which Paragraph on its own would preserve; a newline stays a hard break. Break opportunities follow Skia's UAX-14
 // rules, so breaks inside URLs and punctuation-dense runs can differ from a
 // browser's.
 //
@@ -12,14 +12,18 @@
 // punctuation (em dash etc.); astral/emoji (surrogate pairs) and CJK line-break
 // rules are untested.
 
-import { fontVariationList } from "./paint-helpers";
+import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	InlineShapedLine,
 	InlineSpan,
 	SpanFont,
 	TextEngine,
 } from "./text-engine";
-import type { TextLayout, TextLayoutInput } from "./text-types";
+import {
+	paragraphGaps,
+	type TextLayout,
+	type TextLayoutInput,
+} from "./text-types";
 import type { FontVMetrics } from "./types";
 
 // biome-ignore lint/suspicious/noExplicitAny: caller-supplied CanvasKit instance
@@ -43,14 +47,19 @@ const NATURAL_WIDTH = 1e7; // effectively unbounded — single-line advance
 // divides back to a per-em ratio without rounding noise.
 const PROBE_EM = 1000;
 
-// CSS white-space: normal: collapse every run of whitespace (spaces, tabs,
-// newlines) to a single space. Line-edge trimming is handled
-// per line via endExcludingWhitespaces.
+// CSS white-space: pre-line: collapse every other run of whitespace to a
+// single space and keep each newline as a hard break. Line-edge trimming is
+// handled per line via endExcludingWhitespaces.
 function collapse(text: string): string {
-	return text.replace(/\s+/g, " ");
+	return text
+		.replace(/\r\n?/g, "\n")
+		.replace(/[^\S\n]+/g, " ")
+		.replace(/ ?\n ?/g, "\n");
 }
 
-type Line = { text: string; width: number };
+const hardLines = (text: string): number => text.split(/\r\n?|\n/).length;
+
+type Line = { text: string; width: number; hardBreak?: boolean };
 
 export function createParagraphEngine(
 	ck: CK,
@@ -102,12 +111,31 @@ export function createParagraphEngine(
 			// would otherwise shape a 700 span as the 400 instance under synthetic
 			// bold: lighter strokes and 400's advances, so thin and mis-wrapped.
 			fontVariations: fontVariationList(font.weight, font.variations),
+			...(font.features
+				? { fontFeatures: fontFeatureList(font.features) }
+				: {}),
 			...(font.letterSpacing ? { letterSpacing: font.letterSpacing } : {}),
 		};
 	}
 
-	function build(text: string, font: SpanFont): { para: CK; builder: CK } {
-		const style = new ck.ParagraphStyle({ textStyle: spanTextStyle(font) });
+	function paragraphStyle(font: SpanFont, direction?: "ltr" | "rtl"): CK {
+		return new ck.ParagraphStyle({
+			textStyle: spanTextStyle(font),
+			...(direction === "rtl"
+				? {
+						textDirection: ck.TextDirection.RTL,
+						textAlign: ck.TextAlign.Left,
+					}
+				: {}),
+		});
+	}
+
+	function build(
+		text: string,
+		font: SpanFont,
+		direction?: "ltr" | "rtl",
+	): { para: CK; builder: CK } {
+		const style = paragraphStyle(font, direction);
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
 		builder.addText(text);
 		return { para: builder.build(), builder };
@@ -122,11 +150,10 @@ export function createParagraphEngine(
 	function layoutInline(
 		spans: InlineSpan[],
 		maxWidth: number,
+		direction?: "ltr" | "rtl",
 	): { lines: InlineShapedLine[] } {
 		if (spans.length === 0) return { lines: [] };
-		const pstyle = new ck.ParagraphStyle({
-			textStyle: spanTextStyle(spans[0]!.font),
-		});
+		const pstyle = paragraphStyle(spans[0]!.font, direction);
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(pstyle, provider);
 		const ranges: { start: number; end: number; spanIndex: number }[] = [];
 		let cursor = 0;
@@ -150,6 +177,7 @@ export function createParagraphEngine(
 						endExcludingWhitespaces: number;
 						width: number;
 						left: number;
+						isHardBreak: boolean;
 					}) => {
 						const fragments = [];
 						for (const r of ranges) {
@@ -176,7 +204,7 @@ export function createParagraphEngine(
 								width: right - left,
 							});
 						}
-						return { fragments, width: lm.width };
+						return { fragments, width: lm.width, hardBreak: lm.isHardBreak };
 					},
 				);
 			return { lines };
@@ -186,9 +214,14 @@ export function createParagraphEngine(
 		}
 	}
 
-	function breakLines(text: string, font: SpanFont, maxWidth: number): Line[] {
+	function breakLines(
+		text: string,
+		font: SpanFont,
+		maxWidth: number,
+		direction?: "ltr" | "rtl",
+	): Line[] {
 		const norm = collapse(text);
-		const { para, builder } = build(norm, font);
+		const { para, builder } = build(norm, font, direction);
 		try {
 			para.layout(maxWidth);
 			return para
@@ -198,10 +231,12 @@ export function createParagraphEngine(
 						startIndex: number;
 						endExcludingWhitespaces: number;
 						width: number;
+						isHardBreak: boolean;
 					}) => ({
 						// UTF-16 code-unit offsets → direct string slice.
 						text: norm.slice(m.startIndex, m.endExcludingWhitespaces).trim(),
 						width: m.width,
+						hardBreak: m.isHardBreak,
 					}),
 				);
 		} finally {
@@ -230,7 +265,7 @@ export function createParagraphEngine(
 			// `>=`, not `>`), so a hug box sized to the raw width would wrap/ellipsize.
 			return {
 				width: Math.ceil(naturalWidth(text, font)),
-				height: lineHeightPx,
+				height: hardLines(text) * lineHeightPx,
 			};
 		}
 		const lines = breakLines(text, font, maxWidth);
@@ -255,10 +290,13 @@ export function createParagraphEngine(
 				input.value,
 				{ ...input.font, size },
 				input.maxWidth,
+				input.direction,
 			);
 			return {
 				lines,
-				totalHeight: lines.length * size * lh,
+				totalHeight:
+					lines.length * size * lh +
+					paragraphGaps(lines) * (input.paragraphSpacing ?? 0),
 				effectiveFontSize: size,
 			};
 		};

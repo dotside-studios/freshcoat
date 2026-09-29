@@ -104,6 +104,11 @@ the records, and **Export** turns templates and records into files.
     group.
   - Move, resize and rotate, with snapping to the artboard and to other layers.
   - Arrow keys nudge a layer, and Esc cancels a drag.
+  - Double-click a selected text layer to edit it in place: a text box in
+    the layer's font stands in for it, with the raw template text and its
+    `{{field}}` tokens, even while a record preview fills the fields in. Esc,
+    Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
+    text is edited in the inspector.
   - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
   - Creation tools: frame, rectangle, ellipse, text, image, QR and barcode.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
@@ -125,6 +130,12 @@ the records, and **Export** turns templates and records into files.
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
+  - Text aligns left, center, right or justified; a justified layer also
+    sets its last line's alignment. Direction is left to right, right to
+    left, or taken from the text. OpenType features are typed as tags
+    (`tnum, -liga, salt=2`). A new line in the content starts a paragraph,
+    and paragraph spacing sets the space after each. Shrink to fit works on
+    mixed-style text too, scaling every style together.
   - Auto layout is Flex or Grid. A grid sets how many columns and rows it
     has, and each one is Fill (a share of the free space), Fixed (a length)
     or Hug (its content's size). With no rows set, rows are added as the

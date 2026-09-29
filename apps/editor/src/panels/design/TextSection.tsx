@@ -1,7 +1,7 @@
 import type { TextElement, TextProperties } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
-import { TextArea } from "@freshcoat-js/ui/field";
+import { TextArea, TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -26,6 +26,7 @@ import { applyFontPick, templateFamilies } from "~/fonts/apply";
 import { type FontPick, FontPicker } from "~/fonts/FontPicker";
 import AlignBottomIcon from "~icons/mingcute/align-bottom-line";
 import AlignCenterIcon from "~icons/mingcute/align-center-line";
+import AlignJustifyIcon from "~icons/mingcute/align-justify-line";
 import AlignLeftIcon from "~icons/mingcute/align-left-line";
 import AlignRightIcon from "~icons/mingcute/align-right-line";
 import AlignTopIcon from "~icons/mingcute/align-top-line";
@@ -37,7 +38,13 @@ import LineHeightIcon from "~icons/mingcute/line-height-line";
 import StrikeIcon from "~icons/mingcute/strikethrough-line";
 import UnderlineIcon from "~icons/mingcute/underline-line";
 import { OverrideMarker, Row } from "./controls";
-import { commonValue, type Inspect, patchLayers } from "./field-helpers";
+import {
+	commonValue,
+	formatFeatures,
+	type Inspect,
+	parseFeatures,
+	patchLayers,
+} from "./field-helpers";
 import { isDeclared, verifyGoogleFamily, WEIGHTS } from "./fonts";
 
 type Font = TextProperties["font"];
@@ -49,6 +56,21 @@ const CASES = [
 	["upper", "UPPERCASE"],
 	["lower", "lowercase"],
 	["title", "Title Case"],
+] as const;
+
+const DIRECTIONS = [
+	["ltr", "Left to right"],
+	["rtl", "Right to left"],
+	["auto", "From the text"],
+] as const;
+
+const LAST_LINE = [
+	["start", "Start"],
+	["end", "End"],
+	["left", "Left"],
+	["center", "Center"],
+	["right", "Right"],
+	["justify", "Justify"],
 ] as const;
 
 const FITS = [
@@ -152,6 +174,20 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					}
 				/>
 			</Row>
+			<Row label="Paragraph" keys={["paragraphSpacing"]}>
+				<NumberField
+					label="Space after"
+					aria-label="Paragraph spacing"
+					className="min-w-0 flex-1"
+					min={0}
+					value={pick((p) => p.paragraphSpacing ?? 0)}
+					onChange={(v) =>
+						setText("paragraph-spacing", () => ({
+							paragraphSpacing: v > 0 ? v : undefined,
+						}))
+					}
+				/>
+			</Row>
 			<Row label="Align" keys={["align", "verticalAlign"]}>
 				<ToggleGroup
 					aria-label="Text align"
@@ -181,6 +217,9 @@ export function TextSection({ ins }: { ins: Inspect }) {
 						tooltip="Align right"
 					>
 						<AlignRightIcon />
+					</ToggleGroupItem>
+					<ToggleGroupItem id="justify" aria-label="Justify" tooltip="Justify">
+						<AlignJustifyIcon />
 					</ToggleGroupItem>
 				</ToggleGroup>
 				<ToggleGroup
@@ -212,6 +251,50 @@ export function TextSection({ ins }: { ins: Inspect }) {
 						<AlignBottomIcon />
 					</ToggleGroupItem>
 				</ToggleGroup>
+			</Row>
+			{pick((p) => p.align) === "justify" && (
+				<Row label="Last line" keys={["alignLast"]}>
+					<Select
+						aria-label="Last line alignment"
+						className="min-w-0 flex-1"
+						placeholder="Mixed"
+						value={pick((p) => p.alignLast ?? "start")}
+						onChange={(v) =>
+							setText("align-last", () => ({
+								alignLast:
+									v === "start"
+										? undefined
+										: (v as TextProperties["alignLast"]),
+							}))
+						}
+					>
+						{LAST_LINE.map(([id, name]) => (
+							<SelectItem key={id} id={id}>
+								{name}
+							</SelectItem>
+						))}
+					</Select>
+				</Row>
+			)}
+			<Row label="Direction" keys={["direction"]}>
+				<Select
+					aria-label="Text direction"
+					className="min-w-0 flex-1"
+					placeholder="Mixed"
+					value={pick((p) => p.direction ?? "ltr")}
+					onChange={(v) =>
+						setText("direction", () => ({
+							direction:
+								v === "ltr" ? undefined : (v as TextProperties["direction"]),
+						}))
+					}
+				>
+					{DIRECTIONS.map(([id, name]) => (
+						<SelectItem key={id} id={id}>
+							{name}
+						</SelectItem>
+					))}
+				</Select>
 			</Row>
 			<Row label="Style" keys={FONT}>
 				<ToggleButton
@@ -246,6 +329,12 @@ export function TextSection({ ins }: { ins: Inspect }) {
 				>
 					<StrikeIcon />
 				</ToggleButton>
+			</Row>
+			<Row label="Features" keys={FONT}>
+				<FeaturesField
+					value={pickFont((f) => formatFeatures(f.features ?? {}))}
+					onCommit={(features) => setFont("font-features", { features })}
+				/>
 			</Row>
 			<Row label="Case" keys={["case"]}>
 				<Select
@@ -312,6 +401,50 @@ export function TextSection({ ins }: { ins: Inspect }) {
 				</Checkbox>
 			</Row>
 		</PanelSection>
+	);
+}
+
+function FeaturesField({
+	value,
+	onCommit,
+}: {
+	value: string | null;
+	onCommit: (features: Font["features"]) => void;
+}) {
+	const shown = value ?? "";
+	const [draft, setDraft] = useState(shown);
+	const [invalid, setInvalid] = useState(false);
+	useEffect(() => {
+		setDraft(shown);
+		setInvalid(false);
+	}, [shown]);
+	const commit = () => {
+		if (draft === shown) return;
+		const features = parseFeatures(draft);
+		if (features === null) {
+			setInvalid(true);
+			return;
+		}
+		setInvalid(false);
+		onCommit(features);
+	};
+	return (
+		<TextField
+			aria-label="OpenType features"
+			className="flex-1"
+			placeholder={value === null ? "Mixed" : "e.g. tnum, -liga"}
+			value={draft}
+			isInvalid={invalid}
+			onChange={(v) => {
+				setDraft(v);
+				setInvalid(false);
+			}}
+			onBlur={commit}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") commit();
+				if (e.key === "Escape") setDraft(shown);
+			}}
+		/>
 	);
 }
 

@@ -14,11 +14,13 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
+import { chooseOption } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 function setup(selection: string[], t: Template = doc()) {
@@ -49,6 +51,12 @@ function typeInto(input: HTMLElement, value: string) {
 	fireEvent.keyDown(input, { key: "Enter" });
 }
 
+beforeAll(() => {
+	// jsdom has no CSS.escape, which react-aria uses to find items by key.
+	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
+	g.CSS ??= {};
+	g.CSS.escape ??= (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
+});
 afterEach(cleanup);
 
 describe("DesignPanel", () => {
@@ -88,6 +96,51 @@ describe("DesignPanel", () => {
 			window.dispatchEvent(new CustomEvent("freshcoat:focus-text"));
 		});
 		expect(document.activeElement).toBe(screen.getByLabelText("Text content"));
+	});
+
+	it("justifies text and then offers the last line's alignment", () => {
+		const c = setup(["0/1/1"]);
+		expect(screen.queryByLabelText("Last line alignment")).toBeNull();
+		fireEvent.click(screen.getByRole("radio", { name: "Justify" }));
+		expect((el(c, "0/1/1").properties as { align?: string }).align).toBe(
+			"justify",
+		);
+		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("sets the text direction", async () => {
+		const c = setup(["0/1/1"]);
+		await chooseOption(
+			userEvent.setup(),
+			screen.getByRole("button", { name: /Text direction/ }),
+			"Right to left",
+		);
+		expect(
+			(el(c, "0/1/1").properties as { direction?: string }).direction,
+		).toBe("rtl");
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("writes OpenType features from the features field", () => {
+		const c = setup(["0/1/1"]);
+		typeInto(screen.getByLabelText("OpenType features"), "tnum, -liga");
+		const font = (el(c, "0/1/1").properties as { font: { features?: unknown } })
+			.font;
+		expect(font.features).toEqual({ tnum: 1, liga: 0 });
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("writes paragraph spacing, and clears it at zero", () => {
+		const c = setup(["0/1/1"]);
+		const field = screen.getByRole("spinbutton", { name: "Paragraph spacing" });
+		typeInto(field, "12");
+		const spacing = () =>
+			(el(c, "0/1/1").properties as { paragraphSpacing?: number })
+				.paragraphSpacing;
+		expect(spacing()).toBe(12);
+		typeInto(field, "0");
+		expect(spacing()).toBeUndefined();
 	});
 
 	it("shows a rect's geometry, fill, stroke and corners, and writes X", () => {

@@ -15,7 +15,8 @@ import type { Template } from "./types";
 //   1.3  barcode element
 //   1.4  variant deltas: pos, size, rotation, opacity, hidden
 //   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
-//        `bleed` and `safeArea`
+//        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
+//        `alignLast`, `direction`, `paragraphSpacing` and font `features`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 5;
@@ -68,6 +69,7 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
+			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 		}
 		for (const value of Object.values(o)) visit(value);
 	};
@@ -85,11 +87,32 @@ export function minimumFormatVersion(template: Template): string {
 					delta.hidden !== undefined
 				)
 					need(4);
+				if (usesTextLayout(delta.properties)) need(5);
 			}
 		}
 	}
 
 	return `${FORMAT_MAJOR}.${minor}`;
+}
+
+const TEXT_ALIGN_1_5 = new Set(["justify", "start", "end"]);
+
+// Text properties 1.5 added, on an element or a variant delta's properties.
+function usesTextLayout(properties: unknown): boolean {
+	if (properties === null || typeof properties !== "object") return false;
+	const p = properties as Record<string, unknown>;
+	const hasFeatures = (font: unknown) =>
+		font !== null &&
+		typeof font === "object" &&
+		(font as Record<string, unknown>).features !== undefined;
+	return (
+		TEXT_ALIGN_1_5.has(p.align as string) ||
+		p.alignLast !== undefined ||
+		p.direction !== undefined ||
+		p.paragraphSpacing !== undefined ||
+		hasFeatures(p.font) ||
+		(Array.isArray(p.spans) && p.spans.some((span) => hasFeatures(span?.font)))
+	);
 }
 
 /**

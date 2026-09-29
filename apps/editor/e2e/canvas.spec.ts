@@ -221,3 +221,47 @@ test("escape cancels a drag in progress", async ({ page }) => {
 	expect(after.x).toBeCloseTo(r.x, 5);
 	expect(await state<number>(page, "s.doc.history.past.length")).toBe(0);
 });
+
+test("double-click edits a text layer on the canvas as one undo step", async ({
+	page,
+}) => {
+	await openSample(page);
+	const key = await state<string>(
+		page,
+		`"0/" + t.template_data[0].elements.findIndex((e) => e.type === "text" && !e.properties.spans)`,
+	);
+	const before = await state<string>(
+		page,
+		`t.template_data[0].elements[${key.split("/")[1]}].properties.value`,
+	);
+	const r = await state<Rect>(page, `s.geometry.get("${key}").rect`);
+	const p = await artboardPoint(page, r.x + 4, r.y + r.height / 2);
+	await page.mouse.click(p.x, p.y);
+	await page.mouse.dblclick(p.x, p.y);
+	const editor = page.getByLabel("Edit text on canvas");
+	await expect(editor).toBeFocused();
+	await expect(editor).toHaveValue(before);
+	expect(await state<string>(page, "s.textEdit")).toBe(key);
+
+	await page.keyboard.press(`${mod}+a`);
+	await page.keyboard.type("Edited {{ name }}");
+	await page.keyboard.press("Escape");
+	await expect(editor).toBeHidden();
+	await settle(page);
+	expect(
+		await state<string>(
+			page,
+			`t.template_data[0].elements[${key.split("/")[1]}].properties.value`,
+		),
+	).toBe("Edited {{ name }}");
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(1);
+
+	await page.keyboard.press(`${mod}+z`);
+	await settle(page);
+	expect(
+		await state<string>(
+			page,
+			`t.template_data[0].elements[${key.split("/")[1]}].properties.value`,
+		),
+	).toBe(before);
+});

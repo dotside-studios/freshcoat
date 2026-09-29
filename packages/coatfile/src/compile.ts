@@ -80,6 +80,7 @@ type TextSpanInput = {
 		lineHeight?: number;
 		decoration?: ResolvedFont["decoration"];
 		variations?: ResolvedFont["variations"];
+		features?: ResolvedFont["features"];
 	};
 	color?: string;
 };
@@ -463,6 +464,7 @@ function compileText(
 		letterSpacing?: number;
 		decoration?: ResolvedFont["decoration"];
 		variations?: ResolvedFont["variations"];
+		features?: ResolvedFont["features"];
 	};
 	const font: ResolvedFont = {
 		family: inputFont.family,
@@ -476,6 +478,7 @@ function compileText(
 		...lineHeightOf(inputFont.lineHeight),
 		decoration: inputFont.decoration,
 		...(inputFont.variations ? { variations: inputFont.variations } : {}),
+		...(inputFont.features ? { features: inputFont.features } : {}),
 	};
 
 	// Normalize: `value` is sugar for a single span. Figma "Case" applies to the
@@ -489,7 +492,18 @@ function compileText(
 		kind: "text",
 		font,
 		color: String(props.color ?? "#000"),
-		align: (props.align as TextNode["align"]) ?? "left",
+		align:
+			(props.align as TextNode["align"]) ??
+			(props.direction ? "start" : "left"),
+		...(props.alignLast
+			? { alignLast: props.alignLast as TextNode["alignLast"] }
+			: {}),
+		...(props.direction
+			? { direction: props.direction as TextNode["direction"] }
+			: {}),
+		...(typeof props.paragraphSpacing === "number" && props.paragraphSpacing > 0
+			? { paragraphSpacing: props.paragraphSpacing * ratio }
+			: {}),
 		verticalAlign: (props.verticalAlign as TextNode["verticalAlign"]) ?? "top",
 		fit: props.fit as TextNode["fit"],
 		maxLines: typeof props.maxLines === "number" ? props.maxLines : undefined,
@@ -530,6 +544,7 @@ function mapSpanFont(
 		...(f.lineHeight === undefined ? {} : lineHeightOf(f.lineHeight)),
 		decoration: f.decoration,
 		...(f.variations ? { variations: f.variations } : {}),
+		...(f.features ? { features: f.features } : {}),
 	};
 }
 
@@ -1105,7 +1120,8 @@ function hasOverrides(span: TextSpanInput): boolean {
 		f.style !== undefined ||
 		f.letterSpacing !== undefined ||
 		f.lineHeight !== undefined ||
-		f.variations !== undefined
+		f.variations !== undefined ||
+		f.features !== undefined
 	);
 }
 

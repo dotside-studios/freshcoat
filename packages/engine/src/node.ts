@@ -146,7 +146,16 @@ export type TextNode = Transform & {
 	font: ResolvedFont;
 	color?: string;
 	fill?: ResolvedFill;
-	align?: "left" | "center" | "right";
+	// start and end follow the resolved direction.
+	align?: "left" | "center" | "right" | "justify" | "start" | "end";
+	// How a justified paragraph sets its last line (and any line ending in a hard
+	// break). Default start.
+	alignLast?: "left" | "center" | "right" | "justify" | "start" | "end";
+	// Extra space after each hard line break, in target px.
+	paragraphSpacing?: number;
+	// Base direction for bidi ordering. auto takes the first strong character.
+	// Default ltr.
+	direction?: "ltr" | "rtl" | "auto";
 	verticalAlign?: "top" | "middle" | "bottom";
 	fit?: "shrink" | "clip";
 	maxLines?: number;

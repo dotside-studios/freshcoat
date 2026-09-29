@@ -21,11 +21,11 @@ export type TranspileTextContext = {
 	worldAnchor?: { x: number; y: number };
 };
 
-const ALIGN: Record<string, "left" | "center" | "right"> = {
+const ALIGN: Record<string, "left" | "center" | "right" | "justify"> = {
 	LEFT: "left",
 	CENTER: "center",
 	RIGHT: "right",
-	JUSTIFIED: "left",
+	JUSTIFIED: "justify",
 };
 const VALIGN: Record<string, "top" | "middle" | "bottom"> = {
 	TOP: "top",
@@ -129,6 +129,7 @@ export function transpileText(
 			? { letterSpacing: node.style.letterSpacing * ctx.scale }
 			: {}),
 		lineHeight,
+		...fontFeatures(node.style.openTypeFeatures),
 	};
 
 	const spans = buildSpans(node, ctx.scale);
@@ -157,6 +158,9 @@ export function transpileText(
 		// above where the layer put it.
 		...(node.style.leadingTrim === "CAP_HEIGHT" ? { leadingTrim: true } : {}),
 		...(fitMode ? { fit: fitMode } : {}),
+		...(node.style.paragraphSpacing
+			? { paragraphSpacing: round2(node.style.paragraphSpacing * ctx.scale) }
+			: {}),
 		...(caseMode ? { case: caseMode } : {}),
 	};
 	if (spans) {
@@ -176,6 +180,21 @@ export function transpileText(
 		size,
 		...(rotation !== 0 ? { rotation } : {}),
 		properties,
+	};
+}
+
+/** Figma's explicitly set OpenType features, as coatfile's lowercase tags. */
+function fontFeatures(features: Record<string, boolean> | undefined): {
+	features?: Record<string, number>;
+} {
+	const entries = Object.entries(features ?? {}).filter(([tag]) =>
+		/^[A-Za-z0-9]{4}$/.test(tag),
+	);
+	if (entries.length === 0) return {};
+	return {
+		features: Object.fromEntries(
+			entries.map(([tag, on]) => [tag.toLowerCase(), on ? 1 : 0]),
+		),
 	};
 }
 

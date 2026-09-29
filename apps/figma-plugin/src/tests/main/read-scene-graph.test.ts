@@ -861,6 +861,27 @@ describe("readTextNode with mixed (symbol) font properties", () => {
 		expect("leadingTrim" in readTextNode(mixedTextNode()).style).toBe(false);
 	});
 
+	it("reads explicit OpenType features, and treats mixed as unset", () => {
+		const out = readTextNode(
+			mixedTextNode({ openTypeFeatures: { TNUM: true, LIGA: false } } as never),
+		);
+		expect(out.style.openTypeFeatures).toEqual({ TNUM: true, LIGA: false });
+		const mixed = readTextNode(
+			mixedTextNode({ openTypeFeatures: Symbol("mixed") } as never),
+		);
+		expect("openTypeFeatures" in mixed.style).toBe(false);
+		expect(findUnpostable(mixed)).toBeNull();
+	});
+
+	it("reads paragraph spacing, and treats mixed as unset", () => {
+		const out = readTextNode(mixedTextNode({ paragraphSpacing: 12 } as never));
+		expect(out.style.paragraphSpacing).toBe(12);
+		const mixed = readTextNode(
+			mixedTextNode({ paragraphSpacing: Symbol("mixed") } as never),
+		);
+		expect("paragraphSpacing" in mixed.style).toBe(false);
+	});
+
 	it("leaves an unmixed text node alone", () => {
 		const out = readTextNode(
 			mixedTextNode({

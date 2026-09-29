@@ -1126,6 +1126,118 @@ add(
 	],
 );
 
+// Justify stretches the first line's word gaps until its last glyph meets the
+// box's right edge; the last line keeps its natural, left-aligned width.
+add(
+	"text-align-justify",
+	"justify spreads a wrapped line to both edges of the box",
+	"core",
+	["draw.text", "text.align", "text.justify"],
+	frame([
+		createText({
+			...box(10, 10, 140, 100),
+			text: "Hl Hl Hl Hl Hl Hlm Hl",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 24,
+				lineHeight: 1.25,
+			},
+			color: "#000000",
+			align: "justify",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [146, 18],
+			from: [5, 5],
+			minDelta: 200,
+			why: "the first line's last stem lands on the box's right edge (150)",
+		},
+		px([146, 48], [255, 255, 255, 255], "the last line keeps its width"),
+	],
+);
+
+// A right-to-left line is shaped in that direction: the trailing "!" is
+// reordered to the line's left, ahead of "Hl".
+add(
+	"text-direction-rtl",
+	"an RTL line orders its runs right to left",
+	"core",
+	["draw.text", "text.direction"],
+	frame([
+		createText({
+			...box(20, 40, 120, 40),
+			text: "Hl!",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 32,
+				lineHeight: 1.2,
+			},
+			color: "#000000",
+			direction: "rtl",
+			align: "left",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [23, 45],
+			from: [10, 60],
+			minDelta: 200,
+			why: "the reordered ! stands at the line's left",
+		},
+		px([23, 57], [255, 255, 255, 255], "the gap between the ! and its dot"),
+		px(
+			[27, 51],
+			[255, 255, 255, 255],
+			"between the ! and the H, where a left-to-right line has the H's crossbar",
+		),
+	],
+);
+
+// tnum gives Geist's narrow "1" a figure-wide advance, so four of them run
+// much further right than the proportional four would.
+add(
+	"text-font-features",
+	"OpenType features are applied when the line is shaped",
+	"core",
+	["draw.text", "text.fontFeatures"],
+	frame([
+		createText({
+			...box(20, 40, 120, 40),
+			text: "1111",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 32,
+				lineHeight: 1.2,
+				features: { tnum: 1 },
+			},
+			color: "#000000",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [86, 55],
+			from: [10, 60],
+			minDelta: 200,
+			why: "the fourth tabular 1 stands at 86; the proportional four end near 63",
+		},
+		px(
+			[40, 55],
+			[255, 255, 255, 255],
+			"where the second proportional 1 would be",
+		),
+	],
+);
+
 // maxLines truncates after wrapping, so the second line's band stays ground.
 add(
 	"text-max-lines",

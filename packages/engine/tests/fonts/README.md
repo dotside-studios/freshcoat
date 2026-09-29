@@ -6,7 +6,7 @@ deterministically with no network fetch. Used by the conformance fixture
 `ConformanceFont`), the text and line-height tests here and in `coatfile`, and
 the worker's render tests.
 
-Both are licensed under the SIL Open Font License 1.1, and neither declares a
+Each is licensed under the SIL Open Font License 1.1, and none declares a
 Reserved Font Name. OFL-1.1 permits bundling and redistribution with software,
 including modified copies, as long as the font is not sold on its own and its
 copyright notice and license travel with it. Each font's license file below is
@@ -20,6 +20,20 @@ the upstream `OFL.txt` verbatim.
 - **License:** SIL Open Font License 1.1, see [`Geist-OFL.txt`](./Geist-OFL.txt)
 
 A verbatim TrueType `sfnt`, with no subsetting or modification.
+
+## NotoSansHebrew-Regular.ttf
+
+- **Family:** Noto Sans Hebrew (proportional sans-serif, Hebrew script)
+- **Source:** [notofonts/hebrew](https://github.com/notofonts/hebrew), the
+  unhinted TrueType build published at
+  [notofonts.github.io](https://github.com/notofonts/notofonts.github.io/tree/main/fonts/NotoSansHebrew/unhinted/ttf)
+- **Copyright:** © 2022 The Noto Project Authors
+- **License:** SIL Open Font License 1.1, see
+  [`NotoSansHebrew-OFL.txt`](./NotoSansHebrew-OFL.txt)
+
+A verbatim TrueType `sfnt`, with no subsetting or modification. Vendored for
+right-to-left layout: Geist has no Hebrew, so without it an RTL string shapes
+as .notdef boxes with meaningless advances. See `tests/text-direction.test.ts`.
 
 ## VendSans-Variable-latin.woff2
 
