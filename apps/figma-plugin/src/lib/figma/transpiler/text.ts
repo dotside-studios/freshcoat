@@ -21,11 +21,11 @@ export type TranspileTextContext = {
 	worldAnchor?: { x: number; y: number };
 };
 
-const ALIGN: Record<string, "left" | "center" | "right"> = {
+const ALIGN: Record<string, "left" | "center" | "right" | "justify"> = {
 	LEFT: "left",
 	CENTER: "center",
 	RIGHT: "right",
-	JUSTIFIED: "left",
+	JUSTIFIED: "justify",
 };
 const VALIGN: Record<string, "top" | "middle" | "bottom"> = {
 	TOP: "top",

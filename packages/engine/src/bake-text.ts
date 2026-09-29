@@ -82,7 +82,10 @@ export function bakeText(
 	const pos: Vec2 = node.pos ?? { x: 0, y: 0 };
 	const size: Size = node.size ?? { width: 0, height: 0 };
 	const color = node.color ?? "#000";
-	const align = node.align ?? "left";
+	const align: LineAlign = {
+		align: node.align ?? "left",
+		last: node.alignLast ?? "left",
+	};
 	const verticalAlign = node.verticalAlign ?? "top";
 	const fit = node.fit;
 	const maxLines = node.maxLines;
@@ -199,7 +202,7 @@ function layoutWrappable(
 	color: string,
 	pos: Vec2,
 	size: Size,
-	align: "left" | "center" | "right",
+	align: LineAlign,
 	verticalAlign: "top" | "middle" | "bottom",
 	lineHeight: number,
 	fit: "shrink" | "clip" | undefined,
@@ -266,13 +269,29 @@ function layoutWrappable(
 	);
 
 	const lines: TextLine[] = mlines.map((line, i) => {
-		const x = xForAlign(align, pos.x, size.width, line.width);
+		const placed = placeLine(
+			align,
+			i === nLines - 1 || line.hardBreak === true,
+			line.text,
+			pos.x,
+			size.width,
+			line.width,
+		);
 		const y = startY + i * lineAdvance;
 		return {
 			text: line.text,
 			y,
 			baseline: y + baseOffset,
-			spans: [{ text: line.text, x, width: line.width, font: effFont, color }],
+			...(placed.wordSpacing ? { wordSpacing: placed.wordSpacing } : {}),
+			spans: [
+				{
+					text: line.text,
+					x: placed.x,
+					width: placed.width,
+					font: effFont,
+					color,
+				},
+			],
 		};
 	});
 	return {
@@ -320,7 +339,7 @@ function layoutInline(
 	defaultColor: string,
 	pos: Vec2,
 	size: Size,
-	align: "left" | "center" | "right",
+	align: LineAlign,
 	verticalAlign: "top" | "middle" | "bottom",
 	leadingTrim: boolean,
 	engine: TextEngine,
@@ -400,22 +419,34 @@ function layoutInline(
 			contentHeight,
 		);
 		let cursorY = startY;
-		const lines: TextLine[] = measuredLines.map((ml) => {
+		const lines: TextLine[] = measuredLines.map((ml, i) => {
 			const sl = ml.shaped;
-			const lineX = xForAlign(align, pos.x, size.width, sl.width);
+			const text = sl.fragments.map((f) => f.text).join("");
+			const placed = placeLine(
+				align,
+				i === measuredLines.length - 1 || sl.hardBreak === true,
+				text,
+				pos.x,
+				size.width,
+				sl.width,
+			);
+			const ws = placed.wordSpacing ?? 0;
 			const y = cursorY;
 			cursorY += ml.advance;
-			const spansOut: TextLineSpan[] = sl.fragments.map((fr) => ({
-				text: fr.text,
-				x: lineX + fr.x,
-				width: fr.width,
-				font: resolved[fr.spanIndex].font,
-				color: resolved[fr.spanIndex].color,
-			}));
+			const spansOut: TextLineSpan[] = spreadFragments(sl.fragments, ws).map(
+				(fr) => ({
+					text: fr.text,
+					x: placed.x + fr.x,
+					width: fr.width,
+					font: resolved[fr.spanIndex].font,
+					color: resolved[fr.spanIndex].color,
+				}),
+			);
 			return {
-				text: sl.fragments.map((f) => f.text).join(""),
+				text,
 				y,
 				baseline: y + ml.baseOffset,
+				...(ws ? { wordSpacing: ws } : {}),
 				spans: spansOut,
 			};
 		});
@@ -436,7 +467,12 @@ function layoutInline(
 		size.height,
 		lineHeightPx,
 	);
-	const lineX = xForAlign(align, pos.x, size.width, totalWidth);
+	const lineX = xForAlign(
+		align.align === "justify" ? align.last : align.align,
+		pos.x,
+		size.width,
+		totalWidth,
+	);
 
 	let cursor = lineX;
 	const spanLayouts: TextLineSpan[] = resolved.map((r, i) => {
@@ -468,8 +504,65 @@ function layoutInline(
 
 // ─────────────── alignment ───────────────
 
+type LineAlign = {
+	align: NonNullable<TextNode["align"]>;
+	last: NonNullable<TextNode["alignLast"]>;
+};
+
+// A line's left edge and painted width, plus the word spacing that stretches a
+// justified line to the box. A justified paragraph's last line takes `last`,
+// and a line with no space to stretch falls back to left.
+function placeLine(
+	align: LineAlign,
+	endsParagraph: boolean,
+	text: string,
+	boxX: number,
+	boxWidth: number,
+	lineWidth: number,
+): { x: number; width: number; wordSpacing?: number } {
+	const mode =
+		align.align === "justify" && endsParagraph ? align.last : align.align;
+	if (mode === "justify") {
+		const gaps = countSpaces(text);
+		if (gaps > 0 && lineWidth < boxWidth)
+			return {
+				x: boxX,
+				width: boxWidth,
+				wordSpacing: (boxWidth - lineWidth) / gaps,
+			};
+		return { x: boxX, width: lineWidth };
+	}
+	return { x: xForAlign(mode, boxX, boxWidth, lineWidth), width: lineWidth };
+}
+
+function countSpaces(text: string): number {
+	let n = 0;
+	for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 32) n++;
+	return n;
+}
+
+// Shift and widen a line's fragments by the word spacing of every space that
+// sits to their left (visually, so it holds for either direction).
+function spreadFragments<F extends { text: string; x: number; width: number }>(
+	fragments: F[],
+	wordSpacing: number,
+): F[] {
+	if (!wordSpacing) return fragments;
+	const order = fragments
+		.map((f, i) => ({ f, i }))
+		.sort((a, b) => a.f.x - b.f.x);
+	const out = fragments.slice();
+	let before = 0;
+	for (const { f, i } of order) {
+		const own = countSpaces(f.text) * wordSpacing;
+		out[i] = { ...f, x: f.x + before, width: f.width + own };
+		before += own;
+	}
+	return out;
+}
+
 function xForAlign(
-	align: "left" | "center" | "right",
+	align: "left" | "center" | "right" | "justify",
 	boxX: number,
 	boxWidth: number,
 	lineWidth: number,

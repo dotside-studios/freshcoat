@@ -27,7 +27,8 @@ export type TextLayoutInput = {
 	fit: "shrink" | "clip" | undefined;
 };
 
-export type MeasuredLine = { text: string; width: number };
+// hardBreak: the line ends its paragraph (a newline, or the end of the text).
+export type MeasuredLine = { text: string; width: number; hardBreak?: boolean };
 
 export type TextLayout = {
 	lines: MeasuredLine[];

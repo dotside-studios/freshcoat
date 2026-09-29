@@ -23,7 +23,11 @@ export type InlineFragment = {
 	x: number;
 	width: number;
 };
-export type InlineShapedLine = { fragments: InlineFragment[]; width: number };
+export type InlineShapedLine = {
+	fragments: InlineFragment[];
+	width: number;
+	hardBreak?: boolean;
+};
 
 export type TextEngine = {
 	// Wrapped/natural width + height of a run (maxWidth null = single line).

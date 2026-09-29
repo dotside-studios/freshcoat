@@ -3371,7 +3371,17 @@
 											"enum": [
 												"left",
 												"center",
-												"right"
+												"right",
+												"justify"
+											]
+										},
+										"alignLast": {
+											"type": "string",
+											"enum": [
+												"left",
+												"center",
+												"right",
+												"justify"
 											]
 										},
 										"verticalAlign": {

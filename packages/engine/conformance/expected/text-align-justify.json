@@ -1,0 +1,118 @@
+{
+	"caseId": "text-align-justify",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"op": "loadFonts",
+			"requests": [
+				{
+					"family": "ConformanceFont"
+				}
+			]
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 10,
+						"y": 10
+					},
+					"size": {
+						"width": 140,
+						"height": 100
+					},
+					"op": "drawText",
+					"layout": {
+						"font": {
+							"family": "ConformanceFont",
+							"weight": 400,
+							"style": "normal",
+							"size": 24,
+							"lineHeight": 1.25
+						},
+						"lines": [
+							{
+								"text": "Hl Hl Hl Hl",
+								"y": 10,
+								"baseline": 27.04,
+								"wordSpacing": 9.626665751139322,
+								"spans": [
+									{
+										"text": "Hl Hl Hl Hl",
+										"x": 10,
+										"width": 140,
+										"font": {
+											"family": "ConformanceFont",
+											"weight": 400,
+											"style": "normal",
+											"size": 24,
+											"lineHeight": 1.25
+										},
+										"color": "#000000"
+									}
+								]
+							},
+							{
+								"text": "Hl Hlm Hl",
+								"y": 40,
+								"baseline": 57.04,
+								"spans": [
+									{
+										"text": "Hl Hlm Hl",
+										"x": 10,
+										"width": 102.79000091552734,
+										"font": {
+											"family": "ConformanceFont",
+											"weight": 400,
+											"style": "normal",
+											"size": 24,
+											"lineHeight": 1.25
+										},
+										"color": "#000000"
+									}
+								]
+							}
+						],
+						"totalHeight": 60,
+						"shrinkApplied": false
+					},
+					"color": "#000000"
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "82319047e092224653eb0f000a47ea5aa10f4870de48460a5e04a23fe32c0724"
+}

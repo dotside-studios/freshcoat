@@ -1,0 +1,92 @@
+{
+	"id": "text-align-justify",
+	"title": "justify spreads a wrapped line to both edges of the box",
+	"profile": "core",
+	"requires": [
+		"draw.text",
+		"text.align",
+		"text.justify"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"pos": {
+					"x": 10,
+					"y": 10
+				},
+				"size": {
+					"width": 140,
+					"height": 100
+				},
+				"text": "Hl Hl Hl Hl Hl Hlm Hl",
+				"font": {
+					"family": "ConformanceFont",
+					"weight": 400,
+					"style": "normal",
+					"size": 24,
+					"lineHeight": 1.25
+				},
+				"color": "#000000",
+				"align": "justify"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "differ",
+			"at": [
+				146,
+				18
+			],
+			"from": [
+				5,
+				5
+			],
+			"minDelta": 200,
+			"why": "the first line's last stem lands on the box's right edge (150)"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				146,
+				48
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the last line keeps its width"
+		}
+	]
+}

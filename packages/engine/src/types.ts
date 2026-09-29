@@ -225,6 +225,9 @@ export type TextLine = {
 	// line-box model graphic tools (Figma) use: the font's ascent + half of the
 	// line's leading. The painter draws at this baseline.
 	baseline?: number;
+	// Extra advance after each space (U+0020), in target px: how a justified
+	// line fills the box. The painter shapes the line with it.
+	wordSpacing?: number;
 	spans: TextLineSpan[];
 };
 

@@ -26,6 +26,7 @@ import { applyFontPick, templateFamilies } from "~/fonts/apply";
 import { type FontPick, FontPicker } from "~/fonts/FontPicker";
 import AlignBottomIcon from "~icons/mingcute/align-bottom-line";
 import AlignCenterIcon from "~icons/mingcute/align-center-line";
+import AlignJustifyIcon from "~icons/mingcute/align-justify-line";
 import AlignLeftIcon from "~icons/mingcute/align-left-line";
 import AlignRightIcon from "~icons/mingcute/align-right-line";
 import AlignTopIcon from "~icons/mingcute/align-top-line";
@@ -49,6 +50,13 @@ const CASES = [
 	["upper", "UPPERCASE"],
 	["lower", "lowercase"],
 	["title", "Title Case"],
+] as const;
+
+const LAST_LINE = [
+	["left", "Left"],
+	["center", "Center"],
+	["right", "Right"],
+	["justify", "Justify"],
 ] as const;
 
 const FITS = [
@@ -182,6 +190,9 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					>
 						<AlignRightIcon />
 					</ToggleGroupItem>
+					<ToggleGroupItem id="justify" aria-label="Justify" tooltip="Justify">
+						<AlignJustifyIcon />
+					</ToggleGroupItem>
 				</ToggleGroup>
 				<ToggleGroup
 					aria-label="Vertical align"
@@ -213,6 +224,28 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					</ToggleGroupItem>
 				</ToggleGroup>
 			</Row>
+			{pick((p) => p.align) === "justify" && (
+				<Row label="Last line" keys={["alignLast"]}>
+					<Select
+						aria-label="Last line alignment"
+						className="min-w-0 flex-1"
+						placeholder="Mixed"
+						value={pick((p) => p.alignLast ?? "left")}
+						onChange={(v) =>
+							setText("align-last", () => ({
+								alignLast:
+									v === "left" ? undefined : (v as TextProperties["alignLast"]),
+							}))
+						}
+					>
+						{LAST_LINE.map(([id, name]) => (
+							<SelectItem key={id} id={id}>
+								{name}
+							</SelectItem>
+						))}
+					</Select>
+				</Row>
+			)}
 			<Row label="Style" keys={FONT}>
 				<ToggleButton
 					aria-label="Italic"

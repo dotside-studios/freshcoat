@@ -379,6 +379,7 @@ function textStyleOf(
 	span: DrawTextCommand["layout"]["lines"][number]["spans"][number],
 	cmd: DrawTextCommand,
 	fallbackFamilies: string[] = [],
+	wordSpacing?: number,
 ) {
 	const weight =
 		WEIGHTS[Math.round((span.font.weight || 400) / 100) * 100] ?? "Normal";
@@ -397,6 +398,7 @@ function textStyleOf(
 		...(span.font.letterSpacing
 			? { letterSpacing: span.font.letterSpacing }
 			: {}),
+		...(wordSpacing ? { wordSpacing } : {}),
 	};
 }
 
@@ -450,14 +452,16 @@ function drawText(
 		}
 		const shape = (): ShapedLine => {
 			const style = new ck.ParagraphStyle({
-				textStyle: textStyleOf(ck, first, cmd, fallback),
+				textStyle: textStyleOf(ck, first, cmd, fallback, line.wordSpacing),
 			});
 			const builder = ck.ParagraphBuilder.MakeFromFontProvider(
 				style,
 				provider,
 			);
 			for (const span of line.spans) {
-				const ts = ck.TextStyle(textStyleOf(ck, span, cmd, fallback));
+				const ts = ck.TextStyle(
+					textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
+				);
 				if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
 				else builder.pushStyle(ts);
 				builder.addText(span.text);
@@ -959,6 +963,7 @@ function lineKey(
 		fallback,
 		color,
 		line.spans.map((s) => [s.text, s.font, s.color]),
+		...(line.wordSpacing ? [line.wordSpacing] : []),
 	]);
 }
 

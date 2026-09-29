@@ -110,6 +110,8 @@ the records, and **Export** turns templates and records into files.
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects and conditional visibility.
+  - Text aligns left, center, right or justified; a justified layer also
+    sets its last line's alignment.
   - A font picker over the whole Google Fonts catalog: search, category
     chips, sort by popularity or name, the template's own families first, and
     each family previewed in its own face. Picking one adds it to the

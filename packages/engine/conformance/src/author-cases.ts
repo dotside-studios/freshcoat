@@ -1126,6 +1126,40 @@ add(
 	],
 );
 
+// Justify stretches the first line's word gaps until its last glyph meets the
+// box's right edge; the last line keeps its natural, left-aligned width.
+add(
+	"text-align-justify",
+	"justify spreads a wrapped line to both edges of the box",
+	"core",
+	["draw.text", "text.align", "text.justify"],
+	frame([
+		createText({
+			...box(10, 10, 140, 100),
+			text: "Hl Hl Hl Hl Hl Hlm Hl",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 24,
+				lineHeight: 1.25,
+			},
+			color: "#000000",
+			align: "justify",
+		}),
+	]),
+	[
+		{
+			kind: "differ",
+			at: [146, 18],
+			from: [5, 5],
+			minDelta: 200,
+			why: "the first line's last stem lands on the box's right edge (150)",
+		},
+		px([146, 48], [255, 255, 255, 255], "the last line keeps its width"),
+	],
+);
+
 // maxLines truncates after wrapping, so the second line's band stays ground.
 add(
 	"text-max-lines",

@@ -601,6 +601,13 @@ render does. `compile()` marks the node and leaves `1.2` on it as the value a
 consumer that ignores the mark will use, so a family whose metrics never arrive
 renders exactly as it did before.
 
+## Text layout
+
+`align` is `left` (the default), `center`, `right` or `justify`. A justified
+paragraph stretches the spaces of every line but its last, which `alignLast`
+sets (`left` by default, or `center`, `right`, `justify`). A line with no space
+to stretch stays at its natural width.
+
 ## Spec
 
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is

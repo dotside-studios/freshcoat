@@ -138,7 +138,10 @@ export type TextNode = Transform & {
 	font: ResolvedFont;
 	color?: string;
 	fill?: ResolvedFill;
-	align?: "left" | "center" | "right";
+	align?: "left" | "center" | "right" | "justify";
+	// How a justified paragraph sets its last line (and any line ending in a hard
+	// break). Default left.
+	alignLast?: "left" | "center" | "right" | "justify";
 	verticalAlign?: "top" | "middle" | "bottom";
 	fit?: "shrink" | "clip";
 	maxLines?: number;

@@ -81,6 +81,16 @@ describe("transpileText", () => {
 		);
 	});
 
+	it("maps justified alignment to justify", () => {
+		const el = transpileText(
+			baseText({
+				style: { ...baseText().style, textAlignHorizontal: "JUSTIFIED" },
+			}),
+			{ frame: FRAME, scale: SCALE },
+		);
+		expect(el.properties.align).toBe("justify");
+	});
+
 	it("emits leadingTrim only for Figma's cap-height vertical trim", () => {
 		const trim = (leadingTrim?: "NONE" | "CAP_HEIGHT") =>
 			transpileText(

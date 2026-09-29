@@ -66,6 +66,11 @@ keeping measurement and painting on the same text implementation. On the
 lower-level path, pass a `textEngine` to resolve layout and unbaked text, or
 supply a scene with resolved geometry and baked text.
 
+A text node's `align` is `left`, `center`, `right` or `justify`. Justified lines
+are baked with a per-line `wordSpacing` that the painter shapes with, so every
+line but a paragraph's last meets both edges of the box; `alignLast` sets that
+last line.
+
 Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations
 after the whole scene is composited. The engine implements these operations;

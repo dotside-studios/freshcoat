@@ -1,0 +1,59 @@
+import { describe, expect, test } from "vitest";
+import { compile } from "../src/compile";
+import type { Node, Template, TextNode, TextProperties } from "../src/types";
+import { validate } from "../src/validate";
+
+function template(props: Partial<TextProperties>): Template {
+	return {
+		format_version: "1.0",
+		version: "1.0.0",
+		id: "text-layout",
+		name: "Text layout",
+		product: "card_cr80",
+		fields: { type: "object", properties: {} },
+		width: 300,
+		height: 200,
+		template_data: [
+			{
+				name: "front",
+				background: {
+					id: "bg",
+					type: "rect",
+					pos: { x: 0, y: 0 },
+					size: { width: 300, height: 200 },
+					properties: { fill: "#fff" },
+				},
+				elements: [
+					{
+						id: "copy",
+						type: "text",
+						pos: { x: 10, y: 10 },
+						size: { width: 200, height: 100 },
+						properties: {
+							value: "Hello there",
+							font: { family: "Inter", size: 20 },
+							...props,
+						},
+					},
+				],
+			},
+		],
+	};
+}
+
+function textNode(props: Partial<TextProperties>): TextNode {
+	const tpl = template(props);
+	expect(validate(tpl)).toMatchObject({ ok: true });
+	const compiled = compile(tpl, {}, { width: 300, height: 200 });
+	const children = (compiled.frames[0].root as { children: Node[] }).children;
+	return children.find((c) => c.kind === "text") as TextNode;
+}
+
+describe("text layout properties", () => {
+	test("justify and the last line's alignment reach the node", () => {
+		const node = textNode({ align: "justify", alignLast: "center" });
+		expect(node.align).toBe("justify");
+		expect(node.alignLast).toBe("center");
+		expect(textNode({ align: "justify" }).alignLast).toBeUndefined();
+	});
+});

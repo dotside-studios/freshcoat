@@ -150,6 +150,7 @@ export function createParagraphEngine(
 						endExcludingWhitespaces: number;
 						width: number;
 						left: number;
+						isHardBreak: boolean;
 					}) => {
 						const fragments = [];
 						for (const r of ranges) {
@@ -176,7 +177,7 @@ export function createParagraphEngine(
 								width: right - left,
 							});
 						}
-						return { fragments, width: lm.width };
+						return { fragments, width: lm.width, hardBreak: lm.isHardBreak };
 					},
 				);
 			return { lines };
@@ -198,10 +199,12 @@ export function createParagraphEngine(
 						startIndex: number;
 						endExcludingWhitespaces: number;
 						width: number;
+						isHardBreak: boolean;
 					}) => ({
 						// UTF-16 code-unit offsets → direct string slice.
 						text: norm.slice(m.startIndex, m.endExcludingWhitespaces).trim(),
 						width: m.width,
+						hardBreak: m.isHardBreak,
 					}),
 				);
 		} finally {

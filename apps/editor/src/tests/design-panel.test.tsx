@@ -83,6 +83,17 @@ describe("DesignPanel", () => {
 		expect(document.activeElement).toBe(screen.getByLabelText("Text content"));
 	});
 
+	it("justifies text and then offers the last line's alignment", () => {
+		const c = setup(["0/1/1"]);
+		expect(screen.queryByLabelText("Last line alignment")).toBeNull();
+		fireEvent.click(screen.getByRole("radio", { name: "Justify" }));
+		expect((el(c, "0/1/1").properties as { align?: string }).align).toBe(
+			"justify",
+		);
+		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
+		expect(validate(c.template).ok).toBe(true);
+	});
+
 	it("shows a rect's geometry, fill, stroke and corners, and writes X", () => {
 		const c = setup(["0/0"]);
 		const x = screen.getByRole("spinbutton", { name: "X" });
