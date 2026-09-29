@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog as RACDialog } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
+import { formatNumber } from "~/app/format";
 import { useExportJobs } from "~/export/export-jobs";
 import {
 	DESTINATION_LABEL,
@@ -98,7 +99,7 @@ export function ExportSelected({
 					data-testid="export-selected-popover"
 				>
 					<h3 className="m-0 font-semibold text-fc-base text-fc-text">
-						{`Export ${ids.length.toLocaleString("en-US")} selected`}
+						{`Export ${formatNumber(ids.length)} selected`}
 					</h3>
 					{preset ? (
 						<>

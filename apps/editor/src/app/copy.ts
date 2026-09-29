@@ -1,11 +1,12 @@
 import type { RecordStatus } from "@freshcoat-js/workspace";
+import { formatNumber } from "~/app/format";
 
 /** Strings more than one part of the editor shows. The rest of the copy
  *  stays inline, beside the control it labels. */
 
 /** A count and its noun: "1 record", "2,400 records". */
 export function plural(n: number, one: string, many = `${one}s`): string {
-	return `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+	return `${formatNumber(n)} ${n === 1 ? one : many}`;
 }
 
 /** The rule for a field key and a column key, which are the same thing. */

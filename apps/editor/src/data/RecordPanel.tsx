@@ -19,7 +19,7 @@ import {
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Dialog, DialogTrigger, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
-import { formatBytes } from "~/app/format";
+import { formatBytes, formatNumber } from "~/app/format";
 import DownIcon from "~icons/mingcute/down-line";
 import LeftIcon from "~icons/mingcute/left-line";
 import PhotoIcon from "~icons/mingcute/pic-line";
@@ -100,13 +100,12 @@ export function RecordPanel({
 					) : at + 1 === index && rows.length === dataset.records.length ? (
 						<span className="text-fc-faint">
 							{" "}
-							of {rows.length.toLocaleString()}
+							of {formatNumber(rows.length)}
 						</span>
 					) : (
 						<span className="text-fc-faint">
 							{" "}
-							· {(at + 1).toLocaleString()} of {rows.length.toLocaleString()}{" "}
-							shown
+							· {formatNumber(at + 1)} of {formatNumber(rows.length)} shown
 						</span>
 					)}
 				</span>
