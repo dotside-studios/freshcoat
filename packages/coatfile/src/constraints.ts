@@ -4,6 +4,7 @@
 // re-places its children the same way. The result is an ordinary template at
 // the new size, so compile, the editor and anything else read it unchanged.
 
+import { scalePathData } from "@freshcoat-js/engine";
 import { isSquareSymbology } from "./barcode-encoder";
 import type {
 	Constraint,
@@ -14,7 +15,7 @@ import type {
 	Variant,
 	Vec2,
 } from "./types";
-import { applyVariant } from "./variants";
+import { applyVariant, type VariantElementDelta } from "./variants";
 
 type Axis = { pos: number; size: number };
 
@@ -99,6 +100,18 @@ function squareBox(box: { pos: Vec2; size: Size }): { pos: Vec2; size: Size } {
 	};
 }
 
+// A vector's path is drawn at its authored coordinates, so it is scaled by the
+// box's change on each axis. Path data that does not parse is left as it was.
+function resizePath(d: string, before: Size, after: Size): string {
+	const sx = before.width === 0 ? 1 : after.width / before.width;
+	const sy = before.height === 0 ? 1 : after.height / before.height;
+	try {
+		return scalePathData(d, sx, sy);
+	} catch {
+		return d;
+	}
+}
+
 function resizeElement(
 	el: Element,
 	from: Size,
@@ -122,6 +135,15 @@ function resizeElement(
 	} as Element;
 
 	if (el.size === undefined || sameSize(box.size, before)) return next;
+	if (next.type === "vector") {
+		return {
+			...next,
+			properties: {
+				...next.properties,
+				d: resizePath(next.properties.d, before, box.size),
+			},
+		};
+	}
 	if (next.type === "frame") {
 		const auto = next.properties.layout !== undefined;
 		return {
@@ -167,8 +189,11 @@ export function resizeElements(
  *
  * Variants are carried: each is applied, the result resized, and its deltas
  * rewritten so every `pos` and `size` a delta already had takes the value its
- * element ends up with, and every override background the resized one. A delta
- * gains no keys, so one that only recolours stays that way.
+ * element ends up with, and every override background the resized one. A
+ * vector's delta also takes the path its element ends up with when it already
+ * set `d`, or when its own `size` makes that path differ from the resized
+ * base's. A delta gains no other keys, so one that only recolours stays that
+ * way.
  */
 export function resizeTemplate(
 	template: Template,
@@ -183,7 +208,7 @@ export function resizeTemplate(
 	return {
 		...resized,
 		variants: template.variants.map((v) =>
-			resizeVariant(template, v, width, height),
+			resizeVariant(template, resized, v, width, height),
 		),
 	};
 }
@@ -209,6 +234,7 @@ function resizeBackground<B extends { size?: Size }>(bg: B, to: Size): B {
 
 function resizeVariant(
 	template: Template,
+	resized: Template,
 	variant: Variant,
 	width: number,
 	height: number,
@@ -224,6 +250,10 @@ function resizeVariant(
 		overrides: variant.overrides.map((ov) => {
 			const frame = laidOut.template_data.find((f) => f.name === ov.name);
 			const byId = frame ? elementsById(frame.elements) : new Map();
+			const baseFrame = resized.template_data.find((f) => f.name === ov.name);
+			const baseById = baseFrame
+				? elementsById(baseFrame.elements)
+				: new Map<string, Element>();
 			return {
 				...ov,
 				...(ov.background !== undefined
@@ -242,6 +272,10 @@ function resizeVariant(
 									...(d.size !== undefined && el.size !== undefined
 										? { size: el.size }
 										: {}),
+									...(el.type === "vector" &&
+									vectorPathChanged(d, el, baseById.get(d.id))
+										? { properties: { ...d.properties, d: el.properties.d } }
+										: {}),
 								};
 							}),
 						}
@@ -249,6 +283,15 @@ function resizeVariant(
 			};
 		}),
 	};
+}
+
+function vectorPathChanged(
+	delta: VariantElementDelta,
+	el: Extract<Element, { type: "vector" }>,
+	base: Element | undefined,
+): boolean {
+	if (delta.properties?.d !== undefined) return true;
+	return base?.type === "vector" && base.properties.d !== el.properties.d;
 }
 
 // The first element with each id, nested ones included, as applyVariant

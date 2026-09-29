@@ -354,7 +354,9 @@ the template's shorter side, so a mark keeps its size relative to a photo's
 short edge. `resizeTemplate(t, w, h)` does the same re-placing on the document
 itself and returns a template at the new size. Its variants come along: every
 `pos` and `size` a delta already had, and every override background, takes the
-value it has once that variant is laid out at the new size.
+value it has once that variant is laid out at the new size. A vector's delta
+also takes its laid-out `d` when it already set one, or when its own `size`
+leaves the path different from the resized base's.
 
 - A frame or mask whose box changed re-places its own children the same way.
 - An auto-layout frame's flow children ignore constraints, because the layout
@@ -364,6 +366,8 @@ value it has once that variant is laid out at the new size.
   shorter side of its box, centred in it. 1D barcodes and PDF417 stretch.
 - Images re-fit (`cover`, `contain`) and text rewraps in the new box; a frame's
   background always covers it.
+- A vector's `d` scales with its box on each axis, arcs included. Path data
+  that does not parse keeps its authored coordinates.
 
 ## Vectors and blend modes
 

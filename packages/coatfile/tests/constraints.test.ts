@@ -17,6 +17,7 @@ import type {
 	Template,
 } from "../src/types";
 import { validate } from "../src/validate";
+import { applyVariant } from "../src/variants";
 import { compileToCommands } from "./helpers/compile-commands";
 
 const FROM = { width: 200, height: 100 };
@@ -306,6 +307,50 @@ describe("resizeTemplate", () => {
 			y: 20,
 		});
 	});
+
+	test("carries variants: a vector's path matches its variant laid out", () => {
+		const vector = (id: string, w: number): Element => ({
+			id,
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: w, height: 20 },
+			constraints: { horizontal: "stretch" },
+			properties: { d: "M0 0 L100 20" },
+		});
+		const t = template([vector("a", 100), vector("b", 100), vector("c", 100)]);
+		t.format_version = "1.4";
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{ id: "a", properties: {}, size: { width: 50, height: 20 } },
+							{ id: "b", properties: { d: "M0 0 L50 10" } },
+							{ id: "c", properties: { fill: "#f00" } },
+						],
+					},
+				],
+			},
+		];
+		const out = resizeTemplate(t, 300, 100);
+		expect(out.template_data[0].elements[0].properties).toEqual({
+			d: "M0 0 L200 20",
+		});
+		expect(out.variants![0].overrides[0].elements).toEqual([
+			{
+				id: "a",
+				properties: { d: "M0 0 L300 20" },
+				size: { width: 150, height: 20 },
+			},
+			{ id: "b", properties: { d: "M0 0 L100 10" } },
+			{ id: "c", properties: { fill: "#f00" } },
+		]);
+		const direct = resizeTemplate(applyVariant(t, "v"), 300, 100);
+		expect(applyVariant(out, "v").template_data).toEqual(direct.template_data);
+	});
 });
 
 describe("fitDesignSize", () => {
@@ -457,6 +502,27 @@ describe("compile with resize", () => {
 		expect(root.children[0].size).toEqual({ width: 600, height: 320 });
 		expect(findNode(root, "mark")?.pos).toEqual(findNode(base, "mark")?.pos);
 		expect(findNode(root, "mark")?.pos).toEqual({ x: 240, y: 140 });
+	});
+
+	test("a stretched vector's path follows its box", () => {
+		const wave: Element = {
+			id: "wave",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 200, height: 20 },
+			constraints: { horizontal: "stretch" },
+			properties: { d: "M0 0 L200 20 A10 10 0 0 1 180 0 Z", fill: "#000" },
+		};
+		const root = compile(template([wave]), {}, {
+			width: 300,
+			height: 100,
+			resize: { width: 300, height: 100 },
+		}).frames[0].root;
+		const node = findNode(root, "wave");
+		expect(node?.size).toEqual({ width: 300, height: 20 });
+		expect(node?.kind === "path" && node.d).toBe(
+			"M0 0 L300 20 A15 10 0 0 1 270 0 Z",
+		);
 	});
 
 	test("resize at the template's own size compiles every fixture unchanged", () => {
