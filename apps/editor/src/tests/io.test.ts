@@ -1,3 +1,4 @@
+import { FORMAT_VERSION, type Template } from "@freshcoat-js/coatfile";
 import {
 	COAT_MEDIA_TYPE,
 	LEGACY_TKIT_MEDIA_TYPE,
@@ -10,6 +11,7 @@ import {
 	saveCoat,
 	saveFileName,
 	saveJson,
+	sendableTemplate,
 } from "../doc/io";
 import { removeElements, unwrap } from "../doc/ops";
 import { deepFreeze, doc, frozenDoc, PNG_SHA } from "./doc-fixture";
@@ -66,6 +68,61 @@ describe("round trip", () => {
 		expect(json.ok && JSON.parse(json.data).assets).toBeUndefined();
 		const kept = saveJson(frozenDoc());
 		expect(kept.ok && JSON.parse(kept.data).assets[0].sha256).toBe(PNG_SHA);
+	});
+});
+
+describe("format_version", () => {
+	const withBarcode = (formatVersion: string): Template => {
+		const t = doc();
+		t.format_version = formatVersion;
+		t.template_data[1].elements.push({
+			id: "code",
+			type: "barcode",
+			pos: { x: 0, y: 0 },
+			size: { width: 200, height: 80 },
+			properties: { value: "123", symbology: "code128" },
+		});
+		return deepFreeze(t);
+	};
+
+	test("saveJson keeps a version that already covers the fields", () => {
+		const saved = saveJson(frozenDoc());
+		expect(saved.ok && JSON.parse(saved.data).format_version).toBe("1.1");
+	});
+
+	test("saveJson raises an old version to cover new fields", () => {
+		const t = withBarcode("1.1");
+		const saved = saveJson(t);
+		if (!saved.ok) throw new Error(JSON.stringify(saved.errors));
+		expect(JSON.parse(saved.data).format_version).toBe("1.3");
+		expect(t.format_version).toBe("1.1");
+	});
+
+	test("saveJson never lowers the version", () => {
+		const saved = saveJson(withBarcode(FORMAT_VERSION));
+		expect(saved.ok && JSON.parse(saved.data).format_version).toBe(
+			FORMAT_VERSION,
+		);
+	});
+
+	test("saveJson raises for variant deltas", () => {
+		const t = doc();
+		const override = t.variants?.[0].overrides[0];
+		if (!override) throw new Error("fixture has no variant override");
+		override.elements = [{ id: "a", properties: {}, hidden: true }];
+		const saved = saveJson(deepFreeze(t));
+		if (!saved.ok) throw new Error(JSON.stringify(saved.errors));
+		expect(JSON.parse(saved.data).format_version).toBe("1.4");
+	});
+
+	test("saveCoat and sendableTemplate raise it too", async () => {
+		const t = withBarcode("1.1");
+		const coat = await saveCoat(t);
+		if (!coat.ok) throw new Error(JSON.stringify(coat.errors));
+		const opened = await openFile(coat.data, "x.coat");
+		expect(opened.kind === "ok" && opened.template.format_version).toBe("1.3");
+		const sent = sendableTemplate(t);
+		expect(sent.ok && sent.data.format_version).toBe("1.3");
 	});
 });
 
