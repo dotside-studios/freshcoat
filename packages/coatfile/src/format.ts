@@ -17,7 +17,7 @@ import type { Template } from "./types";
 //   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
-//        per-corner frame `cornerRadius`
+//        per-corner frame `cornerRadius`; `linear-burn` blend mode
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 5;
@@ -77,6 +77,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (usesPerCornerRadius(o.properties)) need(5);
 			}
 		}
+		if (o.blendMode === "linear-burn") need(5);
 		for (const value of Object.values(o)) visit(value);
 	};
 	visit(template.template_data);

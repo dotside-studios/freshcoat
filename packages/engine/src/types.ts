@@ -18,8 +18,7 @@ import type { EncodeFormat, EncodeOptions } from "./png";
 export type Vec2 = { x: number; y: number };
 export type Size = { width: number; height: number };
 // Figma's layer blend modes, minus pass-through (a group-only compositing
-// choice, not a mode) and linear burn (no Skia equivalent). `plus` is Figma's
-// linear dodge.
+// choice, not a mode). `plus` is Figma's linear dodge.
 export type BlendMode =
 	| "normal"
 	| "multiply"
@@ -37,7 +36,8 @@ export type BlendMode =
 	| "saturation"
 	| "color"
 	| "luminosity"
-	| "plus";
+	| "plus"
+	| "linear-burn";
 
 // SVG's fill-rule. Nonzero is the default, as in SVG and Skia.
 export type FillRule = "nonzero" | "evenodd";

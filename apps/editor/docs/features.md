@@ -124,7 +124,8 @@ the records, and **Export** turns templates and records into files.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer.
 - **Inspector:**
-  - Geometry, blend mode and alignment.
+  - Geometry, blend mode (every Figma layer mode, linear burn included) and
+    alignment.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.

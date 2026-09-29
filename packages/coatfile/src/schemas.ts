@@ -36,6 +36,7 @@ export const BlendModeSchema = z.enum([
 	"color",
 	"luminosity",
 	"plus",
+	"linear-burn",
 ]);
 
 export const FontWeightSchema = z.union([

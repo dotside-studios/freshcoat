@@ -191,6 +191,19 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.5");
 	});
 
+	test("1.5: the linear-burn blend mode", () => {
+		expect(
+			minimumFormatVersion(
+				withElements(base(), rect("r", { blendMode: "multiply" })),
+			),
+		).toBe("1.0");
+		expect(
+			minimumFormatVersion(
+				withElements(base(), rect("r", { blendMode: "linear-burn" })),
+			),
+		).toBe("1.5");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },

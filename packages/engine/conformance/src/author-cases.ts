@@ -617,6 +617,27 @@ add(
 	],
 );
 
+// linear burn is max(0, s + d - 1) per channel: (64,128,192) under
+// (128,192,255) gives (0,65,192).
+add(
+	"blend-linear-burn",
+	"linear burn adds the channels and subtracts one",
+	"core",
+	["blend.linear-burn"],
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#4080c0") }),
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#80c0ff"),
+			blendMode: "linear-burn",
+		}),
+	]),
+	[
+		px([80, 60], [0, 65, 192, 255], "max(0, s + d - 1) per channel", 2),
+		px([10, 10], [64, 128, 192, 255], "the ground, unblended", 2),
+	],
+);
+
 add(
 	"blend-lighten",
 	"lighten is the per-channel maximum",

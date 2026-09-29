@@ -86,7 +86,8 @@ each one. `fit: "shrink"` works on styled spans as well as single-style text,
 scaling every span by one factor; the approximate engine, which cannot shape
 spans together, does not shrink them.
 
-Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
+Gradients, masks, blend modes (linear burn runs as a runtime blender, since
+Skia has no native mode for it) and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations
 after the whole scene is composited. The engine implements these operations;
 the caller decides when and where to use them.

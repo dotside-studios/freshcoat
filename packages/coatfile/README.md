@@ -307,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -431,11 +431,17 @@ frame of editable `vector`, `frame` and `mask` elements in design px, and
 returns the features it skipped. An `image` element can also point at an SVG
 source directly; the engine draws it as vector art.
 
-`blendMode` is any of Figma's layer modes except linear burn, which Skia has no
-equivalent for: `multiply`, `screen`, `overlay`, `darken`, `lighten`,
-`color-dodge`, `color-burn`, `hard-light`, `soft-light`, `difference`,
-`exclusion`, `hue`, `saturation`, `color`, `luminosity`, and `plus` (linear
-dodge).
+`blendMode` is any of Figma's layer modes: `multiply`, `screen`, `overlay`,
+`darken`, `lighten`, `color-dodge`, `color-burn`, `linear-burn` (1.5),
+`hard-light`, `soft-light`, `difference`, `exclusion`, `hue`, `saturation`,
+`color`, `luminosity`, and `plus` (linear dodge).
+
+There is no pass-through mode, because groups and frames are not isolated in
+the first place. Their children blend with whatever is under the group, which
+is what Figma calls pass-through. A group becomes an isolated layer only when it
+carries a layer effect of its own (`opacity` below 1, `blendMode`, `blur`,
+`shadow` or `adjust`), and a separate `pass-through` value would render exactly
+like leaving `blendMode` unset.
 
 ## Barcodes
 
