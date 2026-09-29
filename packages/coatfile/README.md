@@ -610,6 +610,11 @@ renders exactly as it did before.
 
 ## Text layout
 
+A newline in `value` or a span's `text` is a hard line break; other runs of
+whitespace collapse to one space (CSS `white-space: pre-line`).
+`paragraphSpacing` adds that much space after each hard break, in the same units
+as `size`, and shrink-to-fit and a hug height both count it.
+
 `direction` is the paragraph's base direction for bidirectional text: `ltr`
 (the default), `rtl`, or `auto`, which takes the first letter of the resolved
 text (after `{{field}}` substitution), as HTML's `dir="auto"` does.

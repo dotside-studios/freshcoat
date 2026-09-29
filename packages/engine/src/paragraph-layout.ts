@@ -2,8 +2,8 @@
 // breaking AND measurement in the same engine the CanvasKit painter shapes with,
 // so layout and paint agree.
 //
-// Whitespace runs are collapsed before shaping (CSS white-space: normal), which
-// Paragraph on its own would preserve. Break opportunities follow Skia's UAX-14
+// Whitespace runs are collapsed before shaping (CSS white-space: pre-line),
+// which Paragraph on its own would preserve; a newline stays a hard break. Break opportunities follow Skia's UAX-14
 // rules, so breaks inside URLs and punctuation-dense runs can differ from a
 // browser's.
 //
@@ -19,7 +19,11 @@ import type {
 	SpanFont,
 	TextEngine,
 } from "./text-engine";
-import type { TextLayout, TextLayoutInput } from "./text-types";
+import {
+	paragraphGaps,
+	type TextLayout,
+	type TextLayoutInput,
+} from "./text-types";
 import type { FontVMetrics } from "./types";
 
 // biome-ignore lint/suspicious/noExplicitAny: caller-supplied CanvasKit instance
@@ -43,12 +47,17 @@ const NATURAL_WIDTH = 1e7; // effectively unbounded — single-line advance
 // divides back to a per-em ratio without rounding noise.
 const PROBE_EM = 1000;
 
-// CSS white-space: normal: collapse every run of whitespace (spaces, tabs,
-// newlines) to a single space. Line-edge trimming is handled
-// per line via endExcludingWhitespaces.
+// CSS white-space: pre-line: collapse every other run of whitespace to a
+// single space and keep each newline as a hard break. Line-edge trimming is
+// handled per line via endExcludingWhitespaces.
 function collapse(text: string): string {
-	return text.replace(/\s+/g, " ");
+	return text
+		.replace(/\r\n?/g, "\n")
+		.replace(/[^\S\n]+/g, " ")
+		.replace(/ ?\n ?/g, "\n");
 }
+
+const hardLines = (text: string): number => text.split(/\r\n?|\n/).length;
 
 type Line = { text: string; width: number; hardBreak?: boolean };
 
@@ -254,7 +263,7 @@ export function createParagraphEngine(
 			// `>=`, not `>`), so a hug box sized to the raw width would wrap/ellipsize.
 			return {
 				width: Math.ceil(naturalWidth(text, font)),
-				height: lineHeightPx,
+				height: hardLines(text) * lineHeightPx,
 			};
 		}
 		const lines = breakLines(text, font, maxWidth);
@@ -283,7 +292,9 @@ export function createParagraphEngine(
 			);
 			return {
 				lines,
-				totalHeight: lines.length * size * lh,
+				totalHeight:
+					lines.length * size * lh +
+					paragraphGaps(lines) * (input.paragraphSpacing ?? 0),
 				effectiveFontSize: size,
 			};
 		};

@@ -27,10 +27,20 @@ export type TextLayoutInput = {
 	lineHeight: number;
 	fit: "shrink" | "clip" | undefined;
 	direction?: "ltr" | "rtl";
+	// Extra space after each line that ends a paragraph, but the last. Counted
+	// in totalHeight, so shrink-to-fit makes room for it.
+	paragraphSpacing?: number;
 };
 
 // hardBreak: the line ends its paragraph (a newline, or the end of the text).
 export type MeasuredLine = { text: string; width: number; hardBreak?: boolean };
+
+// The paragraph gaps a set of lines opens: one per hard break but the last line's.
+export function paragraphGaps(lines: { hardBreak?: boolean }[]): number {
+	let n = 0;
+	for (let i = 0; i < lines.length - 1; i++) if (lines[i].hardBreak) n++;
+	return n;
+}
 
 export type TextLayout = {
 	lines: MeasuredLine[];

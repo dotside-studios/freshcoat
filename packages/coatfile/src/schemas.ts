@@ -220,6 +220,8 @@ export const TextPropertiesSchema = z.object({
 	alignLast: z
 		.enum(["left", "center", "right", "justify", "start", "end"])
 		.optional(),
+	// Extra space after each hard line break (a newline), in design units.
+	paragraphSpacing: z.number().min(0).optional(),
 	// Base direction for bidi ordering; auto takes the first strong character
 	// of the resolved text. Default ltr.
 	direction: z.enum(["ltr", "rtl", "auto"]).optional(),

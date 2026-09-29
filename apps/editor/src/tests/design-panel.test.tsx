@@ -124,6 +124,18 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
+	it("writes paragraph spacing, and clears it at zero", () => {
+		const c = setup(["0/1/1"]);
+		const field = screen.getByRole("spinbutton", { name: "Paragraph spacing" });
+		typeInto(field, "12");
+		const spacing = () =>
+			(el(c, "0/1/1").properties as { paragraphSpacing?: number })
+				.paragraphSpacing;
+		expect(spacing()).toBe(12);
+		typeInto(field, "0");
+		expect(spacing()).toBeUndefined();
+	});
+
 	it("shows a rect's geometry, fill, stroke and corners, and writes X", () => {
 		const c = setup(["0/0"]);
 		const x = screen.getByRole("spinbutton", { name: "X" });

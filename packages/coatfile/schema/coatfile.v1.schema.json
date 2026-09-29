@@ -3412,6 +3412,10 @@
 												"end"
 											]
 										},
+										"paragraphSpacing": {
+											"type": "number",
+											"minimum": 0
+										},
 										"direction": {
 											"type": "string",
 											"enum": [

@@ -109,6 +109,16 @@ describe("transpileText", () => {
 		expect("features" in (none.properties.font as object)).toBe(false);
 	});
 
+	it("carries paragraph spacing, scaled", () => {
+		const el = transpileText(
+			baseText({ style: { ...baseText().style, paragraphSpacing: 12 } }),
+			{ frame: FRAME, scale: 2 },
+		);
+		expect(el.properties.paragraphSpacing).toBe(24);
+		const none = transpileText(baseText(), { frame: FRAME, scale: SCALE });
+		expect("paragraphSpacing" in none.properties).toBe(false);
+	});
+
 	it("emits leadingTrim only for Figma's cap-height vertical trim", () => {
 		const trim = (leadingTrim?: "NONE" | "CAP_HEIGHT") =>
 			transpileText(

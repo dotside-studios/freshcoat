@@ -158,6 +158,9 @@ export function transpileText(
 		// above where the layer put it.
 		...(node.style.leadingTrim === "CAP_HEIGHT" ? { leadingTrim: true } : {}),
 		...(fitMode ? { fit: fitMode } : {}),
+		...(node.style.paragraphSpacing
+			? { paragraphSpacing: round2(node.style.paragraphSpacing * ctx.scale) }
+			: {}),
 		...(caseMode ? { case: caseMode } : {}),
 	};
 	if (spans) {

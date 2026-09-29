@@ -457,6 +457,9 @@ function compileText(
 		...(props.direction
 			? { direction: props.direction as TextNode["direction"] }
 			: {}),
+		...(typeof props.paragraphSpacing === "number" && props.paragraphSpacing > 0
+			? { paragraphSpacing: props.paragraphSpacing * ratio }
+			: {}),
 		verticalAlign: (props.verticalAlign as TextNode["verticalAlign"]) ?? "top",
 		fit: props.fit as TextNode["fit"],
 		maxLines: typeof props.maxLines === "number" ? props.maxLines : undefined,

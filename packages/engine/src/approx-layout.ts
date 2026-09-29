@@ -9,7 +9,12 @@
 // don't matter — only rough line counts and widths. Production render paths pass
 // createParagraphEngine for pixel-exact layout.
 import type { SpanFont, TextEngine } from "./text-engine";
-import type { MeasuredLine, TextLayout, TextLayoutInput } from "./text-types";
+import {
+	type MeasuredLine,
+	paragraphGaps,
+	type TextLayout,
+	type TextLayoutInput,
+} from "./text-types";
 
 // Mean glyph advance as a fraction of font size — a serviceable stand-in for a
 // proportional font's average character width.
@@ -20,21 +25,38 @@ function collapse(text: string): string {
 	return text.replace(/\s+/g, " ").trim();
 }
 
+// Each newline-separated paragraph, collapsed on its own.
+function paragraphs(text: string): string[] {
+	return text.split(/\r\n?|\n/).map(collapse);
+}
+
 function advance(text: string, size: number, letterSpacing = 0): number {
 	const n = [...text].length;
 	if (n === 0) return 0;
 	return n * size * CHAR_W + Math.max(0, n - 1) * letterSpacing;
 }
 
-// Proportional char-count wrap: split into ceil(natural / maxWidth) even chunks.
-// Bars, not glyphs, are drawn from this, so mid-word splits are invisible.
 function wrap(
 	text: string,
 	size: number,
 	letterSpacing: number,
 	maxWidth: number,
 ): MeasuredLine[] {
-	const norm = collapse(text);
+	return paragraphs(text).flatMap((p) => {
+		const lines = wrapParagraph(p, size, letterSpacing, maxWidth);
+		lines[lines.length - 1] = { ...lines[lines.length - 1], hardBreak: true };
+		return lines;
+	});
+}
+
+// Proportional char-count wrap: split into ceil(natural / maxWidth) even chunks.
+// Bars, not glyphs, are drawn from this, so mid-word splits are invisible.
+function wrapParagraph(
+	norm: string,
+	size: number,
+	letterSpacing: number,
+	maxWidth: number,
+): MeasuredLine[] {
 	const chars = [...norm];
 	const natural = advance(norm, size, letterSpacing);
 	if (natural <= maxWidth || chars.length <= 1) {
@@ -57,9 +79,12 @@ const measureText: TextEngine["measureText"] = (text, font, maxWidth) => {
 	const lineHeightPx = font.size * font.lineHeight;
 	if (text.length === 0) return { width: 0, height: lineHeightPx };
 	if (maxWidth === null) {
+		const paras = paragraphs(text);
 		return {
-			width: advance(collapse(text), font.size, font.letterSpacing ?? 0),
-			height: lineHeightPx,
+			width: Math.max(
+				...paras.map((p) => advance(p, font.size, font.letterSpacing ?? 0)),
+			),
+			height: paras.length * lineHeightPx,
 		};
 	}
 	const lines = wrap(text, font.size, font.letterSpacing ?? 0, maxWidth);
@@ -81,7 +106,9 @@ const layoutText: TextEngine["layoutText"] = (
 		const lines = wrap(input.value, size, ls, input.maxWidth);
 		return {
 			lines,
-			totalHeight: lines.length * size * lh,
+			totalHeight:
+				lines.length * size * lh +
+				paragraphGaps(lines) * (input.paragraphSpacing ?? 0),
 			effectiveFontSize: size,
 		};
 	};

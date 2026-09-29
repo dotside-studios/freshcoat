@@ -84,4 +84,16 @@ describe("text layout properties", () => {
 		expect(bad({ tabular: 1 })).toBe(false);
 		expect(bad({ ss01: 1 })).toBe(true);
 	});
+
+	test("paragraph spacing reaches the node, scaled with the render", () => {
+		expect(textNode({ paragraphSpacing: 12 }).paragraphSpacing).toBe(12);
+		expect(textNode({}).paragraphSpacing).toBeUndefined();
+		const tpl = template({ paragraphSpacing: 12 });
+		const compiled = compile(tpl, {}, { width: 600, height: 400 });
+		const children = (compiled.frames[0].root as { children: Node[] })
+			.children;
+		const node = children.find((c) => c.kind === "text") as TextNode;
+		expect(node.paragraphSpacing).toBe(24);
+		expect(validate(template({ paragraphSpacing: -1 })).ok).toBe(false);
+	});
 });

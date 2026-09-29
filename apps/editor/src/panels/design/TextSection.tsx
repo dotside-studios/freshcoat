@@ -174,6 +174,20 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					}
 				/>
 			</Row>
+			<Row label="Paragraph" keys={["paragraphSpacing"]}>
+				<NumberField
+					label="Space after"
+					aria-label="Paragraph spacing"
+					className="min-w-0 flex-1"
+					min={0}
+					value={pick((p) => p.paragraphSpacing ?? 0)}
+					onChange={(v) =>
+						setText("paragraph-spacing", () => ({
+							paragraphSpacing: v > 0 ? v : undefined,
+						}))
+					}
+				/>
+			</Row>
 			<Row label="Align" keys={["align", "verticalAlign"]}>
 				<ToggleGroup
 					aria-label="Text align"

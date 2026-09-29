@@ -129,11 +129,11 @@ function ownSizeOf(child: Node, measure: MeasureText): Size {
 	if (child.kind === "text") {
 		const width =
 			lc.width === "hug"
-				? measure(textOf(child), child.font, null).width
+				? measureText(child, measure, null).width
 				: fixed(lc.width, base.width);
 		const height =
 			lc.height === "hug"
-				? capLines(measure(textOf(child), child.font, width).height, child)
+				? capLines(measureText(child, measure, width).height, child)
 				: fixed(lc.height, base.height);
 		return { width, height };
 	}
@@ -686,7 +686,7 @@ function gridIntrinsicWidth(child: Node, measure: MeasureText): number {
 	if (isRotated(child))
 		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).width;
 	if (child.kind === "text")
-		return measure(textOf(child), child.font, null).width;
+		return measureText(child, measure, null).width;
 	return child.size?.width ?? 0;
 }
 
@@ -698,7 +698,7 @@ function gridIntrinsicHeight(
 	if (isRotated(child))
 		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).height;
 	if (child.kind === "text")
-		return measure(textOf(child), child.font, width).height;
+		return measureText(child, measure, width).height;
 	return child.size?.height ?? 0;
 }
 
@@ -779,7 +779,7 @@ function intrinsicCross(
 	measure: MeasureText,
 ): number {
 	if (child.kind === "text") {
-		const m = measure(textOf(child), child.font, null);
+		const m = measureText(child, measure, null);
 		return isRow ? m.height : m.width;
 	}
 	if (child.kind === "group" && child.layout?.type === "flex") {
@@ -814,7 +814,7 @@ function intrinsicMain(
 ): number {
 	if (child.kind === "text") {
 		const maxWidth = isRow ? null : cross;
-		const m = measure(textOf(child), child.font, maxWidth);
+		const m = measureText(child, measure, maxWidth);
 		return isRow ? m.width : capLines(m.height, child);
 	}
 	if (child.kind === "group" && child.layout?.type === "flex") {
@@ -845,6 +845,20 @@ function capLines(
 		height,
 		node.maxLines * node.font.size * node.font.lineHeight,
 	);
+}
+
+// A text node's measured box, plus the paragraph spacing its hard breaks open.
+function measureText(
+	node: Extract<Node, { kind: "text" }>,
+	measure: MeasureText,
+	maxWidth: number | null,
+): { width: number; height: number } {
+	const text = textOf(node);
+	const m = measure(text, node.font, maxWidth);
+	const spacing = node.paragraphSpacing ?? 0;
+	if (spacing <= 0) return m;
+	const breaks = text.match(/\r\n?|\n/g)?.length ?? 0;
+	return { width: m.width, height: m.height + breaks * spacing };
 }
 
 function textOf(node: Extract<Node, { kind: "text" }>): string {

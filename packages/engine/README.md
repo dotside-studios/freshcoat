@@ -74,7 +74,9 @@ with, so every line but a paragraph's last meets both edges of the box;
 `alignLast` sets that last line. A right-to-left line is baked with
 `direction: "rtl"`, and the painter shapes it in that direction so bidi runs
 land where the baked span boxes say. A font's `features` (OpenType tags to
-values) are passed to shaping for both measurement and paint.
+values) are passed to shaping for both measurement and paint. A newline is a
+hard break, and `paragraphSpacing` is baked into the line positions after
+each one.
 
 Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations

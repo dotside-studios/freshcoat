@@ -13,6 +13,7 @@
 import { getFontMetrics } from "./font-metrics";
 import type { TextNode } from "./node";
 import type { TextEngine } from "./text-engine";
+import { paragraphGaps } from "./text-types";
 import type {
 	BakedTextLayout,
 	ClipOutset,
@@ -87,10 +88,11 @@ export function bakeText(
 		(node.direction === "auto"
 			? resolveDirection(spans.map((s) => s.text).join(""))
 			: node.direction) === "rtl";
-	const align: LineAlign = {
+	const align: ParagraphStyle = {
 		align: physicalAlign(node.align ?? "left", rtl),
 		last: physicalAlign(node.alignLast ?? "start", rtl),
 		rtl,
+		spacing: snapToDevice(Math.max(0, node.paragraphSpacing ?? 0), opts.deviceScale),
 	};
 	const verticalAlign = node.verticalAlign ?? "top";
 	const fit = node.fit;
@@ -208,7 +210,7 @@ function layoutWrappable(
 	color: string,
 	pos: Vec2,
 	size: Size,
-	align: LineAlign,
+	align: ParagraphStyle,
 	verticalAlign: "top" | "middle" | "bottom",
 	lineHeight: number,
 	fit: "shrink" | "clip" | undefined,
@@ -234,6 +236,7 @@ function layoutWrappable(
 		lineHeight,
 		fit,
 		...(align.rtl ? { direction: "rtl" as const } : {}),
+		...(align.spacing ? { paragraphSpacing: align.spacing } : {}),
 	});
 	const effFont: ResolvedFont = {
 		...defaultFont,
@@ -266,9 +269,12 @@ function layoutWrappable(
 		metricsMap,
 	);
 	const nLines = mlines.length;
+	const steps = mlines.map(
+		(l, i) => lineAdvance + (l.hardBreak && i < nLines - 1 ? align.spacing : 0),
+	);
 	const contentHeight = leadingTrim
-		? baseOffset + (nLines - 1) * lineAdvance
-		: lineAdvance * nLines;
+		? baseOffset + sum(steps.slice(0, -1))
+		: sum(steps);
 	const startY = startYForVAlign(
 		verticalAlign,
 		pos.y,
@@ -276,6 +282,7 @@ function layoutWrappable(
 		contentHeight,
 	);
 
+	let cursorY = startY;
 	const lines: TextLine[] = mlines.map((line, i) => {
 		const placed = placeLine(
 			align,
@@ -285,7 +292,8 @@ function layoutWrappable(
 			size.width,
 			line.width,
 		);
-		const y = startY + i * lineAdvance;
+		const y = cursorY;
+		cursorY += steps[i];
 		return {
 			text: line.text,
 			y,
@@ -306,7 +314,7 @@ function layoutWrappable(
 	return {
 		font: effFont,
 		lines,
-		totalHeight: nLines * lineHeightPx,
+		totalHeight: nLines * lineHeightPx + paragraphGaps(mlines) * align.spacing,
 		shrinkApplied: measured.shrinkApplied,
 	};
 }
@@ -348,7 +356,7 @@ function layoutInline(
 	defaultColor: string,
 	pos: Vec2,
 	size: Size,
-	align: LineAlign,
+	align: ParagraphStyle,
 	verticalAlign: "top" | "middle" | "bottom",
 	leadingTrim: boolean,
 	engine: TextEngine,
@@ -426,10 +434,13 @@ function layoutInline(
 			};
 		});
 		const advances = measuredLines.map((l) => l.advance);
+		const gaps =
+			paragraphGaps(measuredLines.map((l) => l.shaped)) * align.spacing;
 		const firstOffset = measuredLines[0]?.baseOffset ?? baseOffset;
-		const contentHeight = leadingTrim
-			? firstOffset + sum(advances.slice(1))
-			: sum(advances) || snapToDevice(lineHeightPx, deviceScale);
+		const contentHeight =
+			(leadingTrim
+				? firstOffset + sum(advances.slice(1))
+				: sum(advances) || snapToDevice(lineHeightPx, deviceScale)) + gaps;
 		const startY = startYForVAlign(
 			verticalAlign,
 			pos.y,
@@ -450,7 +461,9 @@ function layoutInline(
 			);
 			const ws = placed.wordSpacing ?? 0;
 			const y = cursorY;
-			cursorY += ml.advance;
+			cursorY +=
+				ml.advance +
+				(sl.hardBreak && i < measuredLines.length - 1 ? align.spacing : 0);
 			const spansOut: TextLineSpan[] = spreadFragments(sl.fragments, ws).map(
 				(fr) => ({
 					text: fr.text,
@@ -472,7 +485,8 @@ function layoutInline(
 		return {
 			font: dominantFont,
 			lines,
-			totalHeight: sum(measuredLines.map((l) => l.boxPx)) || lineHeightPx,
+			totalHeight:
+				(sum(measuredLines.map((l) => l.boxPx)) || lineHeightPx) + gaps,
 			shrinkApplied: false,
 		};
 	}
@@ -525,10 +539,12 @@ function layoutInline(
 
 type PhysicalAlign = "left" | "center" | "right" | "justify";
 
-type LineAlign = {
+type ParagraphStyle = {
 	align: PhysicalAlign;
 	last: PhysicalAlign;
 	rtl: boolean;
+	// Extra advance after a line that ends a paragraph, snapped like a line's.
+	spacing: number;
 };
 
 function physicalAlign(
@@ -554,7 +570,7 @@ export function resolveDirection(text: string): "ltr" | "rtl" {
 // justified line to the box. A justified paragraph's last line takes `last`,
 // and a line with no space to stretch falls back to start.
 function placeLine(
-	align: LineAlign,
+	align: ParagraphStyle,
 	endsParagraph: boolean,
 	text: string,
 	boxX: number,

@@ -403,6 +403,7 @@ type AnyTextNode = AnySceneNode & {
 	textCase?: unknown;
 	leadingTrim?: unknown;
 	openTypeFeatures?: unknown;
+	paragraphSpacing?: unknown;
 	fills: readonly AnyPaint[];
 	getStyledTextSegments: (fields: string[]) => AnyTextSegment[];
 };
@@ -490,6 +491,9 @@ function baseTextStyle(
 		// — both read as unset, which is Figma's own default (STANDARD).
 		...(plainString(node.leadingTrim)
 			? { leadingTrim: node.leadingTrim as FigmaTextStyle["leadingTrim"] }
+			: {}),
+		...(plainNumber(node.paragraphSpacing)
+			? { paragraphSpacing: plainNumber(node.paragraphSpacing) }
 			: {}),
 		...(plainFeatures(node.openTypeFeatures)
 			? { openTypeFeatures: plainFeatures(node.openTypeFeatures) }
