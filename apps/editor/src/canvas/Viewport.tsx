@@ -33,6 +33,7 @@ import { duplicateElements } from "~/doc/ops";
 import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { useEditor } from "~/state/hooks";
 import type { Tool } from "~/state/store";
+import { Guides } from "./Guides";
 import { parseGradientHandle } from "./gradient-geometry";
 import {
 	draggedGradient,
@@ -337,7 +338,13 @@ export function Viewport() {
 			.filter((k) => canTransform(k, state.geometry));
 		if (keys.length === 0) return;
 		const geometry = state.geometry;
-		const candidates = snapCandidates(geometry, t, keys, state.hidden);
+		const candidates = snapCandidates(
+			geometry,
+			t,
+			keys,
+			state.hidden,
+			controller.sideGuides(),
+		);
 		if (name === "rotate") {
 			const key = keys[0] as string;
 			const rect = geometry.get(key)?.rect;
@@ -595,7 +602,13 @@ export function Viewport() {
 			base: t,
 			geometry,
 			bounds,
-			candidates: snapCandidates(geometry, t, keys, state.hidden),
+			candidates: snapCandidates(
+				geometry,
+				t,
+				keys,
+				state.hidden,
+				controller.sideGuides(),
+			),
 		};
 	};
 
@@ -738,6 +751,7 @@ export function Viewport() {
 					</div>
 					<Overlay draft={draft} />
 					<TextEditor />
+					<Guides />
 					<Rulers />
 				</>
 			) : null}

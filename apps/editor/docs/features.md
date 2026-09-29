@@ -102,7 +102,8 @@ the records, and **Export** turns templates and records into files.
 - **Canvas:**
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
-  - Move, resize and rotate, with snapping to the artboard and to other layers.
+  - Move, resize and rotate, with snapping to the artboard, to other layers
+    and to guides.
   - Arrow keys nudge a layer, and Esc cancels a drag.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
@@ -113,6 +114,14 @@ the records, and **Export** turns templates and records into files.
   - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
     They follow the pan and zoom, and mark the selection's extent with its
     edges' positions.
+  - Guides: drag from a ruler onto the canvas to add a guide, and drag it
+    back onto the ruler to remove it. Moving and resizing snap to guides as
+    they do to layers. A guide is a slider for the keyboard: focus a ruler
+    and press Enter to add one at the middle of the view, then arrow keys
+    move it (Shift for 10) and Delete removes it. View > Remove guides clears
+    the side. Each side keeps its own guides, and adding, moving and removing
+    them are undo steps. Guides are saved in the `.coatworkspace`, not the
+    template, so a `.coat` and every export are unchanged.
   - Creation tools: frame, rectangle, ellipse, text, image, QR and barcode.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
     radial one's center and two radii, an angular one's center and rotation,
@@ -570,7 +579,7 @@ A zip, so a workspace is one file and its images travel with it:
 
 ```
 mimetype                          application/vnd.freshcoat.workspace+zip, stored, first
-workspace.json                    name, template entries and bindings, presets
+workspace.json                    name, template entries, bindings and guides, presets
 templates/<id>.coat               each template, in the same format as a lone .coat
 data/<id>/schema.json             the dataset's columns as JSON Schema
 data/<id>/records.json            its records and their export status

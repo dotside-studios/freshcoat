@@ -5,7 +5,7 @@ import {
 	parseImageInfo,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { singleTemplateWorkspace } from "~/state/workspace";
+import { sameGuides, singleTemplateWorkspace } from "~/state/workspace";
 import { plural } from "./copy";
 
 export type Autosave = {
@@ -129,7 +129,8 @@ function sameWorkspace(a: Workspace, b: Workspace): boolean {
 				t.id === o.id &&
 				t.fileName === o.fileName &&
 				t.template === o.template &&
-				t.binding === o.binding
+				t.binding === o.binding &&
+				sameGuides(t.guides, o.guides)
 			);
 		})
 	);

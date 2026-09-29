@@ -69,7 +69,7 @@ covers shared checks and pull requests.
 
 - **Design:** frames, shapes, text, images, QR codes and barcodes (Code 128,
   EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix, Aztec). Move, resize
-  and rotate with snapping, measure with rulers, edit gradients with handles on the canvas, set
+  and rotate with snapping, measure with rulers and guides, edit gradients with handles on the canvas, set
   constraints for resizing, and choose fonts from the bundled Google Fonts
   catalog snapshot. Pasted SVG becomes editable layers, an SVG image or
   text; SVG files stay vector as images.

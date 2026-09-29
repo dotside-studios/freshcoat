@@ -10,10 +10,12 @@ import type {
 } from "@freshcoat-js/workspace";
 import { templateStem } from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
+import { guidesForSides, type TemplateGuides } from "~/doc/guides";
 import {
 	begin,
 	cancel,
 	commit,
+	commitGuides,
 	createHistory,
 	end,
 	type History,
@@ -161,6 +163,12 @@ export type Action =
 			select?: string[];
 			scope?: EditScope;
 	  }
+	| {
+			type: "guides";
+			guides: TemplateGuides;
+			preview?: boolean;
+			mergeKey?: string;
+	  }
 	| { type: "txEnd" }
 	| { type: "txCancel" }
 	| { type: "undo" }
@@ -200,7 +208,13 @@ export type Action =
 	| { type: "renameWorkspace"; name: string }
 	| { type: "setSection"; section: Section }
 	| { type: "switchTemplate"; id: string }
-	| { type: "addTemplate"; template: Template; fileName: string; id?: string }
+	| {
+			type: "addTemplate";
+			template: Template;
+			fileName: string;
+			id?: string;
+			guides?: TemplateGuides;
+	  }
 	| { type: "removeTemplate"; id: string }
 	| { type: "renameTemplateEntry"; id: string; fileName: string }
 	| { type: "duplicateTemplate"; id: string; newId?: string }
@@ -270,10 +284,11 @@ function freshEditor(
 	fileName: string,
 	view: View,
 	notices: string[] = [],
+	guides?: TemplateGuides,
 ): ParkedEditor {
 	return {
 		doc: {
-			history: createHistory(template),
+			history: createHistory(template, guides),
 			fileName,
 			saved: template,
 			issues: issuesOf(template),
@@ -344,10 +359,13 @@ export function reduce(state: EditorState, action: Action): EditorState {
 		case "commit":
 			return withHistory(
 				state,
-				(h) =>
-					commit(h, landEdit(state, h.present, action.next, action.scope), {
+				(h) => {
+					const next = landEdit(state, h.present, action.next, action.scope);
+					return commit(h, next, {
 						mergeKey: action.mergeKey,
-					}),
+						guides: followSides(h, next),
+					});
+				},
 				{ select: action.select, validate: true },
 			);
 		case "txBegin":
@@ -355,9 +373,17 @@ export function reduce(state: EditorState, action: Action): EditorState {
 		case "txPreview":
 			return withHistory(
 				state,
-				(h) =>
-					preview(h, landEdit(state, h.present, action.next, action.scope)),
+				(h) => {
+					const next = landEdit(state, h.present, action.next, action.scope);
+					return preview(h, next, followSides(h, next));
+				},
 				{ select: action.select },
+			);
+		case "guides":
+			return withHistory(state, (h) =>
+				action.preview
+					? preview(h, h.present, action.guides)
+					: commitGuides(h, action.guides, { mergeKey: action.mergeKey }),
 			);
 		case "txEnd":
 			return withHistory(state, end, { validate: true });
@@ -404,6 +430,7 @@ function reduceOpen(state: EditorState, action: Action): EditorState {
 					first.fileName,
 					state.view,
 					action.notices,
+					first.guides,
 				),
 				workspace: ws,
 			};
@@ -563,8 +590,8 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 		next === ws ? state : { ...state, workspace: next };
 	const edit = (recipe: (w: Draft<WorkspaceState>) => void) =>
 		withWs(produce(ws, recipe));
-	const fresh = (t: Template, fileName: string) =>
-		freshEditor(t, fileName, state.view);
+	const fresh = (t: Template, fileName: string, guides?: TemplateGuides) =>
+		freshEditor(t, fileName, state.view, [], guides);
 	switch (action.type) {
 		case "workspaceSaved":
 			return edit((w) => {
@@ -589,7 +616,12 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 					...ws,
 					templates: [
 						...ws.templates,
-						{ id, fileName: action.fileName, template: action.template },
+						{
+							id,
+							fileName: action.fileName,
+							template: action.template,
+							...(action.guides ? { guides: action.guides } : {}),
+						},
 					],
 				},
 			};
@@ -629,15 +661,17 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 		case "duplicateTemplate": {
 			const source = ws.templates.find((s) => s.id === action.id);
 			if (!source) return state;
-			const template =
+			const history =
 				source.id === ws.activeTemplateId && state.doc
-					? state.doc.history.present
-					: (source.parked?.doc.history.present ?? source.template);
+					? state.doc.history
+					: source.parked?.doc.history;
+			const template = history?.present ?? source.template;
 			const base = templateStem(source.fileName);
 			return reduce(state, {
 				type: "addTemplate",
 				id: action.newId,
 				template,
+				guides: history?.guides ?? source.guides,
 				fileName: `${base} copy${COAT_EXTENSION}`,
 			});
 		}
@@ -732,6 +766,17 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 }
 
 export { activeSlot };
+
+/** The guides after `next`: a renamed side keeps its guides, a removed one
+ *  loses them. */
+function followSides(h: History, next: Template): TemplateGuides {
+	if (next.template_data === h.present.template_data) return h.guides;
+	return guidesForSides(
+		h.guides,
+		h.present.template_data.map((f) => f.name),
+		next.template_data.map((f) => f.name),
+	);
+}
 
 function withHistory(
 	state: EditorState,

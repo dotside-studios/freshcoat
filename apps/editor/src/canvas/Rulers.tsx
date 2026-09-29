@@ -1,5 +1,15 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type KeyboardEvent,
+	type PointerEvent,
+	type RefObject,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { useController } from "~/app/context";
 import { useEditor } from "~/state/hooks";
+import { dragGuide, focusGuide, viewportOf } from "./Guides";
 import { RULER_SIZE, rulerLabel, rulerTicks, selectionExtent } from "./rulers";
 
 type Axis = "x" | "y";
@@ -25,7 +35,13 @@ export function Rulers() {
 	);
 }
 
+const ADDS: Record<Axis, { axis: Axis; label: string }> = {
+	x: { axis: "y", label: "Add horizontal guide" },
+	y: { axis: "x", label: "Add vertical guide" },
+};
+
 function Ruler({ axis }: { axis: Axis }) {
+	const controller = useController();
 	const ref = useRef<HTMLDivElement>(null);
 	const length = useLength(ref, axis);
 	const view = useEditor((s) => s.view);
@@ -42,20 +58,49 @@ function Ruler({ axis }: { axis: Axis }) {
 	const edges = extent?.map(toScreen) ?? [];
 	const horizontal = axis === "x";
 	const S = RULER_SIZE;
+	const adds = ADDS[axis];
+
+	const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+		e.stopPropagation();
+		if (e.button !== 0) return;
+		e.preventDefault();
+		const viewport = viewportOf(e.currentTarget);
+		if (viewport) dragGuide(controller, viewport, adds.axis, null);
+	};
+	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+		if (e.key !== "Enter" && e.key !== " ") return;
+		e.preventDefault();
+		const viewport = viewportOf(e.currentTarget);
+		if (!viewport) return;
+		const v = controller.state.view;
+		const size = controller.viewportSize;
+		const middle =
+			adds.axis === "x"
+				? (size.width / 2 - v.x) / v.zoom
+				: (size.height / 2 - v.y) / v.zoom;
+		const index = controller.addGuide(adds.axis, Math.round(middle));
+		if (index >= 0) focusGuide(viewport, adds.axis, index);
+	};
 
 	return (
+		// biome-ignore lint/a11y/useSemanticElements: a ruler is a drag source as well as a button, and holds the tick marks
 		<div
 			ref={ref}
+			role="button"
+			tabIndex={0}
+			aria-label={adds.label}
+			data-ruler-adds={adds.axis}
 			data-testid={`ruler-${axis}`}
 			data-zoom={view.zoom}
 			data-origin={origin}
 			className={
 				horizontal
-					? "absolute top-0 right-0 left-0 z-10 overflow-hidden border-fc-border border-b bg-fc-panel"
-					: "absolute top-0 bottom-0 left-0 z-10 overflow-hidden border-fc-border border-r bg-fc-panel"
+					? "absolute top-0 right-0 left-0 z-10 overflow-hidden border-fc-border border-b bg-fc-panel outline-none focus-visible:ring-2 focus-visible:ring-fc-accent focus-visible:ring-inset cursor-ns-resize"
+					: "absolute top-0 bottom-0 left-0 z-10 overflow-hidden border-fc-border border-r bg-fc-panel outline-none focus-visible:ring-2 focus-visible:ring-fc-accent focus-visible:ring-inset cursor-ew-resize"
 			}
 			style={horizontal ? { height: S } : { width: S }}
-			onPointerDown={(e) => e.stopPropagation()}
+			onPointerDown={onPointerDown}
+			onKeyDown={onKeyDown}
 		>
 			<svg
 				aria-hidden="true"

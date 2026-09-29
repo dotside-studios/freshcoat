@@ -93,6 +93,7 @@ describe.each([
 		expect(contrast(c("muted"), c("panel"))).toBeGreaterThanOrEqual(4.5);
 		expect(contrast(c("faint"), c("panel"))).toBeGreaterThanOrEqual(3);
 		expect(contrast(c("accent"), c("panel"))).toBeGreaterThanOrEqual(3);
+		expect(contrast(c("guide"), c("panel"))).toBeGreaterThanOrEqual(3);
 		expect(contrast("#ffffff", c("accent"))).toBeGreaterThanOrEqual(4.5);
 	});
 

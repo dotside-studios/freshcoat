@@ -455,6 +455,18 @@ export const COMMANDS: Command[] = [
 			}),
 	},
 	{
+		id: "view.clearGuides",
+		label: "Remove guides",
+		group: "View",
+		enabled: (s) => {
+			const t = s.doc?.history.present;
+			const name = t?.template_data[s.side]?.name;
+			const g = name === undefined ? undefined : s.doc?.history.guides[name];
+			return !!g && g.x.length + g.y.length > 0;
+		},
+		run: ({ controller }) => controller.clearGuides(),
+	},
+	{
 		id: "view.printGuides",
 		label: "Print guides",
 		group: "View",

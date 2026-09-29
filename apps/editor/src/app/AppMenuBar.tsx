@@ -104,6 +104,7 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"view.panels",
 			"-",
 			"view.rulers",
+			"view.clearGuides",
 			"view.printGuides",
 			"view.renderStats",
 			"theme",

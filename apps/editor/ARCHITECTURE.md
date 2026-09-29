@@ -66,7 +66,11 @@ extends it. History (`doc/history.ts`) is a list of whole templates, which
 structural sharing makes cheap: up to 200 steps, with commits under the same
 merge key within a second folded into one (a burst of typing, a run of
 nudges), and transactions for gestures (a drag is one step however many
-frames it paints). Datasets have their own history in the workspace layer.
+frames it paints). Ruler guides (`doc/guides.ts`) are editor state, not part
+of the template: each history step pairs the template with its guides, so
+they undo in the same timeline, and the workspace saves them in the
+`.coatworkspace` manifest. Datasets have their own history in the workspace
+layer.
 
 Variants are edited through a **working template**: the base with the active
 variant applied (`working(state)` in `state/store.ts`), ids unchanged, so a
