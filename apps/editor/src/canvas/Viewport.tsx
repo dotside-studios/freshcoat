@@ -44,7 +44,7 @@ import {
 } from "./gradient-handles";
 import { Overlay, type OverlayDraft } from "./Overlay";
 import {
-	printGuideMetrics,
+	printGuidesFor,
 	printGuidesOn,
 	usePrintGuidesVersion,
 } from "./print-guides";
@@ -725,7 +725,7 @@ export function Viewport() {
 							// With print guides the overlay masks the corners outside
 							// the trim, so the edge and shadow follow the trim too.
 							borderRadius: guides
-								? printGuideMetrics(template).corner * view.zoom
+								? printGuidesFor(template).corner * view.zoom || undefined
 								: undefined,
 						}}
 					>

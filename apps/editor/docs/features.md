@@ -45,6 +45,16 @@ the records, and **Export** turns templates and records into files.
   templates, scales with the template's size, and never reaches an export.
   A layer whose edge falls between the trim and the safe line is listed
   under "Print hints" in the status bar's Issues list.
+- **Bleed and safe area:** Template setup's Size group, and Design with
+  nothing selected, set a Bleed and a Safe area in template units, one value
+  for every side. A file with sides set apart shows Mixed until a value is
+  typed. The print guides draw the bleed as a dotted line outside the trim
+  and the safe area as a dashed line inside it, and are on by default for
+  any template that has either. A template's own safe area replaces the
+  CR80 one, and its print hints follow it. The safe area must leave room
+  inside the template, so a resize that would take that room away is
+  refused. The format is described in the
+  [coatfile guide](../../../packages/coatfile/README.md#bleed-and-safe-area).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
   under the template size re-places layers by them, and an export sized
@@ -374,6 +384,15 @@ modules) and, for PDF417 and Aztec, the error correction.
 
 A PDF preset's Layout group chooses **One per page** (the default) or
 **Sheets**, which lays cards out on paper at their trim size with crop marks.
+
+- **Bleed:** a template with a bleed gets an "Include bleed" checkbox under
+  Size (off by default). With it on, each file is the card with its bleed
+  around it: the background, and any unstroked rectangle, image or frame
+  that runs to a trim edge, extend into it. A one-per-page PDF's pages are
+  the bleed size, with a trim box inside. On sheets, each card is placed by
+  its trim with its bleed around the slot, the gap is widened to twice the
+  bleed when it is narrower ("Gap widened to 6 mm for bleed"), and crop
+  marks start outside the bleed. Bleed needs Template size.
 
 - **Paper:** A4, Letter, Legal, A3, Tabloid, or Custom in millimeters.
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more

@@ -24,6 +24,7 @@ import type {
 	ImageElementSchema,
 	ImagePropertiesSchema,
 	InlineAssetSchema,
+	InsetsSchema,
 	LayoutChildSchema,
 	LayoutSchema,
 	LeafElementSchema,
@@ -143,6 +144,14 @@ export interface ElementShell {
 export type ECLevel = "L" | "M" | "Q" | "H";
 
 export type InlineAsset = z.infer<typeof InlineAssetSchema>;
+export type Insets = z.infer<typeof InsetsSchema>;
+/** An inset resolved to each side. */
+export type Sides = {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+};
 export type TemplateWarning = z.infer<typeof TemplateWarningSchema>;
 export type TemplateSource = z.infer<typeof TemplateSourceSchema>;
 
@@ -159,6 +168,8 @@ export type Template = z.infer<typeof TemplateSchema>;
 export type CompiledTemplate = {
 	width: number;
 	height: number;
+	/** Where the trim lies in the scene, when it was compiled with bleed. */
+	trim?: { x: number; y: number; width: number; height: number };
 	frames: CompiledFrame[];
 };
 
@@ -189,6 +200,9 @@ export type CompileOptions = {
 	 *  check is then skipped: the caller picks `resize` with the target's aspect
 	 *  (see `fitDesignSize`). */
 	resize?: Size;
+	/** Draw the template's `bleed` around the trim. `width` x `height` stays
+	 *  the trim's size and the scene grows by the bleed at the same scale. */
+	bleed?: boolean;
 };
 
 export type ValidationError = {

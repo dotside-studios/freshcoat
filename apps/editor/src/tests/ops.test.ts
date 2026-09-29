@@ -1,5 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { subtleSha256, validate } from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION, subtleSha256, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import {
 	addField,
@@ -22,6 +22,7 @@ import {
 	renameField,
 	resizeTemplate,
 	setFrameProp,
+	setTemplateInsets,
 	setTemplateMeta,
 	ungroup,
 	unwrap,
@@ -596,6 +597,49 @@ describe("template", () => {
 		])
 			refused(resizeTemplate(t, w, h), "invalid_size");
 		expect(unwrap(resizeTemplate(t, 16384, 1)).template.width).toBe(16384);
+	});
+});
+
+describe("bleed and safe area", () => {
+	test("sets one value or each side, and zero removes it", () => {
+		const t = frozenDoc();
+		const one = unwrap(setTemplateInsets(t, "bleed", 12)).template;
+		expect(one.bleed).toBe(12);
+		expectValid(one);
+		const sides = { top: 1, right: 2, bottom: 3, left: 4 };
+		expect(
+			unwrap(setTemplateInsets(t, "safeArea", sides)).template.safeArea,
+		).toEqual(sides);
+		const cleared = unwrap(setTemplateInsets(one, "bleed", 0)).template;
+		expect("bleed" in cleared).toBe(false);
+	});
+
+	test("keeps the template when nothing changes", () => {
+		const t = frozenDoc();
+		expect(unwrap(setTemplateInsets(t, "bleed", 0)).template).toBe(t);
+		const set = unwrap(setTemplateInsets(t, "bleed", 8)).template;
+		expect(unwrap(setTemplateInsets(set, "bleed", 8)).template).toBe(set);
+	});
+
+	test("stamps a template that gains one with the current format", () => {
+		const t = deepFreeze({ ...doc(), format_version: "1.1" });
+		const next = unwrap(setTemplateInsets(t, "bleed", 8)).template;
+		expect(next.format_version).toBe(FORMAT_VERSION);
+	});
+
+	test("refuses a negative value and a safe area bigger than the template", () => {
+		const t = frozenDoc();
+		refused(setTemplateInsets(t, "bleed", -1), "invalid_inset");
+		refused(
+			setTemplateInsets(t, "safeArea", t.height / 2),
+			"safe_area_too_large",
+		);
+	});
+
+	test("refuses a resize that leaves the safe area no room", () => {
+		const t = unwrap(setTemplateInsets(frozenDoc(), "safeArea", 100)).template;
+		refused(resizeTemplate(t, 200, 150), "safe_area_too_large");
+		expect(unwrap(resizeTemplate(t, 201, 201)).template.width).toBe(201);
 	});
 });
 

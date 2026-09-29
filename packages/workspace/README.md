@@ -64,6 +64,14 @@ writes the outputs and records successes or failures.
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex
 backs. The designs inside the PDF are raster images at the chosen density.
+
+A preset with `bleed: true` asks the host to render each card with its
+template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`
+(`bleedMm(pixels, dpi)` converts it). On sheets, each card is placed by its
+trim with the bleed outside the slot. The gap between cards is widened to
+`minGapMm(bleed)`, twice the bleed, when the layout's is narrower, and crop
+marks sit on the trim and start outside the bleed. One card per page, each
+page gets a trim box inside its bleed box.
 Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License

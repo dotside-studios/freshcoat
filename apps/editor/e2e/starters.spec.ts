@@ -206,6 +206,32 @@ test("the portrait card", async ({ page }) => {
 	await shot(page, "davi-card-portrait-back");
 });
 
+test("a bleed and a safe area set in Design draw as guides", async ({
+	page,
+}) => {
+	await openStarter(page, "davi-card");
+	await expect(page.getByTestId("print-guides-bleed")).toHaveCount(0);
+	const bleed = page.getByRole("spinbutton", { name: "Template bleed" });
+	await bleed.fill("36");
+	await bleed.press("Enter");
+	const safe = page.getByRole("spinbutton", { name: "Template safe area" });
+	await safe.fill("60");
+	await safe.press("Enter");
+	expect(await state<unknown[]>(page, "[t.bleed, t.safeArea]")).toEqual([
+		36, 60,
+	]);
+	const guides = page.getByTestId("print-guides");
+	await expect(page.getByTestId("print-guides-bleed")).toBeVisible();
+	expect(Number(await guides.getAttribute("data-bleed"))).toBe(36);
+	expect(Number(await guides.getAttribute("data-safe"))).toBe(60);
+	const artboard = await page.getByTestId("artboard").boundingBox();
+	const line = await page.getByTestId("print-guides-bleed").boundingBox();
+	if (!artboard || !line) throw new Error("no boxes");
+	expect(line.x).toBeLessThan(artboard.x);
+	expect(line.width).toBeGreaterThan(artboard.width);
+	await shot(page, "davi-card-bleed");
+});
+
 test("resizing the photo watermark with constraints keeps the mark in the corner", async ({
 	page,
 }) => {

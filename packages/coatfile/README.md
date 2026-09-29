@@ -138,6 +138,41 @@ Two constraints do apply:
 
 The figma plugin's custom export mode produces exactly this shape.
 
+## Bleed and safe area
+
+`bleed` and `safeArea` (1.5) are insets from the trim in design units: one
+number for every side, or `{ top, right, bottom, left }`. Both are optional
+and must be non-negative. The safe area must leave room inside the trim
+(`safe_area_exceeds_trim`); the bleed has no upper bound.
+
+```jsonc
+{ "width": 1012, "height": 638, "bleed": 35, "safeArea": { "top": 35, "right": 35, "bottom": 35, "left": 35 } }
+```
+
+The trim stays at `0, 0` to `width`, `height`, so a layer placed at `0, 0` is at
+the trim's corner whether or not a render includes the bleed. `safeArea` is a
+guide for authoring tools and never changes a render.
+
+A render includes the bleed only when asked: `compile(t, values, { width,
+height, bleed: true })` or `render(…, { …, bleed: true }, …)`. `width` and
+`height` stay the trim's size, and the scene grows by the bleed at the same
+scale. The compiled template's `trim`, and each painted result's `trim`, give
+the trim's box inside the output. Without the option, and for a template
+without bleed, the output is exactly what it was.
+
+With bleed:
+
+- The background covers the whole bleed box.
+- A top-level `rect`, `image`, or `frame` without a stroke or auto-layout,
+  unrotated, that runs to a trim edge (within half a unit) grows past it by
+  the bleed on that side. A frame's children keep their place on the card.
+- Anything else keeps its box. Whatever of it lies past the trim is drawn,
+  so a layer that should bleed and is not one of the above can be drawn past
+  the trim by hand.
+
+`bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
+insets; `extendIntoBleed` is the edge rule on its own.
+
 ## Inline assets
 
 A template normally points at its rasters by URL. An authoring tool has none —
@@ -272,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a

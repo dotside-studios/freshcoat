@@ -1,4 +1,11 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
+import {
+	type Element,
+	hasInsets,
+	type Sides,
+	type Template,
+	templateBleed,
+	templateSafeArea,
+} from "@freshcoat-js/coatfile";
 import { useSyncExternalStore } from "react";
 import { worldCorners } from "~/doc/geometry";
 import { keyOf } from "~/doc/path";
@@ -31,6 +38,43 @@ export function isPrintedCard(t: Pick<Template, "product">): boolean {
 	return t.product === "card_cr80";
 }
 
+type GuideSource = Pick<
+	Template,
+	"width" | "height" | "product" | "bleed" | "safeArea"
+>;
+
+export type PrintGuideSet = {
+	/** Trim corner radius, in template units; 0 for square corners. */
+	corner: number;
+	/** Safe-area inset from each edge, in template units. */
+	safe: Sides | null;
+	/** Bleed past each edge, in template units. */
+	bleed: Sides;
+};
+
+/** The guides a template shows: its own safe area and bleed, and for a CR80
+ *  card the trim corners and, unless it sets its own, the printer's safe
+ *  area. */
+export function printGuidesFor(t: GuideSource): PrintGuideSet {
+	const cr80 = isPrintedCard(t) ? printGuideMetrics(t) : null;
+	const own = templateSafeArea(t);
+	const safe = hasInsets(own)
+		? own
+		: cr80
+			? { top: cr80.safe, right: cr80.safe, bottom: cr80.safe, left: cr80.safe }
+			: null;
+	return { corner: cr80?.corner ?? 0, safe, bleed: templateBleed(t) };
+}
+
+/** Whether a template has any guides to show. */
+export function hasPrintGuides(t: GuideSource): boolean {
+	return (
+		isPrintedCard(t) ||
+		hasInsets(templateBleed(t)) ||
+		hasInsets(templateSafeArea(t))
+	);
+}
+
 // ── The toggle ───────────────────────────────────────────────────────────────
 
 // Each template in a workspace keeps its own choice for the session; one never
@@ -48,11 +92,11 @@ function subscribe(fn: () => void) {
 
 export function printGuidesOn(
 	templateId: string | undefined,
-	t: Pick<Template, "product"> | null,
+	t: GuideSource | null,
 ): boolean {
 	if (!t) return false;
 	const chosen = templateId === undefined ? undefined : choices.get(templateId);
-	return chosen ?? isPrintedCard(t);
+	return chosen ?? hasPrintGuides(t);
 }
 
 export function setPrintGuides(templateId: string, on: boolean): void {
@@ -117,26 +161,30 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * Top-level layers with an edge between the trim and the safe line: close
  * enough to the cut that it may take part of them. A layer that runs to the
  * trim or past it is bleed, drawn to be cut, and is left alone. Only a
- * template the guides describe gets hints.
+ * template with a safe area gets hints.
  */
 export function safeAreaHints(t: Template): SafeAreaHint[] {
-	if (!isPrintedCard(t)) return [];
-	const { safe } = printGuideMetrics(t);
+	const { safe } = printGuidesFor(t);
+	if (!safe) return [];
 	const eps = 0.5;
-	const inBand = (d: number) => d > eps && d < safe - eps;
+	const insets = [safe.left, safe.top, safe.right, safe.bottom];
+	const inBand = (d: number, i: number) =>
+		d > eps && d < (insets[i] as number) - eps;
+	const even = insets.every((n) => n === safe.top);
+	const where = even ? `, ${Math.round(safe.top)} units in from the trim` : "";
 	const out: SafeAreaHint[] = [];
 	t.template_data.forEach((frame, side) => {
 		frame.elements.forEach((el, index) => {
 			const b = boxOf(el);
 			if (!b) return;
 			const gaps = [b.left, b.top, t.width - b.right, t.height - b.bottom];
-			const edges = EDGE_NAMES.filter((_, i) => inBand(gaps[i] as number));
+			const edges = EDGE_NAMES.filter((_, i) => inBand(gaps[i] as number, i));
 			if (edges.length === 0) return;
 			out.push({
 				key: keyOf({ side, path: [index] }),
 				side,
 				id: el.id,
-				message: `${capitalize(edges.join(" and "))} edge${edges.length > 1 ? "s cross" : " crosses"} the safe area, ${Math.round(safe)} units in from the trim`,
+				message: `${capitalize(edges.join(" and "))} edge${edges.length > 1 ? "s cross" : " crosses"} the safe area${where}`,
 			});
 		});
 	});

@@ -284,3 +284,61 @@ describe("an export on sheets", () => {
 		expect(pool.requests).toHaveLength(0);
 	});
 });
+
+describe("an export on sheets with bleed", () => {
+	const BLEED = 36;
+	function bled(count: number): Workspace {
+		const ws = workspace(count);
+		const entry = ws.templates[0];
+		if (entry) entry.template = { ...entry.template, bleed: BLEED };
+		return ws;
+	}
+
+	it("renders each card with its bleed and places it by its trim", async () => {
+		const pool = pngPool();
+		const preset = { ...sheetPreset({ duplex: "none" }), bleed: true };
+		const result = await runExportJob(bled(2), preset, { pool, assemblePdf });
+		expect(pool.requests.every((r) => r.bleed === true)).toBe(true);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no PDF");
+		const doc = await PDFDocument.load(
+			new Uint8Array(await blob.arrayBuffer()),
+		);
+		const mm = (px: number) => (px / 300) * 25.4;
+		const card = { widthMm: mm(1012), heightMm: mm(638) };
+		const bleedMm = mm(BLEED);
+		const expected = imposeSheets(
+			Array.from({ length: 4 }, () => ({})),
+			card,
+			preset.layout as SheetLayout,
+			{ bleedMm },
+		);
+		expect(expected.gapMm).toBeCloseTo(2 * bleedMm, 9);
+		const height = 297 * PT;
+		const drawn = images(doc.getPage(0));
+		expect(drawn).toHaveLength(4);
+		expected.pages[0]?.slots.forEach((slot, n) => {
+			const [x, y, w, h] = drawn[n] ?? [];
+			expect(x).toBeCloseTo((slot.xMm - bleedMm) * PT, 2);
+			expect(y).toBeCloseTo(
+				height - (slot.yMm + card.heightMm + bleedMm) * PT,
+				2,
+			);
+			expect(w).toBeCloseTo((card.widthMm + 2 * bleedMm) * PT, 2);
+			expect(h).toBeCloseTo((card.heightMm + 2 * bleedMm) * PT, 2);
+		});
+	});
+
+	it("widens the planned gap only when the preset includes bleed", () => {
+		const ws = bled(2);
+		const template = ws.templates[0]?.template;
+		const plan = planExport(ws, sheetPreset());
+		const without = planSheets(plan, template, sheetPreset());
+		const withBleed = planSheets(plan, template, {
+			...sheetPreset(),
+			bleed: true,
+		});
+		expect(without?.imposition?.gapMm).toBe(0);
+		expect(withBleed?.imposition?.gapMm).toBeCloseTo((72 / 300) * 25.4, 9);
+	});
+});

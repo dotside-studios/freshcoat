@@ -7,6 +7,7 @@ import { EditorController } from "~/app/controller";
 import { IssuesList } from "~/app/IssuesPopover";
 import {
 	printGuideMetrics,
+	printGuidesFor,
 	printGuidesOn,
 	safeAreaHints,
 	setPrintGuides,
@@ -191,6 +192,44 @@ describe("Resize with constraints", () => {
 		expect(el(c, "0/0").pos).toEqual({ x: 10, y: 20 });
 	});
 
+	test("sets the bleed and the safe area, one undo step each", async () => {
+		const c = open();
+		render(
+			<ControllerProvider controller={c}>
+				<Size />
+			</ControllerProvider>,
+		);
+		const user = userEvent.setup();
+		const bleed = screen.getByRole("spinbutton", { name: "Template bleed" });
+		await user.clear(bleed);
+		await user.type(bleed, "12{Enter}");
+		const safe = screen.getByRole("spinbutton", {
+			name: "Template safe area",
+		});
+		await user.clear(safe);
+		await user.type(safe, "30{Enter}");
+		const t = c.template as Template;
+		expect([t.bleed, t.safeArea]).toEqual([12, 30]);
+		expect(c.state.doc?.history.past).toHaveLength(2);
+		c.undo();
+		expect((c.template as Template).safeArea).toBeUndefined();
+	});
+
+	test("shows sides set apart as mixed", () => {
+		const c = open({
+			...doc(),
+			bleed: { top: 1, right: 2, bottom: 3, left: 4 },
+		});
+		render(
+			<ControllerProvider controller={c}>
+				<Size />
+			</ControllerProvider>,
+		);
+		const bleed = screen.getByRole("spinbutton", { name: "Template bleed" });
+		expect((bleed as HTMLInputElement).value).toBe("");
+		expect(bleed.getAttribute("placeholder")).toBe("Mixed");
+	});
+
 	test("refuses a size the plain resize refuses", () => {
 		const r = resizeWithConstraints(doc(), 0, 600);
 		expect(r.ok).toBe(false);
@@ -240,6 +279,25 @@ describe("print guides", () => {
 			/Left and top edges cross the safe area/,
 		);
 		expect(safeAreaHints(doc())).toEqual([]);
+	});
+
+	test("show a template's own bleed and safe area, whatever its product", () => {
+		const t: Template = {
+			...doc(),
+			bleed: 12,
+			safeArea: { top: 30, right: 20, bottom: 30, left: 20 },
+		};
+		expect(printGuidesOn("t4", t)).toBe(true);
+		expect(printGuidesFor(t)).toEqual({
+			corner: 0,
+			safe: { top: 30, right: 20, bottom: 30, left: 20 },
+			bleed: { top: 12, right: 12, bottom: 12, left: 12 },
+		});
+		expect(printGuidesFor({ ...card(), safeArea: 10 }).safe?.left).toBe(10);
+		const hints = safeAreaHints(t);
+		expect(hints.find((h) => h.id === "a")?.message).toBe(
+			"Left and top edges cross the safe area",
+		);
 	});
 
 	test("are listed with the issues as hints, while the template stays valid", async () => {

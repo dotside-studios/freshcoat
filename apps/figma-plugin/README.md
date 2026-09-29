@@ -134,6 +134,9 @@ layers were kept, flattened or skipped.
   a barcode widget in Freshcoat. An unknown symbology, or a literal the encoder
   refuses, stops the export with an error; **Export anyway** writes a
   placeholder in its place. See [Field markers](#field-markers) for examples.
+- **Bleed and safe area.** `guide:bleed` and `guide:safe-area` layers on a
+  slot frame become the template's `bleed` and `safeArea`; artwork past the
+  frame's edge is kept. See [Bleed and safe area](#bleed-and-safe-area).
 
 ## Field markers
 
@@ -167,6 +170,39 @@ Code 128, EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix and Aztec.
 
 The Layer tab can edit bindings and field metadata without renaming layers.
 Conditions on a group apply to its contents; nested conditions must all hold.
+
+## Bleed and safe area
+
+The slot frame is the trim: keep it at the card's size, which is what Davi
+card product mode checks. Draw the bleed and safe area as two guide layers,
+direct children of the slot frame:
+
+| Layer name | Meaning |
+|---|---|
+| `guide:bleed` | A box larger than the frame. How far it reaches past each edge is the template's `bleed` on that side |
+| `guide:safe-area` | A box inside the frame. How far in it sits from each edge is the template's `safeArea` on that side |
+
+A CR80 side at 1013×638 with a 35-unit bleed has a `guide:bleed` rectangle at
+−35, −35, sized 1083×708. Use any layer type. Guides are measured by their
+bounding box, read whether visible or hidden, and never exported as
+artwork. The measurement is scaled to design units like everything else, and
+written as one number when every side is the same. Without a guide, the
+template has no `bleed` or `safeArea`, as before.
+
+Artwork meant to print into the bleed goes past the frame's edge. It is
+exported where it is, in trim coordinates (a layer 35 units off the left edge
+has `x: -35`), and coatfile draws it when a render includes the bleed. Turn off
+the frame's **Clip content** to see it in Figma. A plain unstroked rectangle,
+image or frame that runs to the trim edge needs no overhang, because coatfile
+grows it into the bleed on its own. See coatfile's
+[Bleed and safe area](../../packages/coatfile/README.md#bleed-and-safe-area).
+
+A template has one bleed and one safe area. When the slots' guides differ, or
+only some slots have them, each side takes the largest value and the export
+warns with `guide_mismatch`. Other warnings: `guide_empty` for a guide that
+doesn't reach past (or into) the frame, `guide_duplicate` for a second guide of
+the same kind on one slot (the first wins), and `guide_safe_area_exceeds_trim`
+for a safe area that leaves no room on the canvas (it is dropped).
 
 ## Open in Freshcoat
 

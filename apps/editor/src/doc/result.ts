@@ -19,6 +19,8 @@ export type RefusalCode =
 	| "last_side"
 	| "invalid_index"
 	| "invalid_size"
+	| "invalid_inset"
+	| "safe_area_too_large"
 	| "invalid_field_key"
 	| "duplicate_field"
 	| "unknown_field"
