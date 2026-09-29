@@ -1,16 +1,9 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { readClipboard } from "~/app/clipboard";
 import { EditorController } from "~/app/controller";
-import { rasterSize, sizedSvg, svgMarkup, svgSize } from "~/app/svg";
+import { svgMarkup, svgSize } from "~/app/svg";
 import { doc } from "./doc-fixture";
-
-vi.mock("~/app/raster", () => ({
-	rasterizeSvg: vi.fn(
-		async () =>
-			new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }),
-	),
-}));
 
 const ICON =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12" viewBox="0 0 24 12"><path d="M0 0h24v12H0z"/></svg>';
@@ -83,79 +76,71 @@ describe("svgSize", () => {
 	});
 });
 
-describe("rasterSize", () => {
-	it("draws the longest side at 2048", () => {
-		expect(rasterSize({ width: 24, height: 12 })).toEqual({
-			width: 2048,
-			height: 1024,
-		});
-	});
-	it("never shrinks below the drawing's own size, up to 4096", () => {
-		expect(rasterSize({ width: 3000, height: 1000 })).toEqual({
-			width: 3000,
-			height: 1000,
-		});
-		expect(rasterSize({ width: 8000, height: 2000 })).toEqual({
-			width: 4096,
-			height: 1024,
-		});
-	});
-});
-
-describe("sizedSvg", () => {
-	it("sets the size and keeps the drawing's coordinates", () => {
-		const out = new DOMParser().parseFromString(
-			sizedSvg(
-				'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12"/>',
-				{
-					width: 48,
-					height: 24,
-				},
-			),
-			"image/svg+xml",
-		).documentElement;
-		expect(out.getAttribute("width")).toBe("48");
-		expect(out.getAttribute("height")).toBe("24");
-		expect(out.getAttribute("viewBox")).toBe("0 0 24 12");
-	});
-	it("adds the SVG namespace an image needs", () => {
-		const out = sizedSvg("<svg></svg>", { width: 300, height: 150 });
-		expect(out).toContain('xmlns="http://www.w3.org/2000/svg"');
-	});
-});
-
 describe("pasting SVG", () => {
 	it("reads SVG markup as a drawing, not text", async () => {
 		clipboardText(ICON);
 		expect(await readClipboard()).toEqual({ kind: "svg", svg: ICON });
 	});
 
-	it("places one image layer at the drawing's aspect", async () => {
+	it("imports layers by default, fitted and centred, as one undo step", async () => {
 		clipboardText(ICON);
 		const c = new EditorController();
 		const t = doc();
 		c.open(t, "doc.coat");
 		const before = (c.template as Template).template_data[0].elements.length;
 		await c.paste();
-		const after = c.template as Template;
-		const elements = after.template_data[0].elements;
+		const elements = (c.template as Template).template_data[0].elements;
 		expect(elements).toHaveLength(before + 1);
 		const placed = elements.at(-1);
-		expect(placed?.type).toBe("image");
-		expect(
-			elements.some((e) => e.type === "text" && e.properties.value === ICON),
-		).toBe(false);
-		const width = placed?.size?.width ?? 0;
-		const height = placed?.size?.height ?? 0;
-		expect(width / height).toBeCloseTo(2, 1);
+		expect(placed?.type).toBe("frame");
+		const children = placed?.type === "frame" ? placed.properties.children : [];
+		expect(children.map((e) => e.type)).toEqual(["vector"]);
+		const { width = 0, height = 0 } = placed?.size ?? {};
+		expect(width / height).toBeCloseTo(2, 5);
 		expect(width).toBeLessThanOrEqual(t.width / 2);
-		const src = placed?.type === "image" ? placed.properties.src : "";
-		const asset = after.assets?.find((a) => src.endsWith(a.sha256));
-		expect(asset?.contentType).toBe("image/png");
+		expect(height).toBeLessThanOrEqual(t.height / 2);
+		expect((placed?.pos?.x ?? 0) + width / 2).toBeCloseTo(t.width / 2, 5);
+		expect((placed?.pos?.y ?? 0) + height / 2).toBeCloseTo(t.height / 2, 5);
+		const ids = new Set<string>();
+		const walk = (els: typeof elements) => {
+			for (const e of els) {
+				expect(ids.has(e.id)).toBe(false);
+				ids.add(e.id);
+				if (e.type === "frame") walk(e.properties.children);
+			}
+		};
+		walk(elements);
 		c.undo();
 		expect((c.template as Template).template_data[0].elements).toHaveLength(
 			before,
 		);
+	});
+
+	it("keeps the SVG itself when imported as an image", async () => {
+		clipboardText(ICON);
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		c.setSvgPastePrompt(async () => "image");
+		await c.paste();
+		const after = c.template as Template;
+		const placed = after.template_data[0].elements.at(-1);
+		expect(placed?.type).toBe("image");
+		const src = placed?.type === "image" ? placed.properties.src : "";
+		const asset = after.assets?.find((a) => src.endsWith(a.sha256));
+		expect(asset?.contentType).toBe("image/svg+xml");
+		expect(atob(asset?.base64 ?? "")).toBe(ICON);
+		const { width = 0, height = 0 } = placed?.size ?? {};
+		expect(width / height).toBeCloseTo(2, 1);
+	});
+
+	it("places SVG files as SVG images", async () => {
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		await c.placeImage(new File([ICON], "icon.svg", { type: "image/svg+xml" }));
+		const after = c.template as Template;
+		const placed = after.template_data[0].elements.at(-1);
+		expect(placed?.type).toBe("image");
+		expect(after.assets?.at(-1)?.contentType).toBe("image/svg+xml");
 	});
 
 	it("pastes the markup as text when asked to", async () => {
@@ -167,16 +152,6 @@ describe("pasting SVG", () => {
 		const placed = (c.template as Template).template_data[0].elements.at(-1);
 		expect(placed?.type).toBe("text");
 		expect(placed?.type === "text" && placed.properties.value).toBe(ICON);
-	});
-
-	it("imports the drawing when asked to", async () => {
-		clipboardText(ICON);
-		const c = new EditorController();
-		c.open(doc(), "doc.coat");
-		c.setSvgPastePrompt(async () => "image");
-		await c.paste();
-		const placed = (c.template as Template).template_data[0].elements.at(-1);
-		expect(placed?.type).toBe("image");
 	});
 
 	it("pastes nothing when the prompt is dismissed", async () => {

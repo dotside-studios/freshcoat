@@ -8,6 +8,7 @@
 // import `canvaskit-wasm`, so it stays runtime-agnostic), the font bytes, and
 // any image bytes keyed by src. Text is drawn at the compile-baked baseline
 // (`line.baseline`).
+import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontBytes } from "./font-bytes";
 import {
@@ -34,6 +35,7 @@ import {
 	encodePng,
 } from "./png";
 import { squircleSvg } from "./squircle";
+import { isSvg, parseSvg, svgToNode } from "./svg/index";
 import type {
 	BlendMode,
 	CanvasLike,
@@ -630,6 +632,12 @@ function drawImage(
 			ck.ClipOp.Intersect,
 			true,
 		);
+	if (isSvgPicture(img)) {
+		drawSvgPicture(ck, canvas, bin, img, cmd);
+		canvas.restore();
+		drawImageStroke(ck, canvas, bin, cmd);
+		return;
+	}
 	const paint = bin.track(new ck.Paint());
 	paint.setAntiAlias(true);
 	if (cmd.fit === "tile") {
@@ -782,6 +790,100 @@ function drawBitmap(
 	}
 	img.delete();
 	canvas.restore();
+}
+
+type SvgPicture = {
+	svgPicture: CK;
+	width: number;
+	height: number;
+	features: string[];
+	delete(): void;
+};
+
+function isSvgPicture(img: unknown): img is SvgPicture {
+	return typeof img === "object" && img !== null && "svgPicture" in img;
+}
+
+// Recorded at the drawing's own size and scaled when drawn, so it stays
+// vector at every density.
+function makeSvgPicture(ck: CK, provider: CK, bytes: Uint8Array): SvgPicture {
+	const drawing = parseSvg(new TextDecoder().decode(bytes));
+	const { width, height } = drawing;
+	const commands = compileScene(svgToNode(drawing), { width, height });
+	const recorder = new ck.PictureRecorder();
+	const bin = makeBin();
+	try {
+		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
+		const issues: PaintIssues = {
+			unhandled: [],
+			missingImages: [],
+			adjustUnsupported: new Map(),
+		};
+		for (const cmd of commands)
+			if (cmd.op.startsWith("draw"))
+				paintDrawable(
+					ck,
+					canvas,
+					provider,
+					new Map(),
+					bin,
+					cmd as DrawCommand,
+					issues,
+					{ width, height, scale: 1, grid: 1 },
+				);
+		const picture = recorder.finishRecordingAsPicture();
+		return {
+			svgPicture: picture,
+			width,
+			height,
+			features: drawing.warnings.map((w) => w.feature),
+			delete: () => picture.delete(),
+		};
+	} finally {
+		bin.free();
+		recorder.delete();
+	}
+}
+
+function drawSvgPicture(
+	ck: CK,
+	canvas: CK,
+	bin: Bin,
+	img: SvgPicture,
+	cmd: DrawImageCommand,
+) {
+	const { pos, size } = cmd;
+	if (cmd.fit === "tile") {
+		const paint = bin.track(new ck.Paint());
+		paint.setAntiAlias(true);
+		paint.setShader(
+			bin.track(
+				img.svgPicture.makeShader(
+					ck.TileMode.Repeat,
+					ck.TileMode.Repeat,
+					ck.FilterMode.Linear,
+					null,
+					ck.LTRBRect(0, 0, img.width, img.height),
+				),
+			),
+		);
+		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), paint);
+		return;
+	}
+	const r = fitRect(
+		img.width,
+		img.height,
+		pos.x,
+		pos.y,
+		size.width,
+		size.height,
+		cmd.fit,
+	);
+	canvas.clipRect(ck.XYWHRect(r.dx, r.dy, r.dw, r.dh), ck.ClipOp.Intersect, true);
+	canvas.translate(r.dx, r.dy);
+	canvas.scale(r.dw / r.sw, r.dh / r.sh);
+	canvas.translate(-r.sx, -r.sy);
+	canvas.drawPicture(img.svgPicture);
 }
 
 function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
@@ -1879,6 +1981,12 @@ function collectAssets(commands: Command[]): {
 	return { fonts: [...fonts.values()], images: [...images] };
 }
 
+function warnSvgFeatures(warnings: PaintWarning[], src: string, img: CK) {
+	if (isSvgPicture(img))
+		for (const feature of img.features)
+			warnings.push({ kind: "svg_unsupported", src, feature });
+}
+
 // The CanvasKit paint routine env.paint runs (CanvasKit is the only backend, so
 // there is no painter-strategy indirection): one compiled scene -> a live surface
 // + a PaintOutput. freshcoat paints a single scene here — a card's multiple sides
@@ -1941,15 +2049,19 @@ export async function paintScene(
 		const hit = cache?.images.get(src);
 		if (hit) {
 			imageMap.set(src, hit);
+			warnSvgFeatures(warnings, src, hit);
 			continue;
 		}
 		try {
 			const bytes = await rt.loadImageBytes(src);
 			if (cache) cache.stats.imageDecodes++;
-			const img = ck.MakeImageFromEncoded(bytes);
+			const img = isSvg(bytes)
+				? makeSvgPicture(ck, provider, bytes)
+				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
 				cache?.images.set(src, img);
+				warnSvgFeatures(warnings, src, img);
 			} else
 				warnings.push({
 					kind: "image_load_failed",
