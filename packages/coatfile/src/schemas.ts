@@ -567,6 +567,18 @@ export const TemplateWarningSchema = z.object({
  *  — belongs to that exporter and not to the format. */
 export const TemplateSourceSchema = z.looseObject({ kind: z.string() });
 
+/** An inset from each edge of the trim, in design units: one number for every
+ *  side, or each side on its own. */
+export const InsetsSchema = z.union([
+	z.number(),
+	z.object({
+		top: z.number(),
+		right: z.number(),
+		bottom: z.number(),
+		left: z.number(),
+	}),
+]);
+
 export const TemplateSchema = z
 	.object({
 		$schema: z.string().optional(),
@@ -585,6 +597,10 @@ export const TemplateSchema = z
 		product: z.string().optional(),
 		width: z.number(),
 		height: z.number(),
+		// Artwork past the trim, drawn when a render asks for it and cut away.
+		bleed: InsetsSchema.optional(),
+		// What must survive the cut. A guide only; it does not change a render.
+		safeArea: InsetsSchema.optional(),
 		fields: FieldsSchemaSchema,
 		fonts: z.array(FontDescriptorSchema).optional(),
 		template_data: z.array(TemplateFrameSchema),
@@ -603,6 +619,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceFormatVersion(tpl, ctx);
 	enforceRequiredStrings(tpl, ctx);
 	enforceDimensions(tpl, ctx);
+	enforceInsets(tpl, ctx);
 	enforceTemplateDataNonEmpty(tpl, ctx);
 	enforceFrameNameUniqueness(tpl, ctx);
 	enforceBackgroundFrameFill(tpl, ctx);
@@ -679,6 +696,43 @@ function enforceDimensions(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 		addKitIssue(ctx, "invalid_dimension", "height must be a positive integer", [
 			"height",
 		]);
+	}
+}
+
+function enforceInsets(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	for (const key of ["bleed", "safeArea"] as const) {
+		const value = tpl[key];
+		if (value === undefined) continue;
+		const sides =
+			typeof value === "number"
+				? { top: value, right: value, bottom: value, left: value }
+				: value;
+		const entries: [string | undefined, number][] =
+			typeof value === "number" ? [[undefined, value]] : Object.entries(value);
+		let valid = true;
+		for (const [side, n] of entries) {
+			if (Number.isFinite(n) && n >= 0) continue;
+			valid = false;
+			addKitIssue(
+				ctx,
+				"invalid_inset",
+				`${key} must be a non-negative number`,
+				side === undefined ? [key] : [key, side],
+			);
+		}
+		if (
+			valid &&
+			key === "safeArea" &&
+			(sides.left + sides.right >= tpl.width ||
+				sides.top + sides.bottom >= tpl.height)
+		) {
+			addKitIssue(
+				ctx,
+				"safe_area_exceeds_trim",
+				"safeArea must leave room inside the trim",
+				[key],
+			);
+		}
 	}
 }
 
