@@ -110,6 +110,9 @@ the records, and **Export** turns templates and records into files.
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector.
   - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
+  - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
+    They follow the pan and zoom, and mark the selection's extent with its
+    edges' positions.
   - Creation tools: frame, rectangle, ellipse, text, image, QR and barcode.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
     radial one's center and two radii, an angular one's center and rotation,

@@ -48,6 +48,7 @@ import {
 	printGuidesOn,
 	usePrintGuidesVersion,
 } from "./print-guides";
+import { Rulers } from "./Rulers";
 import { TextEditor } from "./TextEditor";
 import { useLiveRender } from "./use-live-render";
 
@@ -737,6 +738,7 @@ export function Viewport() {
 					</div>
 					<Overlay draft={draft} />
 					<TextEditor />
+					<Rulers />
 				</>
 			) : null}
 		</div>

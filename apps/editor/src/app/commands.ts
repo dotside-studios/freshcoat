@@ -443,6 +443,18 @@ export const COMMANDS: Command[] = [
 			}),
 	},
 	{
+		id: "view.rulers",
+		label: "Rulers",
+		keys: ["Shift+R"],
+		group: "View",
+		enabled: hasDoc,
+		run: ({ controller }) =>
+			controller.dispatch({
+				type: "setRulers",
+				on: !controller.state.rulers,
+			}),
+	},
+	{
 		id: "view.printGuides",
 		label: "Print guides",
 		group: "View",

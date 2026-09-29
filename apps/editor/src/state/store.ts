@@ -119,6 +119,7 @@ export type EditorState = {
 	tool: Tool;
 	view: View;
 	panels: { left: boolean; right: boolean };
+	rulers: boolean;
 	rightTab: RightTab;
 	geometry: LayerGeometry;
 	render: RenderState;
@@ -177,6 +178,7 @@ export type Action =
 	| { type: "setTool"; tool: Tool }
 	| { type: "setView"; view: View }
 	| { type: "setPanels"; panels: Partial<EditorState["panels"]> }
+	| { type: "setRulers"; on: boolean }
 	| { type: "setRightTab"; tab: RightTab }
 	| { type: "setActiveFill"; fill: { key: string; index: number } | null }
 	| {
@@ -250,6 +252,7 @@ export function initialState(
 		tool: "move",
 		view: { x: 0, y: 0, zoom: 1 },
 		panels,
+		rulers: false,
 		rightTab: "design",
 		geometry: new Map(),
 		render: { status: "idle", warnings: [] },
@@ -395,6 +398,7 @@ function reduceOpen(state: EditorState, action: Action): EditorState {
 			if (!first) return state;
 			return {
 				...initialState(state.panels),
+				rulers: state.rulers,
 				...freshEditor(
 					first.template,
 					first.fileName,
@@ -412,7 +416,11 @@ function reduceOpen(state: EditorState, action: Action): EditorState {
 function reduceView(state: EditorState, action: Action): EditorState {
 	switch (action.type) {
 		case "close":
-			return { ...initialState(state.panels), view: state.view };
+			return {
+				...initialState(state.panels),
+				view: state.view,
+				rulers: state.rulers,
+			};
 		case "saved":
 			if (!state.doc) return state;
 			return {
@@ -511,6 +519,10 @@ function reduceView(state: EditorState, action: Action): EditorState {
 			return { ...state, view: action.view };
 		case "setPanels":
 			return { ...state, panels: { ...state.panels, ...action.panels } };
+		case "setRulers":
+			return state.rulers === action.on
+				? state
+				: { ...state, rulers: action.on };
 		case "setRightTab": {
 			const tab = LEGACY_TAB[action.tab] ?? action.tab;
 			return state.rightTab === tab ? state : { ...state, rightTab: tab };
