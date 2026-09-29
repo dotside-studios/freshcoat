@@ -69,6 +69,8 @@ export {
 	readImageInfo,
 } from "./image-info";
 export {
+	type BleedMm,
+	bleedMm,
 	type CardSizeMm,
 	CROP_MARK_GAP_MM,
 	CROP_MARK_LENGTH_MM,
@@ -81,7 +83,10 @@ export {
 	type Imposition,
 	imposeSheets,
 	MM_PER_INCH,
+	minGapMm,
+	NO_BLEED,
 	PAPER_SIZES_MM,
+	resolveBleedMm,
 	type SheetLayoutAxis,
 	SheetLayoutError,
 	type SheetPage,

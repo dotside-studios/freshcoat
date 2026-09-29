@@ -32,6 +32,42 @@ export const CROP_MARK_GAP_MM = 2 * (CROP_MARK_OFFSET_MM + CROP_MARK_LENGTH_MM);
 
 export type CardSizeMm = { widthMm: number; heightMm: number };
 
+/** Artwork past each edge of the trim, in millimetres. */
+export type BleedMm = {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+};
+
+export const NO_BLEED: BleedMm = { top: 0, right: 0, bottom: 0, left: 0 };
+
+export function resolveBleedMm(bleed: number | BleedMm | undefined): BleedMm {
+	if (bleed === undefined) return NO_BLEED;
+	if (typeof bleed === "number")
+		return { top: bleed, right: bleed, bottom: bleed, left: bleed };
+	return bleed;
+}
+
+/** The bleed a template of this many pixels of bleed prints at at this DPI. */
+export function bleedMm(
+	bleedPx: { top: number; right: number; bottom: number; left: number },
+	dpi: number,
+): BleedMm {
+	const mm = (px: number) => (px / dpi) * MM_PER_INCH;
+	return {
+		top: mm(bleedPx.top),
+		right: mm(bleedPx.right),
+		bottom: mm(bleedPx.bottom),
+		left: mm(bleedPx.left),
+	};
+}
+
+/** The narrowest gap that keeps neighbouring cards' bleed apart. */
+export function minGapMm(bleed: BleedMm): number {
+	return Math.max(bleed.left + bleed.right, bleed.top + bleed.bottom);
+}
+
 /** The card size a template of this many pixels prints at at this DPI. */
 export function cardSizeMm(
 	widthPx: number,
@@ -80,7 +116,10 @@ export type Imposition<T> = {
 	columns: number;
 	rows: number;
 	perSheet: number;
+	/** the layout's gap, or `minGapMm` of the bleed when that is wider */
 	gapMm: number;
+	/** set when the cards carry bleed; each slot is still its trim's corner */
+	bleedMm?: BleedMm;
 	/** the grid's top-left corner on a front page */
 	originMm: { x: number; y: number };
 	/** pieces of paper: two pages each when backs print, else one */
@@ -177,13 +216,15 @@ function noFit(g: Grid, card: CardSizeMm, layout: SheetLayout, auto: boolean) {
 	return new SheetLayoutError(`${size}, ${what}: ${room}`, axis);
 }
 
-function checkNumbers(card: CardSizeMm, layout: SheetLayout) {
+function checkNumbers(card: CardSizeMm, layout: SheetLayout, bleed: BleedMm) {
 	if (!(card.widthMm > 0 && card.heightMm > 0))
 		throw new SheetLayoutError("The card needs a width and height above 0");
 	if (!(layout.marginMm >= 0))
 		throw new SheetLayoutError("The margin can't be negative");
 	if (!(layout.gapMm >= 0))
 		throw new SheetLayoutError("The gap can't be negative");
+	if (!Object.values(bleed).every((n) => Number.isFinite(n) && n >= 0))
+		throw new SheetLayoutError("The bleed can't be negative");
 	const offset = layout.backOffsetMm;
 	if (offset && !(Number.isFinite(offset.x) && Number.isFinite(offset.y)))
 		throw new SheetLayoutError("The back offset needs two numbers");
@@ -234,15 +275,26 @@ function records<T extends ImposeItem>(items: readonly T[]): Group<T>[] {
  * portrait sheet mirrors its columns and a landscape one its rows; a short
  * edge flip is the other way about.
  *
+ * With `bleedMm`, each card is placed by its trim and its bleed hangs
+ * outside the slot: into the margin at the grid's edge, and into the gap
+ * between cards, which is widened to `minGapMm` when the layout's is
+ * narrower so no card's bleed covers its neighbour's.
+ *
  * Throws a `SheetLayoutError` for a layout that can't be imposed: a card
  * that doesn't fit, or more than two sides under duplex.
  */
 export function imposeSheets<T extends ImposeItem>(
 	items: readonly T[],
 	card: CardSizeMm,
-	layout: SheetLayout,
+	sheetLayout: SheetLayout,
+	options: { bleedMm?: number | BleedMm } = {},
 ): Imposition<T> {
-	checkNumbers(card, layout);
+	const bleed = resolveBleedMm(options.bleedMm);
+	checkNumbers(card, sheetLayout, bleed);
+	const layout = {
+		...sheetLayout,
+		gapMm: Math.max(sheetLayout.gapMm, minGapMm(bleed)),
+	};
 	const paper = portraitPaper(layout);
 	const portrait = grid(paper, "portrait", card, layout);
 	let g: Grid;
@@ -329,6 +381,7 @@ export function imposeSheets<T extends ImposeItem>(
 		rows,
 		perSheet,
 		gapMm: layout.gapMm,
+		...(minGapMm(bleed) > 0 ? { bleedMm: { ...bleed } } : {}),
 		originMm: { x: originX, y: originY },
 		sheets,
 		pages,
@@ -352,15 +405,18 @@ function cuts(origin: number, size: number, gap: number, count: number) {
 	return out;
 }
 
-/** Marks running outward from `edge` in `direction` (-1 or +1), cut short
- *  at `limit`; none if there is no room past the offset. */
+/** Marks running outward from `edge` in `direction` (-1 or +1), starting
+ *  past the card's `bleed` on that side and cut short at `limit`; none if
+ *  there is no room past the offset. */
 function run(
 	edge: number,
 	direction: -1 | 1,
 	limit: number,
+	bleed: number,
 ): [number, number] | null {
-	const start = edge + direction * CROP_MARK_OFFSET_MM;
-	const end = edge + direction * (CROP_MARK_OFFSET_MM + CROP_MARK_LENGTH_MM);
+	const start = edge + direction * (bleed + CROP_MARK_OFFSET_MM);
+	const end =
+		edge + direction * (bleed + CROP_MARK_OFFSET_MM + CROP_MARK_LENGTH_MM);
 	const clipped = direction < 0 ? Math.max(end, limit) : Math.min(end, limit);
 	if ((clipped - start) * direction <= 0) return null;
 	return [start, clipped];
@@ -369,12 +425,14 @@ function run(
 /**
  * The crop marks of a front page's grid: one at each end of every cut line,
  * in the margin, and in the gaps between cards when a gap is wide enough to
- * hold a mark from each side (`CROP_MARK_GAP_MM`). A mark is cut short at the
- * paper's edge, and never crosses a card.
+ * hold a mark from each side (`CROP_MARK_GAP_MM`) past both cards' bleed.
+ * Marks sit on the trim and start outside the bleed. A mark is cut short at
+ * the paper's edge, and never crosses a card or its bleed.
  */
 export function cropMarks(imposition: Imposition<unknown>): CropMark[] {
 	const { paper, card, columns, rows, originMm } = imposition;
 	const gap = imposition.gapMm;
+	const bleed = imposition.bleedMm ?? NO_BLEED;
 	const xs = cuts(originMm.x, card.widthMm, gap, columns);
 	const ys = cuts(originMm.y, card.heightMm, gap, rows);
 	const top = originMm.y;
@@ -388,25 +446,29 @@ export function cropMarks(imposition: Imposition<unknown>): CropMark[] {
 	const horizontal = (y: number, span: [number, number] | null) => {
 		if (span) marks.push({ x1: span[0], y1: y, x2: span[1], y2: y });
 	};
-	const inGaps = gap >= CROP_MARK_GAP_MM - 1e-9;
+	const roomFor = (space: number) => space >= CROP_MARK_GAP_MM - 1e-9;
+	const betweenRows = roomFor(gap - bleed.top - bleed.bottom);
+	const betweenColumns = roomFor(gap - bleed.left - bleed.right);
 	for (const x of xs) {
-		vertical(x, run(top, -1, 0));
-		vertical(x, run(bottom, 1, paper.heightMm));
-		if (inGaps)
+		vertical(x, run(top, -1, 0, bleed.top));
+		vertical(x, run(bottom, 1, paper.heightMm, bleed.bottom));
+		if (betweenRows)
 			for (let r = 0; r + 1 < rows; r++) {
 				const below = originMm.y + r * (card.heightMm + gap) + card.heightMm;
-				vertical(x, run(below, 1, below + gap));
-				vertical(x, run(below + gap, -1, below));
+				const next = below + gap;
+				vertical(x, run(below, 1, next - bleed.top, bleed.bottom));
+				vertical(x, run(next, -1, below + bleed.bottom, bleed.top));
 			}
 	}
 	for (const y of ys) {
-		horizontal(y, run(left, -1, 0));
-		horizontal(y, run(right, 1, paper.widthMm));
-		if (inGaps)
+		horizontal(y, run(left, -1, 0, bleed.left));
+		horizontal(y, run(right, 1, paper.widthMm, bleed.right));
+		if (betweenColumns)
 			for (let c = 0; c + 1 < columns; c++) {
 				const after = originMm.x + c * (card.widthMm + gap) + card.widthMm;
-				horizontal(y, run(after, 1, after + gap));
-				horizontal(y, run(after + gap, -1, after));
+				const next = after + gap;
+				horizontal(y, run(after, 1, next - bleed.left, bleed.right));
+				horizontal(y, run(next, -1, after + bleed.right, bleed.left));
 			}
 	}
 	return marks;

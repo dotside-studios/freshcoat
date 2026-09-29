@@ -194,6 +194,9 @@ export type ExportPreset = {
 	print?: PresetPrint;
 	/** PDF only; default single */
 	layout?: PdfLayout;
+	/** include the template's bleed around each card; default false, the
+	 *  trim alone */
+	bleed?: boolean;
 };
 
 export type Workspace = {

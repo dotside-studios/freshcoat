@@ -160,6 +160,7 @@ const PresetSchema = z.object({
 		})
 		.optional(),
 	layout: LayoutSchema.optional(),
+	bleed: z.boolean().optional(),
 });
 
 const ManifestSchema = z.object({

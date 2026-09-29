@@ -5,6 +5,7 @@ import {
 	DEFAULT_SHEET_LAYOUT,
 	type ImposeItem,
 	imposeSheets,
+	minGapMm,
 	SheetLayoutError,
 	sheetSummary,
 } from "./impose";
@@ -476,6 +477,91 @@ describe("cropMarks", () => {
 			}),
 		);
 		expect(cropMarks(bare)).toEqual([]);
+	});
+});
+
+describe("bleed", () => {
+	it("places each card by its trim, with the gap widened to hold both bleeds", () => {
+		const out = imposeSheets(items(4), CR80, layout(), { bleedMm: 3 });
+		expect(out.gapMm).toBe(6);
+		expect(out.bleedMm).toEqual({ top: 3, right: 3, bottom: 3, left: 3 });
+		expect([out.columns, out.rows]).toEqual([2, 4]);
+		const [a, b, c] = out.pages[0]?.slots ?? [];
+		expect(round((b?.xMm ?? 0) - (a?.xMm ?? 0))).toBe(85.6 + 6);
+		expect(round((c?.yMm ?? 0) - (a?.yMm ?? 0))).toBe(54 + 6);
+	});
+
+	it("keeps a gap already wide enough", () => {
+		const out = imposeSheets(items(1), CR80, layout({ gapMm: 8 }), {
+			bleedMm: 3,
+		});
+		expect(out.gapMm).toBe(8);
+	});
+
+	it("widens the gap by the wider axis of an uneven bleed", () => {
+		const bleedMm = { top: 1, right: 2, bottom: 3, left: 4 };
+		expect(minGapMm(bleedMm)).toBe(6);
+		expect(imposeSheets(items(1), CR80, layout(), { bleedMm }).gapMm).toBe(6);
+	});
+
+	it("leaves a layout without bleed as it was", () => {
+		const out = imposeSheets(items(1), CR80, layout(), { bleedMm: 0 });
+		expect(out).toEqual(imposeSheets(items(1), CR80, layout()));
+		expect(out.bleedMm).toBeUndefined();
+	});
+
+	it("refuses a negative bleed", () => {
+		expect(() =>
+			imposeSheets(items(1), CR80, layout(), { bleedMm: -1 }),
+		).toThrow(SheetLayoutError);
+	});
+
+	it("starts crop marks outside the bleed and keeps them off every card's bleed", () => {
+		for (const [gapMm, bleed] of [
+			[0, 3],
+			[16, 3],
+			[20, 5],
+		] as const) {
+			const imposition = imposeSheets(items(1), CR80, layout({ gapMm }), {
+				bleedMm: bleed,
+			});
+			const { columns, rows, originMm } = imposition;
+			const gap = imposition.gapMm;
+			const marks = cropMarks(imposition);
+			const first = marks[0];
+			expect(first?.x1).toBeCloseTo(originMm.x, 9);
+			expect(first?.y1).toBeCloseTo(originMm.y - bleed - 1, 9);
+			for (const m of marks)
+				for (let c = 0; c < columns; c++)
+					for (let r = 0; r < rows; r++) {
+						const x = originMm.x + c * (CR80.widthMm + gap) - bleed;
+						const y = originMm.y + r * (CR80.heightMm + gap) - bleed;
+						const w = CR80.widthMm + 2 * bleed;
+						const h = CR80.heightMm + 2 * bleed;
+						const inside = (px: number, py: number) =>
+							px > x + 1e-6 &&
+							px < x + w - 1e-6 &&
+							py > y + 1e-6 &&
+							py < y + h - 1e-6;
+						expect(inside(m.x1, m.y1) || inside(m.x2, m.y2)).toBe(false);
+					}
+		}
+	});
+
+	it("puts marks in the gap only when it holds both bleeds and two marks", () => {
+		const count = (gapMm: number) => {
+			const imposition = imposeSheets(items(1), CR80, layout({ gapMm }), {
+				bleedMm: 3,
+			});
+			return [
+				imposition.columns,
+				imposition.rows,
+				cropMarks(imposition).length,
+			];
+		};
+		// 2 × 4, margins only
+		expect(count(15)).toEqual([2, 4, 4 * 2 + 8 * 2]);
+		expect(count(16)).toEqual([2, 4, 4 * (2 + 2 * 3) + 8 * (2 + 2 * 1)]);
 	});
 });
 
