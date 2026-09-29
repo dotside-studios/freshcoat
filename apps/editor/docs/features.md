@@ -328,7 +328,7 @@ to fill cards with records.
     time one reaches 512 MB, `<name>-part-1.zip` and so on; a job that fits
     in one part is a single `<name>.zip`.
   - **Zip file** (Chromium): one zip written into the chosen file as it is
-    made.
+    made, switching to zip64 records only if it passes 4 GB or 65,535 files.
   - **Folder** (Chromium): each file written into the chosen folder as it is
     made, the report last. Cancelling keeps what was written and says how
     many.

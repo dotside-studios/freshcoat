@@ -147,10 +147,9 @@ covers shared checks and pull requests.
 - Print output is for-print's correction for Davi's card printers, not ICC
   color management or soft-proofing. The printer file preview is the file that
   is sent, not a proof of the printed card.
-- Zips are written without zip64, so one zip, or one part of a split download,
-  must stay under 4 GB and 65,535 files. A job that would pass that fails
-  rather than writing a broken zip; Download's 512 MB parts stay well inside
-  it.
+- A zip past 4 GB or 65,535 files is written as zip64, which some older
+  unzip tools cannot open. Download still hands over 512 MB parts, so that a
+  job never holds more than one part in memory.
 - The canvas and the sheet preview show the trim only. Bleed is drawn as a
   guide line, and what fills it appears only in an export with "Include
   bleed". Bleed and safe area take one value for every side; a file can set
