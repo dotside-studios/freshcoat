@@ -204,6 +204,207 @@ describe("validate (frames + elements)", () => {
 	});
 });
 
+describe("validate (gradient stops)", () => {
+	const oneStop = {
+		kind: "linear",
+		angle: 0,
+		stops: [{ offset: 0, color: "#000" }],
+	};
+	const badOffset = {
+		kind: "radial",
+		stops: [
+			{ offset: 0, color: "#000" },
+			{ offset: 1.5, color: "#fff" },
+		],
+	};
+	const goodStops = [
+		{ offset: 0, color: "#000" },
+		{ offset: 1, color: "#fff" },
+	];
+	const box = { pos: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
+	const rect = (fill: unknown) => ({
+		id: "r",
+		type: "rect",
+		...box,
+		properties: { fill },
+	});
+
+	function withElements(elements: unknown[], variants?: unknown) {
+		const tpl = structuredClone(minimalValid) as Record<string, unknown> & {
+			template_data: { elements: unknown[] }[];
+		};
+		tpl.template_data[0].elements = elements;
+		if (variants) tpl.variants = variants;
+		return tpl;
+	}
+
+	function issues(tpl: unknown) {
+		const r = validate(tpl);
+		return r.ok ? [] : r.errors.map((e) => `${e.code} ${e.path}`);
+	}
+
+	test("vector fill", () => {
+		const tpl = withElements([
+			{
+				id: "v",
+				type: "vector",
+				...box,
+				properties: { d: "M0 0L10 10", fill: oneStop },
+			},
+		]);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /template_data/0/elements/0/properties/fill/stops",
+		]);
+	});
+
+	test("frame fill and nested frame children", () => {
+		const tpl = withElements([
+			{
+				id: "f",
+				type: "frame",
+				...box,
+				properties: {
+					fill: oneStop,
+					children: [
+						{
+							id: "g",
+							type: "frame",
+							...box,
+							properties: { children: [rect(badOffset)] },
+						},
+					],
+				},
+			},
+		]);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /template_data/0/elements/0/properties/fill/stops",
+			"invalid_stop_offset /template_data/0/elements/0/properties/children/0/properties/children/0/properties/fill/stops/1/offset",
+		]);
+	});
+
+	test("text fill", () => {
+		const tpl = withElements([
+			{
+				id: "t",
+				type: "text",
+				...box,
+				properties: {
+					value: "Hi",
+					font: { family: "Inter", size: 12 },
+					fill: oneStop,
+				},
+			},
+		]);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /template_data/0/elements/0/properties/fill/stops",
+		]);
+	});
+
+	test("mask shape and children", () => {
+		const tpl = withElements([
+			{
+				id: "m",
+				type: "mask",
+				...box,
+				properties: { mask: rect(oneStop), children: [rect(badOffset)] },
+			},
+		]);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /template_data/0/elements/0/properties/mask/properties/fill/stops",
+			"invalid_stop_offset /template_data/0/elements/0/properties/children/0/properties/fill/stops/1/offset",
+		]);
+	});
+
+	test("variant background and element overrides", () => {
+		const tpl = withElements(
+			[rect("#000")],
+			[
+				{
+					id: "a",
+					label: "A",
+					overrides: [
+						{
+							name: "front",
+							background: {
+								id: "bg",
+								type: "rect",
+								...box,
+								properties: { fill: oneStop },
+							},
+							elements: [{ id: "r", properties: { fill: badOffset } }],
+						},
+					],
+				},
+			],
+		);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /variants/0/overrides/0/background/properties/fill/stops",
+			"invalid_stop_offset /variants/0/overrides/0/elements/0/properties/fill/stops/1/offset",
+		]);
+	});
+
+	test("multi-fill arrays", () => {
+		const tpl = withElements([rect(["#000", oneStop])]);
+		expect(issues(tpl)).toEqual([
+			"gradient_needs_two_stops /template_data/0/elements/0/properties/fill/1/stops",
+		]);
+	});
+
+	test("accepts well-formed gradients in every location", () => {
+		const linear = { kind: "linear", angle: 0, stops: goodStops };
+		const angular = { kind: "angular", stops: goodStops };
+		const tpl = withElements(
+			[
+				{
+					id: "f",
+					type: "frame",
+					...box,
+					properties: {
+						fill: [linear, angular],
+						children: [
+							{
+								id: "v",
+								type: "vector",
+								...box,
+								properties: { d: "M0 0L10 10", fill: linear },
+							},
+							{
+								id: "m",
+								type: "mask",
+								...box,
+								properties: { mask: rect(angular), children: [rect(linear)] },
+							},
+						],
+					},
+				},
+				{
+					id: "t",
+					type: "text",
+					...box,
+					properties: {
+						value: "Hi",
+						font: { family: "Inter", size: 12 },
+						fill: linear,
+					},
+				},
+			],
+			[
+				{
+					id: "a",
+					label: "A",
+					overrides: [
+						{
+							name: "front",
+							elements: [{ id: "t", properties: { fill: angular } }],
+						},
+					],
+				},
+			],
+		);
+		expect(issues(tpl)).toEqual([]);
+	});
+});
+
 describe("validate (variants)", () => {
 	test("rejects duplicate variant ids", () => {
 		const bad = {
