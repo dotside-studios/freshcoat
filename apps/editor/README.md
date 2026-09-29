@@ -89,7 +89,8 @@ covers shared checks and pull requests.
 - **Export:** presets pick a template, records, sides, size and format (PNG,
   JPEG or WebP zips, or a PDF). A pool of workers renders in parallel, and
   writes to a download, a zip file or a folder as it goes. PDFs can lay cards
-  out on sheets of paper with crop marks and duplex backs.
+  out on sheets of paper with crop marks and duplex backs, and any export can
+  include the template's bleed.
 - **Print:** an optional card printer path through `@freshcoat-js/for-print`, with measured
   print profiles and a preview of the file sent to the printer.
 - **Starters:** a Davi card (landscape and portrait), a photo watermark and an
