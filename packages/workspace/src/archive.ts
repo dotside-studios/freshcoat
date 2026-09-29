@@ -11,7 +11,12 @@
 // A template is read from the path its manifest entry names, so a workspace
 // written with `templates/<entryId>.tkit` entries opens unchanged.
 
-import { healElementIds, subtleSha256, validate } from "@freshcoat-js/coatfile";
+import {
+	healElementIds,
+	raiseFormatVersion,
+	subtleSha256,
+	validate,
+} from "@freshcoat-js/coatfile";
 import {
 	COAT_EXTENSION,
 	decodeTemplate,
@@ -262,7 +267,7 @@ async function* workspaceEntries(ws: Workspace): AsyncGenerator<ZipEntry> {
 	for (const entry of ws.templates) {
 		yield {
 			name: templatePath(entry),
-			data: await packTemplate(entry.template),
+			data: await packTemplate(raiseFormatVersion(entry.template)),
 			level: 0,
 		};
 	}
@@ -600,7 +605,7 @@ export async function packTemplates(ws: Workspace): Promise<Uint8Array> {
 		for (let n = 2; used.has(name.toLowerCase()); n++) name = `${stem}-${n}`;
 		used.add(name.toLowerCase());
 		entries[`templates/${name}${COAT_EXTENSION}`] = [
-			await packTemplate(entry.template),
+			await packTemplate(raiseFormatVersion(entry.template)),
 			{ level: 0 },
 		];
 	}

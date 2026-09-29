@@ -19,6 +19,11 @@ the records, and **Export** turns templates and records into files.
   - Templates are exported on their own, as with VS Code's workspaces: the
     active one as `.coat` or `.coat.json`, or all of them as a zip of `.coat`
     files. The current side still exports as a PNG at 1×, 2× or 3×.
+  - Saving, exporting or sending back a template raises its
+    `format_version` to the lowest minor that covers the fields it uses, so
+    a 1.2 file that gains a barcode is saved as 1.3 and an older kit refuses
+    to re-save it instead of dropping the barcode. The version is never
+    lowered.
   - The Templates list adds, duplicates, renames and removes templates. Each
     keeps its own undo history, side and view.
   - Unsaved work is autosaved to IndexedDB, and the welcome screen offers to

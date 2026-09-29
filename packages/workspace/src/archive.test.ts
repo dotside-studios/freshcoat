@@ -629,6 +629,38 @@ describe("packTemplates", () => {
 	});
 });
 
+describe("format_version", () => {
+	const oldLabel: Workspace = {
+		...ws,
+		templates: ws.templates.map((entry) => ({
+			...entry,
+			template: {
+				...entry.template,
+				format_version: "1.0",
+				$schema: "https://example.test/coatfile.json",
+			},
+		})),
+	};
+
+	it("packWorkspace raises each template to what its fields need", async () => {
+		const result = await unpackWorkspace(await packed(oldLabel));
+		if (!result.ok) throw new Error(JSON.stringify(result));
+		for (const entry of result.workspace.templates) {
+			expect(entry.template.format_version).toBe("1.1");
+		}
+	});
+
+	it("packTemplates raises each template to what its fields need", async () => {
+		const zip = unzipSync(await packTemplates(oldLabel));
+		for (const bytes of Object.values(zip)) {
+			const template = (await unpackTemplate(bytes)) as {
+				format_version: string;
+			};
+			expect(template.format_version).toBe("1.1");
+		}
+	});
+});
+
 describe("templateStem", () => {
 	it("drops a current, legacy or plain JSON template extension", () => {
 		expect(templateStem("Card.coat")).toBe("Card");
