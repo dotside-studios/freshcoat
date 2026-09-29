@@ -580,13 +580,14 @@ export class EditorController {
 	}
 
 	/** Adds a drawn path as a vector layer on the side, selected, and goes
-	 *  back to the move tool. */
+	 *  from the pen back to the move tool. */
 	createPath(path: PenPath): string | null {
 		const t = this.template;
 		if (!t) return null;
 		const element = penElement(path, t, this.state.side);
 		const key = element ? this.insert(element) : null;
-		this.dispatch({ type: "setTool", tool: "move" });
+		if (this.state.tool === "pen")
+			this.dispatch({ type: "setTool", tool: "move" });
 		return key;
 	}
 

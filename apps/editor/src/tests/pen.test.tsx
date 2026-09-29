@@ -160,6 +160,14 @@ describe("pen tool", () => {
 		expect(c.base?.template_data[0]?.elements).toHaveLength(count);
 	});
 
+	test("a path finished by picking another tool keeps that tool", () => {
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		c.dispatch({ type: "setTool", tool: "rect" });
+		expect(c.createPath(corners)).not.toBeNull();
+		expect(c.state.tool).toBe("rect");
+	});
+
 	test("is in the shortcuts sheet with how to finish a path", () => {
 		render(<ShortcutsDialog isOpen onOpenChange={() => {}} />);
 		const tools = screen.getByRole("heading", { name: "Tools" })
