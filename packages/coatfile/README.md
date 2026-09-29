@@ -307,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -427,15 +427,27 @@ included. `fillRule: "evenodd"` keeps the hole in a ring drawn as two subpaths
 wound the same way; the default is SVG's nonzero.
 
 `svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
-frame of editable `vector`, `frame` and `mask` elements in design px, and
-returns the features it skipped. An `image` element can also point at an SVG
+frame of editable `vector`, `frame`, `mask`, `image` and `text` elements in
+design px, and returns the features it skipped. Images embedded as `data:`
+URLs (directly or through a same-document reference) become `image`
+elements; `<text>` and `<tspan>` become `text` elements with the SVG's font
+family, size, weight, style, fill and anchor, and spans where the styles
+differ. A text box is sized from an estimate of the line's width, placed so
+the baseline lands where the SVG put it. Markers become vectors, and a pattern
+fill becomes a mask of its tiles. An `image` element can also point at an SVG
 source directly; the engine draws it as vector art.
 
-`blendMode` is any of Figma's layer modes except linear burn, which Skia has no
-equivalent for: `multiply`, `screen`, `overlay`, `darken`, `lighten`,
-`color-dodge`, `color-burn`, `hard-light`, `soft-light`, `difference`,
-`exclusion`, `hue`, `saturation`, `color`, `luminosity`, and `plus` (linear
-dodge).
+`blendMode` is any of Figma's layer modes: `multiply`, `screen`, `overlay`,
+`darken`, `lighten`, `color-dodge`, `color-burn`, `linear-burn` (1.5),
+`hard-light`, `soft-light`, `difference`, `exclusion`, `hue`, `saturation`,
+`color`, `luminosity`, and `plus` (linear dodge).
+
+There is no pass-through mode, because groups and frames are not isolated in
+the first place. Their children blend with whatever is under the group, which
+is what Figma calls pass-through. A group becomes an isolated layer only when it
+carries a layer effect of its own (`opacity` below 1, `blendMode`, `blur`,
+`shadow` or `adjust`), and a separate `pass-through` value would render exactly
+like leaving `blendMode` unset.
 
 ## Barcodes
 
@@ -467,6 +479,12 @@ like `qr_code` does:
   }
 }
 ```
+
+An `itf14` code takes `bearerBars` (1.5): `"none"` (the default), `"frame"`, or
+`"horizontal"` for bars above and below only. The bars are 5 modules thick,
+GS1's recommended 4.8 mm at the nominal 1.016 mm module and more than the two
+narrow bars it requires. They sit outside the quiet zone and inside the box, so
+the modules get narrower to make room. Other symbologies ignore the property.
 
 A GS1 number (EAN-13, UPC-A, ITF-14) may leave its check digit off, and gets it
 added, in the bars and the text. One with the wrong check digit is refused with
@@ -582,6 +600,20 @@ Photos differ per record, so `focus` also takes an `"x,y"` string, which is how 
 field supplies it. A value that does not read as a point in `[0, 1]` falls back
 to the centre; `parseImageFocus` and `formatImageFocus` convert between the two
 forms.
+
+## Strokes and corners
+
+A stroke's `align` is `center` (the default), `inside` or `outside`, and every
+stroked `rect`, `image`, `vector` and `frame` honors it. A rect, frame or
+image strokes its outline inset or outset by half the width, following its
+corners or mask. A vector strokes at twice the width, clipped to its own
+interior or exterior under its `fillRule`, so an `evenodd` hole counts as
+outside.
+
+A `rect` or `frame` takes `cornerRadius` as one number or per corner,
+`[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
+fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
+an `outside` stroke beyond its clip, so the clip never hides it.
 
 ## Ellipses
 

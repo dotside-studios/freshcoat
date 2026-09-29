@@ -18,6 +18,8 @@ import {
 } from "@freshcoat-js/engine";
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import {
+	BEARER_BAR_MODULES,
+	bearerBarsOf,
 	defaultQuietZone,
 	getBarcodeEncoder,
 	isLinearSymbology,
@@ -40,6 +42,7 @@ import { generateMatrix } from "./qr";
 import { childElements } from "./tree";
 import type {
 	Background,
+	BearerBars,
 	CompiledFrame,
 	CompiledTemplate,
 	CompileOptions,
@@ -562,7 +565,8 @@ function lineHeightOf(authored: number | "auto" | undefined): {
 }
 
 // Frame → a group. fill/stroke/cornerRadius lower to a background rect (the
-// group's first child); clipsContent → the group's self-clip. When the frame
+// group's first child); clipsContent → the group's self-clip, with an outside
+// stroke moved to a rect beside the clipped group. When the frame
 // auto-layouts AND has a background, the background must stay out of the flow,
 // so it wraps in an outer static group [bg, inner layout group]; otherwise the
 // frame is the layout group (or a plain static group) directly — no redundant
@@ -577,15 +581,23 @@ function compileFrameElement(
 	const size = base.size;
 	const fills = resolveFills(props.fill as Fill | Fill[] | undefined);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
-	const cornerRadius =
-		typeof props.cornerRadius === "number"
-			? props.cornerRadius * ratio
-			: undefined;
+	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	const clip = props.clipsContent === true;
+	// An outside stroke lies wholly beyond the box, so a clipping frame draws it
+	// outside its clip.
+	const strokeOutside = clip && stroke?.align === "outside";
+	const bgStroke = strokeOutside ? undefined : stroke;
 
 	const bg: RectNode | null =
-		fills || stroke
-			? { kind: "rect", pos: { x: 0, y: 0 }, size, fills, stroke, cornerRadius }
+		fills || bgStroke
+			? {
+					kind: "rect",
+					pos: { x: 0, y: 0 },
+					size,
+					fills,
+					stroke: bgStroke,
+					cornerRadius,
+				}
 			: null;
 
 	const rawChildren = (props.children as Element[] | undefined) ?? [];
@@ -609,21 +621,58 @@ function compileFrameElement(
 		cornerRadius,
 	};
 
-	if (layout && bg) {
-		const inner: GroupNode = {
-			kind: "group",
-			pos: { x: 0, y: 0 },
-			size,
-			layout,
-			children: childNodes,
-		};
-		return { ...outer, kind: "group", children: [bg, inner] };
-	}
+	const frame: GroupNode =
+		layout && bg
+			? {
+					...outer,
+					kind: "group",
+					children: [
+						bg,
+						{
+							kind: "group",
+							pos: { x: 0, y: 0 },
+							size,
+							layout,
+							children: childNodes,
+						},
+					],
+				}
+			: {
+					...outer,
+					kind: "group",
+					layout,
+					children: bg ? [bg, ...childNodes] : childNodes,
+				};
+	if (!strokeOutside) return frame;
+
+	const {
+		id,
+		pos,
+		rotation,
+		opacity,
+		blendMode,
+		shadow,
+		blur,
+		adjust,
+		layoutChild,
+		...content
+	} = frame;
 	return {
-		...outer,
+		id,
+		pos,
+		size,
+		rotation,
+		opacity,
+		blendMode,
+		shadow,
+		blur,
+		adjust,
+		layoutChild,
 		kind: "group",
-		layout,
-		children: bg ? [bg, ...childNodes] : childNodes,
+		children: [
+			{ ...content, pos: { x: 0, y: 0 } },
+			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, cornerRadius },
+		],
 	};
 }
 
@@ -826,20 +875,30 @@ function compileBarcode(
 	const { encoding } = result;
 	if (encoding.kind === "linear") {
 		const n = encoding.modules.length;
-		const module = size.width / (n + 2 * quietZone);
+		const bearers = bearerBarsOf(
+			symbology,
+			props.bearerBars as BearerBars | undefined,
+		);
+		const sideBearers = bearers === "frame" ? BEARER_BAR_MODULES : 0;
+		const module = size.width / (n + 2 * quietZone + 2 * sideBearers);
+		const bearer = bearers === "none" ? 0 : BEARER_BAR_MODULES * module;
 		const pixels = new Uint8Array(n * 4);
 		encoding.modules.forEach((set, i) => {
 			if (set) paint(pixels, i);
 		});
 		children.push({
 			kind: "bitmap",
-			pos: { x: quietZone * module, y: 0 },
-			size: { width: n * module, height: barHeight },
+			pos: { x: (sideBearers + quietZone) * module, y: bearer },
+			size: { width: n * module, height: Math.max(0, barHeight - 2 * bearer) },
 			pixels,
 			pixelWidth: n,
 			pixelHeight: 1,
 			role: "barcode",
 		} satisfies BitmapNode);
+		if (bearers !== "none")
+			children.push(
+				...bearerBarRects(bearers, size.width, barHeight, bearer, foreground),
+			);
 		if (showText) children.push(textLine(encoding.text, barHeight + textGap));
 		return group();
 	}
@@ -869,6 +928,34 @@ function compileBarcode(
 		role: "barcode",
 	} satisfies BitmapNode);
 	return group();
+}
+
+// ITF-14's bearer bars: across the top and bottom of the bars, and for a frame
+// down both sides too, outside the quiet zone.
+function bearerBarRects(
+	bearers: "frame" | "horizontal",
+	width: number,
+	height: number,
+	thickness: number,
+	color: string,
+): RectNode[] {
+	const bar = (x: number, y: number, w: number, h: number): RectNode => ({
+		kind: "rect",
+		pos: { x, y },
+		size: { width: w, height: h },
+		fills: [{ kind: "solid", color }],
+	});
+	const out = [
+		bar(0, 0, width, thickness),
+		bar(0, height - thickness, width, thickness),
+	];
+	const inner = Math.max(0, height - 2 * thickness);
+	if (bearers === "frame")
+		out.push(
+			bar(0, thickness, thickness, inner),
+			bar(width - thickness, thickness, thickness, inner),
+		);
+	return out;
 }
 
 // The shape a barcode will take once its field is filled: the bar area (and the

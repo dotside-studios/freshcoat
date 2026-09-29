@@ -148,6 +148,31 @@ describe("transpileFrame", () => {
 		expect(el.properties.stroke).toEqual({ color: "#000000", width: 4 });
 	});
 
+	it("carries per-corner radii, scaled", () => {
+		const el = transpileFrame(baseFrame({ cornerRadius: [8, 0, 4, 0] }), {
+			outerFrame: OUTER_FRAME,
+			scale: 2,
+		});
+		expect(el.properties.cornerRadius).toEqual([16, 0, 8, 0]);
+	});
+
+	it("carries an OUTSIDE frame stroke", () => {
+		const el = transpileFrame(
+			baseFrame({
+				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+				strokeWeight: 2,
+				strokeAlign: "OUTSIDE",
+				clipsContent: true,
+			}),
+			{ outerFrame: OUTER_FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: "#000000",
+			width: 2,
+			align: "outside",
+		});
+	});
+
 	it("carries the frame border's stroke alignment", () => {
 		const el = transpileFrame(
 			baseFrame({

@@ -1,8 +1,9 @@
-import type { GroupNode, MaskNode, Node, PathNode } from "../node";
+import type { GroupNode, ImageNode, MaskNode, Node, PathNode } from "../node";
 import type { ResolvedFill, Size, Stroke, ViewBox } from "../types";
 import { translate } from "./matrix";
 import {
 	type SvgDrawing,
+	type SvgImage,
 	type SvgItem,
 	type SvgPaint,
 	type SvgShape,
@@ -11,7 +12,8 @@ import {
 import { normalizePath, serializePath, transformPath } from "./path";
 
 /** Lowers a drawing to a scene subtree at the origin, sized to `size` (default
- *  the drawing's own). Content outside the box is clipped, as SVG's root is. */
+ *  the drawing's own). Content outside the box is clipped, as SVG's root is.
+ *  Text is left out, since a picture has no fonts to shape it with. */
 export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 	const box = size ?? { width: drawing.width, height: drawing.height };
 	const [sx, , , sy, tx, ty] = viewBoxMatrix(
@@ -76,9 +78,28 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 		children,
 	});
 
-	const lower = (item: SvgItem): Node => {
+	const image = (i: SvgImage): ImageNode => {
+		const node: ImageNode = {
+			kind: "image",
+			pos: { x: (i.x - ox) * sx, y: (i.y - oy) * sy },
+			size: { width: i.width * sx, height: i.height * sy },
+			src: i.href,
+			fit: i.fit,
+		};
+		if (i.id) node.id = i.id;
+		if (i.rotation) node.rotation = i.rotation;
+		if (i.opacity !== undefined) node.opacity = i.opacity;
+		return node;
+	};
+
+	const lowerAll = (items: SvgItem[]): Node[] =>
+		items.map(lower).filter((n): n is Node => n !== null);
+
+	const lower = (item: SvgItem): Node | null => {
 		if (item.kind === "shape") return path(item);
-		const children = item.children.map(lower);
+		if (item.kind === "image") return image(item);
+		if (item.kind === "text") return null;
+		const children = lowerAll(item.children);
 		let node: Node | null = null;
 		if (item.clip)
 			node = {
@@ -93,7 +114,7 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 				kind: "mask",
 				pos: origin,
 				size: box,
-				mask: group(item.mask.map(lower)),
+				mask: group(lowerAll(item.mask)),
 				children: node ? [node] : children,
 				channel: "luminance",
 			} satisfies MaskNode;
@@ -103,5 +124,5 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 		return node;
 	};
 
-	return { ...group(drawing.children.map(lower)), clip: true };
+	return { ...group(lowerAll(drawing.children)), clip: true };
 }

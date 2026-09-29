@@ -22,7 +22,7 @@ import {
 import type { Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
-import { formatBytes } from "~/app/format";
+import { formatBytes, formatNumber } from "~/app/format";
 import { useEditor } from "~/state/hooks";
 import type { EditorState } from "~/state/store";
 import AddIcon from "~icons/mingcute/add-line";
@@ -867,12 +867,12 @@ function DataStatusBar({
 				{dataset.name}
 			</span>
 			<span data-testid="data-status-records">
-				{shown !== n ? `${shown.toLocaleString("en-US")} of ` : ""}
+				{shown !== n ? `${formatNumber(shown)} of ` : ""}
 				{plural(n, "record")}
 			</span>
 			{selected ? (
 				<span className="text-fc-text" data-testid="data-status-selected">
-					{selected.toLocaleString()} selected
+					{formatNumber(selected)} selected
 				</span>
 			) : null}
 			<span className={issues ? "text-fc-danger-text" : undefined}>

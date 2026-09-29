@@ -36,6 +36,7 @@ export const BLEND_MODES = [
 	"lighten",
 	"color-dodge",
 	"color-burn",
+	"linear-burn",
 	"hard-light",
 	"soft-light",
 	"difference",

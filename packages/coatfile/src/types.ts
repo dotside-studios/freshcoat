@@ -13,8 +13,10 @@ import type {
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
+	BearerBarsSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
+	CornerRadiusSchema,
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
@@ -33,6 +35,7 @@ import type {
 	RectElementSchema,
 	RectPropertiesSchema,
 	SymbologySchema,
+	StrokeSchema,
 	TemplateFrameSchema,
 	TemplateSchema,
 	TemplateSourceSchema,
@@ -66,6 +69,7 @@ export type ImageProperties = z.infer<typeof ImagePropertiesSchema>;
 export type QrCodeProperties = z.infer<typeof QrCodePropertiesSchema>;
 export type BarcodeProperties = z.infer<typeof BarcodePropertiesSchema>;
 export type Symbology = z.infer<typeof SymbologySchema>;
+export type BearerBars = z.infer<typeof BearerBarsSchema>;
 export type RectProperties = z.infer<typeof RectPropertiesSchema>;
 export type VectorProperties = z.infer<typeof VectorPropertiesSchema>;
 
@@ -89,14 +93,8 @@ export type LeafElement = z.infer<typeof LeafElementSchema>;
 
 export interface FrameProperties {
 	fill?: Fill | Fill[];
-	stroke?: {
-		color: string;
-		width: number;
-		dash?: number[];
-		cap?: "butt" | "round" | "square";
-		join?: "round" | "bevel" | "miter";
-	};
-	cornerRadius?: number;
+	stroke?: z.infer<typeof StrokeSchema>;
+	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
 	clipsContent?: boolean;
 	layout?: Layout;
 	children: Element[];

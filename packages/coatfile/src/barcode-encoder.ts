@@ -1,4 +1,4 @@
-import type { Symbology } from "./types";
+import type { BearerBars, Symbology } from "./types";
 
 // What an encoder hands compile: the modules of the symbol, without its quiet
 // zone. A linear code is one row of bars; `text` is its human-readable line,
@@ -92,6 +92,18 @@ const QUIET_ZONE: Record<Symbology, number> = {
 /** The quiet zone, in modules each side, used when an element sets none. */
 export function defaultQuietZone(symbology: Symbology): number {
 	return QUIET_ZONE[symbology];
+}
+
+/** ITF-14's bearer bar thickness, in modules. GS1 asks for at least twice the
+ *  narrow bar and recommends 4.8 mm at the nominal 1.016 mm module. */
+export const BEARER_BAR_MODULES = 5;
+
+/** The bearer bars a barcode draws: ITF-14's setting, and none elsewhere. */
+export function bearerBarsOf(
+	symbology: Symbology,
+	bearerBars: BearerBars | undefined,
+): BearerBars {
+	return symbology === "itf14" ? (bearerBars ?? "none") : "none";
 }
 
 /** The range `errorCorrection` takes for a symbology, or null when it has none

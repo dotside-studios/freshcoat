@@ -178,6 +178,9 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 			id,
 		);
 
+	if (cmd.clip?.kind === "rounded-rect" && Array.isArray(cmd.clip.radius))
+		validateCornerRadius(cmd.clip.radius, `${path}.clip.radius`, add, id);
+
 	for (const shadow of cmd.shadow
 		? Array.isArray(cmd.shadow)
 			? cmd.shadow

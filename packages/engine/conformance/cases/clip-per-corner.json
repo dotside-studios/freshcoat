@@ -1,0 +1,122 @@
+{
+	"id": "clip-per-corner",
+	"title": "a clipping group honors per-corner radii",
+	"profile": "core",
+	"requires": [
+		"group.clip",
+		"shape.perCornerRadius"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "group",
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 80,
+							"height": 60
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#000000"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"clip": true,
+				"cornerRadius": [
+					30,
+					0,
+					0,
+					0
+				]
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				42,
+				32
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the rounded top-left corner"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				118,
+				32
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the square top-right corner"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the interior"
+		}
+	]
+}

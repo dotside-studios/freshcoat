@@ -1,0 +1,125 @@
+{
+	"id": "stroke-outside-path-evenodd",
+	"title": "an outside-aligned stroke follows the path's fill rule",
+	"profile": "core",
+	"requires": [
+		"draw.path",
+		"path.fillRule",
+		"draw.stroke",
+		"stroke.align"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "path",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"d": "M 0 0 H 80 V 80 H 0 Z M 20 20 H 60 V 60 H 20 Z",
+				"fillRule": "evenodd",
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 8,
+					"align": "outside"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				36,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "beyond the outer edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				64,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "inside the hole, along its edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				50,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the ring's body"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the middle of the hole"
+		}
+	]
+}

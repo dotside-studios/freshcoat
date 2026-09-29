@@ -23,6 +23,7 @@ import {
 	parseAssetRef,
 } from "@freshcoat-js/workspace";
 import { plural, STATUS_LABEL } from "~/app/copy";
+import { formatDate } from "~/app/format";
 import type { Action } from "~/state/store";
 import type { JobResult } from "./job";
 
@@ -377,8 +378,8 @@ export function formatTime(iso: string | number | undefined): string {
 	const today = new Date();
 	const sameDay = d.toDateString() === today.toDateString();
 	return sameDay
-		? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-		: d.toLocaleString(undefined, {
+		? formatDate(d, { hour: "2-digit", minute: "2-digit" })
+		: formatDate(d, {
 				month: "short",
 				day: "numeric",
 				hour: "2-digit",

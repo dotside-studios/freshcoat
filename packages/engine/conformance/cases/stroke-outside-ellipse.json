@@ -1,0 +1,94 @@
+{
+	"id": "stroke-outside-ellipse",
+	"title": "an outside-aligned stroke on an ellipse sits wholly beyond its edge",
+	"profile": "core",
+	"requires": [
+		"draw.ellipse",
+		"draw.stroke",
+		"stroke.align"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "ellipse",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 8,
+					"align": "outside"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				36,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "outside the edge, where the band moved to"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				44,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "inside the edge, where a centred stroke would reach"
+		}
+	]
+}

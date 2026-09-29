@@ -19,6 +19,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
+import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { useEditor } from "~/state/hooks";
 import type { EditorState } from "~/state/store";
@@ -502,7 +503,7 @@ export function ExportSection() {
 								className="min-w-20 text-center text-fc-muted text-fc-sm tabular-nums"
 								data-testid="export-sheet-position"
 							>
-								{`Sheet ${sheetCount === 0 ? 0 : sheet + 1} of ${sheetCount.toLocaleString("en-US")}`}
+								{`Sheet ${sheetCount === 0 ? 0 : sheet + 1} of ${formatNumber(sheetCount)}`}
 							</span>
 							<IconButton
 								aria-label="Next sheet"

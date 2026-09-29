@@ -404,6 +404,25 @@ add(
 	],
 );
 
+// Per-corner radii on a group's clip: only the top-left corner is rounded.
+add(
+	"clip-per-corner",
+	"a clipping group honors per-corner radii",
+	"core",
+	["group.clip", "shape.perCornerRadius"],
+	frame([
+		createGroup(
+			[createRect({ ...box(0, 0, 80, 60), fills: solid("#000000") })],
+			{ ...box(40, 30, 80, 60), clip: true, cornerRadius: [30, 0, 0, 0] },
+		),
+	]),
+	[
+		px([42, 32], [255, 255, 255, 255], "the rounded top-left corner"),
+		px([118, 32], [0, 0, 0, 255], "the square top-right corner"),
+		px([80, 60], [0, 0, 0, 255], "the interior"),
+	],
+);
+
 // ─── D6: the semantics that live only in the painter ──────────────────────────
 
 // rotation is applied to the canvas matrix OUTSIDE the layer, so the layer and
@@ -594,6 +613,27 @@ add(
 	]),
 	[
 		px([80, 60], [64, 0, 0, 255], "min of (64,128,192) and (255,0,0)", 2),
+		px([10, 10], [64, 128, 192, 255], "the ground, unblended", 2),
+	],
+);
+
+// linear burn is max(0, s + d - 1) per channel: (64,128,192) under
+// (128,192,255) gives (0,65,192).
+add(
+	"blend-linear-burn",
+	"linear burn adds the channels and subtracts one",
+	"core",
+	["blend.linear-burn"],
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#4080c0") }),
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#80c0ff"),
+			blendMode: "linear-burn",
+		}),
+	]),
+	[
+		px([80, 60], [0, 65, 192, 255], "max(0, s + d - 1) per channel", 2),
 		px([10, 10], [64, 128, 192, 255], "the ground, unblended", 2),
 	],
 );
@@ -982,6 +1022,100 @@ add(
 			[255, 255, 255, 255],
 			"outside the edge, where a centred stroke would reach",
 		),
+	],
+);
+
+// `outside` on an ellipse strokes the ellipse outset by half the width, so the
+// band at the left edge is 32..40 and the interior next to the edge stays clear.
+add(
+	"stroke-outside-ellipse",
+	"an outside-aligned stroke on an ellipse sits wholly beyond its edge",
+	"core",
+	["draw.ellipse", "draw.stroke", "stroke.align"],
+	frame([
+		createEllipse({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: { color: "#000000", width: 8, align: "outside" },
+		}),
+	]),
+	[
+		px([36, 60], [0, 0, 0, 255], "outside the edge, where the band moved to"),
+		px(
+			[44, 60],
+			[255, 255, 255, 255],
+			"inside the edge, where a centred stroke would reach",
+		),
+	],
+);
+
+// A path has no inset geometry, so `inside` is the path's own interior. The
+// triangle's left edge is x = 40 at mid-height.
+add(
+	"stroke-inside-path",
+	"an inside-aligned stroke on a path stays within the path",
+	"core",
+	["draw.path", "draw.stroke", "stroke.align"],
+	frame([
+		createPath({
+			...box(40, 20, 80, 80),
+			d: "M 0 0 L 80 40 L 0 80 Z",
+			fills: solid("#ffffff"),
+			stroke: { color: "#000000", width: 8, align: "inside" },
+		}),
+	]),
+	[
+		px([44, 60], [0, 0, 0, 255], "inside the left edge"),
+		px(
+			[36, 60],
+			[255, 255, 255, 255],
+			"outside the left edge, where a centred stroke would reach",
+		),
+	],
+);
+
+// Under evenodd the hole of a ring is outside the path, so an outside stroke
+// lines the hole as well as the outer edge. The ring's body matches the ground.
+add(
+	"stroke-outside-path-evenodd",
+	"an outside-aligned stroke follows the path's fill rule",
+	"core",
+	["draw.path", "path.fillRule", "draw.stroke", "stroke.align"],
+	frame([
+		createPath({
+			...box(40, 20, 80, 80),
+			d: "M 0 0 H 80 V 80 H 0 Z M 20 20 H 60 V 60 H 20 Z",
+			fillRule: "evenodd",
+			fills: solid("#ffffff"),
+			stroke: { color: "#000000", width: 8, align: "outside" },
+		}),
+	]),
+	[
+		px([36, 60], [0, 0, 0, 255], "beyond the outer edge"),
+		px([64, 60], [0, 0, 0, 255], "inside the hole, along its edge"),
+		px([50, 60], [255, 255, 255, 255], "the ring's body"),
+		px([80, 60], [255, 255, 255, 255], "the middle of the hole"),
+	],
+);
+
+// An image's stroke follows its mask, inset by half the width for `inside`.
+add(
+	"stroke-inside-image-mask",
+	"an inside-aligned stroke on a masked image follows the mask inward",
+	"core",
+	["draw.image", "draw.stroke", "stroke.align"],
+	frame([
+		createImage({
+			...box(40, 20, 80, 80),
+			src: CHECKER_SRC,
+			fit: "cover",
+			mask: { kind: "circle" },
+			stroke: { color: "#000000", width: 8, align: "inside" },
+		}),
+	]),
+	[
+		px([44, 60], [0, 0, 0, 255], "inside the circle's left edge"),
+		px([36, 60], [255, 255, 255, 255], "outside the circle's left edge"),
 	],
 );
 
