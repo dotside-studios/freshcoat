@@ -307,7 +307,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features` |
+| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -582,6 +582,20 @@ Photos differ per record, so `focus` also takes an `"x,y"` string, which is how 
 field supplies it. A value that does not read as a point in `[0, 1]` falls back
 to the centre; `parseImageFocus` and `formatImageFocus` convert between the two
 forms.
+
+## Strokes and corners
+
+A stroke's `align` is `center` (the default), `inside` or `outside`, and every
+stroked `rect`, `image`, `vector` and `frame` honors it. A rect, frame or
+image strokes its outline inset or outset by half the width, following its
+corners or mask. A vector strokes at twice the width, clipped to its own
+interior or exterior under its `fillRule`, so an `evenodd` hole counts as
+outside.
+
+A `rect` or `frame` takes `cornerRadius` as one number or per corner,
+`[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
+fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
+an `outside` stroke beyond its clip, so the clip never hides it.
 
 ## Ellipses
 

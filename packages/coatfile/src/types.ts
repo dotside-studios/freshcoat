@@ -15,6 +15,7 @@ import type {
 	BarcodePropertiesSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
+	CornerRadiusSchema,
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
@@ -33,6 +34,7 @@ import type {
 	RectElementSchema,
 	RectPropertiesSchema,
 	SymbologySchema,
+	StrokeSchema,
 	TemplateFrameSchema,
 	TemplateSchema,
 	TemplateSourceSchema,
@@ -89,14 +91,8 @@ export type LeafElement = z.infer<typeof LeafElementSchema>;
 
 export interface FrameProperties {
 	fill?: Fill | Fill[];
-	stroke?: {
-		color: string;
-		width: number;
-		dash?: number[];
-		cap?: "butt" | "round" | "square";
-		join?: "round" | "bevel" | "miter";
-	};
-	cornerRadius?: number;
+	stroke?: z.infer<typeof StrokeSchema>;
+	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
 	clipsContent?: boolean;
 	layout?: Layout;
 	children: Element[];

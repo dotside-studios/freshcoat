@@ -256,7 +256,7 @@ export const ImageMaskSchema = z.union([
 
 // Shared stroke definition. `align` positions the stroke inside / outside /
 // centered on the shape edge (Figma's stroke position); default center (Skia's
-// native alignment). align currently renders for rects; other shapes use center.
+// native alignment). Every stroked element honors it.
 export const StrokeSchema = z.object({
 	color: z.string(),
 	width: z.number(),
@@ -558,9 +558,9 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 	z.object({
 		fill: FillsSchema.optional(),
 		stroke: StrokeSchema.optional(),
-		cornerRadius: z.number().optional(),
-		// Figma's `clipsContent`. When true, children are clipped to the frame
-		// (rounded-rect if cornerRadius set, plain rect otherwise).
+		cornerRadius: CornerRadiusSchema.optional(),
+		// Figma's `clipsContent`. When true, children are clipped to the frame,
+		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
 		layout: LayoutSchema.optional(),
 		children: z.array(ElementSchema),
