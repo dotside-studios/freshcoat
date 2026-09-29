@@ -189,7 +189,7 @@ export const TextSpanSchema = z.object({
 });
 
 export const TextPropertiesSchema = z.object({
-	// Single-style text. The only form `fit: "shrink"` applies to.
+	// Single-style text.
 	value: z.string().optional(),
 	// Mixed-style text, per-span font + color, wrapped as one paragraph. When
 	// set, wins over `value`.
@@ -226,6 +226,8 @@ export const TextPropertiesSchema = z.object({
 	// of the resolved text. Default ltr.
 	direction: z.enum(["ltr", "rtl", "auto"]).optional(),
 	verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
+	// shrink scales the font down until the text fits the box; with spans,
+	// every span's size scales by the same factor.
 	fit: z.enum(["shrink", "clip"]).optional(),
 	// Figma "Case": transform applied to the RESOLVED text (after token
 	// substitution), so it works on dynamic {{values}}. "original" (or absent)

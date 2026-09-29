@@ -76,7 +76,9 @@ with, so every line but a paragraph's last meets both edges of the box;
 land where the baked span boxes say. A font's `features` (OpenType tags to
 values) are passed to shaping for both measurement and paint. A newline is a
 hard break, and `paragraphSpacing` is baked into the line positions after
-each one.
+each one. `fit: "shrink"` works on styled spans as well as single-style text,
+scaling every span by one factor; the approximate engine, which cannot shape
+spans together, does not shrink them.
 
 Gradients, masks, blend modes and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations

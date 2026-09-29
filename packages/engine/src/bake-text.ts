@@ -130,6 +130,7 @@ export function bakeText(
 				size,
 				align,
 				verticalAlign,
+				fit,
 				leadingTrim,
 				engine,
 				metricsMap,
@@ -342,6 +343,16 @@ function ellipsize(
 
 const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
 
+const SHRINK_FLOOR_PX = 8;
+
+function scaleFont(font: ResolvedFont, k: number): ResolvedFont {
+	return {
+		...font,
+		size: font.size * k,
+		...(font.letterSpacing ? { letterSpacing: font.letterSpacing * k } : {}),
+	};
+}
+
 // Snap to the pixel grid the scene will actually be painted on.
 function snapToDevice(v: number, deviceScale: number | undefined): number {
 	const s = deviceScale && deviceScale > 0 ? deviceScale : 1;
@@ -358,12 +369,13 @@ function layoutInline(
 	size: Size,
 	align: ParagraphStyle,
 	verticalAlign: "top" | "middle" | "bottom",
+	fit: "shrink" | "clip" | undefined,
 	leadingTrim: boolean,
 	engine: TextEngine,
 	metricsMap?: Record<string, FontVMetrics>,
 	deviceScale?: number,
 ): BakedTextLayout {
-	const resolved = spans.map((s) => {
+	const authored = spans.map((s) => {
 		const f = s.font ?? {};
 		const font: ResolvedFont = {
 			family: f.family ?? defaultFont.family,
@@ -385,11 +397,12 @@ function layoutInline(
 		return { text: s.text, font, color: s.color ?? defaultColor };
 	});
 
-	const dominantFont = resolved.reduce((d, r) =>
-		r.font.size > d.font.size ? r : d,
-	).font;
-	const lineHeightPx = dominantFont.size * dominantFont.lineHeight;
-	const baseOffset = baselineOffset(
+	const dominantOf = (rs: typeof authored) =>
+		rs.reduce((d, r) => (r.font.size > d.font.size ? r : d)).font;
+	let resolved = authored;
+	let dominantFont = dominantOf(resolved);
+	let lineHeightPx = dominantFont.size * dominantFont.lineHeight;
+	let baseOffset = baselineOffset(
 		dominantFont,
 		lineHeightPx,
 		leadingTrim,
@@ -401,41 +414,90 @@ function layoutInline(
 	// advance / baseline / vertical-align); the engine returns per-line fragment
 	// geometry only.
 	if (engine.layoutInline) {
-		const shaped = align.rtl
-			? engine.layoutInline(
-					resolved.map((r) => ({ text: r.text, font: r.font })),
-					size.width,
-					"rtl",
-				)
-			: engine.layoutInline(
-					resolved.map((r) => ({ text: r.text, font: r.font })),
-					size.width,
+		const layoutInlineWith = engine.layoutInline;
+		const shape = (rs: typeof authored) => {
+			const input = rs.map((r) => ({ text: r.text, font: r.font }));
+			const shaped = align.rtl
+				? layoutInlineWith(input, size.width, "rtl")
+				: layoutInlineWith(input, size.width);
+			const dominant = dominantOf(rs);
+			// Each line gets the box ITS OWN spans ask for, not the node's tallest.
+			// Line height varies within a text node as freely as size does — a
+			// signature block set to 132% on its first line and Auto on the rest is
+			// one node with two different line boxes — and using a single advance
+			// stacks every later line where the first line's box would have put it.
+			const measured = shaped.lines.map((sl) => {
+				const fonts = sl.fragments.map((fr) => rs[fr.spanIndex].font);
+				const tallest = fonts.reduce(
+					(best, f) =>
+						f.size * f.lineHeight > best.size * best.lineHeight ? f : best,
+					fonts[0] ?? dominant,
 				);
-		// Each line gets the box ITS OWN spans ask for, not the node's tallest.
-		// Line height varies within a text node as freely as size does — a
-		// signature block set to 132% on its first line and Auto on the rest is one
-		// node with two different line boxes — and using a single advance stacks
-		// every later line where the first line's box would have put it.
-		const measuredLines = shaped.lines.map((sl) => {
-			const fonts = sl.fragments.map((fr) => resolved[fr.spanIndex].font);
-			const tallest = fonts.reduce(
-				(best, f) =>
-					f.size * f.lineHeight > best.size * best.lineHeight ? f : best,
-				fonts[0] ?? dominantFont,
-			);
-			const boxPx = tallest.size * tallest.lineHeight;
-			return {
-				shaped: sl,
-				font: tallest,
-				boxPx,
-				// Pixel-rounded like Figma, so a paragraph doesn't drift sub-pixel.
-				advance: snapToDevice(boxPx, deviceScale),
-				baseOffset: baselineOffset(tallest, boxPx, leadingTrim, metricsMap),
+				const boxPx = tallest.size * tallest.lineHeight;
+				return {
+					shaped: sl,
+					font: tallest,
+					boxPx,
+					// Pixel-rounded like Figma, so a paragraph doesn't drift sub-pixel.
+					advance: snapToDevice(boxPx, deviceScale),
+					baseOffset: baselineOffset(tallest, boxPx, leadingTrim, metricsMap),
+				};
+			});
+			const gaps = paragraphGaps(shaped.lines) * align.spacing;
+			const totalHeight =
+				(sum(measured.map((l) => l.boxPx)) ||
+					dominant.size * dominant.lineHeight) + gaps;
+			return { measured, gaps, totalHeight };
+		};
+
+		let shapedSet = shape(resolved);
+		let shrinkApplied = false;
+		// Shrink scales every span by the same factor, searching on the largest
+		// span's whole-pixel size the way single-style text searches its own.
+		const top = dominantFont.size;
+		if (
+			fit === "shrink" &&
+			top >= SHRINK_FLOOR_PX &&
+			shapedSet.totalHeight > size.height
+		) {
+			const scaled = (target: number) =>
+				authored.map((r) => ({
+					...r,
+					font: scaleFont(r.font, target / top),
+				}));
+			let lo = SHRINK_FLOOR_PX;
+			let hi = Math.floor(top) === top ? top - 1 : Math.floor(top);
+			let best: { rs: typeof authored; set: typeof shapedSet } | null = null;
+			while (lo <= hi) {
+				const mid = Math.floor((lo + hi) / 2);
+				const rs = scaled(mid);
+				const set = shape(rs);
+				if (set.totalHeight <= size.height) {
+					best = { rs, set };
+					lo = mid + 1;
+				} else {
+					hi = mid - 1;
+				}
+			}
+			const chosen = best ?? {
+				rs: scaled(SHRINK_FLOOR_PX),
+				set: shape(scaled(SHRINK_FLOOR_PX)),
 			};
-		});
+			resolved = chosen.rs;
+			shapedSet = chosen.set;
+			shrinkApplied = true;
+			dominantFont = dominantOf(resolved);
+			lineHeightPx = dominantFont.size * dominantFont.lineHeight;
+			baseOffset = baselineOffset(
+				dominantFont,
+				lineHeightPx,
+				leadingTrim,
+				metricsMap,
+			);
+		}
+
+		const { measured: measuredLines, gaps } = shapedSet;
 		const advances = measuredLines.map((l) => l.advance);
-		const gaps =
-			paragraphGaps(measuredLines.map((l) => l.shaped)) * align.spacing;
 		const firstOffset = measuredLines[0]?.baseOffset ?? baseOffset;
 		const contentHeight =
 			(leadingTrim
@@ -485,9 +547,8 @@ function layoutInline(
 		return {
 			font: dominantFont,
 			lines,
-			totalHeight:
-				(sum(measuredLines.map((l) => l.boxPx)) || lineHeightPx) + gaps,
-			shrinkApplied: false,
+			totalHeight: shapedSet.totalHeight,
+			shrinkApplied,
 		};
 	}
 

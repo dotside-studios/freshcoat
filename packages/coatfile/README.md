@@ -615,6 +615,11 @@ whitespace collapse to one space (CSS `white-space: pre-line`).
 `paragraphSpacing` adds that much space after each hard break, in the same units
 as `size`, and shrink-to-fit and a hug height both count it.
 
+`fit: "shrink"` lowers the font size, in whole pixels down to 8, until the text
+fits the box's height. With `spans`, every span's size and letter spacing scale
+by the same factor, searched on the largest span's size, so their proportions
+hold.
+
 `direction` is the paragraph's base direction for bidirectional text: `ltr`
 (the default), `rtl`, or `auto`, which takes the first letter of the resolved
 text (after `{{field}}` substitution), as HTML's `dir="auto"` does.
