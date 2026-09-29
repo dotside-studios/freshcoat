@@ -251,6 +251,20 @@ function backgroundFromFrame(
 	};
 }
 
+const TOKEN = /\{\{[^{}]*\}\}/g;
+
+// A text field keeps its runs' styling only when the runs spell out the
+// template itself, each token whole inside one run, so every token is filled
+// in where it was typed and in that run's style. Otherwise the field's value
+// replaces the whole text in the first run's style.
+function spansSpellTemplate(spans: unknown, template: string): boolean {
+	if (!Array.isArray(spans)) return false;
+	const texts = (spans as Array<{ text: string }>).map((s) => s.text);
+	if (texts.join("") !== template) return false;
+	const whole = texts.reduce((n, t) => n + (t.match(TOKEN)?.length ?? 0), 0);
+	return whole === (template.match(TOKEN)?.length ?? 0);
+}
+
 // Drive an element from the node's binding (stored pluginData, else live). The
 // single source for field registration + value templating across kinds:
 //  - text value, text color, shape/frame fill (templated here)
@@ -275,7 +289,10 @@ function applyBindingOverlay(
 	};
 
 	if (el.type === "text" && binding.bind.text !== undefined) {
-		if (props.value !== binding.bind.text) {
+		if (
+			props.value !== binding.bind.text &&
+			!spansSpellTemplate(props.spans, binding.bind.text)
+		) {
 			props.value = binding.bind.text;
 			delete props.spans;
 		}
@@ -284,6 +301,10 @@ function applyBindingOverlay(
 
 	if (el.type === "text" && binding.bind.textColor !== undefined) {
 		props.color = binding.bind.textColor;
+		delete props.fill;
+		if (Array.isArray(props.spans))
+			for (const span of props.spans as Array<Record<string, unknown>>)
+				delete span.color;
 		mark(binding.bind.textColor);
 	}
 	if (
@@ -593,12 +614,16 @@ async function buildSideElements(
 		if (c.kind === "container") {
 			const containerEntry = record(n, "container");
 			if (!isContainerNode(n)) return;
-			// A group carrying an effect has to composite as ONE layer — an inner
-			// shadow belongs to the silhouette of everything in it, not to each
-			// child separately — so it gets an element of its own to hang the
-			// effect on. See groupLayer for the coordinate work that costs.
+			// A group carrying an effect or a blend mode has to composite as ONE
+			// layer — an inner shadow belongs to the silhouette of everything in
+			// it, and a Multiply group multiplies its composited content, not each
+			// child separately — so it gets an element of its own to hang them on. See groupLayer for the coordinate work that costs.
 			const fx = extractEffects(n.effects, scale, localFrame.rotation);
-			if (fx.shadow !== undefined || fx.blur !== undefined) {
+			if (
+				fx.shadow !== undefined ||
+				fx.blur !== undefined ||
+				elementBlendMode(n) !== undefined
+			) {
 				const el = groupLayer(
 					n,
 					fx,
@@ -893,6 +918,8 @@ async function buildSideElements(
 		};
 		if (fx.shadow !== undefined) el.shadow = fx.shadow;
 		if (fx.blur !== undefined) el.blur = fx.blur;
+		const blend = elementBlendMode(n);
+		if (blend) el.blendMode = blend;
 		// The layer composites its subtree as a whole, so its opacity rides here
 		// rather than being folded into each child.
 		applyOpacity(el, inheritedOpacity * opacityOf(n));

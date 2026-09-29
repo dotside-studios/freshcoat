@@ -7,7 +7,7 @@ import type {
 import { vectorFillRule } from "./classify";
 import {
 	figmaColorToHex,
-	figmaPaintToFill,
+	fillsToElement,
 	mapStrokeAlign,
 	mapStrokeCap,
 	mapStrokeJoin,
@@ -68,21 +68,9 @@ export function transpileVector(
 		properties: { d, ...(fillRule ? { fillRule } : {}) },
 	};
 
-	const visibleFills = (node.fills ?? []).filter((f) => f.visible !== false);
-	if (visibleFills.length === 1) {
-		const result = figmaPaintToFill(visibleFills[0], size);
-		if (result.kind === "solid") {
-			out.properties.fill = result.hex;
-			if (result.opacity < 1) out.opacity = result.opacity;
-		} else {
-			out.properties.fill = result.value;
-		}
-	} else if (visibleFills.length > 1) {
-		out.properties.fill = visibleFills.map((f) => {
-			const r = figmaPaintToFill(f, size);
-			return r.kind === "solid" ? r.hex : r.value;
-		});
-	}
+	const painted = fillsToElement(node.fills, size);
+	if (painted.fill !== undefined) out.properties.fill = painted.fill;
+	if (painted.opacity !== undefined) out.opacity = painted.opacity;
 
 	if (
 		node.strokes &&

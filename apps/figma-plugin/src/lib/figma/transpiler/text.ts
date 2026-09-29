@@ -1,9 +1,5 @@
-import type {
-	FigmaBoundingBox,
-	FigmaSolidPaint,
-	FigmaTextNode,
-} from "../types";
-import { figmaColorToHex } from "./colors";
+import type { FigmaBoundingBox, FigmaTextNode, FigmaTextStyle } from "../types";
+import { compositeSolids, figmaPaintToFill } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 import { isWholeMustacheToken } from "./fields";
 
@@ -76,7 +72,6 @@ export function transpileText(
 		throw new FlattenFallbackError(node.id);
 	}
 	const { pos, size, rotation } = placed;
-	const fill = node.fills[0] as FigmaSolidPaint;
 
 	// Fields are registered centrally from the node binding (see index.ts
 	// overlay); here we only derive the element id.
@@ -132,7 +127,12 @@ export function transpileText(
 		...fontFeatures(node.style.openTypeFeatures),
 	};
 
-	const spans = buildSpans(node, ctx.scale);
+	const color = compositeSolids(node.fills);
+	const built = buildSpans(node, ctx.scale, baseFont, color);
+	const decoration = decorationOf(node.style);
+	if (decoration && !built?.decorationSplit) {
+		Object.assign(baseFont, { decoration });
+	}
 
 	// Figma "Case" → coatfile applies it to the RESOLVED text (so dynamic
 	// {{values}} are cased). SMALL_CAPS isn't a plain string transform, so it
@@ -148,7 +148,7 @@ export function transpileText(
 
 	const properties: Record<string, unknown> = {
 		font: baseFont,
-		color: figmaColorToHex(fill.color),
+		...paintProperties(node, size, color),
 		align: ALIGN[node.style.textAlignHorizontal] ?? "left",
 		verticalAlign: VALIGN[node.style.textAlignVertical] ?? "top",
 		// Figma's "Vertical trim". Emitted only for CAP_HEIGHT, because STANDARD is
@@ -163,8 +163,8 @@ export function transpileText(
 			: {}),
 		...(caseMode ? { case: caseMode } : {}),
 	};
-	if (spans) {
-		properties.spans = spans;
+	if (built) {
+		properties.spans = built.spans;
 	} else {
 		properties.value = node.characters;
 	}
@@ -198,13 +198,45 @@ function fontFeatures(features: Record<string, boolean> | undefined): {
 	};
 }
 
+type Decoration = "underline" | "line-through";
+
+function decorationOf(
+	style: Partial<FigmaTextStyle> | undefined,
+): Decoration | undefined {
+	if (style?.textDecoration === "UNDERLINE") return "underline";
+	if (style?.textDecoration === "STRIKETHROUGH") return "line-through";
+	return undefined;
+}
+
+// The text's colour, or for a gradient-filled text its `fill` over the whole
+// box. classify() only lets a text through when its paints are one of the two.
+function paintProperties(
+	node: FigmaTextNode,
+	size: { width: number; height: number },
+	color: string | null,
+): Record<string, unknown> {
+	if (color !== null) return { color };
+	const paint = node.fills.find((f) => f.visible !== false);
+	if (!paint) return {};
+	const result = figmaPaintToFill(paint, size);
+	return result.kind === "fill" ? { fill: result.value } : {};
+}
+
 // Walk characters + characterStyleOverrides; group consecutive chars that
-// share an override key into a single span. Returns undefined when the
-// node has no overrides (caller falls back to the simpler `value` path).
+// share an override key into a single span, carrying only what differs from
+// the element's own font and colour. Returns undefined when the node has no
+// overrides (caller falls back to the simpler `value` path).
+//
+// A span cannot turn off a decoration the element sets, so when runs disagree
+// on it the element sets none and each decorated span carries its own.
 function buildSpans(
 	node: FigmaTextNode,
 	scale: number,
-): Array<Record<string, unknown>> | undefined {
+	baseFont: Record<string, unknown>,
+	baseColor: string | null,
+):
+	| { spans: Array<Record<string, unknown>>; decorationSplit: boolean }
+	| undefined {
 	const overrides = node.characterStyleOverrides;
 	if (!overrides || overrides.length === 0) return undefined;
 	if (!overrides.some((k) => k !== 0)) return undefined;
@@ -221,43 +253,76 @@ function buildSpans(
 		else groups.push({ key, text: chars[i] });
 	}
 
-	return groups.map((g) => {
+	const baseDecoration = decorationOf(node.style);
+	const decorationFor = (key: number) => {
+		const o = key === 0 ? undefined : table[String(key)];
+		return o?.textDecoration !== undefined ? decorationOf(o) : baseDecoration;
+	};
+	const split = groups.some((g) => decorationFor(g.key) !== baseDecoration);
+
+	const spans = groups.map((g) => {
 		const span: Record<string, unknown> = { text: g.text };
-		if (g.key === 0) return span;
-		const styleOverride = table[String(g.key)];
-		if (!styleOverride) return span;
 		const fontOverride: Record<string, unknown> = {};
-		if (styleOverride.fontFamily !== undefined)
-			fontOverride.family = styleOverride.fontFamily;
-		if (styleOverride.fontSize !== undefined)
-			fontOverride.size = round2(styleOverride.fontSize * scale);
-		if (styleOverride.fontWeight !== undefined)
-			Object.assign(fontOverride, weightFields(styleOverride.fontWeight));
-		if (styleOverride.italic !== undefined)
-			fontOverride.style = styleOverride.italic ? "italic" : "normal";
-		// A segment's own line height, in the same shape the base style uses: a
-		// percent or a px value, and nothing at all for AUTO — which is the font's
-		// line box, so it says "auto" rather than inheriting the element's number.
-		if (styleOverride.lineHeightPercentFontSize !== undefined)
-			fontOverride.lineHeight = round2(
-				styleOverride.lineHeightPercentFontSize / 100,
-			);
-		else if (
-			styleOverride.lineHeightPx !== undefined &&
-			styleOverride.fontSize !== undefined
-		)
-			fontOverride.lineHeight = round2(
-				styleOverride.lineHeightPx / styleOverride.fontSize,
-			);
-		else if (styleOverride.fontSize !== undefined)
-			fontOverride.lineHeight = "auto";
-		if (
-			styleOverride.letterSpacing !== undefined &&
-			styleOverride.letterSpacing !== 0
-		) {
-			fontOverride.letterSpacing = styleOverride.letterSpacing * scale;
+		const decoration = decorationFor(g.key);
+		if (split && decoration) fontOverride.decoration = decoration;
+		const styleOverride = g.key === 0 ? undefined : table[String(g.key)];
+		if (styleOverride) {
+			Object.assign(fontOverride, runFont(styleOverride, scale, baseFont));
+			if (styleOverride.fills) {
+				const color = compositeSolids(styleOverride.fills);
+				if (color !== null && color !== baseColor) span.color = color;
+			}
 		}
 		if (Object.keys(fontOverride).length > 0) span.font = fontOverride;
 		return span;
 	});
+	return { spans, decorationSplit: split };
+}
+
+function runFont(
+	styleOverride: Partial<FigmaTextStyle>,
+	scale: number,
+	baseFont: Record<string, unknown>,
+): Record<string, unknown> {
+	const fontOverride: Record<string, unknown> = {};
+	if (styleOverride.fontFamily !== undefined)
+		fontOverride.family = styleOverride.fontFamily;
+	if (styleOverride.fontSize !== undefined)
+		fontOverride.size = round2(styleOverride.fontSize * scale);
+	if (styleOverride.fontWeight !== undefined) {
+		const fields = weightFields(styleOverride.fontWeight);
+		Object.assign(fontOverride, fields);
+		if (!fields.variations && baseFont.variations)
+			fontOverride.variations = { wght: fields.weight };
+	}
+	if (styleOverride.italic !== undefined)
+		fontOverride.style = styleOverride.italic ? "italic" : "normal";
+	// A segment's own line height, in the same shape the base style uses: a
+	// percent or a px value, and nothing at all for AUTO — which is the font's
+	// line box, so it says "auto" rather than inheriting the element's number.
+	if (styleOverride.lineHeightPercentFontSize !== undefined)
+		fontOverride.lineHeight = round2(
+			styleOverride.lineHeightPercentFontSize / 100,
+		);
+	else if (
+		styleOverride.lineHeightPx !== undefined &&
+		styleOverride.fontSize !== undefined
+	)
+		fontOverride.lineHeight = round2(
+			styleOverride.lineHeightPx / styleOverride.fontSize,
+		);
+	else if (styleOverride.fontSize !== undefined)
+		fontOverride.lineHeight = "auto";
+	if (styleOverride.letterSpacing !== undefined) {
+		const spacing = styleOverride.letterSpacing * scale;
+		if (spacing !== ((baseFont.letterSpacing as number | undefined) ?? 0))
+			fontOverride.letterSpacing = spacing;
+	}
+	for (const key of Object.keys(fontOverride)) {
+		if (JSON.stringify(fontOverride[key]) === JSON.stringify(baseFont[key]))
+			delete fontOverride[key];
+	}
+	if (fontOverride.style === "normal" && baseFont.style === undefined)
+		delete fontOverride.style;
+	return fontOverride;
 }

@@ -37,6 +37,7 @@ export type FigmaSolidPaint = {
 	type: "SOLID";
 	visible?: boolean;
 	opacity?: number;
+	blendMode?: FigmaBlendMode;
 	color: FigmaColor;
 };
 
@@ -50,6 +51,7 @@ export type FigmaGradientPaint = {
 		| "GRADIENT_DIAMOND";
 	visible?: boolean;
 	opacity?: number;
+	blendMode?: FigmaBlendMode;
 	gradientHandlePositions: Array<{ x: number; y: number }>;
 	gradientStops: FigmaGradientStop[];
 	/** The paint's own transform, carried unread. Nothing in the transpiler uses
@@ -64,6 +66,7 @@ export type FigmaImagePaint = {
 	type: "IMAGE";
 	visible?: boolean;
 	opacity?: number;
+	blendMode?: FigmaBlendMode;
 	scaleMode: "FILL" | "FIT" | "TILE" | "STRETCH";
 	imageRef: string;
 	// STRETCH (the Plugin API's CROP) only: maps the layer's unit square into
@@ -94,6 +97,9 @@ export type FigmaEffect = {
 	offset?: { x: number; y: number };
 	radius?: number;
 	spread?: number;
+	blendMode?: FigmaBlendMode;
+	// A PROGRESSIVE layer blur ramps its radius across the layer.
+	blurType?: "NORMAL" | "PROGRESSIVE";
 };
 
 export type FigmaTextStyle = {
@@ -118,6 +124,10 @@ export type FigmaTextStyle = {
 	paragraphSpacing?: number;
 	// Figma "OpenType features" the layer explicitly sets, by uppercase tag.
 	openTypeFeatures?: Record<string, boolean>;
+	textDecoration?: "NONE" | "UNDERLINE" | "STRIKETHROUGH";
+	// Only on a styleOverrideTable entry: that run's own paints. The base
+	// style's paints are the node's `fills`.
+	fills?: FigmaPaint[];
 	textCase?:
 		| "ORIGINAL"
 		| "UPPER"

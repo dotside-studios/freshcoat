@@ -5,7 +5,7 @@ import type {
 } from "../types";
 import {
 	figmaColorToHex,
-	figmaPaintToFill,
+	fillsToElement,
 	mapStrokeAlign,
 	mapStrokeCap,
 	mapStrokeJoin,
@@ -29,7 +29,6 @@ export function transpileRect(
 		throw new FlattenFallbackError(node.id);
 	}
 	const { pos, size, rotation } = placed;
-	const visibleFills = (node.fills ?? []).filter((f) => f.visible !== false);
 
 	const out: {
 		id: string;
@@ -58,23 +57,9 @@ export function transpileRect(
 		properties: {},
 	};
 
-	if (visibleFills.length === 1) {
-		const result = figmaPaintToFill(visibleFills[0], size);
-		if (result.kind === "solid") {
-			out.properties.fill = result.hex;
-			if (result.opacity < 1) out.opacity = result.opacity;
-		} else {
-			out.properties.fill = result.value;
-		}
-	} else if (visibleFills.length > 1) {
-		// Multiple fills stack bottom-up. Hoisted opacity from any single solid
-		// fill doesn't apply here — fills with alpha keep it inline as rgba-ish
-		// hex (figmaPaintToFill encodes opacity into the solid hex).
-		out.properties.fill = visibleFills.map((f) => {
-			const r = figmaPaintToFill(f, size);
-			return r.kind === "solid" ? r.hex : r.value;
-		});
-	}
+	const painted = fillsToElement(node.fills, size);
+	if (painted.fill !== undefined) out.properties.fill = painted.fill;
+	if (painted.opacity !== undefined) out.opacity = painted.opacity;
 
 	// Per-corner rounding survives as a [topLeft, topRight, bottomRight,
 	// bottomLeft] tuple: a shape with three square corners and one rounded is

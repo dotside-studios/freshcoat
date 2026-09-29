@@ -1,5 +1,15 @@
 import { linearGradientAngle } from "@freshcoat-js/coatfile";
 import type { FigmaColor, FigmaPaint } from "../types";
+import {
+	angularPlacement,
+	channel,
+	figmaColorToHex,
+	type PaintBox,
+	round4,
+} from "./paint";
+
+export type { PaintBox } from "./paint";
+export { compositeSolids, figmaColorToHex, isMappablePaint } from "./paint";
 
 type SolidFillResult = { kind: "solid"; hex: string; opacity: number };
 type GradientFillResult = {
@@ -19,26 +29,16 @@ type GradientFillResult = {
 				radiusY?: number;
 				rotation?: number;
 				stops: Array<{ offset: number; color: string }>;
+		  }
+		| {
+				kind: "angular";
+				center: [number, number];
+				rotation?: number;
+				stops: Array<{ offset: number; color: string }>;
 		  };
 };
 
-/** The drawable a paint is being read for. Figma normalizes a gradient handle
- *  per axis (x by the width, y by the height) while coatfile carries one
- *  radius as a fraction of the LONGEST side, so converting between them needs
- *  the box. Only its aspect ratio matters, so any consistent unit works. */
-export type PaintBox = { width: number; height: number };
-
 export type FillResult = SolidFillResult | GradientFillResult;
-
-const channel = (v: number): string =>
-	Math.round(Math.max(0, Math.min(1, v)) * 255)
-		.toString(16)
-		.padStart(2, "0");
-
-export function figmaColorToHex(c: FigmaColor): string {
-	const base = `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
-	return c.a >= 1 ? base : `${base}${channel(c.a)}`;
-}
 
 function colorWithoutAlpha(c: FigmaColor): string {
 	return `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
@@ -85,8 +85,6 @@ function radialShape(
 		rotation: ((degrees % 360) + 360) % 360,
 	};
 }
-
-const round4 = (n: number): number => Math.round(n * 10000) / 10000;
 
 // Degrees. Figma's transforms carry float noise — a gradient authored square to
 // its shape arrives with matrix entries like 2.19e-16, which come back out as
@@ -144,7 +142,11 @@ export function figmaPaintToFill(
 			opacity: paintOpacity * channelAlpha,
 		};
 	}
-	if (paint.type === "GRADIENT_LINEAR" || paint.type === "GRADIENT_RADIAL") {
+	if (
+		paint.type === "GRADIENT_LINEAR" ||
+		paint.type === "GRADIENT_RADIAL" ||
+		paint.type === "GRADIENT_ANGULAR"
+	) {
 		// A gradient has no single colour to hang the paint's own opacity on, so
 		// it folds into every stop's alpha — the same thing Figma composites. A
 		// coatfile gradient stop carries its colour and nothing else, so
@@ -158,6 +160,19 @@ export function figmaPaintToFill(
 			return {
 				kind: "fill",
 				value: { kind: "linear", ...linearPlacement(paint), stops },
+			};
+		}
+		if (paint.type === "GRADIENT_ANGULAR") {
+			const placed = angularPlacement(paint.gradientHandlePositions, box);
+			if (!placed) throw new Error("unsupported paint type: uneven angular");
+			return {
+				kind: "fill",
+				value: {
+					kind: "angular",
+					center: placed.center,
+					...(placed.rotation !== 0 ? { rotation: placed.rotation } : {}),
+					stops,
+				},
 			};
 		}
 		const handles = paint.gradientHandlePositions;
@@ -214,4 +229,33 @@ export function mapStrokeAlign(
 	if (figmaAlign === "INSIDE") return "inside";
 	if (figmaAlign === "OUTSIDE") return "outside";
 	return undefined;
+}
+
+/** A shape's visible paints as its coatfile `fill`: one fill, or the stack
+ *  bottom-up. A lone solid's alpha rides as the element's opacity, as it always
+ *  has; in a stack each solid keeps its own. */
+export function fillsToElement(
+	paints: FigmaPaint[] | undefined,
+	box: PaintBox,
+): { fill?: unknown; opacity?: number } {
+	const visible = (paints ?? []).filter((f) => f.visible !== false);
+	if (visible.length === 0) return {};
+	if (visible.length === 1) {
+		const result = figmaPaintToFill(visible[0], box);
+		if (result.kind === "fill") return { fill: result.value };
+		return result.opacity < 1
+			? { fill: result.hex, opacity: result.opacity }
+			: { fill: result.hex };
+	}
+	return {
+		fill: visible.map((f) => {
+			const r = figmaPaintToFill(f, box);
+			if (r.kind === "fill") return r.value;
+			return r.opacity < 1
+				? `${r.hex}${Math.round(r.opacity * 255)
+						.toString(16)
+						.padStart(2, "0")}`
+				: r.hex;
+		}),
+	};
 }

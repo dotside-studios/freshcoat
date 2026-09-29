@@ -257,6 +257,43 @@ describe("readTextNode", () => {
 		expect(findUnpostable(t)).toBeNull();
 	});
 
+	it("reads each run's fills and decoration, and takes mixed fills from the first run", () => {
+		const seg = (
+			start: number,
+			color: { r: number; g: number; b: number },
+			textDecoration: string,
+		) => ({
+			characters: "x",
+			start,
+			end: start + 1,
+			fontName: { family: "Comfortaa", style: "Bold" },
+			fontSize: 24,
+			fontWeight: 700,
+			letterSpacing: { value: 0, unit: "PIXELS" },
+			fills: [{ type: "SOLID", color, opacity: 1, visible: true }],
+			textDecoration,
+		});
+		const t = readTextNode(
+			textNode({
+				characters: "AB",
+				fills: Symbol("mixed"),
+				textDecoration: Symbol("mixed"),
+				getStyledTextSegments: () => [
+					seg(0, { r: 0, g: 0, b: 0 }, "UNDERLINE"),
+					seg(1, { r: 1, g: 0, b: 0 }, "NONE"),
+				],
+			}) as never,
+		);
+		expect(t.fills[0]).toMatchObject({ color: { r: 0, g: 0, b: 0 } });
+		expect(t.style.textDecoration).toBe("UNDERLINE");
+		const key = t.characterStyleOverrides?.[1] ?? 0;
+		expect(key).not.toBe(0);
+		const run = t.styleOverrideTable?.[String(key)];
+		expect(run?.textDecoration).toBe("NONE");
+		expect(run?.fills?.[0]).toMatchObject({ color: { r: 1, g: 0, b: 0 } });
+		expect(findUnpostable(t)).toBeNull();
+	});
+
 	it("treats same letterSpacing.value with different unit as distinct styles", () => {
 		const t = readTextNode(
 			textNode({

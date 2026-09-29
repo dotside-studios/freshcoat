@@ -5,7 +5,7 @@ import type {
 	FigmaNode,
 	FigmaSolidPaint,
 } from "../types";
-import { figmaColorToHex, figmaPaintToFill, mapStrokeAlign } from "./colors";
+import { figmaColorToHex, fillsToElement, mapStrokeAlign } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 import { scaleCorners } from "./rect";
 
@@ -152,7 +152,6 @@ export function transpileFrame(
 		? placeWorld(node, ctx.worldAnchor, ctx.scale)
 		: placeLocal(node, ctx.scale);
 	if ("fallback" in placed) throw new FlattenFallbackError(node.id);
-	const visibleFills = (node.fills ?? []).filter((f) => f.visible !== false);
 
 	const out: {
 		id: string;
@@ -182,20 +181,9 @@ export function transpileFrame(
 		properties: { children: [] },
 	};
 
-	if (visibleFills.length === 1) {
-		const result = figmaPaintToFill(visibleFills[0], placed.size);
-		if (result.kind === "solid") {
-			out.properties.fill = result.hex;
-			if (result.opacity < 1) out.opacity = result.opacity;
-		} else {
-			out.properties.fill = result.value;
-		}
-	} else if (visibleFills.length > 1) {
-		out.properties.fill = visibleFills.map((f) => {
-			const r = figmaPaintToFill(f, placed.size);
-			return r.kind === "solid" ? r.hex : r.value;
-		});
-	}
+	const painted = fillsToElement(node.fills, placed.size);
+	if (painted.fill !== undefined) out.properties.fill = painted.fill;
+	if (painted.opacity !== undefined) out.opacity = painted.opacity;
 
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
