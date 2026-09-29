@@ -22,6 +22,46 @@ export function applyMatrix(m: Matrix, x: number, y: number): [number, number] {
 export const translate = (x: number, y: number): Matrix => [1, 0, 0, 1, x, y];
 export const scale = (x: number, y = x): Matrix => [x, 0, 0, y, 0, 0];
 
+export const rotate = (deg: number): Matrix => {
+	const c = Math.cos(rad(deg));
+	const s = Math.sin(rad(deg));
+	return [c, s, -s, c, 0, 0];
+};
+
+export function invert(m: Matrix): Matrix | null {
+	const det = m[0] * m[3] - m[1] * m[2];
+	if (!det) return null;
+	return [
+		m[3] / det,
+		-m[1] / det,
+		-m[2] / det,
+		m[0] / det,
+		(m[2] * m[5] - m[3] * m[4]) / det,
+		(m[1] * m[4] - m[0] * m[5]) / det,
+	];
+}
+
+/** A matrix as scale, then rotation in degrees. `similar` is false when it
+ *  skews or mirrors, which a box with a rotation cannot carry. */
+export function decompose(m: Matrix): {
+	sx: number;
+	sy: number;
+	rotation: number;
+	similar: boolean;
+} {
+	const sx = Math.hypot(m[0], m[1]);
+	const sy = Math.hypot(m[2], m[3]);
+	const det = m[0] * m[3] - m[1] * m[2];
+	const dot = m[0] * m[2] + m[1] * m[3];
+	const rotation = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
+	return {
+		sx,
+		sy,
+		rotation: Math.abs(rotation) < 1e-9 ? 0 : rotation,
+		similar: det > 0 && Math.abs(dot) <= 1e-9 * Math.max(1, sx * sy),
+	};
+}
+
 export function isIdentity(m: Matrix): boolean {
 	return m.every((v, i) => v === IDENTITY[i]);
 }

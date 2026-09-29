@@ -8,7 +8,7 @@ import type { ExportPreset } from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { DialogTrigger, Dialog as RACDialog } from "react-aria-components";
 import { plural } from "~/app/copy";
-import { formatBytes } from "~/app/format";
+import { formatBytes, formatNumber } from "~/app/format";
 import { useConfirm } from "~/data/ConfirmDialog";
 import CheckIcon from "~icons/mingcute/check-circle-line";
 import CloseIcon from "~icons/mingcute/close-line";
@@ -216,7 +216,7 @@ export function JobBar({
 					{!preset
 						? "Export"
 						: chosen
-							? `Export ${chosen.length.toLocaleString("en-US")} selected`
+							? `Export ${formatNumber(chosen.length)} selected`
 							: `Export ${plural(count, "file")}`}
 				</Button>
 			)}

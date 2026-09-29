@@ -124,7 +124,8 @@ the records, and **Export** turns templates and records into files.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer.
 - **Inspector:**
-  - Geometry, blend mode and alignment.
+  - Geometry, blend mode (every Figma layer mode, linear burn included) and
+    alignment.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
@@ -181,6 +182,13 @@ the records, and **Export** turns templates and records into files.
   being counted. A save that fails validation opens it.
 - **Undo and redo:** every command has one undo step. A drag, a burst of typing
   or a run of nudges is a single step.
+- **SVG paste:** pasted SVG markup can become layers, an image or text.
+  As layers, paths and shapes become vectors, groups frames, and clips and
+  masks mask layers; embedded images become image layers, `<text>` and
+  `<tspan>` become text layers, markers become vectors, and a pattern fill
+  becomes a mask of its tiles. Anything skipped (filters, `foreignObject`,
+  video, audio, external images) raises one "Some SVG features were
+  skipped" toast.
 - **Keyboard:** everything has a shortcut; press `?` to list them.
 - **Themes:** light (the default), dark, or following the system, from
   View > Theme and remembered per browser under `freshcoat.theme`. The
@@ -320,7 +328,7 @@ to fill cards with records.
     time one reaches 512 MB, `<name>-part-1.zip` and so on; a job that fits
     in one part is a single `<name>.zip`.
   - **Zip file** (Chromium): one zip written into the chosen file as it is
-    made.
+    made, switching to zip64 records only if it passes 4 GB or 65,535 files.
   - **Folder** (Chromium): each file written into the chosen folder as it is
     made, the report last. Cancelling keeps what was written and says how
     many.
@@ -559,6 +567,11 @@ case, no periods on labels, buttons, toasts or one-line hints, American
 spelling, "Couldn't …" for failures, and one vocabulary (template, side,
 layer, field, dataset, record, column, preset, export). Shared strings live
 in `src/app/copy.ts`, and a guard test keeps the retired words out.
+
+The words are English everywhere, but numbers, sizes, dates and times are
+written in the browser's language (`navigator.language`): 2,400 records in
+the US, 2.400 records in Germany. They all go through `src/app/format.ts`, and
+the unit tests pin it to en-US.
 
 ## Render stats
 

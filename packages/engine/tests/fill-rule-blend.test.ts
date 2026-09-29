@@ -111,6 +111,7 @@ describe("blend modes", () => {
 		"color",
 		"luminosity",
 		"plus",
+		"linear-burn",
 	];
 
 	test.each(modes)("%s composites differently from normal", async (mode) => {

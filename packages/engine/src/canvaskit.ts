@@ -10,7 +10,7 @@
 // (`line.baseline`).
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { fontBytes } from "./font-bytes";
+import { dataUrlToBytes, fontBytes } from "./font-bytes";
 import {
 	cachedFontProvider,
 	cachedLine,
@@ -36,7 +36,7 @@ import {
 	encodePng,
 } from "./png";
 import { squircleSvg } from "./squircle";
-import { isSvg, parseSvg, svgToNode } from "./svg/index";
+import { isSvg, parseSvg, type SvgItem, svgToNode } from "./svg/index";
 import type {
 	BlendMode,
 	CanvasLike,
@@ -894,11 +894,56 @@ function isSvgPicture(img: unknown): img is SvgPicture {
 	return typeof img === "object" && img !== null && "svgPicture" in img;
 }
 
+// What a drawing embeds: the data URLs its images draw, and whether it has
+// text, which a picture leaves out.
+function svgContents(
+	items: SvgItem[],
+	out: { images: Set<string>; text: boolean },
+): { images: Set<string>; text: boolean } {
+	for (const item of items) {
+		if (item.kind === "image") out.images.add(item.href);
+		else if (item.kind === "text") out.text = true;
+		else if (item.kind === "group") {
+			svgContents(item.children, out);
+			if (item.mask) svgContents(item.mask, out);
+		}
+	}
+	return out;
+}
+
+const MAX_SVG_NESTING = 4;
+
 // Recorded at the drawing's own size and scaled when drawn, so it stays
 // vector at every density.
-function makeSvgPicture(ck: CK, provider: CK, bytes: Uint8Array): SvgPicture {
+function makeSvgPicture(
+	ck: CK,
+	provider: CK,
+	bytes: Uint8Array,
+	nesting = 0,
+): SvgPicture {
 	const drawing = parseSvg(new TextDecoder().decode(bytes));
 	const { width, height } = drawing;
+	const contents = svgContents(drawing.children, {
+		images: new Set(),
+		text: false,
+	});
+	const features = drawing.warnings.map((w) => w.feature);
+	if (contents.text) features.push("text");
+	const images = new Map<string, CK>();
+	for (const src of contents.images) {
+		try {
+			const data = dataUrlToBytes(src);
+			const img = isSvg(data)
+				? nesting < MAX_SVG_NESTING
+					? makeSvgPicture(ck, provider, data, nesting + 1)
+					: null
+				: ck.MakeImageFromEncoded(data);
+			if (img) images.set(src, img);
+			else if (!features.includes("image-decode")) features.push("image-decode");
+		} catch {
+			if (!features.includes("image-decode")) features.push("image-decode");
+		}
+	}
 	const commands = compileScene(svgToNode(drawing), { width, height });
 	const recorder = new ck.PictureRecorder();
 	const bin = makeBin();
@@ -915,7 +960,7 @@ function makeSvgPicture(ck: CK, provider: CK, bytes: Uint8Array): SvgPicture {
 					ck,
 					canvas,
 					provider,
-					new Map(),
+					images,
 					bin,
 					cmd as DrawCommand,
 					issues,
@@ -926,10 +971,11 @@ function makeSvgPicture(ck: CK, provider: CK, bytes: Uint8Array): SvgPicture {
 			svgPicture: picture,
 			width,
 			height,
-			features: drawing.warnings.map((w) => w.feature),
+			features,
 			delete: () => picture.delete(),
 		};
 	} finally {
+		for (const img of images.values()) img.delete();
 		bin.free();
 		recorder.delete();
 	}
@@ -1858,7 +1904,32 @@ const SKIA_BLEND_MODE: Record<BlendMode, string> = {
 	color: "Color",
 	luminosity: "Luminosity",
 	plus: "Plus",
+	"linear-burn": "SrcOver",
 };
+
+// Linear burn, max(0, s + d - 1), in the separable-blend form on premultiplied
+// color. Skia has no native mode for it.
+const LINEAR_BURN_SKSL = `
+	half4 main(half4 src, half4 dst) {
+		half3 burn = max(src.rgb * dst.a + dst.rgb * src.a - src.a * dst.a, 0.0);
+		return half4(
+			src.rgb * (1.0 - dst.a) + dst.rgb * (1.0 - src.a) + burn,
+			src.a + dst.a * (1.0 - src.a));
+	}`;
+
+function linearBurnBlender(ck: CK, bin: Bin): CK | null {
+	let byVariant = effectCache.get(ck);
+	if (!byVariant) {
+		byVariant = new Map();
+		effectCache.set(ck, byVariant);
+	}
+	let eff = byVariant.get("linear-burn");
+	if (eff === undefined) {
+		eff = ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL) ?? null;
+		byVariant.set("linear-burn", eff);
+	}
+	return eff ? bin.track(eff.makeBlender([])) : null;
+}
 
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
@@ -1876,7 +1947,10 @@ function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
 	// after.
 	if (colorFilter) paint.setColorFilter(colorFilter);
 	if (hasOpacity) paint.setAlphaf(opacity);
-	if (blendMode && blendMode !== "normal") {
+	const blender =
+		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
+	if (blender) paint.setBlender(blender);
+	else if (blendMode && blendMode !== "normal") {
 		paint.setBlendMode(
 			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
 		);

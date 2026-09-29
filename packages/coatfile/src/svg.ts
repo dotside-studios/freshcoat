@@ -1,13 +1,16 @@
 import {
 	type Box,
+	estimateTextWidth,
 	type Matrix,
 	normalizePath,
 	parseSvg,
 	pathBounds,
 	type Segment,
+	type SvgImage,
 	type SvgItem,
 	type SvgPaint,
 	type SvgShape,
+	type SvgText,
 	type SvgWarning,
 	serializePath,
 	transformPath,
@@ -17,8 +20,11 @@ import { linearGradientAngle } from "./gradient";
 import type {
 	Element,
 	Fill,
+	FontWeight,
 	FrameElement,
+	ImageElement,
 	MaskElement,
+	TextElement,
 	VectorElement,
 } from "./types";
 
@@ -35,6 +41,14 @@ export type SvgToElementsOptions = {
 export type SvgElements = { element: FrameElement; warnings: SvgWarning[] };
 
 type Placed = { element: Element; box: Box };
+
+// Where a line's baseline sits below its box's top, and the line's height, in
+// ems. Close for common fonts at a line height of 1.2.
+const BASELINE = 0.95;
+const LINE_HEIGHT = 1.2;
+// How much wider than its estimated width a line's box is made, so a font that
+// runs wider than the estimate does not wrap.
+const WIDTH_ALLOWANCE = 1.5;
 
 const round = (n: number) => {
 	const r = Math.round(n * 1e4) / 1e4;
@@ -154,6 +168,103 @@ export function svgToElements(
 		return { element, box: b };
 	};
 
+	const at = (x: number, y: number): [number, number] => [
+		sx * x + m[4],
+		sy * y + m[5],
+	];
+
+	// A box turned about `pivot` by `rotation`, as an element turned about its
+	// own centre.
+	const turned = (box: Box, rotation: number | undefined, pivot: [number, number]): Box => {
+		if (!rotation) return box;
+		const r = (rotation * Math.PI) / 180;
+		const cx = box.x + box.width / 2 - pivot[0];
+		const cy = box.y + box.height / 2 - pivot[1];
+		return {
+			...box,
+			x: pivot[0] + cx * Math.cos(r) - cy * Math.sin(r) - box.width / 2,
+			y: pivot[1] + cx * Math.sin(r) + cy * Math.cos(r) - box.height / 2,
+		};
+	};
+
+	const image = (i: SvgImage): Placed => {
+		const [x, y] = at(i.x, i.y);
+		const box = { x, y, width: i.width * Math.abs(sx), height: i.height * Math.abs(sy) };
+		const element: ImageElement = {
+			id: uniqueId(i.id ?? "image"),
+			type: "image",
+			pos: { x: round(box.x), y: round(box.y) },
+			size: { width: round(box.width), height: round(box.height) },
+			properties: { src: i.href, fit: i.fit },
+		};
+		if (i.rotation) element.rotation = round(i.rotation);
+		if (i.opacity !== undefined) element.opacity = i.opacity;
+		return { element, box };
+	};
+
+	const text = (t: SvgText): Placed => {
+		const runs = t.runs.map((r) => ({
+			...r,
+			font: { ...r.font, size: r.font.size * k },
+		}));
+		const base = runs[0] as (typeof runs)[number];
+		const size = Math.max(...runs.map((r) => r.font.size));
+		const width = estimateTextWidth(runs) * WIDTH_ALLOWANCE + size;
+		const anchor = at(t.x, t.y);
+		const left =
+			t.anchor === "middle"
+				? anchor[0] - width / 2
+				: t.anchor === "end"
+					? anchor[0] - width
+					: anchor[0];
+		const box = turned(
+			{ x: left, y: anchor[1] - BASELINE * size, width, height: LINE_HEIGHT * size },
+			t.rotation,
+			anchor,
+		);
+		const fontOf = (f: (typeof runs)[number]["font"]) => ({
+			family: f.family,
+			size: round(f.size),
+			...(f.weight !== 400 ? { weight: f.weight as FontWeight } : {}),
+			...(f.style === "italic" ? { style: "italic" as const } : {}),
+		});
+		const same = runs.every(
+			(r) =>
+				r.color === base.color &&
+				r.font.family === base.font.family &&
+				r.font.size === base.font.size &&
+				r.font.weight === base.font.weight &&
+				r.font.style === base.font.style,
+		);
+		const properties: TextElement["properties"] = {
+			font: { ...fontOf(base.font), lineHeight: LINE_HEIGHT },
+			color: color(base.color),
+			align: t.anchor === "middle" ? "center" : t.anchor === "end" ? "right" : "left",
+		};
+		if (same) properties.value = runs.map((r) => r.text).join("");
+		else
+			properties.spans = runs.map((r) => ({
+				text: r.text,
+				font: {
+					family: r.font.family,
+					size: round(r.font.size),
+					weight: r.font.weight as FontWeight,
+					style: r.font.style,
+				},
+				color: color(r.color),
+			}));
+		const element: TextElement = {
+			id: uniqueId(t.id ?? "text"),
+			type: "text",
+			pos: { x: round(box.x), y: round(box.y) },
+			size: { width: round(box.width), height: round(box.height) },
+			properties,
+		};
+		if (t.rotation) element.rotation = round(t.rotation);
+		if (t.opacity !== undefined) element.opacity = t.opacity;
+		return { element, box };
+	};
+
 	const relative = (p: Placed, origin: Box): Element => ({
 		...p.element,
 		pos: { x: round(p.box.x - origin.x), y: round(p.box.y - origin.y) },
@@ -178,6 +289,8 @@ export function svgToElements(
 
 	const item = (it: SvgItem): Placed | null => {
 		if (it.kind === "shape") return shape(it);
+		if (it.kind === "image") return image(it);
+		if (it.kind === "text") return text(it);
 		if (!it.id && it.opacity === undefined && !it.clip && !it.mask && it.children.length === 1)
 			return item(it.children[0] as SvgItem);
 		const children = it.children.map(item).filter((p): p is Placed => !!p);

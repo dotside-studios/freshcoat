@@ -17,6 +17,7 @@ import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
+import { formatNumber } from "~/app/format";
 import type { BindingPatch } from "~/state/workspace";
 import {
 	rebindColumn,
@@ -428,15 +429,15 @@ export async function importPhotos(
 		`Imported ${plural(ready.prepared.length, "photo")}`,
 		`${plural(done.rewritten, "cell")} matched`,
 	];
-	if (loose.length) parts.push(`${loose.length.toLocaleString()} unmatched`);
-	if (ready.skipped) parts.push(`${ready.skipped.toLocaleString()} skipped`);
+	if (loose.length) parts.push(`${formatNumber(loose.length)} unmatched`);
+	if (ready.skipped) parts.push(`${formatNumber(ready.skipped)} skipped`);
 	toast(parts.join(", "), {
 		tone: done.rewritten ? "success" : "info",
 		timeout: loose.length && column ? 12000 : 6000,
 		...(loose.length && column
 			? {
 					action: {
-						label: `Add ${loose.length.toLocaleString()} as records`,
+						label: `Add ${formatNumber(loose.length)} as records`,
 						onAction: () =>
 							appendUnmatched(controller, datasetId, loose, column),
 					},
@@ -475,7 +476,7 @@ export async function newDatasetFromPhotos(
 		activeId: dataset.id,
 	});
 	toast(
-		`Created ${dataset.name} from ${plural(dataset.records.length, "photo")}${ready.skipped ? `, ${ready.skipped.toLocaleString()} skipped` : ""}`,
+		`Created ${dataset.name} from ${plural(dataset.records.length, "photo")}${ready.skipped ? `, ${formatNumber(ready.skipped)} skipped` : ""}`,
 		{ tone: "success", timeout: 6000 },
 	);
 	return dataset;
@@ -515,7 +516,7 @@ export async function photosIntoEmptyDataset(
 		return result.dataset;
 	});
 	toast(
-		`Added ${plural(added, "photo")}${ready.skipped ? `, ${ready.skipped.toLocaleString()} skipped` : ""}`,
+		`Added ${plural(added, "photo")}${ready.skipped ? `, ${formatNumber(ready.skipped)} skipped` : ""}`,
 		{ tone: "success", timeout: 6000 },
 	);
 }

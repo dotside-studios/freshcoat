@@ -2,6 +2,7 @@ import { Button } from "@freshcoat-js/ui/button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Fragment, useEffect, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
+import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
 import { SAMPLES } from "~/samples";
 import { STARTERS } from "~/samples/starters";
@@ -84,7 +85,7 @@ export function Welcome({
 					>
 						<RestoreIcon className="size-4 text-fc-accent" />
 						<p className="min-w-0 flex-1 truncate">
-							Unsaved work from {new Date(autosave.savedAt).toLocaleString()}:{" "}
+							Unsaved work from {formatDate(new Date(autosave.savedAt))}:{" "}
 							<span className="text-fc-muted">
 								{autosave.workspace.name} ({autosave.fileName})
 							</span>

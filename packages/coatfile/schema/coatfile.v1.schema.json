@@ -399,7 +399,8 @@
 											"saturation",
 											"color",
 											"luminosity",
-											"plus"
+											"plus",
+											"linear-burn"
 										]
 									},
 									"shadow": {
@@ -1190,7 +1191,8 @@
 											"saturation",
 											"color",
 											"luminosity",
-											"plus"
+											"plus",
+											"linear-burn"
 										]
 									},
 									"shadow": {
@@ -1778,7 +1780,8 @@
 														"saturation",
 														"color",
 														"luminosity",
-														"plus"
+														"plus",
+														"linear-burn"
 													]
 												},
 												"shadow": {
@@ -2569,7 +2572,8 @@
 														"saturation",
 														"color",
 														"luminosity",
-														"plus"
+														"plus",
+														"linear-burn"
 													]
 												},
 												"shadow": {
@@ -3278,7 +3282,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -4111,7 +4116,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -4659,7 +4665,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -5046,7 +5053,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -5459,7 +5467,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -6250,7 +6259,8 @@
 										"saturation",
 										"color",
 										"luminosity",
-										"plus"
+										"plus",
+										"linear-burn"
 									]
 								},
 								"shadow": {
@@ -7024,7 +7034,8 @@
 								"saturation",
 								"color",
 								"luminosity",
-								"plus"
+								"plus",
+								"linear-burn"
 							]
 						},
 						"shadow": {
@@ -7980,7 +7991,8 @@
 								"saturation",
 								"color",
 								"luminosity",
-								"plus"
+								"plus",
+								"linear-burn"
 							]
 						},
 						"shadow": {

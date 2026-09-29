@@ -1,0 +1,107 @@
+{
+	"id": "blend-linear-burn",
+	"title": "linear burn adds the channels and subtracts one",
+	"profile": "core",
+	"requires": [
+		"blend.linear-burn"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#4080c0"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#80c0ff"
+					}
+				],
+				"blendMode": "linear-burn"
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				0,
+				65,
+				192,
+				255
+			],
+			"why": "max(0, s + d - 1) per channel",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				10,
+				10
+			],
+			"expect": [
+				64,
+				128,
+				192,
+				255
+			],
+			"why": "the ground, unblended",
+			"tolerance": 2
+		}
+	]
+}

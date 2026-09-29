@@ -109,12 +109,12 @@ Cross-architecture stability is **unverified** — see Gaps.
 
 ## Coverage
 
-60 cases.
+61 cases.
 
 | Covered | Cases |
 |---|---|
 | Fills | `fill-solid`, `fill-linear`, `fill-radial`, `fill-angular` |
-| Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `opacity` |
+| Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `blend-linear-burn`, `opacity` |
 | Clipping and masking | `clip-circle`, `clip-per-corner`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape` |
 | Shapes | `ellipse`, `path-viewbox`, `path-fill-rule`, `corner-radius`, `corner-radius-per-corner` |
 | Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask` |
