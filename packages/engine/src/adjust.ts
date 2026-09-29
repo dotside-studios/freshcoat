@@ -176,3 +176,127 @@ export function buildAdjust(o: AdjustOptions): Adjust {
 	if (o.sharpen !== undefined && o.sharpen > 0) adjust.sharpen = o.sharpen;
 	return adjust;
 }
+
+const hasColor = (a: Adjust): boolean =>
+	!!(a.colorMatrix || a.lut || a.lut3d);
+
+// The cube size composeAdjust bakes a second adjustment into.
+const COMPOSE_CUBE = 33;
+
+// One `Adjust` that looks like `first` and then `second` applied to its result.
+// A node carries a single adjustment, so a layer that already has one (an
+// authored tone change, say) and gains another (a print correction) needs the
+// two folded together. `first` keeps its own matrix and curve; `second`, and
+// any cube `first` had, are baked into the 3D LUT that runs after them. The
+// stronger of the two sharpens is kept, since it is a spatial pass that cannot
+// be chained per pixel.
+export function composeAdjust(
+	first: Adjust | undefined,
+	second: Adjust | undefined,
+): Adjust {
+	if (!first || Object.keys(first).length === 0) return { ...second };
+	if (!second || Object.keys(second).length === 0) return { ...first };
+	const sharpen = Math.max(first.sharpen ?? 0, second.sharpen ?? 0);
+	const out: Adjust = hasColor(second)
+		? hasColor(first)
+			? {
+					...(first.colorMatrix ? { colorMatrix: first.colorMatrix } : {}),
+					...(first.gamut ? { gamut: first.gamut } : {}),
+					...(first.lut ? { lut: first.lut } : {}),
+					lut3d: bakeLut3d(
+						Math.max(first.lut3d?.size ?? 0, COMPOSE_CUBE),
+						(rgb) =>
+							applyAdjustColor(
+								second,
+								first.lut3d ? sampleLut3d(first.lut3d, rgb) : rgb,
+							),
+					),
+				}
+			: withoutSharpen(second)
+		: withoutSharpen(first);
+	if (sharpen > 0) out.sharpen = sharpen;
+	return out;
+}
+
+function withoutSharpen(a: Adjust): Adjust {
+	const { sharpen: _sharpen, ...rest } = a;
+	return rest;
+}
+
+type Rgb = [number, number, number];
+
+// The per-pixel part of an adjustment on one unpremultiplied colour in [0, 1],
+// in the painter's order: matrix, gamut, curve, cube.
+export function applyAdjustColor(a: Adjust, rgb: Rgb): Rgb {
+	let c: Rgb = [rgb[0], rgb[1], rgb[2]];
+	const m = a.colorMatrix;
+	if (m) {
+		const row = (i: number) =>
+			m[i] * c[0] + m[i + 1] * c[1] + m[i + 2] * c[2] + m[i + 3] + m[i + 4];
+		c = [row(0), row(5), row(10)];
+	}
+	c = a.gamut === "preserve-hue" ? fitGamut(c) : clampRgb(c);
+	if (a.lut) {
+		const at = (t: Uint8Array, v: number) => t[Math.round(v * 255)] / 255;
+		c = [at(a.lut.r, c[0]), at(a.lut.g, c[1]), at(a.lut.b, c[2])];
+	}
+	if (a.lut3d) c = sampleLut3d(a.lut3d, c);
+	return clampRgb(c);
+}
+
+function clampRgb(c: Rgb): Rgb {
+	return [clamp01(c[0]), clamp01(c[1]), clamp01(c[2])];
+}
+
+function clamp01(v: number): number {
+	return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function fitGamut(c: Rgb): Rgb {
+	const l = clamp01(LUMA_R * c[0] + LUMA_G * c[1] + LUMA_B * c[2]);
+	const scale = (v: number) => {
+		const d = v - l;
+		if (v > 1 && d > 0) return (1 - l) / d;
+		if (v < 0 && d < 0) return -l / d;
+		return 1;
+	};
+	const t = Math.min(scale(c[0]), scale(c[1]), scale(c[2]));
+	return clampRgb([l + (c[0] - l) * t, l + (c[1] - l) * t, l + (c[2] - l) * t]);
+}
+
+function sampleLut3d(lut: AdjustLut3d, rgb: Rgb): Rgb {
+	const { size, data } = lut;
+	const top = size - 1;
+	const f = rgb.map((v) => clamp01(v) * top) as Rgb;
+	const lo = f.map(Math.floor) as Rgb;
+	const hi = lo.map((v) => Math.min(v + 1, top)) as Rgb;
+	const t = f.map((v, i) => v - lo[i]) as Rgb;
+	const at = (r: number, g: number, b: number, ch: number) =>
+		data[((b * size + g) * size + r) * 3 + ch] / 255;
+	const mix = (a: number, b: number, k: number) => a + (b - a) * k;
+	const edge = (g: number, b: number, ch: number) =>
+		mix(at(lo[0], g, b, ch), at(hi[0], g, b, ch), t[0]);
+	const out: Rgb = [0, 0, 0];
+	for (let ch = 0; ch < 3; ch++) {
+		const near = mix(edge(lo[1], lo[2], ch), edge(hi[1], lo[2], ch), t[1]);
+		const far = mix(edge(lo[1], hi[2], ch), edge(hi[1], hi[2], ch), t[1]);
+		out[ch] = mix(near, far, t[2]);
+	}
+	return out;
+}
+
+function bakeLut3d(size: number, fn: (rgb: Rgb) => Rgb): AdjustLut3d {
+	const data = new Uint8Array(size * size * size * 3);
+	for (let b = 0; b < size; b++) {
+		for (let g = 0; g < size; g++) {
+			for (let r = 0; r < size; r++) {
+				const c = fn([r / (size - 1), g / (size - 1), b / (size - 1)]);
+				const at = ((b * size + g) * size + r) * 3;
+				data[at] = Math.round(c[0] * 255);
+				data[at + 1] = Math.round(c[1] * 255);
+				data[at + 2] = Math.round(c[2] * 255);
+			}
+		}
+	}
+	return { size, data };
+}

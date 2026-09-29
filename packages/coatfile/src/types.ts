@@ -9,6 +9,7 @@ import type {
 } from "@freshcoat-js/engine";
 import type { z } from "zod";
 import type {
+	AdjustSchema,
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
@@ -17,6 +18,9 @@ import type {
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
+	FlexLayoutSchema,
+	GridLayoutSchema,
+	GridTrackSchema,
 	ImageElementSchema,
 	ImagePropertiesSchema,
 	InlineAssetSchema,
@@ -74,6 +78,10 @@ export type VectorElement = z.infer<typeof VectorElementSchema>;
 
 export type VisibilityCondition = z.infer<typeof VisibilityConditionSchema>;
 export type Layout = z.infer<typeof LayoutSchema>;
+export type FrameFlexLayout = z.infer<typeof FlexLayoutSchema>;
+export type FrameGridLayout = z.infer<typeof GridLayoutSchema>;
+export type GridTrack = z.infer<typeof GridTrackSchema>;
+export type ElementAdjust = z.infer<typeof AdjustSchema>;
 export type LayoutChild = z.infer<typeof LayoutChildSchema>;
 export type Constraint = z.infer<typeof ConstraintSchema>;
 export type Constraints = z.infer<typeof ConstraintsSchema>;
@@ -127,6 +135,7 @@ export interface ElementShell {
 	blendMode?: BlendMode;
 	shadow?: Shadows;
 	blur?: number;
+	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;
 	visibleWhen?: VisibilityCondition | VisibilityCondition[];

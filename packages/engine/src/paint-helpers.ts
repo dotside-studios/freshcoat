@@ -1,4 +1,10 @@
-import type { CornerRadius, FontVariations, Stroke } from "./types";
+import type {
+	CornerRadius,
+	FontVariations,
+	ImageCrop,
+	Stroke,
+	Vec2,
+} from "./types";
 
 // The variation axes a text style instantiates its face at. The weight goes
 // first as `wght`: `fontStyle.weight` only PICKS among registered faces, and a
@@ -14,7 +20,11 @@ export function fontVariationList(
 	return Object.entries(axes).map(([axis, value]) => ({ axis, value }));
 }
 
-// Source/dest rects for object-fit.
+export type FitOptions = { focus?: Vec2; crop?: ImageCrop };
+
+// Source/dest rects for object-fit. `crop` narrows the source first (fractions
+// of it, clamped to it); `focus` then picks which part of that region `cover`
+// keeps.
 export function fitRect(
 	iw: number,
 	ih: number,
@@ -23,6 +33,7 @@ export function fitRect(
 	dw: number,
 	dh: number,
 	fit: "cover" | "contain" | "fill",
+	opts?: FitOptions,
 ): {
 	sx: number;
 	sy: number;
@@ -33,25 +44,30 @@ export function fitRect(
 	dw: number;
 	dh: number;
 } {
-	if (fit === "fill") return { sx: 0, sy: 0, sw: iw, sh: ih, dx, dy, dw, dh };
-	const ir = iw / ih;
+	const { ox, oy, cw, ch } = cropRegion(iw, ih, opts?.crop);
+	if (fit === "fill")
+		return { sx: ox, sy: oy, sw: cw, sh: ch, dx, dy, dw, dh };
+	const ir = cw / ch;
 	const dr = dw / dh;
 	if (fit === "cover") {
+		const focus = opts?.focus;
 		if (ir > dr) {
-			const sw = ih * dr;
-			return { sx: (iw - sw) / 2, sy: 0, sw, sh: ih, dx, dy, dw, dh };
+			const sw = ch * dr;
+			const sx = ox + focusOffset(cw, sw, focus?.x);
+			return { sx, sy: oy, sw, sh: ch, dx, dy, dw, dh };
 		}
-		const sh = iw / dr;
-		return { sx: 0, sy: (ih - sh) / 2, sw: iw, sh, dx, dy, dw, dh };
+		const sh = cw / dr;
+		const sy = oy + focusOffset(ch, sh, focus?.y);
+		return { sx: ox, sy, sw: cw, sh, dx, dy, dw, dh };
 	}
 	// contain
 	if (ir > dr) {
 		const h = dw / ir;
 		return {
-			sx: 0,
-			sy: 0,
-			sw: iw,
-			sh: ih,
+			sx: ox,
+			sy: oy,
+			sw: cw,
+			sh: ch,
 			dx,
 			dy: dy + (dh - h) / 2,
 			dw,
@@ -59,7 +75,41 @@ export function fitRect(
 		};
 	}
 	const w = dh * ir;
-	return { sx: 0, sy: 0, sw: iw, sh: ih, dx: dx + (dw - w) / 2, dy, dw: w, dh };
+	return {
+		sx: ox,
+		sy: oy,
+		sw: cw,
+		sh: ch,
+		dx: dx + (dw - w) / 2,
+		dy,
+		dw: w,
+		dh,
+	};
+}
+
+function cropRegion(
+	iw: number,
+	ih: number,
+	crop: ImageCrop | undefined,
+): { ox: number; oy: number; cw: number; ch: number } {
+	if (!crop) return { ox: 0, oy: 0, cw: iw, ch: ih };
+	const x = clamp01(crop.x);
+	const y = clamp01(crop.y);
+	const w = Math.min(clamp01(crop.width), 1 - x);
+	const h = Math.min(clamp01(crop.height), 1 - y);
+	if (!(w > 0 && h > 0)) return { ox: 0, oy: 0, cw: iw, ch: ih };
+	return { ox: x * iw, oy: y * ih, cw: w * iw, ch: h * ih };
+}
+
+// Where a window of `part` starts within `total` so the focal fraction sits at
+// its middle, held inside the source.
+function focusOffset(total: number, part: number, focus?: number): number {
+	if (focus === undefined || !Number.isFinite(focus)) return (total - part) / 2;
+	return Math.min(Math.max(focus * total - part / 2, 0), total - part);
+}
+
+function clamp01(v: number): number {
+	return Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0;
 }
 
 // Stroke-edge offset for alignment: +w/2 pulls it inside, -w/2 outside, 0 center.

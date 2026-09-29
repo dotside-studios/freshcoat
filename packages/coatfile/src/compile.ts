@@ -1,8 +1,9 @@
 import {
+	type Adjust,
 	type BitmapNode,
+	buildAdjust,
 	type ChildLayout,
 	FALLBACK_LINE_HEIGHT,
-	type FlexLayout,
 	type GroupNode,
 	type ImageNode,
 	type MaskNode,
@@ -12,6 +13,8 @@ import {
 	type RectNode,
 	scalePathData,
 	type TextNode,
+	type TrackSize,
+	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import {
@@ -31,6 +34,7 @@ import {
 import { resizeTemplate } from "./constraints";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
+import { parseImageFocus } from "./image-focus";
 import { substitute } from "./mustache";
 import { generateMatrix } from "./qr";
 import { childElements } from "./tree";
@@ -41,8 +45,12 @@ import type {
 	CompileOptions,
 	CornerRadius,
 	Element,
+	ElementAdjust,
 	Fill,
 	FontRequest,
+	FrameFlexLayout,
+	GridTrack,
+	ImageCrop,
 	Layout,
 	LayoutChild,
 	ResolvedFill,
@@ -287,6 +295,7 @@ function compileBackground(
 		blendMode: bg.blendMode,
 		shadow: scaleShadow(bg.shadow, 1),
 		blur: bg.blur,
+		adjust: resolveAdjust(bg.adjust),
 	};
 	if (bg.type === "rect") {
 		return {
@@ -306,6 +315,7 @@ function compileBackground(
 		kind: "image",
 		src: String(props.src ?? ""),
 		fit: (props.fit as ImageNode["fit"]) ?? "cover",
+		...imageFraming(props),
 		stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
 		mask: resolveImageClip(
 			props.cornerRadius as number | undefined,
@@ -334,6 +344,7 @@ function compileElement(
 		blendMode: el.blendMode,
 		shadow: scaleShadow(el.shadow, ratio),
 		blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
+		adjust: resolveAdjust(el.adjust),
 		layoutChild: mapLayoutChild(el.layoutChild, ratio),
 	};
 	const props = substituteOwnProperties(el, ctx);
@@ -356,6 +367,7 @@ function compileElement(
 				kind: "image",
 				src: String(props.src ?? ""),
 				fit: (props.fit as ImageNode["fit"]) ?? "cover",
+				...imageFraming(props),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 				mask: resolveImageClip(
 					props.cornerRadius as number | undefined,
@@ -433,6 +445,7 @@ type Base = {
 	blendMode?: Element["blendMode"];
 	shadow?: Shadows;
 	blur?: number;
+	adjust?: Adjust;
 	layoutChild?: ChildLayout;
 };
 
@@ -561,11 +574,11 @@ function compileFrameElement(
 			: null;
 
 	const rawChildren = (props.children as Element[] | undefined) ?? [];
-	const childNodes = rawChildren.map((child) =>
-		compileElement(child, ctx, ratio, scope),
-	);
-
 	const layout = mapLayout(props.layout as Layout | undefined, ratio);
+	const childNodes = rawChildren.map((child) => {
+		const node = compileElement(child, ctx, ratio, scope);
+		return layout?.type === "grid" ? withFixedGridSize(node) : node;
+	});
 	const outer = {
 		id: base.id,
 		pos: base.pos,
@@ -575,6 +588,7 @@ function compileFrameElement(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		clip,
 		cornerRadius,
@@ -657,6 +671,7 @@ function compileQr(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		children,
 	};
@@ -717,6 +732,7 @@ function compileBarcode(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		children,
 	});
@@ -970,29 +986,63 @@ function parseHexColor(hex: string): [number, number, number] {
 	return [0, 0, 0];
 }
 
-// ─────────────── layout mapping (template Layout → freshcoat FlexLayout) ───────────────
+// ─────────────── layout mapping (template Layout → freshcoat Layout) ───────────────
 
 function mapLayout(
 	layout: Layout | undefined,
 	ratio: number,
-): FlexLayout | undefined {
+): SceneLayout | undefined {
 	if (!layout) return undefined;
-	const out: FlexLayout = { type: "flex", direction: layout.direction };
-	if (layout.gap !== undefined) out.gap = layout.gap * ratio;
-	if (layout.crossGap !== undefined) out.crossGap = layout.crossGap * ratio;
-	if (layout.padding) {
-		const p = layout.padding;
-		out.padding = [
-			(p.top ?? 0) * ratio,
-			(p.right ?? 0) * ratio,
-			(p.bottom ?? 0) * ratio,
-			(p.left ?? 0) * ratio,
-		];
+	const padding = layout.padding
+		? ([
+				(layout.padding.top ?? 0) * ratio,
+				(layout.padding.right ?? 0) * ratio,
+				(layout.padding.bottom ?? 0) * ratio,
+				(layout.padding.left ?? 0) * ratio,
+			] as [number, number, number, number])
+		: undefined;
+	if ("type" in layout && layout.type === "grid") {
+		const track = (t: GridTrack): TrackSize =>
+			typeof t === "number" ? t * ratio : (t as TrackSize);
+		return {
+			type: "grid",
+			columns: layout.columns.map(track),
+			...(layout.rows ? { rows: layout.rows.map(track) } : {}),
+			...(layout.gap === undefined
+				? {}
+				: {
+						gap:
+							typeof layout.gap === "number"
+								? layout.gap * ratio
+								: [layout.gap[0] * ratio, layout.gap[1] * ratio],
+					}),
+			...(padding ? { padding } : {}),
+		};
 	}
-	if (layout.primaryAlign) out.justify = layout.primaryAlign;
-	if (layout.crossAlign) out.align = layout.crossAlign;
-	if (layout.wrap) out.wrap = true;
+	const flex = layout as FrameFlexLayout;
+	const out: SceneLayout = { type: "flex", direction: flex.direction };
+	if (flex.gap !== undefined) out.gap = flex.gap * ratio;
+	if (flex.crossGap !== undefined) out.crossGap = flex.crossGap * ratio;
+	if (padding) out.padding = padding;
+	if (flex.primaryAlign) out.justify = flex.primaryAlign;
+	if (flex.crossAlign) out.align = flex.crossAlign;
+	if (flex.wrap) out.wrap = true;
 	return out;
+}
+
+// A grid stretches a child to its cell unless told otherwise, where a coatfile
+// child without `fill` or `hug` keeps its own size, as it does in a flex layout.
+function withFixedGridSize(node: Node): Node {
+	const lc = node.layoutChild ?? {};
+	const size = node.size ?? { width: 0, height: 0 };
+	return {
+		...node,
+		layoutChild: {
+			...lc,
+			width: lc.width ?? size.width,
+			height: lc.height ?? size.height,
+		},
+	};
 }
 
 function mapLayoutChild(
@@ -1019,6 +1069,8 @@ function mapLayoutChild(
 			height: lc.max.height !== undefined ? lc.max.height * ratio : undefined,
 		};
 	}
+	if (lc.column !== undefined) out.column = lc.column;
+	if (lc.row !== undefined) out.row = lc.row;
 	return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -1100,6 +1152,25 @@ function scaleOne(shadow: Shadow, ratio: number): Shadow {
 		blur: shadow.blur * ratio,
 		...(shadow.spread !== undefined ? { spread: shadow.spread * ratio } : {}),
 		...(shadow.inset ? { inset: true } : {}),
+	};
+}
+
+function resolveAdjust(adjust: ElementAdjust | undefined): Adjust | undefined {
+	if (!adjust) return undefined;
+	const out = buildAdjust(adjust);
+	return Object.keys(out).length > 0 ? out : undefined;
+}
+
+// `focus` has been substituted by now, so a field-bound one arrives as "x,y".
+function imageFraming(props: Record<string, unknown>): {
+	focus?: Vec2;
+	crop?: ImageCrop;
+} {
+	const focus = parseImageFocus(props.focus);
+	const crop = props.crop as ImageCrop | undefined;
+	return {
+		...(focus ? { focus } : {}),
+		...(crop ? { crop: { ...crop } } : {}),
 	};
 }
 

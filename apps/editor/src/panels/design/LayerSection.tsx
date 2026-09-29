@@ -3,6 +3,7 @@ import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { toast } from "@freshcoat-js/ui/toast";
 import { type ReactNode, useMemo } from "react";
 import {
 	applyRect,
@@ -16,8 +17,15 @@ import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import RotateIcon from "~icons/mingcute/anticlockwise-line";
-import { Marked, Pair, Row } from "./controls";
-import { commonValue, type Inspect, mergeKeyOf } from "./field-helpers";
+import { CommitField, Marked, Pair, Row } from "./controls";
+import { isGridLayout } from "./FrameSection";
+import {
+	commonValue,
+	formatGridLine,
+	type Inspect,
+	mergeKeyOf,
+	parseGridLine,
+} from "./field-helpers";
 
 export const BLEND_MODES = [
 	"normal",
@@ -146,11 +154,13 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 		els.map((e) => Math.round((e.opacity ?? 1) * 100)),
 	);
 	const blend = commonValue(els.map((e) => e.blendMode ?? "normal"));
-	const inLayout = keys.every((k) => {
+	const parentLayouts = keys.map((k) => {
 		const p = parentKeyOf(k);
 		const pe = p ? getElement(t, p) : undefined;
-		return pe?.type === "frame" && pe.properties.layout !== undefined;
+		return pe?.type === "frame" ? pe.properties.layout : undefined;
 	});
+	const inLayout = parentLayouts.every((l) => l !== undefined);
+	const inGrid = inLayout && parentLayouts.every(isGridLayout);
 
 	return (
 		<PanelSection title="Layer">
@@ -195,7 +205,7 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 					))}
 				</Select>
 			</Row>
-			{inLayout && <ResizingRows ins={ins} />}
+			{inLayout && <ResizingRows ins={ins} grid={inGrid} />}
 		</PanelSection>
 	);
 }
@@ -282,13 +292,15 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 	);
 }
 
-function ResizingRows({ ins }: { ins: Inspect }) {
+function ResizingRows({ ins, grid }: { ins: Inspect; grid: boolean }) {
 	const els = ins.layers as Element[];
 	const lc = (e: Element) => e.layoutChild ?? {};
 	const width = commonValue(els.map((e) => lc(e).width ?? "fixed"));
 	const height = commonValue(els.map((e) => lc(e).height ?? "fixed"));
 	const absolute = commonValue(els.map((e) => lc(e).absolute === true));
 	const grow = commonValue(els.map((e) => lc(e).grow === 1));
+	const column = commonValue(els.map((e) => formatGridLine(lc(e).column)));
+	const row = commonValue(els.map((e) => formatGridLine(lc(e).row)));
 
 	const setLc = (field: string, patch: Partial<LayoutChild>) =>
 		ins.setShared(field, (el) => {
@@ -305,8 +317,38 @@ function ResizingRows({ ins }: { ins: Inspect }) {
 			};
 		});
 
+	const place = (axis: "column" | "row") => (text: string) => {
+		const line = parseGridLine(text);
+		if (line === null) {
+			toast("Use a track number like 2, or a span like 1-3", {
+				tone: "danger",
+			});
+			return false;
+		}
+		setLc(`lc-${axis}`, { [axis]: line });
+		return true;
+	};
+
 	return (
 		<>
+			{grid && (
+				<Row label="Cell">
+					<Pair className="flex-1">
+						<CommitField
+							aria-label="Grid column"
+							placeholder="Column"
+							value={column}
+							onCommit={place("column")}
+						/>
+						<CommitField
+							aria-label="Grid row"
+							placeholder="Row"
+							value={row}
+							onCommit={place("row")}
+						/>
+					</Pair>
+				</Row>
+			)}
 			<Row label="Resizing">
 				<Select
 					aria-label="Width sizing"
@@ -353,14 +395,16 @@ function ResizingRows({ ins }: { ins: Inspect }) {
 				>
 					Absolute
 				</Checkbox>
-				<Checkbox
-					isSelected={grow === true}
-					isIndeterminate={grow === null}
-					onChange={(v) => setLc("lc-grow", { grow: v ? 1 : undefined })}
-					className="ml-2"
-				>
-					Grow
-				</Checkbox>
+				{!grid && (
+					<Checkbox
+						isSelected={grow === true}
+						isIndeterminate={grow === null}
+						onChange={(v) => setLc("lc-grow", { grow: v ? 1 : undefined })}
+						className="ml-2"
+					>
+						Grow
+					</Checkbox>
+				)}
 			</Row>
 		</>
 	);

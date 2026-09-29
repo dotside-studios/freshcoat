@@ -684,8 +684,10 @@ async function buildSideElements(
 					? storedToNodeBinding(n.binding)
 					: inferNodeBinding(n);
 				const r = transpileImage(n, ctx, imgBinding?.bind.image);
-				if (r.kind === "element") el = r.element;
-				else {
+				if (r.kind === "element") {
+					el = r.element;
+					for (const w of r.warnings) sink.warnings.push(w);
+				} else {
 					// Static placed image — rasterized, and parked exactly the way a
 					// flattened region is.
 					const placed = placeRaster(n, localFrame, target, inheritedOpacity);

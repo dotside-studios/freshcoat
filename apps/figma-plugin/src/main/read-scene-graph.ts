@@ -5,6 +5,8 @@ import type {
 	FigmaContainerNode,
 	FigmaContainerNodeType,
 	FigmaEffect,
+	FigmaGridTrack,
+	FigmaImageFilters,
 	FigmaNode,
 	FigmaPaint,
 	FigmaRectangleNode,
@@ -99,6 +101,8 @@ type AnyPaint = {
 	}>;
 	scaleMode?: string;
 	imageHash?: string | null;
+	imageTransform?: FigmaTransform;
+	filters?: FigmaImageFilters;
 };
 
 export function readPaint(paint: AnyPaint): FigmaPaint {
@@ -119,6 +123,12 @@ export function readPaint(paint: AnyPaint): FigmaPaint {
 			opacity: paint.opacity,
 			scaleMode: mode as "FILL" | "FIT" | "TILE" | "STRETCH",
 			imageRef: paint.imageHash ?? "",
+			...(paint.scaleMode === "CROP" && paint.imageTransform
+				? { imageTransform: paint.imageTransform }
+				: {}),
+			...(paint.filters && Object.values(paint.filters).some((v) => v)
+				? { filters: { ...paint.filters } }
+				: {}),
 		};
 	}
 	// Gradient (linear/radial/angular/diamond): emit REST-shaped gradient paint.
@@ -711,6 +721,10 @@ type AnyContainerNode = AnySceneNode & {
 	primaryAxisAlignItems?: string;
 	counterAxisAlignItems?: string;
 	layoutWrap?: string;
+	gridRowGap?: number;
+	gridColumnGap?: number;
+	gridRowSizes?: readonly { type: string; value?: number }[];
+	gridColumnSizes?: readonly { type: string; value?: number }[];
 	getMainComponentAsync?: () => Promise<{ id: string } | null>;
 };
 
@@ -745,8 +759,12 @@ function readContainer(node: AnyContainerNode): FigmaContainerNode {
 	// A COMPONENT_SET keeps ALL its component children (Phase 3 derives variants
 	// from them); the transpiler picks the base for template_data. A COMPONENT
 	// carries its variantProperties so the transpiler can build the join key.
+	const grid = node.layoutMode === "GRID";
 	const children = (node.children ?? [])
-		.map((c) => readNode(c as AnySceneNode & { type: string }))
+		.map((c) => {
+			const read = readNode(c as AnySceneNode & { type: string });
+			return read && grid ? { ...read, ...readGridChild(c) } : read;
+		})
 		.filter((c): c is FigmaNode => c !== null);
 
 	const result: FigmaContainerNode = {
@@ -771,6 +789,14 @@ function readContainer(node: AnyContainerNode): FigmaContainerNode {
 		primaryAxisAlignItems: node.primaryAxisAlignItems as never,
 		counterAxisAlignItems: node.counterAxisAlignItems as never,
 		layoutWrap: node.layoutWrap as never,
+		...(grid
+			? {
+					gridRowGap: node.gridRowGap,
+					gridColumnGap: node.gridColumnGap,
+					gridRowSizes: readTracks(node.gridRowSizes),
+					gridColumnSizes: readTracks(node.gridColumnSizes),
+				}
+			: {}),
 	};
 	if (node.variantProperties) {
 		result.componentProperties = Object.fromEntries(
@@ -781,6 +807,38 @@ function readContainer(node: AnyContainerNode): FigmaContainerNode {
 		);
 	}
 	return result;
+}
+
+function readTracks(
+	tracks: readonly { type: string; value?: number }[] | undefined,
+): FigmaGridTrack[] | undefined {
+	return tracks?.map((t) => ({
+		type: t.type as FigmaGridTrack["type"],
+		...(typeof t.value === "number" ? { value: t.value } : {}),
+	}));
+}
+
+// Where a child sits in its GRID parent. The fields only exist on a grid's
+// children, so they are read here rather than for every node.
+type GridChildFields = {
+	gridRowAnchorIndex?: number;
+	gridColumnAnchorIndex?: number;
+	gridRowSpan?: number;
+	gridColumnSpan?: number;
+};
+
+function readGridChild(node: AnySceneNode): GridChildFields {
+	const n = node as AnySceneNode & GridChildFields;
+	const out: GridChildFields = {};
+	for (const key of [
+		"gridRowAnchorIndex",
+		"gridColumnAnchorIndex",
+		"gridRowSpan",
+		"gridColumnSpan",
+	] as const) {
+		if (typeof n[key] === "number") out[key] = n[key];
+	}
+	return out;
 }
 
 /** Entry point: read a selected slot frame (or component set) into a container tree. */

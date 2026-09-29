@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
+import { parseImageFocus } from "./image-focus";
 import type {
 	Element,
 	FrameElement,
@@ -242,9 +243,29 @@ export const StrokeSchema = z.object({
 	align: z.enum(["inside", "outside", "center"]).optional(),
 });
 
+// Fractions of the source image's width and height.
+export const ImageCropSchema = z.object({
+	x: z.number().min(0).max(1),
+	y: z.number().min(0).max(1),
+	width: z.number().gt(0).max(1),
+	height: z.number().gt(0).max(1),
+});
+
 export const ImagePropertiesSchema = z.object({
 	src: z.string(),
 	fit: z.enum(["cover", "contain", "fill", "tile"]),
+	// The point of the image, as [x, y] fractions of it, that `cover` keeps in
+	// the middle of the box. A string is "x,y", so a field can carry a focal
+	// point per record: "{{photo_focus}}". Default the centre.
+	focus: z
+		.union([
+			z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
+			z.string(),
+		])
+		.optional(),
+	// The part of the source that is drawn, before `fit` places it. Ignored by
+	// `tile`.
+	crop: ImageCropSchema.optional(),
 	cornerRadius: z.number().optional(),
 	mask: ImageMaskSchema.optional(),
 	stroke: StrokeSchema.optional(),
@@ -326,17 +347,17 @@ export const ShadowSchema = z.object({
  *  same one-or-many shape a fill takes. */
 export const ShadowsSchema = z.union([ShadowSchema, z.array(ShadowSchema)]);
 
-export const LayoutSchema = z.object({
+const LayoutPaddingSchema = z.object({
+	top: z.number().optional(),
+	right: z.number().optional(),
+	bottom: z.number().optional(),
+	left: z.number().optional(),
+});
+
+export const FlexLayoutSchema = z.object({
 	direction: z.enum(["row", "column"]),
 	gap: z.number().optional(),
-	padding: z
-		.object({
-			top: z.number().optional(),
-			right: z.number().optional(),
-			bottom: z.number().optional(),
-			left: z.number().optional(),
-		})
-		.optional(),
+	padding: LayoutPaddingSchema.optional(),
 	primaryAlign: z
 		.enum([
 			"start",
@@ -352,6 +373,35 @@ export const LayoutSchema = z.object({
 	crossGap: z.number().optional(),
 });
 
+// A track is a length in design px, "auto" (as wide or tall as its largest
+// single-track child) or "<n>fr", a share of the space the others leave.
+export const GridTrackSchema = z.union([
+	z.number().min(0),
+	z.literal("auto"),
+	z.string().regex(/^(?:\d+(?:\.\d+)?|\.\d+)fr$/),
+]);
+
+// Children fill cells row by row unless their `layoutChild` names a column or
+// row. Rows beyond `rows` are added as "auto".
+export const GridLayoutSchema = z.object({
+	type: z.literal("grid"),
+	columns: z.array(GridTrackSchema).min(1),
+	rows: z.array(GridTrackSchema).optional(),
+	// One gap for both axes, or [row gap, column gap].
+	gap: z
+		.union([z.number().min(0), z.tuple([z.number().min(0), z.number().min(0)])])
+		.optional(),
+	padding: LayoutPaddingSchema.optional(),
+});
+
+export const LayoutSchema = z.union([FlexLayoutSchema, GridLayoutSchema]);
+
+// A 1-based track, or an inclusive [first, last] span.
+const GridLineSchema = z.union([
+	z.number().int().min(1),
+	z.tuple([z.number().int().min(1), z.number().int().min(1)]),
+]);
+
 export const LayoutChildSchema = z.object({
 	width: z.enum(["fixed", "hug", "fill"]).optional(),
 	height: z.enum(["fixed", "hug", "fill"]).optional(),
@@ -364,6 +414,21 @@ export const LayoutChildSchema = z.object({
 	max: z
 		.object({ width: z.number().optional(), height: z.number().optional() })
 		.optional(),
+	// Grid placement; ignored in a flex layout.
+	column: GridLineSchema.optional(),
+	row: GridLineSchema.optional(),
+});
+
+// Per-layer tone. Each factor is 1 for no change; `sharpen` is 0 for none.
+// `preserveHue` gives up saturation rather than hue when a boost pushes a
+// colour out of range.
+export const AdjustSchema = z.object({
+	saturation: z.number().min(0).optional(),
+	contrast: z.number().min(0).optional(),
+	brightness: z.number().min(0).optional(),
+	gamma: z.number().positive().optional(),
+	sharpen: z.number().min(0).optional(),
+	preserveHue: z.boolean().optional(),
 });
 
 // Shows an element only while a field is set (a boolean field is "true", any
@@ -402,6 +467,7 @@ const elementShellShape = {
 	blendMode: BlendModeSchema.optional(),
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
+	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),
 	// Several conditions must all hold.
@@ -632,6 +698,8 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceGradientStops(tpl, ctx);
 	enforceGradientPoints(tpl, ctx);
 	enforceFontsBlock(tpl, ctx);
+	enforceGridPlacement(tpl, ctx);
+	enforceImageFraming(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1147,6 +1215,115 @@ function enforceFontsBlock(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 					);
 				}
 			});
+		}
+	});
+}
+
+type ElementVisitor = (
+	el: { type?: unknown; properties?: unknown; layoutChild?: unknown },
+	path: (string | number)[],
+	parentLayout: unknown,
+) => void;
+
+function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
+	function walk(raw: unknown, path: (string | number)[], parentLayout: unknown) {
+		const el = raw as Parameters<ElementVisitor>[0] & {
+			properties?: { children?: unknown[]; mask?: unknown; layout?: unknown };
+		};
+		visit(el, path, parentLayout);
+		const props = el.properties;
+		if (!props) return;
+		if (el.type === "mask" && props.mask !== undefined)
+			walk(props.mask, [...path, "properties", "mask"], null);
+		if (Array.isArray(props.children)) {
+			const layout = el.type === "frame" ? props.layout : null;
+			props.children.forEach((child, i) => {
+				walk(child, [...path, "properties", "children", i], layout);
+			});
+		}
+	}
+	tpl.template_data.forEach((frame, fi) => {
+		walk(frame.background, ["template_data", fi, "background"], null);
+		frame.elements.forEach((el, ei) => {
+			walk(el, ["template_data", fi, "elements", ei], null);
+		});
+	});
+}
+
+// A grid child's column span has to lie within the columns the grid declares.
+// Rows past the declared ones are added as needed, so a row only has to run
+// forwards.
+function enforceGridPlacement(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path, parentLayout) => {
+		const lc = el.layoutChild as
+			| { column?: number | [number, number]; row?: number | [number, number] }
+			| undefined;
+		const grid = parentLayout as
+			| { type?: unknown; columns?: unknown[] }
+			| null
+			| undefined;
+		if (!lc || grid?.type !== "grid" || !Array.isArray(grid.columns)) return;
+		const columns = grid.columns.length;
+		const check = (
+			axis: "column" | "row",
+			value: number | [number, number] | undefined,
+			max: number,
+		) => {
+			if (value === undefined) return;
+			const [first, last] = typeof value === "number" ? [value, value] : value;
+			if (last < first) {
+				addKitIssue(
+					ctx,
+					"grid_span_reversed",
+					`layoutChild.${axis} ends before it starts`,
+					[...path, "layoutChild", axis],
+				);
+			} else if (last > max) {
+				addKitIssue(
+					ctx,
+					"grid_span_out_of_range",
+					`layoutChild.${axis} reaches track ${last}, but the grid has ${max}`,
+					[...path, "layoutChild", axis],
+				);
+			}
+		};
+		check("column", lc.column, columns);
+		check("row", lc.row, Number.POSITIVE_INFINITY);
+	});
+}
+
+// A crop has to stay inside the image, and a focal point written as text
+// without a {{field}} has to read as one.
+function enforceImageFraming(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		if (el.type !== "image") return;
+		const props = el.properties as {
+			focus?: unknown;
+			crop?: { x: number; y: number; width: number; height: number };
+		};
+		const crop = props.crop;
+		if (
+			crop &&
+			(crop.x + crop.width > 1 + 1e-9 || crop.y + crop.height > 1 + 1e-9)
+		) {
+			addKitIssue(
+				ctx,
+				"image_crop_out_of_range",
+				"crop must lie inside the image: x + width and y + height at most 1",
+				[...path, "properties", "crop"],
+			);
+		}
+		if (
+			typeof props.focus === "string" &&
+			!props.focus.includes("{{") &&
+			parseImageFocus(props.focus) === undefined
+		) {
+			addKitIssue(
+				ctx,
+				"invalid_image_focus",
+				'focus text must be "x,y" with both in [0, 1], or reference a field',
+				[...path, "properties", "focus"],
+			);
 		}
 	});
 }

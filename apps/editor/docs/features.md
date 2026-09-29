@@ -119,7 +119,20 @@ the records, and **Export** turns templates and records into files.
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
-    effects and conditional visibility.
+    effects, adjustments and conditional visibility.
+  - Auto layout is Flex or Grid. A grid sets how many columns and rows it
+    has, and each one is Fill (a share of the free space), Fixed (a length)
+    or Hug (its content's size). With no rows set, rows are added as the
+    children need them. Row and column gaps are separate. A child
+    of a grid is placed by its Cell, a column and a row such as `2` or `1-3`;
+    left empty, it takes the next free cell.
+  - Adjust sets a layer's saturation, contrast, brightness, gamma and
+    sharpening, and whether a boost keeps hue. On a frame it adjusts
+    everything inside it.
+  - An image set to Cover has a focus: a fixed point in percent of the
+    image, or a field whose value (`x,y`, such as `0.4,0.3`) moves it for
+    each record. Crop keeps part of the source, in percent, before the fit;
+    Tile ignores it.
   - A font picker over the whole Google Fonts catalog: search, category
     chips, sort by popularity or name, the template's own families first, and
     each family previewed in its own face. Picking one adds it to the
@@ -421,10 +434,10 @@ reaches every variant at once.
   change. One edit is one undo step, as anywhere else.
 - **What a variant can change:** a side's background, and for each layer its
   position, size, rotation, opacity, whether it shows, and any of its own
-  properties (fill, stroke, text, font, color, and so on). Effects, blend
-  mode, constraints, auto-layout sizing and visibility conditions are the
-  same in every variant: their sections say so while a variant is active,
-  and edits there change Default.
+  properties (fill, stroke, text, font, color, and so on). Effects,
+  adjustments, blend mode, constraints, auto-layout sizing, grid cells and
+  visibility conditions are the same in every variant: their sections say so
+  while a variant is active, and edits there change Default.
 - **Structure is shared:** adding, deleting, duplicating, grouping,
   reordering and renaming layers and sides applies to every variant, and
   keeps each variant's changes with the layers they belong to.

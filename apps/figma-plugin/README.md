@@ -105,6 +105,19 @@ layers were kept, flattened or skipped.
   `angle`. A short, off-centre gradient on a wide layer therefore renders
   where it was drawn rather than across the whole box. Handles on the same point fall back to
   the angle alone.
+- **Grid auto layout.** A Figma grid becomes a coatfile grid: fixed tracks
+  keep their length, flexible ones become `fr` shares and hug tracks `auto`,
+  with the row and column gaps and padding. Each child keeps its cell as a
+  1-based `column` and `row`, spans included.
+- **Field images.** An image bound to a field keeps its paint's exposure,
+  contrast and saturation as an `adjust`. Figma gives no formula for them,
+  so they are close readings and the export says so
+  (`image_filter_approximated`); temperature, tint, highlights and shadows
+  are left out with `image_filter_unsupported`. A Crop paint becomes a `crop`
+  region drawn with `fill`, so every record's photo is cropped the same way;
+  a rotated or skewed crop falls back to cover with
+  `image_crop_unsupported`. A static image is rasterized as Figma draws it,
+  filters and crop included.
 - **Colorways.** Each instance of the card component named `<Card> / <Label>`
   becomes a variant, after a first **Default** that is the card itself. What
   the instance changes is diffed against the card, layer by layer: its

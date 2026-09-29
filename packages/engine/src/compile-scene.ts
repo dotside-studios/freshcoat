@@ -244,6 +244,8 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				op: "drawImage",
 				src: node.src,
 				fit: node.fit,
+				...(node.focus ? { focus: node.focus } : {}),
+				...(node.crop ? { crop: node.crop } : {}),
 				stroke: node.stroke,
 				clip: node.mask,
 			};

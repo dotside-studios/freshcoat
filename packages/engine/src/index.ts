@@ -9,9 +9,11 @@
 
 export {
 	type AdjustOptions,
+	applyAdjustColor,
 	brightnessMatrix,
 	buildAdjust,
 	type ColorMatrix,
+	composeAdjust,
 	concatColorMatrix,
 	contrastMatrix,
 	gammaLut,
@@ -116,6 +118,7 @@ export {
 } from "./paint-cache";
 export {
 	decorationLine,
+	type FitOptions,
 	fitRect,
 	insetCorner,
 	strokeInset,
