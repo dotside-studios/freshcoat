@@ -110,8 +110,10 @@ the records, and **Export** turns templates and records into files.
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
-  - Auto layout is Flex or Grid. A grid takes its columns and rows as track
-    lists such as `120 1fr auto`, and separate row and column gaps. A child
+  - Auto layout is Flex or Grid. A grid sets how many columns and rows it
+    has, and each one is Fill (a share of the free space), Fixed (a length)
+    or Hug (its content's size). With no rows set, rows are added as the
+    children need them. Row and column gaps are separate. A child
     of a grid is placed by its Cell, a column and a row such as `2` or `1-3`;
     left empty, it takes the next free cell.
   - Adjust sets a layer's saturation, contrast, brightness, gamma and

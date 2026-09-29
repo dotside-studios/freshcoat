@@ -1,9 +1,4 @@
-import type {
-	Background,
-	Element,
-	GridTrack,
-	Template,
-} from "@freshcoat-js/coatfile";
+import type { Background, Element, Template } from "@freshcoat-js/coatfile";
 import type { EditorController } from "~/app/controller";
 import type { LayerGeometry } from "~/doc/geometry";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";
@@ -111,23 +106,6 @@ export function parseDash(text: string): number[] | undefined | null {
 	const parts = s.split(/[\s,]+/).map(Number);
 	if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
 	return parts;
-}
-
-const TRACK = /^(?:\d+(?:\.\d+)?|\.\d+)(?:fr)?$|^auto$/;
-
-/** Parses "120 1fr auto" into grid tracks; empty is undefined, a typo null. */
-export function parseTracks(text: string): GridTrack[] | undefined | null {
-	const s = text.trim();
-	if (!s) return undefined;
-	const parts = s.split(/[\s,]+/);
-	if (!parts.every((p) => TRACK.test(p))) return null;
-	return parts.map((p) =>
-		p === "auto" || p.endsWith("fr") ? (p as GridTrack) : Number(p),
-	);
-}
-
-export function formatTracks(tracks: readonly GridTrack[] | undefined): string {
-	return (tracks ?? []).map(String).join(" ");
 }
 
 type GridLine = number | [number, number];

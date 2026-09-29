@@ -12,6 +12,7 @@ import {
 	fireEvent,
 	render,
 	screen,
+	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
@@ -171,14 +172,20 @@ describe("DesignPanel", () => {
 			gap: 10,
 			padding: { top: 10, right: 10, bottom: 10, left: 10 },
 		});
-		typeInto(screen.getByLabelText("Grid columns"), "80 1fr auto");
-		expect(layout()).toMatchObject({ columns: [80, "1fr", "auto"] });
-		typeInto(screen.getByLabelText("Grid columns"), "wide");
-		expect(layout()).toMatchObject({ columns: [80, "1fr", "auto"] });
-		expect(screen.getByLabelText("Grid columns")).toHaveProperty(
-			"value",
-			"80 1fr auto",
-		);
+		typeInto(screen.getByRole("spinbutton", { name: "Column count" }), "3");
+		expect(layout()).toMatchObject({ columns: ["1fr", "1fr", "1fr"] });
+		const first = screen.getByRole("radiogroup", { name: "Column 1 size" });
+		fireEvent.click(within(first).getByRole("radio", { name: "Fixed" }));
+		typeInto(screen.getByRole("spinbutton", { name: "Column 1 size" }), "80");
+		typeInto(screen.getByRole("spinbutton", { name: "Column 2 share" }), "2");
+		const third = screen.getByRole("radiogroup", { name: "Column 3 size" });
+		fireEvent.click(within(third).getByRole("radio", { name: "Hug" }));
+		expect(layout()).toMatchObject({ columns: [80, "2fr", "auto"] });
+		expect(screen.getByText("Added as children need them")).toBeTruthy();
+		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "2");
+		expect(layout()).toMatchObject({ rows: ["auto", "auto"] });
+		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "0");
+		expect(layout()).not.toHaveProperty("rows");
 		typeInto(screen.getByRole("spinbutton", { name: "Row gap" }), "4");
 		expect(layout()).toMatchObject({ gap: [4, 10] });
 		expect(validate(c.template).ok).toBe(true);

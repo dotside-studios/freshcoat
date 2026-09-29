@@ -2,30 +2,18 @@ import type {
 	FrameElement,
 	FrameFlexLayout,
 	FrameGridLayout,
+	GridTrack,
 	Layout,
 } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { toast } from "@freshcoat-js/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import ArrowDownIcon from "~icons/mingcute/arrow-down-line";
 import ArrowRightIcon from "~icons/mingcute/arrow-right-line";
-import {
-	AddButton,
-	CommitField,
-	Notice,
-	Pair,
-	RemoveButton,
-	Row,
-} from "./controls";
-import {
-	commonValue,
-	formatTracks,
-	type Inspect,
-	parseTracks,
-} from "./field-helpers";
+import { AddButton, Notice, Pair, RemoveButton, Row } from "./controls";
+import { commonValue, type Inspect } from "./field-helpers";
 
 export const DEFAULT_LAYOUT: Layout = { direction: "row", gap: 8 };
 
@@ -316,7 +304,44 @@ function FlexRows({
 	);
 }
 
-const TRACK_HINT = "Use lengths, auto or fr, like 120 1fr auto";
+type TrackKind = "fill" | "fixed" | "hug";
+type Axis = "columns" | "rows";
+
+const TRACK_KINDS: [TrackKind, string][] = [
+	["fill", "Fill"],
+	["fixed", "Fixed"],
+	["hug", "Hug"],
+];
+
+const AXIS_NAME: Record<Axis, string> = { columns: "Column", rows: "Row" };
+
+export function trackKind(t: GridTrack): TrackKind {
+	if (typeof t === "number") return "fixed";
+	return t === "auto" ? "hug" : "fill";
+}
+
+/** A fill track's share or a fixed track's length; a hug track has none. */
+export function trackAmount(t: GridTrack): number | null {
+	if (typeof t === "number") return t;
+	return t === "auto" ? null : Number.parseFloat(t);
+}
+
+export function makeTrack(kind: TrackKind, amount?: number): GridTrack {
+	if (kind === "hug") return "auto";
+	if (kind === "fixed") return amount ?? 100;
+	return `${amount ?? 1}fr`;
+}
+
+/** The first `count` tracks, new ones filling for columns and hugging for
+ *  rows. */
+export function resizeTracks(
+	tracks: readonly GridTrack[],
+	count: number,
+	axis: Axis,
+): GridTrack[] {
+	const fresh: GridTrack = axis === "columns" ? "1fr" : "auto";
+	return Array.from({ length: count }, (_, i) => tracks[i] ?? fresh);
+}
 
 function GridRows({
 	pick,
@@ -334,33 +359,32 @@ function GridRows({
 			next[axis] = v;
 			return { gap: packGap(next) };
 		});
-	const commitTracks = (axis: "columns" | "rows") => (text: string) => {
-		const tracks = parseTracks(text);
-		if (tracks === null || (axis === "columns" && tracks === undefined)) {
-			toast(TRACK_HINT, { tone: "danger" });
-			return false;
-		}
-		set(axis, () => ({ [axis]: tracks }));
-		return true;
-	};
+	const setCount = (axis: Axis, n: number) =>
+		set(`${axis}-count`, (l) => {
+			const count = Math.max(axis === "columns" ? 1 : 0, Math.round(n));
+			const tracks = resizeTracks(l[axis] ?? [], count, axis);
+			return { [axis]: tracks.length > 0 ? tracks : undefined };
+		});
+	const setTrack = (axis: Axis, i: number, track: GridTrack) =>
+		set(`${axis}-${i}`, (l) => {
+			const tracks = [...(l[axis] ?? [])];
+			if (i >= tracks.length) return {};
+			tracks[i] = track;
+			return { [axis]: tracks };
+		});
+
 	return (
 		<>
-			<Row label="Columns">
-				<CommitField
-					aria-label="Grid columns"
-					placeholder="1fr 1fr"
-					value={pick((l) => formatTracks(l.columns))}
-					onCommit={commitTracks("columns")}
+			{(["columns", "rows"] as const).map((axis) => (
+				<TrackList
+					key={axis}
+					axis={axis}
+					count={pick((l) => l[axis]?.length ?? 0)}
+					tracks={pick((l) => l[axis] ?? [])}
+					onCount={(n) => setCount(axis, n)}
+					onTrack={(i, t) => setTrack(axis, i, t)}
 				/>
-			</Row>
-			<Row label="Rows">
-				<CommitField
-					aria-label="Grid rows"
-					placeholder="Auto"
-					value={pick((l) => formatTracks(l.rows))}
-					onCommit={commitTracks("rows")}
-				/>
-			</Row>
+			))}
 			<Row label="Gap">
 				<Pair className="flex-1">
 					<NumberField
@@ -379,6 +403,83 @@ function GridRows({
 					/>
 				</Pair>
 			</Row>
+		</>
+	);
+}
+
+function TrackList({
+	axis,
+	count,
+	tracks,
+	onCount,
+	onTrack,
+}: {
+	axis: Axis;
+	count: number | null;
+	tracks: GridTrack[] | null;
+	onCount: (n: number) => void;
+	onTrack: (i: number, t: GridTrack) => void;
+}) {
+	const name = AXIS_NAME[axis];
+	return (
+		<>
+			<Row label={axis === "columns" ? "Columns" : "Rows"}>
+				<NumberField
+					aria-label={`${name} count`}
+					className="min-w-0 flex-1"
+					min={axis === "columns" ? 1 : 0}
+					max={24}
+					precision={0}
+					value={count}
+					onChange={onCount}
+				/>
+			</Row>
+			{axis === "rows" && count === 0 && (
+				<Notice>Added as children need them</Notice>
+			)}
+			{tracks?.map((t, i) => {
+				const kind = trackKind(t);
+				const amount = trackAmount(t);
+				const label = `${name} ${i + 1}`;
+				return (
+					<Row
+						// biome-ignore lint/suspicious/noArrayIndexKey: tracks are positional
+						key={i}
+						label={<span className="pl-2">{i + 1}</span>}
+					>
+						<ToggleGroup
+							aria-label={`${label} size`}
+							selectedKeys={[kind]}
+							onSelectionChange={(k) => {
+								const next = [...k][0] as TrackKind | undefined;
+								if (next && next !== kind) onTrack(i, makeTrack(next));
+							}}
+						>
+							{TRACK_KINDS.map(([id, text]) => (
+								<ToggleGroupItem key={id} id={id}>
+									{text}
+								</ToggleGroupItem>
+							))}
+						</ToggleGroup>
+						{amount !== null && (
+							<NumberField
+								aria-label={
+									kind === "fill" ? `${label} share` : `${label} size`
+								}
+								className="w-[64px]"
+								unit={kind === "fill" ? "fr" : undefined}
+								min={kind === "fill" ? 0.1 : 0}
+								precision={kind === "fill" ? 2 : 1}
+								value={amount}
+								onChange={(v) => onTrack(i, makeTrack(kind, v))}
+							/>
+						)}
+					</Row>
+				);
+			})}
+			{count !== null && tracks === null && (
+				<Notice>The frames' {axis} differ</Notice>
+			)}
 		</>
 	);
 }

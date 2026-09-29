@@ -3,17 +3,23 @@ import { validate } from "@freshcoat-js/coatfile";
 import { beforeEach, describe, expect, it } from "vitest";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
-import { gridGaps, packGap, switchLayout } from "~/panels/design/FrameSection";
+import {
+	gridGaps,
+	makeTrack,
+	packGap,
+	resizeTracks,
+	switchLayout,
+	trackAmount,
+	trackKind,
+} from "~/panels/design/FrameSection";
 import {
 	commonValue,
 	documentSwatches,
 	focusFieldOf,
 	formatGridLine,
-	formatTracks,
 	mergeKeyOf,
 	parseDash,
 	parseGridLine,
-	parseTracks,
 	patchLayers,
 } from "~/panels/design/field-helpers";
 import { googleFontUrls, verifyGoogleFamily } from "~/panels/design/fonts";
@@ -179,14 +185,27 @@ describe("font families", () => {
 });
 
 describe("grid helpers", () => {
-	it("parses and formats track lists", () => {
-		expect(parseTracks("120 1fr auto")).toEqual([120, "1fr", "auto"]);
-		expect(parseTracks("1.5fr, .5fr")).toEqual(["1.5fr", ".5fr"]);
-		expect(parseTracks("  ")).toBeUndefined();
-		expect(parseTracks("1fr wide")).toBeNull();
-		expect(parseTracks("-4")).toBeNull();
-		expect(formatTracks([120, "1fr", "auto"])).toBe("120 1fr auto");
-		expect(formatTracks(undefined)).toBe("");
+	it("reads and builds tracks by kind", () => {
+		expect([120, "1.5fr", "auto"].map((t) => trackKind(t))).toEqual([
+			"fixed",
+			"fill",
+			"hug",
+		]);
+		expect([120, "1.5fr", "auto"].map((t) => trackAmount(t))).toEqual([
+			120,
+			1.5,
+			null,
+		]);
+		expect(makeTrack("fill")).toBe("1fr");
+		expect(makeTrack("fill", 2)).toBe("2fr");
+		expect(makeTrack("fixed")).toBe(100);
+		expect(makeTrack("hug", 40)).toBe("auto");
+	});
+
+	it("adds and drops tracks at the end", () => {
+		expect(resizeTracks([80], 3, "columns")).toEqual([80, "1fr", "1fr"]);
+		expect(resizeTracks([], 2, "rows")).toEqual(["auto", "auto"]);
+		expect(resizeTracks([80, "2fr", "auto"], 1, "columns")).toEqual([80]);
 	});
 
 	it("parses and formats grid lines", () => {
