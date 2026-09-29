@@ -67,7 +67,10 @@ describe("OpenType features", () => {
 	test("a span's features merge over the element's", () => {
 		const line = bake({
 			font: { ...font, features: { tnum: 1, liga: 0 } },
-			spans: [{ text: "1111 " }, { text: "1111", font: { features: { tnum: 0 } } }],
+			spans: [
+				{ text: "1111 " },
+				{ text: "1111", font: { features: { tnum: 0 } } },
+			],
 		}).lines[0];
 		const [tabular, proportional] = line.spans;
 		expect(tabular.font.features).toEqual({ tnum: 1, liga: 0 });

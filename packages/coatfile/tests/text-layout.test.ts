@@ -90,8 +90,7 @@ describe("text layout properties", () => {
 		expect(textNode({}).paragraphSpacing).toBeUndefined();
 		const tpl = template({ paragraphSpacing: 12 });
 		const compiled = compile(tpl, {}, { width: 600, height: 400 });
-		const children = (compiled.frames[0].root as { children: Node[] })
-			.children;
+		const children = (compiled.frames[0].root as { children: Node[] }).children;
 		const node = children.find((c) => c.kind === "text") as TextNode;
 		expect(node.paragraphSpacing).toBe(24);
 		expect(validate(template({ paragraphSpacing: -1 })).ok).toBe(false);

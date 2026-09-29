@@ -874,9 +874,7 @@ describe("readTextNode with mixed (symbol) font properties", () => {
 	});
 
 	it("reads paragraph spacing, and treats mixed as unset", () => {
-		const out = readTextNode(
-			mixedTextNode({ paragraphSpacing: 12 } as never),
-		);
+		const out = readTextNode(mixedTextNode({ paragraphSpacing: 12 } as never));
 		expect(out.style.paragraphSpacing).toBe(12);
 		const mixed = readTextNode(
 			mixedTextNode({ paragraphSpacing: Symbol("mixed") } as never),

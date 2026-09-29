@@ -70,18 +70,18 @@ describe("text direction", () => {
 
 	test("start and end follow the direction", () => {
 		const bake = (p: Partial<TextNode>) =>
-			bakeText(node({ text: SHALOM, ...p }), { textEngine: engine })
-				.lines[0];
+			bakeText(node({ text: SHALOM, ...p }), { textEngine: engine }).lines[0];
 		const rtlStart = bake({ direction: "rtl", align: "start" });
 		expect(rtlStart.direction).toBe("rtl");
 		expect(right(rtlStart.spans[0])).toBeCloseTo(310, 5);
 		expect(bake({ direction: "rtl", align: "end" }).spans[0].x).toBe(10);
 		expect(bake({ direction: "ltr", align: "start" }).spans[0].x).toBe(10);
-		expect(bake({ direction: "ltr", align: "start" }).direction).toBeUndefined();
-		expect(right(bake({ direction: "auto", align: "start" }).spans[0])).toBeCloseTo(
-			310,
-			5,
-		);
+		expect(
+			bake({ direction: "ltr", align: "start" }).direction,
+		).toBeUndefined();
+		expect(
+			right(bake({ direction: "auto", align: "start" }).spans[0]),
+		).toBeCloseTo(310, 5);
 		// left and right stay physical under either direction.
 		expect(bake({ direction: "rtl", align: "left" }).spans[0].x).toBe(10);
 	});

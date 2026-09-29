@@ -92,7 +92,10 @@ export function bakeText(
 		align: physicalAlign(node.align ?? "left", rtl),
 		last: physicalAlign(node.alignLast ?? "start", rtl),
 		rtl,
-		spacing: snapToDevice(Math.max(0, node.paragraphSpacing ?? 0), opts.deviceScale),
+		spacing: snapToDevice(
+			Math.max(0, node.paragraphSpacing ?? 0),
+			opts.deviceScale,
+		),
 	};
 	const verticalAlign = node.verticalAlign ?? "top";
 	const fit = node.fit;

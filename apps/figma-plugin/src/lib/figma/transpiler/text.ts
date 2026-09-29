@@ -184,9 +184,9 @@ export function transpileText(
 }
 
 /** Figma's explicitly set OpenType features, as coatfile's lowercase tags. */
-function fontFeatures(
-	features: Record<string, boolean> | undefined,
-): { features?: Record<string, number> } {
+function fontFeatures(features: Record<string, boolean> | undefined): {
+	features?: Record<string, number>;
+} {
 	const entries = Object.entries(features ?? {}).filter(([tag]) =>
 		/^[A-Za-z0-9]{4}$/.test(tag),
 	);

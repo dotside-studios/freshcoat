@@ -685,8 +685,7 @@ function gridItemSize(
 function gridIntrinsicWidth(child: Node, measure: MeasureText): number {
 	if (isRotated(child))
 		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).width;
-	if (child.kind === "text")
-		return measureText(child, measure, null).width;
+	if (child.kind === "text") return measureText(child, measure, null).width;
 	return child.size?.width ?? 0;
 }
 
@@ -697,8 +696,7 @@ function gridIntrinsicHeight(
 ): number {
 	if (isRotated(child))
 		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).height;
-	if (child.kind === "text")
-		return measureText(child, measure, width).height;
+	if (child.kind === "text") return measureText(child, measure, width).height;
 	return child.size?.height ?? 0;
 }
 
