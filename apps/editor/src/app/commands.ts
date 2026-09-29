@@ -364,6 +364,7 @@ export const COMMANDS: Command[] = [
 	tool("rect", "Rectangle", "R"),
 	tool("ellipse", "Ellipse", "O"),
 	tool("text", "Text", "T"),
+	tool("pen", "Pen", "P"),
 	tool("image", "Image…", "I"),
 	tool("qr", "QR code", "Q"),
 	tool("barcode", "Barcode", "B"),

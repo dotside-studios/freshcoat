@@ -8,6 +8,7 @@ import BarcodeIcon from "~icons/mingcute/barcode-line";
 import MoveIcon from "~icons/mingcute/cursor-2-line";
 import FrameIcon from "~icons/mingcute/frame-line";
 import HandIcon from "~icons/mingcute/hand-line";
+import PenIcon from "~icons/mingcute/pen-line";
 import ImageIcon from "~icons/mingcute/pic-line";
 import QrIcon from "~icons/mingcute/qrcode-line";
 import EllipseIcon from "~icons/mingcute/round-line";
@@ -25,6 +26,7 @@ export const TOOL_ICONS: Record<Tool, Icon> = {
 	rect: RectIcon,
 	ellipse: EllipseIcon,
 	text: TextIcon,
+	pen: PenIcon,
 	image: ImageIcon,
 	qr: QrIcon,
 	barcode: BarcodeIcon,

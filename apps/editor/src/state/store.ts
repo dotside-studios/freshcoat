@@ -58,6 +58,7 @@ export type Tool =
 	| "rect"
 	| "ellipse"
 	| "text"
+	| "pen"
 	| "image"
 	| "qr"
 	| "barcode";

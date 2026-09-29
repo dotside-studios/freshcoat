@@ -122,7 +122,13 @@ the records, and **Export** turns templates and records into files.
     the side. Each side keeps its own guides, and adding, moving and removing
     them are undo steps. Guides are saved in the `.coatworkspace`, not the
     template, so a `.coat` and every export are unchanged.
-  - Creation tools: frame, rectangle, ellipse, text, image, QR and barcode.
+  - Creation tools: frame, rectangle, ellipse, pen, text, image, QR and
+    barcode.
+  - Pen (P): click to place corner points and drag to place smooth ones;
+    Shift keeps a segment on 45 degree lines. Click the first point to close
+    the path, press Enter or Esc to finish an open one, and Backspace to take
+    back the last point. The path becomes a vector layer, stroked when open
+    and filled when closed, whose path data the inspector edits.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
     radial one's center and two radii, an angular one's center and rotation,
     and a dot per stop. Shift snaps directions to 15 degrees, and a click on

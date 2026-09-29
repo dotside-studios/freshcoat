@@ -67,6 +67,7 @@ import {
 	siblingsOf,
 	walkLayers,
 } from "~/doc/path";
+import { type PenPath, penElement } from "~/doc/pen";
 import {
 	activeVariantId,
 	geometryForBase,
@@ -548,6 +549,17 @@ export class EditorController {
 			src: opts.src,
 		});
 		const key = this.insert(element, opts.parent);
+		this.dispatch({ type: "setTool", tool: "move" });
+		return key;
+	}
+
+	/** Adds a drawn path as a vector layer on the side, selected, and goes
+	 *  back to the move tool. */
+	createPath(path: PenPath): string | null {
+		const t = this.template;
+		if (!t) return null;
+		const element = penElement(path, t, this.state.side);
+		const key = element ? this.insert(element) : null;
 		this.dispatch({ type: "setTool", tool: "move" });
 		return key;
 	}
