@@ -68,6 +68,8 @@ export {
 	FORMAT_VERSION,
 	type FormatVersionStatus,
 	formatVersionStatus,
+	minimumFormatVersion,
+	raiseFormatVersion,
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { substitute } from "./mustache";

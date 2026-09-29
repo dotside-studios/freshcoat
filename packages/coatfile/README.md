@@ -273,6 +273,21 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 
+A writer that re-saves a template it did not create keeps the version the file
+was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
+1.2 kit would re-save it and drop the barcode. `minimumFormatVersion(t)` names
+the lowest minor that covers every field `t` uses, and `raiseFormatVersion(t)`
+stamps it when it is higher than `t.format_version`. It never lowers the
+version, leaves a `"newer"` or `"unsupported"` one untouched, and returns `t`
+itself when nothing changes. Call it before `packTemplate` or
+`serializeTemplate`.
+
+```ts
+import { raiseFormatVersion } from "@freshcoat-js/coatfile";
+
+const bytes = await packTemplate(raiseFormatVersion(template));
+```
+
 `schema/coatfile.v1.schema.json` is the JSON Schema derived from the zod schema
 `validate` runs. `bun run schema` regenerates it, and a test fails when it
 drifts. Its `$id` is the copy the npm CDN serves from the published package,
