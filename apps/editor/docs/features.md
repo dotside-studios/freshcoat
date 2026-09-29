@@ -89,6 +89,11 @@ the records, and **Export** turns templates and records into files.
     group.
   - Move, resize and rotate, with snapping to the artboard and to other layers.
   - Arrow keys nudge a layer, and Esc cancels a drag.
+  - Double-click a selected text layer to edit it in place: a text box in
+    the layer's font stands in for it, with the raw template text and its
+    `{{field}}` tokens, even while a record preview fills the fields in. Esc,
+    Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
+    text is edited in the inspector.
   - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
   - Creation tools: frame, rectangle, ellipse, text, image, QR and barcode.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a

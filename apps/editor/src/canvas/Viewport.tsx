@@ -48,6 +48,7 @@ import {
 	printGuidesOn,
 	usePrintGuidesVersion,
 } from "./print-guides";
+import { TextEditor } from "./TextEditor";
 import { useLiveRender } from "./use-live-render";
 
 const DRAG_THRESHOLD = { mouse: 3, touch: 6 };
@@ -651,6 +652,7 @@ export function Viewport() {
 		const selected = controller.state.selection;
 		const el = getElement(t, deep);
 		if (selected.includes(deep) && el && "type" in el && el.type === "text") {
+			if (controller.beginTextEdit(deep)) return;
 			controller.dispatch({ type: "setRightTab", tab: "design" });
 			controller.dispatch({ type: "setPanels", panels: { right: true } });
 			requestAnimationFrame(() =>
@@ -734,6 +736,7 @@ export function Viewport() {
 						) : null}
 					</div>
 					<Overlay draft={draft} />
+					<TextEditor />
 				</>
 			) : null}
 		</div>

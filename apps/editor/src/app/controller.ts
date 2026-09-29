@@ -44,6 +44,7 @@ import {
 	removeVariant,
 	setHiddenInVariant,
 	ungroup,
+	updateElement,
 } from "~/doc/ops";
 import {
 	childPaths,
@@ -150,6 +151,7 @@ export class EditorController {
 	private namePrompt: NamePrompt | undefined;
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
+	private textEditFrom: string | undefined;
 
 	constructor(store: EditorStore = createEditorStore()) {
 		this.store = store;
@@ -394,6 +396,49 @@ export class EditorController {
 
 	toggleLocked(keys = this.state.selection): void {
 		for (const key of keys) this.dispatch({ type: "toggleLocked", key });
+	}
+
+	// ── Text on the canvas ──────────────────────────────────────────────────
+
+	/** Starts editing a text layer's raw template text on the canvas, as one
+	 *  undo step. False for a layer that isn't plain text (mixed-style spans are
+	 *  edited in the inspector). */
+	beginTextEdit(key: string): boolean {
+		const t = this.template;
+		const el = t && getElement(t, key);
+		if (!el || !("type" in el) || el.type !== "text") return false;
+		if (el.properties.spans?.length) return false;
+		if (this.state.textEdit) this.endTextEdit();
+		this.select([key]);
+		this.beginTx();
+		this.textEditFrom = el.properties.value ?? "";
+		this.dispatch({ type: "textEdit", key });
+		return true;
+	}
+
+	/** Shows the edited text on the layer, within the edit's undo step. */
+	setEditedText(value: string): void {
+		const key = this.state.textEdit;
+		const t = this.template;
+		if (!key || !t) return;
+		const r = updateElement(t, key, { properties: { value } });
+		if (r.ok) this.previewTx(r.template);
+	}
+
+	/** Ends the edit: one undo step when the text changed, none otherwise. */
+	endTextEdit(): void {
+		const key = this.state.textEdit;
+		if (!key) return;
+		const t = this.template;
+		const el = t && getElement(t, key);
+		const value =
+			el && "type" in el && el.type === "text"
+				? el.properties.value
+				: undefined;
+		this.dispatch({ type: "textEdit", key: null });
+		if ((value ?? "") === this.textEditFrom) this.cancelTx();
+		else this.endTx();
+		this.textEditFrom = undefined;
 	}
 
 	/** Inserts a new layer, at the top of `parent` (the side when omitted). */

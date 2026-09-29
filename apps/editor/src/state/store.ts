@@ -132,6 +132,9 @@ export type EditorState = {
 	/** The gradient fill last opened in the inspector, which the canvas
 	 *  handles edit while its layer is the one selected. */
 	activeFill: { key: string; index: number } | null;
+	/** The text layer being edited on the canvas, which the render leaves out
+	 *  while its editor stands in for it. */
+	textEdit: string | null;
 };
 
 export type Action =
@@ -168,6 +171,7 @@ export type Action =
 	| { type: "resetValues" }
 	| { type: "select"; keys: string[]; mode?: "replace" | "add" | "toggle" }
 	| { type: "hover"; key: string | null }
+	| { type: "textEdit"; key: string | null }
 	| { type: "toggleHidden"; key: string }
 	| { type: "toggleLocked"; key: string }
 	| { type: "setTool"; tool: Tool }
@@ -254,6 +258,7 @@ export function initialState(
 		previewRecordId: null,
 		exportRecordId: null,
 		activeFill: null,
+		textEdit: null,
 	};
 }
 
@@ -482,6 +487,10 @@ function reduceView(state: EditorState, action: Action): EditorState {
 			return state.hover === action.key
 				? state
 				: { ...state, hover: action.key };
+		case "textEdit":
+			return state.textEdit === action.key
+				? state
+				: { ...state, textEdit: action.key };
 		case "toggleHidden":
 			return { ...state, hidden: toggled(state.hidden, action.key) };
 		case "toggleLocked": {

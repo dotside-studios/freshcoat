@@ -1,5 +1,5 @@
 import type { Node, PaintWarning } from "@freshcoat-js/engine";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { previewEdge, usePreviewImages } from "~/data/thumbnails";
 import { collectGeometry, type LayerGeometry } from "~/doc/geometry";
@@ -32,7 +32,12 @@ export function useLiveRender(): {
 	const template = useEditor((s) => s.doc?.history.present ?? null);
 	const side = useEditor((s) => s.side);
 	const variantId = useEditor((s) => s.variantId);
-	const hidden = useEditor((s) => s.hidden);
+	const hiddenLayers = useEditor((s) => s.hidden);
+	const textEdit = useEditor((s) => s.textEdit);
+	const hidden = useMemo(
+		() => (textEdit ? new Set([...hiddenLayers, textEdit]) : hiddenLayers),
+		[hiddenLayers, textEdit],
+	);
 	const values = useEditor((s) => s.values);
 	const zoom = useEditor((s) => s.view.zoom);
 	const datasetAssets = useEditor((s) => {

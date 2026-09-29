@@ -120,8 +120,10 @@ covers shared checks and pull requests.
 
 ## Known limits
 
-- Text is edited in the inspector, not on the canvas. Double-clicking a text
-  layer focuses its content field.
+- Mixed-style text (spans) is edited in the inspector, not on the canvas;
+  double-clicking one focuses its content field. The on-canvas editor for plain
+  text draws in the browser, so its line breaks can differ slightly from the
+  render until the edit ends.
 - Datasets cannot be joined or filtered by a query; an export takes one
   dataset per template.
 - A layer whose ancestor is rotated can be selected and edited in the
