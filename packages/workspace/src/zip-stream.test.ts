@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { crc32 } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { jpegHeader } from "./image-fixtures";
@@ -65,6 +66,26 @@ describe("createZipWriter", () => {
 			expect(listing).toContain("1-photo.jpg");
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("checksums match zlib's at every length and alignment", async () => {
+		const data = new Uint8Array(1031).map((_, i) => (i * 131 + 7) & 0xff);
+		for (const [start, end] of [
+			[0, 0],
+			[0, 1],
+			[3, 11],
+			[5, 1031],
+			[0, 1024],
+		] as const) {
+			const slice = data.subarray(start, end);
+			const out = blobOutput();
+			const writer = createZipWriter(out, MTIME);
+			await writer.add({ name: "x", data: slice, level: 0 });
+			await writer.end();
+			const bytes = new Uint8Array(await out.blob("").arrayBuffer());
+			const crc = new DataView(bytes.buffer).getUint32(14, true);
+			expect(crc).toBe(crc32(slice));
 		}
 	});
 
