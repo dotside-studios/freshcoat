@@ -82,8 +82,9 @@ its errors are listed with the export's warnings.
 
 The exporter keeps supported content as editable template elements: text,
 shapes, vectors, images, layout frames and masks. Features it cannot represent
-are rasterized where possible. For example, background blur, unsupported blend
-modes and some mixed text fills become bitmaps. A rasterized region preserves
+are rasterized where possible. For example, background blur, diamond gradients
+and text whose runs are painted with different gradients become bitmaps. A
+rasterized region preserves
 its rendered appearance, but its internal layers and text are no longer
 editable or available for field substitution.
 
@@ -100,6 +101,42 @@ layers were kept, flattened or skipped.
   unit. Children of an auto-layout frame get none, unless they are absolutely
   positioned. A layer rasterized into a bitmap keeps the constraints of the
   layer it replaces.
+- **Mixed text styling.** Each run of a text layer becomes a span carrying
+  only what it changes: family, size, weight (with an in-between weight as a
+  `wght` variation), italic, letter spacing, line height, underline or
+  strikethrough, and colour. A run's stacked solid fills are composited into
+  one colour. A text filled with one gradient keeps it as the element's `fill`;
+  runs painted with different gradients, or with an image, are rasterized
+  (`text_mixed_styling_flattened`). When runs disagree on a decoration, each
+  decorated span carries it, because a span cannot turn off one the element
+  sets.
+- **Text fields and runs.** A bound `text:` field keeps the layer's runs only
+  when the runs spell out the template, each token whole inside one run, as in
+  a layer whose content is `Hi {{name}}` with the token in bold: the value is
+  filled in where the token was typed, in that run's style. Otherwise the
+  value replaces the whole text in the first run's style. A bound `color:`
+  field colours the whole text, over any run's own colour.
+- **Fills.** Rectangles, vectors and frames keep stacked fills as a `fill`
+  list, bottom first, each solid with its own alpha. Solid, linear, radial and
+  angular paints map; an angular gradient maps when its sweep is even on the
+  layer (not stretched by a non-square box). Diamond gradients, stretched
+  angular ones, paints with their own blend mode, and image fills outside a
+  single-image rectangle are rasterized (`paint_flattened`, or
+  `multi_fill_flattened` for an image inside a stack).
+- **Blend modes.** Every Figma layer blend mode with a coatfile equivalent is
+  carried as `blendMode`, linear dodge as `plus`. Linear burn becomes
+  `multiply` on a layer painted only in colours whose channels are each 0 or 1
+  (black, white, pure primaries), where the two agree; elsewhere, and on a
+  frame or group, it is rasterized. Pass through is how the renderer composites
+  a frame already. A frame set to Normal isolates its content in Figma, which
+  the renderer does only when the frame has opacity, an effect or a blend of
+  its own, so one holding a blended layer without those is rasterized
+  (`blend_mode_flattened`). A group with a blend mode gets a layer of its own.
+- **Effects.** Drop and inner shadows (stacked, with spread) and layer blur are
+  native. Background blur, progressive blur, a shadow with its own blend mode,
+  and noise, texture or glass effects are rasterized (`effect_flattened`).
+- **Auto layout.** Baseline alignment is not supported by the renderer's
+  layout, so it is written as `start`.
 - **Linear gradients.** A gradient's start and end come from Figma's handles,
   normalized to the layer's box, and are written as `from` and `to` beside its
   `angle`. A short, off-centre gradient on a wide layer therefore renders
@@ -229,8 +266,10 @@ and what the transpiler made of it. It carries:
 - **`scene`**: the node trees and properties read from Figma and supplied to
   the transpiler.
 - **`decisions`**: one row per node the walk reached: which element it became,
-  or why it was rasterized (`effect_flattened`, `vector_flattened`, …) or
-  skipped. Element ids are the *final* ones, after colliding layer names are
+  or why it was rasterized or skipped. The rasterization reasons are
+  `text_mixed_styling_flattened`, `multi_fill_flattened`, `paint_flattened`,
+  `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
+  `transform_undecomposable_flattened`. Element ids are the *final* ones, after colliding layer names are
   renamed, so they match the template.
 - **`rasters`**: each pre-exported bitmap's dimensions. A 1×1 is Figma saying
   the node renders nothing, which is otherwise indistinguishable from a good
