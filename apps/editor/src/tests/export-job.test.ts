@@ -8,6 +8,7 @@ import type {
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import {
+	itemSize,
 	type JobPool,
 	type JobProgress,
 	type JobResult,
@@ -15,6 +16,7 @@ import {
 	runExportJob,
 } from "~/export/job";
 import type { RenderOutput, RenderRequest } from "~/export/protocol";
+import { presetBleed } from "~/export/sheets";
 import type { OutputSink } from "~/export/sinks";
 import { membershipCard } from "~/samples/membership-card";
 import { photoWatermark } from "~/samples/photo-watermark";
@@ -766,5 +768,75 @@ describe("size from an image", () => {
 		expect(confirm.mock.calls[0]?.[0]).toBe(8 * 200 * 1024 * 1024);
 		expect(result.cancelled).toBe(true);
 		expect(assemblePdf).not.toHaveBeenCalled();
+	});
+});
+
+describe("bleed", () => {
+	const bleed = { top: 10, right: 20, bottom: 30, left: 40 };
+	function bled(count: number): Workspace {
+		const ws = workspace(count);
+		const entry = ws.templates[0];
+		if (entry) entry.template = { ...entry.template, bleed };
+		return ws;
+	}
+
+	it("is left out unless the preset includes it", async () => {
+		const pool = fakePool();
+		await runExportJob(bled(1), preset(), { pool });
+		expect(pool.requests.some((r) => "bleed" in r)).toBe(false);
+	});
+
+	it("renders every item with it, at the preset's scale", async () => {
+		const pool = fakePool();
+		await runExportJob(bled(1), preset({ bleed: true, scale: 2 }), { pool });
+		expect(pool.requests.map((r) => r.bleed)).toEqual([true, true]);
+		const t = bled(1).templates[0]?.template;
+		if (!t) throw new Error("no template");
+		expect(
+			itemSize(t, preset({ bleed: true, scale: 2 }), {} as never, new Map()),
+		).toEqual({ width: 2144, height: 1356, scale: 2, bleed: true });
+	});
+
+	it("hands a PDF the bleed in millimetres and pages at the bleed size", async () => {
+		const pool = fakePool();
+		const assemblePdf = vi.fn(
+			async (_p: PdfPage[], _o: { dpi: number; title?: string }) =>
+				new Uint8Array(),
+		);
+		await runExportJob(
+			bled(1),
+			preset({ format: "pdf", dpi: 254, bleed: true }),
+			{ pool, assemblePdf },
+		);
+		const [pages, options] = assemblePdf.mock.calls[0] ?? [];
+		expect(pages?.[0]).toMatchObject({ widthPx: 1072, heightPx: 678 });
+		expect(options).toEqual({
+			dpi: 254,
+			title: "All members",
+			bleedMm: {
+				top: expect.closeTo(1, 9),
+				right: expect.closeTo(2, 9),
+				bottom: expect.closeTo(3, 9),
+				left: expect.closeTo(4, 9),
+			},
+		});
+	});
+
+	it("does nothing for a template without bleed or a size from an image", () => {
+		const t = workspace(1).templates[0]?.template;
+		if (!t) throw new Error("no template");
+		expect(presetBleed(t, { bleed: true })).toEqual({
+			top: 0,
+			right: 0,
+			bottom: 0,
+			left: 0,
+		});
+		expect(
+			presetBleed(
+				{ bleed: 5 },
+				{ bleed: true, size: { kind: "image", field: "photo" } },
+			),
+		).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+		expect(presetBleed({ bleed: 5 }, { bleed: true }).left).toBe(5);
 	});
 });

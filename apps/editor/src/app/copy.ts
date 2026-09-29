@@ -124,6 +124,17 @@ export const TEMPLATE_SETUP = {
 	sharedSize: "Every side shares this size",
 } as const;
 
+/** Bleed and safe area, in the template's size settings. */
+export const INSETS = {
+	bleed: "Bleed",
+	safeArea: "Safe area",
+	bleedLabel: "Template bleed",
+	safeAreaLabel: "Template safe area",
+	mixed: "Mixed",
+	negative: "Bleed and safe area can't be negative",
+	safeAreaTooLarge: "The safe area must fit inside the template",
+} as const;
+
 /** The variant choice of a binding and an export, and how the export
  *  preview names a variant. */
 export const VARIANT_EXPORT = {

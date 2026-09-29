@@ -147,9 +147,10 @@ covers shared checks and pull requests.
   must stay under 4 GB and 65,535 files. A job that would pass that fails
   rather than writing a broken zip; Download's 512 MB parts stay well inside
   it.
-- Sheets place cards at trim size. Templates have no bleed area, so a design
-  that runs to the edge needs a clean cut, or a 0 mm gap with a background
-  that forgives a slightly short one.
+- The canvas and the sheet preview show the trim only. Bleed is drawn as a
+  guide line, and what fills it appears only in an export with "Include
+  bleed". Bleed and safe area take one value for every side; a file can set
+  each side, but Studio edits them together.
 - Sheets are a PDF feature. PNG, JPEG and WebP presets are one file per card
   side. Sheets also need Template size: a preset sized from each photo (Match
   image) can't be imposed, since every slot is the template's size and a

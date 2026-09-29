@@ -1,4 +1,8 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import {
+	hasInsets,
+	type Template,
+	templateBleed,
+} from "@freshcoat-js/coatfile";
 import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
@@ -47,11 +51,13 @@ import {
 } from "./export-ui";
 import { profileLabel } from "./print";
 import {
+	BLEED_NEEDS_TEMPLATE_SIZE,
 	PAPER_CHOICES,
 	PAPER_LABEL,
 	type PaperChoice,
 	paperChoice,
 	paperSizeMm,
+	presetBleed,
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 	sheetsFor,
@@ -82,6 +88,16 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** A note under a row, lined up with the row's control. */
+/** One page's design units: the template, with its bleed when the preset
+ *  includes it. */
+function pageSize(template: Template, preset: ExportPreset) {
+	const b = presetBleed(template, preset);
+	return {
+		width: template.width + b.left + b.right,
+		height: template.height + b.top + b.bottom,
+	};
+}
+
 function Hint({
 	children,
 	tone = "faint",
@@ -372,6 +388,20 @@ export function ExportSettings({
 						/>
 					</Row>
 				)}
+				{template && hasInsets(templateBleed(template)) ? (
+					<>
+						<Checkbox
+							isSelected={preset.bleed === true && size.kind === "template"}
+							isDisabled={size.kind === "image"}
+							onChange={(bleed) => set({ bleed })}
+						>
+							Include bleed
+						</Checkbox>
+						{size.kind === "image" ? (
+							<Hint>{BLEED_NEEDS_TEMPLATE_SIZE}</Hint>
+						) : null}
+					</>
+				) : null}
 				{outputSize ? (
 					<Hint tone="muted" testId="export-output-size">
 						{size.kind === "image"
@@ -448,7 +478,7 @@ export function ExportSettings({
 						</Row>
 						{template ? (
 							<Hint tone="muted" testId="export-page-size">
-								{`${sheets ? "Card" : "Page"} ${formatPageSize(template, preset.dpi)}`
+								{`${sheets ? "Card" : "Page"} ${formatPageSize(sheets ? template : pageSize(template, preset), preset.dpi)}`
 									.split(" · ")
 									.map((part, i) => (
 										<Fragment key={part}>
@@ -841,6 +871,12 @@ function LayoutGroup({
 								onChange={(gapMm) => patch({ gapMm })}
 							/>
 						</Row>
+						{sheets?.imposition?.bleedMm &&
+						sheets.imposition.gapMm > sheet.gapMm ? (
+							<Hint testId="export-bleed-gap">
+								{`Gap widened to ${Math.round(sheets.imposition.gapMm * 10) / 10} mm for bleed`}
+							</Hint>
+						) : null}
 						<Checkbox
 							isSelected={sheet.cropMarks}
 							onChange={(cropMarks) => patch({ cropMarks })}

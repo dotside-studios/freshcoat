@@ -1,5 +1,11 @@
-import { fitDesignSize, type Template } from "@freshcoat-js/coatfile";
+import {
+	fitDesignSize,
+	hasInsets,
+	type Sides,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import type {
+	BleedMm,
 	CardSizeMm,
 	Dataset,
 	DatasetAsset,
@@ -23,7 +29,13 @@ import {
 } from "@freshcoat-js/workspace";
 import { gamutPercent, type PrintOutcome, printRequest } from "./print";
 import type { RenderOutput, RenderRequest } from "./protocol";
-import { planSheets, sheetLayout, withSideIndex } from "./sheets";
+import {
+	planSheets,
+	presetBleed,
+	presetBleedMm,
+	sheetLayout,
+	withSideIndex,
+} from "./sheets";
 import {
 	createPartZipSink,
 	type JobFile,
@@ -88,6 +100,7 @@ export type AssemblePdf = (
 		title?: string;
 		layout?: SheetLayout;
 		cardMm?: CardSizeMm;
+		bleedMm?: BleedMm;
 	},
 ) => Promise<Uint8Array>;
 
@@ -223,27 +236,33 @@ type ItemSize = {
 	height: number;
 	scale: number;
 	resize?: { width: number; height: number };
+	/** set when the output includes the template's bleed */
+	bleed?: true;
 };
 
 /**
  * What one item renders at. A template size is the design at the preset's
- * scale. A size from an image is the photo's oriented pixels, capped by
+ * scale, with the bleed around it when the preset includes it. A size from an image is the photo's oriented pixels, capped by
  * `maxEdge`: the design is laid out by its constraints at the photo's aspect
  * and rendered at the density that makes it exactly that many pixels.
  */
 export function itemSize(
-	template: Pick<Template, "width" | "height">,
+	template: Pick<Template, "width" | "height" | "bleed">,
 	preset: ExportPreset,
 	item: ExportItem,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): ItemSize | { error: string } {
 	const size = exportSize(preset);
-	if (size.kind === "template")
+	if (size.kind === "template") {
+		const bleed = presetBleed(template, preset);
+		const { width, height } = withBleed(template, bleed);
 		return {
-			width: Math.round(template.width * preset.scale),
-			height: Math.round(template.height * preset.scale),
+			width: Math.round(width * preset.scale),
+			height: Math.round(height * preset.scale),
 			scale: preset.scale,
+			...(hasInsets(bleed) ? { bleed: true as const } : {}),
 		};
+	}
 	const asset = assets.get(item.values[size.field] ?? "");
 	if (!asset) return { error: `No image in ${size.field}` };
 	if (!asset.width || !asset.height)
@@ -261,6 +280,16 @@ export function itemSize(
 	const height = Math.max(1, Math.round(seen.height * cap));
 	const resize = fitDesignSize(template, width, height);
 	return { width, height, scale: width / resize.width, resize };
+}
+
+function withBleed(
+	template: Pick<Template, "width" | "height">,
+	bleed: Sides,
+): { width: number; height: number } {
+	return {
+		width: template.width + bleed.left + bleed.right,
+		height: template.height + bleed.top + bleed.bottom,
+	};
 }
 
 /** The photos an item's values name, so a worker gets only those. */
@@ -349,6 +378,8 @@ export function runExportJob(
 	// leaves its back in the mirrored slot.
 	const sheet = pdf ? sheetLayout(preset) : null;
 	const cardMm = cardSizeMm(template.width, template.height, preset.dpi);
+	const pageBleedMm = pdf ? presetBleedMm(template, preset) : undefined;
+	const page = withBleed(template, presetBleed(template, preset));
 	const sideIndex = withSideIndex(plan).map((item) => item.sideIndex);
 	if (sheet) {
 		// Refused before anything renders, rather than after every page has.
@@ -431,6 +462,7 @@ export function runExportJob(
 						dpi: preset.dpi,
 						title: preset.name || workspace.name,
 						...(sheet ? { layout: sheet, cardMm } : {}),
+						...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
 					});
 					if (settled) return;
 					file = {
@@ -464,10 +496,9 @@ export function runExportJob(
 							collector.add({
 								bytes: out.bytes,
 								format: out.format === "jpeg" ? "jpeg" : "png",
-								widthPx:
-									size?.resize !== undefined ? size.width : template.width,
+								widthPx: size?.resize !== undefined ? size.width : page.width,
 								heightPx:
-									size?.resize !== undefined ? size.height : template.height,
+									size?.resize !== undefined ? size.height : page.height,
 								...(sheet
 									? {
 											recordId: plan[index].recordId,
@@ -566,6 +597,7 @@ export function runExportJob(
 				scale: size.scale,
 				images: imagesOf(item, assets),
 				...(size.resize ? { resize: size.resize } : {}),
+				...(size.bleed ? { bleed: true } : {}),
 				format,
 				...(quality !== undefined ? { quality } : {}),
 				...(print ? { print } : {}),
