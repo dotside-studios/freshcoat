@@ -68,8 +68,11 @@ export {
 	FORMAT_VERSION,
 	type FormatVersionStatus,
 	formatVersionStatus,
+	minimumFormatVersion,
+	raiseFormatVersion,
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
+export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { substitute } from "./mustache";
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { generateMatrix } from "./qr";
@@ -101,6 +104,7 @@ export type {
 	DrawRectCommand,
 	DrawTextCommand,
 	Element,
+	ElementAdjust,
 	ElementShell,
 	ElementType,
 	EncodedPaintResult,
@@ -118,8 +122,12 @@ export type {
 	FontVMetrics,
 	FrameAssets,
 	FrameElement,
+	FrameFlexLayout,
+	FrameGridLayout,
 	FrameProperties,
 	GradientStop,
+	GridTrack,
+	ImageCrop,
 	ImageElement,
 	ImageLike,
 	ImageProperties,

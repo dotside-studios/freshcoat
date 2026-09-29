@@ -2,6 +2,8 @@
 // against the canonical color formulas), the sync tree walk, and the async
 // per-image analyzeScene driven by an injected sampler (no canvas in for-print).
 import {
+	buildAdjust,
+	composeAdjust,
 	createBitmap,
 	createGroup,
 	createImage,
@@ -203,6 +205,17 @@ describe("planScene (sync)", () => {
 		expect(planned.children[0].adjust).toEqual(printAdjust(YMCKO_PRESET));
 	});
 
+	test("a layer's own adjustment is kept and corrected, not replaced", () => {
+		const own = buildAdjust({ saturation: 0, gamma: 1.2 });
+		const planned = planScene(
+			createGroup([{ ...imageNode(), adjust: own }]),
+		) as ReturnType<typeof createGroup>;
+		const adjust = planned.children[0].adjust;
+		expect(adjust).toEqual(composeAdjust(own, printAdjust(YMCKO_PRESET)));
+		expect(adjust?.colorMatrix).toEqual(own.colorMatrix);
+		expect(adjust?.lut3d).toBeDefined();
+	});
+
 	test("policy can correct graphics and opt photos out", () => {
 		const tree = createGroup([imageNode(), rectNode()]);
 		const planned = planScene(tree, {
@@ -316,6 +329,32 @@ describe("analyzeScene (sampler)", () => {
 		});
 		await analyzeScene(sample, createGroup([big, small]));
 		expect(calls).toBe(2);
+	});
+
+	test("same src with another focus or crop samples separately", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const photo = (extra: object) =>
+			createImage({
+				pos: { x: 0, y: 0 },
+				size: { width: 10, height: 10 },
+				src: "s.png",
+				fit: "cover",
+				...extra,
+			});
+		await analyzeScene(
+			sample,
+			createGroup([
+				photo({}),
+				photo({ focus: { x: 0.2, y: 0.5 } }),
+				photo({ crop: { x: 0, y: 0, width: 0.5, height: 1 } }),
+				photo({ focus: { x: 0.2, y: 0.5 } }),
+			]),
+		);
+		expect(calls).toBe(3);
 	});
 
 	test("reports each analysis once, even when a layer repeats", async () => {

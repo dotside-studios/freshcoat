@@ -19,6 +19,7 @@ or communicate with a printer.
   generic coat engine `Adjust` per layer, so correction happens **per-layer at
   paint time** instead of on the flattened card (`planScene`, `analyzeScene`,
   `classifyIntent`, `printAdjust`).
+  A layer's own `Adjust` is kept: the correction is composed after it.
 - **Recommend finishing**: the whole-frame output ops that aren't per-layer
   (`YMCKO_FINISH` → the coat engine's `FrameFinish`).
 - **CR80 geometry**: format spec + crop fitting (`cr80Dimensions`,

@@ -678,6 +678,7 @@ function drawImage(
 			size.width,
 			size.height,
 			cmd.fit,
+			cmd,
 		);
 		drawImageRectHQ(
 			ck,
@@ -896,6 +897,7 @@ function drawSvgPicture(
 		size.width,
 		size.height,
 		cmd.fit,
+		cmd,
 	);
 	canvas.clipRect(ck.XYWHRect(r.dx, r.dy, r.dw, r.dh), ck.ClipOp.Intersect, true);
 	canvas.translate(r.dx, r.dy);

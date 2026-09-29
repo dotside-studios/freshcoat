@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { transpileImage } from "~/lib/figma/transpiler/image";
-import type { FigmaRectangleNode } from "~/lib/figma/types";
+import type { FigmaImagePaint, FigmaRectangleNode } from "~/lib/figma/types";
 
 const FRAME = { x: 0, y: 0, width: 1000, height: 600 };
 
@@ -93,5 +93,76 @@ describe("transpileImage", () => {
 			expect(r.element.id).toBe("logo");
 			expect(r.element.properties.fit).toBe("cover");
 		}
+	});
+});
+
+describe("dynamic image filters and crop", () => {
+	const dynamic = (fill: Record<string, unknown>) => {
+		const r = transpileImage(
+			baseImage({
+				name: "{{photo}}",
+				fills: [{ type: "IMAGE", imageRef: "abc", ...fill } as FigmaImagePaint],
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		if (r.kind !== "element") throw new Error("expected an element");
+		return r;
+	};
+
+	it("maps exposure, contrast and saturation to adjust", () => {
+		const r = dynamic({
+			scaleMode: "FILL",
+			filters: { exposure: 1, contrast: 0.2, saturation: -1 },
+		});
+		expect(r.element.adjust).toEqual({
+			saturation: 0,
+			contrast: 1.2,
+			brightness: 2,
+		});
+		expect(r.warnings.map((w) => w.code)).toEqual([
+			"image_filter_approximated",
+		]);
+	});
+
+	it("reports filters with no counterpart", () => {
+		const r = dynamic({
+			scaleMode: "FILL",
+			filters: { temperature: 0.3, shadows: -0.2 },
+		});
+		expect(r.element.adjust).toBeUndefined();
+		expect(r.warnings).toMatchObject([
+			{
+				code: "image_filter_unsupported",
+				message: "Image temperature, shadows adjustments were left out.",
+			},
+		]);
+	});
+
+	it("maps an upright crop to fill with a crop region", () => {
+		const r = dynamic({
+			scaleMode: "STRETCH",
+			imageTransform: [
+				[0.5, 0, 0.25],
+				[0, 0.8, 0.1],
+			],
+		});
+		expect(r.element.properties).toMatchObject({
+			fit: "fill",
+			crop: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 },
+		});
+		expect(r.warnings).toEqual([]);
+	});
+
+	it("falls back to cover for a turned crop, and warns", () => {
+		const r = dynamic({
+			scaleMode: "STRETCH",
+			imageTransform: [
+				[0, -1, 1],
+				[1, 0, 0],
+			],
+		});
+		expect(r.element.properties.fit).toBe("cover");
+		expect(r.element.properties).not.toHaveProperty("crop");
+		expect(r.warnings.map((w) => w.code)).toEqual(["image_crop_unsupported"]);
 	});
 });

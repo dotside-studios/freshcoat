@@ -1,3 +1,5 @@
+import type { Template } from "./types";
+
 // The wire format's own version, as `format_version` carries it.
 //
 // A major version is a contract: a reader refuses one it does not know. A minor
@@ -12,9 +14,10 @@
 //   1.2  linear fill `from` / `to`; element `constraints`
 //   1.3  barcode element
 //   1.4  variant deltas: pos, size, rotation, opacity, hidden
+//   1.5  grid layout; element `adjust`; image `focus` and `crop`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 4;
+export const FORMAT_MINOR = 5;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -36,4 +39,74 @@ export function formatVersionStatus(
 	if (Number(match[1]) !== FORMAT_MAJOR) return "unsupported";
 	const minor = match[2] === undefined ? 0 : Number(match[2]);
 	return minor > FORMAT_MINOR ? "newer" : "current";
+}
+
+/** The lowest 1.x a reader needs to keep every field `template` uses. */
+export function minimumFormatVersion(template: Template): string {
+	let minor = 0;
+	const need = (m: number) => {
+		if (m > minor) minor = m;
+	};
+
+	if (
+		template.$schema !== undefined ||
+		template.product === undefined ||
+		template.version === undefined
+	)
+		need(1);
+
+	const visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (node === null || typeof node !== "object") return;
+		const o = node as Record<string, unknown>;
+		if (o.kind === "linear" && (o.from !== undefined || o.to !== undefined))
+			need(2);
+		if (typeof o.id === "string" && typeof o.type === "string") {
+			if (o.constraints !== undefined) need(2);
+			if (o.type === "barcode") need(3);
+		}
+		for (const value of Object.values(o)) visit(value);
+	};
+	visit(template.template_data);
+	visit(template.variants);
+
+	for (const variant of template.variants ?? []) {
+		for (const override of variant.overrides) {
+			for (const delta of override.elements ?? []) {
+				if (
+					delta.pos !== undefined ||
+					delta.size !== undefined ||
+					delta.rotation !== undefined ||
+					delta.opacity !== undefined ||
+					delta.hidden !== undefined
+				)
+					need(4);
+			}
+		}
+	}
+
+	return `${FORMAT_MAJOR}.${minor}`;
+}
+
+/**
+ * `template` with `format_version` raised to `minimumFormatVersion`, so a kit
+ * that only reads the older minor refuses to re-save it rather than dropping
+ * fields. Never lowers it, and leaves a version this kit does not write alone.
+ * Returns `template` itself when nothing changes.
+ */
+export function raiseFormatVersion<T extends Template>(template: T): T {
+	if (formatVersionStatus(template.format_version) !== "current")
+		return template;
+	const needed = minimumFormatVersion(template);
+	return formatMinor(needed) > formatMinor(template.format_version)
+		? { ...template, format_version: needed }
+		: template;
+}
+
+function formatMinor(formatVersion: string): number {
+	const minor = /^\d+\.(\d+)/.exec(formatVersion.trim())?.[1];
+	return minor === undefined ? 0 : Number(minor);
 }

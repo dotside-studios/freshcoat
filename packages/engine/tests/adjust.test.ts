@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 import CanvasKitInit from "canvaskit-wasm";
 import { describe, expect, test } from "vitest";
 import {
+	applyAdjustColor,
 	buildAdjust,
+	composeAdjust,
 	contrastMatrix,
 	gammaLut,
 	identityLut3d,
@@ -160,5 +162,51 @@ describe("CanvasKit painter internals", () => {
 		});
 		await renderSceneToPng(scene, { width: 40, height: 20, ck });
 		expect(uploads).toBe(1);
+	});
+});
+
+describe("composeAdjust", () => {
+	const samples: [number, number, number][] = [
+		[0, 0, 0],
+		[1, 1, 1],
+		[0.8, 0.2, 0.1],
+		[0.3, 0.6, 0.9],
+		[0.5, 0.5, 0.2],
+	];
+
+	test("an empty side leaves the other unchanged", () => {
+		const a = buildAdjust({ saturation: 1.3, gamma: 0.8 });
+		expect(composeAdjust(a, {})).toEqual(a);
+		expect(composeAdjust(undefined, a)).toEqual(a);
+		expect(composeAdjust({}, undefined)).toEqual({});
+	});
+
+	test("looks like the first adjustment and then the second", () => {
+		const first = buildAdjust({ saturation: 0.4, contrast: 1.2, gamma: 1.4 });
+		const second = {
+			...buildAdjust({ saturation: 1.5, brightness: 1.1, gamma: 0.8 }),
+			gamut: "preserve-hue" as const,
+		};
+		const both = composeAdjust(first, second);
+		expect(both.colorMatrix).toEqual(first.colorMatrix);
+		expect(both.lut).toBe(first.lut);
+		expect(both.lut3d?.size).toBe(33);
+		for (const c of samples) {
+			const want = applyAdjustColor(second, applyAdjustColor(first, c));
+			const got = applyAdjustColor(both, c);
+			got.forEach((v, i) => expect(Math.abs(v - want[i])).toBeLessThan(0.03));
+		}
+	});
+
+	test("keeps the stronger sharpen and a lone sharpen passes through", () => {
+		expect(
+			composeAdjust({ sharpen: 0.3 }, buildAdjust({ saturation: 1.2 })),
+		).toEqual({ ...buildAdjust({ saturation: 1.2 }), sharpen: 0.3 });
+		expect(
+			composeAdjust(
+				buildAdjust({ contrast: 1.1, sharpen: 0.2 }),
+				{ sharpen: 0.5 },
+			),
+		).toEqual({ ...buildAdjust({ contrast: 1.1 }), sharpen: 0.5 });
 	});
 });

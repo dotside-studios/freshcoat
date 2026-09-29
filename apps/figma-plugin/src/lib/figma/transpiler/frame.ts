@@ -1,6 +1,7 @@
 import type {
 	FigmaBoundingBox,
 	FigmaContainerNode,
+	FigmaGridTrack,
 	FigmaNode,
 	FigmaSolidPaint,
 } from "../types";
@@ -32,6 +33,7 @@ export function layoutFromContainer(
 ): Record<string, unknown> | undefined {
 	if (node.layoutMode === undefined || node.layoutMode === "NONE")
 		return undefined;
+	if (node.layoutMode === "GRID") return gridLayout(node, scale);
 	const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
 	const out: Record<string, unknown> = { direction };
 	if (node.itemSpacing) out.gap = Math.round(node.itemSpacing * scale * 2) / 2;
@@ -40,14 +42,8 @@ export function layoutFromContainer(
 	if (wrap && node.counterAxisSpacing != null) {
 		out.crossGap = Math.round(node.counterAxisSpacing * scale * 2) / 2;
 	}
-	const padding = {
-		top: Math.round((node.paddingTop ?? 0) * scale * 2) / 2,
-		right: Math.round((node.paddingRight ?? 0) * scale * 2) / 2,
-		bottom: Math.round((node.paddingBottom ?? 0) * scale * 2) / 2,
-		left: Math.round((node.paddingLeft ?? 0) * scale * 2) / 2,
-	};
-	if (padding.top || padding.right || padding.bottom || padding.left)
-		out.padding = padding;
+	const padding = paddingOf(node, scale);
+	if (padding) out.padding = padding;
 	if (node.primaryAxisAlignItems && node.primaryAxisAlignItems !== "MIN") {
 		out.primaryAlign = PRIMARY_ALIGN[node.primaryAxisAlignItems];
 	}
@@ -55,6 +51,55 @@ export function layoutFromContainer(
 		out.crossAlign = CROSS_ALIGN[node.counterAxisAlignItems];
 	}
 	return out;
+}
+
+const half = (v: number) => Math.round(v * 2) / 2;
+
+function paddingOf(node: FigmaContainerNode, scale: number) {
+	const padding = {
+		top: half((node.paddingTop ?? 0) * scale),
+		right: half((node.paddingRight ?? 0) * scale),
+		bottom: half((node.paddingBottom ?? 0) * scale),
+		left: half((node.paddingLeft ?? 0) * scale),
+	};
+	return padding.top || padding.right || padding.bottom || padding.left
+		? padding
+		: undefined;
+}
+
+// A Figma track as a coatfile one: FIXED is a length, FLEX a share, HUG sizes
+// to its content.
+function gridTrack(t: FigmaGridTrack, scale: number): number | string {
+	if (t.type === "FIXED") return half((t.value ?? 0) * scale);
+	if (t.type === "FLEX") return `${t.value ?? 1}fr`;
+	return "auto";
+}
+
+function gridLayout(
+	node: FigmaContainerNode,
+	scale: number,
+): Record<string, unknown> {
+	const columns = (node.gridColumnSizes ?? []).map((t) => gridTrack(t, scale));
+	const rows = (node.gridRowSizes ?? []).map((t) => gridTrack(t, scale));
+	const out: Record<string, unknown> = {
+		type: "grid",
+		columns: columns.length > 0 ? columns : ["1fr"],
+	};
+	if (rows.length > 0) out.rows = rows;
+	const rowGap = half((node.gridRowGap ?? 0) * scale);
+	const columnGap = half((node.gridColumnGap ?? 0) * scale);
+	if (rowGap || columnGap)
+		out.gap = rowGap === columnGap ? rowGap : [rowGap, columnGap];
+	const padding = paddingOf(node, scale);
+	if (padding) out.padding = padding;
+	return out;
+}
+
+// A 0-based anchor and a span as coatfile's 1-based track or inclusive span.
+function gridLine(anchor: number | undefined, span: number | undefined) {
+	if (anchor === undefined || anchor < 0) return undefined;
+	const n = Math.max(1, span ?? 1);
+	return n === 1 ? anchor + 1 : [anchor + 1, anchor + n];
 }
 
 export function layoutChildFromNode(
@@ -76,6 +121,10 @@ export function layoutChildFromNode(
 	if (node.maxWidth != null) max.width = Math.round(node.maxWidth * scale);
 	if (node.maxHeight != null) max.height = Math.round(node.maxHeight * scale);
 	if (Object.keys(max).length > 0) out.max = max;
+	const column = gridLine(node.gridColumnAnchorIndex, node.gridColumnSpan);
+	const row = gridLine(node.gridRowAnchorIndex, node.gridRowSpan);
+	if (column !== undefined) out.column = column;
+	if (row !== undefined) out.row = row;
 	return Object.keys(out).length > 0 ? out : undefined;
 }
 

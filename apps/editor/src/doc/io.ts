@@ -2,6 +2,7 @@ import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import {
 	formatVersionStatus,
 	healElementIds,
+	raiseFormatVersion,
 	validate,
 	verifyAssets,
 } from "@freshcoat-js/coatfile";
@@ -89,9 +90,14 @@ export type SaveResult<T> =
 	| { ok: true; data: T }
 	| { ok: false; errors: ValidationError[] };
 
-/** The `.coat` package bytes, unused assets pruned. */
+/** Unused assets pruned, `format_version` raised to cover the fields used. */
+function writable(t: Template): Template {
+	return raiseFormatVersion(pruneUnusedAssets(t));
+}
+
+/** The `.coat` package bytes. */
 export async function saveCoat(t: Template): Promise<SaveResult<Uint8Array>> {
-	const pruned = pruneUnusedAssets(t);
+	const pruned = writable(t);
 	const v = validate(pruned);
 	if (!v.ok) return { ok: false, errors: v.errors };
 	try {
@@ -101,16 +107,16 @@ export async function saveCoat(t: Template): Promise<SaveResult<Uint8Array>> {
 	}
 }
 
-/** The template, unused assets pruned. */
+/** The template as it would be saved. */
 export function sendableTemplate(t: Template): SaveResult<Template> {
-	const pruned = pruneUnusedAssets(t);
+	const pruned = writable(t);
 	const v = validate(pruned);
 	return v.ok ? { ok: true, data: pruned } : { ok: false, errors: v.errors };
 }
 
-/** The `.coat.json` text, unused assets pruned. */
+/** The `.coat.json` text. */
 export function saveJson(t: Template): SaveResult<string> {
-	const pruned = pruneUnusedAssets(t);
+	const pruned = writable(t);
 	const v = validate(pruned);
 	if (!v.ok) return { ok: false, errors: v.errors };
 	try {

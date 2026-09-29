@@ -95,3 +95,58 @@ describe("textLayoutSizing", () => {
 		});
 	});
 });
+
+describe("grid layout", () => {
+	it("maps a GRID frame's tracks, gaps and padding", () => {
+		const node = {
+			layoutMode: "GRID",
+			gridColumnSizes: [
+				{ type: "FIXED", value: 120 },
+				{ type: "FLEX", value: 1 },
+				{ type: "HUG" },
+			],
+			gridRowSizes: [{ type: "FLEX" }, { type: "FIXED", value: 40 }],
+			gridRowGap: 6,
+			gridColumnGap: 10,
+			paddingTop: 4,
+		} as unknown as FigmaContainerNode;
+		expect(layoutFromContainer(node, 2)).toEqual({
+			type: "grid",
+			columns: [240, "1fr", "auto"],
+			rows: ["1fr", 80],
+			gap: [12, 20],
+			padding: { top: 8, right: 0, bottom: 0, left: 0 },
+		});
+	});
+
+	it("writes equal gaps once and leaves zero gaps out", () => {
+		const grid = (rowGap: number, columnGap: number) =>
+			layoutFromContainer(
+				{
+					layoutMode: "GRID",
+					gridColumnSizes: [{ type: "FLEX", value: 1 }],
+					gridRowGap: rowGap,
+					gridColumnGap: columnGap,
+				} as unknown as FigmaContainerNode,
+				1,
+			);
+		expect(grid(8, 8)).toMatchObject({ gap: 8 });
+		expect(grid(0, 0)).not.toHaveProperty("gap");
+	});
+
+	it("places a grid child by its 1-based track or span", () => {
+		const child = (extra: object) =>
+			layoutChildFromNode({ ...extra } as unknown as FigmaNode, 1);
+		expect(
+			child({
+				gridColumnAnchorIndex: 1,
+				gridColumnSpan: 1,
+				gridRowAnchorIndex: 0,
+				gridRowSpan: 3,
+			}),
+		).toEqual({ column: 2, row: [1, 3] });
+		expect(child({ gridColumnAnchorIndex: 0, gridColumnSpan: 2 })).toEqual({
+			column: [1, 2],
+		});
+	});
+});
