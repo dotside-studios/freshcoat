@@ -21,8 +21,11 @@ function uniform(r: Radius): number | null {
 
 export function CornersSection({ ins }: { ins: Inspect }) {
 	const rectOnly = ins.layers.every((l) => l.type === "rect");
+	const splittable = ins.layers.every(
+		(l) => l.type === "rect" || l.type === "frame",
+	);
 	const radii = ins.layers.map(radiusOf);
-	const split = rectOnly && radii.some((r) => Array.isArray(r));
+	const split = splittable && radii.some((r) => Array.isArray(r));
 	const single = commonValue(radii.map(uniform));
 	const smoothing = commonValue(
 		ins.layers.map((l) =>
@@ -78,7 +81,7 @@ export function CornersSection({ ins }: { ins: Inspect }) {
 						}
 					/>
 				)}
-				{rectOnly && (
+				{splittable && (
 					<ToggleButton
 						aria-label="Independent corners"
 						tooltip="Independent corners"
