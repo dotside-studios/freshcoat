@@ -12,9 +12,10 @@
 //   1.2  linear fill `from` / `to`; element `constraints`
 //   1.3  barcode element
 //   1.4  variant deltas: pos, size, rotation, opacity, hidden
+//   1.5  grid layout; element `adjust`; image `focus` and `crop`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 4;
+export const FORMAT_MINOR = 5;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
