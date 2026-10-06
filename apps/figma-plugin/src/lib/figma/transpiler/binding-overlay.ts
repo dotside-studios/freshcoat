@@ -1,8 +1,8 @@
 import {
+	type BindingResolver,
 	buildFieldMeta,
 	type FieldMeta,
-	inferNodeBinding,
-	storedToNodeBinding,
+	resolveNodeBinding,
 } from "../binding";
 import type { FigmaNode } from "../types";
 import { extractTokens } from "./fields";
@@ -32,10 +32,9 @@ export function applyBindingOverlay(
 	node: FigmaNode,
 	el: Record<string, unknown>,
 	overlayMeta: Map<string, FieldMeta>,
+	resolveBinding: BindingResolver = resolveNodeBinding,
 ): void {
-	const binding = node.binding
-		? storedToNodeBinding(node.binding)
-		: inferNodeBinding(node);
+	const binding = resolveBinding(node);
 	if (!binding) return;
 
 	const props = el.properties as Record<string, unknown>;

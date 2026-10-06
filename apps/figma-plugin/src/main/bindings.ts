@@ -2,8 +2,7 @@ import {
 	bindableProperties,
 	buildFieldMeta,
 	type FieldMeta,
-	inferNodeBinding,
-	storedToNodeBinding,
+	resolveNodeBinding,
 } from "~/lib/figma/binding";
 import {
 	planHarvest,
@@ -12,6 +11,7 @@ import {
 } from "~/lib/figma/harvest";
 import type { ProductRegistryEntry } from "~/lib/figma/transpiler";
 import { extractTokens } from "~/lib/figma/transpiler/fields";
+import { createFieldsOverview } from "~/main/fields-overview";
 import {
 	FIELD_KEY,
 	FIELDS_KEY,
@@ -59,9 +59,7 @@ export function postSelectionDetail(): void {
 	if (sel.length === 1) {
 		const node = readNode(sel[0] as never, { depth: 0 });
 		if (node) {
-			const binding = node.binding
-				? storedToNodeBinding(node.binding)
-				: inferNodeBinding(node);
+			const binding = resolveNodeBinding(node);
 			const slot = slotFrameOf(sel[0]);
 			const metas = slot ? (readFieldMeta(slot) ?? {}) : {};
 			detail = {
@@ -82,56 +80,64 @@ export function postSelectionDetail(): void {
 	figma.ui.postMessage(msg);
 }
 
-// Aggregate every field stored across the page's top-level frames, mapping each
-// to the nodes that reference it (for jump-to-canvas). Decoupled from slot
-// assignment — any harvested frame carries its own field metadata.
-function gatherFieldsOverview(): FieldOverviewItem[] {
-	const items: FieldOverviewItem[] = [];
-	for (const frame of figma.currentPage.children) {
-		if (
-			frame.type !== "FRAME" &&
-			frame.type !== "COMPONENT" &&
-			frame.type !== "COMPONENT_SET"
-		) {
-			continue;
-		}
-		const metas = readFieldMeta(frame) ?? {};
-		const ids = Object.keys(metas);
-		if (ids.length === 0) continue;
+type OverviewFrame = FrameNode | ComponentNode | ComponentSetNode;
 
-		const refs = new Map<string, string[]>();
-		const names = new Map<string, string>();
-		for (const node of frame.findAllWithCriteria({
-			pluginData: { keys: [FIELD_KEY] },
-		})) {
-			const binding = readBinding(node);
-			if (!binding) continue;
-			for (const template of Object.values(binding.bind)) {
-				for (const id of extractTokens(template)) {
-					const list = refs.get(id);
-					if (list) list.push(node.id);
-					else refs.set(id, [node.id]);
-					names.set(node.id, node.name);
-				}
-			}
-		}
-		for (const id of ids) {
-			items.push({
-				id,
-				meta: metas[id],
-				slot: frame.name,
-				nodeIds: refs.get(id) ?? [],
-				layerNames: (refs.get(id) ?? []).map((n) => names.get(n) ?? ""),
-			});
-		}
-	}
-	return items;
+function overviewFrames(): OverviewFrame[] {
+	return figma.currentPage.children.filter(
+		(n): n is OverviewFrame =>
+			n.type === "FRAME" ||
+			n.type === "COMPONENT" ||
+			n.type === "COMPONENT_SET",
+	);
 }
 
-export function postFieldsOverview(): void {
+// Every field stored on one top-level frame, mapping each to the nodes that
+// reference it (for jump-to-canvas). Decoupled from slot assignment: any
+// harvested frame carries its own field metadata.
+function scanFrameFields(frame: OverviewFrame): FieldOverviewItem[] {
+	const metas = readFieldMeta(frame) ?? {};
+	const ids = Object.keys(metas);
+	if (ids.length === 0) return [];
+
+	const refs = new Map<string, string[]>();
+	const names = new Map<string, string>();
+	for (const node of frame.findAllWithCriteria({
+		pluginData: { keys: [FIELD_KEY] },
+	})) {
+		const binding = readBinding(node);
+		if (!binding) continue;
+		for (const template of Object.values(binding.bind)) {
+			for (const id of extractTokens(template)) {
+				const list = refs.get(id);
+				if (list) list.push(node.id);
+				else refs.set(id, [node.id]);
+				names.set(node.id, node.name);
+			}
+		}
+	}
+	return ids.map((id) => ({
+		id,
+		meta: metas[id],
+		slot: frame.name,
+		nodeIds: refs.get(id) ?? [],
+		layerNames: (refs.get(id) ?? []).map((n) => names.get(n) ?? ""),
+	}));
+}
+
+const fieldsOverview = createFieldsOverview(scanFrameFields);
+
+/** Post the fields overview. With `changed`, only those top-level frames are
+ *  rescanned and the rest come from the last scan. */
+export function postFieldsOverview(changed?: Array<BaseNode | null>): void {
+	const frames = overviewFrames();
 	const msg: FieldsOverviewMessage = {
 		type: "fields-overview",
-		fields: gatherFieldsOverview(),
+		fields: changed
+			? fieldsOverview.update(
+					frames,
+					changed.flatMap((n) => (n ? [n.id] : [])),
+				)
+			: fieldsOverview.all(frames),
 	};
 	figma.ui.postMessage(msg);
 }
@@ -186,7 +192,10 @@ export async function handleHarvest(
 	const count = plan.nodeBindings.length;
 	figma.notify(`Synced ${count} field${count === 1 ? "" : "s"} to layers.`);
 	postSelectionDetail();
-	postFieldsOverview();
+	postFieldsOverview([
+		slotFrameOf(card),
+		...frameNodes.map((n) => n && slotFrameOf(n)),
+	]);
 }
 
 export async function handleSetBinding(msg: SetBindingMessage): Promise<void> {
@@ -209,7 +218,7 @@ export async function handleSetBinding(msg: SetBindingMessage): Promise<void> {
 		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
 	}
 	postSelectionDetail();
-	postFieldsOverview();
+	postFieldsOverview([slot]);
 }
 
 export async function handleClearBinding(
@@ -225,5 +234,5 @@ export async function handleClearBinding(
 		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
 	}
 	postSelectionDetail();
-	postFieldsOverview();
+	postFieldsOverview([slot]);
 }

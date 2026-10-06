@@ -97,3 +97,20 @@ export function detectCards(
 	}
 	return cards;
 }
+
+/** The colorway INSTANCEs a cached cards view found for a card, looked up by
+ *  id instead of scanning the page. */
+export async function colorwayInstances<T extends { type: string }>(
+	view: {
+		nodes: Array<{ id: string; colorways: Array<{ instanceId: string }> }>;
+	},
+	cardId: string,
+	getNode: (id: string) => Promise<T | null>,
+): Promise<T[]> {
+	const ids =
+		view.nodes
+			.find((n) => n.id === cardId)
+			?.colorways.map((c) => c.instanceId) ?? [];
+	const nodes: Array<T | null> = await Promise.all(ids.map(getNode));
+	return nodes.filter((n): n is T => n?.type === "INSTANCE");
+}

@@ -473,3 +473,24 @@ export function storedToNodeBinding(stored: StoredBinding): NodeBinding {
 	}
 	return { bind: stored.bind, fields };
 }
+
+export type BindingResolver = (node: FigmaNode) => NodeBinding | null;
+
+/** A node's binding: its stored record, else what its name implies. */
+export function resolveNodeBinding(node: FigmaNode): NodeBinding | null {
+	return node.binding
+		? storedToNodeBinding(node.binding)
+		: inferNodeBinding(node);
+}
+
+/** `resolveNodeBinding`, kept per node object. Scope one to a single
+ *  transpile, over trees that do not change while it runs. */
+export function createBindingResolver(): BindingResolver {
+	const cache = new WeakMap<FigmaNode, NodeBinding | null>();
+	return (node) => {
+		if (cache.has(node)) return cache.get(node) ?? null;
+		const binding = resolveNodeBinding(node);
+		cache.set(node, binding);
+		return binding;
+	};
+}

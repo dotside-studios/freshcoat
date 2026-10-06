@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
 	bindableProperties,
 	buildFieldMeta,
+	createBindingResolver,
 	inferNodeBinding,
 	parseMarker,
 	parseValue,
+	resolveNodeBinding,
 } from "~/lib/figma/binding";
 import type {
 	FigmaImagePaint,
@@ -320,5 +322,32 @@ describe("buildFieldMeta", () => {
 			required: false,
 			title: "Profile URL",
 		});
+	});
+});
+
+describe("createBindingResolver", () => {
+	it("resolves each node once and matches resolveNodeBinding", () => {
+		const resolve = createBindingResolver();
+		const bound = textNode("{{name}}");
+		const stored = {
+			...textNode("Plain"),
+			binding: { bind: { text: "{{tier}}" } },
+		};
+		const plain = textNode("Plain");
+
+		const first = resolve(bound);
+		expect(first).toEqual(resolveNodeBinding(bound));
+		expect(resolve(bound)).toBe(first);
+		expect(resolve(stored)).toEqual(resolveNodeBinding(stored));
+		expect(resolve(stored)).toBe(resolve(stored));
+		expect(resolve(plain)).toBeNull();
+		expect(resolve(plain)).toBeNull();
+	});
+
+	it("keeps nothing between resolvers", () => {
+		const node = textNode("{{name}}");
+		expect(createBindingResolver()(node)).not.toBe(
+			createBindingResolver()(node),
+		);
 	});
 });

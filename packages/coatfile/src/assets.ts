@@ -334,16 +334,22 @@ export async function verifyAssets(
  * `asset:` src that used the old key at the new one: image srcs through
  * `mapAssetSrcs`, and `local` font files. Two entries whose bytes turn out to
  * be the same collapse into one. The picture does not change.
+ *
+ * An asset whose `sha256` is in `known` is taken as already hashed from its
+ * bytes and is not hashed again.
  */
 export async function rehashAssets(
 	template: Template,
 	sha256: Sha256 = subtleSha256,
+	known: ReadonlySet<string> = new Set(),
 ): Promise<{ template: Template; renamed: Map<string, string> }> {
 	const renamed = new Map<string, string>();
 	const assets: InlineAsset[] = [];
 	const seen = new Set<string>();
 	for (const asset of template.assets ?? []) {
-		const actual = await sha256(base64ToBytes(asset.base64));
+		const actual = known.has(asset.sha256)
+			? asset.sha256
+			: await sha256(base64ToBytes(asset.base64));
 		if (actual !== asset.sha256) renamed.set(asset.sha256, actual);
 		if (seen.has(actual)) continue;
 		seen.add(actual);

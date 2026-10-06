@@ -41,6 +41,9 @@ export type ExportedTemplate = Template & {
 export type TranspileResult = {
 	template: ExportedTemplate;
 	trace: NodeTrace[];
+	/** Raster hashes computed from their bytes, for `packTemplate`'s
+	 *  `knownHashes`. */
+	assetHashes: ReadonlySet<string>;
 };
 
 /** One reason an export was stopped, shaped as a warning so the UI lists it
@@ -138,6 +141,22 @@ function validationIssues(
 	}));
 }
 
+/** Hash each byte array once, however often it is asked for. */
+function memoSha256(sha256: Sha256Fn): Sha256Fn {
+	const cache = new WeakMap<Uint8Array, Promise<string>>();
+	return (bytes) => {
+		let hash = cache.get(bytes);
+		if (!hash) {
+			hash = sha256(bytes);
+			cache.set(bytes, hash);
+			hash.catch(() => cache.delete(bytes));
+		}
+		return hash;
+	};
+}
+
+type BuiltTemplate = TranspileResult & { placeholders: ExportIssue[] };
+
 /** Build the template for an export and check it.
  *
  *  Throws SizeMismatchError for frames off the canvas, and ExportBlockedError
@@ -149,7 +168,47 @@ export async function runTranspileToTemplate(
 	metadata: ExportMetadata,
 	opts: TranspileOptions = {},
 ): Promise<TranspileResult> {
+	return finish(await build(msg, memoSha256(sha256), metadata), opts);
+}
+
+export type Transpiler = (
+	msg: ReadDocumentMessage,
+	metadata: ExportMetadata,
+	opts?: TranspileOptions,
+) => Promise<TranspileResult>;
+
+/** `runTranspileToTemplate` that keeps its last build, so running the same
+ *  read and metadata again (as "Export anyway" does) only rechecks it. */
+export function createTranspiler(sha256: Sha256Fn): Transpiler {
+	const hash = memoSha256(sha256);
+	let last: {
+		msg: ReadDocumentMessage;
+		metadata: ExportMetadata;
+		built: BuiltTemplate;
+	} | null = null;
+	return async (msg, metadata, opts = {}) => {
+		if (last?.msg !== msg || last.metadata !== metadata) {
+			last = { msg, metadata, built: await build(msg, hash, metadata) };
+		}
+		return finish(last.built, opts);
+	};
+}
+
+function finish(built: BuiltTemplate, opts: TranspileOptions): TranspileResult {
+	const { placeholders, ...result } = built;
+	if (placeholders.length > 0 && !opts.proceed) {
+		throw new ExportBlockedError(placeholders, true);
+	}
+	return result;
+}
+
+async function build(
+	msg: ReadDocumentMessage,
+	sha256: Sha256Fn,
+	metadata: ExportMetadata,
+): Promise<BuiltTemplate> {
 	const { product } = msg;
+	const assetHashes = new Set<string>();
 
 	const bytesById = new Map(msg.rasters.map((r) => [r.nodeId, r.bytes]));
 	const treeById = new Map(msg.slots.map((s) => [s.nodeId, s.tree]));
@@ -178,9 +237,11 @@ export async function runTranspileToTemplate(
 		// export with content from Figma's 1×1 answer for a node that renders
 		// nothing — without decoding the image.
 		const size = pngSize(bytes);
+		const hash = await sha256(bytes);
+		assetHashes.add(hash);
 		return {
 			blob: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }),
-			sha256: await sha256(bytes),
+			sha256: hash,
 			...(size ?? {}),
 		};
 	};
@@ -252,10 +313,10 @@ export async function runTranspileToTemplate(
 		exported.warnings = [...(exported.warnings ?? []), ...variantWarnings];
 	}
 
-	const placeholders = result.warnings.filter((w) => PROCEEDABLE.has(w.code));
-	if (placeholders.length > 0 && !opts.proceed) {
-		throw new ExportBlockedError(placeholders, true);
-	}
-
-	return { template: exported, trace: result.trace };
+	return {
+		template: exported,
+		trace: result.trace,
+		assetHashes,
+		placeholders: result.warnings.filter((w) => PROCEEDABLE.has(w.code)),
+	};
 }

@@ -194,6 +194,32 @@ describe("packTemplate / unpackTemplate", () => {
 		expect(a).toEqual(b);
 	});
 
+	test("known hashes skip rehashing and pack the same bytes", async () => {
+		const pngSha = await subtleSha256(PNG);
+		const fontSha = await subtleSha256(FONT);
+		const keyed = (await rehashAssets(await withAssets())).template;
+		const plain = await packTemplate(keyed);
+
+		const hashed: Uint8Array[] = [];
+		const counting = (bytes: Uint8Array) => {
+			hashed.push(bytes);
+			return subtleSha256(bytes);
+		};
+		const known = await packTemplate(keyed, {
+			sha256: counting,
+			knownHashes: [pngSha, fontSha],
+		});
+		expect(known).toEqual(plain);
+		expect(hashed).toHaveLength(0);
+
+		const partly = await packTemplate(keyed, {
+			sha256: counting,
+			knownHashes: [pngSha],
+		});
+		expect(partly).toEqual(plain);
+		expect(hashed).toHaveLength(1);
+	});
+
 	test("a template with no assets packs to template.json alone", async () => {
 		const packed = await packTemplate(fixtures.fullFeatureCard);
 		expect(Object.keys(unzipSync(packed))).toEqual([

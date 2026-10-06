@@ -22,10 +22,10 @@ import type { ExportTarget } from "~/ui/export-target";
 import { useMainMessage } from "~/ui/messages";
 import { postToMain } from "~/ui/post";
 import {
+	createTranspiler,
 	ExportBlockedError,
 	type ExportedTemplate,
 	type ExportMetadata,
-	runTranspileToTemplate,
 } from "~/ui/run-transpile";
 import { useAnnounce } from "~/ui/status";
 import type { Issue } from "~/ui/warnings";
@@ -43,6 +43,7 @@ export type Phase =
 
 export type Result = {
 	template: ExportedTemplate;
+	assetHashes: ReadonlySet<string>;
 	fileName: string;
 	/** Packed on first need and kept, so "Download again" is instant. */
 	packed: Uint8Array | null;
@@ -123,6 +124,7 @@ export function useExport(opts: ExportOptions) {
 	const actionRef = useRef<Action>("download");
 	// The read a blocked export came from, so "Export anyway" needs no new one.
 	const lastReadRef = useRef<ReadDocumentMessage | null>(null);
+	const [transpile] = useState(() => createTranspiler(sha256Hex));
 	// The latest options for the read handler, which outlives many renders.
 	const liveRef = useRef(opts);
 	liveRef.current = opts;
@@ -162,22 +164,20 @@ export function useExport(opts: ExportOptions) {
 		const names = layerNames(msg);
 		try {
 			const metadata = pendingMetaRef.current ?? { name: "Untitled" };
-			const { template, trace } = await runTranspileToTemplate(
-				msg,
-				sha256Hex,
-				metadata,
-				{ proceed },
-			);
+			const { template, trace, assetHashes } = await transpile(msg, metadata, {
+				proceed,
+			});
 			const stem = `${msg.product.sku}-${slug(metadata.name, { fallback: "card" })}`;
 			const fileName = `${stem}${COAT_EXTENSION}`;
 			let packed: Uint8Array | null = null;
 			if (action === "download") {
-				packed = await packCoat(template);
+				packed = await packCoat(template, assetHashes);
 				download(fileName, coatBlob(packed));
 			}
 			const counts = template.source.report.counts;
 			const next: Result = {
 				template,
+				assetHashes,
 				fileName,
 				packed,
 				downloaded: action === "download",
@@ -301,7 +301,8 @@ export function useExport(opts: ExportOptions) {
 
 	async function downloadResult(): Promise<void> {
 		if (!result) return;
-		const packed = result.packed ?? (await packCoat(result.template));
+		const packed =
+			result.packed ?? (await packCoat(result.template, result.assetHashes));
 		download(result.fileName, coatBlob(packed));
 		setResult((prev) => (prev ? { ...prev, packed, downloaded: true } : prev));
 		announce(`Downloaded ${result.fileName}`, "success");
