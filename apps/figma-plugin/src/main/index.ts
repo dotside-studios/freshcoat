@@ -13,6 +13,7 @@ import {
 	handleSetBinding,
 	postFieldsOverview,
 	postSelectionDetail,
+	scheduleFieldsOverview,
 	scheduleSelectionDetail,
 	slotFrameOf,
 } from "~/main/bindings";
@@ -387,17 +388,20 @@ export default async function (): Promise<void> {
 	// documentchange would need loadAllPagesAsync under dynamic-page access, so
 	// invalidate from the current page's nodechange instead.
 	let watchedPage = figma.currentPage;
-	const invalidateCards = (): void => cardsPublisher.invalidate();
-	watchedPage.on("nodechange", invalidateCards);
+	const onNodeChange = (event: NodeChangeEvent): void => {
+		cardsPublisher.invalidate();
+		scheduleFieldsOverview(event.nodeChanges);
+	};
+	watchedPage.on("nodechange", onNodeChange);
 
 	figma.on("selectionchange", () => {
 		cardsPublisher.schedule();
 		scheduleSelectionDetail();
 	});
 	figma.on("currentpagechange", () => {
-		watchedPage.off("nodechange", invalidateCards);
+		watchedPage.off("nodechange", onNodeChange);
 		watchedPage = figma.currentPage;
-		watchedPage.on("nodechange", invalidateCards);
+		watchedPage.on("nodechange", onNodeChange);
 		void postCards();
 		postSelectionDetail();
 		postFieldsOverview();

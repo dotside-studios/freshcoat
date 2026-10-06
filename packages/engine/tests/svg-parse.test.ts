@@ -250,6 +250,20 @@ describe("use and defs", () => {
 			"use-missing",
 		]);
 	});
+	test("a symbol referencing itself is cut", () => {
+		const d = parseSvg(
+			svg('<symbol id="s"><path d="M0 0H10V10Z"/><use href="#s"/></symbol><use href="#s"/>'),
+		);
+		expect(shapes(d.children)).toHaveLength(1);
+		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
+	});
+	test("many references to a large group stay fast", () => {
+		const paths = Array.from({ length: 100 }, (_, i) => `<path d="M${i} 0h1v1Z"/>`).join("");
+		const uses = Array.from({ length: 100 }, () => '<use href="#big"/>').join("");
+		const d = parseSvg(svg(`<defs><g id="big">${paths}</g></defs>${uses}<g id="a"><use href="#a"/></g>`));
+		expect(shapes(d.children)).toHaveLength(10000);
+		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
+	});
 	test("external references are ignored", () => {
 		const d = parseSvg(svg('<use href="other.svg#p"/>'));
 		expect(d.children).toEqual([]);

@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { postSelectionDetail, scheduleSelectionDetail } from "~/main/bindings";
-import { FIELD_KEY } from "~/main/plugin-data";
-import type { SelectionDetailMessage } from "~/shared/protocol";
+import {
+	postFieldsOverview,
+	postSelectionDetail,
+	scheduleFieldsOverview,
+	scheduleSelectionDetail,
+} from "~/main/bindings";
+import { FIELD_KEY, FIELDS_KEY } from "~/main/plugin-data";
+import type {
+	FieldsOverviewMessage,
+	SelectionDetailMessage,
+} from "~/shared/protocol";
 
 const shape = (id: string, name: string, type: string) => ({
 	id,
@@ -94,5 +102,90 @@ describe("scheduleSelectionDetail", () => {
 		postSelectionDetail();
 		vi.advanceTimersByTime(50);
 		expect(posted).toHaveLength(1);
+	});
+});
+
+describe("scheduleFieldsOverview", () => {
+	type Layer = { id: string; name: string; removed: boolean };
+
+	function canvas() {
+		const page = { type: "PAGE" };
+		const layers: Layer[] = [
+			{ id: "2:1", name: "Title", removed: false },
+			{ id: "2:2", name: "Subtitle", removed: false },
+		];
+		const frame = {
+			id: "1:1",
+			name: "Front",
+			type: "FRAME",
+			removed: false,
+			parent: page,
+			getPluginData: (key: string) =>
+				key === FIELDS_KEY
+					? JSON.stringify({
+							name: { id: "name", format: "text", title: "Name" },
+						})
+					: "",
+			findAllWithCriteria: () =>
+				layers.map((l) => ({
+					...l,
+					parent: frame,
+					getPluginData: (key: string) =>
+						key === FIELD_KEY
+							? JSON.stringify({ bind: { text: "{{name}}" } })
+							: "",
+				})),
+		};
+		const overviews: FieldsOverviewMessage[] = [];
+		vi.stubGlobal("figma", {
+			currentPage: { children: [frame] },
+			ui: {
+				postMessage: (msg: FieldsOverviewMessage) => overviews.push(msg),
+			},
+		});
+		return { frame, layers, overviews };
+	}
+
+	const change = (
+		type: "PROPERTY_CHANGE" | "DELETE",
+		node: object,
+		properties: string[] = [],
+	) => ({ id: (node as { id: string }).id, type, node, properties }) as never;
+
+	it("refreshes a frame renamed on the canvas", () => {
+		vi.useFakeTimers();
+		const { frame, overviews } = canvas();
+		postFieldsOverview();
+		frame.name = "Back";
+		scheduleFieldsOverview([change("PROPERTY_CHANGE", frame, ["name"])]);
+		scheduleFieldsOverview([change("PROPERTY_CHANGE", frame, ["name"])]);
+		expect(overviews).toHaveLength(1);
+		vi.advanceTimersByTime(100);
+		expect(overviews).toHaveLength(2);
+		expect(overviews[1].fields[0].slot).toBe("Back");
+	});
+
+	it("refreshes a frame whose bound layer was deleted", () => {
+		vi.useFakeTimers();
+		const { layers, overviews } = canvas();
+		postFieldsOverview();
+		expect(overviews[0].fields[0].nodeIds).toEqual(["2:1", "2:2"]);
+		const [gone] = layers.splice(0, 1);
+		scheduleFieldsOverview([
+			change("DELETE", { id: gone.id, removed: true, type: "TEXT" }),
+		]);
+		vi.advanceTimersByTime(100);
+		expect(overviews).toHaveLength(2);
+		expect(overviews[1].fields[0].nodeIds).toEqual(["2:2"]);
+		expect(overviews[1].fields[0].layerNames).toEqual(["Subtitle"]);
+	});
+
+	it("ignores changes that cannot alter the overview", () => {
+		vi.useFakeTimers();
+		const { frame, overviews } = canvas();
+		postFieldsOverview();
+		scheduleFieldsOverview([change("PROPERTY_CHANGE", frame, ["x", "y"])]);
+		vi.advanceTimersByTime(100);
+		expect(overviews).toHaveLength(1);
 	});
 });

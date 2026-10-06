@@ -126,20 +126,57 @@ function scanFrameFields(frame: OverviewFrame): FieldOverviewItem[] {
 
 const fieldsOverview = createFieldsOverview(scanFrameFields);
 
-/** Post the fields overview. With `changed`, only those top-level frames are
- *  rescanned and the rest come from the last scan. */
+let overviewTimer: ReturnType<typeof setTimeout> | null = null;
+const overviewPending = new Set<string>();
+
+/** Post the fields overview. With `changed`, only those top-level frames and
+ *  any queued by `scheduleFieldsOverview` are rescanned, the rest come from the
+ *  last scan. */
 export function postFieldsOverview(changed?: Array<BaseNode | null>): void {
+	if (overviewTimer !== null) clearTimeout(overviewTimer);
+	overviewTimer = null;
+	const pending = [...overviewPending];
+	overviewPending.clear();
 	const frames = overviewFrames();
 	const msg: FieldsOverviewMessage = {
 		type: "fields-overview",
 		fields: changed
-			? fieldsOverview.update(
-					frames,
-					changed.flatMap((n) => (n ? [n.id] : [])),
-				)
+			? fieldsOverview.update(frames, [
+					...changed.flatMap((n) => (n ? [n.id] : [])),
+					...pending,
+				])
 			: fieldsOverview.all(frames),
 	};
 	figma.ui.postMessage(msg);
+}
+
+// Changes that can alter a frame's overview without a binding edit: a frame or
+// bound layer renamed, moved, added or deleted.
+const OVERVIEW_PROPERTIES = new Set<NodeChangeProperty>(["name", "parent"]);
+
+/** Queue the frames touched by canvas changes and post the overview once a
+ *  burst settles. A deleted node is traced to its frame through the last scan. */
+export function scheduleFieldsOverview(
+	changes: readonly NodeChange[],
+	delayMs = 100,
+): void {
+	const before = overviewPending.size;
+	for (const change of changes) {
+		if (
+			change.type === "PROPERTY_CHANGE" &&
+			!change.properties.some((p) => OVERVIEW_PROPERTIES.has(p))
+		)
+			continue;
+		const cached = fieldsOverview.frameOf(change.id);
+		if (cached) overviewPending.add(cached);
+		if (!change.node.removed) {
+			const slot = slotFrameOf(change.node);
+			if (slot) overviewPending.add(slot.id);
+		}
+	}
+	if (overviewPending.size === before) return;
+	if (overviewTimer !== null) clearTimeout(overviewTimer);
+	overviewTimer = setTimeout(() => postFieldsOverview([]), delayMs);
 }
 
 export async function handleHarvest(

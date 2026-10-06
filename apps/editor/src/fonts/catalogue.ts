@@ -83,6 +83,8 @@ export function fuzzyScore(name: string, query: string): number {
 	return Math.max(0, Math.min(CLOSE_MATCH - 1, score - n.length / 100));
 }
 
+const byName = new Intl.Collator(undefined).compare;
+
 /**
  * The families to list for a query, category and sort. A query ranks by how
  * well each name matches, with the sort breaking ties.
@@ -99,9 +101,9 @@ export function filterFamilies<
 ): T[] {
 	const bySort = (a: T, b: T) =>
 		sort === "name"
-			? a.f.localeCompare(b.f)
+			? byName(a.f, b.f)
 			: (a.p ?? Number.POSITIVE_INFINITY) - (b.p ?? Number.POSITIVE_INFINITY) ||
-				a.f.localeCompare(b.f);
+				byName(a.f, b.f);
 	const inCategory = rows.filter((r) => category === "all" || r.c === category);
 	if (!query.trim()) return inCategory.sort(bySort);
 	return inCategory

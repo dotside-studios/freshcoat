@@ -146,3 +146,25 @@ describe("descriptors", () => {
 		);
 	});
 });
+
+describe("sorting the catalogue", () => {
+	test("keeps the localeCompare order", async () => {
+		const { families } = await loadCatalogue();
+		const byLocale = (a: GoogleFontRow, b: GoogleFontRow) =>
+			a.f.localeCompare(b.f);
+		expect(filterFamilies(families, { sort: "name" }).map((r) => r.f)).toEqual(
+			[...families].sort(byLocale).map((r) => r.f),
+		);
+		expect(
+			filterFamilies(families, { sort: "popular" }).map((r) => r.f),
+		).toEqual(
+			[...families]
+				.sort(
+					(a, b) =>
+						(a.p ?? Number.POSITIVE_INFINITY) -
+							(b.p ?? Number.POSITIVE_INFINITY) || byLocale(a, b),
+				)
+				.map((r) => r.f),
+		);
+	});
+});

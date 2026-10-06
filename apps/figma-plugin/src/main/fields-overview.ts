@@ -6,6 +6,7 @@ export function createFieldsOverview<F extends { id: string }>(
 	scan: (frame: F) => FieldOverviewItem[],
 ) {
 	let byFrame = new Map<string, FieldOverviewItem[]>();
+	let frameOfNode = new Map<string, string>();
 
 	function collect(
 		frames: F[],
@@ -17,6 +18,10 @@ export function createFieldsOverview<F extends { id: string }>(
 			next.set(frame.id, cached ?? scan(frame));
 		}
 		byFrame = next;
+		frameOfNode = new Map();
+		for (const [frameId, items] of next)
+			for (const item of items)
+				for (const nodeId of item.nodeIds) frameOfNode.set(nodeId, frameId);
 		return [...next.values()].flat();
 	}
 
@@ -28,5 +33,8 @@ export function createFieldsOverview<F extends { id: string }>(
 			const ids = new Set(changed);
 			return collect(frames, (id) => ids.has(id));
 		},
+		/** The cached frame a node id is, or is bound inside of, if any. */
+		frameOf: (nodeId: string): string | undefined =>
+			byFrame.has(nodeId) ? nodeId : frameOfNode.get(nodeId),
 	};
 }
