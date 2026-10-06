@@ -201,6 +201,8 @@ export type CompileOptions = {
 	/** Draw the template's `bleed` around the trim. `width` x `height` stays
 	 *  the trim's size and the scene grows by the bleed at the same scale. */
 	bleed?: boolean;
+	/** Compile only the frames with these names. */
+	frameNames?: string[];
 };
 
 export type ValidationError = {

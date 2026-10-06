@@ -16,7 +16,6 @@ import {
 	type TrackSize,
 	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
-import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import {
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
@@ -33,10 +32,10 @@ import {
 	offsetElements,
 	templateBleed,
 } from "./bleed";
-import { resizeTemplate } from "./constraints";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
 import { parseImageFocus } from "./image-focus";
+import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generateMatrix } from "./qr";
 import { childElements } from "./tree";
@@ -68,8 +67,6 @@ import type {
 	TemplateFrame,
 	Vec2,
 } from "./types";
-import { validate } from "./validate";
-import { applyVariant } from "./variants";
 import { pruneHiddenElements } from "./visibility";
 
 type TextSpanInput = {
@@ -109,39 +106,10 @@ export function compile(
 	values: Record<string, unknown>,
 	opts: CompileOptions,
 ): CompiledTemplate {
-	const v = validate(inputTemplate);
-	if (!v.ok) {
-		throw new Error(
-			`invalid template: ${v.errors.map((e) => e.code).join(", ")}`,
-		);
-	}
-
-	// `asset:<sha256>` srcs address bytes the template carries in `assets`; point
-	// them at data URLs so the painter loads them like any other image. A
-	// template whose images already have URLs carries no assets and is untouched.
-	const withAssets =
-		inputTemplate.assets && inputTemplate.assets.length > 0
-			? resolveAssetSrcs(inputTemplate, inlineAssetUrls(inputTemplate))
-			: inputTemplate;
-
-	// The variant is applied first, so with `resize` its backgrounds and moved
-	// layers are laid out with everything else.
-	const resolved =
-		opts.variantId === undefined
-			? withAssets
-			: applyVariant(withAssets, opts.variantId);
-
-	// With `resize`, the design is then laid out at that size by its
-	// constraints, and the caller has chosen it to have the target's aspect.
-	// `variants` are left behind first: nothing below reads them, and resizing
-	// would lay out every one.
-	const template = opts.resize
-		? resizeTemplate(
-				withoutVariants(resolved),
-				opts.resize.width,
-				opts.resize.height,
-			)
-		: resolved;
+	const template = prepareTemplate(inputTemplate, {
+		variantId: opts.variantId,
+		resize: opts.resize,
+	});
 
 	const ratio = opts.width / template.width;
 	const aspectTemplate = template.width / template.height;
@@ -169,7 +137,10 @@ export function compile(
 	const height = opts.height + (bleed.top + bleed.bottom) * ratio;
 	const trim = { width: template.width, height: template.height };
 
-	const frames = template.template_data.map((frame) => {
+	const frameData = opts.frameNames
+		? template.template_data.filter((f) => opts.frameNames?.includes(f.name))
+		: template.template_data;
+	const frames = frameData.map((frame) => {
 		const elements = pruneHiddenElements(
 			frame.elements,
 			ctx,
@@ -206,12 +177,6 @@ export function compile(
 		},
 		frames,
 	};
-}
-
-function withoutVariants(t: Template): Template {
-	if (t.variants === undefined) return t;
-	const { variants: _variants, ...rest } = t;
-	return rest;
 }
 
 // ─────────────── frame → root group ───────────────

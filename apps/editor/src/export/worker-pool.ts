@@ -90,6 +90,8 @@ type Task = {
 type Slot = {
 	worker: PoolWorker;
 	task: Task | null;
+	/** the template the worker holds from its last render */
+	template?: RenderRequest["template"];
 	ready: Promise<void>;
 	settleReady?: (error?: Error) => void;
 };
@@ -177,7 +179,13 @@ export function createWorkerPool(
 			const slot = slots[picked] ?? spawn(picked);
 			const task = queue.shift() as Task;
 			slot.task = task;
-			slot.worker.postMessage({ type: "render", id: task.id, ...task.request });
+			const { template, ...rest } = task.request;
+			slot.worker.postMessage(
+				slot.template === template
+					? { type: "render", id: task.id, ...rest }
+					: { type: "render", id: task.id, ...task.request },
+			);
+			slot.template = template;
 		}
 	}
 

@@ -40,11 +40,16 @@ export type RenderOutput = {
 	gamut?: GamutNote[];
 };
 
+/** `template` is left out when it is the one the worker rendered last. */
+export type WorkerRenderRequest = Omit<RenderRequest, "template"> & {
+	template?: Template;
+};
+
 export type WorkerRequest =
 	| { type: "init"; fonts: [string, Uint8Array[]][] }
 	/** images the template itself carries, kept for every render */
 	| { type: "images"; entries: [string, Blob][] }
-	| ({ type: "render"; id: number } & RenderRequest)
+	| ({ type: "render"; id: number } & WorkerRenderRequest)
 	| { type: "dispose" };
 
 export type WorkerReply =

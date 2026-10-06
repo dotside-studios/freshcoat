@@ -261,6 +261,31 @@ describe("worker pool", () => {
 		expect(sent?.images).toEqual([["ws:a", photo]]);
 		expect(sent?.images[0]?.[1]).toBe(photo);
 	});
+
+	it("sends a worker the template only when it changes", async () => {
+		const { pool, workers } = fakePool(1);
+		const template = {} as RenderRequest["template"];
+		const other = {} as RenderRequest["template"];
+		for (const t of [template, template, other]) {
+			const p = pool.render({ ...request("a"), template: t });
+			workers[0].finish();
+			await p;
+		}
+		const sent = workers[0].renders().map((r) => r.template);
+		expect(sent[0]).toBe(template);
+		expect("template" in workers[0].renders()[1]).toBe(false);
+		expect(sent[2]).toBe(other);
+	});
+
+	it("a replacement worker is sent the template again", async () => {
+		const { pool, workers } = fakePool(1);
+		const template = {} as RenderRequest["template"];
+		const p = pool.render({ ...request("a"), template });
+		workers[0].onerror?.({ message: "oom" } as ErrorEvent);
+		await expect(p).rejects.toThrow("oom");
+		void pool.render({ ...request("b"), template });
+		expect(workers[1].renders()[0]?.template).toBe(template);
+	});
 });
 
 describe("exportPoolSize", () => {

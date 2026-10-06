@@ -1,12 +1,18 @@
-import { compile, setBarcodeEncoder } from "@freshcoat-js/coatfile";
+import {
+	compile,
+	createParagraphEngine,
+	setBarcodeEncoder,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import { deriveFontMetrics } from "@freshcoat-js/engine";
 import { createImageLru, DEFAULT_IMAGE_CACHE_PIXELS } from "./image-lru";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
 	OutputFormat,
-	RenderRequest,
+	WorkerRenderRequest,
 	WorkerReply,
 	WorkerRequest,
 } from "./protocol";
@@ -28,6 +34,14 @@ const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
 let ckPromise: Promise<CK> | undefined;
 let fonts = new Map<string, Uint8Array[]>();
+let text:
+	| {
+			engine: ReturnType<typeof createParagraphEngine>;
+			fontMetrics: ReturnType<typeof deriveFontMetrics>;
+	  }
+	| undefined;
+/** the template of the last render; the pool sends it only when it changes */
+let current: Template | undefined;
 /** images the template carries, sent once with `images` */
 let carried = new Map<string, Blob>();
 const decoded = createImageLru<CkImage>(DEFAULT_IMAGE_CACHE_PIXELS, (img) =>
@@ -72,10 +86,26 @@ async function bytesOf(src: string, own: Map<string, Blob>) {
 	return new Uint8Array(await res.arrayBuffer());
 }
 
-async function renderSide(req: RenderRequest) {
+function setFonts(next: Map<string, Uint8Array[]>) {
+	text?.engine.dispose();
+	text = undefined;
+	fonts = next;
+}
+
+function textFor(ck: CK) {
+	text ??= {
+		engine: createParagraphEngine(ck, fonts),
+		fontMetrics: deriveFontMetrics(fonts),
+	};
+	return text;
+}
+
+async function renderSide(req: WorkerRenderRequest) {
+	if (req.template) current = req.template;
 	const ck = await loadCanvasKit();
 	const started = performance.now();
-	const { template } = req;
+	const template = current;
+	if (!template) throw new Error("no template");
 	if (!template.template_data.some((f) => f.name === req.side))
 		throw new Error(`no side named "${req.side}"`);
 	const variantId =
@@ -118,7 +148,9 @@ async function renderSide(req: RenderRequest) {
 			variantId,
 			...(req.resize ? { resize: req.resize } : {}),
 			...(req.bleed ? { bleed: true } : {}),
+			frameNames: [req.side],
 		});
+		const { engine, fontMetrics } = textFor(ck);
 		const painted = await withPrintFallback(req.print, async (print) => {
 			const [result] = await renderCompiled(
 				compiled,
@@ -131,7 +163,7 @@ async function renderSide(req: RenderRequest) {
 							: { constraint: { kind: "scale", value: req.scale } },
 					],
 				},
-				{ ck, env, fonts },
+				{ ck, env, fonts, fontMetrics, textEngine: engine },
 			);
 			if (!result || !("bytes" in result))
 				throw new Error("nothing was rendered");
@@ -173,7 +205,7 @@ function errorText(e: unknown): string {
 async function handle(msg: WorkerRequest): Promise<void> {
 	switch (msg.type) {
 		case "init": {
-			fonts = new Map(msg.fonts);
+			setFonts(new Map(msg.fonts));
 			setBarcodeEncoder(bwipBarcodeEncoder);
 			const started = performance.now();
 			try {
@@ -199,7 +231,8 @@ async function handle(msg: WorkerRequest): Promise<void> {
 			}
 			return;
 		case "dispose":
-			fonts = new Map();
+			setFonts(new Map());
+			current = undefined;
 			carried = new Map();
 			decoded.clear();
 			scope.close();

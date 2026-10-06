@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { fontBytes } from "../src/font-bytes";
+import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
 
 // `bun test`'s vitest shim has no vi.stubGlobal; swap the global by hand.
 const realFetch = globalThis.fetch;
 afterEach(() => {
 	globalThis.fetch = realFetch;
+	clearFontBytesCache();
 });
 
 /** Serve `css` for the stylesheet URL, and one byte per font file keyed by url. */
@@ -147,5 +148,62 @@ describe("fontBytes over a subsetted stylesheet", () => {
 		await expect(fontBytes(google("https://css/x"))).rejects.toThrow(
 			/no font file found/,
 		);
+	});
+});
+
+describe("fontBytes memo", () => {
+	const http = (url: string) =>
+		({
+			kind: "descriptor",
+			descriptor: {
+				kind: "local",
+				family: "X",
+				files: [{ src: url, weight: 400, style: "normal" }],
+			},
+		}) as const;
+
+	test("two resolutions of one stylesheet make one fetch per URL and share arrays", async () => {
+		const requested = stubFetch(SUBSET_CSS, {
+			"https://f/ext-400.woff2": 1,
+			"https://f/latin-400.woff2": 2,
+			"https://f/ext-700.woff2": 3,
+			"https://f/latin-700.woff2": 4,
+		});
+		const [a, b] = await Promise.all([
+			fontBytes(google("https://css/vend")),
+			fontBytes(google("https://css/vend")),
+		]);
+		const c = await fontBytes(google("https://css/vend"));
+		expect(requested.filter((u) => u === "https://css/vend")).toHaveLength(1);
+		expect(requested.filter((u) => u.startsWith("https://f/"))).toHaveLength(4);
+		a.forEach((bytes, i) => {
+			expect(b[i]).toBe(bytes);
+			expect(c[i]).toBe(bytes);
+		});
+	});
+
+	test("two resolutions of one font URL make one fetch and return the same array", async () => {
+		const requested = stubFetch("", { "https://f/a.ttf": 7 });
+		const [a] = await fontBytes(http("https://f/a.ttf"));
+		const [b] = await fontBytes(http("https://f/a.ttf"));
+		expect(requested).toEqual(["https://f/a.ttf"]);
+		expect(b).toBe(a);
+	});
+
+	test("a failed fetch is retried", async () => {
+		const requested = stubFetch("", {});
+		await expect(fontBytes(http("https://f/a.ttf"))).rejects.toThrow(/404/);
+		stubFetch("", { "https://f/a.ttf": 7 });
+		const [bytes] = await fontBytes(http("https://f/a.ttf"));
+		expect(bytes?.[0]).toBe(7);
+		expect(requested).toEqual(["https://f/a.ttf"]);
+	});
+
+	test("a data: font decodes to the same array each time", async () => {
+		const src = `data:font/ttf;base64,${btoa("abc")}`;
+		const [a] = await fontBytes(http(src));
+		const [b] = await fontBytes(http(src));
+		expect(b).toBe(a);
+		expect([...(a ?? [])]).toEqual([97, 98, 99]);
 	});
 });
