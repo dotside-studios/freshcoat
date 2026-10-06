@@ -114,6 +114,20 @@ export function localAabb(
 	};
 }
 
+/** `t` shifted by (dx, dy) expressed in the space `t` describes — the world
+ *  transform of a child box sitting at that local offset. */
+export function translateLocal(
+	t: FigmaTransform,
+	dx: number,
+	dy: number,
+): FigmaTransform {
+	const [[a, b, tx], [c, d, ty]] = t;
+	return [
+		[a, b, tx + a * dx + b * dy],
+		[c, d, ty + c * dx + d * dy],
+	];
+}
+
 /** The coordinate space a raster is being parked in: the box its `pos` is
  *  measured from, plus how that space sits in the world. At slot level the
  *  slot frame's own rotation is stripped (it becomes the axis-aligned card), so

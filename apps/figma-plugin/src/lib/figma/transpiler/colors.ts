@@ -1,4 +1,4 @@
-import { linearGradientAngle } from "@freshcoat-js/coatfile";
+import { type Fill, linearGradientAngle } from "@freshcoat-js/coatfile";
 import type { FigmaNode, FigmaPaint, FigmaSolidPaint } from "../types";
 import {
 	angularPlacement,
@@ -14,31 +14,7 @@ export type { PaintBox } from "./paint";
 export { compositeSolids, figmaColorToHex, isMappablePaint } from "./paint";
 
 type SolidFillResult = { kind: "solid"; hex: string; opacity: number };
-type GradientFillResult = {
-	kind: "fill";
-	value:
-		| {
-				kind: "linear";
-				angle: number;
-				from?: [number, number];
-				to?: [number, number];
-				stops: Array<{ offset: number; color: string }>;
-		  }
-		| {
-				kind: "radial";
-				center: [number, number];
-				radius: number;
-				radiusY?: number;
-				rotation?: number;
-				stops: Array<{ offset: number; color: string }>;
-		  }
-		| {
-				kind: "angular";
-				center: [number, number];
-				rotation?: number;
-				stops: Array<{ offset: number; color: string }>;
-		  };
-};
+type GradientFillResult = { kind: "fill"; value: Exclude<Fill, string> };
 
 export type FillResult = SolidFillResult | GradientFillResult;
 

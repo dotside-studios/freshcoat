@@ -103,13 +103,16 @@ export function transpileText(
 	// auto-height, or auto-width — does NOT clip its own overflow in Figma; the
 	// text simply spills past the box (only a FRAME with "clip content" clips,
 	// which the transpiler handles separately). Figma clips text at the layer
-	// level ONLY when "Truncate text" is on (textAutoResize "TRUNCATE").
+	// level ONLY when "Truncate text" is on (textTruncation ENDING, or the
+	// deprecated textAutoResize "TRUNCATE").
 	// Emitting `fit: "clip"` unconditionally cut off overflowing fixed-size
 	// paragraphs (e.g. the back-of-card legal block), so we clip only for the
 	// truncate case and otherwise let the overflow render. `shrink` (font
 	// binary-searched down) is never what Figma does, so we don't emit it.
-	const fitMode: "clip" | undefined =
-		node.style.textAutoResize === "TRUNCATE" ? "clip" : undefined;
+	const truncates =
+		node.style.textTruncation === "ENDING" ||
+		node.style.textAutoResize === "TRUNCATE";
+	const fitMode: "clip" | undefined = truncates ? "clip" : undefined;
 
 	const baseFont = {
 		family: node.style.fontFamily,
@@ -124,8 +127,16 @@ export function transpileText(
 			? { letterSpacing: node.style.letterSpacing * ctx.scale }
 			: {}),
 		lineHeight,
-		...fontFeatures(node.style.openTypeFeatures),
+		...fontFeatures(node.style.openTypeFeatures, node.style.textCase),
 	};
+	const maxLines = truncates
+		? truncatedLines(
+				node.style.maxLines,
+				size.height,
+				baseFont.size,
+				lineHeight,
+			)
+		: undefined;
 
 	const color = compositeSolids(node.fills);
 	const built = buildSpans(node, ctx.scale, baseFont, color);
@@ -135,8 +146,7 @@ export function transpileText(
 	}
 
 	// Figma "Case" → coatfile applies it to the RESOLVED text (so dynamic
-	// {{values}} are cased). SMALL_CAPS isn't a plain string transform, so it
-	// (and ORIGINAL) emit nothing.
+	// {{values}} are cased). Small caps are font features (see fontFeatures).
 	const textCaseMap: Record<string, "upper" | "lower" | "title"> = {
 		UPPER: "upper",
 		LOWER: "lower",
@@ -158,6 +168,7 @@ export function transpileText(
 		// above where the layer put it.
 		...(node.style.leadingTrim === "CAP_HEIGHT" ? { leadingTrim: true } : {}),
 		...(fitMode ? { fit: fitMode } : {}),
+		...(maxLines !== undefined ? { maxLines } : {}),
 		...(node.style.paragraphSpacing
 			? { paragraphSpacing: round2(node.style.paragraphSpacing * ctx.scale) }
 			: {}),
@@ -183,19 +194,60 @@ export function transpileText(
 	};
 }
 
-/** Figma's explicitly set OpenType features, as coatfile's lowercase tags. */
-function fontFeatures(features: Record<string, boolean> | undefined): {
+/** Figma's "Truncate text" line cap. Without an explicit maxLines Figma keeps
+ *  the lines the box holds, which needs a numeric line height to count. */
+function truncatedLines(
+	maxLines: number | undefined,
+	boxHeight: number,
+	fontSize: number,
+	lineHeight: number | "auto",
+): number | undefined {
+	if (maxLines !== undefined && maxLines > 0) return Math.floor(maxLines);
+	if (lineHeight === "auto") return undefined;
+	const linePx = fontSize * lineHeight;
+	if (!(linePx > 0)) return undefined;
+	return Math.max(1, Math.floor(boxHeight / linePx + 0.01));
+}
+
+type TextCase = FigmaTextStyle["textCase"];
+
+function smallCapsFeatures(textCase: TextCase): Record<string, number> {
+	if (textCase === "SMALL_CAPS") return { smcp: 1 };
+	if (textCase === "SMALL_CAPS_FORCED") return { smcp: 1, c2sc: 1 };
+	return {};
+}
+
+/** Figma's explicitly set OpenType features, as coatfile's lowercase tags,
+ *  plus the ones its small caps case turns on. */
+function fontFeatures(
+	features: Record<string, boolean> | undefined,
+	textCase?: TextCase,
+): {
 	features?: Record<string, number>;
 } {
 	const entries = Object.entries(features ?? {}).filter(([tag]) =>
 		/^[A-Za-z0-9]{4}$/.test(tag),
 	);
-	if (entries.length === 0) return {};
-	return {
-		features: Object.fromEntries(
+	const merged = {
+		...Object.fromEntries(
 			entries.map(([tag, on]) => [tag.toLowerCase(), on ? 1 : 0]),
 		),
+		...smallCapsFeatures(textCase),
 	};
+	return Object.keys(merged).length > 0 ? { features: merged } : {};
+}
+
+/** The small caps features a run sets where its case differs from the base. */
+function runSmallCaps(
+	runCase: TextCase,
+	baseCase: TextCase,
+): Record<string, number> {
+	const run = smallCapsFeatures(runCase);
+	const base = smallCapsFeatures(baseCase);
+	const out: Record<string, number> = {};
+	for (const tag of ["smcp", "c2sc"])
+		if ((run[tag] ?? 0) !== (base[tag] ?? 0)) out[tag] = run[tag] ?? 0;
+	return out;
 }
 
 type Decoration = "underline" | "line-through";
@@ -267,7 +319,10 @@ function buildSpans(
 		if (split && decoration) fontOverride.decoration = decoration;
 		const styleOverride = g.key === 0 ? undefined : table[String(g.key)];
 		if (styleOverride) {
-			Object.assign(fontOverride, runFont(styleOverride, scale, baseFont));
+			Object.assign(
+				fontOverride,
+				runFont(styleOverride, scale, baseFont, node.style.textCase),
+			);
 			if (styleOverride.fills) {
 				const color = compositeSolids(styleOverride.fills);
 				if (color !== null && color !== baseColor) span.color = color;
@@ -283,8 +338,13 @@ function runFont(
 	styleOverride: Partial<FigmaTextStyle>,
 	scale: number,
 	baseFont: Record<string, unknown>,
+	baseCase: TextCase,
 ): Record<string, unknown> {
 	const fontOverride: Record<string, unknown> = {};
+	if (styleOverride.textCase !== undefined) {
+		const caps = runSmallCaps(styleOverride.textCase, baseCase);
+		if (Object.keys(caps).length > 0) fontOverride.features = caps;
+	}
 	if (styleOverride.fontFamily !== undefined)
 		fontOverride.family = styleOverride.fontFamily;
 	if (styleOverride.fontSize !== undefined)

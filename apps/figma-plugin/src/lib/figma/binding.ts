@@ -2,13 +2,14 @@
 // run at harvest time (write pluginData) and at export time (live fallback), so
 // the marker grammar lives in exactly one place.
 
-import type { Symbology } from "@freshcoat-js/coatfile";
+import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import {
 	extractTokens,
 	isWholeMustacheToken,
 	titleCase,
 } from "./transpiler/fields";
+import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
 /** Schema format a field lowers to (coatfile). */
@@ -336,7 +337,7 @@ export function inferNodeBinding(node: FigmaNode): NodeBinding | null {
 				),
 			};
 		}
-		if (node.type === "RECTANGLE" && hasSingleImageFill(node)) {
+		if (canHoldImage(node) && hasSingleImageFill(node)) {
 			return { bind: { image: tmpl }, fields: imageDraftsFor(nameValue, node) };
 		}
 		// A non-text, non-image layer can't be a text/image field without odd
@@ -357,13 +358,6 @@ export function inferNodeBinding(node: FigmaNode): NodeBinding | null {
 
 	return null;
 }
-
-/** A visibility condition, as coatfile's `visibleWhen` carries it. */
-export type VisibilityCondition = {
-	field: string;
-	equals?: string;
-	not?: boolean;
-};
 
 const VISIBILITY_MARKER =
 	/^\s*if:\s*(!)?\s*\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}\s*(?:=\s*(?:"([^"]*)"|(\S+)))?\s*$/;
@@ -436,11 +430,11 @@ export function bindableProperties(node: FigmaNode): BindTarget[] {
 			{ property: "textColor", format: "color" },
 		];
 	}
-	if (node.type === "RECTANGLE") {
-		// A rect already carrying an image fill is only an image.
+	if (canHoldImage(node)) {
+		// A shape already carrying an image fill is only an image.
 		if (hasSingleImageFill(node))
 			return [{ property: "image", format: "image" }];
-		// A plain (solid-fill) rect can be a color swatch, an image placeholder
+		// A plain (solid-fill) shape can be a color swatch, an image placeholder
 		// (the common `{{logo}}`/avatar box), a QR, or a barcode.
 		return [
 			{ property: "fill", format: "color" },

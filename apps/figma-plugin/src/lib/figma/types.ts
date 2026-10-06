@@ -113,13 +113,15 @@ export type FigmaTextStyle = {
 	textAlignHorizontal: "LEFT" | "CENTER" | "RIGHT" | "JUSTIFIED";
 	textAlignVertical: "TOP" | "CENTER" | "BOTTOM";
 	textAutoResize?: "NONE" | "WIDTH_AND_HEIGHT" | "HEIGHT" | "TRUNCATE";
+	// Figma "Truncate text", which replaced textAutoResize TRUNCATE. maxLines
+	// caps the line count; absent means as many lines as the box holds.
+	textTruncation?: "DISABLED" | "ENDING";
+	maxLines?: number;
 	// Figma "Vertical trim". STANDARD (the default) seats the first baseline by
 	// the line box — half the leading, then the ascent. CAP_HEIGHT tucks the cap
 	// line against the box top instead, which moves every line up by roughly
 	// ascent − capHeight.
 	leadingTrim?: "NONE" | "CAP_HEIGHT";
-	// Figma "Case" (textCase). SMALL_CAPS variants aren't a plain string
-	// transform, so they fall back to original.
 	// Figma "Paragraph spacing": px after each paragraph.
 	paragraphSpacing?: number;
 	// Figma "OpenType features" the layer explicitly sets, by uppercase tag.
@@ -226,6 +228,8 @@ export type FigmaTextNode = FigmaBaseNode & {
 	characters: string;
 	style: FigmaTextStyle;
 	fills: FigmaPaint[];
+	strokes?: FigmaPaint[];
+	strokeWeight?: number;
 	characterStyleOverrides?: number[];
 	styleOverrideTable?: Record<string, Partial<FigmaTextStyle>>;
 };
@@ -271,6 +275,11 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	// in the node's bounding-box-local coordinate space and filled by its own
 	// winding rule. An open, stroke-only path has none.
 	fillGeometry?: { path: string; windingRule?: "NONZERO" | "EVENODD" }[];
+	// ELLIPSE only, in radians. Absent reads as a full, solid ellipse.
+	arcData?: { startingAngle: number; endingAngle: number; innerRadius: number };
+	// POLYGON only.
+	pointCount?: number;
+	cornerRadius?: number;
 };
 
 export type FigmaContainerNodeType =

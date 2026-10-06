@@ -379,6 +379,7 @@ type AnyTextSegment = {
 	lineHeight?: AnyLineHeight;
 	fills?: readonly AnyPaint[];
 	textDecoration?: string;
+	textCase?: string;
 };
 
 // Every font property below is typed `unknown` on purpose: Figma returns
@@ -395,12 +396,16 @@ type AnyTextNode = AnySceneNode & {
 	textAlignHorizontal: unknown;
 	textAlignVertical: unknown;
 	textAutoResize?: unknown;
+	textTruncation?: unknown;
+	maxLines?: unknown;
 	textCase?: unknown;
 	leadingTrim?: unknown;
 	openTypeFeatures?: unknown;
 	paragraphSpacing?: unknown;
 	textDecoration?: unknown;
 	fills: readonly AnyPaint[] | typeof figma.mixed;
+	strokes?: readonly AnyPaint[];
+	strokeWeight?: unknown;
 	getStyledTextSegments: (fields: string[]) => AnyTextSegment[];
 };
 
@@ -464,6 +469,8 @@ function baseTextStyle(
 	// describes, same as it is for size and weight. Without this fallback a node
 	// whose runs differ in line height reports AUTO for all of them.
 	const lineHeight = plainLineHeight(node.lineHeight) ?? primary?.lineHeight;
+	const textCase = plainString(node.textCase) ?? primary?.textCase;
+	const maxLines = plainNumber(node.maxLines);
 
 	return {
 		fontFamily: plainString(fontName?.family) ?? DEFAULT_FONT_FAMILY,
@@ -480,9 +487,14 @@ function baseTextStyle(
 		textAutoResize: plainString(
 			node.textAutoResize,
 		) as FigmaTextStyle["textAutoResize"],
-		...(plainString(node.textCase)
-			? { textCase: node.textCase as FigmaTextStyle["textCase"] }
+		...(textCase ? { textCase: textCase as FigmaTextStyle["textCase"] } : {}),
+		...(plainString(node.textTruncation)
+			? {
+					textTruncation:
+						node.textTruncation as FigmaTextStyle["textTruncation"],
+				}
 			: {}),
+		...(maxLines !== undefined && maxLines > 0 ? { maxLines } : {}),
 		// Absent on older API versions, and mixed when it varies across the string
 		// — both read as unset, which is Figma's own default (STANDARD).
 		...(plainString(node.leadingTrim)
@@ -509,6 +521,13 @@ function decorationField(
 		: {};
 }
 
+// Only small caps change the shaped glyphs; other cases are element-level.
+function smallCapsOf(textCase: string | undefined): string {
+	return textCase === "SMALL_CAPS" || textCase === "SMALL_CAPS_FORCED"
+		? textCase
+		: "NONE";
+}
+
 /** A stable signature for a segment's style, used to allocate override keys. */
 function segSignature(s: AnyTextSegment): string {
 	return JSON.stringify([
@@ -525,6 +544,7 @@ function segSignature(s: AnyTextSegment): string {
 		s.lineHeight && s.lineHeight.unit !== "AUTO" ? s.lineHeight.value : 0,
 		s.textDecoration ?? "NONE",
 		readPaints(s.fills),
+		smallCapsOf(s.textCase),
 	]);
 }
 
@@ -541,6 +561,7 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 		"lineHeight",
 		"fills",
 		"textDecoration",
+		"textCase",
 	]);
 	const style = baseTextStyle(node, segments[0]);
 	// Fills that vary across the string read back as mixed; the first run's are
@@ -548,6 +569,7 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 	const fills = readPaints(
 		Array.isArray(node.fills) ? node.fills : segments[0]?.fills,
 	);
+	const strokes = readPaints(node.strokes);
 	const charCount = [...node.characters].length;
 	const overrides = new Array<number>(charCount).fill(0);
 	const table: Record<string, Partial<FigmaTextStyle>> = {};
@@ -576,6 +598,9 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 						? seg.textDecoration
 						: "NONE",
 				...(seg.fills ? { fills: readPaints(seg.fills) } : {}),
+				...(seg.textCase
+					? { textCase: seg.textCase as FigmaTextStyle["textCase"] }
+					: {}),
 				// AUTO contributes no fields, exactly as it does on the base style,
 				// and the transpiler reads that absence as "auto".
 				...lineHeightFields(seg.lineHeight, seg.fontSize),
@@ -591,6 +616,9 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 		characters: node.characters,
 		style,
 		fills,
+		...(strokes.length > 0
+			? { strokes, strokeWeight: plainNumber(node.strokeWeight) }
+			: {}),
 		characterStyleOverrides: overrides,
 		styleOverrideTable: table,
 	};
@@ -689,6 +717,9 @@ type AnyVectorNode = AnySceneNode & {
 	dashPattern?: unknown;
 	vectorPaths?: AnyVectorPaths;
 	fillGeometry?: AnyVectorPaths;
+	arcData?: FigmaVectorNode["arcData"];
+	pointCount?: number;
+	cornerRadius?: unknown;
 };
 
 /** The path a shape node is emitted from.
@@ -753,6 +784,21 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
 		fillGeometry: readGeometry(node),
+		...(node.type === "ELLIPSE" && node.arcData
+			? {
+					arcData: {
+						startingAngle: node.arcData.startingAngle,
+						endingAngle: node.arcData.endingAngle,
+						innerRadius: node.arcData.innerRadius,
+					},
+				}
+			: {}),
+		...(node.type === "POLYGON" && typeof node.pointCount === "number"
+			? { pointCount: node.pointCount }
+			: {}),
+		...(node.type === "POLYGON" && typeof node.cornerRadius === "number"
+			? { cornerRadius: node.cornerRadius }
+			: {}),
 	};
 }
 

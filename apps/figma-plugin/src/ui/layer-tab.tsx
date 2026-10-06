@@ -14,7 +14,11 @@ import {
 	Text,
 	Textbox,
 } from "@create-figma-plugin/ui";
-import { type Symbology, symbologyLabel } from "@freshcoat-js/coatfile";
+import {
+	SYMBOLOGIES,
+	type Symbology,
+	symbologyLabel,
+} from "@freshcoat-js/coatfile";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
@@ -29,7 +33,6 @@ import {
 	parseVisibilityMarker,
 } from "~/lib/figma/binding";
 import {
-	BARCODE_SYMBOLOGIES,
 	DEFAULT_SYMBOLOGY,
 	parseBarcodeLayerName,
 } from "~/lib/figma/transpiler/barcode-name";
@@ -109,7 +112,7 @@ type Pending =
 
 const APPLIED_MS = 1500;
 
-const SYMBOLOGY_OPTIONS: DropdownOption[] = BARCODE_SYMBOLOGIES.map((s) => ({
+const SYMBOLOGY_OPTIONS: DropdownOption[] = SYMBOLOGIES.map((s) => ({
 	value: s,
 	text: symbologyLabel(s),
 }));

@@ -35,7 +35,7 @@ const baseText = (overrides: Partial<FigmaTextNode> = {}): FigmaTextNode => ({
 describe("transpileText", () => {
 	// Field registration from text content is covered centrally (binding.test);
 	// these assert the rendered TextElement (placement, rotation, font, spans).
-	it("maps Figma textCase to the case property; SMALL_CAPS/ORIGINAL omit it", () => {
+	it("maps Figma textCase to the case property; small caps/ORIGINAL omit it", () => {
 		const withCase = (c: FigmaTextNode["style"]["textCase"]) =>
 			transpileText(baseText({ style: { ...baseText().style, textCase: c } }), {
 				frame: FRAME,
@@ -107,6 +107,65 @@ describe("transpileText", () => {
 		});
 		const none = transpileText(baseText(), { frame: FRAME, scale: SCALE });
 		expect("features" in (none.properties.font as object)).toBe(false);
+	});
+
+	describe("small caps", () => {
+		const withCase = (
+			textCase: FigmaTextNode["style"]["textCase"],
+			over: Partial<FigmaTextNode> = {},
+		) =>
+			transpileText(
+				baseText({ style: { ...baseText().style, textCase }, ...over }),
+				{ frame: FRAME, scale: SCALE },
+			);
+		const features = (font: unknown) =>
+			(font as { features?: Record<string, number> }).features;
+
+		it("maps SMALL_CAPS and SMALL_CAPS_FORCED to font features", () => {
+			expect(features(withCase("SMALL_CAPS").properties.font)).toEqual({
+				smcp: 1,
+			});
+			expect(features(withCase("SMALL_CAPS_FORCED").properties.font)).toEqual({
+				smcp: 1,
+				c2sc: 1,
+			});
+		});
+
+		it("merges with explicit OpenType features", () => {
+			const el = transpileText(
+				baseText({
+					style: {
+						...baseText().style,
+						textCase: "SMALL_CAPS",
+						openTypeFeatures: { TNUM: true },
+					},
+				}),
+				{ frame: FRAME, scale: SCALE },
+			);
+			expect(features(el.properties.font)).toEqual({ tnum: 1, smcp: 1 });
+		});
+
+		it("sets a run's small caps on its span, and turns the base's off", () => {
+			const runs = {
+				characters: "AbCd",
+				characterStyleOverrides: [0, 0, 1, 1],
+			};
+			const on = withCase(undefined, {
+				...runs,
+				styleOverrideTable: { "1": { textCase: "SMALL_CAPS_FORCED" } },
+			});
+			const onSpans = on.properties.spans as Array<{ font?: unknown }>;
+			expect("font" in onSpans[0]).toBe(false);
+			expect(features(onSpans[1].font)).toEqual({ smcp: 1, c2sc: 1 });
+
+			const off = withCase("SMALL_CAPS", {
+				...runs,
+				styleOverrideTable: { "1": { textCase: "ORIGINAL" } },
+			});
+			const offSpans = off.properties.spans as Array<{ font?: unknown }>;
+			expect(features(off.properties.font)).toEqual({ smcp: 1 });
+			expect(features(offSpans[1].font)).toEqual({ smcp: 0 });
+		});
 	});
 
 	it("carries paragraph spacing, scaled", () => {
@@ -239,6 +298,61 @@ describe("transpileText", () => {
 			{ frame: FRAME, scale: SCALE },
 		);
 		expect(truncate.properties.fit).toBe("clip");
+	});
+
+	describe("truncation", () => {
+		const truncated = (style: Partial<FigmaTextNode["style"]>) =>
+			transpileText(
+				baseText({
+					absoluteBoundingBox: { x: 100, y: 80, width: 600, height: 100 },
+					style: {
+						...baseText().style,
+						fontSize: 20,
+						lineHeightPercentFontSize: 120,
+						...style,
+					},
+				}),
+				{ frame: FRAME, scale: SCALE },
+			);
+
+		it("reads textTruncation ENDING with maxLines", () => {
+			const el = truncated({ textTruncation: "ENDING", maxLines: 2 });
+			expect(el.properties.fit).toBe("clip");
+			expect(el.properties.maxLines).toBe(2);
+		});
+
+		it("derives maxLines from the box height when none is set", () => {
+			// 100px box over 24px lines holds 4.
+			expect(truncated({ textTruncation: "ENDING" }).properties.maxLines).toBe(
+				4,
+			);
+			expect(
+				truncated({ textAutoResize: "TRUNCATE" }).properties.maxLines,
+			).toBe(4);
+		});
+
+		it("keeps at least one line when the box is shorter than a line", () => {
+			expect(
+				truncated({ textTruncation: "ENDING", fontSize: 200 }).properties
+					.maxLines,
+			).toBe(1);
+		});
+
+		it("only clips when the line height is auto and maxLines is unset", () => {
+			const { lineHeightPercentFontSize: _, ...auto } = baseText().style;
+			const el = transpileText(
+				baseText({ style: { ...auto, textTruncation: "ENDING" } }),
+				{ frame: FRAME, scale: SCALE },
+			);
+			expect(el.properties.fit).toBe("clip");
+			expect("maxLines" in el.properties).toBe(false);
+		});
+
+		it("ignores maxLines when truncation is off", () => {
+			const el = truncated({ textTruncation: "DISABLED", maxLines: 2 });
+			expect("fit" in el.properties).toBe(false);
+			expect("maxLines" in el.properties).toBe(false);
+		});
 	});
 
 	it("does NOT clip fixed / auto-height / auto-width text (Figma shows overflow)", () => {

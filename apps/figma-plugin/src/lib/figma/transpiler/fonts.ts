@@ -1,3 +1,4 @@
+import { childElements, type Element } from "@freshcoat-js/coatfile";
 import { SYSTEM_SAFE } from "./font-catalog";
 
 export type GoogleFontDescriptor = {
@@ -36,28 +37,15 @@ function addFont(map: Map<string, Used>, font: FontLike | undefined): void {
 	map.set(font.family, u);
 }
 
-type ElementLike = {
-	type?: string;
-	properties?: {
-		font?: FontLike;
-		spans?: Array<{ font?: FontLike }>;
-		children?: ElementLike[];
-	};
-};
-
-function walk(
-	elements: ElementLike[] | undefined,
-	map: Map<string, Used>,
-): void {
+function walk(elements: Element[] | undefined, map: Map<string, Used>): void {
 	for (const el of elements ?? []) {
-		const p = el.properties;
-		if (el.type === "text" && p) {
-			addFont(map, p.font);
+		if (el.type === "text") {
+			addFont(map, el.properties.font);
 			// A span inherits the base family unless it overrides it; addFont
 			// ignores spans without a family, so only explicit overrides count.
-			for (const s of p.spans ?? []) addFont(map, s.font);
-		} else if (el.type === "frame" && p) {
-			walk(p.children, map);
+			for (const s of el.properties.spans ?? []) addFont(map, s.font);
+		} else {
+			walk(childElements(el), map);
 		}
 	}
 }
@@ -71,7 +59,7 @@ export function collectFontDescriptors(
 ): GoogleFontDescriptor[] {
 	const used = new Map<string, Used>();
 	for (const frame of templateData)
-		walk(frame.elements as ElementLike[] | undefined, used);
+		walk(frame.elements as Element[] | undefined, used);
 
 	const descriptors: GoogleFontDescriptor[] = [];
 	for (const family of used.keys()) {

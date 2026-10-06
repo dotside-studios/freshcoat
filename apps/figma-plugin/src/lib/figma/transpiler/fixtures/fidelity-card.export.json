@@ -119,7 +119,8 @@
 					},
 					"properties": {
 						"src": "{{user_avatar}}",
-						"fit": "cover"
+						"fit": "cover",
+						"cornerRadius": 80
 					}
 				},
 				{
