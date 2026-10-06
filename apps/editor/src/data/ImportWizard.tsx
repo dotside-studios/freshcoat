@@ -7,6 +7,7 @@ import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
+	type ApplyMappingResult,
 	applyMapping,
 	COLUMN_TYPES,
 	type ColumnMapping,
@@ -19,9 +20,8 @@ import {
 	type ImportPlan,
 	isValidKey,
 	previewMapping,
-	type TableSheet,
 } from "@freshcoat-js/workspace";
-import { type DragEvent, useEffect, useMemo, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
@@ -29,13 +29,15 @@ import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
 import { emptyDataset, replaceDataset, TYPE_LABELS, uniqueName } from "./model";
+import { importTable, tableImporter } from "./table-import";
+import { dataRowCount, type OpenedTable } from "./table-store";
 
 export type ImportTarget = ({ datasetId: string } | { newDataset: true }) & {
 	/** A file already chosen, by a drop: the wizard starts by reading it. */
 	file?: File;
 };
 
-type Loaded = { name: string; sheets: TableSheet[] };
+type Loaded = { name: string; table: OpenedTable };
 
 const NO_ROWS: string[][] = [];
 
@@ -81,6 +83,7 @@ export function ImportWizard({
 	const [file, setFile] = useState<Loaded | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [importing, setImporting] = useState(false);
 	const [sheetIndex, setSheetIndex] = useState(0);
 	const [headerRow, setHeaderRow] = useState(0);
 	const [mode, setMode] = useState<"append" | "replace">("append");
@@ -103,9 +106,11 @@ export function ImportWizard({
 		return undefined;
 	}, [existing, target, file, controller]);
 
-	const rows = file?.sheets[sheetIndex]?.rows ?? NO_ROWS;
+	const sheet = file?.table.sheets[sheetIndex];
+	const rows = sheet?.rows ?? NO_ROWS;
 	const headers = useMemo(() => headersOf(rows, headerRow), [rows, headerRow]);
 	const samples = useMemo(() => dataRowsOf(rows, headerRow), [rows, headerRow]);
+	const recordCount = sheet ? dataRowCount(sheet, headerRow) : 0;
 	const columns = base?.columns;
 
 	// A new file, sheet or header row starts the mapping over.
@@ -115,18 +120,33 @@ export function ImportWizard({
 		setMatch(null);
 	}, [headers, samples, columns]);
 
+	const open = useRef<number | null>(null);
+	const closed = useRef(false);
+	useEffect(() => {
+		closed.current = false;
+		return () => {
+			closed.current = true;
+			if (open.current !== null) tableImporter().close(open.current);
+			open.current = null;
+		};
+	}, []);
+
 	const load = async (chosen: File) => {
 		setLoading(true);
 		setError(null);
 		try {
-			const { readTable } = await import("@freshcoat-js/workspace/tabular");
-			const bytes = new Uint8Array(await chosen.arrayBuffer());
-			const out = await readTable(bytes, chosen.name);
-			const first = out.sheets.findIndex((s) => s.rows.length > 0);
+			const table = await tableImporter().open(chosen, chosen.name);
+			if (closed.current) {
+				tableImporter().close(table.id);
+				return;
+			}
+			if (open.current !== null) tableImporter().close(open.current);
+			open.current = table.id;
+			const first = table.sheets.findIndex((s) => s.rows.length > 0);
 			const index = Math.max(first, 0);
-			const sheetRows = out.sheets[index]?.rows ?? [];
+			const sheetRows = table.sheets[index]?.rows ?? [];
 			const detected = detectHeaderRow(sheetRows);
-			setFile({ name: chosen.name, sheets: out.sheets });
+			setFile({ name: chosen.name, table });
 			setSheetIndex(index);
 			setHeaderRow(detected < 0 && sheetRows.length > 0 ? 0 : detected);
 			setDateOrder(guessDateOrder(sheetRows));
@@ -199,18 +219,38 @@ export function ImportWizard({
 	);
 	const nothingMapped = mapping.every((m) => m.kind === "skip");
 
+	// Totals over the held rows; Import maps the whole file in the worker.
 	const result = useMemo(
 		() => (step === 3 && base ? applyMapping(base, rows, plan) : null),
 		[step, base, rows, plan],
 	);
+	const partial = samples.length < recordCount;
 	const preview = useMemo(
 		() =>
 			step === 3 && base ? previewMapping(rows, plan, base.columns, 20) : [],
 		[step, base, rows, plan],
 	);
 
-	const commit = () => {
-		if (!result || !base) return;
+	const runImport = async (close: () => void) => {
+		if (!file || !base) return;
+		setImporting(true);
+		setError(null);
+		try {
+			const result = await importTable(file.table.id, sheetIndex, base, plan);
+			if (closed.current) return;
+			commit(result);
+			close();
+		} catch (err) {
+			setError(
+				`Couldn't import ${file.name}: ${(err as Error).message ?? String(err)}`,
+			);
+		} finally {
+			setImporting(false);
+		}
+	};
+
+	const commit = (result: ApplyMappingResult) => {
+		if (!base) return;
 		const all = controller.state.workspace?.datasets ?? [];
 		const isNew = !all.some((d) => d.id === base.id);
 		controller.dispatch({
@@ -257,7 +297,7 @@ export function ImportWizard({
 					<>
 						{file ? (
 							<span className="mr-auto min-w-0 truncate text-fc-muted text-fc-sm">
-								{file.name} · {plural(samples.length, "record")}
+								{file.name} · {plural(recordCount, "record")}
 							</span>
 						) : null}
 						<Button variant="ghost" onPress={close}>
@@ -273,7 +313,7 @@ export function ImportWizard({
 								variant="primary"
 								isDisabled={
 									!file ||
-									samples.length === 0 ||
+									recordCount === 0 ||
 									(step === 2 && (blocking || nothingMapped))
 								}
 								onPress={() => setStep((s) => (s + 1) as 2 | 3)}
@@ -283,13 +323,10 @@ export function ImportWizard({
 						) : (
 							<Button
 								variant="primary"
-								isDisabled={!result}
-								onPress={() => {
-									commit();
-									close();
-								}}
+								isDisabled={!result || importing}
+								onPress={() => void runImport(close)}
 							>
-								Import
+								{importing ? "Importing…" : "Import"}
 							</Button>
 						)}
 					</>
@@ -333,19 +370,19 @@ export function ImportWizard({
 						{file ? (
 							<>
 								<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-									{file.sheets.length > 1 ? (
+									{file.table.sheets.length > 1 ? (
 										<Select
 											label="Sheet"
 											selectedKey={String(sheetIndex)}
 											onSelectionChange={(k) => {
 												const i = Number(k);
 												setSheetIndex(i);
-												const r = file.sheets[i]?.rows ?? [];
+												const r = file.table.sheets[i]?.rows ?? [];
 												const h = detectHeaderRow(r);
 												setHeaderRow(h < 0 && r.length ? 0 : h);
 											}}
 										>
-											{file.sheets.map((s, i) => (
+											{file.table.sheets.map((s, i) => (
 												<SelectItem key={s.name} id={String(i)}>
 													{s.name}
 												</SelectItem>
@@ -415,6 +452,9 @@ export function ImportWizard({
 				) : step === 3 && result ? (
 					<div className="flex flex-col gap-2 p-3">
 						<p data-testid="import-totals" className="tabular-nums">
+							{partial
+								? `In the first ${formatNumber(samples.length)} records: `
+								: null}
 							<strong>{formatNumber(result.added)}</strong> to add ·{" "}
 							<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
 							<strong
@@ -429,9 +469,14 @@ export function ImportWizard({
 							mapping={mapping}
 							headers={headers}
 						/>
-						{samples.length > preview.length ? (
+						{recordCount > preview.length ? (
 							<p className="text-fc-faint text-fc-sm">
-								Showing {preview.length} of {formatNumber(samples.length)}
+								Showing {preview.length} of {formatNumber(recordCount)}
+							</p>
+						) : null}
+						{error ? (
+							<p role="alert" className="text-fc-danger">
+								{error}
 							</p>
 						) : null}
 					</div>
