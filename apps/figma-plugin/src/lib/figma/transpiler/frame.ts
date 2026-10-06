@@ -133,11 +133,6 @@ export type TranspileFrameContext = {
 	outerFrame: FigmaBoundingBox;
 	scale: number;
 	worldAnchor?: { x: number; y: number };
-	// Set when this frame is inside a rotated ancestor. A rotated frame also
-	// freezes itself. Frozen ⇒ omit the live `layout` block so coatfile's
-	// (rotation-unaware) auto-layout re-flow doesn't misplace a rotated group;
-	// the baked child positions render as-authored under the painter's rotation.
-	freezeLayout?: boolean;
 };
 
 // Builds the outer shell of a native frame element. Children are filled
@@ -206,11 +201,9 @@ export function transpileFrame(
 		out.properties.clipsContent = true;
 	}
 
-	// A rotated frame (or one inside a rotated ancestor) bakes its layout: emit
-	// no live `layout` block, since coatfile's auto-layout re-flow isn't
-	// rotation-aware and would re-lay-out the group in the wrong space.
-	const frozen = ctx.freezeLayout || placed.rotation !== 0;
-	const layout = frozen ? undefined : layoutFromContainer(node, ctx.scale);
+	// A rotated frame keeps its layout: the engine flows children in the frame's
+	// unrotated box, the same box the painter turns.
+	const layout = layoutFromContainer(node, ctx.scale);
 	if (layout) {
 		out.properties.layout = layout;
 	}

@@ -103,26 +103,14 @@ describe("transpileFrame", () => {
 	};
 	const outer = { x: 0, y: 0, width: 1108, height: 696 };
 
-	it("a rotated auto-layout frame carries rotation + unrotated size but BAKES layout", () => {
+	it("a rotated auto-layout frame carries rotation, unrotated size and live layout", () => {
 		const out = transpileFrame(rotatedStack as never, {
 			outerFrame: outer,
 			scale: 1,
 		});
 		expect(out.rotation).toBe(90);
 		expect(out.size).toEqual({ width: 520, height: 81 });
-		// Rotated ⇒ no live layout block; coatfile's rotation-unaware auto-
-		// layout re-flow would otherwise misplace the group.
-		expect(out.properties.layout).toBeUndefined();
-	});
-
-	it("bakes layout when an ancestor is rotated (freezeLayout), even at rotation 0", () => {
-		const out = transpileFrame(uprightStack as never, {
-			outerFrame: outer,
-			scale: 1,
-			freezeLayout: true,
-		});
-		expect(out.rotation).toBeUndefined();
-		expect(out.properties.layout).toBeUndefined();
+		expect(out.properties.layout).toEqual({ direction: "column" });
 	});
 
 	it("an unrotated auto-layout frame keeps its live layout block", () => {

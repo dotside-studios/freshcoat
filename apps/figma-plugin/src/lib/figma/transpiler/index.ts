@@ -577,12 +577,6 @@ async function buildSideElements(
 		localFrame: RasterFrame,
 		target: unknown[],
 		worldAnchor: { x: number; y: number } | null,
-		// True once we're inside a rotated frame: coatfile's auto-layout
-		// re-flow (resolveLayout) isn't rotation-aware, so a rotated auto-layout
-		// group would be re-laid-out in the wrong space. Inside a rotated subtree
-		// we bake the Figma-resolved positions instead — omit `layout` +
-		// `layoutChild` so the painter just rotates the static group.
-		freezeLayout: boolean,
 		// Opacity owed by ancestors this walk flattened away (GROUPs). A FRAME
 		// carries its own on its element, so it resets this to 1 for its subtree.
 		inheritedOpacity: number,
@@ -624,14 +618,7 @@ async function buildSideElements(
 				fx.blur !== undefined ||
 				elementBlendMode(n) !== undefined
 			) {
-				const el = groupLayer(
-					n,
-					fx,
-					localFrame,
-					worldAnchor,
-					freezeLayout,
-					inheritedOpacity,
-				);
+				const el = groupLayer(n, fx, localFrame, worldAnchor, inheritedOpacity);
 				if (el) {
 					containerEntry.el = el;
 					target.push(el);
@@ -648,14 +635,7 @@ async function buildSideElements(
 			// transform with no double-count.
 			const childOpacity = inheritedOpacity * opacityOf(n);
 			withConstraintScope(groupScope(n), () =>
-				walkChildren(
-					n.children,
-					localFrame,
-					target,
-					worldAnchor,
-					freezeLayout,
-					childOpacity,
-				),
+				walkChildren(n.children, localFrame, target, worldAnchor, childOpacity),
 			);
 			return;
 		}
@@ -749,7 +729,6 @@ async function buildSideElements(
 					outerFrame: localFrame.box,
 					scale,
 					worldAnchor: anchor,
-					freezeLayout,
 				});
 				// The coordinate space this frame opens for its children. Its rotation
 				// is measured in WORLD, not against its parent: the slot frame's own
@@ -761,25 +740,17 @@ async function buildSideElements(
 					transform: n.absoluteTransform,
 					rotation: worldRotationOf(n),
 				};
-				// This frame (or an ancestor) being rotated freezes layout for the
-				// whole subtree: the frame's own `layout` block is dropped by
-				// transpileFrame, and we skip children's `layoutChild` + recurse frozen.
-				const childFrozen = freezeLayout || (frameEl.rotation ?? 0) !== 0;
 				const parentIsAutoLayout =
-					!childFrozen && n.layoutMode !== undefined && n.layoutMode !== "NONE";
+					n.layoutMode !== undefined && n.layoutMode !== "NONE";
 				// Constraints follow Figma's own reading of the frame: an auto-layout
-				// frame's flow children ignore theirs even where the layout is baked
-				// because the frame is rotated.
-				const childScope: ConstraintScope = {
-					autoLayout: n.layoutMode !== undefined && n.layoutMode !== "NONE",
-				};
+				// frame's flow children ignore theirs.
+				const childScope: ConstraintScope = { autoLayout: parentIsAutoLayout };
 				withConstraintScope(childScope, () =>
 					walkChildren(
 						n.children,
 						childFrame,
 						frameEl.properties.children,
 						null,
-						childFrozen,
 						1,
 						(child, before) => {
 							// Tag every element this child produced with the source child's
@@ -895,7 +866,6 @@ async function buildSideElements(
 		fx: ReturnType<typeof extractEffects>,
 		localFrame: RasterFrame,
 		worldAnchor: { x: number; y: number } | null,
-		freezeLayout: boolean,
 		inheritedOpacity: number,
 	): Record<string, unknown> | undefined => {
 		// A slot's direct children place in the stripped world space (the slot's
@@ -932,7 +902,6 @@ async function buildSideElements(
 				inner,
 				(el.properties as { children: unknown[] }).children,
 				worldAnchor,
-				freezeLayout,
 				1,
 			),
 		);
@@ -947,7 +916,6 @@ async function buildSideElements(
 		localFrame: RasterFrame,
 		target: unknown[],
 		worldAnchor: { x: number; y: number } | null,
-		freezeLayout: boolean,
 		inheritedOpacity: number,
 		each?: (node: FigmaNode, before: number) => void,
 	): void => {
@@ -960,18 +928,9 @@ async function buildSideElements(
 					localFrame,
 					target,
 					worldAnchor,
-					freezeLayout,
 					inheritedOpacity,
 				);
-			else
-				walk(
-					run.node,
-					localFrame,
-					target,
-					worldAnchor,
-					freezeLayout,
-					inheritedOpacity,
-				);
+			else walk(run.node, localFrame, target, worldAnchor, inheritedOpacity);
 			each?.(run.node, before);
 		}
 	};
@@ -988,7 +947,6 @@ async function buildSideElements(
 		localFrame: RasterFrame,
 		target: unknown[],
 		worldAnchor: { x: number; y: number } | null,
-		freezeLayout: boolean,
 		inheritedOpacity: number,
 	): void => {
 		const box = worldAnchor
@@ -1020,9 +978,8 @@ async function buildSideElements(
 		applyOpacity(el, inheritedOpacity);
 		applyConstraints(el, maskNode);
 		const inner: RasterFrame = { ...localFrame, originOffset: box.pos };
-		walk(maskNode, inner, shape, worldAnchor, freezeLayout, 1);
-		for (const child of masked)
-			walk(child, inner, children, worldAnchor, freezeLayout, 1);
+		walk(maskNode, inner, shape, worldAnchor, 1);
+		for (const child of masked) walk(child, inner, children, worldAnchor, 1);
 		target.push(el);
 	};
 
@@ -1041,7 +998,6 @@ async function buildSideElements(
 			x: frame.absoluteBoundingBox.x,
 			y: frame.absoluteBoundingBox.y,
 		},
-		false,
 		1,
 	);
 
