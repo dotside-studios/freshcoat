@@ -14,6 +14,7 @@ import {
 } from "~/lib/figma/transpiler/barcode";
 import type { RenderImageFn } from "~/lib/figma/transpiler/rasterize";
 import { pngSize } from "~/lib/png";
+import { slug } from "~/lib/slug";
 import type { ReadDocumentMessage } from "~/shared/protocol";
 import { type FigmaSource, figmaSource } from "~/shared/source";
 
@@ -25,13 +26,6 @@ export type ExportMetadata = {
 	description?: string;
 	mood?: string;
 };
-
-export function slugify(s: string): string {
-	return s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-}
 
 /** A template that has been exported but not yet had its rasters uploaded: the
  *  image srcs are `asset:` hashes and the bytes ride along in `assets`. */
@@ -196,7 +190,7 @@ export async function runTranspileToTemplate(
 		picks,
 		variants,
 		metadata: {
-			id: slugify(metadata.name) || "untitled",
+			id: slug(metadata.name, { fallback: "untitled" }),
 			name: metadata.name,
 			version: "1.0.0",
 			formatVersion: FORMAT_VERSION,

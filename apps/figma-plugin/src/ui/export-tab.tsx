@@ -25,6 +25,7 @@ import {
 } from "~/lib/figma/transpiler/exact-size";
 import { type FigmaNode, isContainerNode } from "~/lib/figma/types";
 import { checkFreshcoatAddress, openInFreshcoat } from "~/lib/handoff";
+import { slug } from "~/lib/slug";
 import type {
 	FieldOverviewItem,
 	PluginSettings,
@@ -64,7 +65,6 @@ import {
 	type ExportedTemplate,
 	type ExportMetadata,
 	runTranspileToTemplate,
-	slugify,
 } from "~/ui/run-transpile";
 import { useAnnounce } from "~/ui/status";
 import { Step } from "~/ui/steps";
@@ -285,7 +285,7 @@ export function ExportTab(props: {
 				metadata,
 				{ proceed },
 			);
-			const stem = `${msg.product.sku}-${slugify(metadata.name) || "card"}`;
+			const stem = `${msg.product.sku}-${slug(metadata.name, { fallback: "card" })}`;
 			const fileName = `${stem}${COAT_EXTENSION}`;
 			let packed: Uint8Array | null = null;
 			if (action === "download") {
@@ -793,7 +793,7 @@ export function ExportTab(props: {
 	const exportSummary =
 		missing ??
 		(product
-			? `${product.sku}-${slugify(name.trim()) || "card"}${COAT_EXTENSION}`
+			? `${product.sku}-${slug(name.trim(), { fallback: "card" })}${COAT_EXTENSION}`
 			: "");
 
 	const stepExport = (
