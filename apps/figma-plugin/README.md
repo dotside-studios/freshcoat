@@ -123,6 +123,13 @@ layers were kept, flattened or skipped.
   angular ones, paints with their own blend mode, and image fills outside a
   single-image rectangle are rasterized (`paint_flattened`, or
   `multi_fill_flattened` for an image inside a stack).
+- **Strokes.** Visible solid stroke paints are composited into one colour,
+  keeping their opacity (a 50% stroke stays translucent); hidden ones are
+  ignored. A dashed stroke keeps its pattern as `dash`. A rectangle, vector or
+  frame with a visible gradient or image stroke is rasterized
+  (`stroke_flattened`).
+- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. Frames
+  keep their radius but not smoothing, which coatfile frames do not carry.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
   linear dodge as `plus`. Pass through is how the renderer composites
   a frame already. A frame set to Normal isolates its content in Figma, which
@@ -265,7 +272,7 @@ and what the transpiler made of it. It carries:
 - **`decisions`**: one row per node the walk reached: which element it became,
   or why it was rasterized or skipped. The rasterization reasons are
   `text_mixed_styling_flattened`, `multi_fill_flattened`, `paint_flattened`,
-  `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
+  `stroke_flattened`, `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
   `transform_undecomposable_flattened`. Element ids are the *final* ones, after colliding layer names are
   renamed, so they match the template.
 - **`rasters`**: each pre-exported bitmap's dimensions. A 1×1 is Figma saying

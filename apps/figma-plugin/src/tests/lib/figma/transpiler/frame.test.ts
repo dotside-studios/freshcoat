@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { classify } from "~/lib/figma/transpiler/classify";
 import { transpileFrame } from "~/lib/figma/transpiler/frame";
 import type { FigmaContainerNode } from "~/lib/figma/types";
 
@@ -187,5 +188,65 @@ describe("transpileFrame", () => {
 			width: 4,
 			align: "inside",
 		});
+	});
+});
+
+describe("transpileFrame strokes", () => {
+	const black = { r: 0, g: 0, b: 0, a: 1 };
+
+	it("keeps stroke opacity and a scaled dash pattern", () => {
+		const el = transpileFrame(
+			baseFrame({
+				strokes: [{ type: "SOLID", color: black, opacity: 0.25 }],
+				strokeWeight: 1,
+				strokeAlign: "INSIDE",
+				dashPattern: [2, 2],
+			}),
+			{ outerFrame: OUTER_FRAME, scale: 2 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: "#00000040",
+			width: 2,
+			dash: [4, 4],
+			align: "inside",
+		});
+	});
+
+	it("ignores a hidden stroke", () => {
+		const el = transpileFrame(
+			baseFrame({
+				strokes: [{ type: "SOLID", color: black, visible: false }],
+				strokeWeight: 1,
+			}),
+			{ outerFrame: OUTER_FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toBeUndefined();
+	});
+
+	it("rasterizes a frame with a gradient stroke", () => {
+		const node = baseFrame({
+			strokes: [
+				{
+					type: "GRADIENT_RADIAL",
+					gradientHandlePositions: [
+						{ x: 0.5, y: 0.5 },
+						{ x: 1, y: 0.5 },
+						{ x: 0.5, y: 1 },
+					],
+					gradientStops: [
+						{ position: 0, color: black },
+						{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+					],
+				},
+			],
+			strokeWeight: 1,
+		});
+		expect(classify(node)).toEqual({
+			kind: "flatten",
+			reason: "stroke_flattened",
+		});
+		expect(() =>
+			transpileFrame(node, { outerFrame: OUTER_FRAME, scale: 1 }),
+		).not.toThrow();
 	});
 });
