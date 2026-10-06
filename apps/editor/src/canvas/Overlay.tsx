@@ -1,4 +1,5 @@
-import { type ReactNode, useSyncExternalStore } from "react";
+import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
+import type { ReactNode } from "react";
 import {
 	ancestorRects,
 	canTransform,
@@ -40,34 +41,6 @@ const HANDLE_CURSOR: Record<Handle, string> = {
 	nw: "nwse-resize",
 	se: "nwse-resize",
 };
-
-const COARSE_QUERY = "(pointer: coarse)";
-
-let coarseList: MediaQueryList | null | undefined;
-
-function coarseQuery(): MediaQueryList | null {
-	if (coarseList === undefined)
-		coarseList =
-			typeof window === "undefined"
-				? null
-				: (window.matchMedia?.(COARSE_QUERY) ?? null);
-	return coarseList;
-}
-
-function subscribeCoarse(onChange: () => void): () => void {
-	const mq = coarseQuery();
-	mq?.addEventListener?.("change", onChange);
-	return () => mq?.removeEventListener?.("change", onChange);
-}
-
-/** Whether the primary pointer is coarse, following changes. */
-function useCoarsePointer(): boolean {
-	return useSyncExternalStore(
-		subscribeCoarse,
-		() => coarseQuery()?.matches ?? false,
-		() => false,
-	);
-}
 
 export function Overlay({
 	draft,
