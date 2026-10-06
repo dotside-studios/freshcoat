@@ -57,6 +57,31 @@ const compiled = compile(template, { displayName: "Alex" }, { width: 1012, heigh
 const [result] = await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts });
 ```
 
+### Rendering many records
+
+`compile()` keeps the value-independent work (validation, embedded assets, the
+variant and `resize`) per template object, so compiling one template for many
+records validates and prepares it once. `prepareTemplate(template, { variantId,
+resize })` exposes that step. The cache is keyed by object identity: do not
+mutate a template after compiling it; pass a new object instead.
+
+`frameNames` on `compile()` compiles only those frames. To reuse text shaping
+across renders, build the engine and metrics once and pass them in the runtime.
+`renderCompiled()` never disposes an engine it was given:
+
+```ts
+import { createParagraphEngine } from "@freshcoat-js/coatfile";
+import { deriveFontMetrics } from "@freshcoat-js/engine";
+
+const textEngine = createParagraphEngine(ck, fonts);
+const fontMetrics = deriveFontMetrics(fonts);
+for (const record of records) {
+  const compiled = compile(template, record, { width, height, frameNames: ["front"] });
+  await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts, fontMetrics, textEngine });
+}
+textEngine.dispose();
+```
+
 To render a compiled node tree yourself (custom paint, inspection, an alternate
 renderer), use the coat engine's `compileScene(root, …)` directly.
 
