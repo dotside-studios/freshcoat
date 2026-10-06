@@ -40,10 +40,11 @@ function addFont(map: Map<string, Used>, font: FontLike | undefined): void {
 function walk(elements: Element[] | undefined, map: Map<string, Used>): void {
 	for (const el of elements ?? []) {
 		if (el.type === "text") {
-			addFont(map, el.properties.font);
-			// A span inherits the base family unless it overrides it; addFont
-			// ignores spans without a family, so only explicit overrides count.
-			for (const s of el.properties.spans ?? []) addFont(map, s.font);
+			const base = el.properties.font;
+			addFont(map, base);
+			// A span inherits whatever of the base font it does not override.
+			for (const s of el.properties.spans ?? [])
+				if (s.font) addFont(map, { ...base, ...s.font });
 		} else {
 			walk(childElements(el), map);
 		}

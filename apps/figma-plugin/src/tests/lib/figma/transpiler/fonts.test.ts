@@ -93,6 +93,33 @@ describe("collectFontDescriptors", () => {
 		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Poppins"]);
 	});
 
+	it("adds a span's weight and italic to the base family when it names none", () => {
+		const td = [
+			frame("front", [
+				{
+					id: "t",
+					type: "text",
+					properties: {
+						font: { family: "Comfortaa", size: 20, weight: 400 },
+						spans: [
+							{ text: "a", font: { weight: 700 } },
+							{ text: "b", font: { style: "italic" } },
+						],
+						color: "#000",
+					},
+				},
+			]),
+		];
+		const fonts = collectFontDescriptors(td);
+		expect(fonts).toEqual([
+			{
+				kind: "google",
+				family: "Comfortaa",
+				url: googleCss2Url("Comfortaa", [400, 700], true),
+			},
+		]);
+	});
+
 	it("collects families inside a mask's shape and content", () => {
 		const td = [
 			frame("front", [
