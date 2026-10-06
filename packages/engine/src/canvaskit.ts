@@ -1121,18 +1121,29 @@ function visibleRows(canvas: CK): { top: number; bottom: number } | null {
 	return { top: (clip[1] - f) / e, bottom: (clip[3] - f) / e };
 }
 
+// Everything textStyleOf and the paragraph style read. Strings are length
+// prefixed so no text can forge a separator.
 function lineKey(
 	line: DrawTextCommand["layout"]["lines"][number],
 	color: string | undefined,
 	fallback: string[],
 ): string {
-	return JSON.stringify([
-		fallback,
-		color,
-		line.spans.map((s) => [s.text, s.font, s.color]),
-		...(line.wordSpacing ? [line.wordSpacing] : []),
-		...(line.direction ? [line.direction] : []),
-	]);
+	const str = (s: string | undefined) =>
+		s === undefined ? "-" : `${s.length}:${s}`;
+	const record = (r: Record<string, number> | undefined) => {
+		let out = "";
+		if (r) for (const [k, v] of Object.entries(r)) out += `${str(k)}=${v},`;
+		return out;
+	};
+	let key = `${fallback.length}${fallback.map(str).join("")}${str(color)}`;
+	key += `|${line.wordSpacing || 0}|${line.direction ?? ""}`;
+	for (const s of line.spans) {
+		const f = s.font;
+		key += `|${str(s.text)}${str(s.color)}${str(f.family)}`;
+		key += `${f.weight},${f.style},${f.size},${f.letterSpacing || 0}`;
+		key += `;${record(f.variations)};${record(f.features)}`;
+	}
+	return key;
 }
 
 function drawShape(

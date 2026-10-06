@@ -27,7 +27,12 @@ import {
 } from "../src/lut-images";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { Adjust, Command, PaintRuntime } from "../src/types";
+import type {
+	Adjust,
+	Command,
+	PaintRuntime,
+	ResolvedFont,
+} from "../src/types";
 
 const CK_BIN = join(
 	fileURLToPath(new URL(".", import.meta.url)),
@@ -109,7 +114,11 @@ function scene(size: { width: number; height: number }, srcs: string[]): Node {
 	});
 }
 
-function textScene(text: string, x: number): Node {
+function textScene(
+	text: string,
+	x: number,
+	font: Partial<ResolvedFont> = {},
+): Node {
 	return createFrame({
 		pos: { x: 0, y: 0 },
 		size: SIZE,
@@ -124,6 +133,7 @@ function textScene(text: string, x: number): Node {
 					style: "normal",
 					size: 16,
 					lineHeight: 1.2,
+					...font,
 				},
 				color: "#101828",
 			}),
@@ -404,6 +414,33 @@ describe("PaintCache", () => {
 		const moved = compile(textScene("Shaped once", 12), SIZE, fonts);
 		const plain = await pixels(moved, runtime(fonts, new Map()).rt);
 		expect(await pixels(moved, rt)).toEqual(plain);
+		cache.dispose();
+	});
+
+	test("each field that shapes a line is in its key", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const variants: Partial<ResolvedFont>[] = [
+			{},
+			{ size: 15 },
+			{ weight: 700 },
+			{ letterSpacing: 1 },
+			{ features: { tnum: 1 } },
+			{ features: { tnum: 0 } },
+			{ variations: { wght: 600 } },
+		];
+		let built = 0;
+		for (const font of variants) {
+			const commands = compile(textScene("Key 10", 4, font), SIZE, fonts);
+			const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(cache.stats().paragraphBuilds).toBeGreaterThan(built);
+			built = cache.stats().paragraphBuilds;
+			await pixels(commands, rt);
+			expect(cache.stats().paragraphBuilds).toBe(built);
+		}
 		cache.dispose();
 	});
 
