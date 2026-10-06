@@ -2506,6 +2506,61 @@ describe("transpile (blend modes)", () => {
 	});
 });
 
+describe("transpile (shape warnings)", () => {
+	async function warningsFor(rect: Record<string, unknown>) {
+		const card = {
+			...frameNode("front", 1013, 638),
+			children: [
+				{
+					id: "1:2",
+					name: "box",
+					type: "RECTANGLE",
+					visible: true,
+					opacity: 1,
+					blendMode: "NORMAL",
+					absoluteBoundingBox: { x: 10, y: 10, width: 100, height: 50 },
+					fills: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+					...rect,
+				},
+			],
+		} as unknown as FigmaContainerNode;
+		const pick = (nodeId: string) => ({
+			fileKey: "FK",
+			nodeId,
+			nodeName: nodeId,
+			width: 1013,
+			height: 638,
+		});
+		const out = await transpile({
+			product: EXACT_PRODUCT,
+			picks: { front: pick("front"), back: pick("back") },
+			metadata: META,
+			fetchNodeTree: async (_k, id) =>
+				id === "front" ? card : frameNode("back", 1013, 638),
+			renderImage: vi.fn(),
+		});
+		return out.warnings.map((w) => w.code);
+	}
+
+	it("warns when per-side stroke weights drop the stroke", async () => {
+		expect(
+			await warningsFor({
+				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+				strokeWeightMixed: true,
+			}),
+		).toContain("stroke_weight_mixed_unsupported");
+	});
+
+	it("warns when per-corner radii ignore corner smoothing", async () => {
+		expect(
+			await warningsFor({ cornerRadius: [8, 0, 8, 0], cornerSmoothing: 0.6 }),
+		).toContain("corner_smoothing_unsupported");
+		expect(
+			await warningsFor({ cornerRadius: 8, cornerSmoothing: 0.6 }),
+		).not.toContain("corner_smoothing_unsupported");
+	});
+});
+
 describe("transpile (bound text names its element)", () => {
 	// The same field on both sides of a card, with the front's layer left at
 	// Figma's auto-name (the preview text) and the back's renamed to the token.

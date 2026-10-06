@@ -125,6 +125,23 @@ describe("transpileRect", () => {
 		expect(el.properties.stroke).toEqual({ color: "#000000", width: 2 });
 	});
 
+	it("omits a stroke whose scaled width rounds to zero", () => {
+		for (const [strokeWeight, scale] of [
+			[0, 1],
+			[0.2, 1],
+			[1, 0.2],
+		]) {
+			const el = transpileRect(
+				baseRect({
+					strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+					strokeWeight,
+				}),
+				{ frame: FRAME, scale },
+			);
+			expect(el.properties.stroke).toBeUndefined();
+		}
+	});
+
 	it("maps ROUND stroke cap/join to round", () => {
 		const el = transpileRect(
 			baseRect({

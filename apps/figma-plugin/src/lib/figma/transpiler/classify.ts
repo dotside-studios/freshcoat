@@ -224,7 +224,7 @@ export function hasTextStroke(n: FigmaTextNode): boolean {
 	return (n.strokes ?? []).some((p) => p.visible !== false);
 }
 
-export function isTextFieldBound(
+function isTextFieldBound(
 	n: FigmaTextNode,
 	resolveBinding: BindingResolver = resolveNodeBinding,
 ): boolean {

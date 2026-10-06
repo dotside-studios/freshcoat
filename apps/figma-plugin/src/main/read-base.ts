@@ -102,8 +102,9 @@ function readEffects(
 }
 
 /** The properties on this node that Figma answered with `figma.mixed`. Every
- *  reader below narrows such a value away — readPaints returns [], the corner
- *  read returns undefined — so without this the collapse is invisible. */
+ *  reader (read-paint.ts, read-text.ts, read-scene-graph.ts) narrows such a
+ *  value away — readPaints returns [], the corner read returns undefined — so
+ *  without this the collapse is invisible. */
 function mixedProperties(node: AnySceneNode): string[] | undefined {
 	const candidates: Array<[string, unknown]> = [
 		["fills", (node as { fills?: unknown }).fills],
