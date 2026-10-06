@@ -486,18 +486,31 @@ describe("validate (mustache references)", () => {
 				pos: { x: 0, y: 0 },
 				size: { width: 100, height: 30 },
 				properties: {
-					value: "Hi {{nope}}",
+					value: "Hi {{nope}} {{ also }}",
 					font: { family: "Comfortaa", size: 16 },
 					color: "#000",
 				},
 			},
 		];
-		const r = validate(bad);
-		expect(r.ok).toBe(false);
-		if (!r.ok) {
-			expect(r.errors.some((e) => e.code === "unknown_field_reference")).toBe(
-				true,
-			);
+		for (let i = 0; i < 2; i++) {
+			const r = validate(bad);
+			expect(r.ok).toBe(false);
+			if (!r.ok) {
+				expect(
+					r.errors
+						.filter((e) => e.code === "unknown_field_reference")
+						.map((e) => [e.path, e.message]),
+				).toEqual([
+					[
+						"/template_data/0/elements/0/properties/value",
+						"mustache reference {{nope}} has no matching field",
+					],
+					[
+						"/template_data/0/elements/0/properties/value",
+						"mustache reference {{also}} has no matching field",
+					],
+				]);
+			}
 		}
 	});
 

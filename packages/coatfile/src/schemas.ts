@@ -994,40 +994,57 @@ function enforceVariantOverrideFrameResolution(
 
 function enforceMustacheReferences(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	const known = new Set(Object.keys(tpl.fields.properties));
+	const path: (string | number)[] = [];
 
-	function walk(value: unknown, path: (string | number)[]) {
+	function walk(value: unknown) {
 		if (typeof value === "string") {
-			const re = new RegExp(REF.source, "g");
+			if (value.indexOf("{{") < 0) return;
+			REF.lastIndex = 0;
 			let m: RegExpExecArray | null;
-			while ((m = re.exec(value)) !== null) {
+			while ((m = REF.exec(value)) !== null) {
 				const id = m[1]!;
 				if (!known.has(id)) {
 					addKitIssue(
 						ctx,
 						"unknown_field_reference",
 						`mustache reference {{${id}}} has no matching field`,
-						path,
+						[...path],
 					);
 				}
 			}
 			return;
 		}
 		if (Array.isArray(value)) {
-			value.forEach((v, i) => walk(v, [...path, i]));
+			for (let i = 0; i < value.length; i++) {
+				path.push(i);
+				walk(value[i]);
+				path.pop();
+			}
 			return;
 		}
 		if (value !== null && typeof value === "object") {
-			for (const [k, v] of Object.entries(value)) walk(v, [...path, k]);
+			for (const k in value) {
+				if (!Object.hasOwn(value, k)) continue;
+				path.push(k);
+				walk((value as Record<string, unknown>)[k]);
+				path.pop();
+			}
 		}
 	}
 
-	walk(tpl.template_data, ["template_data"]);
+	function walkFrom(value: unknown, start: (string | number)[]) {
+		path.length = 0;
+		path.push(...start);
+		walk(value);
+	}
+
+	walkFrom(tpl.template_data, ["template_data"]);
 	tpl.variants?.forEach((v, vi) => {
 		v.overrides.forEach((ov, oi) => {
-			const path = ["variants", vi, "overrides", oi];
+			const at = ["variants", vi, "overrides", oi];
 			if (ov.background !== undefined)
-				walk(ov.background, [...path, "background"]);
-			if (ov.elements !== undefined) walk(ov.elements, [...path, "elements"]);
+				walkFrom(ov.background, [...at, "background"]);
+			if (ov.elements !== undefined) walkFrom(ov.elements, [...at, "elements"]);
 		});
 	});
 }
@@ -1130,7 +1147,8 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	}
 
 	walkObjects(tpl, (obj, path) => {
-		if ("fill" in obj) check(obj.fill, [...path, "fill"]);
+		const fill = obj.fill;
+		if (typeof fill !== "string" && fill != null) check(fill, [...path, "fill"]);
 	});
 }
 
@@ -1161,18 +1179,33 @@ function walkObjects(
 	tpl: ParsedTemplate,
 	visit: (obj: Record<string, unknown>, path: (string | number)[]) => void,
 ) {
-	function walk(value: unknown, path: (string | number)[]) {
+	const path: (string | number)[] = [];
+	function walk(value: unknown) {
 		if (Array.isArray(value)) {
-			value.forEach((v, i) => walk(v, [...path, i]));
+			for (let i = 0; i < value.length; i++) {
+				path.push(i);
+				walk(value[i]);
+				path.pop();
+			}
 			return;
 		}
 		if (value === null || typeof value !== "object") return;
 		const obj = value as Record<string, unknown>;
 		visit(obj, path);
-		for (const [k, v] of Object.entries(obj)) walk(v, [...path, k]);
+		for (const k in obj) {
+			if (!Object.hasOwn(obj, k)) continue;
+			path.push(k);
+			walk(obj[k]);
+			path.pop();
+		}
 	}
-	walk(tpl.template_data, ["template_data"]);
-	if (tpl.variants) walk(tpl.variants, ["variants"]);
+	path.push("template_data");
+	walk(tpl.template_data);
+	path.length = 0;
+	if (tpl.variants) {
+		path.push("variants");
+		walk(tpl.variants);
+	}
 }
 
 function enforceFontsBlock(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
