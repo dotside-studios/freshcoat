@@ -22,9 +22,11 @@ import {
 	cachedFontProvider,
 	cachedLine,
 	cachedMipmaps,
+	cachedPath,
 	cachedSurface,
 	evictUnusedImages,
 	evictUnusedLines,
+	evictUnusedPaths,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
@@ -111,6 +113,9 @@ type Bin = {
 	// A mipmapped copy of `img`, kept with the cached image under `src` when
 	// there is one, else freed with the bin.
 	mipmaps: (src: string, img: CK) => CK;
+	// Path.MakeFromSVGString(d), shared through the PaintCache when there is
+	// one. Callers must not mutate the result.
+	path: (ck: CK, d: string, evenOdd?: boolean) => CK;
 };
 function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
@@ -136,6 +141,16 @@ function makeBin(cache?: PaintCacheState | null): Bin {
 			return (
 				(cache && cachedMipmaps(cache, src, img, build)) ?? track(build())
 			);
+		},
+		path: (ck, d, evenOdd = false) => {
+			const build = () => {
+				const path = ck.Path.MakeFromSVGString(d);
+				if (path && evenOdd) path.setFillType(ck.FillType.EvenOdd);
+				return path;
+			};
+			return cache
+				? cachedPath(cache, evenOdd ? `e${d}` : `n${d}`, build)
+				: track(build());
 		},
 	};
 }
@@ -447,7 +462,7 @@ function maskPath(
 	w: number,
 	h: number,
 ): CK {
-	return bin.track(ck.Path.MakeFromSVGString(maskSvg(clip, x, y, w, h)));
+	return bin.path(ck, maskSvg(clip, x, y, w, h));
 }
 
 function textStyleOf(
@@ -663,13 +678,13 @@ function drawImagePlaceholder(
 	const scx = x + icon * 0.32;
 	const scy = y + icon * 0.3;
 	const sun = `M ${scx - sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx + sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx - sr} ${scy} Z`;
-	canvas.drawPath(bin.track(ck.Path.MakeFromSVGString(sun)), fill);
+	canvas.drawPath(bin.path(ck, sun), fill);
 	const mtn = `M ${x + icon * 0.08} ${y + icon * 0.85} L ${x + icon * 0.42} ${
 		y + icon * 0.5
 	} L ${x + icon * 0.62} ${y + icon * 0.68} L ${x + icon * 0.8} ${
 		y + icon * 0.45
 	} L ${x + icon * 0.92} ${y + icon * 0.85} Z`;
-	canvas.drawPath(bin.track(ck.Path.MakeFromSVGString(mtn)), fill);
+	canvas.drawPath(bin.path(ck, mtn), fill);
 }
 
 // The node's outline stroke, drawn along its mask (or its box when unmasked).
@@ -1038,9 +1053,8 @@ function drawSvgPicture(
 }
 
 function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
-	const path = bin.track(ck.Path.MakeFromSVGString(cmd.d));
+	const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 	if (!path) return;
-	if (cmd.fillRule === "evenodd") path.setFillType(ck.FillType.EvenOdd);
 	canvas.save();
 	canvas.translate(cmd.pos.x, cmd.pos.y); // path coords are origin-relative
 	// A viewBox scales the authored path into the node's size box (SVG viewBox →
@@ -1062,9 +1076,7 @@ function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
 		canvas.drawPath(path, paint);
 	}
 	if (cmd.stroke) {
-		const outline = cmd.strokeD
-			? bin.track(ck.Path.MakeFromSVGString(cmd.strokeD))
-			: null;
+		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
 		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
 		else if (strokeInset(cmd.stroke) !== 0)
 			drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
@@ -1151,11 +1163,7 @@ function drawShape(
 				: null;
 		const fillPath =
 			smoothR !== null
-				? bin.track(
-						ck.Path.MakeFromSVGString(
-							squircleSvg(x, y, w, h, smoothR, smoothing),
-						),
-					)
+				? bin.path(ck, squircleSvg(x, y, w, h, smoothR, smoothing))
 				: null;
 		for (const fill of cmd.fills ?? []) {
 			const paint = bin.track(new ck.Paint());
@@ -1171,16 +1179,15 @@ function drawShape(
 			// Offset the stroked rect for inside/outside alignment (center = 0).
 			const inset = strokeInset(cmd.stroke);
 			if (smoothR !== null) {
-				const path = bin.track(
-					ck.Path.MakeFromSVGString(
-						squircleSvg(
-							x + inset,
-							y + inset,
-							w - 2 * inset,
-							h - 2 * inset,
-							Math.max(0, smoothR - inset),
-							smoothing,
-						),
+				const path = bin.path(
+					ck,
+					squircleSvg(
+						x + inset,
+						y + inset,
+						w - 2 * inset,
+						h - 2 * inset,
+						Math.max(0, smoothR - inset),
+						smoothing,
 					),
 				);
 				canvas.drawPath(path, sp);
@@ -2469,6 +2476,7 @@ export async function paintScene(
 		if (cache) {
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
+			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
 			provider.delete();

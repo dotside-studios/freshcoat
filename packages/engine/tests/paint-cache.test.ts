@@ -12,6 +12,7 @@ import {
 	createFrame,
 	createImage,
 	createPaintCache,
+	createPath,
 	createRect,
 	createText,
 	deriveFontMetrics,
@@ -127,6 +128,33 @@ function textScene(text: string, x: number): Node {
 				color: "#101828",
 			}),
 		],
+	});
+}
+
+// A ring as two same-direction subpaths: its hole shows only under evenodd.
+const RING = "M 0 0 H 20 V 20 H 0 Z M 5 5 H 15 V 15 H 5 Z";
+
+function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		children: fillRules.map((fillRule, i) =>
+			createFrame({
+				pos: { x: 4 + i * 24, y: 4 },
+				size: { width: 20, height: 20 },
+				clip: true,
+				cornerRadius: 4,
+				children: [
+					createPath({
+						pos: { x: 0, y: 0 },
+						size: { width: 20, height: 20 },
+						d: RING,
+						fillRule,
+						fills: [{ kind: "solid", color: "#101828" }],
+					}),
+				],
+			}),
+		),
 	});
 }
 
@@ -406,6 +434,44 @@ describe("PaintCache", () => {
 		expect(lines.length).toBeGreaterThan(50);
 		await pixels(commands, rt);
 		expect(cache.stats().paragraphBuilds).toBeLessThan(10);
+		cache.dispose();
+	});
+
+	test("repeated paints reuse parsed paths", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const commands = compile(
+			pathScene(["nonzero", "evenodd", "nonzero"]),
+			SIZE,
+			fonts,
+		);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const px = await pixels(commands, rt);
+		expect(px).toEqual(plain);
+		// Each fill rule parses the ring once, and each placement its clip.
+		expect(cache.stats().pathBuilds).toBe(5);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(cache.stats().pathBuilds).toBe(5);
+		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
+		expect(at(14)).toBe(255);
+		expect(at(38)).toBe(0);
+		cache.dispose();
+	});
+
+	test("a path dropped from the scene is evicted and parsed again", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const withPath = compile(pathScene(["evenodd"]), SIZE, fonts);
+		await pixels(withPath, rt);
+		expect(cache.stats().pathBuilds).toBe(2);
+		await pixels(compile(pathScene([]), SIZE, fonts), rt);
+		const again = await pixels(withPath, rt);
+		expect(cache.stats().pathBuilds).toBe(4);
+		expect(again).toEqual(await pixels(withPath, runtime(fonts, new Map()).rt));
 		cache.dispose();
 	});
 

@@ -19,6 +19,7 @@ export type PaintCacheStats = {
 	paragraphBuilds: number;
 	lutImageBuilds: number;
 	mipmapBuilds: number;
+	pathBuilds: number;
 };
 
 export type PaintCache = {
@@ -56,6 +57,8 @@ export type PaintCacheState = {
 	// Freed with the provider whose typefaces they use.
 	lines: Map<string, ShapedLine>;
 	linesUsed: Set<string>;
+	paths: Map<string, CK>;
+	pathsUsed: Set<string>;
 	luts: LutImages;
 	surface: CachedSurface | null;
 	disposed: boolean;
@@ -75,17 +78,21 @@ export function createPaintCache(): PaintCache {
 			paragraphBuilds: 0,
 			lutImageBuilds: 0,
 			mipmapBuilds: 0,
+			pathBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
 		lines: new Map(),
 		linesUsed: new Set(),
+		paths: new Map(),
+		pathsUsed: new Set(),
 		luts: createLutImages(),
 		surface: null,
 		disposed: false,
 	};
 	const clear = () => {
 		freeLines(state);
+		freePaths(state);
 		const fonts = state.fonts;
 		state.fonts = null;
 		if (fonts) tryFree(() => fonts.provider.delete());
@@ -224,6 +231,38 @@ export function evictUnusedLines(state: PaintCacheState): void {
 		tryFree(() => line.para.delete());
 	}
 	state.linesUsed.clear();
+}
+
+// A path parsed once per key and reused by every paint that draws it. Callers
+// must not mutate it.
+export function cachedPath(
+	state: PaintCacheState,
+	key: string,
+	build: () => CK,
+): CK {
+	state.pathsUsed.add(key);
+	const hit = state.paths.get(key);
+	if (hit) return hit;
+	const path = build();
+	if (!path) return path;
+	state.stats.pathBuilds++;
+	state.paths.set(key, path);
+	return path;
+}
+
+export function evictUnusedPaths(state: PaintCacheState): void {
+	for (const [key, path] of state.paths) {
+		if (state.pathsUsed.has(key)) continue;
+		state.paths.delete(key);
+		tryFree(() => path.delete());
+	}
+	state.pathsUsed.clear();
+}
+
+function freePaths(state: PaintCacheState): void {
+	for (const path of state.paths.values()) tryFree(() => path.delete());
+	state.paths.clear();
+	state.pathsUsed.clear();
 }
 
 function freeLines(state: PaintCacheState): void {
