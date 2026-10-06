@@ -1559,12 +1559,437 @@ function adjustEffect(
 // a nested offscreen, which a recording canvas can't provide.
 const measuring = new WeakSet<object>();
 
-// The device pixels an adjusted layer can touch: Skia's bounds of a recording of
-// the inner drawable under the main canvas's matrix, so stroke, shadow, blur and
-// glyph outsets count exactly as the painter draws them. Rounded out with 1px
-// spare for antialiasing, plus `spread` for a kernel that reads neighbours, then
-// cut to the device clip (grown by `spread`, so a kernel at the clip edge still
-// reads the real pixels beyond it) and the frame. Null when nothing shows.
+type Bounds = [number, number, number, number];
+
+// An affine SkMatrix as [scaleX, skewX, transX, skewY, scaleY, transY].
+type Affine = [number, number, number, number, number, number];
+
+// One save on the recorder's stack: the matrix it was made under and, for a
+// layer, how its paint grows what is drawn inside it. A plain save reaches the
+// recorder only once the matrix or clip changes under it, so only rotated
+// drawables push one here.
+type RecordedSave = { ctm: Affine; grow?: (b: Bounds) => Bounds };
+
+const f32 = Math.fround;
+
+// The cull a recording of the inner drawable would report, worked out from the
+// commands instead, following SkRecordFillBounds in Skia's float arithmetic:
+// each op's rect grown by its paint, passed through every enclosing save's
+// matrix and paint, mapped to the device and cut to it. Matching it keeps the
+// offscreen's origin, and so every pixel, as before. Null for content whose ops
+// are not modelled here (text, paths, masks, clips, SVG images, barcodes,
+// inner shadows, blenders).
+function predictedBounds(
+	ck: CK,
+	bin: Bin,
+	images: Map<string, CK>,
+	inner: DrawCommand,
+	device: Size,
+	matrix: number[],
+): Bounds | null {
+	if (matrix.length !== 9 || matrix[6] !== 0 || matrix[7] !== 0) return null;
+	if (matrix[8] !== 1) return null;
+	const cull: Bounds = [0, 0, f32(device.width), f32(device.height)];
+	let out: Bounds | null = null;
+	let full = false;
+	let singular = false;
+	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
+		let b = sortBounds(local);
+		for (let i = saves.length - 1; i >= 0; i--) {
+			const save = saves[i] as RecordedSave;
+			const inverse = invertAffine(save.ctm);
+			if (!inverse) {
+				singular = true;
+				return;
+			}
+			b = mapAffine(inverse, b);
+			if (save.grow) b = save.grow(b);
+			b = mapAffine(save.ctm, b);
+		}
+		b = mapAffine(ctm, b);
+		const l = Math.max(b[0], cull[0]);
+		const t = Math.max(b[1], cull[1]);
+		const r = Math.min(b[2], cull[2]);
+		const btm = Math.min(b[3], cull[3]);
+		if (!(l < r && t < btm)) return;
+		out = out ? unionBounds(out, [l, t, r, btm]) : [l, t, r, btm];
+	};
+	const visit = (
+		cmd: DrawCommand,
+		ctm: Affine,
+		saves: RecordedSave[],
+	): boolean => {
+		if (cmd.clip) return false;
+		const c: DrawCommand =
+			cmd.adjust && needsShaderAdjust(cmd)
+				? ({
+						...cmd,
+						adjust: cmd.adjust.colorMatrix
+							? { colorMatrix: cmd.adjust.colorMatrix }
+							: undefined,
+					} as DrawCommand)
+				: cmd;
+		const outer = c.rotation ? [...saves, { ctm }] : saves;
+		let m = ctm;
+		if (c.rotation) {
+			const cx = c.pos.x + c.size.width / 2;
+			const cy = c.pos.y + c.size.height / 2;
+			m = translateAffine(m, cx, cy);
+			m = concatAffine(m, rotationAffine(c.rotation));
+			m = translateAffine(m, -cx, -cy);
+		}
+		let within: RecordedSave[] = outer;
+		if (hasLayerPaint(c)) {
+			const grow = layerGrow(c);
+			if (!grow) return false;
+			const cm = c.adjust?.colorMatrix;
+			if (cm && !shaderSideMatrix(c.adjust) && matrixTouchesTransparent(cm))
+				full = true;
+			within = [...outer, { ctm: m, grow }];
+		}
+		const { x, y } = c.pos;
+		const { width: w, height: h } = c.size;
+		const box: Bounds = [x, y, x + w, y + h].map(f32) as Bounds;
+		if (c.op === "drawRect") {
+			const cr = c.cornerRadius;
+			const smoothing = c.cornerSmoothing ?? 0;
+			const smoothR =
+				smoothing > 0 && typeof cr === "number" && cr > 0 ? cr : null;
+			const fill =
+				smoothR !== null
+					? pathBounds(ck, bin, squircleSvg(x, y, w, h, smoothR, smoothing))
+					: box;
+			if (c.fills?.length) add(fill, m, within);
+			if (c.stroke) {
+				const inset = strokeInset(c.stroke);
+				const geometry =
+					smoothR !== null
+						? pathBounds(
+								ck,
+								bin,
+								squircleSvg(
+									x + inset,
+									y + inset,
+									w - 2 * inset,
+									h - 2 * inset,
+									Math.max(0, smoothR - inset),
+									smoothing,
+								),
+							)
+						: ([
+								x + inset,
+								y + inset,
+								x + inset + (w - 2 * inset),
+								y + inset + (h - 2 * inset),
+							].map(f32) as Bounds);
+				add(strokeBounds(sortBounds(geometry), c.stroke), m, within);
+			}
+			return true;
+		}
+		if (c.op === "drawImage") {
+			const img = images.get(c.src);
+			if (img && isSvgPicture(img)) return false;
+			if (!img || c.fit === "tile") {
+				add(box, m, within);
+			} else {
+				const r = fitRect(img.width(), img.height(), x, y, w, h, c.fit, c);
+				if (r.dw > 0 && r.dh > 0)
+					add(
+						[r.dx, r.dy, r.dx + r.dw, r.dy + r.dh].map(f32) as Bounds,
+						m,
+						within,
+					);
+			}
+			if (c.stroke) {
+				const inset = strokeInset(c.stroke);
+				const path = pathBounds(
+					ck,
+					bin,
+					maskSvg(
+						{ kind: "rect" },
+						x + inset,
+						y + inset,
+						Math.max(0, w - 2 * inset),
+						Math.max(0, h - 2 * inset),
+					),
+				);
+				add(strokeBounds(path, c.stroke), m, within);
+			}
+			return true;
+		}
+		if (c.op === "drawBitmap") {
+			if (c.role === "barcode") return false;
+			if (c.pixelWidth > 0 && c.pixelHeight > 0 && w > 0 && h > 0)
+				add(box, m, within);
+			return true;
+		}
+		if (c.op === "drawQr") {
+			if ((c.margin ?? 0) < 0) return false;
+			add(box, m, within);
+			return true;
+		}
+		if (c.op === "drawGroup") {
+			for (const child of c.children) if (!visit(child, m, within)) return false;
+			return true;
+		}
+		return false;
+	};
+	const ctm = [matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]]
+		.map(f32) as Affine;
+	if (!visit(inner, ctm, []) || singular) return null;
+	if (full) return cull;
+	return out ?? [0, 0, 0, 0];
+}
+
+// Whether layerPaint would build a paint for this drawable.
+function hasLayerPaint(cmd: DrawCommand): boolean {
+	return (
+		(!!cmd.blendMode && cmd.blendMode !== "normal") ||
+		(cmd.opacity !== undefined && cmd.opacity < 1) ||
+		(typeof cmd.blur === "number" && cmd.blur > 0) ||
+		!!cmd.shadow ||
+		(!!cmd.adjust?.colorMatrix && !shaderSideMatrix(cmd.adjust))
+	);
+}
+
+// The layer paint's image filter grown as Skia's computeFastBounds grows it,
+// or null for a paint that is not modelled.
+function layerGrow(cmd: DrawCommand): ((b: Bounds) => Bounds) | null {
+	if (cmd.blendMode === "linear-burn") return null;
+	const list = (
+		Array.isArray(cmd.shadow) ? cmd.shadow : cmd.shadow ? [cmd.shadow] : []
+	).filter((s) => s.color !== "transparent");
+	if (list.some((s) => s.inset)) return null;
+	const blur =
+		typeof cmd.blur === "number" && cmd.blur > 0
+			? f32(3 * f32(LAYER_BLUR_SIGMA(cmd.blur)))
+			: 0;
+	return (b) => {
+		const src = blur ? outsetBounds(b, blur) : b;
+		let out = src;
+		for (const s of list) {
+			const spread = f32(s.spread ?? 0);
+			const base = spread ? outsetBounds(src, spread) : src;
+			const sigma = f32(3 * f32(SHADOW_SIGMA(s.blur)));
+			const blurred = sigma > 0 ? outsetBounds(base, sigma) : base;
+			const dx = f32(s.dx);
+			const dy = f32(s.dy);
+			out = unionBounds(out, [
+				f32(blurred[0] + dx),
+				f32(blurred[1] + dy),
+				f32(blurred[2] + dx),
+				f32(blurred[3] + dy),
+			]);
+		}
+		return out;
+	};
+}
+
+// SkColorFilter::affectsTransparentBlack for a matrix filter: whether
+// transparent black comes out as a nonzero 8-bit color.
+function matrixTouchesTransparent(m: number[]): boolean {
+	for (let row = 0; row < 4; row++) {
+		const v = m[row * 5 + 4] ?? 0;
+		if (Math.floor((v < 0 ? 0 : v > 1 ? 1 : v) * 255 + 0.5) !== 0) return true;
+	}
+	return false;
+}
+
+// SkPaint::computeFastBounds for strokePaint's paint.
+function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
+	const width = f32(stroke.width);
+	if (width < 0) return b;
+	let radius = 1;
+	if (width > 0) {
+		let multiplier = 1;
+		if ((stroke.join ?? "miter") === "miter") multiplier = 4;
+		if (stroke.cap === "square") multiplier = Math.max(multiplier, f32(Math.SQRT2));
+		radius = f32((width / 2) * multiplier);
+	}
+	return outsetBounds(b, radius);
+}
+
+function pathBounds(ck: CK, bin: Bin, svg: string): Bounds {
+	const [l, t, r, b] = bin.path(ck, svg).getBounds() as number[];
+	return [l, t, r, b] as Bounds;
+}
+
+function sortBounds(b: Bounds): Bounds {
+	return [
+		Math.min(b[0], b[2]),
+		Math.min(b[1], b[3]),
+		Math.max(b[0], b[2]),
+		Math.max(b[1], b[3]),
+	];
+}
+
+function outsetBounds(b: Bounds, d: number): Bounds {
+	return [f32(b[0] - d), f32(b[1] - d), f32(b[2] + d), f32(b[3] + d)];
+}
+
+function unionBounds(a: Bounds, b: Bounds): Bounds {
+	return [
+		Math.min(a[0], b[0]),
+		Math.min(a[1], b[1]),
+		Math.max(a[2], b[2]),
+		Math.max(a[3], b[3]),
+	];
+}
+
+// SkMatrix's type mask: 0 identity, 1 translate, 2 scale, 3 affine.
+function affineKind(m: Affine): number {
+	if (m[1] !== 0 || m[3] !== 0) return 3;
+	if (m[0] !== 1 || m[4] !== 1) return 2;
+	return m[2] !== 0 || m[5] !== 0 ? 1 : 0;
+}
+
+// SkMatrix::mapRect.
+function mapAffine(m: Affine, b: Bounds): Bounds {
+	const kind = affineKind(m);
+	if (kind <= 1)
+		return sortBounds([f32(b[0] + m[2]), f32(b[1] + m[5]), f32(b[2] + m[2]), f32(b[3] + m[5])]);
+	if (kind === 2)
+		return sortBounds([
+			f32(f32(b[0] * m[0]) + m[2]),
+			f32(f32(b[1] * m[4]) + m[5]),
+			f32(f32(b[2] * m[0]) + m[2]),
+			f32(f32(b[3] * m[4]) + m[5]),
+		]);
+	const xs: number[] = [];
+	const ys: number[] = [];
+	for (const [x, y] of [
+		[b[0], b[1]],
+		[b[2], b[1]],
+		[b[2], b[3]],
+		[b[0], b[3]],
+	] as const) {
+		xs.push(f32(f32(f32(x * m[0]) + f32(y * m[1])) + m[2]));
+		ys.push(f32(f32(f32(x * m[3]) + f32(y * m[4])) + m[5]));
+	}
+	return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+// SkMatrix::invert.
+function invertAffine(m: Affine): Affine | null {
+	const kind = affineKind(m);
+	if (kind === 0) return m;
+	if (kind === 1) return [1, 0, -m[2], 0, 1, -m[5]];
+	if (kind === 2) {
+		const ix = f32(1 / m[0]);
+		const iy = f32(1 / m[4]);
+		if (!Number.isFinite(ix) || !Number.isFinite(iy)) return null;
+		return [ix, 0, f32(-m[2] * ix), 0, iy, f32(-m[5] * iy)];
+	}
+	const det = m[0] * m[4] - m[1] * m[3];
+	if (Math.abs(f32(det)) <= (1 / 4096) ** 3) return null;
+	const inv = 1 / det;
+	return [
+		f32(m[4] * inv),
+		f32(-m[1] * inv),
+		f32((m[1] * m[5] - m[4] * m[2]) * inv),
+		f32(-m[3] * inv),
+		f32(m[0] * inv),
+		f32((m[3] * m[2] - m[0] * m[5]) * inv),
+	];
+}
+
+// SkMatrix::setConcat(a, b), so b applies first.
+function concatAffine(a: Affine, b: Affine): Affine {
+	const ka = affineKind(a);
+	const kb = affineKind(b);
+	if (ka === 0) return b;
+	if (kb === 0) return a;
+	if (ka <= 2 && kb <= 2)
+		return [
+			f32(a[0] * b[0]),
+			0,
+			f32(f32(a[0] * b[2]) + a[2]),
+			0,
+			f32(a[4] * b[4]),
+			f32(f32(a[4] * b[5]) + a[5]),
+		];
+	const mam = (p: number, q: number, r: number, t: number) => f32(p * q + r * t);
+	return [
+		mam(a[0], b[0], a[1], b[3]),
+		mam(a[0], b[1], a[1], b[4]),
+		f32(mam(a[0], b[2], a[1], b[5]) + a[2]),
+		mam(a[3], b[0], a[4], b[3]),
+		mam(a[3], b[1], a[4], b[4]),
+		f32(mam(a[3], b[2], a[4], b[5]) + a[5]),
+	];
+}
+
+// SkMatrix::preTranslate.
+function translateAffine(m: Affine, dx: number, dy: number): Affine {
+	const x = f32(dx);
+	const y = f32(dy);
+	if (x === 0 && y === 0) return m;
+	if (affineKind(m) <= 1) return [m[0], m[1], f32(m[2] + x), m[3], m[4], f32(m[5] + y)];
+	return [
+		m[0],
+		m[1],
+		f32(m[2] + f32(f32(m[0] * x) + f32(m[1] * y))),
+		m[3],
+		m[4],
+		f32(m[5] + f32(f32(m[3] * x) + f32(m[4] * y))),
+	];
+}
+
+// SkMatrix::setRotate about the origin.
+function rotationAffine(degrees: number): Affine {
+	const rad = f32(f32(degrees) * f32(f32(Math.PI) / 180));
+	const snap = (v: number) => {
+		const s = f32(v);
+		return Math.abs(s) <= 1 / 4096 ? 0 : s;
+	};
+	const sin = snap(Math.sin(rad));
+	const cos = snap(Math.cos(rad));
+	return [cos, -sin, 0, sin, cos, 0];
+}
+
+// Skia's bounds of a recording of the inner drawable under the main canvas's
+// matrix, for content predictedBounds does not model.
+function recordedBounds(
+	ck: CK,
+	provider: CK,
+	images: Map<string, CK>,
+	bin: Bin,
+	inner: DrawCommand,
+	frame: Frame,
+	device: Size,
+	matrix: number[],
+): Bounds {
+	const recorder = new ck.PictureRecorder();
+	let picture: CK = null;
+	try {
+		const rc = recorder.beginRecording(
+			ck.XYWHRect(0, 0, device.width, device.height),
+			true,
+		);
+		measuring.add(rc);
+		rc.concat(matrix);
+		const scratch: PaintIssues = {
+			unhandled: [],
+			missingImages: [],
+			adjustUnsupported: new Map(),
+		};
+		paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
+		picture = recorder.finishRecordingAsPicture();
+		const [l, t, r, b] = picture.cullRect() as number[];
+		return [l, t, r, b];
+	} finally {
+		picture?.delete();
+		recorder.delete();
+	}
+}
+
+// The device pixels an adjusted layer can touch: Skia's bounds of a recording
+// of the inner drawable under the main canvas's matrix, so stroke, shadow, blur
+// and glyph outsets count exactly as the painter draws them. Predicted from the
+// commands where possible, recorded otherwise. Rounded out with 1px spare for
+// antialiasing, plus `spread` for a kernel that reads neighbours, then cut to
+// the device clip (grown by `spread`, so a kernel at the clip edge still reads
+// the real pixels beyond it) and the frame. Null when nothing shows.
 function adjustedDeviceRect(
 	ck: CK,
 	canvas: CK,
@@ -1577,23 +2002,9 @@ function adjustedDeviceRect(
 	matrix: number[],
 	spread: number,
 ): { x: number; y: number; width: number; height: number } | null {
-	const recorder = new ck.PictureRecorder();
-	const rc = recorder.beginRecording(
-		ck.XYWHRect(0, 0, device.width, device.height),
-		true,
-	);
-	measuring.add(rc);
-	rc.concat(matrix);
-	const scratch: PaintIssues = {
-		unhandled: [],
-		missingImages: [],
-		adjustUnsupported: new Map(),
-	};
-	paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
-	const picture = recorder.finishRecordingAsPicture();
-	const [l, t, r, b] = picture.cullRect() as number[];
-	picture.delete();
-	recorder.delete();
+	const [l, t, r, b] =
+		predictedBounds(ck, bin, images, inner, device, matrix) ??
+		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix);
 	const clip = canvas.getDeviceClipBounds() as Int32Array;
 	const pad = 1 + spread;
 	const x0 = Math.max(Math.floor(l) - pad, clip[0] - spread, 0);

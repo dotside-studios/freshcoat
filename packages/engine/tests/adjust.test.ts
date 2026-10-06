@@ -198,6 +198,24 @@ describe("composeAdjust", () => {
 		}
 	});
 
+	test("equal settings return the same tables across calls", () => {
+		const compile = () =>
+			composeAdjust(
+				buildAdjust({ contrast: 1.2, gamma: 1.4 }),
+				buildAdjust({ saturation: 1.5, gamma: 0.8 }),
+			);
+		const a = compile();
+		const b = compile();
+		expect(b.lut).toBe(a.lut);
+		expect(b.lut3d).toBe(a.lut3d);
+		expect(gammaLut(2.2)).toBe(gammaLut(2.2));
+		const other = composeAdjust(
+			buildAdjust({ contrast: 1.2, gamma: 1.4 }),
+			buildAdjust({ saturation: 1.6, gamma: 0.8 }),
+		);
+		expect(other.lut3d?.data).not.toBe(a.lut3d?.data);
+	});
+
 	test("keeps the stronger sharpen and a lone sharpen passes through", () => {
 		expect(
 			composeAdjust({ sharpen: 0.3 }, buildAdjust({ saturation: 1.2 })),

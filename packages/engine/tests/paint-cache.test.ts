@@ -617,8 +617,11 @@ describe("PaintCache", () => {
 		expect(await pixels(commands, rt)).toEqual(plain);
 		expect(cache.stats().lutImageBuilds).toBe(2);
 		expect(await pixels(commands, rt)).toEqual(plain);
-		// Equal tables in new arrays match by content.
-		const rebuilt = compile(adjustScene([adjust()]), SIZE, fonts);
+		const a = adjust();
+		const b = adjust();
+		expect(b.lut?.r).toBe(a.lut?.r);
+		expect(b.lut3d?.data).toBe(a.lut3d?.data);
+		const rebuilt = compile(adjustScene([b]), SIZE, fonts);
 		expect(await pixels(rebuilt, rt)).toEqual(plain);
 		expect(cache.stats().lutImageBuilds).toBe(2);
 		cache.dispose();

@@ -97,6 +97,9 @@ export type ClipOutset = { top: number; bottom: number };
 
 // A per-channel 256-entry transfer LUT (out = table[in]); r/g/b may share one
 // table (gamma) or differ (arbitrary curves). See ./adjust.
+// LUT arrays are treated as immutable once handed to the engine: the adjust
+// helpers share them across calls and the painter caches their images by array
+// identity, so mutating one in place is not seen. Build a new array instead.
 export type AdjustLut = {
 	r: Uint8Array;
 	g: Uint8Array;
