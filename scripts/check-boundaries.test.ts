@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import {
 	checkBoundaries,
 	packageName,
+	parseJsonc,
 	scriptRefs,
 	type Violation,
 } from "./check-boundaries.ts";
@@ -238,4 +239,11 @@ export type { T } from "types-only";
 test("packageName keeps the scope", () => {
 	expect(packageName("@freshcoat-js/coatfile/render")).toBe("@freshcoat-js/coatfile");
 	expect(packageName("react-dom/client")).toBe("react-dom");
+});
+
+test("parseJsonc drops comments and trailing commas but not string contents", () => {
+	expect(parseJsonc(`{ "a": "x, }", "b": [1, /* c */ ],\n// d\n}`)).toEqual({
+		a: "x, }",
+		b: [1],
+	});
 });

@@ -1,4 +1,4 @@
-export { type Rgba, parseColor } from "./color";
+export { type Rgba, parseColor } from "../color";
 export { type Matrix, parseTransform } from "./matrix";
 export {
 	estimateTextWidth,

@@ -8,6 +8,7 @@
 // import `canvaskit-wasm`, so it stays runtime-agnostic), the font bytes, and
 // any image bytes keyed by src. Text is drawn at the compile-baked baseline
 // (`line.baseline`).
+import { parseColor } from "./color";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
@@ -156,34 +157,8 @@ function makeBin(cache?: PaintCacheState | null): Bin {
 }
 
 function toColor(ck: CK, input: string) {
-	const s = input.trim();
-	// CanvasKit's parseColorString("transparent") wrongly returns opaque black,
-	// which would fill e.g. a QR's transparent background solid black.
-	if (s.toLowerCase() === "transparent") return ck.TRANSPARENT;
-	if (s.startsWith("#")) {
-		let h = s.slice(1);
-		if (h.length === 3)
-			h = h
-				.split("")
-				.map((c) => c + c)
-				.join("");
-		const r = parseInt(h.slice(0, 2), 16);
-		const g = parseInt(h.slice(2, 4), 16);
-		const b = parseInt(h.slice(4, 6), 16);
-		const a = h.length >= 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1;
-		return ck.Color(r, g, b, a);
-	}
-	const m = /rgba?\(([^)]+)\)/i.exec(s);
-	if (m) {
-		const [r, g, b, a] = m[1].split(",").map((v) => parseFloat(v.trim()));
-		return ck.Color(r, g, b, a ?? 1);
-	}
-	// Named colors / hsl() etc. — CanvasKit parses these; fall back to black.
-	try {
-		const c = ck.parseColorString(s);
-		if (c) return c;
-	} catch {}
-	return ck.BLACK;
+	const c = parseColor(input);
+	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
 function shaderFor(

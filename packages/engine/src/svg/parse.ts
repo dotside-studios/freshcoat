@@ -1,4 +1,4 @@
-import { parseColor, type Rgba, toHex } from "./color";
+import { parseColor, type Rgba, toHex } from "../color";
 import {
 	applyMatrix,
 	decompose,

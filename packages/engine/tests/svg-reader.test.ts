@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseColor } from "../src/svg/color";
+import { parseColor } from "../src/color";
 import { applyMatrix, multiply, parseTransform } from "../src/svg/matrix";
 import {
 	normalizePath,
@@ -93,6 +93,12 @@ describe("parseColor", () => {
 		expect(parseColor("rgb(100% 0% 0% / 50%)")).toEqual([255, 0, 0, 0.5]);
 		expect(parseColor("hsl(120, 100%, 50%)")).toEqual([0, 255, 0, 1]);
 		expect(parseColor("hsla(240 100% 50% / 0.25)")).toEqual([0, 0, 255, 0.25]);
+	});
+	test("oklch()", () => {
+		const c = parseColor("oklch(68.4% 0.186 0.3 / 25%)");
+		if (!Array.isArray(c)) throw new Error("expected a color");
+		expect(c.slice(0, 3).map(Math.round)).toEqual([240, 94, 148]);
+		expect(c[3]).toBe(0.25);
 	});
 	test("keywords", () => {
 		expect(parseColor("red")).toEqual([255, 0, 0, 1]);
