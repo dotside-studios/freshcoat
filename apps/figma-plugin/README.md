@@ -302,8 +302,11 @@ with its own asset and font loading.
 
 `src/ui/index.tsx` is the shell: the tab list, the status line, and state more
 than one tab reads (settings, the fields overview, the export target). Each tab
-is its own file: `layer-tab.tsx`, `fields-tab.tsx`, `export-tab.tsx` (with
-`steps.tsx`) and `settings-tab.tsx`. Every panel stays mounted, hidden with
+is its own file: `layer-tab.tsx`, `fields-tab.tsx`, `export-tab.tsx` and
+`settings-tab.tsx`. The export tab keeps its state machine (reading, building,
+downloading, handing off) in the `useExport` hook (`use-export.ts`), its four
+steps in `export-steps.tsx` (built on `steps.tsx`), and the frame rows and
+result card in `export-parts.tsx`. Every panel stays mounted, hidden with
 `hidden`, so a tab that is not showing still hears main's messages; listen with
 `useMainMessage` (`messages.ts`).
 
