@@ -9,7 +9,6 @@ import { join, normalize } from "node:path";
 const FINGERPRINTED =
 	/^\/(assets\/.+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+|canvaskit\/\d+\.\d+\.\d+[^/]*\/.+)$/;
 
-// The build writes these next to each compressible file, best first.
 const ENCODINGS = [
 	["br", ".br"],
 	["gzip", ".gz"],

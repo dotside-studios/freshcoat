@@ -18,8 +18,7 @@ const gzip = promisify(zlib.gzip);
 // the loader rather than importing the package). canvaskit-wasm itself stays out
 // of the module graph: the .wasm would choke the dep optimizer parsing it as
 // source. The `full` build, at /canvaskit/<version>/full/*, is the export
-// workers': only it has the JPEG and WebP encoders. The default build is
-// preloaded from index.html so its download starts before the app JS runs.
+// workers': only it has the JPEG and WebP encoders.
 function canvasKitAssets() {
 	const files = [
 		"canvaskit.js",
@@ -88,8 +87,7 @@ function canvasKitAssets() {
 	};
 }
 
-// Writes .br and .gz siblings for the text and wasm assets, which server.ts
-// picks from by Accept-Encoding. Runs after the bundle and public/ are on disk.
+// Writes the .br and .gz siblings server.ts negotiates by Accept-Encoding.
 function precompress() {
 	const COMPRESSIBLE = /\.(wasm|js|css|html|svg|json)$/;
 	const MIN_BYTES = 1024;

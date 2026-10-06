@@ -10,5 +10,4 @@ const { version } = JSON.parse(
 	readFileSync(join(canvasKitBinDir, "..", "package.json"), "utf8"),
 ) as { version: string };
 
-// Versioned so the server can cache the payload as immutable.
 export const CANVASKIT_BASE = `/canvaskit/${version}`;

@@ -7,7 +7,6 @@ import "./styles.css";
 
 initTheme();
 
-// Compiles the preloaded wasm before a workspace opens and the viewport asks.
 const warmCanvasKit = () => getCanvasKit().catch(() => {});
 if ("requestIdleCallback" in window) requestIdleCallback(warmCanvasKit);
 else setTimeout(warmCanvasKit, 1);
