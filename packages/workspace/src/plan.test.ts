@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { resolveValues, variantsFor } from "./binding";
+import { toTemplateValue } from "./columns";
 import {
 	exportSize,
 	fileExtension,
@@ -159,6 +161,66 @@ describe("planExport", () => {
 
 	it("plans nothing for an unknown template", () => {
 		expect(plan({ templateId: "nope" })).toEqual([]);
+	});
+});
+
+describe("planExport against the per-record functions", () => {
+	it("plans what resolveValues, variantsFor and fileNameFor give", () => {
+		const fileName = "{{name}}-{{tier}}-{{number}}-{{side}}";
+		const entry = ws.templates[0] as Workspace["templates"][number];
+		const items = plan({ records: "all", fileName });
+		const records = members.records.filter((r) => r.status !== "skipped");
+		const expected = records.flatMap((record, recordIndex) => {
+			const values = resolveValues(
+				entry.template,
+				entry.binding,
+				members,
+				record,
+				recordIndex,
+			);
+			const cells = Object.fromEntries(
+				members.columns.map((c) => [
+					c.key,
+					toTemplateValue(c, record.values[c.key] ?? null),
+				]),
+			);
+			return variantsFor(
+				entry.template,
+				entry.binding,
+				members,
+				record,
+			).flatMap((variantId) =>
+				["front", "back"].map((side) => ({
+					key: `${record.id}:${side}`,
+					recordId: record.id,
+					recordIndex,
+					side,
+					fileName: `${fileNameFor(fileName, {
+						template: entry.template.id,
+						side,
+						index: recordIndex + 1,
+						count: records.length,
+						record: record.id,
+						variant: variantId,
+						cells,
+						values,
+					})}.png`,
+					values,
+					...(variantId !== undefined ? { variantId } : {}),
+				})),
+			);
+		});
+		expect(items).toEqual(expected);
+		expect(items.map((i) => i.fileName)).toEqual([
+			"Ana-Cruz-gold-007-front.png",
+			"Ana-Cruz-gold-007-back.png",
+			"Ben-Uy-Gold-Tier--front.png",
+			"Ben-Uy-Gold-Tier--back.png",
+			"Cy-Ong-bronze--front.png",
+			"Cy-Ong-bronze--back.png",
+			"Ed-Go---front.png",
+			"Ed-Go---back.png",
+		]);
 	});
 });
 

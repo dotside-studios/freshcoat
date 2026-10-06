@@ -1,5 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { resolveValues, variantsFor } from "./binding";
+import { columnsByKey, resolveValues, variantsFor } from "./binding";
 import { toTemplateValue } from "./columns";
 import type {
 	DataRecord,
@@ -102,7 +102,10 @@ const SOURCE_EXTENSION =
  *  output after its photo. Every character outside `[A-Za-z0-9_.-]` becomes
  *  `-`. */
 export function fileNameFor(pattern: string, ctx: FileNameContext): string {
-	const source = fileNamePattern(pattern);
+	return expandFileName(fileNamePattern(pattern), ctx);
+}
+
+function expandFileName(source: string, ctx: FileNameContext): string {
 	const width = String(Math.max(ctx.count, 1)).length;
 	const expanded = source.replace(
 		/\{\{\s*([^{}]*?)\s*\}\}/g,
@@ -188,6 +191,7 @@ export function planExport(
 	const extension = fileExtension(preset.format);
 	const everyVariant = binding?.variant?.kind === "all";
 	const pattern = fileNamePattern(preset.fileName, everyVariant);
+	const columns = dataset ? columnsByKey(dataset) : undefined;
 
 	const used = new Set<string>();
 	const unique = (base: string) => {
@@ -200,9 +204,9 @@ export function planExport(
 	const items: ExportItem[] = [];
 	records.forEach((record, recordIndex) => {
 		const values = dataset
-			? resolveValues(template, binding, dataset, record, recordIndex)
+			? resolveValues(template, binding, dataset, record, recordIndex, columns)
 			: resolveValues(template, undefined, undefined, undefined, recordIndex);
-		const variantIds = variantsFor(template, binding, dataset, record);
+		const variantIds = variantsFor(template, binding, dataset, record, columns);
 		const cells: Record<string, string> = {};
 		if (dataset && record) {
 			for (const column of dataset.columns) {
@@ -215,7 +219,7 @@ export function planExport(
 		const recordId = record?.id ?? "";
 		for (const variantId of variantIds) {
 			for (const side of sides) {
-				const base = fileNameFor(pattern, {
+				const base = expandFileName(pattern, {
 					template: template.id,
 					side,
 					index: recordIndex + 1,
