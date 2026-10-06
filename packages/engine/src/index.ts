@@ -61,6 +61,7 @@ export {
 	resolveSupersample,
 } from "./export-scale";
 export {
+	clearFontBytesCache,
 	dataUrlToBytes,
 	fontBytes,
 	resolveFontRequest,

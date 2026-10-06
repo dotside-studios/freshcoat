@@ -1,3 +1,4 @@
+import { clearFontBytesCache } from "@freshcoat-js/engine";
 import { afterEach, describe, expect, test } from "vitest";
 import { collectFontBytes } from "../src/fonts";
 import type { Template } from "../src/types";
@@ -5,6 +6,7 @@ import type { Template } from "../src/types";
 const realFetch = globalThis.fetch;
 afterEach(() => {
 	globalThis.fetch = realFetch;
+	clearFontBytesCache();
 });
 
 /** Swap in a fetch that answers by URL. Assigned directly rather than through a
