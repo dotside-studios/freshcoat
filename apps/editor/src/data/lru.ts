@@ -2,7 +2,8 @@
  * A least-recently-used map bounded by entry count and by a total size the
  * caller measures. Setting past either bound evicts from the cold end, and
  * `onEvict` hears about every entry that leaves, whether evicted, replaced,
- * deleted or cleared, so it can free what the entry holds.
+ * deleted or cleared, so it can free what the entry holds. An entry
+ * `isPinned` names is never evicted, even past the bounds.
  */
 export class Lru<K, V> {
 	private readonly map = new Map<K, { value: V; size: number }>();
@@ -14,6 +15,7 @@ export class Lru<K, V> {
 			maxSize?: number;
 			sizeOf?: (value: V) => number;
 			onEvict?: (key: K, value: V) => void;
+			isPinned?: (key: K, value: V) => boolean;
 		},
 	) {}
 
@@ -49,7 +51,7 @@ export class Lru<K, V> {
 		const size = this.opts.sizeOf?.(value) ?? 0;
 		this.map.set(key, { value, size });
 		this.total += size;
-		this.trim();
+		this.trim(key);
 	}
 
 	delete(key: K): boolean {
@@ -69,16 +71,17 @@ export class Lru<K, V> {
 		return [...this.map.keys()];
 	}
 
-	private trim(): void {
+	private trim(newest: K): void {
 		const maxSize = this.opts.maxSize ?? Number.POSITIVE_INFINITY;
-		// The newest entry stays even when it alone is over the size bound.
-		while (
-			this.map.size > 1 &&
-			(this.map.size > this.opts.maxEntries || this.total > maxSize)
-		) {
-			const oldest = this.map.keys().next().value as K;
-			this.delete(oldest);
+		const over = () =>
+			this.map.size > this.opts.maxEntries || this.total > maxSize;
+		if (!over()) return;
+		for (const [key, { value }] of this.map) {
+			if (!over()) return;
+			// The newest entry stays even when it alone is over the size bound.
+			if (key === newest && this.opts.maxEntries > 0) continue;
+			if (this.opts.isPinned?.(key, value)) continue;
+			this.delete(key);
 		}
-		if (this.map.size > this.opts.maxEntries) this.clear();
 	}
 }
