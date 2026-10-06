@@ -1,7 +1,7 @@
 import type { FieldMeta } from "~/lib/figma/binding";
 
-// pluginData keys, in one place because they are written in main/index.ts and
-// read in two more modules.
+// pluginData keys, in one place because they are written in main/bindings.ts
+// and read in main/read-base.ts too.
 //
 // setPluginData is already private to the plugin id — "Plugins with other IDs
 // won't be able to read this data" — so the prefix does no namespacing work.

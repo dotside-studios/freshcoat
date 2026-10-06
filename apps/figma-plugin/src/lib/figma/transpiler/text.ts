@@ -73,8 +73,8 @@ export function transpileText(
 	}
 	const { pos, size, rotation } = placed;
 
-	// Fields are registered centrally from the node binding (see index.ts
-	// overlay); here we only derive the element id.
+	// Fields are registered centrally from the node binding (see
+	// binding-overlay.ts); here we only derive the element id.
 	//
 	// The BINDING names the element, ahead of the layer. Figma auto-names a text
 	// layer after its own content until someone renames it, so a layer bound to

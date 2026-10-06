@@ -1,6 +1,6 @@
 // Pure harvest/reconcile engine: turn freshly-inferred field drafts into the
 // template-global field-metadata map, and compute marker rewrites for renames.
-// No Figma API here — main/index.ts supplies real nodes; this stays testable.
+// No Figma API here: main/bindings.ts supplies real nodes; this stays testable.
 
 import {
 	buildFieldMeta,
