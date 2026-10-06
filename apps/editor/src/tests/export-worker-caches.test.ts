@@ -31,4 +31,21 @@ describe("render worker job caches", () => {
 		expect(key(`data:image/png;base64,${btoa("png")}`)).toBe(assetUri(sha));
 		expect(key("ws:abc")).toBeUndefined();
 	});
+
+	it("tell apart assets whose data URLs sample alike", () => {
+		const a = "a".repeat(64);
+		const b = "b".repeat(64);
+		const body = (mid: string) => `${"A".repeat(500)}${mid}${"A".repeat(500)}`;
+		const template: Template = {
+			...minimal(),
+			assets: [
+				{ sha256: a, contentType: "image/png", base64: body("QUJD") },
+				{ sha256: b, contentType: "image/png", base64: body("REVG") },
+			],
+		} as Template;
+		const key = createJobCaches().analysisKey(template);
+		expect(key(`data:image/png;base64,${body("QUJD")}`)).toBe(assetUri(a));
+		expect(key(`data:image/png;base64,${body("REVG")}`)).toBe(assetUri(b));
+		expect(key(`data:image/png;base64,${body("R0hJ")}`)).toBeUndefined();
+	});
 });

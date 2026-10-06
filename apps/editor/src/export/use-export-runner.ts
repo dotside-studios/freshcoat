@@ -131,18 +131,14 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 					await pool.init(fonts);
 					poolFonts = fonts;
 				}
-				const jobPool = pool;
 				const result = await runExportJob(workspace, preset, {
-					pool: jobPool,
+					pool,
 					signal: own.signal,
 					assemblePdf: deps.assemblePdf,
 					...job,
 					onProgress: (progress) => {
 						if (controller === own) set({ progress });
 					},
-				}).finally(() => {
-					// A job that replaced this one keeps what its workers hold.
-					if (controller === own) jobPool.endJob();
 				});
 				if (controller === own)
 					set({ state: result.cancelled ? "cancelled" : "done", result });
@@ -155,7 +151,12 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 					});
 				return null;
 			} finally {
-				if (controller === own) controller = null;
+				// However this job ended, the workers drop what an earlier one left
+				// them. A job that replaced this one keeps what they hold.
+				if (controller === own) {
+					controller = null;
+					pool?.endJob();
+				}
 			}
 		},
 		cancel() {

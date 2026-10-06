@@ -524,35 +524,8 @@ function drawText(
 			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
 				continue;
 		}
-		const shape = (): ShapedLine => {
-			const style = new ck.ParagraphStyle({
-				textStyle: textStyleOf(ck, first, cmd, fallback, line.wordSpacing),
-				...(line.direction === "rtl"
-					? {
-							textDirection: ck.TextDirection.RTL,
-							textAlign: ck.TextAlign.Left,
-						}
-					: {}),
-			});
-			const builder = ck.ParagraphBuilder.MakeFromFontProvider(
-				style,
-				provider,
-			);
-			for (const span of line.spans) {
-				const ts = ck.TextStyle(
-					textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
-				);
-				if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
-				else builder.pushStyle(ts);
-				builder.addText(span.text);
-				builder.pop();
-			}
-			const para = builder.build();
-			builder.delete();
-			para.layout(1e6); // single pre-wrapped line; no re-wrapping
-			const lm = para.getLineMetrics();
-			return { para, ascent: lm.length ? lm[0].ascent : 0 };
-		};
+		const shape = () =>
+			shapeLine(ck, provider, cmd, line, fallback, fgPaint, bgPaint);
 		let shaped: ShapedLine;
 		if (cache)
 			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
@@ -583,6 +556,42 @@ function drawText(
 			canvas.drawRect(ck.XYWHRect(span.x, top, span.width, thickness), p);
 		}
 	}
+}
+
+function shapeLine(
+	ck: CK,
+	provider: CK,
+	cmd: DrawTextCommand,
+	line: DrawTextCommand["layout"]["lines"][number],
+	fallback: string[],
+	fgPaint: CK,
+	bgPaint: CK,
+): ShapedLine {
+	const first = line.spans[0] as (typeof line.spans)[number];
+	const style = new ck.ParagraphStyle({
+		textStyle: textStyleOf(ck, first, cmd, fallback, line.wordSpacing),
+		...(line.direction === "rtl"
+			? {
+					textDirection: ck.TextDirection.RTL,
+					textAlign: ck.TextAlign.Left,
+				}
+			: {}),
+	});
+	const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
+	for (const span of line.spans) {
+		const ts = ck.TextStyle(
+			textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
+		);
+		if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
+		else builder.pushStyle(ts);
+		builder.addText(span.text);
+		builder.pop();
+	}
+	const para = builder.build();
+	builder.delete();
+	para.layout(1e6); // single pre-wrapped line; no re-wrapping
+	const lm = para.getLineMetrics();
+	return { para, ascent: lm.length ? lm[0].ascent : 0 };
 }
 
 // Mitchell–Netravali cubic (B = C = 1/3): Skia's canonical "high quality"
@@ -1575,15 +1584,18 @@ const f32 = Math.fround;
 // The cull a recording of the inner drawable would report, worked out from the
 // commands instead, following SkRecordFillBounds in Skia's float arithmetic:
 // each op's rect grown by its paint, passed through every enclosing save's
-// matrix and paint, mapped to the device and cut to it. Matching it keeps the
-// offscreen's origin, and so every pixel, as before. Null for content whose ops
-// are not modelled here (text, paths, masks, clips, SVG images, barcodes,
-// inner shadows, blenders).
+// matrix and paint, mapped to the device and cut to it. Clips record no bounds,
+// so they cut nothing. Matching it keeps the offscreen's origin, and so every
+// pixel, as before. Where an op's exact bounds are not known (glyphs), the
+// estimate only ever errs larger. Null for content that is not modelled here
+// (SVG images, inner shadows, blenders).
 function predictedBounds(
 	ck: CK,
+	provider: CK,
 	bin: Bin,
 	images: Map<string, CK>,
 	inner: DrawCommand,
+	frame: Frame,
 	device: Size,
 	matrix: number[],
 ): Bounds | null {
@@ -1591,35 +1603,37 @@ function predictedBounds(
 	if (matrix[8] !== 1) return null;
 	const cull: Bounds = [0, 0, f32(device.width), f32(device.height)];
 	let out: Bounds | null = null;
-	let full = false;
 	let singular = false;
-	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
-		let b = sortBounds(local);
+	const throughSaves = (b: Bounds, saves: RecordedSave[]): Bounds | null => {
 		for (let i = saves.length - 1; i >= 0; i--) {
 			const save = saves[i] as RecordedSave;
 			const inverse = invertAffine(save.ctm);
-			if (!inverse) {
-				singular = true;
-				return;
-			}
+			if (!inverse) return null;
 			b = mapAffine(inverse, b);
 			if (save.grow) b = save.grow(b);
 			b = mapAffine(save.ctm, b);
 		}
-		b = mapAffine(ctm, b);
-		const l = Math.max(b[0], cull[0]);
-		const t = Math.max(b[1], cull[1]);
-		const r = Math.min(b[2], cull[2]);
-		const btm = Math.min(b[3], cull[3]);
-		if (!(l < r && t < btm)) return;
-		out = out ? unionBounds(out, [l, t, r, btm]) : [l, t, r, btm];
+		return b;
 	};
+	const include = (b: Bounds) => {
+		const cut = intersectBounds(b, cull);
+		if (cut) out = out ? unionBounds(out, cut) : cut;
+	};
+	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
+		const b = throughSaves(sortBounds(local), saves);
+		if (!b) {
+			singular = true;
+			return;
+		}
+		include(mapAffine(ctm, b));
+	};
+	// A layer whose paint changes transparent black covers the whole cull.
+	let full = false;
 	const visit = (
 		cmd: DrawCommand,
 		ctm: Affine,
 		saves: RecordedSave[],
 	): boolean => {
-		if (cmd.clip) return false;
 		const c: DrawCommand =
 			cmd.adjust && needsShaderAdjust(cmd)
 				? ({
@@ -1639,14 +1653,25 @@ function predictedBounds(
 			m = translateAffine(m, -cx, -cy);
 		}
 		let within: RecordedSave[] = outer;
-		if (hasLayerPaint(c)) {
+		const layered = hasLayerPaint(c);
+		if (layered) {
 			const grow = layerGrow(c);
 			if (!grow) return false;
+			within = [...outer, { ctm: m, grow }];
 			const cm = c.adjust?.colorMatrix;
 			if (cm && !shaderSideMatrix(c.adjust) && matrixTouchesTransparent(cm))
 				full = true;
-			within = [...outer, { ctm: m, grow }];
 		}
+		// The clip makes paintDrawable's plain save real.
+		if (c.clip && c.op !== "drawImage" && !c.rotation && !layered)
+			within = [...within, { ctm: m }];
+		return visitShape(c, m, within);
+	};
+	const visitShape = (
+		c: DrawCommand,
+		m: Affine,
+		within: RecordedSave[],
+	): boolean => {
 		const { x, y } = c.pos;
 		const { width: w, height: h } = c.size;
 		const box: Bounds = [x, y, x + w, y + h].map(f32) as Bounds;
@@ -1686,18 +1711,52 @@ function predictedBounds(
 			}
 			return true;
 		}
+		if (c.op === "drawText") {
+			const glyphs = textBounds(ck, provider, bin, c, m, device);
+			if (!glyphs) return false;
+			for (const b of glyphs) add(b, m, within);
+			return true;
+		}
+		if (c.op === "drawPath") {
+			const path = bin.path(ck, c.d, c.fillRule === "evenodd");
+			if (!path) return true;
+			// drawPath's save is real once it moves the matrix.
+			let pm = translateAffine(m, c.pos.x, c.pos.y);
+			const vb = c.viewBox;
+			if (vb && vb.width > 0 && vb.height > 0) {
+				pm = scaleAffine(pm, w / vb.width, h / vb.height);
+				pm = translateAffine(pm, -(vb.x ?? 0), -(vb.y ?? 0));
+			}
+			const inPath = pm === m ? within : [...within, { ctm: m }];
+			const [l, t, r, b] = path.getBounds() as number[];
+			const bounds: Bounds = [l, t, r, b] as Bounds;
+			if (c.fills?.length) add(bounds, pm, inPath);
+			if (c.stroke) {
+				const outline = c.strokeD ? bin.path(ck, c.strokeD) : null;
+				if (outline) {
+					const [ol, ot, or, ob] = outline.getBounds() as number[];
+					add(strokeBounds([ol, ot, or, ob] as Bounds, c.stroke), pm, inPath);
+				} else if (strokeInset(c.stroke) !== 0) {
+					const stroke = { ...c.stroke, width: c.stroke.width * 2 };
+					add(strokeBounds(bounds, stroke), pm, [...inPath, { ctm: pm }]);
+				} else add(strokeBounds(bounds, c.stroke), pm, inPath);
+			}
+			return true;
+		}
 		if (c.op === "drawImage") {
 			const img = images.get(c.src);
 			if (img && isSvgPicture(img)) return false;
+			// drawImage clips inside its own save.
+			const inImage = c.clip ? [...within, { ctm: m }] : within;
 			if (!img || c.fit === "tile") {
-				add(box, m, within);
+				add(box, m, inImage);
 			} else {
 				const r = fitRect(img.width(), img.height(), x, y, w, h, c.fit, c);
 				if (r.dw > 0 && r.dh > 0)
 					add(
 						[r.dx, r.dy, r.dx + r.dw, r.dy + r.dh].map(f32) as Bounds,
 						m,
-						within,
+						inImage,
 					);
 			}
 			if (c.stroke) {
@@ -1718,9 +1777,25 @@ function predictedBounds(
 			return true;
 		}
 		if (c.op === "drawBitmap") {
-			if (c.role === "barcode") return false;
-			if (c.pixelWidth > 0 && c.pixelHeight > 0 && w > 0 && h > 0)
-				add(box, m, within);
+			if (!(c.pixelWidth > 0 && c.pixelHeight > 0)) return true;
+			const snapped =
+				c.role === "barcode" ? snapBarcodeAffine(m, c, frame.grid ?? 1) : null;
+			// drawBitmap's save is real once it clips or moves the matrix.
+			const inBitmap = c.clip || snapped ? [...within, { ctm: m }] : within;
+			if (snapped) {
+				const inverse = invertAffine(m);
+				if (!inverse) return false;
+				add(
+					[
+						snapped.x,
+						snapped.y,
+						snapped.x + snapped.width,
+						snapped.y + snapped.height,
+					].map(f32) as Bounds,
+					concatAffine(m, inverse),
+					inBitmap,
+				);
+			} else if (w > 0 && h > 0) add(box, m, inBitmap);
 			return true;
 		}
 		if (c.op === "drawQr") {
@@ -1732,6 +1807,19 @@ function predictedBounds(
 			for (const child of c.children) if (!visit(child, m, within)) return false;
 			return true;
 		}
+		if (c.op === "drawMasked") {
+			// The content layer, then the mask composited into it. DstIn changes
+			// transparent black, so that layer covers the whole cull; DstOut keeps
+			// the content's own bounds.
+			if (!c.invert) {
+				full = true;
+				return true;
+			}
+			const content = [...within, { ctm: m }];
+			for (const child of c.children)
+				if (!visit(child, m, content)) return false;
+			return visit(c.mask, m, [...content, { ctm: m }]);
+		}
 		return false;
 	};
 	const ctm = [matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]]
@@ -1739,6 +1827,146 @@ function predictedBounds(
 	if (!visit(inner, ctm, []) || singular) return null;
 	if (full) return cull;
 	return out ?? [0, 0, 0, 0];
+}
+
+// The local rects a drawText's glyphs and decorations can cover: each line's
+// shaped advance padded by the font box of every family it may draw from.
+// SkTextBlob bounds a positioned run by that box, so this holds the recorded
+// bounds. Lines drawText culls against the clip are skipped here too. Null when
+// a family's box is unknown.
+function textBounds(
+	ck: CK,
+	provider: CK,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	ctm: Affine,
+	device: Size,
+): Bounds[] | null {
+	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	const families = new Set(fallback);
+	for (const line of cmd.layout.lines)
+		for (const span of line.spans) families.add(span.font.family);
+	let em: Bounds | null = null;
+	for (const family of families) {
+		const box = familyBox(ck, provider, family);
+		if (box === null) return null;
+		if (box) em = em ? unionBounds(em, box) : box;
+	}
+	if (!em) return [];
+	const rows =
+		ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
+			? {
+					top: -ctm[5] / ctm[4],
+					bottom: (Math.ceil(device.height) - ctm[5]) / ctm[4],
+				}
+			: null;
+	const cache = shapedLines.get(provider);
+	const out: Bounds[] = [];
+	for (const line of cmd.layout.lines) {
+		const first = line.spans[0];
+		if (!first) continue;
+		const baseline = line.baseline ?? line.y;
+		const size = Math.max(...line.spans.map((s) => s.font.size));
+		if (rows) {
+			const reach = 2 * size;
+			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
+				continue;
+		}
+		const shape = () =>
+			shapeLine(ck, provider, cmd, line, fallback, null, null);
+		let shaped: ShapedLine;
+		if (cache)
+			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
+		else {
+			shaped = shape();
+			bin.track(shaped.para);
+		}
+		const left =
+			line.direction === "rtl"
+				? Math.min(...line.spans.map((s) => s.x))
+				: first.x;
+		const advance = shaped.para.getLongestLine() as number;
+		const slack = size / 8;
+		out.push([
+			left + Math.min(0, em[0]) * size - slack,
+			baseline + Math.min(0, em[1]) * size - slack,
+			left + advance + Math.max(0, em[2]) * size + slack,
+			baseline + Math.max(0, em[3]) * size + slack,
+		]);
+		for (const span of line.spans) {
+			if (!span.font.decoration) continue;
+			const { top, thickness } = decorationLine(
+				span.font.size,
+				span.font.decoration,
+				baseline,
+			);
+			out.push([span.x, top, span.x + span.width, top + thickness]);
+		}
+	}
+	return out;
+}
+
+const familyBoxes = new WeakMap<CK, Map<string, Bounds | null | undefined>>();
+
+// A family's font box per unit of size, over every face registered for it:
+// the box SkFontPriv::GetFontBounds scales. Undefined for a family the
+// provider lacks, null when a face reports no box (a variable font).
+function familyBox(
+	ck: CK,
+	provider: CK,
+	family: string,
+): Bounds | null | undefined {
+	let byFamily = familyBoxes.get(provider);
+	if (!byFamily) {
+		byFamily = new Map();
+		familyBoxes.set(provider, byFamily);
+	}
+	if (byFamily.has(family)) return byFamily.get(family);
+	let box: Bounds | null | undefined;
+	for (const slant of [ck.FontSlant.Upright, ck.FontSlant.Italic]) {
+		for (let weight = 100; weight <= 900; weight += 100) {
+			const typeface = provider.matchFamilyStyle(family, {
+				weight: ck.FontWeight[WEIGHTS[weight] as string],
+				width: ck.FontWidth.Normal,
+				slant,
+			});
+			if (!typeface) continue;
+			const font = new ck.Font(typeface, FONT_BOX_SIZE);
+			const b = font.getMetrics().bounds as number[] | undefined;
+			font.delete();
+			typeface.delete();
+			if (!b) {
+				box = null;
+				break;
+			}
+			const face: Bounds = [
+				b[0] / FONT_BOX_SIZE,
+				b[1] / FONT_BOX_SIZE,
+				b[2] / FONT_BOX_SIZE,
+				b[3] / FONT_BOX_SIZE,
+			];
+			box = box ? unionBounds(box, face) : face;
+		}
+		if (box === null) break;
+	}
+	byFamily.set(family, box);
+	return box;
+}
+
+// SkTypeface::getBounds measures at this size.
+const FONT_BOX_SIZE = 2048;
+
+// snapBarcode under the affine `m`.
+function snapBarcodeAffine(
+	m: Affine,
+	cmd: DrawBitmapCommand,
+	grid: number,
+): { x: number; y: number; width: number; height: number } | null {
+	return snapBarcode(
+		{ getTotalMatrix: () => [m[0], m[1], m[2], m[3], m[4], m[5], 0, 0, 1] },
+		cmd,
+		grid,
+	);
 }
 
 // Whether layerPaint would build a paint for this drawable.
@@ -1825,6 +2053,14 @@ function sortBounds(b: Bounds): Bounds {
 
 function outsetBounds(b: Bounds, d: number): Bounds {
 	return [f32(b[0] - d), f32(b[1] - d), f32(b[2] + d), f32(b[3] + d)];
+}
+
+function intersectBounds(a: Bounds, b: Bounds): Bounds | null {
+	const l = Math.max(a[0], b[0]);
+	const t = Math.max(a[1], b[1]);
+	const r = Math.min(a[2], b[2]);
+	const btm = Math.min(a[3], b[3]);
+	return l < r && t < btm ? [l, t, r, btm] : null;
 }
 
 function unionBounds(a: Bounds, b: Bounds): Bounds {
@@ -1935,6 +2171,14 @@ function translateAffine(m: Affine, dx: number, dy: number): Affine {
 	];
 }
 
+// SkMatrix::preScale.
+function scaleAffine(m: Affine, sx: number, sy: number): Affine {
+	const x = f32(sx);
+	const y = f32(sy);
+	if (x === 1 && y === 1) return m;
+	return [f32(m[0] * x), f32(m[1] * y), m[2], f32(m[3] * x), f32(m[4] * y), m[5]];
+}
+
 // SkMatrix::setRotate about the origin.
 function rotationAffine(degrees: number): Affine {
 	const rad = f32(f32(degrees) * f32(f32(Math.PI) / 180));
@@ -1983,6 +2227,18 @@ function recordedBounds(
 	}
 }
 
+// Test hook: sees every adjusted layer's predicted bounds beside the ones a
+// recording reports.
+let boundsAudit:
+	| ((predicted: Bounds | null, recorded: Bounds) => void)
+	| undefined;
+
+export function auditAdjustedBounds(
+	audit: ((predicted: Bounds | null, recorded: Bounds) => void) | undefined,
+): void {
+	boundsAudit = audit;
+}
+
 // The device pixels an adjusted layer can touch: Skia's bounds of a recording
 // of the inner drawable under the main canvas's matrix, so stroke, shadow, blur
 // and glyph outsets count exactly as the painter draws them. Predicted from the
@@ -2002,8 +2258,22 @@ function adjustedDeviceRect(
 	matrix: number[],
 	spread: number,
 ): { x: number; y: number; width: number; height: number } | null {
+	const predicted = predictedBounds(
+		ck,
+		provider,
+		bin,
+		images,
+		inner,
+		frame,
+		device,
+		matrix,
+	);
+	boundsAudit?.(
+		predicted,
+		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix),
+	);
 	const [l, t, r, b] =
-		predictedBounds(ck, bin, images, inner, device, matrix) ??
+		predicted ??
 		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix);
 	const clip = canvas.getDeviceClipBounds() as Int32Array;
 	const pad = 1 + spread;

@@ -132,6 +132,42 @@ describe("export runner", () => {
 		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
 	});
 
+	it("a replacement that fails before rendering still ends the job", async () => {
+		const { d, pools } = deps({ hold: true });
+		const runner = createExportRunner(d);
+		const first = runner.start(ws, preset);
+		await vi.waitFor(() => expect(pools[0]?.render).toHaveBeenCalled());
+		const second = runner.start(ws, { ...preset, templateId: "nope" });
+		await first;
+		expect(await second).toBe(null);
+		expect(runner.getSnapshot().state).toBe("error");
+		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
+	});
+
+	it("a replacement cancelled while resolving fonts still ends the job", async () => {
+		const { d, pools } = deps({ hold: true });
+		let fontsResolved: (() => void) | undefined;
+		d.resolveFonts = vi
+			.fn(async () => new Map<string, Uint8Array[]>())
+			.mockImplementationOnce(async () => new Map())
+			.mockImplementationOnce(
+				() =>
+					new Promise((resolve) => {
+						fontsResolved = () => resolve(new Map());
+					}),
+			);
+		const runner = createExportRunner(d);
+		const first = runner.start(ws, preset);
+		await vi.waitFor(() => expect(pools[0]?.render).toHaveBeenCalled());
+		const second = runner.start(ws, preset);
+		await first;
+		runner.cancel();
+		fontsResolved?.();
+		expect(await second).toBe(null);
+		expect(runner.getSnapshot().state).toBe("cancelled");
+		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
+	});
+
 	it("rebuilds the pool when a job's photos want another size", async () => {
 		const photos = (pixels: number): Workspace => ({
 			...ws,

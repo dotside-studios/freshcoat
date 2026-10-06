@@ -1,8 +1,13 @@
 import { buildAdjust } from "../../../src/adjust";
 import {
+	createBitmap,
+	createEllipse,
 	createFrame,
 	createGroup,
+	createMask,
+	createPath,
 	createRect,
+	createText,
 	type Node,
 } from "../../../src/node";
 import type { ResolvedFill } from "../../../src/types";
@@ -13,6 +18,8 @@ export type BoundsCase = {
 	height: number;
 	scale?: number;
 	supersample?: number;
+	// Renders with the Geist test font registered.
+	fonts?: boolean;
 	scene: Node;
 };
 
@@ -32,6 +39,23 @@ const ramp: ResolvedFill = {
 	],
 	from: { x: 0, y: 0 },
 	to: { x: 1, y: 1 },
+};
+
+const font = (size: number) => ({
+	family: "Geist",
+	weight: 400 as const,
+	style: "normal" as const,
+	size,
+	lineHeight: 1.2,
+});
+
+const bars = (pattern: string): Uint8Array => {
+	const px = new Uint8Array(pattern.length * 4);
+	for (let i = 0; i < pattern.length; i++) {
+		const v = pattern[i] === "1" ? 0 : 255;
+		px.set([v, v, v, 255], i * 4);
+	}
+	return px;
 };
 
 const frame = (width: number, height: number, children: Node[]) =>
@@ -188,6 +212,205 @@ export const BOUNDS_CASES: BoundsCase[] = [
 				size: { width: 20, height: 1.4 },
 				fills: [{ kind: "solid", color: "#2050c0" }],
 				adjust: buildAdjust({ brightness: 0.8, sharpen: 1 }),
+			}),
+		]),
+	},
+	{
+		name: "text",
+		width: 160,
+		height: 90,
+		scale: 2,
+		fonts: true,
+		scene: frame(160, 90, [
+			createText({
+				pos: { x: 8, y: 6 },
+				size: { width: 140, height: 30 },
+				text: "Ågjy Wq",
+				font: { ...font(24), decoration: "underline" },
+				color: "#203060",
+				shadow: { color: "#00000080", dx: 2, dy: 3, blur: 4 },
+				adjust: buildAdjust({ gamma: 1.8, sharpen: 1 }),
+			}),
+			createText({
+				pos: { x: 20, y: 40 },
+				size: { width: 90, height: 40 },
+				text: "Tilted fj",
+				font: font(18),
+				fill: ramp,
+				rotation: -10,
+				adjust: buildAdjust({ saturation: 1.3, gamma: 0.7 }),
+			}),
+			createText({
+				pos: { x: 110, y: 50 },
+				size: { width: 40, height: 14 },
+				text: "Clipped overflow",
+				font: font(16),
+				color: "#802020",
+				fit: "clip",
+				adjust: buildAdjust({ brightness: 1.1, sharpen: 0.8 }),
+			}),
+		]),
+	},
+	{
+		name: "path",
+		width: 120,
+		height: 90,
+		scene: frame(120, 90, [
+			createPath({
+				pos: { x: 6, y: 8 },
+				size: { width: 50, height: 40 },
+				d: "M0 0 C 30 -10 60 50 20 40 L 5 30 Z",
+				viewBox: { x: 0, y: -10, width: 60, height: 60 },
+				fills: [ramp],
+				stroke: { color: "#202020", width: 3 },
+				adjust: buildAdjust({ gamma: 1.6, sharpen: 1 }),
+			}),
+			createPath({
+				pos: { x: 60, y: 10 },
+				size: { width: 40, height: 40 },
+				d: "M0 20 Q 20 -20 40 20 Q 20 60 0 20 Z",
+				fills: [{ kind: "solid", color: "#40a060" }],
+				stroke: { color: "#103010", width: 4, align: "inside" },
+				rotation: 20,
+				adjust: buildAdjust({ contrast: 1.2, gamma: 1.4 }),
+			}),
+			createPath({
+				pos: { x: 15, y: 55 },
+				size: { width: 50, height: 25 },
+				d: "M0 0 L 50 25 M 0 25 L 50 0",
+				stroke: { color: "#a02060", width: 2, cap: "square", join: "round" },
+				shadow: { color: "#00000060", dx: 2, dy: 2, blur: 3 },
+				adjust: buildAdjust({ gamma: 0.8, sharpen: 0.6 }),
+			}),
+			createEllipse({
+				pos: { x: 75, y: 55 },
+				size: { width: 30, height: 24 },
+				fills: [ramp],
+				stroke: { color: "#202060", width: 3, align: "outside" },
+				adjust: buildAdjust({ saturation: 1.5, gamma: 1.2 }),
+			}),
+		]),
+	},
+	{
+		name: "path-scaled-down",
+		width: 120,
+		height: 90,
+		scale: 0.5,
+		scene: frame(120, 90, [
+			createPath({
+				pos: { x: 10, y: 10 },
+				size: { width: 80, height: 60 },
+				d: "M0 0 C 40 -20 80 80 40 60 L 10 50 Z",
+				fills: [ramp],
+				stroke: { color: "#202020", width: 2, align: "outside" },
+				shadow: { color: "#00000080", dx: 3, dy: 4, blur: 8 },
+				adjust: buildAdjust({ gamma: 1.6, sharpen: 1 }),
+			}),
+		]),
+	},
+	{
+		name: "clip-and-mask",
+		width: 140,
+		height: 100,
+		scene: frame(140, 100, [
+			createGroup(
+				[
+					createRect({
+						pos: { x: -10, y: -6 },
+						size: { width: 60, height: 40 },
+						fills: [ramp],
+					}),
+					createRect({
+						pos: { x: 20, y: 10 },
+						size: { width: 20, height: 30 },
+						fills: [{ kind: "solid", color: "#204080" }],
+						shadow: { color: "#00000080", dx: 3, dy: 3, blur: 4 },
+					}),
+				],
+				{
+					pos: { x: 6, y: 6 },
+					size: { width: 44, height: 34 },
+					clip: true,
+					cornerRadius: 8,
+					adjust: buildAdjust({ gamma: 1.7, sharpen: 1 }),
+				},
+			),
+			createMask(
+				createEllipse({
+					pos: { x: 0, y: 0 },
+					size: { width: 40, height: 30 },
+					fills: [
+						{
+							kind: "linear",
+							stops: [
+								{ offset: 0, color: "#000000" },
+								{ offset: 1, color: "#00000000" },
+							],
+							from: { x: 0, y: 0 },
+							to: { x: 1, y: 0 },
+						},
+					],
+				}),
+				[
+					createRect({
+						pos: { x: -5, y: -5 },
+						size: { width: 50, height: 40 },
+						fills: [ramp],
+					}),
+				],
+				{
+					pos: { x: 70, y: 8 },
+					size: { width: 40, height: 30 },
+					adjust: buildAdjust({ saturation: 1.4, gamma: 1.3 }),
+				},
+			),
+			createMask(
+				createRect({
+					pos: { x: 8, y: 6 },
+					size: { width: 20, height: 14 },
+					fills: [{ kind: "solid", color: "#ffffff" }],
+				}),
+				[
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: { width: 36, height: 26 },
+						fills: [ramp],
+					}),
+				],
+				{
+					pos: { x: 20, y: 55 },
+					size: { width: 36, height: 26 },
+					channel: "luminance",
+					invert: true,
+					rotation: 12,
+					adjust: buildAdjust({ gamma: 0.6, sharpen: 0.7 }),
+				},
+			),
+		]),
+	},
+	{
+		name: "barcode",
+		width: 120,
+		height: 70,
+		scale: 1.5,
+		scene: frame(120, 70, [
+			createBitmap({
+				pos: { x: 10.3, y: 8.6 },
+				size: { width: 61.7, height: 20.2 },
+				pixels: bars("1011001110001011011100101"),
+				pixelWidth: 25,
+				pixelHeight: 1,
+				role: "barcode",
+				adjust: buildAdjust({ gamma: 1.5, sharpen: 1 }),
+			}),
+			createBitmap({
+				pos: { x: 80.2, y: 30.4 },
+				size: { width: 30.5, height: 30.5 },
+				pixels: bars("1010011001011001"),
+				pixelWidth: 4,
+				pixelHeight: 4,
+				role: "barcode",
+				adjust: buildAdjust({ contrast: 1.4, gamma: 0.8 }),
 			}),
 		]),
 	},
