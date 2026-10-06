@@ -62,31 +62,18 @@ export function measureGamut(
 		const r = data[i] / 255;
 		const g = data[i + 1] / 255;
 		const b = data[i + 2] / 255;
-		const out = [0, 0, 0];
-		for (let c = 0; c < 3; c++) {
-			out[c] =
-				m[c * 5] * r + m[c * 5 + 1] * g + m[c * 5 + 2] * b + m[c * 5 + 4];
-		}
-		if (
-			out[0] >= 0 &&
-			out[0] <= 1 &&
-			out[1] >= 0 &&
-			out[1] <= 1 &&
-			out[2] >= 0 &&
-			out[2] <= 1
-		) {
+		const r2 = m[0] * r + m[1] * g + m[2] * b + m[4];
+		const g2 = m[5] * r + m[6] * g + m[7] * b + m[9];
+		const b2 = m[10] * r + m[11] * g + m[12] * b + m[14];
+		if (r2 >= 0 && r2 <= 1 && g2 >= 0 && g2 <= 1 && b2 >= 0 && b2 <= 1) {
 			continue;
 		}
 		clipped++;
 		const l = Math.min(
 			1,
-			Math.max(0, LUMA[0] * out[0] + LUMA[1] * out[1] + LUMA[2] * out[2]),
+			Math.max(0, LUMA[0] * r2 + LUMA[1] * g2 + LUMA[2] * b2),
 		);
-		const t = Math.min(
-			fitScale(out[0], l),
-			fitScale(out[1], l),
-			fitScale(out[2], l),
-		);
+		const t = Math.min(fitScale(r2, l), fitScale(g2, l), fitScale(b2, l));
 		pullbackSum += 1 - t;
 	}
 	return {
