@@ -17,7 +17,7 @@ import type {
 	FigmaVectorNodeType,
 } from "~/lib/figma/types";
 import { isContainerNode, isVectorNode } from "~/lib/figma/types";
-import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
+import { readBinding, readFieldMeta } from "~/main/plugin-data";
 
 function rgbaFrom(color: {
 	r: number;
@@ -245,42 +245,6 @@ function readConstraints(
 			vertical: c.vertical as FigmaConstraints["vertical"],
 		},
 	};
-}
-
-// The author's stored binding for this node (set by the plugin's harvest step).
-// Property → value template, e.g. { text: "{{name}}", textColor: "{{brand}}" }.
-function readBinding(
-	node: AnySceneNode,
-): { bind: Record<string, string> } | undefined {
-	const raw = readPluginData(node, FIELD_KEY);
-	if (!raw) return undefined;
-	try {
-		const parsed = JSON.parse(raw) as { bind?: Record<string, string> };
-		if (parsed && typeof parsed === "object" && parsed.bind) {
-			return { bind: parsed.bind };
-		}
-	} catch {
-		// Malformed pluginData — ignore and fall back to live inference.
-	}
-	return undefined;
-}
-
-// Template-global field metadata (FIELDS_KEY), set on a slot frame by the
-// plugin's harvest/override step. Overrides inferred metadata at export.
-function readFieldMeta(
-	node: AnySceneNode,
-): Record<string, unknown> | undefined {
-	const raw = readPluginData(node, FIELDS_KEY);
-	if (!raw) return undefined;
-	try {
-		const parsed = JSON.parse(raw);
-		if (parsed && typeof parsed === "object") {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {
-		// Malformed pluginData — ignore.
-	}
-	return undefined;
 }
 
 function readEffects(
