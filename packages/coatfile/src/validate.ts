@@ -151,20 +151,33 @@ export function validateValues(
 			});
 		}
 		if (def.pattern !== undefined) {
-			try {
-				if (!new RegExp(def.pattern).test(raw)) {
-					errors.push({
-						path: `/${key}`,
-						code: "value_pattern_mismatch",
-						message: `${key} does not match pattern`,
-					});
-				}
-			} catch {
-				// ignore invalid regex in schema
+			const re = compiledPattern(def.pattern);
+			if (re !== null && !re.test(raw)) {
+				errors.push({
+					path: `/${key}`,
+					code: "value_pattern_mismatch",
+					message: `${key} does not match pattern`,
+				});
 			}
 		}
 	}
 
 	if (errors.length) return { ok: false, errors };
 	return { ok: true, value: v };
+}
+
+const patterns = new Map<string, RegExp | null>();
+
+function compiledPattern(pattern: string): RegExp | null {
+	let re = patterns.get(pattern);
+	if (re === undefined) {
+		try {
+			re = new RegExp(pattern);
+		} catch {
+			// ignore invalid regex in schema
+			re = null;
+		}
+		patterns.set(pattern, re);
+	}
+	return re;
 }

@@ -606,6 +606,25 @@ describe("validateValues", () => {
 		}
 	});
 
+	test("matches patterns on every call and skips invalid ones", () => {
+		const patterned = {
+			type: "object" as const,
+			properties: {
+				code: { type: "string" as const, pattern: "^[A-Z]+$" },
+				broken: { type: "string" as const, pattern: "([" },
+			},
+		};
+		for (let i = 0; i < 2; i++) {
+			expect(validateValues({ code: "AB", broken: "x" }, patterned).ok).toBe(
+				true,
+			);
+			const r = validateValues({ code: "ab", broken: "x" }, patterned);
+			expect(r.ok ? [] : r.errors.map((e) => [e.path, e.code])).toEqual([
+				["/code", "value_pattern_mismatch"],
+			]);
+		}
+	});
+
 	test("flags non-string values", () => {
 		const r = validateValues({ name: 42 }, fields);
 		expect(r.ok).toBe(false);

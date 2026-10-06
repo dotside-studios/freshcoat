@@ -307,6 +307,21 @@ function typeIssue(
 	}
 }
 
+const patterns = new Map<string, RegExp | null>();
+
+function compiledPattern(pattern: string): RegExp | null {
+	let re = patterns.get(pattern);
+	if (re === undefined) {
+		try {
+			re = new RegExp(pattern, "u");
+		} catch {
+			re = null;
+		}
+		patterns.set(pattern, re);
+	}
+	return re;
+}
+
 function textIssue(column: Column, value: string): string | null {
 	if (column.minLength !== undefined && value.length < column.minLength) {
 		return `Shorter than ${column.minLength} characters`;
@@ -315,12 +330,7 @@ function textIssue(column: Column, value: string): string | null {
 		return `Longer than ${column.maxLength} characters`;
 	}
 	if (column.pattern !== undefined) {
-		let re: RegExp | null = null;
-		try {
-			re = new RegExp(column.pattern, "u");
-		} catch {
-			re = null;
-		}
+		const re = compiledPattern(column.pattern);
 		if (re !== null && !re.test(value)) return "Does not match the pattern";
 	}
 	if (

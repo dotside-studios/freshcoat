@@ -135,6 +135,21 @@ describe("parseDateText and serialToIso", () => {
 	});
 });
 
+describe("validateRecord patterns", () => {
+	it("reuses compiled patterns and skips invalid ones", () => {
+		const columns: Column[] = [
+			{ key: "code", type: "text", pattern: "^\\p{Lu}+$" },
+			{ key: "broken", type: "text", pattern: "([" },
+		];
+		for (let i = 0; i < 2; i++) {
+			expect(validateRecord(columns, { code: "ÄB", broken: "x" })).toEqual([]);
+			expect(validateRecord(columns, { code: "ab", broken: "x" })).toEqual([
+				{ column: "code", message: "Does not match the pattern" },
+			]);
+		}
+	});
+});
+
 describe("validateRecord", () => {
 	const columns: Column[] = [
 		{ key: "name", type: "text", required: true, minLength: 2, maxLength: 5 },
