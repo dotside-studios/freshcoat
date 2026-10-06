@@ -30,6 +30,8 @@ export interface DataGridColumn {
 	numeric?: boolean;
 	/** Its cells name their row for assistive tech. */
 	isRowHeader?: boolean;
+	/** Share of the free width this column takes past `width`. */
+	grow?: number;
 }
 
 export type DataGridCellProps = HTMLAttributes<HTMLDivElement> & {
@@ -51,6 +53,9 @@ export interface VirtualDataGridProps<C extends DataGridColumn> {
 	sortDescriptor?: SortDescriptor;
 	onSortChange?: (sort: SortDescriptor) => void;
 	renderEmptyState?: () => ReactNode;
+	/** A plain click or Enter on a row; without it they toggle its selection. */
+	onRowAction?: (rowKey: string) => void;
+	rowClassName?: (rowKey: string) => string | undefined;
 	/** Row height in px. Defaults to 24, or 32 on coarse pointers. */
 	rowHeight?: number;
 	/** Header height in px. Defaults to 26, or 32 on coarse pointers. */
@@ -86,6 +91,8 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 	rowKeys,
 	renderCell,
 	cellProps,
+	onRowAction,
+	rowClassName,
 	selectedKeys,
 	onSelectionChange,
 	sortDescriptor,
@@ -286,6 +293,9 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 			} else if (e.key === " ") {
 				e.preventDefault();
 				toggle(row);
+			} else if (onRowAction) {
+				e.preventDefault();
+				onRowAction(row);
 			}
 			return;
 		}
@@ -343,6 +353,7 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 		const key = rowEl?.dataset.row;
 		if (!key || !scroller.current?.contains(rowEl)) return;
 		if (e.shiftKey) extendTo(key);
+		else if (onRowAction && !e.metaKey && !e.ctrlKey) onRowAction(key);
 		else toggle(key);
 	};
 
@@ -387,8 +398,8 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 					<div
 						role="row"
 						aria-rowindex={1}
-						className="flex"
-						style={{ height: headingHeight, width: totalWidth }}
+						className="flex w-full min-w-max"
+						style={{ height: headingHeight }}
 					>
 						<div
 							role="columnheader"
@@ -430,7 +441,7 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 										focused?.row === HEADER && focused.col === c.id ? 0 : -1
 									}
 									className={`${cellBase} ${headerCell}`}
-									style={{ width: widths[i] }}
+									style={cellStyle(widths[i] as number, c.grow)}
 									onClick={() => sortBy(c)}
 								>
 									<div
@@ -490,6 +501,7 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 									top={item.start - headingHeight}
 									height={rowHeight}
 									selected={isSelected(key)}
+									className={rowClassName?.(key)}
 									tabCol={
 										item.index === focusedIndex && focused
 											? focused.col
@@ -519,6 +531,7 @@ type GridRowProps<C extends DataGridColumn> = {
 	top: number;
 	height: number;
 	selected: boolean;
+	className: string | undefined;
 	/** The cell that takes Tab into the grid, if it is in this row. */
 	tabCol: string | null;
 	columns: readonly C[];
@@ -535,6 +548,7 @@ const GridRow = memo(function GridRow<C extends DataGridColumn>({
 	top,
 	height,
 	selected,
+	className,
 	tabCol,
 	columns,
 	widths,
@@ -550,7 +564,7 @@ const GridRow = memo(function GridRow<C extends DataGridColumn>({
 			aria-selected={selected}
 			data-row={rowKey}
 			data-selected={selected ? "" : undefined}
-			className={rowBase}
+			className={cn(rowBase, className)}
 			style={{ height, transform: `translateY(${top}px)` }}
 		>
 			<div
@@ -588,7 +602,7 @@ const GridRow = memo(function GridRow<C extends DataGridColumn>({
 							c.numeric && "justify-end text-right tabular-nums",
 							extra?.className,
 						)}
-						style={{ width: widths[i] }}
+						style={cellStyle(widths[i] as number, c.grow)}
 					>
 						{renderCell(rowKey, c)}
 					</div>
@@ -644,4 +658,8 @@ function ColumnResizer({
 			onPointerCancel={end}
 		/>
 	);
+}
+
+function cellStyle(width: number, grow: number | undefined) {
+	return grow ? { width, flexGrow: grow } : { width };
 }
