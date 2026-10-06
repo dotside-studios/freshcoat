@@ -2,7 +2,7 @@
 // run at harvest time (write pluginData) and at export time (live fallback), so
 // the marker grammar lives in exactly one place.
 
-import type { Symbology } from "@freshcoat-js/coatfile";
+import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
@@ -377,13 +377,6 @@ export function inferNodeBinding(node: FigmaNode): NodeBinding | null {
 
 	return null;
 }
-
-/** A visibility condition, as coatfile's `visibleWhen` carries it. */
-export type VisibilityCondition = {
-	field: string;
-	equals?: string;
-	not?: boolean;
-};
 
 const VISIBILITY_MARKER =
 	/^\s*if:\s*(!)?\s*\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}\s*(?:=\s*(?:"([^"]*)"|(\S+)))?\s*$/;
