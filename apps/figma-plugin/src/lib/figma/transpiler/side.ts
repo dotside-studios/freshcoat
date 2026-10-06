@@ -1,4 +1,5 @@
 import { assetUri } from "@freshcoat-js/coatfile/assets";
+import type { BindingResolver } from "../binding";
 import type { FigmaContainerNode } from "../types";
 import { dedupeFlattenMarkers } from "./coalesce";
 import { figmaPaintToFill } from "./colors";
@@ -75,6 +76,7 @@ export async function buildSideElements(
 		authorHeight: number;
 		renderImage: RenderImageFn;
 		sink: ElementSink;
+		resolveBinding?: BindingResolver;
 	},
 ): Promise<{
 	background: ReturnType<typeof backgroundFromFrame>;
@@ -87,7 +89,7 @@ export async function buildSideElements(
 		authorWidth,
 		authorHeight,
 	);
-	const w = createWalker(frame, slotName, scale, sink);
+	const w = createWalker(frame, slotName, scale, sink, opts.resolveBinding);
 	const elements = walkSide(w);
 
 	// The density every raster on this side is exported at. Sized in AUTHOR space

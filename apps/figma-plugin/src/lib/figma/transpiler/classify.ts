@@ -1,5 +1,5 @@
 import type { BlendMode } from "@freshcoat-js/coatfile";
-import { inferNodeBinding, storedToNodeBinding } from "../binding";
+import { type BindingResolver, resolveNodeBinding } from "../binding";
 import type {
 	FigmaBlendMode,
 	FigmaEffect,
@@ -224,11 +224,11 @@ export function hasTextStroke(n: FigmaTextNode): boolean {
 	return (n.strokes ?? []).some((p) => p.visible !== false);
 }
 
-export function isTextFieldBound(n: FigmaTextNode): boolean {
-	const binding = n.binding
-		? storedToNodeBinding(n.binding)
-		: inferNodeBinding(n);
-	return binding?.bind.text !== undefined;
+export function isTextFieldBound(
+	n: FigmaTextNode,
+	resolveBinding: BindingResolver = resolveNodeBinding,
+): boolean {
+	return resolveBinding(n)?.bind.text !== undefined;
 }
 
 export function isQrLayerName(name: string): boolean {
@@ -254,7 +254,10 @@ function imageClassification(n: FigmaNode): Classification | undefined {
 	return { kind: "native-image" };
 }
 
-export function classify(n: FigmaNode): Classification {
+export function classify(
+	n: FigmaNode,
+	resolveBinding: BindingResolver = resolveNodeBinding,
+): Classification {
 	if (n.visible === false) return { kind: "skip" };
 	if (n.opacity === 0) return { kind: "skip" };
 
@@ -277,7 +280,7 @@ export function classify(n: FigmaNode): Classification {
 		if (!textIsNative(n))
 			return { kind: "flatten", reason: "text_mixed_styling_flattened" };
 		// A bound text stays native so the field survives; the walk warns instead.
-		if (hasTextStroke(n) && !isTextFieldBound(n))
+		if (hasTextStroke(n) && !isTextFieldBound(n, resolveBinding))
 			return { kind: "flatten", reason: "text_stroke_flattened" };
 		return { kind: "native-text" };
 	}

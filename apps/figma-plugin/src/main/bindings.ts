@@ -2,8 +2,7 @@ import {
 	bindableProperties,
 	buildFieldMeta,
 	type FieldMeta,
-	inferNodeBinding,
-	storedToNodeBinding,
+	resolveNodeBinding,
 } from "~/lib/figma/binding";
 import {
 	planHarvest,
@@ -44,9 +43,7 @@ export function postSelectionDetail(): void {
 	if (sel.length === 1) {
 		const node = readNode(sel[0] as never);
 		if (node) {
-			const binding = node.binding
-				? storedToNodeBinding(node.binding)
-				: inferNodeBinding(node);
+			const binding = resolveNodeBinding(node);
 			const slot = slotFrameOf(sel[0]);
 			const metas = slot ? (readFieldMeta(slot) ?? {}) : {};
 			detail = {

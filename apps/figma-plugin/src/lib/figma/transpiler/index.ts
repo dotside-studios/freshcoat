@@ -3,7 +3,12 @@ import type {
 	VariantElementDelta,
 } from "@freshcoat-js/coatfile";
 import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
-import { buildFieldMeta, type FieldMeta, fieldMetaToSchema } from "../binding";
+import {
+	buildFieldMeta,
+	createBindingResolver,
+	type FieldMeta,
+	fieldMetaToSchema,
+} from "../binding";
 import type { FigmaContainerNode } from "../types";
 import {
 	type CanvasSize,
@@ -63,6 +68,7 @@ export async function transpile(
 	const allAssets: PendingAsset[] = [];
 	// Every decision the walk made, across all slots, in visit order.
 	const trace: NodeTrace[] = [];
+	const resolveBinding = createBindingResolver();
 	// All field metadata is registered here from node bindings (text/image/qr/
 	// color), keyed by field id; first-wins across slots (front before back).
 	const overlayMeta = new Map<string, FieldMeta>();
@@ -182,6 +188,7 @@ export async function transpile(
 			authorWidth,
 			authorHeight,
 			renderImage: input.renderImage,
+			resolveBinding,
 			sink: {
 				counts,
 				warnings,
@@ -306,6 +313,7 @@ export async function transpile(
 					authorHeight,
 					renderImage: input.renderImage,
 					sink: sideSink,
+					resolveBinding,
 				},
 			);
 			for (const a of sideSink.assets) producedAssets.push(a);

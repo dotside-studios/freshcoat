@@ -1,10 +1,10 @@
 import type { TemplateWarning } from "@freshcoat-js/coatfile";
 import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
 import {
+	type BindingResolver,
 	type FieldMeta,
-	inferNodeBinding,
 	parseVisibilityMarker,
-	storedToNodeBinding,
+	resolveNodeBinding,
 } from "../binding";
 import type { FigmaConstraints, FigmaContainerNode, FigmaNode } from "../types";
 import {
@@ -144,6 +144,7 @@ export type Walker = {
 	slotName: string;
 	scale: number;
 	sink: ElementSink;
+	resolveBinding: BindingResolver;
 	constraintScope: ConstraintScope;
 	flattenMarkers: SlottedMarker[];
 	staticImageMarkers: StaticImageMarker[];
@@ -154,12 +155,14 @@ export function createWalker(
 	slotName: string,
 	scale: number,
 	sink: ElementSink,
+	resolveBinding: BindingResolver = resolveNodeBinding,
 ): Walker {
 	return {
 		frame,
 		slotName,
 		scale,
 		sink,
+		resolveBinding,
 		constraintScope: { autoLayout: false },
 		flattenMarkers: [],
 		staticImageMarkers: [],
@@ -307,7 +310,7 @@ function walkNode(
 	inheritedOpacity: number,
 ) {
 	const { scale } = w;
-	const c = classify(n);
+	const c = classify(n, w.resolveBinding);
 	if (c.kind === "skip") {
 		w.sink.counts.skipped++;
 		record(w, n, "skip");
@@ -411,10 +414,7 @@ function walkNode(
 		if (c.kind === "native-text" && isTextNode(n)) {
 			// The binding names the element (see transpileText) — resolved the
 			// same way the image branch below resolves its own.
-			const textBinding = n.binding
-				? storedToNodeBinding(n.binding)
-				: inferNodeBinding(n);
-			el = transpileText(n, ctx, textBinding?.bind.text);
+			el = transpileText(n, ctx, w.resolveBinding(n)?.bind.text);
 			if (hasTextStroke(n))
 				w.sink.warnings.push({
 					severity: "warn",
@@ -432,10 +432,7 @@ function walkNode(
 			// Dynamic if the node carries an image binding (stored or inferred),
 			// not just a bare-token name. Keeps `image:` markers + Layer-tab
 			// image bindings from silently rasterizing.
-			const imgBinding = n.binding
-				? storedToNodeBinding(n.binding)
-				: inferNodeBinding(n);
-			const r = transpileImage(n, ctx, imgBinding?.bind.image);
+			const r = transpileImage(n, ctx, w.resolveBinding(n)?.bind.image);
 			if (r.kind === "element") {
 				el = r.element;
 				for (const warning of r.warnings) w.sink.warnings.push(warning);
@@ -580,7 +577,7 @@ function walkNode(
 		// to the whole group, so its children were walked with none inherited.
 		applyOpacity(el, inheritedOpacity * opacityOf(n));
 		applyConstraints(w, el, n);
-		applyBindingOverlay(n, el, w.sink.overlayMeta);
+		applyBindingOverlay(n, el, w.sink.overlayMeta, w.resolveBinding);
 		entry.el = el;
 		target.push(el);
 	}
