@@ -79,7 +79,7 @@ describe("presets", () => {
 		const second = newPreset("t_doc", [first], "p_2");
 		expect(second.name).toBe("New preset 2");
 		expect(newPreset("t_doc", [first, second]).name).toBe("New preset 3");
-		expect(newPreset("t_doc", []).id).toMatch(/^p_[0-9a-f]{8}$/);
+		expect(newPreset("t_doc", []).id).toMatch(/^p_[0-9a-f]{16}$/);
 		const copy = duplicatePreset(
 			{ ...first, records: "selected", selected: ["r1"] },
 			[first],
