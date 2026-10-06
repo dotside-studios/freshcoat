@@ -1,7 +1,9 @@
 import {
+	assetUri,
 	compile,
 	createPaintCache,
 	createParagraphEngine,
+	inlineAssetUrls,
 	type PaintCache,
 	setBarcodeEncoder,
 	type Template,
@@ -10,6 +12,10 @@ import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { deriveFontMetrics } from "@freshcoat-js/engine";
+import {
+	type AnalysisCache,
+	createAnalysisCache,
+} from "@freshcoat-js/for-print";
 import { crc32 } from "@freshcoat-js/workspace/crc";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
@@ -31,6 +37,8 @@ type CK = any;
 
 /** Decoded pixels one render worker keeps across items. */
 const IMAGE_CACHE_PIXELS = 48_000_000;
+/** Print analyses one render worker keeps across items. */
+const ANALYSIS_CACHE_ENTRIES = 256;
 
 // The `full` build: the default one the editor's canvas uses has neither the
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
@@ -50,6 +58,10 @@ let current: Template | undefined;
 let carried = new Map<string, Blob>();
 /** decoded images, SVG pictures and paths shared by the items of one job */
 let paintCache: PaintCache | undefined;
+/** print analyses shared by the items of one job */
+let analysisCache: AnalysisCache | undefined;
+/** `asset:<sha256>` by the data URL `compile` gives that asset */
+let assetKeys: { template: Template; keys: Map<string, string> } | undefined;
 
 function loadCanvasKit(): Promise<CK> {
 	ckPromise ??= (async () => {
@@ -92,6 +104,17 @@ async function bytesOf(src: string, own: Map<string, Blob>) {
 function resetPaintCache() {
 	paintCache?.dispose();
 	paintCache = undefined;
+	analysisCache = undefined;
+}
+
+function assetKeysOf(template: Template): Map<string, string> {
+	if (assetKeys?.template !== template) {
+		const keys = new Map<string, string>();
+		for (const [sha, url] of inlineAssetUrls(template))
+			keys.set(url, assetUri(sha));
+		assetKeys = { template, keys };
+	}
+	return assetKeys.keys;
 }
 
 function setFonts(next: Map<string, Uint8Array[]>) {
@@ -133,6 +156,8 @@ async function renderSide(req: WorkerRenderRequest) {
 	// reference.
 	env.loadImageBytes = (src) => bytesOf(src, own);
 	paintCache ??= createPaintCache({ maxImagePixels: IMAGE_CACHE_PIXELS });
+	analysisCache ??= createAnalysisCache(ANALYSIS_CACHE_ENTRIES);
+	const assetKeyBySrc = assetKeysOf(template);
 	const design = req.resize ?? {
 		width: template.width,
 		height: template.height,
@@ -158,7 +183,16 @@ async function renderSide(req: WorkerRenderRequest) {
 						: { constraint: { kind: "scale", value: req.scale } },
 				],
 			},
-			{ ck, env, fonts, fontMetrics, textEngine: engine, paintCache },
+			{
+				ck,
+				env,
+				fonts,
+				fontMetrics,
+				textEngine: engine,
+				paintCache,
+				analysisCache,
+				analysisKey: (src) => assetKeyBySrc.get(src),
+			},
 		);
 		if (!result || !("bytes" in result))
 			throw new Error("nothing was rendered");
@@ -227,6 +261,7 @@ async function handle(msg: WorkerRequest): Promise<void> {
 			setFonts(new Map());
 			current = undefined;
 			carried = new Map();
+			assetKeys = undefined;
 			scope.close();
 			return;
 	}
