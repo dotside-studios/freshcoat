@@ -890,6 +890,8 @@ type SvgPicture = {
 	svgPicture: CK;
 	width: number;
 	height: number;
+	// Pixels of the rasters the recording holds, nested pictures' included.
+	rasterPixels: number;
 	features: string[];
 	delete(): void;
 };
@@ -971,10 +973,16 @@ function makeSvgPicture(
 					{ width, height, scale: 1, grid: 1 },
 				);
 		const picture = recorder.finishRecordingAsPicture();
+		let rasterPixels = 0;
+		for (const img of images.values())
+			rasterPixels += isSvgPicture(img)
+				? img.rasterPixels
+				: img.width() * img.height();
 		return {
 			svgPicture: picture,
 			width,
 			height,
+			rasterPixels,
 			features,
 			delete: () => picture.delete(),
 		};

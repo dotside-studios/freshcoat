@@ -26,6 +26,7 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
+import { SVG_PICTURE_PIXELS } from "../src/paint-cache";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {
 	Adjust,
@@ -301,6 +302,51 @@ describe("PaintCache", () => {
 		const one = createPaintCache({ maxImagePixels: 16 });
 		expect(await paintEach(one, order)).toBe(3);
 		one.dispose();
+	});
+
+	test("an SVG image is weighed by the rasters it embeds", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const raster = `data:image/png;base64,${Buffer.from(await bigPng()).toString("base64")}`;
+		const svg = new TextEncoder().encode(
+			`<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><image href="${raster}" width="8" height="8"/></svg>`,
+		);
+		const images = new Map([
+			["img://art.svg", svg],
+			["img://a", await testPng()],
+		]);
+		const paintEach = async (cache: PaintCache, srcs: string[]) => {
+			const { rt } = runtime(fonts, images, cache);
+			for (const src of srcs)
+				await pixels(compile(scene(SIZE, [src]), SIZE, fonts), rt);
+			return cache.stats().imageDecodes;
+		};
+		const order = ["img://art.svg", "img://a", "img://art.svg"];
+		const svgPixels = SVG_PICTURE_PIXELS + 64 * 64;
+
+		const fits = createPaintCache({ maxImagePixels: svgPixels + 16 });
+		expect(await paintEach(fits, order)).toBe(2);
+		fits.dispose();
+
+		const over = createPaintCache({ maxImagePixels: svgPixels + 15 });
+		expect(await paintEach(over, order)).toBe(3);
+		over.dispose();
+	});
+
+	test("an entry cap evicts however small the images", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const png = await testPng();
+		const images = new Map([
+			["img://a", png],
+			["img://b", png],
+		]);
+		const cache = createPaintCache({ maxImagePixels: 1_000_000, maxImages: 1 });
+		const { rt } = runtime(fonts, images, cache);
+		for (const src of ["img://a", "img://b", "img://a"])
+			await pixels(compile(scene(SIZE, [src]), SIZE, fonts), rt);
+		expect(cache.stats().imageDecodes).toBe(3);
+		cache.dispose();
 	});
 
 	test("a downscaled image builds its mipmaps once", async () => {
