@@ -308,17 +308,23 @@ function typeIssue(
 }
 
 const patterns = new Map<string, RegExp | null>();
+export const PATTERN_CACHE_MAX = 256;
 
-function compiledPattern(pattern: string): RegExp | null {
+export function compiledPattern(pattern: string): RegExp | null {
 	let re = patterns.get(pattern);
-	if (re === undefined) {
-		try {
-			re = new RegExp(pattern, "u");
-		} catch {
-			re = null;
-		}
+	if (re !== undefined) {
+		patterns.delete(pattern);
 		patterns.set(pattern, re);
+		return re;
 	}
+	try {
+		re = new RegExp(pattern, "u");
+	} catch {
+		re = null;
+	}
+	patterns.set(pattern, re);
+	if (patterns.size > PATTERN_CACHE_MAX)
+		patterns.delete(patterns.keys().next().value as string);
 	return re;
 }
 

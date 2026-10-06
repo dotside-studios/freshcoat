@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
-import { validate, validateValues } from "../src/validate";
+import {
+	compiledPattern,
+	PATTERN_CACHE_MAX,
+	validate,
+	validateValues,
+} from "../src/validate";
 
 const minimalValid: Template = {
 	format_version: "1.0",
@@ -807,4 +812,16 @@ test("accepts a frame nested inside another frame's children", () => {
 		],
 	};
 	expect(validate(tpl).ok).toBe(true);
+});
+
+test("the compiled pattern cache evicts the least recently used past its cap", () => {
+	const first = compiledPattern("^a");
+	expect(compiledPattern("^a")).toBe(first);
+	const kept = compiledPattern("^kept");
+	for (let i = 0; i < PATTERN_CACHE_MAX - 1; i++) {
+		compiledPattern(`^p${i}`);
+		if (i === 0) compiledPattern("^kept");
+	}
+	expect(compiledPattern("^kept")).toBe(kept);
+	expect(compiledPattern("^a")).not.toBe(first);
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	PATTERN_CACHE_MAX,
 	coerce,
+	compiledPattern,
 	defaultValues,
 	newRecord,
 	parseDateText,
@@ -264,5 +266,19 @@ describe("defaults", () => {
 			status: "pending",
 			values: { a: "x", b: false, c: 2 },
 		});
+	});
+});
+
+describe("compiledPattern", () => {
+	it("reuses a compiled pattern and evicts the least recently used past its cap", () => {
+		const first = compiledPattern("^a");
+		expect(compiledPattern("^a")).toBe(first);
+		const kept = compiledPattern("^kept");
+		for (let i = 0; i < PATTERN_CACHE_MAX - 1; i++) {
+			compiledPattern(`^p${i}`);
+			if (i === 0) compiledPattern("^kept");
+		}
+		expect(compiledPattern("^kept")).toBe(kept);
+		expect(compiledPattern("^a")).not.toBe(first);
 	});
 });
