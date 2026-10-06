@@ -48,6 +48,7 @@
 		"@create-figma-plugin/build": "^4.0.3",
 		"@figma/plugin-typings": "^1.100.0",
 		"@playwright/test": "^1.56.1",
+		"@types/node": "^26.6.3",
 		"typescript": "^5.7.2",
 		"vitest": "^3.0.5"
 	}

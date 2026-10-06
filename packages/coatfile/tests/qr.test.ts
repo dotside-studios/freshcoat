@@ -18,8 +18,7 @@ function findDraw(commands: Command[], op: string): DrawCommand | undefined {
 
 describe("generateMatrix", () => {
 	test("empty payload yields an empty matrix instead of throwing", () => {
-		// QRCode.create("") throws "No input text" — the unfilled-field state must
-		// degrade to a blank QR, not a crash.
+		// The unfilled-field state must degrade to a blank QR, not a crash.
 		expect(generateMatrix("")).toEqual([]);
 	});
 

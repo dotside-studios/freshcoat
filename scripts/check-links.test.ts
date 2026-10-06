@@ -78,6 +78,7 @@ describe("check-links", () => {
 		);
 		expect(slugOf("1. A5 paper for sheets")).toBe("1-a5-paper-for-sheets");
 		expect(slugOf("Add a UI kit component")).toBe("add-a-ui-kit-component");
+		expect(slugOf("Half ½ size")).toBe("half--size");
 	});
 
 	test("every relative link in Freshcoat's own docs resolves", () => {
