@@ -6,6 +6,8 @@ import { clampRasterScale } from "~/lib/figma/transpiler/raster-scale";
  *  slots can be picked from designs of different sizes. */
 export type RasterTarget = { nodeId: string; scale: number };
 
+const EXPORT_CONCURRENCY = 3;
+
 /** Export the given nodes to PNG bytes, keyed by id.
  *
  *  A node that fails to export is skipped rather than failing the batch. The
@@ -14,19 +16,21 @@ export type RasterTarget = { nodeId: string; scale: number };
  *  layer — so one unexportable blob costs the author that region and a warning
  *  they can click, instead of the whole export.
  *
- *  `onProgress` is called after each node. Rasterizing is the slow part of a
+ *  Up to EXPORT_CONCURRENCY exports run at once; output keeps target order.
+ *  `onProgress` is called as each node completes. Rasterizing is the slow part of a
  *  read, and without it a big design is indistinguishable from a hang. */
 export async function exportRasters(
 	targets: RasterTarget[],
 	onProgress?: (done: number, total: number) => void,
 ): Promise<Array<{ nodeId: string; bytes: number[] }>> {
-	const out: Array<{ nodeId: string; bytes: number[] }> = [];
-	for (const target of targets) {
-		const node = await figma.getNodeByIdAsync(target.nodeId);
-		if (node && "exportAsync" in node) {
-			try {
+	let exported = 0;
+	const results = await mapLimit(
+		targets,
+		EXPORT_CONCURRENCY,
+		async (target) => {
+			const bytes = await exportOne(target.nodeId, (node) => {
 				const sized = node as { width?: number; height?: number };
-				const bytes = await (node as ExportMixin).exportAsync({
+				return {
 					format: "PNG",
 					constraint: {
 						type: "SCALE",
@@ -36,16 +40,14 @@ export async function exportRasters(
 							sized.height ?? 0,
 						),
 					},
-				});
-				out.push({ nodeId: target.nodeId, bytes: Array.from(bytes) });
-			} catch {
-				// Unexportable node (zero-size, unsupported effect stack). Leave it
-				// out; the transpiler warns rather than dropping it silently.
-			}
-		}
-		onProgress?.(out.length, targets.length);
-	}
-	return out;
+				};
+			});
+			if (bytes) exported++;
+			onProgress?.(exported, targets.length);
+			return bytes ? { nodeId: target.nodeId, bytes } : null;
+		},
+	);
+	return results.filter((r) => r !== null);
 }
 
 /** Export the given nodes as UI previews, each exactly `width` px across.
@@ -57,19 +59,49 @@ export async function exportThumbnails(
 	nodeIds: string[],
 	width: number,
 ): Promise<Array<{ nodeId: string; bytes: number[] }>> {
-	const out: Array<{ nodeId: string; bytes: number[] }> = [];
-	for (const id of nodeIds) {
-		const node = await figma.getNodeByIdAsync(id);
-		if (!node || !("exportAsync" in node)) continue;
-		try {
-			const bytes = await (node as ExportMixin).exportAsync({
-				format: "PNG",
-				constraint: { type: "WIDTH", value: width },
-			});
-			out.push({ nodeId: id, bytes: Array.from(bytes) });
-		} catch {
-			// Zero-size or otherwise unexportable frame — leave it without a preview.
-		}
+	const results = await mapLimit(nodeIds, EXPORT_CONCURRENCY, async (id) => {
+		const bytes = await exportOne(id, () => ({
+			format: "PNG",
+			constraint: { type: "WIDTH", value: width },
+		}));
+		return bytes ? { nodeId: id, bytes } : null;
+	});
+	return results.filter((r) => r !== null);
+}
+
+/** Export one node, or null when it is gone, not exportable, or the export
+ *  throws (zero-size, unsupported effect stack). */
+async function exportOne(
+	nodeId: string,
+	settingsFor: (node: BaseNode) => ExportSettingsImage,
+): Promise<number[] | null> {
+	const node = await figma.getNodeByIdAsync(nodeId);
+	if (!node || !("exportAsync" in node)) return null;
+	try {
+		const bytes = await (node as ExportMixin).exportAsync(settingsFor(node));
+		return Array.from(bytes);
+	} catch {
+		return null;
 	}
+}
+
+/** Like Promise.all over `items.map(fn)`, with at most `limit` calls in flight.
+ *  Results keep input order. */
+export async function mapLimit<T, R>(
+	items: readonly T[],
+	limit: number,
+	fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const out = new Array<R>(items.length);
+	let next = 0;
+	const worker = async (): Promise<void> => {
+		while (next < items.length) {
+			const i = next++;
+			out[i] = await fn(items[i] as T);
+		}
+	};
+	await Promise.all(
+		Array.from({ length: Math.min(limit, items.length) }, worker),
+	);
 	return out;
 }

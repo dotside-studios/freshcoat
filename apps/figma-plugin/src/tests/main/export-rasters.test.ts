@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RASTER_MAX_DIMENSION } from "~/lib/figma/transpiler/raster-scale";
-import { exportRasters } from "~/main/export-rasters";
+import {
+	exportRasters,
+	exportThumbnails,
+	mapLimit,
+} from "~/main/export-rasters";
 
 type ExportSettings = { constraint: { type: string; value: number } };
 type FakeNode = {
@@ -122,5 +126,58 @@ describe("exportRasters", () => {
 		const onProgress = vi.fn();
 		expect(await exportRasters([], onProgress)).toEqual([]);
 		expect(onProgress).not.toHaveBeenCalled();
+	});
+});
+
+describe("exportRasters concurrency", () => {
+	it("keeps target order when exports finish out of order", async () => {
+		const slow = (byte: number, ms: number): FakeNode => ({
+			width: 10,
+			height: 10,
+			exportAsync: () =>
+				new Promise((r) => setTimeout(() => r(new Uint8Array([byte])), ms)),
+		});
+		stubFigma({ a: slow(1, 30), b: slow(2, 0), c: slow(3, 10) });
+		const out = await exportRasters(at(3, "a", "b", "c"));
+		expect(out.map((r) => r.nodeId)).toEqual(["a", "b", "c"]);
+	});
+
+	it("reports progress up to the total", async () => {
+		stubFigma({ a: ok(1), b: ok(2), c: ok(3), d: ok(4) });
+		const onProgress = vi.fn();
+		await exportRasters(at(3, "a", "b", "c", "d"), onProgress);
+		expect(onProgress).toHaveBeenCalledTimes(4);
+		expect(onProgress).toHaveBeenLastCalledWith(4, 4);
+	});
+});
+
+describe("exportThumbnails", () => {
+	it("exports in input order and skips failures", async () => {
+		stubFigma({ a: ok(1), bad: throws(), gone: null, c: ok(3) });
+		const out = await exportThumbnails(["a", "bad", "gone", "c"], 128);
+		expect(out).toEqual([
+			{ nodeId: "a", bytes: [1] },
+			{ nodeId: "c", bytes: [3] },
+		]);
+	});
+});
+
+describe("mapLimit", () => {
+	it("never runs more than the limit at once and keeps order", async () => {
+		let active = 0;
+		let peak = 0;
+		const out = await mapLimit([5, 1, 4, 2, 3, 0], 2, async (ms) => {
+			active++;
+			peak = Math.max(peak, active);
+			await new Promise((r) => setTimeout(r, ms));
+			active--;
+			return ms * 10;
+		});
+		expect(peak).toBe(2);
+		expect(out).toEqual([50, 10, 40, 20, 30, 0]);
+	});
+
+	it("handles an empty list", async () => {
+		expect(await mapLimit([], 3, async (x) => x)).toEqual([]);
 	});
 });
