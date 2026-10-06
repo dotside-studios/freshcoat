@@ -4,11 +4,23 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32 } from "node:zlib";
-import { strFromU8, unzipSync } from "fflate";
+import {
+	deflateSync,
+	strFromU8,
+	unzipSync,
+	Zip,
+	ZipDeflate,
+	ZipPassThrough,
+} from "fflate";
 import { describe, expect, it } from "vitest";
 import { crc32 as ourCrc32 } from "./crc";
 import { jpegHeader } from "./image-fixtures";
-import { blobOutput, createZipWriter } from "./zip-stream";
+import {
+	blobOutput,
+	createZipWriter,
+	readZip,
+	ZipReadError,
+} from "./zip-stream";
 
 const MTIME = new Date(2026, 8, 1, 12, 0, 0);
 
@@ -135,6 +147,264 @@ describe("createZipWriter", () => {
 		await expect(
 			writer.add({ name: "x", data: new Uint8Array(1), level: 0 }),
 		).rejects.toThrow(/finished/);
+	});
+});
+
+type Read = { via: "file" | "stored"; bytes: Uint8Array };
+
+/** Every entry of a zip as bytes, and whether it came as chunks or as a
+ *  slice; `sliced` asks for stored entries as slices. */
+async function readAll(
+	zip: Uint8Array | Blob,
+	sliced: boolean,
+	limits: { maxBytes?: number } = {},
+): Promise<Record<string, Read>> {
+	const out: Record<string, Read> = {};
+	await readZip(zip instanceof Blob ? zip : new Blob([zip as BlobPart]), {
+		...limits,
+		onFile(name, chunks) {
+			out[name] = { via: "file", bytes: joined(chunks) };
+		},
+		...(sliced
+			? {
+					async onStored(name: string, data: Blob) {
+						out[name] = {
+							via: "stored",
+							bytes: new Uint8Array(await data.arrayBuffer()),
+						};
+					},
+				}
+			: {}),
+	});
+	return out;
+}
+
+function joined(chunks: Uint8Array[]): Uint8Array {
+	const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+	let at = 0;
+	for (const c of chunks) {
+		out.set(c, at);
+		at += c.length;
+	}
+	return out;
+}
+
+function bytesOf(read: Record<string, Read>): Record<string, Uint8Array> {
+	return Object.fromEntries(Object.entries(read).map(([k, v]) => [k, v.bytes]));
+}
+
+/** A zip that marks every size and offset as zip64 whether it needs to or
+ *  not, with its directory found through the zip64 end records and another
+ *  extra field in front of each zip64 one. */
+function zip64Zip(
+	entries: { name: string; data: Uint8Array; deflate?: boolean }[],
+): Uint8Array {
+	const parts: Uint8Array[] = [];
+	const central: Uint8Array[] = [];
+	let offset = 0;
+	for (const e of entries) {
+		const name = new TextEncoder().encode(e.name);
+		const body = e.deflate ? deflateSync(e.data) : e.data;
+		const local = new Uint8Array(30 + name.length + 20);
+		const lv = new DataView(local.buffer);
+		lv.setUint32(0, 0x04034b50, true);
+		lv.setUint16(4, 45, true);
+		lv.setUint16(8, e.deflate ? 8 : 0, true);
+		lv.setUint32(14, crc32(e.data), true);
+		lv.setUint32(18, 0xffffffff, true);
+		lv.setUint32(22, 0xffffffff, true);
+		lv.setUint16(26, name.length, true);
+		lv.setUint16(28, 20, true);
+		local.set(name, 30);
+		lv.setUint16(30 + name.length, 1, true);
+		lv.setUint16(32 + name.length, 16, true);
+		lv.setBigUint64(34 + name.length, BigInt(e.data.length), true);
+		lv.setBigUint64(42 + name.length, BigInt(body.length), true);
+		parts.push(local, body);
+
+		const record = new Uint8Array(46 + name.length + 9 + 28);
+		const cv = new DataView(record.buffer);
+		cv.setUint32(0, 0x02014b50, true);
+		cv.setUint16(4, 45, true);
+		cv.setUint16(6, 45, true);
+		cv.setUint16(10, e.deflate ? 8 : 0, true);
+		cv.setUint32(16, crc32(e.data), true);
+		cv.setUint32(20, 0xffffffff, true);
+		cv.setUint32(24, 0xffffffff, true);
+		cv.setUint16(28, name.length, true);
+		cv.setUint16(30, 9 + 28, true);
+		cv.setUint32(42, 0xffffffff, true);
+		record.set(name, 46);
+		let x = 46 + name.length;
+		cv.setUint16(x, 0x5455, true);
+		cv.setUint16(x + 2, 5, true);
+		x += 9;
+		cv.setUint16(x, 1, true);
+		cv.setUint16(x + 2, 24, true);
+		cv.setBigUint64(x + 4, BigInt(e.data.length), true);
+		cv.setBigUint64(x + 12, BigInt(body.length), true);
+		cv.setBigUint64(x + 20, BigInt(offset), true);
+		central.push(record);
+		offset += local.length + body.length;
+	}
+	const start = offset;
+	const size = central.reduce((n, c) => n + c.length, 0);
+	const end = new Uint8Array(56 + 20 + 22);
+	const ev = new DataView(end.buffer);
+	ev.setUint32(0, 0x06064b50, true);
+	ev.setBigUint64(4, 44n, true);
+	ev.setBigUint64(24, BigInt(entries.length), true);
+	ev.setBigUint64(32, BigInt(entries.length), true);
+	ev.setBigUint64(40, BigInt(size), true);
+	ev.setBigUint64(48, BigInt(start), true);
+	ev.setUint32(56, 0x07064b50, true);
+	ev.setBigUint64(64, BigInt(start + size), true);
+	ev.setUint32(72, 1, true);
+	ev.setUint32(76, 0x06054b50, true);
+	ev.setUint16(84, 0xffff, true);
+	ev.setUint16(86, 0xffff, true);
+	ev.setUint32(88, 0xffffffff, true);
+	ev.setUint32(92, 0xffffffff, true);
+	return joined([...parts, ...central, end]);
+}
+
+/** Where an entry's local header starts, found by its name. */
+function localHeaderOf(zip: Uint8Array, name: string): number {
+	const wanted = new TextEncoder().encode(name);
+	for (let i = 0; i + 30 + wanted.length <= zip.length; i++) {
+		const view = new DataView(zip.buffer, zip.byteOffset + i);
+		if (
+			view.getUint32(0, true) === 0x04034b50 &&
+			view.getUint16(26, true) === wanted.length &&
+			wanted.every((b, j) => zip[i + 30 + j] === b)
+		)
+			return i;
+	}
+	throw new Error(`no local header for ${name}`);
+}
+
+describe("readZip", () => {
+	it("hands stored entries over as slices with the bytes the stream gives", async () => {
+		const jpeg = trickyJpeg();
+		const zip = await zipOf([
+			{ name: "1-photo.jpg", data: jpeg },
+			{ name: "é.jpg", data: jpeg.subarray(3) },
+			{ name: "empty.jpg", data: new Uint8Array() },
+		]);
+		const streamed = await readAll(zip, false);
+		const sliced = await readAll(zip, true);
+		expect(Object.keys(sliced)).toEqual(Object.keys(streamed));
+		expect(bytesOf(sliced)).toEqual(bytesOf(streamed));
+		expect(sliced["1-photo.jpg"]?.via).toBe("stored");
+		expect(sliced["é.jpg"]?.via).toBe("stored");
+		expect(sliced["empty.jpg"]?.via).toBe("stored");
+		expect(sliced["report.csv"]?.via).toBe("file");
+		expect(sliced["1-photo.jpg"]?.bytes).toEqual(jpeg);
+	});
+
+	it("places entries with data descriptors by the central directory", async () => {
+		const jpeg = trickyJpeg();
+		const text = new TextEncoder().encode("a,b\r\n".repeat(500));
+		const parts: Uint8Array[] = [];
+		const zip = new Zip((err, chunk) => {
+			if (err) throw err;
+			parts.push(chunk);
+		});
+		const stored = new ZipPassThrough("photo.jpg");
+		zip.add(stored);
+		stored.push(jpeg, true);
+		const deflated = new ZipDeflate("report.csv", { level: 6 });
+		zip.add(deflated);
+		deflated.push(text, true);
+		zip.end();
+		const bytes = joined(parts);
+		const flags = new DataView(bytes.buffer).getUint16(6, true);
+		expect(flags & 8).toBe(8);
+		const sliced = await readAll(bytes, true);
+		expect(sliced["photo.jpg"]).toEqual({ via: "stored", bytes: jpeg });
+		expect(sliced["report.csv"]).toEqual({ via: "file", bytes: text });
+		expect(bytesOf(sliced)).toEqual(bytesOf(await readAll(bytes, false)));
+	});
+
+	it("reads zip64 end records and extra fields", async () => {
+		const jpeg = trickyJpeg();
+		const text = new TextEncoder().encode("zip64 ".repeat(100));
+		const bytes = zip64Zip([
+			{ name: "photo.jpg", data: jpeg },
+			{ name: "notes.txt", data: text, deflate: true },
+			{ name: "second.jpg", data: jpeg.subarray(5) },
+		]);
+		expect(unzipSync(bytes)["second.jpg"]).toEqual(jpeg.subarray(5));
+		const sliced = await readAll(bytes, true);
+		expect(Object.keys(sliced)).toEqual([
+			"photo.jpg",
+			"notes.txt",
+			"second.jpg",
+		]);
+		expect(sliced["photo.jpg"]).toEqual({ via: "stored", bytes: jpeg });
+		expect(sliced["notes.txt"]).toEqual({ via: "file", bytes: text });
+		expect(sliced["second.jpg"]).toEqual({
+			via: "stored",
+			bytes: jpeg.subarray(5),
+		});
+	});
+
+	it("finds a zip64 directory past 65,535 entries", async () => {
+		const out = blobOutput();
+		const writer = createZipWriter(out, MTIME);
+		for (let i = 0; i < 66_000; i++)
+			await writer.add({
+				name: `${i}.bin`,
+				data: new Uint8Array([i & 0xff, i >> 8]),
+				level: 0,
+			});
+		await writer.end();
+		// Flattened, since slicing a Blob of 132,000 parts is slow in Node.
+		const bytes = new Uint8Array(await out.blob("").arrayBuffer());
+		const sliced = await readAll(bytes, true);
+		expect(Object.keys(sliced)).toHaveLength(66_000);
+		expect(sliced["65999.bin"]).toEqual({
+			via: "stored",
+			bytes: new Uint8Array([65999 & 0xff, 65999 >> 8]),
+		});
+	}, 60_000);
+
+	it("falls back to the stream when the directory does not match its entries", async () => {
+		const jpeg = trickyJpeg();
+		const zip = await zipOf([{ name: "1-photo.jpg", data: jpeg }]);
+		const bytes = zip.slice();
+		const view = new DataView(bytes.buffer);
+		const eocd = bytes.length - 22;
+		const directory = view.getUint32(eocd + 16, true);
+		// The first entry's local header offset, pointed one byte off.
+		view.setUint32(directory + 42, 1, true);
+		const read = await readAll(bytes, true);
+		expect(read["1-photo.jpg"]).toEqual({ via: "file", bytes: jpeg });
+		expect(read["report.csv"]?.via).toBe("file");
+	});
+
+	it("refuses a corrupt deflated entry, as the stream does", async () => {
+		const zip = await zipOf([{ name: "1-photo.jpg", data: trickyJpeg() }]);
+		const at = localHeaderOf(zip, "report.csv");
+		const view = new DataView(zip.buffer);
+		const start = at + 30 + view.getUint16(at + 26, true);
+		// A final block of the reserved type, which no inflater accepts.
+		zip.fill(0xff, start, start + view.getUint32(at + 18, true));
+		for (const sliced of [false, true]) {
+			const err = await readAll(zip, sliced).catch((e: unknown) => e);
+			expect(err).toBeInstanceOf(ZipReadError);
+			expect((err as ZipReadError).reason).toBe("not_a_zip");
+		}
+	});
+
+	it("counts sliced entries against the byte limit", async () => {
+		const zip = await zipOf([{ name: "1-photo.jpg", data: trickyJpeg() }]);
+		for (const sliced of [false, true]) {
+			const err = await readAll(zip, sliced, { maxBytes: 10 }).catch(
+				(e: unknown) => e,
+			);
+			expect((err as ZipReadError).reason).toBe("too_large");
+		}
 	});
 });
 

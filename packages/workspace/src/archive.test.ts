@@ -71,6 +71,21 @@ function manifestOf(files: Record<string, Uint8Array>) {
 	return JSON.parse(strFromU8(files["workspace.json"] as Uint8Array));
 }
 
+/** Where an entry's local header starts, found by its name. */
+function localHeaderOf(zip: Uint8Array, name: string): number {
+	const wanted = strToU8(name);
+	for (let i = 0; i + 30 + wanted.length <= zip.length; i++) {
+		const view = new DataView(zip.buffer, zip.byteOffset + i);
+		if (
+			view.getUint32(0, true) === 0x04034b50 &&
+			view.getUint16(26, true) === wanted.length &&
+			wanted.every((b, j) => zip[i + 30 + j] === b)
+		)
+			return i;
+	}
+	throw new Error(`no local header for ${name}`);
+}
+
 function codeOf(result: UnpackResult): string {
 	return result.ok ? "ok" : result.code;
 }
@@ -471,6 +486,74 @@ describe("packWorkspace", () => {
 		expect(result.workspace.templates).toEqual(ws.templates);
 	});
 
+	it("keeps asset order and header facts while hashing several at once", async () => {
+		// Larger photos first, so later ones finish hashing before them, and
+		// one whose frame header sits past the first 64 KB of the file.
+		const jpegs = Array.from({ length: 9 }, (_, i) =>
+			jpegHeader({
+				width: 100 + i,
+				height: 50 + i,
+				orientation: (i % 8) + 1,
+				padding: i === 4 ? 200_000 : (9 - i) * 40_000,
+			}),
+		);
+		const many: Workspace = {
+			...ws,
+			datasets: [
+				{
+					id: "d_p",
+					name: "Photos",
+					columns: [{ key: "photo", type: "image" }],
+					records: [],
+					assets: jpegs.map((jpeg, i) => ({
+						sha256: sha256(jpeg),
+						contentType: "image/jpeg",
+						name: `IMG_${i}.JPG`,
+						size: jpeg.length,
+						width: 100 + i,
+						height: 50 + i,
+						orientation: (i % 8) + 1,
+						blob: new Blob([jpeg as BlobPart], { type: "image/jpeg" }),
+					})),
+				},
+			],
+		};
+		const result = await unpackWorkspace(await packed(many));
+		if (!result.ok) throw new Error(result.message);
+		const facts = async (assets: Workspace["datasets"][number]["assets"]) =>
+			Promise.all(
+				assets.map(async ({ blob, ...rest }) => ({
+					...rest,
+					type: blob.type,
+					bytes: sha256(new Uint8Array(await blob.arrayBuffer())),
+				})),
+			);
+		const opened = await facts(result.workspace.datasets[0]?.assets ?? []);
+		expect(opened.map((a) => a.name)).toEqual(
+			jpegs.map((_, i) => `IMG_${i}.JPG`),
+		);
+		expect(opened).toEqual(await facts(many.datasets[0]?.assets ?? []));
+	});
+
+	it("opens to the same workspace whether entries are sliced or streamed", async () => {
+		const bytes = await packed(ws);
+		const view = new DataView(bytes.buffer);
+		const directory = view.getUint32(bytes.length - 22 + 16, true);
+		const broken = bytes.slice();
+		// The first entry's local header offset pointed one byte off, so the
+		// reader cannot trust the directory and streams the file instead.
+		new DataView(broken.buffer).setUint32(directory + 42, 1, true);
+		const sliced = await unpackWorkspace(bytes);
+		const streamed = await unpackWorkspace(broken);
+		expect(sliced.ok).toBe(true);
+		expect(await readable(sliced)).toEqual(await readable(streamed));
+		expect(await readable(sliced)).toEqual({
+			ok: true,
+			workspace: await readable(ws),
+			warnings: [],
+		});
+	});
+
 	it("round-trips an empty dataset list and a record-less dataset", async () => {
 		const bare: Workspace = {
 			...ws,
@@ -602,6 +685,55 @@ describe("unpackWorkspace rejections", () => {
 				}),
 			),
 		).toBe("asset_hash_mismatch");
+	});
+
+	it("asset_hash_mismatch for the first corrupt photo in manifest order", async () => {
+		const jpegs = [3, 1, 2].map((n) =>
+			jpegHeader({ width: n, height: n, padding: n * 50_000 }),
+		);
+		const photos: Workspace = {
+			...ws,
+			datasets: [
+				{
+					id: "d_p",
+					name: "Photos",
+					columns: [{ key: "photo", type: "image" }],
+					records: [],
+					assets: jpegs.map((jpeg, i) => ({
+						sha256: sha256(jpeg),
+						contentType: "image/jpeg",
+						name: `IMG_${i}.JPG`,
+						size: jpeg.length,
+						blob: new Blob([jpeg as BlobPart], { type: "image/jpeg" }),
+					})),
+				},
+			],
+		};
+		const bytes = await packed(photos);
+		// Corrupted in place, inside the stored bytes of the second and third
+		// photos, so the largest first one is still hashing when they fail.
+		for (const jpeg of jpegs.slice(1)) {
+			const at = localHeaderOf(bytes, `data/d_p/assets/${sha256(jpeg)}.jpg`);
+			bytes[
+				at + 30 + new DataView(bytes.buffer).getUint16(at + 26, true) + 1000
+			] ^= 0xff;
+		}
+		const result = await unpackWorkspace(bytes);
+		expect(result).toMatchObject({
+			ok: false,
+			code: "asset_hash_mismatch",
+			message: expect.stringContaining(sha256(jpegs[1] as Uint8Array)),
+		});
+	});
+
+	it("not_a_zip, for a deflated entry that does not inflate", async () => {
+		const bytes = await packed(ws);
+		const at = localHeaderOf(bytes, "data/d_members/records.json");
+		const view = new DataView(bytes.buffer);
+		const start = at + 30 + view.getUint16(at + 26, true);
+		// A final block of the reserved type, which no inflater accepts.
+		bytes.fill(0xff, start, start + view.getUint32(at + 18, true));
+		expect(codeOf(await unpackWorkspace(bytes))).toBe("not_a_zip");
 	});
 
 	it("invalid_template, for a template that does not validate", async () => {

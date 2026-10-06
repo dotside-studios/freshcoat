@@ -26,7 +26,7 @@ import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
-import { parseImageInfo } from "./image-info";
+import { readImageInfo } from "./image-info";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import type {
 	Dataset,
@@ -55,6 +55,9 @@ const MIMETYPE_ENTRY = "mimetype";
 const MANIFEST_ENTRY = "workspace.json";
 const MAX_ENTRIES = 50_000;
 const MAX_UNPACKED_BYTES = 1024 * 1024 * 1024;
+// Photos hashed at once as a workspace opens; each one is held whole while
+// its hash is taken.
+const ASSET_LANES = 4;
 // The earliest time a zip records, on every entry, so the same workspace
 // always packs to the same bytes.
 const ZIP_EPOCH = new Date(1980, 0, 1);
@@ -374,6 +377,11 @@ async function readEntries(source: Blob): Promise<ReadEntries> {
 				if (isAssetPath(name)) assets.set(name, new Blob(chunks as BlobPart[]));
 				else files.set(name, joinChunks(chunks));
 			},
+			// A stored photo stays a slice of the file rather than a copy.
+			async onStored(name, data) {
+				if (isAssetPath(name)) assets.set(name, data);
+				else files.set(name, new Uint8Array(await data.arrayBuffer()));
+			},
 		});
 	} catch (err) {
 		if (err instanceof ZipReadError)
@@ -477,28 +485,30 @@ async function readTemplate(
 	};
 }
 
+type ManifestAsset = WorkspaceManifest["datasets"][number]["assets"][number];
+
 async function readAsset(
-	read: ReadEntries,
-	asset: WorkspaceManifest["datasets"][number]["assets"][number],
+	asset: ManifestAsset,
+	stored: Blob | undefined,
 ): Promise<DatasetAsset> {
-	const stored = read.assets.get(asset.path);
 	if (stored === undefined) {
 		throw new UnpackError("missing_entry", `${asset.path} is missing`);
 	}
-	const bytes = new Uint8Array(await stored.arrayBuffer());
-	const actual = await subtleSha256(bytes);
+	const [actual, info] = await Promise.all([
+		stored.arrayBuffer().then((b) => subtleSha256(new Uint8Array(b))),
+		readImageInfo(stored),
+	]);
 	if (actual !== asset.sha256) {
 		throw new UnpackError(
 			"asset_hash_mismatch",
 			`${asset.path} hashes to ${actual}`,
 		);
 	}
-	const info = parseImageInfo(bytes);
 	return {
 		sha256: asset.sha256,
 		contentType: asset.contentType,
 		name: asset.name,
-		size: bytes.length,
+		size: stored.size,
 		...(info
 			? {
 					width: info.width,
@@ -510,6 +520,40 @@ async function readAsset(
 			: {}),
 		blob: new Blob([stored], { type: asset.contentType }),
 	};
+}
+
+/** Every asset in manifest order, a few at a time. When several fail, the
+ *  error is the first one's in that order, as reading them one by one gave. */
+async function readAssets(
+	read: ReadEntries,
+	items: readonly ManifestAsset[],
+): Promise<DatasetAsset[]> {
+	const out: DatasetAsset[] = new Array(items.length);
+	let next = 0;
+	let failed = items.length;
+	let failure: unknown;
+	const worker = async () => {
+		while (next < failed) {
+			const i = next++;
+			const item = items[i] as ManifestAsset;
+			// Taken as the asset is claimed, so a path listed twice is missing
+			// the second time, as it was when assets were read one by one.
+			const stored = read.assets.get(item.path);
+			read.assets.delete(item.path);
+			try {
+				out[i] = await readAsset(item, stored);
+			} catch (err) {
+				if (i < failed) {
+					failed = i;
+					failure = err;
+				}
+			}
+		}
+	};
+	const lanes = Math.max(1, Math.min(ASSET_LANES, items.length));
+	await Promise.all(Array.from({ length: lanes }, worker));
+	if (failed < items.length) throw failure;
+	return out;
 }
 
 async function readDataset(
@@ -528,11 +572,7 @@ async function readDataset(
 			`${item.records}: ${records.error.issues[0]?.message ?? "invalid"}`,
 		);
 	}
-	const assets: DatasetAsset[] = [];
-	for (const asset of item.assets) {
-		assets.push(await readAsset(read, asset));
-		read.assets.delete(asset.path);
-	}
+	const assets = await readAssets(read, item.assets);
 	return {
 		id: item.id,
 		name: item.name,
