@@ -345,10 +345,9 @@ and `freshcoat_plugin:fields` (per slot frame); see
 ["Plugins with other IDs won't be able to read this data"](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/).
 It's there to keep our keys legible in an exported `.fig`.
 
-The `id` in `package.json` is a development placeholder. When preparing a
-published plugin, preserve its assigned identity across updates: plugin data
-is scoped to that identity. Changing it makes existing stored bindings
-inaccessible to the new plugin.
+The `id` in `package.json` is the plugin's permanent assigned id. Keep it
+stable across updates: plugin data is scoped to it, so changing it makes
+existing stored bindings inaccessible to the new plugin.
 
 Layer-name markers such as `text:{{name}}` still allow bindings to be inferred.
 Hand-edited metadata stored only in plugin data, including labels, sources and
