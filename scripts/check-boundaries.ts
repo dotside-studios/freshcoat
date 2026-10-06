@@ -409,7 +409,7 @@ function checkModule(
 	}
 	const name = packageName(spec);
 	if (pkg && name === pkg.name) return;
-	if (name.startsWith("@davi/") && !isKit(name)) {
+	if (name.startsWith("@davi/")) {
 		report(
 			ctx,
 			file,
