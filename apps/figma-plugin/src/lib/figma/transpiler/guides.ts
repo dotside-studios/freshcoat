@@ -1,4 +1,5 @@
 import type { Insets, Sides, TemplateWarning } from "@freshcoat-js/coatfile";
+import { hasInsets } from "@freshcoat-js/coatfile/bleed";
 import type { FigmaContainerNode, FigmaNode } from "../types";
 import { roundHalfPx } from "./coordinates";
 
@@ -17,8 +18,6 @@ export function withoutGuides(children: FigmaNode[]): FigmaNode[] {
 
 export type SlotGuides = { bleed?: Sides; safeArea?: Sides };
 
-const ZERO: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
-
 function sidesEqual(a: Sides, b: Sides): boolean {
 	return (
 		a.top === b.top &&
@@ -26,10 +25,6 @@ function sidesEqual(a: Sides, b: Sides): boolean {
 		a.bottom === b.bottom &&
 		a.left === b.left
 	);
-}
-
-function isZero(s: Sides): boolean {
-	return sidesEqual(s, ZERO);
 }
 
 export function readSlotGuides(
@@ -70,7 +65,7 @@ export function readSlotGuides(
 						bottom: d(trim.y + trim.height - (box.y + box.height)),
 						left: d(box.x - trim.x),
 					};
-		if (isZero(sides)) {
+		if (!hasInsets(sides)) {
 			warnings.push({
 				severity: "warn",
 				code: "guide_empty",

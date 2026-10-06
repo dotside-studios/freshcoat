@@ -1,4 +1,8 @@
-import type { TemplateWarning } from "@freshcoat-js/coatfile";
+import type {
+	TemplateWarning,
+	VariantElementDelta,
+	VisibilityCondition,
+} from "@freshcoat-js/coatfile";
 import {
 	assetUri,
 	type PendingAsset,
@@ -31,7 +35,6 @@ import {
 	inferNodeBinding,
 	parseVisibilityMarker,
 	storedToNodeBinding,
-	type VisibilityCondition,
 } from "../binding";
 import { transpileBarcode } from "./barcode";
 import { isBarcodeLayerName } from "./barcode-name";
@@ -1356,16 +1359,6 @@ function diffElementProperties(
 	return changed;
 }
 
-type ElementDelta = {
-	id: string;
-	properties: Record<string, unknown>;
-	pos?: unknown;
-	size?: unknown;
-	rotation?: number;
-	opacity?: number;
-	hidden?: boolean;
-};
-
 // The base elements a colorway hides, from the base nodes it hides (see
 // alignInstanceVisibility) and the element each produced in the base walk.
 // `top` holds the outermost of them, which carry `hidden: true`; `within`
@@ -1408,7 +1401,7 @@ const SHELL_DEFAULTS = {
 	opacity: 1,
 } as const;
 
-type ShellDelta = Omit<ElementDelta, "id" | "properties" | "hidden">;
+type ShellDelta = Omit<VariantElementDelta, "id" | "properties" | "hidden">;
 
 // Two walks of the same layer can differ in the last bits of a float (the
 // instance sits elsewhere on the page), which is not a change.
@@ -1641,7 +1634,7 @@ export async function transpile(
 		overrides: Array<{
 			name: string;
 			background?: unknown;
-			elements?: ElementDelta[];
+			elements?: VariantElementDelta[];
 		}>;
 		swatch?: string;
 		assets: PendingAsset[];
@@ -1650,7 +1643,7 @@ export async function transpile(
 		const overrides: Array<{
 			name: string;
 			background?: unknown;
-			elements?: ElementDelta[];
+			elements?: VariantElementDelta[];
 		}> = [];
 		let swatch = defaultSwatch;
 		// A variant side still uses a throwaway sink for counts/warnings/field
@@ -1740,7 +1733,7 @@ export async function transpile(
 				});
 			}
 
-			const elementDeltas: ElementDelta[] = [];
+			const elementDeltas: VariantElementDelta[] = [];
 			for (const [id, baseEl] of baseById) {
 				if (hidden.top.has(id)) {
 					elementDeltas.push({ id, properties: {}, hidden: true });
