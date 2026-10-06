@@ -1,10 +1,11 @@
 import { linearGradientAngle } from "@freshcoat-js/coatfile";
-import type { FigmaColor, FigmaPaint } from "../types";
+import type { FigmaNode, FigmaPaint, FigmaSolidPaint } from "../types";
 import {
 	angularPlacement,
 	channel,
 	figmaColorToHex,
 	type PaintBox,
+	rgbHex,
 	round4,
 } from "./paint";
 
@@ -40,8 +41,14 @@ type GradientFillResult = {
 
 export type FillResult = SolidFillResult | GradientFillResult;
 
-function colorWithoutAlpha(c: FigmaColor): string {
-	return `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
+// A placeholder layer's own paint, when it is a single solid one. Such a layer
+// can be any node type, including one with no fills, a gradient, or a stack,
+// and none of those is a colour its marks can be drawn in.
+export function singleSolidFillHex(node: FigmaNode): string | undefined {
+	const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
+	const visible = fills.filter((f) => f.visible !== false);
+	if (visible.length !== 1 || visible[0].type !== "SOLID") return undefined;
+	return figmaColorToHex((visible[0] as FigmaSolidPaint).color);
 }
 
 type RadialShape = { radius: number; radiusY: number; rotation: number };
@@ -138,7 +145,7 @@ export function figmaPaintToFill(
 		const channelAlpha = paint.color.a;
 		return {
 			kind: "solid",
-			hex: colorWithoutAlpha(paint.color),
+			hex: rgbHex(paint.color),
 			opacity: paintOpacity * channelAlpha,
 		};
 	}
@@ -251,11 +258,7 @@ export function fillsToElement(
 		fill: visible.map((f) => {
 			const r = figmaPaintToFill(f, box);
 			if (r.kind === "fill") return r.value;
-			return r.opacity < 1
-				? `${r.hex}${Math.round(r.opacity * 255)
-						.toString(16)
-						.padStart(2, "0")}`
-				: r.hex;
+			return r.opacity < 1 ? `${r.hex}${channel(r.opacity)}` : r.hex;
 		}),
 	};
 }
