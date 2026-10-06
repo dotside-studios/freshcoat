@@ -13,7 +13,7 @@ import {
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
-import { childEntries, keyOf, walkLayers } from "./path";
+import { childEntries, walkLayers } from "./path";
 
 export type VariantOverride = Variant["overrides"][number];
 
@@ -168,6 +168,78 @@ export function hiddenInVariant(
 	return out;
 }
 
+type SideDeltas = {
+	elements: Map<string, VariantElementDelta>;
+	background: Background | undefined;
+};
+
+const deltasCache = new WeakMap<
+	Template,
+	Map<string, Map<string, SideDeltas>>
+>();
+
+function variantDeltas(
+	t: Template,
+	variantId: string,
+): Map<string, SideDeltas> {
+	let byId = deltasCache.get(t);
+	if (!byId) {
+		byId = new Map();
+		deltasCache.set(t, byId);
+	}
+	let out = byId.get(variantId);
+	if (out) return out;
+	out = new Map();
+	const variant = t.variants?.find((v) => v.id === variantId);
+	for (const ov of variant?.overrides ?? []) {
+		let side = out.get(ov.name);
+		if (!side) {
+			side = { elements: new Map(), background: undefined };
+			out.set(ov.name, side);
+		}
+		if (ov.background) side.background = ov.background;
+		for (const d of ov.elements ?? []) {
+			const prev = side.elements.get(d.id);
+			side.elements.set(
+				d.id,
+				prev
+					? {
+							...prev,
+							...d,
+							properties: { ...prev.properties, ...d.properties },
+						}
+					: d,
+			);
+		}
+	}
+	byId.set(variantId, out);
+	return out;
+}
+
+function deltaChanges(d: VariantElementDelta | undefined): boolean {
+	if (!d) return false;
+	if (d.hidden === true) return true;
+	for (const k in d.properties) if (d.properties[k] !== undefined) return true;
+	return DELTA_SHELL.some((k) => d[k] !== undefined);
+}
+
+function sideChangedKeys(
+	t: Template,
+	side: number,
+	deltas: SideDeltas | undefined,
+): string[] {
+	const out: string[] = [];
+	if (!t.template_data[side]) return out;
+	for (const e of walkLayers(t, side)) {
+		const changed =
+			e.key.endsWith("/bg") && "background" in e.path
+				? deltas?.background !== undefined
+				: deltaChanges(deltas?.elements.get(e.element.id));
+		if (changed) out.push(e.key);
+	}
+	return out;
+}
+
 /**
  * The layer keys on `side` the variant changes: overridden values, hidden, or
  * (for the background key) a replaced background. Orphaned deltas, whose id
@@ -180,24 +252,28 @@ export function changedLayerKeys(
 ): string[] {
 	const frame = t.template_data[side];
 	if (!frame) return [];
-	const out: string[] = [];
-	for (const e of walkLayers(t, side)) {
-		const changed =
-			e.key.endsWith("/bg") && "background" in e.path
-				? overrideBackground(t, variantId, frame.name) !== undefined
-				: overriddenKeys(t, variantId, frame.name, e.element.id).length > 0 ||
-					isHiddenInVariant(t, variantId, frame.name, e.element.id);
-		if (changed) out.push(e.key);
-	}
-	return out;
+	return sideChangedKeys(t, side, variantDeltas(t, variantId).get(frame.name));
 }
+
+const countCache = new WeakMap<Template, Map<string, number>>();
 
 /** How many layers the variant changes across every side, a replaced
  *  background counting as one: "3 layers" in the Variants list. */
 export function changedLayerCount(t: Template, variantId: string): number {
+	let byId = countCache.get(t);
+	if (!byId) {
+		byId = new Map();
+		countCache.set(t, byId);
+	}
+	const cached = byId.get(variantId);
+	if (cached !== undefined) return cached;
+	const deltas = variantDeltas(t, variantId);
 	let n = 0;
-	for (let side = 0; side < t.template_data.length; side++)
-		n += changedLayerKeys(t, variantId, side).length;
+	t.template_data.forEach((frame, side) => {
+		const d = deltas.get(frame.name);
+		if (d) n += sideChangedKeys(t, side, d).length;
+	});
+	byId.set(variantId, n);
 	return n;
 }
 
@@ -485,19 +561,27 @@ export function geometryForBase(
 ): LayerGeometry {
 	const id = activeVariantId(base, variantId);
 	if (id === undefined) return geometry;
-	const moved: string[] = [];
+	const deltas = variantDeltas(base, id);
+	const moved = new Set<string>();
 	base.template_data.forEach((frame, side) => {
+		const elements = deltas.get(frame.name)?.elements;
+		if (!elements?.size) return;
 		for (const e of walkLayers(base, side)) {
 			if ("background" in e.path) continue;
-			const d = mergedDelta(base, id, frame.name, e.element.id);
-			if (d && DELTA_SHELL.some((k) => d[k] !== undefined))
-				moved.push(keyOf(e.path));
+			const d = elements.get(e.element.id);
+			if (d && DELTA_SHELL.some((k) => d[k] !== undefined)) moved.add(e.key);
 		}
 	});
-	if (moved.length === 0) return geometry;
+	if (moved.size === 0) return geometry;
 	const out: LayerGeometry = new Map();
 	for (const [key, box] of geometry)
-		if (!moved.some((m) => key === m || key.startsWith(`${m}/`)))
-			out.set(key, box);
+		if (!movedOrInside(key, moved)) out.set(key, box);
 	return out;
+}
+
+function movedOrInside(key: string, moved: Set<string>): boolean {
+	if (moved.has(key)) return true;
+	for (let i = key.lastIndexOf("/"); i > 0; i = key.lastIndexOf("/", i - 1))
+		if (moved.has(key.slice(0, i))) return true;
+	return false;
 }
