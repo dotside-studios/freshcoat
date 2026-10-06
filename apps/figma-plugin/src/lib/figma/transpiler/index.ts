@@ -71,6 +71,7 @@ import {
 	withoutGuides,
 } from "./guides";
 import { transpileImage } from "./image";
+import { canHoldImage } from "./image-shape";
 import { transpileQr } from "./qr";
 import { rasterScaleFor } from "./raster-scale";
 import {
@@ -701,7 +702,7 @@ async function buildSideElements(
 					scale: ctx.scale,
 					worldAnchor: anchor,
 				});
-			else if (c.kind === "native-image" && isRectangleNode(n)) {
+			else if (c.kind === "native-image" && canHoldImage(n)) {
 				// Dynamic if the node carries an image binding (stored or inferred),
 				// not just a bare-token name. Keeps `image:` markers + Layer-tab
 				// image bindings from silently rasterizing.

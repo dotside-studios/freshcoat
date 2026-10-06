@@ -271,6 +271,11 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	// in the node's bounding-box-local coordinate space and filled by its own
 	// winding rule. An open, stroke-only path has none.
 	fillGeometry?: { path: string; windingRule?: "NONZERO" | "EVENODD" }[];
+	// ELLIPSE only, in radians. Absent reads as a full, solid ellipse.
+	arcData?: { startingAngle: number; endingAngle: number; innerRadius: number };
+	// POLYGON only.
+	pointCount?: number;
+	cornerRadius?: number;
 };
 
 export type FigmaContainerNodeType =

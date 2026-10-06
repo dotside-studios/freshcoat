@@ -724,6 +724,9 @@ type AnyVectorNode = AnySceneNode & {
 	dashPattern?: unknown;
 	vectorPaths?: AnyVectorPaths;
 	fillGeometry?: AnyVectorPaths;
+	arcData?: FigmaVectorNode["arcData"];
+	pointCount?: number;
+	cornerRadius?: unknown;
 };
 
 /** The path a shape node is emitted from.
@@ -788,6 +791,21 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
 		fillGeometry: readGeometry(node),
+		...(node.type === "ELLIPSE" && node.arcData
+			? {
+					arcData: {
+						startingAngle: node.arcData.startingAngle,
+						endingAngle: node.arcData.endingAngle,
+						innerRadius: node.arcData.innerRadius,
+					},
+				}
+			: {}),
+		...(node.type === "POLYGON" && typeof node.pointCount === "number"
+			? { pointCount: node.pointCount }
+			: {}),
+		...(node.type === "POLYGON" && typeof node.cornerRadius === "number"
+			? { cornerRadius: node.cornerRadius }
+			: {}),
 	};
 }
 

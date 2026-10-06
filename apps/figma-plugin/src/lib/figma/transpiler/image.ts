@@ -1,13 +1,25 @@
-import type { ElementAdjust, TemplateWarning } from "@freshcoat-js/coatfile";
+import type {
+	ElementAdjust,
+	ImageProperties,
+	TemplateWarning,
+} from "@freshcoat-js/coatfile";
 import { extractTokens } from "../binding";
 import type {
 	FigmaBoundingBox,
 	FigmaImageFilters,
 	FigmaImagePaint,
 	FigmaRectangleNode,
+	FigmaVectorNode,
 } from "../types";
-import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
+import { strokeToElement } from "./colors";
+import {
+	FlattenFallbackError,
+	placeLocal,
+	placeWorld,
+	translateLocal,
+} from "./coordinates";
 import { isWholeMustacheToken } from "./fields";
+import { scaleCorners } from "./rect";
 
 export type TranspileImageContext = {
 	frame: FigmaBoundingBox;
@@ -25,6 +37,7 @@ function dynamicImageElement(
 	// placeholder with no image fill) — default the fit in that case.
 	fill: FigmaImagePaint | undefined,
 	rotation: number,
+	shape: ImageShape,
 	nodeId: string,
 	warnings: TemplateWarning[],
 ) {
@@ -50,7 +63,133 @@ function dynamicImageElement(
 		size: rect.size,
 		...(rotation !== 0 ? { rotation } : {}),
 		...(adjust ? { adjust } : {}),
-		properties: { src: `{{${tokenId}}}`, fit, ...(crop ? { crop } : {}) },
+		properties: {
+			src: `{{${tokenId}}}`,
+			fit,
+			...(crop ? { crop } : {}),
+			...shape,
+		},
+	};
+}
+
+type ImageShape = Pick<ImageProperties, "cornerRadius" | "mask" | "stroke">;
+
+function imageShape(
+	node: FigmaRectangleNode | FigmaVectorNode,
+	size: { width: number; height: number },
+	scale: number,
+	warnings: TemplateWarning[],
+): ImageShape {
+	const stroke = strokeToElement(node, scale);
+	const stroked =
+		(node.strokeWeight ?? 0) > 0 &&
+		(node.strokes ?? []).some((p) => p.visible !== false);
+	if (!stroke && stroked)
+		warnings.push({
+			severity: "warn",
+			code: "image_stroke_unsupported",
+			message: "A gradient or image stroke on an image was left out.",
+			nodeId: node.id,
+		});
+	const clip = imageClip(node, size, scale, warnings);
+	return { ...clip, ...(stroke ? { stroke } : {}) };
+}
+
+function imageClip(
+	node: FigmaRectangleNode | FigmaVectorNode,
+	size: { width: number; height: number },
+	scale: number,
+	warnings: TemplateWarning[],
+): Pick<ImageProperties, "cornerRadius" | "mask"> {
+	if (node.type === "ELLIPSE")
+		return { mask: size.width === size.height ? "circle" : "ellipse" };
+	if (node.type === "POLYGON")
+		return { mask: { kind: "polygon", sides: node.pointCount ?? 3 } };
+	if (node.type !== "RECTANGLE") return {};
+	const corners = scaleCorners(node.cornerRadius, scale);
+	if (corners === undefined) return {};
+	let radius: number;
+	if (typeof corners === "number") radius = corners;
+	else {
+		// An image takes one radius for all four corners.
+		radius = Math.max(...corners);
+		if (corners.some((c) => c !== radius))
+			warnings.push({
+				severity: "warn",
+				code: "image_corner_radius_approximated",
+				message: `Image corners were rounded to ${radius} on every side.`,
+				nodeId: node.id,
+			});
+	}
+	if (node.cornerSmoothing) return { mask: { kind: "squircle", radius } };
+	return { cornerRadius: radius };
+}
+
+// Figma stretches a polygon's vertices to fill its box, while the polygon mask
+// puts them on the ellipse inscribed in its own box. This is the box, in the
+// node's space, whose mask lands on Figma's vertices.
+export function polygonMaskBox(
+	sides: number,
+	width: number,
+	height: number,
+): { x: number; y: number; width: number; height: number } {
+	const xs: number[] = [];
+	const ys: number[] = [];
+	for (let i = 0; i < sides; i++) {
+		const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+		xs.push(Math.cos(a));
+		ys.push(Math.sin(a));
+	}
+	const minX = Math.min(...xs);
+	const minY = Math.min(...ys);
+	const spanX = Math.max(...xs) - minX;
+	const spanY = Math.max(...ys) - minY;
+	return {
+		x: ((-minX - 1) * width) / spanX,
+		y: ((-minY - 1) * height) / spanY,
+		width: (2 * width) / spanX,
+		height: (2 * height) / spanY,
+	};
+}
+
+function maskGeometry<T extends FigmaRectangleNode | FigmaVectorNode>(
+	node: T,
+): T {
+	if (node.type !== "POLYGON" || !node.pointCount) return node;
+	const bb = node.absoluteBoundingBox;
+	const box = polygonMaskBox(
+		node.pointCount,
+		node.width ?? bb.width,
+		node.height ?? bb.height,
+	);
+	return {
+		...node,
+		width: box.width,
+		height: box.height,
+		absoluteBoundingBox: {
+			x: bb.x + box.x,
+			y: bb.y + box.y,
+			width: box.width,
+			height: box.height,
+		},
+		...(node.relativeTransform
+			? {
+					relativeTransform: translateLocal(
+						node.relativeTransform,
+						box.x,
+						box.y,
+					),
+				}
+			: {}),
+		...(node.absoluteTransform
+			? {
+					absoluteTransform: translateLocal(
+						node.absoluteTransform,
+						box.x,
+						box.y,
+					),
+				}
+			: {}),
 	};
 }
 
@@ -135,7 +274,7 @@ export type TranspileImageResult =
 	| { kind: "rasterize"; nodeId: string };
 
 export function transpileImage(
-	node: FigmaRectangleNode,
+	node: FigmaRectangleNode | FigmaVectorNode,
 	ctx: TranspileImageContext,
 	// The resolved image binding's value template, e.g. "{{avatar}}". Makes the
 	// image dynamic regardless of how it was bound (bare-token name, `image:`
@@ -153,12 +292,14 @@ export function transpileImage(
 	if (tokenId) {
 		// A dynamic image renders its content at fill time, so it is placed like a
 		// native node: unrotated geometry + rotation as a real transform.
+		const geometry = maskGeometry(node);
 		const placed = ctx.worldAnchor
-			? placeWorld(node, ctx.worldAnchor, ctx.scale)
-			: placeLocal(node, ctx.scale);
+			? placeWorld(geometry, ctx.worldAnchor, ctx.scale)
+			: placeLocal(geometry, ctx.scale);
 		if ("fallback" in placed) throw new FlattenFallbackError(node.id);
 		const rect = { pos: placed.pos, size: placed.size };
 		const warnings: TemplateWarning[] = [];
+		const shape = imageShape(node, placed.size, ctx.scale, warnings);
 		return {
 			kind: "element",
 			element: dynamicImageElement(
@@ -166,6 +307,7 @@ export function transpileImage(
 				rect,
 				fill,
 				placed.rotation,
+				shape,
 				node.id,
 				warnings,
 			),
