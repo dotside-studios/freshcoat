@@ -6,7 +6,7 @@ import {
 	parseDateText,
 	validateRecord,
 } from "./columns";
-import { newId, slug, uniqueKey } from "./ids";
+import { freshId, slug, uniqueKey } from "./ids";
 import type {
 	ApplyMappingResult,
 	CellValue,
@@ -277,6 +277,7 @@ export function applyMapping(
 		});
 	}
 
+	const ids = new Set(records.map((r) => r.id));
 	const addedIds = new Set<string>();
 	const updatedIds = new Set<string>();
 	for (const { index: rowIndex, cells } of dataRows(rows, plan)) {
@@ -321,7 +322,8 @@ export function applyMapping(
 			for (const [key, value] of Object.entries(values)) {
 				if (!isEmptyValue(value)) stored[key] = value;
 			}
-			record = { id: newId("r"), values: stored, status: "pending" };
+			record = { id: freshId("r", ids), values: stored, status: "pending" };
+			ids.add(record.id);
 			records.push(record);
 			addedIds.add(record.id);
 			if (match?.column) {

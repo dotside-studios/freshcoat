@@ -61,7 +61,7 @@ export {
 	toTemplateValue,
 	validateRecord,
 } from "./columns";
-export { isValidKey, newId, slug, uniqueKey } from "./ids";
+export { freshId, isValidKey, newId, slug, uniqueKey } from "./ids";
 export {
 	type ImageInfo,
 	orientedSize,

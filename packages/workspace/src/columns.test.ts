@@ -261,7 +261,7 @@ describe("defaults", () => {
 		];
 		expect(defaultValues(columns)).toEqual({ a: "x", b: false });
 		const record = newRecord(columns, { c: 2 });
-		expect(record.id).toMatch(/^r_[0-9a-f]{8}$/);
+		expect(record.id).toMatch(/^r_[0-9a-f]{16}$/);
 		expect(record).toMatchObject({
 			status: "pending",
 			values: { a: "x", b: false, c: 2 },
