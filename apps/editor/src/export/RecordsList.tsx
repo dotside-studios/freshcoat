@@ -1,12 +1,8 @@
 import { Button } from "@freshcoat-js/ui/button";
 import {
-	DataBody,
-	DataCell,
-	DataColumn,
-	DataRow,
-	DataTableHeader,
-	VirtualDataTable,
-} from "@freshcoat-js/ui/data-table";
+	type DataGridColumn,
+	VirtualDataGrid,
+} from "@freshcoat-js/ui/data-grid";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
@@ -16,7 +12,7 @@ import type {
 	Dataset,
 	RecordStatus,
 } from "@freshcoat-js/workspace";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { MenuTrigger, type Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY } from "~/app/copy";
@@ -61,13 +57,16 @@ export function StatusBadge({ status }: { status: RecordStatus }) {
 
 type Row = { record: DataRecord; index: number };
 
-const COLUMNS = [
-	{ id: "index", name: "#", width: 44 },
-	{ id: "label", name: "Record", width: "2fr" },
-	{ id: "status", name: "Status", width: 88 },
-	{ id: "exportedAt", name: "Exported", width: 104 },
-	{ id: "error", name: "Error", width: "2fr" },
-] as const;
+type ColumnId = "index" | "label" | "status" | "exportedAt" | "error";
+type ListColumn = DataGridColumn & { id: ColumnId };
+
+const COLUMNS: readonly ListColumn[] = [
+	{ id: "index", header: "#", width: 44, numeric: true },
+	{ id: "label", header: "Record", width: 120, grow: 2, isRowHeader: true },
+	{ id: "status", header: "Status", width: 88 },
+	{ id: "exportedAt", header: "Exported", width: 104 },
+	{ id: "error", header: "Error", width: 120, grow: 2 },
+];
 
 export function RecordsList({
 	dataset,
@@ -97,6 +96,32 @@ export function RecordsList({
 			(record): Row => ({ record, index: index.get(record.id) ?? 0 }),
 		);
 	}, [dataset.records, filter]);
+	const rowById = useMemo(
+		() => new Map(rows.map((r) => [r.record.id, r])),
+		[rows],
+	);
+	const rowKeys = useMemo(() => rows.map((r) => r.record.id), [rows]);
+	const columns = useMemo(
+		() =>
+			COLUMNS.map((c) =>
+				c.id === "label" && label ? { ...c, header: label } : c,
+			),
+		[label],
+	);
+	const renderCell = useCallback(
+		(id: string, c: ListColumn) => {
+			const row = rowById.get(id);
+			return row ? cellContent(c.id, row, label) : null;
+		},
+		[rowById, label],
+	);
+	const rowClassName = useCallback(
+		(id: string) =>
+			id === previewId
+				? "shadow-[inset_2px_0_0_var(--color-fc-accent)]"
+				: undefined,
+		[previewId],
+	);
 	const counts = useMemo(() => {
 		const c: Record<StatusFilter, number> = {
 			all: dataset.records.length,
@@ -169,10 +194,13 @@ export function RecordsList({
 					</Popover>
 				</MenuTrigger>
 			</div>
-			<VirtualDataTable
+			<VirtualDataGrid
 				aria-label={`Records of ${dataset.name}`}
-				containerClassName="flex-1 min-h-0"
-				selectionMode="multiple"
+				className="flex-1 min-h-0"
+				columns={columns}
+				rowKeys={rowKeys}
+				renderCell={renderCell}
+				rowClassName={rowClassName}
 				selectedKeys={selectedKeys}
 				onSelectionChange={(keys: Selection) =>
 					onSelectionChange(
@@ -183,69 +211,33 @@ export function RecordsList({
 						),
 					)
 				}
-				onRowAction={(key) => onPreview(String(key))}
-			>
-				<DataTableHeader columns={COLUMNS}>
-					{(c) => (
-						<DataColumn
-							id={c.id}
-							isRowHeader={c.id === "label"}
-							numeric={c.id === "index"}
-							defaultWidth={c.width}
-							minWidth={40}
-						>
-							{c.id === "label" && label ? label : c.name}
-						</DataColumn>
-					)}
-				</DataTableHeader>
-				<DataBody
-					items={rows}
-					dependencies={[rows, label, previewId]}
-					renderEmptyState={() => (
-						<div className="px-3 py-6 text-center text-fc-faint text-fc-sm">
-							{dataset.records.length === 0
-								? EMPTY.records
-								: `No ${filter} records`}
-						</div>
-					)}
-				>
-					{(row) => (
-						<DataRow
-							id={row.record.id}
-							columns={COLUMNS}
-							dependencies={[row, label, previewId]}
-							className={cn(
-								row.record.id === previewId &&
-									"shadow-[inset_2px_0_0_var(--color-fc-accent)]",
-							)}
-						>
-							{(c) => (
-								<DataCell numeric={c.id === "index"}>
-									{cellContent(c.id, row, label)}
-								</DataCell>
-							)}
-						</DataRow>
-					)}
-				</DataBody>
-			</VirtualDataTable>
+				onRowAction={onPreview}
+				renderEmptyState={() => (
+					<div className="px-3 py-6 text-center text-fc-faint text-fc-sm">
+						{dataset.records.length === 0
+							? EMPTY.records
+							: `No ${filter} records`}
+					</div>
+				)}
+			/>
 		</div>
 	);
 }
 
 function cellContent(
-	column: (typeof COLUMNS)[number]["id"],
+	column: ColumnId,
 	{ record, index }: Row,
 	label: string | undefined,
 ) {
 	switch (column) {
 		case "index":
-			return String(index + 1);
+			return <span className="truncate">{index + 1}</span>;
 		case "label":
-			return recordLabel(record, label);
+			return <span className="truncate">{recordLabel(record, label)}</span>;
 		case "status":
 			return <StatusBadge status={record.status} />;
 		case "exportedAt":
-			return formatTime(record.exportedAt);
+			return <span className="truncate">{formatTime(record.exportedAt)}</span>;
 		case "error":
 			return record.error ? (
 				<span
