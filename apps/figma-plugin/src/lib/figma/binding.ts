@@ -4,7 +4,11 @@
 
 import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
-import { titleCase } from "./transpiler/fields";
+import {
+	extractTokens,
+	isWholeMustacheToken,
+	titleCase,
+} from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
@@ -93,24 +97,6 @@ export type FieldMeta = {
 
 const MARKER_KIND_SET: ReadonlySet<string> = new Set(MARKER_KINDS);
 
-// A single whole token, allowing whitespace inside the braces and around the
-// value (`{{ name }}` → `name`). Inner whitespace is NOT "content with spaces".
-const WHOLE_TOKEN = /^\s*\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}\s*$/;
-// Every token within a template/content string, in order.
-const TOKEN_GLOBAL = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
-
-/** Ordered token ids inside a string (may repeat). */
-export function extractTokens(s: string): string[] {
-	const out: string[] = [];
-	TOKEN_GLOBAL.lastIndex = 0;
-	let m = TOKEN_GLOBAL.exec(s);
-	while (m !== null) {
-		out.push(m[1]);
-		m = TOKEN_GLOBAL.exec(s);
-	}
-	return out;
-}
-
 function dedupe(ids: string[]): string[] {
 	return [...new Set(ids)];
 }
@@ -129,8 +115,8 @@ export function parseValue(raw: string): ParsedValue | null {
 		if (ids.length === 0) return null;
 		return { mode: "template", template: inner, ids: dedupe(ids) };
 	}
-	const m = WHOLE_TOKEN.exec(s);
-	if (m) return { mode: "token", id: m[1] };
+	const m = isWholeMustacheToken(s);
+	if (m.ok) return { mode: "token", id: m.id };
 	return null;
 }
 
@@ -195,10 +181,7 @@ export function parseMarker(layerName: string): ParsedMarker | null {
 }
 
 /** The element property a marker kind drives, given the node it sits on. */
-export function propertyForKind(
-	kind: MarkerKind,
-	node: FigmaNode,
-): BindProperty {
+function propertyForKind(kind: MarkerKind, node: FigmaNode): BindProperty {
 	if (kind === "text") return "text";
 	if (kind === "image") return "image";
 	if (kind === "qr") return "qr";
@@ -207,7 +190,7 @@ export function propertyForKind(
 }
 
 /** The schema format a bound property lowers to. */
-export function formatForProperty(property: BindProperty): FieldFormat {
+function formatForProperty(property: BindProperty): FieldFormat {
 	if (property === "text" || property === "barcode") return "text";
 	if (property === "image") return "image";
 	if (property === "qr") return "url";
@@ -215,9 +198,7 @@ export function formatForProperty(property: BindProperty): FieldFormat {
 }
 
 /** The widget a bound property's field asks for, when it asks for one. */
-export function widgetForProperty(
-	property: BindProperty,
-): FieldWidget | undefined {
+function widgetForProperty(property: BindProperty): FieldWidget | undefined {
 	return property === "barcode" ? "barcode" : undefined;
 }
 

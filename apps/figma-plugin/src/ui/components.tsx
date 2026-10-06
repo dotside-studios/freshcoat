@@ -53,7 +53,7 @@ function QrIcon(): JSX.Element {
 }
 
 /** The Freshcoat mark, from freshcoat/brand/freshcoat-mark-mono.svg. */
-export function FreshcoatMark(): JSX.Element {
+function FreshcoatMark(): JSX.Element {
 	return (
 		<svg
 			width="14"

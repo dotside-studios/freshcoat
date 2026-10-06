@@ -16,7 +16,8 @@ import type {
 	FigmaVectorNode,
 	FigmaVectorNodeType,
 } from "~/lib/figma/types";
-import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
+import { isContainerNode, isVectorNode } from "~/lib/figma/types";
+import { readBinding, readFieldMeta } from "~/main/plugin-data";
 
 function rgbaFrom(color: {
 	r: number;
@@ -244,42 +245,6 @@ function readConstraints(
 			vertical: c.vertical as FigmaConstraints["vertical"],
 		},
 	};
-}
-
-// The author's stored binding for this node (set by the plugin's harvest step).
-// Property → value template, e.g. { text: "{{name}}", textColor: "{{brand}}" }.
-function readBinding(
-	node: AnySceneNode,
-): { bind: Record<string, string> } | undefined {
-	const raw = readPluginData(node, FIELD_KEY);
-	if (!raw) return undefined;
-	try {
-		const parsed = JSON.parse(raw) as { bind?: Record<string, string> };
-		if (parsed && typeof parsed === "object" && parsed.bind) {
-			return { bind: parsed.bind };
-		}
-	} catch {
-		// Malformed pluginData — ignore and fall back to live inference.
-	}
-	return undefined;
-}
-
-// Template-global field metadata (FIELDS_KEY), set on a slot frame by the
-// plugin's harvest/override step. Overrides inferred metadata at export.
-function readFieldMeta(
-	node: AnySceneNode,
-): Record<string, unknown> | undefined {
-	const raw = readPluginData(node, FIELDS_KEY);
-	if (!raw) return undefined;
-	try {
-		const parsed = JSON.parse(raw);
-		if (parsed && typeof parsed === "object") {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {
-		// Malformed pluginData — ignore.
-	}
-	return undefined;
 }
 
 function readEffects(
@@ -869,30 +834,14 @@ type AnyContainerNode = AnySceneNode & {
 	getMainComponentAsync?: () => Promise<{ id: string } | null>;
 };
 
-const VECTOR_TYPES = new Set([
-	"VECTOR",
-	"BOOLEAN_OPERATION",
-	"STAR",
-	"POLYGON",
-	"LINE",
-	"ELLIPSE",
-]);
-const CONTAINER_TYPES = new Set([
-	"FRAME",
-	"GROUP",
-	"COMPONENT",
-	"INSTANCE",
-	"COMPONENT_SET",
-]);
-
 export function readNode(
 	node: AnySceneNode & { type: string },
 ): FigmaNode | null {
 	const t = node.type;
 	if (t === "TEXT") return readTextNode(node as never);
 	if (t === "RECTANGLE") return readRectangleNode(node as never);
-	if (VECTOR_TYPES.has(t)) return readVectorNode(node as never);
-	if (CONTAINER_TYPES.has(t)) return readContainer(node as AnyContainerNode);
+	if (isVectorNode(node)) return readVectorNode(node as never);
+	if (isContainerNode(node)) return readContainer(node as AnyContainerNode);
 	return null; // unsupported node type — skipped by the caller
 }
 

@@ -9,7 +9,7 @@
 // FROM-DESIGN (custom export): there is no product and nothing downstream
 // pinning a print size, so the picked frame IS the canvas — see fromDesignSize.
 
-export const SIZE_TOLERANCE = 1; // px
+const SIZE_TOLERANCE = 1; // px
 
 export type CanvasSize = {
 	orientation: "landscape" | "portrait";

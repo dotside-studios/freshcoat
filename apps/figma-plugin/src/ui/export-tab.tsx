@@ -10,13 +10,7 @@ import {
 	SegmentedControl,
 	Textbox,
 } from "@create-figma-plugin/ui";
-import {
-	COAT_EXTENSION,
-	COAT_MEDIA_TYPE,
-	packTemplate,
-} from "@freshcoat-js/coatfile/coat";
-// js-sha256 because crypto.subtle is unavailable in the plugin iframe (non-secure context).
-import { sha256 } from "js-sha256";
+import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { NodeTrace, ProductRegistryEntry } from "~/lib/figma/transpiler";
@@ -25,7 +19,14 @@ import {
 	SizeMismatchError,
 } from "~/lib/figma/transpiler/exact-size";
 import { type FigmaNode, isContainerNode } from "~/lib/figma/types";
-import { checkFreshcoatAddress, openInFreshcoat } from "~/lib/handoff";
+import {
+	checkFreshcoatAddress,
+	coatBlob,
+	openInFreshcoat,
+	packCoat,
+	sha256Hex,
+} from "~/lib/handoff";
+import { slug } from "~/lib/slug";
 import type {
 	FieldOverviewItem,
 	PluginSettings,
@@ -65,26 +66,11 @@ import {
 	type ExportedTemplate,
 	type ExportMetadata,
 	runTranspileToTemplate,
-	slugify,
 } from "~/ui/run-transpile";
 import { useAnnounce } from "~/ui/status";
 import { Step } from "~/ui/steps";
 import { useThumbnails } from "~/ui/use-thumbnails";
 import { type Issue, WarningList } from "~/ui/warnings";
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-	return sha256(bytes);
-}
-
-function pack(template: ExportedTemplate): Promise<Uint8Array> {
-	return packTemplate(template, { sha256: sha256Hex });
-}
-
-function coatBlob(bytes: Uint8Array): Blob {
-	return new Blob([bytes as Uint8Array<ArrayBuffer>], {
-		type: COAT_MEDIA_TYPE,
-	});
-}
 
 /** What the export button pressed: a download, or a hand-off to Freshcoat. */
 type Action = "download" | "open";
@@ -286,11 +272,11 @@ export function ExportTab(props: {
 				metadata,
 				{ proceed },
 			);
-			const stem = `${msg.product.sku}-${slugify(metadata.name) || "card"}`;
+			const stem = `${msg.product.sku}-${slug(metadata.name, { fallback: "card" })}`;
 			const fileName = `${stem}${COAT_EXTENSION}`;
 			let packed: Uint8Array | null = null;
 			if (action === "download") {
-				packed = await pack(template);
+				packed = await packCoat(template);
 				download(fileName, coatBlob(packed));
 			}
 			const counts = template.source.report.counts;
@@ -442,7 +428,7 @@ export function ExportTab(props: {
 
 	async function downloadResult(): Promise<void> {
 		if (!result) return;
-		const packed = result.packed ?? (await pack(result.template));
+		const packed = result.packed ?? (await packCoat(result.template));
 		download(result.fileName, coatBlob(packed));
 		setResult((prev) => (prev ? { ...prev, packed, downloaded: true } : prev));
 		announce(`Downloaded ${result.fileName}`, "success");
@@ -794,7 +780,7 @@ export function ExportTab(props: {
 	const exportSummary =
 		missing ??
 		(product
-			? `${product.sku}-${slugify(name.trim()) || "card"}${COAT_EXTENSION}`
+			? `${product.sku}-${slug(name.trim(), { fallback: "card" })}${COAT_EXTENSION}`
 			: "");
 
 	const stepExport = (

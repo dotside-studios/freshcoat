@@ -3,7 +3,6 @@ import type {
 	ImageProperties,
 	TemplateWarning,
 } from "@freshcoat-js/coatfile";
-import { extractTokens } from "../binding";
 import type {
 	FigmaBoundingBox,
 	FigmaImageFilters,
@@ -18,7 +17,7 @@ import {
 	placeWorld,
 	translateLocal,
 } from "./coordinates";
-import { isWholeMustacheToken } from "./fields";
+import { extractTokens, isWholeMustacheToken } from "./fields";
 import { scaleCorners } from "./rect";
 
 export type TranspileImageContext = {
@@ -198,7 +197,7 @@ const round4 = (v: number) => Math.round(v * 10000) / 10000;
 // Figma's crop maps the layer's unit square into the image's, so an upright
 // one's scale and translation are the region shown. A turned or skewed crop
 // has no coatfile equivalent and falls back to cover.
-export function cropFromTransform(
+function cropFromTransform(
 	t: FigmaImagePaint["imageTransform"],
 	nodeId: string,
 	warnings: TemplateWarning[],
@@ -238,7 +237,7 @@ const UNSUPPORTED_FILTERS = [
 // Figma's exposure, contrast and saturation (each -1 to 1) as coatfile's
 // factors. Figma documents no formula, so these are close readings rather
 // than exact ones, and the other filters have no counterpart.
-export function adjustFromFilters(
+function adjustFromFilters(
 	f: FigmaImageFilters,
 	nodeId: string,
 	warnings: TemplateWarning[],

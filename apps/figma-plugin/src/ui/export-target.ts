@@ -1,5 +1,6 @@
 import { useMemo, useState } from "preact/hooks";
 import type { ProductRegistryEntry } from "~/lib/figma/transpiler";
+import { slug } from "~/lib/slug";
 import { makeCustomProduct } from "~/main/product";
 import type {
 	CardView,
@@ -7,7 +8,6 @@ import type {
 	NodeCandidate,
 } from "~/shared/protocol";
 import { useMainMessage } from "~/ui/messages";
-import { slugify } from "~/ui/run-transpile";
 
 /** What an export, and a field detection, is about: the canvas, the frame or
  *  card picked for it, and the product that fixes its sides. Held above the
@@ -78,7 +78,7 @@ export function useExportTarget(input: {
 
 	const card = cards.find((c) => c.id === cardId) ?? null;
 	const node = nodes.find((n) => n.id === nodeId) ?? null;
-	const customFrameName = node ? slugify(node.name) || "main" : "";
+	const customFrameName = node ? slug(node.name, { fallback: "main" }) : "";
 
 	// In Davi mode the product comes from the catalog; in custom mode it is
 	// synthesized per export from the picked frame and never hits the registry.

@@ -1,5 +1,5 @@
-import type { FigmaBoundingBox, FigmaNode, FigmaSolidPaint } from "../types";
-import { figmaColorToHex } from "./colors";
+import type { FigmaBoundingBox, FigmaNode } from "../types";
+import { singleSolidFillHex } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 import { isWholeMustacheToken } from "./fields";
 
@@ -28,17 +28,6 @@ export type TranspileQrContext = {
 
 const EC_VALUES = new Set(["L", "M", "Q", "H"]);
 
-// The placeholder's own paint, when it is a single solid one. A `qr:` layer can
-// be any node type — including one with no fills, a gradient, or a stack — and
-// none of those is a colour a QR module can be drawn in, so anything else
-// leaves the foreground to coatfile's default.
-function qrFillColor(node: FigmaNode): string | undefined {
-	const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
-	const visible = fills.filter((f) => f.visible !== false);
-	if (visible.length !== 1 || visible[0].type !== "SOLID") return undefined;
-	return figmaColorToHex((visible[0] as FigmaSolidPaint).color);
-}
-
 // Any node named `qr:…` is a placeholder — only its name + bbox are read, so
 // this accepts any FigmaNode, not just rectangles.
 export function transpileQr(node: FigmaNode, ctx: TranspileQrContext) {
@@ -62,7 +51,7 @@ export function transpileQr(node: FigmaNode, ctx: TranspileQrContext) {
 	// for a dark card exports black-on-dark — and, worse, a colorway that only
 	// recolours the QR produces no override at all, because the base and the
 	// variant both emit an element with no foreground to differ on.
-	const fillColor = qrFillColor(node);
+	const fillColor = singleSolidFillHex(node);
 	if (fillColor) properties.foreground = fillColor;
 	// An explicit `fg=` marker option is the author overriding the layer's own
 	// paint, so it wins.

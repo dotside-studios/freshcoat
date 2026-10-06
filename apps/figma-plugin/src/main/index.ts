@@ -6,7 +6,6 @@ import {
 import {
 	bindableProperties,
 	buildFieldMeta,
-	extractTokens,
 	type FieldMeta,
 	inferNodeBinding,
 	storedToNodeBinding,
@@ -21,6 +20,7 @@ import {
 	exactSizeCheck,
 	fromDesignSize,
 } from "~/lib/figma/transpiler/exact-size";
+import { extractTokens } from "~/lib/figma/transpiler/fields";
 import { rasterScaleFor } from "~/lib/figma/transpiler/raster-scale";
 import { colorwayLabel } from "~/lib/figma/transpiler/variants";
 import type { FigmaContainerNode } from "~/lib/figma/types";
@@ -36,7 +36,12 @@ import {
 	exportThumbnails,
 	type RasterTarget,
 } from "~/main/export-rasters";
-import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
+import {
+	FIELD_KEY,
+	FIELDS_KEY,
+	readBinding,
+	readFieldMeta,
+} from "~/main/plugin-data";
 import { findUnpostable } from "~/main/postable";
 import {
 	applyRemoteProducts,
@@ -357,17 +362,6 @@ function slotFrameOf(node: BaseNode): BaseNode | null {
 	return n?.parent?.type === "PAGE" ? n : null;
 }
 
-function readFieldsMap(node: BaseNode): Record<string, FieldMeta> {
-	const raw = readPluginData(node, FIELDS_KEY);
-	if (!raw) return {};
-	try {
-		const parsed = JSON.parse(raw) as Record<string, FieldMeta>;
-		return parsed && typeof parsed === "object" ? parsed : {};
-	} catch {
-		return {};
-	}
-}
-
 // main → ui: the binding state of the single selected node (drives the Layer tab).
 function postSelectionDetail(): void {
 	const sel = figma.currentPage.selection;
@@ -379,7 +373,7 @@ function postSelectionDetail(): void {
 				? storedToNodeBinding(node.binding)
 				: inferNodeBinding(node);
 			const slot = slotFrameOf(sel[0]);
-			const metas = slot ? readFieldsMap(slot) : {};
+			const metas = slot ? (readFieldMeta(slot) ?? {}) : {};
 			detail = {
 				nodeId: node.id,
 				name: node.name,
@@ -411,7 +405,7 @@ function gatherFieldsOverview(): FieldOverviewItem[] {
 		) {
 			continue;
 		}
-		const metas = readFieldsMap(frame);
+		const metas = readFieldMeta(frame) ?? {};
 		const ids = Object.keys(metas);
 		if (ids.length === 0) continue;
 
@@ -420,20 +414,15 @@ function gatherFieldsOverview(): FieldOverviewItem[] {
 		for (const node of frame.findAllWithCriteria({
 			pluginData: { keys: [FIELD_KEY] },
 		})) {
-			const raw = readPluginData(node, FIELD_KEY);
-			if (!raw) continue;
-			try {
-				const parsed = JSON.parse(raw) as { bind?: Record<string, string> };
-				for (const template of Object.values(parsed.bind ?? {})) {
-					for (const id of extractTokens(template)) {
-						const list = refs.get(id);
-						if (list) list.push(node.id);
-						else refs.set(id, [node.id]);
-						names.set(node.id, node.name);
-					}
+			const binding = readBinding(node);
+			if (!binding) continue;
+			for (const template of Object.values(binding.bind)) {
+				for (const id of extractTokens(template)) {
+					const list = refs.get(id);
+					if (list) list.push(node.id);
+					else refs.set(id, [node.id]);
+					names.set(node.id, node.name);
 				}
-			} catch {
-				// Malformed pluginData — skip this node.
 			}
 		}
 		for (const id of ids) {
@@ -469,7 +458,7 @@ async function handleHarvest(
 		);
 		return;
 	}
-	const cardMeta = readFieldsMap(card);
+	const cardMeta = readFieldMeta(card) ?? {};
 	const slots: SlotHarvestInput[] = [];
 	const frameNodes = await Promise.all(
 		product.frames.map((frame) => {
@@ -524,7 +513,7 @@ async function handleSetBinding(msg: SetBindingMessage): Promise<void> {
 	node.setPluginData(FIELD_KEY, JSON.stringify({ bind: msg.bind }));
 	const slot = slotFrameOf(node);
 	if (slot) {
-		const metas = readFieldsMap(slot);
+		const metas = readFieldMeta(slot) ?? {};
 		for (const id of msg.removedIds ?? []) delete metas[id];
 		for (const m of msg.fields) metas[m.id] = m;
 		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
@@ -539,7 +528,7 @@ async function handleClearBinding(msg: ClearBindingMessage): Promise<void> {
 	node.setPluginData(FIELD_KEY, "");
 	const slot = slotFrameOf(node);
 	if (slot) {
-		const metas = readFieldsMap(slot);
+		const metas = readFieldMeta(slot) ?? {};
 		for (const id of msg.removedIds) delete metas[id];
 		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
 	}

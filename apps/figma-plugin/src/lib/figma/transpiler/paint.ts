@@ -13,8 +13,13 @@ export const channel = (v: number): string =>
 		.toString(16)
 		.padStart(2, "0");
 
+/** `#rrggbb`, ignoring alpha. */
+export function rgbHex(c: FigmaColor): string {
+	return `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
+}
+
 export function figmaColorToHex(c: FigmaColor): string {
-	const base = `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
+	const base = rgbHex(c);
 	return c.a >= 1 ? base : `${base}${channel(c.a)}`;
 }
 
