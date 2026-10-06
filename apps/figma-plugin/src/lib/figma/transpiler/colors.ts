@@ -3,6 +3,7 @@ import type { FigmaColor, FigmaPaint } from "../types";
 import {
 	angularPlacement,
 	channel,
+	compositeSolids,
 	figmaColorToHex,
 	type PaintBox,
 	round4,
@@ -257,5 +258,63 @@ export function fillsToElement(
 						.padStart(2, "0")}`
 				: r.hex;
 		}),
+	};
+}
+
+export type StrokeElement = {
+	color: string;
+	width: number;
+	dash?: number[];
+	cap?: "round" | "square";
+	join?: "round" | "bevel";
+	align?: "inside" | "outside";
+};
+
+// Non-solid strokes are rasterized by classify (`stroke_flattened`).
+export function strokeColor(
+	paints: FigmaPaint[] | undefined,
+): string | undefined {
+	const visible = (paints ?? []).filter((p) => p.visible !== false);
+	if (visible.length === 0) return undefined;
+	return compositeSolids(visible) ?? undefined;
+}
+
+// An odd-length pattern repeats to even, as SVG does.
+export function scaleDash(
+	pattern: number[] | undefined,
+	scale: number,
+): number[] | undefined {
+	if (!pattern || pattern.length === 0) return undefined;
+	if (!pattern.every((d) => Number.isFinite(d) && d >= 0)) return undefined;
+	if (!pattern.some((d) => d > 0)) return undefined;
+	const even = pattern.length % 2 ? [...pattern, ...pattern] : pattern;
+	return even.map((d) => Math.round(d * scale * 100) / 100);
+}
+
+export function strokeToElement(
+	node: {
+		strokes?: FigmaPaint[];
+		strokeWeight?: number;
+		strokeCap?: string;
+		strokeJoin?: string;
+		strokeAlign?: string;
+		dashPattern?: number[];
+	},
+	scale: number,
+): StrokeElement | undefined {
+	if (node.strokeWeight === undefined) return undefined;
+	const color = strokeColor(node.strokes);
+	if (color === undefined) return undefined;
+	const dash = scaleDash(node.dashPattern, scale);
+	const cap = mapStrokeCap(node.strokeCap);
+	const join = mapStrokeJoin(node.strokeJoin);
+	const align = mapStrokeAlign(node.strokeAlign);
+	return {
+		color,
+		width: Math.round(node.strokeWeight * scale * 2) / 2,
+		...(dash ? { dash } : {}),
+		...(cap ? { cap } : {}),
+		...(join ? { join } : {}),
+		...(align ? { align } : {}),
 	};
 }

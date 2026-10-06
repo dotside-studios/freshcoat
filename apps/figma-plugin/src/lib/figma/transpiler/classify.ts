@@ -32,7 +32,8 @@ export type FlattenReason =
 	| "clip_overflow_flattened"
 	| "transform_undecomposable_flattened"
 	| "multi_fill_flattened"
-	| "paint_flattened";
+	| "paint_flattened"
+	| "stroke_flattened";
 
 // PASS_THROUGH is a container's "no isolation", which is how the painter
 // composites a frame already; on anything else it is plain normal.
@@ -189,6 +190,16 @@ function fillsFlattenReason(
 	return undefined;
 }
 
+// coatfile strokes take one colour, so only solid paints composite into one.
+function strokeFlattens(n: {
+	strokes?: FigmaPaint[];
+	strokeWeight?: number;
+}): boolean {
+	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
+	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
+	return visible.length > 0 && compositeSolids(visible) === null;
+}
+
 // coatfile carries a colour per span but a gradient only for the whole
 // element, so each run's paints must come down to one colour, or the whole
 // text must share one gradient.
@@ -253,6 +264,8 @@ export function classify(n: FigmaNode): Classification {
 		}
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-rect" };
 	}
 
@@ -274,6 +287,8 @@ export function classify(n: FigmaNode): Classification {
 		}
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-vector" };
 	}
 
@@ -289,6 +304,8 @@ export function classify(n: FigmaNode): Classification {
 		if (n.type === "GROUP") return { kind: "container" };
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-frame" };
 	}
 	return { kind: "container" };
