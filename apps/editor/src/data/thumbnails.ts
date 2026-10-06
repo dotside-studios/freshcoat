@@ -34,6 +34,7 @@ export function setThumbnailBackend(next: ThumbnailBackend | null): void {
 	thumbs.clear();
 	previews.clear();
 	pending.clear();
+	shown.clear();
 	stack.length = 0;
 	making.clear();
 }
@@ -108,7 +109,25 @@ const thumbs = new Lru<string, Thumb>({
 	onEvict: (_key, t) => {
 		if (t.url) URL.revokeObjectURL(t.url);
 	},
+	isPinned: (_key, t) => shown.has(t.url),
 });
+
+/** The object URLs mounted surfaces show, by how many show each: these are
+ *  not evicted, so no shown thumbnail is revoked. */
+const shown = new Map<string, number>();
+
+function hold(url: string): () => void {
+	if (!url) return () => {};
+	shown.set(url, (shown.get(url) ?? 0) + 1);
+	let held = true;
+	return () => {
+		if (!held) return;
+		held = false;
+		const n = (shown.get(url) ?? 1) - 1;
+		if (n > 0) shown.set(url, n);
+		else shown.delete(url);
+	};
+}
 
 type Job = {
 	key: string;
@@ -263,9 +282,16 @@ export function useThumbnail(
 	const key = asset ? keyOf(asset, width) : "";
 	useEffect(() => {
 		if (!asset) return;
-		return requestThumbnail(asset, width, (next) =>
-			setUrl({ key: keyOf(asset, width), url: next }),
-		);
+		let release = () => {};
+		const withdraw = requestThumbnail(asset, width, (next) => {
+			release();
+			release = hold(next);
+			setUrl({ key: keyOf(asset, width), url: next });
+		});
+		return () => {
+			withdraw();
+			release();
+		};
 	}, [asset, width]);
 	if (!asset) return undefined;
 	if (url?.key === key) return url.url || undefined;
