@@ -261,26 +261,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	showDiagnostics: false,
 };
 
-/** The window every install opened at before the compact layout. Settings are
- *  saved whole, so an author who never resized has exactly this stored. */
-const PREVIOUS_DEFAULT_WINDOW = { width: 400, height: 600 };
-
-/** Stored settings as this version reads them: a window still at the previous
- *  default takes the current one, and a size the author dragged to is kept. */
-export function migrateSettings(stored: PluginSettings): PluginSettings {
-	if (
-		stored.windowWidth === PREVIOUS_DEFAULT_WINDOW.width &&
-		stored.windowHeight === PREVIOUS_DEFAULT_WINDOW.height
-	) {
-		return {
-			...stored,
-			windowWidth: DEFAULT_SETTINGS.windowWidth,
-			windowHeight: DEFAULT_SETTINGS.windowHeight,
-		};
-	}
-	return stored;
-}
-
 /** main → ui: the stored settings. Sent unprompted on startup and in reply to
  *  request-settings. */
 export type SettingsMessage = {

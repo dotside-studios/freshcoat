@@ -353,9 +353,6 @@ Layer-name markers such as `text:{{name}}` still allow bindings to be inferred.
 Hand-edited metadata stored only in plugin data, including labels, sources and
 required flags, must be re-entered after an identity change.
 
-`readPluginData` also checks legacy `davi:` keys for documents created by
-earlier versions under the same plugin identity.
-
 ## Develop
 
 Built with [create-figma-plugin](https://yuanqing.github.io/create-figma-plugin/);

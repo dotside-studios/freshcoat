@@ -36,12 +36,7 @@ import {
 	exportThumbnails,
 	type RasterTarget,
 } from "~/main/export-rasters";
-import {
-	FIELD_KEY,
-	FIELDS_KEY,
-	pluginDataKeys,
-	readPluginData,
-} from "~/main/plugin-data";
+import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
 import { findUnpostable } from "~/main/postable";
 import {
 	applyRemoteProducts,
@@ -72,7 +67,6 @@ import type {
 } from "~/shared/protocol";
 import {
 	DEFAULT_SETTINGS,
-	migrateSettings,
 	type PluginSettings,
 	type SettingsMessage,
 } from "~/shared/protocol";
@@ -424,7 +418,7 @@ function gatherFieldsOverview(): FieldOverviewItem[] {
 		const refs = new Map<string, string[]>();
 		const names = new Map<string, string>();
 		for (const node of frame.findAllWithCriteria({
-			pluginData: { keys: pluginDataKeys(FIELD_KEY) },
+			pluginData: { keys: [FIELD_KEY] },
 		})) {
 			const raw = readPluginData(node, FIELD_KEY);
 			if (!raw) continue;
@@ -603,9 +597,7 @@ let settings: PluginSettings = { ...DEFAULT_SETTINGS };
 // their remembered layout, not the whole panel.
 async function loadSettings(): Promise<PluginSettings> {
 	try {
-		settings = migrateSettings(
-			await loadSettingsAsync(DEFAULT_SETTINGS, SETTINGS_KEY),
-		);
+		settings = await loadSettingsAsync(DEFAULT_SETTINGS, SETTINGS_KEY);
 	} catch {
 		settings = { ...DEFAULT_SETTINGS };
 	}
