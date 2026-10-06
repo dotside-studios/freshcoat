@@ -24,6 +24,14 @@ function readDashPattern(value: unknown): number[] | undefined {
 	return [...value];
 }
 
+function readStrokeWeight(value: unknown): {
+	strokeWeight?: number;
+	strokeWeightMixed?: true;
+} {
+	if (typeof value === "number") return { strokeWeight: value };
+	return value === undefined ? {} : { strokeWeightMixed: true };
+}
+
 function readCornerSmoothing(value: unknown): number | undefined {
 	return typeof value === "number" && value > 0 ? value : undefined;
 }
@@ -31,7 +39,7 @@ function readCornerSmoothing(value: unknown): number | undefined {
 type AnyRectNode = AnySceneNode & {
 	fills?: readonly AnyPaint[];
 	strokes?: readonly AnyPaint[];
-	strokeWeight?: number;
+	strokeWeight?: unknown;
 	strokeCap?: unknown;
 	strokeJoin?: unknown;
 	strokeAlign?: unknown;
@@ -74,8 +82,7 @@ export function readRectangleNode(node: AnyRectNode): FigmaRectangleNode {
 		type: "RECTANGLE",
 		fills: readPaints(node.fills),
 		strokes: readPaints(node.strokes),
-		strokeWeight:
-			typeof node.strokeWeight === "number" ? node.strokeWeight : undefined,
+		...readStrokeWeight(node.strokeWeight),
 		strokeCap: readStrokeEnum(node.strokeCap),
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
@@ -195,7 +202,7 @@ type AnyContainerNode = AnySceneNode & {
 	children?: readonly AnySceneNode[];
 	fills?: readonly AnyPaint[];
 	strokes?: readonly AnyPaint[];
-	strokeWeight?: number;
+	strokeWeight?: unknown;
 	strokeAlign?: unknown;
 	dashPattern?: unknown;
 	cornerRadius?: unknown;
@@ -261,8 +268,7 @@ function readContainer(
 		children,
 		fills: readPaints(node.fills),
 		strokes: readPaints(node.strokes),
-		strokeWeight:
-			typeof node.strokeWeight === "number" ? node.strokeWeight : undefined,
+		...readStrokeWeight(node.strokeWeight),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
 		cornerRadius: readCornerRadius(node),

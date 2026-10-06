@@ -239,6 +239,8 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	fills: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	// Per-side weights, which Figma reports as a mixed strokeWeight.
+	strokeWeightMixed?: true;
 	// Loose string: Figma enums like "ROUND"/"SQUARE"/"NONE"/"MITER"/"BEVEL"
 	// (or figma.mixed for per-segment caps, guarded at read time).
 	strokeCap?: string;
@@ -295,6 +297,7 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	fills?: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	strokeWeightMixed?: true;
 	strokeAlign?: string;
 	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].

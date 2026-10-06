@@ -552,6 +552,7 @@ function walkNode(
 		return;
 	}
 	if (el) {
+		shapeWarnings(n, w.sink.warnings);
 		// Inside a group given its own layer, placement still measured against
 		// the enclosing FRAME (that is where Figma positions a group's
 		// children), so shift onto the group's box.
@@ -581,6 +582,32 @@ function walkNode(
 		entry.el = el;
 		target.push(el);
 	}
+}
+
+function shapeWarnings(n: FigmaNode, warnings: TemplateWarning[]): void {
+	if (
+		(isRectangleNode(n) || isContainerNode(n)) &&
+		n.strokeWeightMixed &&
+		(n.strokes ?? []).some((p) => p.visible !== false)
+	)
+		warnings.push({
+			severity: "warn",
+			code: "stroke_weight_mixed_unsupported",
+			message: `Layer "${n.name}" has a different stroke weight per side, so its stroke was dropped.`,
+			nodeId: n.id,
+		});
+	if (
+		isRectangleNode(n) &&
+		Array.isArray(n.cornerRadius) &&
+		n.cornerRadius.some((c) => c > 0) &&
+		n.cornerSmoothing
+	)
+		warnings.push({
+			severity: "warn",
+			code: "corner_smoothing_unsupported",
+			message: `Layer "${n.name}" has different corner radii, so its corner smoothing is ignored.`,
+			nodeId: n.id,
+		});
 }
 
 // A layer named `if:{{field}}` shows only while the field is set. Everything

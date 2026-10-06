@@ -140,8 +140,12 @@ layers were kept, flattened or skipped.
   keeping their opacity (a 50% stroke stays translucent); hidden ones are
   ignored. A dashed stroke keeps its pattern as `dash`. A rectangle, vector or
   frame with a visible gradient or image stroke is rasterized
-  (`stroke_flattened`).
-- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. Frames
+  (`stroke_flattened`). A stroke with a different weight per side is dropped
+  (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
+  zero is left out.
+- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. The
+  renderer smooths only a uniform radius, so a rectangle with different
+  corners keeps them unsmoothed (`corner_smoothing_unsupported`). Frames
   keep their radius but not smoothing, which coatfile frames do not carry.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
   linear dodge as `plus`. Pass through is how the renderer composites
