@@ -17,7 +17,8 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@freshcoat-js/engine": "workspace:*"
+		"@freshcoat-js/engine": "workspace:*",
+		"zod": "^4.1.13"
 	},
 	"devDependencies": {
 		"canvaskit-wasm": "^0.41.1",

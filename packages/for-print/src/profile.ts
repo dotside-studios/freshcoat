@@ -19,6 +19,7 @@ import {
 } from "./calibration";
 import type { ChartReading } from "./measure";
 import type { ChannelBalance, PrintOptimizeOptions } from "./types";
+import { z } from "zod";
 
 export interface PrintProfileConditions {
 	printer?: string;
@@ -130,116 +131,102 @@ export function profileCacheKey(profile: PrintProfile | undefined): string {
 	return b ? `${b.r}/${b.g}/${b.b}` : "none";
 }
 
-const isFiniteNumber = (v: unknown): v is number =>
-	typeof v === "number" && Number.isFinite(v);
-
 // Exponents outside this are not a cast, they are a mistake — a fit off bad picks
 // or a hand-typed digit. Rejected rather than clamped, because a profile that
 // silently became something else is worse than one that refused to load.
 const MIN_EXPONENT = 0.2;
 const MAX_EXPONENT = 5;
 
-function parseBalance(value: unknown): ChannelBalance | undefined | Error {
-	if (value === undefined || value === null) return undefined;
-	if (typeof value !== "object") return new Error("balance must be an object");
-	const b = value as Record<string, unknown>;
-	const out = {} as ChannelBalance;
-	for (const channel of ["r", "g", "b"] as const) {
-		const k = b[channel];
-		if (!isFiniteNumber(k)) {
-			return new Error(`balance.${channel} must be a number`);
-		}
-		if (k < MIN_EXPONENT || k > MAX_EXPONENT) {
-			return new Error(
-				`balance.${channel} is ${k}, outside the ${MIN_EXPONENT}–${MAX_EXPONENT} a cast correction can plausibly be`,
-			);
-		}
-		out[channel] = k;
-	}
-	return out;
-}
+const exponent = (channel: keyof ChannelBalance) =>
+	z
+		.number({ error: `balance.${channel} must be a number` })
+		.refine((k) => k >= MIN_EXPONENT && k <= MAX_EXPONENT, {
+			error: (issue) =>
+				`balance.${channel} is ${issue.input}, outside the ${MIN_EXPONENT}–${MAX_EXPONENT} a cast correction can plausibly be`,
+		});
 
-function parseConditions(
-	value: unknown,
-): PrintProfileConditions | undefined | Error {
-	if (value === undefined || value === null) return undefined;
-	if (typeof value !== "object" || Array.isArray(value)) {
-		return new Error("conditions must be an object");
-	}
-	const raw = value as Record<string, unknown>;
-	const conditions: PrintProfileConditions = {};
-	for (const field of ["printer", "ribbon", "stock"] as const) {
-		const item = raw[field];
-		if (item === undefined) continue;
-		if (typeof item !== "string" || item.trim() === "") {
-			return new Error(`conditions.${field} must be a non-empty string`);
-		}
-		conditions[field] = item.trim();
-	}
-	return conditions;
-}
+const balanceSchema = z.object(
+	{ r: exponent("r"), g: exponent("g"), b: exponent("b") },
+	{ error: "balance must be an object" },
+);
 
-const CALIBRATION_BLOCKERS: CalibrationBlocker[] = [
+const conditionField = (field: keyof PrintProfileConditions) => {
+	const error = `conditions.${field} must be a non-empty string`;
+	return z.string({ error }).trim().min(1, { error }).optional();
+};
+
+const conditionsSchema = z.object(
+	{
+		printer: conditionField("printer"),
+		ribbon: conditionField("ribbon"),
+		stock: conditionField("stock"),
+	},
+	{ error: "conditions must be an object" },
+);
+
+const CALIBRATION_BLOCKERS = [
 	"stock-clipped",
 	"patches-missed",
 	"uneven-lighting",
 	"uneven-print",
 	"not-enough-gray-steps",
-];
+] as const satisfies readonly CalibrationBlocker[];
 
-function parseAssessment(
+const metric = (field: keyof CalibrationAssessment["metrics"]) => {
+	const error = `assessment.metrics.${field} must be a non-negative number`;
+	return z.number({ error }).min(0, { error });
+};
+
+const blockersError =
+	"assessment.blockers must contain known calibration blockers";
+
+const assessmentSchema = z
+	.object(
+		{
+			usable: z.boolean({ error: "assessment.usable must be a boolean" }),
+			blockers: z.array(z.enum(CALIBRATION_BLOCKERS, { error: blockersError }), {
+				error: blockersError,
+			}),
+			metrics: z.object(
+				{
+					graySteps: metric("graySteps"),
+					missedPatches: metric("missedPatches"),
+					lightSpread: metric("lightSpread"),
+					repeatSpread: metric("repeatSpread"),
+				},
+				{ error: "assessment.metrics must be an object" },
+			),
+		},
+		{ error: "assessment must be an object" },
+	)
+	.refine((a) => a.usable === (a.blockers.length === 0), {
+		error: "assessment.usable must agree with assessment.blockers",
+	});
+
+const profileSchema = z.object(
+	{
+		version: z.literal(1, { error: "profile version must be 1" }).optional(),
+		name: z
+			.string({ error: "profile needs a name saying which printer it describes" })
+			.trim()
+			.min(1, {
+				error: "profile needs a name saying which printer it describes",
+			}),
+		balance: balanceSchema.nullish(),
+		conditions: conditionsSchema.nullish(),
+		assessment: assessmentSchema.nullish(),
+		measuredAt: z.string().optional().catch(undefined),
+		notes: z.string().optional().catch(undefined),
+	},
+	{ error: "profile must be a JSON object" },
+);
+
+function parseConditions(
 	value: unknown,
-): CalibrationAssessment | undefined | Error {
-	if (value === undefined || value === null) return undefined;
-	if (typeof value !== "object" || Array.isArray(value)) {
-		return new Error("assessment must be an object");
-	}
-	const raw = value as Record<string, unknown>;
-	if (typeof raw.usable !== "boolean") {
-		return new Error("assessment.usable must be a boolean");
-	}
-	if (
-		!Array.isArray(raw.blockers) ||
-		!raw.blockers.every(
-			(b) =>
-				typeof b === "string" &&
-				CALIBRATION_BLOCKERS.includes(b as CalibrationBlocker),
-		)
-	) {
-		return new Error(
-			"assessment.blockers must contain known calibration blockers",
-		);
-	}
-	if (raw.usable !== (raw.blockers.length === 0)) {
-		return new Error("assessment.usable must agree with assessment.blockers");
-	}
-	if (
-		typeof raw.metrics !== "object" ||
-		raw.metrics === null ||
-		Array.isArray(raw.metrics)
-	) {
-		return new Error("assessment.metrics must be an object");
-	}
-	const metrics = raw.metrics as Record<string, unknown>;
-	const parsed = {} as CalibrationAssessment["metrics"];
-	for (const field of [
-		"graySteps",
-		"missedPatches",
-		"lightSpread",
-		"repeatSpread",
-	] as const) {
-		if (!isFiniteNumber(metrics[field]) || metrics[field] < 0) {
-			return new Error(
-				`assessment.metrics.${field} must be a non-negative number`,
-			);
-		}
-		parsed[field] = metrics[field];
-	}
-	return {
-		usable: raw.usable,
-		blockers: raw.blockers as CalibrationBlocker[],
-		metrics: parsed,
-	};
+): PrintProfileConditions | undefined | Error {
+	const result = conditionsSchema.nullish().safeParse(value);
+	if (!result.success) return new Error(result.error.issues[0]?.message);
+	return result.data ?? undefined;
 }
 
 // Parse a profile from whatever a deploy handed over — an env var, a settings
@@ -259,30 +246,15 @@ export function parsePrintProfile(input: unknown): PrintProfile | Error {
 			);
 		}
 	}
-	if (typeof value !== "object" || value === null || Array.isArray(value)) {
-		return new Error("profile must be a JSON object");
-	}
-	const raw = value as Record<string, unknown>;
-	const version = raw.version === undefined ? 1 : raw.version;
-	if (version !== 1) return new Error("profile version must be 1");
+	const result = profileSchema.safeParse(value);
+	if (!result.success) return new Error(result.error.issues[0]?.message);
+	const raw = result.data;
 
-	const name = raw.name;
-	if (typeof name !== "string" || name.trim() === "") {
-		return new Error("profile needs a name saying which printer it describes");
-	}
-
-	const balance = parseBalance(raw.balance);
-	if (balance instanceof Error) return balance;
-	const conditions = parseConditions(raw.conditions);
-	if (conditions instanceof Error) return conditions;
-	const assessment = parseAssessment(raw.assessment);
-	if (assessment instanceof Error) return assessment;
-
-	const profile: PrintProfile = { version: 1, name: name.trim() };
-	if (balance) profile.balance = balance;
-	if (typeof raw.measuredAt === "string") profile.measuredAt = raw.measuredAt;
-	if (typeof raw.notes === "string") profile.notes = raw.notes;
-	if (conditions) profile.conditions = conditions;
-	if (assessment) profile.assessment = assessment;
+	const profile: PrintProfile = { version: 1, name: raw.name };
+	if (raw.balance) profile.balance = raw.balance;
+	if (raw.measuredAt !== undefined) profile.measuredAt = raw.measuredAt;
+	if (raw.notes !== undefined) profile.notes = raw.notes;
+	if (raw.conditions) profile.conditions = raw.conditions;
+	if (raw.assessment) profile.assessment = raw.assessment;
 	return profile;
 }
