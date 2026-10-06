@@ -645,6 +645,7 @@ type AnyRectNode = AnySceneNode & {
 	strokeJoin?: unknown;
 	strokeAlign?: unknown;
 	cornerRadius?: unknown;
+	cornerSmoothing?: number;
 	topLeftRadius?: number;
 	topRightRadius?: number;
 	bottomRightRadius?: number;
@@ -687,6 +688,9 @@ export function readRectangleNode(node: AnyRectNode): FigmaRectangleNode {
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		cornerRadius: readCornerRadius(node),
+		...(typeof node.cornerSmoothing === "number" && node.cornerSmoothing > 0
+			? { cornerSmoothing: node.cornerSmoothing }
+			: {}),
 	};
 }
 
@@ -702,6 +706,9 @@ type AnyVectorNode = AnySceneNode & {
 	strokeAlign?: unknown;
 	vectorPaths?: AnyVectorPaths;
 	fillGeometry?: AnyVectorPaths;
+	arcData?: FigmaVectorNode["arcData"];
+	pointCount?: number;
+	cornerRadius?: unknown;
 };
 
 /** The path a shape node is emitted from.
@@ -765,6 +772,21 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		fillGeometry: readGeometry(node),
+		...(node.type === "ELLIPSE" && node.arcData
+			? {
+					arcData: {
+						startingAngle: node.arcData.startingAngle,
+						endingAngle: node.arcData.endingAngle,
+						innerRadius: node.arcData.innerRadius,
+					},
+				}
+			: {}),
+		...(node.type === "POLYGON" && typeof node.pointCount === "number"
+			? { pointCount: node.pointCount }
+			: {}),
+		...(node.type === "POLYGON" && typeof node.cornerRadius === "number"
+			? { cornerRadius: node.cornerRadius }
+			: {}),
 	};
 }
 

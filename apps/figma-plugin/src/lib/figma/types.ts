@@ -246,6 +246,7 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft] when
 	// the four differ (Figma reports the uniform property as mixed then).
 	cornerRadius?: number | [number, number, number, number];
+	cornerSmoothing?: number;
 };
 
 export type FigmaVectorNodeType =
@@ -268,6 +269,11 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	// in the node's bounding-box-local coordinate space and filled by its own
 	// winding rule. An open, stroke-only path has none.
 	fillGeometry?: { path: string; windingRule?: "NONZERO" | "EVENODD" }[];
+	// ELLIPSE only, in radians. Absent reads as a full, solid ellipse.
+	arcData?: { startingAngle: number; endingAngle: number; innerRadius: number };
+	// POLYGON only.
+	pointCount?: number;
+	cornerRadius?: number;
 };
 
 export type FigmaContainerNodeType =

@@ -446,4 +446,83 @@ describe("classify", () => {
 		} as unknown as FigmaNode;
 		expect(classify(n).kind).toBe("native-vector");
 	});
+
+	describe("image-filled ellipses and polygons", () => {
+		const IMAGE = [
+			{ type: "IMAGE" as const, scaleMode: "FILL" as const, imageRef: "a" },
+		];
+		const GEOMETRY = [{ path: "M 0 0 L 10 0 L 10 10 Z" }];
+		const shape = (extra: Partial<FigmaNode>): FigmaNode =>
+			({
+				...baseAttrs,
+				id: "1",
+				name: "{{avatar}}",
+				fills: IMAGE,
+				fillGeometry: GEOMETRY,
+				...extra,
+			}) as FigmaNode;
+
+		it("a full ellipse → native-image", () => {
+			expect(classify(shape({ type: "ELLIPSE" })).kind).toBe("native-image");
+			expect(
+				classify(
+					shape({
+						type: "ELLIPSE",
+						arcData: {
+							startingAngle: 0,
+							endingAngle: 2 * Math.PI,
+							innerRadius: 0,
+						},
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a partial arc or a donut → flatten", () => {
+			for (const arcData of [
+				{ startingAngle: 0, endingAngle: Math.PI, innerRadius: 0 },
+				{ startingAngle: 0, endingAngle: 2 * Math.PI, innerRadius: 0.5 },
+			]) {
+				expect(
+					classify(shape({ type: "ELLIPSE", arcData } as Partial<FigmaNode>)),
+				).toEqual({ kind: "flatten", reason: "paint_flattened" });
+			}
+		});
+
+		it("a regular polygon → native-image", () => {
+			expect(
+				classify(
+					shape({ type: "POLYGON", pointCount: 6 } as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a polygon with rounded corners → flatten", () => {
+			expect(
+				classify(
+					shape({
+						type: "POLYGON",
+						pointCount: 6,
+						cornerRadius: 4,
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("flatten");
+		});
+
+		it("a solid ellipse named image:{{token}} → native-image", () => {
+			expect(
+				classify(
+					shape({
+						type: "ELLIPSE",
+						name: "image:{{avatar}}",
+						fills: [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }],
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a star with an image fill → flatten", () => {
+			expect(classify(shape({ type: "STAR" })).kind).toBe("flatten");
+		});
+	});
 });

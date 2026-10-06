@@ -395,6 +395,37 @@ describe("readVectorNode", () => {
 		expect(v.fillGeometry?.[0]?.path).toBe("M0 0 L10 0 L10 10 Z");
 	});
 
+	it("reads an ellipse's arc and a polygon's point count", () => {
+		const base = {
+			id: "1:3",
+			name: "shape",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			rotation: 0,
+			absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+			effects: [],
+			fills: [],
+			strokes: [],
+		};
+		const arcData = {
+			startingAngle: 0,
+			endingAngle: Math.PI,
+			innerRadius: 0.5,
+		};
+		expect(
+			readVectorNode({ ...base, type: "ELLIPSE", arcData } as never).arcData,
+		).toEqual(arcData);
+		const polygon = readVectorNode({
+			...base,
+			type: "POLYGON",
+			pointCount: 6,
+			cornerRadius: 4,
+		} as never);
+		expect(polygon.pointCount).toBe(6);
+		expect(polygon.cornerRadius).toBe(4);
+	});
+
 	it("reads string strokeCap/strokeJoin, drops figma.mixed symbols", () => {
 		const base = {
 			id: "1:2",

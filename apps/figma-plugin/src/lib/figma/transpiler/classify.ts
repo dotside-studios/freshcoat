@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { isContainerNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";
+import { canHoldImage } from "./image-shape";
 import { compositeSolids, isMappablePaint, type PaintBox } from "./paint";
 import { decomposeTransform, nodeExtent } from "./transform";
 
@@ -213,6 +214,21 @@ export function isImageLayerName(name: string): boolean {
 	return /^image:.+/.test(name);
 }
 
+// An `image:` marker makes a maskable shape a dynamic image placeholder
+// regardless of its current fill, so a plain solid-gray `{{logo}}`/avatar box
+// binds as an image (the Layer-tab "Image" button writes this marker).
+function imageClassification(n: FigmaNode): Classification | undefined {
+	if (!canHoldImage(n)) return undefined;
+	if (isImageLayerName(n.name)) return { kind: "native-image" };
+	const visibleFills = (n.fills ?? []).filter((f) => f.visible !== false);
+	if (visibleFills.length !== 1 || visibleFills[0].type !== "IMAGE")
+		return undefined;
+	const blend = visibleFills[0].blendMode;
+	if (blend && blend !== "NORMAL")
+		return { kind: "flatten", reason: "paint_flattened" };
+	return { kind: "native-image" };
+}
+
 export function classify(n: FigmaNode): Classification {
 	if (n.visible === false) return { kind: "skip" };
 	if (n.opacity === 0) return { kind: "skip" };
@@ -238,19 +254,10 @@ export function classify(n: FigmaNode): Classification {
 		return { kind: "native-text" };
 	}
 
-	if (n.type === "RECTANGLE") {
-		// An `image:` marker makes a rect a dynamic image placeholder regardless
-		// of its current fill — so a plain solid-gray `{{logo}}`/avatar box binds
-		// as an image (the Layer-tab "Image" button writes this marker).
-		if (isImageLayerName(n.name)) return { kind: "native-image" };
+	const image = imageClassification(n);
+	if (image) return image;
 
-		const visibleFills = (n.fills ?? []).filter((f) => f.visible !== false);
-		if (visibleFills.length === 1 && visibleFills[0].type === "IMAGE") {
-			const blend = visibleFills[0].blendMode;
-			if (blend && blend !== "NORMAL")
-				return { kind: "flatten", reason: "paint_flattened" };
-			return { kind: "native-image" };
-		}
+	if (n.type === "RECTANGLE") {
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
 		return { kind: "native-rect" };

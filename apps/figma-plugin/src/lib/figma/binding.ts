@@ -5,6 +5,7 @@
 import type { Symbology } from "@freshcoat-js/coatfile";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { titleCase } from "./transpiler/fields";
+import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
 /** Schema format a field lowers to (coatfile). */
@@ -355,7 +356,7 @@ export function inferNodeBinding(node: FigmaNode): NodeBinding | null {
 				),
 			};
 		}
-		if (node.type === "RECTANGLE" && hasSingleImageFill(node)) {
+		if (canHoldImage(node) && hasSingleImageFill(node)) {
 			return { bind: { image: tmpl }, fields: imageDraftsFor(nameValue, node) };
 		}
 		// A non-text, non-image layer can't be a text/image field without odd
@@ -455,11 +456,11 @@ export function bindableProperties(node: FigmaNode): BindTarget[] {
 			{ property: "textColor", format: "color" },
 		];
 	}
-	if (node.type === "RECTANGLE") {
-		// A rect already carrying an image fill is only an image.
+	if (canHoldImage(node)) {
+		// A shape already carrying an image fill is only an image.
 		if (hasSingleImageFill(node))
 			return [{ property: "image", format: "image" }];
-		// A plain (solid-fill) rect can be a color swatch, an image placeholder
+		// A plain (solid-fill) shape can be a color swatch, an image placeholder
 		// (the common `{{logo}}`/avatar box), a QR, or a barcode.
 		return [
 			{ property: "fill", format: "color" },
