@@ -157,6 +157,25 @@ describe("the diagnostic charts", () => {
 			expect(spread(ramp[i])).toBeGreaterThan(spread(ramp[i - 1]));
 		}
 	});
+
+	test("chroma ramp patches match previously printed charts", () => {
+		const spec = chromaRampChart();
+		const ramp = spec.patches
+			.filter((p) => p.id.startsWith("chroma-250-"))
+			.map((p) => p.rgb);
+		expect(ramp).toEqual([
+			[128, 128, 128],
+			[118, 113, 142],
+			[109, 99, 156],
+			[99, 85, 170],
+			[90, 71, 184],
+			[80, 57, 198],
+			[71, 43, 212],
+			[61, 28, 227],
+			[52, 14, 241],
+			[43, 0, 255],
+		]);
+	});
 });
 
 describe("latticeCharts", () => {

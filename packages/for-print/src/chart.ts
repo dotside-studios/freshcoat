@@ -13,7 +13,6 @@ import {
 	createFrame,
 	createRect,
 	type GroupNode,
-	hslToRgb,
 	type Node,
 } from "@freshcoat-js/engine";
 import { CR80_LONG, CR80_SHORT } from "./geometry";
@@ -108,9 +107,33 @@ const hex = ([r, g, b]: RGB): string =>
 		)
 		.join("")}`;
 
-// Chart colors are authored in HSL because the sweeps vary one axis at a time
-// by definition.
-export { hslToRgb };
+// HSL → RGB, the generator for the hue and chroma sweeps. Chart colors are
+// authored in HSL because the sweeps vary one axis at a time by definition.
+// Kept apart from the engine's hslToRgb, whose rounding differs by one in a
+// few patches: printed charts are read against these exact values.
+export function hslToRgb(h: number, s: number, l: number): RGB {
+	const c = (1 - Math.abs(2 * l - 1)) * s;
+	const hp = (((h % 360) + 360) % 360) / 60;
+	const x = c * (1 - Math.abs((hp % 2) - 1));
+	const [r, g, b] =
+		hp < 1
+			? [c, x, 0]
+			: hp < 2
+				? [x, c, 0]
+				: hp < 3
+					? [0, c, x]
+					: hp < 4
+						? [0, x, c]
+						: hp < 5
+							? [x, 0, c]
+							: [c, 0, x];
+	const m = l - c / 2;
+	return [
+		Math.round((r + m) * 255),
+		Math.round((g + m) * 255),
+		Math.round((b + m) * 255),
+	];
+}
 
 function fiducials(
 	width: number,
