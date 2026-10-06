@@ -8,7 +8,7 @@
 // draws placeholder BARS (not glyphs) from the layout, so exact break positions
 // don't matter — only rough line counts and widths. Production render paths pass
 // createParagraphEngine for pixel-exact layout.
-import type { SpanFont, TextEngine } from "./text-engine";
+import type { ClusterAdvance, SpanFont, TextEngine } from "./text-engine";
 import {
 	type MeasuredLine,
 	paragraphGaps,
@@ -31,7 +31,10 @@ function paragraphs(text: string): string[] {
 }
 
 function advance(text: string, size: number, letterSpacing = 0): number {
-	const n = [...text].length;
+	return advanceOf([...text].length, size, letterSpacing);
+}
+
+function advanceOf(n: number, size: number, letterSpacing = 0): number {
 	if (n === 0) return 0;
 	return n * size * CHAR_W + Math.max(0, n - 1) * letterSpacing;
 }
@@ -97,6 +100,24 @@ const measureSpanWidth: TextEngine["measureSpanWidth"] = (
 	font: SpanFont,
 ) => advance(collapse(text), font.size, font.letterSpacing ?? 0);
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+const clusterAdvances: NonNullable<TextEngine["clusterAdvances"]> = (
+	text,
+	font,
+) => {
+	const out: ClusterAdvance[] = [];
+	let n = 0;
+	for (const { index, segment } of graphemes.segment(text)) {
+		n += [...segment].length;
+		out.push({
+			end: index + segment.length,
+			x: advanceOf(n, font.size, font.letterSpacing ?? 0),
+		});
+	}
+	return out;
+};
+
 const layoutText: TextEngine["layoutText"] = (
 	input: TextLayoutInput,
 ): TextLayout => {
@@ -142,4 +163,5 @@ export const approxEngine: TextEngine = {
 	measureText,
 	measureSpanWidth,
 	layoutText,
+	clusterAdvances,
 };

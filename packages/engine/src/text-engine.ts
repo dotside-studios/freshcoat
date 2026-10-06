@@ -29,6 +29,8 @@ export type InlineShapedLine = {
 	hardBreak?: boolean;
 };
 
+export type ClusterAdvance = { end: number; x: number };
+
 export type TextEngine = {
 	// Wrapped/natural width + height of a run (maxWidth null = single line).
 	measureText: MeasureText;
@@ -36,6 +38,11 @@ export type TextEngine = {
 	measureSpanWidth: (text: string, font: SpanFont) => number;
 	// Full wrap (+ optional shrink-to-fit) of a single-style paragraph.
 	layoutText: (input: TextLayoutInput) => TextLayout;
+	// Optional: every grapheme cluster boundary of a single line, as the UTF-16
+	// end offset of each cluster and the advance from the line start to there,
+	// all from one shaping pass. Lets ellipsize find its cut without reshaping
+	// a candidate per step; engines that omit it get a binary search instead.
+	clusterAdvances?: (text: string, font: SpanFont) => ClusterAdvance[];
 	// Optional: shape multiple styled spans as ONE paragraph and wrap at maxWidth,
 	// returning per-line span fragments with correct cross-span geometry. Engines
 	// that can't shape across styles omit it, and compile falls back to

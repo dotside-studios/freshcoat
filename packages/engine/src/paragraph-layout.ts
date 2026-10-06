@@ -15,6 +15,7 @@
 import { fontArrayBuffer } from "./font-bytes";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
+	ClusterAdvance,
 	InlineShapedLine,
 	InlineSpan,
 	SpanFont,
@@ -274,6 +275,36 @@ export function createParagraphEngine(
 		return naturalWidth(text, font);
 	};
 
+	// Cluster widths summed in logical order, so the advance up to a boundary
+	// holds for either direction.
+	const clusterAdvances: NonNullable<TextEngine["clusterAdvances"]> = (
+		text,
+		font,
+	) => {
+		const out: ClusterAdvance[] = [];
+		if (text.length === 0) return out;
+		const { para, builder } = build(text, font);
+		try {
+			para.layout(NATURAL_WIDTH);
+			let x = 0;
+			let i = 0;
+			while (i < text.length) {
+				const info = para.getGlyphInfoAt(i);
+				if (!info) break;
+				const { end } = info.graphemeClusterTextRange;
+				if (end <= i) break;
+				const [l, , r] = info.graphemeLayoutBounds;
+				x += r - l;
+				out.push({ end, x });
+				i = end;
+			}
+			return out;
+		} finally {
+			para.delete();
+			builder.delete();
+		}
+	};
+
 	// Mirrors text-layout.ts's layoutText/shrinkToFit so the two engines are
 	// interchangeable inside compile.
 	const layoutText: TextEngine["layoutText"] = (
@@ -370,6 +401,7 @@ export function createParagraphEngine(
 		measureSpanWidth,
 		layoutText,
 		layoutInline,
+		clusterAdvances,
 		metricsFor,
 		dispose: () => provider.delete(),
 	};
