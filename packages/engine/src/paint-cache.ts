@@ -4,6 +4,11 @@
 // text, the decoded images and the output surface. A runtime without one paints exactly as
 // it always has, building and freeing all three per paint.
 
+import {
+	createLutImages,
+	freeLutImages,
+	type LutImages,
+} from "./lut-images";
 import type { CanvasLike } from "./types";
 
 export type PaintCacheStats = {
@@ -12,6 +17,7 @@ export type PaintCacheStats = {
 	fontProviderBuilds: number;
 	imageDecodes: number;
 	paragraphBuilds: number;
+	lutImageBuilds: number;
 };
 
 export type PaintCache = {
@@ -45,6 +51,7 @@ export type PaintCacheState = {
 	// Freed with the provider whose typefaces they use.
 	lines: Map<string, ShapedLine>;
 	linesUsed: Set<string>;
+	luts: LutImages;
 	surface: CachedSurface | null;
 	disposed: boolean;
 };
@@ -61,11 +68,13 @@ export function createPaintCache(): PaintCache {
 			fontProviderBuilds: 0,
 			imageDecodes: 0,
 			paragraphBuilds: 0,
+			lutImageBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
 		lines: new Map(),
 		linesUsed: new Set(),
+		luts: createLutImages(),
 		surface: null,
 		disposed: false,
 	};
@@ -76,6 +85,7 @@ export function createPaintCache(): PaintCache {
 		if (fonts) tryFree(() => fonts.provider.delete());
 		for (const img of state.images.values()) tryFree(() => img.delete());
 		state.images.clear();
+		freeLutImages(state.luts);
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -86,7 +96,7 @@ export function createPaintCache(): PaintCache {
 			clear();
 			state.disposed = true;
 		},
-		stats: () => ({ ...state.stats }),
+		stats: () => ({ ...state.stats, lutImageBuilds: state.luts.builds }),
 	};
 	states.set(cache, state);
 	return cache;

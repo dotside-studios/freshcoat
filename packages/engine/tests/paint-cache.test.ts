@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import CanvasKitInit from "canvaskit-wasm";
 import { describe, expect, test, vi } from "vitest";
+import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
 import { clearFontBytesCache } from "../src/font-bytes";
 import { createHeadlessEnv } from "../src/headless";
@@ -17,9 +18,15 @@ import {
 	encodePng,
 	type PaintCache,
 } from "../src/index";
+import {
+	cachedLutImage,
+	createLutImages,
+	evictUnusedLutImages,
+	freeLutImages,
+} from "../src/lut-images";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { Command, PaintRuntime } from "../src/types";
+import type { Adjust, Command, PaintRuntime } from "../src/types";
 
 const CK_BIN = join(
 	fileURLToPath(new URL(".", import.meta.url)),
@@ -108,6 +115,21 @@ function textScene(text: string, x: number): Node {
 				color: "#101828",
 			}),
 		],
+	});
+}
+
+function adjustScene(adjusts: Adjust[]): Node {
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		children: adjusts.map((adjust, i) =>
+			createRect({
+				pos: { x: i * 24, y: 0 },
+				size: { width: 20, height: 20 },
+				fills: [{ kind: "solid", color: "#808080" }],
+				adjust,
+			}),
+		),
 	});
 }
 
@@ -370,5 +392,105 @@ describe("PaintCache", () => {
 		await expect(
 			createHeadlessEnv({ fonts, cache }).paint(commands, ck),
 		).rejects.toThrow(/disposed/);
+	});
+
+	test("repeated paints with the same adjust reuse the LUT images", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const adjust = () =>
+			composeAdjust(
+				buildAdjust({ gamma: 1.4 }),
+				buildAdjust({ saturation: 1.5 }),
+			);
+		const commands = compile(adjustScene([adjust()]), SIZE, fonts);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(cache.stats().lutImageBuilds).toBe(2);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		// Equal tables in new arrays match by content.
+		const rebuilt = compile(adjustScene([adjust()]), SIZE, fonts);
+		expect(await pixels(rebuilt, rt)).toEqual(plain);
+		expect(cache.stats().lutImageBuilds).toBe(2);
+		cache.dispose();
+	});
+
+	test("different LUTs get their own images", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const commands = compile(
+			adjustScene([buildAdjust({ gamma: 2 }), buildAdjust({ gamma: 0.5 })]),
+			SIZE,
+			fonts,
+		);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const px = await pixels(commands, runtime(fonts, new Map(), cache).rt);
+		expect(px).toEqual(plain);
+		expect(cache.stats().lutImageBuilds).toBe(2);
+		const at = (x: number) => px.data[(10 * px.width + x) * 4];
+		expect(at(10)).not.toBe(at(34));
+		cache.dispose();
+	});
+
+	test("a LUT dropped from the scene is evicted and built again", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const adjusted = compile(
+			adjustScene([buildAdjust({ gamma: 2 })]),
+			SIZE,
+			fonts,
+		);
+		await pixels(adjusted, rt);
+		await pixels(compile(adjustScene([{}]), SIZE, fonts), rt);
+		await pixels(adjusted, rt);
+		expect(cache.stats().lutImageBuilds).toBe(2);
+		cache.dispose();
+	});
+});
+
+describe("LUT images", () => {
+	const fake = () => ({ delete: vi.fn() });
+
+	test("equal bytes share an image and different bytes do not", () => {
+		const luts = createLutImages();
+		const a = new Uint8Array([1, 2, 3]);
+		const imgA = cachedLutImage(luts, 1, [a], fake);
+		expect(cachedLutImage(luts, 1, [a], fake)).toBe(imgA);
+		expect(cachedLutImage(luts, 1, [a.slice()], fake)).toBe(imgA);
+		expect(cachedLutImage(luts, 1, [new Uint8Array([1, 2, 4])], fake)).not.toBe(
+			imgA,
+		);
+		expect(cachedLutImage(luts, 2, [a.slice()], fake)).not.toBe(imgA);
+		expect(luts.builds).toBe(3);
+	});
+
+	test("content matches compare against the bytes seen at build time", () => {
+		const luts = createLutImages();
+		const a = new Uint8Array([1, 2, 3]);
+		const imgA = cachedLutImage(luts, 1, [a], fake);
+		const mutated = a.slice();
+		a[0] = 9;
+		mutated[0] = 9;
+		expect(cachedLutImage(luts, 1, [mutated], fake)).not.toBe(imgA);
+		expect(cachedLutImage(luts, 1, [new Uint8Array([1, 2, 3])], fake)).toBe(
+			imgA,
+		);
+	});
+
+	test("eviction and freeing delete the images", () => {
+		const luts = createLutImages();
+		const kept = cachedLutImage(luts, 1, [new Uint8Array([1])], fake);
+		const dropped = cachedLutImage(luts, 1, [new Uint8Array([2])], fake);
+		evictUnusedLutImages(luts);
+		cachedLutImage(luts, 1, [new Uint8Array([1])], fake);
+		evictUnusedLutImages(luts);
+		expect(dropped.delete).toHaveBeenCalledTimes(1);
+		expect(kept.delete).not.toHaveBeenCalled();
+		freeLutImages(luts);
+		expect(kept.delete).toHaveBeenCalledTimes(1);
 	});
 });
