@@ -128,4 +128,29 @@ describe("createCardsPublisher", () => {
 		await vi.runAllTimersAsync();
 		expect(posted).toHaveLength(1);
 	});
+
+	it("serves the cached view to an export without recomputing", async () => {
+		const compute = vi.fn(async () => view("p"));
+		const { publisher } = setup(compute);
+		await publisher.publish();
+		expect(await publisher.view()).toEqual(view("p"));
+		expect(await publisher.view()).toEqual(view("p"));
+		expect(compute).toHaveBeenCalledTimes(1);
+		publisher.invalidate();
+		await publisher.view();
+		expect(compute).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not serve a view invalidated while it was computing", async () => {
+		const first = deferred<CardsView>();
+		const compute = vi
+			.fn<() => Promise<CardsView>>()
+			.mockReturnValueOnce(first.promise)
+			.mockResolvedValueOnce(view("new"));
+		const { publisher } = setup(compute);
+		const pending = publisher.view();
+		publisher.invalidate();
+		first.resolve(view("old"));
+		expect(await pending).toEqual(view("new"));
+	});
 });

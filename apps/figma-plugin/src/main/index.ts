@@ -18,6 +18,7 @@ import {
 import { type CardsView, createCardsPublisher } from "~/main/cards-publisher";
 import {
 	collectColorways,
+	colorwayInstances,
 	type DiscoInstance,
 	type DiscoNode,
 	detectCards,
@@ -253,14 +254,12 @@ async function gatherRead(
 	const colorways: ColorwayRead[] = [];
 	const card = await figma.getNodeByIdAsync(cardId);
 	if (card && card.type === "COMPONENT") {
-		const instances = figma.currentPage.findAllWithCriteria({
-			types: ["INSTANCE"],
-		});
-		const mains = await Promise.all(
-			instances.map((inst) => inst.getMainComponentAsync()),
+		const instances = await colorwayInstances(
+			await cardsPublisher.view(),
+			cardId,
+			(id) => figma.getNodeByIdAsync(id) as Promise<InstanceNode | null>,
 		);
-		for (const [i, inst] of instances.entries()) {
-			if (mains[i]?.id !== cardId) continue;
+		for (const inst of instances) {
 			const label = colorwayLabel(inst.name, card.name);
 			if (label === null) continue;
 			const perSide: Record<string, FigmaContainerNode> = {};

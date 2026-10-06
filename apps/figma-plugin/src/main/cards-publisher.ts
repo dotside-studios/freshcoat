@@ -47,6 +47,20 @@ export function createCardsPublisher(opts: {
 
 	return {
 		publish,
+		/** The current view, computed only if invalidated since the last one. */
+		async view(): Promise<CardsView> {
+			for (;;) {
+				cached ??= opts.compute();
+				const pending = cached;
+				try {
+					const view = await pending;
+					if (cached === pending) return view;
+				} catch (err) {
+					if (cached === pending) cached = null;
+					throw err;
+				}
+			}
+		},
 		/** Coalesce bursts (rapid clicks, drag-select) into one publish. */
 		schedule(): void {
 			cancelScheduled();

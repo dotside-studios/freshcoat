@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	collectColorways,
+	colorwayInstances,
 	detectCards,
 	isCard,
 	mapSides,
@@ -121,5 +122,43 @@ describe("detectCards", () => {
 		expect(cards[0].id).toBe("c:base");
 		expect(cards[0].sides).toEqual({ front: "f", back: "b" });
 		expect(cards[0].colorways).toEqual([{ instanceId: "i1", label: "Amber" }]);
+	});
+});
+
+describe("colorwayInstances", () => {
+	const view = {
+		nodes: [
+			{
+				id: "c1",
+				colorways: [
+					{ instanceId: "i1", label: "Amber" },
+					{ instanceId: "i2", label: "Slate" },
+					{ instanceId: "gone", label: "Gone" },
+				],
+			},
+			{ id: "c2", colorways: [{ instanceId: "i3", label: "Rose" }] },
+		],
+	};
+	const nodes = new Map([
+		["i1", { id: "i1", type: "INSTANCE" }],
+		["i2", { id: "i2", type: "INSTANCE" }],
+		["i3", { id: "i3", type: "INSTANCE" }],
+	]);
+
+	it("looks up only the card's cached instance ids", async () => {
+		const looked: string[] = [];
+		const found = await colorwayInstances(view, "c1", async (id) => {
+			looked.push(id);
+			return nodes.get(id) ?? null;
+		});
+		expect(looked).toEqual(["i1", "i2", "gone"]);
+		expect(found.map((n) => n.id)).toEqual(["i1", "i2"]);
+	});
+
+	it("finds none for a card the view does not list", async () => {
+		const found = await colorwayInstances(view, "nope", async () => {
+			throw new Error("no lookup expected");
+		});
+		expect(found).toEqual([]);
 	});
 });
