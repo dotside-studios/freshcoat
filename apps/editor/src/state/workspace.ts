@@ -10,6 +10,7 @@ import type {
 } from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
 import { hasGuides, type TemplateGuides } from "~/doc/guides";
+import type { History } from "~/doc/history";
 import { produce, produceAt } from "./immer";
 import type { DocState, EditorState } from "./store";
 
@@ -110,9 +111,16 @@ export function singleTemplateWorkspace(
 
 /** The workspace as it stands, the active template read from its editor. */
 export function workspaceSnapshot(state: EditorState): Workspace | null {
-	const ws = state.workspace;
-	if (!ws) return null;
-	const live = state.doc?.history;
+	return state.workspace
+		? workspaceOf(state.workspace, state.doc?.history)
+		: null;
+}
+
+/** The workspace with `live` as the active template's present step. */
+export function workspaceOf(
+	ws: WorkspaceState,
+	live?: Pick<History, "present" | "guides">,
+): Workspace {
 	return {
 		formatVersion: "1.0",
 		name: ws.name,
