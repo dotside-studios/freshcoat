@@ -1,5 +1,7 @@
 import { TemplateSchema } from "./schemas";
+import { type TextRuleBreak, textRuleBreaks } from "./text-rules";
 import type {
+	FieldDefinition,
 	FieldsSchema,
 	Template,
 	ValidationError,
@@ -136,29 +138,8 @@ export function validateValues(
 			});
 			continue;
 		}
-		if (def.maxLength !== undefined && raw.length > def.maxLength) {
-			errors.push({
-				path: `/${key}`,
-				code: "value_too_long",
-				message: `${key} exceeds maxLength ${def.maxLength}`,
-			});
-		}
-		if (def.minLength !== undefined && raw.length < def.minLength) {
-			errors.push({
-				path: `/${key}`,
-				code: "value_too_short",
-				message: `${key} below minLength ${def.minLength}`,
-			});
-		}
-		if (def.pattern !== undefined) {
-			const re = compiledPattern(def.pattern);
-			if (re !== null && !re.test(raw)) {
-				errors.push({
-					path: `/${key}`,
-					code: "value_pattern_mismatch",
-					message: `${key} does not match pattern`,
-				});
-			}
+		for (const broken of textRuleBreaks(def, raw)) {
+			errors.push(RULE_ERRORS[broken](key, def));
 		}
 	}
 
@@ -166,24 +147,23 @@ export function validateValues(
 	return { ok: true, value: v };
 }
 
-const patterns = new Map<string, RegExp | null>();
-export const PATTERN_CACHE_MAX = 256;
-
-export function compiledPattern(pattern: string): RegExp | null {
-	let re = patterns.get(pattern);
-	if (re !== undefined) {
-		patterns.delete(pattern);
-		patterns.set(pattern, re);
-		return re;
-	}
-	try {
-		re = new RegExp(pattern);
-	} catch {
-		// ignore invalid regex in schema
-		re = null;
-	}
-	patterns.set(pattern, re);
-	if (patterns.size > PATTERN_CACHE_MAX)
-		patterns.delete(patterns.keys().next().value as string);
-	return re;
-}
+const RULE_ERRORS: Record<
+	TextRuleBreak,
+	(key: string, def: FieldDefinition) => ValidationError
+> = {
+	too_short: (key, def) => ({
+		path: `/${key}`,
+		code: "value_too_short",
+		message: `${key} below minLength ${def.minLength}`,
+	}),
+	too_long: (key, def) => ({
+		path: `/${key}`,
+		code: "value_too_long",
+		message: `${key} exceeds maxLength ${def.maxLength}`,
+	}),
+	pattern_mismatch: (key) => ({
+		path: `/${key}`,
+		code: "value_pattern_mismatch",
+		message: `${key} does not match pattern`,
+	}),
+};

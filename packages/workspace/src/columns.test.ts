@@ -1,10 +1,9 @@
+import { validateValues } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	coerce,
-	compiledPattern,
 	defaultValues,
 	newRecord,
-	PATTERN_CACHE_MAX,
 	parseDateText,
 	serialToIso,
 	toTemplateValue,
@@ -269,16 +268,24 @@ describe("defaults", () => {
 	});
 });
 
-describe("compiledPattern", () => {
-	it("reuses a compiled pattern and evicts the least recently used past its cap", () => {
-		const first = compiledPattern("^a");
-		expect(compiledPattern("^a")).toBe(first);
-		const kept = compiledPattern("^kept");
-		for (let i = 0; i < PATTERN_CACHE_MAX - 1; i++) {
-			compiledPattern(`^p${i}`);
-			if (i === 0) compiledPattern("^kept");
+describe("patterns agree with coatfile", () => {
+	it("checks cells with the same unicode semantics as template values", () => {
+		const cases: [string, string][] = [
+			["^\\p{L}+$", "Äb"],
+			["^\\p{L}+$", "p{L}"],
+			["^[😀]$", "😀"],
+			["^\\a$", "x"],
+		];
+		for (const [pattern, value] of cases) {
+			const cell = validateRecord(
+				[{ key: "f", type: "text", pattern }],
+				{ f: value },
+			);
+			const field = validateValues(
+				{ f: value },
+				{ type: "object", properties: { f: { type: "string", pattern } } },
+			);
+			expect(cell.length === 0).toBe(field.ok);
 		}
-		expect(compiledPattern("^kept")).toBe(kept);
-		expect(compiledPattern("^a")).not.toBe(first);
 	});
 });

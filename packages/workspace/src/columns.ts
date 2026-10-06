@@ -1,3 +1,4 @@
+import { textRuleBreaks } from "@freshcoat-js/coatfile";
 import { findAssetByName, hasAssetSha, parseAssetRef } from "./assets";
 import { newId } from "./ids";
 import type {
@@ -307,38 +308,15 @@ function typeIssue(
 	}
 }
 
-const patterns = new Map<string, RegExp | null>();
-export const PATTERN_CACHE_MAX = 256;
-
-export function compiledPattern(pattern: string): RegExp | null {
-	let re = patterns.get(pattern);
-	if (re !== undefined) {
-		patterns.delete(pattern);
-		patterns.set(pattern, re);
-		return re;
-	}
-	try {
-		re = new RegExp(pattern, "u");
-	} catch {
-		re = null;
-	}
-	patterns.set(pattern, re);
-	if (patterns.size > PATTERN_CACHE_MAX)
-		patterns.delete(patterns.keys().next().value as string);
-	return re;
-}
-
 function textIssue(column: Column, value: string): string | null {
-	if (column.minLength !== undefined && value.length < column.minLength) {
+	const broken = textRuleBreaks(column, value)[0];
+	if (broken === "too_short") {
 		return `Shorter than ${column.minLength} characters`;
 	}
-	if (column.maxLength !== undefined && value.length > column.maxLength) {
+	if (broken === "too_long") {
 		return `Longer than ${column.maxLength} characters`;
 	}
-	if (column.pattern !== undefined) {
-		const re = compiledPattern(column.pattern);
-		if (re !== null && !re.test(value)) return "Does not match the pattern";
-	}
+	if (broken === "pattern_mismatch") return "Does not match the pattern";
 	if (
 		column.type === "text" &&
 		column.enum !== undefined &&

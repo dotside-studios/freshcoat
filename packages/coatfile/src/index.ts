@@ -188,6 +188,13 @@ export type {
 	VectorProperties,
 	VisibilityCondition,
 } from "./types";
+export {
+	compiledPattern,
+	PATTERN_CACHE_MAX,
+	type TextRuleBreak,
+	type TextRules,
+	textRuleBreaks,
+} from "./text-rules";
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,

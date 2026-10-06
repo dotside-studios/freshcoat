@@ -1,3 +1,4 @@
+import { compiledPattern } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { inputBase } from "@freshcoat-js/ui/field";
@@ -478,12 +479,9 @@ function Constraints({
 						placeholder="Regular expression"
 						validate={(v) => {
 							if (!v) return null;
-							try {
-								new RegExp(v, "u");
-								return null;
-							} catch {
-								return "Not a valid regular expression";
-							}
+							return compiledPattern(v) === null
+								? "Not a valid regular expression"
+								: null;
 						}}
 						onCommit={(v) => patch({ pattern: v || undefined })}
 					/>

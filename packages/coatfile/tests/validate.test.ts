@@ -1,11 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
-import {
-	compiledPattern,
-	PATTERN_CACHE_MAX,
-	validate,
-	validateValues,
-} from "../src/validate";
+import { compiledPattern, PATTERN_CACHE_MAX } from "../src/text-rules";
+import { validate, validateValues } from "../src/validate";
 
 const minimalValid: Template = {
 	format_version: "1.0",
@@ -824,4 +820,16 @@ test("the compiled pattern cache evicts the least recently used past its cap", (
 	}
 	expect(compiledPattern("^kept")).toBe(kept);
 	expect(compiledPattern("^a")).not.toBe(first);
+});
+
+test("patterns compile with unicode semantics", () => {
+	const field = (pattern: string) => ({
+		type: "object" as const,
+		properties: { f: { type: "string" as const, pattern } },
+	});
+	expect(validateValues({ f: "Äb" }, field("^\\p{L}+$")).ok).toBe(true);
+	expect(validateValues({ f: "p{L}" }, field("^\\p{L}+$")).ok).toBe(false);
+	expect(validateValues({ f: "😀" }, field("^[😀]$")).ok).toBe(true);
+	expect(compiledPattern("^\\a$")).toBeNull();
+	expect(validateValues({ f: "x" }, field("^\\a$")).ok).toBe(true);
 });
