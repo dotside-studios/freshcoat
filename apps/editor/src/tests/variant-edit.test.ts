@@ -5,6 +5,7 @@ import type {
 } from "@freshcoat-js/coatfile";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController } from "~/app/controller";
+import type { LayerGeometry } from "~/doc/geometry";
 import { align, applyRect, translateLayers } from "~/doc/geometry";
 import {
 	addFont,
@@ -34,7 +35,7 @@ import {
 	updateField,
 	variantIdFor,
 } from "~/doc/ops";
-import { getElement } from "~/doc/path";
+import { getElement, keyOf, walkLayers } from "~/doc/path";
 import { resizeWithConstraints } from "~/doc/resize";
 import {
 	changedLayerCount,
@@ -775,5 +776,146 @@ describe("sameJson", () => {
 		expect(sameJson({ a: 1 }, { a: 1, b: undefined })).toBe(true);
 		expect(sameJson([1, 2], [2, 1])).toBe(false);
 		expect(sameJson({ a: 1 }, { a: 2 })).toBe(false);
+	});
+});
+
+describe("variant change counts", () => {
+	function manyVariants(): Template {
+		const t = doc();
+		return {
+			...t,
+			variants: [
+				...(t.variants ?? []),
+				{
+					id: "nested",
+					label: "Nested",
+					overrides: [
+						{
+							name: "front",
+							elements: [
+								{ id: "deep", properties: { fill: "#111111" } },
+								{ id: "inner", properties: {}, pos: { x: 4, y: 4 } },
+								{ id: "t1", properties: {}, hidden: true },
+								{ id: "ghost", properties: { fill: "#222222" } },
+							],
+						},
+						{
+							name: "front",
+							elements: [
+								{ id: "t1", properties: {}, hidden: false },
+								{ id: "rot", properties: {}, rotation: 30 },
+								{ id: "spin", properties: { fill: undefined } },
+							],
+						},
+					],
+				},
+				{
+					id: "split",
+					label: "Split",
+					overrides: [
+						{
+							name: "back",
+							background: {
+								id: "bg",
+								type: "rect",
+								properties: { fill: "#333333" },
+							},
+						},
+						{
+							name: "front",
+							elements: [{ id: "f", properties: {}, opacity: 0.5 }],
+						},
+						{
+							name: "front",
+							elements: [{ id: "f1", properties: {}, hidden: true }],
+						},
+					],
+				},
+				{ id: "empty", label: "Empty", overrides: [] },
+			],
+		};
+	}
+
+	function countBefore(t: Template, variantId: string): number {
+		let n = 0;
+		t.template_data.forEach((frame, side) => {
+			for (const e of walkLayers(t, side)) {
+				const changed =
+					e.key.endsWith("/bg") && "background" in e.path
+						? overriddenKeys(t, variantId, frame.name).length > 0
+						: overriddenKeys(t, variantId, frame.name, e.element.id).length >
+								0 || isHiddenInVariant(t, variantId, frame.name, e.element.id);
+				if (changed) n++;
+			}
+		});
+		return n;
+	}
+
+	function geometryBefore(
+		t: Template,
+		variantId: string,
+		geometry: LayerGeometry,
+	): LayerGeometry {
+		const moved: string[] = [];
+		t.template_data.forEach((frame, side) => {
+			for (const e of walkLayers(t, side)) {
+				if ("background" in e.path) continue;
+				const d = mergedDelta(t, variantId, frame.name, e.element.id);
+				if (
+					d &&
+					(d.pos ||
+						d.size ||
+						d.rotation !== undefined ||
+						d.opacity !== undefined)
+				)
+					moved.push(keyOf(e.path));
+			}
+		});
+		if (moved.length === 0) return geometry;
+		const out: LayerGeometry = new Map();
+		for (const [key, box] of geometry)
+			if (!moved.some((m) => key === m || key.startsWith(`${m}/`)))
+				out.set(key, box);
+		return out;
+	}
+
+	test("counts match a per-layer read of the overrides", () => {
+		const t = manyVariants();
+		for (const v of t.variants ?? [])
+			expect(changedLayerCount(t, v.id)).toBe(countBefore(t, v.id));
+		expect(changedLayerCount(t, "nested")).toBe(3);
+		expect(changedLayerCount(t, "nope")).toBe(0);
+	});
+
+	test("a template's counts are computed once", () => {
+		const t = manyVariants();
+		const data = t.template_data;
+		let reads = 0;
+		Object.defineProperty(t, "template_data", {
+			get: () => {
+				reads++;
+				return data;
+			},
+		});
+		const first = changedLayerCount(t, "nested");
+		const after = reads;
+		expect(after).toBeGreaterThan(0);
+		expect(changedLayerCount(t, "nested")).toBe(first);
+		expect(reads).toBe(after);
+	});
+
+	test("geometry for the base matches a per-layer read of the overrides", () => {
+		const t = manyVariants();
+		for (const v of t.variants ?? []) {
+			const g = geometryOf(workingTemplate(t, v.id));
+			expect([...geometryForBase(t, v.id, g).keys()]).toEqual([
+				...geometryBefore(t, v.id, g).keys(),
+			]);
+		}
+		const g = geometryOf(workingTemplate(t, "nested"));
+		const out = geometryForBase(t, "nested", g);
+		expect(out.has("0/1/2")).toBe(false);
+		expect(out.has("0/1/2/0")).toBe(false);
+		expect(out.has("0/1/0")).toBe(true);
 	});
 });
