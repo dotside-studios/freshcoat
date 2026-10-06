@@ -240,8 +240,11 @@ export function JobBar({
 						<ProgressBar
 							aria-label="Export progress"
 							className="min-w-28 max-w-80 flex-1"
-							value={progress?.done ?? 0}
-							maxValue={Math.max(1, progress?.total ?? 1)}
+							value={progress?.assembling?.done ?? progress?.done ?? 0}
+							maxValue={Math.max(
+								1,
+								progress?.assembling?.total ?? progress?.total ?? 1,
+							)}
 							isIndeterminate={!progress}
 							tone={progress && progress.failed > 0 ? "danger" : "accent"}
 						/>
@@ -253,6 +256,13 @@ export function JobBar({
 								/>
 								{progress.failed > 0 ? (
 									<Stat value={progress.failed} label="failed" tone="danger" />
+								) : null}
+								{progress.assembling ? (
+									<Stat
+										testId="export-assembling"
+										value={`${progress.assembling.done} / ${progress.assembling.total}`}
+										label="assembling PDF"
+									/>
 								) : null}
 								<Divider />
 								{rate !== null ? (

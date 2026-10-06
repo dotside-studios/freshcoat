@@ -9,6 +9,7 @@ import { crc32 } from "@freshcoat-js/workspace/crc";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import {
+	type AssemblePdf,
 	itemSize,
 	type JobPool,
 	type JobProgress,
@@ -528,6 +529,35 @@ describe("runExportJob", () => {
 			new Uint8Array(await (result.file?.blob as Blob).arrayBuffer()),
 		);
 		expect(Object.keys(files)).toHaveLength(5);
+	});
+
+	it("reports PDF assembly progress and cancels assembly with the job", async () => {
+		const pool = fakePool();
+		let signal: AbortSignal | undefined;
+		const assemblePdf: AssemblePdf = (pages, _options, extras) => {
+			signal = extras?.signal;
+			extras?.onProgress?.(1, pages.length);
+			return new Promise<Uint8Array>(() => {});
+		};
+		const controller = new AbortController();
+		const progress: JobProgress[] = [];
+		const running = runExportJob(workspace(1), preset({ format: "pdf" }), {
+			pool,
+			assemblePdf,
+			signal: controller.signal,
+			onProgress: (p) => {
+				progress.push(p);
+				if (p.assembling) controller.abort();
+			},
+		});
+		const result = await running;
+		expect(result.cancelled).toBe(true);
+		expect(progress.at(-1)).toMatchObject({
+			done: 2,
+			total: 2,
+			assembling: { done: 1, total: 2 },
+		});
+		expect(signal?.aborted).toBe(true);
 	});
 });
 

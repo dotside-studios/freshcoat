@@ -1,4 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import type { PdfPage } from "@freshcoat-js/workspace";
+import type { AssemblePdfOptions } from "@freshcoat-js/workspace/pdf";
 import type { GamutNote, RenderPrint } from "./print";
 
 export type OutputFormat = "png" | "jpeg" | "webp";
@@ -59,3 +61,16 @@ export type WorkerReply =
 	| { type: "ready"; ok: false; error: string }
 	| ({ type: "render"; id: number; ok: true } & RenderOutput)
 	| { type: "render"; id: number; ok: false; error: string };
+
+export type PdfAssembleOptions = Omit<AssemblePdfOptions, "onProgress">;
+
+export type PdfWorkerRequest = {
+	type: "assemble";
+	pages: PdfPage[];
+	options: PdfAssembleOptions;
+};
+
+export type PdfWorkerReply =
+	| { type: "progress"; done: number; total: number }
+	| { type: "done"; bytes: Uint8Array }
+	| { type: "error"; error: string };

@@ -27,6 +27,7 @@ import {
 	slug,
 	templateStem,
 } from "@freshcoat-js/workspace";
+import { type AssembleExtras, assemblePdfInWorker } from "./pdf-client";
 import { gamutPercent, type PrintOutcome, printRequest } from "./print";
 import type { RenderOutput, RenderRequest } from "./protocol";
 import {
@@ -54,6 +55,8 @@ export type JobProgress = {
 	etaMs: number;
 	/** bytes handed to the destination so far */
 	bytes?: number;
+	/** set while a PDF is assembled: pages embedded of all */
+	assembling?: { done: number; total: number };
 };
 
 export type JobItemResult = {
@@ -102,13 +105,15 @@ export type AssemblePdf = (
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
 	},
+	extras?: AssembleExtras,
 ) => Promise<Uint8Array>;
 
 export type ExportJobOptions = {
 	pool: JobPool;
 	onProgress?: (progress: JobProgress) => void;
 	signal?: AbortSignal;
-	/** defaults to `@freshcoat-js/workspace/pdf`, loaded when a PDF is made */
+	/** defaults to a PDF worker, or `@freshcoat-js/workspace/pdf` on this
+	 *  thread where there are no workers */
 	assemblePdf?: AssemblePdf;
 	/** where a zip format's files go; defaults to one zip in memory, handed
 	 *  back as `file` */
@@ -124,8 +129,13 @@ export const REPORT_FILE_NAME = "export-report.csv";
 export const PDF_CONFIRM_BYTES = 1024 ** 3;
 const PDF_SAMPLE_PAGES = 3;
 
-const loadAssemblePdf: AssemblePdf = async (pages, options) =>
-	(await import("@freshcoat-js/workspace/pdf")).assemblePdf(pages, options);
+const defaultAssemblePdf: AssemblePdf = async (pages, options, extras) =>
+	typeof Worker !== "undefined"
+		? assemblePdfInWorker(pages, options, extras)
+		: (await import("@freshcoat-js/workspace/pdf")).assemblePdf(pages, {
+				...options,
+				...(extras?.onProgress ? { onProgress: extras.onProgress } : {}),
+			});
 
 /** The job's output name without an extension: the preset's name, else the
  *  template's file name. */
@@ -405,6 +415,7 @@ export function runExportJob(
 		let dispatching = false;
 		let writing = false;
 		let asked = false;
+		const assembly = new AbortController();
 
 		const bytesOut = () => sink?.bytes ?? collector?.bytes ?? 0;
 		const sinkResult = (): SinkResult | undefined =>
@@ -416,6 +427,7 @@ export function runExportJob(
 			if (settled) return;
 			settled = true;
 			signal?.removeEventListener("abort", abort);
+			assembly.abort();
 			resolve({ ...result, ms: now() - started, stats });
 		};
 
@@ -423,6 +435,7 @@ export function runExportJob(
 			if (settled) return;
 			settled = true;
 			signal?.removeEventListener("abort", abort);
+			assembly.abort();
 			pool.cancel();
 			void sink?.abort();
 			reject(e);
@@ -457,13 +470,30 @@ export function runExportJob(
 				}
 				let file: JobFile | undefined;
 				if (collector && collector.pages.length > 0) {
-					const assemble = options.assemblePdf ?? loadAssemblePdf;
-					const bytes = await assemble(collector.pages, {
-						dpi: preset.dpi,
-						title: preset.name || workspace.name,
-						...(sheet ? { layout: sheet, cardMm } : {}),
-						...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
-					});
+					const assemble = options.assemblePdf ?? defaultAssemblePdf;
+					const bytes = await assemble(
+						collector.pages,
+						{
+							dpi: preset.dpi,
+							title: preset.name || workspace.name,
+							...(sheet ? { layout: sheet, cardMm } : {}),
+							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
+						},
+						{
+							signal: assembly.signal,
+							onProgress: (embedded, pages) => {
+								if (settled) return;
+								onProgress?.({
+									done: total,
+									failed,
+									total,
+									etaMs: 0,
+									bytes: collector.bytes,
+									assembling: { done: embedded, total: pages },
+								});
+							},
+						},
+					);
 					if (settled) return;
 					file = {
 						blob: new Blob([bytes as BlobPart], { type: "application/pdf" }),

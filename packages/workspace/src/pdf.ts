@@ -24,6 +24,8 @@ export type AssemblePdfOptions = {
 	 *  placed by its trim with the bleed outside it; one per page, each page
 	 *  gets a trim box inside its bleed box */
 	bleedMm?: number | BleedMm;
+	/** called after each image is embedded */
+	onProgress?: (done: number, total: number) => void;
 };
 
 const CROP_MARK_WIDTH_PT = 0.25;
@@ -64,6 +66,15 @@ export async function assemblePdf(
 	doc.setCreationDate(date);
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);
+	let embedded = 0;
+	const embed = async (page: PdfPage) => {
+		const image =
+			page.format === "jpeg"
+				? await doc.embedJpg(page.bytes)
+				: await doc.embedPng(page.bytes);
+		options.onProgress?.(++embedded, pages.length);
+		return image;
+	};
 	if (options.layout?.kind === "sheet") {
 		const first = pages[0];
 		const card = options.cardMm ?? trimOf(first, options.dpi, bleed);
@@ -76,11 +87,7 @@ export async function assemblePdf(
 		for (const sheet of imposition.pages) {
 			const out = doc.addPage([width, height]);
 			for (const slot of sheet.slots) {
-				const page = slot.item;
-				const image =
-					page.format === "jpeg"
-						? await doc.embedJpg(page.bytes)
-						: await doc.embedPng(page.bytes);
+				const image = await embed(slot.item);
 				// pdf-lib measures up from the bottom-left corner.
 				out.drawImage(image, {
 					x: (slot.xMm - bleed.left) * PT_PER_MM,
@@ -102,10 +109,7 @@ export async function assemblePdf(
 		return doc.save();
 	}
 	for (const page of pages) {
-		const image =
-			page.format === "jpeg"
-				? await doc.embedJpg(page.bytes)
-				: await doc.embedPng(page.bytes);
+		const image = await embed(page);
 		const [width, height] = pageSizePt(
 			page.widthPx,
 			page.heightPx,
