@@ -194,6 +194,8 @@ export function useLiveRender(): {
  *  an id can point at the layer. */
 const pathIdsOf = new WeakMap<object, Map<string, string>>();
 
+const NO_WARNINGS = Object.freeze([]) as unknown as string[];
+
 /** Barcode values the encoder refused go to the Issues list as hints, with
  *  their layer; everything else is a line under "Last render". */
 function splitWarnings(
@@ -212,6 +214,7 @@ function splitWarnings(
 			});
 		} else out.warnings.push(describeWarning(w));
 	}
+	if (out.warnings.length === 0) out.warnings = NO_WARNINGS;
 	return out;
 }
 

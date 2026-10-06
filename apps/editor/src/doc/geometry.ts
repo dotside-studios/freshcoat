@@ -91,6 +91,27 @@ export function collectGeometry(
 	return out;
 }
 
+export function sameGeometry(a: LayerGeometry, b: LayerGeometry): boolean {
+	if (a === b) return true;
+	if (a.size !== b.size) return false;
+	for (const [key, x] of a) {
+		const y = b.get(key);
+		if (
+			!y ||
+			x.rect.x !== y.rect.x ||
+			x.rect.y !== y.rect.y ||
+			x.rect.width !== y.rect.width ||
+			x.rect.height !== y.rect.height ||
+			x.rect.rotation !== y.rect.rotation ||
+			x.worldRotation !== y.worldRotation ||
+			x.parentKey !== y.parentKey ||
+			x.autoLayoutChild !== y.autoLayoutChild
+		)
+			return false;
+	}
+	return true;
+}
+
 function nodeChildren(node: Node): Node[] {
 	if (node.kind === "group") return node.children;
 	if (node.kind === "mask") return [node.mask, ...node.children];
