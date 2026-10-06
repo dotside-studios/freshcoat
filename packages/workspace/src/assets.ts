@@ -119,7 +119,7 @@ type AssetIndex = {
 	count: number;
 	byBaseName: Map<string, DatasetAsset>;
 	byStem: Map<string, DatasetAsset>;
-	shas: Set<string>;
+	bySha: Map<string, DatasetAsset>;
 };
 
 const assetIndexes = new WeakMap<readonly DatasetAsset[], AssetIndex>();
@@ -129,15 +129,15 @@ function assetIndex(assets: readonly DatasetAsset[]): AssetIndex {
 	if (cached !== undefined && cached.count === assets.length) return cached;
 	const byBaseName = new Map<string, DatasetAsset>();
 	const byStem = new Map<string, DatasetAsset>();
-	const shas = new Set<string>();
+	const bySha = new Map<string, DatasetAsset>();
 	for (const a of assets) {
 		const base = baseName(a.name).toLowerCase();
 		if (!byBaseName.has(base)) byBaseName.set(base, a);
 		const s = stem(a.name).toLowerCase();
 		if (!byStem.has(s)) byStem.set(s, a);
-		shas.add(a.sha256);
+		if (!bySha.has(a.sha256)) bySha.set(a.sha256, a);
 	}
-	const index = { count: assets.length, byBaseName, byStem, shas };
+	const index = { count: assets.length, byBaseName, byStem, bySha };
 	assetIndexes.set(assets, index);
 	return index;
 }
@@ -158,7 +158,7 @@ export function hasAssetSha(
 	assets: readonly DatasetAsset[],
 	sha256: string,
 ): boolean {
-	return assetIndex(assets).shas.has(sha256);
+	return assetIndex(assets).bySha.has(sha256);
 }
 
 export function assetForRef(
@@ -166,9 +166,7 @@ export function assetForRef(
 	ref: unknown,
 ): DatasetAsset | undefined {
 	const sha = parseAssetRef(ref);
-	return sha === null
-		? undefined
-		: dataset.assets.find((a) => a.sha256 === sha);
+	return sha === null ? undefined : assetIndex(dataset.assets).bySha.get(sha);
 }
 
 /** Files a folder or a zip carries that nobody put there on purpose: hidden
