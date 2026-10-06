@@ -12,6 +12,13 @@ import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { dataUrlToBytes, fontBytes } from "./font-bytes";
 import {
+	cachedLutImage,
+	createLutImages,
+	evictUnusedLutImages,
+	freeLutImages,
+	type LutImages,
+} from "./lut-images";
+import {
 	cachedFontProvider,
 	cachedLine,
 	cachedSurface,
@@ -96,16 +103,14 @@ const WEIGHTS: Record<number, string> = {
 type Bin = {
 	track: <T>(o: T) => T;
 	free: () => void;
-	// LUT textures are immutable during a paint. Reusing an equal table keeps a
-	// photo-heavy scene from allocating and uploading the same 256×1 texture for
-	// every adjusted layer; `free` still owns every cached native image.
-	lutImages: Map<string, CK>;
-	// 3D cubes use a 2D atlas texture; cache them by value for the same reason as
-	// the 1D curves above.
-	lut3dImages: Map<string, CK>;
+	// Reusing an equal table keeps a photo-heavy scene from allocating and
+	// uploading the same LUT texture for every adjusted layer. `free` deletes
+	// them unless a PaintCache passed in owns them.
+	luts: LutImages;
 };
-function makeBin(): Bin {
+function makeBin(shared?: LutImages): Bin {
 	const items: { delete(): void }[] = [];
+	const luts = shared ?? createLutImages();
 	return {
 		track: (o) => {
 			if (o && typeof (o as { delete?: unknown }).delete === "function")
@@ -118,9 +123,9 @@ function makeBin(): Bin {
 					o.delete();
 				} catch {}
 			}
+			if (!shared) freeLutImages(luts);
 		},
-		lutImages: new Map(),
-		lut3dImages: new Map(),
+		luts,
 	};
 }
 
@@ -1309,22 +1314,21 @@ function needsShaderAdjust(cmd: DrawCommand): boolean {
 
 // A 256×1 lookup image encoding a per-channel LUT (x = input 0..255, texel =
 // output). Sampled Nearest/Clamp by the adjust shader.
-function lutKey(lut: NonNullable<DrawCommand["adjust"]>["lut"]): string {
-	if (!lut) throw new Error("lutKey: no lut");
-	// The bytes are the value of a curve; callers often construct separate typed
-	// arrays for the same gamma, so object identity would miss the useful cache.
-	return `${lut.r.join(",")}|${lut.g.join(",")}|${lut.b.join(",")}`;
-}
-
 function lutImage(
 	ck: CK,
 	bin: Bin,
 	lut: NonNullable<DrawCommand["adjust"]>["lut"],
 ): CK {
 	if (!lut) throw new Error("lutImage: no lut");
-	const key = lutKey(lut);
-	const cached = bin.lutImages.get(key);
-	if (cached) return cached;
+	return cachedLutImage(bin.luts, 1, [lut.r, lut.g, lut.b], () =>
+		buildLutImage(ck, lut),
+	);
+}
+
+function buildLutImage(
+	ck: CK,
+	lut: NonNullable<NonNullable<DrawCommand["adjust"]>["lut"]>,
+): CK {
 	const px = new Uint8Array(256 * 4);
 	for (let i = 0; i < 256; i++) {
 		px[i * 4] = lut.r[i];
@@ -1332,26 +1336,17 @@ function lutImage(
 		px[i * 4 + 2] = lut.b[i];
 		px[i * 4 + 3] = 255;
 	}
-	const image = bin.track(
-		ck.MakeImage(
-			{
-				width: 256,
-				height: 1,
-				colorType: ck.ColorType.RGBA_8888,
-				alphaType: ck.AlphaType.Unpremul,
-				colorSpace: ck.ColorSpace.SRGB,
-			},
-			px,
-			256 * 4,
-		),
+	return ck.MakeImage(
+		{
+			width: 256,
+			height: 1,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		},
+		px,
+		256 * 4,
 	);
-	bin.lutImages.set(key, image);
-	return image;
-}
-
-function lut3dKey(lut: NonNullable<DrawCommand["adjust"]>["lut3d"]): string {
-	if (!lut) throw new Error("lut3dKey: no LUT");
-	return `${lut.size}:${lut.data.join(",")}`;
 }
 
 type Lut3d = NonNullable<NonNullable<DrawCommand["adjust"]>["lut3d"]>;
@@ -1375,9 +1370,12 @@ function lut3dImage(
 	lut: NonNullable<DrawCommand["adjust"]>["lut3d"],
 ): CK {
 	if (!validLut3d(lut)) throw new Error("lut3dImage: invalid LUT");
-	const key = lut3dKey(lut);
-	const cached = bin.lut3dImages.get(key);
-	if (cached) return cached;
+	return cachedLutImage(bin.luts, lut.size, [lut.data], () =>
+		buildLut3dImage(ck, lut),
+	);
+}
+
+function buildLut3dImage(ck: CK, lut: Lut3d): CK {
 	const width = lut.size * lut.size;
 	const px = new Uint8Array(width * lut.size * 4);
 	for (let b = 0; b < lut.size; b++) {
@@ -1392,21 +1390,17 @@ function lut3dImage(
 			}
 		}
 	}
-	const image = bin.track(
-		ck.MakeImage(
-			{
-				width,
-				height: lut.size,
-				colorType: ck.ColorType.RGBA_8888,
-				alphaType: ck.AlphaType.Unpremul,
-				colorSpace: ck.ColorSpace.SRGB,
-			},
-			px,
-			width * 4,
-		),
+	return ck.MakeImage(
+		{
+			width,
+			height: lut.size,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		},
+		px,
+		width * 4,
 	);
-	bin.lut3dImages.set(key, image);
-	return image;
 }
 
 // SkSL for the adjust post-pass, generated per feature combination. The source
@@ -2252,7 +2246,7 @@ export async function paintScene(
 		}
 	}
 
-	const bin = makeBin();
+	const bin = makeBin(cache?.luts);
 	const create = commands.find((c) => c.op === "createCanvas") as
 		| {
 				op: "createCanvas";
@@ -2387,6 +2381,7 @@ export async function paintScene(
 		if (cache) {
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
+			evictUnusedLutImages(cache.luts);
 		} else {
 			provider.delete();
 			for (const [src, img] of imageMap)
