@@ -514,8 +514,7 @@ export function ImagePicker({
 	const [query, setQuery] = useState("");
 	const q = query.trim().toLowerCase();
 	const assets = useMemo(
-		() =>
-			dataset.assets.filter((a) => !q || a.name.toLowerCase().includes(q)),
+		() => dataset.assets.filter((a) => !q || a.name.toLowerCase().includes(q)),
 		[dataset.assets, q],
 	);
 	const current = parseAssetRef(value);
