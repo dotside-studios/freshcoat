@@ -4,9 +4,9 @@ import {
 	type TemplateWarning,
 } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import type { FigmaBoundingBox, FigmaNode, FigmaSolidPaint } from "../types";
+import type { FigmaBoundingBox, FigmaNode } from "../types";
 import { DEFAULT_SYMBOLOGY, parseBarcodeLayerName } from "./barcode-name";
-import { figmaColorToHex } from "./colors";
+import { singleSolidFillHex } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
 export type TranspileBarcodeContext = {
@@ -19,15 +19,6 @@ export type TranspileBarcodeContext = {
  *  export stands in a placeholder for it, which the author must agree to. */
 export const BARCODE_UNKNOWN_SYMBOLOGY = "barcode_unknown_symbology";
 export const BARCODE_INVALID_VALUE = "barcode_invalid_value";
-
-// The layer's own paint when it is a single solid, as a QR placeholder reads
-// it: the bars are drawn in the colour the author painted the box.
-function solidFill(node: FigmaNode): string | undefined {
-	const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
-	const visible = fills.filter((f) => f.visible !== false);
-	if (visible.length !== 1 || visible[0].type !== "SOLID") return undefined;
-	return figmaColorToHex((visible[0] as FigmaSolidPaint).color);
-}
 
 /** A `barcode:` layer as a coatfile barcode element. Like a QR placeholder,
  *  only the layer's name, box and single solid fill are read, so any node type
@@ -87,7 +78,7 @@ export function transpileBarcode(
 	const properties: Record<string, unknown> = {
 		value,
 		symbology,
-		foreground: options.foreground ?? solidFill(node) ?? "#000000",
+		foreground: options.foreground ?? singleSolidFillHex(node) ?? "#000000",
 		...(options.background !== undefined
 			? { background: options.background }
 			: {}),

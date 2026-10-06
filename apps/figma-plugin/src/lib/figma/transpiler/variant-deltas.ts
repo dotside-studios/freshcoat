@@ -1,3 +1,4 @@
+import type { VariantElementDelta } from "@freshcoat-js/coatfile";
 import { parseAssetUri } from "@freshcoat-js/coatfile/assets";
 import { nestedElementArrays } from "./finalize";
 import type { NodeTrace } from "./types";
@@ -72,16 +73,6 @@ export function diffElementProperties(
 	return changed;
 }
 
-export type ElementDelta = {
-	id: string;
-	properties: Record<string, unknown>;
-	pos?: unknown;
-	size?: unknown;
-	rotation?: number;
-	opacity?: number;
-	hidden?: boolean;
-};
-
 // The base elements a colorway hides, from the base nodes it hides (see
 // alignInstanceVisibility) and the element each produced in the base walk.
 // `top` holds the outermost of them, which carry `hidden: true`; `within`
@@ -124,7 +115,7 @@ const SHELL_DEFAULTS = {
 	opacity: 1,
 } as const;
 
-type ShellDelta = Omit<ElementDelta, "id" | "properties" | "hidden">;
+type ShellDelta = Omit<VariantElementDelta, "id" | "properties" | "hidden">;
 
 // Two walks of the same layer can differ in the last bits of a float (the
 // instance sits elsewhere on the page), which is not a change.

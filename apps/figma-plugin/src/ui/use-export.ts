@@ -1,9 +1,4 @@
-import {
-	COAT_EXTENSION,
-	COAT_MEDIA_TYPE,
-	packTemplate,
-} from "@freshcoat-js/coatfile/coat";
-import { sha256 } from "js-sha256";
+import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
 import { useRef, useState } from "preact/hooks";
 import type { NodeTrace } from "~/lib/figma/transpiler";
 import {
@@ -11,7 +6,14 @@ import {
 	SizeMismatchError,
 } from "~/lib/figma/transpiler/exact-size";
 import { type FigmaNode, isContainerNode } from "~/lib/figma/types";
-import { checkFreshcoatAddress, openInFreshcoat } from "~/lib/handoff";
+import {
+	checkFreshcoatAddress,
+	coatBlob,
+	openInFreshcoat,
+	packCoat,
+	sha256Hex,
+} from "~/lib/handoff";
+import { slug } from "~/lib/slug";
 import type { ReadDocumentMessage, TemplateMode } from "~/shared/protocol";
 import { plural } from "~/ui/copy";
 import { buildDiagnostics, type Diagnostics } from "~/ui/diagnostics";
@@ -24,24 +26,9 @@ import {
 	type ExportedTemplate,
 	type ExportMetadata,
 	runTranspileToTemplate,
-	slugify,
 } from "~/ui/run-transpile";
 import { useAnnounce } from "~/ui/status";
 import type { Issue } from "~/ui/warnings";
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-	return sha256(bytes);
-}
-
-function pack(template: ExportedTemplate): Promise<Uint8Array> {
-	return packTemplate(template, { sha256: sha256Hex });
-}
-
-function coatBlob(bytes: Uint8Array): Blob {
-	return new Blob([bytes as Uint8Array<ArrayBuffer>], {
-		type: COAT_MEDIA_TYPE,
-	});
-}
 
 /** What the export button pressed: a download, or a hand-off to Freshcoat. */
 export type Action = "download" | "open";
@@ -181,11 +168,11 @@ export function useExport(opts: ExportOptions) {
 				metadata,
 				{ proceed },
 			);
-			const stem = `${msg.product.sku}-${slugify(metadata.name) || "card"}`;
+			const stem = `${msg.product.sku}-${slug(metadata.name, { fallback: "card" })}`;
 			const fileName = `${stem}${COAT_EXTENSION}`;
 			let packed: Uint8Array | null = null;
 			if (action === "download") {
-				packed = await pack(template);
+				packed = await packCoat(template);
 				download(fileName, coatBlob(packed));
 			}
 			const counts = template.source.report.counts;
@@ -314,7 +301,7 @@ export function useExport(opts: ExportOptions) {
 
 	async function downloadResult(): Promise<void> {
 		if (!result) return;
-		const packed = result.packed ?? (await pack(result.template));
+		const packed = result.packed ?? (await packCoat(result.template));
 		download(result.fileName, coatBlob(packed));
 		setResult((prev) => (prev ? { ...prev, packed, downloaded: true } : prev));
 		announce(`Downloaded ${result.fileName}`, "success");

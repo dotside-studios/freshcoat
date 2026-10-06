@@ -13,8 +13,23 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/coatfile/assets";
 import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
+// js-sha256 because crypto.subtle is unavailable in the plugin iframe (non-secure context).
 import { sha256 } from "js-sha256";
 import type { UiToMain } from "~/shared/protocol";
+
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+	return sha256(bytes);
+}
+
+export function packCoat(template: Template): Promise<Uint8Array> {
+	return packTemplate(template, { sha256: sha256Hex });
+}
+
+export function coatBlob(bytes: Uint8Array): Blob {
+	return new Blob([bytes as Uint8Array<ArrayBuffer>], {
+		type: COAT_MEDIA_TYPE,
+	});
+}
 
 /** The longest `coat` value sent as a link. Chromium accepts URLs up to 2 MB;
  *  this leaves room for the address and for browsers that allow less. */
@@ -127,13 +142,7 @@ export async function openInFreshcoat(
 		return { kind: "link", url };
 	}
 
-	const packed = await packTemplate(template, {
-		sha256: async (bytes) => sha256(bytes),
-	});
-	io.download(
-		options.fileName,
-		new Blob([packed as Uint8Array<ArrayBuffer>], { type: COAT_MEDIA_TYPE }),
-	);
+	io.download(options.fileName, coatBlob(await packCoat(template)));
 	const url = openFileUrl(address.base);
 	io.post({ type: "open-external", url });
 	return {

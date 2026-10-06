@@ -1,4 +1,4 @@
-import type { VisibilityCondition } from "../binding";
+import type { VisibilityCondition } from "@freshcoat-js/coatfile";
 import type { FigmaNode } from "../types";
 
 // Figma masks the layers ABOVE a mask layer in the same parent, up to the next

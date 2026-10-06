@@ -8,21 +8,8 @@
 //   barcode:code39:"ID {{id}}"      a template, quoted as in the other markers
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
 import type { Symbology } from "@freshcoat-js/coatfile";
-import { isWholeMustacheToken, parseMustacheTokens } from "./fields";
-
-/** The symbologies a `barcode:` layer can name: coatfile's `SYMBOLOGIES`,
- *  mirrored here so the main thread needs no coatfile runtime (a test holds
- *  the two lists equal). */
-export const BARCODE_SYMBOLOGIES = [
-	"code128",
-	"ean13",
-	"upca",
-	"code39",
-	"itf14",
-	"pdf417",
-	"datamatrix",
-	"aztec",
-] as const satisfies readonly Symbology[];
+import { SYMBOLOGIES } from "@freshcoat-js/coatfile/barcode-encoder";
+import { extractTokens, isWholeMustacheToken } from "./fields";
 
 /** What a `barcode:` layer draws when it names no symbology. */
 export const DEFAULT_SYMBOLOGY: Symbology = "code128";
@@ -48,7 +35,7 @@ export type SymbologyResult =
 
 export function resolveSymbology(name: string): SymbologyResult {
 	const key = normalize(name);
-	const direct = BARCODE_SYMBOLOGIES.find((s) => s === key);
+	const direct = SYMBOLOGIES.find((s) => s === key);
 	if (direct) return { ok: true, symbology: direct };
 	if (ALIASES[key]) return { ok: true, symbology: ALIASES[key] };
 	if (QR_NAMES.has(key)) {
@@ -59,7 +46,7 @@ export function resolveSymbology(name: string): SymbologyResult {
 	}
 	return {
 		ok: false,
-		message: `"${name.trim()}" is not a barcode type. Use one of ${BARCODE_SYMBOLOGIES.join(", ")}`,
+		message: `"${name.trim()}" is not a barcode type. Use one of ${SYMBOLOGIES.join(", ")}`,
 	};
 }
 
@@ -117,7 +104,7 @@ function readValue(
 		return { value: `{{${whole.id}}}`, mode: "token", ids: [whole.id] };
 	const unquoted =
 		s.length >= 2 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s;
-	const ids = [...new Set(parseMustacheTokens(unquoted))];
+	const ids = [...new Set(extractTokens(unquoted))];
 	return {
 		value: unquoted,
 		mode: ids.length > 0 ? "template" : "literal",

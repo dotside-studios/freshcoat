@@ -14,12 +14,15 @@ import {
 	Text,
 	Textbox,
 } from "@create-figma-plugin/ui";
-import { type Symbology, symbologyLabel } from "@freshcoat-js/coatfile";
+import {
+	SYMBOLOGIES,
+	type Symbology,
+	symbologyLabel,
+} from "@freshcoat-js/coatfile";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
 	type BindProperty,
-	extractTokens,
 	type FieldFormat,
 	type FieldMeta,
 	formatsForProperty,
@@ -30,11 +33,11 @@ import {
 	parseVisibilityMarker,
 } from "~/lib/figma/binding";
 import {
-	BARCODE_SYMBOLOGIES,
 	DEFAULT_SYMBOLOGY,
 	parseBarcodeLayerName,
 } from "~/lib/figma/transpiler/barcode-name";
-import { titleCase } from "~/lib/figma/transpiler/fields";
+import { extractTokens, titleCase } from "~/lib/figma/transpiler/fields";
+import { slug } from "~/lib/slug";
 import type { SelectionDetail } from "~/shared/protocol";
 import {
 	byPropertyOrder,
@@ -66,13 +69,6 @@ import {
 import { useMainMessage } from "~/ui/messages";
 import { postToMain } from "~/ui/post";
 import { useAnnounce } from "~/ui/status";
-
-export function slugifyId(s: string): string {
-	return s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "_")
-		.replace(/^_+|_+$/g, "");
-}
 
 function substituteToken(template: string, from: string, to: string): string {
 	return template.replace(
@@ -116,7 +112,7 @@ type Pending =
 
 const APPLIED_MS = 1500;
 
-const SYMBOLOGY_OPTIONS: DropdownOption[] = BARCODE_SYMBOLOGIES.map((s) => ({
+const SYMBOLOGY_OPTIONS: DropdownOption[] = SYMBOLOGIES.map((s) => ({
 	value: s,
 	text: symbologyLabel(s),
 }));
@@ -263,7 +259,7 @@ export function LayerTab(): JSX.Element {
 
 	if (!isBound) {
 		const bindAs = (property: BindProperty, format: FieldFormat) => {
-			const id = slugifyId(detail.name) || "field";
+			const id = slug(detail.name, { sep: "_", fallback: "field" });
 			const label = propertyLabel(property);
 			pendingRef.current = { kind: "bind", nodeId: detail.nodeId, label };
 			postToMain({
@@ -352,7 +348,7 @@ export function LayerTab(): JSX.Element {
 		for (const f of detail.fields) {
 			const draft = drafts[f.id];
 			if (!draft) continue;
-			const newId = slugifyId(draft.id) || f.id;
+			const newId = slug(draft.id, { sep: "_", fallback: f.id });
 			if (newId !== f.id) {
 				renames.push({ from: f.id, to: newId });
 				for (const key of Object.keys(bind)) {
@@ -411,7 +407,9 @@ export function LayerTab(): JSX.Element {
 	};
 
 	const addProperty = (property: BindProperty, format: FieldFormat): void => {
-		const base = detail.fields[0]?.id ?? (slugifyId(detail.name) || "field");
+		const base =
+			detail.fields[0]?.id ??
+			slug(detail.name, { sep: "_", fallback: "field" });
 		const id = `${base}_${property === "textColor" ? "color" : property}`;
 		const label = propertyLabel(property);
 		pendingRef.current = { kind: "bind", nodeId: detail.nodeId, label };
@@ -649,7 +647,7 @@ function VisibilityForm(props: {
 		initial?.equals !== undefined ? "equals" : initial?.not ? "unset" : "set",
 	);
 	const [value, setValue] = useState(initial?.equals ?? "");
-	const id = slugifyId(field);
+	const id = slug(field, { sep: "_" });
 	const valid =
 		id !== "" && /^[a-z_]/.test(id) && (mode !== "equals" || value !== "");
 	const name = (): string => {

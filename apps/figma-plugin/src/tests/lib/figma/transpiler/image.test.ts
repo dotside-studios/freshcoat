@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { transpileImage } from "~/lib/figma/transpiler/image";
-import type { FigmaImagePaint, FigmaRectangleNode } from "~/lib/figma/types";
+import { polygonMaskBox, transpileImage } from "~/lib/figma/transpiler/image";
+import type {
+	FigmaImagePaint,
+	FigmaRectangleNode,
+	FigmaVectorNode,
+} from "~/lib/figma/types";
 
 const FRAME = { x: 0, y: 0, width: 1000, height: 600 };
 
@@ -164,5 +168,164 @@ describe("dynamic image filters and crop", () => {
 		expect(r.element.properties.fit).toBe("cover");
 		expect(r.element.properties).not.toHaveProperty("crop");
 		expect(r.warnings.map((w) => w.code)).toEqual(["image_crop_unsupported"]);
+	});
+});
+
+const imageFill = [
+	{ type: "IMAGE" as const, scaleMode: "FILL" as const, imageRef: "abc" },
+];
+
+const shapeNode = (
+	overrides: Partial<FigmaVectorNode> & Pick<FigmaVectorNode, "type">,
+): FigmaVectorNode => ({
+	id: "1:5",
+	name: "{{avatar}}",
+	visible: true,
+	opacity: 1,
+	blendMode: "NORMAL",
+	absoluteBoundingBox: { x: 0, y: 0, width: 80, height: 80 },
+	relativeTransform: [
+		[1, 0, 0],
+		[0, 1, 0],
+	],
+	width: 80,
+	height: 80,
+	fills: imageFill,
+	...overrides,
+});
+
+function dynamicElement(node: FigmaRectangleNode | FigmaVectorNode) {
+	const r = transpileImage(node, { frame: FRAME, scale: 1 });
+	if (r.kind !== "element") throw new Error("expected an element");
+	return r;
+}
+
+describe("dynamic image shape", () => {
+	it("keeps a uniform corner radius", () => {
+		const { element } = dynamicElement(
+			baseImage({ name: "{{avatar}}", cornerRadius: 40 }),
+		);
+		expect(element.properties.cornerRadius).toBe(40);
+		expect(element.properties).not.toHaveProperty("mask");
+	});
+
+	it("rounds per-corner radii to the largest, and warns", () => {
+		const r = dynamicElement(
+			baseImage({ name: "{{avatar}}", cornerRadius: [24, 24, 0, 0] }),
+		);
+		expect(r.element.properties.cornerRadius).toBe(24);
+		expect(r.warnings.map((w) => w.code)).toEqual([
+			"image_corner_radius_approximated",
+		]);
+	});
+
+	it("maps corner smoothing to a squircle mask", () => {
+		const { element } = dynamicElement(
+			baseImage({ name: "{{avatar}}", cornerRadius: 20, cornerSmoothing: 0.6 }),
+		);
+		expect(element.properties.mask).toEqual({ kind: "squircle", radius: 20 });
+		expect(element.properties).not.toHaveProperty("cornerRadius");
+	});
+
+	it("keeps the stroke", () => {
+		const { element } = dynamicElement(
+			baseImage({
+				name: "{{avatar}}",
+				strokes: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
+				strokeWeight: 4,
+				strokeAlign: "INSIDE",
+			}),
+		);
+		expect(element.properties.stroke).toEqual({
+			color: "#ffffff",
+			width: 4,
+			align: "inside",
+		});
+	});
+
+	it("leaves out a gradient stroke, and warns", () => {
+		const r = dynamicElement(
+			baseImage({
+				name: "{{avatar}}",
+				strokes: [
+					{
+						type: "GRADIENT_LINEAR",
+						gradientHandlePositions: [
+							{ x: 0, y: 0.5 },
+							{ x: 1, y: 0.5 },
+							{ x: 0, y: 1 },
+						],
+						gradientStops: [
+							{ position: 0, color: { r: 0, g: 0, b: 0, a: 1 } },
+							{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+						],
+					},
+				],
+				strokeWeight: 4,
+			}),
+		);
+		expect(r.element.properties).not.toHaveProperty("stroke");
+		expect(r.warnings.map((w) => w.code)).toEqual(["image_stroke_unsupported"]);
+	});
+
+	it("masks a round ellipse as a circle", () => {
+		const { element } = dynamicElement(shapeNode({ type: "ELLIPSE" }));
+		expect(element.properties.mask).toBe("circle");
+		expect(element.properties.src).toBe("{{avatar}}");
+	});
+
+	it("masks an oval ellipse as an ellipse", () => {
+		const { element } = dynamicElement(
+			shapeNode({
+				type: "ELLIPSE",
+				width: 120,
+				absoluteBoundingBox: { x: 0, y: 0, width: 120, height: 80 },
+			}),
+		);
+		expect(element.properties.mask).toBe("ellipse");
+	});
+
+	it("masks a polygon and grows its box onto Figma's vertices", () => {
+		const { element } = dynamicElement(
+			shapeNode({
+				type: "POLYGON",
+				pointCount: 3,
+				relativeTransform: [
+					[1, 0, 10],
+					[0, 1, 20],
+				],
+			}),
+		);
+		expect(element.properties.mask).toEqual({ kind: "polygon", sides: 3 });
+		// A triangle spans 1.5 radii tall and sqrt(3) wide.
+		expect(element.size).toEqual({ width: 92.5, height: 106.5 });
+		expect(element.pos).toEqual({ x: 4, y: 20 });
+	});
+
+	it("leaves a square-sided polygon's box as it is", () => {
+		const { element } = dynamicElement(
+			shapeNode({ type: "POLYGON", pointCount: 4 }),
+		);
+		expect(element.size).toEqual({ width: 80, height: 80 });
+		expect(element.pos).toEqual({ x: 0, y: 0 });
+	});
+});
+
+describe("polygonMaskBox", () => {
+	it("puts each mask vertex on the edge of the node's box", () => {
+		for (const sides of [3, 5, 6, 7]) {
+			const box = polygonMaskBox(sides, 100, 60);
+			const xs: number[] = [];
+			const ys: number[] = [];
+			for (let i = 0; i < sides; i++) {
+				const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+				xs.push(box.x + (box.width / 2) * (1 + Math.cos(a)));
+				ys.push(box.y + (box.height / 2) * (1 + Math.sin(a)));
+			}
+			expect(Math.min(...xs)).toBeCloseTo(0);
+			expect(Math.max(...xs)).toBeCloseTo(100);
+			expect(Math.min(...ys)).toBeCloseTo(0);
+			expect(Math.max(...ys)).toBeCloseTo(60);
+		}
 	});
 });

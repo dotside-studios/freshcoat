@@ -1,4 +1,5 @@
 import type { BlendMode } from "@freshcoat-js/coatfile";
+import { inferNodeBinding, storedToNodeBinding } from "../binding";
 import type {
 	FigmaBlendMode,
 	FigmaEffect,
@@ -7,8 +8,9 @@ import type {
 	FigmaTextNode,
 	FigmaVectorNode,
 } from "../types";
-import { isContainerNode } from "../types";
+import { isContainerNode, isVectorNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";
+import { canHoldImage } from "./image-shape";
 import { compositeSolids, isMappablePaint, type PaintBox } from "./paint";
 import { decomposeTransform, nodeExtent } from "./transform";
 
@@ -26,13 +28,14 @@ export type Classification =
 
 export type FlattenReason =
 	| "text_mixed_styling_flattened"
+	| "text_stroke_flattened"
 	| "effect_flattened"
 	| "blend_mode_flattened"
 	| "vector_flattened"
-	| "clip_overflow_flattened"
 	| "transform_undecomposable_flattened"
 	| "multi_fill_flattened"
-	| "paint_flattened";
+	| "paint_flattened"
+	| "stroke_flattened";
 
 // PASS_THROUGH is a container's "no isolation", which is how the painter
 // composites a frame already; on anything else it is plain normal.
@@ -189,6 +192,16 @@ function fillsFlattenReason(
 	return undefined;
 }
 
+// coatfile strokes take one colour, so only solid paints composite into one.
+function strokeFlattens(n: {
+	strokes?: FigmaPaint[];
+	strokeWeight?: number;
+}): boolean {
+	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
+	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
+	return visible.length > 0 && compositeSolids(visible) === null;
+}
+
 // coatfile carries a colour per span but a gradient only for the whole
 // element, so each run's paints must come down to one colour, or the whole
 // text must share one gradient.
@@ -205,12 +218,40 @@ function textIsNative(n: FigmaTextNode): boolean {
 	return runFills.every((f) => JSON.stringify(f) === base);
 }
 
+/** coatfile text has no stroke, so a visible one is lost unless rasterized. */
+export function hasTextStroke(n: FigmaTextNode): boolean {
+	if ((n.strokeWeight ?? 1) <= 0) return false;
+	return (n.strokes ?? []).some((p) => p.visible !== false);
+}
+
+export function isTextFieldBound(n: FigmaTextNode): boolean {
+	const binding = n.binding
+		? storedToNodeBinding(n.binding)
+		: inferNodeBinding(n);
+	return binding?.bind.text !== undefined;
+}
+
 export function isQrLayerName(name: string): boolean {
 	return /^qr:.+/.test(name);
 }
 
-export function isImageLayerName(name: string): boolean {
+function isImageLayerName(name: string): boolean {
 	return /^image:.+/.test(name);
+}
+
+// An `image:` marker makes a maskable shape a dynamic image placeholder
+// regardless of its current fill, so a plain solid-gray `{{logo}}`/avatar box
+// binds as an image (the Layer-tab "Image" button writes this marker).
+function imageClassification(n: FigmaNode): Classification | undefined {
+	if (!canHoldImage(n)) return undefined;
+	if (isImageLayerName(n.name)) return { kind: "native-image" };
+	const visibleFills = (n.fills ?? []).filter((f) => f.visible !== false);
+	if (visibleFills.length !== 1 || visibleFills[0].type !== "IMAGE")
+		return undefined;
+	const blend = visibleFills[0].blendMode;
+	if (blend && blend !== "NORMAL")
+		return { kind: "flatten", reason: "paint_flattened" };
+	return { kind: "native-image" };
 }
 
 export function classify(n: FigmaNode): Classification {
@@ -235,35 +276,24 @@ export function classify(n: FigmaNode): Classification {
 	if (n.type === "TEXT") {
 		if (!textIsNative(n))
 			return { kind: "flatten", reason: "text_mixed_styling_flattened" };
+		// A bound text stays native so the field survives; the walk warns instead.
+		if (hasTextStroke(n) && !isTextFieldBound(n))
+			return { kind: "flatten", reason: "text_stroke_flattened" };
 		return { kind: "native-text" };
 	}
 
-	if (n.type === "RECTANGLE") {
-		// An `image:` marker makes a rect a dynamic image placeholder regardless
-		// of its current fill — so a plain solid-gray `{{logo}}`/avatar box binds
-		// as an image (the Layer-tab "Image" button writes this marker).
-		if (isImageLayerName(n.name)) return { kind: "native-image" };
+	const image = imageClassification(n);
+	if (image) return image;
 
-		const visibleFills = (n.fills ?? []).filter((f) => f.visible !== false);
-		if (visibleFills.length === 1 && visibleFills[0].type === "IMAGE") {
-			const blend = visibleFills[0].blendMode;
-			if (blend && blend !== "NORMAL")
-				return { kind: "flatten", reason: "paint_flattened" };
-			return { kind: "native-image" };
-		}
+	if (n.type === "RECTANGLE") {
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-rect" };
 	}
 
-	if (
-		n.type === "VECTOR" ||
-		n.type === "BOOLEAN_OPERATION" ||
-		n.type === "STAR" ||
-		n.type === "POLYGON" ||
-		n.type === "LINE" ||
-		n.type === "ELLIPSE"
-	) {
+	if (isVectorNode(n)) {
 		// Without fillGeometry there's nothing to emit. Every region merges into
 		// one `d` under one fill rule, so regions that disagree on theirs cannot.
 		if (!Array.isArray(n.fillGeometry) || n.fillGeometry.length === 0) {
@@ -274,6 +304,8 @@ export function classify(n: FigmaNode): Classification {
 		}
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-vector" };
 	}
 
@@ -289,6 +321,8 @@ export function classify(n: FigmaNode): Classification {
 		if (n.type === "GROUP") return { kind: "container" };
 		const reason = fillsFlattenReason(n.fills, paintBox(n));
 		if (reason) return { kind: "flatten", reason };
+		if (strokeFlattens(n))
+			return { kind: "flatten", reason: "stroke_flattened" };
 		return { kind: "native-frame" };
 	}
 	return { kind: "container" };

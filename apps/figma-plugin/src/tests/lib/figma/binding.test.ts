@@ -10,6 +10,7 @@ import type {
 	FigmaImagePaint,
 	FigmaRectangleNode,
 	FigmaTextNode,
+	FigmaVectorNode,
 } from "~/lib/figma/types";
 
 const bbox = { x: 0, y: 0, width: 10, height: 10 };
@@ -49,6 +50,14 @@ function rectNode(
 		absoluteBoundingBox: bbox,
 		fills,
 	};
+}
+
+function shapeNode(
+	name: string,
+	fills: FigmaVectorNode["fills"],
+	extra: Partial<FigmaVectorNode> & Pick<FigmaVectorNode, "type">,
+): FigmaVectorNode {
+	return { id: "s1", name, absoluteBoundingBox: bbox, fills, ...extra };
 }
 
 describe("parseValue (quoting rule)", () => {
@@ -221,6 +230,43 @@ describe("inferNodeBinding", () => {
 	});
 });
 
+describe("image inference on ellipses and polygons", () => {
+	it("infers a bare token on an image-fill ellipse as an image", () => {
+		const b = inferNodeBinding(
+			shapeNode("{{avatar}}", [IMAGE_FILL], { type: "ELLIPSE" }),
+		);
+		expect(b?.bind).toEqual({ image: "{{avatar}}" });
+	});
+
+	it("infers a bare token on an image-fill polygon as an image", () => {
+		const b = inferNodeBinding(
+			shapeNode("{{badge}}", [IMAGE_FILL], { type: "POLYGON", pointCount: 6 }),
+		);
+		expect(b?.bind).toEqual({ image: "{{badge}}" });
+	});
+
+	it("binds an image marker on a solid ellipse", () => {
+		const b = inferNodeBinding(
+			shapeNode(
+				"image:{{avatar}}",
+				[{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }],
+				{ type: "ELLIPSE" },
+			),
+		);
+		expect(b?.bind).toEqual({ image: "{{avatar}}" });
+	});
+
+	it("ignores a bare token on a partial arc", () => {
+		const b = inferNodeBinding(
+			shapeNode("{{avatar}}", [IMAGE_FILL], {
+				type: "ELLIPSE",
+				arcData: { startingAngle: 0, endingAngle: Math.PI, innerRadius: 0 },
+			}),
+		);
+		expect(b).toBeNull();
+	});
+});
+
 describe("bindableProperties", () => {
 	it("text node → text + textColor", () => {
 		expect(bindableProperties(textNode("Title"))).toEqual([
@@ -233,6 +279,14 @@ describe("bindableProperties", () => {
 		expect(bindableProperties(rectNode("Avatar", [IMAGE_FILL]))).toEqual([
 			{ property: "image", format: "image" },
 		]);
+	});
+
+	it("image-fill ellipse → image", () => {
+		expect(
+			bindableProperties(
+				shapeNode("Avatar", [IMAGE_FILL], { type: "ELLIPSE" }),
+			),
+		).toEqual([{ property: "image", format: "image" }]);
 	});
 
 	it("plain rectangle → fill + image + qr + barcode", () => {

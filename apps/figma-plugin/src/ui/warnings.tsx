@@ -77,7 +77,7 @@ const GROUPS: Array<{
 	},
 ];
 
-export function issueKey(i: Issue): string {
+function issueKey(i: Issue): string {
 	return `${i.severity}:${i.code}:${i.nodeId ?? ""}:${i.slot ?? ""}:${i.message}`;
 }
 

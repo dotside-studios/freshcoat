@@ -113,13 +113,15 @@ export type FigmaTextStyle = {
 	textAlignHorizontal: "LEFT" | "CENTER" | "RIGHT" | "JUSTIFIED";
 	textAlignVertical: "TOP" | "CENTER" | "BOTTOM";
 	textAutoResize?: "NONE" | "WIDTH_AND_HEIGHT" | "HEIGHT" | "TRUNCATE";
+	// Figma "Truncate text", which replaced textAutoResize TRUNCATE. maxLines
+	// caps the line count; absent means as many lines as the box holds.
+	textTruncation?: "DISABLED" | "ENDING";
+	maxLines?: number;
 	// Figma "Vertical trim". STANDARD (the default) seats the first baseline by
 	// the line box — half the leading, then the ascent. CAP_HEIGHT tucks the cap
 	// line against the box top instead, which moves every line up by roughly
 	// ascent − capHeight.
 	leadingTrim?: "NONE" | "CAP_HEIGHT";
-	// Figma "Case" (textCase). SMALL_CAPS variants aren't a plain string
-	// transform, so they fall back to original.
 	// Figma "Paragraph spacing": px after each paragraph.
 	paragraphSpacing?: number;
 	// Figma "OpenType features" the layer explicitly sets, by uppercase tag.
@@ -226,6 +228,8 @@ export type FigmaTextNode = FigmaBaseNode & {
 	characters: string;
 	style: FigmaTextStyle;
 	fills: FigmaPaint[];
+	strokes?: FigmaPaint[];
+	strokeWeight?: number;
 	characterStyleOverrides?: number[];
 	styleOverrideTable?: Record<string, Partial<FigmaTextStyle>>;
 };
@@ -243,9 +247,11 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	// INSIDE, so leaving it unread paints every such stroke half a weight wide of
 	// where the design put it.
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft] when
 	// the four differ (Figma reports the uniform property as mixed then).
 	cornerRadius?: number | [number, number, number, number];
+	cornerSmoothing?: number;
 };
 
 export type FigmaVectorNodeType =
@@ -264,10 +270,16 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	strokeCap?: string;
 	strokeJoin?: string;
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Figma's REST API attaches fillGeometry as an array of path regions, each
 	// in the node's bounding-box-local coordinate space and filled by its own
 	// winding rule. An open, stroke-only path has none.
 	fillGeometry?: { path: string; windingRule?: "NONZERO" | "EVENODD" }[];
+	// ELLIPSE only, in radians. Absent reads as a full, solid ellipse.
+	arcData?: { startingAngle: number; endingAngle: number; innerRadius: number };
+	// POLYGON only.
+	pointCount?: number;
+	cornerRadius?: number;
 };
 
 export type FigmaContainerNodeType =
@@ -284,6 +296,7 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].
 	cornerRadius?: number | [number, number, number, number];
 	clipsContent?: boolean;
@@ -313,15 +326,13 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	layoutWrap?: "NO_WRAP" | "WRAP";
 };
 
-export type FigmaFrameNode = FigmaContainerNode & { type: "FRAME" };
-
 export type FigmaNode =
 	| FigmaTextNode
 	| FigmaRectangleNode
 	| FigmaVectorNode
 	| FigmaContainerNode;
 
-export function isContainerNode(n: FigmaNode): n is FigmaContainerNode {
+export function isContainerNode(n: { type: string }): n is FigmaContainerNode {
 	return (
 		n.type === "FRAME" ||
 		n.type === "GROUP" ||
@@ -339,7 +350,7 @@ export function isRectangleNode(n: FigmaNode): n is FigmaRectangleNode {
 	return n.type === "RECTANGLE";
 }
 
-export function isVectorNode(n: FigmaNode): n is FigmaVectorNode {
+export function isVectorNode(n: { type: string }): n is FigmaVectorNode {
 	return (
 		n.type === "VECTOR" ||
 		n.type === "BOOLEAN_OPERATION" ||

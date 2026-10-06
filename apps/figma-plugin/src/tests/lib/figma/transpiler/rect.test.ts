@@ -222,3 +222,107 @@ describe("transpileRect", () => {
 		expect(el.properties.fill).toEqual(["#ff0000", "#00ff00"]);
 	});
 });
+
+describe("transpileRect strokes and corners", () => {
+	const black = { r: 0, g: 0, b: 0, a: 1 };
+	const gradient = {
+		type: "GRADIENT_LINEAR" as const,
+		gradientHandlePositions: [
+			{ x: 0, y: 0 },
+			{ x: 1, y: 0 },
+		],
+		gradientStops: [
+			{ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+			{ position: 1, color: { r: 0, g: 0, b: 1, a: 1 } },
+		],
+	};
+
+	it("keeps a translucent stroke's opacity as 8-digit hex", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [{ type: "SOLID", color: black, opacity: 0.5 }],
+				strokeWeight: 2,
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toEqual({ color: "#00000080", width: 2 });
+	});
+
+	it("draws no stroke when every stroke paint is hidden", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [{ type: "SOLID", color: black, visible: false }],
+				strokeWeight: 2,
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toBeUndefined();
+	});
+
+	it("skips a hidden stroke paint for the visible one", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [
+					{ type: "SOLID", color: black, visible: false },
+					{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 } },
+				],
+				strokeWeight: 2,
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toEqual({ color: "#0000ff", width: 2 });
+	});
+
+	it("does not throw on a gradient stroke", () => {
+		const el = transpileRect(
+			baseRect({ strokes: [gradient], strokeWeight: 2 }),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toBeUndefined();
+	});
+
+	it("emits a scaled dash pattern", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [{ type: "SOLID", color: black }],
+				strokeWeight: 2,
+				dashPattern: [4, 2],
+			}),
+			{ frame: FRAME, scale: 2 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: "#000000",
+			width: 4,
+			dash: [8, 4],
+		});
+	});
+
+	it("repeats an odd dash pattern to even length", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [{ type: "SOLID", color: black }],
+				strokeWeight: 1,
+				dashPattern: [3],
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke?.dash).toEqual([3, 3]);
+	});
+
+	it("emits corner smoothing with a corner radius", () => {
+		const el = transpileRect(
+			baseRect({ cornerRadius: 12, cornerSmoothing: 0.6 }),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.cornerRadius).toBe(12);
+		expect(el.properties.cornerSmoothing).toBe(0.6);
+	});
+
+	it("omits corner smoothing without a corner radius", () => {
+		const el = transpileRect(baseRect({ cornerSmoothing: 0.6 }), {
+			frame: FRAME,
+			scale: 1,
+		});
+		expect("cornerSmoothing" in el.properties).toBe(false);
+	});
+});

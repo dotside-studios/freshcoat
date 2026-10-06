@@ -11,6 +11,7 @@ import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
 import type { JSX } from "preact";
 import type { ProductRegistryEntry } from "~/lib/figma/transpiler";
 import type { SizeIssue } from "~/lib/figma/transpiler/exact-size";
+import { slug } from "~/lib/slug";
 import type { FieldOverviewItem, PluginSettings } from "~/shared/protocol";
 import { Hint, ProgressBar } from "~/ui/components";
 import { plural } from "~/ui/copy";
@@ -19,7 +20,6 @@ import type { ExportTarget } from "~/ui/export-target";
 import type { FieldDetector } from "~/ui/fields-tab";
 import { Field, FieldGroup, Indented, Row, Stack } from "~/ui/layout";
 import { postToMain } from "~/ui/post";
-import { slugify } from "~/ui/run-transpile";
 import { Step } from "~/ui/steps";
 import type { Phase, Result } from "~/ui/use-export";
 import { WarningList } from "~/ui/warnings";
@@ -400,7 +400,7 @@ export function StepExport(props: {
 	const exportSummary =
 		props.missing ??
 		(product
-			? `${product.sku}-${slugify(props.name.trim()) || "card"}${COAT_EXTENSION}`
+			? `${product.sku}-${slug(props.name.trim(), { fallback: "card" })}${COAT_EXTENSION}`
 			: "");
 
 	return (

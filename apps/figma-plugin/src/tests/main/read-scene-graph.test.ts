@@ -394,6 +394,37 @@ describe("readVectorNode", () => {
 		expect(v.fillGeometry?.[0]?.path).toBe("M0 0 L10 0 L10 10 Z");
 	});
 
+	it("reads an ellipse's arc and a polygon's point count", () => {
+		const base = {
+			id: "1:3",
+			name: "shape",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			rotation: 0,
+			absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+			effects: [],
+			fills: [],
+			strokes: [],
+		};
+		const arcData = {
+			startingAngle: 0,
+			endingAngle: Math.PI,
+			innerRadius: 0.5,
+		};
+		expect(
+			readVectorNode({ ...base, type: "ELLIPSE", arcData } as never).arcData,
+		).toEqual(arcData);
+		const polygon = readVectorNode({
+			...base,
+			type: "POLYGON",
+			pointCount: 6,
+			cornerRadius: 4,
+		} as never);
+		expect(polygon.pointCount).toBe(6);
+		expect(polygon.cornerRadius).toBe(4);
+	});
+
 	it("reads string strokeCap/strokeJoin, drops figma.mixed symbols", () => {
 		const base = {
 			id: "1:2",
@@ -579,6 +610,71 @@ describe("readRectangleNode (corner radius)", () => {
 	it("reports no radius when neither form is readable", () => {
 		const r = rect({ cornerRadius: Symbol("figma.mixed") });
 		expect(r.cornerRadius).toBeUndefined();
+	});
+
+	it("reads corner smoothing", () => {
+		expect(rect({ cornerSmoothing: 0.6 }).cornerSmoothing).toBe(0.6);
+		expect("cornerSmoothing" in rect({ cornerSmoothing: 0 })).toBe(false);
+	});
+});
+
+describe("stroke paints and dash pattern", () => {
+	const base = {
+		id: "1:5",
+		name: "line",
+		visible: true,
+		opacity: 1,
+		blendMode: "NORMAL",
+		absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 40 },
+		effects: [],
+		fills: [],
+		strokeWeight: 1,
+	};
+
+	it("keeps a solid stroke's opacity apart from its color", () => {
+		const r = readRectangleNode({
+			...base,
+			type: "RECTANGLE",
+			strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0 }, opacity: 0.5 }],
+		} as never);
+		expect(r.strokes?.[0]).toMatchObject({
+			type: "SOLID",
+			opacity: 0.5,
+			color: { r: 1, g: 0, b: 0, a: 1 },
+		});
+	});
+
+	it("reads dashPattern on rectangles, vectors and frames", () => {
+		const dashed = { dashPattern: [4, 2], strokes: [] };
+		expect(
+			readRectangleNode({ ...base, ...dashed, type: "RECTANGLE" } as never)
+				.dashPattern,
+		).toEqual([4, 2]);
+		expect(
+			readVectorNode({ ...base, ...dashed, type: "VECTOR" } as never)
+				.dashPattern,
+		).toEqual([4, 2]);
+		const frame = readNode({
+			...base,
+			...dashed,
+			type: "FRAME",
+			children: [],
+		} as never);
+		expect(frame && "dashPattern" in frame && frame.dashPattern).toEqual([
+			4, 2,
+		]);
+	});
+
+	it("omits an empty or unreadable dashPattern", () => {
+		for (const dashPattern of [[], Symbol("figma.mixed"), ["4"]]) {
+			const r = readRectangleNode({
+				...base,
+				type: "RECTANGLE",
+				strokes: [],
+				dashPattern,
+			} as never);
+			expect("dashPattern" in r).toBe(false);
+		}
 	});
 });
 
@@ -941,6 +1037,88 @@ describe("readTextNode with mixed (symbol) font properties", () => {
 			mixedTextNode({ paragraphSpacing: Symbol("mixed") } as never),
 		);
 		expect("paragraphSpacing" in mixed.style).toBe(false);
+	});
+
+	it("reads truncation and max lines, and treats mixed or null as unset", () => {
+		const out = readTextNode(
+			mixedTextNode({ textTruncation: "ENDING", maxLines: 3 } as never),
+		);
+		expect(out.style.textTruncation).toBe("ENDING");
+		expect(out.style.maxLines).toBe(3);
+		const unset = readTextNode(
+			mixedTextNode({
+				textTruncation: Symbol("mixed"),
+				maxLines: null,
+			} as never),
+		);
+		expect("textTruncation" in unset.style).toBe(false);
+		expect("maxLines" in unset.style).toBe(false);
+		expect(findUnpostable(unset)).toBeNull();
+	});
+
+	it("reads strokes, and omits them when there are none", () => {
+		const stroke = {
+			type: "SOLID",
+			color: { r: 1, g: 0, b: 0 },
+			opacity: 1,
+			visible: true,
+		};
+		const out = readTextNode(
+			mixedTextNode({ strokes: [stroke], strokeWeight: 2 } as never),
+		);
+		expect(out.strokes).toHaveLength(1);
+		expect(out.strokeWeight).toBe(2);
+		const none = readTextNode(mixedTextNode({ strokes: [] } as never));
+		expect("strokes" in none).toBe(false);
+		expect("strokes" in readTextNode(mixedTextNode())).toBe(false);
+	});
+
+	it("takes a mixed textCase from the first run, and records small caps runs", () => {
+		const out = readTextNode(
+			mixedTextNode({
+				getStyledTextSegments: () => [
+					{
+						start: 0,
+						end: 8,
+						fontName: { family: "Inter", style: "Regular" },
+						fontSize: 12,
+						fontWeight: 400,
+						textCase: "ORIGINAL",
+					},
+					{
+						start: 8,
+						end: 12,
+						fontName: { family: "Inter", style: "Regular" },
+						fontSize: 12,
+						fontWeight: 400,
+						textCase: "SMALL_CAPS",
+					},
+				],
+			}),
+		);
+		expect(out.style.textCase).toBe("ORIGINAL");
+		expect(out.styleOverrideTable?.["1"]?.textCase).toBe("SMALL_CAPS");
+		expect(out.characterStyleOverrides?.slice(8)).toEqual([1, 1, 1, 1]);
+	});
+
+	it("does not split runs that differ only in a non-small-caps case", () => {
+		const seg = (start: number, end: number, textCase: string) => ({
+			start,
+			end,
+			fontName: { family: "Inter", style: "Regular" },
+			fontSize: 12,
+			fontWeight: 400,
+			textCase,
+		});
+		const out = readTextNode(
+			mixedTextNode({
+				getStyledTextSegments: () => [
+					seg(0, 8, "ORIGINAL"),
+					seg(8, 12, "UPPER"),
+				],
+			}),
+		);
+		expect(Object.keys(out.styleOverrideTable ?? {})).toHaveLength(0);
 	});
 
 	it("leaves an unmixed text node alone", () => {

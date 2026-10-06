@@ -1,6 +1,5 @@
 import {
 	FORMAT_VERSION,
-	SYMBOLOGIES,
 	type Template,
 	validate,
 } from "@freshcoat-js/coatfile";
@@ -19,7 +18,6 @@ import {
 } from "~/lib/figma/binding";
 import { reconcileFields } from "~/lib/figma/harvest";
 import {
-	BARCODE_SYMBOLOGIES,
 	isBarcodeLayerName,
 	parseBarcodeLayerName,
 	resolveSymbology,
@@ -100,10 +98,6 @@ async function run(...children: FigmaNode[]) {
 }
 
 describe("barcode symbologies", () => {
-	it("are coatfile's", () => {
-		expect([...BARCODE_SYMBOLOGIES]).toEqual([...SYMBOLOGIES]);
-	});
-
 	it("read with case, spaces, hyphens and underscores ignored, and by alias", () => {
 		for (const [name, symbology] of [
 			["Code-128", "code128"],

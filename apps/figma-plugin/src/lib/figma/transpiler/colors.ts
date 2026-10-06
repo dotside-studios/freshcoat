@@ -1,10 +1,12 @@
-import { linearGradientAngle } from "@freshcoat-js/coatfile";
-import type { FigmaColor, FigmaPaint } from "../types";
+import { type Fill, linearGradientAngle } from "@freshcoat-js/coatfile";
+import type { FigmaNode, FigmaPaint, FigmaSolidPaint } from "../types";
 import {
 	angularPlacement,
 	channel,
+	compositeSolids,
 	figmaColorToHex,
 	type PaintBox,
+	rgbHex,
 	round4,
 } from "./paint";
 
@@ -12,36 +14,18 @@ export type { PaintBox } from "./paint";
 export { compositeSolids, figmaColorToHex, isMappablePaint } from "./paint";
 
 type SolidFillResult = { kind: "solid"; hex: string; opacity: number };
-type GradientFillResult = {
-	kind: "fill";
-	value:
-		| {
-				kind: "linear";
-				angle: number;
-				from?: [number, number];
-				to?: [number, number];
-				stops: Array<{ offset: number; color: string }>;
-		  }
-		| {
-				kind: "radial";
-				center: [number, number];
-				radius: number;
-				radiusY?: number;
-				rotation?: number;
-				stops: Array<{ offset: number; color: string }>;
-		  }
-		| {
-				kind: "angular";
-				center: [number, number];
-				rotation?: number;
-				stops: Array<{ offset: number; color: string }>;
-		  };
-};
+type GradientFillResult = { kind: "fill"; value: Exclude<Fill, string> };
 
 export type FillResult = SolidFillResult | GradientFillResult;
 
-function colorWithoutAlpha(c: FigmaColor): string {
-	return `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
+// A placeholder layer's own paint, when it is a single solid one. Such a layer
+// can be any node type, including one with no fills, a gradient, or a stack,
+// and none of those is a colour its marks can be drawn in.
+export function singleSolidFillHex(node: FigmaNode): string | undefined {
+	const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
+	const visible = fills.filter((f) => f.visible !== false);
+	if (visible.length !== 1 || visible[0].type !== "SOLID") return undefined;
+	return figmaColorToHex((visible[0] as FigmaSolidPaint).color);
 }
 
 type RadialShape = { radius: number; radiusY: number; rotation: number };
@@ -138,7 +122,7 @@ export function figmaPaintToFill(
 		const channelAlpha = paint.color.a;
 		return {
 			kind: "solid",
-			hex: colorWithoutAlpha(paint.color),
+			hex: rgbHex(paint.color),
 			opacity: paintOpacity * channelAlpha,
 		};
 	}
@@ -251,11 +235,65 @@ export function fillsToElement(
 		fill: visible.map((f) => {
 			const r = figmaPaintToFill(f, box);
 			if (r.kind === "fill") return r.value;
-			return r.opacity < 1
-				? `${r.hex}${Math.round(r.opacity * 255)
-						.toString(16)
-						.padStart(2, "0")}`
-				: r.hex;
+			return r.opacity < 1 ? `${r.hex}${channel(r.opacity)}` : r.hex;
 		}),
+	};
+}
+
+export type StrokeElement = {
+	color: string;
+	width: number;
+	dash?: number[];
+	cap?: "round" | "square";
+	join?: "round" | "bevel";
+	align?: "inside" | "outside";
+};
+
+// Non-solid strokes are rasterized by classify (`stroke_flattened`).
+export function strokeColor(
+	paints: FigmaPaint[] | undefined,
+): string | undefined {
+	const visible = (paints ?? []).filter((p) => p.visible !== false);
+	if (visible.length === 0) return undefined;
+	return compositeSolids(visible) ?? undefined;
+}
+
+// An odd-length pattern repeats to even, as SVG does.
+export function scaleDash(
+	pattern: number[] | undefined,
+	scale: number,
+): number[] | undefined {
+	if (!pattern || pattern.length === 0) return undefined;
+	if (!pattern.every((d) => Number.isFinite(d) && d >= 0)) return undefined;
+	if (!pattern.some((d) => d > 0)) return undefined;
+	const even = pattern.length % 2 ? [...pattern, ...pattern] : pattern;
+	return even.map((d) => Math.round(d * scale * 100) / 100);
+}
+
+export function strokeToElement(
+	node: {
+		strokes?: FigmaPaint[];
+		strokeWeight?: number;
+		strokeCap?: string;
+		strokeJoin?: string;
+		strokeAlign?: string;
+		dashPattern?: number[];
+	},
+	scale: number,
+): StrokeElement | undefined {
+	if (node.strokeWeight === undefined) return undefined;
+	const color = strokeColor(node.strokes);
+	if (color === undefined) return undefined;
+	const dash = scaleDash(node.dashPattern, scale);
+	const cap = mapStrokeCap(node.strokeCap);
+	const join = mapStrokeJoin(node.strokeJoin);
+	const align = mapStrokeAlign(node.strokeAlign);
+	return {
+		color,
+		width: Math.round(node.strokeWeight * scale * 2) / 2,
+		...(dash ? { dash } : {}),
+		...(cap ? { cap } : {}),
+		...(join ? { join } : {}),
+		...(align ? { align } : {}),
 	};
 }

@@ -3,7 +3,7 @@ import { useRef } from "preact/hooks";
 
 export type TabId = "layer" | "fields" | "export" | "settings";
 
-export const TABS: Array<{ id: TabId; label: string }> = [
+const TABS: Array<{ id: TabId; label: string }> = [
 	{ id: "layer", label: "Layer" },
 	{ id: "fields", label: "Fields" },
 	{ id: "export", label: "Export" },

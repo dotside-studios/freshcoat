@@ -53,6 +53,58 @@ describe("classify", () => {
 		expect(classify(n).kind).toBe("native-text");
 	});
 
+	describe("TEXT with a stroke", () => {
+		const stroked = (over: Record<string, unknown> = {}): FigmaNode => ({
+			...baseAttrs,
+			id: "1",
+			name: "headline",
+			type: "TEXT",
+			characters: "Hello",
+			style: {
+				fontFamily: "Inter",
+				fontSize: 16,
+				fontWeight: 400,
+				textAlignHorizontal: "LEFT",
+				textAlignVertical: "TOP",
+			},
+			fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+			strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+			strokeWeight: 2,
+			...over,
+		});
+
+		it("is rasterized", () => {
+			expect(classify(stroked())).toEqual({
+				kind: "flatten",
+				reason: "text_stroke_flattened",
+			});
+		});
+
+		it("stays native when bound to a field", () => {
+			expect(classify(stroked({ name: "{{name}}" })).kind).toBe("native-text");
+			expect(
+				classify(stroked({ binding: { bind: { text: "{{name}}" } } })).kind,
+			).toBe("native-text");
+		});
+
+		it("ignores a hidden or zero-weight stroke", () => {
+			expect(
+				classify(
+					stroked({
+						strokes: [
+							{
+								type: "SOLID",
+								color: { r: 1, g: 0, b: 0, a: 1 },
+								visible: false,
+							},
+						],
+					}),
+				).kind,
+			).toBe("native-text");
+			expect(classify(stroked({ strokeWeight: 0 })).kind).toBe("native-text");
+		});
+	});
+
 	it("TEXT with character-style overrides → native-text (lowers to spans)", () => {
 		const n: FigmaNode = {
 			...baseAttrs,
@@ -445,5 +497,84 @@ describe("classify", () => {
 			],
 		} as unknown as FigmaNode;
 		expect(classify(n).kind).toBe("native-vector");
+	});
+
+	describe("image-filled ellipses and polygons", () => {
+		const IMAGE = [
+			{ type: "IMAGE" as const, scaleMode: "FILL" as const, imageRef: "a" },
+		];
+		const GEOMETRY = [{ path: "M 0 0 L 10 0 L 10 10 Z" }];
+		const shape = (extra: Partial<FigmaNode>): FigmaNode =>
+			({
+				...baseAttrs,
+				id: "1",
+				name: "{{avatar}}",
+				fills: IMAGE,
+				fillGeometry: GEOMETRY,
+				...extra,
+			}) as FigmaNode;
+
+		it("a full ellipse → native-image", () => {
+			expect(classify(shape({ type: "ELLIPSE" })).kind).toBe("native-image");
+			expect(
+				classify(
+					shape({
+						type: "ELLIPSE",
+						arcData: {
+							startingAngle: 0,
+							endingAngle: 2 * Math.PI,
+							innerRadius: 0,
+						},
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a partial arc or a donut → flatten", () => {
+			for (const arcData of [
+				{ startingAngle: 0, endingAngle: Math.PI, innerRadius: 0 },
+				{ startingAngle: 0, endingAngle: 2 * Math.PI, innerRadius: 0.5 },
+			]) {
+				expect(
+					classify(shape({ type: "ELLIPSE", arcData } as Partial<FigmaNode>)),
+				).toEqual({ kind: "flatten", reason: "paint_flattened" });
+			}
+		});
+
+		it("a regular polygon → native-image", () => {
+			expect(
+				classify(
+					shape({ type: "POLYGON", pointCount: 6 } as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a polygon with rounded corners → flatten", () => {
+			expect(
+				classify(
+					shape({
+						type: "POLYGON",
+						pointCount: 6,
+						cornerRadius: 4,
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("flatten");
+		});
+
+		it("a solid ellipse named image:{{token}} → native-image", () => {
+			expect(
+				classify(
+					shape({
+						type: "ELLIPSE",
+						name: "image:{{avatar}}",
+						fills: [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }],
+					} as Partial<FigmaNode>),
+				).kind,
+			).toBe("native-image");
+		});
+
+		it("a star with an image fill → flatten", () => {
+			expect(classify(shape({ type: "STAR" })).kind).toBe("flatten");
+		});
 	});
 });

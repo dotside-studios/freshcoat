@@ -1,11 +1,11 @@
 import {
 	buildFieldMeta,
-	extractTokens,
 	type FieldMeta,
 	inferNodeBinding,
 	storedToNodeBinding,
 } from "../binding";
 import type { FigmaNode } from "../types";
+import { extractTokens } from "./fields";
 
 const TOKEN = /\{\{[^{}]*\}\}/g;
 

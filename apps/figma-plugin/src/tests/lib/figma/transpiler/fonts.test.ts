@@ -92,4 +92,29 @@ describe("collectFontDescriptors", () => {
 		const fonts = collectFontDescriptors(td);
 		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Poppins"]);
 	});
+
+	it("collects families inside a mask's shape and content", () => {
+		const td = [
+			frame("front", [
+				{
+					id: "m",
+					type: "mask",
+					pos: { x: 0, y: 0 },
+					size: { width: 10, height: 10 },
+					properties: {
+						mask: { ...textEl("Lobster"), pos: { x: 0, y: 0 } },
+						children: [
+							{
+								id: "f",
+								type: "frame",
+								properties: { children: [textEl("Comfortaa", 700)] },
+							},
+						],
+					},
+				},
+			]),
+		];
+		const fonts = collectFontDescriptors(td);
+		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Lobster"]);
+	});
 });

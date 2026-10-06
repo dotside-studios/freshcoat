@@ -6,13 +6,13 @@ import {
 	parseVisibilityMarker,
 	storedToNodeBinding,
 } from "../binding";
-import type {
-	FigmaConstraints,
-	FigmaContainerNode,
-	FigmaNode,
-	FigmaVectorNode,
+import type { FigmaConstraints, FigmaContainerNode, FigmaNode } from "../types";
+import {
+	isContainerNode,
+	isRectangleNode,
+	isTextNode,
+	isVectorNode,
 } from "../types";
-import { isContainerNode, isRectangleNode, isTextNode } from "../types";
 import { transpileBarcode } from "./barcode";
 import { isBarcodeLayerName } from "./barcode-name";
 import { applyBindingOverlay } from "./binding-overlay";
@@ -21,6 +21,7 @@ import {
 	classify,
 	elementBlendMode,
 	type FlattenReason,
+	hasTextStroke,
 	isQrLayerName,
 } from "./classify";
 import type { FlattenMarker } from "./coalesce";
@@ -38,23 +39,13 @@ import { addVisibility, maskRuns } from "./finalize";
 import { layoutChildFromNode, transpileFrame } from "./frame";
 import { withoutGuides } from "./guides";
 import { transpileImage } from "./image";
+import { canHoldImage } from "./image-shape";
 import { transpileQr } from "./qr";
 import { transpileRect } from "./rect";
 import { textLayoutSizing, transpileText } from "./text";
 import { decomposeTransform, nodeExtent } from "./transform";
 import type { NodeTrace } from "./types";
 import { transpileVector } from "./vector";
-
-const VECTOR_TYPES = new Set([
-	"VECTOR",
-	"BOOLEAN_OPERATION",
-	"STAR",
-	"POLYGON",
-	"LINE",
-	"ELLIPSE",
-]);
-const isVectorNode = (n: FigmaNode): n is FigmaVectorNode =>
-	VECTOR_TYPES.has(n.type);
 
 // Mutable outputs a side's element production writes into. The base slot
 // loop passes the REAL outer accumulators (counts/warnings/overlayMeta feed
@@ -311,12 +302,6 @@ function walkNode(
 	localFrame: RasterFrame,
 	target: unknown[],
 	worldAnchor: { x: number; y: number } | null,
-	// True once we're inside a rotated frame: coatfile's auto-layout
-	// re-flow (resolveLayout) isn't rotation-aware, so a rotated auto-layout
-	// group would be re-laid-out in the wrong space. Inside a rotated subtree
-	// we bake the Figma-resolved positions instead — omit `layout` +
-	// `layoutChild` so the painter just rotates the static group.
-	freezeLayout: boolean,
 	// Opacity owed by ancestors this walk flattened away (GROUPs). A FRAME
 	// carries its own on its element, so it resets this to 1 for its subtree.
 	inheritedOpacity: number,
@@ -365,7 +350,6 @@ function walkNode(
 				fx,
 				localFrame,
 				worldAnchor,
-				freezeLayout,
 				inheritedOpacity,
 			);
 			if (el) {
@@ -390,7 +374,6 @@ function walkNode(
 				localFrame,
 				target,
 				worldAnchor,
-				freezeLayout,
 				childOpacity,
 			),
 		);
@@ -432,13 +415,20 @@ function walkNode(
 				? storedToNodeBinding(n.binding)
 				: inferNodeBinding(n);
 			el = transpileText(n, ctx, textBinding?.bind.text);
+			if (hasTextStroke(n))
+				w.sink.warnings.push({
+					severity: "warn",
+					code: "text_stroke_unsupported",
+					message: `Text layer "${n.name}" has a stroke, which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
+					nodeId: n.id,
+				});
 		} else if (c.kind === "native-rect" && isRectangleNode(n))
 			el = transpileRect(n, {
 				frame: ctx.frame,
 				scale: ctx.scale,
 				worldAnchor: anchor,
 			});
-		else if (c.kind === "native-image" && isRectangleNode(n)) {
+		else if (c.kind === "native-image" && canHoldImage(n)) {
 			// Dynamic if the node carries an image binding (stored or inferred),
 			// not just a bare-token name. Keeps `image:` markers + Layer-tab
 			// image bindings from silently rasterizing.
@@ -486,7 +476,6 @@ function walkNode(
 				outerFrame: localFrame.box,
 				scale,
 				worldAnchor: anchor,
-				freezeLayout,
 			});
 			// The coordinate space this frame opens for its children. Its rotation
 			// is measured in WORLD, not against its parent: the slot frame's own
@@ -498,18 +487,11 @@ function walkNode(
 				transform: n.absoluteTransform,
 				rotation: worldRotationOf(n),
 			};
-			// This frame (or an ancestor) being rotated freezes layout for the
-			// whole subtree: the frame's own `layout` block is dropped by
-			// transpileFrame, and we skip children's `layoutChild` + recurse frozen.
-			const childFrozen = freezeLayout || (frameEl.rotation ?? 0) !== 0;
 			const parentIsAutoLayout =
-				!childFrozen && n.layoutMode !== undefined && n.layoutMode !== "NONE";
+				n.layoutMode !== undefined && n.layoutMode !== "NONE";
 			// Constraints follow Figma's own reading of the frame: an auto-layout
-			// frame's flow children ignore theirs even where the layout is baked
-			// because the frame is rotated.
-			const childScope: ConstraintScope = {
-				autoLayout: n.layoutMode !== undefined && n.layoutMode !== "NONE",
-			};
+			// frame's flow children ignore theirs.
+			const childScope: ConstraintScope = { autoLayout: parentIsAutoLayout };
 			withConstraintScope(w, childScope, () =>
 				walkChildren(
 					w,
@@ -517,7 +499,6 @@ function walkNode(
 					childFrame,
 					frameEl.properties.children,
 					null,
-					childFrozen,
 					1,
 					(child, before) => {
 						// Tag every element this child produced with the source child's
@@ -634,7 +615,6 @@ function groupLayer(
 	fx: ReturnType<typeof extractEffects>,
 	localFrame: RasterFrame,
 	worldAnchor: { x: number; y: number } | null,
-	freezeLayout: boolean,
 	inheritedOpacity: number,
 ): Record<string, unknown> | undefined {
 	const { scale } = w;
@@ -673,7 +653,6 @@ function groupLayer(
 			inner,
 			(el.properties as { children: unknown[] }).children,
 			worldAnchor,
-			freezeLayout,
 			1,
 		),
 	);
@@ -689,7 +668,6 @@ function walkChildren(
 	localFrame: RasterFrame,
 	target: unknown[],
 	worldAnchor: { x: number; y: number } | null,
-	freezeLayout: boolean,
 	inheritedOpacity: number,
 	each?: (node: FigmaNode, before: number) => void,
 ): void {
@@ -703,19 +681,9 @@ function walkChildren(
 				localFrame,
 				target,
 				worldAnchor,
-				freezeLayout,
 				inheritedOpacity,
 			);
-		else
-			walk(
-				w,
-				run.node,
-				localFrame,
-				target,
-				worldAnchor,
-				freezeLayout,
-				inheritedOpacity,
-			);
+		else walk(w, run.node, localFrame, target, worldAnchor, inheritedOpacity);
 		each?.(run.node, before);
 	}
 }
@@ -733,7 +701,6 @@ function maskLayer(
 	localFrame: RasterFrame,
 	target: unknown[],
 	worldAnchor: { x: number; y: number } | null,
-	freezeLayout: boolean,
 	inheritedOpacity: number,
 ): void {
 	const { scale } = w;
@@ -766,9 +733,8 @@ function maskLayer(
 	applyOpacity(el, inheritedOpacity);
 	applyConstraints(w, el, maskNode);
 	const inner: RasterFrame = { ...localFrame, originOffset: box.pos };
-	walk(w, maskNode, inner, shape, worldAnchor, freezeLayout, 1);
-	for (const child of masked)
-		walk(w, child, inner, children, worldAnchor, freezeLayout, 1);
+	walk(w, maskNode, inner, shape, worldAnchor, 1);
+	for (const child of masked) walk(w, child, inner, children, worldAnchor, 1);
 	target.push(el);
 }
 
@@ -790,7 +756,6 @@ export function walkSide(w: Walker): unknown[] {
 			x: w.frame.absoluteBoundingBox.x,
 			y: w.frame.absoluteBoundingBox.y,
 		},
-		false,
 		1,
 	);
 	return elements;

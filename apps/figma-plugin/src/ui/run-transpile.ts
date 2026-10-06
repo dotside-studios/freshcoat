@@ -1,4 +1,5 @@
 import {
+	checkVariants,
 	FORMAT_VERSION,
 	type Template,
 	type TemplateWarning,
@@ -14,6 +15,7 @@ import {
 } from "~/lib/figma/transpiler/barcode";
 import type { RenderImageFn } from "~/lib/figma/transpiler/rasterize";
 import { pngSize } from "~/lib/png";
+import { slug } from "~/lib/slug";
 import type { ReadDocumentMessage } from "~/shared/protocol";
 import { type FigmaSource, figmaSource } from "~/shared/source";
 
@@ -25,13 +27,6 @@ export type ExportMetadata = {
 	description?: string;
 	mood?: string;
 };
-
-export function slugify(s: string): string {
-	return s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-}
 
 /** A template that has been exported but not yet had its rasters uploaded: the
  *  image srcs are `asset:` hashes and the bytes ride along in `assets`. */
@@ -117,27 +112,29 @@ function locate(
 	return found ? { slot, nodeId: found } : { slot };
 }
 
+function elementNodeIds(
+	trace: NodeTrace[],
+): (slot: string, elementId: string) => string | undefined {
+	const byElement = new Map<string, string>();
+	for (const t of trace) {
+		if (t.elementId) byElement.set(`${t.slot}\u0000${t.elementId}`, t.nodeId);
+	}
+	return (slot, id) => byElement.get(`${slot}\u0000${id}`);
+}
+
 function validationIssues(
 	template: Template,
 	errors: ValidationError[],
 	trace: NodeTrace[],
 	picks: Record<string, FigmaPick>,
 ): ExportIssue[] {
-	const byElement = new Map<string, string>();
-	for (const t of trace) {
-		if (t.elementId) byElement.set(`${t.slot}\u0000${t.elementId}`, t.nodeId);
-	}
+	const nodeIdOf = elementNodeIds(trace);
 	return errors.map((e) => ({
 		severity: "error" as const,
 		code: e.code,
 		message: e.path ? `${e.message} (at ${e.path})` : e.message,
 		...(e.path ? { path: e.path } : {}),
-		...locate(
-			template,
-			e.path,
-			(slot, id) => byElement.get(`${slot}\u0000${id}`),
-			(slot) => picks[slot]?.nodeId,
-		),
+		...locate(template, e.path, nodeIdOf, (slot) => picks[slot]?.nodeId),
 	}));
 }
 
@@ -196,7 +193,7 @@ export async function runTranspileToTemplate(
 		picks,
 		variants,
 		metadata: {
-			id: slugify(metadata.name) || "untitled",
+			id: slug(metadata.name, { fallback: "untitled" }),
 			name: metadata.name,
 			version: "1.0.0",
 			formatVersion: FORMAT_VERSION,
@@ -234,6 +231,25 @@ export async function runTranspileToTemplate(
 			validationIssues(exported, checked.errors, result.trace, picks),
 			false,
 		);
+	}
+
+	const nodeIdOf = elementNodeIds(result.trace);
+	const variantWarnings = checkVariants(exported).map(
+		(issue): TemplateWarning => {
+			const nodeId = issue.elementId
+				? nodeIdOf(issue.side, issue.elementId)
+				: undefined;
+			return {
+				severity: "warn",
+				code: issue.code,
+				message: issue.message,
+				slot: issue.side,
+				...(nodeId ? { nodeId } : {}),
+			};
+		},
+	);
+	if (variantWarnings.length > 0) {
+		exported.warnings = [...(exported.warnings ?? []), ...variantWarnings];
 	}
 
 	const placeholders = result.warnings.filter((w) => PROCEEDABLE.has(w.code));

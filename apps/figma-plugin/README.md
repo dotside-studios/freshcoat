@@ -110,6 +110,18 @@ layers were kept, flattened or skipped.
   (`text_mixed_styling_flattened`). When runs disagree on a decoration, each
   decorated span carries it, because a span cannot turn off one the element
   sets.
+- **Truncate text.** A layer set to truncate clips (`fit: "clip"`) and keeps
+  Figma's max lines as `maxLines`, ellipsizing the last one. Without a max,
+  `maxLines` is the number of lines the box holds; with an auto line height
+  that count is unknown, so the text only clips. The renderer ellipsizes only
+  single-style text; a layer with runs clips at the box.
+- **Small caps.** Case Small caps sets the `smcp` font feature, and Forced
+  small caps `smcp` and `c2sc`, on the element or on the runs that use them,
+  beside any OpenType features the layer sets.
+- **Text strokes.** coatfile text has no stroke, so a stroked text layer is
+  rasterized (`text_stroke_flattened`). A layer bound to a text field stays
+  text so the field still works, and its stroke is dropped with the warning
+  `text_stroke_unsupported`.
 - **Text fields and runs.** A bound `text:` field keeps the layer's runs only
   when the runs spell out the template, each token whole inside one run, as in
   a layer whose content is `Hi {{name}}` with the token in bold: the value is
@@ -121,8 +133,16 @@ layers were kept, flattened or skipped.
   angular paints map; an angular gradient maps when its sweep is even on the
   layer (not stretched by a non-square box). Diamond gradients, stretched
   angular ones, paints with their own blend mode, and image fills outside a
-  single-image rectangle are rasterized (`paint_flattened`, or
-  `multi_fill_flattened` for an image inside a stack).
+  single-image rectangle, full ellipse or sharp-cornered polygon are
+  rasterized (`paint_flattened`, or `multi_fill_flattened` for an image inside
+  a stack).
+- **Strokes.** Visible solid stroke paints are composited into one colour,
+  keeping their opacity (a 50% stroke stays translucent); hidden ones are
+  ignored. A dashed stroke keeps its pattern as `dash`. A rectangle, vector or
+  frame with a visible gradient or image stroke is rasterized
+  (`stroke_flattened`).
+- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. Frames
+  keep their radius but not smoothing, which coatfile frames do not carry.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
   linear dodge as `plus`. Pass through is how the renderer composites
   a frame already. A frame set to Normal isolates its content in Figma, which
@@ -152,6 +172,15 @@ layers were kept, flattened or skipped.
   a rotated or skewed crop falls back to cover with
   `image_crop_unsupported`. A static image is rasterized as Figma draws it,
   filters and crop included.
+- **Field image shapes.** A bound image keeps its layer's outline and stroke.
+  A rectangle's corner radius becomes `cornerRadius`, or a `squircle` mask
+  with corner smoothing. Images take one radius, so different corners all get
+  the largest (`image_corner_radius_approximated`). A full ellipse becomes a
+  `circle` or `ellipse` mask and a polygon a `polygon` mask, its box grown so
+  the vertices land where Figma draws them; the photo fills that box. Partial
+  arcs, donuts and polygons with rounded corners are rasterized and cannot
+  hold a field. A gradient or image stroke on a bound image is left out
+  (`image_stroke_unsupported`) so the field survives.
 - **Colorways.** Each instance of the card component named `<Card> / <Label>`
   becomes a variant, after a first **Default** that is the card itself. What
   the instance changes is diffed against the card, layer by layer: its
@@ -194,8 +223,10 @@ with a letter or underscore and contain letters, digits or underscores.
 Quote values containing literal text or multiple tokens, as in
 `text:"ID {{id}}"`. A single token needs no quotes. Tokens placed in a text
 layer's content also become fields without quotes. A layer named only
-`{{id}}` is inferred as text for a text layer, or as an image for a rectangle
-with a single image fill; use explicit markers for other kinds.
+`{{id}}` is inferred as text for a text layer, or as an image for a
+rectangle, full ellipse or sharp-cornered polygon with a single image fill;
+use explicit markers for other kinds. `image:` also binds those shapes when
+they have a plain fill.
 
 Barcode options follow semicolons: `text=0` hides the human-readable line,
 `fg` and `bg` set colors, `margin` sets the quiet zone in modules, and `ec`
@@ -264,7 +295,8 @@ and what the transpiler made of it. It carries:
   the transpiler.
 - **`decisions`**: one row per node the walk reached: which element it became,
   or why it was rasterized or skipped. The rasterization reasons are
-  `text_mixed_styling_flattened`, `multi_fill_flattened`, `paint_flattened`,
+  `text_mixed_styling_flattened`, `text_stroke_flattened`,
+  `multi_fill_flattened`, `paint_flattened`, `stroke_flattened`,
   `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
   `transform_undecomposable_flattened`. Element ids are the *final* ones, after colliding layer names are
   renamed, so they match the template.
@@ -348,17 +380,13 @@ and `freshcoat_plugin:fields` (per slot frame); see
 ["Plugins with other IDs won't be able to read this data"](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/).
 It's there to keep our keys legible in an exported `.fig`.
 
-The `id` in `package.json` is a development placeholder. When preparing a
-published plugin, preserve its assigned identity across updates: plugin data
-is scoped to that identity. Changing it makes existing stored bindings
-inaccessible to the new plugin.
+The `id` in `package.json` is the plugin's permanent assigned id. Keep it
+stable across updates: plugin data is scoped to it, so changing it makes
+existing stored bindings inaccessible to the new plugin.
 
 Layer-name markers such as `text:{{name}}` still allow bindings to be inferred.
 Hand-edited metadata stored only in plugin data, including labels, sources and
 required flags, must be re-entered after an identity change.
-
-`readPluginData` also checks legacy `davi:` keys for documents created by
-earlier versions under the same plugin identity.
 
 ## Develop
 

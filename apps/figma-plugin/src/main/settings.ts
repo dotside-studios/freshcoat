@@ -4,7 +4,6 @@ import {
 } from "@create-figma-plugin/utilities";
 import {
 	DEFAULT_SETTINGS,
-	migrateSettings,
 	type PluginSettings,
 	type SettingsMessage,
 } from "~/shared/protocol";
@@ -20,9 +19,7 @@ let settings: PluginSettings = { ...DEFAULT_SETTINGS };
 // their remembered layout, not the whole panel.
 export async function loadSettings(): Promise<PluginSettings> {
 	try {
-		settings = migrateSettings(
-			await loadSettingsAsync(DEFAULT_SETTINGS, SETTINGS_KEY),
-		);
+		settings = await loadSettingsAsync(DEFAULT_SETTINGS, SETTINGS_KEY);
 	} catch {
 		settings = { ...DEFAULT_SETTINGS };
 	}

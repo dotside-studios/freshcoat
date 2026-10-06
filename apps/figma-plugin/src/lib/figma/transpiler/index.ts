@@ -1,4 +1,7 @@
-import type { TemplateWarning } from "@freshcoat-js/coatfile";
+import type {
+	TemplateWarning,
+	VariantElementDelta,
+} from "@freshcoat-js/coatfile";
 import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
 import { buildFieldMeta, type FieldMeta, fieldMetaToSchema } from "../binding";
 import type { FigmaContainerNode } from "../types";
@@ -27,7 +30,6 @@ import {
 	collectAssetRefsDeep,
 	diffElementProperties,
 	diffElementShell,
-	type ElementDelta,
 	fillOf,
 	flattenElementsById,
 	hiddenElements,
@@ -224,7 +226,7 @@ export async function transpile(
 		overrides: Array<{
 			name: string;
 			background?: unknown;
-			elements?: ElementDelta[];
+			elements?: VariantElementDelta[];
 		}>;
 		swatch?: string;
 		assets: PendingAsset[];
@@ -233,7 +235,7 @@ export async function transpile(
 		const overrides: Array<{
 			name: string;
 			background?: unknown;
-			elements?: ElementDelta[];
+			elements?: VariantElementDelta[];
 		}> = [];
 		let swatch = defaultSwatch;
 		// A variant side still uses a throwaway sink for counts/warnings/field
@@ -323,7 +325,7 @@ export async function transpile(
 				});
 			}
 
-			const elementDeltas: ElementDelta[] = [];
+			const elementDeltas: VariantElementDelta[] = [];
 			for (const [id, baseEl] of baseById) {
 				if (hidden.top.has(id)) {
 					elementDeltas.push({ id, properties: {}, hidden: true });

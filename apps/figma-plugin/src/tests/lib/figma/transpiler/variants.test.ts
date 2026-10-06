@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	colorwayLabel,
-	slugFromLabel,
 	uniqueVariantId,
 } from "~/lib/figma/transpiler/variants";
 
@@ -25,16 +24,6 @@ describe("colorwayLabel", () => {
 		expect(colorwayLabel("Aurora Card / Amber / L", "Aurora Card")).toBe(
 			"Amber / L",
 		);
-	});
-});
-
-describe("slugFromLabel", () => {
-	it("lowercases and dashes", () => {
-		expect(slugFromLabel("Amber")).toBe("amber");
-		expect(slugFromLabel("Sky / L")).toBe("sky-l");
-	});
-	it("falls back to `variant` when empty", () => {
-		expect(slugFromLabel("  ")).toBe("variant");
 	});
 });
 

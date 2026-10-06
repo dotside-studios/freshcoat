@@ -14,10 +14,14 @@
 		"id": "1685967766479998641",
 		"main": "src/main/index.ts",
 		"ui": "src/ui/index.tsx",
-		"editorType": ["figma"],
-    "documentAccess": "dynamic-page",
+		"editorType": [
+			"figma"
+		],
+		"documentAccess": "dynamic-page",
 		"networkAccess": {
-			"allowedDomains": ["https://davishopusercontent.dotsidecdn.net"],
+			"allowedDomains": [
+				"https://davishopusercontent.dotsidecdn.net"
+			],
 			"reasoning": "Only when you choose the \"Davi card product\" canvas: fetches the published product catalog (catalog/products.json) so the product list stays in sync with the order site. The default custom export makes no network requests."
 		}
 	},
