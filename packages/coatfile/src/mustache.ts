@@ -17,6 +17,7 @@ export function substitute(
 }
 
 function substituteString(s: string, ctx: Record<string, unknown>): string {
+	if (s.indexOf("{{") < 0) return s;
 	return s.replace(TOKEN, (_match, id: string) => {
 		const v = ctx[id];
 		return v == null ? "" : String(v);

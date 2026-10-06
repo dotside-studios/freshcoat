@@ -60,4 +60,11 @@ describe("substitute", () => {
 		const tree = { count: 7, nested: { id: 42 } };
 		expect(substitute(tree, {})).toEqual(tree);
 	});
+
+	test("leaves strings without tokens untouched", () => {
+		const uri = `data:image/png;base64,${"A".repeat(1 << 16)}`;
+		expect(substitute(uri, { A: "x" })).toBe(uri);
+		expect(substitute("a {b} }}", { b: "x" })).toBe("a {b} }}");
+		expect(substitute("{{ 1x }}", {})).toBe("{{ 1x }}");
+	});
 });
