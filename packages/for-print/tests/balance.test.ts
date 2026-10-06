@@ -7,9 +7,9 @@
 import { describe, expect, test } from "vitest";
 import { fitChannelBalance, isBalanceMeaningful } from "../src/balance";
 import { assessCalibration } from "../src/calibration";
-import { grayBalanceChart } from "../src/chart";
+import { grayBalanceChart, type RGB } from "../src/chart";
 import type { ChartReading, PatchReading } from "../src/measure";
-import type { ChannelBalance, RGB } from "../src/types";
+import type { ChannelBalance } from "../src/types";
 
 // A printer as a per-channel response curve: what it lays down for a level sent.
 type Printer = (level: number, channel: number) => number;

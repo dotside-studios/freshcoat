@@ -1,9 +1,8 @@
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import type { Element, Template, VectorElement } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { cleanup, render, screen } from "@testing-library/react";
-import CanvasKitInit, { type CanvasKit } from "canvaskit-wasm";
+import type { CanvasKit } from "canvaskit-wasm";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { findCommand } from "~/app/commands";
 import { EditorController } from "~/app/controller";
@@ -16,16 +15,7 @@ import { doc } from "./doc-fixture";
 let ck: CanvasKit;
 
 beforeAll(async () => {
-	const bin = join(
-		dirname(createRequire(import.meta.url).resolve("canvaskit-wasm")),
-		"..",
-		"bin",
-	);
-	ck = await (
-		CanvasKitInit as unknown as (o: {
-			locateFile(f: string): string;
-		}) => Promise<CanvasKit>
-	)({ locateFile: (f) => join(bin, f) });
+	ck = await loadCanvasKit();
 });
 
 afterEach(cleanup);

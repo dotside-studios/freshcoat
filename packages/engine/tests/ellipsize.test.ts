@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { ellipsize } from "../src/bake-text";
@@ -9,16 +7,7 @@ import { createParagraphEngine } from "../src/paragraph-layout";
 import type { TextEngine } from "../src/text-engine";
 import type { ResolvedFont } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 const font: ResolvedFont = {
 	family: "Geist",
@@ -108,9 +97,7 @@ let ck: TextEngine & { dispose(): void };
 
 beforeAll(async () => {
 	const bytes = new Uint8Array(readFileSync(FONT));
-	const kit = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	const kit = await loadCanvasKit();
 	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 	ck = createParagraphEngine(kit as any, new Map([["Geist", [bytes]]]));
 });

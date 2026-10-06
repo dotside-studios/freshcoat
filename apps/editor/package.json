@@ -43,6 +43,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",
+		"@freshcoat-js/test-utils": "workspace:*",
 		"@iconify-json/mingcute": "^1.2.7",
 		"@playwright/test": "^1.56.1",
 		"@svgr/core": "^8.1.0",

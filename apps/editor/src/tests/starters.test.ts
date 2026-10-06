@@ -1,6 +1,4 @@
 // @vitest-environment node
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import type { Element, Template } from "@freshcoat-js/coatfile";
 import {
 	applyVariant,
@@ -14,7 +12,7 @@ import {
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import type { Node } from "@freshcoat-js/engine";
 import { renderSceneToPng } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { walkLayers } from "../doc/path";
 import { sampleValues } from "../doc/values";
@@ -23,12 +21,6 @@ import { DAVI_WORDMARK_HEIGHT, daviWordmark } from "../samples/davi-wordmark";
 import { findStarter, STARTERS } from "../samples/starters";
 import { VEND_SANS } from "../samples/vend-sans";
 
-const CK_BIN = join(
-	dirname(createRequire(import.meta.url).resolve("canvaskit-wasm")),
-	"..",
-	"bin",
-);
-
 let ck: unknown;
 // The Google fonts the Davi card names are not reachable offline, so Vend Sans
 // stands in for them and the text is still shaped with a real face.
@@ -36,11 +28,7 @@ let fonts: Map<string, Uint8Array[]>;
 
 beforeAll(async () => {
 	setBarcodeEncoder(bwipBarcodeEncoder);
-	ck = await (
-		CanvasKitInit as unknown as (o: {
-			locateFile(f: string): string;
-		}) => Promise<unknown>
-	)({ locateFile: (f) => join(CK_BIN, f) });
+	ck = await loadCanvasKit();
 	const src = VEND_SANS.kind === "local" ? VEND_SANS.files[0].src : "";
 	const bytes = new Uint8Array(
 		Buffer.from(src.slice(src.indexOf(",") + 1), "base64"),

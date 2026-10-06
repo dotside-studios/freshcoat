@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { bakeText, resolveDirection } from "../src/bake-text";
 import { createText, type TextNode } from "../src/node";
@@ -9,18 +6,6 @@ import { createParagraphEngine } from "../src/paragraph-layout";
 import { makeRuntime, paintCanvasKit } from "../src/runtime";
 import { compileScene } from "../src/compile-scene";
 import type { ResolvedFont } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const font = (name: string) =>
-	new Uint8Array(
-		readFileSync(fileURLToPath(new URL(`./fonts/${name}`, import.meta.url))),
-	);
 
 const base: ResolvedFont = {
 	family: "Hebrew",
@@ -37,12 +22,10 @@ let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;
 
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 	fonts = new Map([
-		["Hebrew", [font("NotoSansHebrew-Regular.ttf")]],
-		["Geist", [font("Geist-Regular.ttf")]],
+		["Hebrew", [testFontBytes("NotoSansHebrew-Regular.ttf")]],
+		["Geist", [testFontBytes("Geist-Regular.ttf")]],
 	]);
 	engine = createParagraphEngine(ck, fonts);
 });

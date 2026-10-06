@@ -4,30 +4,18 @@
 // than a start angle: a start angle other than 0 leaves part of the circle
 // outside the swept window, where the clamp paints an end stop.
 import { createHash } from "node:crypto";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import { createRect } from "../src/index";
 import type { ResolvedFill } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const SIZE = 200;
 const C = SIZE / 2;
 
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 /** Paints a SIZE×SIZE rect filled with `fill` and returns its RGBA pixels. */

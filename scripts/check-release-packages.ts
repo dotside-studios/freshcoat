@@ -76,8 +76,7 @@ try {
 	const font = join(
 		root,
 		"packages",
-		"engine",
-		"tests",
+		"test-utils",
 		"fonts",
 		"Geist-Regular.ttf",
 	);

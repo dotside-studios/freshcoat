@@ -12,7 +12,9 @@ const svg = (body: string, attrs = 'width="100" height="100"') =>
 	`<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${body}</svg>`;
 
 function shapes(items: SvgItem[]): SvgShape[] {
-	return items.flatMap((i) => (i.kind === "shape" ? [i] : shapes(i.children)));
+	return items.flatMap((i) =>
+		i.kind === "shape" ? [i] : i.kind === "group" ? shapes(i.children) : [],
+	);
 }
 
 function only(markup: string): SvgShape {

@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
@@ -16,15 +16,12 @@ import { createFrame, createPath, createRect, createText } from "../src/node";
 import { BOUNDS_CASES } from "./fixtures/adjust-bounds/scenes";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
-const CK_BIN = join(HERE, "..", "node_modules", "canvaskit-wasm", "bin");
 const GOLDENS = join(HERE, "fixtures", "adjust-bounds");
 const TOLERANCE = 2;
-const GEIST = readFileSync(join(HERE, "fonts", "Geist-Regular.ttf"));
+const GEIST = readFileSync(testFontPath("Geist-Regular.ttf"));
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as unknown;
+	return (await loadCanvasKit()) as unknown;
 }
 
 function maxDiff(ck: any, a: Uint8Array, b: Uint8Array): number {

@@ -1,22 +1,12 @@
 // The print toggle on render(): off = passthrough; on = the frame is planned and
 // the whole-frame finish is applied. Uses a near-white background so the finish's
 // white-clamp is observable without needing image assets.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import { render } from "../src/render";
 import type { Template } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 // A single 40×40 front with a near-white (#fafafa = 250) background.
 const template = {
@@ -45,9 +35,7 @@ const template = {
 } as unknown as Template;
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as any)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as any;
+	return (await loadCanvasKit()) as any;
 }
 const centerR = (ck: any, png: Uint8Array): number => {
 	const d = decodePixels(ck, png)!;

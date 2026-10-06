@@ -2,9 +2,7 @@
 // color-correction steps (saturation matrix, contrast matrix, gamma LUT), proven
 // in pure JS against reference formulas. What the field DOES once painted is the
 // conformance corpus's subject, not this file's.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import {
 	applyAdjustColor,
@@ -129,19 +127,9 @@ describe("adjust builder ↔ reference color steps", () => {
 // This one is neither. It asserts that equal LUTs share a texture within a
 // paint, which is an efficiency property of THIS painter; a second backend is
 // free to upload twice and still be correct, so it is not conformance.
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 describe("CanvasKit painter internals", () => {
 	test("reuses equal LUT textures across adjusted layers in one paint", async () => {
-		const ck: any = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck: any = await loadCanvasKit();
 		let uploads = 0;
 		const makeImage = ck.MakeImage.bind(ck);
 		ck.MakeImage = (...args: unknown[]) => {

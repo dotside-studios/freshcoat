@@ -13,6 +13,7 @@ Studio or Figma.
 | [`for-print`](packages/for-print/) | Image analysis, correction planning and measured card-printer profiles | General ICC color management or printer transport |
 | [`workspace`](packages/workspace/) | Datasets, bindings, archives, export planning, imposition and PDF assembly | Rendering workers or file destinations |
 | [`ui`](packages/ui/) | Shared React controls, themes and accessibility behavior | Template or workspace models |
+| [`test-utils`](packages/test-utils/) | CanvasKit loading and vendored fonts for test suites | Anything shipped to users |
 | [Studio](apps/editor/) | Interactive editing, history, browser persistence and export execution | A separate template format or renderer |
 | [Figma plugin](apps/figma-plugin/) | Reading Figma designs, transpilation, diagnostics and handoff | Studio's controller or workspace UI |
 
@@ -49,7 +50,8 @@ not workspace APIs. Print correction uses `for-print` when requested.
 Internal dependencies are declared with Bun's `workspace:*` protocol.
 The engine is the foundation; for-print depends on it; coatfile depends on
 both. Workspace builds on coatfile and for-print. The UI package has no
-dependency on the template or rendering model.
+dependency on the template or rendering model. Test suites share fixtures
+through `test-utils`, which packages list only as a dev dependency.
 
 Both applications consume the shared packages rather than each other's
 source. Repository checks reject undeclared imports and paths that escape

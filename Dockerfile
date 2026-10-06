@@ -9,6 +9,7 @@ COPY apps/figma-plugin/package.json ./apps/figma-plugin/
 COPY packages/coatfile/package.json ./packages/coatfile/
 COPY packages/engine/package.json ./packages/engine/
 COPY packages/for-print/package.json ./packages/for-print/
+COPY packages/test-utils/package.json ./packages/test-utils/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/workspace/package.json ./packages/workspace/
 RUN bun install --frozen-lockfile

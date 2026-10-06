@@ -1,17 +1,7 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const frameTemplate = {
 	format_version: "1.0",
@@ -40,9 +30,7 @@ const frameTemplate = {
 
 describe("createHeadlessEnv", () => {
 	test("renders a frame offscreen to PNG with no canvas host", async () => {
-		const ck = (await (CanvasKitInit as any)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		})) as any;
+		const ck = (await loadCanvasKit()) as any;
 		const { compileToCommands } = await import("./helpers/compile-commands");
 		const frames = compileToCommands(
 			frameTemplate,

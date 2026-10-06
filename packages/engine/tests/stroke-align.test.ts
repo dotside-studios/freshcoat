@@ -1,6 +1,4 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
@@ -16,14 +14,6 @@ import {
 import type { DrawGroupCommand, DrawPathCommand, Stroke } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 const W = 100;
 const H = 100;
 const BLACK = [0, 0, 0];
@@ -38,9 +28,7 @@ const stroke = (align: Stroke["align"]): Stroke => ({
 
 let ck: unknown;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 async function paint(node: Node) {

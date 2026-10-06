@@ -1,27 +1,15 @@
 // End-to-end: print { analyze: true } renders each image layer as-rendered,
 // analyzes it, and attaches a per-image correction — so the painted image differs
 // from the un-optimized render. finish:false isolates the per-layer adjust.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import { render } from "../src/render";
 import type { Template } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as any)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as any;
+	return (await loadCanvasKit()) as any;
 }
 
 // A solid-color PNG as a data URL (the headless env decodes data: URLs).

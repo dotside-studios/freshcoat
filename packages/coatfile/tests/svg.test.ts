@@ -1,8 +1,6 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { EncodedPaintedFrame } from "../src/render";
 import { render } from "../src/render";
@@ -17,14 +15,6 @@ import type {
 	VectorElement,
 } from "../src/types";
 import { validate } from "../src/validate";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const svg = (body: string, attrs = 'width="100" height="100"') =>
 	`<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${body}</svg>`;
@@ -339,9 +329,7 @@ function template(element: Element, extra: Element[] = []): Template {
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 async function pixels(tpl: Template, markup = ICON) {

@@ -4,25 +4,14 @@
 // and advancing every line by the node's tallest span puts each later line where
 // the first line's box would have ended.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { bakeText } from "../src/bake-text";
 import { createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { ResolvedFont } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 const base: ResolvedFont = {
 	family: "Geist",
@@ -48,9 +37,7 @@ const node = (middleLineHeight: number) =>
 
 describe("inline text with per-span line heights", () => {
 	test("each line advances by its own box", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(FONT));
 		const textEngine = createParagraphEngine(ck, new Map([["Geist", [bytes]]]));
 		try {
@@ -70,9 +57,7 @@ describe("inline text with per-span line heights", () => {
 	});
 
 	test("uniform line heights stack uniformly, as before", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(FONT));
 		const textEngine = createParagraphEngine(ck, new Map([["Geist", [bytes]]]));
 		try {

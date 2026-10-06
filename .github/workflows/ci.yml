@@ -58,6 +58,9 @@ jobs:
       - run: bun run --cwd packages/ui typecheck
       - run: bun run --cwd packages/workspace typecheck
       - run: bun run --cwd packages/engine typecheck
+      - run: bun run --cwd packages/for-print typecheck
+      - run: bun run --cwd packages/coatfile typecheck
+      - run: bun run --cwd packages/test-utils typecheck
       - run: bun run --cwd apps/editor typecheck
       - run: bun run --cwd apps/figma-plugin typecheck
 
@@ -76,6 +79,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
+      - run: bun run --cwd packages/test-utils test
       - run: bun run --cwd packages/engine test
       - run: bun run --cwd packages/coatfile test
       - run: bun run --cwd packages/for-print test

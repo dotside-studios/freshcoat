@@ -1,36 +1,18 @@
 // A paint cache over an env that holds the fonts map: records that hide a field
 // set in its own family keep the font provider, and paint what an uncached
 // render does.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { createPaintCache, type PaintCache } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import { type EncodedPaintedFrame, render } from "../src/render";
 import type { Template } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const GEIST = new Uint8Array(
-	readFileSync(
-		fileURLToPath(
-			new URL("../../engine/tests/fonts/Geist-Regular.ttf", import.meta.url),
-		),
-	),
-);
+const GEIST = testFontBytes("Geist-Regular.ttf");
 
 let ck: any;
 async function ckInit(): Promise<any> {
-	ck ??= await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck ??= await loadCanvasKit();
 	return ck;
 }
 

@@ -1,23 +1,13 @@
 // Export settings on render(): the compile size decides the layout, each export
 // setting decides the density that layout is rasterized at — so one call can
 // return the same side at several sizes, each tagged with what it is.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import type { EncodedPaintedFrame } from "../src/render";
 import { render } from "../src/render";
 import type { Template } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const side = (name: string, fill: string) => ({
 	name,
@@ -46,9 +36,7 @@ const template = {
 } as unknown as Template;
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as unknown;
+	return (await loadCanvasKit()) as unknown;
 }
 
 const pngSize = (ck: any, png: Uint8Array) => {

@@ -1,23 +1,12 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { bakeText } from "../src/bake-text";
 import { createText, type TextNode } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { ResolvedFont } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 const font: ResolvedFont = {
 	family: "Geist",
@@ -30,9 +19,7 @@ const font: ResolvedFont = {
 let engine: ReturnType<typeof createParagraphEngine>;
 
 beforeAll(async () => {
-	const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	const ck = await loadCanvasKit();
 	engine = createParagraphEngine(
 		ck,
 		new Map([["Geist", [new Uint8Array(readFileSync(FONT))]]]),

@@ -1,8 +1,6 @@
 // PathNode.fillRule keeps a two-subpath ring's hole, and every BlendMode reaches
 // Skia as a real mode rather than falling back to normal compositing.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import {
@@ -14,21 +12,11 @@ import {
 } from "../src/index";
 import type { BlendMode } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 async function pixelAt(children: Node[], x: number, y: number) {

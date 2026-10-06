@@ -1,8 +1,6 @@
 // deriveFontMetrics + renderSceneToPng: the one-call headless path.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import {
@@ -12,16 +10,7 @@ import {
 	deriveFontMetrics,
 } from "../src/index";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 describe("deriveFontMetrics", () => {
 	test("reads metrics for each family's first face; skips empty", () => {
@@ -40,9 +29,7 @@ describe("deriveFontMetrics", () => {
 describe("renderSceneToPng", () => {
 	test("compiles + paints a text scene to PNG in one call", async () => {
 		const bytes = new Uint8Array(readFileSync(FONT));
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const scene = createFrame({
 			pos: { x: 0, y: 0 },
 			size: { width: 120, height: 60 },

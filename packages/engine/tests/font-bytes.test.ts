@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
+import type { FontResolution } from "../src/types";
 import {
 	clearFontBytesCache,
 	FONT_MEMO_MAX,
@@ -164,7 +165,7 @@ describe("fontBytes memo", () => {
 				family: "X",
 				files: [{ src: url, weight: 400, style: "normal" }],
 			},
-		}) as const;
+		}) satisfies FontResolution;
 
 	test("two resolutions of one stylesheet make one fetch per URL and share arrays", async () => {
 		const requested = stubFetch(SUBSET_CSS, {

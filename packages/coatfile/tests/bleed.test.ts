@@ -1,8 +1,6 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { decodePixels, type GroupNode, type Node } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import {
 	bleedSize,
@@ -14,14 +12,6 @@ import { compile } from "../src/compile";
 import { type EncodedPaintedFrame, render } from "../src/render";
 import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 function card(extra: Partial<Template> = {}, elements: Element[] = []) {
 	return {
@@ -257,9 +247,7 @@ describe("compile with bleed", () => {
 
 describe("render with bleed", () => {
 	test("paints the bleed and reports where the trim is", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const template = card({ bleed: 5 }, [rect("dot", 0, 0, 10, 10)]);
 		const run = (bleed?: boolean) =>
 			render(

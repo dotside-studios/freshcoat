@@ -1,30 +1,17 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { TextLayoutInput } from "../src/text-types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 const shaped: number[] = [];
 
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 	const make = ck.ParagraphBuilder.MakeFromFontProvider;
 	ck.ParagraphBuilder.MakeFromFontProvider = (style: any, provider: any) => {
 		shaped.push(style.textStyle.fontSize);

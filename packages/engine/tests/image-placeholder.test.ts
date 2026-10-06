@@ -1,27 +1,15 @@
 // A missing/undecodable image paints freshcoat's placeholder. When the image
 // node carries a shape mask (e.g. a circular avatar), the placeholder must be
 // clipped to that shape too — not left as a bare square.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import { compileScene, createImage } from "../src/index";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 let ck: any;
 async function initCk() {
 	if (!ck)
-		ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		ck = await loadCanvasKit();
 	return ck;
 }
 

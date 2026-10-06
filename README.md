@@ -60,8 +60,9 @@ Figma plugin bundles.
   authoring. The workspace package adds datasets, bindings, export plans,
   PDF assembly and sheet imposition for applications that need batch output.
 
-The [workspace](packages/workspace/) and [UI](packages/ui/) packages are
-internal packages and are not currently included in npm releases.
+The [workspace](packages/workspace/), [UI](packages/ui/) and
+[test-utils](packages/test-utils/) packages are internal packages and are
+not currently included in npm releases.
 The workspace model is independent of React; the UI kit supplies Studio's
 React controls and themes.
 

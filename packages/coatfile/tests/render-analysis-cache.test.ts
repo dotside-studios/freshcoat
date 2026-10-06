@@ -1,8 +1,6 @@
 // An analysis cache on the render runtime: a print-analyzed batch samples and
 // analyzes each distinct image once, and paints what an uncached render does.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { createPaintCache } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { createAnalysisCache } from "@freshcoat-js/for-print";
@@ -10,19 +8,9 @@ import { describe, expect, test } from "vitest";
 import { type EncodedPaintedFrame, type RenderRuntime, render } from "../src/render";
 import type { Template } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 let ck: any;
 async function ckInit(): Promise<any> {
-	ck ??= await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck ??= await loadCanvasKit();
 	return ck;
 }
 

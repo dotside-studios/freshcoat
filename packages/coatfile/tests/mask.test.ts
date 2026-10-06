@@ -1,8 +1,6 @@
 // The mask element: a shape (or any element) whose coverage decides how much of
 // the content shows. Positions are relative to the mask element, like a frame's.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { beforeAll, describe, expect, test } from "vitest";
@@ -11,14 +9,6 @@ import type { EncodedPaintedFrame } from "../src/render";
 import { render } from "../src/render";
 import type { Element, MaskElement, Template } from "../src/types";
 import { validate } from "../src/validate";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const rect = (
 	id: string,
@@ -96,9 +86,7 @@ const circle = {
 
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 async function pixels(tpl: Template, values: Record<string, unknown> = {}) {

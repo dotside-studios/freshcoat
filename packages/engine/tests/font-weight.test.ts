@@ -5,25 +5,12 @@
 // 700 span therefore matches that 400 face and gets Skia's synthetic bold: 400's
 // advances, so text that is both too light and wrapped as if it were regular.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createParagraphEngine } from "../src/paragraph-layout";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const VARIABLE = fileURLToPath(
-	new URL("./fonts/VendSans-Variable-latin.woff2", import.meta.url),
-);
-const STATIC = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const VARIABLE = testFontPath("VendSans-Variable-latin.woff2");
+const STATIC = testFontPath("Geist-Regular.ttf");
 
 const SAMPLE = "Certificate of Appreciation";
 
@@ -41,9 +28,7 @@ const measure = (
 
 describe("variable font weights", () => {
 	test("a 700 span is heavier — and wider — than 400 from the same variable face", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(VARIABLE));
 		const engine = createParagraphEngine(ck, new Map([["Vend Sans", [bytes]]]));
 		try {
@@ -59,9 +44,7 @@ describe("variable font weights", () => {
 	});
 
 	test("a static face ignores the axis rather than distorting", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(STATIC));
 		const engine = createParagraphEngine(ck, new Map([["Geist", [bytes]]]));
 		try {
@@ -75,9 +58,7 @@ describe("variable font weights", () => {
 	});
 
 	test("a light weight is lighter, and narrower, than regular", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(VARIABLE));
 		const engine = createParagraphEngine(ck, new Map([["Vend Sans", [bytes]]]));
 		try {
@@ -90,9 +71,7 @@ describe("variable font weights", () => {
 	});
 
 	test("a wght variation overrides the weight step", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const bytes = new Uint8Array(readFileSync(VARIABLE));
 		const engine = createParagraphEngine(ck, new Map([["Vend Sans", [bytes]]]));
 		try {

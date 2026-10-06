@@ -1,22 +1,12 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { approxEngine } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { compile } from "../src/compile";
 import { prepareTemplate } from "../src/prepare";
 import { renderCompiled } from "../src/render";
 import { TemplateSchema } from "../src/schemas";
 import type { Template } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const side = (name: string, fill: string) => ({
 	name,
@@ -98,9 +88,7 @@ describe("template preparation reuse", () => {
 
 describe("renderCompiled() with a provided text engine", () => {
 	test("uses it and leaves it undisposed", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const dispose = vi.fn();
 		const textEngine = { ...approxEngine, dispose };
 		const compiled = compile(makeTemplate(), {}, { width: 40, height: 20 });

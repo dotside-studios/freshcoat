@@ -1,9 +1,7 @@
 // Phase 4: the unified mask node. Lowering picks the implementation by what the
 // mask IS — a single opaque shape → a drawGroup with a clipPath (fast), anything
 // else → a drawMasked offscreen-coverage command (general). Both render.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import type { MeasureText } from "../src/index";
@@ -19,13 +17,6 @@ import {
 } from "../src/index";
 import type { GroupNode, MaskNode } from "../src/node";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 const measure: MeasureText = () => ({ width: 0, height: 0 });
 
@@ -241,9 +232,7 @@ describe("mask render smoke", () => {
 	let ck: any;
 	async function initCk() {
 		if (!ck)
-			ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-				locateFile: (f: string) => join(CK_BIN, f),
-			});
+			ck = await loadCanvasKit();
 		return ck;
 	}
 	async function paint(scene: Parameters<typeof compileScene>[0]) {

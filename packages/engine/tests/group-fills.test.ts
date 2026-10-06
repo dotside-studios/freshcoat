@@ -1,9 +1,7 @@
 // A group paints its own background, so a hug-height container does not need a
 // sibling rect sized to it — which is what forced a caller to resolve the layout
 // once to learn the height and again to paint.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { compileScene } from "../src/compile-scene";
@@ -11,14 +9,6 @@ import { decodePixels } from "../src/decode";
 import { renderSceneToPng } from "../src/headless";
 import { createGroup, createRect, createText } from "../src/node";
 import type { DrawGroupCommand, DrawRectCommand } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const BOX = { pos: { x: 0, y: 0 }, size: { width: 40, height: 20 } };
 
@@ -126,9 +116,7 @@ describe("group fills", () => {
 	});
 
 	test("paints the fill", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const { bytes } = await renderSceneToPng(
 			createGroup([], {
 				...BOX,

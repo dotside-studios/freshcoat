@@ -2,9 +2,7 @@
 // tool's Auto does. compile() marks the node and keeps a usable fallback; the
 // render resolves it against the family's real metrics.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { createParagraphEngine, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
@@ -12,19 +10,7 @@ import type { DrawTextCommand, Node, Template, TextNode } from "../src/types";
 import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const VEND_SANS = fileURLToPath(
-	new URL(
-		"../../engine/tests/fonts/VendSans-Variable-latin.woff2",
-		import.meta.url,
-	),
-);
+const VEND_SANS = testFontPath("VendSans-Variable-latin.woff2");
 // Vend Sans' own line box: typo ascent 1.09 + descent 0.39.
 const VEND_SANS_AUTO = 1.48;
 const SIZE = 40;
@@ -97,9 +83,7 @@ describe('lineHeight: "auto"', () => {
 	});
 
 	test("the render lays the lines out at the font's line box", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const fonts = new Map([
 			["Vend Sans", [new Uint8Array(readFileSync(VEND_SANS))]],
 		]);
