@@ -1,29 +1,20 @@
-import {
-	loadSettingsAsync,
-	saveSettingsAsync,
-	showUI,
-} from "@create-figma-plugin/utilities";
-import {
-	bindableProperties,
-	buildFieldMeta,
-	type FieldMeta,
-	inferNodeBinding,
-	storedToNodeBinding,
-} from "~/lib/figma/binding";
-import {
-	planHarvest,
-	renameInMarker,
-	type SlotHarvestInput,
-} from "~/lib/figma/harvest";
+import { showUI } from "@create-figma-plugin/utilities";
 import type { ProductRegistryEntry } from "~/lib/figma/transpiler";
 import {
 	exactSizeCheck,
 	fromDesignSize,
 } from "~/lib/figma/transpiler/exact-size";
-import { extractTokens } from "~/lib/figma/transpiler/fields";
 import { rasterScaleFor } from "~/lib/figma/transpiler/raster-scale";
 import { colorwayLabel } from "~/lib/figma/transpiler/variants";
 import type { FigmaContainerNode } from "~/lib/figma/types";
+import {
+	handleClearBinding,
+	handleHarvest,
+	handleSetBinding,
+	postFieldsOverview,
+	postSelectionDetail,
+	slotFrameOf,
+} from "~/main/bindings";
 import { type CardsView, createCardsPublisher } from "~/main/cards-publisher";
 import {
 	collectColorways,
@@ -36,12 +27,6 @@ import {
 	exportThumbnails,
 	type RasterTarget,
 } from "~/main/export-rasters";
-import {
-	FIELD_KEY,
-	FIELDS_KEY,
-	readBinding,
-	readFieldMeta,
-} from "~/main/plugin-data";
 import { findUnpostable } from "~/main/postable";
 import {
 	applyRemoteProducts,
@@ -49,36 +34,29 @@ import {
 	listProductSpecs,
 } from "~/main/product";
 import { collectRasterTargets } from "~/main/raster-targets";
-import { readFrameTree, readNode } from "~/main/read-scene-graph";
+import { readFrameTree } from "~/main/read-scene-graph";
+import {
+	handleSaveSettings,
+	loadSettings,
+	postSettings,
+} from "~/main/settings";
 import type {
 	CardsMessage,
 	CardView,
-	ClearBindingMessage,
 	ColorwayRead,
-	FieldOverviewItem,
-	FieldsOverviewMessage,
 	NodeCandidate,
 	ReadDocumentMessage,
 	ReadFailedMessage,
 	ReadProgressMessage,
 	ResizeNodeMessage,
-	SelectionDetail,
-	SelectionDetailMessage,
-	SetBindingMessage,
 	SlotRead,
 	TemplateMode,
 	ThumbnailsMessage,
 	UiToMain,
 } from "~/shared/protocol";
-import {
-	DEFAULT_SETTINGS,
-	type PluginSettings,
-	type SettingsMessage,
-} from "~/shared/protocol";
 
 // 2x the thumbnail box in layout.tsx, so previews stay sharp on retina.
 const THUMBNAIL_WIDTH = 128;
-const SETTINGS_KEY = "freshcoat_plugin_settings";
 
 /** Author units per design unit for a slot, mirroring how the transpiler settles
  *  the canvas: a custom export takes the design's own measurement (so the two
@@ -354,188 +332,6 @@ async function readCardIntoSlots(
 	}
 }
 
-// The slot frame a node lives in = its top-level ancestor on the current page,
-// where template-global field metadata (FIELDS_KEY) is stored.
-function slotFrameOf(node: BaseNode): BaseNode | null {
-	let n: BaseNode | null = node;
-	while (n?.parent && n.parent.type !== "PAGE") n = n.parent;
-	return n?.parent?.type === "PAGE" ? n : null;
-}
-
-// main → ui: the binding state of the single selected node (drives the Layer tab).
-function postSelectionDetail(): void {
-	const sel = figma.currentPage.selection;
-	let detail: SelectionDetail | null = null;
-	if (sel.length === 1) {
-		const node = readNode(sel[0] as never);
-		if (node) {
-			const binding = node.binding
-				? storedToNodeBinding(node.binding)
-				: inferNodeBinding(node);
-			const slot = slotFrameOf(sel[0]);
-			const metas = slot ? (readFieldMeta(slot) ?? {}) : {};
-			detail = {
-				nodeId: node.id,
-				name: node.name,
-				nodeType: node.type,
-				capabilities: bindableProperties(node),
-				bind: binding?.bind ?? {},
-				fields: (binding?.fields ?? []).map((d) => ({
-					id: d.id,
-					format: d.format,
-					meta: metas[d.id] ?? buildFieldMeta(d),
-				})),
-			};
-		}
-	}
-	const msg: SelectionDetailMessage = { type: "selection-detail", detail };
-	figma.ui.postMessage(msg);
-}
-
-// Aggregate every field stored across the page's top-level frames, mapping each
-// to the nodes that reference it (for jump-to-canvas). Decoupled from slot
-// assignment — any harvested frame carries its own field metadata.
-function gatherFieldsOverview(): FieldOverviewItem[] {
-	const items: FieldOverviewItem[] = [];
-	for (const frame of figma.currentPage.children) {
-		if (
-			frame.type !== "FRAME" &&
-			frame.type !== "COMPONENT" &&
-			frame.type !== "COMPONENT_SET"
-		) {
-			continue;
-		}
-		const metas = readFieldMeta(frame) ?? {};
-		const ids = Object.keys(metas);
-		if (ids.length === 0) continue;
-
-		const refs = new Map<string, string[]>();
-		const names = new Map<string, string>();
-		for (const node of frame.findAllWithCriteria({
-			pluginData: { keys: [FIELD_KEY] },
-		})) {
-			const binding = readBinding(node);
-			if (!binding) continue;
-			for (const template of Object.values(binding.bind)) {
-				for (const id of extractTokens(template)) {
-					const list = refs.get(id);
-					if (list) list.push(node.id);
-					else refs.set(id, [node.id]);
-					names.set(node.id, node.name);
-				}
-			}
-		}
-		for (const id of ids) {
-			items.push({
-				id,
-				meta: metas[id],
-				slot: frame.name,
-				nodeIds: refs.get(id) ?? [],
-				layerNames: (refs.get(id) ?? []).map((n) => names.get(n) ?? ""),
-			});
-		}
-	}
-	return items;
-}
-
-function postFieldsOverview(): void {
-	const msg: FieldsOverviewMessage = {
-		type: "fields-overview",
-		fields: gatherFieldsOverview(),
-	};
-	figma.ui.postMessage(msg);
-}
-
-async function handleHarvest(
-	product: ProductRegistryEntry,
-	sideAssignment: Record<string, string>,
-	cardId: string,
-): Promise<void> {
-	const card = await figma.getNodeByIdAsync(cardId);
-	if (!card) {
-		figma.notify(
-			"Could not resolve the card to sync fields to. Re-pick your card.",
-		);
-		return;
-	}
-	const cardMeta = readFieldMeta(card) ?? {};
-	const slots: SlotHarvestInput[] = [];
-	const frameNodes = await Promise.all(
-		product.frames.map((frame) => {
-			const nodeId = sideAssignment[frame.name];
-			return nodeId ? figma.getNodeByIdAsync(nodeId) : null;
-		}),
-	);
-	for (const node of frameNodes) {
-		if (
-			!node ||
-			(node.type !== "FRAME" &&
-				node.type !== "COMPONENT" &&
-				node.type !== "COMPONENT_SET")
-		) {
-			continue;
-		}
-		slots.push({
-			slotId: node.id,
-			tree: readFrameTree(node as never),
-			existingMeta: cardMeta,
-		});
-	}
-	const plan = planHarvest(slots);
-	const bound = await Promise.all(
-		plan.nodeBindings.map((nb) => figma.getNodeByIdAsync(nb.nodeId)),
-	);
-	for (const [i, nb] of plan.nodeBindings.entries()) {
-		bound[i]?.setPluginData(FIELD_KEY, JSON.stringify(nb.record));
-	}
-	if (card) {
-		const mergedMeta: Record<string, FieldMeta> = {};
-		for (const sm of plan.slotMeta) Object.assign(mergedMeta, sm.meta);
-		card.setPluginData(FIELDS_KEY, JSON.stringify(mergedMeta));
-	}
-	const count = plan.nodeBindings.length;
-	figma.notify(`Synced ${count} field${count === 1 ? "" : "s"} to layers.`);
-	postSelectionDetail();
-	postFieldsOverview();
-}
-
-async function handleSetBinding(msg: SetBindingMessage): Promise<void> {
-	const node = await figma.getNodeByIdAsync(msg.nodeId);
-	if (!node) return;
-	if (msg.setName !== undefined) {
-		(node as SceneNode).name = msg.setName;
-	} else {
-		for (const r of msg.renames ?? []) {
-			const renamed = renameInMarker(node.name, r.from, r.to);
-			if (renamed !== null) (node as SceneNode).name = renamed;
-		}
-	}
-	node.setPluginData(FIELD_KEY, JSON.stringify({ bind: msg.bind }));
-	const slot = slotFrameOf(node);
-	if (slot) {
-		const metas = readFieldMeta(slot) ?? {};
-		for (const id of msg.removedIds ?? []) delete metas[id];
-		for (const m of msg.fields) metas[m.id] = m;
-		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
-	}
-	postSelectionDetail();
-	postFieldsOverview();
-}
-
-async function handleClearBinding(msg: ClearBindingMessage): Promise<void> {
-	const node = await figma.getNodeByIdAsync(msg.nodeId);
-	if (!node) return;
-	node.setPluginData(FIELD_KEY, "");
-	const slot = slotFrameOf(node);
-	if (slot) {
-		const metas = readFieldMeta(slot) ?? {};
-		for (const id of msg.removedIds) delete metas[id];
-		slot.setPluginData(FIELDS_KEY, JSON.stringify(metas));
-	}
-	postSelectionDetail();
-	postFieldsOverview();
-}
-
 async function postThumbnails(nodeIds: string[]): Promise<void> {
 	if (nodeIds.length === 0) return;
 	const msg: ThumbnailsMessage = {
@@ -577,38 +373,6 @@ async function handleFocus(nodeId: string): Promise<void> {
 	}
 }
 
-// Panel state persisted in clientStorage. Held in memory so a save can merge a
-// partial patch without a read round-trip; the UI only ever sends the keys it
-// changed.
-let settings: PluginSettings = { ...DEFAULT_SETTINGS };
-
-// clientStorage is not guaranteed — a read that throws must cost the author
-// their remembered layout, not the whole panel.
-async function loadSettings(): Promise<PluginSettings> {
-	try {
-		settings = await loadSettingsAsync(DEFAULT_SETTINGS, SETTINGS_KEY);
-	} catch {
-		settings = { ...DEFAULT_SETTINGS };
-	}
-	return settings;
-}
-
-function postSettings(): void {
-	const msg: SettingsMessage = { type: "settings", settings };
-	figma.ui.postMessage(msg);
-}
-
-async function handleSaveSettings(
-	patch: Partial<PluginSettings>,
-): Promise<void> {
-	settings = { ...settings, ...patch };
-	try {
-		await saveSettingsAsync(settings, SETTINGS_KEY);
-	} catch {
-		// Preference didn't stick; the in-memory copy still drives this session.
-	}
-}
-
 export default async function (): Promise<void> {
 	// Size the window from storage BEFORE showing it — resizing after paint
 	// makes the panel visibly jump on every open.
@@ -640,34 +404,58 @@ export default async function (): Promise<void> {
 	});
 
 	figma.ui.onmessage = (msg: UiToMain) => {
-		if (msg.type === "request-read")
-			void readCardIntoSlots(
-				msg.product,
-				msg.mode,
-				msg.sideAssignment,
-				msg.cardId,
-			);
-		else if (msg.type === "harvest")
-			void handleHarvest(msg.product, msg.sideAssignment, msg.cardId);
-		else if (msg.type === "set-binding") void handleSetBinding(msg);
-		else if (msg.type === "clear-binding") void handleClearBinding(msg);
-		else if (msg.type === "focus-node") void handleFocus(msg.nodeId);
-		else if (msg.type === "resize-node") void handleResize(msg);
-		else if (msg.type === "request-fields") postFieldsOverview();
-		else if (msg.type === "request-thumbnails")
-			void postThumbnails(msg.nodeIds);
-		else if (msg.type === "resize-window")
-			figma.ui.resize(msg.width, msg.height);
-		else if (msg.type === "save-settings")
-			void handleSaveSettings(msg.settings);
-		else if (msg.type === "request-settings") postSettings();
-		else if (msg.type === "open-external") {
-			if (/^https?:\/\//.test(msg.url)) figma.openExternal(msg.url);
-		} else if (msg.type === "products-loaded") {
-			// The UI fetched the live catalog; overlay it so card detection and
-			// reads use the same SKUs/frames, then re-post cards with the new specs.
-			applyRemoteProducts(msg.products);
-			void postCards();
+		switch (msg.type) {
+			case "request-read":
+				void readCardIntoSlots(
+					msg.product,
+					msg.mode,
+					msg.sideAssignment,
+					msg.cardId,
+				);
+				return;
+			case "harvest":
+				void handleHarvest(msg.product, msg.sideAssignment, msg.cardId);
+				return;
+			case "set-binding":
+				void handleSetBinding(msg);
+				return;
+			case "clear-binding":
+				void handleClearBinding(msg);
+				return;
+			case "focus-node":
+				void handleFocus(msg.nodeId);
+				return;
+			case "resize-node":
+				void handleResize(msg);
+				return;
+			case "request-fields":
+				postFieldsOverview();
+				return;
+			case "request-thumbnails":
+				void postThumbnails(msg.nodeIds);
+				return;
+			case "resize-window":
+				figma.ui.resize(msg.width, msg.height);
+				return;
+			case "save-settings":
+				void handleSaveSettings(msg.settings);
+				return;
+			case "request-settings":
+				postSettings();
+				return;
+			case "open-external":
+				if (/^https?:\/\//.test(msg.url)) figma.openExternal(msg.url);
+				return;
+			case "products-loaded":
+				// The UI fetched the live catalog; overlay it so card detection and
+				// reads use the same SKUs/frames, then re-post cards with the new specs.
+				applyRemoteProducts(msg.products);
+				void postCards();
+				return;
+			default: {
+				const unhandled: never = msg;
+				return unhandled;
+			}
 		}
 	};
 }

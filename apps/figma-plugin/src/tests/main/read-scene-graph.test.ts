@@ -1,17 +1,16 @@
 import { describe, expect, it, test } from "vitest";
 import { figmaPaintToFill } from "~/lib/figma/transpiler/colors";
 import { findUnpostable } from "~/main/postable";
+import { readBaseFields } from "~/main/read-base";
+import { gradientHandlesFromTransform, readPaint } from "~/main/read-paint";
 import {
-	gradientHandlesFromTransform,
-	readBaseFields,
 	readContainerAsync,
 	readFrameTree,
 	readNode,
-	readPaint,
 	readRectangleNode,
-	readTextNode,
 	readVectorNode,
 } from "~/main/read-scene-graph";
+import { readTextNode } from "~/main/read-text";
 
 describe("readPaint (solid)", () => {
 	it("folds RGB + paint.opacity into FigmaSolidPaint with color.a = 1", () => {

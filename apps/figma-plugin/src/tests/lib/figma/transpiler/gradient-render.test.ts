@@ -14,7 +14,7 @@ import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { beforeAll, describe, expect, it } from "vitest";
 import { transpileRect } from "~/lib/figma/transpiler/rect";
 import type { FigmaRectangleNode, FigmaTransform } from "~/lib/figma/types";
-import { readPaint } from "~/main/read-scene-graph";
+import { readPaint } from "~/main/read-paint";
 
 // CanvasKit is coatfile's dev dependency, not the plugin's; resolve it from
 // there rather than adding a second copy of the WASM.
