@@ -61,6 +61,18 @@ async function testPng(): Promise<Uint8Array> {
 	return encodePng(px, 4, 4);
 }
 
+// A 64x64 checker, which the 16px slots in scene() shrink below half size.
+async function bigPng(): Promise<Uint8Array> {
+	const px = new Uint8Array(64 * 64 * 4);
+	for (let y = 0; y < 64; y++)
+		for (let x = 0; x < 64; x++)
+			px.set(
+				(x >> 2) % 2 === (y >> 2) % 2 ? [220, 40, 40, 255] : [40, 90, 220, 255],
+				(y * 64 + x) * 4,
+			);
+	return encodePng(px, 64, 64);
+}
+
 function scene(size: { width: number; height: number }, srcs: string[]): Node {
 	return createFrame({
 		pos: { x: 0, y: 0 },
@@ -220,6 +232,23 @@ describe("PaintCache", () => {
 		await pixels(commands, rt);
 		expect(cache.stats().imageDecodes).toBe(1);
 		expect(load).toHaveBeenCalledTimes(1);
+		cache.dispose();
+	});
+
+	test("a downscaled image builds its mipmaps once", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const images = new Map([["img://big", await bigPng()]]);
+		const commands = compile(scene(SIZE, ["img://big"]), SIZE, fonts);
+		const plain = await pixels(commands, runtime(fonts, images).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(cache.stats().mipmapBuilds).toBe(1);
+		await pixels(compile(scene(SIZE, []), SIZE, fonts), rt);
+		await pixels(commands, rt);
+		expect(cache.stats().mipmapBuilds).toBe(2);
 		cache.dispose();
 	});
 

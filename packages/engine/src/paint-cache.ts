@@ -18,6 +18,7 @@ export type PaintCacheStats = {
 	imageDecodes: number;
 	paragraphBuilds: number;
 	lutImageBuilds: number;
+	mipmapBuilds: number;
 };
 
 export type PaintCache = {
@@ -35,6 +36,10 @@ type FontKey = { family: string; bytes: Uint8Array }[];
 
 export type ShapedLine = { para: CK; ascent: number };
 
+// A decoded image and, once a heavy downscale has asked for it, its mipmapped
+// copy, freed together.
+export type CachedImage = { image: CK; mipped: CK | null };
+
 type CachedSurface = {
 	surface: CK;
 	canvas: CanvasLike;
@@ -47,7 +52,7 @@ type CachedSurface = {
 export type PaintCacheState = {
 	stats: PaintCacheStats;
 	fonts: { key: FontKey; provider: CK } | null;
-	images: Map<string, CK>;
+	images: Map<string, CachedImage>;
 	// Freed with the provider whose typefaces they use.
 	lines: Map<string, ShapedLine>;
 	linesUsed: Set<string>;
@@ -69,6 +74,7 @@ export function createPaintCache(): PaintCache {
 			imageDecodes: 0,
 			paragraphBuilds: 0,
 			lutImageBuilds: 0,
+			mipmapBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
@@ -83,7 +89,7 @@ export function createPaintCache(): PaintCache {
 		const fonts = state.fonts;
 		state.fonts = null;
 		if (fonts) tryFree(() => fonts.provider.delete());
-		for (const img of state.images.values()) tryFree(() => img.delete());
+		for (const entry of state.images.values()) freeImage(entry);
 		state.images.clear();
 		freeLutImages(state.luts);
 		const surface = state.surface;
@@ -167,11 +173,34 @@ export function evictUnusedImages(
 	used: string[],
 ): void {
 	const keep = new Set(used);
-	for (const [src, img] of state.images) {
+	for (const [src, entry] of state.images) {
 		if (keep.has(src)) continue;
 		state.images.delete(src);
-		tryFree(() => img.delete());
+		freeImage(entry);
 	}
+}
+
+// The mipmapped copy of a cached image, built on first use. null when `image`
+// is not the one cached under `src`.
+export function cachedMipmaps(
+	state: PaintCacheState,
+	src: string,
+	image: CK,
+	build: () => CK,
+): CK | null {
+	const entry = state.images.get(src);
+	if (!entry || entry.image !== image) return null;
+	if (!entry.mipped) {
+		entry.mipped = build();
+		state.stats.mipmapBuilds++;
+	}
+	return entry.mipped;
+}
+
+function freeImage(entry: CachedImage): void {
+	const { image, mipped } = entry;
+	if (mipped) tryFree(() => mipped.delete());
+	tryFree(() => image.delete());
 }
 
 export function cachedLine(

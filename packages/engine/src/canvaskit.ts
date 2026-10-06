@@ -21,6 +21,7 @@ import {
 import {
 	cachedFontProvider,
 	cachedLine,
+	cachedMipmaps,
 	cachedSurface,
 	evictUnusedImages,
 	evictUnusedLines,
@@ -107,25 +108,35 @@ type Bin = {
 	// uploading the same LUT texture for every adjusted layer. `free` deletes
 	// them unless a PaintCache passed in owns them.
 	luts: LutImages;
+	// A mipmapped copy of `img`, kept with the cached image under `src` when
+	// there is one, else freed with the bin.
+	mipmaps: (src: string, img: CK) => CK;
 };
-function makeBin(shared?: LutImages): Bin {
+function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
-	const luts = shared ?? createLutImages();
+	const luts = cache?.luts ?? createLutImages();
+	const track = <T>(o: T): T => {
+		if (o && typeof (o as { delete?: unknown }).delete === "function")
+			items.push(o as unknown as { delete(): void });
+		return o;
+	};
 	return {
-		track: (o) => {
-			if (o && typeof (o as { delete?: unknown }).delete === "function")
-				items.push(o as unknown as { delete(): void });
-			return o;
-		},
+		track,
 		free: () => {
 			for (const o of items) {
 				try {
 					o.delete();
 				} catch {}
 			}
-			if (!shared) freeLutImages(luts);
+			if (!cache) freeLutImages(luts);
 		},
 		luts,
+		mipmaps: (src, img) => {
+			const build = () => img.makeCopyWithDefaultMipmaps();
+			return (
+				(cache && cachedMipmaps(cache, src, img, build)) ?? track(build())
+			);
+		},
 	};
 }
 
@@ -596,8 +607,9 @@ function drawImageRectHQ(
 	ck: CK,
 	canvas: CK,
 	bin: Bin,
+	src: string,
 	img: CK,
-	src: CK,
+	rect: CK,
 	dest: CK,
 	paint: CK,
 	scale: number,
@@ -606,17 +618,17 @@ function drawImageRectHQ(
 	// mipmaps (each level pre-filtered) keep the shrink clean. Above it, cubic
 	// is both sharper and cheaper (no mip pyramid to build).
 	if (scale > 0 && scale < 0.5) {
-		const mipped = bin.track(img.makeCopyWithDefaultMipmaps());
+		const mipped = bin.mipmaps(src, img);
 		canvas.drawImageRectOptions(
 			mipped,
-			src,
+			rect,
 			dest,
 			ck.FilterMode.Linear,
 			ck.MipmapMode.Linear,
 			paint,
 		);
 	} else {
-		canvas.drawImageRectCubic(img, src, dest, MITCHELL, MITCHELL, paint);
+		canvas.drawImageRectCubic(img, rect, dest, MITCHELL, MITCHELL, paint);
 	}
 }
 
@@ -756,6 +768,7 @@ function drawImage(
 			ck,
 			canvas,
 			bin,
+			cmd.src,
 			img,
 			ck.XYWHRect(r.sx, r.sy, r.sw, r.sh),
 			ck.XYWHRect(r.dx, r.dy, r.dw, r.dh),
@@ -2290,7 +2303,7 @@ export async function paintScene(
 			}
 			continue;
 		}
-		const hit = cache?.images.get(src);
+		const hit = cache?.images.get(src)?.image;
 		if (hit) {
 			imageMap.set(src, hit);
 			warnSvgFeatures(warnings, src, hit);
@@ -2304,7 +2317,7 @@ export async function paintScene(
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
-				cache?.images.set(src, img);
+				cache?.images.set(src, { image: img, mipped: null });
 				warnSvgFeatures(warnings, src, img);
 			} else
 				warnings.push({
@@ -2321,7 +2334,7 @@ export async function paintScene(
 		}
 	}
 
-	const bin = makeBin(cache?.luts);
+	const bin = makeBin(cache);
 	const create = commands.find((c) => c.op === "createCanvas") as
 		| {
 				op: "createCanvas";
