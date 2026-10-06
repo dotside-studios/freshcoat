@@ -26,6 +26,7 @@ import {
 	resolveExportScale,
 	resolveSupersample,
 	sampleImageNode,
+	type TextEngine,
 } from "@freshcoat-js/engine";
 import { compile } from "./compile";
 import type { CompiledTemplate, Template } from "./types";
@@ -69,6 +70,9 @@ export type RenderRuntime = {
 	fonts?: Map<string, Uint8Array[]>;
 	// Per-family vertical metrics; derived from `fonts` when omitted.
 	fontMetrics?: Record<string, FontVMetrics>;
+	// A text engine built from `fonts`, reused across renders. The caller owns
+	// it; one is created and disposed per call when omitted.
+	textEngine?: TextEngine;
 };
 
 // Print-optimization toggle. When enabled, each frame's node tree is run through
@@ -249,7 +253,10 @@ export async function renderCompiled(
 	const fontMetrics = runtime.fontMetrics ?? deriveFontMetrics(fonts);
 	// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 	const ck = runtime.ck as any;
-	const textEngine = createParagraphEngine(ck, fonts);
+	const ownEngine = runtime.textEngine
+		? undefined
+		: createParagraphEngine(ck, fonts);
+	const textEngine = runtime.textEngine ?? (ownEngine as TextEngine);
 	const print = resolvePrint(opts.print);
 	// Analyze the layer AS RENDERED: draw the image into its own box honoring `fit`
 	// (a cover crop shows only part of the source), bounded to a small buffer, then
@@ -333,6 +340,6 @@ export async function renderCompiled(
 		}
 		return results;
 	} finally {
-		textEngine.dispose();
+		ownEngine?.dispose();
 	}
 }
