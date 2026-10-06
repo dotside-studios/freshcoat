@@ -29,7 +29,6 @@ export type FlattenReason =
 	| "effect_flattened"
 	| "blend_mode_flattened"
 	| "vector_flattened"
-	| "clip_overflow_flattened"
 	| "transform_undecomposable_flattened"
 	| "multi_fill_flattened"
 	| "paint_flattened";
