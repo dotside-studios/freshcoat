@@ -1,12 +1,8 @@
 import {
-	DataBody,
-	DataCell,
-	DataColumn,
-	DataRow,
-	DataTableHeader,
-	useCoarsePointer,
-	VirtualDataTable,
-} from "@freshcoat-js/ui/data-table";
+	type DataGridColumn,
+	VirtualDataGrid,
+} from "@freshcoat-js/ui/data-grid";
+import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import type {
@@ -56,7 +52,7 @@ export type GridHandle = {
 	reveal: (recordId: string, col?: string, edit?: boolean) => void;
 };
 
-type GridColumn = { id: string; column?: Column };
+type GridColumn = DataGridColumn & { column?: Column };
 
 const WIDTHS: Record<ColumnType, number> = {
 	text: 160,
@@ -72,7 +68,7 @@ const WIDTHS: Record<ColumnType, number> = {
 };
 
 const activeCell =
-	"data-focused:bg-fc-accent-soft/60 data-focused:outline-1 data-focused:outline-fc-accent data-focused:outline-solid data-focused:-outline-offset-1";
+	"focus:bg-fc-accent-soft/60 focus:outline-1 focus:outline-fc-accent focus:outline-solid focus:-outline-offset-1";
 
 export type RecordsGridProps = {
 	dataset: Dataset;
@@ -117,6 +113,18 @@ export function useRowItems(rows: readonly DataRecord[]): RowItem[] {
 	}, [rows]);
 }
 
+function renderCell(id: string, c: GridColumn): ReactNode {
+	if (c.column) return <RecordCell id={id} column={c.column} />;
+	if (c.id === INDEX_COLUMN) return <IndexCell id={id} />;
+	return <StatusCell id={id} />;
+}
+
+function cellProps(id: string, c: GridColumn) {
+	return c.column
+		? { "data-col": c.column.key, "data-row": id, className: activeCell }
+		: undefined;
+}
+
 export const RecordsGrid = memo(function RecordsGrid({
 	dataset,
 	rows,
@@ -155,12 +163,40 @@ export const RecordsGrid = memo(function RecordsGrid({
 
 	const gridColumns = useMemo<GridColumn[]>(
 		() => [
-			{ id: INDEX_COLUMN },
-			{ id: STATUS_COLUMN },
-			...dataset.columns.map((c) => ({ id: c.key, column: c })),
+			{
+				id: INDEX_COLUMN,
+				header: "#",
+				isRowHeader: true,
+				allowsSorting: true,
+				numeric: true,
+				width: coarse ? 56 : 48,
+				minWidth: 40,
+			},
+			{
+				id: STATUS_COLUMN,
+				header: "Status",
+				allowsSorting: true,
+				width: 92,
+				minWidth: 72,
+			},
+			...dataset.columns.map((c) => ({
+				id: c.key,
+				column: c,
+				allowsSorting: true,
+				numeric: NUMERIC_TYPES.has(c.type),
+				width: WIDTHS[c.type],
+				minWidth: 56,
+				header: (
+					<span title={c.title ? `${c.title} (${c.key})` : c.key}>
+						{c.key}
+						{c.required ? <span className="text-fc-danger"> *</span> : null}
+					</span>
+				),
+			})),
 		],
-		[dataset.columns],
+		[dataset.columns, coarse],
 	);
+	const rowKeys = useMemo(() => items.map((i) => i.id), [items]);
 
 	const findCell = useCallback((cell: CellRef) => {
 		const root = wrapper.current;
@@ -458,13 +494,16 @@ export const RecordsGrid = memo(function RecordsGrid({
 
 	const datasetName = dataset.name;
 	// A value edit reaches the cells through the grid context; keeping the
-	// table element the same skips re-rendering react-aria's collection.
+	// grid element the same skips re-rendering its rows.
 	const table = useMemo(
 		() => (
-			<VirtualDataTable
+			<VirtualDataGrid
 				aria-label={`Records of ${datasetName}`}
-				containerClassName="flex-1 min-h-0"
-				selectionMode="multiple"
+				className="flex-1 min-h-0"
+				columns={gridColumns}
+				rowKeys={rowKeys}
+				renderCell={renderCell}
+				cellProps={cellProps}
 				selectedKeys={selection}
 				onSelectionChange={onSelectionChange}
 				sortDescriptor={sort as SortDescriptor | undefined}
@@ -478,87 +517,12 @@ export const RecordsGrid = memo(function RecordsGrid({
 					if (column !== INDEX_COLUMN && column !== STATUS_COLUMN)
 						onColumnFocus(column);
 				}}
-			>
-				<DataTableHeader columns={gridColumns}>
-					{(c) =>
-						c.column ? (
-							<DataColumn
-								id={c.id}
-								allowsSorting
-								numeric={NUMERIC_TYPES.has(c.column.type)}
-								defaultWidth={WIDTHS[c.column.type]}
-								minWidth={56}
-							>
-								<span
-									title={
-										c.column.title
-											? `${c.column.title} (${c.column.key})`
-											: c.column.key
-									}
-								>
-									{c.column.key}
-									{c.column.required ? (
-										<span className="text-fc-danger"> *</span>
-									) : null}
-								</span>
-							</DataColumn>
-						) : c.id === INDEX_COLUMN ? (
-							<DataColumn
-								id={c.id}
-								isRowHeader
-								allowsSorting
-								numeric
-								defaultWidth={coarse ? 56 : 48}
-								minWidth={40}
-							>
-								#
-							</DataColumn>
-						) : (
-							<DataColumn
-								id={c.id}
-								allowsSorting
-								defaultWidth={92}
-								minWidth={72}
-							>
-								Status
-							</DataColumn>
-						)
-					}
-				</DataTableHeader>
-				<DataBody
-					items={items}
-					dependencies={[gridColumns]}
-					renderEmptyState={() => (
-						<div className="px-3 py-8 text-center text-fc-faint text-fc-sm">
-							{emptyState}
-						</div>
-					)}
-				>
-					{(item) => (
-						<DataRow id={item.id} data-row={item.id} columns={gridColumns}>
-							{(c) =>
-								c.column ? (
-									<DataCell
-										data-row={item.id}
-										data-col={c.column.key}
-										className={activeCell}
-									>
-										<RecordCell id={item.id} column={c.column} />
-									</DataCell>
-								) : c.id === INDEX_COLUMN ? (
-									<DataCell data-row={item.id} numeric>
-										<IndexCell id={item.id} />
-									</DataCell>
-								) : (
-									<DataCell data-row={item.id}>
-										<StatusCell id={item.id} />
-									</DataCell>
-								)
-							}
-						</DataRow>
-					)}
-				</DataBody>
-			</VirtualDataTable>
+				renderEmptyState={() => (
+					<div className="px-3 py-8 text-center text-fc-faint text-fc-sm">
+						{emptyState}
+					</div>
+				)}
+			/>
 		),
 		[
 			datasetName,
@@ -568,8 +532,7 @@ export const RecordsGrid = memo(function RecordsGrid({
 			onSortChange,
 			onColumnFocus,
 			gridColumns,
-			coarse,
-			items,
+			rowKeys,
 			emptyState,
 		],
 	);
