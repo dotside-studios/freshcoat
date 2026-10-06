@@ -13,10 +13,12 @@ import {
 	parseAssetRef,
 	type RecordStatus,
 } from "@freshcoat-js/workspace";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type KeyboardEvent,
 	type RefObject,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -490,8 +492,14 @@ function ColorEditor({
 	);
 }
 
+const PICKER_COLUMNS = 4;
+const PICKER_TILE_H = 72;
+const PICKER_GAP = 4;
+const PICKER_ROW_H = PICKER_TILE_H + PICKER_GAP;
+const PICKER_LIST_H = 240;
+
 /** The dataset's photos to choose one from, as a cell or a form field
- *  edits an image column. */
+ *  edits an image column. Only the rows in view are mounted. */
 export function ImagePicker({
 	dataset,
 	importPhotos,
@@ -505,10 +513,44 @@ export function ImagePicker({
 }) {
 	const [query, setQuery] = useState("");
 	const q = query.trim().toLowerCase();
-	const assets = dataset.assets.filter(
-		(a) => !q || a.name.toLowerCase().includes(q),
+	const assets = useMemo(
+		() =>
+			dataset.assets.filter((a) => !q || a.name.toLowerCase().includes(q)),
+		[dataset.assets, q],
 	);
 	const current = parseAssetRef(value);
+	const listRef = useRef<HTMLDivElement>(null);
+	const [focused, setFocused] = useState(-1);
+	const rows = Math.ceil(assets.length / PICKER_COLUMNS);
+	const focusedRow =
+		focused >= 0 && focused < assets.length
+			? Math.floor(focused / PICKER_COLUMNS)
+			: -1;
+	const virtualizer = useVirtualizer({
+		count: rows,
+		getScrollElement: () => listRef.current,
+		estimateSize: () => PICKER_ROW_H,
+		overscan: 2,
+		initialRect: { width: 272, height: PICKER_LIST_H },
+		// The focused photo stays mounted, so focus is not lost on scroll.
+		rangeExtractor: (range) => {
+			const out: number[] = [];
+			const start = Math.max(0, range.startIndex - range.overscan);
+			const end = Math.min(range.count - 1, range.endIndex + range.overscan);
+			for (let i = start; i <= end; i++) out.push(i);
+			if (
+				focusedRow >= 0 &&
+				focusedRow < range.count &&
+				!out.includes(focusedRow)
+			)
+				out.push(focusedRow);
+			return out.sort((a, b) => a - b);
+		},
+	});
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new filter starts at the top
+	useEffect(() => {
+		virtualizer.scrollToOffset(0);
+	}, [q, virtualizer]);
 	return (
 		<>
 			{dataset.assets.length > 8 ? (
@@ -523,26 +565,64 @@ export function ImagePicker({
 			{dataset.assets.length === 0 ? (
 				<p className="px-1 text-fc-muted text-fc-sm">No photos</p>
 			) : (
-				<div className="grid max-h-60 grid-cols-4 gap-1 overflow-auto">
-					{assets.map((a) => (
-						<RACButton
-							key={a.sha256}
-							aria-label={a.name}
-							onPress={() => onPick(assetRef(a.sha256))}
-							className={cn(
-								"flex min-w-0 flex-col items-center gap-0.5 rounded-[3px] p-1 outline-none data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid data-hovered:bg-fc-hover",
-								current === a.sha256 && "bg-fc-accent-soft",
-							)}
-						>
-							<AssetThumb
-								asset={a}
-								className="size-12 rounded-[2px] bg-fc-panel object-cover"
-							/>
-							<span className="w-full truncate text-center text-[10px] text-fc-muted">
-								{a.name}
-							</span>
-						</RACButton>
-					))}
+				<div
+					ref={listRef}
+					className="relative overflow-auto"
+					style={{
+						height: Math.min(
+							PICKER_LIST_H,
+							Math.max(0, virtualizer.getTotalSize() - PICKER_GAP),
+						),
+					}}
+				>
+					<div
+						className="relative w-full"
+						style={{ height: virtualizer.getTotalSize() }}
+					>
+						{virtualizer.getVirtualItems().map((row) => (
+							<div
+								key={row.key}
+								className="absolute inset-x-0 top-0 grid grid-cols-4 gap-1"
+								style={{
+									transform: `translateY(${row.start}px)`,
+									height: PICKER_TILE_H,
+								}}
+							>
+								{assets
+									.slice(
+										row.index * PICKER_COLUMNS,
+										(row.index + 1) * PICKER_COLUMNS,
+									)
+									.map((a, i) => {
+										const index = row.index * PICKER_COLUMNS + i;
+										return (
+											<RACButton
+												key={a.sha256}
+												aria-label={a.name}
+												onPress={() => onPick(assetRef(a.sha256))}
+												onFocusChange={(on) =>
+													setFocused((was) =>
+														on ? index : was === index ? -1 : was,
+													)
+												}
+												className={cn(
+													"flex min-w-0 flex-col items-center gap-0.5 rounded-[3px] p-1 outline-none data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid data-hovered:bg-fc-hover",
+													current === a.sha256 && "bg-fc-accent-soft",
+												)}
+											>
+												<AssetThumb
+													asset={a}
+													className="size-12 shrink-0 rounded-[2px] bg-fc-panel object-cover"
+												/>
+												<span className="w-full truncate text-center text-[10px] text-fc-muted leading-[14px]">
+													{a.name}
+												</span>
+											</RACButton>
+										);
+									})}
+							</div>
+						))}
+					</div>
 				</div>
 			)}
 			<div className="flex items-center justify-end gap-2">
