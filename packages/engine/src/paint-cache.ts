@@ -148,9 +148,9 @@ export function paintCacheState(cache: PaintCache): PaintCacheState {
 	return state;
 }
 
-// The provider is keyed on the loaded list itself, family and byte-array
+// The provider is keyed on the registered list itself, family and byte-array
 // identity in order, so a caller that keeps its fonts map stable keeps its
-// provider.
+// provider, whichever of those families a scene uses.
 export function cachedFontProvider(
 	state: PaintCacheState,
 	loaded: FontKey,

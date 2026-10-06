@@ -36,6 +36,7 @@ export function createHeadlessEnv(opts?: {
 	return makeRuntime(
 		{
 			cache: opts?.cache,
+			...(opts?.fonts ? { fonts: opts.fonts } : {}),
 			...(opts?.loadImage ? { loadImage: opts.loadImage } : {}),
 			resolveFont(req) {
 				return resolveFontRequest(req, opts?.fonts);

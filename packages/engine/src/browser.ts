@@ -22,6 +22,7 @@ export function createBrowserEnv(opts?: {
 	return makeRuntime(
 		{
 			cache: opts?.cache,
+			...(opts?.fonts ? { fonts: opts.fonts } : {}),
 			resolveFont(req) {
 				return resolveFontRequest(req, opts?.fonts);
 			},
