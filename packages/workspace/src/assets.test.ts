@@ -8,6 +8,7 @@ import {
 	assetRef,
 	filesFromZip,
 	findAssetByName,
+	hasAssetSha,
 	imageContentType,
 	isHiddenPath,
 	parseAssetRef,
@@ -24,7 +25,7 @@ import {
 	photoPng,
 	photoSha,
 } from "./test-fixtures";
-import type { Dataset } from "./types";
+import type { Dataset, DatasetAsset } from "./types";
 
 const file = (name: string, bytes: Uint8Array, type = ""): AssetFile => ({
 	name,
@@ -67,6 +68,31 @@ describe("asset references", () => {
 		expect(findAssetByName(members.assets, "ana")?.sha256).toBe(photoSha);
 		expect(findAssetByName(members.assets, "an")).toBeUndefined();
 		expect(findAssetByName(members.assets, " ")).toBeUndefined();
+	});
+
+	it("prefers a full name over a stem, and the first of equal names", () => {
+		const asset = (sha256: string, name: string): DatasetAsset => ({
+			sha256,
+			name,
+			contentType: "image/png",
+			size: 1,
+			blob: new Blob([]),
+		});
+		const assets = [
+			asset("a", "logo.png.png"),
+			asset("b", "Logo.png"),
+			asset("c", "logo.PNG"),
+			asset("d", "logo.jpg"),
+		];
+		expect(findAssetByName(assets, "logo.png")?.sha256).toBe("b");
+		expect(findAssetByName(assets, "LOGO")?.sha256).toBe("b");
+		expect(findAssetByName(assets, "dir\\logo.jpg")?.sha256).toBe("d");
+		const grown = [asset("e", "new.png")];
+		expect(findAssetByName(grown, "new")?.sha256).toBe("e");
+		grown.unshift(asset("f", "new.jpg"));
+		expect(findAssetByName(grown, "new")?.sha256).toBe("f");
+		expect(hasAssetSha(assets, "c")).toBe(true);
+		expect(hasAssetSha(assets, "e")).toBe(false);
 	});
 });
 

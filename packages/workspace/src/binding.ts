@@ -1,7 +1,33 @@
 import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
-import type { Binding, DataRecord, Dataset, FieldSource } from "./types";
+import type {
+	Binding,
+	Column,
+	DataRecord,
+	Dataset,
+	FieldSource,
+} from "./types";
+
+/** A dataset's columns by key, the first of any that share one. */
+export function columnsByKey(dataset: Dataset): Map<string, Column> {
+	const columns = new Map<string, Column>();
+	for (const column of dataset.columns) {
+		if (!columns.has(column.key)) columns.set(column.key, column);
+	}
+	return columns;
+}
+
+function columnOf(
+	dataset: Dataset | undefined,
+	key: string,
+	columns: ReadonlyMap<string, Column> | undefined,
+): Column | undefined {
+	if (dataset === undefined) return undefined;
+	return columns !== undefined
+		? columns.get(key)
+		: dataset.columns.find((c) => c.key === key);
+}
 
 /** Each template field bound to the column with the same key, exactly or
  *  ignoring case. Fields with no such column are left to their default. */
@@ -36,6 +62,7 @@ export function resolveValues(
 	dataset: Dataset | undefined,
 	record: DataRecord | undefined,
 	index: number,
+	columns?: ReadonlyMap<string, Column>,
 ): Record<string, string> {
 	const values: Record<string, string> = {};
 	for (const [key, field] of Object.entries(template.fields.properties)) {
@@ -46,7 +73,7 @@ export function resolveValues(
 		else if (source.kind === "serial") {
 			values[key] = serialValue(source, index);
 		} else {
-			const column = dataset?.columns.find((c) => c.key === source.column);
+			const column = columnOf(dataset, source.column, columns);
 			const cell = record?.values[source.column] ?? null;
 			values[key] =
 				column === undefined || isEmptyValue(cell)
@@ -67,6 +94,7 @@ export function variantFor(
 	binding: Binding | undefined,
 	dataset: Dataset | undefined,
 	record: DataRecord | undefined,
+	columns?: ReadonlyMap<string, Column>,
 ): string | undefined {
 	const variants = template.variants ?? [];
 	const source = binding?.variant;
@@ -74,7 +102,7 @@ export function variantFor(
 	if (source.kind === "fixed") {
 		return variants.some((v) => v.id === source.id) ? source.id : undefined;
 	}
-	const column = dataset?.columns.find((c) => c.key === source.column);
+	const column = columnOf(dataset, source.column, columns);
 	const cell = record?.values[source.column] ?? null;
 	if (column === undefined || isEmptyValue(cell)) return undefined;
 	const wanted = toTemplateValue(column, cell).trim().toLowerCase();
@@ -94,9 +122,10 @@ export function variantsFor(
 	binding: Binding | undefined,
 	dataset: Dataset | undefined,
 	record: DataRecord | undefined,
+	columns?: ReadonlyMap<string, Column>,
 ): (string | undefined)[] {
 	if (binding?.variant?.kind !== "all") {
-		return [variantFor(template, binding, dataset, record)];
+		return [variantFor(template, binding, dataset, record, columns)];
 	}
 	const changed = (template.variants ?? []).filter((v) => !isEmptyVariant(v));
 	return [undefined, ...changed.map((v) => v.id)];

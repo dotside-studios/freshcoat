@@ -243,7 +243,37 @@ export type ImageSampler = (image: ImageNode) => Promise<PixelData>;
 // the core win over correcting one flattened card. Non-photo intents follow
 // `policy` (default: untouched). Pass `policy.photo` explicitly to override
 // analysis: `null` leaves photos alone, a preset forces a fixed correction.
-// Recommendations are cached per src.
+export type AnalysisCache = Map<string, Promise<ImageAnalysis>>;
+
+export type AnalyzeSceneOptions = {
+	cache?: AnalysisCache;
+	// A short stable key for an image src, such as an asset's sha256. Defaults
+	// to a hash of any long src.
+	srcKey?: (src: string) => string;
+};
+
+const LONG_SRC = 256;
+
+function defaultSrcKey(src: string): string {
+	if (src.length <= LONG_SRC) return src;
+	let h1 = 0xdeadbeef;
+	let h2 = 0x41c6ce57;
+	for (let i = 0; i < src.length; i++) {
+		const c = src.charCodeAt(i);
+		h1 = Math.imul(h1 ^ c, 2654435761);
+		h2 = Math.imul(h2 ^ c, 1597334677);
+	}
+	h1 =
+		Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+		Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+	h2 =
+		Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+		Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+	return `#${src.length}:${(h1 >>> 0).toString(36)}:${(h2 >>> 0).toString(36)}`;
+}
+
+// Recommendations are cached per src, and across calls when `options.cache` is
+// passed.
 export async function analyzeScene(
 	sample: ImageSampler,
 	root: Node,
@@ -252,6 +282,7 @@ export async function analyzeScene(
 	// especially, which nothing downstream can recover once the render has clamped.
 	// Not called for layers an explicit `policy.photo` opted out of analysis.
 	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
+	options: AnalyzeSceneOptions = {},
 ): Promise<Node> {
 	const analyzePhotos = !("photo" in policy);
 	// Cache the in-flight PROMISE, not the resolved value: children walk
@@ -259,23 +290,33 @@ export async function analyzeScene(
 	// value-cache and sample twice. Key on the rendered appearance (src + fit +
 	// size + focus + crop), since the same src cropped differently analyzes
 	// differently.
-	const cache = new Map<string, Promise<ImageAnalysis>>();
+	const cache = options.cache ?? new Map<string, Promise<ImageAnalysis>>();
+	const srcKey = options.srcKey ?? defaultSrcKey;
 	const sampleKey = (n: ImageNode) =>
-		`${n.src}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
+		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
+	const seen = new Map<string, Promise<ImageAnalysis>>();
 
 	function photoOptions(node: ImageNode): Promise<PrintOptimizeOptions | null> {
 		if (!analyzePhotos) return Promise.resolve(policy.photo ?? null);
 		const key = sampleKey(node);
-		let analysis = cache.get(key);
+		let analysis = seen.get(key);
 		if (!analysis) {
-			// Reported on the miss, so duplicated layers are one analysis and one
-			// report — the same pixels counted twice would overstate the pressure.
-			analysis = sample(node).then((px) => {
-				const result = analyzePixels(px);
+			let shared = cache.get(key);
+			if (!shared) {
+				shared = sample(node).then(analyzePixels);
+				cache.set(key, shared);
+				// A failed sample is not kept, so a later call samples again.
+				shared.catch(() => {
+					if (cache.get(key) === shared) cache.delete(key);
+				});
+			}
+			// Reported once per call, so duplicated layers are one analysis and one
+			// report: the same pixels counted twice would overstate the pressure.
+			analysis = shared.then((result) => {
 				onAnalysis?.(result, node);
 				return result;
 			});
-			cache.set(key, analysis);
+			seen.set(key, analysis);
 		}
 		return analysis.then((a) => a.recommendation);
 	}
