@@ -8,6 +8,7 @@ import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { deriveFontMetrics } from "@freshcoat-js/engine";
+import { crc32 } from "@freshcoat-js/workspace/crc";
 import { createImageLru, DEFAULT_IMAGE_CACHE_PIXELS } from "./image-lru";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
@@ -179,8 +180,10 @@ async function renderSide(req: WorkerRenderRequest) {
 				throw new Error("Barcode: the encoder isn't loaded");
 		}
 		const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
+		const bytes = ownBytes(result.bytes);
 		return {
-			bytes: ownBytes(result.bytes),
+			bytes,
+			crc: crc32(bytes),
 			format: (result.format ?? "png") as OutputFormat,
 			width: result.width,
 			height: result.height,

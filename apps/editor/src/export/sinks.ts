@@ -30,7 +30,8 @@ export interface OutputSink {
 	readonly kind: ExportDestination;
 	/** resolves when the sink can take more */
 	readonly ready: Promise<void>;
-	add(name: string, bytes: Uint8Array): Promise<void>;
+	/** `crc` is the bytes' CRC-32 when already known */
+	add(name: string, bytes: Uint8Array, crc?: number): Promise<void>;
 	finish(): Promise<SinkResult>;
 	/** Stops, keeping what the destination keeps: a folder its files, a
 	 *  download the parts already handed over, a zip file nothing. */
@@ -132,8 +133,8 @@ export function createStreamZipSink(
 		get bytes() {
 			return zip.bytes;
 		},
-		async add(name, data) {
-			await zip.add({ name, data, level: levelFor(name) });
+		async add(name, data, crc) {
+			await zip.add({ name, data, level: levelFor(name), crc });
 			files++;
 		},
 		async finish() {
@@ -204,7 +205,7 @@ export function createPartZipSink(options: PartZipSinkOptions): OutputSink {
 		get bytes() {
 			return written + zip.bytes;
 		},
-		async add(name, data) {
+		async add(name, data, crc) {
 			if (aborted) throw new Error("the export was cancelled");
 			// a local header, the bytes, and a central directory entry
 			const cost = data.length + 2 * (46 + name.length * 3);
@@ -217,7 +218,7 @@ export function createPartZipSink(options: PartZipSinkOptions): OutputSink {
 				);
 				zip = newPart();
 			}
-			await zip.add({ name, data, level: levelFor(name) });
+			await zip.add({ name, data, level: levelFor(name), crc });
 			files++;
 		},
 		async finish() {

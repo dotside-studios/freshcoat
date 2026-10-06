@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { crc32 } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
+import { crc32 as ourCrc32 } from "./crc";
 import { jpegHeader } from "./image-fixtures";
 import { blobOutput, createZipWriter } from "./zip-stream";
 
@@ -87,7 +88,45 @@ describe("createZipWriter", () => {
 			const bytes = new Uint8Array(await out.blob("").arrayBuffer());
 			const crc = new DataView(bytes.buffer).getUint32(14, true);
 			expect(crc).toBe(crc32(slice));
+			expect(ourCrc32(slice)).toBe(crc32(slice));
 		}
+	});
+
+	it("writes the same archive from a precomputed CRC", async () => {
+		const jpeg = trickyJpeg();
+		const blob = new Blob([jpeg as BlobPart]);
+		const write = async (withCrc: boolean) => {
+			const out = blobOutput();
+			const writer = createZipWriter(out, MTIME);
+			for (const [name, data] of [
+				["a.jpg", jpeg],
+				["b.jpg", blob],
+			] as const)
+				await writer.add({
+					name,
+					data,
+					level: 0,
+					...(withCrc ? { crc: ourCrc32(jpeg) } : {}),
+				});
+			await writer.end();
+			return new Uint8Array(await out.blob("").arrayBuffer());
+		};
+		const computed = await write(false);
+		const given = await write(true);
+		expect(given).toEqual(computed);
+		const files = unzipSync(given);
+		expect(files["a.jpg"]).toEqual(jpeg);
+		expect(files["b.jpg"]).toEqual(jpeg);
+	});
+
+	it("trusts a precomputed CRC without reading the data for one", async () => {
+		const data = new Uint8Array([1, 2, 3]);
+		const out = blobOutput();
+		const writer = createZipWriter(out, MTIME);
+		await writer.add({ name: "x", data, level: 0, crc: 0x12345678 });
+		await writer.end();
+		const bytes = new Uint8Array(await out.blob("").arrayBuffer());
+		expect(new DataView(bytes.buffer).getUint32(14, true)).toBe(0x12345678);
 	});
 
 	it("refuses entries after the end", async () => {
