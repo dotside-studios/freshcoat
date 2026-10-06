@@ -13,6 +13,7 @@ import {
 	handleSetBinding,
 	postFieldsOverview,
 	postSelectionDetail,
+	scheduleSelectionDetail,
 	slotFrameOf,
 } from "~/main/bindings";
 import { type CardsView, createCardsPublisher } from "~/main/cards-publisher";
@@ -392,7 +393,7 @@ export default async function (): Promise<void> {
 
 	figma.on("selectionchange", () => {
 		cardsPublisher.schedule();
-		postSelectionDetail();
+		scheduleSelectionDetail();
 	});
 	figma.on("currentpagechange", () => {
 		watchedPage.off("nodechange", invalidateCards);

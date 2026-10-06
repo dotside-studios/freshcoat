@@ -122,6 +122,8 @@ function mixedProperties(node: AnySceneNode): string[] | undefined {
 
 export function readBaseFields(node: AnySceneNode) {
 	const mixed = mixedProperties(node);
+	const binding = readBinding(node);
+	const fieldMeta = readFieldMeta(node);
 	return {
 		id: node.id,
 		name: node.name,
@@ -166,7 +168,7 @@ export function readBaseFields(node: AnySceneNode) {
 		minHeight: node.minHeight,
 		maxHeight: node.maxHeight,
 		...readConstraints(node),
-		...(readBinding(node) ? { binding: readBinding(node) } : {}),
-		...(readFieldMeta(node) ? { fieldMeta: readFieldMeta(node) } : {}),
+		...(binding ? { binding } : {}),
+		...(fieldMeta ? { fieldMeta } : {}),
 	};
 }

@@ -1,4 +1,8 @@
-import type { FigmaTextNode, FigmaTextStyle } from "~/lib/figma/types";
+import type {
+	FigmaPaint,
+	FigmaTextNode,
+	FigmaTextStyle,
+} from "~/lib/figma/types";
 import { type AnySceneNode, readBaseFields } from "~/main/read-base";
 import { type AnyPaint, readPaints } from "~/main/read-paint";
 
@@ -194,7 +198,7 @@ function smallCapsOf(textCase: string | undefined): string {
 }
 
 /** A stable signature for a segment's style, used to allocate override keys. */
-function segSignature(s: AnyTextSegment): string {
+function segSignature(s: AnyTextSegment, fills: FigmaPaint[]): string {
 	return JSON.stringify([
 		s.fontName.family,
 		s.fontName.style,
@@ -208,7 +212,7 @@ function segSignature(s: AnyTextSegment): string {
 		s.lineHeight?.unit ?? "AUTO",
 		s.lineHeight && s.lineHeight.unit !== "AUTO" ? s.lineHeight.value : 0,
 		s.textDecoration ?? "NONE",
-		readPaints(s.fills),
+		fills,
 		smallCapsOf(s.textCase),
 	]);
 }
@@ -241,12 +245,13 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 
 	// The dominant (first) segment's style is the base (key 0); each *other*
 	// distinct style gets an incrementing key.
-	const baseSig = segments.length > 0 ? segSignature(segments[0]) : "";
-	const keyBySig = new Map<string, number>([[baseSig, 0]]);
+	const segFills = segments.map((seg) => readPaints(seg.fills));
+	const sigs = segments.map((seg, i) => segSignature(seg, segFills[i]));
+	const keyBySig = new Map<string, number>([[sigs[0] ?? "", 0]]);
 	let nextKey = 1;
 
-	for (const seg of segments) {
-		const sig = segSignature(seg);
+	for (const [i, seg] of segments.entries()) {
+		const sig = sigs[i];
 		let key = keyBySig.get(sig);
 		if (key === undefined) {
 			key = nextKey++;
@@ -262,7 +267,7 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 					seg.textDecoration === "STRIKETHROUGH"
 						? seg.textDecoration
 						: "NONE",
-				...(seg.fills ? { fills: readPaints(seg.fills) } : {}),
+				...(seg.fills ? { fills: segFills[i] } : {}),
 				...(seg.textCase
 					? { textCase: seg.textCase as FigmaTextStyle["textCase"] }
 					: {}),
