@@ -35,7 +35,7 @@
 		"@freshcoat-js/for-print": "workspace:*",
 		"bwip-js": "^4.11.4",
 		"fflate": "^0.8.3",
-		"uqr": "^0.1.3",
+		"lean-qr": "^2.7.4",
 		"zod": "^4.1.13"
 	},
 	"devDependencies": {
