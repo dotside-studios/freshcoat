@@ -65,7 +65,11 @@ function alpha(s: string | undefined): number {
 		: clamp(Number.parseFloat(s), 0, 1);
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+export function hslToRgb(
+	h: number,
+	s: number,
+	l: number,
+): [number, number, number] {
 	const hue = (((h % 360) + 360) % 360) / 360;
 	const f = (n: number) => {
 		const k = (n + hue * 12) % 12;

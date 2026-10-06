@@ -1,7 +1,7 @@
 import { subtleSha256 } from "@freshcoat-js/coatfile";
 import { newRecord } from "./columns";
 import { newId } from "./ids";
-import { orientedSize, readImageInfo } from "./image-info";
+import { orientedSize, readImageInfo, sniffImageType } from "./image-info";
 import type { CellValue, Column, Dataset, DatasetAsset } from "./types";
 import { readZip } from "./zip-stream";
 
@@ -92,18 +92,10 @@ export function imageContentType(name: string, bytes?: Uint8Array): string {
 }
 
 function sniffImage(b: Uint8Array): string | null {
-	const at = (i: number, ...values: number[]) =>
-		values.every((v, j) => b[i + j] === v);
-	if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
-	if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
-	if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
-	if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) {
-		return "image/webp";
-	}
-	if (at(4, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66)) {
-		return "image/avif";
-	}
-	return null;
+	const type = sniffImageType(b);
+	if (type !== null) return type;
+	const avif = [0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66];
+	return avif.every((v, j) => b[4 + j] === v) ? "image/avif" : null;
 }
 
 function extensionOf(name: string): string {
