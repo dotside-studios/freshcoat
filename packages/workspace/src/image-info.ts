@@ -50,18 +50,33 @@ export function orientedSize(info: {
 		: { width: info.width, height: info.height };
 }
 
+/** The media type of a PNG, JPEG, GIF or WebP from its magic number. */
+export function sniffImageType(b: Uint8Array): string | null {
+	const at = (i: number, ...values: number[]) =>
+		values.every((v, j) => b[i + j] === v);
+	if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
+	if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+	if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
+	if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
+		return "image/webp";
+	return null;
+}
+
 function parse(b: Uint8Array): Parsed {
 	if (b.length < 4) return b.length === 0 ? null : "more";
-	if (b[0] === 0xff && b[1] === 0xd8) return parseJpeg(b);
-	if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
-		return parsePng(b);
-	if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38)
-		return parseGif(b);
-	if (ascii(b, 0, 4) === "RIFF") {
-		if (b.length < 12) return "more";
-		if (ascii(b, 8, 4) === "WEBP") return parseWebp(b);
+	if (b.length < 12 && ascii(b, 0, 4) === "RIFF") return "more";
+	switch (sniffImageType(b)) {
+		case "image/jpeg":
+			return parseJpeg(b);
+		case "image/png":
+			return parsePng(b);
+		case "image/gif":
+			return parseGif(b);
+		case "image/webp":
+			return parseWebp(b);
+		default:
+			return null;
 	}
-	return null;
 }
 
 function ascii(b: Uint8Array, at: number, length: number): string {
