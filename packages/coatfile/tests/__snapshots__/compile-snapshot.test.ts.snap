@@ -291,7 +291,7 @@ exports[`compile output is stable full-feature-card at 1x 1`] = `
                 "kind": "bitmap",
                 "pixelHeight": 29,
                 "pixelWidth": 29,
-                "pixels": "bytes:3364:d88f8b55",
+                "pixels": "bytes:3364:92c61125",
                 "pos": {
                   "x": 0,
                   "y": 0,
@@ -474,7 +474,7 @@ exports[`compile output is stable full-feature-card at 0.5x 1`] = `
                 "kind": "bitmap",
                 "pixelHeight": 29,
                 "pixelWidth": 29,
-                "pixels": "bytes:3364:d88f8b55",
+                "pixels": "bytes:3364:92c61125",
                 "pos": {
                   "x": 0,
                   "y": 0,
@@ -657,7 +657,7 @@ exports[`compile output is stable full-feature-card amber at 1x 1`] = `
                 "kind": "bitmap",
                 "pixelHeight": 29,
                 "pixelWidth": 29,
-                "pixels": "bytes:3364:d88f8b55",
+                "pixels": "bytes:3364:92c61125",
                 "pos": {
                   "x": 0,
                   "y": 0,
@@ -840,7 +840,7 @@ exports[`compile output is stable full-feature-card amber at 0.5x 1`] = `
                 "kind": "bitmap",
                 "pixelHeight": 29,
                 "pixelWidth": 29,
-                "pixels": "bytes:3364:d88f8b55",
+                "pixels": "bytes:3364:92c61125",
                 "pos": {
                   "x": 0,
                   "y": 0,
