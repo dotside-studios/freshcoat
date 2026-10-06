@@ -10,7 +10,14 @@
 // (`line.baseline`).
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { dataUrlToBytes, fontBytes } from "./font-bytes";
+import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
+import {
+	cachedLutImage,
+	createLutImages,
+	evictUnusedLutImages,
+	freeLutImages,
+	type LutImages,
+} from "./lut-images";
 import {
 	cachedFontProvider,
 	cachedLine,
@@ -96,16 +103,14 @@ const WEIGHTS: Record<number, string> = {
 type Bin = {
 	track: <T>(o: T) => T;
 	free: () => void;
-	// LUT textures are immutable during a paint. Reusing an equal table keeps a
-	// photo-heavy scene from allocating and uploading the same 256×1 texture for
-	// every adjusted layer; `free` still owns every cached native image.
-	lutImages: Map<string, CK>;
-	// 3D cubes use a 2D atlas texture; cache them by value for the same reason as
-	// the 1D curves above.
-	lut3dImages: Map<string, CK>;
+	// Reusing an equal table keeps a photo-heavy scene from allocating and
+	// uploading the same LUT texture for every adjusted layer. `free` deletes
+	// them unless a PaintCache passed in owns them.
+	luts: LutImages;
 };
-function makeBin(): Bin {
+function makeBin(shared?: LutImages): Bin {
 	const items: { delete(): void }[] = [];
+	const luts = shared ?? createLutImages();
 	return {
 		track: (o) => {
 			if (o && typeof (o as { delete?: unknown }).delete === "function")
@@ -118,9 +123,9 @@ function makeBin(): Bin {
 					o.delete();
 				} catch {}
 			}
+			if (!shared) freeLutImages(luts);
 		},
-		lutImages: new Map(),
-		lut3dImages: new Map(),
+		luts,
 	};
 }
 
@@ -241,11 +246,7 @@ function shaderFor(
 function makeFontProvider(ck: CK, fonts: LoadedFontBytes[]): CK {
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const f of fonts) {
-		const buf = f.bytes.buffer.slice(
-			f.bytes.byteOffset,
-			f.bytes.byteOffset + f.bytes.byteLength,
-		);
-		provider.registerFont(buf, f.family);
+		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
 	}
 	// Stash the registered families on the provider so text styles can append them
 	// as a per-glyph fallback chain (drawText → textStyleOf). Without listing them
@@ -1309,22 +1310,21 @@ function needsShaderAdjust(cmd: DrawCommand): boolean {
 
 // A 256×1 lookup image encoding a per-channel LUT (x = input 0..255, texel =
 // output). Sampled Nearest/Clamp by the adjust shader.
-function lutKey(lut: NonNullable<DrawCommand["adjust"]>["lut"]): string {
-	if (!lut) throw new Error("lutKey: no lut");
-	// The bytes are the value of a curve; callers often construct separate typed
-	// arrays for the same gamma, so object identity would miss the useful cache.
-	return `${lut.r.join(",")}|${lut.g.join(",")}|${lut.b.join(",")}`;
-}
-
 function lutImage(
 	ck: CK,
 	bin: Bin,
 	lut: NonNullable<DrawCommand["adjust"]>["lut"],
 ): CK {
 	if (!lut) throw new Error("lutImage: no lut");
-	const key = lutKey(lut);
-	const cached = bin.lutImages.get(key);
-	if (cached) return cached;
+	return cachedLutImage(bin.luts, 1, [lut.r, lut.g, lut.b], () =>
+		buildLutImage(ck, lut),
+	);
+}
+
+function buildLutImage(
+	ck: CK,
+	lut: NonNullable<NonNullable<DrawCommand["adjust"]>["lut"]>,
+): CK {
 	const px = new Uint8Array(256 * 4);
 	for (let i = 0; i < 256; i++) {
 		px[i * 4] = lut.r[i];
@@ -1332,26 +1332,17 @@ function lutImage(
 		px[i * 4 + 2] = lut.b[i];
 		px[i * 4 + 3] = 255;
 	}
-	const image = bin.track(
-		ck.MakeImage(
-			{
-				width: 256,
-				height: 1,
-				colorType: ck.ColorType.RGBA_8888,
-				alphaType: ck.AlphaType.Unpremul,
-				colorSpace: ck.ColorSpace.SRGB,
-			},
-			px,
-			256 * 4,
-		),
+	return ck.MakeImage(
+		{
+			width: 256,
+			height: 1,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		},
+		px,
+		256 * 4,
 	);
-	bin.lutImages.set(key, image);
-	return image;
-}
-
-function lut3dKey(lut: NonNullable<DrawCommand["adjust"]>["lut3d"]): string {
-	if (!lut) throw new Error("lut3dKey: no LUT");
-	return `${lut.size}:${lut.data.join(",")}`;
 }
 
 type Lut3d = NonNullable<NonNullable<DrawCommand["adjust"]>["lut3d"]>;
@@ -1375,9 +1366,12 @@ function lut3dImage(
 	lut: NonNullable<DrawCommand["adjust"]>["lut3d"],
 ): CK {
 	if (!validLut3d(lut)) throw new Error("lut3dImage: invalid LUT");
-	const key = lut3dKey(lut);
-	const cached = bin.lut3dImages.get(key);
-	if (cached) return cached;
+	return cachedLutImage(bin.luts, lut.size, [lut.data], () =>
+		buildLut3dImage(ck, lut),
+	);
+}
+
+function buildLut3dImage(ck: CK, lut: Lut3d): CK {
 	const width = lut.size * lut.size;
 	const px = new Uint8Array(width * lut.size * 4);
 	for (let b = 0; b < lut.size; b++) {
@@ -1392,21 +1386,17 @@ function lut3dImage(
 			}
 		}
 	}
-	const image = bin.track(
-		ck.MakeImage(
-			{
-				width,
-				height: lut.size,
-				colorType: ck.ColorType.RGBA_8888,
-				alphaType: ck.AlphaType.Unpremul,
-				colorSpace: ck.ColorSpace.SRGB,
-			},
-			px,
-			width * 4,
-		),
+	return ck.MakeImage(
+		{
+			width,
+			height: lut.size,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		},
+		px,
+		width * 4,
 	);
-	bin.lut3dImages.set(key, image);
-	return image;
 }
 
 // SkSL for the adjust post-pass, generated per feature combination. The source
@@ -1529,14 +1519,65 @@ function adjustEffect(
 	return eff;
 }
 
+// Recording canvases that adjustedDeviceRect is measuring. An adjusted
+// descendant met while measuring paints its geometry directly instead of opening
+// a nested offscreen, which a recording canvas can't provide.
+const measuring = new WeakSet<object>();
+
+// The device pixels an adjusted layer can touch: Skia's bounds of a recording of
+// the inner drawable under the main canvas's matrix, so stroke, shadow, blur and
+// glyph outsets count exactly as the painter draws them. Rounded out with 1px
+// spare for antialiasing, plus `spread` for a kernel that reads neighbours, then
+// cut to the device clip (grown by `spread`, so a kernel at the clip edge still
+// reads the real pixels beyond it) and the frame. Null when nothing shows.
+function adjustedDeviceRect(
+	ck: CK,
+	canvas: CK,
+	provider: CK,
+	images: Map<string, CK>,
+	bin: Bin,
+	inner: DrawCommand,
+	frame: Frame,
+	device: Size,
+	matrix: number[],
+	spread: number,
+): { x: number; y: number; width: number; height: number } | null {
+	const recorder = new ck.PictureRecorder();
+	const rc = recorder.beginRecording(
+		ck.XYWHRect(0, 0, device.width, device.height),
+		true,
+	);
+	measuring.add(rc);
+	rc.concat(matrix);
+	const scratch: PaintIssues = {
+		unhandled: [],
+		missingImages: [],
+		adjustUnsupported: new Map(),
+	};
+	paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
+	const picture = recorder.finishRecordingAsPicture();
+	const [l, t, r, b] = picture.cullRect() as number[];
+	picture.delete();
+	recorder.delete();
+	const clip = canvas.getDeviceClipBounds() as Int32Array;
+	const pad = 1 + spread;
+	const x0 = Math.max(Math.floor(l) - pad, clip[0] - spread, 0);
+	const y0 = Math.max(Math.floor(t) - pad, clip[1] - spread, 0);
+	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + spread, device.width);
+	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + spread, device.height);
+	if (!(x1 > x0 && y1 > y0)) return null;
+	return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
 // Apply an adjust's LUTs/sharpen via an offscreen SkSL pass: render the drawable
-// (with only its color matrix) to a frame-sized offscreen surface, then draw it
-// back through the adjust shader. The color matrix rides the inner render, so
-// ordering is matrix → curve → cube → sharpen — color first, spatial last. The
-// offscreen inherits the main canvas's full CTM and is composited back in
-// device coordinates, so an adjusted descendant follows every parent transform
-// exactly once. Falls back to a matrix-only render (+ an adjust_unsupported warning)
-// if the surface or effect can't be created.
+// (with only its color matrix) to an offscreen surface covering just its device
+// rect, then draw it back through the adjust shader. The color matrix rides the
+// inner render, so ordering is matrix → curve → cube → sharpen — color first,
+// spatial last. The offscreen inherits the main canvas's full CTM, shifted by the
+// rect's whole-pixel origin, and is composited back in device coordinates, so an
+// adjusted descendant follows every parent transform exactly once. Falls back to
+// a matrix-only render (+ an adjust_unsupported warning) if the surface or effect
+// can't be created.
 function paintAdjustedOffscreen(
 	ck: CK,
 	canvas: CK,
@@ -1548,6 +1589,16 @@ function paintAdjustedOffscreen(
 	frame: Frame,
 ) {
 	const adjust = cmd.adjust as NonNullable<DrawCommand["adjust"]>;
+	if (measuring.has(canvas)) {
+		const geometry = {
+			...cmd,
+			adjust: adjust.colorMatrix
+				? { colorMatrix: adjust.colorMatrix }
+				: undefined,
+		} as DrawCommand;
+		paintDrawable(ck, canvas, provider, images, bin, geometry, issues, frame);
+		return;
+	}
 	const hasLut = !!adjust.lut;
 	const hasLut3d = !!adjust.lut3d;
 	const amount = adjust.sharpen ?? 0;
@@ -1576,14 +1627,29 @@ function paintAdjustedOffscreen(
 		return;
 	}
 
-	// The offscreen matches the SURFACE, not the design box: at a 2× export the
+	// The offscreen is in SURFACE pixels, not design units: at a 2× export the
 	// layer must be rendered at 2× too, or it would be blitted back upscaled from
 	// half-resolution pixels. The inner render draws in design units under the same
-	// scaled matrix the main canvas carries.
+	// scaled matrix the main canvas carries. Only the layer's own device rect is
+	// allocated, so N adjusted photos hold N photo-sized surfaces, not N frames.
 	const device = exportPixelSize(frame, frame.scale);
+	const matrix = canvas.getTotalMatrix();
+	const rect = adjustedDeviceRect(
+		ck,
+		canvas,
+		provider,
+		images,
+		bin,
+		inner,
+		frame,
+		device,
+		matrix,
+		hasSharpen ? 1 : 0,
+	);
+	if (!rect) return;
 	const info = {
-		width: device.width,
-		height: device.height,
+		width: rect.width,
+		height: rect.height,
 		colorType: ck.ColorType.RGBA_8888,
 		alphaType: ck.AlphaType.Premul,
 		colorSpace: ck.ColorSpace.SRGB,
@@ -1618,9 +1684,10 @@ function paintAdjustedOffscreen(
 	const off = surface.getCanvas();
 	off.clear(ck.TRANSPARENT);
 	// The main canvas may already carry an export scale and arbitrary ancestor
-	// transforms. Render the inner layer through that exact local→device matrix so
-	// the snapshot occupies the same texels it would on the main surface.
-	const matrix = canvas.getTotalMatrix();
+	// transforms. Render the inner layer through that exact local→device matrix,
+	// moved by the rect's whole-pixel origin, so each snapshot texel is the device
+	// pixel it would be on the main surface.
+	off.translate(-rect.x, -rect.y);
 	off.concat(matrix);
 	paintDrawable(ck, off, provider, images, bin, inner, issues, frame);
 	// The snapshot is copy-on-write off this surface, and the shader samples it when
@@ -1636,6 +1703,7 @@ function paintAdjustedOffscreen(
 			ck.TileMode.Clamp,
 			ck.FilterMode.Nearest,
 			ck.MipmapMode.None,
+			ck.Matrix.translated(rect.x, rect.y),
 		),
 	);
 	const children: CK[] = [srcSh];
@@ -1683,13 +1751,14 @@ function paintAdjustedOffscreen(
 	// export scale. The snapshot already includes parent rotations/transforms; a
 	// second application here would move it. The main clip remains in device space,
 	// so clipping semantics are unchanged.
-	// Transparent offscreen pixels stay transparent, so a full-frame draw only
-	// lays down the drawable.
 	const inverse = ck.Matrix.invert(matrix);
 	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
 	canvas.save();
 	canvas.concat(inverse);
-	canvas.drawRect(ck.XYWHRect(0, 0, device.width, device.height), paint);
+	canvas.drawRect(
+		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
+		paint,
+	);
 	canvas.restore();
 }
 
@@ -2252,7 +2321,7 @@ export async function paintScene(
 		}
 	}
 
-	const bin = makeBin();
+	const bin = makeBin(cache?.luts);
 	const create = commands.find((c) => c.op === "createCanvas") as
 		| {
 				op: "createCanvas";
@@ -2387,6 +2456,7 @@ export async function paintScene(
 		if (cache) {
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
+			evictUnusedLutImages(cache.luts);
 		} else {
 			provider.delete();
 			for (const [src, img] of imageMap)
