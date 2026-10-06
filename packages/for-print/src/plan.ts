@@ -245,11 +245,45 @@ export type ImageSampler = (image: ImageNode) => Promise<PixelData>;
 // analysis: `null` leaves photos alone, a preset forces a fixed correction.
 export type AnalysisCache = Map<string, Promise<ImageAnalysis>>;
 
+// An AnalysisCache that keeps at most `maxEntries`, dropping the least recently
+// used first.
+export function createAnalysisCache(maxEntries: number): AnalysisCache {
+	return new BoundedAnalysisCache(maxEntries);
+}
+
+class BoundedAnalysisCache extends Map<string, Promise<ImageAnalysis>> {
+	readonly maxEntries: number;
+
+	constructor(maxEntries: number) {
+		super();
+		this.maxEntries = maxEntries;
+	}
+
+	override get(key: string): Promise<ImageAnalysis> | undefined {
+		const hit = super.get(key);
+		if (hit) {
+			super.delete(key);
+			super.set(key, hit);
+		}
+		return hit;
+	}
+
+	override set(key: string, value: Promise<ImageAnalysis>): this {
+		super.delete(key);
+		super.set(key, value);
+		for (const oldest of this.keys()) {
+			if (this.size <= this.maxEntries) break;
+			this.delete(oldest);
+		}
+		return this;
+	}
+}
+
 export type AnalyzeSceneOptions = {
 	cache?: AnalysisCache;
-	// A short stable key for an image src, such as an asset's sha256. Defaults
-	// to a hash of any long src.
-	srcKey?: (src: string) => string;
+	// A short stable key for an image src, such as an asset's sha256. A src it
+	// returns undefined for falls back to a hash of any long src.
+	srcKey?: (src: string) => string | undefined;
 };
 
 const LONG_SRC = 256;
@@ -291,7 +325,7 @@ export async function analyzeScene(
 	// size + focus + crop), since the same src cropped differently analyzes
 	// differently.
 	const cache = options.cache ?? new Map<string, Promise<ImageAnalysis>>();
-	const srcKey = options.srcKey ?? defaultSrcKey;
+	const srcKey = (src: string) => options.srcKey?.(src) ?? defaultSrcKey(src);
 	const sampleKey = (n: ImageNode) =>
 		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
 	const seen = new Map<string, Promise<ImageAnalysis>>();

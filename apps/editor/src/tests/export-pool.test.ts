@@ -171,19 +171,17 @@ describe("worker pool", () => {
 		await expect(init).rejects.toThrow("no wasm");
 	});
 
-	it("setImages sends the same Blobs to every worker", () => {
+	it("endJob tells every live worker the job is over, after its renders", async () => {
 		const { pool, workers } = fakePool(2);
-		void pool.init(new Map());
-		const photo = new Blob([new Uint8Array([9])]);
-		pool.setImages(new Map([["ws:abc", photo]]));
-		for (const w of workers) {
-			expect(w.received.at(-1)).toEqual({
-				type: "images",
-				entries: [["ws:abc", photo]],
-			});
-			const sent = w.received.at(-1) as { entries: [string, Blob][] };
-			expect(sent.entries[0]?.[1]).toBe(photo);
-		}
+		const busy = pool.render(request("a"));
+		pool.endJob();
+		expect(workers).toHaveLength(1);
+		expect(workers[0].received.map((m) => m.type)).toEqual([
+			"render",
+			"jobEnd",
+		]);
+		workers[0].finish();
+		await busy;
 	});
 
 	it("cancel rejects queued work, terminates busy workers and replaces them lazily", async () => {
@@ -191,7 +189,6 @@ describe("worker pool", () => {
 		const fonts = new Map([["Inter", [new Uint8Array([1])]]]);
 		void pool.init(fonts);
 		for (const w of workers) w.emit({ type: "ready", ok: true, ms: 1 });
-		pool.setImages([["ws:x", new Blob([new Uint8Array([2])])]]);
 		const all = Promise.allSettled(
 			["a", "b", "c", "d"].map((side) => pool.render(request(side))),
 		);
@@ -208,11 +205,7 @@ describe("worker pool", () => {
 		const after = pool.render(request("d"));
 		expect(workers).toHaveLength(3);
 		const fresh = workers[2];
-		expect(fresh.received.map((m) => m.type)).toEqual([
-			"init",
-			"images",
-			"render",
-		]);
+		expect(fresh.received.map((m) => m.type)).toEqual(["init", "render"]);
 		fresh.finish();
 		await expect(after).resolves.toMatchObject({ width: 10 });
 	});

@@ -85,7 +85,9 @@ textEngine.dispose();
 To reuse decoded images, SVG pictures, paths and the paint font provider across
 renders, pass a `paintCache` too. A paint frees the cached images it did not
 draw; with `maxImagePixels` it keeps them, least recently used first out, until
-the cache fits that many decoded pixels. The text engine lays text out and the
+the cache fits that many decoded pixels and at most `maxImages` entries (256 by
+default). An SVG picture counts as the rasters it embeds plus a fixed cost for
+its recorded drawing. The text engine lays text out and the
 cache paints it, so the two work side by side. The caller owns the cache:
 dispose it when the batch ends or the fonts change.
 

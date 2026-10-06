@@ -35,6 +35,7 @@ function fakePool(size: number, opts: { hold?: boolean }) {
 		releases,
 		init: vi.fn(async () => {}),
 		dispose: vi.fn(),
+		endJob: vi.fn(),
 		cancel: vi.fn(),
 		render: vi.fn(
 			() =>
@@ -103,6 +104,32 @@ describe("export runner", () => {
 		expect(result?.file).toBeUndefined();
 		expect(runner.getSnapshot().state).toBe("cancelled");
 		expect(pools[0]?.cancel).toHaveBeenCalled();
+		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
+	});
+
+	it("ends the job on the pool once it has rendered", async () => {
+		const { d, pools } = deps({ hold: true });
+		const runner = createExportRunner(d);
+		const running = runner.start(ws, preset);
+		await vi.waitFor(() => expect(pools[0]?.render).toHaveBeenCalled());
+		expect(pools[0]?.endJob).not.toHaveBeenCalled();
+		for (const release of pools[0]?.releases ?? []) release();
+		await running;
+		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
+	});
+
+	it("a job a newer one replaced leaves the pool's caches to it", async () => {
+		const { d, pools } = deps({ hold: true });
+		const runner = createExportRunner(d);
+		const first = runner.start(ws, preset);
+		await vi.waitFor(() => expect(pools[0]?.render).toHaveBeenCalled());
+		const second = runner.start(ws, preset);
+		await first;
+		expect(pools[0]?.endJob).not.toHaveBeenCalled();
+		await vi.waitFor(() => expect(pools[0]?.render).toHaveBeenCalledTimes(2));
+		for (const release of pools[0]?.releases ?? []) release();
+		await second;
+		expect(pools[0]?.endJob).toHaveBeenCalledTimes(1);
 	});
 
 	it("rebuilds the pool when a job's photos want another size", async () => {

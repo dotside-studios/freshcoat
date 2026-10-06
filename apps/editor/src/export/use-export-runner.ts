@@ -48,7 +48,8 @@ export type JobExtras = Pick<ExportJobOptions, "sink" | "confirmLargePdf">;
 export type ExportRunnerDeps = {
 	createPool?: (
 		size: number,
-	) => Pick<WorkerPool, "init" | "dispose"> & ExportJobOptions["pool"];
+	) => Pick<WorkerPool, "init" | "endJob" | "dispose"> &
+		ExportJobOptions["pool"];
 	/** the pool size for a job whose largest photo has this many pixels */
 	poolSize?: (largestImagePixels: number) => number;
 	resolveFonts?: (template: Template) => Promise<Map<string, Uint8Array[]>>;
@@ -130,14 +131,18 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 					await pool.init(fonts);
 					poolFonts = fonts;
 				}
+				const jobPool = pool;
 				const result = await runExportJob(workspace, preset, {
-					pool,
+					pool: jobPool,
 					signal: own.signal,
 					assemblePdf: deps.assemblePdf,
 					...job,
 					onProgress: (progress) => {
 						if (controller === own) set({ progress });
 					},
+				}).finally(() => {
+					// A job that replaced this one keeps what its workers hold.
+					if (controller === own) jobPool.endJob();
 				});
 				if (controller === own)
 					set({ state: result.cancelled ? "cancelled" : "done", result });

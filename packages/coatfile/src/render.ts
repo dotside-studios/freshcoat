@@ -1,4 +1,6 @@
 import {
+	type AnalysisCache,
+	type AnalyzeSceneOptions,
 	analyzeScene,
 	type ImageAnalysis,
 	type ImageSampler,
@@ -77,6 +79,12 @@ export type RenderRuntime = {
 	// Keeps decoded images, SVG pictures, paths and the font provider across
 	// paints, in place of any cache on `env`. The caller owns and disposes it.
 	paintCache?: PaintCache;
+	// Keeps print analyses across renders, so a batch analyzes each distinct
+	// image once. The caller owns it.
+	analysisCache?: AnalysisCache;
+	// A short stable key for an image src, such as its asset's sha256, for
+	// `analysisCache`. Undefined falls back to a hash of the src.
+	analysisKey?: (src: string) => string | undefined;
 };
 
 // Print-optimization toggle. When enabled, each frame's node tree is run through
@@ -154,10 +162,11 @@ async function planFrame(
 	print: ResolvedPrint,
 	sample: ImageSampler,
 	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
+	options?: AnalyzeSceneOptions,
 ): Promise<Node> {
 	if (!print.analyze) return planScene(root, print.policy);
 	try {
-		return await analyzeScene(sample, root, print.policy, onAnalysis);
+		return await analyzeScene(sample, root, print.policy, onAnalysis, options);
 	} catch {
 		return planScene(root, print.policy);
 	}
@@ -273,6 +282,10 @@ export async function renderCompiled(
 		if (!pixels) throw new Error(`print analyze: could not sample ${node.src}`);
 		return pixels;
 	};
+	const analyzeOptions: AnalyzeSceneOptions = {
+		...(runtime.analysisCache ? { cache: runtime.analysisCache } : {}),
+		...(runtime.analysisKey ? { srcKey: runtime.analysisKey } : {}),
+	};
 	// No export settings = the one 1× export, so the common case is unchanged.
 	const settings: ExportSetting[] = opts.exports?.length ? opts.exports : [{}];
 	const design = { width: compiled.width, height: compiled.height };
@@ -295,8 +308,12 @@ export async function renderCompiled(
 				: (f.root as Node);
 			const analyses: Array<{ analysis: ImageAnalysis; node: ImageNode }> = [];
 			const root = print
-				? await planFrame(scene, print, sample, (analysis, node) =>
-						analyses.push({ analysis, node }),
+				? await planFrame(
+						scene,
+						print,
+						sample,
+						(analysis, node) => analyses.push({ analysis, node }),
+						analyzeOptions,
 					)
 				: scene;
 			const planWarnings = gamutWarnings(analyses);

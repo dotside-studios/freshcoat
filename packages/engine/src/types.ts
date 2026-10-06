@@ -629,6 +629,9 @@ export type PaintRuntime = {
 	// Resolve a font request to what the env has (bytes / descriptor / nothing). A
 	// bare string is a by-name request.
 	resolveFont(req: FontRequest | string): FontResolution;
+	// Every family the env holds bytes for. A paint through a cache registers
+	// all of them, so a scene that uses fewer keeps the cached provider.
+	fonts?: Map<string, Uint8Array[]>;
 	loadImageBytes(src: string): Promise<Uint8Array>;
 	// Decoded images the runtime owns. When present, paint asks it for each image
 	// instead of decoding loadImageBytes itself, and never frees what it returns:
