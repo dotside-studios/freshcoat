@@ -128,7 +128,12 @@ export function isCoatPackage(bytes: Uint8Array): boolean {
 	);
 }
 
-export type PackOptions = { sha256?: Sha256 };
+export type PackOptions = {
+	sha256?: Sha256;
+	/** Asset hashes the caller already computed from the same bytes. Those
+	 *  assets are not hashed again; the package is the same either way. */
+	knownHashes?: Iterable<string>;
+};
 
 /**
  * Package a template. Each carried asset is re-keyed by the real hash of its
@@ -148,6 +153,7 @@ export async function packTemplate(
 	const { template: keyed } = await rehashAssets(
 		template,
 		options.sha256 ?? subtleSha256,
+		new Set(options.knownHashes),
 	);
 	const assets = [...(keyed.assets ?? [])].sort((a, b) =>
 		a.sha256 < b.sha256 ? -1 : a.sha256 > b.sha256 ? 1 : 0,

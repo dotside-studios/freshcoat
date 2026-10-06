@@ -6,6 +6,7 @@ import {
 	validate,
 } from "@freshcoat-js/coatfile";
 import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
+import { packTemplate } from "@freshcoat-js/coatfile/coat";
 import { sha256 } from "js-sha256";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -16,7 +17,11 @@ import {
 import { fixtures } from "~/lib/figma/transpiler/fixtures";
 import type { FigmaContainerNode } from "~/lib/figma/types";
 import type { ReadDocumentMessage } from "~/shared/protocol";
-import { ExportBlockedError, runTranspileToTemplate } from "~/ui/run-transpile";
+import {
+	createTranspiler,
+	ExportBlockedError,
+	runTranspileToTemplate,
+} from "~/ui/run-transpile";
 
 const FIXTURES = resolve(__dirname, "../../lib/figma/transpiler/fixtures");
 const EXPORT_GOLDEN = resolve(FIXTURES, "fidelity-card.export.json");
@@ -60,6 +65,15 @@ function message(
 		colorways: [],
 		rasters: [{ nodeId: "6:4", bytes: PNG }],
 	};
+}
+
+function withBadBarcode(): ReadDocumentMessage {
+	const { front, back } = fixtures.fidelityCard.figma;
+	const edited = structuredClone(front);
+	const barcode = edited.children.find((c) => c.id === "6:6");
+	if (!barcode) throw new Error("fixture changed");
+	barcode.name = "barcode:ean13:5901234123458";
+	return message(edited, back);
 }
 
 // The two things an export records that change from run to run.
@@ -217,15 +231,6 @@ describe("golden fixtures", () => {
 });
 
 describe("runTranspileToTemplate (barcode placeholders)", () => {
-	const withBadBarcode = (): ReadDocumentMessage => {
-		const { front, back } = fixtures.fidelityCard.figma;
-		const edited = structuredClone(front);
-		const barcode = edited.children.find((c) => c.id === "6:6");
-		if (!barcode) throw new Error("fixture changed");
-		barcode.name = "barcode:ean13:5901234123458";
-		return message(edited, back);
-	};
-
 	it("stops the export, naming the layer, until the author proceeds", async () => {
 		const error = await runTranspileToTemplate(withBadBarcode(), hex, {
 			name: "Bad",
@@ -255,5 +260,53 @@ describe("runTranspileToTemplate (barcode placeholders)", () => {
 		expect(template.warnings).toContainEqual(
 			expect.objectContaining({ code: "barcode_invalid_value", nodeId: "6:6" }),
 		);
+	});
+});
+
+describe("createTranspiler", () => {
+	it("hashes each raster once, and not again on export anyway", async () => {
+		const hashed: Uint8Array[] = [];
+		const counting = async (bytes: Uint8Array): Promise<string> => {
+			hashed.push(bytes);
+			return sha256(bytes);
+		};
+		const run = createTranspiler(counting);
+		const msg = withBadBarcode();
+		const metadata = { name: "Bad" };
+
+		await expect(run(msg, metadata)).rejects.toBeInstanceOf(ExportBlockedError);
+		expect(hashed).toEqual([msg.rasters[0].bytes]);
+
+		const { template, assetHashes } = await run(msg, metadata, {
+			proceed: true,
+		});
+		expect(hashed).toHaveLength(1);
+		expect([...assetHashes]).toEqual([sha256(PNG)]);
+
+		const packHashed: Uint8Array[] = [];
+		const packed = await packTemplate(template, {
+			sha256: (bytes) => {
+				packHashed.push(bytes);
+				return sha256(bytes);
+			},
+			knownHashes: assetHashes,
+		});
+		expect(packHashed).toHaveLength(0);
+		expect(packed).toEqual(await packTemplate(template, { sha256: hex }));
+	});
+
+	it("builds again for a new read", async () => {
+		const hashed: Uint8Array[] = [];
+		const run = createTranspiler(async (bytes) => {
+			hashed.push(bytes);
+			return sha256(bytes);
+		});
+		const { front, back } = fixtures.fidelityCard.figma;
+		const metadata = { name: "Card" };
+		const first = await run(message(front, back), metadata);
+		const second = await run(message(front, back), metadata);
+		expect(second.template).not.toBe(first.template);
+		expect(stable(second.template)).toEqual(stable(first.template));
+		expect(hashed).toHaveLength(1);
 	});
 });

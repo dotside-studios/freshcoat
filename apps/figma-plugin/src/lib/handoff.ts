@@ -10,19 +10,30 @@
 // each side decodes.
 
 import type { Template } from "@freshcoat-js/coatfile";
-import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/coatfile/assets";
+import {
+	base64ToBytes,
+	bytesToBase64,
+	subtleSha256,
+} from "@freshcoat-js/coatfile/assets";
 import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
-// js-sha256 because crypto.subtle is unavailable in the plugin iframe (non-secure context).
+// js-sha256 where crypto.subtle is unavailable, as in the plugin iframe (non-secure context).
 import { sha256 } from "js-sha256";
 import type { UiToMain } from "~/shared/protocol";
 
+const hasSubtle =
+	globalThis.isSecureContext === true &&
+	globalThis.crypto?.subtle !== undefined;
+
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-	return sha256(bytes);
+	return hasSubtle ? subtleSha256(bytes) : sha256(bytes);
 }
 
-export function packCoat(template: Template): Promise<Uint8Array> {
-	return packTemplate(template, { sha256: sha256Hex });
+export function packCoat(
+	template: Template,
+	knownHashes?: Iterable<string>,
+): Promise<Uint8Array> {
+	return packTemplate(template, { sha256: sha256Hex, knownHashes });
 }
 
 export function coatBlob(bytes: Uint8Array): Blob {
