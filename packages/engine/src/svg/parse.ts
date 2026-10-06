@@ -235,6 +235,7 @@ type Context = {
 	style: Declarations;
 	depth: number;
 	uses: Set<string>;
+	ancestors: Set<XmlElement>;
 	viewport: Viewport;
 };
 
@@ -1240,6 +1241,16 @@ export function parseSvg(markup: string): SvgDrawing {
 	};
 
 	const walk = (el: XmlElement, ctx: Context): SvgItem[] => {
+		if (ctx.ancestors.has(el)) return walkElement(el, ctx);
+		ctx.ancestors.add(el);
+		try {
+			return walkElement(el, ctx);
+		} finally {
+			ctx.ancestors.delete(el);
+		}
+	};
+
+	const walkElement = (el: XmlElement, ctx: Context): SvgItem[] => {
 		if (ctx.depth > MAX_DEPTH) {
 			warn("depth-limit", `content nested deeper than ${MAX_DEPTH} is skipped`);
 			return [];
@@ -1311,7 +1322,7 @@ export function parseSvg(markup: string): SvgDrawing {
 					warn("use-missing", `"#${id}" is not in the document`);
 					return [];
 				}
-				if (ctx.uses.has(id) || target === el || contains(target, el)) {
+				if (ctx.uses.has(id) || ctx.ancestors.has(target)) {
 					warn("use-cycle", `"#${id}" refers to itself`);
 					return [];
 				}
@@ -1356,6 +1367,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		style: rootStyle,
 		depth: 0,
 		uses: new Set(),
+		ancestors: new Set(),
 		viewport: viewBox,
 	});
 	const drawing: SvgDrawing = {
@@ -1441,10 +1453,4 @@ function parseAngle(value: string): number {
 		default:
 			return n;
 	}
-}
-
-function contains(ancestor: XmlElement, el: XmlElement): boolean {
-	for (const c of ancestor.children)
-		if (!("text" in c) && (c === el || contains(c, el))) return true;
-	return false;
 }
