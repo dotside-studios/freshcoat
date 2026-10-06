@@ -19,8 +19,8 @@ export type RasterTarget = { nodeId: string; scale: number };
 export async function exportRasters(
 	targets: RasterTarget[],
 	onProgress?: (done: number, total: number) => void,
-): Promise<Array<{ nodeId: string; bytes: number[] }>> {
-	const out: Array<{ nodeId: string; bytes: number[] }> = [];
+): Promise<Array<{ nodeId: string; bytes: Uint8Array }>> {
+	const out: Array<{ nodeId: string; bytes: Uint8Array }> = [];
 	for (const target of targets) {
 		const node = await figma.getNodeByIdAsync(target.nodeId);
 		if (node && "exportAsync" in node) {
@@ -37,7 +37,7 @@ export async function exportRasters(
 						),
 					},
 				});
-				out.push({ nodeId: target.nodeId, bytes: Array.from(bytes) });
+				out.push({ nodeId: target.nodeId, bytes });
 			} catch {
 				// Unexportable node (zero-size, unsupported effect stack). Leave it
 				// out; the transpiler warns rather than dropping it silently.
@@ -56,8 +56,8 @@ export async function exportRasters(
 export async function exportThumbnails(
 	nodeIds: string[],
 	width: number,
-): Promise<Array<{ nodeId: string; bytes: number[] }>> {
-	const out: Array<{ nodeId: string; bytes: number[] }> = [];
+): Promise<Array<{ nodeId: string; bytes: Uint8Array }>> {
+	const out: Array<{ nodeId: string; bytes: Uint8Array }> = [];
 	for (const id of nodeIds) {
 		const node = await figma.getNodeByIdAsync(id);
 		if (!node || !("exportAsync" in node)) continue;
@@ -66,7 +66,7 @@ export async function exportThumbnails(
 				format: "PNG",
 				constraint: { type: "WIDTH", value: width },
 			});
-			out.push({ nodeId: id, bytes: Array.from(bytes) });
+			out.push({ nodeId: id, bytes });
 		} catch {
 			// Zero-size or otherwise unexportable frame — leave it without a preview.
 		}

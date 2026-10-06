@@ -154,9 +154,7 @@ export async function runTranspileToTemplate(
 ): Promise<TranspileResult> {
 	const { product } = msg;
 
-	const bytesById = new Map(
-		msg.rasters.map((r) => [r.nodeId, new Uint8Array(r.bytes)]),
-	);
+	const bytesById = new Map(msg.rasters.map((r) => [r.nodeId, r.bytes]));
 	const treeById = new Map(msg.slots.map((s) => [s.nodeId, s.tree]));
 
 	const picks: Record<string, FigmaPick> = {};
@@ -184,7 +182,7 @@ export async function runTranspileToTemplate(
 		// nothing — without decoding the image.
 		const size = pngSize(bytes);
 		return {
-			blob: new Blob([bytes], { type: "image/png" }),
+			blob: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }),
 			sha256: await sha256(bytes),
 			...(size ?? {}),
 		};
