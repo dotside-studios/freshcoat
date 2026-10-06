@@ -22,7 +22,7 @@ const EXPORT_CONCURRENCY = 3;
 export async function exportRasters(
 	targets: RasterTarget[],
 	onProgress?: (done: number, total: number) => void,
-): Promise<Array<{ nodeId: string; bytes: number[] }>> {
+): Promise<Array<{ nodeId: string; bytes: Uint8Array }>> {
 	let exported = 0;
 	const results = await mapLimit(
 		targets,
@@ -58,7 +58,7 @@ export async function exportRasters(
 export async function exportThumbnails(
 	nodeIds: string[],
 	width: number,
-): Promise<Array<{ nodeId: string; bytes: number[] }>> {
+): Promise<Array<{ nodeId: string; bytes: Uint8Array }>> {
 	const results = await mapLimit(nodeIds, EXPORT_CONCURRENCY, async (id) => {
 		const bytes = await exportOne(id, () => ({
 			format: "PNG",
@@ -74,12 +74,11 @@ export async function exportThumbnails(
 async function exportOne(
 	nodeId: string,
 	settingsFor: (node: BaseNode) => ExportSettingsImage,
-): Promise<number[] | null> {
+): Promise<Uint8Array | null> {
 	const node = await figma.getNodeByIdAsync(nodeId);
 	if (!node || !("exportAsync" in node)) return null;
 	try {
-		const bytes = await (node as ExportMixin).exportAsync(settingsFor(node));
-		return Array.from(bytes);
+		return await (node as ExportMixin).exportAsync(settingsFor(node));
 	} catch {
 		return null;
 	}

@@ -1,8 +1,10 @@
 import { fileURLToPath } from "node:url";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { CANVASKIT_BASE } from "./canvaskit-assets";
 
 export default defineConfig({
+	define: { __CANVASKIT_BASE__: JSON.stringify(CANVASKIT_BASE) },
 	resolve: {
 		alias: [
 			{

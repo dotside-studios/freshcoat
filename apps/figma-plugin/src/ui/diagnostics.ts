@@ -61,7 +61,7 @@ export function buildDiagnostics(input: {
 		})),
 		decisions: trace,
 		rasters: msg.rasters.map((r) => {
-			const size = pngSize(new Uint8Array(r.bytes));
+			const size = pngSize(r.bytes);
 			return {
 				nodeId: r.nodeId,
 				bytes: r.bytes.length,

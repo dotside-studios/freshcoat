@@ -28,7 +28,7 @@ export type SlotRead = {
 /** A raster the main thread pre-exported for a node id. */
 export type RasterRead = {
 	nodeId: string;
-	bytes: number[]; // PNG bytes (Uint8Array spread to a transferable array)
+	bytes: Uint8Array; // PNG bytes
 };
 
 /** main → ui: everything transpile needs, gathered offline. */
@@ -223,7 +223,7 @@ export type RequestThumbnailsMessage = {
  *  stale preview corrects itself. */
 export type ThumbnailsMessage = {
 	type: "thumbnails";
-	items: Array<{ nodeId: string; bytes: number[] }>;
+	items: Array<{ nodeId: string; bytes: Uint8Array }>;
 };
 
 /** Panel state that outlives a session, in figma.clientStorage. Deliberately

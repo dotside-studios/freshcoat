@@ -1,9 +1,7 @@
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { type ReactNode, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { VariantBar } from "~/canvas/VariantBar";
 import { Viewport } from "~/canvas/Viewport";
-import { DataSection } from "~/data/DataSection";
-import { ExportSection } from "~/export/ExportSection";
 import { LeftPanel } from "~/panels/LeftPanel";
 import { RightPanel } from "~/panels/RightPanel";
 import { useEditor } from "~/state/hooks";
@@ -12,6 +10,15 @@ import type { CommandContext } from "./commands";
 import { useController } from "./context";
 import { StatusBar } from "./StatusBar";
 import { ToolStrip } from "./ToolStrip";
+
+const loadData = () => import("~/data/DataSection");
+const loadExport = () => import("~/export/ExportSection");
+const DataSection = lazy(() =>
+	loadData().then((m) => ({ default: m.DataSection })),
+);
+const ExportSection = lazy(() =>
+	loadExport().then((m) => ({ default: m.ExportSection })),
+);
 
 // Docked panels leave a 1024px tablet about 500px of canvas, which is enough
 // to work in; below this they cover the canvas instead.
@@ -33,13 +40,28 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 			});
 	}, [controller]);
 
+	useEffect(() => {
+		const prefetch = () => {
+			void loadData();
+			void loadExport();
+		};
+		if (typeof requestIdleCallback === "function") {
+			const id = requestIdleCallback(prefetch);
+			return () => cancelIdleCallback(id);
+		}
+		const id = setTimeout(prefetch, 1);
+		return () => clearTimeout(id);
+	}, []);
+
 	const section = useEditor((s) => s.section);
 
 	return (
 		<>
 			<AppMenuBar ctx={ctx} />
-			{section === "data" ? <DataSection /> : null}
-			{section === "export" ? <ExportSection /> : null}
+			<Suspense fallback={<SectionLoading />}>
+				{section === "data" ? <DataSection /> : null}
+				{section === "export" ? <ExportSection /> : null}
+			</Suspense>
 			{/* Edit stays mounted while hidden so its render session stays warm. */}
 			<div
 				className={cn(
@@ -86,6 +108,14 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 				<StatusBar />
 			</div>
 		</>
+	);
+}
+
+function SectionLoading() {
+	return (
+		<div className="grid min-h-0 flex-1 place-items-center bg-fc-app text-fc-faint text-fc-sm">
+			Loading…
+		</div>
 	);
 }
 
