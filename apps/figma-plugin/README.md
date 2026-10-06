@@ -110,6 +110,18 @@ layers were kept, flattened or skipped.
   (`text_mixed_styling_flattened`). When runs disagree on a decoration, each
   decorated span carries it, because a span cannot turn off one the element
   sets.
+- **Truncate text.** A layer set to truncate clips (`fit: "clip"`) and keeps
+  Figma's max lines as `maxLines`, ellipsizing the last one. Without a max,
+  `maxLines` is the number of lines the box holds; with an auto line height
+  that count is unknown, so the text only clips. The renderer ellipsizes only
+  single-style text; a layer with runs clips at the box.
+- **Small caps.** Case Small caps sets the `smcp` font feature, and Forced
+  small caps `smcp` and `c2sc`, on the element or on the runs that use them,
+  beside any OpenType features the layer sets.
+- **Text strokes.** coatfile text has no stroke, so a stroked text layer is
+  rasterized (`text_stroke_flattened`). A layer bound to a text field stays
+  text so the field still works, and its stroke is dropped with the warning
+  `text_stroke_unsupported`.
 - **Text fields and runs.** A bound `text:` field keeps the layer's runs only
   when the runs spell out the template, each token whole inside one run, as in
   a layer whose content is `Hi {{name}}` with the token in bold: the value is
@@ -264,7 +276,8 @@ and what the transpiler made of it. It carries:
   the transpiler.
 - **`decisions`**: one row per node the walk reached: which element it became,
   or why it was rasterized or skipped. The rasterization reasons are
-  `text_mixed_styling_flattened`, `multi_fill_flattened`, `paint_flattened`,
+  `text_mixed_styling_flattened`, `text_stroke_flattened`,
+  `multi_fill_flattened`, `paint_flattened`,
   `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
   `transform_undecomposable_flattened`. Element ids are the *final* ones, after colliding layer names are
   renamed, so they match the template.
