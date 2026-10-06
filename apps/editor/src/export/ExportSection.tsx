@@ -220,11 +220,15 @@ export function ExportSection() {
 	// and under All variants each record in each of its variants.
 	const planned = useMemo(() => {
 		const ids: string[] = [];
+		const idSet = new Set<string>();
 		const sides: string[] = [];
 		const stops: Stop[] = [];
 		const seen = new Set<string>();
 		for (const item of plan) {
-			if (!ids.includes(item.recordId)) ids.push(item.recordId);
+			if (!idSet.has(item.recordId)) {
+				idSet.add(item.recordId);
+				ids.push(item.recordId);
+			}
 			if (!sides.includes(item.side)) sides.push(item.side);
 			const stop = everyVariant
 				? { recordId: item.recordId, token: variantToken(item.variantId) }
@@ -234,7 +238,7 @@ export function ExportSection() {
 				stops.push(stop);
 			}
 		}
-		return { ids, sides, stops, set: new Set(ids) };
+		return { ids, sides, stops, set: idSet };
 	}, [plan, everyVariant]);
 	const lastResult = jobs.snapshot.lastResult;
 	const failedIds = useMemo(
