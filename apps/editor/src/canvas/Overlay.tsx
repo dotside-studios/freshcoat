@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import {
 	ancestorRects,
 	canTransform,
@@ -41,6 +41,34 @@ const HANDLE_CURSOR: Record<Handle, string> = {
 	se: "nwse-resize",
 };
 
+const COARSE_QUERY = "(pointer: coarse)";
+
+let coarseList: MediaQueryList | null | undefined;
+
+function coarseQuery(): MediaQueryList | null {
+	if (coarseList === undefined)
+		coarseList =
+			typeof window === "undefined"
+				? null
+				: (window.matchMedia?.(COARSE_QUERY) ?? null);
+	return coarseList;
+}
+
+function subscribeCoarse(onChange: () => void): () => void {
+	const mq = coarseQuery();
+	mq?.addEventListener?.("change", onChange);
+	return () => mq?.removeEventListener?.("change", onChange);
+}
+
+/** Whether the primary pointer is coarse, following changes. */
+function useCoarsePointer(): boolean {
+	return useSyncExternalStore(
+		subscribeCoarse,
+		() => coarseQuery()?.matches ?? false,
+		() => false,
+	);
+}
+
 export function Overlay({
 	draft,
 	pen,
@@ -54,9 +82,7 @@ export function Overlay({
 	const hover = useEditor((s) => s.hover);
 	const tool = useEditor((s) => s.tool);
 	const inTx = useEditor((s) => s.doc?.history.tx !== undefined);
-	const coarse =
-		typeof window !== "undefined" &&
-		window.matchMedia?.("(pointer: coarse)").matches;
+	const coarse = useCoarsePointer();
 
 	const toScreen = (p: Point) => ({
 		x: view.x + p.x * view.zoom,
