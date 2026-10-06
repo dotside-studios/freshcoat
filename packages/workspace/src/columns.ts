@@ -1,4 +1,4 @@
-import { findAssetByName, parseAssetRef } from "./assets";
+import { findAssetByName, hasAssetSha, parseAssetRef } from "./assets";
 import { newId } from "./ids";
 import type {
 	CellIssue,
@@ -294,7 +294,7 @@ function typeIssue(
 			if (typeof value !== "string") return "Not an image";
 			const sha = parseAssetRef(value);
 			if (sha !== null) {
-				if (assets === undefined || assets.some((a) => a.sha256 === sha)) {
+				if (assets === undefined || hasAssetSha(assets, sha)) {
 					return null;
 				}
 				return "Photo is not in this dataset";

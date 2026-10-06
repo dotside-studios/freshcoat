@@ -123,6 +123,33 @@ function stem(name: string): string {
 	return dot <= 0 ? base : base.slice(0, dot);
 }
 
+type AssetIndex = {
+	count: number;
+	byBaseName: Map<string, DatasetAsset>;
+	byStem: Map<string, DatasetAsset>;
+	shas: Set<string>;
+};
+
+const assetIndexes = new WeakMap<readonly DatasetAsset[], AssetIndex>();
+
+function assetIndex(assets: readonly DatasetAsset[]): AssetIndex {
+	const cached = assetIndexes.get(assets);
+	if (cached !== undefined && cached.count === assets.length) return cached;
+	const byBaseName = new Map<string, DatasetAsset>();
+	const byStem = new Map<string, DatasetAsset>();
+	const shas = new Set<string>();
+	for (const a of assets) {
+		const base = baseName(a.name).toLowerCase();
+		if (!byBaseName.has(base)) byBaseName.set(base, a);
+		const s = stem(a.name).toLowerCase();
+		if (!byStem.has(s)) byStem.set(s, a);
+		shas.add(a.sha256);
+	}
+	const index = { count: assets.length, byBaseName, byStem, shas };
+	assetIndexes.set(assets, index);
+	return index;
+}
+
 /** The asset an image cell names by file name: case-insensitive, with or
  *  without its extension, ignoring any folder in front of it. */
 export function findAssetByName(
@@ -131,10 +158,15 @@ export function findAssetByName(
 ): DatasetAsset | undefined {
 	const wanted = baseName(value.trim()).toLowerCase();
 	if (wanted === "") return undefined;
-	return (
-		assets.find((a) => baseName(a.name).toLowerCase() === wanted) ??
-		assets.find((a) => stem(a.name).toLowerCase() === wanted)
-	);
+	const index = assetIndex(assets);
+	return index.byBaseName.get(wanted) ?? index.byStem.get(wanted);
+}
+
+export function hasAssetSha(
+	assets: readonly DatasetAsset[],
+	sha256: string,
+): boolean {
+	return assetIndex(assets).shas.has(sha256);
 }
 
 export function assetForRef(
