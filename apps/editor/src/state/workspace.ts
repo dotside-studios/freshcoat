@@ -68,8 +68,11 @@ export function newId(prefix: string): string {
 	const hex =
 		typeof crypto !== "undefined" && "randomUUID" in crypto
 			? crypto.randomUUID().replace(/-/g, "")
-			: Math.random().toString(16).slice(2).padEnd(8, "0");
-	return `${prefix}_${hex.slice(0, 8)}`;
+			: (
+					Math.random().toString(16).slice(2) +
+					Math.random().toString(16).slice(2)
+				).padEnd(16, "0");
+	return `${prefix}_${hex.slice(0, 16)}`;
 }
 
 export function workspaceState(

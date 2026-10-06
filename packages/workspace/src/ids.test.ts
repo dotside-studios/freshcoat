@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { isValidKey, newId, slug, uniqueKey } from "./ids";
+import { freshId, isValidKey, newId, slug, uniqueKey } from "./ids";
 
 describe("ids", () => {
-	it("mints prefixed 8-hex ids", () => {
+	it("mints prefixed 16-hex ids", () => {
 		const a = newId("r");
-		expect(a).toMatch(/^r_[0-9a-f]{8}$/);
+		expect(a).toMatch(/^r_[0-9a-f]{16}$/);
 		expect(newId("r")).not.toBe(a);
+	});
+
+	it("mints 200,000 unique ids", () => {
+		const ids = new Set<string>();
+		for (let i = 0; i < 200_000; i++) ids.add(newId("r"));
+		expect(ids.size).toBe(200_000);
+	});
+
+	it("skips taken ids", () => {
+		const taken = new Set([newId("r")]);
+		const id = freshId("r", taken);
+		expect(taken.has(id)).toBe(false);
 	});
 
 	it("slugs any text into a valid key", () => {

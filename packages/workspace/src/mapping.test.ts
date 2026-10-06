@@ -164,7 +164,7 @@ describe("applyMapping", () => {
 			"pending",
 			"pending",
 		]);
-		expect(added.every((r) => /^r_[0-9a-f]{8}$/.test(r.id))).toBe(true);
+		expect(added.every((r) => /^r_[0-9a-f]{16}$/.test(r.id))).toBe(true);
 		expect(added[0]?.values).toEqual({
 			first_name: "Cy",
 			email: "cy@x.co",
@@ -185,6 +185,20 @@ describe("applyMapping", () => {
 			{ row: 4, column: "first_name", message: "Required" },
 		]);
 		expect(result.dataset.records[0]).toBe(base.records[0]);
+	});
+
+	it("gives every imported record a distinct id", () => {
+		const rows = [
+			["n"],
+			...Array.from({ length: 40_000 }, (_, i) => [`P${i}`]),
+		];
+		const result = applyMapping(base, rows, {
+			...plan,
+			mapping: [{ kind: "column", column: "first_name" }],
+		});
+		expect(result.added).toBe(40_000);
+		const ids = new Set(result.dataset.records.map((r) => r.id));
+		expect(ids.size).toBe(result.dataset.records.length);
 	});
 
 	it("fills an unmapped or empty cell of a new record from the default", () => {
