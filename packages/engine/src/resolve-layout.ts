@@ -46,11 +46,22 @@ export function resolveLayout(
 	root: Node,
 	opts: { measure: MeasureText },
 ): Node {
-	return resolveNode(root, opts.measure);
+	return resolveNode(root, { measure: opts.measure, plans: new WeakMap() });
 }
 
-function resolveNode(node: Node, measure: MeasureText): Node {
-	if (node.kind === "mask") return resolveMask(node, measure);
+// Per-call state. `plans` memoizes each flex container's sizing by the box it
+// was handed: a `hug` child is sized for its cross axis, again for its main
+// axis, then once more when placed, and without the memo every nested level
+// repeats all of that for its own children (3^depth). A plan depends only on
+// the node and that box, never on position, so the probes and the placement
+// share it.
+type LayoutCtx = {
+	measure: MeasureText;
+	plans: WeakMap<GroupNode, Map<string, FlexPlan>>;
+};
+
+function resolveNode(node: Node, ctx: LayoutCtx): Node {
+	if (node.kind === "mask") return resolveMask(node, ctx);
 	if (node.kind !== "group") return node;
 	if (!node.layout) {
 		// A layout-less group is a static container: its children's pos is
@@ -61,25 +72,25 @@ function resolveNode(node: Node, measure: MeasureText): Node {
 			children: resolveChildren(
 				node.children,
 				node.pos ?? { x: 0, y: 0 },
-				measure,
+				ctx,
 			),
 		};
 	}
 	const pos: Vec2 = node.pos ?? { x: 0, y: 0 };
 	const size: Size = node.size ?? { width: 0, height: 0 };
 	return node.layout.type === "grid"
-		? resolveGrid(node, node.layout, pos, size, measure)
-		: resolveFlex(node, node.layout, pos, size, measure);
+		? resolveGrid(node, node.layout, pos, size, ctx)
+		: resolveFlex(node, node.layout, pos, size, ctx);
 }
 
 // A mask node is a static container: its mask + children are relative to it,
 // folded to absolute (like a layout-less group).
-function resolveMask(node: MaskNode, measure: MeasureText): MaskNode {
+function resolveMask(node: MaskNode, ctx: LayoutCtx): MaskNode {
 	const offset = node.pos ?? { x: 0, y: 0 };
 	return {
 		...node,
-		mask: resolveChildren([node.mask], offset, measure)[0],
-		children: resolveChildren(node.children, offset, measure),
+		mask: resolveChildren([node.mask], offset, ctx)[0],
+		children: resolveChildren(node.children, offset, ctx),
 	};
 }
 
@@ -120,7 +131,7 @@ const isRotated = (node: Node): boolean => (node.rotation ?? 0) !== 0;
 // and `fill`/`grow`/`stretch` have nothing to mean (there is no container axis
 // left to fill). Those fall back to the authored size; `hug` and fixed numbers
 // still resolve, which is what a turned label or a turned nested stack needs.
-function ownSizeOf(child: Node, measure: MeasureText): Size {
+function ownSizeOf(child: Node, ctx: LayoutCtx): Size {
 	const lc: ChildLayout = child.layoutChild ?? {};
 	const base = child.size ?? { width: 0, height: 0 };
 	const fixed = (mode: ChildLayout["width"], fallback: number) =>
@@ -129,11 +140,11 @@ function ownSizeOf(child: Node, measure: MeasureText): Size {
 	if (child.kind === "text") {
 		const width =
 			lc.width === "hug"
-				? measureText(child, measure, null).width
+				? measureText(child, ctx, null).width
 				: fixed(lc.width, base.width);
 		const height =
 			lc.height === "hug"
-				? capLines(measureText(child, measure, width).height, child)
+				? capLines(measureText(child, ctx, width).height, child)
 				: fixed(lc.height, base.height);
 		return { width, height };
 	}
@@ -144,14 +155,7 @@ function ownSizeOf(child: Node, measure: MeasureText): Size {
 			width: lc.width === "hug" ? 0 : fixed(lc.width, base.width),
 			height: lc.height === "hug" ? 0 : fixed(lc.height, base.height),
 		};
-		const resolved = resolveFlex(
-			child,
-			child.layout,
-			{ x: 0, y: 0 },
-			probe,
-			measure,
-		);
-		return resolved.size ?? base;
+		return { ...planFlex(child, child.layout, probe, ctx).outSize };
 	}
 	return {
 		width: fixed(lc.width, base.width),
@@ -169,13 +173,35 @@ function normalizePad(p: FlexLayout["padding"]): Padding {
 
 // ─────────────── the container two-pass ───────────────
 
-function resolveFlex(
+type FlexPlan = {
+	measured: Measured[];
+	lines: Measured[][];
+	freeAfterGrow: number;
+	outSize: Size;
+};
+
+// Exact numbers, with -0 kept apart from 0 so a cached plan is the one a fresh
+// resolve would have produced.
+const num = (n: number): string => (Object.is(n, -0) ? "-0" : String(n));
+
+// Everything about a flex container that its handed-in size decides: the
+// measured and grown children, the wrapped lines and the container's own size.
+// Cached plans are shared, so callers must treat them as read-only.
+function planFlex(
 	group: GroupNode,
 	layout: FlexLayout,
-	pos: Vec2,
 	size: Size,
-	measure: MeasureText,
-): GroupNode {
+	ctx: LayoutCtx,
+): FlexPlan {
+	let bySize = ctx.plans.get(group);
+	if (!bySize) {
+		bySize = new Map();
+		ctx.plans.set(group, bySize);
+	}
+	const key = `${num(size.width)},${num(size.height)}`;
+	const cached = bySize.get(key);
+	if (cached) return cached;
+
 	const isRow = layout.direction === "row";
 	const axis = isRow ? ROW_AXIS : COLUMN_AXIS;
 	const gap = layout.gap ?? 0;
@@ -186,20 +212,12 @@ function resolveFlex(
 	const crossPadTotal = isRow ? p.top + p.bottom : p.left + p.right;
 	const contentMain = axis.main(size) - mainPadTotal;
 	const contentCross = axis.cross(size) - crossPadTotal;
-	// Absolute placement origin: container pos + leading padding.
-	const originMain = isRow ? pos.x : pos.y;
-	const originCross = isRow ? pos.y : pos.x;
-	const mainStart = originMain + (isRow ? p.left : p.top);
-	const crossStart = originCross + (isRow ? p.top : p.left);
 
 	const flow = group.children.filter((c) => c.layoutChild?.absolute !== true);
-	const absolute = group.children.filter(
-		(c) => c.layoutChild?.absolute === true,
-	);
 
 	// Pass 1 — measure each flow child's intrinsic main/cross + grow + clamps.
 	const measured = flow.map((child) =>
-		measureChild(child, isRow, contentCross, measure),
+		measureChild(child, isRow, contentCross, ctx),
 	);
 
 	// Grow: distribute leftover main-axis space by weight, honoring per-child max.
@@ -256,6 +274,65 @@ function resolveFlex(
 		lines.push(measured);
 	}
 
+	// Hug axes grow to enclose content; fixed/fill axes keep the handed-in size.
+	const maxCross = measured.reduce((mx, m) => Math.max(mx, m.cross), 0);
+	let naturalMain = grownTotal + mainPadTotal;
+	let naturalCross = maxCross + crossPadTotal;
+	if (layout.wrap) {
+		const lineMains = lines.map(
+			(line) =>
+				line.reduce((s, m) => s + m.main, 0) +
+				gap * Math.max(0, line.length - 1),
+		);
+		const stackedCross =
+			lines.reduce(
+				(s, line) => s + line.reduce((mx, m) => Math.max(mx, m.cross), 0),
+				0,
+			) +
+			crossGap * Math.max(0, lines.length - 1);
+		naturalMain = Math.max(0, ...lineMains) + mainPadTotal;
+		naturalCross = stackedCross + crossPadTotal;
+	}
+	const hugsWidth = group.layoutChild?.width === "hug";
+	const hugsHeight = group.layoutChild?.height === "hug";
+	const outSize: Size = {
+		width: hugsWidth ? (isRow ? naturalMain : naturalCross) : size.width,
+		height: hugsHeight ? (isRow ? naturalCross : naturalMain) : size.height,
+	};
+
+	const plan: FlexPlan = { measured, lines, freeAfterGrow, outSize };
+	bySize.set(key, plan);
+	return plan;
+}
+
+function resolveFlex(
+	group: GroupNode,
+	layout: FlexLayout,
+	pos: Vec2,
+	size: Size,
+	ctx: LayoutCtx,
+): GroupNode {
+	const { lines, freeAfterGrow, outSize } = planFlex(group, layout, size, ctx);
+	const isRow = layout.direction === "row";
+	const axis = isRow ? ROW_AXIS : COLUMN_AXIS;
+	const gap = layout.gap ?? 0;
+	const crossGap = layout.crossGap ?? gap;
+	const p = normalizePad(layout.padding);
+
+	const mainPadTotal = isRow ? p.left + p.right : p.top + p.bottom;
+	const crossPadTotal = isRow ? p.top + p.bottom : p.left + p.right;
+	const contentMain = axis.main(size) - mainPadTotal;
+	const contentCross = axis.cross(size) - crossPadTotal;
+	// Absolute placement origin: container pos + leading padding.
+	const originMain = isRow ? pos.x : pos.y;
+	const originCross = isRow ? pos.y : pos.x;
+	const mainStart = originMain + (isRow ? p.left : p.top);
+	const crossStart = originCross + (isRow ? p.top : p.left);
+
+	const absolute = group.children.filter(
+		(c) => c.layoutChild?.absolute === true,
+	);
+
 	// Pass 2 — place. Justify along main, align along cross, per line.
 	const placed: Node[] = [];
 	let lineCrossCursor = crossStart;
@@ -288,13 +365,13 @@ function resolveFlex(
 			// The flow placed the FOOTPRINT. A turned child's own box is centred in
 			// it, because that is the point the painter rotates around. Identical to
 			// the footprint when nothing is turned.
-			const childSize: Size = m.own ?? footSize;
+			const childSize: Size = m.own ? { ...m.own } : footSize;
 			const abs: Vec2 = {
 				x: footprint.x + (footSize.width - childSize.width) / 2,
 				y: footprint.y + (footSize.height - childSize.height) / 2,
 			};
 			cursor += m.main + dist.between;
-			placed.push(placeChild(m.child, abs, childSize, measure));
+			placed.push(placeChild(m.child, abs, childSize, ctx));
 		}
 		lineCrossCursor += lineCross + crossGap;
 	}
@@ -304,39 +381,13 @@ function resolveFlex(
 	const placedAbsolute: Node[] = absolute.map((c) => {
 		const local = c.pos ?? { x: 0, y: 0 };
 		const abs: Vec2 = { x: pos.x + local.x, y: pos.y + local.y };
-		return placeChild(c, abs, c.size ?? { width: 0, height: 0 }, measure);
+		return placeChild(c, abs, c.size ?? { width: 0, height: 0 }, ctx);
 	});
-
-	// Hug axes grow to enclose content; fixed/fill axes keep the handed-in size.
-	const maxCross = measured.reduce((mx, m) => Math.max(mx, m.cross), 0);
-	let naturalMain = grownTotal + mainPadTotal;
-	let naturalCross = maxCross + crossPadTotal;
-	if (layout.wrap) {
-		const lineMains = lines.map(
-			(line) =>
-				line.reduce((s, m) => s + m.main, 0) +
-				gap * Math.max(0, line.length - 1),
-		);
-		const stackedCross =
-			lines.reduce(
-				(s, line) => s + line.reduce((mx, m) => Math.max(mx, m.cross), 0),
-				0,
-			) +
-			crossGap * Math.max(0, lines.length - 1);
-		naturalMain = Math.max(0, ...lineMains) + mainPadTotal;
-		naturalCross = stackedCross + crossPadTotal;
-	}
-	const hugsWidth = group.layoutChild?.width === "hug";
-	const hugsHeight = group.layoutChild?.height === "hug";
-	const outSize: Size = {
-		width: hugsWidth ? (isRow ? naturalMain : naturalCross) : size.width,
-		height: hugsHeight ? (isRow ? naturalCross : naturalMain) : size.height,
-	};
 
 	return {
 		...stripChild(group),
 		pos,
-		size: outSize,
+		size: { ...outSize },
 		layout: undefined,
 		children: [...placed, ...placedAbsolute],
 	};
@@ -346,21 +397,21 @@ function placeChild(
 	child: Node,
 	abs: Vec2,
 	size: Size,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): Node {
 	if (child.kind === "mask") {
 		return {
 			...stripChild(child),
 			pos: abs,
 			size,
-			mask: resolveChildren([child.mask], abs, measure)[0],
-			children: resolveChildren(child.children, abs, measure),
+			mask: resolveChildren([child.mask], abs, ctx)[0],
+			children: resolveChildren(child.children, abs, ctx),
 		};
 	}
 	if (child.kind === "group" && child.layout) {
 		return child.layout.type === "grid"
-			? resolveGrid(child, child.layout, abs, size, measure)
-			: resolveFlex(child, child.layout, abs, size, measure);
+			? resolveGrid(child, child.layout, abs, size, ctx)
+			: resolveFlex(child, child.layout, abs, size, ctx);
 	}
 	if (child.kind === "group") {
 		// Layout-less group placed by a layout parent: fold its resolved absolute
@@ -369,7 +420,7 @@ function placeChild(
 			...stripChild(child),
 			pos: abs,
 			size,
-			children: resolveChildren(child.children, abs, measure),
+			children: resolveChildren(child.children, abs, ctx),
 		};
 	}
 	return { ...stripChild(child), pos: abs, size };
@@ -380,7 +431,7 @@ function placeChild(
 function resolveChildren(
 	children: Node[],
 	offset: Vec2,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): Node[] {
 	return children.map((c) => {
 		const local = c.pos ?? { x: 0, y: 0 };
@@ -388,7 +439,7 @@ function resolveChildren(
 			...c,
 			pos: { x: offset.x + local.x, y: offset.y + local.y },
 		};
-		return resolveNode(moved, measure);
+		return resolveNode(moved, ctx);
 	});
 }
 
@@ -427,7 +478,7 @@ function resolveGrid(
 	layout: GridLayout,
 	pos: Vec2,
 	size: Size,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): GroupNode {
 	const p = normalizePad(layout.padding);
 	const [rowGap, colGap] = normalizeGap(layout.gap);
@@ -462,7 +513,7 @@ function resolveGrid(
 		if (pl.colSpan === 1) {
 			colAuto[pl.col] = Math.max(
 				colAuto[pl.col],
-				gridIntrinsicWidth(flow[i], measure),
+				gridIntrinsicWidth(flow[i], ctx),
 			);
 		}
 	});
@@ -477,7 +528,7 @@ function resolveGrid(
 			const cellW = spanExtent(colSizes, pl.col, pl.colSpan, colGap);
 			rowAuto[pl.row] = Math.max(
 				rowAuto[pl.row],
-				gridIntrinsicHeight(flow[i], cellW, measure),
+				gridIntrinsicHeight(flow[i], cellW, ctx),
 			);
 		}
 	});
@@ -494,7 +545,7 @@ function resolveGrid(
 		// fill — and sits centred on the cell, the point the painter turns it
 		// around. An upright item is sized and placed exactly as before.
 		if (isRotated(child)) {
-			const own = ownSizeOf(child, measure);
+			const own = ownSizeOf(child, ctx);
 			const foot = rotatedFootprint(own, child.rotation);
 			return placeChild(
 				child,
@@ -503,28 +554,28 @@ function resolveGrid(
 					y: cellY + (cellH - foot.height) / 2 + (foot.height - own.height) / 2,
 				},
 				own,
-				measure,
+				ctx,
 			);
 		}
 		const lc = child.layoutChild ?? {};
 		const w = gridItemSize(lc.width, cellW, () =>
-			gridIntrinsicWidth(child, measure),
+			gridIntrinsicWidth(child, ctx),
 		);
 		const h = gridItemSize(lc.height, cellH, () =>
-			gridIntrinsicHeight(child, w, measure),
+			gridIntrinsicHeight(child, w, ctx),
 		);
 		return placeChild(
 			child,
 			{ x: cellX, y: cellY },
 			{ width: w, height: h },
-			measure,
+			ctx,
 		);
 	});
 
 	const placedAbsolute: Node[] = absolute.map((c) => {
 		const local = c.pos ?? { x: 0, y: 0 };
 		const abs: Vec2 = { x: pos.x + local.x, y: pos.y + local.y };
-		return placeChild(c, abs, c.size ?? { width: 0, height: 0 }, measure);
+		return placeChild(c, abs, c.size ?? { width: 0, height: 0 }, ctx);
 	});
 
 	const hugsWidth = group.layoutChild?.width === "hug";
@@ -682,21 +733,21 @@ function gridItemSize(
 
 // Auto tracks size to the space an item COVERS, so a turned item contributes
 // its footprint — the same rule the flex flow uses.
-function gridIntrinsicWidth(child: Node, measure: MeasureText): number {
+function gridIntrinsicWidth(child: Node, ctx: LayoutCtx): number {
 	if (isRotated(child))
-		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).width;
-	if (child.kind === "text") return measureText(child, measure, null).width;
+		return rotatedFootprint(ownSizeOf(child, ctx), child.rotation).width;
+	if (child.kind === "text") return measureText(child, ctx, null).width;
 	return child.size?.width ?? 0;
 }
 
 function gridIntrinsicHeight(
 	child: Node,
 	width: number,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): number {
 	if (isRotated(child))
-		return rotatedFootprint(ownSizeOf(child, measure), child.rotation).height;
-	if (child.kind === "text") return measureText(child, measure, width).height;
+		return rotatedFootprint(ownSizeOf(child, ctx), child.rotation).height;
+	if (child.kind === "text") return measureText(child, ctx, width).height;
 	return child.size?.height ?? 0;
 }
 
@@ -719,13 +770,13 @@ function measureChild(
 	child: Node,
 	isRow: boolean,
 	containerCross: number,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): Measured {
 	if (isRotated(child)) {
 		// A turned child keeps its own box and only claims a different amount of
 		// the flow. It never grows: growing is a main-axis notion of the
 		// container's, and the container's main axis is not one of this child's.
-		const own = ownSizeOf(child, measure);
+		const own = ownSizeOf(child, ctx);
 		const foot = rotatedFootprint(own, child.rotation);
 		return {
 			child,
@@ -743,7 +794,7 @@ function measureChild(
 	if (crossMode === "fill" || lc.alignSelf === "stretch") {
 		cross = containerCross;
 	} else if (crossMode === "hug") {
-		cross = intrinsicCross(child, isRow, measure);
+		cross = intrinsicCross(child, isRow, ctx);
 	} else if (typeof crossMode === "number") {
 		cross = crossMode;
 	} else {
@@ -755,7 +806,7 @@ function measureChild(
 	const mainMode = isRow ? lc.width : lc.height;
 	let main: number;
 	if (mainMode === "hug") {
-		main = intrinsicMain(child, isRow, cross, measure);
+		main = intrinsicMain(child, isRow, cross, ctx);
 	} else if (typeof mainMode === "number") {
 		main = mainMode;
 	} else {
@@ -774,10 +825,10 @@ function measureChild(
 function intrinsicCross(
 	child: Node,
 	isRow: boolean,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): number {
 	if (child.kind === "text") {
-		const m = measureText(child, measure, null);
+		const m = measureText(child, ctx, null);
 		return isRow ? m.height : m.width;
 	}
 	if (child.kind === "group" && child.layout?.type === "flex") {
@@ -792,14 +843,7 @@ function intrinsicCross(
 		const probe: Size = isRow
 			? { width: fixedW, height: child.size?.height ?? 0 }
 			: { width: child.size?.width ?? 0, height: 0 };
-		const resolved = resolveFlex(
-			child,
-			child.layout,
-			{ x: 0, y: 0 },
-			probe,
-			measure,
-		);
-		return axisCross(resolved.size, isRow);
+		return axisCross(planFlex(child, child.layout, probe, ctx).outSize, isRow);
 	}
 	return axisCross(child.size, isRow);
 }
@@ -808,25 +852,18 @@ function intrinsicMain(
 	child: Node,
 	isRow: boolean,
 	cross: number,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 ): number {
 	if (child.kind === "text") {
 		const maxWidth = isRow ? null : cross;
-		const m = measureText(child, measure, maxWidth);
+		const m = measureText(child, ctx, maxWidth);
 		return isRow ? m.width : capLines(m.height, child);
 	}
 	if (child.kind === "group" && child.layout?.type === "flex") {
 		const probe: Size = isRow
 			? { width: 0, height: cross }
 			: { width: cross, height: 0 };
-		const resolved = resolveFlex(
-			child,
-			child.layout,
-			{ x: 0, y: 0 },
-			probe,
-			measure,
-		);
-		return axisMain(resolved.size, isRow);
+		return axisMain(planFlex(child, child.layout, probe, ctx).outSize, isRow);
 	}
 	return axisMain(child.size, isRow);
 }
@@ -848,11 +885,11 @@ function capLines(
 // A text node's measured box, plus the paragraph spacing its hard breaks open.
 function measureText(
 	node: Extract<Node, { kind: "text" }>,
-	measure: MeasureText,
+	ctx: LayoutCtx,
 	maxWidth: number | null,
 ): { width: number; height: number } {
 	const text = textOf(node);
-	const m = measure(text, node.font, maxWidth);
+	const m = ctx.measure(text, node.font, maxWidth);
 	const spacing = node.paragraphSpacing ?? 0;
 	if (spacing <= 0) return m;
 	const breaks = text.match(/\r\n?|\n/g)?.length ?? 0;

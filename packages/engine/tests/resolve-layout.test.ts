@@ -602,3 +602,65 @@ describe("resolveLayout — rotated flow children", () => {
 		expect(out.children[1].pos).toEqual({ x: 0, y: 40 });
 	});
 });
+
+describe("resolveLayout — nested hug groups", () => {
+	// Each level hugs a text and the next level, alternating direction.
+	function nest(depth: number): GroupNode {
+		let node: Node = createText({ text: "leaf", font: FONT });
+		for (let i = 0; i < depth; i++) {
+			node = autoLayout(
+				createGroup(
+					[
+						createText({
+							text: `level ${i}`,
+							font: FONT,
+							layoutChild: { width: "hug", height: "hug" },
+						}),
+						node,
+					],
+					{ layoutChild: { width: "hug", height: "hug" } },
+				),
+				{ direction: i % 2 === 0 ? "row" : "column", gap: 4, padding: 2 },
+			);
+		}
+		return autoLayout(
+			createGroup([node], {
+				pos: { x: 0, y: 0 },
+				size: { width: 1000, height: 1000 },
+			}),
+			{ direction: "column" },
+		);
+	}
+
+	function countedMeasure(): { fn: MeasureText; calls: () => number } {
+		let n = 0;
+		return {
+			fn: (text, font, maxWidth) => {
+				n++;
+				return measure(text, font, maxWidth);
+			},
+			calls: () => n,
+		};
+	}
+
+	test("layout of an 8-deep hug nest", () => {
+		const out = asGroup(resolveLayout(nest(8), { measure }));
+		let g = asGroup(out.children[0]);
+		expect(g.size).toEqual({ width: 328, height: 98 });
+		for (let i = 0; i < 7; i++) g = asGroup(g.children[1]);
+		expect(g.pos).toEqual({ x: 236, y: 70 });
+		expect(g.size).toEqual({ width: 78, height: 14 });
+		expect(g.children[1].pos).toEqual({ x: 312, y: 72 });
+	});
+
+	test("text measurement grows linearly with depth", () => {
+		const counts = [6, 7, 8].map((depth) => {
+			const m = countedMeasure();
+			resolveLayout(nest(depth), { measure: m.fn });
+			return m.calls();
+		});
+		const step = counts[1] - counts[0];
+		expect(counts[2] - counts[1]).toBe(step);
+		expect(counts[2]).toBeLessThan(8 * 10);
+	});
+});
