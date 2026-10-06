@@ -250,9 +250,7 @@ export type StrokeElement = {
 };
 
 // Non-solid strokes are rasterized by classify (`stroke_flattened`).
-export function strokeColor(
-	paints: FigmaPaint[] | undefined,
-): string | undefined {
+export function strokeColor(paints: FigmaPaint[] | undefined): string | undefined {
 	const visible = (paints ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0) return undefined;
 	return compositeSolids(visible) ?? undefined;
@@ -282,6 +280,8 @@ export function strokeToElement(
 	scale: number,
 ): StrokeElement | undefined {
 	if (node.strokeWeight === undefined) return undefined;
+	const width = Math.round(node.strokeWeight * scale * 2) / 2;
+	if (!(width > 0)) return undefined;
 	const color = strokeColor(node.strokes);
 	if (color === undefined) return undefined;
 	const dash = scaleDash(node.dashPattern, scale);
@@ -290,7 +290,7 @@ export function strokeToElement(
 	const align = mapStrokeAlign(node.strokeAlign);
 	return {
 		color,
-		width: Math.round(node.strokeWeight * scale * 2) / 2,
+		width,
 		...(dash ? { dash } : {}),
 		...(cap ? { cap } : {}),
 		...(join ? { join } : {}),
