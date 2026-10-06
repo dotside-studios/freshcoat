@@ -277,10 +277,9 @@ describe("patterns agree with coatfile", () => {
 			["^\\a$", "x"],
 		];
 		for (const [pattern, value] of cases) {
-			const cell = validateRecord(
-				[{ key: "f", type: "text", pattern }],
-				{ f: value },
-			);
+			const cell = validateRecord([{ key: "f", type: "text", pattern }], {
+				f: value,
+			});
 			const field = validateValues(
 				{ f: value },
 				{ type: "object", properties: { f: { type: "string", pattern } } },
