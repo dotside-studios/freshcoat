@@ -273,6 +273,36 @@ describe("PaintCache", () => {
 		cache.dispose();
 	});
 
+	test("an image budget keeps what other paints drew, oldest out first", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const png = await testPng();
+		const images = new Map([
+			["img://a", png],
+			["img://b", png],
+			["img://c", png],
+		]);
+		const paintEach = async (cache: PaintCache, srcs: string[]) => {
+			const { rt } = runtime(fonts, images, cache);
+			for (const src of srcs)
+				await pixels(compile(scene(SIZE, [src]), SIZE, fonts), rt);
+			return cache.stats().imageDecodes;
+		};
+		const order = ["img://a", "img://b", "img://a"];
+		const unbounded = createPaintCache();
+		expect(await paintEach(unbounded, order)).toBe(3);
+		unbounded.dispose();
+
+		const two = createPaintCache({ maxImagePixels: 32 });
+		expect(await paintEach(two, order)).toBe(2);
+		expect(await paintEach(two, ["img://c", "img://a", "img://b"])).toBe(4);
+		two.dispose();
+
+		const one = createPaintCache({ maxImagePixels: 16 });
+		expect(await paintEach(one, order)).toBe(3);
+		one.dispose();
+	});
+
 	test("a downscaled image builds its mipmaps once", async () => {
 		await initCk();
 		const fonts = new Map([["Geist", [FONT]]]);

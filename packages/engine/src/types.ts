@@ -647,8 +647,13 @@ export type PaintRuntime = {
 	// single surface. Multi-side rendering is the caller's loop — freshcoat has no
 	// notion of named frames/sides. ck is the CanvasKit-WASM instance; typed
 	// loosely as it has no TS types, and optional because a runtime built around a
-	// non-CanvasKit Painter has no use for one.
-	paint(commands: Command[], ck?: unknown): Promise<PaintResult>;
+	// non-CanvasKit Painter has no use for one. `opts.cache` paints through that
+	// cache in place of the runtime's own.
+	paint(
+		commands: Command[],
+		ck?: unknown,
+		opts?: { cache?: PaintCache },
+	): Promise<PaintResult>;
 };
 
 // The backend seam: a compiled scene becomes an output. CanvasKit is the only

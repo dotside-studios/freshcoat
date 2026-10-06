@@ -221,3 +221,72 @@ describe("transpileVector (several regions)", () => {
 		expect("fillRule" in el.properties).toBe(false);
 	});
 });
+
+describe("transpileVector strokes", () => {
+	const black = { r: 0, g: 0, b: 0, a: 1 };
+
+	it("keeps stroke opacity and dash pattern", () => {
+		const el = transpileVector(
+			baseVector({
+				strokes: [{ type: "SOLID", color: black, opacity: 0.5 }],
+				strokeWeight: 2,
+				dashPattern: [6, 3],
+			}),
+			{ frame: FRAME, scale: 1.5 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: "#00000080",
+			width: 3,
+			dash: [9, 4.5],
+		});
+	});
+
+	it("ignores a hidden stroke", () => {
+		const el = transpileVector(
+			baseVector({
+				strokes: [{ type: "SOLID", color: black, visible: false }],
+				strokeWeight: 2,
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toBeUndefined();
+	});
+
+	it("rasterizes a vector with a gradient stroke", () => {
+		const node = baseVector({
+			strokes: [
+				{
+					type: "GRADIENT_LINEAR",
+					gradientHandlePositions: [
+						{ x: 0, y: 0 },
+						{ x: 1, y: 0 },
+					],
+					gradientStops: [
+						{ position: 0, color: black },
+						{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+					],
+				},
+			],
+			strokeWeight: 2,
+		});
+		expect(classify(node)).toEqual({
+			kind: "flatten",
+			reason: "stroke_flattened",
+		});
+	});
+
+	it("keeps a vector native when its image stroke is hidden", () => {
+		const node = baseVector({
+			strokes: [
+				{
+					type: "IMAGE",
+					scaleMode: "FILL",
+					imageRef: "h",
+					visible: false,
+				},
+			],
+			strokeWeight: 2,
+		});
+		expect(classify(node).kind).toBe("native-vector");
+	});
+});

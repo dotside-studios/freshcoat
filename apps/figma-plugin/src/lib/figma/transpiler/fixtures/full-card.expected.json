@@ -35,7 +35,11 @@
 					"type": "image",
 					"pos": { "x": 64, "y": 64 },
 					"size": { "width": 160, "height": 160 },
-					"properties": { "src": "{{user_avatar}}", "fit": "cover" }
+					"properties": {
+						"src": "{{user_avatar}}",
+						"fit": "cover",
+						"cornerRadius": 80
+					}
 				},
 				{
 					"id": "display_name",

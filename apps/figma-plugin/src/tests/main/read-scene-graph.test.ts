@@ -395,6 +395,37 @@ describe("readVectorNode", () => {
 		expect(v.fillGeometry?.[0]?.path).toBe("M0 0 L10 0 L10 10 Z");
 	});
 
+	it("reads an ellipse's arc and a polygon's point count", () => {
+		const base = {
+			id: "1:3",
+			name: "shape",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			rotation: 0,
+			absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+			effects: [],
+			fills: [],
+			strokes: [],
+		};
+		const arcData = {
+			startingAngle: 0,
+			endingAngle: Math.PI,
+			innerRadius: 0.5,
+		};
+		expect(
+			readVectorNode({ ...base, type: "ELLIPSE", arcData } as never).arcData,
+		).toEqual(arcData);
+		const polygon = readVectorNode({
+			...base,
+			type: "POLYGON",
+			pointCount: 6,
+			cornerRadius: 4,
+		} as never);
+		expect(polygon.pointCount).toBe(6);
+		expect(polygon.cornerRadius).toBe(4);
+	});
+
 	it("reads string strokeCap/strokeJoin, drops figma.mixed symbols", () => {
 		const base = {
 			id: "1:2",
@@ -580,6 +611,71 @@ describe("readRectangleNode (corner radius)", () => {
 	it("reports no radius when neither form is readable", () => {
 		const r = rect({ cornerRadius: Symbol("figma.mixed") });
 		expect(r.cornerRadius).toBeUndefined();
+	});
+
+	it("reads corner smoothing", () => {
+		expect(rect({ cornerSmoothing: 0.6 }).cornerSmoothing).toBe(0.6);
+		expect("cornerSmoothing" in rect({ cornerSmoothing: 0 })).toBe(false);
+	});
+});
+
+describe("stroke paints and dash pattern", () => {
+	const base = {
+		id: "1:5",
+		name: "line",
+		visible: true,
+		opacity: 1,
+		blendMode: "NORMAL",
+		absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 40 },
+		effects: [],
+		fills: [],
+		strokeWeight: 1,
+	};
+
+	it("keeps a solid stroke's opacity apart from its color", () => {
+		const r = readRectangleNode({
+			...base,
+			type: "RECTANGLE",
+			strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0 }, opacity: 0.5 }],
+		} as never);
+		expect(r.strokes?.[0]).toMatchObject({
+			type: "SOLID",
+			opacity: 0.5,
+			color: { r: 1, g: 0, b: 0, a: 1 },
+		});
+	});
+
+	it("reads dashPattern on rectangles, vectors and frames", () => {
+		const dashed = { dashPattern: [4, 2], strokes: [] };
+		expect(
+			readRectangleNode({ ...base, ...dashed, type: "RECTANGLE" } as never)
+				.dashPattern,
+		).toEqual([4, 2]);
+		expect(
+			readVectorNode({ ...base, ...dashed, type: "VECTOR" } as never)
+				.dashPattern,
+		).toEqual([4, 2]);
+		const frame = readNode({
+			...base,
+			...dashed,
+			type: "FRAME",
+			children: [],
+		} as never);
+		expect(frame && "dashPattern" in frame && frame.dashPattern).toEqual([
+			4, 2,
+		]);
+	});
+
+	it("omits an empty or unreadable dashPattern", () => {
+		for (const dashPattern of [[], Symbol("figma.mixed"), ["4"]]) {
+			const r = readRectangleNode({
+				...base,
+				type: "RECTANGLE",
+				strokes: [],
+				dashPattern,
+			} as never);
+			expect("dashPattern" in r).toBe(false);
+		}
 	});
 });
 
