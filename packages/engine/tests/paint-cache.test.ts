@@ -12,6 +12,7 @@ import {
 	createFrame,
 	createImage,
 	createPaintCache,
+	createPath,
 	createRect,
 	createText,
 	deriveFontMetrics,
@@ -26,7 +27,12 @@ import {
 } from "../src/lut-images";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { Adjust, Command, PaintRuntime } from "../src/types";
+import type {
+	Adjust,
+	Command,
+	PaintRuntime,
+	ResolvedFont,
+} from "../src/types";
 
 const CK_BIN = join(
 	fileURLToPath(new URL(".", import.meta.url)),
@@ -59,6 +65,18 @@ async function testPng(): Promise<Uint8Array> {
 			px.set(x < 2 === y < 2 ? [220, 40, 40, 255] : [40, 90, 220, 255], i);
 		}
 	return encodePng(px, 4, 4);
+}
+
+// A 64x64 checker, which the 16px slots in scene() shrink below half size.
+async function bigPng(): Promise<Uint8Array> {
+	const px = new Uint8Array(64 * 64 * 4);
+	for (let y = 0; y < 64; y++)
+		for (let x = 0; x < 64; x++)
+			px.set(
+				(x >> 2) % 2 === (y >> 2) % 2 ? [220, 40, 40, 255] : [40, 90, 220, 255],
+				(y * 64 + x) * 4,
+			);
+	return encodePng(px, 64, 64);
 }
 
 function scene(size: { width: number; height: number }, srcs: string[]): Node {
@@ -96,7 +114,11 @@ function scene(size: { width: number; height: number }, srcs: string[]): Node {
 	});
 }
 
-function textScene(text: string, x: number): Node {
+function textScene(
+	text: string,
+	x: number,
+	font: Partial<ResolvedFont> = {},
+): Node {
 	return createFrame({
 		pos: { x: 0, y: 0 },
 		size: SIZE,
@@ -111,10 +133,38 @@ function textScene(text: string, x: number): Node {
 					style: "normal",
 					size: 16,
 					lineHeight: 1.2,
+					...font,
 				},
 				color: "#101828",
 			}),
 		],
+	});
+}
+
+// A ring as two same-direction subpaths: its hole shows only under evenodd.
+const RING = "M 0 0 H 20 V 20 H 0 Z M 5 5 H 15 V 15 H 5 Z";
+
+function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		children: fillRules.map((fillRule, i) =>
+			createFrame({
+				pos: { x: 4 + i * 24, y: 4 },
+				size: { width: 20, height: 20 },
+				clip: true,
+				cornerRadius: 4,
+				children: [
+					createPath({
+						pos: { x: 0, y: 0 },
+						size: { width: 20, height: 20 },
+						d: RING,
+						fillRule,
+						fills: [{ kind: "solid", color: "#101828" }],
+					}),
+				],
+			}),
+		),
 	});
 }
 
@@ -220,6 +270,23 @@ describe("PaintCache", () => {
 		await pixels(commands, rt);
 		expect(cache.stats().imageDecodes).toBe(1);
 		expect(load).toHaveBeenCalledTimes(1);
+		cache.dispose();
+	});
+
+	test("a downscaled image builds its mipmaps once", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const images = new Map([["img://big", await bigPng()]]);
+		const commands = compile(scene(SIZE, ["img://big"]), SIZE, fonts);
+		const plain = await pixels(commands, runtime(fonts, images).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(cache.stats().mipmapBuilds).toBe(1);
+		await pixels(compile(scene(SIZE, []), SIZE, fonts), rt);
+		await pixels(commands, rt);
+		expect(cache.stats().mipmapBuilds).toBe(2);
 		cache.dispose();
 	});
 
@@ -350,6 +417,33 @@ describe("PaintCache", () => {
 		cache.dispose();
 	});
 
+	test("each field that shapes a line is in its key", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const variants: Partial<ResolvedFont>[] = [
+			{},
+			{ size: 15 },
+			{ weight: 700 },
+			{ letterSpacing: 1 },
+			{ features: { tnum: 1 } },
+			{ features: { tnum: 0 } },
+			{ variations: { wght: 600 } },
+		];
+		let built = 0;
+		for (const font of variants) {
+			const commands = compile(textScene("Key 10", 4, font), SIZE, fonts);
+			const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(cache.stats().paragraphBuilds).toBeGreaterThan(built);
+			built = cache.stats().paragraphBuilds;
+			await pixels(commands, rt);
+			expect(cache.stats().paragraphBuilds).toBe(built);
+		}
+		cache.dispose();
+	});
+
 	test("lines dropped from the scene are shaped again", async () => {
 		await initCk();
 		const fonts = new Map([["Geist", [FONT]]]);
@@ -377,6 +471,44 @@ describe("PaintCache", () => {
 		expect(lines.length).toBeGreaterThan(50);
 		await pixels(commands, rt);
 		expect(cache.stats().paragraphBuilds).toBeLessThan(10);
+		cache.dispose();
+	});
+
+	test("repeated paints reuse parsed paths", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const commands = compile(
+			pathScene(["nonzero", "evenodd", "nonzero"]),
+			SIZE,
+			fonts,
+		);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const px = await pixels(commands, rt);
+		expect(px).toEqual(plain);
+		// Each fill rule parses the ring once, and each placement its clip.
+		expect(cache.stats().pathBuilds).toBe(5);
+		expect(await pixels(commands, rt)).toEqual(plain);
+		expect(cache.stats().pathBuilds).toBe(5);
+		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
+		expect(at(14)).toBe(255);
+		expect(at(38)).toBe(0);
+		cache.dispose();
+	});
+
+	test("a path dropped from the scene is evicted and parsed again", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const withPath = compile(pathScene(["evenodd"]), SIZE, fonts);
+		await pixels(withPath, rt);
+		expect(cache.stats().pathBuilds).toBe(2);
+		await pixels(compile(pathScene([]), SIZE, fonts), rt);
+		const again = await pixels(withPath, rt);
+		expect(cache.stats().pathBuilds).toBe(4);
+		expect(again).toEqual(await pixels(withPath, runtime(fonts, new Map()).rt));
 		cache.dispose();
 	});
 

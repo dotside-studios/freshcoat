@@ -21,9 +21,12 @@ import {
 import {
 	cachedFontProvider,
 	cachedLine,
+	cachedMipmaps,
+	cachedPath,
 	cachedSurface,
 	evictUnusedImages,
 	evictUnusedLines,
+	evictUnusedPaths,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
@@ -107,25 +110,48 @@ type Bin = {
 	// uploading the same LUT texture for every adjusted layer. `free` deletes
 	// them unless a PaintCache passed in owns them.
 	luts: LutImages;
+	// A mipmapped copy of `img`, kept with the cached image under `src` when
+	// there is one, else freed with the bin.
+	mipmaps: (src: string, img: CK) => CK;
+	// Path.MakeFromSVGString(d), shared through the PaintCache when there is
+	// one. Callers must not mutate the result.
+	path: (ck: CK, d: string, evenOdd?: boolean) => CK;
 };
-function makeBin(shared?: LutImages): Bin {
+function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
-	const luts = shared ?? createLutImages();
+	const luts = cache?.luts ?? createLutImages();
+	const track = <T>(o: T): T => {
+		if (o && typeof (o as { delete?: unknown }).delete === "function")
+			items.push(o as unknown as { delete(): void });
+		return o;
+	};
 	return {
-		track: (o) => {
-			if (o && typeof (o as { delete?: unknown }).delete === "function")
-				items.push(o as unknown as { delete(): void });
-			return o;
-		},
+		track,
 		free: () => {
 			for (const o of items) {
 				try {
 					o.delete();
 				} catch {}
 			}
-			if (!shared) freeLutImages(luts);
+			if (!cache) freeLutImages(luts);
 		},
 		luts,
+		mipmaps: (src, img) => {
+			const build = () => img.makeCopyWithDefaultMipmaps();
+			return (
+				(cache && cachedMipmaps(cache, src, img, build)) ?? track(build())
+			);
+		},
+		path: (ck, d, evenOdd = false) => {
+			const build = () => {
+				const path = ck.Path.MakeFromSVGString(d);
+				if (path && evenOdd) path.setFillType(ck.FillType.EvenOdd);
+				return path;
+			};
+			return cache
+				? cachedPath(cache, evenOdd ? `e${d}` : `n${d}`, build)
+				: track(build());
+		},
 	};
 }
 
@@ -436,7 +462,7 @@ function maskPath(
 	w: number,
 	h: number,
 ): CK {
-	return bin.track(ck.Path.MakeFromSVGString(maskSvg(clip, x, y, w, h)));
+	return bin.path(ck, maskSvg(clip, x, y, w, h));
 }
 
 function textStyleOf(
@@ -596,8 +622,9 @@ function drawImageRectHQ(
 	ck: CK,
 	canvas: CK,
 	bin: Bin,
+	src: string,
 	img: CK,
-	src: CK,
+	rect: CK,
 	dest: CK,
 	paint: CK,
 	scale: number,
@@ -606,17 +633,17 @@ function drawImageRectHQ(
 	// mipmaps (each level pre-filtered) keep the shrink clean. Above it, cubic
 	// is both sharper and cheaper (no mip pyramid to build).
 	if (scale > 0 && scale < 0.5) {
-		const mipped = bin.track(img.makeCopyWithDefaultMipmaps());
+		const mipped = bin.mipmaps(src, img);
 		canvas.drawImageRectOptions(
 			mipped,
-			src,
+			rect,
 			dest,
 			ck.FilterMode.Linear,
 			ck.MipmapMode.Linear,
 			paint,
 		);
 	} else {
-		canvas.drawImageRectCubic(img, src, dest, MITCHELL, MITCHELL, paint);
+		canvas.drawImageRectCubic(img, rect, dest, MITCHELL, MITCHELL, paint);
 	}
 }
 
@@ -651,13 +678,13 @@ function drawImagePlaceholder(
 	const scx = x + icon * 0.32;
 	const scy = y + icon * 0.3;
 	const sun = `M ${scx - sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx + sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx - sr} ${scy} Z`;
-	canvas.drawPath(bin.track(ck.Path.MakeFromSVGString(sun)), fill);
+	canvas.drawPath(bin.path(ck, sun), fill);
 	const mtn = `M ${x + icon * 0.08} ${y + icon * 0.85} L ${x + icon * 0.42} ${
 		y + icon * 0.5
 	} L ${x + icon * 0.62} ${y + icon * 0.68} L ${x + icon * 0.8} ${
 		y + icon * 0.45
 	} L ${x + icon * 0.92} ${y + icon * 0.85} Z`;
-	canvas.drawPath(bin.track(ck.Path.MakeFromSVGString(mtn)), fill);
+	canvas.drawPath(bin.path(ck, mtn), fill);
 }
 
 // The node's outline stroke, drawn along its mask (or its box when unmasked).
@@ -756,6 +783,7 @@ function drawImage(
 			ck,
 			canvas,
 			bin,
+			cmd.src,
 			img,
 			ck.XYWHRect(r.sx, r.sy, r.sw, r.sh),
 			ck.XYWHRect(r.dx, r.dy, r.dw, r.dh),
@@ -1025,9 +1053,8 @@ function drawSvgPicture(
 }
 
 function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
-	const path = bin.track(ck.Path.MakeFromSVGString(cmd.d));
+	const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 	if (!path) return;
-	if (cmd.fillRule === "evenodd") path.setFillType(ck.FillType.EvenOdd);
 	canvas.save();
 	canvas.translate(cmd.pos.x, cmd.pos.y); // path coords are origin-relative
 	// A viewBox scales the authored path into the node's size box (SVG viewBox →
@@ -1049,9 +1076,7 @@ function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
 		canvas.drawPath(path, paint);
 	}
 	if (cmd.stroke) {
-		const outline = cmd.strokeD
-			? bin.track(ck.Path.MakeFromSVGString(cmd.strokeD))
-			: null;
+		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
 		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
 		else if (strokeInset(cmd.stroke) !== 0)
 			drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
@@ -1096,18 +1121,29 @@ function visibleRows(canvas: CK): { top: number; bottom: number } | null {
 	return { top: (clip[1] - f) / e, bottom: (clip[3] - f) / e };
 }
 
+// Everything textStyleOf and the paragraph style read. Strings are length
+// prefixed so no text can forge a separator.
 function lineKey(
 	line: DrawTextCommand["layout"]["lines"][number],
 	color: string | undefined,
 	fallback: string[],
 ): string {
-	return JSON.stringify([
-		fallback,
-		color,
-		line.spans.map((s) => [s.text, s.font, s.color]),
-		...(line.wordSpacing ? [line.wordSpacing] : []),
-		...(line.direction ? [line.direction] : []),
-	]);
+	const str = (s: string | undefined) =>
+		s === undefined ? "-" : `${s.length}:${s}`;
+	const record = (r: Record<string, number> | undefined) => {
+		let out = "";
+		if (r) for (const [k, v] of Object.entries(r)) out += `${str(k)}=${v},`;
+		return out;
+	};
+	let key = `${fallback.length}${fallback.map(str).join("")}${str(color)}`;
+	key += `|${line.wordSpacing || 0}|${line.direction ?? ""}`;
+	for (const s of line.spans) {
+		const f = s.font;
+		key += `|${str(s.text)}${str(s.color)}${str(f.family)}`;
+		key += `${f.weight},${f.style},${f.size},${f.letterSpacing || 0}`;
+		key += `;${record(f.variations)};${record(f.features)}`;
+	}
+	return key;
 }
 
 function drawShape(
@@ -1138,11 +1174,7 @@ function drawShape(
 				: null;
 		const fillPath =
 			smoothR !== null
-				? bin.track(
-						ck.Path.MakeFromSVGString(
-							squircleSvg(x, y, w, h, smoothR, smoothing),
-						),
-					)
+				? bin.path(ck, squircleSvg(x, y, w, h, smoothR, smoothing))
 				: null;
 		for (const fill of cmd.fills ?? []) {
 			const paint = bin.track(new ck.Paint());
@@ -1158,16 +1190,15 @@ function drawShape(
 			// Offset the stroked rect for inside/outside alignment (center = 0).
 			const inset = strokeInset(cmd.stroke);
 			if (smoothR !== null) {
-				const path = bin.track(
-					ck.Path.MakeFromSVGString(
-						squircleSvg(
-							x + inset,
-							y + inset,
-							w - 2 * inset,
-							h - 2 * inset,
-							Math.max(0, smoothR - inset),
-							smoothing,
-						),
+				const path = bin.path(
+					ck,
+					squircleSvg(
+						x + inset,
+						y + inset,
+						w - 2 * inset,
+						h - 2 * inset,
+						Math.max(0, smoothR - inset),
+						smoothing,
 					),
 				);
 				canvas.drawPath(path, sp);
@@ -1202,13 +1233,29 @@ function drawShape(
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), bg);
 		const fg = bin.track(new ck.Paint());
 		fg.setColor(toColor(ck, foreground));
-		for (let y = 0; y < modules.length; y++)
-			for (let x = 0; x < modules.length; x++)
-				if (modules[y][x])
-					canvas.drawRect(
-						ck.XYWHRect(pos.x + margin + x * m, pos.y + margin + y * m, m, m),
-						fg,
-					);
+		// Under a rotation or skew, adjacent rects rasterize their shared edges
+		// differently from one merged rect, so runs are merged only when the
+		// canvas is axis-aligned. Edges are computed as the per-module rects
+		// computed them.
+		const [, b, , d, , , g, h] = canvas.getTotalMatrix() as number[];
+		const merge = b === 0 && d === 0 && g === 0 && h === 0;
+		for (let y = 0; y < modules.length; y++) {
+			const top = pos.y + margin + y * m;
+			for (let x = 0; x < modules.length; x++) {
+				if (!modules[y][x]) continue;
+				const start = x;
+				while (merge && x + 1 < modules.length && modules[y][x + 1]) x++;
+				canvas.drawRect(
+					ck.LTRBRect(
+						pos.x + margin + start * m,
+						top,
+						pos.x + margin + x * m + m,
+						top + m,
+					),
+					fg,
+				);
+			}
+		}
 	} else if (cmd.op === "drawGroup") {
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
@@ -2247,6 +2294,7 @@ export async function paintScene(
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
 	if (cache) cache.stats.paints++;
 	const { fonts, images } = collectAssets(commands);
+	const requested = new Set(images);
 	const warnings: PaintWarning[] = [];
 
 	const loaded: LoadedFontBytes[] = [];
@@ -2290,7 +2338,7 @@ export async function paintScene(
 			}
 			continue;
 		}
-		const hit = cache?.images.get(src);
+		const hit = cache?.images.get(src)?.image;
 		if (hit) {
 			imageMap.set(src, hit);
 			warnSvgFeatures(warnings, src, hit);
@@ -2304,7 +2352,7 @@ export async function paintScene(
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
-				cache?.images.set(src, img);
+				cache?.images.set(src, { image: img, mipped: null });
 				warnSvgFeatures(warnings, src, img);
 			} else
 				warnings.push({
@@ -2321,7 +2369,7 @@ export async function paintScene(
 		}
 	}
 
-	const bin = makeBin(cache?.luts);
+	const bin = makeBin(cache);
 	const create = commands.find((c) => c.op === "createCanvas") as
 		| {
 				op: "createCanvas";
@@ -2418,7 +2466,7 @@ export async function paintScene(
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {
-				if (!images.includes(src)) {
+				if (!requested.has(src)) {
 					warnings.push({
 						kind: "image_load_failed",
 						src,
@@ -2456,6 +2504,7 @@ export async function paintScene(
 		if (cache) {
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
+			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
 			provider.delete();
@@ -2483,9 +2532,7 @@ export async function paintScene(
 					alphaType: ck.AlphaType.Unpremul,
 					colorSpace: ck.ColorSpace.SRGB,
 				}) as Uint8Array | null;
-				return data
-					? { data: new Uint8Array(data), width: w, height: h }
-					: null;
+				return data ? { data, width: w, height: h } : null;
 			} finally {
 				snap.delete();
 			}
@@ -2540,7 +2587,7 @@ export async function paintScene(
 				if (!pixels) return skiaPng();
 				try {
 					return {
-						bytes: await encodePng(new Uint8Array(pixels), w, h, encodeOpts),
+						bytes: await encodePng(pixels, w, h, encodeOpts),
 						format: "png" as const,
 					};
 				} catch {
@@ -2630,7 +2677,7 @@ function encodeJpeg(ck: CK, snap: CK, quality: number): Uint8Array | null {
 	if (!pixels) return null;
 	const flat = ck.MakeImage(
 		{ ...info, alphaType: ck.AlphaType.Opaque },
-		flattenOverWhite(new Uint8Array(pixels)),
+		flattenOverWhite(pixels),
 		width * 4,
 	);
 	if (!flat) return null;

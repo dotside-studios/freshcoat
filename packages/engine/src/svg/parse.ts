@@ -22,6 +22,7 @@ import {
 } from "./path";
 import {
 	type Declarations,
+	indexRules,
 	matchRules,
 	parseStyleAttr,
 	parseStyleSheet,
@@ -394,6 +395,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		for (const c of el.children) if (!("text" in c)) index(c);
 	};
 	index(root);
+	const ruleIndex = indexRules(rules);
 
 	const vb = parseViewBox(root.attrs.viewBox);
 	const noViewport = { width: 0, height: 0 };
@@ -426,7 +428,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		const classes = (el.attrs.class ?? "").split(/\s+/).filter(Boolean);
 		Object.assign(
 			out,
-			matchRules(rules, localName(el.name), el.attrs.id, classes),
+			matchRules(ruleIndex, localName(el.name), el.attrs.id, classes),
 		);
 		if (el.attrs.style) Object.assign(out, parseStyleAttr(el.attrs.style));
 		for (const [k, v] of Object.entries(out))

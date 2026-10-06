@@ -7,7 +7,13 @@ import {
 	serializePath,
 	transformPath,
 } from "../src/svg/path";
-import { parseStyleAttr, parseStyleSheet } from "../src/svg/style";
+import {
+	indexRules,
+	matchRules,
+	parseStyleAttr,
+	parseStyleSheet,
+	type StyleRule,
+} from "../src/svg/style";
 import { parseXml, SvgError } from "../src/svg/xml";
 
 const close = (a: number[], b: number[], eps = 1e-6) => {
@@ -205,5 +211,57 @@ describe("styles", () => {
 			[{ kind: "id", name: "b" }, 100, { fill: "red" }],
 			[{ kind: "type", name: "path" }, 1, { stroke: "blue" }],
 		]);
+	});
+
+	test("matched rules apply by specificity, then source order", () => {
+		const rules = parseStyleSheet(
+			"#i { fill: id1 } .b { fill: b1; stroke: b1 } path { fill: t1; opacity: t1 }" +
+				" .a { fill: a1; stroke-width: a1 } path { fill: t2 } .b { stroke: b2 }" +
+				" #i { stroke: id2 } circle, .a { opacity: ca }",
+		);
+		// Every rule against every element, as matching worked before indexing.
+		const scan = (
+			list: StyleRule[],
+			name: string,
+			id: string | undefined,
+			classes: string[],
+		) =>
+			Object.assign(
+				{},
+				...list
+					.map((r, order) => ({ r, order }))
+					.filter(({ r }) =>
+						r.selector.kind === "type"
+							? r.selector.name === name
+							: r.selector.kind === "class"
+								? classes.includes(r.selector.name)
+								: r.selector.name === id,
+					)
+					.sort(
+						(a, b) => a.r.specificity - b.r.specificity || a.order - b.order,
+					)
+					.map((h) => h.r.decls),
+			);
+		const index = indexRules(rules);
+		const cases: [string, string | undefined, string[]][] = [
+			["path", undefined, []],
+			["path", "i", ["a", "b"]],
+			["path", "i", ["b", "a", "b"]],
+			["circle", undefined, ["a"]],
+			["rect", "x", ["c"]],
+			["rect", "", []],
+		];
+		for (const [name, id, classes] of cases)
+			expect(matchRules(index, name, id, classes)).toEqual(
+				scan(rules, name, id, classes),
+			);
+		expect(matchRules(index, "path", "i", ["b", "a"])).toEqual({
+			fill: "id1",
+			stroke: "id2",
+			opacity: "ca",
+			"stroke-width": "a1",
+		});
+		const keys = Object.keys(matchRules(index, "path", undefined, ["a", "b"]));
+		expect(keys).toEqual(Object.keys(scan(rules, "path", undefined, ["a", "b"])));
 	});
 });

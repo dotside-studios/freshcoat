@@ -306,7 +306,8 @@ export function createParagraphEngine(
 			return { ...full, shrinkApplied: false };
 
 		let lo = SHRINK_FLOOR_PX;
-		let hi = input.font.size;
+		// The full size was just shown not to fit, so search below it.
+		let hi = Math.ceil(input.font.size) - 1;
 		let best: ReturnType<typeof once> | null = null;
 		while (lo <= hi) {
 			const mid = Math.floor((lo + hi) / 2);
