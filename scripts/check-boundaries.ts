@@ -535,6 +535,7 @@ function lineOf(text: string, needle: string): number {
 
 export function parseJsonc(text: string): unknown {
 	let out = "";
+	let comma = -1;
 	for (let i = 0; i < text.length; i++) {
 		const c = text[i];
 		if (c === '"') {
@@ -542,6 +543,7 @@ export function parseJsonc(text: string): unknown {
 			while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
 			out += text.slice(i, j + 1);
 			i = j;
+			comma = -1;
 		} else if (c === "/" && text[i + 1] === "/") {
 			while (i < text.length && text[i] !== "\n") i++;
 			out += "\n";
@@ -549,9 +551,15 @@ export function parseJsonc(text: string): unknown {
 			const end = text.indexOf("*/", i + 2);
 			out += text.slice(i, end + 2).replace(/[^\n]/g, " ");
 			i = end + 1;
-		} else out += c;
+		} else {
+			if ((c === "}" || c === "]") && comma !== -1)
+				out = out.slice(0, comma) + out.slice(comma + 1);
+			if (c === ",") comma = out.length;
+			else if (!/\s/.test(c)) comma = -1;
+			out += c;
+		}
 	}
-	return JSON.parse(out.replace(/,(\s*[}\]])/g, "$1"));
+	return JSON.parse(out);
 }
 
 function* walk(dir: string): Generator<string> {
