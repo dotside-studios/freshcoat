@@ -63,22 +63,42 @@ export function parseStyleSheet(css: string): StyleRule[] {
 	return rules;
 }
 
+type IndexedRule = { rule: StyleRule; order: number };
+
+export type RuleIndex = {
+	type: Map<string, IndexedRule[]>;
+	class: Map<string, IndexedRule[]>;
+	id: Map<string, IndexedRule[]>;
+};
+
+/** Groups the rules by the type, class or id their selector names. */
+export function indexRules(rules: StyleRule[]): RuleIndex {
+	const index: RuleIndex = { type: new Map(), class: new Map(), id: new Map() };
+	rules.forEach((rule, order) => {
+		const byName = index[rule.selector.kind];
+		const list = byName.get(rule.selector.name);
+		if (list) list.push({ rule, order });
+		else byName.set(rule.selector.name, [{ rule, order }]);
+	});
+	return index;
+}
+
 /** The declarations the rules give an element, by specificity then order. */
 export function matchRules(
-	rules: StyleRule[],
+	index: RuleIndex,
 	name: string,
 	id: string | undefined,
 	classes: string[],
 ): Declarations {
-	const hits = rules
-		.map((r, order) => ({ r, order }))
-		.filter(({ r }) =>
-			r.selector.kind === "type"
-				? r.selector.name === name
-				: r.selector.kind === "class"
-					? classes.includes(r.selector.name)
-					: r.selector.name === id,
-		)
-		.sort((a, b) => a.r.specificity - b.r.specificity || a.order - b.order);
-	return Object.assign({}, ...hits.map((h) => h.r.decls));
+	const hits: IndexedRule[] = [];
+	const add = (list: IndexedRule[] | undefined) => {
+		if (list) hits.push(...list);
+	};
+	add(index.type.get(name));
+	for (const c of new Set(classes)) add(index.class.get(c));
+	if (id !== undefined) add(index.id.get(id));
+	hits.sort(
+		(a, b) => a.rule.specificity - b.rule.specificity || a.order - b.order,
+	);
+	return Object.assign({}, ...hits.map((h) => h.rule.decls));
 }
