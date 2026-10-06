@@ -1,6 +1,7 @@
 // The render vocabulary, re-exported so a consumer can import it from here.
 export {
 	approxEngine,
+	createPaintCache,
 	createParagraphEngine,
 	encodePng,
 	exportPixelSize,
@@ -8,6 +9,9 @@ export {
 	MAX_EXPORT_DIMENSION,
 	MAX_SUPERSAMPLE,
 	type MeasureText,
+	type PaintCache,
+	type PaintCacheOptions,
+	type PaintCacheStats,
 	readFontMetrics,
 	registerFontMetrics,
 	resolveExportScale,

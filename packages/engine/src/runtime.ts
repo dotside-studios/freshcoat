@@ -59,12 +59,13 @@ export function makeRuntime(
 ): PaintRuntime {
 	const rt: PaintRuntime = {
 		...base,
-		async paint(commands, ck): Promise<PaintResult> {
+		async paint(commands, ck, opts): Promise<PaintResult> {
 			// Without a painter the backend is CanvasKit and `ck` is its instance,
 			// which is every caller in the tree. With one, the backend was chosen at
 			// construction and `ck` is not consulted.
 			const paint = painter ?? paintCanvasKit(ck);
-			return applyDisposePolicy(await paint(commands, rt), policy, encode);
+			const target = opts?.cache ? { ...rt, cache: opts.cache } : rt;
+			return applyDisposePolicy(await paint(commands, target), policy, encode);
 		},
 	};
 	return rt;
