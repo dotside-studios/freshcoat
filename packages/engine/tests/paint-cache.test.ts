@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
@@ -35,25 +32,12 @@ import type {
 	ResolvedFont,
 } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = new Uint8Array(
-	readFileSync(
-		fileURLToPath(new URL("./fonts/Geist-Regular.ttf", import.meta.url)),
-	),
-);
+const FONT = testFontBytes("Geist-Regular.ttf");
 
 let ck: any;
 async function initCk() {
 	if (!ck)
-		ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		ck = await loadCanvasKit();
 	return ck;
 }
 

@@ -1,6 +1,4 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import {
@@ -11,21 +9,11 @@ import {
 	validateCommands,
 } from "../src/index";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 async function initCk() {
 	if (!ck)
-		ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		ck = await loadCanvasKit();
 	return ck;
 }
 

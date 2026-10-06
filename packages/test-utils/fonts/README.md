@@ -1,10 +1,11 @@
 # Test fonts
 
 Fonts vendored for text-layout and rendering tests, so they run offline and
-deterministically with no network fetch. Used by the conformance fixture
-(`conformance/src/canvaskit-fixture.ts`, which registers Geist as
-`ConformanceFont`), the text and line-height tests here and in `coatfile`, and
-the worker's render tests.
+deterministically with no network fetch. Used by the engine conformance
+fixture (`packages/engine/conformance/src/canvaskit-fixture.ts`, which
+registers Geist as `ConformanceFont`) and by the text and line-height tests in
+`engine` and `coatfile`. Load them with `testFontPath` or `testFontBytes` from
+`@freshcoat-js/test-utils`.
 
 Each is licensed under the SIL Open Font License 1.1, and none declares a
 Reserved Font Name. OFL-1.1 permits bundling and redistribution with software,
@@ -33,7 +34,8 @@ A verbatim TrueType `sfnt`, with no subsetting or modification.
 
 A verbatim TrueType `sfnt`, with no subsetting or modification. Vendored for
 right-to-left layout: Geist has no Hebrew, so without it an RTL string shapes
-as .notdef boxes with meaningless advances. See `tests/text-direction.test.ts`.
+as .notdef boxes with meaningless advances. See
+`packages/engine/tests/text-direction.test.ts`.
 
 ## VendSans-Variable-latin.woff2
 
@@ -52,4 +54,4 @@ Name, it may keep the Vend Sans name.
 Vendored because a VARIABLE face is the only way to test weight instancing: a
 family delivered this way registers at its default instance, so a 700 span
 silently gets 400 + synthetic bold unless the `wght` axis is set. See
-`tests/font-weight.test.ts`.
+`packages/engine/tests/font-weight.test.ts`.

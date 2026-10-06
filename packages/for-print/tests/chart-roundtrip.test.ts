@@ -7,9 +7,7 @@
 // patch actually is — an off-by-one in the layout, an antialiased patch edge, or
 // a registration point that doesn't land on its mark would all pass there and
 // fail here.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { decodePixels } from "@freshcoat-js/engine";
 import { renderSceneToPng } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
@@ -26,18 +24,8 @@ import {
 import { grayCast, readChart, repeatSpread } from "../src/measure";
 import type { PixelData } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as any)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as any;
+	return (await loadCanvasKit()) as any;
 }
 
 // Paint a chart through the SAME call the tool makes — renderSceneToPng, headless,

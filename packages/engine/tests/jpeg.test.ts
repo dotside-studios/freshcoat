@@ -1,22 +1,11 @@
 // JPEG encoding. Only CanvasKit's `full` build carries the JPEG encoder (the
 // worker pins it for WebP), so the round trip runs on that build and the
 // fallback on the default one, which answers in PNG and says so.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
-import FullCanvasKitInit from "canvaskit-wasm/bin/full/canvaskit.js";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import { flattenOverWhite } from "../src/jpeg";
 import { createFrame, createRect } from "../src/node";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instances
 let full: any;
@@ -24,12 +13,8 @@ let full: any;
 let base: any;
 
 beforeAll(async () => {
-	full = await (FullCanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, "full", f),
-	});
-	base = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	full = await loadCanvasKit("full");
+	base = await loadCanvasKit();
 });
 
 const W = 64;

@@ -3,9 +3,7 @@
 // Geist. Structural (not pixel) so it needs no native-canvas backend: it drives
 // compile with the engine and checks the laid-out text IR.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import {
 	createParagraphEngine,
 	type FontVMetrics,
@@ -15,16 +13,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import type { DrawTextCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT_PATH = fileURLToPath(
-	new URL("../../engine/tests/fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT_PATH = testFontPath("Geist-Regular.ttf");
 const FAMILY = "ParityFont";
 const W = 500;
 const H = 300;
@@ -36,9 +25,7 @@ let fontMetrics: Record<string, FontVMetrics>;
 beforeAll(async () => {
 	const bytes = new Uint8Array(readFileSync(FONT_PATH));
 	fonts = new Map([[FAMILY, [bytes]]]);
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 	const m = readFontMetrics(bytes);
 	fontMetrics = m ? { [FAMILY]: m } : {};
 });

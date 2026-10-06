@@ -3,9 +3,7 @@
 // marked `autoLineHeight` carries only a fallback number until the metrics for
 // its family turn up.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { autoLineHeight, FALLBACK_LINE_HEIGHT } from "../src/line-height";
@@ -13,18 +11,9 @@ import { createFrame, createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { DrawTextCommand } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 // A woff2 — the format a browser is served, and the one readFontMetrics cannot
 // parse, so this also covers the engine-probed metrics path.
-const VARIABLE = fileURLToPath(
-	new URL("./fonts/VendSans-Variable-latin.woff2", import.meta.url),
-);
+const VARIABLE = testFontPath("VendSans-Variable-latin.woff2");
 // Vend Sans: typo ascent 1.09 + descent 0.39, no line gap.
 const VEND_SANS_AUTO = 1.48;
 
@@ -88,9 +77,7 @@ describe("autoLineHeight", () => {
 
 describe("compileScene with an AUTO line height", () => {
 	test("bakes the font's line box, read through the engine when the bytes are woff2", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const fonts = new Map([
 			["Vend Sans", [new Uint8Array(readFileSync(VARIABLE))]],
 		]);
@@ -108,9 +95,7 @@ describe("compileScene with an AUTO line height", () => {
 	});
 
 	test("keeps the fallback for a family nothing knows the metrics of", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const fonts = new Map([
 			["Vend Sans", [new Uint8Array(readFileSync(VARIABLE))]],
 		]);
@@ -135,9 +120,7 @@ describe("compileScene with an AUTO line height", () => {
 	});
 
 	test("an explicit line height is left alone", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const fonts = new Map([
 			["Vend Sans", [new Uint8Array(readFileSync(VARIABLE))]],
 		]);

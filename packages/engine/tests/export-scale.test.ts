@@ -6,10 +6,7 @@
 // that step outside the scaled canvas matrix — the frame finish and the adjust
 // offscreen — still cover the whole frame.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { compileScene } from "../src/compile-scene";
@@ -24,19 +21,10 @@ import { createFrame, createRect, createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { EncodedPaintResult } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 const SIZE = { width: 100, height: 50 };
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as unknown;
+	return (await loadCanvasKit()) as unknown;
 }
 
 type RGB = [number, number, number];
@@ -188,16 +176,7 @@ describe("text baked for an export scale", () => {
 			[
 				"Vend Sans",
 				[
-					new Uint8Array(
-						readFileSync(
-							fileURLToPath(
-								new URL(
-									"./fonts/VendSans-Variable-latin.woff2",
-									import.meta.url,
-								),
-							),
-						),
-					),
+					testFontBytes("VendSans-Variable-latin.woff2"),
 				],
 			],
 		]);

@@ -1,8 +1,6 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { decodePixels, type GroupNode } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import type { EncodedPaintedFrame } from "../src/render";
@@ -19,14 +17,6 @@ import type {
 } from "../src/types";
 import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const cell = (
 	id: string,
@@ -226,9 +216,7 @@ describe("grid layout paint", () => {
 	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 	let ck: any;
 	beforeAll(async () => {
-		ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		ck = await loadCanvasKit();
 	});
 
 	test("paints each child in its cell", async () => {

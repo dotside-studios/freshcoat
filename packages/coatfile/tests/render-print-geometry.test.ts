@@ -6,26 +6,14 @@
 // second pass inside compileScene folded every nested frame's own pos into its
 // children again, sliding a QR out of the box drawn for it. This pins that a
 // layer nested in a positioned frame lands in the same place either way.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import { render } from "../src/render";
 import type { Template } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as any)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as any;
+	return (await loadCanvasKit()) as any;
 }
 
 // A card back in miniature: a QR nested inside a positioned frame, which is the

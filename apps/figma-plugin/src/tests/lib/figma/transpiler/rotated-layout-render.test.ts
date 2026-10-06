@@ -1,8 +1,6 @@
 // A rotated auto-layout frame keeps its live layout. Each case renders the
 // transpiled template twice: as emitted, and with every `layout`/`layoutChild`
 // stripped so the baked Figma positions draw as-is. The two must match.
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
 import { type Template, validate } from "@freshcoat-js/coatfile";
 import {
 	type EncodedPaintedFrame,
@@ -10,6 +8,7 @@ import {
 } from "@freshcoat-js/coatfile/render";
 import { decodePixels } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
 	type ProductRegistryEntry,
@@ -20,12 +19,6 @@ import type {
 	FigmaNode,
 	FigmaTransform,
 } from "~/lib/figma/types";
-
-const coatfileRequire = createRequire(
-	resolve(__dirname, "../../../../../../../packages/coatfile/package.json"),
-);
-const CK_ENTRY = coatfileRequire.resolve("canvaskit-wasm");
-const CK_BIN = join(dirname(CK_ENTRY), "..", "bin");
 
 const W = 400;
 const H = 300;
@@ -214,10 +207,7 @@ function find(template: Template, id: string): El {
 // biome-ignore lint/suspicious/noExplicitAny: the untyped CanvasKit instance
 let ck: any;
 beforeAll(async () => {
-	const init = coatfileRequire("canvaskit-wasm") as (
-		o: unknown,
-	) => Promise<unknown>;
-	ck = await init({ locateFile: (f: string) => join(CK_BIN, f) });
+	ck = await loadCanvasKit();
 });
 
 async function pixels(template: Template): Promise<Uint8Array> {

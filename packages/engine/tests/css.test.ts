@@ -76,7 +76,8 @@ describe("parseLinearGradient", () => {
 			"linear-gradient(180deg, var(--brand) 0%, #fff 100%)",
 			(c) => (c === "var(--brand)" ? "#abcdef" : parseCssColor(c)),
 		);
-		expect(fill?.stops[0].color).toBe("#abcdef");
+		if (fill?.kind !== "linear") throw new Error("unreachable");
+		expect(fill.stops[0]?.color).toBe("#abcdef");
 	});
 
 	test("non-linear-gradient → null", () => {

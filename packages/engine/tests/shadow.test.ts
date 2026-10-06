@@ -1,29 +1,17 @@
 // Shadows: drop and inner, with spread, singly and stacked. Asserted on real
 // painted pixels — the filter graph is CanvasKit's, so only the output proves it.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult, Shadows } from "../src/types";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const W = 80;
 const H = 80;
 
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 type RGBA = [number, number, number, number];

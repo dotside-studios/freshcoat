@@ -18,7 +18,7 @@ import {
 	PDF417Reader,
 	RGBLuminanceSource,
 } from "@zxing/library";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { bwipBarcodeEncoder } from "../src/barcode";
 import { setBarcodeEncoder } from "../src/barcode-encoder";
@@ -35,20 +35,10 @@ import type {
 } from "../src/types";
 import { validate } from "../src/validate";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 // biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 afterEach(() => {
@@ -388,8 +378,8 @@ describe("compile", () => {
 			{ x: 0, y: 0, width: 363, height: 100 },
 		);
 		const zero = findBitmap(compiledGroup(wider, { code: "LC 0001" }).group);
-		expect(zero?.pos.x).toBe(0);
-		expect(zero?.size.width).toBe(363);
+		expect(zero?.pos?.x).toBe(0);
+		expect(zero?.size?.width).toBe(363);
 	});
 
 	test("1D bars fill the height the text line leaves", () => {
@@ -407,7 +397,7 @@ describe("compile", () => {
 			align: "center",
 			font: { size: 20 },
 		});
-		if (!bitmap || !text) throw new Error();
+		if (!bitmap?.size || !text?.pos) throw new Error();
 		expect(bitmap.size.height).toBeCloseTo(120 - 20 * 1.2 - 20 * 0.15);
 		expect(text.pos.y).toBeCloseTo(bitmap.size.height + 3);
 	});

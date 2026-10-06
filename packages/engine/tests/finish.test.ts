@@ -1,20 +1,11 @@
 // FrameFinish: the whole-frame, post-composite output pass — white-clamp,
 // black-extract, and dither — run through an SkSL pass on the final surface.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult, FrameFinish } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 type RGB = [number, number, number];
 
 const pixelAt = (ck: any, png: Uint8Array, x: number, y: number): RGB => {
@@ -68,9 +59,7 @@ const render = async (ck: unknown, finish?: FrameFinish) =>
 
 describe("FrameFinish", () => {
 	test("white-clamp and black-extract snap near-white/near-black to pure", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const control = await render(ck);
 		const finished = await render(ck, { whiteClamp: 248, blackExtract: 30 });
 
@@ -84,18 +73,14 @@ describe("FrameFinish", () => {
 	});
 
 	test("thresholds are exclusive — values at/below stay put", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		// whiteClamp 250 does NOT clamp a 250 pixel (needs strictly greater).
 		const finished = await render(ck, { whiteClamp: 250 });
 		expect(pixelAt(ck, finished.bytes, 10, 10)[0]).toBe(250);
 	});
 
 	test("dither perturbs a flat field into varied values (breaks banding)", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const finished = await render(ck, { dither: 4 });
 		// Sample several mid-gray pixels; with ±4-level noise they should not all be
 		// identical, and should stay near 128.
@@ -106,9 +91,7 @@ describe("FrameFinish", () => {
 	});
 
 	test("monochrome dither is seed-stable and never introduces colored grain", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const finish: FrameFinish = {
 			dither: { amount: 4, seed: 8675309, mode: "monochrome" },
 		};
@@ -127,9 +110,7 @@ describe("FrameFinish", () => {
 	});
 
 	test("an all-undefined finish emits no command and changes nothing", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		const control = await render(ck);
 		const noop = await render(ck, {});
 		expect(pixelAt(ck, noop.bytes, 10, 10)).toEqual(

@@ -2,9 +2,7 @@
 // halves that matter are that it flags a malformed scene with a usable path, and
 // that it stays silent on the scenes compileScene actually emits.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import {
 	buildAdjust,
@@ -19,16 +17,7 @@ import {
 } from "../src/index";
 import type { Command, DrawRectCommand } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 const FAMILY = "ValidateFont";
 
 let ck: any;
@@ -36,9 +25,7 @@ let fonts: Map<string, Uint8Array[]>;
 
 beforeAll(async () => {
 	fonts = new Map([[FAMILY, [new Uint8Array(readFileSync(FONT))]]]);
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 const box = (x: number, y: number, w: number, h: number) => ({

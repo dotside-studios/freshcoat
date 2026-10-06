@@ -26,6 +26,7 @@ the Figma bundle command also uses `zip`.
 | Print analysis and correction | [for-print](packages/for-print/README.md) |
 | Dataset and export planning | [workspace](packages/workspace/README.md) |
 | Shared React controls and themes | [UI kit](packages/ui/README.md#contributing) |
+| CanvasKit and font fixtures for tests | [test-utils](packages/test-utils/README.md) |
 | Browser editor | [Studio contribution guide](apps/editor/CONTRIBUTING.md) |
 | Figma exporter and harness | [Figma plugin](apps/figma-plugin/README.md) |
 
@@ -58,6 +59,8 @@ Add tests next to the behavior you change. SDK changes should test public
 inputs and outputs, including refusals and malformed files. A change to a
 shared package may affect either application; run the relevant consumer tests
 as well as the package's own suite.
+Load CanvasKit and test fonts through [test-utils](packages/test-utils/)
+instead of resolving `canvaskit-wasm` or font files by path.
 
 For SDK exports, dependencies or runtime behavior, also run
 `release:pack` and `release:check`. Source imports can pass while compiled
@@ -99,8 +102,8 @@ bun run check:notices
 
 Use [Conventional Commits](https://www.conventionalcommits.org), with one focused
 change per commit. Use a scope that identifies the component: `engine`,
-`coatfile`, `for-print`, `workspace`, `ui`, `editor`, `figma-plugin`,
-or `release`. Repository-wide documentation can use `docs: ...`.
+`coatfile`, `for-print`, `workspace`, `ui`, `test-utils`, `editor`,
+`figma-plugin` or `release`. Repository-wide documentation can use `docs: ...`.
 
 Before opening a pull request:
 

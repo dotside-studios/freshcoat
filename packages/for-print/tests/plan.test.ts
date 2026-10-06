@@ -253,7 +253,7 @@ describe("planScene (sync)", () => {
 					? "graphic"
 					: undefined,
 			graphic: NO_PROCESSING,
-		});
+		}) as typeof tree;
 		expect(planned.children[0].adjust).toBeUndefined();
 	});
 
@@ -272,7 +272,7 @@ describe("planScene (sync)", () => {
 			children: [imageNode()],
 		};
 		const planned = planScene(masked) as typeof masked;
-		expect(planned.adjust).toBeUndefined();
+		expect((planned as Node).adjust).toBeUndefined();
 		expect(planned.children[0].adjust).toBeDefined();
 	});
 });
@@ -487,12 +487,13 @@ describe("analyzeScene (sampler)", () => {
 
 	test("intent resolver can keep an image out of analysis", async () => {
 		let calls = 0;
-		const planned = await analyzeScene(
+		const tree = createGroup([imageNode("logo.png")]);
+		const planned = (await analyzeScene(
 			async () => {
 				calls++;
 				return brightBuffer();
 			},
-			createGroup([imageNode("logo.png")]),
+			tree,
 			{
 				intentFor: (node) =>
 					node.kind === "image" && node.src === "logo.png"
@@ -500,7 +501,7 @@ describe("analyzeScene (sampler)", () => {
 						: undefined,
 				graphic: NO_PROCESSING,
 			},
-		);
+		)) as typeof tree;
 		expect(calls).toBe(0);
 		expect(planned.children[0].adjust).toBeUndefined();
 	});

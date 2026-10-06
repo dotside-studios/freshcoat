@@ -1,29 +1,17 @@
 // An elliptical radial gradient: Skia only draws circles, so anything other
 // than a circle is that circle under a shader local matrix. These paint one and
 // read the pixels back to check the reach along each axis.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { renderSceneToPng } from "../src/headless";
 import { createRect } from "../src/index";
 import type { ResolvedFill } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 const SIZE = 200;
 
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 /** Paint a SIZE×SIZE rect filled with `fill`, and return an alpha sampler. */

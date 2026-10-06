@@ -47,6 +47,7 @@
 		"@biomejs/biome": "2.4.5",
 		"@create-figma-plugin/build": "^4.0.3",
 		"@figma/plugin-typings": "^1.100.0",
+		"@freshcoat-js/test-utils": "workspace:*",
 		"@playwright/test": "^1.56.1",
 		"@types/node": "^26.6.3",
 		"typescript": "^5.7.2",

@@ -2,9 +2,7 @@
 // viewBox → viewport). Structural: the viewBox threads onto the drawPath command
 // only when set. Behavioral: a 10-unit path with a 10×10 viewBox scaled into a
 // 100×100 node fills the far corner; without the viewBox it stays at native size.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import {
@@ -13,14 +11,6 @@ import {
 	createPath,
 	createRect,
 } from "../src/index";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 
@@ -74,9 +64,7 @@ describe("PathNode.viewBox scales the paint", () => {
 		x: number,
 		y: number,
 	) {
-		const ck = (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		})) as any;
+		const ck = (await loadCanvasKit()) as any;
 		const env = createHeadlessEnv();
 		const commands = compileScene(scene(viewBox), { width: 100, height: 100 });
 		const result = (await env.paint(commands, ck)) as { bytes: Uint8Array };

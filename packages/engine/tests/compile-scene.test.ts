@@ -4,9 +4,7 @@
 //      we expect (asset collection + per-kind lowering), no pixels involved.
 //   2. SMOKE — that Command[] actually paints: headless CanvasKit → PNG bytes.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import type { MeasureText } from "../src/index";
@@ -25,16 +23,7 @@ import {
 } from "../src/index";
 import type { BakedTextLayout, Command } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 describe("compileScene structural lowering", () => {
 	test("a geometric tree lowers to the exact Command[]", () => {
@@ -371,9 +360,7 @@ describe("compileScene structural lowering", () => {
 describe("compileScene render smoke", () => {
 	test("a compiled geometric scene paints to PNG bytes", async () => {
 		const bytes = new Uint8Array(readFileSync(FONT));
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 
 		const scene = createFrame({
 			pos: { x: 0, y: 0 },
@@ -404,9 +391,7 @@ describe("compileScene render smoke", () => {
 	});
 
 	test("a bitmap node paints through CanvasKit (drawBitmap path)", async () => {
-		const ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		const ck = await loadCanvasKit();
 		// 2×2 checker: opaque red / transparent.
 		const px = new Uint8Array([
 			255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 255,

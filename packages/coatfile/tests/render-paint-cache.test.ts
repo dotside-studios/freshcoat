@@ -1,27 +1,15 @@
 // A PaintCache on the render runtime: a batch of records that share images
 // decodes each shared one once, and paints exactly what an uncached render does.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { createPaintCache, type PaintCache } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { describe, expect, test } from "vitest";
 import { type EncodedPaintedFrame, render } from "../src/render";
 import type { Template } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 let ck: any;
 async function ckInit(): Promise<any> {
-	ck ??= await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck ??= await loadCanvasKit();
 	return ck;
 }
 

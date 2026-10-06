@@ -95,9 +95,9 @@ describe("resolveLayout — flex", () => {
 		);
 		const out = asGroup(resolveLayout(g, { measure }));
 		// used 60, free 60, gaps between 3 items = 2 → between = 30
-		expect(out.children[0].pos.x).toBe(0);
-		expect(out.children[1].pos.x).toBe(50);
-		expect(out.children[2].pos.x).toBe(100);
+		expect(out.children[0].pos?.x).toBe(0);
+		expect(out.children[1].pos?.x).toBe(50);
+		expect(out.children[2].pos?.x).toBe(100);
 	});
 
 	test("align=center centers children on the cross axis", () => {
@@ -121,7 +121,7 @@ describe("resolveLayout — flex", () => {
 			{ direction: "row", gap: 0 },
 		);
 		const out = asGroup(resolveLayout(g, { measure }));
-		expect(out.children[1].pos.x).toBe(20);
+		expect(out.children[1].pos?.x).toBe(20);
 		expect(out.children[1].size).toEqual({ width: 80, height: 20 });
 	});
 
@@ -139,7 +139,7 @@ describe("resolveLayout — flex", () => {
 		const out = asGroup(resolveLayout(g, { measure }));
 		expect(out.children[0].size?.width).toBe(40); // 80 / 2
 		expect(out.children[1].size?.width).toBe(40);
-		expect(out.children[1].pos.x).toBe(40);
+		expect(out.children[1].pos?.x).toBe(40);
 	});
 
 	test("max clamps a grow child; leftover stays with the container", () => {
@@ -189,8 +189,8 @@ describe("resolveLayout — flex", () => {
 		);
 		const out = asGroup(resolveLayout(g, { measure }));
 		// free 80, 2 items → 3 units of 80/3 ≈ 26.67: x0=26.67, x1=26.67+20+26.67
-		expect(out.children[0].pos.x).toBeCloseTo(80 / 3, 5);
-		expect(out.children[1].pos.x).toBeCloseTo(80 / 3 + 20 + 80 / 3, 5);
+		expect(out.children[0].pos?.x).toBeCloseTo(80 / 3, 5);
+		expect(out.children[1].pos?.x).toBeCloseTo(80 / 3 + 20 + 80 / 3, 5);
 	});
 
 	test("wrap stacks lines by crossGap", () => {
@@ -330,9 +330,9 @@ describe("resolveLayout — grid", () => {
 		expect(out.layout).toBeUndefined();
 		expect(out.children[0].pos).toEqual({ x: 0, y: 0 });
 		expect(out.children[0].size).toEqual({ width: 30, height: 20 });
-		expect(out.children[1].pos.x).toBe(30);
+		expect(out.children[1].pos?.x).toBe(30);
 		expect(out.children[1].size?.width).toBe(40);
-		expect(out.children[2].pos.x).toBe(70);
+		expect(out.children[2].pos?.x).toBe(70);
 		expect(out.children[2].size?.width).toBe(50);
 	});
 
@@ -344,7 +344,7 @@ describe("resolveLayout — grid", () => {
 		const out = asGroup(resolveLayout(g, { measure }));
 		// leftover = 100 - 40 - 10(gap) = 50 → the 1fr col
 		expect(out.children[0].size?.width).toBe(40);
-		expect(out.children[1].pos.x).toBe(50); // 40 + 10
+		expect(out.children[1].pos?.x).toBe(50); // 40 + 10
 		expect(out.children[1].size?.width).toBe(50);
 	});
 
@@ -356,7 +356,7 @@ describe("resolveLayout — grid", () => {
 		const out = asGroup(resolveLayout(g, { measure }));
 		expect(out.children[0].size?.width).toBe(20); // 80 * 1/4
 		expect(out.children[1].size?.width).toBe(60); // 80 * 3/4
-		expect(out.children[1].pos.x).toBe(20);
+		expect(out.children[1].pos?.x).toBe(20);
 	});
 
 	test("auto-flow wraps into rows and stacks by row gap", () => {

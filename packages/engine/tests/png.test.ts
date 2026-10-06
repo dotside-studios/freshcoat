@@ -4,9 +4,7 @@
 // arithmetic is right, since a wrong byte anywhere fails to decode or decodes
 // to different pixels.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { renderSceneToPng } from "../src/headless";
@@ -14,21 +12,10 @@ import { createFrame, createRect, createText } from "../src/node";
 import { encodePng } from "../src/png";
 import type { EncodedPaintResult } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-const FONT = fileURLToPath(
-	new URL("./fonts/Geist-Regular.ttf", import.meta.url),
-);
+const FONT = testFontPath("Geist-Regular.ttf");
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as unknown;
+	return (await loadCanvasKit()) as unknown;
 }
 
 // A gradient (where filtering hurts) with flat colour and text over it (where it

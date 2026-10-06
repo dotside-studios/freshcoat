@@ -1,8 +1,6 @@
 // A bitmap's `role`: lowered onto its command, checked by validateCommands, and,
 // for a barcode, snapped to whole output pixels by the painter.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "../src/headless";
 import {
@@ -16,20 +14,10 @@ import {
 	validateCommands,
 } from "../src/index";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
-
 // biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;
 beforeAll(async () => {
-	ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	});
+	ck = await loadCanvasKit();
 });
 
 // Bar, space, bar, space: four modules, one pixel row, drawn at x = 10.4 across

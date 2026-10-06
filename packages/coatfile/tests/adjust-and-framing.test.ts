@@ -1,5 +1,3 @@
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
 	buildAdjust,
 	decodePixels,
@@ -7,7 +5,7 @@ import {
 	type ImageNode,
 } from "@freshcoat-js/engine";
 import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { formatImageFocus, parseImageFocus } from "../src/image-focus";
@@ -15,14 +13,6 @@ import type { EncodedPaintedFrame } from "../src/render";
 import { render } from "../src/render";
 import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
-
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 
 function template(elements: Element[], fields: string[] = []): Template {
 	return {
@@ -174,9 +164,7 @@ describe("adjust and framing paint", () => {
 	let ck: any;
 	let bands: string;
 	beforeAll(async () => {
-		ck = await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-			locateFile: (f: string) => join(CK_BIN, f),
-		});
+		ck = await loadCanvasKit();
 		// 80×20: red, green, blue and white bands, 20px each.
 		const surface = ck.MakeSurface(80, 20);
 		const canvas = surface.getCanvas();

@@ -4,9 +4,7 @@
 // (3) end to end through paint: the output size is unchanged, edge coverage that
 // a same-size render can only approximate is resolved, and the frame finish still
 // runs at output resolution rather than being averaged away by the reduction.
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import CanvasKitInit from "canvaskit-wasm";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
@@ -19,19 +17,10 @@ import { renderSceneToPng } from "../src/headless";
 import { createFrame, createPath, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/types";
 
-const CK_BIN = join(
-	fileURLToPath(new URL(".", import.meta.url)),
-	"..",
-	"node_modules",
-	"canvaskit-wasm",
-	"bin",
-);
 const SIZE = { width: 100, height: 50 };
 
 async function ckInit(): Promise<any> {
-	return (await (CanvasKitInit as (o: unknown) => Promise<unknown>)({
-		locateFile: (f: string) => join(CK_BIN, f),
-	})) as unknown;
+	return (await loadCanvasKit()) as unknown;
 }
 
 type RGB = [number, number, number];
