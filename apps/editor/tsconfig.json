@@ -1,5 +1,5 @@
 {
-	"include": ["src/**/*.ts", "src/**/*.tsx", "e2e/**/*.ts", "scripts/**/*.ts", "../scripts/**/*.ts", "vite.config.ts", "playwright.config.ts"],
+	"include": ["src/**/*.ts", "src/**/*.tsx", "e2e/**/*.ts", "scripts/**/*.ts", "../scripts/**/*.ts", "vite.config.ts", "canvaskit-assets.ts", "server.ts", "server.test.ts", "playwright.config.ts"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",
