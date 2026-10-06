@@ -24,6 +24,7 @@ import {
 import { rasterScaleFor } from "~/lib/figma/transpiler/raster-scale";
 import { colorwayLabel } from "~/lib/figma/transpiler/variants";
 import type { FigmaContainerNode } from "~/lib/figma/types";
+import { type CardsView, createCardsPublisher } from "~/main/cards-publisher";
 import {
 	collectColorways,
 	type DiscoInstance,
@@ -35,7 +36,12 @@ import {
 	exportThumbnails,
 	type RasterTarget,
 } from "~/main/export-rasters";
-import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
+import {
+	FIELD_KEY,
+	FIELDS_KEY,
+	pluginDataKeys,
+	readPluginData,
+} from "~/main/plugin-data";
 import { findUnpostable } from "~/main/postable";
 import {
 	applyRemoteProducts,
@@ -98,7 +104,7 @@ function pickDefaultSku(): string {
 	return listProductSpecs()[0]?.sku ?? "card_cr80";
 }
 
-async function postCards(): Promise<void> {
+async function computeCardsView(): Promise<CardsView> {
 	const product = getProductSpec(pickDefaultSku());
 	const sideNames = product
 		? product.frames.map((f) => f.name)
@@ -123,15 +129,13 @@ async function postCards(): Promise<void> {
 	const instanceNodes = figma.currentPage.findAllWithCriteria({
 		types: ["INSTANCE"],
 	});
-	const instances: DiscoInstance[] = [];
-	for (const inst of instanceNodes) {
-		const main = await inst.getMainComponentAsync();
-		instances.push({
+	const instances: DiscoInstance[] = await Promise.all(
+		instanceNodes.map(async (inst) => ({
 			id: inst.id,
 			name: inst.name,
-			mainComponentId: main?.id ?? null,
-		});
-	}
+			mainComponentId: (await inst.getMainComponentAsync())?.id ?? null,
+		})),
+	);
 
 	const discovered = detectCards(nodes, instances, sideNames, required);
 	const nameById = new Map(
@@ -174,24 +178,34 @@ async function postCards(): Promise<void> {
 		};
 	});
 
-	// The card currently highlighted on the canvas = the selection's top-level
-	// page-child ancestor, if that ancestor is one of the detected cards.
+	return { cards, nodes: candidates, pageName: figma.currentPage.name };
+}
+
+// The card currently highlighted on the canvas = the selection's top-level
+// page-child ancestor, if that ancestor is one of the detected cards.
+function selectedIdsIn(view: CardsView): {
+	selectedCardId: string | null;
+	selectedNodeId: string | null;
+} {
 	const selNode = figma.currentPage.selection[0] ?? null;
 	const selTop = selNode ? slotFrameOf(selNode) : null;
-	const selectedCardId =
-		selTop && cards.some((c) => c.id === selTop.id) ? selTop.id : null;
-	const selectedNodeId =
-		selTop && candidates.some((c) => c.id === selTop.id) ? selTop.id : null;
-
-	const msg: CardsMessage = {
-		type: "cards",
-		cards,
-		nodes: candidates,
-		pageName: figma.currentPage.name,
-		selectedCardId,
-		selectedNodeId,
+	return {
+		selectedCardId:
+			selTop && view.cards.some((c) => c.id === selTop.id) ? selTop.id : null,
+		selectedNodeId:
+			selTop && view.nodes.some((c) => c.id === selTop.id) ? selTop.id : null,
 	};
-	figma.ui.postMessage(msg);
+}
+
+const cardsPublisher = createCardsPublisher({
+	compute: computeCardsView,
+	selected: selectedIdsIn,
+	post: (msg: CardsMessage) => figma.ui.postMessage(msg),
+});
+
+function postCards(): Promise<void> {
+	cardsPublisher.invalidate();
+	return cardsPublisher.publish();
 }
 
 function postReadFailed(message: string): void {
@@ -226,9 +240,14 @@ async function gatherRead(
 	// Scale per slot, so a colorway instance's rasters match their base side's.
 	const slotRasterScale: Record<string, number> = {};
 
-	for (const frame of product.frames) {
-		const nodeId = sideAssignment[frame.name];
-		const node = nodeId ? await figma.getNodeByIdAsync(nodeId) : null;
+	const frameNodes = await Promise.all(
+		product.frames.map((frame) => {
+			const nodeId = sideAssignment[frame.name];
+			return nodeId ? figma.getNodeByIdAsync(nodeId) : null;
+		}),
+	);
+	for (const [i, frame] of product.frames.entries()) {
+		const node = frameNodes[i];
 		if (!node || (node.type !== "FRAME" && node.type !== "COMPONENT")) {
 			throw new Error(
 				`The frame for "${frame.label}" is no longer on the canvas. Pick it again.`,
@@ -260,9 +279,11 @@ async function gatherRead(
 		const instances = figma.currentPage.findAllWithCriteria({
 			types: ["INSTANCE"],
 		});
-		for (const inst of instances) {
-			const main = await inst.getMainComponentAsync();
-			if (main?.id !== cardId) continue;
+		const mains = await Promise.all(
+			instances.map((inst) => inst.getMainComponentAsync()),
+		);
+		for (const [i, inst] of instances.entries()) {
+			if (mains[i]?.id !== cardId) continue;
 			const label = colorwayLabel(inst.name, card.name);
 			if (label === null) continue;
 			const perSide: Record<string, FigmaContainerNode> = {};
@@ -402,14 +423,18 @@ function gatherFieldsOverview(): FieldOverviewItem[] {
 
 		const refs = new Map<string, string[]>();
 		const names = new Map<string, string>();
-		for (const node of frame.findAll(() => true)) {
+		for (const node of frame.findAllWithCriteria({
+			pluginData: { keys: pluginDataKeys(FIELD_KEY) },
+		})) {
 			const raw = readPluginData(node, FIELD_KEY);
 			if (!raw) continue;
 			try {
 				const parsed = JSON.parse(raw) as { bind?: Record<string, string> };
 				for (const template of Object.values(parsed.bind ?? {})) {
 					for (const id of extractTokens(template)) {
-						refs.set(id, [...(refs.get(id) ?? []), node.id]);
+						const list = refs.get(id);
+						if (list) list.push(node.id);
+						else refs.set(id, [node.id]);
 						names.set(node.id, node.name);
 					}
 				}
@@ -452,10 +477,13 @@ async function handleHarvest(
 	}
 	const cardMeta = readFieldsMap(card);
 	const slots: SlotHarvestInput[] = [];
-	for (const frame of product.frames) {
-		const nodeId = sideAssignment[frame.name];
-		if (!nodeId) continue;
-		const node = await figma.getNodeByIdAsync(nodeId);
+	const frameNodes = await Promise.all(
+		product.frames.map((frame) => {
+			const nodeId = sideAssignment[frame.name];
+			return nodeId ? figma.getNodeByIdAsync(nodeId) : null;
+		}),
+	);
+	for (const node of frameNodes) {
 		if (
 			!node ||
 			(node.type !== "FRAME" &&
@@ -471,9 +499,11 @@ async function handleHarvest(
 		});
 	}
 	const plan = planHarvest(slots);
-	for (const nb of plan.nodeBindings) {
-		const n = await figma.getNodeByIdAsync(nb.nodeId);
-		if (n) n.setPluginData(FIELD_KEY, JSON.stringify(nb.record));
+	const bound = await Promise.all(
+		plan.nodeBindings.map((nb) => figma.getNodeByIdAsync(nb.nodeId)),
+	);
+	for (const [i, nb] of plan.nodeBindings.entries()) {
+		bound[i]?.setPluginData(FIELD_KEY, JSON.stringify(nb.record));
 	}
 	if (card) {
 		const mergedMeta: Record<string, FieldMeta> = {};
@@ -609,13 +639,22 @@ export default async function (): Promise<void> {
 	postSelectionDetail();
 	postFieldsOverview();
 
-	const refresh = (): void => {
+	// documentchange would need loadAllPagesAsync under dynamic-page access, so
+	// invalidate from the current page's nodechange instead.
+	let watchedPage = figma.currentPage;
+	const invalidateCards = (): void => cardsPublisher.invalidate();
+	watchedPage.on("nodechange", invalidateCards);
+
+	figma.on("selectionchange", () => {
+		cardsPublisher.schedule();
+		postSelectionDetail();
+	});
+	figma.on("currentpagechange", () => {
+		watchedPage.off("nodechange", invalidateCards);
+		watchedPage = figma.currentPage;
+		watchedPage.on("nodechange", invalidateCards);
 		void postCards();
 		postSelectionDetail();
-	};
-	figma.on("selectionchange", refresh);
-	figma.on("currentpagechange", () => {
-		refresh();
 		postFieldsOverview();
 	});
 

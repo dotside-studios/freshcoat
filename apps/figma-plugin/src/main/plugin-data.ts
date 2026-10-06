@@ -35,3 +35,9 @@ export function readPluginData(node: PluginDataReader, key: string): string {
 	const legacy = LEGACY[key];
 	return legacy ? node.getPluginData(legacy) : "";
 }
+
+/** Every key `readPluginData` may read for `key`, for pluginData search criteria. */
+export function pluginDataKeys(key: string): string[] {
+	const legacy = LEGACY[key];
+	return legacy ? [key, legacy] : [key];
+}
