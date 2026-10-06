@@ -1,5 +1,6 @@
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
 import { figmaPaintToFill } from "~/lib/figma/transpiler/colors";
+import { FIELD_KEY, FIELDS_KEY } from "~/main/plugin-data";
 import { findUnpostable } from "~/main/postable";
 import { readBaseFields } from "~/main/read-base";
 import { gradientHandlesFromTransform, readPaint } from "~/main/read-paint";
@@ -1270,5 +1271,65 @@ describe("readPaint (image)", () => {
 		});
 		expect(p).not.toHaveProperty("imageTransform");
 		expect(p).not.toHaveProperty("filters");
+	});
+});
+
+describe("Figma API reads", () => {
+	it("calls getPluginData once per key per node", () => {
+		const getPluginData = vi.fn((key: string) =>
+			key === FIELD_KEY ? JSON.stringify({ bind: { fill: "{{brand}}" } }) : "",
+		);
+		const node = readNode({ ...leaf("1:1", "a"), getPluginData } as never);
+		expect(node?.binding).toEqual({ bind: { fill: "{{brand}}" } });
+		expect(getPluginData.mock.calls.map(([key]) => key).sort()).toEqual(
+			[FIELD_KEY, FIELDS_KEY].sort(),
+		);
+	});
+
+	it("does not read vectorPaths when fillGeometry is used", () => {
+		const vectorPaths = vi.fn(() => []);
+		const node = {
+			...leaf("1:2", "v"),
+			type: "VECTOR",
+			fillGeometry: [{ windingRule: "NONZERO", data: "M0 0 L1 1 Z" }],
+			get vectorPaths() {
+				return vectorPaths();
+			},
+		};
+		const v = readVectorNode(node as never);
+		expect(v.fillGeometry).toEqual([
+			{ path: "M0 0 L1 1 Z", windingRule: "NONZERO" },
+		]);
+		expect(vectorPaths).not.toHaveBeenCalled();
+	});
+
+	it("reads vectorPaths for a stroke-only shape", () => {
+		const v = readVectorNode({
+			...leaf("1:3", "v"),
+			type: "VECTOR",
+			fills: [],
+			fillGeometry: [{ windingRule: "NONZERO", data: "M0 0 L1 1 Z" }],
+			vectorPaths: [{ windingRule: "NONE", data: "M0 0 L1 1" }],
+		} as never);
+		expect(v.fillGeometry).toEqual([{ path: "M0 0 L1 1" }]);
+	});
+
+	it("depth 0 reads the container without its children", () => {
+		const child = {
+			...leaf("1:5", "child"),
+			getPluginData: vi.fn(() => ""),
+		};
+		const frame = {
+			...leaf("1:4", "frame"),
+			type: "FRAME",
+			children: [child],
+		};
+		const out = readNode(frame as never, { depth: 0 });
+		expect(out?.type).toBe("FRAME");
+		expect((out as { children: unknown[] }).children).toEqual([]);
+		expect(child.getPluginData).not.toHaveBeenCalled();
+		expect(
+			(readNode(frame as never) as { children: unknown[] }).children,
+		).toHaveLength(1);
 	});
 });
