@@ -5,7 +5,7 @@ import {
 	parseImageInfo,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { sameGuides, singleTemplateWorkspace } from "~/state/workspace";
+import { newId, sameGuides, singleTemplateWorkspace } from "~/state/workspace";
 import { plural } from "./copy";
 
 export type Autosave = {
@@ -14,15 +14,24 @@ export type Autosave = {
 	savedAt: number;
 	/** photos the document names that storage did not hold */
 	missingAssets?: number;
+	/** datasets the document names that storage did not hold */
+	missingDatasets?: number;
 };
 
 /** What restoring `saved` has to tell the user. */
 export function restoreNotices(saved: Autosave): string[] {
+	const notices: string[] = [];
+	const d = saved.missingDatasets;
+	if (d)
+		notices.push(
+			`${plural(d, "dataset")} ${d === 1 ? "wasn't" : "weren't"} autosaved. Import ${d === 1 ? "it" : "them"} again in Data.`,
+		);
 	const n = saved.missingAssets;
-	if (!n) return [];
-	return [
-		`${plural(n, "photo")} ${n === 1 ? "wasn't" : "weren't"} autosaved. Add ${n === 1 ? "it" : "them"} again in Data.`,
-	];
+	if (n)
+		notices.push(
+			`${plural(n, "photo")} ${n === 1 ? "wasn't" : "weren't"} autosaved. Add ${n === 1 ? "it" : "them"} again in Data.`,
+		);
+	return notices;
 }
 
 /** An asset as the document stores it: everything but its bytes, which live
@@ -39,11 +48,15 @@ type StoredWorkspace = Omit<Workspace, "datasets"> & {
  *  stored under its own key, so a write puts only the ones that changed. */
 type StoredShell = Omit<Workspace, "datasets"> & { datasets: string[] };
 
+/** Which tab wrote the shell, and its count of writes when it did. */
+type WriterStamp = { tabId: string; generation: number };
+
 type StoredAutosave = {
 	version: 3;
 	workspace: StoredShell;
 	fileName: string;
 	savedAt: number;
+	writer?: WriterStamp;
 };
 
 /** What version 2 stored: the whole workspace under one key. Rewritten as
@@ -85,10 +98,15 @@ const DATASET_PREFIX = "dataset:";
 
 const datasetKey = (id: string) => `${DATASET_PREFIX}${id}`;
 
+const TAB_ID = newId("tab");
+
 export type AutosaveOptions = {
 	/** Called once when storage fills up and photos stop being saved, and
 	 *  not again until they have been saved once more. */
 	onStorageFull?: () => void;
+	/** Who this store writes as; another tab's writes make what this one
+	 *  remembers writing unreliable. Defaults to an id made per tab. */
+	tabId?: string;
 };
 
 export type AutosaveStore = {
@@ -207,6 +225,9 @@ export function createAutosaveStore(
 	/** shas the assets store is known to hold, read on the first write */
 	let stored: Set<string> | null = null;
 	let full = false;
+	const tabId = opts.tabId ?? TAB_ID;
+	/** the generation of this store's last shell write */
+	let generation = 0;
 	let conn: Promise<IDBDatabase> | null = null;
 	let running: Promise<void> = Promise.resolve();
 	let waiting: Omit<Autosave, "savedAt"> | null = null;
@@ -302,10 +323,8 @@ export function createAutosaveStore(
 		await done(tx);
 	}
 
-	async function datasetKeys(db: IDBDatabase): Promise<Map<string, null>> {
-		const keys = await request(
-			db.transaction(DOC_STORE).objectStore(DOC_STORE).getAllKeys(),
-		);
+	async function datasetKeys(docs: IDBObjectStore): Promise<Map<string, null>> {
+		const keys = await request(docs.getAllKeys());
 		return new Map(
 			keys
 				.map(String)
@@ -314,11 +333,28 @@ export function createAutosaveStore(
 		);
 	}
 
+	function isMine(doc: unknown): boolean {
+		const writer = (doc as StoredAutosave | undefined)?.writer;
+		return writer?.tabId === tabId && writer.generation === generation;
+	}
+
+	function forget(): void {
+		written = null;
+		stored = null;
+		savedAssets = null;
+	}
+
 	async function writeNow(entry: Omit<Autosave, "savedAt">): Promise<void> {
 		const ws = entry.workspace;
 		if (last !== null && sameWorkspace(last, ws)) return;
 		const db = await connect();
 		try {
+			if (written !== null) {
+				const current = await request(
+					db.transaction(DOC_STORE).objectStore(DOC_STORE).get(KEY),
+				);
+				if (!isMine(current)) forget();
+			}
 			const assetsChanged =
 				savedAssets === null || !sameAssets(savedAssets, ws);
 			let assetsSaved = true;
@@ -332,9 +368,11 @@ export function createAutosaveStore(
 					full = true;
 				}
 			}
-			const before = written ?? (await datasetKeys(db));
 			const tx = db.transaction(DOC_STORE, "readwrite");
 			const docs = tx.objectStore(DOC_STORE);
+			if (written !== null && !isMine(await request(docs.get(KEY))))
+				written = null;
+			const before = written ?? (await datasetKeys(docs));
 			const now = new Map<string, Dataset>();
 			for (const d of ws.datasets) {
 				const key = datasetKey(d.id);
@@ -347,9 +385,11 @@ export function createAutosaveStore(
 				workspace: shell(ws),
 				fileName: entry.fileName,
 				savedAt: Date.now(),
+				writer: { tabId, generation: generation + 1 },
 			};
 			docs.put(doc, KEY);
 			await done(tx);
+			generation += 1;
 			written = now;
 			last = ws;
 			if (assetsSaved) {
@@ -425,6 +465,7 @@ export function createAutosaveStore(
 				}
 				if (!("version" in v)) return fromInline(v);
 				let saved: StoredDataset[];
+				let missingDatasets = 0;
 				if (v.version === 2) {
 					saved = v.workspace.datasets;
 				} else {
@@ -434,6 +475,7 @@ export function createAutosaveStore(
 							| StoredDataset
 							| undefined;
 						if (d) saved.push(d);
+						else missingDatasets += 1;
 					}
 				}
 				const blobs = tx.objectStore(ASSET_STORE);
@@ -457,6 +499,7 @@ export function createAutosaveStore(
 					savedAt: v.savedAt,
 				};
 				if (missing) out.missingAssets = missing;
+				if (missingDatasets) out.missingDatasets = missingDatasets;
 				return out;
 			} catch {
 				await disconnect();

@@ -2,7 +2,11 @@
 import "fake-indexeddb/auto";
 import type { Dataset, DatasetAsset, Workspace } from "@freshcoat-js/workspace";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAutosaveStore } from "~/app/autosave";
+import {
+	type Autosave,
+	createAutosaveStore,
+	restoreNotices,
+} from "~/app/autosave";
 import { doc as docFixture } from "./doc-fixture";
 
 let dbCount = 0;
@@ -362,6 +366,69 @@ describe("autosave", () => {
 		expect(doc.workspace.datasets).toEqual(["d_1"]);
 		const again = await createAutosaveStore(db).read();
 		expect(again?.workspace).toEqual(read?.workspace);
+	});
+
+	it("rewrites its datasets after another tab writes over them", async () => {
+		const db = freshDb();
+		const tabA = createAutosaveStore(db, { tabId: "A" });
+		const tabB = createAutosaveStore(db, { tabId: "B" });
+		const ws = workspace([asset(1)]);
+		await tabA.write({ workspace: ws, fileName: "a" });
+		const other = workspace([asset(2)]);
+		await tabB.write({
+			workspace: {
+				...other,
+				datasets: [{ ...(other.datasets[0] as Dataset), id: "d_b" }],
+			},
+			fileName: "b",
+		});
+		expect(await rawGet(db, "autosave", "dataset:d_1")).toBeUndefined();
+
+		const edited: Workspace = {
+			...ws,
+			templates: [{ id: "t_1", fileName: "a.coat", template: docFixture() }],
+		};
+		await tabA.write({ workspace: edited, fileName: "a" });
+		expect(((await rawGet(db, "autosave")) as string[]).sort()).toEqual([
+			"current",
+			"dataset:d_1",
+		]);
+
+		const read = await createAutosaveStore(db).read();
+		expect(read?.fileName).toBe("a");
+		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_1"]);
+		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
+		expect(read?.missingDatasets).toBeUndefined();
+		expect(read?.missingAssets).toBeUndefined();
+	});
+
+	it("restores the rest and says so when a dataset is missing", async () => {
+		const db = freshDb();
+		const ws = workspace([asset(1)]);
+		const second: Dataset = {
+			...(ws.datasets[0] as Dataset),
+			id: "d_2",
+			assets: [],
+			records: [],
+		};
+		await createAutosaveStore(db).write({
+			workspace: { ...ws, datasets: [...ws.datasets, second] },
+			fileName: "a",
+		});
+		const raw = await openRaw(db);
+		await new Promise<void>((resolve) => {
+			const tx = raw.transaction("autosave", "readwrite");
+			tx.objectStore("autosave").delete("dataset:d_1");
+			tx.oncomplete = () => resolve();
+		});
+		raw.close();
+
+		const read = await createAutosaveStore(db).read();
+		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_2"]);
+		expect(read?.missingDatasets).toBe(1);
+		expect(restoreNotices(read as Autosave)).toEqual([
+			"1 dataset wasn't autosaved. Import it again in Data.",
+		]);
 	});
 
 	it("reopens after another tab deletes the database", async () => {
