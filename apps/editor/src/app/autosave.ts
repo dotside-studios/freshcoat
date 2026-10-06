@@ -375,7 +375,9 @@ export function createAutosaveStore(
 	): Promise<void> {
 		const tx = db.transaction(DOC_STORE, "readwrite");
 		const docs = tx.objectStore(DOC_STORE);
-		const now = (await request(docs.get(KEY))) as { version?: number } | undefined;
+		const now = (await request(docs.get(KEY))) as
+			| { version?: number }
+			| undefined;
 		if (now?.version !== 2) return;
 		for (const d of v.workspace.datasets) docs.put(d, datasetKey(d.id));
 		const doc: StoredAutosave = {
