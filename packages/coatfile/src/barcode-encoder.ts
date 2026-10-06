@@ -1,3 +1,5 @@
+// The Figma plugin's main thread imports this module, so it must stay free of
+// runtime imports: type imports only.
 import type { BearerBars, Symbology } from "./types";
 
 // What an encoder hands compile: the modules of the symbol, without its quiet
