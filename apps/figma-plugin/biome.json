@@ -11,7 +11,8 @@
 			"**/src/**/*",
 			"!**/fixtures/**/*.json",
 			"harness/**/*.ts",
-			"build.ts",
+			"build-figma-plugin.*.js",
+			"package.json",
 			"vitest.config.ts"
 		]
 	},

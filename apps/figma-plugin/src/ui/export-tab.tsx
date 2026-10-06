@@ -15,6 +15,7 @@ import {
 	COAT_MEDIA_TYPE,
 	packTemplate,
 } from "@freshcoat-js/coatfile/coat";
+// js-sha256 because crypto.subtle is unavailable in the plugin iframe (non-secure context).
 import { sha256 } from "js-sha256";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
