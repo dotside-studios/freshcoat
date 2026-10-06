@@ -29,11 +29,26 @@ export function restoreNotices(saved: Autosave): string[] {
  *  in the `assets` store under their sha256. */
 type AssetMeta = Omit<DatasetAsset, "blob">;
 
+type StoredDataset = Omit<Dataset, "assets"> & { assets: AssetMeta[] };
+
 type StoredWorkspace = Omit<Workspace, "datasets"> & {
-	datasets: (Omit<Dataset, "assets"> & { assets: AssetMeta[] })[];
+	datasets: StoredDataset[];
 };
 
+/** The workspace with its datasets reduced to their ids; each dataset is
+ *  stored under its own key, so a write puts only the ones that changed. */
+type StoredShell = Omit<Workspace, "datasets"> & { datasets: string[] };
+
 type StoredAutosave = {
+	version: 3;
+	workspace: StoredShell;
+	fileName: string;
+	savedAt: number;
+};
+
+/** What version 2 stored: the whole workspace under one key. Rewritten as
+ *  version 3 when read. */
+type SingleRecordAutosave = {
 	version: 2;
 	workspace: StoredWorkspace;
 	fileName: string;
@@ -66,6 +81,9 @@ type InlineAutosave = {
 const DOC_STORE = "autosave";
 const ASSET_STORE = "assets";
 const KEY = "current";
+const DATASET_PREFIX = "dataset:";
+
+const datasetKey = (id: string) => `${DATASET_PREFIX}${id}`;
 
 export type AutosaveOptions = {
 	/** Called once when storage fills up and photos stop being saved, and
@@ -104,14 +122,19 @@ function isQuotaError(err: unknown): boolean {
 	);
 }
 
-function stripAssets(ws: Workspace): StoredWorkspace {
-	return {
-		...ws,
-		datasets: ws.datasets.map((d) => ({
-			...d,
-			assets: d.assets.map(({ blob: _blob, ...meta }) => meta),
-		})),
-	};
+function stripAssets(d: Dataset): StoredDataset {
+	return { ...d, assets: d.assets.map(({ blob: _blob, ...meta }) => meta) };
+}
+
+function shell(ws: Workspace | StoredWorkspace): StoredShell {
+	return { ...ws, datasets: ws.datasets.map((d) => d.id) };
+}
+
+function sameAssets(saved: DatasetAsset[][], ws: Workspace): boolean {
+	return (
+		saved.length === ws.datasets.length &&
+		ws.datasets.every((d, i) => d.assets === saved[i])
+	);
 }
 
 /** Whether two snapshots hold the same things, compared the way the store
@@ -165,19 +188,26 @@ function fromInline(v: InlineAutosave): Autosave {
 }
 
 /**
- * Autosave in two object stores: the workspace document with its photos
- * reduced to metadata, and the photos' Blobs keyed by sha256, each written
- * once. Writes run one at a time; a write that arrives while one runs
- * replaces any other waiting behind it.
+ * Autosave in two object stores: the workspace document, split into a shell
+ * and one record per dataset with its photos reduced to metadata, and the
+ * photos' Blobs keyed by sha256, each written once. Writes run one at a time
+ * over one connection; a write that arrives while one runs replaces any
+ * other waiting behind it.
  */
 export function createAutosaveStore(
 	dbName = "freshcoat",
 	opts: AutosaveOptions = {},
 ): AutosaveStore {
 	let last: Workspace | null = null;
+	/** each dataset's assets as of the last write that saved its photos */
+	let savedAssets: DatasetAsset[][] | null = null;
+	/** the dataset each key holds, by identity, or null when written before
+	 *  this session; read on the first write */
+	let written: Map<string, Dataset | null> | null = null;
 	/** shas the assets store is known to hold, read on the first write */
 	let stored: Set<string> | null = null;
 	let full = false;
+	let conn: Promise<IDBDatabase> | null = null;
 	let running: Promise<void> = Promise.resolve();
 	let waiting: Omit<Autosave, "savedAt"> | null = null;
 
@@ -196,6 +226,38 @@ export function createAutosaveStore(
 			req.onsuccess = () => resolve(req.result);
 			req.onerror = () => reject(req.error);
 		});
+	}
+
+	/** The session's connection, opened on first use and again after it
+	 *  closes, forgetting what the store was known to hold. */
+	function connect(): Promise<IDBDatabase> {
+		if (conn) return conn;
+		last = null;
+		savedAssets = null;
+		written = null;
+		stored = null;
+		const p: Promise<IDBDatabase> = openDb().then((db) => {
+			const drop = () => {
+				if (conn === p) conn = null;
+			};
+			db.onversionchange = () => {
+				drop();
+				db.close();
+			};
+			db.onclose = drop;
+			return db;
+		});
+		conn = p;
+		p.catch(() => {
+			if (conn === p) conn = null;
+		});
+		return p;
+	}
+
+	async function disconnect(): Promise<void> {
+		const p = conn;
+		conn = null;
+		(await p?.catch(() => null))?.close();
 	}
 
 	async function writeAssets(db: IDBDatabase, ws: Workspace): Promise<void> {
@@ -240,39 +302,91 @@ export function createAutosaveStore(
 		await done(tx);
 	}
 
+	async function datasetKeys(db: IDBDatabase): Promise<Map<string, null>> {
+		const keys = await request(
+			db.transaction(DOC_STORE).objectStore(DOC_STORE).getAllKeys(),
+		);
+		return new Map(
+			keys
+				.map(String)
+				.filter((k) => k.startsWith(DATASET_PREFIX))
+				.map((k) => [k, null]),
+		);
+	}
+
 	async function writeNow(entry: Omit<Autosave, "savedAt">): Promise<void> {
-		if (last !== null && sameWorkspace(last, entry.workspace)) return;
-		const db = await openDb();
+		const ws = entry.workspace;
+		if (last !== null && sameWorkspace(last, ws)) return;
+		const db = await connect();
 		try {
+			const assetsChanged =
+				savedAssets === null || !sameAssets(savedAssets, ws);
 			let assetsSaved = true;
-			try {
-				await writeAssets(db, entry.workspace);
-			} catch (err) {
-				if (!isQuotaError(err)) throw err;
-				assetsSaved = false;
-				if (!full) opts.onStorageFull?.();
-				full = true;
+			if (assetsChanged) {
+				try {
+					await writeAssets(db, ws);
+				} catch (err) {
+					if (!isQuotaError(err)) throw err;
+					assetsSaved = false;
+					if (!full) opts.onStorageFull?.();
+					full = true;
+				}
 			}
+			const before = written ?? (await datasetKeys(db));
+			const tx = db.transaction(DOC_STORE, "readwrite");
+			const docs = tx.objectStore(DOC_STORE);
+			const now = new Map<string, Dataset>();
+			for (const d of ws.datasets) {
+				const key = datasetKey(d.id);
+				now.set(key, d);
+				if (before.get(key) !== d) docs.put(stripAssets(d), key);
+			}
+			for (const key of before.keys()) if (!now.has(key)) docs.delete(key);
 			const doc: StoredAutosave = {
-				version: 2,
-				workspace: stripAssets(entry.workspace),
+				version: 3,
+				workspace: shell(ws),
 				fileName: entry.fileName,
 				savedAt: Date.now(),
 			};
-			const tx = db.transaction(DOC_STORE, "readwrite");
-			tx.objectStore(DOC_STORE).put(doc, KEY);
+			docs.put(doc, KEY);
 			await done(tx);
-			last = entry.workspace;
+			written = now;
+			last = ws;
 			if (assetsSaved) {
 				full = false;
-				await collect(db, entry.workspace);
+				if (assetsChanged) await collect(db, ws);
+				savedAssets = ws.datasets.map((d) => d.assets);
 			} else {
 				// Retry the photos on the next write, even if nothing changed.
 				last = null;
+				savedAssets = null;
 			}
-		} finally {
-			db.close();
+		} catch (err) {
+			await disconnect();
+			throw err;
 		}
+	}
+
+	/** Rewrites a single-record autosave as the shell and one record per
+	 *  dataset, unless a write replaced it meanwhile. */
+	async function migrate(
+		db: IDBDatabase,
+		v: SingleRecordAutosave,
+	): Promise<void> {
+		const tx = db.transaction(DOC_STORE, "readwrite");
+		const docs = tx.objectStore(DOC_STORE);
+		const now = (await request(docs.get(KEY))) as { version?: number } | undefined;
+		if (now?.version !== 2) return;
+		for (const d of v.workspace.datasets) docs.put(d, datasetKey(d.id));
+		const doc: StoredAutosave = {
+			version: 3,
+			workspace: shell(v.workspace),
+			fileName: v.fileName,
+			savedAt: v.savedAt,
+		};
+		docs.put(doc, KEY);
+		await done(tx);
+		written = null;
 	}
 
 	return {
@@ -290,67 +404,79 @@ export function createAutosaveStore(
 
 		async read() {
 			try {
-				const db = await openDb();
-				try {
-					const v = (await request(
-						db.transaction(DOC_STORE).objectStore(DOC_STORE).get(KEY),
-					)) as
-						| StoredAutosave
-						| InlineAutosave
-						| LegacyTemplateAutosave
-						| undefined;
-					if (!v) return null;
-					if (!("workspace" in v)) {
-						return {
-							workspace: singleTemplateWorkspace(v.template, v.fileName),
-							fileName: "Untitled.coatworkspace",
-							savedAt: v.savedAt,
-						};
-					}
-					if (!("version" in v)) return fromInline(v);
-					const store = db.transaction(ASSET_STORE).objectStore(ASSET_STORE);
-					let missing = 0;
-					const datasets: Dataset[] = [];
-					for (const d of v.workspace.datasets) {
-						const assets: DatasetAsset[] = [];
-						for (const meta of d.assets) {
-							const blob = (await request(store.get(meta.sha256))) as
-								| Blob
-								| undefined;
-							if (blob) assets.push({ ...meta, blob });
-							else missing += 1;
-						}
-						datasets.push({ ...d, assets });
-					}
-					const out: Autosave = {
-						workspace: { ...v.workspace, datasets },
-						fileName: v.fileName,
+				const db = await connect();
+				const tx = db.transaction([DOC_STORE, ASSET_STORE]);
+				const docs = tx.objectStore(DOC_STORE);
+				const v = (await request(docs.get(KEY))) as
+					| StoredAutosave
+					| SingleRecordAutosave
+					| InlineAutosave
+					| LegacyTemplateAutosave
+					| undefined;
+				if (!v) return null;
+				if (!("workspace" in v)) {
+					return {
+						workspace: singleTemplateWorkspace(v.template, v.fileName),
+						fileName: "Untitled.coatworkspace",
 						savedAt: v.savedAt,
 					};
-					if (missing) out.missingAssets = missing;
-					return out;
-				} finally {
-					db.close();
 				}
+				if (!("version" in v)) return fromInline(v);
+				let saved: StoredDataset[];
+				if (v.version === 2) {
+					saved = v.workspace.datasets;
+				} else {
+					saved = [];
+					for (const id of v.workspace.datasets) {
+						const d = (await request(docs.get(datasetKey(id)))) as
+							| StoredDataset
+							| undefined;
+						if (d) saved.push(d);
+					}
+				}
+				const blobs = tx.objectStore(ASSET_STORE);
+				let missing = 0;
+				const datasets: Dataset[] = [];
+				for (const d of saved) {
+					const assets: DatasetAsset[] = [];
+					for (const meta of d.assets) {
+						const blob = (await request(blobs.get(meta.sha256))) as
+							| Blob
+							| undefined;
+						if (blob) assets.push({ ...meta, blob });
+						else missing += 1;
+					}
+					datasets.push({ ...d, assets });
+				}
+				if (v.version === 2) await migrate(db, v).catch(() => {});
+				const out: Autosave = {
+					workspace: { ...v.workspace, datasets },
+					fileName: v.fileName,
+					savedAt: v.savedAt,
+				};
+				if (missing) out.missingAssets = missing;
+				return out;
 			} catch {
+				await disconnect();
 				return null;
 			}
 		},
 
 		async clear() {
 			last = null;
+			savedAssets = null;
+			written = null;
 			try {
-				const db = await openDb();
-				try {
-					const tx = db.transaction([DOC_STORE, ASSET_STORE], "readwrite");
-					tx.objectStore(DOC_STORE).delete(KEY);
-					tx.objectStore(ASSET_STORE).clear();
-					await done(tx);
-					stored = new Set();
-				} finally {
-					db.close();
-				}
-			} catch {}
+				const db = await connect();
+				const tx = db.transaction([DOC_STORE, ASSET_STORE], "readwrite");
+				tx.objectStore(DOC_STORE).clear();
+				tx.objectStore(ASSET_STORE).clear();
+				await done(tx);
+				stored = new Set();
+				written = new Map();
+			} catch {
+				await disconnect();
+			}
 		},
 	};
 }

@@ -161,6 +161,7 @@ export class EditorController {
 	fonts: Map<string, Uint8Array[]> | undefined;
 	private viewport = { width: 0, height: 0 };
 	private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
+	private autosaveSeen: Pick<EditorState, "doc" | "workspace">;
 	private openedListeners = new Set<() => void>();
 	private issuesListeners = new Set<() => void>();
 	private namePrompt: NamePrompt | undefined;
@@ -170,6 +171,8 @@ export class EditorController {
 
 	constructor(store: EditorStore = createEditorStore()) {
 		this.store = store;
+		const { doc, workspace } = store.getState();
+		this.autosaveSeen = { doc, workspace };
 		this.store.subscribe(() => this.scheduleAutosave());
 	}
 
@@ -1271,7 +1274,11 @@ export class EditorController {
 	}
 
 	private scheduleAutosave(): void {
-		if (!this.state.workspace) return;
+		const { doc, workspace } = this.state;
+		const seen = this.autosaveSeen;
+		if (doc === seen.doc && workspace === seen.workspace) return;
+		this.autosaveSeen = { doc, workspace };
+		if (!workspace) return;
 		clearTimeout(this.autosaveTimer);
 		this.autosaveTimer = setTimeout(() => {
 			const ws = workspaceSnapshot(this.state);

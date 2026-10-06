@@ -80,10 +80,12 @@ describe("autosave", () => {
 		]);
 		const doc = (await rawGet(db, "autosave", "current")) as {
 			version: number;
-			workspace: Workspace;
+			workspace: { datasets: string[] };
 		};
-		expect(doc.version).toBe(2);
-		expect(doc.workspace.datasets[0]?.assets[0]).toEqual({
+		expect(doc.version).toBe(3);
+		expect(doc.workspace.datasets).toEqual(["d_1"]);
+		const stored = (await rawGet(db, "autosave", "dataset:d_1")) as Dataset;
+		expect(stored.assets[0]).toEqual({
 			sha256: "sha1",
 			contentType: "image/png",
 			name: "p1.png",
@@ -104,13 +106,13 @@ describe("autosave", () => {
 		const put = vi.spyOn(IDBObjectStore.prototype, "put");
 		const ws = workspace([asset(1)]);
 		await store.write({ workspace: ws, fileName: "a" });
-		expect(put).toHaveBeenCalledTimes(2);
+		expect(put).toHaveBeenCalledTimes(3);
 		await store.write({ workspace: { ...ws }, fileName: "a" });
-		expect(put).toHaveBeenCalledTimes(2);
+		expect(put).toHaveBeenCalledTimes(3);
 		const more = workspace([asset(1), asset(3)]);
 		await store.write({ workspace: more, fileName: "a" });
-		// the new photo and the document, not the old photo again
-		expect(put).toHaveBeenCalledTimes(4);
+		// the new photo, the dataset and the shell, not the old photo again
+		expect(put).toHaveBeenCalledTimes(6);
 	});
 
 	it("deletes photos no workspace references after a write", async () => {
@@ -223,10 +225,10 @@ describe("autosave", () => {
 		});
 		const doc = (await rawGet(db, "autosave", "current")) as {
 			version: number;
-			workspace: Workspace;
 		};
-		expect(doc.version).toBe(2);
-		expect(doc.workspace.datasets[0]?.assets[0]).toEqual({
+		expect(doc.version).toBe(3);
+		const stored = (await rawGet(db, "autosave", "dataset:d_1")) as Dataset;
+		expect(stored.assets[0]).toEqual({
 			sha256: "old",
 			contentType: "image/png",
 			name: "old.png",
@@ -254,5 +256,127 @@ describe("autosave", () => {
 		});
 		const read = await createAutosaveStore(db).read();
 		expect(read?.workspace.templates[0]?.fileName).toBe("x.coat");
+	});
+
+	it("rewrites only the shell when a template changes", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		const ws = workspace([asset(1)]);
+		await store.write({ workspace: ws, fileName: "a" });
+		const put = vi.spyOn(IDBObjectStore.prototype, "put");
+		const getAllKeys = vi.spyOn(IDBObjectStore.prototype, "getAllKeys");
+		const edited: Workspace = {
+			...ws,
+			templates: [{ id: "t_1", fileName: "a.coat", template: docFixture() }],
+		};
+		await store.write({ workspace: edited, fileName: "a" });
+		expect(put.mock.calls.map((c) => c[1])).toEqual(["current"]);
+		expect(getAllKeys).not.toHaveBeenCalled();
+		const read = await createAutosaveStore(db).read();
+		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
+		expect(read?.workspace.templates[0]?.template).toEqual(
+			edited.templates[0]?.template,
+		);
+	});
+
+	it("deletes the key of a removed dataset", async () => {
+		const db = freshDb();
+		const ws = workspace([asset(1)]);
+		const second: Dataset = {
+			...(ws.datasets[0] as Dataset),
+			id: "d_2",
+			assets: [],
+			records: [],
+		};
+		await createAutosaveStore(db).write({
+			workspace: { ...ws, datasets: [...ws.datasets, second] },
+			fileName: "a",
+		});
+		expect(((await rawGet(db, "autosave")) as string[]).sort()).toEqual([
+			"current",
+			"dataset:d_1",
+			"dataset:d_2",
+		]);
+		// A new session, which learns the keys from the store.
+		await createAutosaveStore(db).write({
+			workspace: { ...ws, datasets: [second] },
+			fileName: "a",
+		});
+		expect(((await rawGet(db, "autosave")) as string[]).sort()).toEqual([
+			"current",
+			"dataset:d_2",
+		]);
+		expect(await rawGet(db, "assets")).toEqual([]);
+		const read = await createAutosaveStore(db).read();
+		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_2"]);
+	});
+
+	it("reads a single-record autosave and migrates it", async () => {
+		const db = freshDb();
+		const ws = workspace([asset(1)]);
+		await new Promise<void>((resolve, reject) => {
+			const req = indexedDB.open(db, 2);
+			req.onupgradeneeded = () => {
+				req.result.createObjectStore("autosave");
+				req.result.createObjectStore("assets");
+			};
+			req.onsuccess = () => {
+				const tx = req.result.transaction(["autosave", "assets"], "readwrite");
+				tx.objectStore("assets").put(asset(1).blob, "sha1");
+				tx.objectStore("autosave").put(
+					{
+						version: 2,
+						workspace: {
+							...ws,
+							datasets: ws.datasets.map((d) => ({
+								...d,
+								assets: d.assets.map(({ blob: _b, ...meta }) => meta),
+							})),
+						},
+						fileName: "old.coatworkspace",
+						savedAt: 5,
+					},
+					"current",
+				);
+				tx.oncomplete = () => {
+					req.result.close();
+					resolve();
+				};
+				tx.onerror = () => reject(tx.error);
+			};
+		});
+
+		const read = await createAutosaveStore(db).read();
+		expect(read?.fileName).toBe("old.coatworkspace");
+		expect(read?.savedAt).toBe(5);
+		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
+		expect(read?.workspace.datasets[0]?.assets[0]?.sha256).toBe("sha1");
+		expect(read?.missingAssets).toBeUndefined();
+
+		const doc = (await rawGet(db, "autosave", "current")) as {
+			version: number;
+			savedAt: number;
+			workspace: { datasets: string[] };
+		};
+		expect(doc).toMatchObject({ version: 3, savedAt: 5 });
+		expect(doc.workspace.datasets).toEqual(["d_1"]);
+		const again = await createAutosaveStore(db).read();
+		expect(again?.workspace).toEqual(read?.workspace);
+	});
+
+	it("reopens after another tab deletes the database", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		await new Promise<void>((resolve, reject) => {
+			const req = indexedDB.deleteDatabase(db);
+			req.onsuccess = () => resolve();
+			req.onerror = () => reject(req.error);
+		});
+		await store.write({ workspace: workspace([asset(1)]), fileName: "b" });
+		const read = await store.read();
+		expect(read?.fileName).toBe("b");
+		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
+		expect(read?.missingAssets).toBeUndefined();
 	});
 });
