@@ -51,6 +51,9 @@ export function memoizeTextEngine<E extends TextEngine>(
 		measureSpanWidth: memo(engine.measureSpanWidth),
 		layoutText: memo(engine.layoutText),
 		...(engine.layoutInline ? { layoutInline: memo(engine.layoutInline) } : {}),
+		...(engine.clusterAdvances
+			? { clusterAdvances: memo(engine.clusterAdvances) }
+			: {}),
 		cacheStats: () => ({
 			...stats,
 			size: caches.reduce((n, c) => n + c.size, 0),

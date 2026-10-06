@@ -323,22 +323,59 @@ function layoutWrappable(
 	};
 }
 
-// Trim `text` so `text + "…"` fits within maxWidth (binary search on length).
-function ellipsize(
+// Trim `text` so `text + "…"` fits within maxWidth. With engine.clusterAdvances
+// the cut comes from one shaping pass over `text`, checked against the real
+// measure of the result and moved a cluster at a time if kerning or rounding
+// disagrees; without it, binary search on length.
+export function ellipsize(
 	text: string,
 	font: ResolvedFont,
 	maxWidth: number,
 	engine: TextEngine,
 ): string {
 	const ell = "…";
-	if (engine.measureText(`${text}${ell}`, font, null).width <= maxWidth)
-		return `${text}${ell}`;
+	const fits = (prefix: string) =>
+		engine.measureText(`${prefix}${ell}`, font, null).width <= maxWidth;
+	if (fits(text)) return `${text}${ell}`;
+	if (!engine.clusterAdvances) return bisectEllipsize(text, ell, fits);
+
+	const xAt = new Map<number, number>([[0, 0]]);
+	const clusters = engine.clusterAdvances(text, font);
+	for (const c of clusters) xAt.set(c.end, c.x);
+	// Distinct trimmed cut points, ascending. The untrimmed full text is
+	// already known not to fit.
+	const cuts: { end: number; x: number }[] = [{ end: 0, x: 0 }];
+	for (const c of clusters) {
+		const end = text.slice(0, c.end).trimEnd().length;
+		const x = xAt.get(end);
+		if (x === undefined || end === cuts[cuts.length - 1].end) continue;
+		if (end === text.length) continue;
+		cuts.push({ end, x });
+	}
+
+	const budget = maxWidth - engine.measureText(ell, font, null).width;
+	let i = 0;
+	while (i + 1 < cuts.length && cuts[i + 1].x <= budget) i++;
+	const cut = (k: number) => text.slice(0, cuts[k].end);
+	if (i > 0 && !fits(cut(i))) {
+		do i--;
+		while (i > 0 && !fits(cut(i)));
+	} else {
+		while (i + 1 < cuts.length && fits(cut(i + 1))) i++;
+	}
+	return `${cut(i)}${ell}`;
+}
+
+function bisectEllipsize(
+	text: string,
+	ell: string,
+	fits: (prefix: string) => boolean,
+): string {
 	let lo = 0;
 	let hi = text.length;
 	while (lo < hi) {
 		const mid = Math.ceil((lo + hi) / 2);
-		const candidate = `${text.slice(0, mid).trimEnd()}${ell}`;
-		if (engine.measureText(candidate, font, null).width <= maxWidth) lo = mid;
+		if (fits(text.slice(0, mid).trimEnd())) lo = mid;
 		else hi = mid - 1;
 	}
 	return `${text.slice(0, lo).trimEnd()}${ell}`;

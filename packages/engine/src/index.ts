@@ -145,7 +145,11 @@ export {
 	memoizeTextEngine,
 	type TextEngineCacheStats,
 } from "./text-cache";
-export type { SpanFont, TextEngine } from "./text-engine";
+export type {
+	ClusterAdvance,
+	SpanFont,
+	TextEngine,
+} from "./text-engine";
 export type {
 	MeasuredLine,
 	MeasureText,
