@@ -1,5 +1,5 @@
 import { linearGradientAngle } from "@freshcoat-js/coatfile";
-import type { FigmaColor, FigmaPaint } from "../types";
+import type { FigmaColor, FigmaPaint, FigmaSolidPaint } from "../types";
 import {
 	angularPlacement,
 	channel,
@@ -229,6 +229,40 @@ export function mapStrokeAlign(
 	if (figmaAlign === "INSIDE") return "inside";
 	if (figmaAlign === "OUTSIDE") return "outside";
 	return undefined;
+}
+
+export type ElementStroke = {
+	color: string;
+	width: number;
+	cap?: "round" | "square";
+	join?: "round" | "bevel";
+	align?: "inside" | "outside";
+};
+
+/** A shape's first stroke as its coatfile `stroke`, or undefined without one. */
+export function strokeToElement(
+	node: {
+		strokes?: FigmaPaint[];
+		strokeWeight?: number;
+		strokeCap?: string;
+		strokeJoin?: string;
+		strokeAlign?: string;
+	},
+	scale: number,
+): ElementStroke | undefined {
+	if (!node.strokes || node.strokes.length === 0) return undefined;
+	if (node.strokeWeight === undefined) return undefined;
+	const stroke = node.strokes[0] as FigmaSolidPaint;
+	const cap = mapStrokeCap(node.strokeCap);
+	const join = mapStrokeJoin(node.strokeJoin);
+	const align = mapStrokeAlign(node.strokeAlign);
+	return {
+		color: figmaColorToHex(stroke.color),
+		width: Math.round(node.strokeWeight * scale * 2) / 2,
+		...(cap ? { cap } : {}),
+		...(join ? { join } : {}),
+		...(align ? { align } : {}),
+	};
 }
 
 /** A shape's visible paints as its coatfile `fill`: one fill, or the stack

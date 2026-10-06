@@ -1,15 +1,5 @@
-import type {
-	FigmaBoundingBox,
-	FigmaRectangleNode,
-	FigmaSolidPaint,
-} from "../types";
-import {
-	figmaColorToHex,
-	fillsToElement,
-	mapStrokeAlign,
-	mapStrokeCap,
-	mapStrokeJoin,
-} from "./colors";
+import type { FigmaBoundingBox, FigmaRectangleNode } from "../types";
+import { type ElementStroke, fillsToElement, strokeToElement } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
 export type TranspileRectContext = {
@@ -39,13 +29,7 @@ export function transpileRect(
 		opacity?: number;
 		properties: {
 			fill?: unknown;
-			stroke?: {
-				color: string;
-				width: number;
-				cap?: "round" | "square";
-				join?: "round" | "bevel";
-				align?: "inside" | "outside";
-			};
+			stroke?: ElementStroke;
 			cornerRadius?: number | [number, number, number, number];
 		};
 	} = {
@@ -68,23 +52,8 @@ export function transpileRect(
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
 
-	if (
-		node.strokes &&
-		node.strokes.length > 0 &&
-		node.strokeWeight !== undefined
-	) {
-		const stroke = node.strokes[0] as FigmaSolidPaint;
-		const cap = mapStrokeCap(node.strokeCap);
-		const join = mapStrokeJoin(node.strokeJoin);
-		const align = mapStrokeAlign(node.strokeAlign);
-		out.properties.stroke = {
-			color: figmaColorToHex(stroke.color),
-			width: Math.round(node.strokeWeight * ctx.scale * 2) / 2,
-			...(cap ? { cap } : {}),
-			...(join ? { join } : {}),
-			...(align ? { align } : {}),
-		};
-	}
+	const stroke = strokeToElement(node, ctx.scale);
+	if (stroke) out.properties.stroke = stroke;
 
 	return out;
 }
