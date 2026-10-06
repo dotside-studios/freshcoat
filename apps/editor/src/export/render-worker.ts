@@ -24,7 +24,7 @@ type CkImage = { width(): number; height(): number; delete(): void };
 
 // The `full` build: the default one the editor's canvas uses has neither the
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
-const CANVASKIT_BASE = "/canvaskit/full";
+const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
 let ckPromise: Promise<CK> | undefined;
 let fonts = new Map<string, Uint8Array[]>();

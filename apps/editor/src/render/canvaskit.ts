@@ -1,6 +1,7 @@
 // Loads the classic canvaskit.js (its top-level `var CanvasKitInit` becomes a
 // global) and inits it against the .wasm the vite plugin serves. Cached for the
-// session.
+// session. Both URLs must match the preloads vite.config.ts injects into
+// index.html, or the browser downloads them twice.
 let ckPromise: Promise<unknown> | undefined;
 
 export function getCanvasKit(): Promise<unknown> {
@@ -10,7 +11,7 @@ export function getCanvasKit(): Promise<unknown> {
 				// biome-ignore lint/suspicious/noExplicitAny: global set by the script
 				if ((globalThis as any).CanvasKitInit) return resolve();
 				const s = document.createElement("script");
-				s.src = "/canvaskit/canvaskit.js";
+				s.src = `${__CANVASKIT_BASE__}/canvaskit.js`;
 				s.onload = () => resolve();
 				s.onerror = () => reject(new Error("failed to load canvaskit.js"));
 				document.head.appendChild(s);
@@ -19,7 +20,7 @@ export function getCanvasKit(): Promise<unknown> {
 			const init = (globalThis as any).CanvasKitInit;
 			if (typeof init !== "function")
 				throw new Error("CanvasKitInit global missing after script load");
-			return init({ locateFile: () => "/canvaskit/canvaskit.wasm" });
+			return init({ locateFile: () => `${__CANVASKIT_BASE__}/canvaskit.wasm` });
 		})();
 		ckPromise.catch(() => {
 			ckPromise = undefined;
