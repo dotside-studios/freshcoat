@@ -82,6 +82,24 @@ for (const record of records) {
 textEngine.dispose();
 ```
 
+To reuse decoded images, SVG pictures, paths and the paint font provider across
+renders, pass a `paintCache` too. A paint frees the cached images it did not
+draw; with `maxImagePixels` it keeps them, least recently used first out, until
+the cache fits that many decoded pixels. The text engine lays text out and the
+cache paints it, so the two work side by side. The caller owns the cache:
+dispose it when the batch ends or the fonts change.
+
+```ts
+import { createPaintCache } from "@freshcoat-js/coatfile";
+
+const paintCache = createPaintCache({ maxImagePixels: 48_000_000 });
+for (const record of records) {
+  const compiled = compile(template, record, { width, height, frameNames: ["front"] });
+  await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts, fontMetrics, textEngine, paintCache });
+}
+paintCache.dispose();
+```
+
 To render a compiled node tree yourself (custom paint, inspection, an alternate
 renderer), use the coat engine's `compileScene(root, …)` directly.
 
