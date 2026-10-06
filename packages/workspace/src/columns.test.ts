@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-	PATTERN_CACHE_MAX,
 	coerce,
 	compiledPattern,
 	defaultValues,
 	newRecord,
+	PATTERN_CACHE_MAX,
 	parseDateText,
 	serialToIso,
 	toTemplateValue,
