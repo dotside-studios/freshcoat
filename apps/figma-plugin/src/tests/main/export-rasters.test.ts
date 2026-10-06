@@ -41,8 +41,8 @@ describe("exportRasters", () => {
 		stubFigma({ a: ok(1), b: ok(2) });
 		const out = await exportRasters(at(3, "a", "b"));
 		expect(out).toEqual([
-			{ nodeId: "a", bytes: [1] },
-			{ nodeId: "b", bytes: [2] },
+			{ nodeId: "a", bytes: new Uint8Array([1]) },
+			{ nodeId: "b", bytes: new Uint8Array([2]) },
 		]);
 	});
 

@@ -58,7 +58,7 @@ function message(
 		mode: "davi",
 		slots: [slot("front", front), slot("back", back)],
 		colorways: [],
-		rasters: [{ nodeId: "6:4", bytes: [...PNG] }],
+		rasters: [{ nodeId: "6:4", bytes: PNG }],
 	};
 }
 

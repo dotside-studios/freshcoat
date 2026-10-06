@@ -34,7 +34,7 @@ const width = Number(params.get("w") ?? DEFAULT_SETTINGS.windowWidth);
 const height = Number(params.get("h") ?? DEFAULT_SETTINGS.windowHeight);
 const state: HarnessState | undefined = STATES[stateName];
 
-const bytes = (b64: string): number[] => [...base64ToBytes(b64)];
+const bytes = (b64: string): Uint8Array => base64ToBytes(b64);
 const THUMBS = {
 	aurora: bytes(THUMB_AURORA),
 	ember: bytes(THUMB_EMBER),

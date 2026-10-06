@@ -1,10 +1,9 @@
-import { bytesToBase64 } from "@freshcoat-js/coatfile/assets";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { MainToUi } from "~/shared/protocol";
 import { postToMain } from "~/ui/post";
 
 /**
- * Frame previews for a set of nodes, as data URLs keyed by node id.
+ * Frame previews for a set of nodes, as object URLs keyed by node id.
  *
  * Requests are made once per node and cached for the session: an export is
  * real work in the main thread, and the caller's id list is recomputed on
@@ -22,26 +21,37 @@ export function useThumbnails(nodeIds: string[]): Record<string, string> {
 	// Ids already asked for. Kept out of state so arrivals don't re-trigger the
 	// request effect — that loop is the classic way this hook goes wrong.
 	const requestedRef = useRef<Set<string>>(new Set());
+	// Mirrors `urls` so replaced and unmounted object URLs can be revoked.
+	const urlsRef = useRef<Record<string, string>>({});
 
 	useEffect(() => {
 		const onMessage = (e: MessageEvent): void => {
 			const msg = e.data.pluginMessage as MainToUi | undefined;
 			if (msg?.type !== "thumbnails") return;
-			setUrls((prev) => {
-				const next = { ...prev };
-				for (const item of msg.items) {
-					next[item.nodeId] = `data:image/png;base64,${bytesToBase64(
-						new Uint8Array(item.bytes),
-					)}`;
-					// Main sends unprompted replacements for frames it changed; make
-					// sure a later render of the same id can ask again if it needs to.
-					requestedRef.current.add(item.nodeId);
-				}
-				return next;
-			});
+			const next = { ...urlsRef.current };
+			for (const item of msg.items) {
+				const old = next[item.nodeId];
+				if (old) URL.revokeObjectURL(old);
+				next[item.nodeId] = URL.createObjectURL(
+					new Blob([item.bytes as Uint8Array<ArrayBuffer>], {
+						type: "image/png",
+					}),
+				);
+				// Main sends unprompted replacements for frames it changed; make
+				// sure a later render of the same id can ask again if it needs to.
+				requestedRef.current.add(item.nodeId);
+			}
+			urlsRef.current = next;
+			setUrls(next);
 		};
 		window.addEventListener("message", onMessage);
-		return () => window.removeEventListener("message", onMessage);
+		return () => {
+			window.removeEventListener("message", onMessage);
+			for (const url of Object.values(urlsRef.current)) {
+				URL.revokeObjectURL(url);
+			}
+			urlsRef.current = {};
+		};
 	}, []);
 
 	const key = nodeIds.join(",");
