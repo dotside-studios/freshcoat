@@ -6,6 +6,10 @@ import {
 	type TranspileOutput,
 	transpile,
 } from "~/lib/figma/transpiler/index";
+import {
+	hiddenElements,
+	traceElementsByNode,
+} from "~/lib/figma/transpiler/variant-deltas";
 import type { FigmaContainerNode, FigmaNode } from "~/lib/figma/types";
 
 // A colorway instance sits elsewhere on the page than its main component, and
@@ -409,3 +413,39 @@ function findNode(
 	}
 	return undefined;
 }
+
+describe("hiddenElements", () => {
+	const trace = [
+		{ slot: "front", nodeId: "1:1", elementId: "group" },
+		{ slot: "front", nodeId: "1:2", elementId: "label" },
+		{ slot: "front", nodeId: "1:3" },
+		{ slot: "back", nodeId: "1:1", elementId: "other" },
+	].map((t) => ({
+		...t,
+		name: t.nodeId,
+		nodeType: "FRAME",
+		decision: "native",
+	}));
+	const elements = [
+		{
+			id: "group",
+			type: "frame",
+			properties: { children: [{ id: "label", type: "text" }] },
+		},
+		{ id: "solo", type: "rect" },
+	];
+
+	it("indexes the side's trace by node", () => {
+		expect([...traceElementsByNode(trace as never, "front")]).toEqual([
+			["1:1", ["group"]],
+			["1:2", ["label"]],
+		]);
+	});
+
+	it("marks the outermost hidden element and everything under it", () => {
+		const index = traceElementsByNode(trace as never, "front");
+		const hidden = hiddenElements(elements, index, new Set(["1:1", "1:2"]));
+		expect([...hidden.top]).toEqual(["group"]);
+		expect([...hidden.within]).toEqual(["group", "label"]);
+	});
+});

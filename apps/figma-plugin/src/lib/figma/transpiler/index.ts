@@ -33,6 +33,7 @@ import {
 	fillOf,
 	flattenElementsById,
 	hiddenElements,
+	traceElementsByNode,
 } from "./variant-deltas";
 import { alignInstanceVisibility, uniqueVariantId } from "./variants";
 import { makeThrowawaySink } from "./walk";
@@ -203,16 +204,39 @@ export async function transpile(
 	const variants: unknown[] = [];
 	const variantPicks: Record<string, FigmaVariantPick> = {};
 
-	const primarySlotName = input.product.frames[0]?.name;
-	const defaultSwatch = primarySlotName
-		? fillOf(
-				backgroundFromFrame(
-					baseSideFrames[primarySlotName],
-					primarySlotName,
+	// What every colorway diffs a side against, worked out once per side.
+	const baseSlots = new Map<
+		string,
+		{
+			background: ReturnType<typeof backgroundFromFrame>;
+			elements: unknown[];
+			byId: Map<string, Record<string, unknown>>;
+			elementsByNode: Map<string, string[]>;
+		}
+	>();
+	const baseSlotOf = (name: string) => {
+		let base = baseSlots.get(name);
+		if (!base) {
+			const elements = baseElementsBySlot[name] ?? [];
+			base = {
+				background: backgroundFromFrame(
+					baseSideFrames[name],
+					name,
 					authorWidth,
 					authorHeight,
 				),
-			)
+				elements,
+				byId: flattenElementsById(elements),
+				elementsByNode: traceElementsByNode(trace, name),
+			};
+			baseSlots.set(name, base);
+		}
+		return base;
+	};
+
+	const primarySlotName = input.product.frames[0]?.name;
+	const defaultSwatch = primarySlotName
+		? fillOf(baseSlotOf(primarySlotName).background)
 		: undefined;
 
 	// Diffs a colorway instance's sides against the base BY ELEMENT ID (see
@@ -288,22 +312,15 @@ export async function transpile(
 
 			if (slot.name === primarySlotName) swatch = fillOf(vBg) ?? swatch;
 
-			const baseBg = backgroundFromFrame(
-				baseSideFrames[slot.name],
-				slot.name,
-				authorWidth,
-				authorHeight,
-			);
-			const bgDiffers = backgroundsDiffer(vBg, baseBg);
+			const base = baseSlotOf(slot.name);
+			const bgDiffers = backgroundsDiffer(vBg, base.background);
 
-			const baseElements = baseElementsBySlot[slot.name] ?? [];
 			const hidden = hiddenElements(
-				baseElements,
-				trace,
-				slot.name,
+				base.elements,
+				base.elementsByNode,
 				aligned.hiddenBaseNodes,
 			);
-			const baseById = flattenElementsById(baseElements);
+			const baseById = base.byId;
 			const varById = flattenElementsById(vEls);
 			// A hidden layer's own element can be missing from the instance's walk
 			// (its raster was never exported), which is not a structural change.

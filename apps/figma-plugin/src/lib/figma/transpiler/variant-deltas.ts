@@ -73,21 +73,35 @@ export function diffElementProperties(
 	return changed;
 }
 
-// The base elements a colorway hides, from the base nodes it hides (see
-// alignInstanceVisibility) and the element each produced in the base walk.
-// `top` holds the outermost of them, which carry `hidden: true`; `within`
-// holds those and everything under them, which need no delta of their own
-// since hiding an element hides its subtree.
-export function hiddenElements(
-	elements: unknown[],
+/** The element ids each node produced on one side, from the base walk's
+ *  trace. */
+export function traceElementsByNode(
 	trace: NodeTrace[],
 	slot: string,
+): Map<string, string[]> {
+	const out = new Map<string, string[]>();
+	for (const t of trace) {
+		if (t.slot !== slot || !t.elementId) continue;
+		const ids = out.get(t.nodeId);
+		if (ids) ids.push(t.elementId);
+		else out.set(t.nodeId, [t.elementId]);
+	}
+	return out;
+}
+
+// The base elements a colorway hides, from the base nodes it hides (see
+// alignInstanceVisibility) and the element each produced in the base walk
+// (see traceElementsByNode). `top` holds the outermost of them, which carry
+// `hidden: true`; `within` holds those and everything under them, which need
+// no delta of their own since hiding an element hides its subtree.
+export function hiddenElements(
+	elements: unknown[],
+	elementsByNode: Map<string, string[]>,
 	hiddenNodes: Set<string>,
 ): { top: Set<string>; within: Set<string> } {
 	const hiddenIds = new Set<string>();
-	for (const t of trace) {
-		if (t.slot === slot && t.elementId && hiddenNodes.has(t.nodeId))
-			hiddenIds.add(t.elementId);
+	for (const nodeId of hiddenNodes) {
+		for (const id of elementsByNode.get(nodeId) ?? []) hiddenIds.add(id);
 	}
 	const top = new Set<string>();
 	const within = new Set<string>();
