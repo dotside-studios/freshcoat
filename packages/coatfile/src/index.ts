@@ -85,6 +85,7 @@ export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { substitute } from "./mustache";
 export { healElementIds, uniquifyElementIds } from "./normalize";
+export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
 export { childElements } from "./tree";
 export type {
