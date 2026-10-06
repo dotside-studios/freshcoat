@@ -33,7 +33,9 @@ export function useThumbnails(nodeIds: string[]): Record<string, string> {
 				const old = next[item.nodeId];
 				if (old) URL.revokeObjectURL(old);
 				next[item.nodeId] = URL.createObjectURL(
-					new Blob([item.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }),
+					new Blob([item.bytes as Uint8Array<ArrayBuffer>], {
+						type: "image/png",
+					}),
 				);
 				// Main sends unprompted replacements for frames it changed; make
 				// sure a later render of the same id can ask again if it needs to.
