@@ -1,6 +1,7 @@
 import { assetUri } from "@freshcoat-js/coatfile/assets";
 import type { BindingResolver } from "../binding";
 import type { FigmaContainerNode } from "../types";
+import { hasBarcodeLayer, loadBarcodeEncoder } from "./barcode";
 import { dedupeFlattenMarkers } from "./coalesce";
 import { figmaPaintToFill } from "./colors";
 import {
@@ -89,6 +90,7 @@ export async function buildSideElements(
 		authorWidth,
 		authorHeight,
 	);
+	if (hasBarcodeLayer(frame)) await loadBarcodeEncoder();
 	const w = createWalker(frame, slotName, scale, sink, opts.resolveBinding);
 	const elements = walkSide(w);
 
