@@ -70,32 +70,30 @@ export async function encodePng(
 	// nothing — but dropping it is not always the smaller stream (long runs of an
 	// identical RGBA pixel compress better than the same runs in RGB), so it is a
 	// candidate rather than a rule.
-	const layouts: Layout[] = isOpaque(pixels, expected)
-		? [{ bytes: pixels, channels: 4 }, rgbLayout(pixels, width, height)]
-		: [{ bytes: pixels, channels: 4 }];
-	const filters = opts?.effort === "best" ? [false, true] : [false];
-	const plans = layouts.flatMap((layout) =>
-		filters.map((adaptive) => ({ layout, adaptive })),
-	);
+	const opaque = isOpaque(pixels, expected);
+	const adaptive = opts?.effort === "best";
+	const plans: { channels: 3 | 4; rows: Uint8Array }[] = [
+		{ channels: 4, rows: filterRows(pixels, width, height, 4, false) },
+	];
+	if (adaptive)
+		plans.push({
+			channels: 4,
+			rows: filterRows(pixels, width, height, 4, true),
+		});
+	if (opaque) {
+		plans.push({ channels: 3, rows: rgbRows(pixels, width, height) });
+		if (adaptive) {
+			const rgb = rgbLayout(pixels, width, height);
+			plans.push({ channels: 3, rows: filterRows(rgb, width, height, 3, true) });
+		}
+	}
 
-	const streams = await Promise.all(
-		plans.map((p) =>
-			deflate(
-				filterRows(
-					p.layout.bytes,
-					width,
-					height,
-					p.layout.channels,
-					p.adaptive,
-				),
-			),
-		),
-	);
+	const streams = await Promise.all(plans.map((p) => deflate(p.rows)));
 	let best = 0;
 	for (let i = 1; i < streams.length; i++) {
 		if (streams[i].length < streams[best].length) best = i;
 	}
-	return assemble(streams[best], width, height, plans[best].layout.channels);
+	return assemble(streams[best], width, height, plans[best].channels);
 }
 
 // Read a frame's pixels straight out of a decode and encode them. The pairing
@@ -104,29 +102,46 @@ export function encodeDecodedPng(
 	decoded: DecodedPixels,
 	opts?: EncodePngOptions,
 ): Promise<Uint8Array> {
-	return encodePng(
-		new Uint8Array(decoded.data),
-		decoded.width,
-		decoded.height,
-		opts,
-	);
+	return encodePng(decoded.data, decoded.width, decoded.height, opts);
 }
-
-type Layout = { bytes: Uint8Array; channels: 3 | 4 };
 
 function isOpaque(pixels: Uint8Array, length: number): boolean {
 	for (let i = 3; i < length; i += 4) if (pixels[i] !== 255) return false;
 	return true;
 }
 
-function rgbLayout(pixels: Uint8Array, width: number, height: number): Layout {
+function rgbLayout(
+	pixels: Uint8Array,
+	width: number,
+	height: number,
+): Uint8Array {
 	const out = new Uint8Array(width * height * 3);
 	for (let src = 0, dst = 0; dst < out.length; src += 4, dst += 3) {
 		out[dst] = pixels[src];
 		out[dst + 1] = pixels[src + 1];
 		out[dst + 2] = pixels[src + 2];
 	}
-	return { bytes: out, channels: 3 };
+	return out;
+}
+
+// The RGB scanlines, each behind a filter type 0 byte, read straight from RGBA.
+function rgbRows(
+	pixels: Uint8Array,
+	width: number,
+	height: number,
+): Uint8Array {
+	const out = new Uint8Array((width * 3 + 1) * height);
+	let src = 0;
+	let dst = 0;
+	for (let y = 0; y < height; y++) {
+		out[dst++] = 0;
+		for (let x = 0; x < width; x++, src += 4) {
+			out[dst++] = pixels[src];
+			out[dst++] = pixels[src + 1];
+			out[dst++] = pixels[src + 2];
+		}
+	}
+	return out;
 }
 
 // Prefix each scanline with its filter type (PNG spec §6). `adaptive` picks the

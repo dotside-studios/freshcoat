@@ -2504,9 +2504,7 @@ export async function paintScene(
 					alphaType: ck.AlphaType.Unpremul,
 					colorSpace: ck.ColorSpace.SRGB,
 				}) as Uint8Array | null;
-				return data
-					? { data: new Uint8Array(data), width: w, height: h }
-					: null;
+				return data ? { data, width: w, height: h } : null;
 			} finally {
 				snap.delete();
 			}
@@ -2561,7 +2559,7 @@ export async function paintScene(
 				if (!pixels) return skiaPng();
 				try {
 					return {
-						bytes: await encodePng(new Uint8Array(pixels), w, h, encodeOpts),
+						bytes: await encodePng(pixels, w, h, encodeOpts),
 						format: "png" as const,
 					};
 				} catch {
@@ -2651,7 +2649,7 @@ function encodeJpeg(ck: CK, snap: CK, quality: number): Uint8Array | null {
 	if (!pixels) return null;
 	const flat = ck.MakeImage(
 		{ ...info, alphaType: ck.AlphaType.Opaque },
-		flattenOverWhite(new Uint8Array(pixels)),
+		flattenOverWhite(pixels),
 		width * 4,
 	);
 	if (!flat) return null;
