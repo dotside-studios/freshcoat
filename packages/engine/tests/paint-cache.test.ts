@@ -5,6 +5,7 @@ import CanvasKitInit from "canvaskit-wasm";
 import { describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
+import { clearFontBytesCache } from "../src/font-bytes";
 import { createHeadlessEnv } from "../src/headless";
 import {
 	compileScene,
@@ -237,6 +238,47 @@ describe("PaintCache", () => {
 		await pixels(commands, rt);
 		expect(cache.stats().fontProviderBuilds).toBe(2);
 		cache.dispose();
+	});
+
+	test("a descriptor-loaded font keeps its provider across paints", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const commands = compile(scene(SIZE, []), SIZE, fonts);
+		const realFetch = globalThis.fetch;
+		const requested: string[] = [];
+		globalThis.fetch = (async (url: string) => {
+			requested.push(url);
+			if (url === "https://css/geist")
+				return {
+					ok: true,
+					text: async () =>
+						"@font-face { src: url(https://f/geist.ttf) format('truetype'); }",
+				};
+			return { ok: true, arrayBuffer: async () => FONT.slice().buffer };
+		}) as unknown as typeof globalThis.fetch;
+		const cache = createPaintCache();
+		try {
+			const env = createHeadlessEnv({ cache });
+			const rt: PaintRuntime = {
+				...env,
+				resolveFont: (req) => ({
+					kind: "descriptor",
+					descriptor: {
+						kind: "google",
+						family: typeof req === "string" ? req : req.family,
+						url: "https://css/geist",
+					},
+				}),
+			};
+			await pixels(commands, rt);
+			await pixels(commands, rt);
+			expect(cache.stats().fontProviderBuilds).toBe(1);
+			expect(requested).toEqual(["https://css/geist", "https://f/geist.ttf"]);
+		} finally {
+			globalThis.fetch = realFetch;
+			clearFontBytesCache();
+			cache.dispose();
+		}
 	});
 
 	test("a new scene size creates a new surface", async () => {

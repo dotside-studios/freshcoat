@@ -9,7 +9,7 @@ import type {
 	Workspace,
 } from "@freshcoat-js/workspace";
 import { templateStem } from "@freshcoat-js/workspace";
-import type { LayerGeometry } from "~/doc/geometry";
+import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
 import { guidesForSides, type TemplateGuides } from "~/doc/guides";
 import {
 	begin,
@@ -565,12 +565,14 @@ function reduceView(state: EditorState, action: Action): EditorState {
 		case "rendered":
 			return {
 				...state,
-				geometry: action.geometry,
+				geometry: sameGeometry(state.geometry, action.geometry)
+					? state.geometry
+					: action.geometry,
 				render: {
 					status: "ok",
 					timings: action.timings,
 					stats: action.stats,
-					warnings: action.warnings,
+					warnings: keepIfSame(action.warnings, state.render.warnings),
 					...(action.barcodes?.length ? { barcodes: action.barcodes } : {}),
 				},
 			};

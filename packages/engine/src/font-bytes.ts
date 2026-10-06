@@ -40,7 +40,7 @@ async function descriptorBytes(d: FontDescriptor): Promise<Uint8Array[]> {
 }
 
 async function fileBytes(src: string): Promise<Uint8Array> {
-	if (src.startsWith("data:")) return dataUrlToBytes(src);
+	if (src.startsWith("data:")) return dataFontBytes(src);
 	if (/^https?:/i.test(src)) return fetchBytes(src);
 	throw new Error(
 		`cannot fetch local font path "${src}"; a runtime must materialize local files in resolveFont`,
@@ -65,7 +65,11 @@ async function fileBytes(src: string): Promise<Uint8Array> {
  * the wrong cap height — and load them all, which also picks up the accented
  * ranges and the other weights the single-face fetch was dropping.
  */
-async function stylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
+function stylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
+	return memoize(stylesheetMemo, cssUrl, loadStylesheetFontBytes);
+}
+
+async function loadStylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
 	const css = await fetchText(cssUrl);
 	const faces = parseStylesheetFaces(css);
 	if (faces.length === 0) {
@@ -154,13 +158,75 @@ async function fetchText(url: string): Promise<string> {
 	return res.text();
 }
 
-async function fetchBytes(url: string): Promise<Uint8Array> {
+function fetchBytes(url: string): Promise<Uint8Array> {
+	return memoize(fileMemo, url, loadBytes);
+}
+
+async function loadBytes(url: string): Promise<Uint8Array> {
 	const res = await fetch(url, {
 		headers: { "user-agent": TTF_UA },
 		signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT_MS),
 	});
 	if (!res.ok) throw new Error(`fetch ${url} -> ${res.status}`);
 	return new Uint8Array(await res.arrayBuffer());
+}
+
+// Same source, same Uint8Array: the PaintCache keys its font provider on byte
+// identity. In-flight promises are shared and a rejection is evicted, so a
+// failed load is retried by the next paint.
+const fileMemo = new Map<string, Promise<Uint8Array>>();
+const stylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
+const dataMemo = new Map<string, Uint8Array>();
+const DATA_MEMO_MAX = 16;
+
+function memoize<T>(
+	memo: Map<string, Promise<T>>,
+	key: string,
+	load: (key: string) => Promise<T>,
+): Promise<T> {
+	const hit = memo.get(key);
+	if (hit) return hit;
+	const p = load(key);
+	memo.set(key, p);
+	p.catch(() => {
+		if (memo.get(key) === p) memo.delete(key);
+	});
+	return p;
+}
+
+function dataFontBytes(src: string): Uint8Array {
+	const hit = dataMemo.get(src);
+	if (hit) {
+		dataMemo.delete(src);
+		dataMemo.set(src, hit);
+		return hit;
+	}
+	const bytes = dataUrlToBytes(src);
+	dataMemo.set(src, bytes);
+	if (dataMemo.size > DATA_MEMO_MAX) {
+		const oldest = dataMemo.keys().next().value as string;
+		dataMemo.delete(oldest);
+	}
+	return bytes;
+}
+
+export function clearFontBytesCache(): void {
+	fileMemo.clear();
+	stylesheetMemo.clear();
+	dataMemo.clear();
+}
+
+// The ArrayBuffer CanvasKit registers a font from, copied only when the view
+// does not span its whole buffer.
+export function fontArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+	const { buffer, byteOffset, byteLength } = bytes;
+	if (
+		byteOffset === 0 &&
+		byteLength === buffer.byteLength &&
+		buffer instanceof ArrayBuffer
+	)
+		return buffer;
+	return buffer.slice(byteOffset, byteOffset + byteLength) as ArrayBuffer;
 }
 
 export function dataUrlToBytes(src: string): Uint8Array {

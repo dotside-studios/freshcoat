@@ -10,7 +10,7 @@
 // (`line.baseline`).
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { dataUrlToBytes, fontBytes } from "./font-bytes";
+import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -246,11 +246,7 @@ function shaderFor(
 function makeFontProvider(ck: CK, fonts: LoadedFontBytes[]): CK {
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const f of fonts) {
-		const buf = f.bytes.buffer.slice(
-			f.bytes.byteOffset,
-			f.bytes.byteOffset + f.bytes.byteLength,
-		);
-		provider.registerFont(buf, f.family);
+		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
 	}
 	// Stash the registered families on the provider so text styles can append them
 	// as a per-glyph fallback chain (drawText → textStyleOf). Without listing them
