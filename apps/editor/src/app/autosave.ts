@@ -148,6 +148,22 @@ function shell(ws: Workspace | StoredWorkspace): StoredShell {
 	return { ...ws, datasets: ws.datasets.map((d) => d.id) };
 }
 
+/** What tells one write of the shell from another. */
+type Stamp = { writer?: WriterStamp; savedAt?: number };
+
+function stamp(doc: unknown): Stamp {
+	const v = doc as Partial<StoredAutosave> | undefined;
+	return { writer: v?.writer, savedAt: v?.savedAt };
+}
+
+function sameStamp(a: Stamp, b: Stamp): boolean {
+	return (
+		a.savedAt === b.savedAt &&
+		a.writer?.tabId === b.writer?.tabId &&
+		a.writer?.generation === b.writer?.generation
+	);
+}
+
 function sameAssets(saved: DatasetAsset[][], ws: Workspace): boolean {
 	return (
 		saved.length === ws.datasets.length &&
@@ -333,9 +349,10 @@ export function createAutosaveStore(
 		);
 	}
 
-	function isMine(doc: unknown): boolean {
-		const writer = (doc as StoredAutosave | undefined)?.writer;
-		return writer?.tabId === tabId && writer.generation === generation;
+	function isMine(seen: Stamp): boolean {
+		return (
+			seen.writer?.tabId === tabId && seen.writer.generation === generation
+		);
 	}
 
 	function forget(): void {
@@ -349,12 +366,12 @@ export function createAutosaveStore(
 		if (last !== null && sameWorkspace(last, ws)) return;
 		const db = await connect();
 		try {
-			if (written !== null) {
-				const current = await request(
+			const seen = stamp(
+				await request(
 					db.transaction(DOC_STORE).objectStore(DOC_STORE).get(KEY),
-				);
-				if (!isMine(current)) forget();
-			}
+				),
+			);
+			if (written !== null && !isMine(seen)) forget();
 			const assetsChanged =
 				savedAssets === null || !sameAssets(savedAssets, ws);
 			let assetsSaved = true;
@@ -370,8 +387,10 @@ export function createAutosaveStore(
 			}
 			const tx = db.transaction(DOC_STORE, "readwrite");
 			const docs = tx.objectStore(DOC_STORE);
-			if (written !== null && !isMine(await request(docs.get(KEY))))
-				written = null;
+			// Another tab wrote since the check above, and may have collected
+			// photos this write put.
+			const raced = !sameStamp(seen, stamp(await request(docs.get(KEY))));
+			if (raced) forget();
 			const before = written ?? (await datasetKeys(docs));
 			const now = new Map<string, Dataset>();
 			for (const d of ws.datasets) {
@@ -392,7 +411,10 @@ export function createAutosaveStore(
 			generation += 1;
 			written = now;
 			last = ws;
-			if (assetsSaved) {
+			if (raced) {
+				last = null;
+				savedAssets = null;
+			} else if (assetsSaved) {
 				full = false;
 				if (assetsChanged) await collect(db, ws);
 				savedAssets = ws.datasets.map((d) => d.assets);

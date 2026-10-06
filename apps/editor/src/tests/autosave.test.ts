@@ -402,6 +402,63 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
+	it("puts photos again that another tab collected mid-write", async () => {
+		const db = freshDb();
+		const tabA = createAutosaveStore(db, { tabId: "A" });
+		const tabB = createAutosaveStore(db, { tabId: "B" });
+		const ws = workspace([asset(1)]);
+		await tabA.write({ workspace: ws, fileName: "a" });
+
+		const other = workspace([asset(2)]);
+		const bWorkspace: Workspace = {
+			...other,
+			datasets: [{ ...(other.datasets[0] as Dataset), id: "d_b" }],
+		};
+		let tabBWrote: Promise<void> | null = null;
+		const put = IDBObjectStore.prototype.put;
+		vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+			this: IDBObjectStore,
+			value,
+			key,
+		) {
+			const req = put.call(this, value, key);
+			if (this.name === "assets" && key === "sha3" && !tabBWrote) {
+				const tx = this.transaction;
+				let handler: ((e: Event) => void) | null = null;
+				Object.defineProperty(tx, "oncomplete", {
+					configurable: true,
+					get: () => (e: Event) => {
+						tabBWrote = tabB.write({ workspace: bWorkspace, fileName: "b" });
+						tabBWrote.then(() => handler?.call(tx, e));
+					},
+					set: (h) => {
+						handler = h;
+					},
+				});
+			}
+			return req;
+		});
+		const photoX = workspace([asset(1), asset(3)]);
+		await tabA.write({ workspace: photoX, fileName: "a" });
+		expect(tabBWrote).not.toBeNull();
+		expect(await rawGet(db, "assets", "sha3")).toBeUndefined();
+		vi.restoreAllMocks();
+
+		await tabA.write({
+			workspace: { ...photoX, name: "Edited" },
+			fileName: "a",
+		});
+		expect(await rawGet(db, "assets", "sha3")).toBeInstanceOf(Blob);
+
+		const read = await createAutosaveStore(db).read();
+		expect(read?.fileName).toBe("a");
+		expect(
+			read?.workspace.datasets[0]?.assets.map((a) => a.sha256).sort(),
+		).toEqual(["sha1", "sha3"]);
+		expect(read?.missingAssets).toBeUndefined();
+		expect(read?.missingDatasets).toBeUndefined();
+	});
+
 	it("restores the rest and says so when a dataset is missing", async () => {
 		const db = freshDb();
 		const ws = workspace([asset(1)]);
