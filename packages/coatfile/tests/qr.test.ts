@@ -114,6 +114,14 @@ describe("generateMatrix symbol version", () => {
 	});
 });
 
+describe("generateMatrix memo", () => {
+	test("returns the same matrix for repeated calls", () => {
+		const a = generateMatrix("https://example.com/memo", "Q");
+		expect(generateMatrix("https://example.com/memo", "Q")).toBe(a);
+		expect(generateMatrix("https://example.com/memo", "L")).not.toBe(a);
+	});
+});
+
 function decode(matrix: boolean[][]): string {
 	const scale = 4;
 	const side = (matrix.length + 8) * scale;
