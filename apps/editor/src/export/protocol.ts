@@ -30,6 +30,8 @@ export type RenderOutput = {
 	format: OutputFormat;
 	width: number;
 	height: number;
+	/** CRC-32 of `bytes`, computed in the worker */
+	crc?: number;
 	ms: number;
 	/** set when the request asked for print: "fallback" when the print path
 	 *  failed and the bytes are a plain render */

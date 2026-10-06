@@ -8,12 +8,15 @@
 // of each stored Blob, which is cheap next to holding it.
 
 import { deflateSync, Unzip, UnzipInflate, unzipSync } from "fflate";
+import { crc32, crcUpdate } from "./crc";
 
 export type ZipEntry = {
 	name: string;
 	data: Uint8Array | Blob;
 	/** 0 stores, 6 deflates */
 	level: 0 | 6;
+	/** precomputed CRC-32 of `data`, so the writer skips reading it */
+	crc?: number;
 };
 
 /** Where written zip bytes go: a Blob part is passed whole, so a sink that
@@ -21,50 +24,6 @@ export type ZipEntry = {
 export type ZipOutput = {
 	write(part: Uint8Array | Blob): Promise<void>;
 };
-
-// Slicing-by-8: table k holds the CRC of a byte followed by k zero bytes, so
-// eight bytes fold in with eight lookups and no per-byte shift chain.
-const CRC_TABLE = (() => {
-	const table = new Int32Array(256 * 8);
-	for (let n = 0; n < 256; n++) {
-		let c = n;
-		for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-		table[n] = c;
-	}
-	for (let n = 0; n < 256; n++)
-		for (let t = 1; t < 8; t++) {
-			const prev = table[(t - 1) * 256 + n] as number;
-			table[t * 256 + n] = (table[prev & 0xff] as number) ^ (prev >>> 8);
-		}
-	return table;
-})();
-
-function crcUpdate(crc: number, bytes: Uint8Array): number {
-	const t = CRC_TABLE;
-	const b = bytes;
-	let c = crc;
-	let i = 0;
-	for (const n = b.length - 8; i <= n; i += 8) {
-		const lo =
-			c ^
-			((b[i] as number) |
-				((b[i + 1] as number) << 8) |
-				((b[i + 2] as number) << 16) |
-				((b[i + 3] as number) << 24));
-		c =
-			(t[1792 + (lo & 0xff)] as number) ^
-			(t[1536 + ((lo >>> 8) & 0xff)] as number) ^
-			(t[1280 + ((lo >>> 16) & 0xff)] as number) ^
-			(t[1024 + (lo >>> 24)] as number) ^
-			(t[768 + (b[i + 4] as number)] as number) ^
-			(t[512 + (b[i + 5] as number)] as number) ^
-			(t[256 + (b[i + 6] as number)] as number) ^
-			(t[b[i + 7] as number] as number);
-	}
-	for (; i < b.length; i++)
-		c = (t[(c ^ (b[i] as number)) & 0xff] as number) ^ (c >>> 8);
-	return c;
-}
 
 async function* chunksOf(blob: Blob): AsyncGenerator<Uint8Array> {
 	const reader = blob.stream().getReader();
@@ -82,7 +41,7 @@ async function* chunksOf(blob: Blob): AsyncGenerator<Uint8Array> {
 async function crcOf(data: Uint8Array | Blob): Promise<number> {
 	// isView rather than instanceof: bytes made in another realm (a test DOM,
 	// a frame) are still bytes, and have no stream() to read them by.
-	if (ArrayBuffer.isView(data)) return (crcUpdate(-1, data) ^ -1) >>> 0;
+	if (ArrayBuffer.isView(data)) return crc32(data);
 	let c = -1;
 	for await (const chunk of chunksOf(data)) c = crcUpdate(c, chunk);
 	return (c ^ -1) >>> 0;
@@ -222,7 +181,7 @@ export type ZipWriter = {
 
 /**
  * An incremental zip writer. A stored Blob entry is read twice, once for its
- * CRC and once into the output; a deflated one is read into memory, which
+ * CRC and once into the output, unless the entry brings its CRC; a deflated one is read into memory, which
  * suits the small text entries it is used for. Zip64 records are written only
  * where a size, offset or count needs them, so a zip under 4 GB and 65,535
  * entries is the same classic zip it always was.
@@ -249,14 +208,14 @@ export function createZipWriter(out: ZipOutput, mtime: Date): ZipWriter {
 			if (entry.level === 0) {
 				body = entry.data;
 				size = entry.data instanceof Blob ? entry.data.size : entry.data.length;
-				crc = await crcOf(entry.data);
+				crc = entry.crc ?? (await crcOf(entry.data));
 			} else {
 				const raw =
 					entry.data instanceof Blob
 						? new Uint8Array(await entry.data.arrayBuffer())
 						: entry.data;
 				size = raw.length;
-				crc = await crcOf(raw);
+				crc = entry.crc ?? (await crcOf(raw));
 				body = deflateSync(raw, { level: entry.level });
 			}
 			const compressed = body instanceof Blob ? body.size : body.length;

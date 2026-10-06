@@ -5,6 +5,7 @@ import type {
 	PdfPage,
 	Workspace,
 } from "@freshcoat-js/workspace";
+import { crc32 } from "@freshcoat-js/workspace/crc";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -17,7 +18,7 @@ import {
 } from "~/export/job";
 import type { RenderOutput, RenderRequest } from "~/export/protocol";
 import { presetBleed } from "~/export/sheets";
-import type { OutputSink } from "~/export/sinks";
+import { createPartZipSink, type OutputSink } from "~/export/sinks";
 import { membershipCard } from "~/samples/membership-card";
 import { photoWatermark } from "~/samples/photo-watermark";
 
@@ -477,6 +478,56 @@ describe("runExportJob", () => {
 		expect(result.file).toBeUndefined();
 		expect(result.items.map((i) => i.ok)).toEqual([false, false]);
 		expect(assemblePdf).not.toHaveBeenCalled();
+	});
+
+	it("hands each output's CRC to the sink, and the zip carries it", async () => {
+		const outputs: RenderOutput[] = [];
+		const pool: JobPool = {
+			size: 2,
+			async render(req) {
+				const bytes = encoder.encode(`${req.values.display_name}|${req.side}`);
+				const out = {
+					bytes,
+					crc: crc32(bytes),
+					format: req.format,
+					width: 1,
+					height: 1,
+					ms: 1,
+				};
+				outputs.push(out);
+				return out;
+			},
+			cancel() {},
+		};
+		const crcs: (number | undefined)[] = [];
+		const inner = createPartZipSink({ name: "x" });
+		const sink: OutputSink = {
+			...inner,
+			get ready() {
+				return inner.ready;
+			},
+			get files() {
+				return inner.files;
+			},
+			get bytes() {
+				return inner.bytes;
+			},
+			add(name, bytes, crc) {
+				crcs.push(crc);
+				return inner.add(name, bytes, crc);
+			},
+		};
+		const result = await runExportJob(workspace(2), preset(), { pool, sink });
+		expect(crcs.slice(0, 4)).toEqual(
+			result.items.map((item) =>
+				crc32(encoder.encode(`Member ${item.recordId.slice(2)}|${item.side}`)),
+			),
+		);
+		expect(crcs[4]).toBeUndefined();
+		const files = unzipSync(
+			new Uint8Array(await (result.file?.blob as Blob).arrayBuffer()),
+		);
+		expect(Object.keys(files)).toHaveLength(5);
 	});
 });
 

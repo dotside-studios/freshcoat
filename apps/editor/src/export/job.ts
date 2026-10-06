@@ -490,7 +490,7 @@ export function runExportJob(
 						if (sink) {
 							await sink.ready;
 							if (settled) return;
-							await sink.add(plan[index].fileName, out.bytes);
+							await sink.add(plan[index].fileName, out.bytes, out.crc);
 						} else if (collector) {
 							const size = sizes[index];
 							collector.add({
