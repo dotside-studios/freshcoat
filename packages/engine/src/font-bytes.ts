@@ -173,10 +173,11 @@ async function loadBytes(url: string): Promise<Uint8Array> {
 
 // Same source, same Uint8Array: the PaintCache keys its font provider on byte
 // identity. In-flight promises are shared and a rejection is evicted, so a
-// failed load is retried by the next paint.
+// failed load is retried by the next paint. Each memo is a small LRU.
 const fileMemo = new Map<string, Promise<Uint8Array>>();
 const stylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
 const dataMemo = new Map<string, Uint8Array>();
+export const FONT_MEMO_MAX = 64;
 const DATA_MEMO_MAX = 16;
 
 function memoize<T>(
@@ -184,10 +185,10 @@ function memoize<T>(
 	key: string,
 	load: (key: string) => Promise<T>,
 ): Promise<T> {
-	const hit = memo.get(key);
+	const hit = touch(memo, key);
 	if (hit) return hit;
 	const p = load(key);
-	memo.set(key, p);
+	remember(memo, key, p, FONT_MEMO_MAX);
 	p.catch(() => {
 		if (memo.get(key) === p) memo.delete(key);
 	});
@@ -195,19 +196,30 @@ function memoize<T>(
 }
 
 function dataFontBytes(src: string): Uint8Array {
-	const hit = dataMemo.get(src);
-	if (hit) {
-		dataMemo.delete(src);
-		dataMemo.set(src, hit);
-		return hit;
-	}
+	const hit = touch(dataMemo, src);
+	if (hit) return hit;
 	const bytes = dataUrlToBytes(src);
-	dataMemo.set(src, bytes);
-	if (dataMemo.size > DATA_MEMO_MAX) {
-		const oldest = dataMemo.keys().next().value as string;
-		dataMemo.delete(oldest);
-	}
+	remember(dataMemo, src, bytes, DATA_MEMO_MAX);
 	return bytes;
+}
+
+function touch<T>(memo: Map<string, T>, key: string): T | undefined {
+	const hit = memo.get(key);
+	if (hit !== undefined) {
+		memo.delete(key);
+		memo.set(key, hit);
+	}
+	return hit;
+}
+
+function remember<T>(
+	memo: Map<string, T>,
+	key: string,
+	value: T,
+	max: number,
+): void {
+	memo.set(key, value);
+	if (memo.size > max) memo.delete(memo.keys().next().value as string);
 }
 
 export function clearFontBytesCache(): void {

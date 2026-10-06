@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
+import {
+	clearFontBytesCache,
+	FONT_MEMO_MAX,
+	fontBytes,
+} from "../src/font-bytes";
 
 // `bun test`'s vitest shim has no vi.stubGlobal; swap the global by hand.
 const realFetch = globalThis.fetch;
@@ -197,6 +201,35 @@ describe("fontBytes memo", () => {
 		const [bytes] = await fontBytes(http("https://f/a.ttf"));
 		expect(bytes?.[0]).toBe(7);
 		expect(requested).toEqual(["https://f/a.ttf"]);
+	});
+
+	test("the file memo evicts the least recently used URL past its cap", async () => {
+		const bytes: Record<string, number> = {};
+		const urls = Array.from(
+			{ length: FONT_MEMO_MAX + 1 },
+			(_, i) => `https://f/${i}.ttf`,
+		);
+		for (const url of urls) bytes[url] = 1;
+		const requested = stubFetch("", bytes);
+		for (const url of urls.slice(0, FONT_MEMO_MAX)) await fontBytes(http(url));
+		await fontBytes(http(urls[0] as string));
+		await fontBytes(http(urls[FONT_MEMO_MAX] as string));
+		expect(requested).toHaveLength(FONT_MEMO_MAX + 1);
+		await fontBytes(http(urls[0] as string));
+		expect(requested).toHaveLength(FONT_MEMO_MAX + 1);
+		await fontBytes(http(urls[1] as string));
+		expect(requested).toHaveLength(FONT_MEMO_MAX + 2);
+	});
+
+	test("the stylesheet memo evicts past its cap", async () => {
+		const requested = stubFetch(
+			"@font-face { src: url(https://f/a.ttf); }",
+			{ "https://f/a.ttf": 1 },
+		);
+		for (let i = 0; i <= FONT_MEMO_MAX; i++)
+			await fontBytes(google(`https://css/${i}`));
+		await fontBytes(google("https://css/0"));
+		expect(requested.filter((u) => u === "https://css/0")).toHaveLength(2);
 	});
 
 	test("a data: font decodes to the same array each time", async () => {
