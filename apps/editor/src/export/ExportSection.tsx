@@ -22,8 +22,7 @@ import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { useEditor } from "~/state/hooks";
-import type { EditorState } from "~/state/store";
-import { workspaceSnapshot } from "~/state/workspace";
+import { workspaceOf } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
 import CloseIcon from "~icons/mingcute/close-line";
 import PresetsIcon from "~icons/mingcute/layout-left-line";
@@ -121,13 +120,17 @@ function useRail(): [boolean, (on: boolean) => void] {
 export function ExportSection() {
 	const controller = useController();
 	const wsState = useEditor((s) => s.workspace);
-	const doc = useEditor((s) => s.doc);
+	const present = useEditor((s) => s.doc?.history.present);
+	const guides = useEditor((s) => s.doc?.history.guides);
 	const workspace = useMemo(
 		() =>
 			wsState
-				? workspaceSnapshot({ workspace: wsState, doc } as EditorState)
+				? workspaceOf(
+						wsState,
+						present && guides ? { present, guides } : undefined,
+					)
 				: null,
-		[wsState, doc],
+		[wsState, present, guides],
 	);
 	const jobs = useExportJobs();
 	const narrow = useNarrow();
