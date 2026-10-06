@@ -1,4 +1,8 @@
-import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
+import {
+	compiledPattern,
+	type FieldDefinition,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
@@ -593,12 +597,9 @@ function FieldEditor({
 				placeholder="Regular expression"
 				inputClassName="font-fc-mono"
 				validate={(v) => {
-					try {
-						new RegExp(v);
-						return null;
-					} catch {
-						return "Not a valid regular expression";
-					}
+					return compiledPattern(v) === null
+						? "Not a valid regular expression"
+						: null;
 				}}
 				onCommit={(v) => patch({ pattern: v || undefined }, "pattern")}
 			/>
