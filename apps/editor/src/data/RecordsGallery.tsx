@@ -38,7 +38,13 @@ import {
 	titleColumn,
 } from "./gallery-model";
 import type { GridUiStore } from "./grid-state";
-import { assetMap, displayText, recordIssues } from "./model";
+import {
+	assetMap,
+	displayText,
+	recordByIdMap,
+	recordIndexMap,
+	recordIssues,
+} from "./model";
 import { useRowItems } from "./RecordsGrid";
 import { type ThumbWidth, useThumbnail } from "./thumbnails";
 
@@ -122,13 +128,13 @@ export const RecordsGallery = memo(function RecordsGallery({
 	}, [size, narrow, width]);
 
 	const ctx = useMemo<CardContextValue>(() => {
-		const indexMap = new Map(dataset.records.map((r, i) => [r.id, i]));
+		const indexMap = recordIndexMap(dataset.records);
 		const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio;
 		// The well is the card less its padding, at the widest a card grows.
 		const well = layout.maxItemSize.width - 24;
 		return {
 			dataset,
-			recordById: new Map(dataset.records.map((r) => [r.id, r])),
+			recordById: recordByIdMap(dataset.records),
 			indexOf: (id) => indexMap.get(id) ?? -1,
 			assets: assetMap(dataset.assets),
 			image: imageColumn(dataset.columns),

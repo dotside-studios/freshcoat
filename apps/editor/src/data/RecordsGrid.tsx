@@ -43,6 +43,8 @@ import {
 	assetMap,
 	INDEX_COLUMN,
 	NUMERIC_TYPES,
+	recordByIdMap,
+	recordIndexMap,
 	type SortSpec,
 	STATUS_COLUMN,
 	setCell,
@@ -147,14 +149,8 @@ export const RecordsGrid = memo(function RecordsGrid({
 	}, []);
 
 	const assets = useMemo(() => assetMap(dataset.assets), [dataset.assets]);
-	const indexMap = useMemo(
-		() => new Map(dataset.records.map((r, i) => [r.id, i])),
-		[dataset.records],
-	);
-	const recordById = useMemo(
-		() => new Map(dataset.records.map((r) => [r.id, r])),
-		[dataset.records],
-	);
+	const indexMap = recordIndexMap(dataset.records);
+	const recordById = recordByIdMap(dataset.records);
 	const items = useRowItems(rows);
 
 	const gridColumns = useMemo<GridColumn[]>(

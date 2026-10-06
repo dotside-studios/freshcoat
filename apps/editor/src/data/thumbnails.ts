@@ -34,6 +34,7 @@ export function setThumbnailBackend(next: ThumbnailBackend | null): void {
 	thumbs.clear();
 	previews.clear();
 	pending.clear();
+	stack.length = 0;
 	making.clear();
 }
 
@@ -118,6 +119,9 @@ type Job = {
 
 /** Waiting to be made, oldest first. */
 const pending = new Map<string, Job>();
+/** The order of `pending`, newest on top. An entry no longer in `pending`
+ *  under its key is stale and skipped. */
+const stack: Job[] = [];
 /** Being made. A request for one of these waits for it rather than making
  *  it again: a second copy would replace the first in the cache, and that
  *  revokes the URL a surface may still be showing. */
@@ -136,10 +140,24 @@ function objectUrl(blob: Blob): string {
 		: "";
 }
 
+function enqueue(job: Job): void {
+	pending.set(job.key, job);
+	stack.push(job);
+	if (stack.length > 64 && stack.length > pending.size * 2)
+		stack.splice(0, stack.length, ...pending.values());
+}
+
+/** The newest request first: what was just scrolled into view. */
+function nextJob(): Job | undefined {
+	for (let job = stack.pop(); job; job = stack.pop())
+		if (pending.get(job.key) === job) return job;
+	return undefined;
+}
+
 function pump(): void {
 	while (inFlight < MAX_IN_FLIGHT && pending.size > 0) {
-		// The newest request first: what was just scrolled into view.
-		const job = [...pending.values()].at(-1) as Job;
+		const job = nextJob();
+		if (!job) break;
 		pending.delete(job.key);
 		if (job.waiters.size === 0) continue;
 		inFlight += 1;
@@ -215,7 +233,7 @@ export function requestThumbnail(
 	} else {
 		job = { key, asset, width, waiters: new Set() };
 	}
-	pending.set(key, job);
+	enqueue(job);
 	const waiter = (url: string) => onUrl(url);
 	const queued = job;
 	queued.waiters.add(waiter);
@@ -319,6 +337,24 @@ export function previewImage(
 	return loading;
 }
 
+const shaMaps = new WeakMap<
+	readonly DatasetAsset[],
+	ReadonlyMap<string, DatasetAsset>
+>();
+
+function assetsBySha(
+	assets: readonly DatasetAsset[],
+): ReadonlyMap<string, DatasetAsset> {
+	let map = shaMaps.get(assets);
+	if (!map) {
+		const first = new Map<string, DatasetAsset>();
+		for (const a of assets) if (!first.has(a.sha256)) first.set(a.sha256, a);
+		map = first;
+		shaMaps.set(assets, map);
+	}
+	return map;
+}
+
 /** The `ws:` references among a record's values that name one of `assets`. */
 export function referencedAssets(
 	assets: readonly DatasetAsset[] | undefined,
@@ -331,7 +367,7 @@ export function referencedAssets(
 		const sha = parseAssetRef(value);
 		if (sha === null || seen.has(sha)) continue;
 		seen.add(sha);
-		const asset = assets.find((a) => a.sha256 === sha);
+		const asset = assetsBySha(assets).get(sha);
 		if (asset) out.push(asset);
 	}
 	return out;

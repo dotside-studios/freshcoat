@@ -165,6 +165,39 @@ describe("thumbnails", () => {
 		expect(backend).toHaveBeenCalledTimes(2);
 	});
 
+	it("makes the newest request first, skipping withdrawn ones", async () => {
+		const made: number[] = [];
+		const resolvers: (() => void)[] = [];
+		backend.mockImplementation(async (req) => {
+			made.push(new Uint8Array(await req.blob.arrayBuffer())[0] as number);
+			return new Promise<Blob>((resolve) => {
+				resolvers.push(() => resolve(new Blob([new Uint8Array(4)])));
+			});
+		});
+		const drain = async () => {
+			for (;;) {
+				await new Promise((r) => setTimeout(r, 0));
+				const next = resolvers.shift();
+				if (!next) return;
+				next();
+			}
+		};
+		const keep = () => {};
+		requestThumbnail(asset(1), 160, keep);
+		requestThumbnail(asset(2), 160, keep);
+		for (let i = 3; i <= 150; i++) {
+			const cancel = requestThumbnail(asset(i), 160, keep);
+			if (i % 3 !== 0) cancel();
+		}
+		// Asked again: it moves to the front of the line.
+		requestThumbnail(asset(9), 160, keep);
+		requestThumbnail(asset(10), 160, keep);
+		await drain();
+		const expected = [1, 2, 10, 9];
+		for (let i = 150; i >= 3; i--) if (i % 3 === 0 && i !== 9) expected.push(i);
+		expect(made).toEqual(expected);
+	});
+
 	it("a request for one being made waits for it, so no shown URL is revoked", async () => {
 		const resolvers: (() => void)[] = [];
 		backend.mockImplementation(

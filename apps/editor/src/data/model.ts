@@ -53,6 +53,41 @@ export const TYPE_LABELS: Record<ColumnType, string> = {
 	image: "Image",
 };
 
+// ------------------------------------------------------------------ lookups
+
+const indexMaps = new WeakMap<
+	readonly DataRecord[],
+	ReadonlyMap<string, number>
+>();
+const byIdMaps = new WeakMap<
+	readonly DataRecord[],
+	ReadonlyMap<string, DataRecord>
+>();
+
+/** Each record's position by id, made once per records array. */
+export function recordIndexMap(
+	records: readonly DataRecord[],
+): ReadonlyMap<string, number> {
+	let map = indexMaps.get(records);
+	if (!map) {
+		map = new Map(records.map((r, i) => [r.id, i]));
+		indexMaps.set(records, map);
+	}
+	return map;
+}
+
+/** Each record by id, made once per records array. */
+export function recordByIdMap(
+	records: readonly DataRecord[],
+): ReadonlyMap<string, DataRecord> {
+	let map = byIdMaps.get(records);
+	if (!map) {
+		map = new Map(records.map((r) => [r.id, r]));
+		byIdMaps.set(records, map);
+	}
+	return map;
+}
+
 // ------------------------------------------------------------------ display
 
 export function assetMap(
