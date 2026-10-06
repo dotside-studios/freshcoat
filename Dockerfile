@@ -17,12 +17,13 @@ RUN bun install --frozen-lockfile
 FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY packages ./packages
-COPY apps ./apps
+COPY apps/editor ./apps/editor
 RUN bun run --cwd apps/editor build
 
 # The editor is fully static, so the runner ships the build output and the Bun
 # static server only.
-FROM base AS runner
+FROM oven/bun:1.3.13-slim AS runner
+WORKDIR /app
 ENV NODE_ENV=production
 
 COPY apps/editor/server.ts ./apps/editor/

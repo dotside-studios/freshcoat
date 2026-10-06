@@ -14,6 +14,7 @@ watchPatterns = [
 	"/bun.lock",
 	"/tsconfig.base.json",
 	"/Dockerfile",
+	"/.dockerignore",
 ]
 
 [deploy]
