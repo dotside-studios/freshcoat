@@ -36,12 +36,28 @@ export function slotFrameOf(node: BaseNode): BaseNode | null {
 	return n?.parent?.type === "PAGE" ? n : null;
 }
 
+let selectionTimer: ReturnType<typeof setTimeout> | null = null;
+let selectionSeq = 0;
+
+/** Coalesce selection bursts into one post. A direct post supersedes it. */
+export function scheduleSelectionDetail(delayMs = 50): void {
+	if (selectionTimer !== null) clearTimeout(selectionTimer);
+	const mine = ++selectionSeq;
+	selectionTimer = setTimeout(() => {
+		selectionTimer = null;
+		if (mine === selectionSeq) postSelectionDetail();
+	}, delayMs);
+}
+
 // main → ui: the binding state of the single selected node (drives the Layer tab).
 export function postSelectionDetail(): void {
+	if (selectionTimer !== null) clearTimeout(selectionTimer);
+	selectionTimer = null;
+	selectionSeq++;
 	const sel = figma.currentPage.selection;
 	let detail: SelectionDetail | null = null;
 	if (sel.length === 1) {
-		const node = readNode(sel[0] as never);
+		const node = readNode(sel[0] as never, { depth: 0 });
 		if (node) {
 			const binding = resolveNodeBinding(node);
 			const slot = slotFrameOf(sel[0]);

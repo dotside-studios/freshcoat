@@ -244,18 +244,23 @@ function shaderFor(
 
 // A TypefaceFontProvider registered from explicit font bytes (no global font
 // registry, no cache poisoning) — Paragraph resolves families against it.
+// The env's whole fonts map, then whatever the scene loaded from elsewhere.
+function withEnvFonts(
+	loaded: LoadedFontBytes[],
+	fonts: Map<string, Uint8Array[]>,
+): LoadedFontBytes[] {
+	const out: LoadedFontBytes[] = [];
+	for (const [family, faces] of fonts)
+		for (const bytes of faces) out.push({ family, bytes });
+	for (const f of loaded) if (!fonts.has(f.family)) out.push(f);
+	return out;
+}
+
 function makeFontProvider(ck: CK, fonts: LoadedFontBytes[]): CK {
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const f of fonts) {
 		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
 	}
-	// Stash the registered families on the provider so text styles can append them
-	// as a per-glyph fallback chain (drawText → textStyleOf). Without listing them
-	// in fontFamilies, CanvasKit renders any glyph the span's font lacks (emoji,
-	// CJK, …) as tofu even though a covering font is registered here.
-	(provider as { __families?: string[] }).__families = [
-		...new Set(fonts.map((f) => f.family)),
-	];
 	return provider;
 }
 
@@ -890,6 +895,8 @@ type SvgPicture = {
 	svgPicture: CK;
 	width: number;
 	height: number;
+	// Pixels of the rasters the recording holds, nested pictures' included.
+	rasterPixels: number;
 	features: string[];
 	delete(): void;
 };
@@ -971,10 +978,16 @@ function makeSvgPicture(
 					{ width, height, scale: 1, grid: 1 },
 				);
 		const picture = recorder.finishRecordingAsPicture();
+		let rasterPixels = 0;
+		for (const img of images.values())
+			rasterPixels += isSvgPicture(img)
+				? img.rasterPixels
+				: img.width() * img.height();
 		return {
 			svgPicture: picture,
 			width,
 			height,
+			rasterPixels,
 			features,
 			delete: () => picture.delete(),
 		};
@@ -2287,8 +2300,12 @@ export async function paintScene(
 			});
 		}
 	}
+	const registered =
+		cache && rt.fonts ? withEnvFonts(loaded, rt.fonts) : loaded;
 	const provider = cache
-		? cachedFontProvider(cache, loaded, () => makeFontProvider(ck, loaded))
+		? cachedFontProvider(cache, registered, () =>
+				makeFontProvider(ck, registered),
+			)
 		: makeFontProvider(ck, loaded);
 	if (cache) shapedLines.set(provider, cache);
 
@@ -2411,6 +2428,15 @@ export async function paintScene(
 			skCanvas.save();
 			skCanvas.scale(frame.scale, frame.scale);
 		}
+		// The families this scene loaded, in order, are the per-glyph fallback
+		// chain its text styles append (drawText → textStyleOf). Without listing
+		// them in fontFamilies, CanvasKit renders any glyph the span's font lacks
+		// (emoji, CJK, …) as tofu even though a covering font is registered. A
+		// cached provider can hold more families than this scene uses, so the
+		// chain is set per paint, right before drawing.
+		(provider as { __families?: string[] }).__families = [
+			...new Set(loaded.map((f) => f.family)),
+		];
 		for (const cmd of commands) {
 			if (
 				cmd.op === "createCanvas" ||

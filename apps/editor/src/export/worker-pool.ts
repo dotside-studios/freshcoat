@@ -19,10 +19,9 @@ export type WorkerPool = {
 	readonly size: number;
 	/** Sends the fonts to every worker and resolves once each has CanvasKit. */
 	init(fonts: Map<string, Uint8Array[]>): Promise<void>;
-	/** Replaces every worker's map of images the template carries. Blobs are
-	 *  cloned by reference, so this copies no bytes. A dataset's photos go
-	 *  with each render instead, only the ones it uses. */
-	setImages(images: Map<string, Blob> | [string, Blob][]): void;
+	/** Tells every worker the job is over, so an idle one frees the images,
+	 *  analyses and surface it kept across the job's items. */
+	endJob(): void;
 	render(request: RenderRequest): Promise<RenderOutput>;
 	/** Rejects queued work and terminates busy workers. */
 	cancel(): void;
@@ -112,7 +111,6 @@ export function createWorkerPool(
 	const slots: (Slot | null)[] = Array.from({ length: size }, () => null);
 	const queue: Task[] = [];
 	let fonts: [string, Uint8Array[]][] | null = null;
-	let images: [string, Blob][] | null = null;
 	let nextId = 1;
 	let cursor = 0;
 	let disposed = false;
@@ -160,7 +158,6 @@ export function createWorkerPool(
 			expectReady(slot);
 			worker.postMessage({ type: "init", fonts });
 		}
-		if (images) worker.postMessage({ type: "images", entries: images });
 		slots[index] = slot;
 		return slot;
 	}
@@ -219,10 +216,8 @@ export function createWorkerPool(
 			}
 			await Promise.all(slots.map((slot) => slot?.ready));
 		},
-		setImages(next) {
-			images = [...(next instanceof Map ? next.entries() : next)];
-			for (const slot of slots)
-				slot?.worker.postMessage({ type: "images", entries: images });
+		endJob() {
+			for (const slot of slots) slot?.worker.postMessage({ type: "jobEnd" });
 		},
 		render(request) {
 			if (disposed) return Promise.reject(new Error("the pool is disposed"));

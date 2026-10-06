@@ -64,6 +64,7 @@ export {
 	type AnalyzeSceneOptions,
 	analyzeScene,
 	classifyIntent,
+	createAnalysisCache,
 	type ImageSampler,
 	type LayerIntent,
 	type LayerIntentResolver,

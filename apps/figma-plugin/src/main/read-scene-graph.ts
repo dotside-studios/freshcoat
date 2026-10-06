@@ -133,10 +133,10 @@ function readGeometry(
 	const paints = Array.isArray(node.fills) ? node.fills : [];
 	const hasFill = paints.some((f) => f.visible !== false);
 	const resolved = node.fillGeometry ?? [];
-	const authored = node.vectorPaths ?? [];
 	if (hasFill && resolved.length > 0) {
 		return resolved.map(readVectorPath);
 	}
+	const authored = node.vectorPaths ?? [];
 	if (authored.length > 0) return authored.map(readVectorPath);
 	if (resolved.length > 0) return resolved.map(readVectorPath);
 	if (
@@ -222,25 +222,35 @@ type AnyContainerNode = AnySceneNode & {
 	getMainComponentAsync?: () => Promise<{ id: string } | null>;
 };
 
+/** `depth` limits how many levels of children are read; 0 reads the node alone. */
+export type ReadOptions = { depth?: number };
+
 export function readNode(
 	node: AnySceneNode & { type: string },
+	opts: ReadOptions = {},
 ): FigmaNode | null {
 	const t = node.type;
 	if (t === "TEXT") return readTextNode(node as never);
 	if (t === "RECTANGLE") return readRectangleNode(node as never);
 	if (isVectorNode(node)) return readVectorNode(node as never);
-	if (isContainerNode(node)) return readContainer(node as AnyContainerNode);
+	if (isContainerNode(node))
+		return readContainer(node as AnyContainerNode, opts.depth);
 	return null; // unsupported node type — skipped by the caller
 }
 
-function readContainer(node: AnyContainerNode): FigmaContainerNode {
+function readContainer(
+	node: AnyContainerNode,
+	depth = Number.POSITIVE_INFINITY,
+): FigmaContainerNode {
 	// A COMPONENT_SET keeps ALL its component children (Phase 3 derives variants
 	// from them); the transpiler picks the base for template_data. A COMPONENT
 	// carries its variantProperties so the transpiler can build the join key.
 	const grid = node.layoutMode === "GRID";
-	const children = (node.children ?? [])
+	const children = (depth > 0 ? (node.children ?? []) : [])
 		.map((c) => {
-			const read = readNode(c as AnySceneNode & { type: string });
+			const read = readNode(c as AnySceneNode & { type: string }, {
+				depth: depth - 1,
+			});
 			return read && grid ? { ...read, ...readGridChild(c) } : read;
 		})
 		.filter((c): c is FigmaNode => c !== null);

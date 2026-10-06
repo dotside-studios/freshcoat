@@ -59,11 +59,20 @@ export type PaintCacheOptions = {
 	// Decoded pixels kept across paints. Images the current paint draws are
 	// always kept, however far over this that leaves the cache.
 	maxImagePixels?: number;
+	// Cached images kept across paints with `maxImagePixels`, whatever their
+	// size. Default 256.
+	maxImages?: number;
 };
+
+const DEFAULT_MAX_IMAGES = 256;
+
+// What an SVG picture costs beyond the rasters it embeds: its recorded ops.
+export const SVG_PICTURE_PIXELS = 65_536;
 
 export type PaintCacheState = {
 	stats: PaintCacheStats;
 	maxImagePixels: number;
+	maxImages: number;
 	fonts: { key: FontKey; provider: CK } | null;
 	images: Map<string, CachedImage>;
 	// Freed with the provider whose typefaces they use.
@@ -83,6 +92,7 @@ const states = new WeakMap<PaintCache, PaintCacheState>();
 export function createPaintCache(opts?: PaintCacheOptions): PaintCache {
 	const state: PaintCacheState = {
 		maxImagePixels: opts?.maxImagePixels ?? 0,
+		maxImages: opts?.maxImages ?? DEFAULT_MAX_IMAGES,
 		stats: {
 			paints: 0,
 			surfaceCreates: 0,
@@ -138,9 +148,9 @@ export function paintCacheState(cache: PaintCache): PaintCacheState {
 	return state;
 }
 
-// The provider is keyed on the loaded list itself, family and byte-array
+// The provider is keyed on the registered list itself, family and byte-array
 // identity in order, so a caller that keeps its fonts map stable keeps its
-// provider.
+// provider, whichever of those families a scene uses.
 export function cachedFontProvider(
 	state: PaintCacheState,
 	loaded: FontKey,
@@ -188,7 +198,7 @@ export function cachedSurface(
 }
 
 // Deletes the cached images this paint's scene did not use, oldest first, until
-// what is left fits the cache's image budget.
+// what is left fits the cache's image budget and entry cap.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
@@ -205,7 +215,12 @@ export function evictUnusedImages(
 		for (const entry of state.images.values()) total += imagePixels(entry);
 	for (const [src, entry] of state.images) {
 		if (keep.has(src)) continue;
-		if (state.maxImagePixels > 0 && total <= state.maxImagePixels) break;
+		if (
+			state.maxImagePixels > 0 &&
+			total <= state.maxImagePixels &&
+			state.images.size <= state.maxImages
+		)
+			break;
 		state.images.delete(src);
 		total -= imagePixels(entry);
 		freeImage(entry);
@@ -214,6 +229,8 @@ export function evictUnusedImages(
 
 function imagePixels(entry: CachedImage): number {
 	const { image, mipped } = entry;
+	if (typeof image.rasterPixels === "number")
+		return SVG_PICTURE_PIXELS + image.rasterPixels;
 	const pixels =
 		typeof image.width === "function"
 			? image.width() * image.height()

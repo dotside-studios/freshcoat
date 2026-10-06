@@ -1,8 +1,6 @@
 import {
 	compile,
-	createPaintCache,
 	createParagraphEngine,
-	type PaintCache,
 	setBarcodeEncoder,
 	type Template,
 } from "@freshcoat-js/coatfile";
@@ -18,6 +16,7 @@ import type {
 	WorkerReply,
 	WorkerRequest,
 } from "./protocol";
+import { createJobCaches } from "./worker-caches";
 
 type WorkerScope = {
 	postMessage(message: WorkerReply, transfer: Transferable[]): void;
@@ -28,9 +27,6 @@ const scope = self as unknown as WorkerScope;
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped
 type CK = any;
-
-/** Decoded pixels one render worker keeps across items. */
-const IMAGE_CACHE_PIXELS = 48_000_000;
 
 // The `full` build: the default one the editor's canvas uses has neither the
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
@@ -46,10 +42,7 @@ let text:
 	| undefined;
 /** the template of the last render; the pool sends it only when it changes */
 let current: Template | undefined;
-/** images the template carries, sent once with `images` */
-let carried = new Map<string, Blob>();
-/** decoded images, SVG pictures and paths shared by the items of one job */
-let paintCache: PaintCache | undefined;
+const caches = createJobCaches();
 
 function loadCanvasKit(): Promise<CK> {
 	ckPromise ??= (async () => {
@@ -82,20 +75,15 @@ function ownBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 }
 
 async function bytesOf(src: string, own: Map<string, Blob>) {
-	const blob = own.get(src) ?? carried.get(src);
+	const blob = own.get(src);
 	if (blob) return new Uint8Array(await blob.arrayBuffer());
 	const res = await fetch(src);
 	if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
 	return new Uint8Array(await res.arrayBuffer());
 }
 
-function resetPaintCache() {
-	paintCache?.dispose();
-	paintCache = undefined;
-}
-
 function setFonts(next: Map<string, Uint8Array[]>) {
-	resetPaintCache();
+	caches.clear();
 	text?.engine.dispose();
 	text = undefined;
 	fonts = next;
@@ -132,7 +120,6 @@ async function renderSide(req: WorkerRenderRequest) {
 	// Only this worker holds the bytes; the default would fetch the `ws:`
 	// reference.
 	env.loadImageBytes = (src) => bytesOf(src, own);
-	paintCache ??= createPaintCache({ maxImagePixels: IMAGE_CACHE_PIXELS });
 	const design = req.resize ?? {
 		width: template.width,
 		height: template.height,
@@ -158,7 +145,16 @@ async function renderSide(req: WorkerRenderRequest) {
 						: { constraint: { kind: "scale", value: req.scale } },
 				],
 			},
-			{ ck, env, fonts, fontMetrics, textEngine: engine, paintCache },
+			{
+				ck,
+				env,
+				fonts,
+				fontMetrics,
+				textEngine: engine,
+				paintCache: caches.paint(),
+				analysisCache: caches.analysis(),
+				analysisKey: caches.analysisKey(template),
+			},
 		);
 		if (!result || !("bytes" in result))
 			throw new Error("nothing was rendered");
@@ -209,9 +205,8 @@ async function handle(msg: WorkerRequest): Promise<void> {
 			}
 			return;
 		}
-		case "images":
-			carried = new Map(msg.entries);
-			resetPaintCache();
+		case "jobEnd":
+			caches.clear();
 			return;
 		case "render":
 			try {
@@ -226,14 +221,13 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		case "dispose":
 			setFonts(new Map());
 			current = undefined;
-			carried = new Map();
 			scope.close();
 			return;
 	}
 }
 
-// Messages are handled one at a time and in order, so an `images` or `init`
-// sent before a `render` always applies to it.
+// Messages are handled one at a time and in order, so an `init` sent before a
+// `render` always applies to it, and a `jobEnd` waits for the renders before it.
 let queue: Promise<void> = Promise.resolve();
 scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
 	const msg = event.data;

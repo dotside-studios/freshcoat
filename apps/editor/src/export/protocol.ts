@@ -51,8 +51,8 @@ export type WorkerRenderRequest = Omit<RenderRequest, "template"> & {
 
 export type WorkerRequest =
 	| { type: "init"; fonts: [string, Uint8Array[]][] }
-	/** images the template itself carries, kept for every render */
-	| { type: "images"; entries: [string, Blob][] }
+	/** the job is over: free what was kept across its items */
+	| { type: "jobEnd" }
 	| ({ type: "render"; id: number } & WorkerRenderRequest)
 	| { type: "dispose" };
 
