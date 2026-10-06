@@ -1222,13 +1222,29 @@ function drawShape(
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), bg);
 		const fg = bin.track(new ck.Paint());
 		fg.setColor(toColor(ck, foreground));
-		for (let y = 0; y < modules.length; y++)
-			for (let x = 0; x < modules.length; x++)
-				if (modules[y][x])
-					canvas.drawRect(
-						ck.XYWHRect(pos.x + margin + x * m, pos.y + margin + y * m, m, m),
-						fg,
-					);
+		// Under a rotation or skew, adjacent rects rasterize their shared edges
+		// differently from one merged rect, so runs are merged only when the
+		// canvas is axis-aligned. Edges are computed as the per-module rects
+		// computed them.
+		const [, b, , d, , , g, h] = canvas.getTotalMatrix() as number[];
+		const merge = b === 0 && d === 0 && g === 0 && h === 0;
+		for (let y = 0; y < modules.length; y++) {
+			const top = pos.y + margin + y * m;
+			for (let x = 0; x < modules.length; x++) {
+				if (!modules[y][x]) continue;
+				const start = x;
+				while (merge && x + 1 < modules.length && modules[y][x + 1]) x++;
+				canvas.drawRect(
+					ck.LTRBRect(
+						pos.x + margin + start * m,
+						top,
+						pos.x + margin + x * m + m,
+						top + m,
+					),
+					fg,
+				);
+			}
+		}
 	} else if (cmd.op === "drawGroup") {
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
