@@ -1040,6 +1040,88 @@ describe("readTextNode with mixed (symbol) font properties", () => {
 		expect("paragraphSpacing" in mixed.style).toBe(false);
 	});
 
+	it("reads truncation and max lines, and treats mixed or null as unset", () => {
+		const out = readTextNode(
+			mixedTextNode({ textTruncation: "ENDING", maxLines: 3 } as never),
+		);
+		expect(out.style.textTruncation).toBe("ENDING");
+		expect(out.style.maxLines).toBe(3);
+		const unset = readTextNode(
+			mixedTextNode({
+				textTruncation: Symbol("mixed"),
+				maxLines: null,
+			} as never),
+		);
+		expect("textTruncation" in unset.style).toBe(false);
+		expect("maxLines" in unset.style).toBe(false);
+		expect(findUnpostable(unset)).toBeNull();
+	});
+
+	it("reads strokes, and omits them when there are none", () => {
+		const stroke = {
+			type: "SOLID",
+			color: { r: 1, g: 0, b: 0 },
+			opacity: 1,
+			visible: true,
+		};
+		const out = readTextNode(
+			mixedTextNode({ strokes: [stroke], strokeWeight: 2 } as never),
+		);
+		expect(out.strokes).toHaveLength(1);
+		expect(out.strokeWeight).toBe(2);
+		const none = readTextNode(mixedTextNode({ strokes: [] } as never));
+		expect("strokes" in none).toBe(false);
+		expect("strokes" in readTextNode(mixedTextNode())).toBe(false);
+	});
+
+	it("takes a mixed textCase from the first run, and records small caps runs", () => {
+		const out = readTextNode(
+			mixedTextNode({
+				getStyledTextSegments: () => [
+					{
+						start: 0,
+						end: 8,
+						fontName: { family: "Inter", style: "Regular" },
+						fontSize: 12,
+						fontWeight: 400,
+						textCase: "ORIGINAL",
+					},
+					{
+						start: 8,
+						end: 12,
+						fontName: { family: "Inter", style: "Regular" },
+						fontSize: 12,
+						fontWeight: 400,
+						textCase: "SMALL_CAPS",
+					},
+				],
+			}),
+		);
+		expect(out.style.textCase).toBe("ORIGINAL");
+		expect(out.styleOverrideTable?.["1"]?.textCase).toBe("SMALL_CAPS");
+		expect(out.characterStyleOverrides?.slice(8)).toEqual([1, 1, 1, 1]);
+	});
+
+	it("does not split runs that differ only in a non-small-caps case", () => {
+		const seg = (start: number, end: number, textCase: string) => ({
+			start,
+			end,
+			fontName: { family: "Inter", style: "Regular" },
+			fontSize: 12,
+			fontWeight: 400,
+			textCase,
+		});
+		const out = readTextNode(
+			mixedTextNode({
+				getStyledTextSegments: () => [
+					seg(0, 8, "ORIGINAL"),
+					seg(8, 12, "UPPER"),
+				],
+			}),
+		);
+		expect(Object.keys(out.styleOverrideTable ?? {})).toHaveLength(0);
+	});
+
 	it("leaves an unmixed text node alone", () => {
 		const out = readTextNode(
 			mixedTextNode({

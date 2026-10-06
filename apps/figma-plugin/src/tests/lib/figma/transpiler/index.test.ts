@@ -2581,6 +2581,38 @@ describe("transpile (bound text names its element)", () => {
 		expect(t.template_data[0].elements[0].id).toBe("name");
 		expect(t.template_data[1].elements[0].id).toBe("name");
 	});
+
+	it("keeps a stroked bound text as text and warns that the stroke is dropped", async () => {
+		const stroked = (layerName: string, id: string) => {
+			const frame = side(layerName, id);
+			Object.assign(frame.children[0], {
+				strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+				strokeWeight: 2,
+			});
+			return frame;
+		};
+		const pick = (nodeId: string) => ({
+			fileKey: "FK",
+			nodeId,
+			nodeName: nodeId,
+			width: 1013,
+			height: 638,
+		});
+		const out = await transpile({
+			product: EXACT_PRODUCT,
+			picks: { front: pick("front"), back: pick("back") },
+			metadata: META,
+			fetchNodeTree: async (_k, id) => stroked("{{name}}", id),
+			renderImage: vi.fn(),
+		});
+		const t = out.template as {
+			template_data: Array<{ elements: Array<{ type: string }> }>;
+		};
+		expect(t.template_data[0].elements[0].type).toBe("text");
+		expect(
+			out.warnings.filter((w) => w.code === "text_stroke_unsupported"),
+		).toHaveLength(2);
+	});
 });
 
 describe("transpile (rotated child of a live auto-layout)", () => {

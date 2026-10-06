@@ -40,6 +40,7 @@ import {
 	classify,
 	elementBlendMode,
 	type FlattenReason,
+	hasTextStroke,
 	isQrLayerName,
 } from "./classify";
 import { dedupeFlattenMarkers, type FlattenMarker } from "./coalesce";
@@ -696,6 +697,13 @@ async function buildSideElements(
 					? storedToNodeBinding(n.binding)
 					: inferNodeBinding(n);
 				el = transpileText(n, ctx, textBinding?.bind.text);
+				if (hasTextStroke(n))
+					sink.warnings.push({
+						severity: "warn",
+						code: "text_stroke_unsupported",
+						message: `Text layer "${n.name}" has a stroke, which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
+						nodeId: n.id,
+					});
 			} else if (c.kind === "native-rect" && isRectangleNode(n))
 				el = transpileRect(n, {
 					frame: ctx.frame,
