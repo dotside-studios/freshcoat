@@ -14,6 +14,7 @@ import {
 import { describe, expect, test } from "vitest";
 import { analyzePixels } from "../src/analyze";
 import {
+	type AnalysisCache,
 	analyzeScene,
 	classifyIntent,
 	planScene,
@@ -372,6 +373,74 @@ describe("analyzeScene (sampler)", () => {
 		expect(seen).toHaveLength(1);
 		expect(seen[0].src).toBe("dup.png");
 		expect(seen[0].clipped).toBeGreaterThanOrEqual(0);
+	});
+
+	test("an external cache is shared across calls, and each call still reports", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const cache: AnalysisCache = new Map();
+		const reports: string[] = [];
+		const report = (_a: unknown, node: { src: string }) =>
+			reports.push(node.src);
+		const tree = createGroup([imageNode("a.png"), imageNode("b.png")]);
+		const first = await analyzeScene(sample, tree, {}, report, { cache });
+		const second = await analyzeScene(sample, tree, {}, report, { cache });
+		expect(calls).toBe(2);
+		expect(cache.size).toBe(2);
+		expect(second).toEqual(first);
+		expect(reports).toEqual(["a.png", "b.png", "a.png", "b.png"]);
+
+		const keyed = new Map() as AnalysisCache;
+		await analyzeScene(sample, tree, {}, undefined, {
+			cache: keyed,
+			srcKey: (src) => `sha:${src.length}`,
+		});
+		expect(calls).toBe(3);
+		expect([...keyed.keys()][0]?.startsWith("sha:5|cover|")).toBe(true);
+	});
+
+	test("a failed sample is not kept in an external cache", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			if (calls === 1) throw new Error("decode failed");
+			return brightBuffer();
+		};
+		const cache: AnalysisCache = new Map();
+		const tree = createGroup([imageNode("x.png")]);
+		await expect(
+			analyzeScene(sample, tree, {}, undefined, { cache }),
+		).rejects.toThrow("decode failed");
+		await Promise.resolve();
+		expect(cache.size).toBe(0);
+		await analyzeScene(sample, tree, {}, undefined, { cache });
+		expect(calls).toBe(2);
+	});
+
+	test("keys a long data URI by a hash, not the URI itself", async () => {
+		const uri = (c: string) => `data:image/png;base64,${c.repeat(4096)}`;
+		const cache: AnalysisCache = new Map();
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		await analyzeScene(
+			sample,
+			createGroup([
+				imageNode(uri("A")),
+				imageNode(uri("A")),
+				imageNode(uri("B")),
+			]),
+			{},
+			undefined,
+			{ cache },
+		);
+		expect(calls).toBe(2);
+		for (const key of cache.keys()) expect(key.length).toBeLessThan(128);
 	});
 
 	test("no analysis, no report: an explicit photo policy never calls back", async () => {

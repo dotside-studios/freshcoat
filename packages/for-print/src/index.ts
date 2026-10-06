@@ -60,6 +60,8 @@ export {
 	repeatSpread,
 } from "./measure";
 export {
+	type AnalysisCache,
+	type AnalyzeSceneOptions,
 	analyzeScene,
 	classifyIntent,
 	type ImageSampler,
