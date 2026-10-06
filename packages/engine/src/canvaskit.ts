@@ -2294,6 +2294,7 @@ export async function paintScene(
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
 	if (cache) cache.stats.paints++;
 	const { fonts, images } = collectAssets(commands);
+	const requested = new Set(images);
 	const warnings: PaintWarning[] = [];
 
 	const loaded: LoadedFontBytes[] = [];
@@ -2465,7 +2466,7 @@ export async function paintScene(
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {
-				if (!images.includes(src)) {
+				if (!requested.has(src)) {
 					warnings.push({
 						kind: "image_load_failed",
 						src,
