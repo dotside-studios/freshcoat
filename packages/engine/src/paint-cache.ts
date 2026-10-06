@@ -3,6 +3,11 @@
 // would otherwise rebuild on every paint: the font provider, the shaped lines of
 // text, the decoded images and the output surface. A runtime without one paints exactly as
 // it always has, building and freeing all three per paint.
+//
+// By default a paint frees every cached image its scene did not draw. A batch
+// caller painting many different scenes passes `maxImagePixels` instead: images
+// a paint did not draw then stay, least recently used first out, until the
+// cached images fit the budget.
 
 import {
 	createLutImages,
@@ -50,8 +55,15 @@ type CachedSurface = {
 	hosted: boolean;
 };
 
+export type PaintCacheOptions = {
+	// Decoded pixels kept across paints. Images the current paint draws are
+	// always kept, however far over this that leaves the cache.
+	maxImagePixels?: number;
+};
+
 export type PaintCacheState = {
 	stats: PaintCacheStats;
+	maxImagePixels: number;
 	fonts: { key: FontKey; provider: CK } | null;
 	images: Map<string, CachedImage>;
 	// Freed with the provider whose typefaces they use.
@@ -68,8 +80,9 @@ export type PaintCacheState = {
 // three methods and nothing outside render-kit can reach into it.
 const states = new WeakMap<PaintCache, PaintCacheState>();
 
-export function createPaintCache(): PaintCache {
+export function createPaintCache(opts?: PaintCacheOptions): PaintCache {
 	const state: PaintCacheState = {
+		maxImagePixels: opts?.maxImagePixels ?? 0,
 		stats: {
 			paints: 0,
 			surfaceCreates: 0,
@@ -174,17 +187,38 @@ export function cachedSurface(
 	return state.surface;
 }
 
-// Deletes the cached images this paint's scene did not use.
+// Deletes the cached images this paint's scene did not use, oldest first, until
+// what is left fits the cache's image budget.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
 ): void {
 	const keep = new Set(used);
+	for (const src of keep) {
+		const entry = state.images.get(src);
+		if (!entry) continue;
+		state.images.delete(src);
+		state.images.set(src, entry);
+	}
+	let total = 0;
+	if (state.maxImagePixels > 0)
+		for (const entry of state.images.values()) total += imagePixels(entry);
 	for (const [src, entry] of state.images) {
 		if (keep.has(src)) continue;
+		if (state.maxImagePixels > 0 && total <= state.maxImagePixels) break;
 		state.images.delete(src);
+		total -= imagePixels(entry);
 		freeImage(entry);
 	}
+}
+
+function imagePixels(entry: CachedImage): number {
+	const { image, mipped } = entry;
+	const pixels =
+		typeof image.width === "function"
+			? image.width() * image.height()
+			: image.width * image.height;
+	return mipped ? Math.ceil((pixels * 4) / 3) : pixels;
 }
 
 // The mipmapped copy of a cached image, built on first use. null when `image`

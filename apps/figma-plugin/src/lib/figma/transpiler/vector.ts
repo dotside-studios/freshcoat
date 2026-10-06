@@ -1,7 +1,7 @@
 import { scalePathData } from "@freshcoat-js/engine/path";
 import type { FigmaBoundingBox, FigmaVectorNode } from "../types";
 import { vectorFillRule } from "./classify";
-import { type ElementStroke, fillsToElement, strokeToElement } from "./colors";
+import { fillsToElement, type StrokeElement, strokeToElement } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
 export type TranspileVectorContext = {
@@ -41,7 +41,7 @@ export function transpileVector(
 			d: string;
 			fillRule?: "evenodd";
 			fill?: unknown;
-			stroke?: ElementStroke;
+			stroke?: StrokeElement;
 		};
 	} = {
 		id: node.name.replace(/[^a-zA-Z0-9_]/g, "_") || node.id.replace(":", "_"),

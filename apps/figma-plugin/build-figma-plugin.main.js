@@ -5,7 +5,9 @@ export default function (buildOptions) {
 		...buildOptions,
 		define: {
 			...buildOptions.define,
-			FRESHCOAT_URL: JSON.stringify(process.env.FRESHCOAT_URL ?? "https://freshcoat.dotsidestudios.com"),
+			FRESHCOAT_URL: JSON.stringify(
+				process.env.FRESHCOAT_URL ?? "https://freshcoat.dotsidestudios.com",
+			),
 		},
 	};
 }

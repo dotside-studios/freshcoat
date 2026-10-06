@@ -1,6 +1,8 @@
 import {
 	compile,
+	createPaintCache,
 	createParagraphEngine,
+	type PaintCache,
 	setBarcodeEncoder,
 	type Template,
 } from "@freshcoat-js/coatfile";
@@ -9,7 +11,6 @@ import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { deriveFontMetrics } from "@freshcoat-js/engine";
 import { crc32 } from "@freshcoat-js/workspace/crc";
-import { createImageLru, DEFAULT_IMAGE_CACHE_PIXELS } from "./image-lru";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
 	OutputFormat,
@@ -27,7 +28,9 @@ const scope = self as unknown as WorkerScope;
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped
 type CK = any;
-type CkImage = { width(): number; height(): number; delete(): void };
+
+/** Decoded pixels one render worker keeps across items. */
+const IMAGE_CACHE_PIXELS = 48_000_000;
 
 // The `full` build: the default one the editor's canvas uses has neither the
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
@@ -45,9 +48,8 @@ let text:
 let current: Template | undefined;
 /** images the template carries, sent once with `images` */
 let carried = new Map<string, Blob>();
-const decoded = createImageLru<CkImage>(DEFAULT_IMAGE_CACHE_PIXELS, (img) =>
-	img.delete(),
-);
+/** decoded images, SVG pictures and paths shared by the items of one job */
+let paintCache: PaintCache | undefined;
 
 function loadCanvasKit(): Promise<CK> {
 	ckPromise ??= (async () => {
@@ -87,7 +89,13 @@ async function bytesOf(src: string, own: Map<string, Blob>) {
 	return new Uint8Array(await res.arrayBuffer());
 }
 
+function resetPaintCache() {
+	paintCache?.dispose();
+	paintCache = undefined;
+}
+
 function setFonts(next: Map<string, Uint8Array[]>) {
+	resetPaintCache();
 	text?.engine.dispose();
 	text = undefined;
 	fonts = next;
@@ -114,87 +122,69 @@ async function renderSide(req: WorkerRenderRequest) {
 			? req.variantId
 			: undefined;
 	const own = new Map(req.images);
-	// The images this render has asked for stay decoded until it is done.
-	const using = new Set<string>();
 	const env = createHeadlessEnv({
 		fonts,
 		encode: {
 			format: req.format,
 			...(req.quality !== undefined ? { quality: req.quality } : {}),
 		},
-		async loadImage(src) {
-			using.add(src);
-			decoded.pin(using);
-			const hit = decoded.get(src);
-			if (hit) return hit;
-			const img = ck.MakeImageFromEncoded(
-				await bytesOf(src, own),
-			) as CkImage | null;
-			if (!img) return null;
-			decoded.set(src, img, img.width() * img.height());
-			return img;
-		},
 	});
-	// Print analysis samples each photo from its encoded bytes, which only
-	// this worker holds; the default would fetch the `ws:` reference.
+	// Only this worker holds the bytes; the default would fetch the `ws:`
+	// reference.
 	env.loadImageBytes = (src) => bytesOf(src, own);
+	paintCache ??= createPaintCache({ maxImagePixels: IMAGE_CACHE_PIXELS });
 	const design = req.resize ?? {
 		width: template.width,
 		height: template.height,
 	};
-	try {
-		const compiled = compile(template, req.values, {
-			width: design.width,
-			height: design.height,
-			variantId,
-			...(req.resize ? { resize: req.resize } : {}),
-			...(req.bleed ? { bleed: true } : {}),
-			frameNames: [req.side],
-		});
-		const { engine, fontMetrics } = textFor(ck);
-		const painted = await withPrintFallback(req.print, async (print) => {
-			const [result] = await renderCompiled(
-				compiled,
-				{
-					frameNames: [req.side],
-					...(print ? { print } : {}),
-					exports: [
-						req.scale === 1
-							? {}
-							: { constraint: { kind: "scale", value: req.scale } },
-					],
-				},
-				{ ck, env, fonts, fontMetrics, textEngine: engine },
-			);
-			if (!result || !("bytes" in result))
-				throw new Error("nothing was rendered");
-			return result;
-		});
-		const { result } = painted;
-		// A placeholder in place of a code would print as if it scanned; the
-		// item fails instead, with the encoder's reason.
-		for (const w of result.warnings) {
-			if (w.kind === "barcode_invalid")
-				throw new Error(`Barcode: ${w.message}`);
-			if (w.kind === "barcode_unavailable")
-				throw new Error("Barcode: the encoder isn't loaded");
-		}
-		const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
-		const bytes = ownBytes(result.bytes);
-		return {
-			bytes,
-			crc: crc32(bytes),
-			format: (result.format ?? "png") as OutputFormat,
-			width: result.width,
-			height: result.height,
-			ms: performance.now() - started,
-			...(painted.print !== "off" ? { print: painted.print } : {}),
-			...(painted.error ? { printError: painted.error } : {}),
-			...(gamut.length > 0 ? { gamut } : {}),
-		};
-	} finally {
-		decoded.pin([]);
+	const compiled = compile(template, req.values, {
+		width: design.width,
+		height: design.height,
+		variantId,
+		...(req.resize ? { resize: req.resize } : {}),
+		...(req.bleed ? { bleed: true } : {}),
+		frameNames: [req.side],
+	});
+	const { engine, fontMetrics } = textFor(ck);
+	const painted = await withPrintFallback(req.print, async (print) => {
+		const [result] = await renderCompiled(
+			compiled,
+			{
+				frameNames: [req.side],
+				...(print ? { print } : {}),
+				exports: [
+					req.scale === 1
+						? {}
+						: { constraint: { kind: "scale", value: req.scale } },
+				],
+			},
+			{ ck, env, fonts, fontMetrics, textEngine: engine, paintCache },
+		);
+		if (!result || !("bytes" in result))
+			throw new Error("nothing was rendered");
+		return result;
+	});
+	const { result } = painted;
+	// A placeholder in place of a code would print as if it scanned; the
+	// item fails instead, with the encoder's reason.
+	for (const w of result.warnings) {
+		if (w.kind === "barcode_invalid") throw new Error(`Barcode: ${w.message}`);
+		if (w.kind === "barcode_unavailable")
+			throw new Error("Barcode: the encoder isn't loaded");
 	}
+	const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
+	const bytes = ownBytes(result.bytes);
+	return {
+		bytes,
+		crc: crc32(bytes),
+		format: (result.format ?? "png") as OutputFormat,
+		width: result.width,
+		height: result.height,
+		ms: performance.now() - started,
+		...(painted.print !== "off" ? { print: painted.print } : {}),
+		...(painted.error ? { printError: painted.error } : {}),
+		...(gamut.length > 0 ? { gamut } : {}),
+	};
 }
 
 function reply(message: WorkerReply, transfer: Transferable[] = []) {
@@ -221,7 +211,7 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		}
 		case "images":
 			carried = new Map(msg.entries);
-			decoded.clear();
+			resetPaintCache();
 			return;
 		case "render":
 			try {
@@ -237,7 +227,6 @@ async function handle(msg: WorkerRequest): Promise<void> {
 			setFonts(new Map());
 			current = undefined;
 			carried = new Map();
-			decoded.clear();
 			scope.close();
 			return;
 	}

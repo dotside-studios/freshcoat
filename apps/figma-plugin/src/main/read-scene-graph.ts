@@ -637,6 +637,16 @@ function readStrokeEnum(value: unknown): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
+function readDashPattern(value: unknown): number[] | undefined {
+	if (!Array.isArray(value) || value.length === 0) return undefined;
+	if (!value.every((v) => typeof v === "number")) return undefined;
+	return [...value];
+}
+
+function readCornerSmoothing(value: unknown): number | undefined {
+	return typeof value === "number" && value > 0 ? value : undefined;
+}
+
 type AnyRectNode = AnySceneNode & {
 	fills?: readonly AnyPaint[];
 	strokes?: readonly AnyPaint[];
@@ -644,8 +654,9 @@ type AnyRectNode = AnySceneNode & {
 	strokeCap?: unknown;
 	strokeJoin?: unknown;
 	strokeAlign?: unknown;
+	dashPattern?: unknown;
 	cornerRadius?: unknown;
-	cornerSmoothing?: number;
+	cornerSmoothing?: unknown;
 	topLeftRadius?: number;
 	topRightRadius?: number;
 	bottomRightRadius?: number;
@@ -687,11 +698,17 @@ export function readRectangleNode(node: AnyRectNode): FigmaRectangleNode {
 		strokeCap: readStrokeEnum(node.strokeCap),
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
+		...dashField(node.dashPattern),
 		cornerRadius: readCornerRadius(node),
-		...(typeof node.cornerSmoothing === "number" && node.cornerSmoothing > 0
-			? { cornerSmoothing: node.cornerSmoothing }
+		...(readCornerSmoothing(node.cornerSmoothing) !== undefined
+			? { cornerSmoothing: readCornerSmoothing(node.cornerSmoothing) }
 			: {}),
 	};
+}
+
+function dashField(value: unknown): { dashPattern?: number[] } {
+	const dashPattern = readDashPattern(value);
+	return dashPattern ? { dashPattern } : {};
 }
 
 type AnyVectorPaths = readonly { windingRule: string; data: string }[];
@@ -704,6 +721,7 @@ type AnyVectorNode = AnySceneNode & {
 	strokeCap?: unknown;
 	strokeJoin?: unknown;
 	strokeAlign?: unknown;
+	dashPattern?: unknown;
 	vectorPaths?: AnyVectorPaths;
 	fillGeometry?: AnyVectorPaths;
 	arcData?: FigmaVectorNode["arcData"];
@@ -771,6 +789,7 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		strokeCap: readStrokeEnum(node.strokeCap),
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
+		...dashField(node.dashPattern),
 		fillGeometry: readGeometry(node),
 		...(node.type === "ELLIPSE" && node.arcData
 			? {
@@ -797,6 +816,7 @@ type AnyContainerNode = AnySceneNode & {
 	strokes?: readonly AnyPaint[];
 	strokeWeight?: number;
 	strokeAlign?: unknown;
+	dashPattern?: unknown;
 	cornerRadius?: unknown;
 	topLeftRadius?: number;
 	topRightRadius?: number;
@@ -869,6 +889,7 @@ function readContainer(node: AnyContainerNode): FigmaContainerNode {
 		strokeWeight:
 			typeof node.strokeWeight === "number" ? node.strokeWeight : undefined,
 		strokeAlign: readStrokeEnum(node.strokeAlign),
+		...dashField(node.dashPattern),
 		cornerRadius: readCornerRadius(node),
 		clipsContent: node.clipsContent,
 		layoutMode: node.layoutMode as never,

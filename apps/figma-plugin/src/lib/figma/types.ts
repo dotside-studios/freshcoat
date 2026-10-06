@@ -243,6 +243,7 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	// INSIDE, so leaving it unread paints every such stroke half a weight wide of
 	// where the design put it.
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft] when
 	// the four differ (Figma reports the uniform property as mixed then).
 	cornerRadius?: number | [number, number, number, number];
@@ -265,6 +266,7 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	strokeCap?: string;
 	strokeJoin?: string;
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Figma's REST API attaches fillGeometry as an array of path regions, each
 	// in the node's bounding-box-local coordinate space and filled by its own
 	// winding rule. An open, stroke-only path has none.
@@ -290,6 +292,7 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
 	strokeAlign?: string;
+	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].
 	cornerRadius?: number | [number, number, number, number];
 	clipsContent?: boolean;

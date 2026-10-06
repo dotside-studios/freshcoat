@@ -243,6 +243,31 @@ describe("dynamic image shape", () => {
 		});
 	});
 
+	it("leaves out a gradient stroke, and warns", () => {
+		const r = dynamicElement(
+			baseImage({
+				name: "{{avatar}}",
+				strokes: [
+					{
+						type: "GRADIENT_LINEAR",
+						gradientHandlePositions: [
+							{ x: 0, y: 0.5 },
+							{ x: 1, y: 0.5 },
+							{ x: 0, y: 1 },
+						],
+						gradientStops: [
+							{ position: 0, color: { r: 0, g: 0, b: 0, a: 1 } },
+							{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+						],
+					},
+				],
+				strokeWeight: 4,
+			}),
+		);
+		expect(r.element.properties).not.toHaveProperty("stroke");
+		expect(r.warnings.map((w) => w.code)).toEqual(["image_stroke_unsupported"]);
+	});
+
 	it("masks a round ellipse as a circle", () => {
 		const { element } = dynamicElement(shapeNode({ type: "ELLIPSE" }));
 		expect(element.properties.mask).toBe("circle");

@@ -124,6 +124,13 @@ layers were kept, flattened or skipped.
   single-image rectangle, full ellipse or sharp-cornered polygon are
   rasterized (`paint_flattened`, or `multi_fill_flattened` for an image inside
   a stack).
+- **Strokes.** Visible solid stroke paints are composited into one colour,
+  keeping their opacity (a 50% stroke stays translucent); hidden ones are
+  ignored. A dashed stroke keeps its pattern as `dash`. A rectangle, vector or
+  frame with a visible gradient or image stroke is rasterized
+  (`stroke_flattened`).
+- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. Frames
+  keep their radius but not smoothing, which coatfile frames do not carry.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
   linear dodge as `plus`. Pass through is how the renderer composites
   a frame already. A frame set to Normal isolates its content in Figma, which
@@ -160,7 +167,8 @@ layers were kept, flattened or skipped.
   `circle` or `ellipse` mask and a polygon a `polygon` mask, its box grown so
   the vertices land where Figma draws them; the photo fills that box. Partial
   arcs, donuts and polygons with rounded corners are rasterized and cannot
-  hold a field.
+  hold a field. A gradient or image stroke on a bound image is left out
+  (`image_stroke_unsupported`) so the field survives.
 - **Colorways.** Each instance of the card component named `<Card> / <Label>`
   becomes a variant, after a first **Default** that is the card itself. What
   the instance changes is diffed against the card, layer by layer: its
@@ -276,7 +284,7 @@ and what the transpiler made of it. It carries:
 - **`decisions`**: one row per node the walk reached: which element it became,
   or why it was rasterized or skipped. The rasterization reasons are
   `text_mixed_styling_flattened`, `multi_fill_flattened`, `paint_flattened`,
-  `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
+  `stroke_flattened`, `blend_mode_flattened`, `effect_flattened`, `vector_flattened` and
   `transform_undecomposable_flattened`. Element ids are the *final* ones, after colliding layer names are
   renamed, so they match the template.
 - **`rasters`**: each pre-exported bitmap's dimensions. A 1×1 is Figma saying
@@ -356,17 +364,13 @@ and `freshcoat_plugin:fields` (per slot frame); see
 ["Plugins with other IDs won't be able to read this data"](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/).
 It's there to keep our keys legible in an exported `.fig`.
 
-The `id` in `package.json` is a development placeholder. When preparing a
-published plugin, preserve its assigned identity across updates: plugin data
-is scoped to that identity. Changing it makes existing stored bindings
-inaccessible to the new plugin.
+The `id` in `package.json` is the plugin's permanent assigned id. Keep it
+stable across updates: plugin data is scoped to it, so changing it makes
+existing stored bindings inaccessible to the new plugin.
 
 Layer-name markers such as `text:{{name}}` still allow bindings to be inferred.
 Hand-edited metadata stored only in plugin data, including labels, sources and
 required flags, must be re-entered after an identity change.
-
-`readPluginData` also checks legacy `davi:` keys for documents created by
-earlier versions under the same plugin identity.
 
 ## Develop
 

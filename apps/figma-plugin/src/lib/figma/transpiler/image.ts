@@ -81,6 +81,16 @@ function imageShape(
 	warnings: TemplateWarning[],
 ): ImageShape {
 	const stroke = strokeToElement(node, scale);
+	const stroked =
+		(node.strokeWeight ?? 0) > 0 &&
+		(node.strokes ?? []).some((p) => p.visible !== false);
+	if (!stroke && stroked)
+		warnings.push({
+			severity: "warn",
+			code: "image_stroke_unsupported",
+			message: "A gradient or image stroke on an image was left out.",
+			nodeId: node.id,
+		});
 	const clip = imageClip(node, size, scale, warnings);
 	return { ...clip, ...(stroke ? { stroke } : {}) };
 }
