@@ -4,28 +4,8 @@ import {
 	type PendingAsset,
 	parseAssetUri,
 } from "@freshcoat-js/coatfile/assets";
-import type {
-	FigmaConstraints,
-	FigmaContainerNode,
-	FigmaNode,
-	FigmaVectorNode,
-} from "../types";
-import { isContainerNode, isRectangleNode, isTextNode } from "../types";
-
-const VECTOR_TYPES = new Set([
-	"VECTOR",
-	"BOOLEAN_OPERATION",
-	"STAR",
-	"POLYGON",
-	"LINE",
-	"ELLIPSE",
-]);
-const isVectorNode = (n: FigmaNode): n is FigmaVectorNode =>
-	VECTOR_TYPES.has(n.type);
-
 import {
 	buildFieldMeta,
-	extractTokens,
 	type FieldMeta,
 	fieldMetaToSchema,
 	inferNodeBinding,
@@ -33,6 +13,13 @@ import {
 	storedToNodeBinding,
 	type VisibilityCondition,
 } from "../binding";
+import type { FigmaConstraints, FigmaContainerNode, FigmaNode } from "../types";
+import {
+	isContainerNode,
+	isRectangleNode,
+	isTextNode,
+	isVectorNode,
+} from "../types";
 import { transpileBarcode } from "./barcode";
 import { isBarcodeLayerName } from "./barcode-name";
 import {
@@ -62,6 +49,7 @@ import {
 	SizeMismatchError,
 	sizesAgree,
 } from "./exact-size";
+import { extractTokens } from "./fields";
 import { collectFontDescriptors } from "./fonts";
 import { layoutChildFromNode, transpileFrame } from "./frame";
 import {

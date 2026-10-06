@@ -16,6 +16,7 @@ import type {
 	FigmaVectorNode,
 	FigmaVectorNodeType,
 } from "~/lib/figma/types";
+import { isContainerNode, isVectorNode } from "~/lib/figma/types";
 import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
 
 function rgbaFrom(color: {
@@ -799,30 +800,14 @@ type AnyContainerNode = AnySceneNode & {
 	getMainComponentAsync?: () => Promise<{ id: string } | null>;
 };
 
-const VECTOR_TYPES = new Set([
-	"VECTOR",
-	"BOOLEAN_OPERATION",
-	"STAR",
-	"POLYGON",
-	"LINE",
-	"ELLIPSE",
-]);
-const CONTAINER_TYPES = new Set([
-	"FRAME",
-	"GROUP",
-	"COMPONENT",
-	"INSTANCE",
-	"COMPONENT_SET",
-]);
-
 export function readNode(
 	node: AnySceneNode & { type: string },
 ): FigmaNode | null {
 	const t = node.type;
 	if (t === "TEXT") return readTextNode(node as never);
 	if (t === "RECTANGLE") return readRectangleNode(node as never);
-	if (VECTOR_TYPES.has(t)) return readVectorNode(node as never);
-	if (CONTAINER_TYPES.has(t)) return readContainer(node as AnyContainerNode);
+	if (isVectorNode(node)) return readVectorNode(node as never);
+	if (isContainerNode(node)) return readContainer(node as AnyContainerNode);
 	return null; // unsupported node type — skipped by the caller
 }
 

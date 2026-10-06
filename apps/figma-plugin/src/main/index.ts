@@ -6,7 +6,6 @@ import {
 import {
 	bindableProperties,
 	buildFieldMeta,
-	extractTokens,
 	type FieldMeta,
 	inferNodeBinding,
 	storedToNodeBinding,
@@ -21,6 +20,7 @@ import {
 	exactSizeCheck,
 	fromDesignSize,
 } from "~/lib/figma/transpiler/exact-size";
+import { extractTokens } from "~/lib/figma/transpiler/fields";
 import { rasterScaleFor } from "~/lib/figma/transpiler/raster-scale";
 import { colorwayLabel } from "~/lib/figma/transpiler/variants";
 import type { FigmaContainerNode } from "~/lib/figma/types";

@@ -8,7 +8,7 @@
 //   barcode:code39:"ID {{id}}"      a template, quoted as in the other markers
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
 import type { Symbology } from "@freshcoat-js/coatfile";
-import { isWholeMustacheToken, parseMustacheTokens } from "./fields";
+import { extractTokens, isWholeMustacheToken } from "./fields";
 
 /** The symbologies a `barcode:` layer can name: coatfile's `SYMBOLOGIES`,
  *  mirrored here so the main thread needs no coatfile runtime (a test holds
@@ -117,7 +117,7 @@ function readValue(
 		return { value: `{{${whole.id}}}`, mode: "token", ids: [whole.id] };
 	const unquoted =
 		s.length >= 2 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s;
-	const ids = [...new Set(parseMustacheTokens(unquoted))];
+	const ids = [...new Set(extractTokens(unquoted))];
 	return {
 		value: unquoted,
 		mode: ids.length > 0 ? "template" : "literal",

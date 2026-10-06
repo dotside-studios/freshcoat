@@ -313,15 +313,13 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	layoutWrap?: "NO_WRAP" | "WRAP";
 };
 
-export type FigmaFrameNode = FigmaContainerNode & { type: "FRAME" };
-
 export type FigmaNode =
 	| FigmaTextNode
 	| FigmaRectangleNode
 	| FigmaVectorNode
 	| FigmaContainerNode;
 
-export function isContainerNode(n: FigmaNode): n is FigmaContainerNode {
+export function isContainerNode(n: { type: string }): n is FigmaContainerNode {
 	return (
 		n.type === "FRAME" ||
 		n.type === "GROUP" ||
@@ -339,7 +337,7 @@ export function isRectangleNode(n: FigmaNode): n is FigmaRectangleNode {
 	return n.type === "RECTANGLE";
 }
 
-export function isVectorNode(n: FigmaNode): n is FigmaVectorNode {
+export function isVectorNode(n: { type: string }): n is FigmaVectorNode {
 	return (
 		n.type === "VECTOR" ||
 		n.type === "BOOLEAN_OPERATION" ||

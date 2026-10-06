@@ -1,5 +1,4 @@
 import type { ElementAdjust, TemplateWarning } from "@freshcoat-js/coatfile";
-import { extractTokens } from "../binding";
 import type {
 	FigmaBoundingBox,
 	FigmaImageFilters,
@@ -7,7 +6,7 @@ import type {
 	FigmaRectangleNode,
 } from "../types";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
-import { isWholeMustacheToken } from "./fields";
+import { extractTokens, isWholeMustacheToken } from "./fields";
 
 export type TranspileImageContext = {
 	frame: FigmaBoundingBox;

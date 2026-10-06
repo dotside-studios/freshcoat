@@ -19,7 +19,6 @@ import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
 	type BindProperty,
-	extractTokens,
 	type FieldFormat,
 	type FieldMeta,
 	formatsForProperty,
@@ -34,7 +33,7 @@ import {
 	DEFAULT_SYMBOLOGY,
 	parseBarcodeLayerName,
 } from "~/lib/figma/transpiler/barcode-name";
-import { titleCase } from "~/lib/figma/transpiler/fields";
+import { extractTokens, titleCase } from "~/lib/figma/transpiler/fields";
 import type { SelectionDetail } from "~/shared/protocol";
 import {
 	byPropertyOrder,

@@ -1,41 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
-	inferImageField,
-	inferQrField,
-	inferStringField,
+	extractTokens,
 	isWholeMustacheToken,
-	kebabToSnake,
-	parseMustacheTokens,
 	titleCase,
 } from "~/lib/figma/transpiler/fields";
 
-describe("parseMustacheTokens", () => {
+describe("extractTokens", () => {
 	it("extracts every token from a string", () => {
-		expect(parseMustacheTokens("Hello {{first}} and {{second}}!")).toEqual([
+		expect(extractTokens("Hello {{first}} and {{second}}!")).toEqual([
 			"first",
 			"second",
 		]);
 	});
 
 	it("returns empty array on no tokens", () => {
-		expect(parseMustacheTokens("Hello world")).toEqual([]);
+		expect(extractTokens("Hello world")).toEqual([]);
 	});
 
 	it("trims whitespace inside braces", () => {
-		expect(parseMustacheTokens("{{  spaced  }}")).toEqual(["spaced"]);
+		expect(extractTokens("{{  spaced  }}")).toEqual(["spaced"]);
 	});
 
 	it("ignores invalid identifiers", () => {
-		expect(parseMustacheTokens("{{1abc}} {{a-b}} {{ok_one}}")).toEqual([
-			"ok_one",
-		]);
-	});
-});
-
-describe("kebabToSnake", () => {
-	it("converts dashes to underscores", () => {
-		expect(kebabToSnake("user-avatar")).toBe("user_avatar");
-		expect(kebabToSnake("plain")).toBe("plain");
+		expect(extractTokens("{{1abc}} {{a-b}} {{ok_one}}")).toEqual(["ok_one"]);
 	});
 });
 
@@ -61,39 +48,5 @@ describe("titleCase", () => {
 		expect(titleCase("display_name")).toBe("Display Name");
 		expect(titleCase("user_avatar")).toBe("User Avatar");
 		expect(titleCase("name")).toBe("Name");
-	});
-});
-
-describe("inferStringField / inferImageField / inferQrField", () => {
-	it("inferStringField returns title", () => {
-		expect(inferStringField("display_name")).toEqual({
-			type: "string",
-			title: "Display Name",
-		});
-	});
-
-	it("inferImageField sets format and aspect when provided", () => {
-		expect(inferImageField("user_avatar", [1, 1])).toEqual({
-			type: "string",
-			format: "image",
-			title: "User Avatar",
-			"x-image-aspect": [1, 1],
-		});
-	});
-
-	it("inferImageField omits aspect when not provided", () => {
-		expect(inferImageField("banner")).toEqual({
-			type: "string",
-			format: "image",
-			title: "Banner",
-		});
-	});
-
-	it("inferQrField sets x-widget", () => {
-		expect(inferQrField("link")).toEqual({
-			type: "string",
-			title: "Link",
-			"x-widget": "url",
-		});
 	});
 });

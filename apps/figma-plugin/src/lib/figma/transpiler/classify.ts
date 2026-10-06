@@ -7,7 +7,7 @@ import type {
 	FigmaTextNode,
 	FigmaVectorNode,
 } from "../types";
-import { isContainerNode } from "../types";
+import { isContainerNode, isVectorNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";
 import { compositeSolids, isMappablePaint, type PaintBox } from "./paint";
 import { decomposeTransform, nodeExtent } from "./transform";
@@ -256,14 +256,7 @@ export function classify(n: FigmaNode): Classification {
 		return { kind: "native-rect" };
 	}
 
-	if (
-		n.type === "VECTOR" ||
-		n.type === "BOOLEAN_OPERATION" ||
-		n.type === "STAR" ||
-		n.type === "POLYGON" ||
-		n.type === "LINE" ||
-		n.type === "ELLIPSE"
-	) {
+	if (isVectorNode(n)) {
 		// Without fillGeometry there's nothing to emit. Every region merges into
 		// one `d` under one fill rule, so regions that disagree on theirs cannot.
 		if (!Array.isArray(n.fillGeometry) || n.fillGeometry.length === 0) {
