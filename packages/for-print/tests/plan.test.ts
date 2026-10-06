@@ -217,6 +217,23 @@ describe("planScene (sync)", () => {
 		expect(adjust?.lut3d).toBeDefined();
 	});
 
+	test("equal print settings return the same tables and composed cube", () => {
+		const own = buildAdjust({ saturation: 1.2 });
+		const scene = (): Node => ({ ...imageNode(), adjust: own });
+		const balance = { r: 0.95, g: 1, b: 1.05 };
+		const a = planScene(scene(), { balance }).adjust;
+		const b = planScene(scene(), { balance }).adjust;
+		expect(a?.lut3d).toBeDefined();
+		expect(b?.lut3d).toBe(a?.lut3d);
+		const pa = printAdjust({ ...YMCKO_PRESET, balance });
+		const pb = printAdjust({ ...YMCKO_PRESET, balance });
+		expect(pb.lut?.r).toBe(pa.lut?.r);
+		expect(pb.lut?.b).toBe(pa.lut?.b);
+		const n1 = printAdjust(YMCKO_PRESET).lut;
+		const n2 = printAdjust(YMCKO_PRESET).lut;
+		expect(n2?.r).toBe(n1?.r);
+	});
+
 	test("policy can correct graphics and opt photos out", () => {
 		const tree = createGroup([imageNode(), rectNode()]);
 		const planned = planScene(tree, {

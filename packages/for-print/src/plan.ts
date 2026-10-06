@@ -73,7 +73,34 @@ export function classifyIntent(node: Node): LayerIntent {
 // steps: it corrects what the printer does to the finished signal, so it belongs
 // at the end of the chain rather than folded into `gamma`. At 1 the table is
 // bit-identical to what it was before balance existed.
+//
+// Equal parameters return the same table, so freshcoat's composed-cube and LUT
+// image caches hit by identity across renders. Treat it as read-only.
 function toneLut(gamma: number, darkness: number, balance = 1): Uint8Array {
+	const key = `${gamma}|${darkness}|${balance}`;
+	const hit = toneMemo.get(key);
+	if (hit) {
+		toneMemo.delete(key);
+		toneMemo.set(key, hit);
+		return hit;
+	}
+	const t = buildToneLut(gamma, darkness, balance);
+	toneMemo.set(key, t);
+	for (const oldest of toneMemo.keys()) {
+		if (toneMemo.size <= TONE_MEMO_MAX) break;
+		toneMemo.delete(oldest);
+	}
+	return t;
+}
+
+const toneMemo = new Map<string, Uint8Array>();
+const TONE_MEMO_MAX = 64;
+
+function buildToneLut(
+	gamma: number,
+	darkness: number,
+	balance: number,
+): Uint8Array {
 	const t = new Uint8Array(256);
 	for (let i = 0; i < 256; i++) {
 		// gamma is a rounded integer LUT (like gammaStep); darkness then operates on
