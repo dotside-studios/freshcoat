@@ -10,6 +10,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import GithubSlugger, { slug } from "github-slugger";
 
 const SKIP_DIRS = new Set([
 	"node_modules",
@@ -41,15 +42,12 @@ export function markdownFiles(root: string): string[] {
 	return out;
 }
 
-/** The anchor GitHub gives a heading. */
-export function slugOf(heading: string): string {
+/** A heading's text as GitHub renders it. */
+function headingText(heading: string): string {
 	return heading
 		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/[`*~]/g, "")
-		.trim()
-		.toLowerCase()
-		.replace(/[^\p{L}\p{N}\s_-]/gu, "")
-		.replace(/\s/g, "-");
+		.trim();
 }
 
 /** Blanks out fenced code blocks, keeping line numbers. */
@@ -72,16 +70,17 @@ function withoutFences(text: string): string[] {
 
 const withoutSpans = (line: string) => line.replace(/(`+)[^`]*?\1/g, "");
 
+/** The anchor GitHub gives a heading. */
+export function slugOf(heading: string): string {
+	return slug(headingText(heading));
+}
+
 export function anchorsOf(text: string): Set<string> {
 	const anchors = new Set<string>();
-	const seen = new Map<string, number>();
+	const slugger = new GithubSlugger();
 	for (const line of withoutFences(text)) {
 		const heading = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/);
-		if (!heading) continue;
-		const base = slugOf(heading[1] as string);
-		const n = seen.get(base) ?? 0;
-		seen.set(base, n + 1);
-		anchors.add(n === 0 ? base : `${base}-${n}`);
+		if (heading) anchors.add(slugger.slug(headingText(heading[1] as string)));
 	}
 	return anchors;
 }
