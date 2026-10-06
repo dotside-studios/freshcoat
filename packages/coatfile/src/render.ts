@@ -19,6 +19,7 @@ import {
 	type ImageNode,
 	type KeptPaintResult,
 	type Node,
+	type PaintCache,
 	type PaintResult,
 	type PaintRuntime,
 	type PaintWarning,
@@ -73,6 +74,9 @@ export type RenderRuntime = {
 	// A text engine built from `fonts`, reused across renders. The caller owns
 	// it; one is created and disposed per call when omitted.
 	textEngine?: TextEngine;
+	// Keeps decoded images, SVG pictures, paths and the font provider across
+	// paints, in place of any cache on `env`. The caller owns and disposes it.
+	paintCache?: PaintCache;
 };
 
 // Print-optimization toggle. When enabled, each frame's node tree is run through
@@ -319,6 +323,7 @@ export async function renderCompiled(
 				const result = await runtime.env.paint(
 					atExport(commands, scale, supersample),
 					ck,
+					runtime.paintCache ? { cache: runtime.paintCache } : undefined,
 				);
 				results.push({
 					...result,

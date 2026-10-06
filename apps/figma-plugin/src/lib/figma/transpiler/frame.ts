@@ -3,9 +3,8 @@ import type {
 	FigmaContainerNode,
 	FigmaGridTrack,
 	FigmaNode,
-	FigmaSolidPaint,
 } from "../types";
-import { figmaColorToHex, fillsToElement, mapStrokeAlign } from "./colors";
+import { fillsToElement, type StrokeElement, strokeToElement } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 import { scaleCorners } from "./rect";
 
@@ -162,11 +161,7 @@ export function transpileFrame(
 		opacity?: number;
 		properties: {
 			fill?: unknown;
-			stroke?: {
-				color: string;
-				width: number;
-				align?: "inside" | "outside";
-			};
+			stroke?: StrokeElement;
 			cornerRadius?: number | [number, number, number, number];
 			clipsContent?: boolean;
 			layout?: unknown;
@@ -188,19 +183,8 @@ export function transpileFrame(
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
 
-	if (
-		node.strokes &&
-		node.strokes.length > 0 &&
-		node.strokeWeight !== undefined
-	) {
-		const stroke = node.strokes[0] as FigmaSolidPaint;
-		const align = mapStrokeAlign(node.strokeAlign);
-		out.properties.stroke = {
-			color: figmaColorToHex(stroke.color),
-			width: Math.round(node.strokeWeight * ctx.scale * 2) / 2,
-			...(align ? { align } : {}),
-		};
-	}
+	const stroke = strokeToElement(node, ctx.scale);
+	if (stroke) out.properties.stroke = stroke;
 
 	if (node.clipsContent === true) {
 		out.properties.clipsContent = true;
