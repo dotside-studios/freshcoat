@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { FIELD_KEY, FIELDS_KEY, readPluginData } from "~/main/plugin-data";
+import {
+	FIELD_KEY,
+	FIELDS_KEY,
+	pluginDataKeys,
+	readPluginData,
+} from "~/main/plugin-data";
 
 /** A node whose pluginData is a plain map. */
 function node(data: Record<string, string>) {
@@ -38,5 +43,15 @@ describe("readPluginData", () => {
 
 	it("tolerates a node with no pluginData at all", () => {
 		expect(readPluginData({}, FIELD_KEY)).toBe("");
+	});
+});
+
+describe("pluginDataKeys", () => {
+	it("includes the pre-rename key so search finds older markup", () => {
+		expect(pluginDataKeys(FIELD_KEY)).toEqual([FIELD_KEY, "davi:field"]);
+	});
+
+	it("is just the key when it has no legacy name", () => {
+		expect(pluginDataKeys("other")).toEqual(["other"]);
 	});
 });
