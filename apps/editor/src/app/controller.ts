@@ -68,7 +68,6 @@ import {
 	parentKeyOf,
 	parseKey,
 	siblingsOf,
-	walkLayers,
 } from "~/doc/path";
 import { type PenPath, penElement } from "~/doc/pen";
 import {
@@ -1383,18 +1382,7 @@ export class EditorController {
 		const t = this.template;
 		if (!t) return null;
 		const { geometry, locked, hidden, side, selection } = this.state;
-		const entries = [...walkLayers(t, side)].filter(
-			(e) => !e.key.endsWith("/bg") && !e.key.split("/").includes("-1"),
-		);
-		// Depth-first order paints parents before children, so the last hit wins.
-		let hit: string | null = null;
-		for (const e of entries) {
-			if (locked.has(e.key) || hidden.has(e.key)) continue;
-			if ([...locked].some((l) => isAncestor(l, e.key))) continue;
-			const box = geometry.get(e.key);
-			if (!box || !containsPoint(box.rect, box.worldRotation, point)) continue;
-			hit = e.key;
-		}
+		const hit = hitLayer(t, side, geometry, locked, hidden, point);
 		if (!hit || opts.deep) return hit;
 		return topmostSelectable(hit, selection);
 	}
@@ -1421,6 +1409,43 @@ function warnStructural(
 		"A structural edit ran in a variant; scope it to the base.",
 		op.name || op.toString().slice(0, 120),
 	);
+}
+
+/**
+ * The topmost layer under `point` that is neither locked, under a locked
+ * layer, nor hidden. Walks back to front, so the first hit is the answer.
+ * Backgrounds and mask sources are never hit.
+ */
+export function hitLayer(
+	t: Template,
+	side: number,
+	geometry: LayerGeometry,
+	locked: ReadonlySet<string>,
+	hidden: ReadonlySet<string>,
+	point: { x: number; y: number },
+): string | null {
+	const frame = t.template_data[side];
+	if (!frame) return null;
+	const visit = (el: Element, key: string, blocked: boolean): string | null => {
+		const out = blocked || locked.has(key);
+		if (el.type === "frame" || el.type === "mask") {
+			const children = el.properties.children;
+			for (let i = children.length - 1; i >= 0; i--) {
+				const hit = visit(children[i] as Element, `${key}/${i}`, out);
+				if (hit) return hit;
+			}
+		}
+		if (out || hidden.has(key)) return null;
+		const box = geometry.get(key);
+		return box && containsPoint(box.rect, box.worldRotation, point)
+			? key
+			: null;
+	};
+	for (let i = frame.elements.length - 1; i >= 0; i--) {
+		const hit = visit(frame.elements[i] as Element, `${side}/${i}`, false);
+		if (hit) return hit;
+	}
+	return null;
 }
 
 /**
