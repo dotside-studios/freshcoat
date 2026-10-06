@@ -12,6 +12,7 @@
 // punctuation (em dash etc.); astral/emoji (surrogate pairs) and CJK line-break
 // rules are untested.
 
+import { fontArrayBuffer } from "./font-bytes";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	InlineShapedLine,
@@ -68,13 +69,7 @@ export function createParagraphEngine(
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const [family, list] of fonts) {
 		for (const bytes of list) {
-			provider.registerFont(
-				bytes.buffer.slice(
-					bytes.byteOffset,
-					bytes.byteOffset + bytes.byteLength,
-				),
-				family,
-			);
+			provider.registerFont(fontArrayBuffer(bytes), family);
 		}
 	}
 	// Every registered family, in insertion order, used as the per-glyph fallback
