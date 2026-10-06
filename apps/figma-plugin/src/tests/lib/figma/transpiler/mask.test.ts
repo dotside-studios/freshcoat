@@ -5,7 +5,7 @@ import {
 	transpile,
 } from "~/lib/figma/transpiler/index";
 import type { FigmaContainerNode, FigmaNode } from "~/lib/figma/types";
-import { readBaseFields } from "~/main/read-scene-graph";
+import { readBaseFields } from "~/main/read-base";
 
 const PRODUCT: ProductRegistryEntry = {
 	sku: "card_cr80",
