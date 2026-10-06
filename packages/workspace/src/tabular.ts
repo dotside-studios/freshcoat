@@ -75,7 +75,8 @@ function cellText(value: unknown): string {
 	return String(value);
 }
 
-/** Rows of equal width, with empty trailing rows and columns removed. */
+/** Rows of equal width, with empty trailing rows and columns removed. The
+ *  matrix is trimmed in place. */
 function trim(rows: string[][]): string[][] {
 	const filled = (cell: string | undefined) =>
 		cell !== undefined && cell.trim() !== "";
@@ -91,9 +92,93 @@ function trim(rows: string[][]): string[][] {
 			}
 		}
 	}
-	return rows
-		.slice(0, height)
-		.map((row) => Array.from({ length: width }, (_, c) => row[c] ?? ""));
+	rows.length = height;
+	for (let r = 0; r < height; r++) {
+		const row = rows[r] ?? [];
+		rows[r] = row;
+		if (row.length > width) row.length = width;
+		for (let c = 0; c < width; c++) row[c] ??= "";
+	}
+	return rows;
+}
+
+const SEPARATORS = [",", "\t", ";", "|"];
+
+/** The separator used most outside quotes in the first 1024 characters,
+ *  ties going to the earlier one in `SEPARATORS`, and a comma when none is. */
+function guessSeparator(text: string): string {
+	const counts = SEPARATORS.map(() => 0);
+	let quoted = false;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (ch === '"') quoted = !quoted;
+		else if (!quoted) {
+			const k = SEPARATORS.indexOf(ch as string);
+			if (k !== -1) counts[k] = (counts[k] ?? 0) + 1;
+		}
+	}
+	let best = 0;
+	for (let k = 1; k < counts.length; k++) {
+		if ((counts[k] ?? 0) > (counts[best] ?? 0)) best = k;
+	}
+	return SEPARATORS[best] as string;
+}
+
+/**
+ * Delimited text as rows, read the way SheetJS reads it: a `sep=` first line
+ * names the separator, else `separator`, else the likeliest one. A quote
+ * opens a quoted span only at the start of a cell, and a cell that starts
+ * and ends with a quote loses both and has `""` unescaped.
+ */
+function splitDelimited(input: string, separator?: string): string[][] {
+	let text = input;
+	let sep: string;
+	if (text.startsWith("sep=")) {
+		if (text.charCodeAt(5) === 13 && text.charCodeAt(6) === 10) {
+			sep = text.charAt(4);
+			text = text.slice(7);
+		} else if (text.charCodeAt(5) === 13 || text.charCodeAt(5) === 10) {
+			sep = text.charAt(4);
+			text = text.slice(6);
+		} else sep = guessSeparator(text.slice(0, 1024));
+	} else sep = separator ?? guessSeparator(text.slice(0, 1024));
+	const sepCode = sep.charCodeAt(0);
+	const rows: string[][] = [];
+	let row: string[] = [];
+	let start = 0;
+	let startCode = text.charCodeAt(0);
+	let quoted = false;
+	const finish = (end: number, code: number) => {
+		let cell = text.slice(start, end);
+		if (cell.charCodeAt(cell.length - 1) === 13) cell = cell.slice(0, -1);
+		if (cell.charCodeAt(0) === 34 && cell.charCodeAt(cell.length - 1) === 34) {
+			cell = cell.slice(1, -1).replaceAll('""', '"');
+		}
+		row.push(cell);
+		start = end + 1;
+		startCode = text.charCodeAt(start);
+		if (code !== sepCode) {
+			rows.push(row);
+			row = [];
+		}
+	};
+	let end = 0;
+	let code = 0;
+	for (; end < text.length; end++) {
+		code = text.charCodeAt(end);
+		if (code === 34) {
+			if (startCode === 34) quoted = !quoted;
+			continue;
+		}
+		if (quoted) continue;
+		if (code === 13) {
+			if (text.charCodeAt(end + 1) === 10) end++;
+			finish(end, code);
+		} else if (code === sepCode || code === 10) finish(end, code);
+	}
+	if (end - start > 0) finish(end, code);
+	if (row.length > 0) rows.push(row);
+	return rows;
 }
 
 function objectsToRows(items: unknown[]): string[][] {
@@ -165,13 +250,15 @@ async function loadXlsx(): Promise<XlsxModule> {
 
 function sheetRows(XLSX: XlsxModule, sheet: WorkSheet): string[][] {
 	const ref = sheet["!ref"];
-	if (ref === undefined) return [];
+	const data = sheet["!data"];
+	if (ref === undefined || data === undefined) return [];
 	const range = XLSX.utils.decode_range(ref);
 	const rows: string[][] = [];
 	for (let r = range.s.r; r <= range.e.r; r++) {
+		const cells = data[r];
 		const row: string[] = [];
 		for (let c = range.s.c; c <= range.e.c; c++) {
-			const cell = sheet[XLSX.utils.encode_cell({ r, c })] as
+			const cell = cells?.[c] as
 				| { t: string; v?: unknown; w?: string }
 				| undefined;
 			if (cell === undefined || cell.t === "z") row.push("");
@@ -205,19 +292,15 @@ export async function readTable(
 		sheets = [{ name: base, rows: readNdjson(decodeText(input)) }];
 	} else if (TEXT_FORMATS.has(ext)) {
 		const text = decodeText(input);
-		if (text.trim() === "") sheets = [];
-		else {
-			const XLSX = await loadXlsx();
-			const wb = XLSX.read(text, {
-				type: "string",
-				raw: true,
-				...(ext === "tsv" ? { FS: "\t" } : {}),
-			});
-			sheets = wb.SheetNames.map((name) => ({
-				name: base,
-				rows: sheetRows(XLSX, wb.Sheets[name] as WorkSheet),
-			}));
-		}
+		sheets =
+			text.trim() === ""
+				? []
+				: [
+						{
+							name: base,
+							rows: splitDelimited(text, ext === "tsv" ? "\t" : undefined),
+						},
+					];
 	} else if (WORKBOOK_FORMATS.has(ext)) {
 		if (typeof input === "string") {
 			throw new TabularError("invalid_file", `A .${ext} file is binary`);
@@ -230,7 +313,7 @@ export async function readTable(
 		const XLSX = await loadXlsx();
 		let wb: import("xlsx").WorkBook;
 		try {
-			wb = XLSX.read(input, { type: "array", cellDates: true });
+			wb = XLSX.read(input, { type: "array", cellDates: true, dense: true });
 		} catch (err) {
 			throw new TabularError(
 				"invalid_file",
