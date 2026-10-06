@@ -116,6 +116,7 @@ export {
 export {
 	createPaintCache,
 	type PaintCache,
+	type PaintCacheOptions,
 	type PaintCacheStats,
 } from "./paint-cache";
 export {
