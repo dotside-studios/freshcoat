@@ -184,7 +184,7 @@ export function figmaPaintToFill(
 // Figma stroke-cap enum → coatfile. Returns undefined for the canvas
 // default (butt) so callers can omit it and keep output lean. Arrow caps
 // (ARROW_*) and NONE are unsupported → butt → undefined.
-export function mapStrokeCap(
+function mapStrokeCap(
 	figmaCap: string | undefined,
 ): "round" | "square" | undefined {
 	if (figmaCap === "ROUND") return "round";
@@ -194,7 +194,7 @@ export function mapStrokeCap(
 
 // Figma stroke-join enum → coatfile. Returns undefined for the canvas
 // default (miter) so callers can omit it.
-export function mapStrokeJoin(
+function mapStrokeJoin(
 	figmaJoin: string | undefined,
 ): "round" | "bevel" | undefined {
 	if (figmaJoin === "ROUND") return "round";
@@ -207,7 +207,7 @@ export function mapStrokeJoin(
 // 4px border sits entirely within the box rather than straddling it. Returns
 // undefined for CENTER (the painter's own default) so an unaligned stroke stays
 // out of the emitted element.
-export function mapStrokeAlign(
+function mapStrokeAlign(
 	figmaAlign: string | undefined,
 ): "inside" | "outside" | undefined {
 	if (figmaAlign === "INSIDE") return "inside";
@@ -250,14 +250,14 @@ export type StrokeElement = {
 };
 
 // Non-solid strokes are rasterized by classify (`stroke_flattened`).
-export function strokeColor(paints: FigmaPaint[] | undefined): string | undefined {
+function strokeColor(paints: FigmaPaint[] | undefined): string | undefined {
 	const visible = (paints ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0) return undefined;
 	return compositeSolids(visible) ?? undefined;
 }
 
 // An odd-length pattern repeats to even, as SVG does.
-export function scaleDash(
+function scaleDash(
 	pattern: number[] | undefined,
 	scale: number,
 ): number[] | undefined {
