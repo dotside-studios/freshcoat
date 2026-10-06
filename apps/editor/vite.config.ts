@@ -164,7 +164,7 @@ export default defineConfig(({ mode }) => ({
 	optimizeDeps: {
 		entries: ["index.html", "e2e/probes/*.ts"],
 		exclude: ["canvaskit-wasm"],
-		// uqr, xlsx and zod are found by the scan of the entries above. They
+		// lean-qr, xlsx and zod are found by the scan of the entries above. They
 		// are not named here: the editor reaches them only through a kit or
 		// @freshcoat-js/workspace, so from here they resolve only when hoisted.
 		include: ["react-aria-components", "fflate"],

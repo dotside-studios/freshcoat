@@ -1,3 +1,9 @@
+import {
+	BinaryBitmap,
+	HybridBinarizer,
+	QRCodeReader,
+	RGBLuminanceSource,
+} from "@zxing/library";
 import { describe, expect, test } from "vitest";
 import { generateMatrix } from "../src/qr";
 import type { Command, DrawCommand, Template } from "../src/types";
@@ -85,5 +91,58 @@ describe("compile with an empty QR value", () => {
 		const bmp = findDraw(front.commands, "drawBitmap");
 		expect(bmp).toBeDefined();
 		expect((bmp as { pixelWidth: number }).pixelWidth).toBeGreaterThan(0);
+	});
+});
+
+const version = (m: boolean[][]) => (m.length - 17) / 4;
+
+describe("generateMatrix symbol version", () => {
+	const url = `https://example.com/p/${"1234567890".repeat(4)}`;
+
+	test.each([
+		[url, "M", 3],
+		[url, "H", 5],
+		[`ORDER-${"0".repeat(20)}`, "L", 1],
+		["https://freshcoat.app/c/AB12CD", "M", 3],
+	] as const)("%s at %s is version %i", (value, ec, expected) => {
+		expect(version(generateMatrix(value, ec))).toBe(expected);
+	});
+
+	test("a long digit-run URL encodes at M", () => {
+		const m = generateMatrix(`https://example.com/p/${"7".repeat(4000)}`, "M");
+		expect(version(m)).toBeLessThanOrEqual(40);
+	});
+});
+
+describe("generateMatrix memo", () => {
+	test("returns the same matrix for repeated calls", () => {
+		const a = generateMatrix("https://example.com/memo", "Q");
+		expect(generateMatrix("https://example.com/memo", "Q")).toBe(a);
+		expect(generateMatrix("https://example.com/memo", "L")).not.toBe(a);
+	});
+});
+
+function decode(matrix: boolean[][]): string {
+	const scale = 4;
+	const side = (matrix.length + 8) * scale;
+	const luma = new Uint8ClampedArray(side * side).fill(255);
+	for (let y = 0; y < side; y++)
+		for (let x = 0; x < side; x++)
+			if (matrix[Math.floor(y / scale) - 4]?.[Math.floor(x / scale) - 4])
+				luma[y * side + x] = 0;
+	const source = new RGBLuminanceSource(luma, side, side);
+	return new QRCodeReader()
+		.decode(new BinaryBitmap(new HybridBinarizer(source)))
+		.getText();
+}
+
+describe("generateMatrix decodes", () => {
+	test.each([
+		["https://freshcoat.app/c/AB12CD", "L"],
+		[`https://example.com/p/${"1234567890".repeat(4)}`, "M"],
+		[`ORDER-${"0".repeat(20)}`, "Q"],
+		["Café ✓ https://x.io/ü", "H"],
+	] as const)("%s at %s", (value, ec) => {
+		expect(decode(generateMatrix(value, ec))).toBe(value);
 	});
 });

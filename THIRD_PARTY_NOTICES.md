@@ -63,6 +63,7 @@ be published separately. They are not listed below.
 | immer | 10.2.0 | MIT | https://github.com/immerjs/immer |
 | isbot | 5.2.2 | Unlicense | https://github.com/omrilotan/isbot |
 | js-sha256 | 0.11.1 | MIT | https://github.com/emn178/js-sha256 |
+| lean-qr | 2.7.4 | MIT | https://github.com/davidje13/lean-qr |
 | natural-compare-lite | 1.4.0 | MIT | https://github.com/litejs/natural-compare-lite |
 | pako | 1.0.11 | MIT AND Zlib | https://github.com/nodeca/pako |
 | pdf-lib | 1.17.1 | MIT | https://github.com/Hopding/pdf-lib |
@@ -80,7 +81,6 @@ be published separately. They are not listed below.
 | tailwindcss | 4.3.3 | MIT | https://github.com/tailwindlabs/tailwindcss |
 | tslib | 1.14.1 | 0BSD | https://github.com/Microsoft/tslib |
 | tslib | 2.8.1 | 0BSD | https://github.com/Microsoft/tslib |
-| uqr | 0.1.3 | MIT | https://github.com/unjs/uqr |
 | use-sync-external-store | 1.7.0 | MIT | https://github.com/react/react |
 | xlsx | 0.20.3 | Apache-2.0 | https://git.sheetjs.com/SheetJS/sheetjs |
 | zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |
@@ -1040,6 +1040,34 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+### lean-qr 2.7.4
+
+License: MIT
+
+```text
+MIT License
+
+Copyright (c) 2021-2025 David Evans
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### natural-compare-lite 1.4.0
 
 License: MIT
@@ -1374,35 +1402,6 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
 LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
-```
-
-### uqr 0.1.3
-
-License: MIT
-
-```text
-MIT License
-
-Copyright (c) Project Nayuki
-Copyright (c) 2023 Anthony Fu <https://github.com/antfu>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ### use-sync-external-store 1.7.0
