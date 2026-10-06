@@ -208,7 +208,7 @@ export function isQrLayerName(name: string): boolean {
 	return /^qr:.+/.test(name);
 }
 
-export function isImageLayerName(name: string): boolean {
+function isImageLayerName(name: string): boolean {
 	return /^image:.+/.test(name);
 }
 

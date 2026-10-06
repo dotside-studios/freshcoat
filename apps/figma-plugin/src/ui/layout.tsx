@@ -25,7 +25,7 @@ const SPACE: Record<Space, string> = {
 
 /** The side margin of every tab. 12 px at the compact width, growing a little
  *  with the window so a wide panel breathes instead of stretching. */
-export const GUTTER = "var(--fc-gutter)";
+const GUTTER = "var(--fc-gutter)";
 
 /** The width of a label beside its control, as Figma's property rows have. */
 const LABEL_WIDTH = "64px";
@@ -149,7 +149,7 @@ export function Panel(props: {
 }
 
 /** The action bar at the bottom of a tab. */
-export function Footer(props: { children: ComponentChildren }): JSX.Element {
+function Footer(props: { children: ComponentChildren }): JSX.Element {
 	return (
 		<div
 			class="fc-footer"

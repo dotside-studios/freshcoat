@@ -7,7 +7,7 @@ import type {
 
 /** Stamped on `template.source.kind` by every export this plugin writes. A
  *  consumer keys off it to know the rest of the object has the shape below. */
-export const FIGMA_SOURCE_KIND = "figma";
+const FIGMA_SOURCE_KIND = "figma";
 
 /** What this plugin records about an export. coatfile fixes only `kind` and
  *  round-trips the rest unread, so this module is the whole definition. */

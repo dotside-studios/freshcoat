@@ -22,7 +22,7 @@ const PRODUCTS: Record<string, ProductRegistryEntry> = {
 // products, written to `catalog/products.json` on the site's S3 public base).
 // The plugin fetches this at startup; the manifest's `networkAccess` must allow
 // this host.
-export const PRODUCTS_REGISTRY_URL =
+const PRODUCTS_REGISTRY_URL =
 	"https://davishopusercontent.dotsidecdn.net/catalog/products.json";
 
 // The live registry: starts as the shipped fallback, replaced/extended once the
