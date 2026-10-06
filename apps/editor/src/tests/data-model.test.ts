@@ -22,6 +22,8 @@ import {
 	keyProblem,
 	moveColumn,
 	rebindColumn,
+	recordByIdMap,
+	recordIndexMap,
 	recordIssues,
 	renameColumn,
 	STATUS_COLUMN,
@@ -430,5 +432,32 @@ describe("helpers", () => {
 		expect(guessDateOrder([["a"], ["31/03/2025"]])).toBe("dmy");
 		expect(guessDateOrder([["03/31/2025"]])).toBe("mdy");
 		expect(guessDateOrder([["03/04/2025"]])).toBe("mdy");
+	});
+});
+
+describe("record lookups", () => {
+	it("reuses the maps for the same records array", () => {
+		const records = [rec("a", {}), rec("b", {}), rec("c", {})];
+		const index = recordIndexMap(records);
+		expect([...index]).toEqual([
+			["a", 0],
+			["b", 1],
+			["c", 2],
+		]);
+		expect(recordIndexMap(records)).toBe(index);
+		const byId = recordByIdMap(records);
+		expect(byId.get("b")).toBe(records[1]);
+		expect(recordByIdMap(records)).toBe(byId);
+	});
+
+	it("makes new maps for a new records array", () => {
+		const records = [rec("a", {}), rec("b", {})];
+		const index = recordIndexMap(records);
+		const byId = recordByIdMap(records);
+		const next = [records[1] as DataRecord, records[0] as DataRecord];
+		expect(recordIndexMap(next)).not.toBe(index);
+		expect(recordIndexMap(next).get("a")).toBe(1);
+		expect(recordByIdMap(next)).not.toBe(byId);
+		expect(recordIndexMap(records).get("a")).toBe(0);
 	});
 });

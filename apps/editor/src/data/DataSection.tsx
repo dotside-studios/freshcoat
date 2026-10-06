@@ -71,6 +71,7 @@ import {
 	emptyDataset,
 	filterRecords,
 	issueCount,
+	recordIndexMap,
 	type SortSpec,
 	schemaChanges,
 	sortRecords,
@@ -480,10 +481,7 @@ function RecordsPane({
 		} catch {}
 	};
 
-	const indexMap = useMemo(
-		() => new Map(dataset.records.map((r, i) => [r.id, i])),
-		[dataset.records],
-	);
+	const indexMap = recordIndexMap(dataset.records);
 	const searched = useMemo(
 		() => filterRecords(dataset.records, dataset, deferredQuery),
 		[dataset, deferredQuery],
