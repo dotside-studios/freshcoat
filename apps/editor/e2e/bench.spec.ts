@@ -111,3 +111,36 @@ test("bench: watermark 200 photos", async ({ page }, info) => {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+// A 100,000-record CSV of 20 columns, read and imported as the wizard does
+// it: in the import worker, and on the page for comparison.
+test("bench: import a 100k-record CSV", async ({ page }, info) => {
+	test.setTimeout(300_000);
+	await page.goto("/");
+	await page.waitForLoadState("networkidle");
+	const probe = (inPage: boolean) =>
+		page.evaluate(
+			async ({ path, inPage }) => {
+				const mod = await import(/* @vite-ignore */ path);
+				return mod.runImportProbe(100_000, { inPage });
+			},
+			{ path: probePath("import-probe"), inPage },
+		) as Promise<{
+			bytes: number;
+			records: number;
+			read: { ms: number; longestTaskMs: number; blockedMs: number };
+			import: { ms: number; longestTaskMs: number; blockedMs: number };
+		}>;
+	const worker = await probe(false);
+	const inPage = await probe(true);
+	const result = { worker, inPage };
+	console.log(`import ${JSON.stringify(result)}`);
+	await info.attach("bench-import.json", {
+		body: JSON.stringify(result, null, 2),
+		contentType: "application/json",
+	});
+	expect(worker.records).toBe(100_000);
+	expect(inPage.records).toBe(100_000);
+	expect(worker.read.longestTaskMs).toBeLessThan(200);
+	expect(worker.import.longestTaskMs).toBeLessThan(200);
+});

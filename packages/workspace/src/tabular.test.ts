@@ -61,6 +61,103 @@ describe("readTable: delimited text", () => {
 	});
 });
 
+/** What readTable gave for delimited text when SheetJS read it. */
+function sheetJsRows(text: string, ext: string): string[][] {
+	if (text.trim() === "") return [];
+	const wb = XLSX.read(text, {
+		type: "string",
+		raw: true,
+		...(ext === "tsv" ? { FS: "\t" } : {}),
+	});
+	const sheet = wb.Sheets[wb.SheetNames[0] as string] as XLSX.WorkSheet;
+	const rows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+		header: 1,
+		raw: false,
+		defval: "",
+		blankrows: true,
+	});
+	const filled = (c: string | undefined) => c !== undefined && c.trim() !== "";
+	let height = rows.length;
+	while (height > 0 && !(rows[height - 1] ?? []).some(filled)) height -= 1;
+	let width = 0;
+	for (const row of rows.slice(0, height)) {
+		for (let c = row.length - 1; c >= width; c--) {
+			if (filled(row[c])) width = c + 1;
+		}
+	}
+	return rows
+		.slice(0, height)
+		.map((row) => Array.from({ length: width }, (_, c) => row[c] ?? ""));
+}
+
+const rowsOf = async (text: string, name: string) =>
+	(await readTable(text, name).catch(() => null))?.sheets[0]?.rows ?? [];
+
+describe("readTable: delimited text matches SheetJS", () => {
+	const fixtures = [
+		'id,name,note\r\n007,"Cruz, Ana","Café ☕ 日本"\r\n008,Ben,"say ""hi"""\r\n',
+		"a,b,,\n1,,,\n,,,\n\n",
+		"a\tb\n1,2\t3\n",
+		'a,"multi\r\nline",c\r\n1,2,3',
+		'a,"open quote\nnever closed',
+		'a,b"c,"d"e"\n"x""y",z',
+		"a;b;c\n1;2;3",
+		"a|b\n1|2",
+		"sep=;\r\na;b,c\n",
+		"sep=|\na|b",
+		"a\rb\rc",
+		"a,b\n\n\nc,d\n",
+		'" spaced ", x ,\n',
+		'"",""\n"a"',
+	];
+	it("on the edge-case fixtures", async () => {
+		for (const text of fixtures) {
+			for (const ext of ["csv", "tsv", "txt"]) {
+				expect(await rowsOf(text, `x.${ext}`), `${ext}: ${text}`).toEqual(
+					sheetJsRows(text, ext),
+				);
+			}
+		}
+	});
+
+	it("on random text made of separators, quotes and line breaks", async () => {
+		let seed = 7;
+		const random = () => {
+			seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+			return seed / 0x7fffffff;
+		};
+		const parts = [
+			"a",
+			"b",
+			",",
+			'"',
+			'"',
+			"\t",
+			";",
+			"|",
+			"\r",
+			"\n",
+			"\r\n",
+			" ",
+			"é",
+		];
+		const starts = ["x", "sep=;\n", "sep=|\r\n", '"q', ",", "\n"];
+		for (let i = 0; i < 1500; i++) {
+			let text = starts[Math.floor(random() * starts.length)] as string;
+			const n = 1 + Math.floor(random() * 30);
+			for (let k = 0; k < n; k++) {
+				text += parts[Math.floor(random() * parts.length)];
+			}
+			for (const ext of ["csv", "tsv", "txt"]) {
+				expect(
+					await rowsOf(text, `x.${ext}`),
+					`${ext}: ${JSON.stringify(text)}`,
+				).toEqual(sheetJsRows(text, ext));
+			}
+		}
+	});
+});
+
 describe("readTable: JSON", () => {
 	it("unions keys in first-seen order and stringifies nested values", async () => {
 		const json = JSON.stringify({
