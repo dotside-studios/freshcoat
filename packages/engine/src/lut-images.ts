@@ -1,6 +1,8 @@
 // Native images built from adjust LUT tables, looked up first by array identity
 // and then by content, so equal tables share one image without stringifying
-// them. A paint owns one per bin; a PaintCache keeps one across paints.
+// them. LUT arrays are immutable (see AdjustLut), so an identity hit is trusted
+// without comparing bytes. A paint owns one per bin; a PaintCache keeps one
+// across paints.
 
 // biome-ignore lint/suspicious/noExplicitAny: external WASM API, untyped
 type CK = any;

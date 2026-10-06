@@ -103,14 +103,53 @@ export function brightnessMatrix(k: number): ColorMatrix {
 }
 
 // Per-channel gamma curve as a 256-entry LUT: out = round(255·(i/255)^gamma),
-// clamped. r/g/b share one table.
+// clamped. r/g/b share one table. Equal gammas return the same table, so the
+// painter's LUT image cache hits by identity; treat it as read-only.
 export function gammaLut(gamma: number): AdjustLut {
-	const table = new Uint8Array(256);
-	for (let i = 0; i < 256; i++) {
-		const v = Math.round(255 * (i / 255) ** gamma);
-		table[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+	return memoLru(gammaMemo, GAMMA_MEMO_MAX, gamma, () => {
+		const table = new Uint8Array(256);
+		for (let i = 0; i < 256; i++) {
+			const v = Math.round(255 * (i / 255) ** gamma);
+			table[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+		}
+		return { r: table, g: table, b: table };
+	});
+}
+
+const gammaMemo = new Map<number, AdjustLut>();
+const GAMMA_MEMO_MAX = 64;
+const bakeMemo = new Map<string, AdjustLut3d>();
+const BAKE_MEMO_MAX = 16;
+
+function memoLru<K, V>(
+	memo: Map<K, V>,
+	max: number,
+	key: K,
+	build: () => V,
+): V {
+	const hit = memo.get(key);
+	if (hit) {
+		memo.delete(key);
+		memo.set(key, hit);
+		return hit;
 	}
-	return { r: table, g: table, b: table };
+	const value = build();
+	memo.set(key, value);
+	if (memo.size > max) memo.delete(memo.keys().next().value as K);
+	return value;
+}
+
+const tableIds = new WeakMap<object, number>();
+let nextTableId = 0;
+
+function tableId(table: object | undefined): number | string {
+	if (!table) return "-";
+	let id = tableIds.get(table);
+	if (id === undefined) {
+		id = nextTableId++;
+		tableIds.set(table, id);
+	}
+	return id;
 }
 
 // An identity RGB cube, useful as a starting point for an authored or measured
@@ -203,19 +242,38 @@ export function composeAdjust(
 					...(first.colorMatrix ? { colorMatrix: first.colorMatrix } : {}),
 					...(first.gamut ? { gamut: first.gamut } : {}),
 					...(first.lut ? { lut: first.lut } : {}),
-					lut3d: bakeLut3d(
-						Math.max(first.lut3d?.size ?? 0, COMPOSE_CUBE),
-						(rgb) =>
-							applyAdjustColor(
-								second,
-								first.lut3d ? sampleLut3d(first.lut3d, rgb) : rgb,
-							),
-					),
+					lut3d: composedCube(first.lut3d, second),
 				}
 			: withoutSharpen(second)
 		: withoutSharpen(first);
 	if (sharpen > 0) out.sharpen = sharpen;
 	return out;
+}
+
+// Keyed by the second adjustment's color parameters and the tables' identities,
+// so equal settings return the same cube across compiles.
+function composedCube(
+	cube: AdjustLut3d | undefined,
+	second: Adjust,
+): AdjustLut3d {
+	const size = Math.max(cube?.size ?? 0, COMPOSE_CUBE);
+	const key = [
+		size,
+		cube ? `${cube.size}:${tableId(cube.data)}` : "-",
+		second.colorMatrix?.join(",") ?? "-",
+		second.gamut ?? "-",
+		second.lut
+			? `${tableId(second.lut.r)},${tableId(second.lut.g)},${tableId(second.lut.b)}`
+			: "-",
+		second.lut3d
+			? `${second.lut3d.size}:${tableId(second.lut3d.data)}`
+			: "-",
+	].join("|");
+	return memoLru(bakeMemo, BAKE_MEMO_MAX, key, () =>
+		bakeLut3d(size, (rgb) =>
+			applyAdjustColor(second, cube ? sampleLut3d(cube, rgb) : rgb),
+		),
+	);
 }
 
 function withoutSharpen(a: Adjust): Adjust {
