@@ -77,6 +77,37 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 	return [f(0), f(8), f(4)];
 }
 
+/** OKLCh to sRGB channels in 0..255, unclamped. L is 0..1, H is degrees. */
+export function oklchToRgb(l: number, c: number, h: number): [number, number, number] {
+	const hr = (h * Math.PI) / 180;
+	const a = c * Math.cos(hr);
+	const b = c * Math.sin(hr);
+
+	const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+	const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+	const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+
+	const lc = l_ * l_ * l_;
+	const mc = m_ * m_ * m_;
+	const sc = s_ * s_ * s_;
+
+	const lr = 4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc;
+	const lg = -1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc;
+	const lb = -0.0041960863 * lc - 0.7034186147 * mc + 1.707614701 * sc;
+
+	const enc = (x: number) =>
+		255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
+	return [enc(lr), enc(lg), enc(lb)];
+}
+
+function oklch(l: string, c: string, h: string): [number, number, number] {
+	return oklchToRgb(
+		l.endsWith("%") ? Number.parseFloat(l) / 100 : Number.parseFloat(l),
+		c.endsWith("%") ? (Number.parseFloat(c) / 100) * 0.4 : Number.parseFloat(c),
+		Number.parseFloat(h),
+	);
+}
+
 /** Reads a color. `none` is returned as is; `currentColor` resolves to
  *  `current`. Anything unreadable, a paint server `url()` included, is null. */
 export function parseColor(raw: string, current?: Rgba): Rgba | "none" | null {
@@ -97,7 +128,7 @@ export function parseColor(raw: string, current?: Rgba): Rgba | "none" | null {
 		}
 		return null;
 	}
-	const fn = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(v);
+	const fn = /^(rgba?|hsla?|oklch)\(([^)]*)\)$/.exec(v);
 	if (fn) {
 		const parts = (fn[2] ?? "").split(/[\s,/]+/).filter(Boolean);
 		if (parts.length < 3 || parts.length > 4) return null;
@@ -105,6 +136,10 @@ export function parseColor(raw: string, current?: Rgba): Rgba | "none" | null {
 		const [a, b, c, d] = parts as [string, string, string, string?];
 		if (fn[1]?.startsWith("rgb"))
 			return [channel(a), channel(b), channel(c), alpha(d)];
+		if (fn[1] === "oklch") {
+			const [r, g, bl] = oklch(a, b, c);
+			return [clamp(r, 0, 255), clamp(g, 0, 255), clamp(bl, 0, 255), alpha(d)];
+		}
 		const [r, g, bl] = hslToRgb(
 			Number.parseFloat(a),
 			clamp(Number.parseFloat(b) / 100, 0, 1),

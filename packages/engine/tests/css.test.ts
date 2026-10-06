@@ -24,6 +24,20 @@ describe("oklchToHex / parseCssColor", () => {
 		expect(parseCssColor("black")).toBe("#000000");
 	});
 
+	test("hsl(), full named set and modern rgb() syntax", () => {
+		expect(parseCssColor("hsl(0 100% 50%)")).toBe("#ff0000");
+		expect(parseCssColor("CornflowerBlue")).toBe("#6495ed");
+		expect(parseCssColor("rgb(240 94 148)")).toBe("#f05e94");
+	});
+
+	test("alpha is kept", () => {
+		expect(parseCssColor("rgba(255, 0, 0, 0.5)")).toBe("#ff000080");
+		expect(parseCssColor("rgb(255 0 0 / 50%)")).toBe("#ff000080");
+		expect(parseCssColor("oklch(0.684 0.186 0.3 / 0.5)")).toBe("#f05e9480");
+		expect(parseCssColor("#abcd")).toBe("#aabbccdd");
+		expect(parseCssColor("transparent")).toBe("#00000000");
+	});
+
 	test("unparseable → fallback", () => {
 		expect(parseCssColor("var(--x)", "#123456")).toBe("#123456");
 		expect(parseCssColor("")).toBe("#000000");
