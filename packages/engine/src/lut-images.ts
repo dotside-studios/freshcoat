@@ -4,8 +4,7 @@
 // without comparing bytes. A paint owns one per bin; a PaintCache keeps one
 // across paints.
 
-// biome-ignore lint/suspicious/noExplicitAny: external WASM API, untyped
-type CK = any;
+import type { Image } from "canvaskit-wasm";
 
 type Entry = {
 	size: number;
@@ -13,7 +12,7 @@ type Entry = {
 	source: Uint8Array[];
 	// A private copy, so a caller mutating its arrays cannot fake a content match.
 	bytes: Uint8Array[];
-	image: CK | null;
+	image: Image | null;
 	used: boolean;
 };
 
@@ -33,8 +32,8 @@ export function cachedLutImage(
 	luts: LutImages,
 	size: number,
 	parts: Uint8Array[],
-	build: () => CK,
-): CK {
+	build: () => Image | null,
+): Image | null {
 	const known = luts.byArray.get(parts[0]);
 	if (
 		known?.image &&

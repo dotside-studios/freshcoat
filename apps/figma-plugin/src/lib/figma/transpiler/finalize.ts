@@ -126,15 +126,17 @@ export function dropUnfilledSlots(elements: unknown[]): unknown[] {
 // the diff aligns element-for-element.
 export function uniquifyElementIdsDeep(elements: unknown[]): unknown[] {
 	const seen = new Set<string>();
+	const nextSuffix = new Map<string, number>();
 	const walk = (els: unknown[]): void => {
 		for (const raw of els) {
 			const el = raw as Record<string, unknown>;
 			const originalId = typeof el.id === "string" ? el.id : "";
 			let id = originalId;
 			if (seen.has(id)) {
-				let n = 2;
+				let n = nextSuffix.get(originalId) ?? 2;
 				while (seen.has(`${originalId}_${n}`)) n += 1;
 				id = `${originalId}_${n}`;
+				nextSuffix.set(originalId, n + 1);
 			}
 			seen.add(id);
 			el.id = id;

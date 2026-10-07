@@ -7,6 +7,7 @@ import {
 } from "@freshcoat-js/workspace";
 import { newId, sameGuides, singleTemplateWorkspace } from "~/state/workspace";
 import { plural } from "./copy";
+import { isNotReadable } from "./source-assets";
 
 export type Autosave = {
 	workspace: Workspace;
@@ -104,6 +105,9 @@ export type AutosaveOptions = {
 	/** Called once when storage fills up and photos stop being saved, and
 	 *  not again until they have been saved once more. */
 	onStorageFull?: () => void;
+	/** Called once per photo whose bytes can no longer be read, such as a
+	 *  slice of a file that changed on disk. */
+	onUnreadable?: (asset: DatasetAsset) => void;
 	/** Who this store writes as; another tab's writes make what this one
 	 *  remembers writing unreliable. Defaults to an id made per tab. */
 	tabId?: string;
@@ -114,6 +118,10 @@ export type AutosaveStore = {
 	read(): Promise<Autosave | null>;
 	/** The stored copy of one photo, or null. */
 	asset(sha256: string): Promise<Blob | null>;
+	/** Stores `asset` unless storage holds it already and hands back the
+	 *  stored copy, or null when storage is unavailable or full. Throws when
+	 *  the asset's bytes can no longer be read. */
+	keep(asset: DatasetAsset): Promise<Blob | null>;
 	clear(): Promise<void>;
 };
 
@@ -242,6 +250,10 @@ export function createAutosaveStore(
 	let written: Map<string, Dataset | null> | null = null;
 	/** shas the assets store is known to hold, read on the first write */
 	let stored: Set<string> | null = null;
+	/** puts running now, by sha, shared by writes and keep */
+	const putting = new Map<string, Promise<void>>();
+	/** Blobs a put found unreadable, skipped on later writes */
+	const unreadable = new WeakSet<Blob>();
 	let full = false;
 	const tabId = opts.tabId ?? TAB_ID;
 	/** the generation of this store's last shell write */
@@ -299,18 +311,22 @@ export function createAutosaveStore(
 		(await p?.catch(() => null))?.close();
 	}
 
-	async function writeAssets(db: IDBDatabase, ws: Workspace): Promise<void> {
+	async function storedKeys(db: IDBDatabase): Promise<Set<string>> {
 		if (stored === null) {
 			const keys = await request(
 				db.transaction(ASSET_STORE).objectStore(ASSET_STORE).getAllKeys(),
 			);
-			stored = new Set(keys.map(String));
+			stored ??= new Set(keys.map(String));
 		}
-		for (const dataset of ws.datasets) {
-			for (const asset of dataset.assets) {
-				if (stored.has(asset.sha256)) continue;
-				// One transaction each, so a full disk loses the photo that did
-				// not fit rather than the ones before it.
+		return stored;
+	}
+
+	/** Puts one photo in its own transaction, so a full disk loses the photo
+	 *  that did not fit rather than the ones before it. */
+	function putAsset(db: IDBDatabase, asset: DatasetAsset): Promise<void> {
+		let p = putting.get(asset.sha256);
+		if (!p) {
+			p = (async () => {
 				const tx = db.transaction(ASSET_STORE, "readwrite");
 				try {
 					tx.objectStore(ASSET_STORE).put(asset.blob, asset.sha256);
@@ -321,9 +337,45 @@ export function createAutosaveStore(
 					} catch {}
 					throw err;
 				}
-				stored.add(asset.sha256);
+				stored?.add(asset.sha256);
+			})().finally(() => putting.delete(asset.sha256));
+			putting.set(asset.sha256, p);
+		}
+		return p;
+	}
+
+	async function getAsset(
+		db: IDBDatabase,
+		sha256: string,
+	): Promise<Blob | null> {
+		const blob = (await request(
+			db.transaction(ASSET_STORE).objectStore(ASSET_STORE).get(sha256),
+		)) as Blob | undefined;
+		return blob ?? null;
+	}
+
+	/** Whether every photo was saved; one that cannot be read is skipped. */
+	async function writeAssets(db: IDBDatabase, ws: Workspace): Promise<boolean> {
+		const keys = await storedKeys(db);
+		let all = true;
+		for (const dataset of ws.datasets) {
+			for (const asset of dataset.assets) {
+				if (keys.has(asset.sha256)) continue;
+				if (unreadable.has(asset.blob)) {
+					all = false;
+					continue;
+				}
+				try {
+					await putAsset(db, asset);
+				} catch (err) {
+					if (!isNotReadable(err)) throw err;
+					all = false;
+					unreadable.add(asset.blob);
+					opts.onUnreadable?.(asset);
+				}
 			}
 		}
+		return all;
 	}
 
 	async function collect(db: IDBDatabase, ws: Workspace): Promise<void> {
@@ -383,7 +435,7 @@ export function createAutosaveStore(
 			let assetsSaved = true;
 			if (assetsChanged) {
 				try {
-					await writeAssets(db, ws);
+					assetsSaved = await writeAssets(db, ws);
 				} catch (err) {
 					if (!isQuotaError(err)) throw err;
 					assetsSaved = false;
@@ -538,12 +590,24 @@ export function createAutosaveStore(
 
 		async asset(sha256) {
 			try {
-				const db = await connect();
-				const blob = (await request(
-					db.transaction(ASSET_STORE).objectStore(ASSET_STORE).get(sha256),
-				)) as Blob | undefined;
-				return blob ?? null;
+				return await getAsset(await connect(), sha256);
 			} catch {
+				return null;
+			}
+		},
+
+		async keep(asset) {
+			try {
+				const db = await connect();
+				const have = await getAsset(db, asset.sha256);
+				if (have) {
+					stored?.add(asset.sha256);
+					return have;
+				}
+				await putAsset(db, asset);
+				return await getAsset(db, asset.sha256);
+			} catch (err) {
+				if (isNotReadable(err)) throw err;
 				return null;
 			}
 		},
@@ -578,6 +642,7 @@ export function configureAutosave(opts: AutosaveOptions): void {
 function store(): AutosaveStore {
 	shared ??= createAutosaveStore("freshcoat", {
 		onStorageFull: () => sharedOptions.onStorageFull?.(),
+		onUnreadable: (asset) => sharedOptions.onUnreadable?.(asset),
 	});
 	return shared;
 }
@@ -590,8 +655,8 @@ export function readAutosave(): Promise<Autosave | null> {
 	return store().read();
 }
 
-export function readAutosaveAsset(sha256: string): Promise<Blob | null> {
-	return store().asset(sha256);
+export function keepAutosaveAsset(asset: DatasetAsset): Promise<Blob | null> {
+	return store().keep(asset);
 }
 
 export function clearAutosave(): Promise<void> {

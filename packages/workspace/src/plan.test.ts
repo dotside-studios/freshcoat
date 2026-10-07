@@ -17,7 +17,14 @@ import {
 	preset,
 	workspace,
 } from "./test-fixtures";
-import type { ExportPreset, VariantSource, Workspace } from "./types";
+import type {
+	DataRecord,
+	Dataset,
+	ExportItem,
+	ExportPreset,
+	VariantSource,
+	Workspace,
+} from "./types";
 
 const ws: Workspace = deepFreeze(workspace);
 const plan = (changes: Partial<ExportPreset>) =>
@@ -220,6 +227,119 @@ describe("planExport against the per-record functions", () => {
 			"Cy-Ong-bronze--back.png",
 			"Ed-Go---front.png",
 			"Ed-Go---back.png",
+		]);
+	});
+});
+
+describe("planExport file names against the regex expansion", () => {
+	const SOURCE_EXTENSION =
+		/\.(jpe?g|jfif|png|webp|gif|avif|heic|heif|tiff?|bmp)$/i;
+	const legacyExpand = (
+		source: string,
+		ctx: Parameters<typeof fileNameFor>[1],
+	) => {
+		const width = String(Math.max(ctx.count, 1)).length;
+		const expanded = source.replace(
+			/\{\{\s*([^{}]*?)\s*\}\}/g,
+			(_, token: string) => {
+				switch (token) {
+					case "template":
+						return ctx.template;
+					case "side":
+						return ctx.side;
+					case "index":
+						return String(ctx.index).padStart(width, "0");
+					case "record":
+						return ctx.record;
+					case "variant":
+						return ctx.variant ?? "default";
+					default:
+						return (ctx.cells?.[token] ?? ctx.values?.[token] ?? "").replace(
+							SOURCE_EXTENSION,
+							"",
+						);
+				}
+			},
+		);
+		const clean = expanded.replace(/[^\w.-]/g, "-");
+		return clean === "" || /^\.+$/.test(clean) ? "file" : clean;
+	};
+	const legacyNames = (items: ExportItem[], pattern: string) => {
+		const used = new Set<string>();
+		const unique = (base: string) => {
+			let name = base;
+			for (let n = 2; used.has(name.toLowerCase()); n++) name = `${base}-${n}`;
+			used.add(name.toLowerCase());
+			return name;
+		};
+		const count = new Set(items.map((i) => i.recordId)).size;
+		return items.map((item) => {
+			const record = dataset.records.find((r) => r.id === item.recordId);
+			const cells = Object.fromEntries(
+				dataset.columns.map((c) => [
+					c.key,
+					toTemplateValue(c, record?.values[c.key] ?? null),
+				]),
+			);
+			const base = legacyExpand(fileNamePattern(pattern), {
+				template: "member-card",
+				side: item.side,
+				index: item.recordIndex + 1,
+				count,
+				record: item.recordId,
+				variant: item.variantId,
+				cells,
+				values: item.values,
+			});
+			return `${unique(base)}.png`;
+		});
+	};
+	const names = [
+		"Ana Cruz",
+		"Ana Cruz",
+		"ana cruz",
+		"Ana-Cruz-2",
+		"ANA CRUZ",
+		undefined,
+		"",
+		"...",
+		"IMG_1.JPG",
+		"img_1.png",
+		"Ana-Cruz",
+		"Zoë Ñ",
+	];
+	const dataset: Dataset = {
+		...members,
+		records: names.map(
+			(name, i): DataRecord => ({
+				id: `r_${i}`,
+				values: name === undefined ? {} : { name },
+				status: "pending",
+			}),
+		),
+	};
+	const fixture: Workspace = { ...ws, datasets: [dataset] };
+
+	it.each([
+		"{{name}}",
+		"{{ name }}-{{side}}",
+		"{{name}}-{{index}}",
+		"{{missing}}",
+		"{{name}}.{{tier}}.{{number}}",
+		"{{template}}/{{record}}/{{variant}}",
+		"{{name}}{{name}}-{{",
+		"",
+	])("matches for %j", (fileName) => {
+		const items = planExport(fixture, { ...preset, fileName });
+		expect(items).toHaveLength(names.length * 2);
+		expect(items.map((i) => i.fileName)).toEqual(legacyNames(items, fileName));
+	});
+
+	it("pads the index to the record count", () => {
+		const items = planExport(fixture, { ...preset, sides: ["front"] });
+		expect(items.map((i) => i.fileName).slice(8, 10)).toEqual([
+			"member-card-09-front.png",
+			"member-card-10-front.png",
 		]);
 	});
 });

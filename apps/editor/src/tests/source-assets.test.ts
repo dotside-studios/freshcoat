@@ -1,12 +1,15 @@
 // @vitest-environment node
+import "fake-indexeddb/auto";
 import { subtleSha256 } from "@freshcoat-js/coatfile";
 import type { DatasetAsset, Workspace } from "@freshcoat-js/workspace";
 import { unpackWorkspace } from "@freshcoat-js/workspace/archive";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { createAutosaveStore } from "~/app/autosave";
 import { EditorController } from "~/app/controller";
 import * as download from "~/app/download";
 import {
 	createSourceAssets,
+	reportSourceChanged,
 	SourceChangedError,
 	stopSourceAssets,
 	trackSourceAssets,
@@ -119,7 +122,7 @@ describe("copying a workspace's photos off its file", () => {
 		const read = vi.spyOn(a.source, "arrayBuffer");
 		const copies = createSourceAssets(workspaceOf([a.asset]), {
 			fileName: "w.coatworkspace",
-			backup: async () => stored,
+			keep: async () => stored,
 			schedule: (task) => task(),
 		});
 		await copies.done;
@@ -132,7 +135,7 @@ describe("copying a workspace's photos off its file", () => {
 		const stored = new Blob(["alpha"], { type: "image/png" });
 		const copies = createSourceAssets(workspaceOf([a.asset]), {
 			fileName: "w.coatworkspace",
-			backup: async (sha) => (sha === a.asset.sha256 ? stored : null),
+			keep: async (x) => (x.sha256 === a.asset.sha256 ? stored : null),
 			schedule: never,
 		});
 		a.source.changed = true;
@@ -149,7 +152,7 @@ describe("copying a workspace's photos off its file", () => {
 		const onChanged = vi.fn();
 		const copies = createSourceAssets(workspaceOf([a.asset, b.asset]), {
 			fileName: "w.coatworkspace",
-			backup: async () => null,
+			keep: async () => null,
 			schedule: never,
 			onChanged,
 		});
@@ -187,7 +190,7 @@ describe("saving a workspace whose file changed", () => {
 		controller.openWorkspace(ws, "w.coatworkspace");
 		trackSourceAssets(ws, {
 			fileName: "w.coatworkspace",
-			backup,
+			keep: (x) => backup(x.sha256),
 			schedule: never,
 		});
 		return controller;
@@ -258,5 +261,193 @@ describe("saving a workspace whose file changed", () => {
 		expect(
 			await bytesOf(out.workspace.datasets[0]?.assets[0]?.blob as Blob),
 		).toBe("alpha");
+	});
+});
+
+let dbCount = 0;
+const freshDb = () => `source-assets-test-${++dbCount}`;
+
+/** Fails a put of a changed slice the way a browser does. */
+function refuseChangedPuts(): void {
+	const realPut = IDBObjectStore.prototype.put;
+	vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey,
+	) {
+		if (value instanceof FileSlice && value.changed)
+			throw new DOMException("the file changed", "NotReadableError");
+		return realPut.call(this, value, key);
+	});
+}
+
+async function storedKeys(name: string): Promise<string[]> {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(name);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+	try {
+		return await new Promise((resolve) => {
+			const req = db.transaction("assets").objectStore("assets").getAllKeys();
+			req.onsuccess = () => resolve(req.result.map(String));
+		});
+	} finally {
+		db.close();
+	}
+}
+
+describe("copying a workspace's photos into storage", () => {
+	test("swaps in the stored copy without reading the file into memory", async () => {
+		const name = freshDb();
+		const store = createAutosaveStore(name);
+		const a = await photo("alpha");
+		const b = await photo("beta");
+		const readA = vi.spyOn(a.source, "arrayBuffer");
+		const readB = vi.spyOn(b.source, "arrayBuffer");
+		const copies = createSourceAssets(workspaceOf([a.asset, b.asset]), {
+			fileName: "w.coatworkspace",
+			keep: store.keep,
+			schedule: (task) => task(),
+		});
+		await copies.done;
+		a.source.changed = true;
+		b.source.changed = true;
+		expect(copies.pending).toBe(0);
+		expect(readA).not.toHaveBeenCalled();
+		expect(readB).not.toHaveBeenCalled();
+		expect(a.asset.blob).not.toBeInstanceOf(FileSlice);
+		expect((await storedKeys(name)).sort()).toEqual(
+			[a.asset.sha256, b.asset.sha256].sort(),
+		);
+		expect(await bytesOf(a.asset.blob)).toBe("alpha");
+		expect(await bytesOf(b.asset.blob)).toBe("beta");
+	});
+
+	test("does not put a photo autosave already stored", async () => {
+		const name = freshDb();
+		const store = createAutosaveStore(name);
+		const a = await photo("alpha");
+		const ws = workspaceOf([a.asset]);
+		await store.write({ workspace: ws, fileName: "w.coatworkspace" });
+		const put = vi.spyOn(IDBObjectStore.prototype, "put");
+		const copies = createSourceAssets(ws, {
+			fileName: "w.coatworkspace",
+			keep: store.keep,
+			schedule: (task) => task(),
+		});
+		await copies.done;
+		expect(put).not.toHaveBeenCalled();
+		expect(a.asset.blob).not.toBeInstanceOf(FileSlice);
+	});
+
+	test("copies into memory when storage is unavailable", async () => {
+		const real = globalThis.indexedDB;
+		vi.stubGlobal("indexedDB", undefined);
+		try {
+			const store = createAutosaveStore(freshDb());
+			const a = await photo("alpha");
+			const read = vi.spyOn(a.source, "arrayBuffer");
+			const copies = createSourceAssets(workspaceOf([a.asset]), {
+				fileName: "w.coatworkspace",
+				keep: store.keep,
+				schedule: (task) => task(),
+			});
+			await copies.done;
+			a.source.changed = true;
+			expect(read).toHaveBeenCalledOnce();
+			expect(a.asset.blob).not.toBe(a.source);
+			expect(await bytesOf(a.asset.blob)).toBe("alpha");
+		} finally {
+			vi.stubGlobal("indexedDB", real);
+		}
+	});
+
+	test("saves after the file changes once the photos are stored", async () => {
+		let written: Blob | null = null;
+		vi.spyOn(download, "downloadBytes").mockImplementation(async (data) => {
+			written = data as Blob;
+		});
+		const store = createAutosaveStore(freshDb());
+		const a = await photo("alpha");
+		const ws = workspaceOf([a.asset]);
+		const controller = new EditorController();
+		controller.openWorkspace(ws, "w.coatworkspace");
+		await trackSourceAssets(ws, {
+			fileName: "w.coatworkspace",
+			keep: store.keep,
+			schedule: (task) => task(),
+		}).done;
+		a.source.changed = true;
+		expect(await controller.saveWorkspace()).toBe(true);
+		const out = await unpackWorkspace(
+			new Uint8Array(await (written as unknown as Blob).arrayBuffer()),
+		);
+		if (!out.ok) throw new Error(out.message);
+		expect(
+			await bytesOf(out.workspace.datasets[0]?.assets[0]?.blob as Blob),
+		).toBe("alpha");
+	});
+
+	test("says the file changed when a photo cannot be stored or read", async () => {
+		refuseChangedPuts();
+		const store = createAutosaveStore(freshDb());
+		const a = await photo("alpha");
+		const onChanged = vi.fn();
+		const copies = createSourceAssets(workspaceOf([a.asset]), {
+			fileName: "w.coatworkspace",
+			keep: store.keep,
+			schedule: never,
+			onChanged,
+		});
+		a.source.changed = true;
+		await expect(copies.settle([a.asset])).rejects.toBeInstanceOf(
+			SourceChangedError,
+		);
+		expect(onChanged).toHaveBeenCalledOnce();
+		expect(a.asset.blob).toBe(a.source);
+	});
+});
+
+describe("autosave with a photo that cannot be read", () => {
+	test("keeps writing the document and says so once", async () => {
+		refuseChangedPuts();
+		const name = freshDb();
+		const onUnreadable = vi.fn();
+		const store = createAutosaveStore(name, { onUnreadable });
+		const a = await photo("alpha");
+		const b = await photo("beta");
+		a.source.changed = true;
+		const ws = workspaceOf([a.asset, b.asset]);
+		await store.write({ workspace: ws, fileName: "w.coatworkspace" });
+		expect(await storedKeys(name)).toEqual([b.asset.sha256]);
+		let read = await store.read();
+		expect(read?.workspace.datasets[0]?.assets).toHaveLength(1);
+		expect(read?.missingAssets).toBe(1);
+
+		await store.write({
+			workspace: { ...ws, name: "Renamed" },
+			fileName: "w.coatworkspace",
+		});
+		read = await store.read();
+		expect(read?.workspace.name).toBe("Renamed");
+		expect(onUnreadable).toHaveBeenCalledOnce();
+		expect(onUnreadable).toHaveBeenCalledWith(a.asset);
+	});
+
+	test("reports through the tracked workspace's message", async () => {
+		const a = await photo("alpha");
+		const onChanged = vi.fn();
+		trackSourceAssets(workspaceOf([a.asset]), {
+			fileName: "w.coatworkspace",
+			schedule: never,
+			onChanged,
+		});
+		reportSourceChanged();
+		reportSourceChanged();
+		expect(onChanged).toHaveBeenCalledOnce();
+		expect(onChanged.mock.calls[0]?.[0].message).toMatch(
+			/^w\.coatworkspace changed on disk/,
+		);
 	});
 });
