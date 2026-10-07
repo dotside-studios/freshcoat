@@ -1318,8 +1318,10 @@ function drawShape(
 			}
 		}
 	} else if (cmd.op === "drawGroup") {
+		if (cmd.isolate) canvas.saveLayer(undefined, null);
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
+		if (cmd.isolate) canvas.restore();
 	} else if (cmd.op === "drawMasked") {
 		drawMasked(ck, canvas, provider, images, bin, cmd, issues, frame);
 	} else {
@@ -3495,7 +3497,8 @@ function passThrough(cmd: DrawCommand): boolean {
 		!cmd.shadow &&
 		!(cmd.blur && cmd.blur > 0) &&
 		!(cmd.opacity !== undefined && cmd.opacity < 1) &&
-		(!cmd.blendMode || cmd.blendMode === "normal")
+		(!cmd.blendMode || cmd.blendMode === "normal") &&
+		!(cmd.op === "drawGroup" && cmd.isolate)
 	);
 }
 

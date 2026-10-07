@@ -279,10 +279,7 @@ describe("the mask clip shortcut and drawMasked paint the same", () => {
 			expect(slow.warnings).toEqual([]);
 			expect(diff(fast.pixels, slow.pixels, EDGE_TOLERANCE).over).toBe(0);
 		},
-		({ shape, place, content }) => {
-			const partlyCovered = shape.name !== "rect" || place.rotation;
-			if (content.children.length > 1 && partlyCovered)
-				return "the clip antialiases each child against a partly covered edge, so overlapping children compound its coverage";
+		({ shape, place }) => {
 			if (shape.name === "ellipse" && place.rotation && place.offset)
 				return "a few edge pixels of the clip differ from drawMasked by up to 1/4 coverage, with the same area and centroid";
 			return null;

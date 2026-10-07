@@ -389,6 +389,9 @@ export type DrawPathCommand = DrawCommandBase & {
 export type DrawGroupCommand = DrawCommandBase & {
 	op: "drawGroup";
 	children: DrawCommand[];
+	// Paint the children into one layer that the clip covers once, so children
+	// overlapping at a partly covered clip edge do not compound its coverage.
+	isolate?: boolean;
 };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then
