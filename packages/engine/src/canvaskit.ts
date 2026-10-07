@@ -2312,12 +2312,13 @@ function recordedBounds(
 	frame: Frame,
 	device: Size,
 	matrix: number[],
+	reach = 0,
 ): Bounds {
 	const recorder = new ck.PictureRecorder();
 	let picture: SkPicture | null = null;
 	try {
 		const rc = recorder.beginRecording(
-			ck.XYWHRect(0, 0, device.width, device.height),
+			ck.LTRBRect(-reach, -reach, device.width + reach, device.height + reach),
 			true,
 		);
 		measuring.add(rc);
@@ -2349,13 +2350,14 @@ export function auditAdjustedBounds(
 	boundsAudit = audit;
 }
 
-// The device pixels an adjusted layer can touch: Skia's bounds of a recording
-// of the inner drawable under the main canvas's matrix, so stroke, shadow, blur
-// and glyph outsets count exactly as the painter draws them. Predicted from the
+// The device pixels an adjusted layer's content can touch: Skia's bounds of a
+// recording of the inner drawable under the main canvas's matrix, so stroke and
+// glyph outsets count exactly as the painter draws them. Predicted from the
 // commands where possible, recorded otherwise. Rounded out with 1px spare for
 // antialiasing, plus `spread` for a kernel that reads neighbours, then cut to
 // the device clip (grown by `spread`, so a kernel at the clip edge still reads
-// the real pixels beyond it) and the frame. Null when nothing shows.
+// the real pixels beyond it) and the frame. `reach` grows both cuts by how far
+// the layer's shadows and blur carry content into view. Null when nothing shows.
 function adjustedDeviceRect(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -2367,6 +2369,7 @@ function adjustedDeviceRect(
 	device: Size,
 	matrix: number[],
 	spread: number,
+	reach: number,
 ): { x: number; y: number; width: number; height: number } | null {
 	const predicted = predictedBounds(
 		ck,
@@ -2377,33 +2380,44 @@ function adjustedDeviceRect(
 		frame,
 		device,
 		matrix,
+		reach > 0,
 	);
-	boundsAudit?.(
-		predicted,
-		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix),
-	);
-	const [l, t, r, b] =
-		predicted ??
-		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix);
+	const recorded = () =>
+		recordedBounds(
+			ck,
+			provider,
+			images,
+			bin,
+			inner,
+			frame,
+			device,
+			matrix,
+			reach,
+		);
+	boundsAudit?.(predicted, recorded());
+	const [l, t, r, b] = predicted ?? recorded();
 	const clip = canvas.getDeviceClipBounds();
 	const pad = 1 + spread;
-	const x0 = Math.max(Math.floor(l) - pad, clip[0] - spread, 0);
-	const y0 = Math.max(Math.floor(t) - pad, clip[1] - spread, 0);
-	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + spread, device.width);
-	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + spread, device.height);
+	const grow = spread + reach;
+	const x0 = Math.max(Math.floor(l) - pad, clip[0] - grow, -reach);
+	const y0 = Math.max(Math.floor(t) - pad, clip[1] - grow, -reach);
+	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + grow, device.width + reach);
+	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + grow, device.height + reach);
 	if (!(x1 > x0 && y1 > y0)) return null;
 	return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
-// Apply an adjust's LUTs/sharpen via an offscreen SkSL pass: render the drawable
-// (with only its color matrix) to an offscreen surface covering just its device
-// rect, then draw it back through the adjust shader. The color matrix rides the
-// inner render, so ordering is matrix → curve → cube → sharpen — color first,
-// spatial last. The offscreen inherits the main canvas's full CTM, shifted by the
-// rect's whole-pixel origin, and is composited back in device coordinates, so an
-// adjusted descendant follows every parent transform exactly once. Falls back to
-// a matrix-only render (+ an adjust_unsupported warning) if the surface or effect
-// can't be created.
+// Apply an adjust's LUTs/sharpen via an offscreen SkSL pass: render the
+// drawable's content and clip (with only its color matrix) to an offscreen
+// surface covering just its device rect, then draw it back through the adjust
+// shader inside a layer carrying the drawable's shadows, blur, opacity and
+// blend. The color matrix rides the inner render, so ordering is matrix → curve
+// → cube → sharpen, and the shadows are cast from the adjusted result in their
+// own color, as layerPaint orders them. The offscreen inherits the main canvas's
+// full CTM, shifted by the rect's whole-pixel origin, and is composited back in
+// device coordinates, so an adjusted descendant follows every parent transform
+// exactly once. Falls back to a matrix-only render (+ an adjust_unsupported
+// warning) if the surface or effect can't be created.
 function paintAdjustedOffscreen(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -2435,21 +2449,24 @@ function paintAdjustedOffscreen(
 	if (adjust.gamut === "preserve-hue" && !matrixInShader) {
 		reportAdjustUnsupported(issues, cmd, "gamut");
 	}
-	// The inner drawable: same node, but only the (cheap) color matrix survives —
-	// lut/sharpen are this pass's job, so dropping them avoids re-entering here.
+	// The inner drawable: content, rotation and clip, with only the (cheap) color
+	// matrix of the adjust. lut/sharpen are this pass's job, and the layer effects
+	// come after it.
 	const inner: DrawCommand = {
+		...layerContent(cmd),
+		...(cmd.rotation ? { rotation: cmd.rotation } : {}),
+		...(adjust.colorMatrix && !matrixInShader
+			? { adjust: { colorMatrix: adjust.colorMatrix } }
+			: {}),
+	} as DrawCommand;
+	const effects = { ...cmd, adjust: undefined } as DrawCommand;
+	const matrixOnly = {
 		...cmd,
-		adjust:
-			adjust.colorMatrix && !matrixInShader
-				? { colorMatrix: adjust.colorMatrix }
-				: undefined,
+		adjust: adjust.colorMatrix ? { colorMatrix: adjust.colorMatrix } : undefined,
 	} as DrawCommand;
 	if (hasLut3d && !validLut3d(adjust.lut3d)) {
 		reportAdjustUnsupported(issues, cmd, "lut3d");
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
-		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
+		paintDrawable(ck, canvas, provider, images, bin, matrixOnly, issues, frame);
 		return;
 	}
 
@@ -2460,6 +2477,7 @@ function paintAdjustedOffscreen(
 	// allocated, so N adjusted photos hold N photo-sized surfaces, not N frames.
 	const device = exportPixelSize(frame, frame.scale);
 	const matrix = canvas.getTotalMatrix();
+	const reach = Math.ceil(layerReach(effects) * matrixStretch(matrix));
 	const rect = adjustedDeviceRect(
 		ck,
 		canvas,
@@ -2471,6 +2489,7 @@ function paintAdjustedOffscreen(
 		device,
 		matrix,
 		hasSharpen ? 1 : 0,
+		reach,
 	);
 	if (!rect) return;
 	const info = {
@@ -2500,10 +2519,7 @@ function paintAdjustedOffscreen(
 		if (hasSharpen) reportAdjustUnsupported(issues, cmd, "sharpen");
 		if (matrixInShader) reportAdjustUnsupported(issues, cmd, "gamut");
 		surface?.delete();
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
-		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
+		paintDrawable(ck, canvas, provider, images, bin, matrixOnly, issues, frame);
 		return;
 	}
 
@@ -2573,19 +2589,73 @@ function paintAdjustedOffscreen(
 	const shader = bin.track(effect.makeShaderWithChildren(uniforms, children));
 	const paint = bin.track(new ck.Paint());
 	paint.setShader(shader);
-	// Blit in DEVICE pixels — undo the main canvas's complete CTM, not merely the
-	// export scale. The snapshot already includes parent rotations/transforms; a
-	// second application here would move it. The main clip remains in device space,
-	// so clipping semantics are unchanged.
-	const inverse = ck.Matrix.invert(matrix);
-	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
+	// The layer opens under the drawable's own rotated matrix, so its filters
+	// work in local units exactly as paintDrawable's would. Inside it, blit in
+	// DEVICE pixels: undo the complete CTM, not merely the export scale. The
+	// snapshot already includes parent rotations/transforms; a second application
+	// here would move it. The main clip remains in device space, so clipping
+	// semantics are unchanged.
 	canvas.save();
+	if (cmd.rotation) {
+		const cx = cmd.pos.x + cmd.size.width / 2;
+		const cy = cmd.pos.y + cmd.size.height / 2;
+		canvas.translate(cx, cy);
+		canvas.rotate(cmd.rotation, 0, 0);
+		canvas.translate(-cx, -cy);
+	}
+	const local = canvas.getTotalMatrix();
+	const inverse = ck.Matrix.invert(local);
+	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
+	const lp = layerPaint(ck, bin, effects);
+	if (lp) {
+		const back = layerPaintBoundable(effects)
+			? invertAffine(local.slice(0, 6).map(f32) as Affine)
+			: null;
+		const affine = local[6] === 0 && local[7] === 0 && local[8] === 1;
+		const bounds =
+			back && affine
+				? mapAffine(back, [
+						rect.x,
+						rect.y,
+						rect.x + rect.width,
+						rect.y + rect.height,
+					])
+				: null;
+		canvas.saveLayer(lp, bounds ? ck.LTRBRect(...bounds) : null);
+	}
 	canvas.concat(inverse);
 	canvas.drawRect(
 		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
 		paint,
 	);
+	if (lp) canvas.restore();
 	canvas.restore();
+}
+
+// How far, in local units, a layer's blur and shadows can carry its content.
+function layerReach(cmd: DrawCommand): number {
+	const blur =
+		typeof cmd.blur === "number" && cmd.blur > 0
+			? 3 * LAYER_BLUR_SIGMA(cmd.blur)
+			: 0;
+	let shadows = 0;
+	for (const s of shadowList(cmd.shadow))
+		shadows = Math.max(
+			shadows,
+			Math.abs(s.dx) +
+				Math.abs(s.dy) +
+				Math.abs(s.spread ?? 0) +
+				3 * SHADOW_SIGMA(s.blur),
+		);
+	return blur + shadows;
+}
+
+// The most a matrix lengthens a unit vector, bounded above by its row sums.
+function matrixStretch(m: number[]): number {
+	return Math.max(
+		Math.abs(m[0]) + Math.abs(m[1]),
+		Math.abs(m[3]) + Math.abs(m[4]),
+	);
 }
 
 // Collapse the supersampled render into the output surface, so each output pixel
@@ -3130,7 +3200,10 @@ function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
 }
 
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
-// composites onto everything below it exactly like a Figma layer.
+// composites onto everything below it exactly like a Figma layer. The effects
+// run in the order README.md's "Layer effect order" gives: the color matrix is
+// the first image filter rather than the paint's color filter, which Skia would
+// apply after the shadows and after the paint's alpha.
 function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	const { blendMode, opacity, blur, shadow } = cmd;
 	const hasBlend = blendMode && blendMode !== "normal";
@@ -3140,10 +3213,6 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	if (!hasBlend && !hasOpacity && !hasBlur && !shadow && !colorFilter)
 		return null;
 	const paint = bin.track(new ck.Paint());
-	// The color filter runs on the layer's contents (before blur/shadow, which are
-	// image filters on the layer result): color-correct first, spatial effects
-	// after.
-	if (colorFilter) paint.setColorFilter(colorFilter);
 	if (hasOpacity) paint.setAlphaf(opacity);
 	const blender =
 		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
@@ -3153,14 +3222,16 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
 		);
 	}
-	let filter: ImageFilter | null = null;
+	let filter: ImageFilter | null = colorFilter
+		? bin.track(ck.ImageFilter.MakeColorFilter(colorFilter, null))
+		: null;
 	if (typeof blur === "number" && blur > 0)
 		filter = bin.track(
 			ck.ImageFilter.MakeBlur(
 				LAYER_BLUR_SIGMA(blur),
 				LAYER_BLUR_SIGMA(blur),
 				ck.TileMode.Decal,
-				null,
+				filter,
 			),
 		);
 	const sh = shadowFilter(ck, bin, shadow);

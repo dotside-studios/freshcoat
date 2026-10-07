@@ -1705,6 +1705,76 @@ add(
 	],
 );
 
+// ─── layer effect order ───────────────────────────────────────────────────────
+
+// Adjust recolors the drawable, not the shadows it casts: a shadow keeps its own
+// color, as in Figma. A backend running the adjust over the finished layer
+// darkens the shadow to (4,16,144) under the LUT and turns it red under the
+// matrix.
+add(
+	"adjust-lut-keeps-shadow-color",
+	"a LUT adjusts the content and leaves the drop shadow's color",
+	"raster",
+	["adjust.lut", "effect.shadow"],
+	frame([
+		createRect({
+			...box(20, 40, 40, 40),
+			fills: solid("#808080"),
+			shadow: { color: "#2040c0", dx: 60, dy: 0, blur: 0 },
+			adjust: buildAdjust({ gamma: 2 }),
+		}),
+	]),
+	[
+		px([40, 60], [64, 64, 64, 255], "128 at gamma 2 is 64", 2),
+		px([100, 60], [32, 64, 192, 255], "the shadow in its own color", 2),
+	],
+);
+
+add(
+	"adjust-matrix-keeps-shadow-color",
+	"a colorMatrix adjusts the content and leaves the drop shadow's color",
+	"core",
+	["adjust.colorMatrix", "effect.shadow"],
+	frame([
+		createRect({
+			...box(20, 40, 40, 40),
+			fills: solid("#2f6fed"),
+			shadow: { color: "#2040c0", dx: 60, dy: 0, blur: 0 },
+			adjust: {
+				colorMatrix: [
+					0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+				],
+			},
+		}),
+	]),
+	[
+		px([40, 60], [237, 111, 47, 255], "(47,111,237) with R and B exchanged", 2),
+		px([100, 60], [32, 64, 192, 255], "the shadow in its own color", 2),
+	],
+);
+
+// Blend mode composites the adjusted layer onto its parent. A backend blending
+// before the adjust pass blends against nothing and lands 64 here.
+add(
+	"adjust-lut-blends-on-composite",
+	"an adjusted layer's blend mode reads the pixels below it",
+	"raster",
+	["adjust.lut", "blend.multiply"],
+	frame([
+		createRect({ ...box(20, 20, 120, 80), fills: solid("#808080") }),
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#808080"),
+			blendMode: "multiply",
+			adjust: buildAdjust({ gamma: 2 }),
+		}),
+	]),
+	[
+		px([80, 60], [32, 32, 32, 255], "64 multiplied onto 128", 2),
+		px([30, 25], [128, 128, 128, 255], "the layer below, outside the square"),
+	],
+);
+
 mkdirSync(CASES_DIR, { recursive: true });
 for (const c of cases)
 	writeFileSync(join(CASES_DIR, `${c.id}.json`), stringifyCase(c));

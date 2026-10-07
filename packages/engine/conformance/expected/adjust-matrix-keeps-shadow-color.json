@@ -1,0 +1,91 @@
+{
+	"caseId": "adjust-matrix-keeps-shadow-color",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 20,
+						"y": 40
+					},
+					"size": {
+						"width": 40,
+						"height": 40
+					},
+					"shadow": {
+						"color": "#2040c0",
+						"dx": 60,
+						"dy": 0,
+						"blur": 0
+					},
+					"adjust": {
+						"colorMatrix": [
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							1,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							0,
+							1,
+							0
+						]
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "5840d3b0f09835fa0c6e9e03b2bcdd9dc82d8ce6627a45438fb470582d630ca8"
+}
