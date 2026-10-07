@@ -14,13 +14,12 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
-import { chooseOption } from "./aria";
+import { chooseOption, fastUser, spinbutton } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 function setup(selection: string[], t: Template = doc()) {
@@ -63,17 +62,12 @@ describe("DesignPanel", () => {
 	it("shows a text layer's position, content and type sections", () => {
 		setup(["0/1/1"]);
 		// t1 sits at 70,10 inside frame f at 200,100.
-		expect(screen.getByRole("spinbutton", { name: "X" })).toHaveProperty(
-			"value",
-			"270",
-		);
+		expect(spinbutton("X")).toHaveProperty("value", "270");
 		expect(screen.getByLabelText("Text content")).toHaveProperty(
 			"value",
 			"Hi {{ name }}",
 		);
-		expect(
-			screen.getByRole("spinbutton", { name: "Font size" }),
-		).toHaveProperty("value", "16");
+		expect(spinbutton("Font size")).toHaveProperty("value", "16");
 		expect(screen.queryByText("Stroke")).toBeNull();
 		expect(screen.getByText("Text")).toBeTruthy();
 		expect(screen.getByText("Fill")).toBeTruthy();
@@ -112,7 +106,7 @@ describe("DesignPanel", () => {
 	it("sets the text direction", async () => {
 		const c = setup(["0/1/1"]);
 		await chooseOption(
-			userEvent.setup(),
+			fastUser(),
 			screen.getByRole("button", { name: /Text direction/ }),
 			"Right to left",
 		);
@@ -133,7 +127,7 @@ describe("DesignPanel", () => {
 
 	it("writes paragraph spacing, and clears it at zero", () => {
 		const c = setup(["0/1/1"]);
-		const field = screen.getByRole("spinbutton", { name: "Paragraph spacing" });
+		const field = spinbutton("Paragraph spacing");
 		typeInto(field, "12");
 		const spacing = () =>
 			(el(c, "0/1/1").properties as { paragraphSpacing?: number })
@@ -145,7 +139,7 @@ describe("DesignPanel", () => {
 
 	it("shows a rect's geometry, fill, stroke and corners, and writes X", () => {
 		const c = setup(["0/0"]);
-		const x = screen.getByRole("spinbutton", { name: "X" });
+		const x = spinbutton("X");
 		expect(x).toHaveProperty("value", "10");
 		expect(screen.getByText("Stroke")).toBeTruthy();
 		expect(screen.getByText("Corners")).toBeTruthy();
@@ -157,10 +151,10 @@ describe("DesignPanel", () => {
 
 	it("shows Mixed for differing values and writes every layer", () => {
 		const c = setup(["0/0", "0/5"]);
-		const y = screen.getByRole("spinbutton", { name: "Y" });
+		const y = spinbutton("Y");
 		expect(y).toHaveProperty("value", "");
 		expect(y.getAttribute("placeholder")).toBe("Mixed");
-		typeInto(screen.getByRole("spinbutton", { name: "Opacity" }), "50");
+		typeInto(spinbutton("Opacity"), "50");
 		expect(el(c, "0/0").opacity).toBe(0.5);
 		expect(el(c, "0/5").opacity).toBe(0.5);
 		expect(c.state.doc?.history.past).toHaveLength(1);
@@ -168,9 +162,7 @@ describe("DesignPanel", () => {
 
 	it("disables X and Y for auto-layout children", () => {
 		setup(["0/3/0"]);
-		expect(
-			screen.getByRole("spinbutton", { name: "X" }).hasAttribute("disabled"),
-		).toBe(true);
+		expect(spinbutton("X").hasAttribute("disabled")).toBe(true);
 		expect(screen.getByText("Resizing")).toBeTruthy();
 	});
 
@@ -183,8 +175,8 @@ describe("DesignPanel", () => {
 
 	it("edits the template size with nothing selected, as an undo step", () => {
 		const c = setup([]);
-		const w = screen.getByRole("spinbutton", { name: "Template width" });
-		const h = screen.getByRole("spinbutton", { name: "Template height" });
+		const w = spinbutton("Template width");
+		const h = spinbutton("Template height");
 		expect([w, h].map((f) => (f as HTMLInputElement).value)).toEqual([
 			"1000",
 			"600",
@@ -230,7 +222,7 @@ describe("DesignPanel", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Independent corners" }),
 		);
-		typeInto(screen.getByRole("spinbutton", { name: "TL radius" }), "12");
+		typeInto(spinbutton("TL radius"), "12");
 		expect(
 			(el(c, "0/1").properties as { cornerRadius?: unknown }).cornerRadius,
 		).toEqual([12, 0, 0, 0]);
@@ -255,21 +247,21 @@ describe("DesignPanel", () => {
 			gap: 10,
 			padding: { top: 10, right: 10, bottom: 10, left: 10 },
 		});
-		typeInto(screen.getByRole("spinbutton", { name: "Column count" }), "3");
+		typeInto(spinbutton("Column count"), "3");
 		expect(layout()).toMatchObject({ columns: ["1fr", "1fr", "1fr"] });
 		const first = screen.getByRole("radiogroup", { name: "Column 1 size" });
 		fireEvent.click(within(first).getByRole("radio", { name: "Fixed" }));
-		typeInto(screen.getByRole("spinbutton", { name: "Column 1 size" }), "80");
-		typeInto(screen.getByRole("spinbutton", { name: "Column 2 share" }), "2");
+		typeInto(spinbutton("Column 1 size"), "80");
+		typeInto(spinbutton("Column 2 share"), "2");
 		const third = screen.getByRole("radiogroup", { name: "Column 3 size" });
 		fireEvent.click(within(third).getByRole("radio", { name: "Hug" }));
 		expect(layout()).toMatchObject({ columns: [80, "2fr", "auto"] });
 		expect(screen.getByText("Added as children need them")).toBeTruthy();
-		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "2");
+		typeInto(spinbutton("Row count"), "2");
 		expect(layout()).toMatchObject({ rows: ["auto", "auto"] });
-		typeInto(screen.getByRole("spinbutton", { name: "Row count" }), "0");
+		typeInto(spinbutton("Row count"), "0");
 		expect(layout()).not.toHaveProperty("rows");
-		typeInto(screen.getByRole("spinbutton", { name: "Row gap" }), "4");
+		typeInto(spinbutton("Row gap"), "4");
 		expect(layout()).toMatchObject({ gap: [4, 10] });
 		expect(validate(c.template).ok).toBe(true);
 		fireEvent.click(screen.getByRole("radio", { name: "Flex" }));
@@ -296,15 +288,15 @@ describe("DesignPanel", () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add adjustments" }));
 		expect(el(c, "0/0").adjust).toEqual({});
-		typeInto(screen.getByRole("spinbutton", { name: "Saturation" }), "50");
-		typeInto(screen.getByRole("spinbutton", { name: "Gamma" }), "0.8");
+		typeInto(spinbutton("Saturation"), "50");
+		typeInto(spinbutton("Gamma"), "0.8");
 		fireEvent.click(screen.getByRole("checkbox", { name: "Preserve hue" }));
 		expect(el(c, "0/0").adjust).toEqual({
 			saturation: 0.5,
 			gamma: 0.8,
 			preserveHue: true,
 		});
-		typeInto(screen.getByRole("spinbutton", { name: "Saturation" }), "100");
+		typeInto(spinbutton("Saturation"), "100");
 		expect(el(c, "0/0").adjust).toEqual({ gamma: 0.8, preserveHue: true });
 		expect(validate(c.template).ok).toBe(true);
 		fireEvent.click(screen.getByRole("button", { name: "Remove adjustments" }));
@@ -314,13 +306,13 @@ describe("DesignPanel", () => {
 	it("sets an image's focal point and crop", () => {
 		const c = setup(["0/2/0"]);
 		const props = () => el(c, "0/2/0").properties as ImageProperties;
-		typeInto(screen.getByRole("spinbutton", { name: "Focus X" }), "20");
+		typeInto(spinbutton("Focus X"), "20");
 		expect(props().focus).toEqual([0.2, 0.5]);
 		fireEvent.click(screen.getByRole("checkbox", { name: "Crop image" }));
 		expect(props().crop).toEqual({ x: 0, y: 0, width: 1, height: 1 });
-		typeInto(screen.getByRole("spinbutton", { name: "Crop X" }), "30");
+		typeInto(spinbutton("Crop X"), "30");
 		expect(props().crop).toEqual({ x: 0.3, y: 0, width: 0.7, height: 1 });
-		typeInto(screen.getByRole("spinbutton", { name: "Crop width" }), "90");
+		typeInto(spinbutton("Crop width"), "90");
 		expect(props().crop).toEqual({ x: 0.3, y: 0, width: 0.7, height: 1 });
 		expect(validate(c.template).ok).toBe(true);
 

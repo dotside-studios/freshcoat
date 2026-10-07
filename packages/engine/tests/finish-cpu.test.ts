@@ -13,6 +13,7 @@ import {
 	encodePng,
 	type PaintCache,
 } from "../src/index";
+import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { FrameFinish } from "../src/types";
 
@@ -164,4 +165,47 @@ describe("the finish on the CPU", () => {
 			cache.dispose();
 		}
 	});
+
+	test.each([
+		{ width: 1500, height: 1100 },
+		{ width: 2022, height: 1276 },
+	])("keeps one float of noise per channel at %o", async (size) => {
+		const png = await noisePng(size);
+		for (const mode of ["monochrome", "per-channel"] as const) {
+			const cache = createPaintCache({ maxImagePixels: 48e6 });
+			try {
+				const finish: FrameFinish = {
+					whiteClamp: 254,
+					dither: { amount: 2, seed: 0, mode },
+				};
+				const shader = await paint(size, finish, png, cache, false);
+				const cpu = await paint(size, finish, png, cache, true);
+				expect(Buffer.from(cpu).equals(shader)).toBe(true);
+				const channels = mode === "monochrome" ? 1 : 3;
+				expect(paintCacheState(cache).finishNoise?.noise.length).toBe(
+					size.width * size.height * channels,
+				);
+			} finally {
+				cache.dispose();
+			}
+		}
+	}, 60_000);
+
+	test("budgets the noise at its own size", async () => {
+		const size = { width: 1500, height: 1100 };
+		const png = await noisePng(size);
+		const pixels = size.width * size.height;
+		const cache = createPaintCache({ maxImagePixels: pixels * 2 });
+		try {
+			const finish: FrameFinish = {
+				dither: { amount: 2, seed: 0, mode: "monochrome" },
+			};
+			await paint(size, finish, png, cache, true);
+			await paint(size, finish, png, cache, true);
+			expect(cache.stats().finishNoiseBuilds).toBe(1);
+			expect(paintCacheState(cache).finishNoise?.noise.length).toBe(pixels);
+		} finally {
+			cache.dispose();
+		}
+	}, 60_000);
 });

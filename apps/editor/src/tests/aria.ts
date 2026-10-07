@@ -38,3 +38,29 @@ export async function chooseOption(
 	const listbox = await screen.findByRole("listbox");
 	await user.click(within(listbox).getByRole("option", { name: option }));
 }
+
+/**
+ * A button by its label or, without one, its text: either is its accessible
+ * name here. A `*ByRole` query with a name over a whole section names every
+ * button in it, which costs 300 ms or more in jsdom.
+ */
+export function button(
+	name: string | RegExp,
+	container: HTMLElement = document.body,
+): HTMLElement {
+	const scope = within(container);
+	return (
+		scope.queryByLabelText(name, { selector: "button" }) ??
+		scope.getByText(name, { selector: "button" })
+	);
+}
+
+/** A number field's input by its label, for the same reason as `button`. */
+export function spinbutton(
+	name: string | RegExp,
+	container: HTMLElement = document.body,
+): HTMLElement {
+	return within(container).getByLabelText(name, {
+		selector: '[role="spinbutton"]',
+	});
+}

@@ -1,15 +1,13 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { Binding, Dataset } from "@freshcoat-js/workspace";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent, {
-	PointerEventsCheckLevel,
-} from "@testing-library/user-event";
+import type userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { BindingEditor, TemplateBindingEditor } from "~/binding/BindingEditor";
-import { chooseOption } from "./aria";
+import { chooseOption, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 beforeAll(() => {
@@ -66,11 +64,7 @@ function setup(initial?: Binding) {
 	render(<Harness initial={initial} log={log} />);
 	return {
 		log,
-		// jsdom has none of the app's CSS, so checking `pointer-events` up the
-		// tree on every click only costs time.
-		user: userEvent.setup({
-			pointerEventsCheck: PointerEventsCheckLevel.Never,
-		}),
+		user: fastUser(),
 		last: () => log.at(-1),
 	};
 }
@@ -277,7 +271,7 @@ describe("template binding editor", () => {
 				<TemplateBindingEditor templateId={id} />
 			</ControllerProvider>,
 		);
-		const user = userEvent.setup();
+		const user = fastUser();
 		await choose(user, /Dataset/, "People");
 		expect(controller.state.workspace?.templates[0]?.binding).toEqual(bound);
 	});

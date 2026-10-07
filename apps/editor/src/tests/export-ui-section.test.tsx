@@ -8,7 +8,6 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
 	afterAll,
 	afterEach,
@@ -29,7 +28,7 @@ import type {
 	ExportRunnerSnapshot,
 } from "~/export/use-export-runner";
 import { photoWatermark } from "~/samples/photo-watermark";
-import { chooseOption } from "./aria";
+import { button, chooseOption, fastUser } from "./aria";
 import { doc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
 
 const sizes: [string, number][] = [
@@ -201,7 +200,7 @@ function setup() {
 		templateId,
 		fake,
 		downloads,
-		user: userEvent.setup(),
+		user: fastUser(),
 		records: () =>
 			controller.state.workspace?.datasets[0]?.records ?? people.records,
 	};
@@ -235,7 +234,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 		expect(controller.state.workspace?.activePresetId).toBe(presets[0]?.id);
 		// 3 records (the skipped one is left out) × 2 sides.
-		expect(screen.getByRole("button", { name: "Export 6 files" })).toBeTruthy();
+		expect(button("Export 6 files")).toBeTruthy();
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-1-front.png",
 		);
@@ -244,15 +243,16 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 	});
 
-	test("lists records with their status and changes them in bulk", async () => {
-		const { controller, user, records } = setup();
+	/** Sets an All preset and opens the Records tab. */
+	async function recordsTab() {
+		const ctx = setup();
 		act(() => {
-			controller.dispatch({
+			ctx.controller.dispatch({
 				type: "setPreset",
 				preset: {
 					id: "p_1",
 					name: "All",
-					templateId: controller.state.workspace?.activeTemplateId as string,
+					templateId: ctx.templateId,
 					records: "all",
 					sides: "all",
 					format: "png-zip",
@@ -263,13 +263,22 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		await user.click(screen.getByRole("tab", { name: "Records" }));
+		await ctx.user.click(screen.getByRole("tab", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Ada")).toBeTruthy());
+		return { ...ctx, list };
+	}
+
+	test("lists records with their status", async () => {
+		const { list } = await recordsTab();
 		expect(within(list).getByText("font missing")).toBeTruthy();
 		expect(
 			list.querySelectorAll("[data-status]").length,
 		).toBeGreaterThanOrEqual(4);
+	});
+
+	test("changes records' status in bulk", async () => {
+		const { user, records, list } = await recordsTab();
 		const rowOf = (name: string) =>
 			within(list).getByText(name).closest('[role="row"]') as HTMLElement;
 		await user.click(within(rowOf("Ada")).getByRole("checkbox"));
@@ -286,11 +295,9 @@ describe("export section", { timeout: 20_000 }, () => {
 			"skipped",
 		]);
 		// The list's selection is what the button exports, until it is cleared.
-		expect(
-			screen.getByRole("button", { name: "Export 2 selected" }),
-		).toBeTruthy();
-		await user.click(screen.getByRole("button", { name: "Clear selection" }));
-		expect(screen.getByRole("button", { name: "Export 2 files" })).toBeTruthy();
+		expect(button("Export 2 selected")).toBeTruthy();
+		await user.click(button("Clear selection"));
+		expect(button("Export 2 files")).toBeTruthy();
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Bo-front.png",
 		);
@@ -317,9 +324,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		expect(
-			screen.getByRole("button", { name: "Export 0 files" }),
-		).toHaveProperty("disabled", true);
+		expect(button("Export 0 files")).toHaveProperty("disabled", true);
 		await user.click(screen.getByRole("tab", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Bo")).toBeTruthy());
@@ -328,7 +333,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			.closest('[role="row"]') as HTMLElement;
 		await user.click(within(row).getByRole("checkbox"));
 		expect(controller.state.workspace?.presets[0]?.selected).toEqual(["r2"]);
-		expect(screen.getByRole("button", { name: "Export 1 file" })).toBeTruthy();
+		expect(button("Export 1 file")).toBeTruthy();
 		expect(screen.getByTestId("export-page-size").textContent).toBe(
 			"Page 3.33 × 2.00 in · 84.7 × 50.8 mm",
 		);
@@ -358,14 +363,16 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-unbound").textContent).toBe(
 			"Not bound to a dataset, exporting defaults",
 		);
-		expect(screen.getByRole("button", { name: "Export 2 files" })).toBeTruthy();
+		expect(button("Export 2 files")).toBeTruthy();
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-front@2x.png",
 		);
 	});
 
-	test("a finished job marks records, downloads once and keeps history", async () => {
-		const { controller, user, fake, downloads, records } = setup();
+	/** Runs the All preset and finishes it with two files ok and one failed. */
+	async function finishedJob() {
+		const ctx = setup();
+		const { controller, user, fake } = ctx;
 		const templateId = controller.state.workspace?.activeTemplateId as string;
 		act(() => {
 			controller.dispatch({
@@ -384,7 +391,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		await user.click(screen.getByRole("button", { name: "Export 6 files" }));
+		await user.click(button("Export 6 files"));
 		expect(fake.started).toHaveLength(1);
 		const bar = screen.getByTestId("export-job");
 		expect(bar.dataset.state).toBe("running");
@@ -428,6 +435,11 @@ describe("export section", { timeout: 20_000 }, () => {
 			});
 		});
 		expect(bar.dataset.state).toBe("done");
+		return { ...ctx, bar, file };
+	}
+
+	test("a finished job marks records and downloads once", async () => {
+		const { downloads, records, file } = await finishedJob();
 		expect(downloads).toEqual([file]);
 		expect(records().map((r) => [r.status, r.error])).toEqual([
 			["exported", undefined],
@@ -439,22 +451,29 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-summary").textContent).toBe(
 			"All · 2 ok · 1 failed · 1.5 s",
 		);
-		await user.click(screen.getByRole("button", { name: "Report" }));
+	});
+
+	test("a finished job downloads its report and its file again", async () => {
+		const { user, downloads } = await finishedJob();
+		await user.click(button("Report"));
 		expect(downloads.at(-1)?.name).toBe("export-report.csv");
 		expect(await downloads.at(-1)?.blob.text()).toContain(
 			"c,r2,front,failed,no font",
 		);
 		downloads.pop();
-		await user.click(screen.getByRole("button", { name: "Download all.zip" }));
+		await user.click(button("Download all.zip"));
 		expect(downloads).toHaveLength(2);
+	});
 
-		await user.click(screen.getByRole("button", { name: "Retry failed" }));
+	test("a finished job retries its failures and keeps history", async () => {
+		const { user, fake, downloads, bar } = await finishedJob();
+		await user.click(button("Retry failed"));
 		expect(fake.started[1]?.preset.records).toBe("failed");
 		act(() => fake.runner.cancel());
 		await waitFor(() => expect(bar.dataset.state).toBe("cancelled"));
-		expect(downloads).toHaveLength(2);
+		expect(downloads).toHaveLength(1);
 
-		await user.click(screen.getByRole("button", { name: "Job history" }));
+		await user.click(button("Job history"));
 		const entries = await screen.findAllByTestId("export-history-entry");
 		expect(entries.map((e) => e.textContent)).toEqual([
 			expect.stringContaining("All (retry)"),
@@ -561,7 +580,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			"r3:default",
 			"r3:dark",
 		]);
-		expect(screen.getByRole("button", { name: "Export 6 files" })).toBeTruthy();
+		expect(button("Export 6 files")).toBeTruthy();
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Ada-default.png",
 		);
@@ -587,7 +606,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-preview").dataset.renderKey).toMatch(
 			/^r2:front:default\|/,
 		);
-		await user.click(screen.getByRole("button", { name: "Next record" }));
+		await user.click(button("Next record"));
 		expect(screen.getByTestId("export-preview").dataset.renderKey).toMatch(
 			/^r2:front:dark\|/,
 		);
@@ -620,7 +639,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		expect(screen.getByRole("button", { name: "Export 1 file" })).toBeTruthy();
+		expect(button("Export 1 file")).toBeTruthy();
 		const settings = screen.getByTestId("export-settings");
 		expect(within(settings).getByText(/\{\{variant\}\}/)).toBeTruthy();
 		await chooseOption(
@@ -632,11 +651,11 @@ describe("export section", { timeout: 20_000 }, () => {
 			controller.state.workspace?.templates.find((t) => t.id === id)?.binding,
 		).toEqual({ datasetId: "", fields: {}, variant: { kind: "all" } });
 		expect(screen.getByTestId("export-unbound")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Export 2 files" })).toBeTruthy();
+		expect(button("Export 2 files")).toBeTruthy();
 		expect(screen.getByTestId("export-stepper-position").textContent).toBe(
 			"1 / 2",
 		);
-		await user.click(screen.getByRole("button", { name: "Next record" }));
+		await user.click(button("Next record"));
 		expect(screen.getByTestId("export-preview").dataset.renderKey).toMatch(
 			/^:front:dark\|/,
 		);
@@ -665,7 +684,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		await user.click(screen.getByRole("button", { name: "Export 3 files" }));
+		await user.click(button("Export 3 files"));
 		const item = (recordId: string, ok: boolean) => ({
 			key: `${recordId}:front`,
 			recordId,
@@ -681,7 +700,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				items: [item("r1", false), item("r2", true), item("r3", true)],
 			});
 		});
-		await user.click(screen.getByRole("button", { name: "Show failed" }));
+		await user.click(button("Show failed"));
 		const strip = screen.getByTestId("export-filmstrip");
 		// r1 failed in the job; r3 was already failed
 		expect(
@@ -783,7 +802,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				<ExportSection />
 			</ControllerProvider>,
 		);
-		const user = userEvent.setup();
+		const user = fastUser();
 		expect(screen.getByRole("radio", { name: "Output" })).toBeTruthy();
 		expect(screen.getByRole("radio", { name: "Source" })).toBeTruthy();
 		await user.click(screen.getByRole("radio", { name: "Split" }));

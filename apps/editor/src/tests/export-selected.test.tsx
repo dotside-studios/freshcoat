@@ -34,6 +34,7 @@ import type {
 	ExportRunnerSnapshot,
 } from "~/export/use-export-runner";
 import { membershipCard } from "~/samples/membership-card";
+import { button } from "./aria";
 import { doc } from "./doc-fixture";
 
 const members: Dataset = {
@@ -410,7 +411,7 @@ describe("the filmstrip's selection in Export", { timeout: 20_000 }, () => {
 	test("Mod-click and Shift-click select, and the button exports the selection", async () => {
 		const { controller, preset, fake } = setup();
 		// The preset's own filter: the three pending records, two sides each.
-		expect(screen.getByRole("button", { name: "Export 6 files" })).toBeTruthy();
+		expect(button("Export 6 files")).toBeTruthy();
 		fireEvent.click(screen.getByRole("radio", { name: /All/ }));
 		fireEvent.click(cell("r1"));
 		fireEvent.click(cell("r2"), { ctrlKey: true });
@@ -418,9 +419,7 @@ describe("the filmstrip's selection in Export", { timeout: 20_000 }, () => {
 		expect(cell("r1").getAttribute("aria-checked")).toBe("false");
 		// The plain click previewed; the Mod-click did not move the preview.
 		expect(cell("r1").getAttribute("aria-selected")).toBe("true");
-		expect(
-			screen.getByRole("button", { name: "Export 1 selected" }),
-		).toBeTruthy();
+		expect(button("Export 1 selected")).toBeTruthy();
 		fireEvent.click(cell("r4"), { shiftKey: true });
 		expect(
 			["r1", "r2", "r3", "r4"].map((id) =>
@@ -431,9 +430,7 @@ describe("the filmstrip's selection in Export", { timeout: 20_000 }, () => {
 			"3 selected",
 		);
 		await act(async () => {
-			fireEvent.click(
-				screen.getByRole("button", { name: "Export 3 selected" }),
-			);
+			fireEvent.click(button("Export 3 selected"));
 		});
 		await vi.waitFor(() => expect(fake.started).toHaveLength(1));
 		expect(fake.started[0]?.preset).toMatchObject({
@@ -447,16 +444,12 @@ describe("the filmstrip's selection in Export", { timeout: 20_000 }, () => {
 	test("Mod+A selects every cell, Escape and Clear return to the preset's count", () => {
 		setup();
 		fireEvent.keyDown(strip(), { key: "a", code: "KeyA", ctrlKey: true });
-		expect(
-			screen.getByRole("button", { name: "Export 3 selected" }),
-		).toBeTruthy();
+		expect(button("Export 3 selected")).toBeTruthy();
 		fireEvent.keyDown(strip(), { key: "Escape" });
-		expect(screen.getByRole("button", { name: "Export 6 files" })).toBeTruthy();
+		expect(button("Export 6 files")).toBeTruthy();
 		fireEvent.keyDown(strip(), { key: " " });
-		expect(
-			screen.getByRole("button", { name: "Export 1 selected" }),
-		).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
-		expect(screen.getByRole("button", { name: "Export 6 files" })).toBeTruthy();
+		expect(button("Export 1 selected")).toBeTruthy();
+		fireEvent.click(button("Clear selection"));
+		expect(button("Export 6 files")).toBeTruthy();
 	});
 });

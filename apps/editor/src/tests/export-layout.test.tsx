@@ -9,7 +9,6 @@ import {
 	SheetLayoutError,
 } from "@freshcoat-js/workspace";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
 	afterEach,
 	beforeAll,
@@ -35,6 +34,7 @@ import {
 	withSideIndex,
 } from "~/export/sheets";
 import type { ExportRunner } from "~/export/use-export-runner";
+import { button, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 const item = (recordId: string, recordIndex: number, side: string) =>
@@ -229,7 +229,7 @@ function setup(preset: Partial<ExportPreset> = {}) {
 				preset: { ...current(), ...patch },
 			});
 		});
-	return { controller, current, update, user: userEvent.setup() };
+	return { controller, current, update, user: fastUser() };
 }
 
 const layoutGroup = () => screen.getByTestId("export-layout");
@@ -271,7 +271,7 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("double-sided pairs sheets, with the offset under More", async () => {
 		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+		expect(screen.queryByText("More", { selector: "button" })).toBeNull();
 		await user.click(
 			within(layoutGroup()).getByRole("checkbox", { name: "Double-sided" }),
 		);
@@ -284,28 +284,22 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 			"10 per sheet · 3 sheets",
 		);
 		expect(screen.getByText("Match the printer's flip setting")).toBeTruthy();
-		await user.click(
-			within(layoutGroup()).getByRole("button", { name: "More" }),
-		);
+		await user.click(button("More", layoutGroup()));
 		expect(
 			screen.getByRole("spinbutton", { name: "Back offset X" }),
 		).toBeTruthy();
 		// a two-sided template has backs of its own
-		expect(screen.queryByRole("checkbox", { name: "Blank backs" })).toBeNull();
+		expect(screen.queryByLabelText("Blank backs")).toBeNull();
 	});
 
 	test("a card that doesn't fit shows inline and blocks Export", () => {
 		const { update } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		expect(
-			screen.getByRole("button", { name: "Export 42 files" }),
-		).toHaveProperty("disabled", false);
+		expect(button("Export 42 files")).toHaveProperty("disabled", false);
 		update({ layout: { ...DEFAULT_SHEET_LAYOUT, marginMm: 100 } });
 		const error = screen.getByTestId("export-sheet-error");
 		expect(error.getAttribute("role")).toBe("alert");
 		expect(error.textContent).toMatch(/too wide/);
-		expect(
-			screen.getByRole("button", { name: "Export 42 files" }),
-		).toHaveProperty("disabled", true);
+		expect(button("Export 42 files")).toHaveProperty("disabled", true);
 		expect(screen.queryByTestId("export-sheet-summary")).toBeNull();
 		// The job bar says it in a few words, with the whole of it on hover.
 		const bar = screen.getByTestId("export-blocked");
@@ -330,15 +324,12 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		const preview = screen.getByTestId("sheet-preview");
 		expect(preview.dataset.side).toBe("front");
 		expect(screen.getAllByTestId("sheet-slot").length).toBeGreaterThan(0);
-		await user.click(screen.getByRole("button", { name: "Next sheet" }));
-		await user.click(screen.getByRole("button", { name: "Next sheet" }));
+		await user.click(button("Next sheet"));
+		await user.click(button("Next sheet"));
 		expect(screen.getByTestId("export-sheet-position").textContent).toBe(
 			"Sheet 3 of 3",
 		);
-		expect(screen.getByRole("button", { name: "Next sheet" })).toHaveProperty(
-			"disabled",
-			true,
-		);
+		expect(button("Next sheet")).toHaveProperty("disabled", true);
 		await user.click(
 			within(screen.getByRole("radiogroup", { name: "Sheet side" })).getByRole(
 				"radio",

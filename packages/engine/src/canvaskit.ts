@@ -2928,17 +2928,16 @@ function finishNoise(
 	paint.setShader(shader);
 	const canvas = target.getCanvas();
 	canvas.drawRect(ck.XYWHRect(0, 0, info.width, info.height), paint);
-	// CanvasKit sizes a float readback it allocates in bytes rather than
-	// floats, reading four times past the pixels, so it reads into ours.
-	const dest = ck.Malloc(Float32Array, info.width * info.height * 4);
+	// CanvasKit sizes its own F32 result in bytes rather than floats, so read
+	// into a buffer of the right length instead.
+	const size = info.width * info.height * 4;
+	const dest = ck.Malloc(Float32Array, size);
 	try {
-		const rgba = canvas.readPixels(0, 0, target.imageInfo(), dest) as
-			| Float32Array
-			| null;
-		if (!rgba) return null;
+		if (!canvas.readPixels(0, 0, target.imageInfo(), dest)) return null;
+		const rgba = dest.toTypedArray() as Float32Array;
 		const channels = u.monochrome ? 1 : 3;
-		const noise = new Float32Array((rgba.length / 4) * channels);
-		for (let i = 0, j = 0; i < rgba.length; i += 4)
+		const noise = new Float32Array(info.width * info.height * channels);
+		for (let i = 0, j = 0; i < size; i += 4)
 			for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
 		cacheFinishNoise(cache, { key, noise });
 		return noise;
