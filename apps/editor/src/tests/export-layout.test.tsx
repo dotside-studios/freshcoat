@@ -8,6 +8,16 @@ import {
 	DEFAULT_SHEET_LAYOUT,
 	SheetLayoutError,
 } from "@freshcoat-js/workspace";
+import {
+	pagesPerSheet,
+	planSheets,
+	SHEETS_DONT_FIT,
+	SHEETS_NEED_TEMPLATE_SIZE,
+	sheetLayout,
+	sheetOf,
+	shortSheetError,
+	withSideIndex,
+} from "@freshcoat-js/workspace/export";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import {
 	afterEach,
@@ -23,16 +33,6 @@ import { EditorController } from "~/app/controller";
 import { ExportSection } from "~/export/ExportSection";
 import { exportJobsFor } from "~/export/export-jobs";
 import { previewModes } from "~/export/preview-mode";
-import {
-	pagesPerSheet,
-	planSheets,
-	SHEETS_DONT_FIT,
-	SHEETS_NEED_TEMPLATE_SIZE,
-	sheetLayout,
-	sheetOf,
-	shortSheetError,
-	withSideIndex,
-} from "~/export/sheets";
 import type { ExportRunner } from "~/export/use-export-runner";
 import { button, fastUser } from "./aria";
 import { doc } from "./doc-fixture";

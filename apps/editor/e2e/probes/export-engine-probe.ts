@@ -1,7 +1,11 @@
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import {
+	type JobFile,
+	type JobProgress,
+	runExportJob,
+} from "@freshcoat-js/workspace/export";
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
-import { type JobFile, type JobProgress, runExportJob } from "~/export/job";
 import { createWorkerPool } from "~/export/worker-pool";
 import { resolveTemplateFonts } from "~/render/fonts";
 import { membershipCard } from "~/samples/membership-card";

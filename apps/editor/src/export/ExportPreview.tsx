@@ -2,6 +2,7 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import type { DatasetAsset, ExportPreset } from "@freshcoat-js/workspace";
+import { printEnabled } from "@freshcoat-js/workspace/export";
 import type { CanvasKit } from "canvaskit-wasm";
 import {
 	type PointerEvent as ReactPointerEvent,
@@ -27,7 +28,7 @@ import {
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import PrintIcon from "~icons/mingcute/print-line";
 import { type PreviewMode, splitAt, stepSplit } from "./preview-mode";
-import { printEnabled, printerFileNote } from "./print";
+import { printerFileNote } from "./print";
 import { usePrinterFile } from "./printer-file";
 
 export type PreviewItem = {

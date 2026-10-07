@@ -1,9 +1,6 @@
+import type { RenderRequest } from "@freshcoat-js/workspace/export";
 import { describe, expect, it } from "vitest";
-import type {
-	RenderRequest,
-	WorkerReply,
-	WorkerRequest,
-} from "~/export/protocol";
+import type { WorkerReply, WorkerRequest } from "~/export/protocol";
 import {
 	createWorkerPool,
 	exportPoolSize,

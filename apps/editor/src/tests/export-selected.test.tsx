@@ -1,5 +1,6 @@
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { planExport } from "@freshcoat-js/workspace";
+import { type JobResult, withRecordIds } from "@freshcoat-js/workspace/export";
 import {
 	act,
 	cleanup,
@@ -28,7 +29,6 @@ import {
 	selectedRunLabel,
 } from "~/export/export-ui";
 import { selectionAfterClick } from "~/export/filmstrip-model";
-import { type JobResult, withRecordIds } from "~/export/job";
 import type {
 	ExportRunner,
 	ExportRunnerSnapshot,

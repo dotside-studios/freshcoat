@@ -9,6 +9,7 @@ import {
 	DEFAULT_FILE_NAME_PATTERN,
 	planExport,
 } from "@freshcoat-js/workspace";
+import type { JobResult } from "@freshcoat-js/workspace/export";
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,
@@ -27,7 +28,6 @@ import {
 	selectedIds,
 	statusActions,
 } from "~/export/export-ui";
-import type { JobResult } from "~/export/job";
 import { duplicatePreset, newPreset } from "~/export/preset";
 import { photoWatermark } from "~/samples/photo-watermark";
 import { doc } from "./doc-fixture";

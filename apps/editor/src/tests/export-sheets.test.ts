@@ -9,6 +9,14 @@ import {
 	planExport,
 	SheetLayoutError,
 } from "@freshcoat-js/workspace";
+import {
+	type JobPool,
+	planSheets,
+	type RenderOutput,
+	type RenderRequest,
+	runExportJob,
+	withSideIndex,
+} from "@freshcoat-js/workspace/export";
 import { assemblePdf } from "@freshcoat-js/workspace/pdf";
 import {
 	decodePDFRawStream,
@@ -18,9 +26,6 @@ import {
 	PDFRawStream,
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { type JobPool, runExportJob } from "~/export/job";
-import type { RenderOutput, RenderRequest } from "~/export/protocol";
-import { planSheets, withSideIndex } from "~/export/sheets";
 import { membershipCard } from "~/samples/membership-card";
 
 const PNG = Uint8Array.from(

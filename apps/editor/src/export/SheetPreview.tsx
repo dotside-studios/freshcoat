@@ -2,6 +2,7 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import type { DatasetAsset, Imposition } from "@freshcoat-js/workspace";
 import { cropMarks } from "@freshcoat-js/workspace";
+import { type SheetItem, showsRecord } from "@freshcoat-js/workspace/export";
 import {
 	type CSSProperties,
 	useEffect,
@@ -18,7 +19,6 @@ import {
 	type SheetThumbRequest,
 	thumbKey,
 } from "./sheet-thumbs";
-import { type SheetItem, showsRecord } from "./sheets";
 
 type Size = { width: number; height: number };
 

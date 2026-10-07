@@ -3,6 +3,7 @@ import { Button } from "@freshcoat-js/ui/button";
 import { DialogTrigger, Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { planExport } from "@freshcoat-js/workspace";
+import { withRecordIds } from "@freshcoat-js/workspace/export";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog as RACDialog } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -15,7 +16,6 @@ import {
 	presetsForDataset,
 } from "~/export/export-ui";
 import { JobBar } from "~/export/JobBar";
-import { withRecordIds } from "~/export/job";
 import { useEditor } from "~/state/hooks";
 import { workspaceSnapshot } from "~/state/workspace";
 import ExportIconFill from "~icons/mingcute/upload-2-fill";

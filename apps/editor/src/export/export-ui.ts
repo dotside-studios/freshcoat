@@ -19,10 +19,10 @@ import {
 	orientedSize,
 	parseAssetRef,
 } from "@freshcoat-js/workspace";
+import type { JobResult } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
 import { formatDate } from "~/app/format";
 import type { Action } from "~/state/store";
-import type { JobResult } from "./job";
 
 export const RECORD_FILTERS: { id: ExportPreset["records"]; label: string }[] =
 	[

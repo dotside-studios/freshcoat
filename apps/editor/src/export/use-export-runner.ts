@@ -1,8 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { settleAssets } from "~/app/source-assets";
-import { resolveTemplateFonts } from "~/render/fonts";
 import {
 	boundDatasetOf,
 	type ExportJobOptions,
@@ -10,7 +7,11 @@ import {
 	type JobResult,
 	largestImagePixels,
 	runExportJob,
-} from "./job";
+} from "@freshcoat-js/workspace/export";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { settleAssets } from "~/app/source-assets";
+import { resolveTemplateFonts } from "~/render/fonts";
+import { assemblePdf } from "./pdf-client";
 import {
 	createWorkerPool,
 	defaultPoolSize,
@@ -137,7 +138,7 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 				const result = await runExportJob(workspace, preset, {
 					pool,
 					signal: own.signal,
-					assemblePdf: deps.assemblePdf,
+					assemblePdf: deps.assemblePdf ?? assemblePdf,
 					...job,
 					onProgress: (progress) => {
 						if (controller === own) set({ progress });

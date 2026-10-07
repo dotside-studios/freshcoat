@@ -24,6 +24,7 @@ scheduling and file destinations.
 | `mapping` | the import wizard's mapping of source columns to schema columns |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
+| `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
 | `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
@@ -59,10 +60,36 @@ template format and its renders are unchanged.
 ## Where it sits
 
 `planExport()` turns a workspace and preset into export items with resolved
-values, variants and file names. The host resolves output size from the preset,
-renders those items through [`@freshcoat-js/coatfile`](../coatfile) and
-[`@freshcoat-js/engine`](../engine),
-writes the outputs and records successes or failures.
+values, variants and file names. `@freshcoat-js/workspace/export` runs them:
+`runExportJob()` sizes each item from the preset, renders it through a pool,
+and writes the outputs in plan order to a zip, or into one PDF, with a report
+of what succeeded or failed. Rendering goes through
+[`@freshcoat-js/coatfile`](../coatfile) and [`@freshcoat-js/engine`](../engine).
+
+```ts
+import { loadCanvasKit } from "@freshcoat-js/engine/node";
+import {
+  createItemRenderer,
+  inlinePool,
+  runExportJob,
+} from "@freshcoat-js/workspace/export";
+
+// The full build carries the JPEG and WebP encoders.
+const items = createItemRenderer({
+  ck: await loadCanvasKit("full"),
+  fonts: new Map([["Inter", [interBytes]]]),
+});
+const result = await runExportJob(workspace, preset, {
+  pool: inlinePool(items),
+});
+// result.file is the zip or PDF; result.items says how each item went.
+```
+
+The pool is the host's: `inlinePool` renders one item at a time on the
+calling thread, and Studio passes a pool of workers, each holding its own
+`createItemRenderer`. So is the destination: the default keeps the zip in
+memory, and a host can pass any `OutputSink`, such as `createStreamZipSink`
+over a writable stream.
 
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex

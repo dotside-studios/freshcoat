@@ -1,9 +1,8 @@
 import type {
 	RenderOutput,
 	RenderRequest,
-	WorkerReply,
-	WorkerRequest,
-} from "./protocol";
+} from "@freshcoat-js/workspace/export";
+import type { WorkerReply, WorkerRequest } from "./protocol";
 
 /** The part of `Worker` the pool uses, so tests can hand it fakes. */
 export type PoolWorker = {

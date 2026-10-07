@@ -1,6 +1,6 @@
 import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import type { RenderOutput } from "@freshcoat-js/workspace/export";
 import { describe, expect, it, vi } from "vitest";
-import type { RenderOutput } from "~/export/protocol";
 import {
 	createExportRunner,
 	type ExportRunnerDeps,

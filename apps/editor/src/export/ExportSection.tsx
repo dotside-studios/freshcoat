@@ -17,6 +17,13 @@ import {
 	variantFor,
 	variantsFor,
 } from "@freshcoat-js/workspace";
+import {
+	itemSize,
+	pagesPerSheet,
+	planSheets,
+	sheetOf,
+	withRecordIds,
+} from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
@@ -55,7 +62,6 @@ import {
 import { GlyphNotice } from "./GlyphNotice";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
-import { itemSize, withRecordIds } from "./job";
 import { PresetList } from "./PresetList";
 import { newPreset } from "./preset";
 import {
@@ -67,7 +73,6 @@ import {
 } from "./preview-mode";
 import { RecordsList } from "./RecordsList";
 import { SheetPreview } from "./SheetPreview";
-import { pagesPerSheet, planSheets, sheetOf } from "./sheets";
 
 /** A place the preview steps to: a record, and under All variants one of
  *  its variants by token (`variantToken`). */

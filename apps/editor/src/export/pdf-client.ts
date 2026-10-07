@@ -1,5 +1,9 @@
 import type { PdfPage } from "@freshcoat-js/workspace";
 import type {
+	AssembleExtras,
+	AssemblePdf,
+} from "@freshcoat-js/workspace/export";
+import type {
 	PdfAssembleOptions,
 	PdfWorkerReply,
 	PdfWorkerRequest,
@@ -15,11 +19,6 @@ export type PdfWorker = {
 };
 
 export type PdfWorkerFactory = () => PdfWorker;
-
-export type AssembleExtras = {
-	signal?: AbortSignal;
-	onProgress?: (done: number, total: number) => void;
-};
 
 export const createPdfWorker: PdfWorkerFactory = () =>
 	new Worker(new URL("./pdf-worker.ts", import.meta.url), {
@@ -72,3 +71,12 @@ export function assemblePdfInWorker(
 		worker.postMessage({ type: "assemble", pages, options }, [...buffers]);
 	});
 }
+
+/** Assembles in a worker where there are workers, else on this thread. */
+export const assemblePdf: AssemblePdf = async (pages, options, extras) =>
+	typeof Worker !== "undefined"
+		? assemblePdfInWorker(pages, options, extras)
+		: (await import("@freshcoat-js/workspace/pdf")).assemblePdf(pages, {
+				...options,
+				...(extras?.onProgress ? { onProgress: extras.onProgress } : {}),
+			});
