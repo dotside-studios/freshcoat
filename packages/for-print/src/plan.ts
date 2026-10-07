@@ -13,6 +13,7 @@
 
 import {
 	type Adjust,
+	applyAdjustColor,
 	composeAdjust,
 	type FrameFinish,
 	type ImageNode,
@@ -331,6 +332,52 @@ function defaultSrcKey(src: string): string {
 	return `#${src.length}:${(h1 >>> 0).toString(36)}:${(h2 >>> 0).toString(36)}`;
 }
 
+// The pixels as the layer's own adjustment leaves them, which is what the print
+// correction composes onto (see withAdjust). Sharpen is spatial and left out.
+function asAdjusted(pixels: PixelData, adjust: Adjust | undefined): PixelData {
+	if (!adjust || !(adjust.colorMatrix || adjust.lut || adjust.lut3d))
+		return pixels;
+	const { data, width, height } = pixels;
+	const out = new Uint8ClampedArray(data.length);
+	for (let i = 0; i < data.length; i += 4) {
+		const [r, g, b] = applyAdjustColor(adjust, [
+			data[i] / 255,
+			data[i + 1] / 255,
+			data[i + 2] / 255,
+		]);
+		out[i] = Math.round(r * 255);
+		out[i + 1] = Math.round(g * 255);
+		out[i + 2] = Math.round(b * 255);
+		out[i + 3] = data[i + 3];
+	}
+	return { data: out, width, height };
+}
+
+const tableIds = new WeakMap<object, number>();
+let nextTableId = 0;
+
+function tableId(table: object): number {
+	let id = tableIds.get(table);
+	if (id === undefined) {
+		id = nextTableId++;
+		tableIds.set(table, id);
+	}
+	return id;
+}
+
+// Tables by identity, as the engine's own caches key them.
+function adjustKey(a: Adjust | undefined): string {
+	if (!a || !(a.colorMatrix || a.lut || a.lut3d)) return "";
+	return [
+		a.colorMatrix?.join(",") ?? "-",
+		a.gamut ?? "-",
+		a.lut
+			? `${tableId(a.lut.r)},${tableId(a.lut.g)},${tableId(a.lut.b)}`
+			: "-",
+		a.lut3d ? `${a.lut3d.size}:${tableId(a.lut3d.data)}` : "-",
+	].join("|");
+}
+
 // Recommendations are cached per src, and across calls when `options.cache` is
 // passed.
 export async function analyzeScene(
@@ -347,12 +394,12 @@ export async function analyzeScene(
 	// Cache the in-flight PROMISE, not the resolved value: children walk
 	// concurrently (Promise.all), so identical layers would otherwise both miss a
 	// value-cache and sample twice. Key on the rendered appearance (src + fit +
-	// size + focus + crop), since the same src cropped differently analyzes
-	// differently.
+	// size + focus + crop + own adjust), since the same src cropped or adjusted
+	// differently analyzes differently.
 	const cache = options.cache ?? new Map<string, Promise<ImageAnalysis>>();
 	const srcKey = (src: string) => options.srcKey?.(src) ?? defaultSrcKey(src);
 	const sampleKey = (n: ImageNode) =>
-		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
+		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}|${adjustKey(n.adjust)}`;
 	const seen = new Map<string, Promise<ImageAnalysis>>();
 
 	function photoOptions(node: ImageNode): Promise<PrintOptimizeOptions | null> {
@@ -362,7 +409,9 @@ export async function analyzeScene(
 		if (!analysis) {
 			let shared = cache.get(key);
 			if (!shared) {
-				shared = sample(node).then(analyzePixels);
+				shared = sample(node).then((pixels) =>
+					analyzePixels(asAdjusted(pixels, node.adjust)),
+				);
 				cache.set(key, shared);
 				// A failed sample is not kept, so a later call samples again.
 				shared.catch(() => {

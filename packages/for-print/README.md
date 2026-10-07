@@ -41,7 +41,7 @@ import { sampleImageNode, compileScene } from "@freshcoat-js/engine";
 // Sync, policy-driven: photos get the YMCKO preset; text/QR/graphics stay pristine.
 const presetScene = planScene(nodeTree);
 
-// Or analyze photos as displayed, including their fit and crop.
+// Or analyze photos as displayed: their fit, crop and own adjustment.
 const sample: ImageSampler = async (image) => {
   const pixels = await sampleImageNode(ck, image, loadBytes);
   if (!pixels) throw new Error(`Couldn't decode ${image.src}`);

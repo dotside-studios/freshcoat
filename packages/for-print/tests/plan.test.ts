@@ -2,6 +2,7 @@
 // against the canonical color formulas), the sync tree walk, and the async
 // per-image analyzeScene driven by an injected sampler (no canvas in for-print).
 import {
+	type Adjust,
 	buildAdjust,
 	composeAdjust,
 	createBitmap,
@@ -315,6 +316,44 @@ describe("analyzeScene (sampler)", () => {
 		};
 		await analyzeScene(sample, createGroup([imageNode("p.png")]));
 		expect(seen).toEqual([{ src: "p.png", fit: "cover" }]);
+	});
+
+	test("analyzes a photo as its own adjustment leaves it", async () => {
+		const own = buildAdjust({ gamma: 3 });
+		const photo = { ...imageNode("p.png"), adjust: own };
+		const planned = await analyzeScene(async () => brightBuffer(), photo);
+		const darkened = brightBuffer();
+		for (let i = 0; i < darkened.data.length; i += 4)
+			for (let c = 0; c < 3; c++)
+				darkened.data[i + c] = (own.lut as { r: Uint8Array }).r[
+					darkened.data[i + c]
+				];
+		const recommendation = analyzePixels(darkened).recommendation;
+		expect(recommendation).not.toEqual(
+			analyzePixels(brightBuffer()).recommendation,
+		);
+		expect(planned.adjust).toEqual(
+			composeAdjust(own, printAdjust(recommendation)),
+		);
+	});
+
+	test("the same photo with another adjustment samples separately", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const photo = (adjust?: Adjust) => ({ ...imageNode("s.png"), adjust });
+		await analyzeScene(
+			sample,
+			createGroup([
+				photo(),
+				photo(buildAdjust({ gamma: 2 })),
+				photo(buildAdjust({ gamma: 2 })),
+				photo(buildAdjust({ saturation: 0.5 })),
+			]),
+		);
+		expect(calls).toBe(3);
 	});
 
 	test("caches by rendered appearance — identical layers sample once", async () => {
