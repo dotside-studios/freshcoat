@@ -913,6 +913,39 @@ add(
 );
 
 add(
+	"mask-luminance-alpha",
+	"a luminance mask's coverage is its luminance times its alpha",
+	"core",
+	["mask.luminance", "mask.invert"],
+	frame([
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff80") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(30, 20, 50, 80), channel: "luminance" },
+		),
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff40") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(80, 20, 50, 80), channel: "luminance", invert: true },
+		),
+	]),
+	[
+		px(
+			[55, 60],
+			[151, 183, 246, 255],
+			"white at 50% alpha keeps 50% of the content, not all of it",
+			3,
+		),
+		px(
+			[105, 60],
+			[99, 147, 242, 255],
+			"inverted white at 25% alpha keeps 75%",
+			3,
+		),
+	],
+);
+
+add(
 	"mask-invert",
 	"invert flips the mask's coverage",
 	"core",

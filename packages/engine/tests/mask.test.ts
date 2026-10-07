@@ -288,3 +288,55 @@ describe("mask render smoke", () => {
 		expect([png[0], png[1], png[2], png[3]]).toEqual([137, 80, 78, 71]);
 	});
 });
+
+describe("luminance mask coverage", () => {
+	let ck: any;
+	async function pixel(maskColor: string, invert: boolean) {
+		if (!ck) ck = await loadCanvasKit();
+		const scene = createMask(
+			createRect({ size: { width: 20, height: 20 }, fills: solid(maskColor) }),
+			[
+				createRect({
+					size: { width: 20, height: 20 },
+					fills: solid("#ff0000"),
+				}),
+			],
+			{ channel: "luminance", invert },
+		);
+		const commands = compileScene(scene, { width: 20, height: 20 });
+		const result = (await createHeadlessEnv().paint(commands, ck)) as {
+			bytes: Uint8Array;
+			warnings: unknown[];
+		};
+		const img = ck.MakeImageFromEncoded(result.bytes);
+		const px = img.readPixels(10, 10, {
+			width: 1,
+			height: 1,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		}) as Uint8Array;
+		img.delete();
+		return { px: Array.from(px), warnings: result.warnings };
+	}
+
+	test.each([
+		{ mask: "#ffffff80", invert: false, alpha: 128 },
+		{ mask: "#ffffff", invert: false, alpha: 255 },
+		{ mask: "#000000", invert: false, alpha: 0 },
+		{ mask: "#808080", invert: false, alpha: 128 },
+		{ mask: "#ffffff80", invert: true, alpha: 127 },
+		{ mask: "#ffffff", invert: true, alpha: 0 },
+		{ mask: "#000000", invert: true, alpha: 255 },
+		{ mask: "#808080", invert: true, alpha: 127 },
+	])("mask $mask, invert $invert → alpha $alpha", async ({
+		mask,
+		invert,
+		alpha,
+	}) => {
+		const { px, warnings } = await pixel(mask, invert);
+		expect(Math.abs(px[3] - alpha)).toBeLessThanOrEqual(2);
+		if (px[3] > 0) expect(px.slice(0, 3)).toEqual([255, 0, 0]);
+		expect(warnings).toEqual([]);
+	});
+});
