@@ -19,6 +19,7 @@ import {
 	type Symbology,
 	symbologyLabel,
 } from "@freshcoat-js/coatfile";
+import { tokenIds } from "@freshcoat-js/coatfile/tokens";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
@@ -36,7 +37,7 @@ import {
 	DEFAULT_SYMBOLOGY,
 	parseBarcodeLayerName,
 } from "~/lib/figma/transpiler/barcode-name";
-import { extractTokens, titleCase } from "~/lib/figma/transpiler/fields";
+import { titleCase } from "~/lib/figma/transpiler/fields";
 import { slug } from "~/lib/slug";
 import type { SelectionDetail } from "~/shared/protocol";
 import {
@@ -319,7 +320,7 @@ export function LayerTab(): JSX.Element {
 	const propByField: Record<string, BindProperty> = {};
 	for (const [property, template] of Object.entries(detail.bind)) {
 		if (!template) continue;
-		for (const id of extractTokens(template)) {
+		for (const id of tokenIds(template)) {
 			propByField[id] = property as BindProperty;
 		}
 	}
@@ -358,7 +359,7 @@ export function LayerTab(): JSX.Element {
 			fields.push({ ...draft, id: newId });
 		}
 		// A new symbology is written into the name, under the field's new key.
-		const barcodeId = bind.barcode ? extractTokens(bind.barcode)[0] : null;
+		const barcodeId = bind.barcode ? tokenIds(bind.barcode)[0] : null;
 		const setName =
 			symbologyChanged && symbology && barcodeId
 				? markerName("barcode", barcodeId, { symbology }) +
@@ -390,7 +391,7 @@ export function LayerTab(): JSX.Element {
 		setConfirming(null);
 		const bind = { ...detail.bind } as Record<string, string>;
 		delete bind[property];
-		const keep = new Set(Object.values(bind).flatMap((t) => extractTokens(t)));
+		const keep = new Set(Object.values(bind).flatMap((t) => tokenIds(t)));
 		pendingRef.current = {
 			kind: "remove",
 			nodeId: detail.nodeId,

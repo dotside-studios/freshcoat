@@ -3,6 +3,7 @@ import type {
 	ImageProperties,
 	TemplateWarning,
 } from "@freshcoat-js/coatfile";
+import { tokenIds } from "@freshcoat-js/coatfile/tokens";
 import type {
 	FigmaBoundingBox,
 	FigmaImageFilters,
@@ -17,7 +18,7 @@ import {
 	placeWorld,
 	translateLocal,
 } from "./coordinates";
-import { extractTokens, isWholeMustacheToken } from "./fields";
+import { isWholeMustacheToken } from "./fields";
 import { scaleCorners } from "./rect";
 
 export type TranspileImageContext = {
@@ -286,7 +287,7 @@ export function transpileImage(
 
 	const tokenMatch = isWholeMustacheToken(node.name);
 	const tokenId =
-		extractTokens(imageTemplate ?? "")[0] ??
+		tokenIds(imageTemplate ?? "")[0] ??
 		(tokenMatch.ok ? tokenMatch.id : undefined);
 	if (tokenId) {
 		// A dynamic image renders its content at fill time, so it is placed like a

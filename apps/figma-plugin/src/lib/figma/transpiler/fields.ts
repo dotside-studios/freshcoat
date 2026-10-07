@@ -1,23 +1,10 @@
-const TOKEN_GLOBAL = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
-const TOKEN_WHOLE = /^\s*\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}\s*$/;
-
-/** Ordered token ids inside a string (may repeat). */
-export function extractTokens(s: string): string[] {
-	const out: string[] = [];
-	TOKEN_GLOBAL.lastIndex = 0;
-	let m = TOKEN_GLOBAL.exec(s);
-	while (m !== null) {
-		out.push(m[1]);
-		m = TOKEN_GLOBAL.exec(s);
-	}
-	return out;
-}
+import { wholeToken } from "@freshcoat-js/coatfile/tokens";
 
 export function isWholeMustacheToken(
 	s: string,
 ): { ok: true; id: string } | { ok: false } {
-	const m = TOKEN_WHOLE.exec(s);
-	return m ? { ok: true, id: m[1] } : { ok: false };
+	const id = wholeToken(s.trim());
+	return id === undefined ? { ok: false } : { ok: true, id };
 }
 
 export function titleCase(id: string): string {
