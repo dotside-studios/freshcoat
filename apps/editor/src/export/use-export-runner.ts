@@ -1,8 +1,10 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { settleAssets } from "~/app/source-assets";
 import { resolveTemplateFonts } from "~/render/fonts";
 import {
+	boundDatasetOf,
 	type ExportJobOptions,
 	type JobProgress,
 	type JobResult,
@@ -113,6 +115,7 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 					(t) => t.id === preset.templateId,
 				);
 				if (!entry) throw new Error("template not found");
+				await settleAssets(boundDatasetOf(workspace, preset)?.assets ?? []);
 				const fonts = await resolveFonts(entry.template);
 				if (own.signal.aborted) {
 					if (controller === own) set({ state: "cancelled" });
