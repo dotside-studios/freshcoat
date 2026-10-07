@@ -80,6 +80,10 @@ const env = createHeadlessEnv({
 });
 ```
 
+`createBrowserEnv` keeps the painted canvas live instead of encoding it. Each
+surface is made on a DOM `<canvas>` unless you pass `createCanvas`, for
+example to paint on an `OffscreenCanvas` in a worker.
+
 ## Painting and text
 
 The supplied text engine uses CanvasKit Paragraph for layout and shaping,

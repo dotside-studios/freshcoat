@@ -1,6 +1,7 @@
+import type { CanvasLike } from "@freshcoat-js/engine";
+import { createBrowserEnv } from "@freshcoat-js/engine/browser";
 import { loadWorkerCanvasKit } from "./canvaskit-worker";
 import { renderLiveFrame } from "./live-frame";
-import { createOffscreenEnv } from "./offscreen-env";
 import type { PreviewReply, PreviewRequest } from "./preview-protocol";
 import { createPreviewReceiver } from "./preview-sync";
 import { createRenderSession, type RenderSession } from "./session";
@@ -56,7 +57,14 @@ async function init(canvas: OffscreenCanvas) {
 	display = { canvas, ctx };
 	const ck = await loadWorkerCanvasKit(__CANVASKIT_BASE__);
 	session = createRenderSession(ck, (opts) =>
-		createOffscreenEnv({ ...opts, onCanvas: watch }),
+		createBrowserEnv({
+			...opts,
+			createCanvas(width, height) {
+				const canvas = new OffscreenCanvas(width, height);
+				watch(canvas);
+				return canvas as unknown as CanvasLike;
+			},
+		}),
 	);
 }
 

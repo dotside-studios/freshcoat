@@ -36,6 +36,19 @@ describe("createBrowserEnv", () => {
 		expect(c.height).toBe(4);
 	});
 
+	test("createBrowserEnv({createCanvas}) makes surfaces on the given canvas", () => {
+		const el = { width: 5, height: 6, getContext: () => null };
+		const sizes: number[][] = [];
+		const rt = createBrowserEnv({
+			createCanvas: (w, h) => {
+				sizes.push([w, h]);
+				return el;
+			},
+		});
+		expect(rt.canvas?.createCanvas(5, 6)).toBe(el);
+		expect(sizes).toEqual([[5, 6]]);
+	});
+
 	test("createBrowserEnv({fonts}) resolves pre-supplied bytes", () => {
 		const bytes = new Uint8Array([1, 2, 3]);
 		const rt = createBrowserEnv({ fonts: new Map([["Roboto", [bytes]]]) });
