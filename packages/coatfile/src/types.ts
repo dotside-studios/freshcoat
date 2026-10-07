@@ -96,6 +96,7 @@ export interface FrameProperties {
 	stroke?: z.infer<typeof StrokeSchema>;
 	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
 	clipsContent?: boolean;
+	isolate?: boolean;
 	layout?: Layout;
 	children: Element[];
 }

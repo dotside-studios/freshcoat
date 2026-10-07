@@ -662,6 +662,36 @@ describe("compile (frame → group)", () => {
 		expect(findDraw(cmds, "drawGroup")!.clip).toBeUndefined();
 	});
 
+	test("isolate reaches the drawGroup, and absent stays pass-through", () => {
+		const isolated = getCommands(
+			withFrame({ isolate: true, children: [] }),
+			{},
+			{ width: 100, height: 60 },
+		);
+		expect(findDraw(isolated, "drawGroup")!.isolate).toBe(true);
+
+		for (const props of [{ children: [] }, { isolate: false, children: [] }]) {
+			const plain = getCommands(withFrame(props), {}, { width: 100, height: 60 });
+			expect("isolate" in findDraw(plain, "drawGroup")!).toBe(false);
+		}
+	});
+
+	test("an isolated frame with an outside stroke isolates the whole frame", () => {
+		const cmds = getCommands(
+			withFrame({
+				isolate: true,
+				clipsContent: true,
+				stroke: { color: "#000", width: 4, align: "outside" },
+				children: [],
+			}),
+			{},
+			{ width: 100, height: 60 },
+		);
+		const [outer, content] = findDraws(cmds, "drawGroup");
+		expect(outer!.isolate).toBe(true);
+		expect("isolate" in content!).toBe(false);
+	});
+
 	test("text inside a frame contributes its font family to assets.fonts", () => {
 		const out = compile(
 			withFrame({
