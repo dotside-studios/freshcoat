@@ -402,7 +402,7 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
-	it("puts photos again that another tab collected mid-write", async () => {
+	it("puts photos again that another tab collected mid-write without another edit", async () => {
 		const db = freshDb();
 		const tabA = createAutosaveStore(db, { tabId: "A" });
 		const tabB = createAutosaveStore(db, { tabId: "B" });
@@ -441,13 +441,6 @@ describe("autosave", () => {
 		const photoX = workspace([asset(1), asset(3)]);
 		await tabA.write({ workspace: photoX, fileName: "a" });
 		expect(tabBWrote).not.toBeNull();
-		expect(await rawGet(db, "assets", "sha3")).toBeUndefined();
-		vi.restoreAllMocks();
-
-		await tabA.write({
-			workspace: { ...photoX, name: "Edited" },
-			fileName: "a",
-		});
 		expect(await rawGet(db, "assets", "sha3")).toBeInstanceOf(Blob);
 
 		const read = await createAutosaveStore(db).read();

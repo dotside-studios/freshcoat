@@ -361,10 +361,14 @@ export function createAutosaveStore(
 		savedAssets = null;
 	}
 
-	async function writeNow(entry: Omit<Autosave, "savedAt">): Promise<void> {
+	async function writeNow(
+		entry: Omit<Autosave, "savedAt">,
+		retried = false,
+	): Promise<void> {
 		const ws = entry.workspace;
 		if (last !== null && sameWorkspace(last, ws)) return;
 		const db = await connect();
+		let raced = false;
 		try {
 			const seen = stamp(
 				await request(
@@ -389,7 +393,7 @@ export function createAutosaveStore(
 			const docs = tx.objectStore(DOC_STORE);
 			// Another tab wrote since the check above, and may have collected
 			// photos this write put.
-			const raced = !sameStamp(seen, stamp(await request(docs.get(KEY))));
+			raced = !sameStamp(seen, stamp(await request(docs.get(KEY))));
 			if (raced) forget();
 			const before = written ?? (await datasetKeys(docs));
 			const now = new Map<string, Dataset>();
@@ -427,6 +431,7 @@ export function createAutosaveStore(
 			await disconnect();
 			throw err;
 		}
+		if (raced && !retried && waiting === null) await writeNow(entry, true);
 	}
 
 	/** Rewrites a single-record autosave as the shell and one record per
