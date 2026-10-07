@@ -43,6 +43,12 @@ export type CachedBackground = {
 	warnings: PaintWarning[];
 };
 
+// The dither noise of the finishing pass for one frame size, seed and mode.
+export type CachedFinishNoise = {
+	key: string;
+	noise: Float32Array;
+};
+
 type CachedSurface = {
 	surface: Surface;
 	canvas: CanvasLike;
@@ -71,6 +77,7 @@ export type PaintCacheState = {
 	luts: LutImages;
 	surface: CachedSurface | null;
 	background: CachedBackground | null;
+	finishNoise: CachedFinishNoise | null;
 	disposed: boolean;
 };
 
@@ -93,6 +100,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 			pathBuilds: 0,
 			backgroundSnapshots: 0,
 			backgroundReuses: 0,
+			finishNoiseBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
@@ -103,6 +111,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		luts: createLutImages(),
 		surface: null,
 		background: null,
+		finishNoise: null,
 		disposed: false,
 	};
 	const clear = () => {
@@ -115,6 +124,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		state.images.clear();
 		freeLutImages(state.luts);
 		state.background = null;
+		state.finishNoise = null;
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -197,7 +207,7 @@ export function cachedSurface(
 // Deletes the cached images this paint's scene did not use, oldest first, until
 // what is left fits the cache's image budget and entry cap. The background,
 // cheaper to redraw than an image is to decode, goes if it does not fit beside
-// them.
+// them, then the finish noise.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
@@ -224,11 +234,14 @@ export function evictUnusedImages(
 		total -= imagePixels(entry);
 		freeImage(entry);
 	}
+	if (state.maxImagePixels <= 0) return;
 	if (
-		state.maxImagePixels > 0 &&
-		total + backgroundPixels(state) > state.maxImagePixels
+		total + backgroundPixels(state) + finishNoisePixels(state) >
+		state.maxImagePixels
 	)
 		state.background = null;
+	if (total + finishNoisePixels(state) > state.maxImagePixels)
+		state.finishNoise = null;
 }
 
 // Keeps one background, replacing any other. With an image budget it counts
@@ -239,6 +252,21 @@ export function cacheBackground(
 ): void {
 	state.background = background;
 	state.stats.backgroundSnapshots++;
+}
+
+// Keeps the noise of one frame, replacing any other. With an image budget it
+// counts against that budget (see evictUnusedImages).
+export function cacheFinishNoise(
+	state: PaintCacheState,
+	noise: CachedFinishNoise,
+): void {
+	state.finishNoise = noise;
+	state.stats.finishNoiseBuilds++;
+}
+
+// In pixels of 8-bit RGBA: a float of noise takes the bytes of one.
+function finishNoisePixels(state: PaintCacheState): number {
+	return state.finishNoise ? state.finishNoise.noise.length : 0;
 }
 
 function backgroundPixels(state: PaintCacheState): number {

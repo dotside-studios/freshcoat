@@ -1,9 +1,10 @@
 // An opt-in cache a runtime carries across paints of the same scene, for an
 // interactive caller that repaints many times a second. It keeps what paintScene
 // would otherwise rebuild on every paint: the font provider, the shaped lines of
-// text, the decoded images, the output surface and, offscreen, the pixels of a
-// leading background the paints share. A runtime without one paints exactly as
-// it always has, building and freeing all three per paint.
+// text, the decoded images, the output surface, the dither noise of a finish
+// and, offscreen, the pixels of a leading background the paints share. A
+// runtime without one paints exactly as it always has, building and freeing
+// all three per paint.
 //
 // By default a paint frees every cached image its scene did not draw. A batch
 // caller painting many different scenes passes `maxImagePixels` instead: images
@@ -23,6 +24,7 @@ export type PaintCacheStats = {
 	pathBuilds: number;
 	backgroundSnapshots: number;
 	backgroundReuses: number;
+	finishNoiseBuilds: number;
 };
 
 export type PaintCache = {
