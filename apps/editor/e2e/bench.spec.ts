@@ -38,6 +38,42 @@ for (const sample of ["membership-card", "certificate"]) {
 	});
 }
 
+// The live preview's worst case, painted from the worker and on the main
+// thread, for comparing how each holds the main thread up during a drag. On a
+// real GPU, open /bench?sample=stress and /bench?sample=stress&preview=main
+// instead: these runs draw through SwiftShader, which takes seconds a frame
+// to raster the selected photo on either path.
+test("bench: stress, worker and main thread", async ({ browser }, info) => {
+	test.setTimeout(1_200_000);
+	const results: Record<string, unknown> = {};
+	for (const preview of ["worker", "main"]) {
+		const page = await browser.newPage();
+		const query = preview === "main" ? "&preview=main" : "";
+		await page.goto(`/?bench&sample=stress&frames=6${query}`);
+		const handle = await page.waitForFunction(
+			() =>
+				(window as unknown as { __freshcoatBench?: unknown }).__freshcoatBench,
+			undefined,
+			{ timeout: 580_000 },
+		);
+		const result = (await handle.jsonValue()) as {
+			error?: string;
+			previewMode: string;
+			latency: { renders: number };
+		};
+		expect(result.error).toBeUndefined();
+		expect(result.previewMode).toBe(preview);
+		expect(result.latency.renders).toBe(6);
+		results[preview] = result;
+		await page.close();
+	}
+	console.log(`stress ${JSON.stringify(results)}`);
+	await info.attach("bench-stress.json", {
+		body: JSON.stringify(results, null, 2),
+		contentType: "application/json",
+	});
+});
+
 // 200 records with two sides each through the render worker pool.
 test("bench: export 200 records", async ({ page }, info) => {
 	test.setTimeout(300_000);

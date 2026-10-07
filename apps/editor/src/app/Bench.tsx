@@ -20,6 +20,17 @@ export type BenchResult = {
 	};
 	/** A drag at the display's frame rate: how many renders keep up. */
 	throughput: { frames: number; renders: number; perSecond: number };
+	/** How the main thread held up during that drag. */
+	jank: {
+		/** Gaps between animation frames, in ms. */
+		frameGap: StageStats;
+		/** Frames that came 50 ms or more after the one before. */
+		slowFrames: number;
+		/** Main-thread tasks of 50 ms or more, where the browser reports them. */
+		longTasks: { count: number; totalMs: number; maxMs: number } | null;
+	};
+	/** Where the Edit canvas was painted. */
+	previewMode: string;
 	typing: { renders: number; total: StageStats };
 	cache: unknown;
 };
@@ -35,6 +46,11 @@ declare global {
 export function BenchPage() {
 	const { controller } = useRouteContext({ from: "/bench" });
 	const search = useSearch({ from: "/bench" });
+	// Read when the Edit canvas mounts, which is after this.
+	if (search.preview === "main")
+		(
+			window as { __freshcoatPreviewWorker?: boolean }
+		).__freshcoatPreviewWorker = false;
 	return (
 		<Editor controller={controller} urlSync={false}>
 			<BenchRunner
@@ -109,6 +125,8 @@ function BenchRunner({ sample, frames }: { sample: string; frames: number }) {
 
 			// Throughput: request every frame, never wait; count what lands.
 			const before = (f.renderStats() as { completed: number }).completed;
+			const longTasks = observeLongTasks();
+			const frameAt: number[] = [];
 			const started = performance.now();
 			controller.beginTx();
 			for (let i = 1; i <= frames; i++) {
@@ -123,9 +141,12 @@ function BenchRunner({ sample, frames }: { sample: string; frames: number }) {
 					),
 				);
 				await nextFrame();
+				frameAt.push(performance.now());
 			}
 			await idle(f);
 			const elapsed = performance.now() - started;
+			const gaps = frameAt.slice(1).map((t, i) => t - (frameAt[i] as number));
+			const long = longTasks.stop();
 			controller.cancelTx();
 			const renders =
 				(f.renderStats() as { completed: number }).completed - before;
@@ -134,7 +155,7 @@ function BenchRunner({ sample, frames }: { sample: string; frames: number }) {
 			const text = firstTextKey(controller.template as typeof t, side);
 			const typed: number[] = [];
 			if (text) {
-				for (let i = 0; i < 20; i++) {
+				for (let i = 0; i < Math.min(20, frames); i++) {
 					controller.edit(
 						(doc) =>
 							updateElement(doc, text, (el: Element) =>
@@ -177,6 +198,12 @@ function BenchRunner({ sample, frames }: { sample: string; frames: number }) {
 					renders,
 					perSecond: Math.round((renders / elapsed) * 1000 * 10) / 10,
 				},
+				jank: {
+					frameGap: stats(gaps),
+					slowFrames: gaps.filter((g) => g >= 50).length,
+					longTasks: long,
+				},
+				previewMode: f.previewMode ?? "main",
 				typing: { renders: typed.length, total: stats(typed) },
 				cache: f.cacheStats(),
 			};
@@ -203,6 +230,7 @@ function BenchRunner({ sample, frames }: { sample: string; frames: number }) {
 }
 
 type Hooks = {
+	previewMode?: string;
 	renderIdle(): Promise<void>;
 	renderStats(): unknown;
 	cacheStats(): unknown;
@@ -232,6 +260,33 @@ async function idle(f: Hooks) {
 	await f.renderIdle();
 }
 
+/** Main-thread tasks of 50 ms or more from now until `stop`; null where the
+ *  browser does not report them. */
+function observeLongTasks() {
+	const durations: number[] = [];
+	let observer: PerformanceObserver | null = null;
+	if (PerformanceObserver.supportedEntryTypes?.includes("longtask")) {
+		observer = new PerformanceObserver((list) => {
+			for (const entry of list.getEntries()) durations.push(entry.duration);
+		});
+		observer.observe({ type: "longtask" });
+	}
+	return {
+		stop() {
+			if (!observer) return null;
+			for (const entry of observer.takeRecords())
+				durations.push(entry.duration);
+			observer.disconnect();
+			const r = (n: number) => Math.round(n * 10) / 10;
+			return {
+				count: durations.length,
+				totalMs: r(durations.reduce((a, b) => a + b, 0)),
+				maxMs: r(Math.max(0, ...durations)),
+			};
+		},
+	};
+}
+
 function stats(xs: number[]): StageStats {
 	const s = [...xs].sort((a, b) => a - b);
 	const at = (q: number) =>
@@ -252,7 +307,7 @@ function summary(r: BenchResult): string {
 	const l = r.latency;
 	const s = (x: StageStats) => `${x.p50} / ${x.p95} / ${x.max}`;
 	return [
-		`${r.sample} ${r.size.width}×${r.size.height}`,
+		`${r.sample} ${r.size.width}×${r.size.height}, preview: ${r.previewMode}`,
 		"ms        p50 / p95 / max",
 		`total     ${s(l.total)}`,
 		`compile   ${s(l.perStage.compile)}`,
@@ -261,5 +316,9 @@ function summary(r: BenchResult): string {
 		`paint     ${s(l.perStage.paint)}`,
 		`typing    ${s(r.typing.total)}`,
 		`drag      ${r.throughput.renders} renders / ${r.throughput.frames} frames, ${r.throughput.perSecond}/s`,
+		`frame gap ${s(r.jank.frameGap)}, ${r.jank.slowFrames} ≥ 50 ms`,
+		r.jank.longTasks
+			? `long tasks ${r.jank.longTasks.count}, ${r.jank.longTasks.totalMs} ms, max ${r.jank.longTasks.maxMs}`
+			: "long tasks not reported",
 	].join("\n");
 }

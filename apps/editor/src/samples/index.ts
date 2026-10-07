@@ -39,6 +39,18 @@ export const SAMPLES: Sample[] = [
 	},
 ];
 
+/** Opened by id, as the bench does, and never listed. */
+export const BENCH_SAMPLES: Sample[] = [
+	{
+		id: "stress",
+		name: "Stress",
+		description: "A bench-only worst case for the live preview",
+		width: 2400,
+		height: 1600,
+		load: () => import("./stress").then((m) => m.stress()),
+	},
+];
+
 export function findSample(id: string): Sample | undefined {
-	return SAMPLES.find((s) => s.id === id);
+	return [...SAMPLES, ...BENCH_SAMPLES].find((s) => s.id === id);
 }

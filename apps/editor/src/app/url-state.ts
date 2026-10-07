@@ -50,13 +50,19 @@ export type EditorSearch = {
 };
 
 /** The search `/bench` accepts. */
-export type BenchSearch = { sample?: string; frames?: string; theme?: string };
+export type BenchSearch = {
+	sample?: string;
+	frames?: string;
+	theme?: string;
+	/** "main" paints the Edit canvas on the main thread. */
+	preview?: string;
+};
 
 const INTENT_PARAMS = ["sample", "starter", "new"] as const;
 export const SECTIONS: readonly Section[] = ["edit", "data", "export"];
 const VIEW_KEYS = ["template", "side", "record", "dataset", "preset"] as const;
 const EDITOR_KEYS = [...VIEW_KEYS, ...INTENT_PARAMS, "theme"] as const;
-const BENCH_KEYS = ["sample", "frames", "theme"] as const;
+const BENCH_KEYS = ["sample", "frames", "theme", "preview"] as const;
 
 /** Parses a query string. Malformed input parses to what can be read of it
  *  rather than throwing. */
