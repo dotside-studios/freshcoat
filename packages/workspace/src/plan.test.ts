@@ -310,11 +310,13 @@ describe("planExport file names against the regex expansion", () => {
 	];
 	const dataset: Dataset = {
 		...members,
-		records: names.map((name, i): DataRecord => ({
-			id: `r_${i}`,
-			values: name === undefined ? {} : { name },
-			status: "pending" as const,
-		})),
+		records: names.map(
+			(name, i): DataRecord => ({
+				id: `r_${i}`,
+				values: name === undefined ? {} : { name },
+				status: "pending",
+			}),
+		),
 	};
 	const fixture: Workspace = { ...ws, datasets: [dataset] };
 
