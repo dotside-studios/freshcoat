@@ -8,7 +8,6 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -17,6 +16,7 @@ import { ContentPanel } from "~/panels/ContentPanel";
 import { setRequired, withPatch } from "~/panels/content/field-def";
 import { RightPanel } from "~/panels/RightPanel";
 import type { RightTab } from "~/state/store";
+import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 beforeAll(() => {
@@ -36,7 +36,7 @@ function setup(template: Template = doc(), panel = <ContentPanel />) {
 	);
 	const t = () => controller.template as Template;
 	const past = () => controller.state.doc?.history.past.length ?? 0;
-	return { controller, t, past, user: userEvent.setup() };
+	return { controller, t, past, user: fastUser() };
 }
 
 const textOf = (t: Template, key: string) => {

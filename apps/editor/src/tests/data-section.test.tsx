@@ -1,13 +1,12 @@
 import type { Dataset } from "@freshcoat-js/workspace";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
 import { renameColumnEverywhere } from "../data/actions";
 import { DataSection } from "../data/DataSection";
 import { forgetViews } from "../data/gallery-model";
-import { chooseOption } from "./aria";
+import { chooseOption, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 let controller: EditorController;
@@ -34,7 +33,7 @@ function setup(withData = true) {
 	controller.dispatch({ type: "open", template: doc(), fileName: "doc.coat" });
 	if (withData)
 		controller.dispatch({ type: "datasetEdit", datasets: [dataset()] });
-	const user = userEvent.setup();
+	const user = fastUser();
 	render(
 		<ControllerProvider controller={controller}>
 			<DataSection />

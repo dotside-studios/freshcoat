@@ -8,12 +8,12 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { LeftPanel } from "~/panels/LeftPanel";
 import { COLLAPSED_KEY } from "~/panels/layers/SectionHeader";
+import { fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 beforeEach(() => {
@@ -64,7 +64,7 @@ function mount(c: EditorController = open()) {
 			<LeftPanel />
 		</ControllerProvider>,
 	);
-	return userEvent.setup();
+	return fastUser();
 }
 
 const base = (c: EditorController) => c.base as Template;

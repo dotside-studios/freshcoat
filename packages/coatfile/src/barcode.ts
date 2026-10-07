@@ -189,35 +189,41 @@ function linearModules(drawing: Drawing): boolean[] {
 	return modules;
 }
 
-// Even-odd point in polygon, sampled at the module's centre.
-function inside(polys: Point[][], x: number, y: number): boolean {
-	let crossings = 0;
-	for (const poly of polys) {
-		for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-			const [xi, yi] = poly[i];
-			const [xj, yj] = poly[j];
-			if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-				crossings++;
-			}
-		}
-	}
-	return crossings % 2 === 1;
-}
-
+// Even-odd fill, sampled at each module's centre. Each row is a scanline: the
+// edges it crosses, sorted, toggle the fill between them, so a module is set
+// when an odd number of crossings lie to its right.
 function matrixRows(drawing: Drawing): boolean[][] {
 	const cols = Math.round(drawing.width);
+	const height = Math.round(drawing.height);
 	const rows: boolean[][] = [];
-	for (let r = 0; r < Math.round(drawing.height); r++) {
-		const row = new Array<boolean>(cols).fill(false);
-		for (let c = 0; c < cols; c++) {
-			for (const fill of drawing.fills) {
-				if (inside(fill, c + 0.5, r + 0.5)) {
-					row[c] = true;
-					break;
+	for (let r = 0; r < height; r++) {
+		rows.push(new Array<boolean>(cols).fill(false));
+	}
+	for (const fill of drawing.fills) {
+		const crossings: number[][] = Array.from({ length: height }, () => []);
+		for (const poly of fill) {
+			for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+				const [xi, yi] = poly[i];
+				const [xj, yj] = poly[j];
+				if (yi === yj) continue;
+				const lo = Math.max(0, Math.ceil(Math.min(yi, yj) - 0.5));
+				const hi = Math.min(height, Math.ceil(Math.max(yi, yj) - 0.5));
+				for (let r = lo; r < hi; r++) {
+					const y = r + 0.5;
+					crossings[r].push(((xj - xi) * (y - yi)) / (yj - yi) + xi);
 				}
 			}
 		}
-		rows.push(row);
+		for (let r = 0; r < height; r++) {
+			const xs = crossings[r].sort((a, b) => a - b);
+			const row = rows[r];
+			let left = 0;
+			for (let c = 0; c < cols; c++) {
+				const x = c + 0.5;
+				while (left < xs.length && xs[left] <= x) left++;
+				if ((xs.length - left) % 2 === 1) row[c] = true;
+			}
+		}
 	}
 	return rows;
 }

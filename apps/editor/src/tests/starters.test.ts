@@ -50,6 +50,16 @@ function byId(t: Template, side: number, id: string): Element {
 	throw new Error(`no ${id}`);
 }
 
+const CATALOGUE = await Promise.all(
+	[...STARTERS, ...SAMPLES].map(async (s) => ({
+		s,
+		variantIds: [
+			undefined,
+			...((await s.load()).variants ?? []).map((v) => v.id),
+		],
+	})),
+);
+
 describe("starters", () => {
 	test("ids are unique, distinct from the samples, and each lists its size", async () => {
 		const ids = STARTERS.map((s) => s.id);
@@ -67,16 +77,17 @@ describe("starters", () => {
 		}
 	});
 
-	for (const s of [...STARTERS, ...SAMPLES]) {
-		test(`${s.id} validates and renders every side and variant without warnings`, async () => {
+	for (const { s, variantIds } of CATALOGUE) {
+		test(`${s.id} validates`, async () => {
 			const t = await s.load();
 			const v = validate(t);
 			expect(v.ok ? [] : v.errors).toEqual([]);
 			expect(checkVariants(t)).toEqual([]);
-			for (const variantId of [
-				undefined,
-				...(t.variants ?? []).map((x) => x.id),
-			]) {
+		});
+
+		for (const variantId of variantIds) {
+			test(`${s.id} renders every side of ${variantId ?? "the default"} without warnings`, async () => {
+				const t = await s.load();
 				const out = compile(t, sampleValues(t), {
 					width: t.width,
 					height: t.height,
@@ -98,8 +109,8 @@ describe("starters", () => {
 						137, 80, 78, 71,
 					]);
 				}
-			}
-		});
+			});
+		}
 	}
 });
 

@@ -7,7 +7,6 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
 	afterAll,
 	afterEach,
@@ -33,6 +32,7 @@ import {
 import { newDocument } from "~/doc/new-document";
 import { slugId } from "~/panels/setup/GeneralSection";
 import { VEND_SANS } from "~/samples/vend-sans";
+import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 const fetches: string[] = [];
@@ -94,7 +94,7 @@ function mount(template: Template = doc(), fileName = "doc.coat") {
 		t,
 		past,
 		show: () => act(() => show()),
-		user: userEvent.setup(),
+		user: fastUser(),
 	};
 }
 

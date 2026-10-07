@@ -1,6 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -8,6 +7,7 @@ import * as download from "~/app/download";
 import { IssuesList, IssuesPopover } from "~/app/IssuesPopover";
 import { updateElement } from "~/doc/ops";
 import { useEditor } from "~/state/hooks";
+import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 beforeEach(() => {
@@ -34,7 +34,7 @@ function mount(ui: React.ReactNode, template: Template = doc()) {
 	const controller = new EditorController();
 	controller.dispatch({ type: "open", template, fileName: "doc.coat" });
 	render(<ControllerProvider controller={controller}>{ui}</ControllerProvider>);
-	return { controller, user: userEvent.setup() };
+	return { controller, user: fastUser() };
 }
 
 /** The name of the text `breakText` breaks. */
