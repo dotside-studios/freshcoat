@@ -75,6 +75,59 @@ Preserve readable legacy file formats unless a compatibility change is
 intentional and documented. A new format feature belongs in its package,
 not in an application-specific copy of the model.
 
+## Cache and performance checks
+
+### Paint cache fuzz test
+
+[`paint-cache-fuzz.test.ts`](packages/engine/tests/paint-cache-fuzz.test.ts)
+paints seeded sequences of random scenes through one `PaintCache` and checks
+that each paint's pixels and warnings match a fresh uncached paint byte for
+byte. It runs in `bun run test` with a short fixed set of seeds. For a longer
+run, raise the iteration count:
+
+```sh
+cd packages/engine
+FUZZ_ITERATIONS=500 bun test tests/paint-cache-fuzz.test.ts
+```
+
+A failure names its seed and the command that replays it, for example
+`FUZZ_SEED=42 FUZZ_ITERATIONS=1`. Treat it as a cache bug, not a flaky
+test: fix the cache, then add a focused regression test to
+`paint-cache.test.ts`. Do not change the seeds or the generator to get a
+green run.
+
+### Render benchmark
+
+[`bench-render.ts`](apps/editor/scripts/bench-render.ts) times `compileScene`
+on the membership card and on its front repeated 12 times, and
+`renderCompiled` per record for both sides with print off and on. It uses the
+full CanvasKit build on software surfaces. Each time is divided by a
+calibration loop's, and a case fails when that ratio is more than 30% above
+its baseline in
+[`bench-render.baseline.json`](apps/editor/scripts/bench-render.baseline.json).
+A case over the limit is measured twice more before it fails.
+
+```sh
+bun run --cwd apps/editor bench:render
+```
+
+CI runs it in the `bench` job, which reports the numbers in the job summary
+and uploads them as the `bench-render` artifact. The job does not block
+merging yet. Once its results are steady across runs, remove its
+`continue-on-error` in [`ci.yml`](.github/workflows/ci.yml).
+
+Update the baselines when a change makes rendering faster, when a slowdown is
+intended, or when a case is added or renamed. Run this on a quiet machine
+and commit the new file, with the reason in the commit message:
+
+```sh
+bun run --cwd apps/editor bench:render --update
+```
+
+The update takes the median of three rounds per case. The `bench-render`
+artifact from a CI run uses the same format, so you can copy it over the
+baseline to match the hosted runners.
+
 ## Code and documentation
 
 - Use strict TypeScript and the package's existing formatting conventions.
