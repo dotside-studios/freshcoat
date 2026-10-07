@@ -12,7 +12,7 @@
  * TOLERANCE above the baseline's.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
 	compile,
 	createPaintCache,
@@ -49,10 +49,9 @@ plugin({
 	name: "vite-asset-queries",
 	setup(build) {
 		build.onResolve({ filter: /\?(inline|url)$/ }, (args) => ({
-			path: join(args.importer, "..", args.path),
-			namespace: "vite-asset",
+			path: resolve(args.importer, "..", args.path),
 		}));
-		build.onLoad({ filter: /.*/, namespace: "vite-asset" }, (args) => {
+		build.onLoad({ filter: /\?(inline|url)$/ }, (args) => {
 			const [file, query] = args.path.split("?") as [string, string];
 			const value =
 				query === "inline"
