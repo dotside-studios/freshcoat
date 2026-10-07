@@ -22,6 +22,7 @@ import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
+import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
 import { workspaceOf } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
@@ -51,6 +52,8 @@ import {
 	variantToken,
 	withVariantEntries,
 } from "./filmstrip-model";
+import { GlyphNotice } from "./GlyphNotice";
+import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
 import { itemSize, withRecordIds } from "./job";
 import { PresetList } from "./PresetList";
@@ -238,6 +241,8 @@ export function ExportSection() {
 		return lastRunPlan.current;
 	}, [chosen, workspace, preset, plan, typingFileName]);
 	const runCount = runPlan.length;
+	const { fonts } = useDocumentFonts(template ?? null);
+	const glyphIssues = useGlyphPreflight(template, fonts, runPlan);
 	// What the export button would put on sheets, when the preset uses them.
 	const sheets = useMemo(
 		() => (preset ? planSheets(runPlan, template, preset) : null),
@@ -852,6 +857,17 @@ export function ExportSection() {
 									<Notice testId="export-unbound">
 										Not bound to a dataset, exporting defaults
 									</Notice>
+								) : null}
+								{glyphIssues ? (
+									<GlyphNotice
+										issues={glyphIssues}
+										labelFor={(id) => {
+											const record = dataset?.records.find((r) => r.id === id);
+											return record ? labelFor(record) : id;
+										}}
+										onPick={dataset ? (id) => pickRecord(id) : undefined}
+										showSide={sides.length > 1}
+									/>
 								) : null}
 								{sheetMode && template && imposition ? (
 									<SheetPreview
