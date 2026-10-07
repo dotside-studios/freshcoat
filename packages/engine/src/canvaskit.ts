@@ -36,6 +36,7 @@ import { parseColor } from "./color";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
+import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -608,7 +609,7 @@ function shapeLine(
 				}
 			: {}),
 	});
-	const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
+	const builder = makeParagraphBuilder(ck, style, provider);
 	for (const span of line.spans) {
 		// Typed as a constructor only; CanvasKit also allows the plain call.
 		const ts = (ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
@@ -1333,7 +1334,17 @@ function drawMasked(
 	issues: PaintIssues,
 	frame: Frame,
 ) {
-	canvas.saveLayer();
+	const content: DrawCommand = {
+		op: "drawGroup",
+		pos: cmd.pos,
+		size: cmd.size,
+		children: cmd.children,
+	};
+	const ctm = (canvas.getTotalMatrix() as number[]).slice(0, 6) as Affine;
+	const bounds = originInvariant(cmd.mask, ctm)
+		? layerBounds(ck, canvas, provider, images, bin, content, frame)
+		: null;
+	canvas.saveLayer(undefined, bounds);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
 	const maskPaint = bin.track(new ck.Paint());
@@ -1347,7 +1358,7 @@ function drawMasked(
 				]),
 			),
 		);
-	canvas.saveLayer(maskPaint);
+	canvas.saveLayer(maskPaint, bounds);
 	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
 	canvas.restore();
 	canvas.restore();
@@ -1648,7 +1659,8 @@ const f32 = Math.fround;
 // so they cut nothing. Matching it keeps the offscreen's origin, and so every
 // pixel, as before. Where an op's exact bounds are not known (glyphs), the
 // estimate only ever errs larger. Null for content that is not modelled here
-// (SVG images, inner shadows, blenders).
+// (SVG images, inner shadows, blenders). With `uncut`, nothing is cut to the
+// device and no line is culled.
 function predictedBounds(
 	ck: CanvasKit,
 	provider: TypefaceFontProvider,
@@ -1658,10 +1670,18 @@ function predictedBounds(
 	frame: Frame,
 	device: Size,
 	matrix: number[],
+	uncut = false,
 ): Bounds | null {
 	if (matrix.length !== 9 || matrix[6] !== 0 || matrix[7] !== 0) return null;
 	if (matrix[8] !== 1) return null;
-	const cull: Bounds = [0, 0, f32(device.width), f32(device.height)];
+	const cull: Bounds = uncut
+		? [
+				Number.NEGATIVE_INFINITY,
+				Number.NEGATIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+			]
+		: [0, 0, f32(device.width), f32(device.height)];
 	let out: Bounds | null = null;
 	let singular = false;
 	const throughSaves = (b: Bounds, saves: RecordedSave[]): Bounds | null => {
@@ -1676,7 +1696,7 @@ function predictedBounds(
 		return b;
 	};
 	const include = (b: Bounds) => {
-		const cut = intersectBounds(b, cull);
+		const cut = uncut ? b : intersectBounds(b, cull);
 		if (cut) out = out ? unionBounds(out, cut) : cut;
 	};
 	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
@@ -1772,7 +1792,8 @@ function predictedBounds(
 			return true;
 		}
 		if (c.op === "drawText") {
-			const glyphs = textBounds(ck, provider, bin, c, m, device);
+			const rows = uncut ? null : device;
+			const glyphs = textBounds(ck, provider, bin, c, m, rows);
 			if (!glyphs) return false;
 			for (const b of glyphs) add(b, m, within);
 			return true;
@@ -1901,7 +1922,7 @@ function textBounds(
 	bin: Bin,
 	cmd: DrawTextCommand,
 	ctm: Affine,
-	device: Size,
+	device: Size | null,
 ): Bounds[] | null {
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
 	const families = new Set(fallback);
@@ -1915,7 +1936,7 @@ function textBounds(
 	}
 	if (!em) return [];
 	const rows =
-		ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
+		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
 					top: -ctm[5] / ctm[4],
 					bottom: (Math.ceil(device.height) - ctm[5]) / ctm[4],
@@ -2066,9 +2087,7 @@ function hasLayerPaint(cmd: DrawCommand): boolean {
 // or null for a paint that is not modelled.
 function layerGrow(cmd: DrawCommand): ((b: Bounds) => Bounds) | null {
 	if (cmd.blendMode === "linear-burn") return null;
-	const list = (
-		Array.isArray(cmd.shadow) ? cmd.shadow : cmd.shadow ? [cmd.shadow] : []
-	).filter((s) => s.color !== "transparent");
+	const list = shadowList(cmd.shadow);
 	if (list.some((s) => s.inset)) return null;
 	const blur =
 		typeof cmd.blur === "number" && cmd.blur > 0
@@ -2798,6 +2817,104 @@ function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
+// Test hook: paint every layer unbounded.
+let boundLayers = true;
+
+export function setLayerBounds(enabled: boolean): void {
+	boundLayers = enabled;
+}
+
+// Conservative local bounds for a layer holding `inner`, so it is allocated and
+// filtered over its content rather than the whole surface. Skia grows them for
+// the layer paint's image filter itself. Padded by a device pixel. Null leaves
+// the layer unbounded: content that is not modelled or not originInvariant, a
+// matrix that is not a positive scale and translate, or a recording canvas.
+function layerBounds(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
+	bin: Bin,
+	inner: DrawCommand,
+	frame: Frame,
+): Rect | null {
+	if (!boundLayers || measuring.has(canvas)) return null;
+	const matrix = canvas.getTotalMatrix() as number[];
+	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
+	if (!(matrix[0] > 0 && matrix[4] > 0)) return null;
+	const ctm = matrix.slice(0, 6) as Affine;
+	if (!originInvariant(inner, ctm)) return null;
+	const device = exportPixelSize(frame, frame.scale);
+	const b = predictedBounds(
+		ck,
+		provider,
+		bin,
+		images,
+		inner,
+		frame,
+		device,
+		matrix,
+		true,
+	);
+	if (!b || !b.every(Number.isFinite)) return null;
+	const inverse = invertAffine(ctm);
+	if (!inverse) return null;
+	const [l, t, r, btm] = mapAffine(inverse, [
+		b[0] - 1,
+		b[1] - 1,
+		b[2] + 1,
+		b[3] + 1,
+	]);
+	return ck.LTRBRect(l, t, r, btm);
+}
+
+// Whether a layer paint keeps the destination wherever its layer is transparent,
+// so bounding the layer cannot change what lands outside it.
+function layerPaintBoundable(cmd: DrawCommand): boolean {
+	const cm = cmd.adjust?.colorMatrix;
+	if (cm && !shaderSideMatrix(cmd.adjust) && matrixTouchesTransparent(cm))
+		return false;
+	return !shadowList(cmd.shadow).some((s) => s.inset);
+}
+
+// Whether `cmd` paints the same in a layer at another whole-pixel origin. Skia
+// maps geometry through the layer's translation in float, so clips, paths,
+// rotations, gradients and sampled images can shift by an edge pixel or a whole
+// column. Rounded corners can move by a few levels and are accepted. `m` is the
+// layer's scale and translate.
+function originInvariant(cmd: DrawCommand, m: Affine): boolean {
+	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd)) return false;
+	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
+	if (cmd.op === "drawRect")
+		return (
+			!cmd.cornerSmoothing &&
+			(cmd.fills ?? []).every((f) => f.kind === "solid")
+		);
+	if (cmd.op === "drawText") return !cmd.fill || cmd.fill.kind === "solid";
+	if (cmd.op === "drawGroup")
+		return cmd.children.every((c) => originInvariant(c, m));
+	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
+	return cmd.op === "drawQr";
+}
+
+// Whether every pixel edge of a nearest-sampled bitmap lands clear of device
+// pixel centers, so float error in the layer's translation cannot flip a column.
+function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
+	if (cmd.role === "barcode") return false;
+	const x = m[0] * cmd.pos.x + m[2];
+	const y = m[4] * cmd.pos.y + m[5];
+	const w = m[0] * cmd.size.width;
+	const h = m[4] * cmd.size.height;
+	const clear = (start: number, extent: number, n: number) => {
+		for (let i = 0; i <= n; i++) {
+			const edge = start + (extent * i) / n;
+			if (Math.abs(edge - Math.floor(edge) - 0.5) < 1 / 256) return false;
+		}
+		return true;
+	};
+	return clear(x, w, cmd.pixelWidth) && clear(y, h, cmd.pixelHeight);
+}
+
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
 function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
@@ -2895,6 +3012,13 @@ function invertedSilhouette(
 	return bin.track(ck.ImageFilter.MakeColorFilter(cf, null));
 }
 
+// A drawable's visible shadows.
+function shadowList(shadow: DrawCommand["shadow"]) {
+	return (Array.isArray(shadow) ? shadow : shadow ? [shadow] : []).filter(
+		(s) => s.color !== "transparent",
+	);
+}
+
 // The image filter for a drawable's whole shadow stack, or null when it has
 // none. A `null` input anywhere in the graph is the layer's own contents.
 //
@@ -2907,9 +3031,7 @@ function shadowFilter(
 	bin: Bin,
 	shadow: DrawCommand["shadow"],
 ): ImageFilter | null {
-	const list = (Array.isArray(shadow) ? shadow : shadow ? [shadow] : []).filter(
-		(s) => s.color !== "transparent",
-	);
+	const list = shadowList(shadow);
 	if (list.length === 0) return null;
 
 	let under: ImageFilter | null = null;
@@ -2960,6 +3082,21 @@ function shadowFilter(
 	return out;
 }
 
+// What paintDrawable draws inside the layer: the drawable without its layer
+// paint, its rotation already on the canvas.
+function layerContent(cmd: DrawCommand): DrawCommand {
+	const {
+		rotation: _r,
+		opacity: _o,
+		blendMode: _b,
+		blur: _l,
+		shadow: _s,
+		adjust: _a,
+		...rest
+	} = cmd;
+	return rest as DrawCommand;
+}
+
 function paintDrawable(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -3000,7 +3137,20 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd);
-	if (lp) canvas.saveLayer(lp);
+	if (lp) {
+		const bounds = layerPaintBoundable(cmd)
+			? layerBounds(
+					ck,
+					canvas,
+					provider,
+					images,
+					bin,
+					layerContent(cmd),
+					frame,
+				)
+			: null;
+		canvas.saveLayer(lp, bounds);
+	}
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	if (cmd.clip && cmd.op !== "drawImage")
 		canvas.clipPath(
@@ -3432,7 +3582,7 @@ export async function paintScene(
 			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
-			provider.delete();
+			deleteFontProvider(provider);
 			for (const [src, img] of imageMap)
 				if (!borrowed.has(src)) img.delete();
 		}
