@@ -3341,8 +3341,11 @@ function paintDrawable(
 // frame, each as a structural key. Text and images also depend on fonts and
 // decoded bytes the key would not cover, so the run stops at the first one. A
 // group that paints straight onto the canvas is entered, keying each child
-// with the group around it.
-function backgroundKeys(drawables: DrawCommand[], outer = ""): string[] {
+// with the group around it. `complete` is whether every drawable was keyed.
+function backgroundKeys(
+	drawables: DrawCommand[],
+	outer = "",
+): { keys: string[]; complete: boolean } {
 	const keys: string[] = [];
 	for (const cmd of drawables) {
 		if (selfContained(cmd)) {
@@ -3355,34 +3358,35 @@ function backgroundKeys(drawables: DrawCommand[], outer = ""): string[] {
 				children,
 				`${outer + JSON.stringify(group)}>`,
 			);
-			keys.push(...inner);
-			if (inner.length === children.length) continue;
+			keys.push(...inner.keys);
+			if (inner.complete) continue;
 		}
-		break;
+		return { keys, complete: false };
 	}
-	return keys;
+	return { keys, complete: true };
 }
 
 // The first `count` keyed drawables and the rest. A pass-through group cut
 // between its children becomes two groups with the same props, which paint the
-// same pixels as the one.
+// same pixels as the one. Only what backgroundKeys keys is counted.
 function splitBackground(
 	drawables: DrawCommand[],
 	count: number,
 ): { head: DrawCommand[]; tail: DrawCommand[]; taken: number } {
 	let taken = 0;
 	for (let i = 0; i < drawables.length; i++) {
-		if (taken === count)
-			return {
-				head: drawables.slice(0, i),
-				tail: drawables.slice(i),
-				taken,
-			};
 		const cmd = drawables[i] as DrawCommand;
-		if (selfContained(cmd) || cmd.op !== "drawGroup") {
+		const split = () => ({
+			head: drawables.slice(0, i),
+			tail: drawables.slice(i),
+			taken,
+		});
+		if (taken === count) return split();
+		if (selfContained(cmd)) {
 			taken++;
 			continue;
 		}
+		if (cmd.op !== "drawGroup" || !passThrough(cmd)) return split();
 		const inner = splitBackground(cmd.children, count - taken);
 		taken += inner.taken;
 		if (inner.tail.length === 0) continue;
@@ -3630,7 +3634,7 @@ export async function paintScene(
 	const bgFrame = pixelInfo
 		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
 		: "";
-	const lead = pixelInfo ? backgroundKeys(drawables) : [];
+	const lead = pixelInfo ? backgroundKeys(drawables).keys : [];
 	const closest =
 		cache && pixelInfo ? closestBackground(cache, bgFrame, lead) : null;
 	const held = closest?.held ?? null;
