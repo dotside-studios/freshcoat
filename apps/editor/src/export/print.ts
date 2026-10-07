@@ -43,11 +43,11 @@ export function printRequest(
 }
 
 /** What the worker hands `renderCompiled`. The finish is coatfile's
- *  default, YMCKO. */
+ *  default, YMCKO, with the balance as its curve. */
 export function printRenderOptions(print: RenderPrint): PrintRenderOptions {
 	return {
 		analyze: print.analyze,
-		policy: print.balance ? { balance: print.balance } : {},
+		...(print.balance ? { balance: print.balance } : {}),
 	};
 }
 

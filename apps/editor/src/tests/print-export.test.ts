@@ -44,15 +44,14 @@ describe("the request mapping", () => {
 		).toEqual({ analyze: true });
 	});
 
-	it("hands renderCompiled the analysis and the balance as policy", () => {
+	it("hands renderCompiled the analysis and the balance", () => {
 		expect(printRenderOptions({ analyze: true, balance: BALANCE })).toEqual({
 			analyze: true,
-			policy: { balance: BALANCE },
+			balance: BALANCE,
 		});
 		// No finish given: coatfile's default is the YMCKO finish.
 		expect(printRenderOptions({ analyze: false })).toEqual({
 			analyze: false,
-			policy: {},
 		});
 	});
 });
@@ -65,7 +64,7 @@ describe("the print fallback", () => {
 			if (print) throw new Error("SkSL effect unavailable");
 			return "plain";
 		});
-		expect(calls).toEqual([{ analyze: true, policy: {} }, undefined]);
+		expect(calls).toEqual([{ analyze: true }, undefined]);
 		expect(out).toEqual({
 			result: "plain",
 			print: "fallback",

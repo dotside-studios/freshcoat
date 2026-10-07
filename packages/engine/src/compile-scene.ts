@@ -159,6 +159,7 @@ export function compileScene(root: Node, opts: CompileSceneOptions): Command[] {
 // no-op and shouldn't emit a command (or spin up the post-pass).
 function hasFinishOp(f: FrameFinish): boolean {
 	return (
+		f.curve !== undefined ||
 		f.whiteClamp !== undefined ||
 		f.blackExtract !== undefined ||
 		(typeof f.dither === "number" ? f.dither > 0 : (f.dither?.amount ?? 0) > 0)

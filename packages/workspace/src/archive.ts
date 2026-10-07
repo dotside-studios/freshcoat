@@ -158,12 +158,12 @@ const PresetSchema = z.object({
 			profile: z
 				.unknown()
 				.transform((value, ctx) => {
-					const profile = parsePrintProfile(value);
-					if (profile instanceof Error) {
-						ctx.addIssue({ code: "custom", message: profile.message });
+					const parsed = parsePrintProfile(value);
+					if (!parsed.ok) {
+						ctx.addIssue({ code: "custom", message: parsed.message });
 						return z.NEVER;
 					}
-					return profile;
+					return parsed.profile;
 				})
 				.optional(),
 		})

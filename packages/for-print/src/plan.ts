@@ -13,12 +13,14 @@
 
 import {
 	type Adjust,
+	applyAdjustColor,
 	composeAdjust,
+	type FrameFinish,
 	type ImageNode,
 	type Node,
 } from "@freshcoat-js/engine";
 import { analyzePixels, correctionMatrix } from "./analyze";
-import { NO_PROCESSING, YMCKO_PRESET } from "./presets";
+import { YMCKO_FINISH, YMCKO_PRESET } from "./presets";
 import type {
 	ChannelBalance,
 	ImageAnalysis,
@@ -69,10 +71,8 @@ export function classifyIntent(node: Node): LayerIntent {
 // step — both per-channel, so they compose into one 256-entry table. Mirrors the
 // order and math of the gamma + darkness pixel steps.
 //
-// `balance` is this channel's cast exponent and applies LAST, after the tone
-// steps: it corrects what the printer does to the finished signal, so it belongs
-// at the end of the chain rather than folded into `gamma`. At 1 the table is
-// bit-identical to what it was before balance existed.
+// `balance` is a channel's cast exponent, applied after the tone steps. Only
+// printFinish sets it, with the tone steps at identity.
 //
 // Equal parameters return the same table, so freshcoat's composed-cube and LUT
 // image caches hit by identity across renders. Treat it as read-only.
@@ -138,31 +138,39 @@ export function printAdjust(o: PrintOptimizeOptions): Adjust {
 		adjust.gamut = "preserve-hue";
 	}
 
-	// One table per channel only when the balance asks for it. With no cast
-	// measured, all three are the same table and the same object — the shape
-	// freshcoat has always been handed.
 	const darkness = o.darkness ?? 0;
-	if (NEUTRAL_BALANCE(o.balance)) {
-		if (o.gamma !== 1 || darkness > 0) {
-			const lut = toneLut(o.gamma, darkness);
-			adjust.lut = { r: lut, g: lut, b: lut };
-		}
-	} else {
-		const b = o.balance as ChannelBalance;
-		adjust.lut = {
-			r: toneLut(o.gamma, darkness, b.r),
-			g: toneLut(o.gamma, darkness, b.g),
-			b: toneLut(o.gamma, darkness, b.b),
-		};
+	if (o.gamma !== 1 || darkness > 0) {
+		const lut = toneLut(o.gamma, darkness);
+		adjust.lut = { r: lut, g: lut, b: lut };
 	}
 
 	if (o.sharpness > 0) adjust.sharpen = o.sharpness;
 	return adjust;
 }
 
-// Per-intent correction policy. A value corrects that intent; null/undefined
-// leaves it untouched. The default corrects photos with the YMCKO preset and
-// leaves everything else pristine.
+// The whole-frame finish with the printer's measured cast (see ./profile) as its
+// curve. The cast belongs to the printer, not to any layer, so it is corrected
+// once on the composited card, where it also holds across blends and edges.
+export function printFinish(
+	balance?: ChannelBalance,
+	base: FrameFinish = YMCKO_FINISH,
+): FrameFinish {
+	if (NEUTRAL_BALANCE(balance)) return base;
+	const b = balance as ChannelBalance;
+	return {
+		...base,
+		curve: {
+			r: toneLut(1, 0, b.r),
+			g: toneLut(1, 0, b.g),
+			b: toneLut(1, 0, b.b),
+		},
+	};
+}
+
+// Per-intent correction policy. A value corrects that intent; null leaves it
+// untouched. Undefined takes the default: photos are corrected (with the YMCKO
+// preset in planScene, by analysis in analyzeScene) and everything else is left
+// pristine.
 export type PlanPolicy = {
 	// Optional semantic override for exceptions to node-kind classification. This
 	// is deliberately a resolver rather than a field on freshcoat nodes: intent
@@ -172,16 +180,6 @@ export type PlanPolicy = {
 	graphic?: PrintOptimizeOptions | null;
 	text?: PrintOptimizeOptions | null;
 	code?: PrintOptimizeOptions | null;
-	// The printer's measured cast (see ./profile), applied to EVERY drawable —
-	// including the ones the intents above leave pristine.
-	//
-	// A cast belongs to the printer, not to the art: the ribbon lays down the same
-	// too-warm red under a photo, a brand gradient and a line of text alike. Scoping
-	// it by intent would also miss the layer that shows it most, since a card whose
-	// ground is a vector rect is `graphic` and correcting graphics is off by
-	// default. It is a per-channel curve with no spatial effect, so a text or QR
-	// layer stays exactly as crisp as it was.
-	balance?: ChannelBalance;
 };
 
 function intentFor(node: Node, policy: PlanPolicy): LayerIntent {
@@ -207,22 +205,10 @@ function policyFor(
 }
 
 // Attach an adjust to a leaf if the options produce a non-empty one; otherwise
-// return the node untouched (no empty `adjust` field). A measured `balance`
-// reaches a layer the intent left alone as the only correction it carries.
-function withAdjust(
-	node: Node,
-	opts: PrintOptimizeOptions | null,
-	balance?: ChannelBalance,
-): Node {
-	const merged = opts
-		? balance
-			? { ...opts, balance }
-			: opts
-		: balance
-			? { ...NO_PROCESSING, balance }
-			: null;
-	if (!merged) return node;
-	const adjust = printAdjust(merged);
+// return the node untouched (no empty `adjust` field).
+function withAdjust(node: Node, opts: PrintOptimizeOptions | null): Node {
+	if (!opts) return node;
+	const adjust = printAdjust(opts);
 	if (Object.keys(adjust).length === 0) return node;
 	// A layer's own adjustment is part of its design; the correction applies to
 	// what it produces.
@@ -246,15 +232,16 @@ function mapTree(node: Node, leaf: (n: Node) => Node): Node {
 	return leaf(node);
 }
 
-const DEFAULT_POLICY: PlanPolicy = { photo: YMCKO_PRESET };
-
 // Sync planner: attach a policy-driven Adjust per layer, no image I/O. Photos get
 // the policy's photo preset (YMCKO by default); text/QR/graphics are left pristine
 // unless the policy opts them in. Returns a new tree; the input is not mutated.
 export function planScene(root: Node, policy: PlanPolicy = {}): Node {
-	const p = { ...DEFAULT_POLICY, ...policy };
+	const p = {
+		...policy,
+		photo: policy.photo === undefined ? YMCKO_PRESET : policy.photo,
+	};
 	return mapTree(root, (node) =>
-		withAdjust(node, policyFor(intentFor(node, p), p), p.balance),
+		withAdjust(node, policyFor(intentFor(node, p), p)),
 	);
 }
 
@@ -265,11 +252,6 @@ export function planScene(root: Node, policy: PlanPolicy = {}): Node {
 // decoding/rendering, keeping for-print free of any canvas.
 export type ImageSampler = (image: ImageNode) => Promise<PixelData>;
 
-// Async planner: like planScene, but each photo layer is ANALYZED (per-image
-// brightness/saturation/contrast) and corrected with its own recommendation —
-// the core win over correcting one flattened card. Non-photo intents follow
-// `policy` (default: untouched). Pass `policy.photo` explicitly to override
-// analysis: `null` leaves photos alone, a preset forces a fixed correction.
 export type AnalysisCache = Map<string, Promise<ImageAnalysis>>;
 
 // An AnalysisCache that keeps at most `maxEntries`, dropping the least recently
@@ -307,6 +289,12 @@ class BoundedAnalysisCache extends Map<string, Promise<ImageAnalysis>> {
 }
 
 export type AnalyzeSceneOptions = {
+	policy?: PlanPolicy;
+	// Called once per analyzed photo with what analysis found — the gamut pressure
+	// especially, which nothing downstream can recover once the render has clamped.
+	// Not called for layers a `policy.photo` value opted out of analysis.
+	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void;
+	// Keeps analyses across calls.
 	cache?: AnalysisCache;
 	// A short stable key for an image src, such as an asset's sha256. A src it
 	// returns undefined for falls back to a hash of any long src.
@@ -333,28 +321,73 @@ function defaultSrcKey(src: string): string {
 	return `#${src.length}:${(h1 >>> 0).toString(36)}:${(h2 >>> 0).toString(36)}`;
 }
 
-// Recommendations are cached per src, and across calls when `options.cache` is
-// passed.
+// The pixels as the layer's own adjustment leaves them, which is what the print
+// correction composes onto (see withAdjust). Sharpen is spatial and left out.
+function asAdjusted(pixels: PixelData, adjust: Adjust | undefined): PixelData {
+	if (!adjust || !(adjust.colorMatrix || adjust.lut || adjust.lut3d))
+		return pixels;
+	const { data, width, height } = pixels;
+	const out = new Uint8ClampedArray(data.length);
+	for (let i = 0; i < data.length; i += 4) {
+		const [r, g, b] = applyAdjustColor(adjust, [
+			data[i] / 255,
+			data[i + 1] / 255,
+			data[i + 2] / 255,
+		]);
+		out[i] = Math.round(r * 255);
+		out[i + 1] = Math.round(g * 255);
+		out[i + 2] = Math.round(b * 255);
+		out[i + 3] = data[i + 3];
+	}
+	return { data: out, width, height };
+}
+
+const tableIds = new WeakMap<object, number>();
+let nextTableId = 0;
+
+function tableId(table: object): number {
+	let id = tableIds.get(table);
+	if (id === undefined) {
+		id = nextTableId++;
+		tableIds.set(table, id);
+	}
+	return id;
+}
+
+// Tables by identity, as the engine's own caches key them.
+function adjustKey(a: Adjust | undefined): string {
+	if (!a || !(a.colorMatrix || a.lut || a.lut3d)) return "";
+	return [
+		a.colorMatrix?.join(",") ?? "-",
+		a.gamut ?? "-",
+		a.lut
+			? `${tableId(a.lut.r)},${tableId(a.lut.g)},${tableId(a.lut.b)}`
+			: "-",
+		a.lut3d ? `${a.lut3d.size}:${tableId(a.lut3d.data)}` : "-",
+	].join("|");
+}
+
+// Async planner: like planScene, but each photo layer is ANALYZED (per-image
+// brightness/saturation/contrast) and corrected with its own recommendation —
+// the core win over correcting one flattened card. Non-photo intents follow
+// `policy` (default: untouched). A `policy.photo` value overrides analysis: null
+// leaves photos alone, a preset forces a fixed correction.
 export async function analyzeScene(
 	sample: ImageSampler,
 	root: Node,
-	policy: PlanPolicy = {},
-	// Called once per analyzed photo with what analysis found — the gamut pressure
-	// especially, which nothing downstream can recover once the render has clamped.
-	// Not called for layers an explicit `policy.photo` opted out of analysis.
-	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
 	options: AnalyzeSceneOptions = {},
 ): Promise<Node> {
-	const analyzePhotos = !("photo" in policy);
+	const { policy = {}, onAnalysis } = options;
+	const analyzePhotos = policy.photo === undefined;
 	// Cache the in-flight PROMISE, not the resolved value: children walk
 	// concurrently (Promise.all), so identical layers would otherwise both miss a
 	// value-cache and sample twice. Key on the rendered appearance (src + fit +
-	// size + focus + crop), since the same src cropped differently analyzes
-	// differently.
+	// size + focus + crop + own adjust), since the same src cropped or adjusted
+	// differently analyzes differently.
 	const cache = options.cache ?? new Map<string, Promise<ImageAnalysis>>();
 	const srcKey = (src: string) => options.srcKey?.(src) ?? defaultSrcKey(src);
 	const sampleKey = (n: ImageNode) =>
-		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}`;
+		`${srcKey(n.src)}|${n.fit}|${Math.round(n.size?.width ?? 0)}x${Math.round(n.size?.height ?? 0)}|${JSON.stringify([n.focus, n.crop])}|${adjustKey(n.adjust)}`;
 	const seen = new Map<string, Promise<ImageAnalysis>>();
 
 	function photoOptions(node: ImageNode): Promise<PrintOptimizeOptions | null> {
@@ -364,7 +397,9 @@ export async function analyzeScene(
 		if (!analysis) {
 			let shared = cache.get(key);
 			if (!shared) {
-				shared = sample(node).then(analyzePixels);
+				shared = sample(node).then((pixels) =>
+					analyzePixels(asAdjusted(pixels, node.adjust)),
+				);
 				cache.set(key, shared);
 				// A failed sample is not kept, so a later call samples again.
 				shared.catch(() => {
@@ -395,10 +430,46 @@ export async function analyzeScene(
 		}
 		const intent = intentFor(node, policy);
 		if (node.kind === "image" && intent === "photo") {
-			return withAdjust(node, await photoOptions(node), policy.balance);
+			return withAdjust(node, await photoOptions(node));
 		}
-		return withAdjust(node, policyFor(intent, policy), policy.balance);
+		return withAdjust(node, policyFor(intent, policy));
 	}
 
 	return walk(root);
+}
+
+export type PrintPlanOptions = Omit<AnalyzeSceneOptions, "policy"> & {
+	policy?: PlanPolicy;
+	// When given, photos are analyzed one by one; otherwise they take the preset.
+	sample?: ImageSampler;
+	// The printer's measured cast, applied as the finish's curve.
+	balance?: ChannelBalance;
+	// Default: YMCKO_FINISH. False keeps only the balance curve, if any.
+	finish?: FrameFinish | false;
+};
+
+export type PrintPlan = {
+	scene: Node;
+	// Pass to compileScene's `finish`. Undefined when there is nothing to apply.
+	finish: FrameFinish | undefined;
+};
+
+// The scene with its per-layer corrections and the finish that goes with it,
+// so neither half is applied without the other.
+export async function planForPrint(
+	root: Node,
+	options: PrintPlanOptions = {},
+): Promise<PrintPlan> {
+	const { sample, balance, finish: base, ...analyze } = options;
+	const scene = sample
+		? await analyzeScene(sample, root, analyze)
+		: planScene(root, analyze.policy);
+	const finish = printFinish(
+		balance,
+		base === false ? {} : (base ?? YMCKO_FINISH),
+	);
+	return {
+		scene,
+		finish: Object.keys(finish).length ? finish : undefined,
+	};
 }

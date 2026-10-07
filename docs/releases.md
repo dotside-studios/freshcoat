@@ -1,7 +1,6 @@
 # Releases
 
 Freshcoat releases use one version for the core SDK and the Figma plugin.
-The first prepared version is `0.1.0`, tagged `v0.1.0`.
 
 | Deliverable | Distribution |
 |---|---|
@@ -9,7 +8,7 @@ The first prepared version is `0.1.0`, tagged `v0.1.0`.
 | `@freshcoat-js/engine` | npm: the rendering engine |
 | `@freshcoat-js/for-print` | npm: print analysis and correction planning |
 | `@freshcoat-js/coatfile` | npm: template files, validation, compilation and rendering helpers |
-| Freshcoat for Figma | GitHub release ZIP; Figma Community publication is manual |
+| Freshcoat for Figma | GitHub release ZIP; Community updates are published separately in Figma |
 
 Studio is deployed separately. The UI and workspace packages remain internal.
 
@@ -156,15 +155,15 @@ third-party notices. Download it from a GitHub release, extract it, and import
 its manifest through Figma desktop's development plugin menu. No build is
 needed to use that bundle.
 
-Community publishing remains a separate manual step. The plugin has been
-submitted and is awaiting Figma's review; it is not yet publicly available
-through Community. Release ZIPs can still be installed as development plugins.
+The plugin is available in Figma Community. Publishing a GitHub release does
+not update that listing: publish each plugin update separately through Figma.
+Release ZIPs can also be installed as development plugins.
 
 The permanent plugin ID is `1685967766479998641`, configured in
 `apps/figma-plugin/package.json` under `figma-plugin.id`. The build generates
 `manifest.json` from that configuration. Keep the ID stable across updates:
 changing it makes plugin data saved under the old identity inaccessible.
 
-Check the plugin in Figma and submit it through Figma's publishing flow. CI
-does not submit or update a Community listing. See
+Check the plugin in Figma and submit updates through Figma's publishing flow.
+CI does not update the Community listing. See
 [Figma's plugin documentation](https://developers.figma.com/docs/plugins/).

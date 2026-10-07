@@ -21,6 +21,7 @@ import {
 	type Point,
 	toneWedgeChart,
 } from "../src/chart";
+import { profileFromPhoto } from "../src/calibrate";
 import { grayCast, readChart, repeatSpread } from "../src/measure";
 import type { PixelData } from "../src/types";
 
@@ -104,4 +105,39 @@ describe("chart → paint → read", () => {
 		for (const c of grayCast(reading)) expect(Math.abs(c)).toBeLessThan(1);
 		expect(repeatSpread(reading)).toBeLessThanOrEqual(1);
 	}, 60_000);
+});
+
+describe("profileFromPhoto", () => {
+	test("turns a photo of the printed chart into a profile", async () => {
+		const ck = await ckInit();
+		const spec = grayBalanceChart();
+		// Exposed so the bare card is bright but not blown, as a usable photo is.
+		const photo = await paint(ck, spec);
+		const data = photo.data.map((v, i) => (i % 4 === 3 ? v : v * 0.9));
+		const result = profileFromPhoto({ ...photo, data }, cornersOf(spec), {
+			name: "Smart-51 / batch A / PVC",
+		});
+		if (!result.ok)
+			throw new Error(
+				`${result.reason} ${"assessment" in result ? result.assessment.blockers : ""}`,
+			);
+		expect(result.profile.name).toBe("Smart-51 / batch A / PVC");
+		expect(result.profile.assessment?.usable).toBe(true);
+		for (const k of Object.values(result.profile.balance ?? {}))
+			expect(Math.abs(k - 1)).toBeLessThan(0.01);
+		expect(result.reading.chartId).toBe(spec.id);
+	}, 60_000);
+
+	test("says when the picked corners cannot be read", () => {
+		const spec = grayBalanceChart();
+		const photo = {
+			data: new Uint8ClampedArray(4),
+			width: 1,
+			height: 1,
+		};
+		const p = { x: 0, y: 0 };
+		expect(
+			profileFromPhoto(photo, [p, p, p, p], { name: "p" }, spec),
+		).toEqual({ ok: false, reason: "unreadable-corners" });
+	});
 });

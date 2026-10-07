@@ -1,0 +1,21 @@
+{
+	"calibrationMs": 45.58,
+	"cases": {
+		"compileScene membership card": {
+			"ms": 0.091,
+			"relative": 0.00205
+		},
+		"compileScene front x12 (192 layers)": {
+			"ms": 0.32,
+			"relative": 0.00723
+		},
+		"renderCompiled per record, print off": {
+			"ms": 54.646,
+			"relative": 1.15843
+		},
+		"renderCompiled per record, print on": {
+			"ms": 155.951,
+			"relative": 3.50334
+		}
+	}
+}

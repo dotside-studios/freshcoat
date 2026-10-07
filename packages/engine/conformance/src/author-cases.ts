@@ -31,6 +31,8 @@ const box = (x: number, y: number, w: number, h: number) => ({
 	size: { width: w, height: h },
 });
 const solid = (color: string) => [{ kind: "solid" as const, color }];
+const table = (f: (i: number) => number) =>
+	Uint8Array.from({ length: 256 }, (_, i) => f(i));
 
 // Every case paints on the same opaque white ground, so an untouched sample is
 // (255,255,255,255) in each of them and "the backend drew nothing here" is one
@@ -538,6 +540,27 @@ add(
 	{ finish: { blackExtract: 30 } },
 );
 
+// Each channel reads its own table, then the threshold sees the curved value:
+// 200 maps to 252 on red only, so whiteClamp at 248 leaves the pixel alone.
+add(
+	"finish-curve",
+	"the finish curve maps each channel through its own table first",
+	"raster",
+	["finish.curve", "finish.whiteClamp"],
+	frame([createRect({ ...box(0, 0, W, H), fills: solid("#c8c8c8") })]),
+	[px([80, 60], [252, 200, 100, 255], "200 through r, g and b tables")],
+	{
+		finish: {
+			curve: {
+				r: table((i) => (i === 200 ? 252 : i)),
+				g: table((i) => i),
+				b: table((i) => (i === 200 ? 100 : i)),
+			},
+			whiteClamp: 248,
+		},
+	},
+);
+
 // The layout is the compile's at every density: a 2x export is a 2x raster of the
 // SAME layout, so the rect's edges land at exactly twice their design coordinates.
 add(
@@ -556,6 +579,27 @@ add(
 		px([82, 62], [47, 111, 237, 255], "just inside it"),
 	],
 	{ scale: 2 },
+);
+
+add(
+	"adjust-per-channel-lut",
+	"each channel of an adjust LUT reads its own table",
+	"raster",
+	["adjust.lut"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#808080"),
+			adjust: {
+				lut: {
+					r: table(() => 200),
+					g: table(() => 100),
+					b: table(() => 50),
+				},
+			},
+		}),
+	]),
+	[px([80, 60], [200, 100, 50, 255], "a flat table per channel")],
 );
 
 // ─── text ─────────────────────────────────────────────────────────────────────

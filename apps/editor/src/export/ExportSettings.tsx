@@ -600,12 +600,12 @@ function PrintGroup({
 		const file = files?.[0];
 		if (!file) return;
 		const parsed = parsePrintProfile(await file.text());
-		if (parsed instanceof Error) {
+		if (!parsed.ok) {
 			setError(`Couldn't import ${file.name}: ${parsed.message}`);
 			return;
 		}
 		setError(null);
-		onChange({ ...print, profile: parsed });
+		onChange({ ...print, profile: parsed.profile });
 	};
 	const removeProfile = () => {
 		const { profile: _drop, ...rest } = print;
