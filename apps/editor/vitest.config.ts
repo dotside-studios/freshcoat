@@ -23,6 +23,9 @@ export default defineConfig({
 	plugins: [viteReact()],
 	test: {
 		environment: "jsdom",
+		// The root test script runs every package at once, so the editor's jsdom
+		// workers take half the cores rather than all but one.
+		maxWorkers: "50%",
 		include: ["src/**/*.test.{ts,tsx}"],
 		setupFiles: ["src/tests/render-count.ts", "src/tests/setup-locale.ts"],
 	},

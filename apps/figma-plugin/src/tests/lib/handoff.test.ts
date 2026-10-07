@@ -194,6 +194,7 @@ describe("openInFreshcoat", () => {
 		expect(unpacked.assets?.[0]?.base64).toBe(template.assets?.[0]?.base64);
 	});
 
+	// Encodes a megabyte raster about twenty times, so it takes seconds.
 	it("cuts over at exactly HANDOFF_MAX_CHARS", async () => {
 		// Find raster sizes either side of the limit, so the boundary itself is
 		// what is tested rather than two templates far from it.

@@ -1,7 +1,6 @@
 import type { Dataset } from "@freshcoat-js/workspace";
 import * as ws from "@freshcoat-js/workspace";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
@@ -12,7 +11,7 @@ import {
 	type TableImporter,
 } from "../data/table-import";
 import { HEAD_ROWS } from "../data/table-store";
-import { chooseOption } from "./aria";
+import { button, chooseOption, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 vi.mock("@freshcoat-js/workspace", async (original) => {
@@ -67,7 +66,7 @@ afterEach(() => {
 
 describe("Import wizard", { timeout: 30_000 }, () => {
 	it("previews from the rows it holds and maps the whole file on Import", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const onImported = vi.fn();
 		render(
 			<ControllerProvider controller={controller}>
@@ -83,8 +82,8 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			expect(wizard.textContent).toContain("people.csv · 1,500 records"),
 		);
 
-		const next = () => user.click(screen.getByRole("button", { name: "Next" }));
-		const back = () => user.click(screen.getByRole("button", { name: "Back" }));
+		const next = () => user.click(button("Next"));
+		const back = () => user.click(button("Back"));
 		await next();
 		await next();
 		const totals = () => screen.getByTestId("import-totals").textContent;
@@ -94,11 +93,7 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		await back();
 		await back();
 		await user.click(screen.getByRole("radio", { name: "Replace" }));
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Date order/ }),
-			/Day first/,
-		);
+		await chooseOption(user, button(/Date order/), /Day first/);
 		await next();
 		await next();
 		await back();
@@ -113,7 +108,7 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		expect(previews.length).toBeGreaterThan(0);
 		for (const [, rows] of previews) expect(rows.length).toBe(HEAD_ROWS);
 
-		await user.click(screen.getByRole("button", { name: "Import" }));
+		await user.click(button("Import"));
 		await waitFor(() => expect(onImported).toHaveBeenCalled());
 		expect(apply).toHaveBeenCalledTimes(1);
 		const [, sheet, sent, plan] = apply.mock.calls[0] ?? [];
@@ -132,7 +127,7 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 	});
 
 	it("leaves the existing records on the page when nothing is matched", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		render(
 			<ControllerProvider controller={controller}>
 				<ImportWizard
@@ -148,9 +143,9 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			),
 		);
 		const before = controller.state.workspace?.datasets[0]?.records;
-		await user.click(screen.getByRole("button", { name: "Next" }));
-		await user.click(screen.getByRole("button", { name: "Next" }));
-		await user.click(screen.getByRole("button", { name: "Import" }));
+		await user.click(button("Next"));
+		await user.click(button("Next"));
+		await user.click(button("Import"));
 		await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
 		expect(apply.mock.calls[0]?.[2].records).toEqual([]);
 		await waitFor(() =>

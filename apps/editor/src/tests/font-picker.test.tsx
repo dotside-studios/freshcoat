@@ -7,7 +7,6 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
 	afterAll,
 	afterEach,
@@ -22,6 +21,7 @@ import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { FontPickerPanel } from "~/fonts/FontPicker";
 import { DesignPanel } from "~/panels/design/DesignPanel";
+import { button, fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 const saved = new Map<string, PropertyDescriptor | undefined>();
@@ -70,7 +70,7 @@ async function panel(templateFamilies: string[] = [], value = "Inter") {
 		within(list)
 			.getAllByRole("option")
 			.map((o) => o.getAttribute("aria-label"));
-	return { onPick, onClose, search, list, names, user: userEvent.setup() };
+	return { onPick, onClose, search, list, names, user: fastUser() };
 }
 
 describe("<FontPickerPanel>", () => {
@@ -185,7 +185,7 @@ describe("the Text section's family field", { timeout: 20_000 }, () => {
 	test("picking a family adds it with the weights in use and sets it, in one undo step", async () => {
 		const t = doc();
 		const c = setup(t);
-		const user = userEvent.setup();
+		const user = fastUser();
 		// t1 is bold, so the new family needs its bold too
 		c.edit((d) => {
 			const next = structuredClone(d);
@@ -194,15 +194,16 @@ describe("the Text section's family field", { timeout: 20_000 }, () => {
 			return { ok: true, template: next, selection: ["0/1/1"] } as never;
 		});
 		const before = c.state.doc?.history.past.length ?? 0;
-		await user.click(
-			screen.getByRole("button", { name: "Font family: Inter" }),
-		);
+		await user.click(button("Font family: Inter"));
 		const search = await screen.findByRole("combobox", {
 			name: "Search fonts",
 		});
 		await user.click(search);
 		await user.paste("Playfair Display");
-		await screen.findByRole("option", { name: "Playfair Display" });
+		await within(screen.getByRole("listbox", { name: "Fonts" })).findByRole(
+			"option",
+			{ name: "Playfair Display" },
+		);
 		await user.keyboard("{Enter}");
 
 		const now = c.template as Template;
@@ -215,7 +216,7 @@ describe("the Text section's family field", { timeout: 20_000 }, () => {
 			(getElement(now, "0/1/1") as TextElement).properties.font.family,
 		).toBe("Playfair Display");
 		expect(c.state.doc?.history.past.length).toBe(before + 1);
-		expect(screen.queryByRole("combobox", { name: "Search fonts" })).toBeNull();
+		expect(screen.queryByLabelText("Search fonts")).toBeNull();
 
 		c.undo();
 		const undone = c.template as Template;
@@ -229,19 +230,15 @@ describe("the Text section's family field", { timeout: 20_000 }, () => {
 
 	test("Esc closes the popover without an edit", async () => {
 		const c = setup();
-		const user = userEvent.setup();
-		await user.click(
-			screen.getByRole("button", { name: "Font family: Inter" }),
-		);
+		const user = fastUser();
+		await user.click(button("Font family: Inter"));
 		await user.click(await screen.findByRole("radio", { name: "Name" }));
 		const fonts = (c.template as Template).fonts;
 		fireEvent.keyDown(screen.getByRole("combobox", { name: "Search fonts" }), {
 			key: "Escape",
 		});
 		await waitFor(() =>
-			expect(
-				screen.queryByRole("combobox", { name: "Search fonts" }),
-			).toBeNull(),
+			expect(screen.queryByLabelText("Search fonts")).toBeNull(),
 		);
 		expect((c.template as Template).fonts).toBe(fonts);
 	});
