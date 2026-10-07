@@ -2,8 +2,12 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { setLayerBounds } from "../src/canvaskit";
+import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { deriveFontMetrics } from "../src/font-metrics";
+import { createHeadlessEnv } from "../src/headless";
+import { createParagraphEngine } from "../src/paragraph-layout";
+import type { EncodedPaintResult } from "../src/types";
 import {
 	createBitmap,
 	createEllipse,
@@ -29,10 +33,19 @@ const box = (x: number, y: number, width: number, height: number) => ({
 	size: { width, height },
 });
 
+// A rounded corner's antialiased pixels can move by up to 1/8 coverage under a
+// bounded layer's new origin. See originInvariant.
+const ROUNDED_TOLERANCE = 32;
+
+const FONTS = () =>
+	new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
+
+// Laid out with every font, painted with `fonts`.
 async function render(
 	children: Node[],
 	bounded: boolean,
 	scale = 1,
+	fonts = FONTS(),
 ): Promise<{ data: Uint8Array; boundedLayers: number }> {
 	setLayerBounds(bounded);
 	let boundedLayers = 0;
@@ -47,13 +60,27 @@ async function render(
 			background: createRect({ ...box(0, 0, W, H), fills: solid("#ffffff") }),
 			children,
 		});
-		const out = await renderSceneToPng(scene, {
-			width: W,
-			height: H,
-			scale,
+		const layout = new Map([
+			...FONTS(),
+			["Missing", [testFontBytes("Geist-Regular.ttf")]],
+		]);
+		const textEngine = createParagraphEngine(ck, layout);
+		let commands: ReturnType<typeof compileScene>;
+		try {
+			commands = compileScene(scene, {
+				width: W,
+				height: H,
+				scale,
+				textEngine,
+				fontMetrics: deriveFontMetrics(layout),
+			});
+		} finally {
+			textEngine.dispose();
+		}
+		const out = (await createHeadlessEnv({ fonts }).paint(
+			commands,
 			ck,
-			fonts: new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]),
-		});
+		)) as EncodedPaintResult;
 		const px = decodePixels(ck, out.bytes);
 		if (!px) throw new Error("decode failed");
 		return { data: px.data, boundedLayers };
@@ -62,9 +89,9 @@ async function render(
 	}
 }
 
-async function compare(children: Node[], scale = 1) {
-	const unbounded = await render(children, false, scale);
-	const bounded = await render(children, true, scale);
+async function compare(children: Node[], scale = 1, fonts = FONTS()) {
+	const unbounded = await render(children, false, scale, fonts);
+	const bounded = await render(children, true, scale, fonts);
 	expect(unbounded.boundedLayers).toBe(0);
 	let maxDiff = 0;
 	for (let i = 0; i < bounded.data.length; i++)
@@ -268,9 +295,7 @@ describe("bounded effect layers", () => {
 		expect(r.maxDiff).toBe(0);
 	});
 
-	// Rounded corners are bounded on purpose: the layer's new origin can move a
-	// few corner pixels by some levels.
-	test("a shadowed rounded rect moves at most a few levels", async () => {
+	test("a shadowed rounded rect stays within the corner tolerance", async () => {
 		const r = await compare([
 			createRect({
 				...box(72.5, 17.5, 31.5, 21),
@@ -280,6 +305,150 @@ describe("bounded effect layers", () => {
 			}),
 		]);
 		expect(r.boundedLayers).toBe(1);
-		expect(r.maxDiff).toBeLessThanOrEqual(10);
+		expect(r.maxDiff).toBeLessThanOrEqual(ROUNDED_TOLERANCE);
 	});
+
+	for (const decoration of ["underline", "line-through"] as const)
+		test(`${decoration} with a missing font`, async () => {
+			const text = (
+				x: number,
+				y: number,
+				effect: Partial<Parameters<typeof createText>[0]>,
+			) =>
+				createText({
+					...box(x, y, 160, 40),
+					text: "No typeface here",
+					font: {
+						family: "Missing",
+						weight: 400,
+						style: "normal",
+						size: 24,
+						lineHeight: 1.2,
+						decoration,
+					},
+					color: "#101828",
+					...effect,
+				});
+			const children = [
+				text(20, 20, { opacity: 0.5 }),
+				text(30, 90, { shadow: shadow(6, 8, 4) }),
+			];
+			const r = await compare(children, 1, new Map());
+			expect(r.boundedLayers).toBe(2);
+			expect(r.maxDiff).toBe(0);
+			const { data } = await render(children, true, 1, new Map());
+			expect(data.some((v, i) => i % 4 !== 3 && v < 128)).toBe(true);
+		});
+
+	for (const scale of [0.5, 1, 2])
+		test(`a blurred group holding a shadowed text group at ${scale}x`, async () => {
+			const r = await compare(
+				[
+					createGroup(
+						[
+							createGroup(
+								[
+									createText({
+										...box(120.25, 90.5, 110, 60),
+										text: "Shadowed text that wraps",
+										font: {
+											family: "Geist",
+											weight: 400,
+											style: "normal",
+											size: 18.5,
+											lineHeight: 1.2,
+											decoration: "underline",
+										},
+										color: "#101828",
+									}),
+									createRect({
+										...box(176.25, 101, 73, 51.25),
+										fills: solid("#2f6fed"),
+										shadow: shadow(-20.25, 28.75, 18, -1.25),
+									}),
+								],
+								{ ...box(0, 0, W, H), shadow: shadow(-26.5, -12, 17.5, 2.75) },
+							),
+						],
+						{ ...box(0, 0, W, H), blur: 6.5 },
+					),
+				],
+				scale,
+			);
+			expect(r.boundedLayers).toBe(3);
+			expect(r.maxDiff).toBe(0);
+		});
+});
+
+// Seeded random scenes of rects and text under nested opacity, blur and shadow
+// layers, at several scales.
+describe("bounded effect layers, randomized", () => {
+	const random = (seed: number) => {
+		let s = seed >>> 0;
+		return () => {
+			s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+			return s / 2 ** 32;
+		};
+	};
+
+	const scene = (r: () => number, rounded: boolean): Node[] => {
+		const pick = <T>(list: readonly T[]) =>
+			list[Math.floor(r() * list.length)] as T;
+		const n = (lo: number, hi: number) =>
+			Math.round((lo + r() * (hi - lo)) * 4) / 4;
+		const effect = () => {
+			const k = r();
+			if (k < 0.3) return { opacity: n(0.2, 0.9) };
+			if (k < 0.55) return { blur: n(1, 20) };
+			if (k < 0.85)
+				return { shadow: shadow(n(-30, 30), n(-30, 30), n(0, 20), n(-3, 5)) };
+			return {};
+		};
+		const leaf = (): Node =>
+			r() < 0.5
+				? createRect({
+						...box(n(-20, 200), n(-20, 150), n(5, 80), n(5, 60)),
+						fills: solid(pick(["#e33", "#2f6fed", "#3e3"])),
+						...(rounded && r() < 0.5 ? { cornerRadius: n(1, 16) } : {}),
+						...effect(),
+					})
+				: createText({
+						...box(n(-20, 180), n(-10, 140), n(40, 160), 60),
+						text: pick(["Hello", "Shadowed text that wraps", "Ag"]),
+						font: {
+							family: "Geist",
+							weight: 400,
+							style: pick(["normal", "italic"] as const),
+							size: n(8, 28),
+							lineHeight: 1.2,
+							...(r() < 0.3
+								? { decoration: pick(["underline", "line-through"] as const) }
+								: {}),
+						},
+						color: "#101828",
+						...effect(),
+					});
+		const node = (depth: number): Node =>
+			depth > 0 && r() < 0.5
+				? createGroup(
+						Array.from({ length: 1 + Math.floor(r() * 3) }, () =>
+							node(depth - 1),
+						),
+						{ ...box(0, 0, W, H), ...effect() },
+					)
+				: leaf();
+		return Array.from({ length: 1 + Math.floor(r() * 3) }, () => node(2));
+	};
+
+	for (const [rounded, tolerance] of [
+		[false, 0],
+		[true, ROUNDED_TOLERANCE],
+	] as const)
+		test(`${rounded ? "with" : "without"} rounded corners`, async () => {
+			for (let seed = 1; seed <= 12; seed++) {
+				const scale = [0.5, 1, 2][seed % 3] as number;
+				const r = await compare(scene(random(seed * 7919), rounded), scale);
+				expect(r.maxDiff, `seed ${seed}`).toBeLessThanOrEqual(tolerance);
+			}
+		}, 120_000);
 });
