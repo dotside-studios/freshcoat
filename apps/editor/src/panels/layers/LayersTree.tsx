@@ -34,7 +34,7 @@ import {
 	overrideBackground,
 	workingTemplate,
 } from "~/doc/variant-edit";
-import { useEditor } from "~/state/hooks";
+import { useEditor, useStore } from "~/state/hooks";
 import { present } from "~/state/store";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
@@ -92,10 +92,29 @@ function ancestorsOf(key: string): string[] {
 	return out;
 }
 
-/** Hidden itself, or inside a hidden layer. */
-function useHiddenInTree(key: string): boolean {
-	return useEditor(
-		(s) => s.hidden.has(key) || ancestorsOf(key).some((k) => s.hidden.has(k)),
+/** Rows hidden themselves, or inside a hidden layer. */
+const HiddenInTreeContext = createContext<ReadonlySet<string>>(new Set());
+
+function HiddenInTree({
+	rowIndex,
+	children,
+}: {
+	rowIndex: Map<string, LayerRow>;
+	children: ReactNode;
+}) {
+	const hidden = useEditor((s) => s.hidden);
+	const inTree = useMemo(() => {
+		const out = new Set<string>();
+		if (hidden.size === 0) return out;
+		for (const key of rowIndex.keys())
+			if (hidden.has(key) || ancestorsOf(key).some((k) => hidden.has(k)))
+				out.add(key);
+		return out;
+	}, [hidden, rowIndex]);
+	return (
+		<HiddenInTreeContext.Provider value={inTree}>
+			{children}
+		</HiddenInTreeContext.Provider>
 	);
 }
 
@@ -136,6 +155,7 @@ function setAll(
 
 export function LayersTree() {
 	const controller = useController();
+	const store = useStore();
 	// A drag moves layers without renaming or restacking them, so the tree
 	// shows the state the drag started from until it ends.
 	const template = useEditor((s) => {
@@ -145,7 +165,6 @@ export function LayersTree() {
 	const side = useEditor((s) => s.side);
 	const variantId = useEditor((s) => s.variantId);
 	const selection = useEditor((s) => s.selection);
-	const hover = useEditor((s) => s.hover);
 	const marks = useMemo(
 		() => variantMarks(template, variantId, side),
 		[template, variantId, side],
@@ -215,11 +234,24 @@ export function LayersTree() {
 
 	// A layer hovered on the canvas lights up its row.
 	useEffect(() => {
-		if (!hover || rows.length === 0) return;
-		const el = wrapRef.current?.querySelector(rowSelector(hover));
-		el?.setAttribute("data-canvas-hover", "");
-		return () => el?.removeAttribute("data-canvas-hover");
-	}, [hover, rows]);
+		if (rows.length === 0) return;
+		let hover: string | null = null;
+		let el: Element | null | undefined = null;
+		const apply = () => {
+			const next = store.getState().hover;
+			if (next === hover) return;
+			el?.removeAttribute("data-canvas-hover");
+			hover = next;
+			el = hover ? wrapRef.current?.querySelector(rowSelector(hover)) : null;
+			el?.setAttribute("data-canvas-hover", "");
+		};
+		apply();
+		const unsubscribe = store.subscribe(apply);
+		return () => {
+			unsubscribe();
+			el?.removeAttribute("data-canvas-hover");
+		};
+	}, [store, rows]);
 
 	const onSelectionChange = useCallback(
 		(keys: Selection) => {
@@ -507,23 +539,25 @@ export function LayersTree() {
 							}
 						}}
 					>
-						<Tree
-							aria-label="Layers"
-							data-testid="layers-tree"
-							items={rows}
-							selectionMode="multiple"
-							selectionBehavior="replace"
-							selectedKeys={selectedKeys}
-							onSelectionChange={onSelectionChange}
-							expandedKeys={expanded}
-							onExpandedChange={(keys) =>
-								setExpand((s) => ({ ...s, keys: new Set(keys) }))
-							}
-							dragAndDropHooks={dragAndDropHooks}
-							className="min-h-0 flex-1"
-						>
-							{renderRow}
-						</Tree>
+						<HiddenInTree rowIndex={rowIndex}>
+							<Tree
+								aria-label="Layers"
+								data-testid="layers-tree"
+								items={rows}
+								selectionMode="multiple"
+								selectionBehavior="replace"
+								selectedKeys={selectedKeys}
+								onSelectionChange={onSelectionChange}
+								expandedKeys={expanded}
+								onExpandedChange={(keys) =>
+									setExpand((s) => ({ ...s, keys: new Set(keys) }))
+								}
+								dragAndDropHooks={dragAndDropHooks}
+								className="min-h-0 flex-1"
+							>
+								{renderRow}
+							</Tree>
+						</HiddenInTree>
 					</div>
 				</ContextMenu>
 			</RenamingContext.Provider>
@@ -546,7 +580,9 @@ function indexRows(rows: LayerRow[]): Map<string, LayerRow> {
 function RowIcon({ row }: { row: LayerRow }) {
 	const Icon = layerIcon(row.element, row.kind === "background");
 	const marks = useContext(VariantMarksContext);
-	const dim = useHiddenInTree(row.key) || (marks?.hidden.has(row.key) ?? false);
+	const dim =
+		useContext(HiddenInTreeContext).has(row.key) ||
+		(marks?.hidden.has(row.key) ?? false);
 	return <Icon className={cn(dim && "opacity-45")} />;
 }
 
@@ -555,7 +591,7 @@ function RowLabel({ row }: { row: LayerRow }) {
 	const renaming = useContext(RenamingContext);
 	const marks = useContext(VariantMarksContext);
 	const hiddenInVariant = marks?.hidden.has(row.key) ?? false;
-	const dim = useHiddenInTree(row.key) || hiddenInVariant;
+	const dim = useContext(HiddenInTreeContext).has(row.key) || hiddenInVariant;
 
 	if (renaming.key === row.key)
 		return (
@@ -631,8 +667,11 @@ function RowLabel({ row }: { row: LayerRow }) {
 
 function RowToggles({ rowKey }: { rowKey: string }) {
 	const controller = useController();
-	const hidden = useEditor((s) => s.hidden.has(rowKey));
-	const locked = useEditor((s) => s.locked.has(rowKey));
+	const flags = useEditor(
+		(s) => (s.hidden.has(rowKey) ? 1 : 0) | (s.locked.has(rowKey) ? 2 : 0),
+	);
+	const hidden = (flags & 1) !== 0;
+	const locked = (flags & 2) !== 0;
 	const reveal =
 		"opacity-0 group-data-hovered/row:opacity-100 group-data-focus-visible/row:opacity-100 data-focus-visible:opacity-100 pointer-coarse:opacity-100";
 	const button =

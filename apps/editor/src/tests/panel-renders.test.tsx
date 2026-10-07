@@ -11,6 +11,7 @@ import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { updateElement } from "~/doc/ops";
 import { DesignPanel } from "~/panels/design/DesignPanel";
+import { LeftPanel } from "~/panels/LeftPanel";
 import { doc, geometryOf } from "./doc-fixture";
 import { countRenders, trackRenders } from "./render-count";
 
@@ -75,6 +76,32 @@ beforeAll(() => {
 	trackRenders();
 });
 afterEach(cleanup);
+
+describe("Layers tree renders", () => {
+	it("a canvas hover lights the row without re-rendering the tree", () => {
+		const c = setup(rects(200), <LeftPanel />);
+		const row = (key: string) => screen.getByTestId(`layer-row-${key}`);
+		const counts = countRenders(() => {
+			act(() => c.dispatch({ type: "hover", key: "0/3" }));
+			act(() => c.dispatch({ type: "hover", key: "0/4" }));
+		});
+		expect(counts.get("LayersTree") ?? 0).toBe(0);
+		expect(counts.size).toBe(0);
+		expect(row("0/3").hasAttribute("data-canvas-hover")).toBe(false);
+		expect(row("0/4").hasAttribute("data-canvas-hover")).toBe(true);
+		act(() => c.dispatch({ type: "hover", key: null }));
+		expect(row("0/4").hasAttribute("data-canvas-hover")).toBe(false);
+	});
+
+	it("hiding a layer re-renders one row's toggles, not the tree", () => {
+		const c = setup(rects(200), <LeftPanel />);
+		const counts = countRenders(() => {
+			act(() => c.toggleHidden(["0/7"]));
+		});
+		expect(counts.get("LayersTree") ?? 0).toBe(0);
+		expect(counts.get("RowToggles")).toBe(1);
+	});
+});
 
 describe("Design panel renders", () => {
 	it("a scrub step re-renders only the geometry fields", () => {
