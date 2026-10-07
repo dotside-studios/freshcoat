@@ -103,8 +103,8 @@ async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 	return out;
 }
 
-// The fast path as it was written before rows were built straight from RGBA:
-// an RGB copy, then filter type 0 rows of each layout, the smaller deflate kept.
+// The fast path built from an RGB copy: filter type 0 rows of RGB when the frame
+// is opaque, of RGBA otherwise.
 async function referenceIdat(px: Uint8Array, width: number, height: number) {
 	const rows = (bytes: Uint8Array, channels: number) => {
 		const stride = width * channels;
@@ -116,14 +116,12 @@ async function referenceIdat(px: Uint8Array, width: number, height: number) {
 			);
 		return out;
 	};
-	const candidates = [{ channels: 4, idat: await deflate(rows(px, 4)) }];
-	if (px.every((v, i) => i % 4 !== 3 || v === 255)) {
-		const rgb = new Uint8Array(width * height * 3);
-		for (let i = 0; i < width * height; i++)
-			rgb.set(px.subarray(i * 4, i * 4 + 3), i * 3);
-		candidates.push({ channels: 3, idat: await deflate(rows(rgb, 3)) });
-	}
-	return candidates.reduce((a, b) => (b.idat.length < a.idat.length ? b : a));
+	if (!px.every((v, i) => i % 4 !== 3 || v === 255))
+		return { channels: 4, idat: await deflate(rows(px, 4)) };
+	const rgb = new Uint8Array(width * height * 3);
+	for (let i = 0; i < width * height; i++)
+		rgb.set(px.subarray(i * 4, i * 4 + 3), i * 3);
+	return { channels: 3, idat: await deflate(rows(rgb, 3)) };
 }
 
 function idatOf(png: Uint8Array): Uint8Array {
@@ -138,7 +136,7 @@ function idatOf(png: Uint8Array): Uint8Array {
 }
 
 describe("encodePng", () => {
-	test("the fast path writes what the previous encoder wrote", async () => {
+	test("the fast path writes one unfiltered stream per layout", async () => {
 		const ck = await ckInit();
 		for (const alpha of ["", "80"]) {
 			const source = decodePixels(ck, (await render(ck, alpha)).bytes);
@@ -198,6 +196,27 @@ describe("encodePng", () => {
 		const back = decodePixels(ck, kept);
 		if (!back) throw new Error("decode failed");
 		expect(Array.from(back.data)).toEqual(Array.from(translucent.data));
+	});
+
+	test("fast drops alpha only from an opaque frame, losslessly", async () => {
+		const ck = await ckInit();
+		for (const [alpha, colourType] of [
+			["", 2],
+			["80", 6],
+		] as const) {
+			const source = decodePixels(ck, (await render(ck, alpha)).bytes);
+			if (!source) throw new Error("decode failed");
+			const png = await encodePng(
+				new Uint8Array(source.data),
+				source.width,
+				source.height,
+				{ effort: "fast" },
+			);
+			expect(png[25]).toBe(colourType);
+			const back = decodePixels(ck, png);
+			if (!back) throw new Error("decode failed");
+			expect(Array.from(back.data)).toEqual(Array.from(source.data));
+		}
 	});
 
 	test("best effort is never worse, and still exact", async () => {
