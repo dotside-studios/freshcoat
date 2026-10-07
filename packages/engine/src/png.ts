@@ -10,16 +10,15 @@
 //     smooth gradients it routinely costs 20–40% instead, because the raw rows
 //     already compress as long runs and filtering turns them into noise.
 //
-// So this encodes the plausible candidates and keeps the smallest — measured,
-// not guessed. Deflate is the platform's own (CompressionStream), which keeps
+// So "best" encodes the plausible candidates and keeps the smallest; "fast"
+// encodes one. Deflate is the platform's own (CompressionStream), which keeps
 // this dependency-free and identical in a browser and on a server.
 import type { DecodedPixels } from "./decode";
 
 export type PngEffort =
-	// Both channel layouts, unfiltered. Two deflates, and on every frame measured
-	// here it lands on the same bytes "best" does.
+	// One deflate, unfiltered: RGB when the frame is opaque, RGBA otherwise.
 	| "fast"
-	// Adds the filtered variants: four deflates instead of two. Filtering pays on
+	// Both layouts, each unfiltered and filtered. Filtering pays on
 	// photographic content, where a row genuinely predicts the next one; on flat
 	// colour and gradients it costs 20–40%, so it is opt-in.
 	| "best";
@@ -67,14 +66,17 @@ export async function encodePng(
 		);
 	}
 	// A fully opaque frame spends a byte per pixel on an alpha channel that says
-	// nothing — but dropping it is not always the smaller stream (long runs of an
-	// identical RGBA pixel compress better than the same runs in RGB), so it is a
-	// candidate rather than a rule.
+	// nothing. Dropping it is not always the smaller stream (long runs of an
+	// identical RGBA pixel compress better than the same runs in RGB), so only
+	// "best" keeps it as a candidate.
 	const opaque = isOpaque(pixels, expected);
 	const adaptive = opts?.effort === "best";
-	const plans: { channels: 3 | 4; rows: Uint8Array }[] = [
-		{ channels: 4, rows: filterRows(pixels, width, height, 4, false) },
-	];
+	const plans: { channels: 3 | 4; rows: Uint8Array }[] = [];
+	if (!opaque || adaptive)
+		plans.push({
+			channels: 4,
+			rows: filterRows(pixels, width, height, 4, false),
+		});
 	if (adaptive)
 		plans.push({
 			channels: 4,

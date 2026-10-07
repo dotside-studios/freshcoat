@@ -2,7 +2,7 @@
 // interactive caller that repaints many times a second. It keeps what paintScene
 // would otherwise rebuild on every paint: the font provider, the shaped lines of
 // text, the decoded images, the output surface, the dither noise of a finish
-// and, offscreen, the pixels of a leading background the paints share. A
+// and, offscreen, the pixels of the leading backgrounds the paints share. A
 // runtime without one paints exactly as it always has, building and freeing
 // all three per paint.
 //

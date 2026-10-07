@@ -1,26 +1,106 @@
+import { subtleSha256 } from "@freshcoat-js/coatfile";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
+import type { DatasetAsset } from "@freshcoat-js/workspace";
 import { createAutosaveStore } from "~/app/autosave";
+import { singleTemplateWorkspace } from "~/state/workspace";
 
-const store = createAutosaveStore("freshcoat-autosave-probe");
+export type AutosaveProbe = { assets: DatasetAsset[] };
 
-export async function keepPicked(input: HTMLInputElement) {
-	const file = input.files?.[0];
-	if (!file) throw new Error("no file picked");
-	const blob = file.slice(0, file.size, file.type);
-	await store.keep({
-		sha256: "picked",
-		contentType: file.type,
-		name: file.name,
-		size: file.size,
-		blob,
-	});
-	return file.size;
+/** Photos from the files picked into `selector`, read while they are intact. */
+export async function pickAssets(selector: string): Promise<AutosaveProbe> {
+	const input = document.querySelector(selector) as HTMLInputElement;
+	const assets: DatasetAsset[] = [];
+	for (const file of input.files ?? []) {
+		const blob = file.slice(0, file.size, file.type);
+		assets.push({
+			sha256: await subtleSha256(new Uint8Array(await blob.arrayBuffer())),
+			contentType: file.type,
+			name: file.name,
+			size: file.size,
+			blob,
+		});
+	}
+	return { assets };
 }
 
-export async function readKept() {
-	const blob = await store.asset("picked");
+function open(name: string): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		const req = indexedDB.open(name);
+		req.onupgradeneeded = () => req.result.createObjectStore("a");
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+export async function rawPut(blob: Blob): Promise<{
+	thrown?: string;
+	request?: string;
+	transaction: string;
+}> {
+	const db = await open(`raw-${crypto.randomUUID()}`);
+	const out: { thrown?: string; request?: string; transaction: string } = {
+		transaction: "",
+	};
+	const tx = db.transaction("a", "readwrite");
+	try {
+		const req = tx.objectStore("a").put(blob, "k");
+		req.onerror = () => {
+			out.request = req.error?.name;
+		};
+	} catch (err) {
+		out.thrown = (err as Error).name;
+	}
+	out.transaction = await new Promise<string>((resolve) => {
+		tx.oncomplete = () => resolve("complete");
+		tx.onabort = () => resolve(`abort ${tx.error?.name ?? "null"}`);
+	});
+	db.close();
+	return out;
+}
+
+/** Autosaves a workspace holding `probe`'s photos and reads it back. */
+export async function runAutosave(probe: AutosaveProbe) {
+	const unreadable: string[] = [];
+	const store = createAutosaveStore(`autosave-${crypto.randomUUID()}`, {
+		onUnreadable: (asset) => unreadable.push(asset.name),
+	});
+	const ws = singleTemplateWorkspace(fixtures.fullFeatureCard, "w.coat");
+	ws.datasets = [
+		{
+			id: "d1",
+			name: "People",
+			columns: [],
+			records: [],
+			assets: probe.assets,
+		},
+	];
+	await store.write({ workspace: ws, fileName: "w.coatworkspace" });
+	const read = await store.read();
+	return {
+		saved: read !== null,
+		assets: read?.workspace.datasets[0]?.assets.map((a) => a.name) ?? [],
+		missingAssets: read?.missingAssets ?? 0,
+		unreadable,
+	};
+}
+
+const keeper = createAutosaveStore(`autosave-keep-${crypto.randomUUID()}`);
+
+/** Keeps `probe`'s first photo; the size of the stored copy, or null. */
+export async function keepFirst(probe: AutosaveProbe): Promise<number | null> {
+	const asset = probe.assets[0];
+	if (!asset) throw new Error("no photo picked");
+	return (await keeper.keep(asset))?.size ?? null;
+}
+
+/** The bytes of the stored copy of `probe`'s first photo, or why not. */
+export async function readKept(
+	probe: AutosaveProbe,
+): Promise<{ bytes: number } | { error: string }> {
+	const blob = await keeper.asset(probe.assets[0]?.sha256 ?? "");
 	if (!blob) return { error: "missing" };
 	try {
-		return { bytes: Array.from(new Uint8Array(await blob.arrayBuffer())) };
+		return { bytes: (await blob.arrayBuffer()).byteLength };
 	} catch (err) {
 		return { error: (err as Error).name };
 	}

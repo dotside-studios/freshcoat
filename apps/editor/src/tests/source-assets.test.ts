@@ -281,6 +281,25 @@ function refuseChangedPuts(): void {
 	});
 }
 
+/** Fails puts of a changed file the way a browser may: by aborting the
+ *  transaction with an error other than NotReadableError. */
+function abortChangedPuts(name: "UnknownError" | "AbortError"): void {
+	const realPut = IDBObjectStore.prototype.put;
+	vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey,
+	) {
+		if (!(value instanceof FileSlice && value.changed))
+			return realPut.call(this, value, key);
+		if (name === "UnknownError")
+			throw new DOMException("the put failed", "UnknownError");
+		const req = realPut.call(this, new Blob(), key);
+		this.transaction.abort();
+		return req;
+	});
+}
+
 async function storedKeys(name: string): Promise<string[]> {
 	const db = await new Promise<IDBDatabase>((resolve, reject) => {
 		const req = indexedDB.open(name);
@@ -433,6 +452,50 @@ describe("autosave with a photo that cannot be read", () => {
 		expect(read?.workspace.name).toBe("Renamed");
 		expect(onUnreadable).toHaveBeenCalledOnce();
 		expect(onUnreadable).toHaveBeenCalledWith(a.asset);
+	});
+
+	test.each([
+		"UnknownError",
+		"AbortError",
+	] as const)("skips the photo when its put fails with %s", async (error) => {
+		abortChangedPuts(error);
+		const name = freshDb();
+		const onUnreadable = vi.fn();
+		const store = createAutosaveStore(name, { onUnreadable });
+		const a = await photo("alpha");
+		const b = await photo("beta");
+		a.source.changed = true;
+		const ws = workspaceOf([a.asset, b.asset]);
+		await store.write({ workspace: ws, fileName: "w.coatworkspace" });
+		expect(await storedKeys(name)).toEqual([b.asset.sha256]);
+		const read = await store.read();
+		expect(read?.workspace.datasets[0]?.assets).toHaveLength(1);
+		expect(read?.missingAssets).toBe(1);
+
+		await store.write({
+			workspace: { ...ws, name: "Renamed" },
+			fileName: "w.coatworkspace",
+		});
+		expect((await store.read())?.workspace.name).toBe("Renamed");
+		expect(onUnreadable).toHaveBeenCalledOnce();
+		expect(onUnreadable).toHaveBeenCalledWith(a.asset);
+	});
+
+	test("still fails the write when a readable photo's put fails", async () => {
+		vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(() => {
+			throw new DOMException("the put failed", "UnknownError");
+		});
+		const name = freshDb();
+		const onUnreadable = vi.fn();
+		const store = createAutosaveStore(name, { onUnreadable });
+		const a = await photo("alpha");
+		await store.write({
+			workspace: workspaceOf([a.asset]),
+			fileName: "w.coatworkspace",
+		});
+		vi.restoreAllMocks();
+		expect(await store.read()).toBeNull();
+		expect(onUnreadable).not.toHaveBeenCalled();
 	});
 
 	test("reports through the tracked workspace's message", async () => {

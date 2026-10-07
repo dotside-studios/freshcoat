@@ -150,6 +150,17 @@ function isQuotaError(err: unknown): boolean {
 	);
 }
 
+/** Chromium can fail the put of a changed file with an error other than
+ *  NotReadableError, so a failed put is checked by reading the blob. */
+async function canRead(blob: Blob): Promise<boolean> {
+	try {
+		await blob.slice(0, 1).arrayBuffer();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function stripAssets(d: Dataset): StoredDataset {
 	return { ...d, assets: d.assets.map(({ blob: _blob, ...meta }) => meta) };
 }
@@ -373,7 +384,11 @@ export function createAutosaveStore(
 				try {
 					await putAsset(db, asset);
 				} catch (err) {
-					if (!isNotReadable(err)) throw err;
+					if (
+						!isNotReadable(err) &&
+						(isQuotaError(err) || (await canRead(asset.blob)))
+					)
+						throw err;
 					all = false;
 					unreadable.add(asset.blob);
 					opts.onUnreadable?.(asset);

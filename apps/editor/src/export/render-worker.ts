@@ -7,7 +7,6 @@ import {
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
-import { deriveFontMetrics } from "@freshcoat-js/engine";
 import { crc32 } from "@freshcoat-js/workspace/crc";
 import { loadWorkerCanvasKit } from "~/render/canvaskit-worker";
 import { gamutNotes, withPrintFallback } from "./print";
@@ -17,7 +16,7 @@ import type {
 	WorkerReply,
 	WorkerRequest,
 } from "./protocol";
-import { createJobCaches } from "./worker-caches";
+import { createJobCaches, createWorkerText } from "./worker-caches";
 
 type WorkerScope = {
 	postMessage(message: WorkerReply, transfer: Transferable[]): void;
@@ -34,12 +33,7 @@ type CK = any;
 const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
 let fonts = new Map<string, Uint8Array[]>();
-let text:
-	| {
-			engine: ReturnType<typeof createParagraphEngine>;
-			fontMetrics: ReturnType<typeof deriveFontMetrics>;
-	  }
-	| undefined;
+const text = createWorkerText<ReturnType<typeof createParagraphEngine>>();
 /** the template of the last render; the pool sends it only when it changes */
 let current: Template | undefined;
 const caches = createJobCaches();
@@ -67,17 +61,8 @@ async function bytesOf(src: string, own: Map<string, Blob>) {
 
 function setFonts(next: Map<string, Uint8Array[]>) {
 	caches.clear();
-	text?.engine.dispose();
-	text = undefined;
+	text.clear();
 	fonts = next;
-}
-
-function textFor(ck: CK) {
-	text ??= {
-		engine: createParagraphEngine(ck, fonts),
-		fontMetrics: deriveFontMetrics(fonts),
-	};
-	return text;
 }
 
 async function renderSide(req: WorkerRenderRequest) {
@@ -115,7 +100,9 @@ async function renderSide(req: WorkerRenderRequest) {
 		...(req.bleed ? { bleed: true } : {}),
 		frameNames: [req.side],
 	});
-	const { engine, fontMetrics } = textFor(ck);
+	const { engine, fontMetrics } = text.get(fonts, (f) =>
+		createParagraphEngine(ck, f),
+	);
 	const painted = await withPrintFallback(req.print, async (print) => {
 		const [result] = await renderCompiled(
 			compiled,
