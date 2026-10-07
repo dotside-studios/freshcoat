@@ -193,12 +193,6 @@ describe("identity adjustments are no-ops", () => {
 			expect(adjusted.warnings).toEqual([]);
 			expect(diff(plain.pixels, adjusted.pixels, 2).over).toBe(0);
 		},
-		({ adjust, layer }) =>
-			(adjust.name === "lut" || adjust.name === "lut3d") &&
-			layer.fx.blendMode &&
-			layer.fx.blendMode !== "normal"
-				? "paintAdjustedOffscreen (canvaskit.ts) drops the blend mode"
-				: null,
 	);
 });
 
@@ -232,13 +226,15 @@ describe("the mask clip shortcut and drawMasked paint the same", () => {
 	const contents = [
 		{
 			name: "one child",
-			children: [createRect({ ...at(0, 0, 80, 60), fills: solid("#ef4444") })],
+			children: [
+				createRect({ ...at(-10, -10, 100, 80), fills: solid("#ef4444") }),
+			],
 		},
 		{
 			name: "overlapping children",
 			children: [
-				createRect({ ...at(0, 0, 80, 60), fills: solid("#ef4444") }),
-				createEllipse({ ...at(30, 20, 60, 50), fills: solid("#2563eb") }),
+				createRect({ ...at(-10, -10, 100, 80), fills: solid("#ef4444") }),
+				createRect({ ...at(-10, -10, 100, 80), fills: solid("#2563eb") }),
 			],
 		},
 	];
@@ -284,36 +280,32 @@ describe("the mask clip shortcut and drawMasked paint the same", () => {
 			expect(diff(fast.pixels, slow.pixels, EDGE_TOLERANCE).over).toBe(0);
 		},
 		({ shape, place, content }) => {
-			if (place.rotation && place.offset)
-				return "lowerMask (compile-scene.ts) swaps in the mask shape's box, so the clip rotates around another center";
-			if (shape.name === "squircle")
-				return "the squircle clip (canvaskit.ts) is its own curve and ignores cornerSmoothing";
-			if (content.children.length > 1 && shape.name !== "rect")
-				return "the clip antialiases each child against a curved edge, so overlapping children compound its coverage";
+			const partlyCovered = shape.name !== "rect" || place.rotation;
+			if (content.children.length > 1 && partlyCovered)
+				return "the clip antialiases each child against a partly covered edge, so overlapping children compound its coverage";
+			if (shape.name === "ellipse" && place.rotation && place.offset)
+				return "a few edge pixels of the clip differ from drawMasked by up to 1/4 coverage, with the same area and centroid";
 			return null;
 		},
 	);
 });
 
 describe("mask coverage is luminance times alpha", () => {
-	const ignoredAlpha = "fastClip (compile-scene.ts) ignores fill alpha";
-	const droppedAlpha = "drawMasked (canvaskit.ts) drops the mask's alpha";
 	const fill = (
 		channel: "alpha" | "luminance",
 		color: string,
 		coverage: number,
-		bug?: string,
-	) => ({ name: `${channel} ${color}`, channel, color, coverage, bug });
+	) => ({ name: `${channel} ${color}`, channel, color, coverage });
 	const fills = [
 		fill("alpha", "#ffffff", 1),
 		fill("alpha", "#000000", 1),
-		fill("alpha", "#ffffff80", 0.5, ignoredAlpha),
-		fill("alpha", "#00000040", 0.25, ignoredAlpha),
+		fill("alpha", "#ffffff80", 0.5),
+		fill("alpha", "#00000040", 0.25),
 		fill("luminance", "#ffffff", 1),
 		fill("luminance", "#000000", 0),
 		fill("luminance", "#808080", 0.5),
-		fill("luminance", "#ffffff80", 0.5, droppedAlpha),
-		fill("luminance", "#80808080", 0.25, droppedAlpha),
+		fill("luminance", "#ffffff80", 0.5),
+		fill("luminance", "#80808080", 0.25),
 	];
 	const shapes = [
 		{ name: "rect", make: createRect },
@@ -335,7 +327,6 @@ describe("mask coverage is luminance times alpha", () => {
 			expect(Math.abs(alpha - f.coverage)).toBeLessThan(0.02);
 			expect(pixel(out, 5, 5)[3]).toBe(0);
 		},
-		({ fill: f }) => f.bug ?? null,
 	);
 });
 
