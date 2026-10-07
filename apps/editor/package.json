@@ -23,7 +23,8 @@
 		"notices": "bun ../../scripts/third-party-notices.ts",
 		"notices:check": "bun ../../scripts/third-party-notices.ts --check",
 		"boundaries": "bun ../../scripts/check-boundaries.ts",
-		"test:scripts": "bun test ../../scripts"
+		"test:scripts": "bun test ../../scripts",
+		"bench:render": "bun scripts/bench-render.ts"
 	},
 	"dependencies": {
 		"@freshcoat-js/for-print": "workspace:*",
