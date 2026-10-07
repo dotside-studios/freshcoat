@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import type { Command, PaintRuntime } from "../src/types";
+import type { PaintRuntime } from "../src/runtime-types";
+import type { Command } from "../src/types";
 
 // A single empty scene — enough to drive makeSurface + the dispose closure without
 // needing the full drawing API on the fake CanvasKit.
@@ -54,11 +55,9 @@ function fakeRt(loseContext: () => void): {
 	const rt = {
 		canvas: {
 			createCanvas: () => el,
-			decodeImage: async () => ({}),
-			encode: () => new Uint8Array(),
 		},
 		resolveFont: () => ({ kind: "none" }),
-		loadImageBytes: async () => new Uint8Array(),
+		loadBytes: async () => new Uint8Array(),
 		paint: async () => ({}),
 	} as unknown as PaintRuntime;
 	return { rt, getContext };

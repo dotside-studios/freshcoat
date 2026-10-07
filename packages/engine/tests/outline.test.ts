@@ -2,7 +2,7 @@ import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createGroup, createMask, createRect, type Node } from "../src/node";
 import type { CornerRadius, DrawGroupCommand } from "../src/types";
 

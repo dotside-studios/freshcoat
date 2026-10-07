@@ -51,7 +51,8 @@ import {
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
+import { fontArrayBuffer, fontBytes } from "./font-bytes";
+import { dataUrlToBytes } from "./loader";
 import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
 import {
 	cachedLutImage,
@@ -95,10 +96,10 @@ import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
 import { PATTERN_SKSL, type PatternFill } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
+import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
 import type {
 	AdjustLut,
 	BlendMode,
-	CanvasLike,
 	Command,
 	DrawBitmapCommand,
 	DrawCommand,
@@ -108,8 +109,6 @@ import type {
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
-	PaintOutput,
-	PaintRuntime,
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
@@ -3830,7 +3829,7 @@ function warnSvgFeatures(
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
-	rt: PaintRuntime,
+	rt: PaintTarget,
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -3844,7 +3843,7 @@ export async function paintScene(
 		try {
 			// CanvasKit has no native font system, so it always materializes bytes
 			// (from the env's pre-supplied resolution or the shared fetch).
-			for (const bytes of await fontBytes(rt.resolveFont(req)))
+			for (const bytes of await fontBytes(rt.resolveFont(req), rt.loadBytes))
 				loaded.push({ family: req.family, bytes });
 		} catch (e) {
 			warnings.push({
@@ -3891,7 +3890,7 @@ export async function paintScene(
 			continue;
 		}
 		try {
-			const bytes = await rt.loadImageBytes(src);
+			const bytes = await rt.loadBytes(src);
 			if (cache) cache.stats.imageDecodes++;
 			const img = isSvg(bytes)
 				? makeSvgPicture(ck, provider, bytes, await loadSvg())
@@ -4248,7 +4247,7 @@ export async function paintScene(
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
 	ck: CanvasKit,
-	rt: PaintRuntime,
+	rt: PaintTarget,
 	w: number,
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
@@ -4286,7 +4285,7 @@ function makeSurface(
 	const surface = ck.MakeSurface(w, h) as Surface;
 	return {
 		surface,
-		canvas: { width: w, height: h, getContext: () => null },
+		canvas: { width: w, height: h },
 		loseContext: noop,
 	};
 }

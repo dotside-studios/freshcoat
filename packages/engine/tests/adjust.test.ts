@@ -13,7 +13,7 @@ import {
 	identityLut3d,
 	saturationMatrix,
 } from "../src/adjust";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
 
 // ── reference formulas (the canonical per-pixel color steps, in 0–255 space) ──

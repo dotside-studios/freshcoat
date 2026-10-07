@@ -1,10 +1,13 @@
 // A PaintCache on the render runtime: a batch of records that share images
 // decodes each shared one once, and paints exactly what an uncached render does.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { createPaintCache, type PaintCache } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import {
+	createRenderer,
+	mapLoader,
+	type PaintCacheOptions,
+} from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
-import { type EncodedPaintedFrame, render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
 let ck: any;
@@ -75,56 +78,52 @@ async function setup() {
 		["b.png", solidPng(ck, [40, 40, 200, 255])],
 	]);
 	const loads = new Map<string, number>();
-	const env = createHeadlessEnv({ images });
-	const load = env.loadImageBytes;
-	env.loadImageBytes = (src) => {
+	const inner = mapLoader(images);
+	const load = (src: string) => {
 		loads.set(src, (loads.get(src) ?? 0) + 1);
-		return load(src);
+		return inner(src);
 	};
-	return { ck, env, loads };
+	return { ck, load, loads };
 }
 
-async function renderAll(paintCache?: PaintCache) {
-	const { ck, env, loads } = await setup();
+async function renderAll(cache: PaintCacheOptions | false) {
+	const { ck, load, loads } = await setup();
+	const renderer = await createRenderer({ ck, load, cache });
 	const out: Uint8Array[] = [];
 	for (const values of RECORDS) {
-		const [frame] = (await render(
-			template,
-			values,
-			{ width: 48, height: 20 },
-			{ ck, env, paintCache },
-		)) as EncodedPaintedFrame[];
+		const [frame] = await renderTemplate(renderer, template, values, {
+			width: 48,
+			height: 20,
+		});
 		expect(frame?.warnings).toEqual([]);
 		out.push(frame?.bytes as Uint8Array);
 	}
-	return { out, loads };
+	const stats = renderer.stats().paintCache;
+	renderer.dispose();
+	return { out, loads, stats };
 }
 
-describe("render() with a paint cache", () => {
+describe("renderTemplate() with a paint cache", () => {
 	test("records sharing an image and an SVG image decode each once", async () => {
-		const cache = createPaintCache();
-		const { loads } = await renderAll(cache);
+		const { loads, stats } = await renderAll({});
 		expect(loads.get("logo.png")).toBe(1);
 		expect(loads.get("art.svg")).toBe(1);
 		expect(loads.get("a.png")).toBe(1);
 		expect(loads.get("b.png")).toBe(1);
-		expect(cache.stats()).toMatchObject({ paints: 2, imageDecodes: 4 });
-		cache.dispose();
+		expect(stats).toMatchObject({ paints: 2, imageDecodes: 4 });
 	});
 
 	test("paints the same bytes as an uncached render", async () => {
-		const plain = await renderAll();
+		const plain = await renderAll(false);
 		expect(plain.loads.get("logo.png")).toBe(2);
 		for (const maxImagePixels of [undefined, 1_000_000]) {
-			const cache = createPaintCache({ maxImagePixels });
-			const cached = await renderAll(cache);
+			const cached = await renderAll({ maxImagePixels });
 			expect(cached.out).toEqual(plain.out);
-			cache.dispose();
 		}
 	});
 
-	test("disposing the cache frees what it holds", async () => {
-		const { env } = await setup();
+	test("disposing the renderer frees what its cache holds", async () => {
+		const { load } = await setup();
 		const real = await ckInit();
 		const live = new Set<unknown>();
 		const spy = Object.create(real);
@@ -139,24 +138,21 @@ describe("render() with a paint cache", () => {
 			};
 			return img;
 		};
-		const cache = createPaintCache({ maxImagePixels: 1_000_000 });
+		const renderer = await createRenderer({
+			ck: spy,
+			load,
+			cache: { maxImagePixels: 1_000_000 },
+		});
 		for (const values of RECORDS)
-			await render(
-				template,
-				values,
-				{ width: 48, height: 20 },
-				{ ck: spy, env, paintCache: cache },
-			);
+			await renderTemplate(renderer, template, values, { width: 48, height: 20 });
 		expect(live.size).toBe(3);
-		cache.dispose();
+		renderer.dispose();
 		expect(live.size).toBe(0);
 		await expect(
-			render(
-				template,
-				RECORDS[0] as Record<string, unknown>,
-				{ width: 48, height: 20 },
-				{ ck: spy, env, paintCache: cache },
-			),
+			renderTemplate(renderer, template, RECORDS[0] as Record<string, unknown>, {
+				width: 48,
+				height: 20,
+			}),
 		).rejects.toThrow("disposed");
 	});
 });

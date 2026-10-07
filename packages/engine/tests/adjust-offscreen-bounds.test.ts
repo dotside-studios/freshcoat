@@ -10,7 +10,7 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { auditAdjustedBounds } from "../src/canvaskit";
 import {
 	createFrame,

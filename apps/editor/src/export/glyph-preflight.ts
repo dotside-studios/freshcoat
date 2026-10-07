@@ -1,10 +1,6 @@
-import {
-	compile,
-	type Template,
-	type TextEngine,
-} from "@freshcoat-js/coatfile";
+import { compile, type Template } from "@freshcoat-js/coatfile";
 import { findMissingGlyphs } from "@freshcoat-js/coatfile/render";
-import type { FontVMetrics } from "@freshcoat-js/engine";
+import type { Renderer } from "@freshcoat-js/engine";
 import type { ExportItem } from "@freshcoat-js/workspace";
 
 export type GlyphCheckItem = Pick<
@@ -21,15 +17,10 @@ export type GlyphIssue = {
 	codepoints: number[];
 };
 
-export type GlyphText = {
-	textEngine: TextEngine;
-	fontMetrics?: Record<string, FontVMetrics>;
-};
-
 export function checkGlyphs(
 	template: Template,
 	item: GlyphCheckItem,
-	text: GlyphText,
+	renderer: Renderer,
 ): GlyphIssue[] {
 	const variantId =
 		item.variantId && template.variants?.some((v) => v.id === item.variantId)
@@ -41,8 +32,7 @@ export function checkGlyphs(
 		...(variantId ? { variantId } : {}),
 		frameNames: [item.side],
 	});
-	return findMissingGlyphs(compiled, {
-		...text,
+	return findMissingGlyphs(renderer, compiled, {
 		frameNames: [item.side],
 	}).map((m) => ({
 		recordId: item.recordId,
@@ -61,7 +51,7 @@ const CHUNK = 25;
 export async function checkAllGlyphs(
 	template: Template,
 	items: readonly GlyphCheckItem[],
-	text: GlyphText,
+	renderer: Renderer,
 	stale: () => boolean = () => false,
 ): Promise<GlyphIssue[] | null> {
 	const out: GlyphIssue[] = [];
@@ -69,7 +59,7 @@ export async function checkAllGlyphs(
 		if (i > 0) await new Promise((resolve) => setTimeout(resolve, 0));
 		if (stale()) return null;
 		for (const item of items.slice(i, i + CHUNK))
-			out.push(...checkGlyphs(template, item, text));
+			out.push(...checkGlyphs(template, item, renderer));
 	}
 	return out;
 }

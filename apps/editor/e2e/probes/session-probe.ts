@@ -49,23 +49,33 @@ export async function runSessionProbe(frames: number) {
 	};
 }
 
-/** The tools-site path: a fresh env, surface and text engine every render. */
+/** The tools-site path: a fresh renderer, surface and text engine every render. */
 export async function runUncachedProbe(frames: number) {
-	const { render } = await import("@freshcoat-js/coatfile/render");
-	const { createBrowserEnv } = await import("@freshcoat-js/engine/browser");
+	const { renderTemplate } = await import("@freshcoat-js/coatfile/render");
+	const { createRenderer } = await import("@freshcoat-js/engine");
 	const ck = await getCanvasKit();
 	const template = fixtures.fullFeatureCard;
-	const fonts = new Map<string, Uint8Array[]>();
 	const totals: number[] = [];
 	for (let i = 0; i < frames; i++) {
 		const t0 = performance.now();
-		const results = await render(
+		const renderer = await createRenderer({
+			ck,
+			cache: false,
+			surface: (width, height) => {
+				const canvas = document.createElement("canvas");
+				canvas.width = width;
+				canvas.height = height;
+				return canvas;
+			},
+		});
+		const results = await renderTemplate(
+			renderer,
 			template,
 			{ displayName: `Frame ${i}` },
-			{ width: template.width, height: template.height },
-			{ ck, env: createBrowserEnv({ fonts }), fonts },
+			{ output: { canvas: true } },
 		);
-		for (const r of results) if ("dispose" in r) r.dispose();
+		for (const r of results) r.release();
+		renderer.dispose();
 		totals.push(performance.now() - t0);
 	}
 	const sorted = [...totals].sort((a, b) => a - b);

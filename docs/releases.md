@@ -11,6 +11,8 @@ Freshcoat releases use one version for the core SDK and the Figma plugin.
 
 Studio is deployed separately. The UI and workspace packages remain internal.
 
+Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md).
+
 ## Prepare and check a release
 
 Update the version in these four manifests together:

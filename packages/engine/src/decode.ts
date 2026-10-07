@@ -6,6 +6,7 @@
 
 import type { Canvas, CanvasKit, Image } from "canvaskit-wasm";
 import { imageInfo } from "./color-policy";
+import type { ByteLoader } from "./loader";
 import type { ImageNode } from "./node";
 import { fitRect } from "./paint-helpers";
 
@@ -28,8 +29,6 @@ export type ImageSampleOptions = {
 	// The longest side of the fitted image buffer. Omit for the node's full box.
 	maxDim?: number;
 };
-
-export type ImageBytesLoader = (src: string) => Promise<Uint8Array>;
 
 // A rectangle in pixels; `w`/`h` are extents, not right/bottom.
 export type PixelRect = { x: number; y: number; w: number; h: number };
@@ -98,11 +97,11 @@ export function drawImageToPixels(
 export async function sampleImageNode(
 	ck: unknown,
 	node: ImageNode,
-	loadImageBytes: ImageBytesLoader,
+	loadBytes: ByteLoader,
 	opts?: ImageSampleOptions,
 ): Promise<DecodedPixels | null> {
 	const c = ck as CanvasKit;
-	const img = c.MakeImageFromEncoded(await loadImageBytes(node.src));
+	const img = c.MakeImageFromEncoded(await loadBytes(node.src));
 	if (!img) return null;
 	try {
 		const boxW = node.size?.width ?? img.width();

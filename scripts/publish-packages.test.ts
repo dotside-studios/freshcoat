@@ -125,7 +125,7 @@ describe("release publisher", () => {
 
 	test("dry runs never inspect or publish to the registry", () => {
 		expect(publish(true).exitCode).toBe(0);
-		expect(calls()).toHaveLength(3);
+		expect(calls()).toHaveLength(artifacts.length);
 		for (const args of calls()) {
 			expect(args[0]).toBe("publish");
 			expect(args).toContain("--dry-run");
@@ -134,7 +134,9 @@ describe("release publisher", () => {
 
 	test("reruns skip versions only when registry integrity matches", () => {
 		expect(publish(false, { REGISTRY_MODE: "same" }).exitCode).toBe(0);
-		expect(calls().map((args) => args[0])).toEqual(["view", "view", "view"]);
+		expect(calls().map((args) => args[0])).toEqual(
+			artifacts.map(() => "view"),
+		);
 	});
 
 	test("refuses to overwrite an existing version with different bytes", () => {
@@ -150,14 +152,9 @@ describe("release publisher", () => {
 	test("publishes missing versions in dependency order", () => {
 		expect(publish().exitCode).toBe(0);
 		const invoked = calls();
-		expect(invoked.map((args) => args[0])).toEqual([
-			"view",
-			"publish",
-			"view",
-			"publish",
-			"view",
-			"publish",
-		]);
+		expect(invoked.map((args) => args[0])).toEqual(
+			artifacts.flatMap(() => ["view", "publish"]),
+		);
 		expect(
 			invoked.filter((args) => args[0] === "publish").map((args) => args[1]),
 		).toEqual(

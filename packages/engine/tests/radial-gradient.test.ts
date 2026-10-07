@@ -3,7 +3,7 @@
 // read the pixels back to check the reach along each axis.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createRect } from "../src/index";
 import type { ResolvedFill } from "../src/types";
 

@@ -199,6 +199,12 @@ export async function buildPackages(tag?: string): Promise<void> {
 			allowImportingTsExtensions: false,
 			declaration: true,
 			resolveJsonModule: true,
+			...(data.devDependencies?.["@types/node"]
+				? {
+						types: ["node"],
+						typeRoots: [join(packageRoot, "node_modules", "@types")],
+					}
+				: { types: [] }),
 			rootDir: packageRoot,
 			outDir: output,
 			baseUrl: root,

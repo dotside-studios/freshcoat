@@ -3,7 +3,7 @@
 // render resolves it against the family's real metrics.
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { createParagraphEngine, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
+import { createRenderer, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import type { DrawTextCommand, Node, Template, TextNode } from "../src/types";
@@ -84,10 +84,10 @@ describe('lineHeight: "auto"', () => {
 
 	test("the render lays the lines out at the font's line box", async () => {
 		const ck = await loadCanvasKit();
-		const fonts = new Map([
-			["Vend Sans", [new Uint8Array(readFileSync(VEND_SANS))]],
-		]);
-		const textEngine = createParagraphEngine(ck, fonts);
+		const renderer = await createRenderer({
+			ck,
+			fonts: { "Vend Sans": [new Uint8Array(readFileSync(VEND_SANS))] },
+		});
 		const advance = (lineHeight: number | "auto") => {
 			const [frame] = compileToCommands(
 				template(lineHeight),
@@ -95,7 +95,7 @@ describe('lineHeight: "auto"', () => {
 				{
 					width: 400,
 					height: 200,
-					textEngine,
+					renderer,
 				},
 			);
 			const text = frame.commands.find(
@@ -110,7 +110,7 @@ describe('lineHeight: "auto"', () => {
 			expect(advance("auto")).toBeCloseTo(Math.round(SIZE * VEND_SANS_AUTO), 3);
 			expect(advance(1.2)).toBeCloseTo(Math.round(SIZE * 1.2), 3);
 		} finally {
-			textEngine.dispose();
+			renderer.dispose();
 		}
 	});
 });

@@ -1,16 +1,15 @@
 import {
 	buildAdjust,
+	createRenderer,
 	decodePixels,
 	type GroupNode,
 	type ImageNode,
 } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { formatImageFocus, parseImageFocus } from "../src/image-focus";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
 
@@ -187,12 +186,12 @@ describe("adjust and framing paint", () => {
 
 	async function centre(el: Element, values: Record<string, unknown> = {}) {
 		const tpl = template([el], ["photo_focus"]);
-		const [frame] = (await render(
+		const [frame] = (await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			tpl,
 			values,
 			{ width: 40, height: 40 },
-			{ ck, env: createHeadlessEnv() },
-		)) as EncodedPaintedFrame[];
+		));
 		const d = decodePixels(ck, frame.bytes);
 		if (!d) throw new Error("decode failed");
 		const i = (20 * d.width + 20) * 4;

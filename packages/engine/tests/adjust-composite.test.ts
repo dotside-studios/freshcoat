@@ -3,7 +3,7 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createGroup, createRect } from "../src/node";
 import type { Adjust, BlendMode } from "../src/types";
 

@@ -97,10 +97,13 @@
     "packages/engine": {
       "name": "@freshcoat-js/engine",
       "version": "0.3.0",
+      "dependencies": {
+        "canvaskit-wasm": "0.41.1",
+      },
       "devDependencies": {
         "@freshcoat-js/test-utils": "workspace:*",
         "@types/bun": "^1.3.12",
-        "canvaskit-wasm": "^0.41.1",
+        "@types/node": "^26.6.3",
         "typescript": "^5.7.2",
         "vitest": "^4.1.6",
       },
@@ -123,7 +126,7 @@
       "name": "@freshcoat-js/test-utils",
       "version": "0.0.0",
       "dependencies": {
-        "canvaskit-wasm": "^0.41.1",
+        "@freshcoat-js/engine": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "^1.3.12",

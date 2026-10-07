@@ -76,7 +76,7 @@ async function paint(node: TextNode) {
 				const bytes = fonts.get(family);
 				return bytes ? { kind: "bytes", bytes } : { kind: "none" };
 			},
-			loadImageBytes: async () => new Uint8Array(),
+			loadBytes: async () => new Uint8Array(),
 		},
 		"encode",
 		undefined,

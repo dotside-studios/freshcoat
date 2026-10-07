@@ -4,11 +4,11 @@ import {
 	compileScene,
 	createFrame,
 	createGroup,
-	createParagraphEngine,
 	createText,
-	memoizeTextEngine,
 	missingGlyphs,
 } from "../src/index";
+import { createParagraphEngine } from "../src/paragraph-layout";
+import { memoizeTextEngine } from "../src/text-cache";
 import type { TextEngine } from "../src/text-engine";
 import type { ResolvedFont } from "../src/types";
 

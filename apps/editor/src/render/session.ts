@@ -4,23 +4,15 @@ import {
 	type Template,
 } from "@freshcoat-js/coatfile";
 import {
-	type Command,
-	compileScene,
-	createPaintCache,
-	createParagraphEngine,
-	deriveFontMetrics,
-	type FontVMetrics,
-	memoizeTextEngine,
+	createRenderer,
 	type Node,
-	type PaintCache,
 	type PaintCacheStats,
-	type PaintRuntime,
 	type PaintWarning,
-	prepareScene,
+	type Renderer,
 	resolveExportScale,
-	type TextEngine,
+	type SurfaceCanvas,
 } from "@freshcoat-js/engine";
-import { createBrowserEnv } from "@freshcoat-js/engine/browser";
+import type { CanvasKit } from "canvaskit-wasm";
 import { hasBarcode, loadBarcodeEncoder } from "./barcode";
 
 export type RenderInput<G> = {
@@ -54,76 +46,53 @@ export type RenderOutput<G> = {
 
 export type RenderSession = {
 	render<G>(input: RenderInput<G>): Promise<RenderOutput<G>>;
-	stats(): PaintCacheStats;
+	stats(): PaintCacheStats | undefined;
 	/** Frees the surface and everything decoded, so the next render starts
 	 *  over, as after a lost GPU context. */
 	reset(): void;
 	dispose(): void;
 };
 
-/** Builds the runtime a session paints through. */
-export type RenderEnvFactory = (opts: {
-	fonts: Map<string, Uint8Array[]>;
-	images: Map<string, Uint8Array>;
-	cache: PaintCache;
-}) => PaintRuntime;
+/** Makes the canvas each surface is painted on. */
+export type SurfaceFactory = (width: number, height: number) => SurfaceCanvas;
+
+const domCanvas: SurfaceFactory = (width, height) => {
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	return canvas;
+};
 
 /**
- * One CanvasKit pipeline kept warm across renders: the paint cache owns the
- * surface, font provider and decoded images, and the paragraph engine and font
- * metrics are rebuilt only when the fonts map changes identity.
+ * One renderer kept warm across renders: its paint cache owns the surface,
+ * font provider and decoded images, and its paragraph engine and font metrics
+ * are rebuilt only when the fonts map changes identity.
  */
 export function createRenderSession(
-	ck: unknown,
-	makeEnv: RenderEnvFactory = createBrowserEnv,
+	ck: CanvasKit,
+	surface: SurfaceFactory = domCanvas,
 ): RenderSession {
-	const cache = createPaintCache();
-	let text: {
-		fonts: Map<string, Uint8Array[]>;
-		engine: TextEngine & { dispose(): void };
-		metrics: Record<string, FontVMetrics>;
-	} | null = null;
-	let env: {
-		fonts: Map<string, Uint8Array[]>;
-		images: Map<string, Uint8Array>;
-		runtime: PaintRuntime;
-	} | null = null;
+	let renderer: Renderer | null = null;
+	const ready = createRenderer({ ck, surface }).then((r) => {
+		renderer = r;
+		return r;
+	});
+	let fonts: Map<string, Uint8Array[]> | null = null;
 	let disposed = false;
-
-	const textFor = (fonts: Map<string, Uint8Array[]>) => {
-		if (text?.fonts !== fonts) {
-			text?.engine.dispose();
-			text = {
-				fonts,
-				engine: memoizeTextEngine(createParagraphEngine(ck, fonts)),
-				metrics: deriveFontMetrics(fonts),
-			};
-		}
-		return text;
-	};
-
-	const envFor = (
-		fonts: Map<string, Uint8Array[]>,
-		images: Map<string, Uint8Array>,
-	) => {
-		if (env?.fonts !== fonts || env.images !== images) {
-			env = {
-				fonts,
-				images,
-				runtime: makeEnv({ fonts, images, cache }),
-			};
-		}
-		return env.runtime;
-	};
 
 	return {
 		async render(input) {
 			if (disposed) throw new Error("render session is disposed");
+			const r = await ready;
 			const { template } = input;
 			// Without the encoder a barcode draws as a placeholder; a failed load
 			// still renders, and the placeholder's warning says why.
 			if (!getBarcodeEncoder() && hasBarcode(template))
 				await loadBarcodeEncoder().catch(() => {});
+			if (fonts !== input.fonts) {
+				await r.addFonts(Object.fromEntries(input.fonts));
+				fonts = input.fonts;
+			}
 			const t0 = performance.now();
 			const compiled = compile(template, input.values, {
 				width: template.width,
@@ -133,11 +102,7 @@ export function createRenderSession(
 			if (!frame) throw new Error("template has no side to render");
 			const t1 = performance.now();
 
-			const { engine, metrics } = textFor(input.fonts);
-			const prepared = prepareScene(frame.root as Node, {
-				textEngine: engine,
-				fontMetrics: metrics,
-			});
+			const prepared = r.prepare(frame.root as Node);
 			const geometry = input.collect(prepared);
 			const t2 = performance.now();
 
@@ -146,10 +111,8 @@ export function createRenderSession(
 				{ kind: "scale", value: input.scale },
 				design,
 			);
-			const commands: Command[] = compileScene(prepared, {
+			const commands = r.compile(prepared, {
 				...design,
-				textEngine: engine,
-				fontMetrics: metrics,
 				fonts: frame.assets.fonts,
 				images: frame.assets.images,
 				prepared: true,
@@ -157,19 +120,17 @@ export function createRenderSession(
 			});
 			const t3 = performance.now();
 
-			const result = await envFor(input.fonts, input.images).paint(
-				commands,
-				ck,
-			);
+			const result = await r.paint(commands, {
+				images: input.images,
+				output: { canvas: true },
+			});
 			const t4 = performance.now();
-			if (!("canvas" in result))
-				throw new Error("the browser runtime returned no canvas");
 
 			return {
-				canvas: result.canvas as unknown as HTMLCanvasElement,
+				canvas: result.canvas as HTMLCanvasElement,
 				geometry,
-				// compileScene is called directly here, so the compile warnings
-				// renderCompiled would merge are read off the frame.
+				// The scene is compiled here rather than through renderCompiled, so
+				// the compile warnings are read off the frame.
 				warnings: [...(frame.warnings ?? []), ...result.warnings],
 				scale,
 				timings: {
@@ -181,14 +142,11 @@ export function createRenderSession(
 				},
 			};
 		},
-		stats: () => cache.stats(),
-		reset: () => cache.clear(),
+		stats: () => renderer?.stats().paintCache,
+		reset: () => renderer?.clear(),
 		dispose() {
 			disposed = true;
-			text?.engine.dispose();
-			text = null;
-			env = null;
-			cache.dispose();
+			void ready.then((r) => r.dispose());
 		},
 	};
 }

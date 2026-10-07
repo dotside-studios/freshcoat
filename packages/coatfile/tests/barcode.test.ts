@@ -5,8 +5,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { planScene } from "@freshcoat-js/for-print";
-import { type BitmapNode, decodePixels, type Node } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { type BitmapNode, createRenderer, decodePixels, type Node } from "@freshcoat-js/engine";
 import {
 	AztecCodeReader,
 	BarcodeFormat,
@@ -21,12 +20,11 @@ import {
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { bwipBarcodeEncoder } from "../src/barcode";
-import { setBarcodeEncoder } from "../src/barcode-encoder";
+import { getBarcodeEncoder, setBarcodeEncoder } from "../src/barcode-encoder";
 import { compile } from "../src/compile";
 import { resizeTemplate } from "../src/constraints";
 import { collectFontRequests } from "../src/fonts";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderCompiled, renderTemplate } from "../src/render";
 import type {
 	BarcodeProperties,
 	Element,
@@ -114,7 +112,8 @@ async function paint(
 	scale = 1,
 	supersample = 1,
 ) {
-	const [frame] = (await render(
+	const [frame] = (await renderTemplate(
+		await createRenderer({ ck, cache: false }),
 		tpl,
 		values,
 		{
@@ -127,8 +126,7 @@ async function paint(
 				},
 			],
 		},
-		{ ck, env: createHeadlessEnv() },
-	)) as EncodedPaintedFrame[];
+	));
 	const pixels = decodePixels(ck, frame.bytes);
 	if (!pixels) throw new Error("decode failed");
 	return { frame, pixels };
@@ -525,13 +523,24 @@ describe("placeholders", () => {
 		expect(frame.warnings).toEqual([
 			{ kind: "barcode_unavailable", symbology: "ean13", layer: "code" },
 		]);
-		// render() hands the warning on with the painter's own.
-		const { frame: painted } = await paint(tpl, { code: "590123412345" });
-		expect(painted.warnings).toContainEqual({
+		// renderCompiled() hands the warning on with the painter's own.
+		const [painted] = await renderCompiled(
+			await createRenderer({ ck, cache: false }),
+			compile(tpl, { code: "590123412345" }, { width: tpl.width, height: tpl.height }),
+		);
+		expect(painted?.warnings).toContainEqual({
 			kind: "barcode_unavailable",
 			symbology: "ean13",
 			layer: "code",
 		});
+	});
+
+	test("renderTemplate() loads the encoder when the template draws a barcode", async () => {
+		expect(getBarcodeEncoder()).toBeNull();
+		const tpl = barcodeTemplate({ symbology: "ean13" });
+		const { frame } = await paint(tpl, { code: "590123412345" });
+		expect(frame.warnings).toEqual([]);
+		expect(getBarcodeEncoder()).toBe(bwipBarcodeEncoder);
 	});
 
 	test("with an invalid value: a placeholder, and the encoder's message", () => {

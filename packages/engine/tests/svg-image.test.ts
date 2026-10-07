@@ -1,6 +1,6 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage, createPaintCache } from "../src/index";
 import type { ImageNode, MaskNode, PathNode } from "../src/node";
 import { parseSvg, svgToNode } from "../src/svg";

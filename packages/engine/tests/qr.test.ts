@@ -1,7 +1,7 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import type { Command, DrawQrCommand } from "../src/types";
 
 let ck: any;

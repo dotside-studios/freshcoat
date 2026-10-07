@@ -3,7 +3,7 @@
 // fallback on the default one, which answers in PNG and says so.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { flattenOverWhite } from "../src/jpeg";
 import { createFrame, createRect } from "../src/node";
 

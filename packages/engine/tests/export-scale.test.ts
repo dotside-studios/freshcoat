@@ -16,10 +16,10 @@ import {
 	MAX_EXPORT_DIMENSION,
 	resolveExportScale,
 } from "../src/export-scale";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect, createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { EncodedPaintResult } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
 
 const SIZE = { width: 100, height: 50 };
 

@@ -12,12 +12,11 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./browser": "./src/browser.ts",
-		"./headless": "./src/headless.ts",
+		"./browser": "./src/platform/browser.ts",
+		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
 		"./svg": "./src/svg/index.ts",
-		"./svg/sniff": "./src/svg/sniff.ts",
-		"./runtime": "./src/runtime.ts"
+		"./svg/sniff": "./src/svg/sniff.ts"
 	},
 	"scripts": {
 		"test": "bun test",
@@ -25,10 +24,13 @@
 		"conformance": "bun run conformance/src/report.ts --goldens",
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
+	"dependencies": {
+		"canvaskit-wasm": "0.41.1"
+	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@types/bun": "^1.3.12",
-		"canvaskit-wasm": "^0.41.1",
+		"@types/node": "^26.6.3",
 		"typescript": "^5.7.2",
 		"vitest": "^4.1.6"
 	}

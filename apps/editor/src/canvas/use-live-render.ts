@@ -1,3 +1,4 @@
+import type { CanvasKit } from "canvaskit-wasm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { previewEdge, usePreviewImages } from "~/data/thumbnails";
@@ -71,7 +72,7 @@ export function useLiveRender(): {
 	const [mode, setMode] = useState<"worker" | "main">(() =>
 		previewWorkerEnabled() ? "worker" : "main",
 	);
-	const [ck, setCk] = useState<unknown>(null);
+	const [ck, setCk] = useState<CanvasKit | null>(null);
 	const [activeScheduler, setScheduler] =
 		useState<RenderScheduler<LiveRequest> | null>(null);
 
@@ -107,8 +108,9 @@ export function useLiveRender(): {
 						},
 					})
 				: null;
-		const backend: LiveBackend =
-			worker ?? createMainBackend(createRenderSession(ck));
+		const backend: LiveBackend | null =
+			worker ?? (ck ? createMainBackend(createRenderSession(ck)) : null);
+		if (!backend) return;
 		const scheduler = createRenderScheduler(
 			(request: LiveRequest) => {
 				lastRequest = request;

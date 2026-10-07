@@ -1,12 +1,7 @@
 import { paintScene } from "./canvaskit";
 import type { EncodeOptions } from "./png";
-import type {
-	Command,
-	Painter,
-	PaintOutput,
-	PaintResult,
-	PaintRuntime,
-} from "./types";
+import type { PaintOutput, PaintResult, PaintRuntime, Painter } from "./runtime-types";
+import type { Command } from "./types";
 
 export type DisposePolicy = "keep" | "encode";
 

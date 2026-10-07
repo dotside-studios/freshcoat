@@ -3,7 +3,7 @@
 // clipped to that shape too — not left as a bare square.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage } from "../src/index";
 
 let ck: any;

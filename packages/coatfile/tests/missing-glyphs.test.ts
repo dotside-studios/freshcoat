@@ -1,4 +1,4 @@
-import { createParagraphEngine, memoizeTextEngine } from "@freshcoat-js/engine";
+import { createRenderer, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
@@ -44,22 +44,21 @@ const template = {
 	template_data: [side("front", ["name", "city"]), side("back", ["motto"])],
 } as unknown as Template;
 
-let engine: ReturnType<typeof memoizeTextEngine>;
+let renderer: Renderer;
 
 beforeAll(async () => {
-	const ck = await loadCanvasKit();
-	engine = memoizeTextEngine(
-		createParagraphEngine(
-			ck,
-			new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]),
-		),
-	);
+	renderer = await createRenderer({
+		ck: await loadCanvasKit(),
+		fonts: { Geist: [testFontBytes("Geist-Regular.ttf")] },
+		cache: false,
+	});
 });
 
 const check = (values: Record<string, string>, frameNames?: string[]) =>
 	findMissingGlyphs(
+		renderer,
 		compile(template, values, { width: 240, height: 80 }),
-		frameNames ? { textEngine: engine, frameNames } : { textEngine: engine },
+		frameNames ? { frameNames } : {},
 	);
 
 describe("findMissingGlyphs", () => {

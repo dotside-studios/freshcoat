@@ -7,7 +7,7 @@ import { identityColorMatrix, identityLut3d } from "../src/adjust";
 import { paintScene, setLayerBounds } from "../src/canvaskit";
 import { compileScene, prepareScene } from "../src/compile-scene";
 import { deriveFontMetrics } from "../src/font-metrics";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	createEllipse,
 	createGroup,

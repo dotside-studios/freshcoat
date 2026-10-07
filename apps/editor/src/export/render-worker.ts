@@ -1,14 +1,17 @@
 import {
 	compile,
-	createParagraphEngine,
 	setBarcodeEncoder,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import {
+	createRenderer,
+	fetchLoader,
+	type Renderer,
+} from "@freshcoat-js/engine";
+import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/engine/browser";
 import { crc32 } from "@freshcoat-js/workspace/crc";
-import { loadWorkerCanvasKit } from "~/render/canvaskit-worker";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
 	OutputFormat,
@@ -16,7 +19,7 @@ import type {
 	WorkerReply,
 	WorkerRequest,
 } from "./protocol";
-import { createJobCaches, createWorkerText } from "./worker-caches";
+import { createJobCaches, IMAGE_CACHE_PIXELS } from "./worker-caches";
 
 type WorkerScope = {
 	postMessage(message: WorkerReply, transfer: Transferable[]): void;
@@ -25,21 +28,34 @@ type WorkerScope = {
 };
 const scope = self as unknown as WorkerScope;
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped
-type CK = any;
-
 // The `full` build: the default one the editor's canvas uses has neither the
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
 const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
 let fonts = new Map<string, Uint8Array[]>();
-const text = createWorkerText<ReturnType<typeof createParagraphEngine>>();
+/** built for `fonts` on the first render after they change */
+let renderer: Promise<Renderer> | undefined;
+/** the bytes only this worker holds for the item being rendered */
+let own = new Map<string, Blob>();
 /** the template of the last render; the pool sends it only when it changes */
 let current: Template | undefined;
 const caches = createJobCaches();
 
-function loadCanvasKit(): Promise<CK> {
-	return loadWorkerCanvasKit(CANVASKIT_BASE);
+function loadCanvasKit() {
+	return loadCanvasKitAt(CANVASKIT_BASE);
+}
+
+function rendererFor(): Promise<Renderer> {
+	renderer ??= loadCanvasKit().then((ck) =>
+		createRenderer({
+			ck,
+			fonts: Object.fromEntries(fonts),
+			// Only this worker holds the bytes; fetch would miss the `ws:` reference.
+			load: (src) => bytesOf(src),
+			cache: { maxImagePixels: IMAGE_CACHE_PIXELS },
+		}),
+	);
+	return renderer;
 }
 
 /** A buffer the worker alone owns, so it can be transferred rather than copied. */
@@ -51,23 +67,22 @@ function ownBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 		: bytes.slice();
 }
 
-async function bytesOf(src: string, own: Map<string, Blob>) {
+async function bytesOf(src: string) {
 	const blob = own.get(src);
 	if (blob) return new Uint8Array(await blob.arrayBuffer());
-	const res = await fetch(src);
-	if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
-	return new Uint8Array(await res.arrayBuffer());
+	return fetchLoader(src);
 }
 
 function setFonts(next: Map<string, Uint8Array[]>) {
 	caches.clear();
-	text.clear();
+	void renderer?.then((r) => r.dispose());
+	renderer = undefined;
 	fonts = next;
 }
 
 async function renderSide(req: WorkerRenderRequest) {
 	if (req.template) current = req.template;
-	const ck = await loadCanvasKit();
+	const r = await rendererFor();
 	const started = performance.now();
 	const template = current;
 	if (!template) throw new Error("no template");
@@ -77,17 +92,7 @@ async function renderSide(req: WorkerRenderRequest) {
 		req.variantId && template.variants?.some((v) => v.id === req.variantId)
 			? req.variantId
 			: undefined;
-	const own = new Map(req.images);
-	const env = createHeadlessEnv({
-		fonts,
-		encode: {
-			format: req.format,
-			...(req.quality !== undefined ? { quality: req.quality } : {}),
-		},
-	});
-	// Only this worker holds the bytes; the default would fetch the `ws:`
-	// reference.
-	env.loadImageBytes = (src) => bytesOf(src, own);
+	own = new Map(req.images);
 	const design = req.resize ?? {
 		width: template.width,
 		height: template.height,
@@ -100,34 +105,25 @@ async function renderSide(req: WorkerRenderRequest) {
 		...(req.bleed ? { bleed: true } : {}),
 		frameNames: [req.side],
 	});
-	const { engine, fontMetrics } = text.get(fonts, (f) =>
-		createParagraphEngine(ck, f),
-	);
 	const painted = await withPrintFallback(req.print, async (print) => {
-		const [result] = await renderCompiled(
-			compiled,
-			{
-				frameNames: [req.side],
-				...(print ? { print } : {}),
-				exports: [
-					req.scale === 1
-						? {}
-						: { constraint: { kind: "scale", value: req.scale } },
-				],
+		const [result] = await renderCompiled(r, compiled, {
+			frameNames: [req.side],
+			...(print ? { print } : {}),
+			exports: [
+				req.scale === 1
+					? {}
+					: { constraint: { kind: "scale", value: req.scale } },
+			],
+			analysisCache: caches.analysis(),
+			analysisKey: caches.analysisKey(template),
+			output: {
+				encode: {
+					format: req.format,
+					...(req.quality !== undefined ? { quality: req.quality } : {}),
+				},
 			},
-			{
-				ck,
-				env,
-				fonts,
-				fontMetrics,
-				textEngine: engine,
-				paintCache: caches.paint(),
-				analysisCache: caches.analysis(),
-				analysisKey: caches.analysisKey(template),
-			},
-		);
-		if (!result || !("bytes" in result))
-			throw new Error("nothing was rendered");
+		});
+		if (!result) throw new Error("nothing was rendered");
 		return result;
 	});
 	const { result } = painted;
@@ -177,6 +173,7 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		}
 		case "jobEnd":
 			caches.clear();
+			void renderer?.then((r) => r.clear());
 			return;
 		case "render":
 			try {

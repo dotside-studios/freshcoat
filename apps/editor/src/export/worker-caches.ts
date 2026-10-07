@@ -1,30 +1,21 @@
 import {
 	assetUri,
-	createPaintCache,
 	type InlineAsset,
-	type PaintCache,
 	type Template,
 } from "@freshcoat-js/coatfile";
-import {
-	type CachedTextEngine,
-	deriveFontMetrics,
-	memoizeTextEngine,
-	type TextEngine,
-} from "@freshcoat-js/engine";
 import {
 	type AnalysisCache,
 	createAnalysisCache,
 } from "@freshcoat-js/for-print";
 
 /** Decoded pixels one render worker keeps across items. */
-const IMAGE_CACHE_PIXELS = 48_000_000;
+export const IMAGE_CACHE_PIXELS = 48_000_000;
 /** Print analyses one render worker keeps across items. */
 const ANALYSIS_CACHE_ENTRIES = 256;
 
-/** What a render worker keeps across the items of one job. */
+/** What a render worker keeps across the items of one job, beside its
+ *  renderer's paint cache. */
 export type JobCaches = {
-	/** decoded images, SVG pictures, paths, the font provider and the surface */
-	paint(): PaintCache;
 	analysis(): AnalysisCache;
 	/** `asset:<sha256>` for the data URL `compile` gives one of the template's
 	 *  assets */
@@ -34,16 +25,11 @@ export type JobCaches = {
 };
 
 export function createJobCaches(): JobCaches {
-	let paint: PaintCache | undefined;
 	let analysis: AnalysisCache | undefined;
 	let assetKeys:
 		| { template: Template; keys: Map<string, InlineAsset[]> }
 		| undefined;
 	return {
-		paint() {
-			paint ??= createPaintCache({ maxImagePixels: IMAGE_CACHE_PIXELS });
-			return paint;
-		},
 		analysis() {
 			analysis ??= createAnalysisCache(ANALYSIS_CACHE_ENTRIES);
 			return analysis;
@@ -78,52 +64,9 @@ export function createJobCaches(): JobCaches {
 			};
 		},
 		clear() {
-			paint?.dispose();
-			paint = undefined;
 			analysis = undefined;
 			assetKeys = undefined;
 		},
-	};
-}
-
-type Fonts = Map<string, Uint8Array[]>;
-type DisposableTextEngine = TextEngine & { dispose(): void };
-
-/** One render worker's text engine, memoized as the live preview's is. */
-export type WorkerText<E extends DisposableTextEngine> = {
-	/** The engine for `fonts`, rebuilt by `create` when `fonts` is a different
-	 *  map. */
-	get(
-		fonts: Fonts,
-		create: (fonts: Fonts) => E,
-	): {
-		engine: CachedTextEngine<E>;
-		fontMetrics: ReturnType<typeof deriveFontMetrics>;
-	};
-	clear(): void;
-};
-
-export function createWorkerText<
-	E extends DisposableTextEngine,
->(): WorkerText<E> {
-	let text: (ReturnType<WorkerText<E>["get"]> & { fonts: Fonts }) | undefined;
-	const clear = () => {
-		text?.engine.dispose();
-		text = undefined;
-	};
-	return {
-		get(fonts, create) {
-			if (text?.fonts !== fonts) {
-				clear();
-				text = {
-					fonts,
-					engine: memoizeTextEngine(create(fonts)),
-					fontMetrics: deriveFontMetrics(fonts),
-				};
-			}
-			return text;
-		},
-		clear,
 	};
 }
 

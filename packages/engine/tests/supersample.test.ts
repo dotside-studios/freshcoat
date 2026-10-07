@@ -13,9 +13,9 @@ import {
 	MAX_SUPERSAMPLE,
 	resolveSupersample,
 } from "../src/export-scale";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createPath, createRect } from "../src/node";
-import type { EncodedPaintResult } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
 
 const SIZE = { width: 100, height: 50 };
 

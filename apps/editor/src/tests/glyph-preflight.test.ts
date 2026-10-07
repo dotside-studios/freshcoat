@@ -1,13 +1,12 @@
 // @vitest-environment node
 import type { Template } from "@freshcoat-js/coatfile";
-import { createParagraphEngine, memoizeTextEngine } from "@freshcoat-js/engine";
+import { createRenderer, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import {
 	checkAllGlyphs,
 	codepointLabel,
 	type GlyphCheckItem,
-	type GlyphText,
 	summarizeGlyphs,
 } from "~/export/glyph-preflight";
 
@@ -58,23 +57,19 @@ const ITEMS = [
 	item("r3", { name: "Zoë", note: "Ships 🚀 fast" }),
 ];
 
-let text: GlyphText;
+let renderer: Renderer;
 
 beforeAll(async () => {
-	const ck = await loadCanvasKit();
-	text = {
-		textEngine: memoizeTextEngine(
-			createParagraphEngine(
-				ck,
-				new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]),
-			),
-		),
-	};
+	renderer = await createRenderer({
+		ck: await loadCanvasKit(),
+		fonts: { Geist: [testFontBytes("Geist-Regular.ttf")] },
+		cache: false,
+	});
 });
 
 describe("checkAllGlyphs", () => {
 	test("lists each record and element whose text the fonts can't draw", async () => {
-		const issues = await checkAllGlyphs(template, ITEMS, text);
+		const issues = await checkAllGlyphs(template, ITEMS, renderer);
 		expect(issues).toEqual([
 			{
 				recordId: "r2",
@@ -102,7 +97,12 @@ describe("checkAllGlyphs", () => {
 			item(`r${i}`, { name: "漢", note: "" }),
 		);
 		let checks = 0;
-		const out = await checkAllGlyphs(template, many, text, () => ++checks > 1);
+		const out = await checkAllGlyphs(
+			template,
+			many,
+			renderer,
+			() => ++checks > 1,
+		);
 		expect(out).toBeNull();
 	});
 

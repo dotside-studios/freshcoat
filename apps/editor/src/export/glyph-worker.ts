@@ -1,7 +1,7 @@
-import { createParagraphEngine, type Template } from "@freshcoat-js/coatfile";
-import { deriveFontMetrics, memoizeTextEngine } from "@freshcoat-js/engine";
-import { loadWorkerCanvasKit } from "~/render/canvaskit-worker";
-import { checkAllGlyphs, type GlyphText } from "./glyph-preflight";
+import type { Template } from "@freshcoat-js/coatfile";
+import { createRenderer, type Renderer } from "@freshcoat-js/engine";
+import { getCanvasKit } from "~/render/canvaskit";
+import { checkAllGlyphs } from "./glyph-preflight";
 import type { GlyphWorkerReply, GlyphWorkerRequest } from "./protocol";
 
 type Scope = {
@@ -11,24 +11,21 @@ type Scope = {
 const scope = self as unknown as Scope;
 
 let template: Template | undefined;
-let text: (GlyphText & { dispose(): void }) | undefined;
+let renderer: Renderer | undefined;
 let latest = 0;
 
 async function handle(msg: GlyphWorkerRequest) {
-	const ck = await loadWorkerCanvasKit(__CANVASKIT_BASE__);
 	if (msg.template) template = msg.template;
 	if (msg.fonts) {
-		text?.dispose();
-		const fonts = new Map(msg.fonts);
-		const engine = createParagraphEngine(ck, fonts);
-		text = {
-			textEngine: memoizeTextEngine(engine),
-			fontMetrics: deriveFontMetrics(fonts),
-			dispose: engine.dispose,
-		};
+		renderer?.dispose();
+		renderer = await createRenderer({
+			ck: await getCanvasKit(),
+			fonts: Object.fromEntries(msg.fonts),
+			cache: false,
+		});
 	}
-	if (!template || !text) throw new Error("nothing to check");
-	return checkAllGlyphs(template, msg.items, text, () => latest !== msg.id);
+	if (!template || !renderer) throw new Error("nothing to check");
+	return checkAllGlyphs(template, msg.items, renderer, () => latest !== msg.id);
 }
 
 let queue: Promise<void> = Promise.resolve();

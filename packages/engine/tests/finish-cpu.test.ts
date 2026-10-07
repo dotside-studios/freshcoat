@@ -3,16 +3,16 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { setCpuFinish } from "../src/canvaskit";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createFrame,
 	createImage,
 	createPaintCache,
-	deriveFontMetrics,
 	encodePng,
 	type PaintCache,
 } from "../src/index";
+import { deriveFontMetrics } from "../src/font-metrics";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { FrameFinish } from "../src/types";

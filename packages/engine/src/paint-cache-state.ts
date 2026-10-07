@@ -20,7 +20,8 @@ import type {
 	PaintCacheOptions,
 	PaintCacheStats,
 } from "./paint-cache";
-import type { CanvasLike, PaintWarning } from "./types";
+import type { CanvasLike } from "./runtime-types";
+import type { PaintWarning } from "./types";
 
 type FontKey = { family: string; bytes: Uint8Array }[];
 
@@ -369,6 +370,20 @@ export function cachedMipmaps(
 		state.stats.mipmapBuilds++;
 	}
 	return entry.mipped;
+}
+
+// Drops a decoded image and every background that drew it, so the next paint
+// decodes `src` again from whatever bytes it is given.
+export function forgetImage(state: PaintCacheState, src: string): void {
+	const entry = state.images.get(src);
+	if (entry) {
+		state.images.delete(src);
+		freeImage(entry);
+	}
+	const key = JSON.stringify(src);
+	state.backgrounds = state.backgrounds.filter(
+		(bg) => !bg.keys.some((k) => k.includes(key)),
+	);
 }
 
 function freeImage(entry: CachedImage): void {

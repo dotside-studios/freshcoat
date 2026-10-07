@@ -27,9 +27,9 @@
 		"bench:render": "bun scripts/bench-render.ts"
 	},
 	"dependencies": {
-		"@freshcoat-js/for-print": "workspace:*",
-		"@freshcoat-js/engine": "workspace:*",
 		"@freshcoat-js/coatfile": "workspace:*",
+		"@freshcoat-js/engine": "workspace:*",
+		"@freshcoat-js/for-print": "workspace:*",
 		"@freshcoat-js/ui": "workspace:*",
 		"@freshcoat-js/workspace": "workspace:*",
 		"@tanstack/react-router": "1.170.33",

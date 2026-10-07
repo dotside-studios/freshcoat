@@ -1,11 +1,7 @@
-// freshcoat — the rendering foundation. Compiles the composable Node IR
-// (via compileScene) to a flat Command list and paints it to pixels via CanvasKit
-// (WASM Skia) — no native canvas anywhere. The paint TARGET (offscreen vs live
-// canvas) lives on its own subpaths — freshcoat/browser | /headless — and
-// each env's `paint(frames, ck)` defaults to the CanvasKit painter, so the barrel
-// stays free of DOM / WASM weight. The backend seam itself is
-// freshcoat/runtime (Painter + makeRuntime); the `Painter` TYPE is
-// re-exported here, since a type costs nothing.
+// The coat engine. compileScene lowers the Node IR to a flat Command list, and
+// createRenderer paints it to pixels with CanvasKit (WASM Skia). Platform code
+// (loading CanvasKit, reading files) lives on the /node and /browser subpaths,
+// so this entry stays free of DOM and Node APIs.
 
 export {
 	type AdjustOptions,
@@ -48,7 +44,6 @@ export {
 	type DecodeOptions,
 	decodePixels,
 	drawImageToPixels,
-	type ImageBytesLoader,
 	type ImageSampleOptions,
 	type PixelRect,
 	sampleImageNode,
@@ -64,12 +59,16 @@ export {
 } from "./export-scale";
 export {
 	clearFontBytesCache,
-	dataUrlToBytes,
 	fontBytes,
 	resolveFontRequest,
 } from "./font-bytes";
 export {
-	deriveFontMetrics,
+	type ByteLoader,
+	dataUrlToBytes,
+	fetchLoader,
+	mapLoader,
+} from "./loader";
+export {
 	getFontMetrics,
 	readFontMetrics,
 	registerFontMetrics,
@@ -129,7 +128,6 @@ export {
 	strokeInset,
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
-export { createParagraphEngine } from "./paragraph-layout";
 export { scalePathData } from "./path-data";
 export { flattenOverWhite } from "./jpeg";
 export {
@@ -150,12 +148,28 @@ export {
 } from "./pattern";
 export { resolveLayout } from "./resolve-layout";
 export { outlinePath, rectShape } from "./outline";
-export { squircleSvg } from "./squircle";
 export {
-	type CachedTextEngine,
-	memoizeTextEngine,
-	type TextEngineCacheStats,
-} from "./text-cache";
+	type CanvasFrame,
+	createRenderer,
+	type DefaultOutput,
+	type EncodedFrame,
+	type FontLoadReport,
+	type FontSources,
+	type FrameFor,
+	type FrameInfo,
+	type Output,
+	type PaintOptions,
+	type PixelsFrame,
+	type RenderedFrame,
+	type Renderer,
+	type RendererCompileOptions,
+	type RendererOptions,
+	type RendererStats,
+	type RenderOptions,
+	type SurfaceCanvas,
+} from "./renderer";
+export { squircleSvg } from "./squircle";
+export type { TextEngineCacheStats } from "./text-cache";
 export type {
 	ClusterAdvance,
 	SpanFont,

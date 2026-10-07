@@ -1,11 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { applyDisposePolicy } from "../src/runtime";
-import type { CanvasLike, PaintOutput } from "../src/types";
+import type { CanvasLike, PaintOutput } from "../src/runtime-types";
 
 const fakeCanvas = (): CanvasLike => ({
 	width: 2,
 	height: 2,
-	getContext: () => null,
 });
 
 function fakeOutput(spy: { encoded: number; disposed: number }): PaintOutput {

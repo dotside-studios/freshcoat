@@ -1,25 +1,15 @@
-import type { Precision } from "./color-policy";
-import { compileScene } from "./compile-scene";
-import { dataUrlToBytes, resolveFontRequest } from "./font-bytes";
-import { deriveFontMetrics } from "./font-metrics";
-import type { Node } from "./node";
-import type { PaintCache } from "./paint-cache";
-import { createParagraphEngine } from "./paragraph-layout";
-import type { EncodeOptions } from "./png";
-import { makeRuntime } from "./runtime";
-import type {
-	EncodedPaintResult,
-	FontVMetrics,
-	FrameFinish,
-	PaintRuntime,
-} from "./types";
-
-async function fetchBytes(url: string): Promise<Uint8Array> {
-	if (url.startsWith("data:")) return dataUrlToBytes(url);
-	const res = await fetch(url);
-	if (!res.ok) throw new Error(`fetch ${url} -> ${res.status}`);
-	return new Uint8Array(await res.arrayBuffer());
-}
+import type { Precision } from "../../src/color-policy";
+import { compileScene } from "../../src/compile-scene";
+import { resolveFontRequest } from "../../src/font-bytes";
+import { deriveFontMetrics } from "../../src/font-metrics";
+import { type ByteLoader, mapLoader } from "../../src/loader";
+import type { Node } from "../../src/node";
+import type { PaintCache } from "../../src/paint-cache";
+import { createParagraphEngine } from "../../src/paragraph-layout";
+import type { EncodeOptions } from "../../src/png";
+import { makeRuntime } from "../../src/runtime";
+import type { EncodedPaintResult, PaintRuntime } from "../../src/runtime-types";
+import type { FontVMetrics, FrameFinish } from "../../src/types";
 
 // A headless runtime: font resolution + image byte I/O, NO canvas host, encode
 // policy. With no host, the paint step renders offscreen via ck.MakeSurface and
@@ -27,6 +17,8 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
 export function createHeadlessEnv(opts?: {
 	fonts?: Map<string, Uint8Array[]>;
 	images?: Map<string, Uint8Array>;
+	// Where bytes not in `images` come from. Default: data: URLs and fetch.
+	load?: ByteLoader;
 	// How to encode: format, quality, and how hard to work at making a PNG small
 	// (see ./png). Default: PNG at "fast".
 	encode?: EncodeOptions;
@@ -42,9 +34,7 @@ export function createHeadlessEnv(opts?: {
 			resolveFont(req) {
 				return resolveFontRequest(req, opts?.fonts);
 			},
-			async loadImageBytes(src) {
-				return opts?.images?.get(src) ?? fetchBytes(src);
-			},
+			loadBytes: mapLoader(opts?.images, opts?.load),
 		},
 		"encode",
 		opts?.encode,

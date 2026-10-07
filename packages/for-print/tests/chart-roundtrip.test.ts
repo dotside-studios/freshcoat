@@ -8,8 +8,7 @@
 // a registration point that doesn't land on its mark would all pass there and
 // fail here.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { decodePixels } from "@freshcoat-js/engine";
-import { renderSceneToPng } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import {
 	type ChartSpec,
@@ -29,15 +28,17 @@ async function ckInit(): Promise<any> {
 	return (await loadCanvasKit()) as any;
 }
 
-// Paint a chart through the SAME call the tool makes — renderSceneToPng, headless,
-// no print optimization anywhere near it. Same function rather than an equivalent
-// one on purpose: the point of this file is that what ships is what was measured.
+// Paint a chart the way the tool does: a renderer's offscreen PNG, with no print
+// optimization anywhere near it, decoded back. Encoded and decoded rather than
+// read as raw pixels on purpose: the point of this file is that what ships is
+// what was measured.
 async function paint(ck: any, spec: ChartSpec): Promise<PixelData> {
-	const { bytes } = await renderSceneToPng(chartScene(spec), {
+	const renderer = await createRenderer({ ck, cache: false });
+	const { bytes } = await renderer.render(chartScene(spec), {
 		width: spec.width,
 		height: spec.height,
-		ck,
 	});
+	renderer.dispose();
 	const pixels = decodePixels(ck, bytes);
 	if (!pixels) throw new Error("could not decode the painted chart");
 	return pixels;

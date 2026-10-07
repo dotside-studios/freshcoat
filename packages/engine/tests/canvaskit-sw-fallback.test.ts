@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import type { Command, PaintRuntime } from "../src/types";
+import type { PaintRuntime } from "../src/runtime-types";
+import type { Command } from "../src/types";
 
 const commands: Command[] = [
 	{ op: "createCanvas", width: 4, height: 4 },

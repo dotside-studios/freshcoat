@@ -5,11 +5,12 @@
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import {
-	createParagraphEngine,
+	createRenderer,
 	type FontVMetrics,
+	type Renderer,
 	readFontMetrics,
 } from "@freshcoat-js/engine";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { DrawTextCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
@@ -18,17 +19,19 @@ const FAMILY = "ParityFont";
 const W = 500;
 const H = 300;
 
-let ck: any;
-let fonts: Map<string, Uint8Array[]>;
+let renderer: Renderer;
 let fontMetrics: Record<string, FontVMetrics>;
 
 beforeAll(async () => {
 	const bytes = new Uint8Array(readFileSync(FONT_PATH));
-	fonts = new Map([[FAMILY, [bytes]]]);
-	ck = await loadCanvasKit();
+	renderer = await createRenderer({
+		ck: await loadCanvasKit(),
+		fonts: { [FAMILY]: [bytes] },
+	});
 	const m = readFontMetrics(bytes);
 	fontMetrics = m ? { [FAMILY]: m } : {};
 });
+afterAll(() => renderer.dispose());
 
 function card(properties: Record<string, unknown>): Template {
 	return {
@@ -65,18 +68,13 @@ function card(properties: Record<string, unknown>): Template {
 }
 
 function drawText(template: Template, useEngine: boolean): DrawTextCommand {
-	const engine = useEngine ? createParagraphEngine(ck, fonts) : undefined;
 	const frames = compileToCommands(
 		template,
 		{},
-		{
-			width: W,
-			height: H,
-			fontMetrics,
-			textEngine: engine,
-		},
+		useEngine
+			? { width: W, height: H, renderer }
+			: { width: W, height: H, fontMetrics },
 	);
-	engine?.dispose();
 	const cmd = frames[0]!.commands.find((c) => c.op === "drawText");
 	if (!cmd || cmd.op !== "drawText") throw new Error("no drawText command");
 	return cmd;

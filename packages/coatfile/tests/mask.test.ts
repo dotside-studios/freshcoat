@@ -1,12 +1,10 @@
 // The mask element: a shape (or any element) whose coverage decides how much of
 // the content shows. Positions are relative to the mask element, like a frame's.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { decodePixels } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Element, MaskElement, Template } from "../src/types";
 import { validate } from "../src/validate";
 
@@ -90,12 +88,12 @@ beforeAll(async () => {
 });
 
 async function pixels(tpl: Template, values: Record<string, unknown> = {}) {
-	const [frame] = (await render(
+	const [frame] = (await renderTemplate(
+		await createRenderer({ ck, cache: false }),
 		tpl,
 		values,
 		{ width: 80, height: 80 },
-		{ ck, env: createHeadlessEnv() },
-	)) as EncodedPaintedFrame[];
+	));
 	const d = decodePixels(ck, frame.bytes);
 	if (!d) throw new Error("decode failed");
 	return (x: number, y: number) =>

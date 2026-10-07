@@ -10,7 +10,7 @@ import {
 import { loadCases } from "../conformance/src/corpus";
 import { runConformance, sha256 } from "../conformance/src/run";
 import { makeRuntime } from "../src/runtime";
-import type { Painter } from "../src/types";
+import type { Painter } from "../src/runtime-types";
 
 let fixture: Fixture;
 
@@ -50,7 +50,7 @@ describe("the reference backend", () => {
 					const bytes = fixture.fonts.get(family);
 					return bytes ? { kind: "bytes", bytes } : { kind: "none" };
 				},
-				loadImageBytes: async (src) => {
+				loadBytes: async (src) => {
 					const bytes = fixture.images.get(src);
 					if (!bytes) throw new Error(`no image bytes for ${src}`);
 					return bytes;

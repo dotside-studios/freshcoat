@@ -2,10 +2,9 @@
 // analyzes it, and attaches a per-image correction — so the painted image differs
 // from the un-optimized render. finish:false isolates the per-layer adjust.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { decodePixels } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
 async function ckInit(): Promise<any> {
@@ -75,17 +74,17 @@ describe("render() print analyze path", () => {
 		const src = solidPngDataUrl(ck, [42, 157, 143, 255]);
 		const tpl = template(src);
 
-		const off = await render(
+		const off = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			tpl,
 			{},
 			{ width: 40, height: 40 },
-			{ ck, env: createHeadlessEnv() },
 		);
-		const on = await render(
+		const on = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			tpl,
 			{},
 			{ width: 40, height: 40, print: { analyze: true, finish: false } },
-			{ ck, env: createHeadlessEnv() },
 		);
 
 		const a = centerRGB(ck, (off[0] as { bytes: Uint8Array }).bytes);
@@ -101,11 +100,11 @@ describe("render() print analyze path", () => {
 		// Pale and near-neutral, so analysis prescribes its strongest boosts — which
 		// this close to full scale is more range than the layer has left.
 		const src = solidPngDataUrl(ck, [200, 205, 235, 255]);
-		const on = await render(
+		const on = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			template(src),
 			{},
 			{ width: 40, height: 40, print: { analyze: true } },
-			{ ck, env: createHeadlessEnv() },
 		);
 
 		const warning = on[0].warnings.find((w) => w.kind === "gamut_compressed");
@@ -121,11 +120,11 @@ describe("render() print analyze path", () => {
 		const ck = await ckInit();
 		// Mid-toned with room in every direction — the boosts land inside the range.
 		const src = solidPngDataUrl(ck, [120, 130, 125, 255]);
-		const on = await render(
+		const on = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			template(src),
 			{},
 			{ width: 40, height: 40, print: { analyze: true } },
-			{ ck, env: createHeadlessEnv() },
 		);
 		expect(on[0].warnings.some((w) => w.kind === "gamut_compressed")).toBe(
 			false,

@@ -10,10 +10,9 @@ import {
 	validate,
 } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import type { Node } from "@freshcoat-js/engine";
-import { renderSceneToPng } from "@freshcoat-js/engine/headless";
+import { createRenderer, type Node, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { walkLayers } from "../doc/path";
 import { sampleValues } from "../doc/values";
 import { SAMPLES } from "../samples";
@@ -21,10 +20,11 @@ import { DAVI_WORDMARK_HEIGHT, daviWordmark } from "../samples/davi-wordmark";
 import { findStarter, STARTERS } from "../samples/starters";
 import { VEND_SANS } from "../samples/vend-sans";
 
-let ck: unknown;
+let ck: Awaited<ReturnType<typeof loadCanvasKit>>;
 // The Google fonts the Davi card names are not reachable offline, so Vend Sans
 // stands in for them and the text is still shaped with a real face.
 let fonts: Map<string, Uint8Array[]>;
+let renderer: Renderer;
 
 beforeAll(async () => {
 	setBarcodeEncoder(bwipBarcodeEncoder);
@@ -36,7 +36,9 @@ beforeAll(async () => {
 	fonts = new Map(
 		["Vend Sans", "Playfair Display", "Roboto"].map((f) => [f, [bytes]]),
 	);
+	renderer = await createRenderer({ ck, fonts: Object.fromEntries(fonts) });
 });
+afterAll(() => renderer.dispose());
 
 async function load(id: string): Promise<Template> {
 	const s = findStarter(id);
@@ -98,11 +100,9 @@ describe("starters", () => {
 				);
 				for (const frame of out.frames) {
 					expect(frame.warnings ?? []).toEqual([]);
-					const result = await renderSceneToPng(frame.root as Node, {
+					const result = await renderer.render(frame.root as Node, {
 						width: t.width,
 						height: t.height,
-						ck,
-						fonts,
 					});
 					expect(result.warnings).toEqual([]);
 					expect(Array.from(result.bytes.slice(0, 4))).toEqual([
@@ -299,11 +299,9 @@ type CK = {
 /** Left and right ink edges of the light text in rows `top`..`bottom`. */
 async function inkEdges(t: Template, top: number, bottom: number) {
 	const out = compile(t, sampleValues(t), { width: t.width, height: t.height });
-	const png = await renderSceneToPng(out.frames[0]?.root as Node, {
+	const png = await renderer.render(out.frames[0]?.root as Node, {
 		width: t.width,
 		height: t.height,
-		ck,
-		fonts,
 	});
 	const kit = ck as CK;
 	const img = kit.MakeImageFromEncoded(png.bytes);

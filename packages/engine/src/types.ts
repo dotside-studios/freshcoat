@@ -12,9 +12,6 @@
 // structurally identical.
 
 import type { Precision } from "./color-policy";
-import type { DecodedPixels } from "./decode";
-import type { PaintCache } from "./paint-cache";
-import type { EncodeFormat, EncodeOptions } from "./png";
 
 export type Vec2 = { x: number; y: number };
 export type Size = { width: number; height: number };
@@ -470,128 +467,6 @@ export type FontVMetrics = {
 	capHeight: number; // 0 if the font predates OS/2 v2
 };
 
-export type CanvasLike = {
-	width: number;
-	height: number;
-	getContext(type: "2d"): CanvasRenderingContext2DLike | null;
-};
-
-// Structural stand-ins for the DOM's nominal CanvasGradient/CanvasPattern, so a
-// non-DOM canvas satisfies them without a cast.
-export type CanvasGradientLike = {
-	addColorStop(offset: number, color: string): void;
-};
-export type CanvasPatternLike = {
-	readonly __canvasPattern?: never;
-};
-
-// The Canvas2D string unions, declared rather than taken from the DOM lib.
-// This package is consumed by a server whose tsconfig has no DOM — a worker that
-// could name `document` is a worker that can typecheck a mistake — and these are
-// the only DOM types its public surface referenced.
-export type LineCap = "butt" | "round" | "square";
-export type LineJoin = "round" | "bevel" | "miter";
-export type TextAlign = "start" | "end" | "left" | "right" | "center";
-export type TextBaseline =
-	| "top"
-	| "hanging"
-	| "middle"
-	| "alphabetic"
-	| "ideographic"
-	| "bottom";
-
-export type CanvasRenderingContext2DLike = {
-	fillStyle: string | CanvasGradientLike | CanvasPatternLike;
-	strokeStyle: string;
-	lineWidth: number;
-	lineCap: LineCap;
-	lineJoin: LineJoin;
-	globalAlpha: number;
-	globalCompositeOperation: string;
-	font: string;
-	textAlign: TextAlign;
-	textBaseline: TextBaseline;
-	shadowColor: string;
-	shadowBlur: number;
-	shadowOffsetX: number;
-	shadowOffsetY: number;
-	filter: string;
-	// High-quality image resampling for scaled draws. Optional: not every
-	// canvas exposes them.
-	imageSmoothingEnabled?: boolean;
-	imageSmoothingQuality?: "low" | "medium" | "high";
-	save(): void;
-	restore(): void;
-	translate(x: number, y: number): void;
-	rotate(angle: number): void;
-	fillRect(x: number, y: number, w: number, h: number): void;
-	strokeRect(x: number, y: number, w: number, h: number): void;
-	beginPath(): void;
-	closePath(): void;
-	rect(x: number, y: number, w: number, h: number): void;
-	// Optional path arg fills/strokes a prebuilt Path2D (used for squircles);
-	// omitting it fills/strokes the current path.
-	fill(path?: unknown): void;
-	stroke(path?: unknown): void;
-	clip(): void;
-	measureText(text: string): { width: number };
-	fillText(text: string, x: number, y: number): void;
-	drawImage(
-		image: unknown,
-		dx: number,
-		dy: number,
-		dw: number,
-		dh: number,
-	): void;
-	drawImage(
-		image: unknown,
-		sx: number,
-		sy: number,
-		sw: number,
-		sh: number,
-		dx: number,
-		dy: number,
-		dw: number,
-		dh: number,
-	): void;
-	roundRect(
-		x: number,
-		y: number,
-		w: number,
-		h: number,
-		radius: number | number[],
-	): void;
-	setLineDash(segments: number[]): void;
-	createLinearGradient(
-		x0: number,
-		y0: number,
-		x1: number,
-		y1: number,
-	): CanvasGradientLike;
-	createRadialGradient(
-		x0: number,
-		y0: number,
-		r0: number,
-		x1: number,
-		y1: number,
-		r1: number,
-	): CanvasGradientLike;
-	createConicGradient(
-		startAngle: number,
-		x: number,
-		y: number,
-	): CanvasGradientLike;
-	createPattern(
-		image: unknown,
-		repetition: "repeat" | "repeat-x" | "repeat-y" | "no-repeat",
-	): CanvasPatternLike | null;
-};
-
-export type ImageLike = {
-	width: number;
-	height: number;
-};
-
 export type PaintWarning =
 	| { kind: "image_load_failed"; src: string; error: string }
 	// An SVG source drew without a feature it uses (text, filters, patterns).
@@ -633,108 +508,10 @@ export type PaintWarning =
 			pullback: number;
 	  };
 
-// Raw paint output. Carries lifecycle closures the runtime decides whether to
-// call — the "env owns disposal" seam. Internal to the paint step.
-export type PaintOutput = {
-	// The raster surface, when the backend has one. A backend that emits a
-	// document rather than pixels has no canvas and leaves this unset; its bytes
-	// come back from encode() like any other format.
-	canvas?: CanvasLike;
-	warnings: PaintWarning[];
-	// The painted frame as raw RGBA, at the device size the scene was rendered at.
-	// Separate from encode() because a comparison between two backends is about
-	// pixels, not about which encoder wrote them. null when the surface cannot be
-	// read back (a lost context); absent when the backend cannot rasterize at all.
-	readPixels?(): DecodedPixels | null;
-	// PNG bytes of the painted frame. Async because encoding goes through the
-	// platform's deflate (see ./png), which is a stream.
-	encode(
-		opts?: EncodeOptions,
-	): Promise<{ bytes: Uint8Array; format: EncodeFormat }>;
-	dispose(): void;
-};
-
-// The canvas host — a live surface to back a displayable (WebGL/SW) CanvasKit
-// surface with, when present. Its presence IS the capability: a host-less
-// runtime (createHeadlessEnv) renders offscreen instead.
-export type CanvasHost = {
-	createCanvas(width: number, height: number): CanvasLike;
-	decodeImage(bytes: Uint8Array): Promise<ImageLike>;
-	encode(canvas: CanvasLike): Uint8Array;
-};
-
 // What a runtime knows about a font request without fetching: pre-supplied bytes
 // (env already has them), a descriptor to load from, or nothing (by-name). The
-// shared `fontBytes` helper turns this into bytes; a native font system (Canvas2D)
-// can instead consume the resolution directly (register by path / stylesheet).
+// shared `fontBytes` helper turns this into bytes.
 export type FontResolution =
 	| { kind: "bytes"; bytes: Uint8Array[] }
 	| { kind: "descriptor"; descriptor: FontDescriptor }
 	| { kind: "none" };
-
-// The runtime (env) — the agnostic paint TARGET: offscreen-encode (server) vs
-// live-canvas keep (browser). Owns image byte I/O, font resolution + surface
-// lifecycle. `paint` takes the CanvasKit instance directly (CanvasKit is the
-// only backend, so there is no painter-strategy indirection).
-export type PaintRuntime = {
-	// Resolve a font request to what the env has (bytes / descriptor / nothing). A
-	// bare string is a by-name request.
-	resolveFont(req: FontRequest | string): FontResolution;
-	// Every family the env holds bytes for. A paint through a cache registers
-	// all of them, so a scene that uses fewer keeps the cached provider.
-	fonts?: Map<string, Uint8Array[]>;
-	loadImageBytes(src: string): Promise<Uint8Array>;
-	// Decoded images the runtime owns. When present, paint asks it for each image
-	// instead of decoding loadImageBytes itself, and never frees what it returns:
-	// a caller that keeps its own bounded cache of decoded images (an export
-	// worker reusing a logo across records) frees them on its own schedule. Null
-	// is an image that could not be had, painted as a placeholder.
-	loadImage?(src: string, ck: unknown): Promise<unknown | null>;
-	canvas?: CanvasHost;
-	// Native (DOM) font registration, browser env only: the resolution is loaded
-	// by the platform (FontFace / stylesheet). Absent on a canvas-less runtime.
-	registerFont?(family: string, res: FontResolution): void | Promise<void>;
-	// Keeps the font provider, decoded images and surface across paints (see
-	// ./paint-cache). Absent, every paint builds and frees its own.
-	cache?: PaintCache;
-	// Paint ONE compiled scene (a Command[] beginning with createCanvas) to a
-	// single surface. Multi-side rendering is the caller's loop — freshcoat has no
-	// notion of named frames/sides. ck is the CanvasKit-WASM instance; typed
-	// loosely as it has no TS types, and optional because a runtime built around a
-	// non-CanvasKit Painter has no use for one. `opts.cache` paints through that
-	// cache in place of the runtime's own.
-	paint(
-		commands: Command[],
-		ck?: unknown,
-		opts?: { cache?: PaintCache },
-	): Promise<PaintResult>;
-};
-
-// The backend seam: a compiled scene becomes an output. CanvasKit is the only
-// implementation, and there is no plan for a second one; the parameter exists so
-// that the conformance suite can grade a Painter without reaching into the
-// runtime, which is also how the reference backend is graded today. A backend
-// that emitted a document rather than pixels would leave PaintOutput.canvas unset
-// and answer encode() with its own bytes and format.
-export type Painter = (
-	commands: Command[],
-	rt: PaintRuntime,
-) => Promise<PaintOutput>;
-
-// paint() output after the runtime applies its disposal policy: browser keeps the
-// live canvas (+ dispose for unmount), server hands back encoded bytes. Neither
-// carries a frame/side name — the caller knows which scene it painted.
-export type KeptPaintResult = {
-	canvas: CanvasLike;
-	warnings: PaintWarning[];
-	dispose(): void;
-};
-export type EncodedPaintResult = {
-	// The encoded image, in whatever `format` says. Not named `png`: a WebP
-	// render answers here too, and a field read as the wrong format is how a
-	// caller comes to store one under the other's content type.
-	bytes: Uint8Array;
-	format: EncodeFormat;
-	warnings: PaintWarning[];
-};
-export type PaintResult = KeptPaintResult | EncodedPaintResult;
