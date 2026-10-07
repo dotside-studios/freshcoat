@@ -72,6 +72,18 @@ const hardLines = (text: string): number => text.split(/\r\n?|\n/).length;
 
 type Line = { text: string; width: number; hardBreak?: boolean };
 
+// The paragraph's unresolved codepoints, in the order the text first uses them.
+function missingIn(para: Paragraph, text: string): number[] | undefined {
+	const unresolved = new Set(para.unresolvedCodepoints());
+	if (unresolved.size === 0) return undefined;
+	const out: number[] = [];
+	for (const ch of text) {
+		const cp = ch.codePointAt(0) as number;
+		if (unresolved.delete(cp)) out.push(cp);
+	}
+	return [...out, ...unresolved];
+}
+
 export function createParagraphEngine(
 	canvasKit: unknown,
 	fonts: Map<string, Uint8Array[]>,
@@ -160,7 +172,7 @@ export function createParagraphEngine(
 		spans: InlineSpan[],
 		maxWidth: number,
 		direction?: "ltr" | "rtl",
-	): { lines: InlineShapedLine[] } {
+	): { lines: InlineShapedLine[]; missing?: number[] } {
 		if (spans.length === 0) return { lines: [] };
 		const pstyle = paragraphStyle(spans[0]!.font, direction);
 		const builder = makeParagraphBuilder(ck, pstyle, provider);
@@ -221,7 +233,8 @@ export function createParagraphEngine(
 						return { fragments, width: lm.width, hardBreak: lm.isHardBreak };
 					},
 				);
-			return { lines };
+			const missing = missingIn(para, full);
+			return missing ? { lines, missing } : { lines };
 		} finally {
 			para.delete();
 			builder.delete();
@@ -233,12 +246,12 @@ export function createParagraphEngine(
 		font: SpanFont,
 		maxWidth: number,
 		direction?: "ltr" | "rtl",
-	): Line[] {
+	): { lines: Line[]; missing?: number[] } {
 		const norm = collapse(text);
 		const { para, builder } = build(norm, font, direction);
 		try {
 			para.layout(maxWidth);
-			return para
+			const lines = para
 				.getLineMetrics()
 				.map(
 					(m: {
@@ -253,6 +266,8 @@ export function createParagraphEngine(
 						hardBreak: m.isHardBreak,
 					}),
 				);
+			const missing = missingIn(para, norm);
+			return missing ? { lines, missing } : { lines };
 		} finally {
 			para.delete();
 			builder.delete();
@@ -282,7 +297,7 @@ export function createParagraphEngine(
 				height: hardLines(text) * lineHeightPx,
 			};
 		}
-		const lines = breakLines(text, font, maxWidth);
+		const { lines } = breakLines(text, font, maxWidth);
 		const width = lines.reduce((max, l) => Math.max(max, l.width), 0);
 		const height = Math.max(1, lines.length) * lineHeightPx;
 		return { width, height };
@@ -330,7 +345,7 @@ export function createParagraphEngine(
 	): TextLayout => {
 		const lh = input.lineHeight;
 		const once = (size: number) => {
-			const lines = breakLines(
+			const { lines, missing } = breakLines(
 				input.value,
 				{ ...input.font, size },
 				input.maxWidth,
@@ -338,6 +353,7 @@ export function createParagraphEngine(
 			);
 			return {
 				lines,
+				...(missing ? { missing } : {}),
 				totalHeight:
 					lines.length * size * lh +
 					paragraphGaps(lines) * (input.paragraphSpacing ?? 0),

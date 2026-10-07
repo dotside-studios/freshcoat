@@ -868,6 +868,59 @@
 																	"kind",
 																	"stops"
 																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"kind": {
+																		"type": "string",
+																		"const": "pattern"
+																	},
+																	"pattern": {
+																		"type": "string",
+																		"enum": [
+																			"noise",
+																			"paper",
+																			"hatching",
+																			"dots"
+																		]
+																	},
+																	"scale": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"angle": {
+																		"type": "number"
+																	},
+																	"density": {
+																		"type": "number",
+																		"minimum": 0,
+																		"maximum": 1
+																	},
+																	"seed": {
+																		"type": "integer",
+																		"minimum": -9007199254740991,
+																		"maximum": 9007199254740991
+																	},
+																	"colors": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "string"
+																			},
+																			{
+																				"type": "string"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	}
+																},
+																"required": [
+																	"kind",
+																	"pattern"
+																]
 															}
 														]
 													},
@@ -1041,6 +1094,59 @@
 																	"required": [
 																		"kind",
 																		"stops"
+																	]
+																},
+																{
+																	"type": "object",
+																	"properties": {
+																		"kind": {
+																			"type": "string",
+																			"const": "pattern"
+																		},
+																		"pattern": {
+																			"type": "string",
+																			"enum": [
+																				"noise",
+																				"paper",
+																				"hatching",
+																				"dots"
+																			]
+																		},
+																		"scale": {
+																			"type": "number",
+																			"exclusiveMinimum": 0
+																		},
+																		"angle": {
+																			"type": "number"
+																		},
+																		"density": {
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		"seed": {
+																			"type": "integer",
+																			"minimum": -9007199254740991,
+																			"maximum": 9007199254740991
+																		},
+																		"colors": {
+																			"type": "array",
+																			"prefixItems": [
+																				{
+																					"type": "string"
+																				},
+																				{
+																					"type": "string"
+																				}
+																			],
+																			"items": false,
+																			"minItems": 2,
+																			"maxItems": 2
+																		}
+																	},
+																	"required": [
+																		"kind",
+																		"pattern"
 																	]
 																}
 															]
@@ -2255,6 +2361,59 @@
 																				"kind",
 																				"stops"
 																			]
+																		},
+																		{
+																			"type": "object",
+																			"properties": {
+																				"kind": {
+																					"type": "string",
+																					"const": "pattern"
+																				},
+																				"pattern": {
+																					"type": "string",
+																					"enum": [
+																						"noise",
+																						"paper",
+																						"hatching",
+																						"dots"
+																					]
+																				},
+																				"scale": {
+																					"type": "number",
+																					"exclusiveMinimum": 0
+																				},
+																				"angle": {
+																					"type": "number"
+																				},
+																				"density": {
+																					"type": "number",
+																					"minimum": 0,
+																					"maximum": 1
+																				},
+																				"seed": {
+																					"type": "integer",
+																					"minimum": -9007199254740991,
+																					"maximum": 9007199254740991
+																				},
+																				"colors": {
+																					"type": "array",
+																					"prefixItems": [
+																						{
+																							"type": "string"
+																						},
+																						{
+																							"type": "string"
+																						}
+																					],
+																					"items": false,
+																					"minItems": 2,
+																					"maxItems": 2
+																				}
+																			},
+																			"required": [
+																				"kind",
+																				"pattern"
+																			]
 																		}
 																	]
 																},
@@ -2428,6 +2587,59 @@
 																				"required": [
 																					"kind",
 																					"stops"
+																				]
+																			},
+																			{
+																				"type": "object",
+																				"properties": {
+																					"kind": {
+																						"type": "string",
+																						"const": "pattern"
+																					},
+																					"pattern": {
+																						"type": "string",
+																						"enum": [
+																							"noise",
+																							"paper",
+																							"hatching",
+																							"dots"
+																						]
+																					},
+																					"scale": {
+																						"type": "number",
+																						"exclusiveMinimum": 0
+																					},
+																					"angle": {
+																						"type": "number"
+																					},
+																					"density": {
+																						"type": "number",
+																						"minimum": 0,
+																						"maximum": 1
+																					},
+																					"seed": {
+																						"type": "integer",
+																						"minimum": -9007199254740991,
+																						"maximum": 9007199254740991
+																					},
+																					"colors": {
+																						"type": "array",
+																						"prefixItems": [
+																							{
+																								"type": "string"
+																							},
+																							{
+																								"type": "string"
+																							}
+																						],
+																						"items": false,
+																						"minItems": 2,
+																						"maxItems": 2
+																					}
+																				},
+																				"required": [
+																					"kind",
+																					"pattern"
 																				]
 																			}
 																		]
@@ -3990,6 +4202,59 @@
 														"kind",
 														"stops"
 													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"kind": {
+															"type": "string",
+															"const": "pattern"
+														},
+														"pattern": {
+															"type": "string",
+															"enum": [
+																"noise",
+																"paper",
+																"hatching",
+																"dots"
+															]
+														},
+														"scale": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"angle": {
+															"type": "number"
+														},
+														"density": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"seed": {
+															"type": "integer",
+															"minimum": -9007199254740991,
+															"maximum": 9007199254740991
+														},
+														"colors": {
+															"type": "array",
+															"prefixItems": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "string"
+																}
+															],
+															"items": false,
+															"minItems": 2,
+															"maxItems": 2
+														}
+													},
+													"required": [
+														"kind",
+														"pattern"
+													]
 												}
 											]
 										},
@@ -4058,6 +4323,38 @@
 											"type": "integer",
 											"exclusiveMinimum": 0,
 											"maximum": 9007199254740991
+										},
+										"arc": {
+											"type": "object",
+											"properties": {
+												"radius": {
+													"type": "number",
+													"minimum": 0
+												},
+												"sweep": {
+													"type": "number",
+													"exclusiveMinimum": 0,
+													"maximum": 360
+												},
+												"startAngle": {
+													"type": "number"
+												},
+												"direction": {
+													"type": "string",
+													"enum": [
+														"outside",
+														"inside"
+													]
+												},
+												"align": {
+													"type": "string",
+													"enum": [
+														"start",
+														"center",
+														"end"
+													]
+												}
+											}
 										}
 									},
 									"required": [
@@ -5960,6 +6257,59 @@
 																"kind",
 																"stops"
 															]
+														},
+														{
+															"type": "object",
+															"properties": {
+																"kind": {
+																	"type": "string",
+																	"const": "pattern"
+																},
+																"pattern": {
+																	"type": "string",
+																	"enum": [
+																		"noise",
+																		"paper",
+																		"hatching",
+																		"dots"
+																	]
+																},
+																"scale": {
+																	"type": "number",
+																	"exclusiveMinimum": 0
+																},
+																"angle": {
+																	"type": "number"
+																},
+																"density": {
+																	"type": "number",
+																	"minimum": 0,
+																	"maximum": 1
+																},
+																"seed": {
+																	"type": "integer",
+																	"minimum": -9007199254740991,
+																	"maximum": 9007199254740991
+																},
+																"colors": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "string"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																}
+															},
+															"required": [
+																"kind",
+																"pattern"
+															]
 														}
 													]
 												},
@@ -6133,6 +6483,59 @@
 																"required": [
 																	"kind",
 																	"stops"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"kind": {
+																		"type": "string",
+																		"const": "pattern"
+																	},
+																	"pattern": {
+																		"type": "string",
+																		"enum": [
+																			"noise",
+																			"paper",
+																			"hatching",
+																			"dots"
+																		]
+																	},
+																	"scale": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"angle": {
+																		"type": "number"
+																	},
+																	"density": {
+																		"type": "number",
+																		"minimum": 0,
+																		"maximum": 1
+																	},
+																	"seed": {
+																		"type": "integer",
+																		"minimum": -9007199254740991,
+																		"maximum": 9007199254740991
+																	},
+																	"colors": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "string"
+																			},
+																			{
+																				"type": "string"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	}
+																},
+																"required": [
+																	"kind",
+																	"pattern"
 																]
 															}
 														]
@@ -6765,6 +7168,59 @@
 																"kind",
 																"stops"
 															]
+														},
+														{
+															"type": "object",
+															"properties": {
+																"kind": {
+																	"type": "string",
+																	"const": "pattern"
+																},
+																"pattern": {
+																	"type": "string",
+																	"enum": [
+																		"noise",
+																		"paper",
+																		"hatching",
+																		"dots"
+																	]
+																},
+																"scale": {
+																	"type": "number",
+																	"exclusiveMinimum": 0
+																},
+																"angle": {
+																	"type": "number"
+																},
+																"density": {
+																	"type": "number",
+																	"minimum": 0,
+																	"maximum": 1
+																},
+																"seed": {
+																	"type": "integer",
+																	"minimum": -9007199254740991,
+																	"maximum": 9007199254740991
+																},
+																"colors": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "string"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																}
+															},
+															"required": [
+																"kind",
+																"pattern"
+															]
 														}
 													]
 												},
@@ -6938,6 +7394,59 @@
 																"required": [
 																	"kind",
 																	"stops"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"kind": {
+																		"type": "string",
+																		"const": "pattern"
+																	},
+																	"pattern": {
+																		"type": "string",
+																		"enum": [
+																			"noise",
+																			"paper",
+																			"hatching",
+																			"dots"
+																		]
+																	},
+																	"scale": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"angle": {
+																		"type": "number"
+																	},
+																	"density": {
+																		"type": "number",
+																		"minimum": 0,
+																		"maximum": 1
+																	},
+																	"seed": {
+																		"type": "integer",
+																		"minimum": -9007199254740991,
+																		"maximum": 9007199254740991
+																	},
+																	"colors": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "string"
+																			},
+																			{
+																				"type": "string"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	}
+																},
+																"required": [
+																	"kind",
+																	"pattern"
 																]
 															}
 														]
@@ -7533,6 +8042,59 @@
 														"kind",
 														"stops"
 													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"kind": {
+															"type": "string",
+															"const": "pattern"
+														},
+														"pattern": {
+															"type": "string",
+															"enum": [
+																"noise",
+																"paper",
+																"hatching",
+																"dots"
+															]
+														},
+														"scale": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"angle": {
+															"type": "number"
+														},
+														"density": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"seed": {
+															"type": "integer",
+															"minimum": -9007199254740991,
+															"maximum": 9007199254740991
+														},
+														"colors": {
+															"type": "array",
+															"prefixItems": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "string"
+																}
+															],
+															"items": false,
+															"minItems": 2,
+															"maxItems": 2
+														}
+													},
+													"required": [
+														"kind",
+														"pattern"
+													]
 												}
 											]
 										},
@@ -7706,6 +8268,59 @@
 														"required": [
 															"kind",
 															"stops"
+														]
+													},
+													{
+														"type": "object",
+														"properties": {
+															"kind": {
+																"type": "string",
+																"const": "pattern"
+															},
+															"pattern": {
+																"type": "string",
+																"enum": [
+																	"noise",
+																	"paper",
+																	"hatching",
+																	"dots"
+																]
+															},
+															"scale": {
+																"type": "number",
+																"exclusiveMinimum": 0
+															},
+															"angle": {
+																"type": "number"
+															},
+															"density": {
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															"seed": {
+																"type": "integer",
+																"minimum": -9007199254740991,
+																"maximum": 9007199254740991
+															},
+															"colors": {
+																"type": "array",
+																"prefixItems": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "string"
+																	}
+																],
+																"items": false,
+																"minItems": 2,
+																"maxItems": 2
+															}
+														},
+														"required": [
+															"kind",
+															"pattern"
 														]
 													}
 												]

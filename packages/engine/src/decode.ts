@@ -43,15 +43,14 @@ function readRGBA(
 	width: number,
 	height: number,
 ): Uint8Array | null {
-	const px = source.readPixels(
+	// Without a destination CanvasKit already copies out of the WASM heap.
+	return source.readPixels(
 		0,
 		0,
 		imageInfo(c, "pixels", width, height),
 		undefined,
 		width * 4,
 	) as Uint8Array | null;
-	// Copy out of the WASM heap so the result owns its buffer.
-	return px ? px.slice() : null;
 }
 
 // Draw an image's `src` rect into an `outW`×`outH` surface at `dest` (Mitchell

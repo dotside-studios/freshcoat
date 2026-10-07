@@ -10,6 +10,7 @@ import type {
 	FillRule,
 	ImageCrop,
 	ResolvedFill,
+	TextArc,
 	ResolvedFont,
 	Shadows,
 	ShapeMask,
@@ -169,6 +170,10 @@ export type TextNode = Transform & {
 	// against — while coatfile compiles the field explicitly, defaulting to
 	// Figma's own default, which is standard rather than trimmed.
 	leadingTrim?: boolean;
+	// Sets the text along a circle; each hard line is one ring. Defaults:
+	// a radius that keeps the glyphs inside the box, startAngle 0, outside,
+	// center.
+	arc?: Partial<TextArc>;
 	// A pre-baked layout, used as is. Without one, compileScene bakes text/spans
 	// through its TextEngine.
 	layout?: BakedTextLayout;

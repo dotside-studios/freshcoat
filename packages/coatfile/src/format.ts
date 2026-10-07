@@ -19,7 +19,7 @@ import type { Template } from "./types";
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
-//   1.6  frame `isolate`; element `backdropBlur`
+//   1.6  frame `isolate`; text `arc`; element `backdropBlur`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 6;
@@ -80,6 +80,7 @@ export function minimumFormatVersion(template: Template): string {
 			)
 				need(5);
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
+			if (o.type === "text" && usesArc(o.properties)) need(6);
 			if (o.type === "frame") {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
@@ -105,6 +106,7 @@ export function minimumFormatVersion(template: Template): string {
 				)
 					need(4);
 				if (usesTextLayout(delta.properties)) need(5);
+				if (usesArc(delta.properties)) need(6);
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
@@ -128,6 +130,14 @@ function usesIsolate(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).isolate !== undefined
+	);
+}
+
+function usesArc(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).arc !== undefined
 	);
 }
 

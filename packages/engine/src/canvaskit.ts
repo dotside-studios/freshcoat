@@ -14,7 +14,9 @@ import type {
 	Canvas,
 	CanvasKit,
 	ColorFilter,
+	Font,
 	FontWeightEnumValues,
+	GlyphRun,
 	Image,
 	ImageFilter,
 	ImageInfo,
@@ -32,6 +34,13 @@ import type {
 	TextStyle,
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
+import {
+	type ArcLine,
+	placeOnArc,
+	rsxformBounds,
+	spanAt,
+	spanByteStarts,
+} from "./arc-text";
 import { parseColor } from "./color";
 import {
 	imageInfo,
@@ -83,6 +92,7 @@ import {
 	encodePng,
 } from "./png";
 import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
+import { PATTERN_SKSL, type PatternFill } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type {
@@ -105,6 +115,8 @@ import type {
 	ShapeMask,
 	Size,
 	Stroke,
+	TextArc,
+	TextLine,
 } from "./types";
 
 type EnumKey<E> = Exclude<keyof E, "values">;
@@ -202,6 +214,57 @@ function toColor(ck: CanvasKit, input: string) {
 	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
+// Device pixels per local unit under the canvas's current matrix.
+function devicePx(canvas: Canvas): number {
+	const m = canvas.getTotalMatrix();
+	const px = Math.sqrt(Math.abs(m[0] * m[4] - m[1] * m[3]));
+	return Number.isFinite(px) && px > 0 ? px : 1;
+}
+
+// `px` is device pixels per design unit and `unit` the local units one design
+// unit spans, which differ from 1 only inside a path's viewBox.
+type PatternSpace = { px: number; unit?: [number, number] };
+
+function patternShader(
+	ck: CanvasKit,
+	bin: Bin,
+	fill: PatternFill,
+	x: number,
+	y: number,
+	space: PatternSpace,
+): Shader {
+	const [c0, c1] = fill.colors;
+	const eff = cachedEffect(ck, `pattern-${fill.pattern}`, () =>
+		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern]),
+	);
+	if (!eff)
+		return bin.track(ck.Shader.MakeColor(toColor(ck, c0), ck.ColorSpace.SRGB));
+	const scale = Math.max(fill.scale, 1e-3);
+	const [ux, uy] = space.unit ?? [1, 1];
+	const local = ck.Matrix.multiply(
+		ck.Matrix.translated(x, y),
+		ck.Matrix.scaled(ux, uy),
+		ck.Matrix.rotated((fill.angle * Math.PI) / 180),
+		ck.Matrix.scaled(scale, scale),
+	);
+	const density = Math.min(Math.max(fill.density, 0), 1);
+	const uniforms = [
+		...toColor(ck, c0),
+		...toColor(ck, c1),
+		density,
+		1 / (scale * space.px),
+	];
+	if (fill.pattern === "hatching" || fill.pattern === "dots")
+		return bin.track(eff.makeShader(uniforms, local));
+	const octaves = fill.pattern === "paper" ? 4 : 3;
+	const noise = bin.track(
+		fill.pattern === "paper"
+			? ck.Shader.MakeTurbulence(1, 1, octaves, fill.seed, 0, 0)
+			: ck.Shader.MakeFractalNoise(1, 1, octaves, fill.seed, 0, 0),
+	);
+	return bin.track(eff.makeShaderWithChildren(uniforms, [noise], local));
+}
+
 function shaderFor(
 	ck: CanvasKit,
 	bin: Bin,
@@ -210,7 +273,9 @@ function shaderFor(
 	y: number,
 	w: number,
 	h: number,
+	space: PatternSpace = { px: 1 },
 ): Shader {
+	if (fill.kind === "pattern") return patternShader(ck, bin, fill, x, y, space);
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -531,6 +596,7 @@ function drawText(
 					cmd.pos.y,
 					cmd.size.width,
 					cmd.size.height,
+					{ px: devicePx(canvas) },
 				)
 			: null;
 	let fgPaint: Paint | null = null;
@@ -543,6 +609,10 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	if (cmd.arc) {
+		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+		return;
+	}
 	// Gradient paints depend on position, so those lines are not cached.
 	const cache = fgPaint ? undefined : shapedLines.get(provider);
 	const rows = visibleRows(canvas);
@@ -587,6 +657,163 @@ function drawText(
 			canvas.drawRect(ck.XYWHRect(span.x, top, span.width, thickness), p);
 		}
 	}
+}
+
+// Each baked line shaped once, as drawText shapes it, with its run positions
+// relative to the paragraph baseline and its ring offset from the first line.
+function arcLines(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	fallback: string[],
+): { line: TextLine; arc: ArcLine }[] {
+	const cache = shapedLines.get(provider);
+	const first = cmd.layout.lines[0];
+	const base0 = first ? (first.baseline ?? first.y) : 0;
+	const out: { line: TextLine; arc: ArcLine }[] = [];
+	for (const line of cmd.layout.lines) {
+		if (!line.spans[0]) continue;
+		const shape = () =>
+			shapeLine(ck, provider, cmd, line, fallback, null, null);
+		let shaped: ShapedLine;
+		if (cache)
+			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
+		else {
+			shaped = shape();
+			bin.track(shaped.para);
+		}
+		const sl = shaped.para.getShapedLines()[0];
+		for (const run of sl?.runs ?? []) bin.track(run.typeface);
+		out.push({
+			line,
+			arc: {
+				runs: sl?.runs ?? [],
+				baseline: sl?.baseline ?? 0,
+				offset: (line.baseline ?? line.y) - base0,
+			},
+		});
+	}
+	return out;
+}
+
+function arcCenter(cmd: DrawTextCommand): [number, number] {
+	return [
+		cmd.pos.x + cmd.size.width / 2,
+		cmd.pos.y + cmd.size.height / 2,
+	];
+}
+
+function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
+	const font = bin.track(new ck.Font(run.typeface, run.size));
+	font.setSubpixel(true);
+	font.setEdging(ck.FontEdging.AntiAlias);
+	const scaleX = (run as { scaleX?: number }).scaleX;
+	if (scaleX && scaleX !== 1) font.setScaleX(scaleX);
+	if (run.fakeBold) font.setEmbolden(true);
+	if (run.fakeItalic) font.setSkewX(-FAKE_ITALIC_SKEW);
+	return font;
+}
+
+// Text along a circle: the line's own shaped glyphs, each drawn under an
+// RSXform, colored by the span its cluster belongs to.
+function drawArcText(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	arc: TextArc,
+	fallback: string[],
+	fgPaint: Paint | null,
+) {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const [cx, cy] = arcCenter(cmd);
+	const placed = placeOnArc(
+		lines.map((l) => l.arc),
+		arc,
+		cx,
+		cy,
+	);
+	const paints = new Map<string, Paint>();
+	const paintFor = (color: string) => {
+		let p = paints.get(color);
+		if (!p) {
+			p = bin.track(new ck.Paint());
+			p.setAntiAlias(true);
+			p.setColor(toColor(ck, color));
+			paints.set(color, p);
+		}
+		return p;
+	};
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		shaped.runs.forEach((run, ri) => {
+			const xforms = placed[li]?.[ri];
+			const n = run.glyphs.length;
+			if (!xforms || n === 0) return;
+			const font = runFont(ck, bin, run);
+			let from = 0;
+			while (from < n) {
+				const span = spanAt(starts, run.offsets[from] as number);
+				let to = from + 1;
+				while (to < n && spanAt(starts, run.offsets[to] as number) === span)
+					to++;
+				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
+					run.glyphs.subarray(from, to),
+					xforms.subarray(4 * from, 4 * to),
+					font,
+				);
+				if (blob) {
+					bin.track(blob);
+					const color = line.spans[span]?.color ?? cmd.color ?? "#000000";
+					canvas.drawTextBlob(blob, 0, 0, fgPaint ?? paintFor(color));
+				}
+				from = to;
+			}
+		});
+	});
+}
+
+// The local rects arc text's glyphs can cover: each glyph's font box under its
+// RSXform.
+function arcTextBounds(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	arc: TextArc,
+	fallback: string[],
+	em: Bounds,
+): Bounds[] {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const [cx, cy] = arcCenter(cmd);
+	const placed = placeOnArc(
+		lines.map((l) => l.arc),
+		arc,
+		cx,
+		cy,
+	);
+	const out: Bounds[] = [];
+	lines.forEach(({ arc: shaped }, li) => {
+		shaped.runs.forEach((run, ri) => {
+			const xforms = placed[li]?.[ri];
+			if (!xforms) return;
+			const size = run.size;
+			const skew = run.fakeItalic
+				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * size
+				: 0;
+			const slack = size / 8;
+			const b = rsxformBounds(xforms, [
+				Math.min(0, em[0]) * size - skew - slack,
+				Math.min(0, em[1]) * size - slack,
+				Math.max(0, em[2]) * size + skew + slack,
+				Math.max(0, em[3]) * size + slack,
+			]);
+			if (b) out.push(b);
+		});
+	});
+	return out;
 }
 
 function shapeLine(
@@ -1086,16 +1313,22 @@ function drawPath(
 	const vb = cmd.viewBox;
 	let boxW = cmd.size.width;
 	let boxH = cmd.size.height;
+	const space: PatternSpace = { px: devicePx(canvas) };
 	if (vb && vb.width > 0 && vb.height > 0) {
 		canvas.scale(cmd.size.width / vb.width, cmd.size.height / vb.height);
 		if (vb.x || vb.y) canvas.translate(-(vb.x ?? 0), -(vb.y ?? 0));
 		boxW = vb.width;
 		boxH = vb.height;
+		space.unit = [vb.width / cmd.size.width, vb.height / cmd.size.height];
 	}
+	const ox = vb?.x ?? 0;
+	const oy = vb?.y ?? 0;
 	for (const fill of cmd.fills ?? []) {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
 		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
+		else if (fill.kind === "pattern")
+			paint.setShader(patternShader(ck, bin, fill, ox, oy, space));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
@@ -1189,7 +1422,10 @@ function drawShape(
 			const paint = bin.track(new ck.Paint());
 			paint.setAntiAlias(true);
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
-			else paint.setShader(shaderFor(ck, bin, fill, x, y, w, h));
+			else
+				paint.setShader(
+					shaderFor(ck, bin, fill, x, y, w, h, { px: devicePx(canvas) }),
+				);
 			drawOutline(canvas, outline, paint);
 		}
 		if (cmd.stroke)
@@ -1523,6 +1759,24 @@ function adjustShaderSksl(
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
 // instances (e.g. across tests) never share an effect.
 const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
+function cachedEffect(
+	ck: CanvasKit,
+	key: string,
+	make: () => RuntimeEffect | null | undefined,
+): RuntimeEffect | null {
+	let byVariant = effectCache.get(ck);
+	if (!byVariant) {
+		byVariant = new Map();
+		effectCache.set(ck, byVariant);
+	}
+	let eff = byVariant.get(key);
+	if (eff === undefined) {
+		eff = make() ?? null;
+		byVariant.set(key, eff);
+	}
+	return eff;
+}
+
 function adjustEffect(
 	ck: CanvasKit,
 	hasMatrix: boolean,
@@ -1531,22 +1785,13 @@ function adjustEffect(
 	hasLut3d: boolean,
 	hasSharpen: boolean,
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
 	const bit = (b: boolean) => (b ? 1 : 0);
 	const key = `${bit(hasMatrix)}${bit(preserveHue)}${bit(hasLut)}${bit(hasLut3d)}${bit(hasSharpen)}`;
-	let eff = byVariant.get(key);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
-			) ?? null;
-		byVariant.set(key, eff);
-	}
-	return eff;
+	return cachedEffect(ck, key, () =>
+		ck.RuntimeEffect.Make(
+			adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
+		),
+	);
 }
 
 // Recording canvases that adjustedDeviceRect is measuring. An adjusted
@@ -1841,6 +2086,10 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
+	if (cmd.arc)
+		return em
+			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
+			: [];
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2702,22 +2951,13 @@ function finishEffect(
 	ck: CanvasKit,
 	variant: "finish" | "finish-curve" | "finish-noise",
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get(variant);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				variant === "finish-noise"
-					? FINISH_NOISE_SKSL
-					: finishSksl(variant === "finish-curve"),
-			) ?? null;
-		byVariant.set(variant, eff);
-	}
-	return eff;
+	return cachedEffect(ck, variant, () =>
+		ck.RuntimeEffect.Make(
+			variant === "finish-noise"
+				? FINISH_NOISE_SKSL
+				: finishSksl(variant === "finish-curve"),
+		),
+	);
 }
 
 function normalizeDither(dither: FrameFinish["dither"]) {
@@ -2989,16 +3229,9 @@ const LINEAR_BURN_SKSL = `
 	}`;
 
 function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get("linear-burn");
-	if (eff === undefined) {
-		eff = ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL) ?? null;
-		byVariant.set("linear-burn", eff);
-	}
+	const eff = cachedEffect(ck, "linear-burn", () =>
+		ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL),
+	);
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
@@ -3081,7 +3314,8 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			!outlineIsPath(rectShape(cmd.cornerRadius, cmd.cornerSmoothing)) &&
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
-	if (cmd.op === "drawText") return !cmd.fill || cmd.fill.kind === "solid";
+	if (cmd.op === "drawText")
+		return !cmd.arc && (!cmd.fill || cmd.fill.kind === "solid");
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
@@ -3428,9 +3662,15 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd, frame.precision);
-	const layered = lp !== null || isolates(cmd);
-	if (layered) {
-		const bounds = layerPaintBoundable(cmd)
+	// drawImage clips/strokes itself so its stroke isn't clipped.
+	const clips = !!cmd.clip && cmd.op !== "drawImage";
+	// Inside the clip, so the clip antialiases the composited children once
+	// rather than each child that overlaps a partly covered edge.
+	const isolated = isolates(cmd);
+	const inner = isolated && clips;
+	const outer = lp !== null || (isolated && !inner);
+	const bounds =
+		(outer || inner) && layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
 					canvas,
@@ -3441,13 +3681,13 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp ?? undefined, bounds);
-	}
-	// drawImage clips/strokes itself so its stroke isn't clipped.
-	if (cmd.clip && cmd.op !== "drawImage")
+	if (outer) canvas.saveLayer(lp ?? undefined, bounds);
+	if (clips && cmd.clip)
 		clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
+	if (inner) canvas.saveLayer(undefined, bounds);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (layered) canvas.restore();
+	if (inner) canvas.restore();
+	if (outer) canvas.restore();
 	canvas.restore();
 }
 
@@ -3952,23 +4192,32 @@ export async function paintScene(
 
 				const w = snap.width();
 				const h = snap.height();
-				const pixels = snap.readPixels(
-					0,
-					0,
-					imageInfo(ck, "pixels", w, h),
-				) as Uint8Array | null;
-				// A surface that won't read back (a lost context) still has Skia's
-				// encoder, which works off the snapshot rather than a pixel buffer —
-				// as does a runtime without CompressionStream. Bigger bytes beat no
-				// bytes, so both fall back to it rather than failing the render.
-				if (!pixels) return skiaPng();
+				// Without a destination CanvasKit copies the frame out to the JS heap.
+				// encodePng copies the rows before it awaits, so a heap growth that
+				// detaches this view cannot reach it.
+				const dest = ck.Malloc(Uint8Array, w * h * 4);
 				try {
-					return {
-						bytes: await encodePng(pixels, w, h, encodeOpts),
-						format: "png" as const,
-					};
-				} catch {
-					return skiaPng();
+					const pixels = snap.readPixels(
+						0,
+						0,
+						imageInfo(ck, "pixels", w, h),
+						dest,
+					) as Uint8Array | null;
+					// A surface that won't read back (a lost context) still has Skia's
+					// encoder, which works off the snapshot rather than a pixel buffer —
+					// as does a runtime without CompressionStream. Bigger bytes beat no
+					// bytes, so both fall back to it rather than failing the render.
+					if (!pixels) return skiaPng();
+					try {
+						return {
+							bytes: await encodePng(pixels, w, h, encodeOpts),
+							format: "png" as const,
+						};
+					} catch {
+						return skiaPng();
+					}
+				} finally {
+					ck.Free(dest);
 				}
 			} finally {
 				snap.delete();
@@ -3988,9 +4237,13 @@ export async function paintScene(
 	};
 }
 
-// Bind to rt.canvas when present (WebGL, SW fallback) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface -> null IS the capability probe
-// (a host canvas that can't back WebGL), so this needs no environment flag.
+// Bind to rt.canvas when present (WebGL, then SW) -> displayable; otherwise an
+// offscreen raster surface. MakeWebGLCanvasSurface throws when the host canvas
+// can't back WebGL (context creation fails, or MakeOnScreenGLSurface fails and its
+// DOM-node swap throws on an OffscreenCanvas), so a failed WebGL attempt is caught
+// on its own and still falls back to SW. A throw may leave a WebGL context on the
+// element, which locks it out of the 2D context SW presents through, so SW gets a
+// fresh element and the old one's context is released.
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
@@ -4000,18 +4253,34 @@ function makeSurface(
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
-	if (rt.canvas) {
-		try {
-			const el = rt.canvas.createCanvas(w, h);
-			// Typed for DOM canvases only; any canvas the host makes is accepted.
-			const target = el as unknown as HTMLCanvasElement;
-			const gl = ck.MakeWebGLCanvasSurface(target);
-			if (gl)
-				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(target);
-			if (sw) return { surface: sw, canvas: el, loseContext: noop };
-		} catch {
-			// Fall through to an offscreen surface.
+	const host = rt.canvas;
+	if (host) {
+		const create = (): CanvasLike | undefined => {
+			try {
+				return host.createCanvas(w, h);
+			} catch {
+				return undefined;
+			}
+		};
+		// Typed for DOM canvases only; any canvas the host makes is accepted.
+		const asTarget = (el: CanvasLike) => el as unknown as HTMLCanvasElement;
+		let el = create();
+		if (el) {
+			const canvas = el;
+			try {
+				const gl = ck.MakeWebGLCanvasSurface(asTarget(canvas));
+				if (gl)
+					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
+			} catch {
+				releaseGL(canvas);
+				el = create();
+			}
+		}
+		if (el) {
+			try {
+				const sw = ck.MakeSWCanvasSurface(asTarget(el));
+				if (sw) return { surface: sw, canvas: el, loseContext: noop };
+			} catch {}
 		}
 	}
 	const surface = ck.MakeSurface(w, h) as Surface;

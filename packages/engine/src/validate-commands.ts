@@ -10,6 +10,7 @@
 // Not part of the paint path. The conformance harness runs it on every case, and
 // a consumer building scenes by hand can run it in dev; production paints
 // unchecked, as it always has.
+import { PATTERN_KINDS } from "./pattern";
 import type {
 	Adjust,
 	Command,
@@ -352,6 +353,30 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 							id,
 						);
 				});
+			if (cmd.arc) {
+				const { radius, startAngle, sweep } = cmd.arc;
+				if (!finite(radius) || radius < 0)
+					add(
+						"bad_arc",
+						"arc radius must be a finite number >= 0",
+						`${path}.arc.radius`,
+						id,
+					);
+				if (!finite(startAngle))
+					add(
+						"bad_arc",
+						"arc startAngle is not finite",
+						`${path}.arc.startAngle`,
+						id,
+					);
+				if (sweep !== undefined && (!finite(sweep) || sweep <= 0))
+					add(
+						"bad_arc",
+						"arc sweep must be a finite number > 0",
+						`${path}.arc.sweep`,
+						id,
+					);
+			}
 			break;
 		case "drawGroup":
 			if (cmd.isolate !== undefined && typeof cmd.isolate !== "boolean")
@@ -444,6 +469,49 @@ function validateAdjust(
 		);
 }
 
+function validatePattern(
+	fill: Extract<ResolvedFill, { kind: "pattern" }>,
+	path: string,
+	add: Add,
+	id?: string,
+): void {
+	if (!PATTERN_KINDS.includes(fill.pattern))
+		add(
+			"unknown_pattern",
+			`unknown pattern "${fill.pattern}"`,
+			`${path}.pattern`,
+			id,
+		);
+	if (!finite(fill.scale) || fill.scale <= 0)
+		add(
+			"bad_pattern_scale",
+			`pattern scale must be > 0, got ${fill.scale}`,
+			`${path}.scale`,
+			id,
+		);
+	if (!finite(fill.density) || fill.density < 0 || fill.density > 1)
+		add(
+			"bad_pattern_density",
+			`pattern density must be within 0..1, got ${fill.density}`,
+			`${path}.density`,
+			id,
+		);
+	if (!finite(fill.angle))
+		add(
+			"bad_pattern_angle",
+			"pattern angle must be finite",
+			`${path}.angle`,
+			id,
+		);
+	if (!Number.isInteger(fill.seed))
+		add(
+			"bad_pattern_seed",
+			`pattern seed must be an integer, got ${fill.seed}`,
+			`${path}.seed`,
+			id,
+		);
+}
+
 function validateFill(
 	fill: ResolvedFill,
 	path: string,
@@ -451,6 +519,10 @@ function validateFill(
 	id?: string,
 ): void {
 	if (fill.kind === "solid") return;
+	if (fill.kind === "pattern") {
+		validatePattern(fill, path, add, id);
+		return;
+	}
 	const stops = fill.stops;
 	if (!stops || stops.length === 0) {
 		add("empty_gradient", "gradient has no stops", `${path}.stops`, id);

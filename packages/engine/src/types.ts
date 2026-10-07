@@ -65,6 +65,8 @@ export type FontDescriptor =
 
 export type GradientStop = { offset: number; color: string };
 
+export type PatternKind = "noise" | "paper" | "hatching" | "dots";
+
 export type FontRequest =
 	| { family: string }
 	| { family: string; descriptor: FontDescriptor };
@@ -200,6 +202,19 @@ export type ResolvedFill =
 			stops: GradientStop[];
 			center: Vec2;
 			rotation: number;
+	  }
+	// A procedural pattern in design units, anchored at the drawable's top-left,
+	// so it moves with the shape and keeps its size at every export density.
+	// `scale` is the feature size: noise grain, paper fibre, line spacing or dot
+	// pitch. `density` in [0, 1] is how much of colors[1] covers colors[0].
+	| {
+			kind: "pattern";
+			pattern: PatternKind;
+			scale: number;
+			angle: number;
+			density: number;
+			seed: number;
+			colors: [string, string];
 	  };
 
 export type ResolvedFont = {
@@ -224,6 +239,8 @@ export type BakedTextLayout = {
 	lines: TextLine[];
 	totalHeight: number;
 	shrinkApplied: boolean;
+	// See TextLayout.missing.
+	missing?: number[];
 };
 
 // One laid-out visual line. y is the line's top in target pixels (with
@@ -334,11 +351,26 @@ export type DrawCommandBase = {
 	adjust?: Adjust;
 };
 
+// Text set along a circle centered on the element box. Angles are degrees
+// clockwise from 12 o'clock. outside reads clockwise with glyph tops pointing
+// away from the center; inside reads counter-clockwise with tops pointing in.
+// `align` places the line's start, middle or end at `startAngle`.
+export type TextArc = {
+	// Radius of the first line's baseline, in target px.
+	radius: number;
+	startAngle: number;
+	direction: "outside" | "inside";
+	align: "start" | "center" | "end";
+	// Spreads each line's glyph positions across this many degrees.
+	sweep?: number;
+};
+
 export type DrawTextCommand = DrawCommandBase & {
 	op: "drawText";
 	layout: BakedTextLayout;
 	color: string;
 	fill?: ResolvedFill;
+	arc?: TextArc;
 };
 
 export type DrawImageCommand = DrawCommandBase & {
