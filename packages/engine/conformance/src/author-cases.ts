@@ -957,6 +957,39 @@ add(
 );
 
 add(
+	"mask-luminance-alpha",
+	"a luminance mask's coverage is its luminance times its alpha",
+	"core",
+	["mask.luminance", "mask.invert"],
+	frame([
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff80") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(30, 20, 50, 80), channel: "luminance" },
+		),
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff40") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(80, 20, 50, 80), channel: "luminance", invert: true },
+		),
+	]),
+	[
+		px(
+			[55, 60],
+			[151, 183, 246, 255],
+			"white at 50% alpha keeps 50% of the content, not all of it",
+			3,
+		),
+		px(
+			[105, 60],
+			[99, 147, 242, 255],
+			"inverted white at 25% alpha keeps 75%",
+			3,
+		),
+	],
+);
+
+add(
 	"mask-invert",
 	"invert flips the mask's coverage",
 	"core",
@@ -1745,6 +1778,38 @@ add(
 			"a flat interior is unchanged by an unsharp mask",
 			6,
 		),
+		{ kind: "warning", warning: "adjust_unsupported", absent: true },
+	],
+);
+
+// The LUT is the identity, so the layer still reads as plain multiply: the blend
+// meets the real destination, not the transparent offscreen the LUT runs in.
+const identityLut = () => ({
+	lut: { r: table((i) => i), g: table((i) => i), b: table((i) => i) },
+});
+add(
+	"adjust-lut-keeps-blend",
+	"an adjusted layer keeps its blend mode and opacity",
+	"raster",
+	["adjust.lut", "blend.multiply", "transform.opacity"],
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#0000ff") }),
+		createRect({
+			...box(20, 30, 50, 60),
+			fills: solid("#ff0000"),
+			blendMode: "multiply",
+			adjust: identityLut(),
+		}),
+		createRect({
+			...box(90, 30, 50, 60),
+			fills: solid("#ffffff"),
+			opacity: 0.5,
+			adjust: identityLut(),
+		}),
+	]),
+	[
+		px([45, 60], [0, 0, 0, 255], "multiply of red over blue", 2),
+		px([115, 60], [128, 128, 255, 255], "half opacity applied once", 2),
 		{ kind: "warning", warning: "adjust_unsupported", absent: true },
 	],
 );
