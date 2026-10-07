@@ -11,6 +11,7 @@
 // about templates — the caller delivers final resolved values on the nodes.
 import { bakeText, resolveLeadingTrim, textClipOutset } from "./bake-text";
 import { parseColor } from "./color";
+import type { Precision } from "./color-policy";
 import { metricsLookup, resolveAutoLineHeights } from "./line-height";
 import type {
 	EllipseNode,
@@ -76,6 +77,8 @@ export type CompileSceneOptions = {
 	// the grid the export LANDS on, not the denser one it passes through. Omit/1 =
 	// render at the export size.
 	supersample?: number;
+	// Working precision (see ./color-policy). Omit = "u8".
+	precision?: Precision;
 };
 
 type BakeCtx = {
@@ -121,6 +124,9 @@ export function compileScene(root: Node, opts: CompileSceneOptions): Command[] {
 			height: opts.height,
 			...(scale !== 1 ? { scale } : {}),
 			...(supersample !== 1 ? { supersample } : {}),
+			...(opts.precision && opts.precision !== "u8"
+				? { precision: opts.precision }
+				: {}),
 		},
 	];
 

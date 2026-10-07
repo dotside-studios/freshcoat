@@ -5,6 +5,7 @@
 // no WASM itself, so it stays in the light barrel.
 
 import type { Canvas, CanvasKit, Image } from "canvaskit-wasm";
+import { imageInfo } from "./color-policy";
 import type { ImageNode } from "./node";
 import { fitRect } from "./paint-helpers";
 
@@ -42,17 +43,10 @@ function readRGBA(
 	width: number,
 	height: number,
 ): Uint8Array | null {
-	const info = {
-		width,
-		height,
-		colorType: c.ColorType.RGBA_8888,
-		alphaType: c.AlphaType.Unpremul,
-		colorSpace: c.ColorSpace.SRGB,
-	};
 	const px = source.readPixels(
 		0,
 		0,
-		info,
+		imageInfo(c, "pixels", width, height),
 		undefined,
 		width * 4,
 	) as Uint8Array | null;

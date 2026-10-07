@@ -33,6 +33,13 @@ import type {
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
 import { parseColor } from "./color";
+import {
+	imageInfo,
+	makeImageFromPixels,
+	makeLayerSurface,
+	type Precision,
+	resolvePrecision,
+} from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
@@ -111,7 +118,13 @@ type LoadedFontBytes = { family: string; bytes: Uint8Array };
 // the canvas matrix do the work.
 // `grid` is how many device pixels make one output pixel: the supersample
 // factor, 1 when the scene is drawn at its export size.
-type Frame = { width: number; height: number; scale: number; grid?: number };
+type Frame = {
+	width: number;
+	height: number;
+	scale: number;
+	grid?: number;
+	precision?: Precision;
+};
 
 // Canvas2D shadowBlur ≈ 2·sigma. Figma's layer-blur value is ~2.27× the
 // Gaussian sigma (bjango blur-radius comparison), so a value of N → sigma N/2.27.
@@ -854,16 +867,12 @@ function drawBitmap(
 ) {
 	const { pos, size, pixels, pixelWidth, pixelHeight } = cmd;
 	if (pixelWidth <= 0 || pixelHeight <= 0) return;
-	const img = ck.MakeImage(
-		{
-			width: pixelWidth,
-			height: pixelHeight,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
+	const img = makeImageFromPixels(
+		ck,
+		"pixels",
+		pixelWidth,
+		pixelHeight,
 		pixels,
-		pixelWidth * 4,
 	);
 	if (!img) return;
 	canvas.save();
@@ -1373,17 +1382,7 @@ function buildLutImage(
 		px[i * 4 + 2] = lut.b[i];
 		px[i * 4 + 3] = 255;
 	}
-	return ck.MakeImage(
-		{
-			width: 256,
-			height: 1,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
-		px,
-		256 * 4,
-	);
+	return makeImageFromPixels(ck, "pixels", 256, 1, px);
 }
 
 type Lut3d = NonNullable<NonNullable<DrawCommand["adjust"]>["lut3d"]>;
@@ -1427,17 +1426,7 @@ function buildLut3dImage(ck: CanvasKit, lut: Lut3d): Image | null {
 			}
 		}
 	}
-	return ck.MakeImage(
-		{
-			width,
-			height: lut.size,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
-		px,
-		width * 4,
-	);
+	return makeImageFromPixels(ck, "pixels", width, lut.size, px);
 }
 
 // SkSL for the adjust post-pass, generated per feature combination. The source
@@ -2397,14 +2386,13 @@ function paintAdjustedOffscreen(
 		reach,
 	);
 	if (!rect) return;
-	const info = {
-		width: rect.width,
-		height: rect.height,
-		colorType: ck.ColorType.RGBA_8888,
-		alphaType: ck.AlphaType.Premul,
-		colorSpace: ck.ColorSpace.SRGB,
-	};
-	const surface = canvas.makeSurface(info);
+	const surface = makeLayerSurface(
+		ck,
+		canvas,
+		rect.width,
+		rect.height,
+		frame.precision,
+	);
 	const effect = surface
 		? adjustEffect(
 				ck,
@@ -2511,7 +2499,7 @@ function paintAdjustedOffscreen(
 	const local = canvas.getTotalMatrix();
 	const inverse = ck.Matrix.invert(local);
 	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
-	const lp = layerPaint(ck, bin, effects);
+	const lp = layerPaint(ck, bin, effects, frame.precision);
 	if (lp) {
 		const back = layerPaintBoundable(effects)
 			? invertAffine(local.slice(0, 6).map(f32) as Affine)
@@ -2588,6 +2576,7 @@ function reduceSupersampled(
 	design: Size,
 	exportScale: number,
 	supersample: number,
+	precision: Precision,
 ) {
 	const rect = (s: Size) => ck.XYWHRect(0, 0, s.width, s.height);
 	const retire = (s: Surface) => bin.track({ delete: () => s.dispose() });
@@ -2596,18 +2585,30 @@ function reduceSupersampled(
 	let levelSize = exportPixelSize(design, exportScale * supersample);
 	retire(src);
 
+	if (supersample === 1) {
+		const canvas = out.getCanvas();
+		canvas.clear(ck.TRANSPARENT);
+		canvas.drawImage(
+			bin.track(src.makeImageSnapshot()),
+			0,
+			0,
+			bin.track(new ck.Paint()),
+		);
+		return;
+	}
+
 	for (let factor = supersample; factor > 1; factor /= 2) {
 		const target = exportPixelSize(design, (exportScale * factor) / 2);
 		const last = factor === 2;
 		const dst = last
 			? out
-			: level.getCanvas().makeSurface({
-					width: target.width,
-					height: target.height,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Premul,
-					colorSpace: ck.ColorSpace.SRGB,
-				});
+			: makeLayerSurface(
+					ck,
+					level.getCanvas(),
+					target.width,
+					target.height,
+					precision,
+				);
 		const img = bin.track(level.makeImageSnapshot());
 		const paint = bin.track(new ck.Paint());
 		if (!dst) {
@@ -2926,13 +2927,9 @@ function finishNoise(
 	if (cache.finishNoise?.key === key) return cache.finishNoise.noise;
 	const effect = finishEffect(ck, "finish-noise");
 	if (!effect) return null;
-	const target = surface.getCanvas().makeSurface({
-		width: info.width,
-		height: info.height,
-		colorType: ck.ColorType.RGBA_F32,
-		alphaType: ck.AlphaType.Unpremul,
-		colorSpace: info.colorSpace,
-	});
+	const target = surface
+		.getCanvas()
+		.makeSurface(imageInfo(ck, "float", info.width, info.height));
 	if (!target) return null;
 	bin.track({ delete: () => target.dispose() });
 	const shader = bin.track(effect.makeShader([u.seed, u.monochrome ? 1 : 0]));
@@ -3128,8 +3125,15 @@ function setLayerBlend(
 // composites onto everything below it exactly like a Figma layer. The effects
 // run in the order README.md's "Layer effect order" gives: the color matrix is
 // the first image filter rather than the paint's color filter, which Skia would
-// apply after the shadows and after the paint's alpha.
-function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
+// apply after the shadows and after the paint's alpha. Skia evaluates image
+// filters in 8 bits, so under F16 a matrix with nothing to order against stays
+// on the paint, where the result is the same at full precision.
+function layerPaint(
+	ck: CanvasKit,
+	bin: Bin,
+	cmd: DrawCommand,
+	precision: Precision = "u8",
+): Paint | null {
 	const { blendMode, opacity, blur, shadow } = cmd;
 	const hasBlend = blendMode && blendMode !== "normal";
 	const hasOpacity = opacity !== undefined && opacity < 1;
@@ -3140,9 +3144,13 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	const paint = bin.track(new ck.Paint());
 	if (hasOpacity) paint.setAlphaf(opacity);
 	setLayerBlend(ck, bin, paint, blendMode);
-	let filter: ImageFilter | null = colorFilter
-		? bin.track(ck.ImageFilter.MakeColorFilter(colorFilter, null))
-		: null;
+	const onPaint =
+		precision === "f16" && !hasOpacity && !hasBlur && !shadow;
+	if (colorFilter && onPaint) paint.setColorFilter(colorFilter);
+	let filter: ImageFilter | null =
+		colorFilter && !onPaint
+			? bin.track(ck.ImageFilter.MakeColorFilter(colorFilter, null))
+			: null;
 	if (typeof blur === "number" && blur > 0)
 		filter = bin.track(
 			ck.ImageFilter.MakeBlur(
@@ -3343,7 +3351,7 @@ function paintDrawable(
 		canvas.rotate(cmd.rotation, 0, 0);
 		canvas.translate(-cx, -cy);
 	}
-	const lp = layerPaint(ck, bin, cmd);
+	const lp = layerPaint(ck, bin, cmd, frame.precision);
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	const clips = !!cmd.clip && cmd.op !== "drawImage";
 	// Inside the clip, so the clip antialiases the composited children once
@@ -3604,6 +3612,7 @@ export async function paintScene(
 				height: number;
 				scale?: number;
 				supersample?: number;
+				precision?: Precision;
 		  }
 		| undefined;
 	if (!create) throw new Error("canvaskit: scene has no createCanvas command");
@@ -3631,24 +3640,33 @@ export async function paintScene(
 	);
 	const renderScale = exportScale * supersample;
 	const render = exportPixelSize(design, renderScale);
-	const frame: Frame = { ...design, scale: renderScale, grid: supersample };
+	const precision = resolvePrecision(create.precision);
+	const frame: Frame = {
+		...design,
+		scale: renderScale,
+		grid: supersample,
+		precision,
+	};
 
-	// Derived from the output surface rather than ck.MakeSurface so it stays on the
-	// same backend (GPU under WebGL). A backend that won't give one degrades to
-	// rendering at the export size — softer than asked for, but a render.
+	// A working surface apart from the output, when the render is denser than
+	// the export or deeper than 8 bits. Derived from the output surface rather
+	// than ck.MakeSurface so it stays on the same backend (GPU under WebGL). A
+	// backend that won't give one degrades to rendering straight into the output
+	// at the export size and 8 bits: softer than asked for, but a render.
 	const superSurface =
-		supersample > 1
-			? surface.getCanvas().makeSurface({
-					width: render.width,
-					height: render.height,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Premul,
-					colorSpace: ck.ColorSpace.SRGB,
-				})
+		supersample > 1 || precision !== "u8"
+			? makeLayerSurface(
+					ck,
+					surface.getCanvas(),
+					render.width,
+					render.height,
+					precision,
+				)
 			: null;
-	if (supersample > 1 && !superSurface) {
+	if (!superSurface) {
 		frame.scale = exportScale;
 		frame.grid = 1;
+		frame.precision = "u8";
 	}
 	// Where the drawables actually land: the supersampled offscreen when there is
 	// one, else the output surface directly (the pre-supersampling path, untouched).
@@ -3668,7 +3686,8 @@ export async function paintScene(
 	// the closest one's run keeps the shared part in its place; one that shares
 	// none keeps its own beside the others. Nothing is read back that the cache
 	// could not keep.
-	const pixelInfo = cache && !rt.canvas ? target.imageInfo() : null;
+	const pixelInfo =
+		cache && !rt.canvas && frame.precision === "u8" ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
 		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
 		: "";
@@ -3781,6 +3800,7 @@ export async function paintScene(
 				design,
 				exportScale,
 				supersample,
+				precision,
 			);
 		const finishCmd = commands.find((c) => c.op === "finishFrame") as
 			| { op: "finishFrame"; finish: FrameFinish }
@@ -3815,13 +3835,11 @@ export async function paintScene(
 			try {
 				const w = snap.width();
 				const h = snap.height();
-				const data = snap.readPixels(0, 0, {
-					width: w,
-					height: h,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Unpremul,
-					colorSpace: ck.ColorSpace.SRGB,
-				}) as Uint8Array | null;
+				const data = snap.readPixels(
+					0,
+					0,
+					imageInfo(ck, "pixels", w, h),
+				) as Uint8Array | null;
 				return data ? { data, width: w, height: h } : null;
 			} finally {
 				snap.delete();
@@ -3863,13 +3881,11 @@ export async function paintScene(
 
 				const w = snap.width();
 				const h = snap.height();
-				const pixels = snap.readPixels(0, 0, {
-					width: w,
-					height: h,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Unpremul,
-					colorSpace: ck.ColorSpace.SRGB,
-				}) as Uint8Array | null;
+				const pixels = snap.readPixels(
+					0,
+					0,
+					imageInfo(ck, "pixels", w, h),
+				) as Uint8Array | null;
 				// A surface that won't read back (a lost context) still has Skia's
 				// encoder, which works off the snapshot rather than a pixel buffer —
 				// as does a runtime without CompressionStream. Bigger bytes beat no
@@ -3962,19 +3978,18 @@ function encodeJpeg(
 ): Uint8Array | null {
 	const width = snap.width();
 	const height = snap.height();
-	const info = {
+	const pixels = snap.readPixels(
+		0,
+		0,
+		imageInfo(ck, "pixels", width, height),
+	) as Uint8Array | null;
+	if (!pixels) return null;
+	const flat = makeImageFromPixels(
+		ck,
+		"opaque",
 		width,
 		height,
-		colorType: ck.ColorType.RGBA_8888,
-		alphaType: ck.AlphaType.Unpremul,
-		colorSpace: ck.ColorSpace.SRGB,
-	};
-	const pixels = snap.readPixels(0, 0, info) as Uint8Array | null;
-	if (!pixels) return null;
-	const flat = ck.MakeImage(
-		{ ...info, alphaType: ck.AlphaType.Opaque },
 		flattenOverWhite(pixels),
-		width * 4,
 	);
 	if (!flat) return null;
 	try {
