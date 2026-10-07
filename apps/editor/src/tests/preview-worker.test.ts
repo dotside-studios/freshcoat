@@ -4,12 +4,13 @@ import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { resolveFontRequest } from "@freshcoat-js/engine";
 import { makeRuntime } from "@freshcoat-js/engine/runtime";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { sampleValues } from "~/doc/values";
 import { type LiveRequest, renderLiveFrame } from "~/render/live-frame";
 import {
 	createWorkerBackend,
 	type PreviewWorkerLike,
+	previewWorkerEnabled,
 	previewWorkerSupported,
 	StalePreviewError,
 } from "~/render/preview-client";
@@ -275,6 +276,27 @@ describe("preview worker client", () => {
 
 	test("without OffscreenCanvas the main thread paints", () => {
 		expect(previewWorkerSupported()).toBe(false);
+		expect(previewWorkerEnabled()).toBe(false);
+	});
+
+	test("the worker paints only when opted into", () => {
+		class Canvas {
+			transferControlToOffscreen() {}
+		}
+		const win: { __freshcoatPreviewWorker?: boolean } = {};
+		vi.stubGlobal("window", win);
+		vi.stubGlobal("Worker", class {});
+		vi.stubGlobal("OffscreenCanvas", class {});
+		vi.stubGlobal("createImageBitmap", () => {});
+		vi.stubGlobal("HTMLCanvasElement", Canvas);
+		try {
+			expect(previewWorkerSupported()).toBe(true);
+			expect(previewWorkerEnabled()).toBe(false);
+			win.__freshcoatPreviewWorker = true;
+			expect(previewWorkerEnabled()).toBe(true);
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 });
 

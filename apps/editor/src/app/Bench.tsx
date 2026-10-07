@@ -47,10 +47,10 @@ export function BenchPage() {
 	const { controller } = useRouteContext({ from: "/bench" });
 	const search = useSearch({ from: "/bench" });
 	// Read when the Edit canvas mounts, which is after this.
-	if (search.preview === "main")
+	if (search.preview === "worker")
 		(
 			window as { __freshcoatPreviewWorker?: boolean }
-		).__freshcoatPreviewWorker = false;
+		).__freshcoatPreviewWorker = true;
 	return (
 		<Editor controller={controller} urlSync={false}>
 			<BenchRunner
