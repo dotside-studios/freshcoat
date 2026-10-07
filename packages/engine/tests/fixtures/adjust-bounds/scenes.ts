@@ -18,7 +18,7 @@ export type BoundsCase = {
 	height: number;
 	scale?: number;
 	supersample?: number;
-	// Renders with the Geist test font registered.
+	// Renders with the Geist and Hebrew test fonts registered.
 	fonts?: boolean;
 	scene: Node;
 };
@@ -48,6 +48,8 @@ const font = (size: number) => ({
 	size,
 	lineHeight: 1.2,
 });
+
+const hebrew = (size: number) => ({ ...font(size), family: "Hebrew" });
 
 const bars = (pattern: string): Uint8Array => {
 	const px = new Uint8Array(pattern.length * 4);
@@ -411,6 +413,104 @@ export const BOUNDS_CASES: BoundsCase[] = [
 				pixelHeight: 4,
 				role: "barcode",
 				adjust: buildAdjust({ contrast: 1.4, gamma: 0.8 }),
+			}),
+		]),
+	},
+	{
+		name: "text-negative-spacing",
+		width: 420,
+		height: 220,
+		fonts: true,
+		scene: frame(420, 220, [
+			createText({
+				pos: { x: 130, y: 10 },
+				size: { width: 260, height: 80 },
+				text: "Wavy",
+				font: { ...font(60), letterSpacing: -40 },
+				color: "#203060",
+				adjust: buildAdjust({ gamma: 1.8, sharpen: 1 }),
+			}),
+			createText({
+				pos: { x: 130, y: 110 },
+				size: { width: 260, height: 80 },
+				text: "שלום עולם",
+				font: { ...hebrew(60), letterSpacing: -30 },
+				direction: "rtl",
+				align: "left",
+				color: "#602030",
+				adjust: buildAdjust({ saturation: 1.3, gamma: 0.7 }),
+			}),
+		]),
+	},
+	{
+		name: "text-spacing-and-leading",
+		width: 300,
+		height: 160,
+		fonts: true,
+		scene: frame(300, 160, [
+			createText({
+				pos: { x: 20, y: 10 },
+				size: { width: 260, height: 70 },
+				text: "Ag jy Wq fj\nÅg",
+				font: { ...font(28), lineHeight: 0.6, letterSpacing: 6 },
+				align: "justify",
+				alignLast: "justify",
+				color: "#203060",
+				adjust: buildAdjust({ gamma: 1.6, sharpen: 1 }),
+			}),
+			createText({
+				pos: { x: 40, y: 90 },
+				size: { width: 220, height: 50 },
+				text: "שלום עולם טוב",
+				font: { ...hebrew(26), letterSpacing: -14 },
+				direction: "rtl",
+				align: "justify",
+				alignLast: "justify",
+				color: "#204020",
+				adjust: buildAdjust({ contrast: 1.2, sharpen: 0.8 }),
+			}),
+		]),
+	},
+	{
+		name: "text-shadow",
+		width: 220,
+		height: 120,
+		fonts: true,
+		scene: frame(220, 120, [
+			createText({
+				pos: { x: 20, y: 20 },
+				size: { width: 160, height: 50 },
+				text: "Shade fj",
+				font: { ...font(36), letterSpacing: -8 },
+				color: "#203060",
+				shadow: [
+					{ color: "#00000080", dx: -14, dy: 18, blur: 10 },
+					{ color: "#a0204080", dx: 10, dy: -6, blur: 2, spread: 4 },
+				],
+				adjust: buildAdjust({ gamma: 1.8, sharpen: 1 }),
+			}),
+		]),
+	},
+	{
+		name: "large-stroke",
+		width: 160,
+		height: 120,
+		scene: frame(160, 120, [
+			createPath({
+				pos: { x: 40, y: 30 },
+				size: { width: 60, height: 50 },
+				d: "M0 50 L 30 0 L 60 50",
+				stroke: { color: "#202060", width: 18, join: "miter", cap: "square" },
+				adjust: buildAdjust({ gamma: 1.6, sharpen: 1 }),
+			}),
+			createRect({
+				pos: { x: 110, y: 20 },
+				size: { width: 30, height: 70 },
+				rotation: 15,
+				fills: [ramp],
+				stroke: { color: "#602020", width: 16, align: "outside" },
+				shadow: { color: "#00000080", dx: 5, dy: 6, blur: 6 },
+				adjust: buildAdjust({ saturation: 1.4, sharpen: 1 }),
 			}),
 		]),
 	},

@@ -23,7 +23,7 @@ import {
 	redo,
 	undo,
 } from "~/doc/history";
-import { getElement, remapKeys } from "~/doc/path";
+import { getElement, keyRemapper, sameStructure } from "~/doc/path";
 import { sampleValues } from "~/doc/values";
 import {
 	activeVariantId,
@@ -84,6 +84,12 @@ export type DocState = {
 	/** The template as last saved (or opened); dirty is a comparison with it. */
 	saved: Template;
 	issues: ValidationError[];
+	/** `issues` predate `history.present`: a merging edit or a transaction
+	 *  left validation for when it settles. */
+	issuesStale?: boolean;
+	/** The template the selection, hidden and locked keys name layers in,
+	 *  when a transaction left them unmapped. Absent when it is the present. */
+	keysAt?: Template;
 	/** What loading had to say about the file: healed ids, a newer format. */
 	notices: string[];
 };
@@ -171,6 +177,7 @@ export type Action =
 			mergeKey?: string;
 	  }
 	| { type: "txEnd" }
+	| { type: "validate" }
 	| { type: "txCancel" }
 	| { type: "undo" }
 	| { type: "redo" }
@@ -356,7 +363,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
 		case "addTemplate":
 		case "removeTemplate":
 		case "duplicateTemplate":
-			return withKnownVariant(reduceOpen(state, action));
+			return withKnownVariant(reduceOpen(validated(state), action));
 		case "commit":
 			return withHistory(
 				state,
@@ -367,7 +374,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
 						guides: followSides(h, next),
 					});
 				},
-				{ select: action.select, validate: true },
+				{ select: action.select, validate: action.mergeKey === undefined },
 			);
 		case "txBegin":
 			return withHistory(state, begin);
@@ -388,6 +395,8 @@ export function reduce(state: EditorState, action: Action): EditorState {
 			);
 		case "txEnd":
 			return withHistory(state, end, { validate: true });
+		case "validate":
+			return validated(state);
 		case "txCancel":
 			return withHistory(state, cancel, { validate: true });
 		case "undo":
@@ -797,31 +806,48 @@ function withHistory(
 		changed && state.variantId !== undefined
 			? activeVariantId(after, state.variantId)
 			: state.variantId;
-	const remap = (keys: Iterable<string>) =>
-		changed ? remapKeys(before, after, keys) : [...keys];
+	const inTx = history.tx !== undefined;
+	const validate =
+		opts.validate && !inTx && (changed || state.doc.issuesStale === true);
+	const from = state.doc.keysAt ?? before;
+	const deferKeys = inTx && from !== after && sameStructure(from, after);
+	const moved = from !== after && !deferKeys;
+	const remap = moved
+		? keyRemapper(from, after)
+		: (keys: Iterable<string>) => [...keys];
+	const { keysAt: _, ...doc } = state.doc;
 	return {
 		...state,
 		side,
 		variantId,
 		doc: {
-			...state.doc,
+			...doc,
 			history,
-			issues:
-				opts.validate && (changed || history.tx === undefined)
-					? issuesOf(after)
-					: state.doc.issues,
+			issues: validate ? issuesOf(after) : state.doc.issues,
+			issuesStale: validate ? false : state.doc.issuesStale || changed,
+			...(deferKeys ? { keysAt: from } : {}),
 		},
 		selection: keepIfSame(
 			opts.select ?? remap(state.selection),
 			state.selection,
 		),
 		hover: changed ? null : state.hover,
-		hidden: changed
+		hidden: moved
 			? keepSetIfSame(remap(state.hidden), state.hidden)
 			: state.hidden,
-		locked: changed
+		locked: moved
 			? keepSetIfSame(remap(state.locked), state.locked)
 			: state.locked,
+	};
+}
+
+/** Brings `doc.issues` up to the present when an edit left them stale. */
+function validated(state: EditorState): EditorState {
+	const doc = state.doc;
+	if (!doc?.issuesStale) return state;
+	return {
+		...state,
+		doc: { ...doc, issues: issuesOf(doc.history.present), issuesStale: false },
 	};
 }
 

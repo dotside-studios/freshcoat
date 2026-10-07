@@ -82,7 +82,7 @@ const rowBase =
  * A grid of rows that mounts only the rows in view, so its cost does not
  * grow with the row count. Rows select through their checkboxes, a click,
  * Shift-click and Mod-click; arrow keys, Page Up/Down and Home/End move a
- * roving focus between cells.
+ * roving focus between cells, and with Shift extend the selected range.
  */
 export function VirtualDataGrid<C extends DataGridColumn>({
 	"aria-label": label,
@@ -107,6 +107,8 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 	const selectWidth = coarse ? 36 : 28;
 	const scroller = useRef<HTMLDivElement>(null);
 	const anchor = useRef<string | null>(null);
+	/** Where the last range from the anchor ended, so the next one replaces it. */
+	const extent = useRef<string | null>(null);
 	const latest = useRef({ rowKeys, selectedKeys, onSelectionChange });
 	latest.current = { rowKeys, selectedKeys, onSelectionChange };
 
@@ -184,24 +186,36 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 		if (next.has(key)) next.delete(key);
 		else next.add(key);
 		anchor.current = key;
+		extent.current = null;
 		onSelectionChange(next);
 	}, []);
 
-	const extendTo = useCallback((key: string) => {
+	const extendTo = useCallback((key: string, origin?: string) => {
 		const { rowKeys, selectedKeys, onSelectionChange } = latest.current;
-		const from = anchor.current ? rowKeys.indexOf(anchor.current) : -1;
 		const to = rowKeys.indexOf(key);
 		if (to < 0) return;
+		let from = anchor.current ? rowKeys.indexOf(anchor.current) : -1;
 		if (from < 0) {
-			anchor.current = key;
-			onSelectionChange(new Set([key]));
-			return;
+			extent.current = null;
+			if (origin === undefined) {
+				anchor.current = key;
+				onSelectionChange(new Set([key]));
+				return;
+			}
+			anchor.current = origin;
+			from = rowKeys.indexOf(origin);
+			if (from < 0) return;
 		}
 		const next = new Set<string | number>(
 			selectedKeys === "all" ? rowKeys : selectedKeys,
 		);
+		const prev = extent.current ? rowKeys.indexOf(extent.current) : -1;
+		if (prev >= 0)
+			for (let i = Math.min(from, prev); i <= Math.max(from, prev); i++)
+				next.delete(rowKeys[i] as string);
 		for (let i = Math.min(from, to); i <= Math.max(from, to); i++)
 			next.add(rowKeys[i] as string);
+		extent.current = key;
 		onSelectionChange(next);
 	}, []);
 
@@ -329,11 +343,13 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 				nr = ri < 0 ? -1 : Math.max(0, ri - page);
 				break;
 			case "Home":
-				nc = 0;
+				if (e.shiftKey) nr = 0;
+				else nc = 0;
 				if (mod) nr = 0;
 				break;
 			case "End":
-				nc = cols.length - 1;
+				if (e.shiftKey) nr = last;
+				else nc = cols.length - 1;
 				if (mod) nr = last;
 				break;
 			default:
@@ -343,6 +359,14 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 		nr = Math.max(-1, Math.min(last, nr));
 		nc = Math.max(0, Math.min(cols.length - 1, nc));
 		if (nr === ri && nc === ci) return;
+		const nextRow = nr < 0 ? undefined : rowKeys[nr];
+		if (nextRow !== undefined && nr !== ri) {
+			if (e.shiftKey && row !== undefined) extendTo(nextRow, row);
+			else if (!e.shiftKey) {
+				anchor.current = nextRow;
+				extent.current = null;
+			}
+		}
 		focusAt(nr, cols[nc] as string);
 	};
 
@@ -361,13 +385,18 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 	const range = virtualizer.range;
 	const focusMounted =
 		focusedIndex >= 0 && items.some((i) => i.index === focusedIndex);
-	const fallbackRow = focusMounted
-		? -1
-		: Math.max(range?.startIndex ?? 0, items[0]?.index ?? 0);
+	const headerFocused = focused?.row === HEADER;
+	const fallbackRow =
+		focusMounted || headerFocused
+			? -1
+			: Math.max(range?.startIndex ?? 0, items[0]?.index ?? 0);
 	const fallbackCol =
-		focused && focused.row !== HEADER
-			? focused.col
-			: (columns[0]?.id ?? SELECT);
+		focused && !headerFocused ? focused.col : (columns[0]?.id ?? SELECT);
+	const headerTabCol = headerFocused
+		? focused.col
+		: rowKeys.length === 0
+			? (columns[0]?.id ?? SELECT)
+			: null;
 	const sortColumn = sortDescriptor?.column;
 
 	return (
@@ -406,9 +435,7 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 							aria-colindex={1}
 							data-header=""
 							data-column={SELECT}
-							tabIndex={
-								focused?.row === HEADER && focused.col === SELECT ? 0 : -1
-							}
+							tabIndex={headerTabCol === SELECT ? 0 : -1}
 							className={cn(cellBase, headerCell, "justify-center")}
 							style={{ width: selectWidth }}
 						>
@@ -437,9 +464,7 @@ export function VirtualDataGrid<C extends DataGridColumn>({
 									data-header=""
 									data-column={c.id}
 									data-sort-direction={direction}
-									tabIndex={
-										focused?.row === HEADER && focused.col === c.id ? 0 : -1
-									}
+									tabIndex={headerTabCol === c.id ? 0 : -1}
 									className={`${cellBase} ${headerCell}`}
 									style={cellStyle(widths[i] as number, c.grow)}
 									onClick={() => sortBy(c)}

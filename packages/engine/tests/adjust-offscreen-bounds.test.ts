@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
@@ -18,7 +18,11 @@ import { BOUNDS_CASES } from "./fixtures/adjust-bounds/scenes";
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const GOLDENS = join(HERE, "fixtures", "adjust-bounds");
 const TOLERANCE = 2;
-const GEIST = readFileSync(testFontPath("Geist-Regular.ttf"));
+const FONTS = () =>
+	new Map([
+		["Geist", [testFontBytes("Geist-Regular.ttf")]],
+		["Hebrew", [testFontBytes("NotoSansHebrew-Regular.ttf")]],
+	]);
 
 async function ckInit(): Promise<any> {
 	return (await loadCanvasKit()) as unknown;
@@ -45,9 +49,7 @@ describe("adjust offscreen sized to the layer", () => {
 				scale: c.scale,
 				supersample: c.supersample,
 				ck,
-				...(c.fonts
-					? { fonts: new Map([["Geist", [new Uint8Array(GEIST)]]]) }
-					: {}),
+				...(c.fonts ? { fonts: FONTS() } : {}),
 			});
 			expect(out.warnings).toEqual([]);
 			const golden = readFileSync(join(GOLDENS, `${c.name}.png`));
@@ -185,15 +187,22 @@ describe("adjust offscreen sized to the layer", () => {
 					scale: c.scale,
 					supersample: c.supersample,
 					ck,
-					...(c.fonts
-						? { fonts: new Map([["Geist", [new Uint8Array(GEIST)]]]) }
-						: {}),
+					...(c.fonts ? { fonts: FONTS() } : {}),
 				});
 			}
 		} finally {
 			auditAdjustedBounds(undefined);
 		}
-		for (const kind of ["text", "path", "clip-and-mask", "barcode"])
+		for (const kind of [
+			"text",
+			"text-negative-spacing",
+			"text-spacing-and-leading",
+			"text-shadow",
+			"large-stroke",
+			"path",
+			"clip-and-mask",
+			"barcode",
+		])
 			expect(pairs.some((p) => p.name === kind)).toBe(true);
 		const EPS = 1e-3;
 		for (const { name, predicted: p, recorded: r } of pairs) {
@@ -255,7 +264,7 @@ describe("adjust offscreen sized to the layer", () => {
 				width: 120,
 				height: 80,
 				ck,
-				fonts: new Map([["Geist", [new Uint8Array(GEIST)]]]),
+				fonts: FONTS(),
 			});
 		} finally {
 			ck.Canvas.prototype.drawParagraph = drawParagraph;

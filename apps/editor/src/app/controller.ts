@@ -37,6 +37,7 @@ import {
 	sideGuides,
 	type TemplateGuides,
 } from "~/doc/guides";
+import { MERGE_WINDOW_MS } from "~/doc/history";
 import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
@@ -96,11 +97,22 @@ import {
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";
-import { clearAutosave, configureAutosave, writeAutosave } from "./autosave";
+import {
+	clearAutosave,
+	configureAutosave,
+	readAutosaveAsset,
+	writeAutosave,
+} from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
+import {
+	SourceChangedError,
+	settleAssets,
+	stopSourceAssets,
+	trackSourceAssets,
+} from "./source-assets";
 import { loadSvgImport } from "./svg";
 import type { SvgElements, svgToElements } from "./svg-import";
 
@@ -165,6 +177,8 @@ export class EditorController {
 	private viewport = { width: 0, height: 0 };
 	private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 	private autosaveSeen: Pick<EditorState, "doc" | "workspace">;
+	private validateTimer: ReturnType<typeof setTimeout> | undefined;
+	private validateSeen: EditorState["doc"] = null;
 	private openedListeners = new Set<() => void>();
 	private issuesListeners = new Set<() => void>();
 	private namePrompt: NamePrompt | undefined;
@@ -177,6 +191,7 @@ export class EditorController {
 		const { doc, workspace } = store.getState();
 		this.autosaveSeen = { doc, workspace };
 		this.store.subscribe(() => this.scheduleAutosave());
+		this.store.subscribe(() => this.scheduleValidation());
 	}
 
 	get state(): EditorState {
@@ -1119,6 +1134,7 @@ export class EditorController {
 	}
 
 	close(): void {
+		stopSourceAssets();
 		this.dispatch({ type: "close" });
 		void clearAutosave();
 	}
@@ -1137,6 +1153,13 @@ export class EditorController {
 			return false;
 		}
 		this.openWorkspace(out.workspace, name, out.warnings);
+		if (bytes instanceof Blob)
+			trackSourceAssets(out.workspace, {
+				fileName: name,
+				backup: readAutosaveAsset,
+				onChanged: (err) =>
+					toast(err.message, { tone: "danger", timeout: 12000 }),
+			});
 		return true;
 	}
 
@@ -1152,6 +1175,7 @@ export class EditorController {
 	}
 
 	openWorkspace(ws: Workspace, fileName: string, notices: string[] = []): void {
+		stopSourceAssets();
 		this.dispatch({ type: "openWorkspace", workspace: ws, fileName, notices });
 		for (const n of notices) toast(n, { tone: "warning", timeout: 8000 });
 		requestAnimationFrame(() => this.fitView());
@@ -1195,6 +1219,7 @@ export class EditorController {
 		if (!archive) return false;
 		const { packWorkspace, WORKSPACE_MEDIA_TYPE } = archive;
 		try {
+			await settleAssets(ws.datasets.flatMap((d) => d.assets));
 			const bytes = await packWorkspace(ws);
 			const name = workspaceFileName(this.state.workspace?.fileName, ws.name);
 			await downloadBytes(bytes, name, WORKSPACE_MEDIA_TYPE);
@@ -1202,9 +1227,9 @@ export class EditorController {
 			void clearAutosave();
 			return true;
 		} catch (err) {
-			toast(`Couldn't save the workspace: ${String(err)}`, {
-				tone: "danger",
-			});
+			const reason =
+				err instanceof SourceChangedError ? err.message : String(err);
+			toast(`Couldn't save the workspace: ${reason}`, { tone: "danger" });
 			return false;
 		}
 	}
@@ -1378,6 +1403,18 @@ export class EditorController {
 			if (ws && fileName && isDirty(this.state))
 				void writeAutosave({ workspace: ws, fileName });
 		}, 1000);
+	}
+
+	private scheduleValidation(): void {
+		const { doc } = this.state;
+		if (doc === this.validateSeen) return;
+		this.validateSeen = doc;
+		clearTimeout(this.validateTimer);
+		if (!doc?.issuesStale || doc.history.tx) return;
+		this.validateTimer = setTimeout(
+			() => this.dispatch({ type: "validate" }),
+			MERGE_WINDOW_MS,
+		);
 	}
 
 	// ── View ─────────────────────────────────────────────────────────────────

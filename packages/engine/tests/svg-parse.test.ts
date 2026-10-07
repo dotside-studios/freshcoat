@@ -259,6 +259,22 @@ describe("use and defs", () => {
 		expect(shapes(d.children)).toHaveLength(1);
 		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
 	});
+	test("an indirect cycle is cut before its target expands", () => {
+		const d = parseSvg(
+			svg(
+				'<defs><g id="p"><path d="M0 0H1V1Z"/><g id="b"><use href="#q"/></g></g><g id="q"><use href="#p"/></g></defs><use href="#b"/>',
+			),
+		);
+		expect(d.children).toEqual([]);
+		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
+	});
+	test("a reference to the root is cut", () => {
+		const d = parseSvg(
+			svg('<path d="M0 0H1V1Z"/><use href="#r"/>', 'id="r" width="100" height="100"'),
+		);
+		expect(shapes(d.children)).toHaveLength(1);
+		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
+	});
 	test("many references to a large group stay fast", () => {
 		const paths = Array.from({ length: 100 }, (_, i) => `<path d="M${i} 0h1v1Z"/>`).join("");
 		const uses = Array.from({ length: 100 }, () => '<use href="#big"/>').join("");

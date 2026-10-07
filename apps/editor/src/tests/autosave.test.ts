@@ -104,6 +104,14 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
+	it("hands back one stored photo by its sha", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		expect(await bytes((await store.asset("sha1")) as Blob)).toEqual([1, 1, 1]);
+		expect(await store.asset("sha9")).toBeNull();
+	});
+
 	it("writes each photo once and skips a workspace it already wrote", async () => {
 		const db = freshDb();
 		const store = createAutosaveStore(db);
@@ -402,7 +410,7 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
-	it("puts photos again that another tab collected mid-write", async () => {
+	it("puts photos again that another tab collected mid-write without another edit", async () => {
 		const db = freshDb();
 		const tabA = createAutosaveStore(db, { tabId: "A" });
 		const tabB = createAutosaveStore(db, { tabId: "B" });
@@ -441,13 +449,6 @@ describe("autosave", () => {
 		const photoX = workspace([asset(1), asset(3)]);
 		await tabA.write({ workspace: photoX, fileName: "a" });
 		expect(tabBWrote).not.toBeNull();
-		expect(await rawGet(db, "assets", "sha3")).toBeUndefined();
-		vi.restoreAllMocks();
-
-		await tabA.write({
-			workspace: { ...photoX, name: "Edited" },
-			fileName: "a",
-		});
 		expect(await rawGet(db, "assets", "sha3")).toBeInstanceOf(Blob);
 
 		const read = await createAutosaveStore(db).read();

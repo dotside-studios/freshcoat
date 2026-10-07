@@ -37,7 +37,7 @@ import { linearGradientPoints } from "./gradient";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
-import { generateMatrix } from "./qr";
+import { generatePixels } from "./qr";
 import { childElements } from "./tree";
 import type {
 	Background,
@@ -652,8 +652,6 @@ function compileQr(
 	const value = String(props.value ?? "");
 	const ec =
 		(props.errorCorrection as "L" | "M" | "Q" | "H" | undefined) ?? "M";
-	const modules = generateMatrix(value, ec);
-	const n = modules.length;
 	const margin = typeof props.margin === "number" ? props.margin * ratio : 0;
 	const foreground = String(props.foreground ?? "#000");
 	const background = props.background as string | undefined;
@@ -668,19 +666,11 @@ function compileQr(
 			fills: [{ kind: "solid", color: background }],
 		});
 	}
-	const [r, g, b] = parseHexColor(foreground);
-	const pixels = new Uint8Array(n * n * 4);
-	for (let y = 0; y < n; y++) {
-		for (let x = 0; x < n; x++) {
-			if (modules[y][x]) {
-				const i = (y * n + x) * 4;
-				pixels[i] = r;
-				pixels[i + 1] = g;
-				pixels[i + 2] = b;
-				pixels[i + 3] = 255;
-			}
-		}
-	}
+	const { size: n, pixels } = generatePixels(
+		value,
+		ec,
+		parseHexColor(foreground),
+	);
 	children.push({
 		kind: "bitmap",
 		pos: { x: margin, y: margin },
