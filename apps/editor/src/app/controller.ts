@@ -96,11 +96,22 @@ import {
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";
-import { clearAutosave, configureAutosave, writeAutosave } from "./autosave";
+import {
+	clearAutosave,
+	configureAutosave,
+	readAutosaveAsset,
+	writeAutosave,
+} from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { exportSidePng } from "./export-png";
+import {
+	SourceChangedError,
+	settleAssets,
+	stopSourceAssets,
+	trackSourceAssets,
+} from "./source-assets";
 import { svgMarkup, svgSize } from "./svg";
 
 configureAutosave({
@@ -1056,6 +1067,7 @@ export class EditorController {
 	}
 
 	close(): void {
+		stopSourceAssets();
 		this.dispatch({ type: "close" });
 		void clearAutosave();
 	}
@@ -1071,10 +1083,18 @@ export class EditorController {
 			return false;
 		}
 		this.openWorkspace(out.workspace, name, out.warnings);
+		if (bytes instanceof Blob)
+			trackSourceAssets(out.workspace, {
+				fileName: name,
+				backup: readAutosaveAsset,
+				onChanged: (err) =>
+					toast(err.message, { tone: "danger", timeout: 12000 }),
+			});
 		return true;
 	}
 
 	openWorkspace(ws: Workspace, fileName: string, notices: string[] = []): void {
+		stopSourceAssets();
 		this.dispatch({ type: "openWorkspace", workspace: ws, fileName, notices });
 		for (const n of notices) toast(n, { tone: "warning", timeout: 8000 });
 		requestAnimationFrame(() => this.fitView());
@@ -1118,6 +1138,7 @@ export class EditorController {
 			"@freshcoat-js/workspace"
 		);
 		try {
+			await settleAssets(ws.datasets.flatMap((d) => d.assets));
 			const bytes = await packWorkspace(ws);
 			const name = workspaceFileName(this.state.workspace?.fileName, ws.name);
 			await downloadBytes(bytes, name, WORKSPACE_MEDIA_TYPE);
@@ -1125,9 +1146,9 @@ export class EditorController {
 			void clearAutosave();
 			return true;
 		} catch (err) {
-			toast(`Couldn't save the workspace: ${String(err)}`, {
-				tone: "danger",
-			});
+			const reason =
+				err instanceof SourceChangedError ? err.message : String(err);
+			toast(`Couldn't save the workspace: ${reason}`, { tone: "danger" });
 			return false;
 		}
 	}

@@ -4,6 +4,7 @@ import {
 	parseAssetRef,
 } from "@freshcoat-js/workspace";
 import { useEffect, useMemo, useState } from "react";
+import { recoverAsset } from "~/app/source-assets";
 import { Lru } from "./lru";
 import type { ThumbnailReply, ThumbnailRequest } from "./thumbnail-worker";
 
@@ -182,8 +183,17 @@ function pump(): void {
 		inFlight += 1;
 		making.set(job.key, job);
 		const size = seenSize(job.asset);
-		make({ blob: job.asset.blob, kind: "thumb", maxWidth: job.width, ...size })
-			.catch(() => job.asset.blob)
+		const makeThumb = () =>
+			make({
+				blob: job.asset.blob,
+				kind: "thumb",
+				maxWidth: job.width,
+				...size,
+			});
+		makeThumb()
+			.catch(async () => ((await recoverAsset(job.asset)) ? makeThumb() : null))
+			.catch(() => null)
+			.then((made) => made ?? job.asset.blob)
 			.then((blob) => {
 				// Cleared by a backend change while it was made: nobody asked
 				// this cache for it.
@@ -337,15 +347,23 @@ async function loadPreview(
 		Math.max(size.width, size.height) <= maxEdge;
 	// A photo already this small, in a format the renderer reads, is used as
 	// it is: the renderer applies its EXIF orientation too.
-	if (small && DECODABLE.has(asset.contentType))
-		return new Uint8Array(await asset.blob.arrayBuffer());
-	const blob = await make({
-		blob: asset.blob,
-		kind: "preview",
-		maxEdge,
-		...size,
-	}).catch(() => asset.blob);
-	return new Uint8Array(await blob.arrayBuffer());
+	const load = async () => {
+		if (small && DECODABLE.has(asset.contentType))
+			return new Uint8Array(await asset.blob.arrayBuffer());
+		const blob = await make({
+			blob: asset.blob,
+			kind: "preview",
+			maxEdge,
+			...size,
+		}).catch(() => asset.blob);
+		return new Uint8Array(await blob.arrayBuffer());
+	};
+	try {
+		return await load();
+	} catch (err) {
+		if (await recoverAsset(asset)) return load();
+		throw err;
+	}
 }
 
 /** A photo's bytes with its long edge at most `maxEdge`, upright. The last

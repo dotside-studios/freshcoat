@@ -104,6 +104,14 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
+	it("hands back one stored photo by its sha", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		expect(await bytes((await store.asset("sha1")) as Blob)).toEqual([1, 1, 1]);
+		expect(await store.asset("sha9")).toBeNull();
+	});
+
 	it("writes each photo once and skips a workspace it already wrote", async () => {
 		const db = freshDb();
 		const store = createAutosaveStore(db);

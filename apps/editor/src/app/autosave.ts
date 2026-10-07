@@ -112,6 +112,8 @@ export type AutosaveOptions = {
 export type AutosaveStore = {
 	write(entry: Omit<Autosave, "savedAt">): Promise<void>;
 	read(): Promise<Autosave | null>;
+	/** The stored copy of one photo, or null. */
+	asset(sha256: string): Promise<Blob | null>;
 	clear(): Promise<void>;
 };
 
@@ -529,6 +531,18 @@ export function createAutosaveStore(
 			}
 		},
 
+		async asset(sha256) {
+			try {
+				const db = await connect();
+				const blob = (await request(
+					db.transaction(ASSET_STORE).objectStore(ASSET_STORE).get(sha256),
+				)) as Blob | undefined;
+				return blob ?? null;
+			} catch {
+				return null;
+			}
+		},
+
 		async clear() {
 			last = null;
 			savedAssets = null;
@@ -569,6 +583,10 @@ export function writeAutosave(entry: Omit<Autosave, "savedAt">): Promise<void> {
 
 export function readAutosave(): Promise<Autosave | null> {
 	return store().read();
+}
+
+export function readAutosaveAsset(sha256: string): Promise<Blob | null> {
+	return store().asset(sha256);
 }
 
 export function clearAutosave(): Promise<void> {

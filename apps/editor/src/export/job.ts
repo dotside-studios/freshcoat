@@ -203,7 +203,7 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-function boundDatasetOf(
+export function boundDatasetOf(
 	workspace: Workspace,
 	preset: ExportPreset,
 ): Dataset | undefined {
