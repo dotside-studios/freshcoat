@@ -81,7 +81,7 @@ its errors are listed with the export's warnings.
 
 The exporter keeps supported content as editable template elements: text,
 shapes, vectors, images, layout frames and masks. Features it cannot represent
-are rasterized where possible. For example, background blur, diamond gradients
+are rasterized where possible. For example, progressive blur, diamond gradients
 and text whose runs are painted with different gradients become bitmaps. A
 rasterized region preserves
 its rendered appearance, but its internal layers and text are no longer
@@ -153,9 +153,13 @@ layers were kept, flattened or skipped.
   a layer of its own, and so does a Normal group holding a blended layer, with
   `isolate`. Any other group is flattened into its parent, which changes
   nothing when none of its layers blend.
-- **Effects.** Drop and inner shadows (stacked, with spread) and layer blur are
-  native. Background blur, progressive blur, a shadow with its own blend mode,
-  and noise, texture or glass effects are rasterized (`effect_flattened`).
+- **Effects.** Drop and inner shadows (stacked, with spread), layer blur and
+  background blur are native. Background blur becomes the element's
+  `backdropBlur`, so it keeps blurring whatever is placed beneath it. On text
+  and groups it is rasterized, because the backdrop would cover their box
+  rather than their outline. Progressive blur, a shadow with its own blend
+  mode, and noise, texture or glass effects are rasterized
+  (`effect_flattened`).
 - **Auto layout.** Baseline alignment is not supported by the renderer's
   layout, so it is written as `start`.
 - **Linear gradients.** A gradient's start and end come from Figma's handles,

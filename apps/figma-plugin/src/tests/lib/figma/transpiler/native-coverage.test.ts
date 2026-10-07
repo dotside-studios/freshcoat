@@ -508,6 +508,23 @@ describe("in a transpiled card", () => {
 		expect(child?.blendMode).toBe("multiply");
 	});
 
+	it("keeps a background blur editable on a rect and a frame", async () => {
+		const [box, card] = await elementsOf([
+			rect({
+				effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 12 }],
+			}),
+			frame([], {
+				id: "1:8",
+				name: "card",
+				effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 6 }],
+			}),
+		]);
+		expect(box.type).toBe("rect");
+		expect(box.backdropBlur).toBe(12);
+		expect(card.type).toBe("frame");
+		expect(card.backdropBlur).toBe(6);
+	});
+
 	it("flattens a Normal group when nothing in it blends", async () => {
 		const [el] = await elementsOf([
 			frame([rect()], { type: "GROUP", name: "plain", blendMode: "NORMAL" }),

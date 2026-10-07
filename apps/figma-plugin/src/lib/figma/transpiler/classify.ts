@@ -119,14 +119,19 @@ export function vectorFillRule(
 }
 
 // DROP_SHADOW, INNER_SHADOW and LAYER_BLUR lower to the element's shadow stack
-// and blur. BACKGROUND_BLUR samples what is behind the layer, which a filter on
-// the layer cannot see. A progressive blur ramps its radius and a shadow with
-// its own blend mode composites apart from its layer, neither of which the
-// element's blur and shadow can say. Newer kinds (noise, texture, glass) have
-// no equivalent.
-function isUnsupportedEffect(e: FigmaEffect): boolean {
+// and blur, BACKGROUND_BLUR to its backdropBlur. The backdrop is blurred under
+// the element's outline, which for text is its box rather than its glyphs and
+// for a group is a box Figma never draws, so those two keep flattening. A
+// progressive blur ramps its radius and a shadow with its own blend mode
+// composites apart from its layer, neither of which the element's blur and
+// shadow can say. Newer kinds (noise, texture, glass) have no equivalent.
+function isUnsupportedEffect(n: FigmaNode, e: FigmaEffect): boolean {
 	if (e.visible === false) return false;
 	if (e.type === "LAYER_BLUR") return e.blurType === "PROGRESSIVE";
+	if (e.type === "BACKGROUND_BLUR")
+		return (
+			e.blurType === "PROGRESSIVE" || n.type === "TEXT" || n.type === "GROUP"
+		);
 	if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW")
 		return e.blendMode !== undefined && e.blendMode !== "NORMAL";
 	return true;
@@ -134,7 +139,7 @@ function isUnsupportedEffect(e: FigmaEffect): boolean {
 
 function hasUnsupportedEffects(n: FigmaNode): boolean {
 	if (!Array.isArray(n.effects)) return false;
-	return n.effects.some(isUnsupportedEffect);
+	return n.effects.some((e) => isUnsupportedEffect(n, e));
 }
 
 // A node whose transform can't be decomposed into rotation + translation

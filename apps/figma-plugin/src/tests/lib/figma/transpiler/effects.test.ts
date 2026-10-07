@@ -51,7 +51,27 @@ describe("extractEffects", () => {
 		expect(fx.blur).toBe(12);
 	});
 
-	it("INNER_SHADOW becomes an inset shadow; BACKGROUND_BLUR is left to classify", () => {
+	it("BACKGROUND_BLUR → backdropBlur scaled with ratio", () => {
+		const fx = extractEffects(
+			[
+				{ type: "BACKGROUND_BLUR", visible: true, radius: 8 },
+				{ type: "BACKGROUND_BLUR", visible: true, radius: 2 },
+			],
+			2,
+		);
+		expect(fx.backdropBlur).toBe(16);
+		expect(fx.blur).toBeUndefined();
+	});
+
+	it("a hidden BACKGROUND_BLUR is dropped", () => {
+		const fx = extractEffects(
+			[{ type: "BACKGROUND_BLUR", visible: false, radius: 8 }],
+			1,
+		);
+		expect(fx.backdropBlur).toBeUndefined();
+	});
+
+	it("INNER_SHADOW becomes an inset shadow beside a BACKGROUND_BLUR", () => {
 		const fx = extractEffects(
 			[
 				{
@@ -75,6 +95,7 @@ describe("extractEffects", () => {
 			inset: true,
 		});
 		expect(fx.blur).toBeUndefined();
+		expect(fx.backdropBlur).toBe(8);
 	});
 
 	it("scales spread with the ratio like every other length", () => {
