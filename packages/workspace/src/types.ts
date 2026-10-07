@@ -58,7 +58,7 @@ export type DatasetAsset = {
 	/** EXIF 1..8, JPEG only */
 	orientation?: number;
 	/** the file's bytes: a File as picked, or a Blob read from an archive or
-	 *  autosave, never copied into JavaScript memory by the store */
+	 *  autosave; the workspace store never swaps it for an in-memory copy */
 	blob: Blob;
 };
 
