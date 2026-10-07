@@ -102,35 +102,63 @@ const SOURCE_EXTENSION =
  *  output after its photo. Every character outside `[A-Za-z0-9_.-]` becomes
  *  `-`. */
 export function fileNameFor(pattern: string, ctx: FileNameContext): string {
-	return expandFileName(fileNamePattern(pattern), ctx);
+	return compileFileName(fileNamePattern(pattern), ctx.count)(ctx);
 }
 
-function expandFileName(source: string, ctx: FileNameContext): string {
-	const width = String(Math.max(ctx.count, 1)).length;
-	const expanded = source.replace(
-		/\{\{\s*([^{}]*?)\s*\}\}/g,
-		(_, token: string) => {
-			switch (token) {
-				case "template":
-					return ctx.template;
-				case "side":
-					return ctx.side;
-				case "index":
-					return String(ctx.index).padStart(width, "0");
-				case "record":
-					return ctx.record;
-				case "variant":
-					return ctx.variant ?? "default";
-				default:
-					return (ctx.cells?.[token] ?? ctx.values?.[token] ?? "").replace(
-						SOURCE_EXTENSION,
-						"",
-					);
-			}
-		},
-	);
-	const clean = expanded.replace(/[^\w.-]/g, "-");
-	return clean === "" || /^\.+$/.test(clean) ? "file" : clean;
+type FileNamePart = { literal: string } | { token: string };
+
+function cleanFileName(text: string): string {
+	return text.replace(/[^\w.-]/g, "-");
+}
+
+/** Parses a pattern once into a function from an item to its file name.
+ *  Literals are cleaned up front, since cleaning works per character. */
+function compileFileName(
+	source: string,
+	count: number,
+): (ctx: FileNameContext) => string {
+	const width = String(Math.max(count, 1)).length;
+	const parts: FileNamePart[] = [];
+	const tokens = /\{\{\s*([^{}]*?)\s*\}\}/g;
+	let at = 0;
+	for (let match = tokens.exec(source); match; match = tokens.exec(source)) {
+		if (match.index > at)
+			parts.push({ literal: cleanFileName(source.slice(at, match.index)) });
+		parts.push({ token: match[1] as string });
+		at = match.index + match[0].length;
+	}
+	if (at < source.length)
+		parts.push({ literal: cleanFileName(source.slice(at)) });
+
+	const tokenValue = (token: string, ctx: FileNameContext): string => {
+		switch (token) {
+			case "template":
+				return ctx.template;
+			case "side":
+				return ctx.side;
+			case "index":
+				return String(ctx.index).padStart(width, "0");
+			case "record":
+				return ctx.record;
+			case "variant":
+				return ctx.variant ?? "default";
+			default:
+				return (ctx.cells?.[token] ?? ctx.values?.[token] ?? "").replace(
+					SOURCE_EXTENSION,
+					"",
+				);
+		}
+	};
+
+	return (ctx) => {
+		let clean = "";
+		for (const part of parts)
+			clean +=
+				"literal" in part
+					? part.literal
+					: cleanFileName(tokenValue(part.token, ctx));
+		return clean === "" || /^\.+$/.test(clean) ? "file" : clean;
+	};
 }
 
 function selectRecords(dataset: Dataset, preset: ExportPreset): DataRecord[] {
@@ -190,15 +218,25 @@ export function planExport(
 			: `@${preset.scale}x`;
 	const extension = fileExtension(preset.format);
 	const everyVariant = binding?.variant?.kind === "all";
-	const pattern = fileNamePattern(preset.fileName, everyVariant);
+	const expandFileName = compileFileName(
+		fileNamePattern(preset.fileName, everyVariant),
+		records.length,
+	);
 	const columns = dataset ? columnsByKey(dataset) : undefined;
 
-	const used = new Set<string>();
+	// lowercased name -> the next suffix to try for it
+	const used = new Map<string, number>();
 	const unique = (base: string) => {
-		let name = base;
-		for (let n = 2; used.has(name.toLowerCase()); n++) name = `${base}-${n}`;
-		used.add(name.toLowerCase());
-		return name;
+		const key = base.toLowerCase();
+		let n = used.get(key);
+		if (n === undefined) {
+			used.set(key, 2);
+			return base;
+		}
+		while (used.has(`${key}-${n}`)) n++;
+		used.set(key, n + 1);
+		used.set(`${key}-${n}`, 2);
+		return `${base}-${n}`;
 	};
 
 	const items: ExportItem[] = [];
@@ -219,7 +257,7 @@ export function planExport(
 		const recordId = record?.id ?? "";
 		for (const variantId of variantIds) {
 			for (const side of sides) {
-				const base = expandFileName(pattern, {
+				const base = expandFileName({
 					template: template.id,
 					side,
 					index: recordIndex + 1,
