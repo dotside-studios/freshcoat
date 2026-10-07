@@ -3352,9 +3352,15 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd, frame.precision);
-	const layered = lp !== null || isolates(cmd);
-	if (layered) {
-		const bounds = layerPaintBoundable(cmd)
+	// drawImage clips/strokes itself so its stroke isn't clipped.
+	const clips = !!cmd.clip && cmd.op !== "drawImage";
+	// Inside the clip, so the clip antialiases the composited children once
+	// rather than each child that overlaps a partly covered edge.
+	const isolated = isolates(cmd);
+	const inner = isolated && clips;
+	const outer = lp !== null || (isolated && !inner);
+	const bounds =
+		(outer || inner) && layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
 					canvas,
@@ -3365,13 +3371,13 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp ?? undefined, bounds);
-	}
-	// drawImage clips/strokes itself so its stroke isn't clipped.
-	if (cmd.clip && cmd.op !== "drawImage")
+	if (outer) canvas.saveLayer(lp ?? undefined, bounds);
+	if (clips && cmd.clip)
 		clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
+	if (inner) canvas.saveLayer(undefined, bounds);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (layered) canvas.restore();
+	if (inner) canvas.restore();
+	if (outer) canvas.restore();
 	canvas.restore();
 }
 
