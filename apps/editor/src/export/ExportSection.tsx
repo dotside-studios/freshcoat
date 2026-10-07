@@ -9,6 +9,7 @@ import {
 	type DataRecord,
 	type DatasetAsset,
 	type ExportItem,
+	type ExportPreset,
 	parseAssetRef,
 	planExport,
 	resolveValues,
@@ -16,7 +17,7 @@ import {
 	variantFor,
 	variantsFor,
 } from "@freshcoat-js/workspace";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
@@ -117,6 +118,39 @@ function useRail(): [boolean, (on: boolean) => void] {
 	return [rail, set];
 }
 
+/** How long the file-name pattern must rest before the plan follows it. */
+const FILE_NAME_SETTLE_MS = 150;
+
+/** Whether the preset's file-name pattern has changed in the last moment,
+ *  so the plan can wait for typing to pause. */
+function useTypingFileName(preset: ExportPreset | undefined): boolean {
+	const id = preset?.id;
+	const fileName = preset?.fileName;
+	const [settled, setSettled] = useState({ id, fileName });
+	useEffect(() => {
+		const timer = setTimeout(
+			() =>
+				setSettled((prev) =>
+					prev.id === id && prev.fileName === fileName
+						? prev
+						: { id, fileName },
+				),
+			FILE_NAME_SETTLE_MS,
+		);
+		return () => clearTimeout(timer);
+	}, [id, fileName]);
+	return id === settled.id && fileName !== settled.fileName;
+}
+
+/** Whether planning just these records plans the same records as `plan`. */
+function coversPlan(ids: readonly string[], plan: readonly ExportItem[]) {
+	const wanted = new Set(ids);
+	const planned = new Set(plan.map((item) => item.recordId));
+	return (
+		wanted.size === planned.size && [...wanted].every((id) => planned.has(id))
+	);
+}
+
 export function ExportSection() {
 	const controller = useController();
 	const wsState = useEditor((s) => s.workspace);
@@ -162,10 +196,14 @@ export function ExportSection() {
 	const dataset = boundDataset(workspace, preset);
 	const unbound = !!preset && !!template && !dataset;
 
-	const plan = useMemo(
-		() => (workspace && preset ? planExport(workspace, preset) : []),
-		[workspace, preset],
-	);
+	const typingFileName = useTypingFileName(preset);
+	const lastPlan = useRef<ExportItem[]>([]);
+	const plan = useMemo(() => {
+		if (!typingFileName)
+			lastPlan.current =
+				workspace && preset ? planExport(workspace, preset) : [];
+		return lastPlan.current;
+	}, [workspace, preset, typingFileName]);
 	const issues = useMemo(() => {
 		if (!template) return 0;
 		const result = validate(template);
@@ -189,13 +227,16 @@ export function ExportSection() {
 	// Chosen records the export button runs over in place of the preset's
 	// own. A saved selection is the preset's own, so it runs as usual.
 	const chosen = preset?.records === "selected" ? NONE : selection;
-	const runPlan = useMemo(
-		() =>
-			chosen.length > 0 && workspace && preset
-				? planExport(workspace, withRecordIds(preset, chosen))
-				: plan,
-		[chosen, workspace, preset, plan],
-	);
+	// Choosing every planned record plans the same items, so the plan serves.
+	const lastRunPlan = useRef<ExportItem[]>([]);
+	const runPlan = useMemo(() => {
+		if (!typingFileName)
+			lastRunPlan.current =
+				chosen.length > 0 && workspace && preset && !coversPlan(chosen, plan)
+					? planExport(workspace, withRecordIds(preset, chosen))
+					: plan;
+		return lastRunPlan.current;
+	}, [chosen, workspace, preset, plan, typingFileName]);
 	const runCount = runPlan.length;
 	// What the export button would put on sheets, when the preset uses them.
 	const sheets = useMemo(

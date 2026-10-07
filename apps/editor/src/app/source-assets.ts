@@ -3,8 +3,10 @@ import { plural } from "./copy";
 
 // A workspace opened from a file keeps its stored photos as slices of that
 // file, which the browser refuses to read once the file changes on disk. Each
-// one is swapped for a copy in the background, on the asset object itself so
-// every snapshot, undo step and saved state that shares it sees the copy.
+// one is copied into storage in the background and swapped for the stored
+// copy, on the asset object itself so every snapshot, undo step and saved
+// state that shares it sees the copy. A copy in memory is kept only when
+// storage cannot hold it.
 
 export class SourceChangedError extends Error {
 	constructor(
@@ -29,8 +31,9 @@ export function isNotReadable(err: unknown): boolean {
 
 export type SourceAssetsOptions = {
 	fileName: string;
-	/** A copy of the photo stored elsewhere, such as autosave's, or null. */
-	backup?: (sha256: string) => Promise<Blob | null>;
+	/** Stores the photo, such as in autosave's store, and hands back the
+	 *  stored copy, or null when it cannot. */
+	keep?: (asset: DatasetAsset) => Promise<Blob | null>;
 	/** Runs `task` when the page is idle. */
 	schedule?: (task: () => void) => void;
 	lanes?: number;
@@ -49,6 +52,8 @@ export type SourceAssets = {
 	/** Copies every one of `assets` still read from the file, or throws a
 	 *  SourceChangedError naming how many cannot be. */
 	settle(assets: Iterable<DatasetAsset>): Promise<void>;
+	/** Says the file changed, unless that was said already. */
+	report(): void;
 	stop(): void;
 };
 
@@ -83,20 +88,27 @@ export function createSourceAssets(
 	let stopped = false;
 	let reported = false;
 
+	function changed(): SourceChangedError {
+		const err = new SourceChangedError(opts.fileName, 1);
+		if (!reported) {
+			reported = true;
+			opts.onChanged?.(err);
+		}
+		return err;
+	}
+
 	async function copyOf(asset: DatasetAsset): Promise<Blob> {
-		const saved = await opts.backup?.(asset.sha256).catch(() => null);
-		if (saved && saved.size === asset.size) return saved;
 		try {
+			const saved = await opts.keep?.(asset).catch((err: unknown) => {
+				if (isNotReadable(err)) throw err;
+				return null;
+			});
+			if (saved && saved.size === asset.size) return saved;
 			const bytes = await asset.blob.arrayBuffer();
 			return new Blob([bytes], { type: asset.contentType });
 		} catch (err) {
 			if (!isNotReadable(err)) throw err;
-			const changed = new SourceChangedError(opts.fileName, 1);
-			if (!reported) {
-				reported = true;
-				opts.onChanged?.(changed);
-			}
-			throw changed;
+			throw changed();
 		}
 	}
 
@@ -152,6 +164,9 @@ export function createSourceAssets(
 			if (unreadable > 0)
 				throw new SourceChangedError(opts.fileName, unreadable);
 		},
+		report() {
+			changed();
+		},
 		stop() {
 			stopped = true;
 		},
@@ -178,6 +193,10 @@ export function stopSourceAssets(): void {
 
 export function recoverAsset(asset: DatasetAsset): Promise<boolean> {
 	return current?.recover(asset) ?? Promise.resolve(false);
+}
+
+export function reportSourceChanged(): void {
+	current?.report();
 }
 
 export function settleAssets(assets: Iterable<DatasetAsset>): Promise<void> {
