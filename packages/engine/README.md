@@ -130,6 +130,7 @@ own subpath.
 | `@freshcoat-js/engine/runtime` | the backend seam: `Painter` and `makeRuntime` |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
+| `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 
 ## Staying warm
 
