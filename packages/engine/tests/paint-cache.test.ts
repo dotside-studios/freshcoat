@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { Image } from "canvaskit-wasm";
-import { describe, expect, test, vi } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
 import { clearFontBytesCache } from "../src/font-bytes";
@@ -9,6 +9,7 @@ import { createHeadlessEnv } from "../src/headless";
 import {
 	compileScene,
 	createFrame,
+	createGroup,
 	createImage,
 	createPaintCache,
 	createPath,
@@ -25,7 +26,11 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
-import { paintCacheState, SVG_PICTURE_PIXELS } from "../src/paint-cache-state";
+import {
+	DEFAULT_MAX_BACKGROUND_PIXELS,
+	paintCacheState,
+	SVG_PICTURE_PIXELS,
+} from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {
 	Adjust,
@@ -760,9 +765,122 @@ function cardScene(
 	});
 }
 
+type Spec =
+	| { rect: string }
+	| { text: string }
+	| { image: string }
+	| { group: Spec[]; opacity?: number };
+
+let slot = 0;
+function build(spec: Spec): Node {
+	const pos = { x: (slot % 6) * 14 + 2, y: Math.floor(slot / 6) * 14 + 2 };
+	slot++;
+	if ("rect" in spec)
+		return createRect({
+			pos,
+			size: { width: 12, height: 12 },
+			fills: [{ kind: "solid", color: spec.rect }],
+		});
+	if ("image" in spec)
+		return createImage({
+			pos,
+			size: { width: 12, height: 12 },
+			src: spec.image,
+			fit: "cover",
+		});
+	if ("text" in spec)
+		return createText({
+			pos,
+			size: { width: 40, height: 14 },
+			text: spec.text,
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 10,
+				lineHeight: 1.2,
+			},
+			color: "#101828",
+		});
+	return createGroup(spec.group.map(build), { opacity: spec.opacity });
+}
+
+function specScene(specs: Spec[]): Node {
+	slot = 0;
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		background: createRect({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			fills: [{ kind: "solid", color: "#f5f0e6" }],
+		}),
+		children: specs.map(build),
+	});
+}
+
+function nested(name: string): Spec[] {
+	return [
+		{
+			group: [
+				{ group: [{ rect: "#ef4444" }, { rect: "#3b82f6" }, { text: name }] },
+				{ text: "fixed" },
+			],
+		},
+		{ rect: "#22c55e" },
+	];
+}
+
+function mulberry32(seed: number): () => number {
+	let a = seed;
+	return () => {
+		a = (a + 0x6d2b79f5) | 0;
+		let t = Math.imul(a ^ (a >>> 15), 1 | a);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+// Two trees of the same shape whose text and image leaves differ.
+function randomPair(rand: () => number, depth: number): [Spec[], Spec[]] {
+	const colors = ["#ef4444", "#3b82f6", "#22c55e", "#a855f7"];
+	const names = ["Ada", "Grace", "Hedy", "Joan"];
+	const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)] as T;
+	const level = (d: number): [Spec[], Spec[]] => {
+		const a: Spec[] = [];
+		const b: Spec[] = [];
+		const n = 1 + Math.floor(rand() * 4);
+		for (let i = 0; i < n; i++) {
+			const r = rand();
+			if (d > 0 && r < 0.4) {
+				const [ga, gb] = level(d - 1);
+				const opacity = rand() < 0.2 ? 0.5 : undefined;
+				a.push({ group: ga, opacity });
+				b.push({ group: gb, opacity });
+			} else if (r < 0.65) {
+				const c = pick(colors);
+				a.push({ rect: c });
+				b.push({ rect: c });
+			} else if (r < 0.85) {
+				a.push({ text: pick(names) });
+				b.push({ text: pick(names) });
+			} else {
+				a.push({ image: pick(["img://a", "img://b"]) });
+				b.push({ image: pick(["img://a", "img://b"]) });
+			}
+		}
+		return [a, b];
+	};
+	return level(depth);
+}
+
 describe("PaintCache background", () => {
 	const fonts = new Map([["Geist", [FONT]]]);
 	const images = new Map<string, Uint8Array>();
+	beforeAll(async () => {
+		images.set("img://a", await testPng());
+		images.set("img://b", await bigPng());
+	});
 
 	// Paints each scene through one cache and checks it against an uncached
 	// paint of the same scene.
@@ -937,6 +1055,121 @@ describe("PaintCache background", () => {
 			backgroundSnapshots: 4,
 			backgroundReuses: 0,
 		});
+		cache.dispose();
+	});
+
+	test("text inside a nested group ends the run", async () => {
+		await initCk();
+		for (const extra of [{}, { supersample: 2 }]) {
+			const cache = createPaintCache();
+			await paintRecords(
+				[specScene(nested("Alice")), specScene(nested("Bob"))],
+				cache,
+				extra,
+			);
+			cache.dispose();
+		}
+	});
+
+	test("deeper record-bound leaves end the run", async () => {
+		await initCk();
+		const variants: ((v: string, src: string) => Spec[])[] = [
+			(v) => [
+				{ group: [{ group: [{ group: [{ rect: "#ef4444" }, { text: v }] }] }] },
+				{ rect: "#22c55e" },
+				{ rect: "#3b82f6" },
+			],
+			(v) => [
+				{ group: [{ rect: "#ef4444" }, { group: [{ text: v }] }] },
+				{ group: [{ rect: "#22c55e" }] },
+			],
+			(_, src) => [
+				{ group: [{ group: [{ rect: "#ef4444" }, { image: src }] }, { rect: "#a855f7" }] },
+				{ rect: "#22c55e" },
+			],
+			(v) => [
+				{ group: [{ group: [{ rect: "#ef4444" }] }, { group: [{ text: v }, { rect: "#3b82f6" }] }] },
+				{ rect: "#22c55e" },
+			],
+		];
+		for (const variant of variants) {
+			const cache = createPaintCache();
+			await paintRecords(
+				[
+					specScene(variant("Alice", "img://a")),
+					specScene(variant("Bob", "img://b")),
+					specScene(variant("Carol", "img://a")),
+				],
+				cache,
+			);
+			cache.dispose();
+		}
+	});
+
+	test("random scenes differing in text and images paint as uncached", async () => {
+		await initCk();
+		const rand = mulberry32(81);
+		for (let i = 0; i < 120; i++) {
+			const [a, b] = randomPair(rand, 1 + (i % 4));
+			const cache = createPaintCache();
+			await paintRecords([specScene(a), specScene(b), specScene(a)], cache);
+			cache.dispose();
+		}
+	});
+
+	// Paints `commands` and counts the canvas readbacks the paint itself made.
+	async function readbacks(commands: Command[], rt: PaintRuntime) {
+		const spy = vi.spyOn(ck.Canvas.prototype, "readPixels");
+		try {
+			const out = await paintScene(ck, commands, rt);
+			out.dispose();
+			return spy.mock.calls.length;
+		} finally {
+			spy.mockRestore();
+		}
+	}
+
+	test("a background the budget cannot hold is never read back", async () => {
+		await initCk();
+		const cache = createPaintCache({ maxImagePixels: 4096 + 100 });
+		const { rt } = runtime(fonts, images, cache);
+		const commands = compile(
+			specScene([{ rect: "#ef4444" }, { image: "img://b" }]),
+			SIZE,
+			fonts,
+		);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(cache.stats()).toMatchObject({
+			imageDecodes: 1,
+			backgroundSnapshots: 0,
+			backgroundReuses: 0,
+		});
+		cache.dispose();
+	});
+
+	test("an unbudgeted cache keeps no background over the default cap", async () => {
+		await initCk();
+		const side = Math.ceil(Math.sqrt(DEFAULT_MAX_BACKGROUND_PIXELS)) + 1;
+		const size = { width: side, height: side };
+		const commands = compile(
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size,
+				background: createRect({
+					pos: { x: 0, y: 0 },
+					size,
+					fills: [{ kind: "solid", color: "#f5f0e6" }],
+				}),
+				children: [],
+			}),
+			size,
+			fonts,
+		);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(cache.stats().backgroundSnapshots).toBe(0);
 		cache.dispose();
 	});
 });

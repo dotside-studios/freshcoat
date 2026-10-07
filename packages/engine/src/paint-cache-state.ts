@@ -62,6 +62,10 @@ const DEFAULT_MAX_IMAGES = 256;
 
 const MAX_BACKGROUNDS = 4;
 
+// What the backgrounds of a cache without an image budget may hold together:
+// 64 MB of RGBA.
+export const DEFAULT_MAX_BACKGROUND_PIXELS = 16_777_216;
+
 // What an SVG picture costs beyond the rasters it embeds: its recorded ops.
 export const SVG_PICTURE_PIXELS = 65_536;
 
@@ -277,9 +281,22 @@ export function touchBackground(
 	state.stats.backgroundReuses++;
 }
 
+// Whether a background of `pixels` fits beside the images and finish noise the
+// budget also holds, so a paint reads back only what it can keep.
+export function backgroundFits(
+	state: PaintCacheState,
+	pixels: number,
+): boolean {
+	if (state.maxImagePixels <= 0) return pixels <= DEFAULT_MAX_BACKGROUND_PIXELS;
+	return (
+		imagesPixels(state) + finishNoisePixels(state) + pixels <=
+		state.maxImagePixels
+	);
+}
+
 // Keeps `background` as the most recently used, in place of `replaces` when
-// given, else beside the others with the least recently used out past the cap.
-// With an image budget they count against it (see evictUnusedImages).
+// given, else beside the others. The least recently used go past the cap, or
+// until the rest fit the image budget or, without one, the default cap.
 export function cacheBackground(
 	state: PaintCacheState,
 	background: CachedBackground,
@@ -291,6 +308,12 @@ export function cacheBackground(
 	if (state.backgrounds.length > MAX_BACKGROUNDS)
 		state.backgrounds.length = MAX_BACKGROUNDS;
 	state.stats.backgroundSnapshots++;
+	const budgeted = state.maxImagePixels > 0;
+	const limit = budgeted ? state.maxImagePixels : DEFAULT_MAX_BACKGROUND_PIXELS;
+	let held = budgeted ? imagesPixels(state) + finishNoisePixels(state) : 0;
+	for (const bg of state.backgrounds) held += backgroundPixels(bg);
+	while (state.backgrounds.length > 1 && held > limit)
+		held -= backgroundPixels(state.backgrounds.pop() as CachedBackground);
 }
 
 function sharedLength(a: string[], b: string[]): number {
@@ -316,6 +339,12 @@ function finishNoisePixels(state: PaintCacheState): number {
 
 function backgroundPixels(background: CachedBackground): number {
 	return background.pixels.length / 4;
+}
+
+function imagesPixels(state: PaintCacheState): number {
+	let total = 0;
+	for (const entry of state.images.values()) total += imagePixels(entry);
+	return total;
 }
 
 function imagePixels(entry: CachedImage): number {
