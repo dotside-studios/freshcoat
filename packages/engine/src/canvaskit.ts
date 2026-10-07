@@ -394,6 +394,8 @@ function maskSvg(
 			return `${d}Z`;
 		}
 		case "squircle": {
+			if (clip.smoothing !== undefined)
+				return squircleSvg(x, y, w, h, clip.radius, clip.smoothing);
 			const max = Math.min(w, h) / 2;
 			const r = Math.min(clip.radius, max);
 			const p = Math.min(r * 1.5, max);
@@ -434,7 +436,7 @@ function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
 		case "rounded-rect":
 			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
 		case "squircle":
-			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
+			return { ...clip, radius: Math.max(0, clip.radius - inset) };
 		case "circle":
 		case "ellipse":
 			return clip;
