@@ -1705,6 +1705,38 @@ add(
 	],
 );
 
+// The LUT is the identity, so the layer still reads as plain multiply: the blend
+// meets the real destination, not the transparent offscreen the LUT runs in.
+const identityLut = () => ({
+	lut: { r: table((i) => i), g: table((i) => i), b: table((i) => i) },
+});
+add(
+	"adjust-lut-keeps-blend",
+	"an adjusted layer keeps its blend mode and opacity",
+	"raster",
+	["adjust.lut", "blend.multiply", "transform.opacity"],
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#0000ff") }),
+		createRect({
+			...box(20, 30, 50, 60),
+			fills: solid("#ff0000"),
+			blendMode: "multiply",
+			adjust: identityLut(),
+		}),
+		createRect({
+			...box(90, 30, 50, 60),
+			fills: solid("#ffffff"),
+			opacity: 0.5,
+			adjust: identityLut(),
+		}),
+	]),
+	[
+		px([45, 60], [0, 0, 0, 255], "multiply of red over blue", 2),
+		px([115, 60], [128, 128, 255, 255], "half opacity applied once", 2),
+		{ kind: "warning", warning: "adjust_unsupported", absent: true },
+	],
+);
+
 mkdirSync(CASES_DIR, { recursive: true });
 for (const c of cases)
 	writeFileSync(join(CASES_DIR, `${c.id}.json`), stringifyCase(c));
