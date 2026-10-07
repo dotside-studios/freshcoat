@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
 import { clearFontBytesCache } from "../src/font-bytes";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createFrame,
@@ -15,10 +15,10 @@ import {
 	createPath,
 	createRect,
 	createText,
-	deriveFontMetrics,
 	encodePng,
 	type PaintCache,
 } from "../src/index";
+import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -32,13 +32,8 @@ import {
 	SVG_PICTURE_PIXELS,
 } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type {
-	Adjust,
-	Command,
-	PaintRuntime,
-	ResolvedFill,
-	ResolvedFont,
-} from "../src/types";
+import type { PaintRuntime } from "../src/runtime-types";
+import type { Adjust, Command, ResolvedFill, ResolvedFont } from "../src/types";
 
 const FONT = testFontBytes("Geist-Regular.ttf");
 

@@ -1,5 +1,4 @@
-import { approxEngine } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { compile } from "../src/compile";
@@ -86,18 +85,15 @@ describe("template preparation reuse", () => {
 	});
 });
 
-describe("renderCompiled() with a provided text engine", () => {
-	test("uses it and leaves it undisposed", async () => {
+describe("renderCompiled()", () => {
+	test("paints only the named frames", async () => {
 		const ck = await loadCanvasKit();
-		const dispose = vi.fn();
-		const textEngine = { ...approxEngine, dispose };
+		const renderer = await createRenderer({ ck });
 		const compiled = compile(makeTemplate(), {}, { width: 40, height: 20 });
-		const results = await renderCompiled(
-			compiled,
-			{ frameNames: ["front"] },
-			{ ck, env: createHeadlessEnv(), textEngine, fontMetrics: {} },
-		);
+		const results = await renderCompiled(renderer, compiled, {
+			frameNames: ["front"],
+		});
 		expect(results.map((r) => r.name)).toEqual(["front"]);
-		expect(dispose).not.toHaveBeenCalled();
+		renderer.dispose();
 	});
 });

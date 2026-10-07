@@ -15,24 +15,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
 	compile,
-	createPaintCache,
-	createParagraphEngine,
 	type Element,
 	setBarcodeEncoder,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import {
-	type ExportOptions,
+	type RenderCompiledOptions,
 	renderCompiled,
 } from "@freshcoat-js/coatfile/render";
-import {
-	compileScene,
-	deriveFontMetrics,
-	memoizeTextEngine,
-	type Node,
-} from "@freshcoat-js/engine";
+import { createRenderer, type Node } from "@freshcoat-js/engine";
 import { createAnalysisCache } from "@freshcoat-js/for-print";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { plugin } from "bun";
@@ -180,11 +172,8 @@ const RECORDS = [
 
 const ck = await loadCanvasKit("full");
 setBarcodeEncoder(bwipBarcodeEncoder);
-const fonts = new Map([
-	["Vend Sans", [testFontBytes("VendSans-Variable-latin.woff2")]],
-]);
-const fontMetrics = deriveFontMetrics(fonts);
-const textEngine = memoizeTextEngine(createParagraphEngine(ck, fonts));
+const fonts = { "Vend Sans": [testFontBytes("VendSans-Variable-latin.woff2")] };
+const compiler = await createRenderer({ ck, fonts, cache: false });
 
 const card = membershipCard();
 const synthetic = repeatedFront(card, 12);
@@ -198,10 +187,8 @@ async function compileRepeat(template: Template): Promise<number> {
 	const ms = await time(() => {
 		for (let i = 0; i < batch; i++)
 			for (const frame of compiled.frames)
-				compileScene(frame.root as Node, {
+				compiler.compile(frame.root as Node, {
 					...size,
-					textEngine,
-					fontMetrics,
 					fonts: frame.assets.fonts,
 					images: frame.assets.images,
 				});
@@ -209,12 +196,17 @@ async function compileRepeat(template: Template): Promise<number> {
 	return ms / batch;
 }
 
-// Per record, both sides to PNG through one paint cache, as an export worker
-// renders a job.
-async function renderRecords(print: ExportOptions["print"]): Promise<number> {
-	const paintCache = createPaintCache({ maxImagePixels: 48_000_000 });
+// Per record, both sides to PNG through one renderer and its paint cache, as an
+// export worker renders a job.
+async function renderRecords(
+	print: RenderCompiledOptions["print"],
+): Promise<number> {
+	const renderer = await createRenderer({
+		ck,
+		fonts,
+		cache: { maxImagePixels: 48_000_000 },
+	});
 	const analysisCache = createAnalysisCache(256);
-	const env = createHeadlessEnv({ fonts });
 	try {
 		return await time(
 			async (i) => {
@@ -223,13 +215,8 @@ async function renderRecords(print: ExportOptions["print"]): Promise<number> {
 				] as (typeof RECORDS)[number];
 				const values = { ...sampleValues(card), display_name, tier, member_id };
 				const compiled = compile(card, values, size);
-				const frames = await renderCompiled(compiled, print ? { print } : {}, {
-					ck,
-					env,
-					fonts,
-					fontMetrics,
-					textEngine,
-					paintCache,
+				const frames = await renderCompiled(renderer, compiled, {
+					...(print ? { print } : {}),
 					analysisCache,
 				});
 				if (frames.length !== 2) throw new Error("expected both sides");
@@ -238,7 +225,7 @@ async function renderRecords(print: ExportOptions["print"]): Promise<number> {
 			RECORDS.length,
 		);
 	} finally {
-		paintCache.dispose();
+		renderer.dispose();
 	}
 }
 

@@ -80,10 +80,10 @@ import {
 import { squircleSvg } from "./squircle";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
+import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
 import type {
 	AdjustLut,
 	BlendMode,
-	CanvasLike,
 	Command,
 	CornerRadius,
 	DrawBitmapCommand,
@@ -94,8 +94,6 @@ import type {
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
-	PaintOutput,
-	PaintTarget,
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
@@ -3942,7 +3940,7 @@ function makeSurface(
 	const surface = ck.MakeSurface(w, h) as Surface;
 	return {
 		surface,
-		canvas: { width: w, height: h, getContext: () => null },
+		canvas: { width: w, height: h },
 		loseContext: noop,
 	};
 }

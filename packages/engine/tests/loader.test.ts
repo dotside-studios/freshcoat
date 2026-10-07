@@ -1,10 +1,11 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
-import { createHeadlessEnv, renderSceneToPng } from "../src/headless";
+import { createHeadlessEnv, renderSceneToPng } from "./helpers/headless";
 import { dataUrlToBytes, fetchLoader, mapLoader } from "../src/loader";
 import { createRect } from "../src/node";
-import type { Command, EncodedPaintResult, FontResolution } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
+import type { Command, FontResolution } from "../src/types";
 
 const local = (src: string): FontResolution => ({
 	kind: "descriptor",

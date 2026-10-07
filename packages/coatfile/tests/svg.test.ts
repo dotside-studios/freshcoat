@@ -1,9 +1,7 @@
-import { decodePixels } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import { ElementSchema } from "../src/schemas";
 import { svgToElements } from "../src/svg";
 import type {
@@ -333,17 +331,12 @@ beforeAll(async () => {
 });
 
 async function pixels(tpl: Template, markup = ICON) {
-	const [frame] = (await render(
+	const [frame] = (await renderTemplate(
+		await createRenderer({ ck, cache: false }),
 		tpl,
 		{},
-		{ width: 96, height: 96 },
-		{
-			ck,
-			env: createHeadlessEnv({
-				images: new Map([["icon.svg", new TextEncoder().encode(markup)]]),
-			}),
-		},
-	)) as EncodedPaintedFrame[];
+		{ width: 96, height: 96, images: new Map([["icon.svg", new TextEncoder().encode(markup)]]) },
+	));
 	if (!frame) throw new Error("no frame");
 	const d = decodePixels(ck, frame.bytes);
 	if (!d) throw new Error("decode failed");

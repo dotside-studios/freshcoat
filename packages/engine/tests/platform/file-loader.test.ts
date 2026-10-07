@@ -5,8 +5,9 @@ import { pathToFileURL } from "node:url";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, describe, expect, test } from "vitest";
 import { fileLoader } from "../../src/platform/file-loader";
-import { createHeadlessEnv } from "../../src/headless";
-import type { Command, EncodedPaintResult } from "../../src/types";
+import { createHeadlessEnv } from "../helpers/headless";
+import type { EncodedPaintResult } from "../../src/runtime-types";
+import type { Command } from "../../src/types";
 
 const root = mkdtempSync(join(tmpdir(), "file-loader-"));
 mkdirSync(join(root, "fonts"));

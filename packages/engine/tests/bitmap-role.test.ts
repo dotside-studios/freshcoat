@@ -2,7 +2,7 @@
 // for a barcode, snapped to whole output pixels by the painter.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	approxEngine,
 	type BitmapRole,

@@ -3,12 +3,8 @@
 // same gradient transform Figma holds, evaluated per pixel, and the template is
 // rendered by coatfile with CanvasKit.
 import { type Template, validate } from "@freshcoat-js/coatfile";
-import {
-	type EncodedPaintedFrame,
-	render,
-} from "@freshcoat-js/coatfile/render";
-import { decodePixels } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, it } from "vitest";
 import { transpileRect } from "~/lib/figma/transpiler/rect";
@@ -133,12 +129,12 @@ describe("linear gradient points (render)", () => {
 		} as unknown as Template;
 		expect(validate(template).ok).toBe(true);
 
-		const [frame] = (await render(
+		const [frame] = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			template,
 			{},
 			{ width: W, height: H },
-			{ ck, env: createHeadlessEnv() },
-		)) as EncodedPaintedFrame[];
+		);
 		const pixels = decodePixels(ck, frame.bytes);
 		if (!pixels) throw new Error("decode failed");
 		expect([pixels.width, pixels.height]).toEqual([W, H]);

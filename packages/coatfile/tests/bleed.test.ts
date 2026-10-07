@@ -1,5 +1,4 @@
-import { decodePixels, type GroupNode, type Node } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels, type GroupNode, type Node } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import {
@@ -9,7 +8,7 @@ import {
 	templateSafeArea,
 } from "../src/bleed";
 import { compile } from "../src/compile";
-import { type EncodedPaintedFrame, render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
 
@@ -249,8 +248,9 @@ describe("render with bleed", () => {
 	test("paints the bleed and reports where the trim is", async () => {
 		const ck = await loadCanvasKit();
 		const template = card({ bleed: 5 }, [rect("dot", 0, 0, 10, 10)]);
-		const run = (bleed?: boolean) =>
-			render(
+		const run = async (bleed?: boolean) =>
+			renderTemplate(
+				await createRenderer({ ck, cache: false }),
 				template,
 				{},
 				{
@@ -259,8 +259,7 @@ describe("render with bleed", () => {
 					bleed,
 					exports: [{ constraint: { kind: "scale", value: 2 } }],
 				},
-				{ ck, env: createHeadlessEnv() },
-			) as Promise<EncodedPaintedFrame[]>;
+			);
 
 		const [trimOnly] = await run();
 		expect([trimOnly?.width, trimOnly?.height, trimOnly?.trim]).toEqual([

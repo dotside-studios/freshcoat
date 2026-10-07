@@ -2,9 +2,10 @@
 // black-extract, and dither — run through an SkSL pass on the final surface.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
-import type { EncodedPaintResult, FrameFinish } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
+import type { FrameFinish } from "../src/types";
 
 type RGB = [number, number, number];
 

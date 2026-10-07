@@ -1,10 +1,8 @@
-import { decodePixels, type GroupNode } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, decodePixels, type GroupNode } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type {
 	Command,
 	DrawCommand,
@@ -228,12 +226,12 @@ describe("grid layout paint", () => {
 				cell("c", "#00ff00", { ...FILL, column: [1, 2] }),
 			],
 		);
-		const [frame] = (await render(
+		const [frame] = (await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			tpl,
 			{},
 			{ width: 120, height: 60 },
-			{ ck, env: createHeadlessEnv() },
-		)) as EncodedPaintedFrame[];
+		));
 		const d = decodePixels(ck, frame.bytes);
 		if (!d) throw new Error("decode failed");
 		const at = (x: number, y: number) =>

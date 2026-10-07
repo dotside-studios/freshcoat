@@ -27,13 +27,12 @@ import {
 	type TextEngineCacheStats,
 } from "./text-cache";
 import type { TextEngine } from "./text-engine";
+import type { CanvasLike, PaintOutput } from "./runtime-types";
 import type {
-	CanvasLike,
 	Command,
 	FontRequest,
 	FontVMetrics,
 	FrameFinish,
-	PaintOutput,
 	PaintWarning,
 } from "./types";
 import type { CompileSceneOptions } from "./compile-scene";
@@ -142,6 +141,9 @@ export type Renderer = {
 	/** Loads the families these requests describe that the renderer lacks. */
 	loadFonts(requests: readonly FontRequest[]): Promise<FontLoadReport>;
 	stats(): RendererStats;
+	/** Frees the cached surface, images and font provider; the next paint
+	 *  rebuilds them, as after a lost GPU context. */
+	clear(): void;
 	dispose(): void;
 };
 
@@ -318,7 +320,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				requests.map(async (req) => {
 					if (!("descriptor" in req)) return;
 					const key = JSON.stringify(req.descriptor);
-					if (fonts.has(req.family) && fontKeys.get(req.family) === key) return;
+					// Bytes given directly win over a descriptor, as they do when painting.
+					if (fonts.has(req.family) && (fontKeys.get(req.family) ?? key) === key)
+						return;
 					try {
 						const bytes = (await fontBytes(resolveFontRequest(req), load)).filter(
 							(b) => b.length > 0,
@@ -343,6 +347,11 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				...(cache ? { paintCache: cache.stats() } : {}),
 				...(text ? { text: text.engine.cacheStats() } : {}),
 			};
+		},
+		clear() {
+			alive();
+			cache?.clear();
+			perCall.clear();
 		},
 		dispose() {
 			if (disposed) return;

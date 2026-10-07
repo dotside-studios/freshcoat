@@ -7,9 +7,9 @@
 // children again, sliding a QR out of the box drawn for it. This pins that a
 // layer nested in a positioned frame lands in the same place either way.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
-import { render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
 async function ckInit(): Promise<any> {
@@ -67,11 +67,14 @@ describe("render() print geometry", () => {
 		const ck = await ckInit();
 		const size = { width: 80, height: 50 };
 
-		const off = await render(TEMPLATE, {}, size, {
-			ck,
-			env: createHeadlessEnv(),
-		});
-		const on = await render(
+		const off = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
+			TEMPLATE,
+			{},
+			size,
+		);
+		const on = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			TEMPLATE,
 			{},
 			{
@@ -80,7 +83,6 @@ describe("render() print geometry", () => {
 				// finishing nothing — so any difference in the output is geometry.
 				print: { analyze: true, policy: { photo: null }, finish: false },
 			},
-			{ ck, env: createHeadlessEnv() },
 		);
 
 		const a = Buffer.from((off[0] as { bytes: Uint8Array }).bytes);

@@ -3,7 +3,7 @@
 // else → a drawMasked offscreen-coverage command (general). Both render.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import type { MeasureText } from "../src/index";
 import {
 	autoLayout,

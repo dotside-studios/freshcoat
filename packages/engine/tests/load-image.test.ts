@@ -2,7 +2,7 @@
 // loadImage: paint draws them and leaves freeing them to the runtime.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage } from "../src/index";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here

@@ -12,13 +12,11 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./browser": "./src/browser.ts",
-		"./headless": "./src/headless.ts",
+		"./browser": "./src/platform/browser.ts",
 		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
 		"./svg": "./src/svg/index.ts",
-		"./svg/sniff": "./src/svg/sniff.ts",
-		"./runtime": "./src/runtime.ts"
+		"./svg/sniff": "./src/svg/sniff.ts"
 	},
 	"scripts": {
 		"test": "bun test",

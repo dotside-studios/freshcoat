@@ -17,7 +17,7 @@ export type PreviewReply =
 			type: "render";
 			id: number;
 			ok: true;
-			stats: PaintCacheStats;
+			stats?: PaintCacheStats;
 			/** the frame, readable, when the request asked for one */
 			snapshot?: ImageBitmap;
 	  } & LiveResult)

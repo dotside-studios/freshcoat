@@ -1,8 +1,6 @@
 // @vitest-environment node
 import { setBarcodeEncoder } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import { resolveFontRequest } from "@freshcoat-js/engine";
-import { makeRuntime } from "@freshcoat-js/engine/runtime";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import { sampleValues } from "~/doc/values";
@@ -301,7 +299,7 @@ describe("preview worker client", () => {
 });
 
 describe("main-thread fallback", () => {
-	let ck: unknown;
+	let ck: Awaited<ReturnType<typeof loadCanvasKit>>;
 	let fonts: Map<string, Uint8Array[]>;
 
 	beforeAll(async () => {
@@ -324,17 +322,10 @@ describe("main-thread fallback", () => {
 		const sample = SAMPLES[0];
 		if (!sample) throw new Error("no samples");
 		const template = await sample.load();
-		// No canvas host in node: the frame is painted offscreen and kept.
-		const session = createRenderSession(ck, ({ fonts, images, cache }) =>
-			makeRuntime(
-				{
-					cache,
-					fonts,
-					resolveFont: (req) => resolveFontRequest(req, fonts),
-					loadBytes: async (src) => images.get(src) ?? new Uint8Array(),
-				},
-				"keep",
-			),
+		// No WebGL in node: the surface falls back to an offscreen raster.
+		const session = createRenderSession(
+			ck,
+			(width, height) => ({ width, height }) as OffscreenCanvas,
 		);
 		const live = request({
 			template,
@@ -348,7 +339,7 @@ describe("main-thread fallback", () => {
 		expect(out.geometry.get("0/bg")).toBeDefined();
 		expect(out.geometry.size).toBeGreaterThan(3);
 		expect(Array.isArray(out.warnings)).toBe(true);
-		expect(session.stats().surfaceCreates).toBe(1);
+		expect(session.stats()?.surfaceCreates).toBe(1);
 
 		// The worker's rebuilt request lays out the same boxes.
 		const receiver = createPreviewReceiver();

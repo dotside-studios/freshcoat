@@ -9,7 +9,8 @@ import {
 import { readFontMetrics } from "../../src/font-metrics";
 import { createParagraphEngine } from "../../src/paragraph-layout";
 import { paintCanvasKit } from "../../src/runtime";
-import type { FontVMetrics, Painter } from "../../src/types";
+import type { Painter } from "../../src/runtime-types";
+import type { FontVMetrics } from "../../src/types";
 import { conformanceImages } from "./assets";
 
 export const FAMILY = "ConformanceFont";

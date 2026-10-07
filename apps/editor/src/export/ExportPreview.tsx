@@ -2,6 +2,7 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import type { DatasetAsset, ExportPreset } from "@freshcoat-js/workspace";
+import type { CanvasKit } from "canvaskit-wasm";
 import {
 	type PointerEvent as ReactPointerEvent,
 	useEffect,
@@ -82,7 +83,7 @@ export function ExportItemPreview({
 	const boxRef = useRef<HTMLDivElement>(null);
 	const hostRef = useRef<HTMLDivElement>(null);
 	const [box, setBox] = useState<Size | null>(null);
-	const [ck, setCk] = useState<unknown>(null);
+	const [ck, setCk] = useState<CanvasKit | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [painted, setPainted] = useState<string | null>(null);
 	const [scheduler, setScheduler] = useState<RenderScheduler<Input> | null>(

@@ -1,11 +1,10 @@
-// An analysis cache on the render runtime: a print-analyzed batch samples and
+// An analysis cache on renderTemplate: a print-analyzed batch samples and
 // analyzes each distinct image once, and paints what an uncached render does.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { createPaintCache } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, mapLoader } from "@freshcoat-js/engine";
 import { createAnalysisCache } from "@freshcoat-js/for-print";
 import { describe, expect, test } from "vitest";
-import { type EncodedPaintedFrame, type RenderRuntime, render } from "../src/render";
+import { type RenderTemplateOptions, renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
 let ck: any;
@@ -61,7 +60,9 @@ const RECORDS = ["a.png", "b.png", "a.png", "b.png", "a.png", "b.png"].map(
 	(photo) => ({ photo }),
 );
 
-async function renderAll(runtime: Partial<RenderRuntime> = {}) {
+async function renderAll(
+	options: Pick<RenderTemplateOptions, "analysisCache" | "analysisKey"> = {},
+) {
 	const ck = await ckInit();
 	const images = new Map<string, Uint8Array>([
 		["logo.png", solidPng(ck, [20, 160, 60, 255])],
@@ -69,28 +70,30 @@ async function renderAll(runtime: Partial<RenderRuntime> = {}) {
 		["b.png", solidPng(ck, [40, 40, 200, 255])],
 	]);
 	const loads = new Map<string, number>();
-	const env = createHeadlessEnv({ images });
-	const load = env.loadBytes;
-	env.loadBytes = (src) => {
-		loads.set(src, (loads.get(src) ?? 0) + 1);
-		return load(src);
-	};
-	const paintCache = createPaintCache({ maxImagePixels: 1_000_000 });
+	const inner = mapLoader(images);
+	const renderer = await createRenderer({
+		ck,
+		load: (src) => {
+			loads.set(src, (loads.get(src) ?? 0) + 1);
+			return inner(src);
+		},
+		cache: { maxImagePixels: 1_000_000 },
+	});
 	const out: Uint8Array[] = [];
 	for (const values of RECORDS) {
-		const [frame] = (await render(
-			template,
-			values,
-			{ width: 32, height: 20, print: { analyze: true } },
-			{ ck, env, paintCache, ...runtime },
-		)) as EncodedPaintedFrame[];
+		const [frame] = await renderTemplate(renderer, template, values, {
+			width: 32,
+			height: 20,
+			print: { analyze: true },
+			...options,
+		});
 		out.push(frame?.bytes as Uint8Array);
 	}
-	paintCache.dispose();
+	renderer.dispose();
 	return { out, loads };
 }
 
-describe("render() with an analysis cache", () => {
+describe("renderTemplate() with an analysis cache", () => {
 	test("analyzes each distinct image once across many records", async () => {
 		const analysisCache = createAnalysisCache(16);
 		const { loads } = await renderAll({ analysisCache });

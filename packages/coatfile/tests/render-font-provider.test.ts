@@ -1,11 +1,10 @@
-// A paint cache over an env that holds the fonts map: records that hide a field
+// A renderer that holds the fonts map, with a paint cache: records that hide a field
 // set in its own family keep the font provider, and paint what an uncached
 // render does.
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { createPaintCache, type PaintCache } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer, type PaintCacheOptions } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
-import { type EncodedPaintedFrame, render } from "../src/render";
+import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
 const GEIST = testFontBytes("Geist-Regular.ttf");
@@ -62,33 +61,31 @@ const RECORDS = [
 	{ name: "Di" },
 ];
 
-async function renderAll(paintCache?: PaintCache) {
+async function renderAll(cache: PaintCacheOptions | false) {
 	const ck = await ckInit();
-	const fonts = new Map([
-		["Geist", [GEIST]],
-		["Badge", [GEIST.slice()]],
-	]);
-	const env = createHeadlessEnv({ fonts });
+	const renderer = await createRenderer({
+		ck,
+		cache,
+		fonts: { Geist: [GEIST], Badge: [GEIST.slice()] },
+	});
 	const out: Uint8Array[] = [];
 	for (const values of RECORDS) {
-		const [frame] = (await render(
-			template,
-			values,
-			{ width: 64, height: 24 },
-			{ ck, env, fonts, paintCache },
-		)) as EncodedPaintedFrame[];
+		const [frame] = await renderTemplate(renderer, template, values, {
+			width: 64,
+			height: 24,
+		});
 		expect(frame?.warnings).toEqual([]);
 		out.push(frame?.bytes as Uint8Array);
 	}
-	return out;
+	const stats = renderer.stats().paintCache;
+	renderer.dispose();
+	return { out, stats };
 }
 
-describe("render() font provider with a paint cache", () => {
+describe("renderTemplate() font provider with a paint cache", () => {
 	test("records that hide a uniquely-fonted field keep the provider", async () => {
-		const cache = createPaintCache();
-		const cached = await renderAll(cache);
-		expect(cache.stats()).toMatchObject({ paints: 4, fontProviderBuilds: 1 });
-		cache.dispose();
-		expect(cached).toEqual(await renderAll());
+		const cached = await renderAll({});
+		expect(cached.stats).toMatchObject({ paints: 4, fontProviderBuilds: 1 });
+		expect(cached.out).toEqual((await renderAll(false)).out);
 	});
 });

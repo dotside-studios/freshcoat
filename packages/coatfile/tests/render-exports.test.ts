@@ -1,12 +1,14 @@
-// Export settings on render(): the compile size decides the layout, each export
+// Export settings on renderTemplate(): the compile size decides the layout, each export
 // setting decides the density that layout is rasterized at — so one call can
 // return the same side at several sizes, each tagged with what it is.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { decodePixels } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import {
+	createRenderer,
+	decodePixels,
+	type ExportSetting,
+} from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
-import type { EncodedPaintedFrame } from "../src/render";
-import { render } from "../src/render";
+import { renderTemplate, type TemplateFrame } from "../src/render";
 import type { Template } from "../src/types";
 
 const side = (name: string, fill: string) => ({
@@ -47,16 +49,16 @@ const pngSize = (ck: any, png: Uint8Array) => {
 
 const renderAt = async (
 	ck: any,
-	exports?: Parameters<typeof render>[2]["exports"],
+	exports?: ExportSetting[],
 ) =>
-	(await render(
+	(await renderTemplate(
+		await createRenderer({ ck, cache: false }),
 		template,
 		{},
 		{ width: 40, height: 20, exports },
-		{ ck, env: createHeadlessEnv() },
-	)) as EncodedPaintedFrame[];
+	));
 
-describe("render() export settings", () => {
+describe("renderTemplate() export settings", () => {
 	test("no settings = one 1× result per frame, tagged with its pixel size", async () => {
 		const ck = await ckInit();
 		const results = await renderAt(ck);
@@ -99,7 +101,7 @@ describe("render() export settings", () => {
 			{ constraint: { kind: "scale", value: 2 } },
 		]);
 		// Same white front at both densities; only the pixel count differs.
-		const px = (r: EncodedPaintedFrame) => {
+		const px = (r: TemplateFrame) => {
 			const d = decodePixels(ck, r.bytes);
 			if (!d) throw new Error("decode failed");
 			const o =
@@ -153,7 +155,8 @@ describe("render() export settings", () => {
 
 	test("frameNames still restricts which sides are exported", async () => {
 		const ck = await ckInit();
-		const results = (await render(
+		const results = (await renderTemplate(
+			await createRenderer({ ck, cache: false }),
 			template,
 			{},
 			{
@@ -162,8 +165,7 @@ describe("render() export settings", () => {
 				frameNames: ["back"],
 				exports: [{ constraint: { kind: "scale", value: 3 } }],
 			},
-			{ ck, env: createHeadlessEnv() },
-		)) as EncodedPaintedFrame[];
+		));
 		expect(results.map((r) => [r.name, r.width, r.height])).toEqual([
 			["back", 120, 60],
 		]);

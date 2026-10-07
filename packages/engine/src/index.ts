@@ -1,11 +1,7 @@
-// freshcoat — the rendering foundation. Compiles the composable Node IR
-// (via compileScene) to a flat Command list and paints it to pixels via CanvasKit
-// (WASM Skia) — no native canvas anywhere. The paint TARGET (offscreen vs live
-// canvas) lives on its own subpaths — freshcoat/browser | /headless — and
-// each env's `paint(frames, ck)` defaults to the CanvasKit painter, so the barrel
-// stays free of DOM / WASM weight. The backend seam itself is
-// freshcoat/runtime (Painter + makeRuntime); the `Painter` TYPE is
-// re-exported here, since a type costs nothing.
+// The coat engine. compileScene lowers the Node IR to a flat Command list, and
+// createRenderer paints it to pixels with CanvasKit (WASM Skia). Platform code
+// (loading CanvasKit, reading files) lives on the /node and /browser subpaths,
+// so this entry stays free of DOM and Node APIs.
 
 export {
 	type AdjustOptions,
@@ -72,7 +68,6 @@ export {
 	mapLoader,
 } from "./loader";
 export {
-	deriveFontMetrics,
 	getFontMetrics,
 	readFontMetrics,
 	registerFontMetrics,
@@ -131,7 +126,6 @@ export {
 	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
-export { createParagraphEngine } from "./paragraph-layout";
 export { scalePathData } from "./path-data";
 export { flattenOverWhite } from "./jpeg";
 export {
@@ -166,11 +160,7 @@ export {
 	type SurfaceCanvas,
 } from "./renderer";
 export { squircleSvg } from "./squircle";
-export {
-	type CachedTextEngine,
-	memoizeTextEngine,
-	type TextEngineCacheStats,
-} from "./text-cache";
+export type { TextEngineCacheStats } from "./text-cache";
 export type {
 	ClusterAdvance,
 	SpanFont,

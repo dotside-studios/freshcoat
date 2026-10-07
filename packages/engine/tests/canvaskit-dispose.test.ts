@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import type { Command, PaintRuntime } from "../src/types";
+import type { PaintRuntime } from "../src/runtime-types";
+import type { Command } from "../src/types";
 
 // A single empty scene — enough to drive makeSurface + the dispose closure without
 // needing the full drawing API on the fake CanvasKit.

@@ -90,6 +90,26 @@ describe("createRenderer", () => {
 		renderer.dispose();
 	});
 
+	test("makes canvas-output surfaces on the canvases the factory gives", async () => {
+		const sizes: number[][] = [];
+		const renderer = await createRenderer({
+			ck,
+			surface: (width, height) => {
+				sizes.push([width, height]);
+				return { width, height } as unknown as OffscreenCanvas;
+			},
+		});
+		const frame = await renderer.render(rect("#000000"), {
+			width: 8,
+			height: 8,
+			output: { canvas: true },
+		});
+		expect(sizes).toEqual([[8, 8]]);
+		expect([frame.canvas.width, frame.canvas.height]).toEqual([8, 8]);
+		frame.release();
+		renderer.dispose();
+	});
+
 	test("decodes a per-call image again when its bytes change", async () => {
 		const renderer = await createRenderer({ ck });
 		const red = (await renderer.render(rect("#ff0000"), { width: 8, height: 8 })).bytes;
@@ -168,6 +188,10 @@ describe("createRenderer", () => {
 		expect(reads).toEqual(["a.ttf"]);
 		await renderer.loadFonts([local("Body", "b.ttf")]);
 		expect(renderer.fonts.get("Body")?.[0]).toBe(files["b.ttf"]);
+		await renderer.addFonts({ Given: [files["a.ttf"] as Uint8Array] });
+		await renderer.loadFonts([local("Given", "b.ttf")]);
+		expect(reads).toEqual(["a.ttf", "b.ttf"]);
+		expect(renderer.fonts.get("Given")?.[0]).toBe(files["a.ttf"]);
 		const report = await renderer.loadFonts([local("Missing", "c.ttf")]);
 		expect(report.failed.map((f) => f.family)).toEqual(["Missing"]);
 		expect(renderer.fonts.has("Missing")).toBe(false);
@@ -184,6 +208,20 @@ describe("createRenderer", () => {
 		expect(commands[0]).toMatchObject({ op: "createCanvas", width: 120, height: 40 });
 		const frame = await renderer.paint(commands, { output: { pixels: true } });
 		expect(frame.pixels.width).toBe(120);
+		renderer.dispose();
+	});
+
+	test("clear frees the cache and the next paint rebuilds it", async () => {
+		const renderer = await createRenderer({ ck });
+		await renderer.render(rect("#ff0000"), { width: 8, height: 8 });
+		renderer.clear();
+		const frame = await renderer.render(rect("#00ff00"), {
+			width: 8,
+			height: 8,
+			output: { pixels: true },
+		});
+		expect(firstPixel(frame.pixels.data)).toEqual([0, 255, 0, 255]);
+		expect(renderer.stats().paintCache?.surfaceCreates).toBe(2);
 		renderer.dispose();
 	});
 

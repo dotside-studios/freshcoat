@@ -20,7 +20,8 @@ import type {
 	PaintCacheOptions,
 	PaintCacheStats,
 } from "./paint-cache";
-import type { CanvasLike, PaintWarning } from "./types";
+import type { CanvasLike } from "./runtime-types";
+import type { PaintWarning } from "./types";
 
 type FontKey = { family: string; bytes: Uint8Array }[];
 

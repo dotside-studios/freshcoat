@@ -18,9 +18,7 @@
 		"./bleed": "./src/bleed.ts",
 		"./render": "./src/render.ts",
 		"./svg": "./src/svg.ts",
-		"./browser": "./src/browser.ts",
 		"./normalize": "./src/normalize.ts",
-		"./headless": "./src/headless.ts",
 		"./coat": "./src/coat.ts",
 		"./fixtures": "./fixtures/index.ts",
 		"./schema/*": "./schema/*"

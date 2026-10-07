@@ -1,5 +1,5 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { createRenderer } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
 
@@ -28,23 +28,15 @@ const frameTemplate = {
 	],
 } as unknown as Template;
 
-describe("createHeadlessEnv", () => {
-	test("renders a frame offscreen to PNG with no canvas host", async () => {
-		const ck = (await loadCanvasKit()) as any;
+describe("renderer.paint", () => {
+	test("paints compiled frame commands offscreen to PNG", async () => {
+		const ck = await loadCanvasKit();
 		const { compileToCommands } = await import("./helpers/compile-commands");
-		const frames = compileToCommands(
-			frameTemplate,
-			{},
-			{
-				width: 40,
-				height: 40,
-			},
-		);
-		const env = createHeadlessEnv();
-		expect(env.canvas).toBeUndefined();
-		const result = await env.paint(frames[0].commands, ck);
-		const png = (result as { bytes: Uint8Array }).bytes;
+		const frames = compileToCommands(frameTemplate, {}, { width: 40, height: 40 });
+		const renderer = await createRenderer({ ck });
+		const result = await renderer.paint(frames[0]?.commands ?? []);
 		// PNG magic number.
-		expect(Array.from(png.slice(0, 4))).toEqual([137, 80, 78, 71]);
+		expect(Array.from(result.bytes.slice(0, 4))).toEqual([137, 80, 78, 71]);
+		renderer.dispose();
 	});
 });

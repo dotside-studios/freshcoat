@@ -10,7 +10,7 @@ import {
 import { loadCases } from "../conformance/src/corpus";
 import { runConformance, sha256 } from "../conformance/src/run";
 import { makeRuntime } from "../src/runtime";
-import type { Painter } from "../src/types";
+import type { Painter } from "../src/runtime-types";
 
 let fixture: Fixture;
 

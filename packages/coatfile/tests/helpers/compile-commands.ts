@@ -3,6 +3,7 @@ import {
 	type Command,
 	compileScene,
 	type FontVMetrics,
+	type Renderer,
 	type TextEngine,
 } from "@freshcoat-js/engine";
 import { compile } from "../../src/compile";
@@ -15,6 +16,8 @@ type Opts = {
 	resize?: { width: number; height: number };
 	fontMetrics?: Record<string, FontVMetrics>;
 	textEngine?: TextEngine;
+	// Compile through this renderer's Paragraph engine and metrics instead.
+	renderer?: Renderer;
 };
 
 export function compileToCommands(
@@ -30,14 +33,19 @@ export function compileToCommands(
 	});
 	const textEngine = opts.textEngine ?? approxEngine;
 	return compiled.frames.map((f) => {
-		const commands = compileScene(f.root, {
+		const size = {
 			width: compiled.width,
 			height: compiled.height,
-			textEngine,
-			fontMetrics: opts.fontMetrics,
 			fonts: f.assets.fonts,
 			images: f.assets.images,
-		});
+		};
+		const commands = opts.renderer
+			? opts.renderer.compile(f.root, size)
+			: compileScene(f.root, {
+					...size,
+					textEngine,
+					fontMetrics: opts.fontMetrics,
+				});
 		// Flatten the plain root container to top-level draws (matches the old output).
 		const last = commands[commands.length - 1];
 		if (

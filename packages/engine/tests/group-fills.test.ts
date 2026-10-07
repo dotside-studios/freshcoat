@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createGroup, createRect, createText } from "../src/node";
 import type { DrawGroupCommand, DrawRectCommand } from "../src/types";
 

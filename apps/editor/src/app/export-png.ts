@@ -1,6 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
-import { render } from "@freshcoat-js/coatfile/render";
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+import { createRenderer } from "@freshcoat-js/engine";
 import { exportFileName } from "~/doc/io";
 import { getCanvasKit } from "~/render/canvaskit";
 import { downloadBytes } from "./download";
@@ -18,28 +18,25 @@ export async function renderSidePng(
 ): Promise<{ png: Uint8Array; width: number; height: number; name: string }> {
 	const frame = t.template_data[opts.side];
 	if (!frame) throw new Error("no such side");
-	const ck = await getCanvasKit();
+	const renderer = await createRenderer({
+		ck: await getCanvasKit(),
+		...(opts.fonts ? { fonts: Object.fromEntries(opts.fonts) } : {}),
+		cache: false,
+	});
 	const variantId =
 		opts.variantId && t.variants?.some((v) => v.id === opts.variantId)
 			? opts.variantId
 			: undefined;
-	const [result] = await render(
-		t,
-		opts.values,
-		{
-			width: t.width,
-			height: t.height,
-			variantId,
-			frameNames: [frame.name],
-			exports: [
-				opts.scale === 1
-					? {}
-					: { constraint: { kind: "scale", value: opts.scale } },
-			],
-		},
-		{ ck, env: createHeadlessEnv({ fonts: opts.fonts }), fonts: opts.fonts },
-	);
-	if (!result || !("bytes" in result)) throw new Error("nothing was rendered");
+	const [result] = await renderTemplate(renderer, t, opts.values, {
+		variantId,
+		frameNames: [frame.name],
+		exports: [
+			opts.scale === 1
+				? {}
+				: { constraint: { kind: "scale", value: opts.scale } },
+		],
+	}).finally(() => renderer.dispose());
+	if (!result) throw new Error("nothing was rendered");
 	return {
 		png: result.bytes,
 		width: result.width,

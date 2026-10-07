@@ -9,12 +9,8 @@ import { compileScene } from "../../src/compile-scene";
 import type { DecodedPixels } from "../../src/decode";
 import { makeRuntime } from "../../src/runtime";
 import type { TextEngine } from "../../src/text-engine";
-import type {
-	Command,
-	FontVMetrics,
-	Painter,
-	PaintWarning,
-} from "../../src/types";
+import type { Painter } from "../../src/runtime-types";
+import type { Command, FontVMetrics, PaintWarning } from "../../src/types";
 import { validateCommands } from "../../src/validate-commands";
 import { loadCases, loadExpected } from "./corpus";
 import type {

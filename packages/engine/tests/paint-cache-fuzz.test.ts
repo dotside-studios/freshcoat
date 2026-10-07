@@ -6,7 +6,7 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
 import { beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createEllipse,
@@ -17,11 +17,11 @@ import {
 	createPath,
 	createRect,
 	createText,
-	deriveFontMetrics,
 	encodePng,
 	type PaintCache,
 	type PaintCacheOptions,
 } from "../src/index";
+import { deriveFontMetrics } from "../src/font-metrics";
 import type { Node, Transform } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {

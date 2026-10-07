@@ -7,10 +7,10 @@ import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect, createText } from "../src/node";
 import { encodePng } from "../src/png";
-import type { EncodedPaintResult } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
 
 const FONT = testFontPath("Geist-Regular.ttf");
 

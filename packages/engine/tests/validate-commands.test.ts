@@ -10,11 +10,11 @@ import {
 	createBitmap,
 	createFrame,
 	createGroup,
-	createParagraphEngine,
 	createRect,
 	createText,
 	validateCommands,
 } from "../src/index";
+import { createParagraphEngine } from "../src/paragraph-layout";
 import type { Command, DrawRectCommand } from "../src/types";
 
 const FONT = testFontPath("Geist-Regular.ttf");

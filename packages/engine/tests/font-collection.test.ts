@@ -1,15 +1,15 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	type Command,
 	compileScene,
 	createFrame,
 	createPaintCache,
 	createText,
-	deriveFontMetrics,
 } from "../src/index";
+import { deriveFontMetrics } from "../src/font-metrics";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 

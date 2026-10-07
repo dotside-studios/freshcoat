@@ -5,9 +5,9 @@ import { setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import { deriveFontMetrics } from "../src/font-metrics";
-import { createHeadlessEnv } from "../src/headless";
+import { createHeadlessEnv } from "./helpers/headless";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { EncodedPaintResult } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
 import {
 	createBitmap,
 	createEllipse,

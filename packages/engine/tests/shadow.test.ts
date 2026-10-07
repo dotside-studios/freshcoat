@@ -2,9 +2,10 @@
 // painted pixels — the filter graph is CanvasKit's, so only the output proves it.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "../src/headless";
+import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
-import type { EncodedPaintResult, Shadows } from "../src/types";
+import type { EncodedPaintResult } from "../src/runtime-types";
+import type { Shadows } from "../src/types";
 
 const W = 80;
 const H = 80;
