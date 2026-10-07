@@ -2928,18 +2928,22 @@ function finishNoise(
 	paint.setShader(shader);
 	const canvas = target.getCanvas();
 	canvas.drawRect(ck.XYWHRect(0, 0, info.width, info.height), paint);
-	const rgba = canvas.readPixels(
-		0,
-		0,
-		target.imageInfo(),
-	) as Float32Array | null;
-	if (!rgba) return null;
-	const channels = u.monochrome ? 1 : 3;
-	const noise = new Float32Array((rgba.length / 4) * channels);
-	for (let i = 0, j = 0; i < rgba.length; i += 4)
-		for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
-	cacheFinishNoise(cache, { key, noise });
-	return noise;
+	// CanvasKit sizes its own F32 result in bytes rather than floats, so read
+	// into a buffer of the right length instead.
+	const size = info.width * info.height * 4;
+	const dest = ck.Malloc(Float32Array, size);
+	try {
+		if (!canvas.readPixels(0, 0, target.imageInfo(), dest)) return null;
+		const rgba = dest.toTypedArray() as Float32Array;
+		const channels = u.monochrome ? 1 : 3;
+		const noise = new Float32Array(info.width * info.height * channels);
+		for (let i = 0, j = 0; i < size; i += 4)
+			for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
+		cacheFinishNoise(cache, { key, noise });
+		return noise;
+	} finally {
+		ck.Free(dest);
+	}
 }
 
 // Skia's name for each layer blend mode. Figma's linear dodge is Skia's Plus.
