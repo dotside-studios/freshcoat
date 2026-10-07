@@ -71,10 +71,8 @@ export function classifyIntent(node: Node): LayerIntent {
 // step — both per-channel, so they compose into one 256-entry table. Mirrors the
 // order and math of the gamma + darkness pixel steps.
 //
-// `balance` is this channel's cast exponent and applies LAST, after the tone
-// steps: it corrects what the printer does to the finished signal, so it belongs
-// at the end of the chain rather than folded into `gamma`. At 1 the table is
-// bit-identical to what it was before balance existed.
+// `balance` is a channel's cast exponent, applied after the tone steps. Only
+// printFinish sets it, with the tone steps at identity.
 //
 // Equal parameters return the same table, so freshcoat's composed-cube and LUT
 // image caches hit by identity across renders. Treat it as read-only.
@@ -140,22 +138,10 @@ export function printAdjust(o: PrintOptimizeOptions): Adjust {
 		adjust.gamut = "preserve-hue";
 	}
 
-	// One table per channel only when the balance asks for it. With no cast
-	// measured, all three are the same table and the same object — the shape
-	// freshcoat has always been handed.
 	const darkness = o.darkness ?? 0;
-	if (NEUTRAL_BALANCE(o.balance)) {
-		if (o.gamma !== 1 || darkness > 0) {
-			const lut = toneLut(o.gamma, darkness);
-			adjust.lut = { r: lut, g: lut, b: lut };
-		}
-	} else {
-		const b = o.balance as ChannelBalance;
-		adjust.lut = {
-			r: toneLut(o.gamma, darkness, b.r),
-			g: toneLut(o.gamma, darkness, b.g),
-			b: toneLut(o.gamma, darkness, b.b),
-		};
+	if (o.gamma !== 1 || darkness > 0) {
+		const lut = toneLut(o.gamma, darkness);
+		adjust.lut = { r: lut, g: lut, b: lut };
 	}
 
 	if (o.sharpness > 0) adjust.sharpen = o.sharpness;

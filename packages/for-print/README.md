@@ -122,10 +122,9 @@ It remains compatible with older profiles and normalizes them to the current
 `version: 1` schema.
 
 Profiles describe measured channel balance for a printer, ribbon and stock
-combination. They are not ICC profiles. Pass a profile's `balance` to
-`printFinish()` to get the whole-frame finish with the balance as its curve,
-or use `withProfile()` to combine it with a single-image recommendation. Use
-one or the other for a given image, not both.
+combination. They are not ICC profiles. A profile's `balance` corrects the
+composited card, never a layer: pass it to `planForPrint` or `printFinish()`,
+which apply it as the whole-frame finish's curve.
 
 ## License
 

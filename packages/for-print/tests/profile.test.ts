@@ -3,12 +3,10 @@
 import { describe, expect, test } from "vitest";
 import { grayBalanceChart } from "../src/chart";
 import type { ChartReading, PatchReading } from "../src/measure";
-import { NO_PROCESSING } from "../src/presets";
 import {
 	createPrintProfile,
 	parsePrintProfile,
 	profileCacheKey,
-	withProfile,
 } from "../src/profile";
 
 const neutralReading = (): ChartReading => {
@@ -171,27 +169,6 @@ describe("createPrintProfile", () => {
 			conditions: { stock: "" },
 		});
 		expect(result).toMatchObject({ ok: false, reason: "invalid-conditions" });
-	});
-});
-
-describe("withProfile", () => {
-	test("supplies the balance and leaves the analysis alone", () => {
-		const analysed = { ...NO_PROCESSING, saturation: 1.25, gamma: 0.9 };
-		const merged = withProfile(analysed, {
-			name: "p",
-			balance: { r: 1.08, g: 1, b: 1 },
-		});
-		// The profile owns the cast and nothing else: a profile that pinned
-		// saturation would throw away the per-image analysis.
-		expect(merged.balance).toEqual({ r: 1.08, g: 1, b: 1 });
-		expect(merged.saturation).toBe(1.25);
-		expect(merged.gamma).toBe(0.9);
-	});
-
-	test("an unmeasured profile changes nothing", () => {
-		const analysed = { ...NO_PROCESSING, saturation: 1.25 };
-		expect(withProfile(analysed, { name: "p" })).toBe(analysed);
-		expect(withProfile(analysed, undefined)).toBe(analysed);
 	});
 });
 
