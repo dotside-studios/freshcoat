@@ -304,6 +304,28 @@ describe("field definitions", () => {
 		expect(t().fields.required).toEqual(["name"]);
 	});
 
+	test("the pattern input accepts patterns that only parse without the u flag", async () => {
+		const { t, user } = setup();
+		await user.click(screen.getByRole("button", { name: "title field" }));
+		const pattern = within(screen.getByTestId("field-title")).getByRole(
+			"textbox",
+			{ name: "Pattern" },
+		);
+		for (const legacy of ["^\\d{3}\\-\\d{4}$", "^[\\w-.]+$", "^\\#\\d+$"]) {
+			await user.clear(pattern);
+			await user.click(pattern);
+			await user.paste(legacy);
+			expect(pattern.getAttribute("aria-invalid")).not.toBe("true");
+			expect(screen.queryByText("Not a valid regular expression")).toBeNull();
+			fireEvent.blur(pattern);
+			expect(t().fields.properties.title?.pattern).toBe(legacy);
+		}
+		await user.clear(pattern);
+		await user.click(pattern);
+		await user.paste("^(a");
+		expect(screen.getByText("Not a valid regular expression")).toBeTruthy();
+	});
+
 	test("delete is refused while referenced and lists the references", async () => {
 		const { controller, t, user } = setup();
 		await user.click(

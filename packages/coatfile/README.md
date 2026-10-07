@@ -667,6 +667,15 @@ across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
 
+## Field patterns
+
+A field's `pattern` is a JavaScript regular expression that `validateValues`
+and workspace column checks enforce. It compiles with the `u` flag, so
+`^\p{L}+$` matches letters in any script. A pattern that only parses without
+`u`, such as `^\#\d+$` or `^[\w-.]+$`, compiles without flags instead. A
+pattern invalid in both modes imposes no constraint, and the editor flags it as
+not a valid regular expression.
+
 ## Conditional visibility
 
 `visibleWhen` on any element shows it only while a field is set, and drops it

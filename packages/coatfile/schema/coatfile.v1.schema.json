@@ -154,7 +154,8 @@
 								"type": "number"
 							},
 							"pattern": {
-								"type": "string"
+								"type": "string",
+								"description": "JavaScript regular expression. Compiled with the u flag, or without flags when it only parses that way. A pattern invalid in both modes imposes no constraint."
 							},
 							"readOnly": {
 								"type": "boolean"

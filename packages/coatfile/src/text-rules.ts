@@ -9,8 +9,9 @@ export type TextRuleBreak = "too_short" | "too_long" | "pattern_mismatch";
 const patterns = new Map<string, RegExp | null>();
 export const PATTERN_CACHE_MAX = 256;
 
-/** Field patterns compile with the `u` flag. An invalid pattern is `null`
- *  and imposes no constraint. */
+/** Field patterns compile with the `u` flag, falling back to no flags for
+ *  patterns that only parse without it, such as `^\#\d+$`. A pattern
+ *  invalid in both modes is `null` and imposes no constraint. */
 export function compiledPattern(pattern: string): RegExp | null {
 	let re = patterns.get(pattern);
 	if (re !== undefined) {
@@ -18,15 +19,19 @@ export function compiledPattern(pattern: string): RegExp | null {
 		patterns.set(pattern, re);
 		return re;
 	}
-	try {
-		re = new RegExp(pattern, "u");
-	} catch {
-		re = null;
-	}
+	re = compile(pattern, "u") ?? compile(pattern, "");
 	patterns.set(pattern, re);
 	if (patterns.size > PATTERN_CACHE_MAX)
 		patterns.delete(patterns.keys().next().value as string);
 	return re;
+}
+
+function compile(pattern: string, flags: string): RegExp | null {
+	try {
+		return new RegExp(pattern, flags);
+	} catch {
+		return null;
+	}
 }
 
 export function textRuleBreaks(rules: TextRules, value: string): TextRuleBreak[] {

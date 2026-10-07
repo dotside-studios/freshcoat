@@ -104,7 +104,12 @@ export const FieldDefinitionSchema = z.object({
 	format: z.enum(["color", "url", "image", "longText", "boolean"]).optional(),
 	maxLength: z.number().optional(),
 	minLength: z.number().optional(),
-	pattern: z.string().optional(),
+	pattern: z
+		.string()
+		.describe(
+			"JavaScript regular expression. Compiled with the u flag, or without flags when it only parses that way. A pattern invalid in both modes imposes no constraint.",
+		)
+		.optional(),
 	readOnly: z.boolean().optional(),
 	"x-widget": z.string().optional(),
 	"x-source": z.enum(["user", "system", "order"]).optional(),
