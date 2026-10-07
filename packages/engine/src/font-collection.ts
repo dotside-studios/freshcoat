@@ -1,11 +1,34 @@
 // One FontCollection per provider, so Skia's paragraph cache can hit.
 
-// biome-ignore lint/suspicious/noExplicitAny: external WASM API, untyped
-type CK = any;
+// biome-ignore lint/suspicious/noExplicitAny: built and read by untyped callers
+type Untyped = any;
+type ParagraphStyle = Untyped;
+type ParagraphBuilder = Untyped;
 
-const collections = new WeakMap<CK, CK>();
+type TypefaceFontProvider = { delete(): void };
 
-export function fontCollectionFor(ck: CK, provider: CK): CK {
+type FontCollection = {
+	setDefaultFontManager(provider: TypefaceFontProvider): void;
+	enableFontFallback(): void;
+	delete(): void;
+};
+
+type CanvasKit = {
+	FontCollection: { Make(): FontCollection };
+	ParagraphBuilder: {
+		MakeFromFontCollection(
+			style: ParagraphStyle,
+			collection: FontCollection,
+		): ParagraphBuilder;
+	};
+};
+
+const collections = new WeakMap<TypefaceFontProvider, FontCollection>();
+
+export function fontCollectionFor(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+): FontCollection {
 	let fc = collections.get(provider);
 	if (!fc) {
 		fc = ck.FontCollection.Make();
@@ -16,14 +39,18 @@ export function fontCollectionFor(ck: CK, provider: CK): CK {
 	return fc;
 }
 
-export function makeParagraphBuilder(ck: CK, style: CK, provider: CK): CK {
+export function makeParagraphBuilder(
+	ck: CanvasKit,
+	style: ParagraphStyle,
+	provider: TypefaceFontProvider,
+): ParagraphBuilder {
 	return ck.ParagraphBuilder.MakeFromFontCollection(
 		style,
 		fontCollectionFor(ck, provider),
 	);
 }
 
-export function deleteFontProvider(provider: CK): void {
+export function deleteFontProvider(provider: TypefaceFontProvider): void {
 	const fc = collections.get(provider);
 	collections.delete(provider);
 	try {
