@@ -106,25 +106,26 @@ describe("bounded effect layers", () => {
 		}, 30_000);
 	}
 
-	test("a drop shadow on text", async () => {
-		const r = await compare([
-			createText({
-				...box(30, 40, 160, 60),
-				text: "Shadowed text that wraps",
-				font: {
-					family: "Geist",
-					weight: 400,
-					style: "normal",
-					size: 22,
-					lineHeight: 1.2,
-				},
-				color: "#101828",
-				shadow: shadow(14, 18, 12),
-			}),
-		]);
-		expect(r.boundedLayers).toBe(1);
-		expect(r.maxDiff).toBe(0);
-	});
+	for (const style of ["normal", "italic"] as const)
+		test(`a drop shadow on ${style} text`, async () => {
+			const r = await compare([
+				createText({
+					...box(30, 40, 160, 60),
+					text: "Shadowed text that wraps",
+					font: {
+						family: "Geist",
+						weight: 400,
+						style,
+						size: 22,
+						lineHeight: 1.2,
+					},
+					color: "#101828",
+					shadow: [shadow(14, 18, 12), shadow(-40, 0, 0)],
+				}),
+			]);
+			expect(r.boundedLayers).toBe(1);
+			expect(r.maxDiff).toBe(0);
+		});
 
 	test("an inner shadow stays unbounded", async () => {
 		const r = await compare([
