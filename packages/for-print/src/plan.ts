@@ -181,9 +181,10 @@ export function printFinish(
 	};
 }
 
-// Per-intent correction policy. A value corrects that intent; null/undefined
-// leaves it untouched. The default corrects photos with the YMCKO preset and
-// leaves everything else pristine.
+// Per-intent correction policy. A value corrects that intent; null leaves it
+// untouched. Undefined takes the default: photos are corrected (with the YMCKO
+// preset in planScene, by analysis in analyzeScene) and everything else is left
+// pristine.
 export type PlanPolicy = {
 	// Optional semantic override for exceptions to node-kind classification. This
 	// is deliberately a resolver rather than a field on freshcoat nodes: intent
@@ -245,13 +246,14 @@ function mapTree(node: Node, leaf: (n: Node) => Node): Node {
 	return leaf(node);
 }
 
-const DEFAULT_POLICY: PlanPolicy = { photo: YMCKO_PRESET };
-
 // Sync planner: attach a policy-driven Adjust per layer, no image I/O. Photos get
 // the policy's photo preset (YMCKO by default); text/QR/graphics are left pristine
 // unless the policy opts them in. Returns a new tree; the input is not mutated.
 export function planScene(root: Node, policy: PlanPolicy = {}): Node {
-	const p = { ...DEFAULT_POLICY, ...policy };
+	const p = {
+		...policy,
+		photo: policy.photo === undefined ? YMCKO_PRESET : policy.photo,
+	};
 	return mapTree(root, (node) =>
 		withAdjust(node, policyFor(intentFor(node, p), p)),
 	);
@@ -264,11 +266,6 @@ export function planScene(root: Node, policy: PlanPolicy = {}): Node {
 // decoding/rendering, keeping for-print free of any canvas.
 export type ImageSampler = (image: ImageNode) => Promise<PixelData>;
 
-// Async planner: like planScene, but each photo layer is ANALYZED (per-image
-// brightness/saturation/contrast) and corrected with its own recommendation —
-// the core win over correcting one flattened card. Non-photo intents follow
-// `policy` (default: untouched). Pass `policy.photo` explicitly to override
-// analysis: `null` leaves photos alone, a preset forces a fixed correction.
 export type AnalysisCache = Map<string, Promise<ImageAnalysis>>;
 
 // An AnalysisCache that keeps at most `maxEntries`, dropping the least recently
@@ -306,6 +303,12 @@ class BoundedAnalysisCache extends Map<string, Promise<ImageAnalysis>> {
 }
 
 export type AnalyzeSceneOptions = {
+	policy?: PlanPolicy;
+	// Called once per analyzed photo with what analysis found — the gamut pressure
+	// especially, which nothing downstream can recover once the render has clamped.
+	// Not called for layers a `policy.photo` value opted out of analysis.
+	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void;
+	// Keeps analyses across calls.
 	cache?: AnalysisCache;
 	// A short stable key for an image src, such as an asset's sha256. A src it
 	// returns undefined for falls back to a hash of any long src.
@@ -378,19 +381,18 @@ function adjustKey(a: Adjust | undefined): string {
 	].join("|");
 }
 
-// Recommendations are cached per src, and across calls when `options.cache` is
-// passed.
+// Async planner: like planScene, but each photo layer is ANALYZED (per-image
+// brightness/saturation/contrast) and corrected with its own recommendation —
+// the core win over correcting one flattened card. Non-photo intents follow
+// `policy` (default: untouched). A `policy.photo` value overrides analysis: null
+// leaves photos alone, a preset forces a fixed correction.
 export async function analyzeScene(
 	sample: ImageSampler,
 	root: Node,
-	policy: PlanPolicy = {},
-	// Called once per analyzed photo with what analysis found — the gamut pressure
-	// especially, which nothing downstream can recover once the render has clamped.
-	// Not called for layers an explicit `policy.photo` opted out of analysis.
-	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
 	options: AnalyzeSceneOptions = {},
 ): Promise<Node> {
-	const analyzePhotos = !("photo" in policy);
+	const { policy = {}, onAnalysis } = options;
+	const analyzePhotos = policy.photo === undefined;
 	// Cache the in-flight PROMISE, not the resolved value: children walk
 	// concurrently (Promise.all), so identical layers would otherwise both miss a
 	// value-cache and sample twice. Key on the rendered appearance (src + fit +

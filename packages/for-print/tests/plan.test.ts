@@ -423,9 +423,10 @@ describe("analyzeScene (sampler)", () => {
 			imageNode("dup.png"),
 			textNode(),
 		]);
-		await analyzeScene(sample, tree, {}, (analysis, node) =>
-			seen.push({ src: node.src, clipped: analysis.gamut.clipped }),
-		);
+		await analyzeScene(sample, tree, {
+			onAnalysis: (analysis, node) =>
+				seen.push({ src: node.src, clipped: analysis.gamut.clipped }),
+		});
 		// One sample, one report — the same pixels twice would overstate the share.
 		expect(seen).toHaveLength(1);
 		expect(seen[0].src).toBe("dup.png");
@@ -443,15 +444,15 @@ describe("analyzeScene (sampler)", () => {
 		const report = (_a: unknown, node: { src: string }) =>
 			reports.push(node.src);
 		const tree = createGroup([imageNode("a.png"), imageNode("b.png")]);
-		const first = await analyzeScene(sample, tree, {}, report, { cache });
-		const second = await analyzeScene(sample, tree, {}, report, { cache });
+		const first = await analyzeScene(sample, tree, { onAnalysis: report, cache });
+		const second = await analyzeScene(sample, tree, { onAnalysis: report, cache });
 		expect(calls).toBe(2);
 		expect(cache.size).toBe(2);
 		expect(second).toEqual(first);
 		expect(reports).toEqual(["a.png", "b.png", "a.png", "b.png"]);
 
 		const keyed = new Map() as AnalysisCache;
-		await analyzeScene(sample, tree, {}, undefined, {
+		await analyzeScene(sample, tree, {
 			cache: keyed,
 			srcKey: (src) => `sha:${src.length}`,
 		});
@@ -469,11 +470,11 @@ describe("analyzeScene (sampler)", () => {
 		const cache: AnalysisCache = new Map();
 		const tree = createGroup([imageNode("x.png")]);
 		await expect(
-			analyzeScene(sample, tree, {}, undefined, { cache }),
+			analyzeScene(sample, tree, { cache }),
 		).rejects.toThrow("decode failed");
 		await Promise.resolve();
 		expect(cache.size).toBe(0);
-		await analyzeScene(sample, tree, {}, undefined, { cache });
+		await analyzeScene(sample, tree, { cache });
 		expect(calls).toBe(2);
 	});
 
@@ -492,8 +493,6 @@ describe("analyzeScene (sampler)", () => {
 				imageNode(uri("A")),
 				imageNode(uri("B")),
 			]),
-			{},
-			undefined,
 			{ cache },
 		);
 		expect(calls).toBe(2);
@@ -505,10 +504,29 @@ describe("analyzeScene (sampler)", () => {
 		await analyzeScene(
 			async () => brightBuffer(),
 			createGroup([imageNode()]),
-			{ photo: null },
-			(_a, node) => seen.push(node.src),
+			{
+				policy: { photo: null },
+				onAnalysis: (_a, node) => seen.push(node.src),
+			},
 		);
 		expect(seen).toEqual([]);
+	});
+
+	test("an undefined photo policy still analyzes, and still corrects in planScene", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const tree = createGroup([imageNode()]);
+		const policy = { photo: undefined, graphic: null };
+		const analyzed = (await analyzeScene(sample, tree, {
+			policy,
+		})) as typeof tree;
+		expect(calls).toBe(1);
+		expect(analyzed.children[0].adjust).toBeDefined();
+		const planned = planScene(tree, policy) as typeof tree;
+		expect(planned.children[0].adjust).toEqual(printAdjust(YMCKO_PRESET));
 	});
 
 	test("explicit photo policy overrides analysis (never samples)", async () => {
@@ -519,7 +537,7 @@ describe("analyzeScene (sampler)", () => {
 		};
 		const tree = createGroup([imageNode()]);
 		const planned = (await analyzeScene(sample, tree, {
-			photo: null,
+			policy: { photo: null },
 		})) as typeof tree;
 		expect(planned.children[0].adjust).toBeUndefined();
 		expect(calls).toBe(0);
@@ -535,11 +553,13 @@ describe("analyzeScene (sampler)", () => {
 			},
 			tree,
 			{
-				intentFor: (node) =>
-					node.kind === "image" && node.src === "logo.png"
-						? "graphic"
-						: undefined,
-				graphic: NO_PROCESSING,
+				policy: {
+					intentFor: (node) =>
+						node.kind === "image" && node.src === "logo.png"
+							? "graphic"
+							: undefined,
+					graphic: NO_PROCESSING,
+				},
 			},
 		)) as typeof tree;
 		expect(calls).toBe(0);

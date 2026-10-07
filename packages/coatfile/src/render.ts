@@ -169,12 +169,14 @@ async function planFrame(
 	root: Node,
 	print: ResolvedPrint,
 	sample: ImageSampler,
-	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
-	options?: AnalyzeSceneOptions,
+	options: AnalyzeSceneOptions,
 ): Promise<Node> {
 	if (!print.analyze) return planScene(root, print.policy);
 	try {
-		return await analyzeScene(sample, root, print.policy, onAnalysis, options);
+		return await analyzeScene(sample, root, {
+			...options,
+			...(print.policy ? { policy: print.policy } : {}),
+		});
 	} catch {
 		return planScene(root, print.policy);
 	}
@@ -316,13 +318,10 @@ export async function renderCompiled(
 				: (f.root as Node);
 			const analyses: Array<{ analysis: ImageAnalysis; node: ImageNode }> = [];
 			const root = print
-				? await planFrame(
-						scene,
-						print,
-						sample,
-						(analysis, node) => analyses.push({ analysis, node }),
-						analyzeOptions,
-					)
+				? await planFrame(scene, print, sample, {
+						...analyzeOptions,
+						onAnalysis: (analysis, node) => analyses.push({ analysis, node }),
+					})
 				: scene;
 			const planWarnings = gamutWarnings(analyses);
 			const commands = compileScene(root, {

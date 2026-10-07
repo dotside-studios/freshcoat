@@ -48,6 +48,7 @@ const sample: ImageSampler = async (image) => {
   return pixels;
 };
 const analyzedScene = await analyzeScene(sample, nodeTree);
+// Options: { policy, onAnalysis, cache, srcKey }.
 
 // freshcoat does the output: per-layer adjust + the whole-frame finish.
 // With a measured profile, use `printFinish(profile.balance)` instead.
@@ -76,7 +77,8 @@ const analysis = analyzePixels(pixels); // recommendation + notes
 
 `classifyIntent`: `image → photo`, `text → text`, `bitmap → code` (QR/pixel art),
 `rect|ellipse|path → graphic`, `group|mask → container`. By default, the planner
-attaches photo corrections only to photos. It walks containers and applies
+attaches photo corrections only to photos. In `PlanPolicy`, an intent set to
+`null` stays untouched and one left `undefined` takes the default. It walks containers and applies
 corrections to leaves. Whole-frame finishing, including a profile's channel
 balance, acts on the composited image.
 
