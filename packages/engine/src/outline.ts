@@ -131,6 +131,18 @@ export function outlineGeometry(
 		case "squircle": {
 			const sw = Math.max(0, iw);
 			const sh = Math.max(0, ih);
+			if (shape.smoothing !== undefined)
+				return {
+					kind: "path",
+					d: squircleSvg(
+						ix,
+						iy,
+						sw,
+						sh,
+						Math.max(0, shape.radius - inset),
+						shape.smoothing,
+					),
+				};
 			const max = Math.min(sw, sh) / 2;
 			const r = Math.min(Math.max(0, shape.radius - inset), max);
 			const p = Math.min(r * 1.5, max);

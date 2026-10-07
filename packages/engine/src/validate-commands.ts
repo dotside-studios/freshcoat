@@ -216,6 +216,13 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 	}
 
 	if (cmd.adjust) validateAdjust(cmd.adjust, `${path}.adjust`, add, id);
+	if (cmd.op !== "drawGroup" && "isolate" in cmd)
+		add(
+			"isolate_not_group",
+			`isolate applies to drawGroup only, not ${cmd.op}`,
+			`${path}.isolate`,
+			id,
+		);
 
 	if ("fills" in cmd && cmd.fills)
 		cmd.fills.forEach((f, i) => {
@@ -320,6 +327,13 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 				});
 			break;
 		case "drawGroup":
+			if (cmd.isolate !== undefined && typeof cmd.isolate !== "boolean")
+				add(
+					"bad_isolate",
+					`isolate must be a boolean, got ${typeof cmd.isolate}`,
+					`${path}.isolate`,
+					id,
+				);
 			cmd.children.forEach((c, i) => {
 				validateDrawable(c, `${path}.children[${i}]`, add);
 			});

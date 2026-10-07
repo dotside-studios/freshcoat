@@ -217,6 +217,36 @@ describe("minimumFormatVersion", () => {
 		).toBe("1.5");
 	});
 
+	test("1.6: frame isolate, on elements and deltas", () => {
+		const frame = (properties: Record<string, unknown>) =>
+			({
+				id: "f",
+				type: "frame",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 20 },
+				properties: { children: [], ...properties },
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), frame(properties)));
+		expect(need({})).toBe("1.0");
+		expect(need({ isolate: true })).toBe("1.6");
+
+		const t = withElements(base(), frame({}));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "f", properties: { isolate: true } }],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.6");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },
