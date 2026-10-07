@@ -27,12 +27,12 @@ export type ExtractedEffects = {
 	/** One shadow, or the whole stack in paint order. */
 	shadow?: ExtractedShadow | ExtractedShadow[];
 	blur?: number;
+	backdropBlur?: number;
 };
 
-// Extract DROP_SHADOW / INNER_SHADOW / LAYER_BLUR effects from a Figma node into
-// coatfile's element-shell shadow + blur fields. BACKGROUND_BLUR is ignored
-// (classify already flattens nodes carrying one, so this is just defensive —
-// anything reaching here has passed the classify gate).
+// Extract DROP_SHADOW / INNER_SHADOW / LAYER_BLUR / BACKGROUND_BLUR effects from
+// a Figma node into coatfile's element-shell shadow, blur and backdropBlur
+// fields. Figma's background blur radius maps like its layer blur radius.
 //
 // Figma stacks effects the way it stacks fills, first entry bottom-most, and
 // coatfile's shadow array paints in that same order, so the list is carried
@@ -74,6 +74,9 @@ export function extractEffects(
 		}
 		if (e.type === "LAYER_BLUR" && out.blur === undefined) {
 			out.blur = (e.radius ?? 0) * scale;
+		}
+		if (e.type === "BACKGROUND_BLUR" && out.backdropBlur === undefined) {
+			out.backdropBlur = (e.radius ?? 0) * scale;
 		}
 	}
 	if (shadows.length === 1) out.shadow = shadows[0];

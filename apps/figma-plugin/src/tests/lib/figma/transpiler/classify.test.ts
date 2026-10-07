@@ -321,16 +321,93 @@ describe("classify", () => {
 		expect(classify(n).kind).toBe("native-rect");
 	});
 
-	it("RECTANGLE with a background blur → flatten (it samples what is behind)", () => {
+	it("RECTANGLE with a background blur → native-rect (lowers to backdropBlur)", () => {
+		const n: FigmaNode = {
+			...baseAttrs,
+			id: "1",
+			name: "x",
+			type: "RECTANGLE",
+			fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 0.3 } }],
+			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+		};
+		expect(classify(n).kind).toBe("native-rect");
+	});
+
+	it("FRAME with a background blur → native-frame", () => {
+		const n: FigmaNode = {
+			...baseAttrs,
+			id: "1",
+			name: "g",
+			type: "FRAME",
+			children: [],
+			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+		};
+		expect(classify(n).kind).toBe("native-frame");
+	});
+
+	it("a progressive background blur → flatten", () => {
 		const n: FigmaNode = {
 			...baseAttrs,
 			id: "1",
 			name: "x",
 			type: "RECTANGLE",
 			fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
-			effects: [{ type: "BACKGROUND_BLUR", visible: true }],
+			effects: [
+				{
+					type: "BACKGROUND_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 8,
+				},
+			],
 		};
 		const c = classify(n);
+		expect(c.kind).toBe("flatten");
+		if (c.kind === "flatten") expect(c.reason).toBe("effect_flattened");
+	});
+
+	it("TEXT with a background blur → flatten (the backdrop would cover its box)", () => {
+		const n: FigmaNode = {
+			...baseAttrs,
+			id: "1",
+			name: "x",
+			type: "TEXT",
+			characters: "Hello",
+			style: {
+				fontFamily: "Inter",
+				fontSize: 16,
+				fontWeight: 400,
+				textAlignHorizontal: "LEFT",
+				textAlignVertical: "TOP",
+			},
+			fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+		};
+		const c = classify(n);
+		expect(c.kind).toBe("flatten");
+		if (c.kind === "flatten") expect(c.reason).toBe("effect_flattened");
+	});
+
+	it("GROUP with a background blur → flatten (a group has no outline)", () => {
+		const node = {
+			...baseAttrs,
+			id: "1:1",
+			name: "group",
+			type: "GROUP",
+			fills: [],
+			strokes: [],
+			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+			children: [
+				{
+					id: "1:2",
+					name: "c",
+					type: "RECTANGLE",
+					fills: [],
+					absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+				},
+			],
+		};
+		const c = classify(node as never);
 		expect(c.kind).toBe("flatten");
 		if (c.kind === "flatten") expect(c.reason).toBe("effect_flattened");
 	});

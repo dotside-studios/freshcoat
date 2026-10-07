@@ -209,7 +209,14 @@ describe("classify (barcode)", () => {
 			classify(
 				layer("barcode:{{x}}", {
 					blendMode: "LINEAR_BURN",
-					effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 3 }],
+					effects: [
+						{
+							type: "LAYER_BLUR",
+							blurType: "PROGRESSIVE",
+							visible: true,
+							radius: 3,
+						},
+					],
 				}),
 			),
 		).toEqual({ kind: "native-barcode" });

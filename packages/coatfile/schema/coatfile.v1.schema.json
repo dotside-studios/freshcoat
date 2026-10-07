@@ -472,6 +472,9 @@
 									"blur": {
 										"type": "number"
 									},
+									"backdropBlur": {
+										"type": "number"
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -1370,6 +1373,9 @@
 									"blur": {
 										"type": "number"
 									},
+									"backdropBlur": {
+										"type": "number"
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -1957,6 +1963,9 @@
 													]
 												},
 												"blur": {
+													"type": "number"
+												},
+												"backdropBlur": {
 													"type": "number"
 												},
 												"adjust": {
@@ -2857,6 +2866,9 @@
 												"blur": {
 													"type": "number"
 												},
+												"backdropBlur": {
+													"type": "number"
+												},
 												"adjust": {
 													"type": "object",
 													"properties": {
@@ -3565,6 +3577,9 @@
 									]
 								},
 								"blur": {
+									"type": "number"
+								},
+								"backdropBlur": {
 									"type": "number"
 								},
 								"adjust": {
@@ -4486,6 +4501,9 @@
 								"blur": {
 									"type": "number"
 								},
+								"backdropBlur": {
+									"type": "number"
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -5035,6 +5053,9 @@
 								"blur": {
 									"type": "number"
 								},
+								"backdropBlur": {
+									"type": "number"
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -5421,6 +5442,9 @@
 									]
 								},
 								"blur": {
+									"type": "number"
+								},
+								"backdropBlur": {
 									"type": "number"
 								},
 								"adjust": {
@@ -5835,6 +5859,9 @@
 									]
 								},
 								"blur": {
+									"type": "number"
+								},
+								"backdropBlur": {
 									"type": "number"
 								},
 								"adjust": {
@@ -6735,6 +6762,9 @@
 								"blur": {
 									"type": "number"
 								},
+								"backdropBlur": {
+									"type": "number"
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -7614,6 +7644,9 @@
 							]
 						},
 						"blur": {
+							"type": "number"
+						},
+						"backdropBlur": {
 							"type": "number"
 						},
 						"adjust": {
@@ -8680,6 +8713,9 @@
 							]
 						},
 						"blur": {
+							"type": "number"
+						},
+						"backdropBlur": {
 							"type": "number"
 						},
 						"adjust": {

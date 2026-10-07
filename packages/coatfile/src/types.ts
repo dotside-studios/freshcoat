@@ -134,6 +134,7 @@ export interface ElementShell {
 	blendMode?: BlendMode;
 	shadow?: Shadows;
 	blur?: number;
+	backdropBlur?: number;
 	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;

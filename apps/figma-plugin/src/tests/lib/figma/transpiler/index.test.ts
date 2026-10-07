@@ -1566,7 +1566,14 @@ describe("transpile (rasters placed at absoluteRenderBounds, the exported region
 					width: 600,
 					height: 600,
 					fills: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
-					effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+					effects: [
+						{
+							type: "LAYER_BLUR",
+							blurType: "PROGRESSIVE",
+							visible: true,
+							radius: 8,
+						},
+					],
 				},
 			],
 		} as unknown as FigmaContainerNode;
@@ -1711,7 +1718,14 @@ describe("transpile (rasters placed at absoluteRenderBounds, the exported region
 					width: 150,
 					height: 90,
 					fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 } }],
-					effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+					effects: [
+						{
+							type: "LAYER_BLUR",
+							blurType: "PROGRESSIVE",
+							visible: true,
+							radius: 8,
+						},
+					],
 				},
 			],
 		} as unknown as FigmaContainerNode;
@@ -1879,7 +1893,14 @@ describe("transpile (raster z-order)", () => {
 			width: box.width,
 			height: box.height,
 			fills: solidFill,
-			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+			effects: [
+				{
+					type: "LAYER_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 8,
+				},
+			],
 		}) as unknown as FigmaNode;
 
 	const slotFrame = (children: FigmaNode[]): FigmaContainerNode =>
@@ -2210,7 +2231,14 @@ describe("transpile (opacity)", () => {
 		const flattened = {
 			...(rect("o:11", "blob") as unknown as Record<string, unknown>),
 			absoluteRenderBounds: { x: 0, y: 0, width: 40, height: 40 },
-			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+			effects: [
+				{
+					type: "LAYER_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 4,
+				},
+			],
 		} as unknown as FigmaNode;
 		const front = {
 			id: "o:1",
@@ -2349,7 +2377,14 @@ describe("transpile (decision trace)", () => {
 		// looks emittable, and it still came out a bitmap.
 		const r = await run([
 			leaf("t:3", "blob", {
-				effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+				effects: [
+					{
+						type: "LAYER_BLUR",
+						blurType: "PROGRESSIVE",
+						visible: true,
+						radius: 8,
+					},
+				],
 			}),
 		]);
 		expect(r.trace[0]).toMatchObject({
@@ -2398,7 +2433,14 @@ describe("transpile (decision trace)", () => {
 			leaf("t:9", "kept"),
 			leaf("t:10", "hidden", { visible: false }),
 			leaf("t:11", "blob", {
-				effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 8 }],
+				effects: [
+					{
+						type: "LAYER_BLUR",
+						blurType: "PROGRESSIVE",
+						visible: true,
+						radius: 8,
+					},
+				],
 			}),
 		]);
 		const decisions = r.report.decisions ?? [];

@@ -228,6 +228,7 @@ function effects(r: Rand, p: number, spread = true): Partial<Transform> {
 	if (r.chance(p)) out.rotation = r.int(-40, 40);
 	if (r.chance(p / 2)) out.blendMode = r.pick(BLENDS);
 	if (r.chance(p / 2)) out.blur = r.pick([0.5, 2, 4]);
+	if (r.chance(p / 2)) out.backdropBlur = r.pick([2, 6]);
 	if (r.chance(p / 2)) out.adjust = r.pick(ADJUSTS);
 	if (r.chance(p / 2))
 		out.shadow = {

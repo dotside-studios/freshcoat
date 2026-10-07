@@ -162,6 +162,12 @@ table so the result matches applying them in turn.
 
 Every paint path applies one drawable's effects in this order:
 
+0. **Backdrop blur**: what lies beneath the drawable's shape is replaced by its
+   blur before the drawable draws. The shape is its clip, else its outline (a
+   rect's rounded corners, a path's fill) or a group's rounded box, else its
+   box. It follows the drawable's `rotation` and `opacity`, not its blend mode.
+   It reads only the layer it is drawn into, so inside an isolated group, a
+   group with its own layer effects or a mask it sees that group's content.
 1. **Content**: the drawable's fills, strokes, text or children, under its
    `rotation`.
 2. **Clip and mask**: a clipping group's shape or a mask node's coverage.

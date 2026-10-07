@@ -1,0 +1,92 @@
+{
+	"id": "backdrop-blur-under-fill",
+	"title": "the layer's fill paints over its blurred backdrop",
+	"profile": "core",
+	"requires": [
+		"effect.backdropBlur"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 80,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#000000"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 20
+				},
+				"size": {
+					"width": 80,
+					"height": 80
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#0000ff80"
+					}
+				],
+				"backdropBlur": 20
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				64,
+				64,
+				191,
+				255
+			],
+			"why": "50% blue over the blurred edge",
+			"tolerance": 22
+		}
+	]
+}

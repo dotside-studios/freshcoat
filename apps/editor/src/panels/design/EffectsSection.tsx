@@ -45,6 +45,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 	const lists = els.map(shadowsOf);
 	const common = commonValue(lists);
 	const blur = commonValue(els.map((e) => e.blur ?? 0));
+	const backdropBlur = commonValue(els.map((e) => e.backdropBlur ?? 0));
 
 	const update = (field: string, fn: (list: Shadow[]) => Shadow[]) =>
 		ins.setShared(field, (el) => ({
@@ -148,6 +149,19 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 					value={blur}
 					onChange={(v) =>
 						ins.setShared("blur", () => ({ blur: v === 0 ? undefined : v }))
+					}
+				/>
+			</Row>
+			<Row label="Background">
+				<NumberField
+					aria-label="Background blur"
+					className="min-w-0 flex-1"
+					min={0}
+					value={backdropBlur}
+					onChange={(v) =>
+						ins.setShared("backdropBlur", () => ({
+							backdropBlur: v === 0 ? undefined : v,
+						}))
 					}
 				/>
 			</Row>

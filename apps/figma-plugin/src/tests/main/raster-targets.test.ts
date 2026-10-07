@@ -36,7 +36,14 @@ const frame: FigmaContainerNode = {
 			id: "1:3",
 			name: "blurred",
 			type: "RECTANGLE",
-			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+			effects: [
+				{
+					type: "LAYER_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 4,
+				},
+			],
 			fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
 		},
 	],

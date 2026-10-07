@@ -282,7 +282,14 @@ describe("transpile with print guides", () => {
 
 	it("never rasterizes a guide", () => {
 		const blurred = bleedGuide("g1", {
-			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+			effects: [
+				{
+					type: "LAYER_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 4,
+				},
+			],
 			fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
 		});
 		expect(collectRasterTargets(slotFrame("front", [blurred]))).toEqual([]);

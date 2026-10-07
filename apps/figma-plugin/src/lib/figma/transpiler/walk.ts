@@ -571,6 +571,7 @@ function walkNode(
 		const fx = extractEffects(n.effects, scale, worldRotation);
 		if (fx.shadow) el.shadow = fx.shadow;
 		if (fx.blur !== undefined) el.blur = fx.blur;
+		if (fx.backdropBlur !== undefined) el.backdropBlur = fx.backdropBlur;
 		// classify() declines to rasterize a layer set to Multiply/Screen/…
 		// precisely because the element can carry the mode itself. Dropping it
 		// here would composite that layer as Normal with nothing to say so —

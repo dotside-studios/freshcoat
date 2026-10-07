@@ -1895,6 +1895,7 @@ function predictedBounds(
 			m = concatAffine(m, rotationAffine(c.rotation));
 			m = translateAffine(m, -cx, -cy);
 		}
+		if (hasBackdrop(c)) full = true;
 		let within: RecordedSave[] = outer;
 		const layered = hasLayerPaint(c);
 		if (layered) {
@@ -3534,6 +3535,8 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		opacity: _o,
 		blendMode: _b,
 		blur: _l,
+		backdropBlur: _bb,
+		backdropClip: _bc,
 		shadow: _s,
 		adjust: _a,
 		...rest
@@ -3543,6 +3546,75 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		return group as DrawCommand;
 	}
 	return rest as DrawCommand;
+}
+
+function hasBackdrop(cmd: DrawCommand): boolean {
+	return typeof cmd.backdropBlur === "number" && cmd.backdropBlur > 0;
+}
+
+function withoutBackdrop(cmd: DrawCommand): DrawCommand {
+	const { backdropBlur: _bb, backdropClip: _bc, ...rest } = cmd;
+	return rest as DrawCommand;
+}
+
+// Replaces what the canvas holds beneath the drawable's shape with its blur,
+// under the drawable's rotation and at its opacity.
+function paintBackdrop(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawCommand,
+) {
+	const sigma = LAYER_BLUR_SIGMA(cmd.backdropBlur as number);
+	canvas.save();
+	if (cmd.rotation) {
+		const cx = cmd.pos.x + cmd.size.width / 2;
+		const cy = cmd.pos.y + cmd.size.height / 2;
+		canvas.translate(cx, cy);
+		canvas.rotate(cmd.rotation, 0, 0);
+		canvas.translate(-cx, -cy);
+	}
+	if (cmd.op === "drawPath") {
+		const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
+		if (path) {
+			const vb = cmd.viewBox;
+			let m = ck.Matrix.translated(cmd.pos.x, cmd.pos.y);
+			if (vb && vb.width > 0 && vb.height > 0)
+				m = ck.Matrix.multiply(
+					m,
+					ck.Matrix.scaled(
+						cmd.size.width / vb.width,
+						cmd.size.height / vb.height,
+					),
+					ck.Matrix.translated(-(vb.x ?? 0), -(vb.y ?? 0)),
+				);
+			const back = ck.Matrix.invert(m);
+			if (back) {
+				canvas.concat(m);
+				canvas.clipPath(path, ck.ClipOp.Intersect, true);
+				canvas.concat(back);
+			}
+		}
+	} else {
+		const own =
+			cmd.backdropClip ??
+			(cmd.op === "drawRect"
+				? rectShape(cmd.cornerRadius, cmd.cornerSmoothing)
+				: { kind: "rect" as const });
+		clipShape(ck, canvas, bin, own, cmd.pos, cmd.size);
+	}
+	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
+	let paint: Paint | undefined;
+	if (cmd.opacity !== undefined && cmd.opacity < 1) {
+		paint = bin.track(new ck.Paint());
+		paint.setAlphaf(cmd.opacity);
+	}
+	const blur = bin.track(
+		ck.ImageFilter.MakeBlur(sigma, sigma, ck.TileMode.Clamp, null),
+	);
+	canvas.saveLayer(paint, null, blur, 0, ck.TileMode.Clamp);
+	canvas.restore();
+	canvas.restore();
 }
 
 function paintDrawable(
@@ -3555,6 +3627,10 @@ function paintDrawable(
 	issues: PaintIssues,
 	frame: Frame,
 ) {
+	if (hasBackdrop(cmd)) {
+		paintBackdrop(ck, canvas, bin, cmd);
+		cmd = withoutBackdrop(cmd);
+	}
 	// lut/sharpen can't be a color filter — route the whole drawable through an
 	// offscreen SkSL pass (which re-enters here with a matrix-only adjust).
 	if (needsShaderAdjust(cmd)) {
@@ -3691,6 +3767,7 @@ function selfContained(cmd: DrawCommand): boolean {
 function passThrough(cmd: DrawCommand): boolean {
 	return (
 		!isolates(cmd) &&
+		!hasBackdrop(cmd) &&
 		!cmd.adjust &&
 		!cmd.shadow &&
 		!(cmd.blur && cmd.blur > 0) &&

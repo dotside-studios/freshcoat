@@ -19,7 +19,7 @@ import type { Template } from "./types";
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
-//   1.6  frame `isolate`; text `arc`
+//   1.6  frame `isolate`; text `arc`; element `backdropBlur`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 6;
@@ -88,6 +88,7 @@ export function minimumFormatVersion(template: Template): string {
 			}
 		}
 		if (o.blendMode === "linear-burn") need(5);
+		if (o.backdropBlur !== undefined) need(6);
 		for (const value of Object.values(o)) visit(value);
 	};
 	visit(template.template_data);
