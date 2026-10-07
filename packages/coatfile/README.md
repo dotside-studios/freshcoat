@@ -353,7 +353,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate` |
+| 1.6 | frame `isolate`; text `arc` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -817,7 +817,7 @@ from.)
 
 ### Text on an arc
 
-`arc` sets a text element along a circle centered on its box, for seals,
+`arc` (1.6) sets a text element along a circle centered on its box, for seals,
 badges and circular labels. Each hard line is one ring and nothing wraps.
 
 ```json
