@@ -128,6 +128,7 @@ export {
 	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
+export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
 export { createParagraphEngine } from "./paragraph-layout";
 export { scalePathData } from "./path-data";
 export { flattenOverWhite } from "./jpeg";
@@ -142,6 +143,7 @@ export {
 	type PngEffort,
 } from "./png";
 export { resolveLayout } from "./resolve-layout";
+export { outlinePath, rectShape } from "./outline";
 export { squircleSvg } from "./squircle";
 export {
 	type CachedTextEngine,
