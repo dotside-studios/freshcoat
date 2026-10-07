@@ -1,21 +1,21 @@
 {
-	"calibrationMs": 43.57,
+	"calibrationMs": 45.58,
 	"cases": {
 		"compileScene membership card": {
-			"ms": 0.067,
-			"relative": 0.00154
+			"ms": 0.091,
+			"relative": 0.00205
 		},
 		"compileScene front x12 (192 layers)": {
-			"ms": 0.247,
-			"relative": 0.00578
+			"ms": 0.32,
+			"relative": 0.00723
 		},
 		"renderCompiled per record, print off": {
-			"ms": 59.617,
-			"relative": 1.39131
+			"ms": 54.646,
+			"relative": 1.15843
 		},
 		"renderCompiled per record, print on": {
-			"ms": 163.961,
-			"relative": 3.82897
+			"ms": 155.951,
+			"relative": 3.50334
 		}
 	}
 }
