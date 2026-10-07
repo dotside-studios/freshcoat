@@ -79,10 +79,24 @@ const FITS = [
 	["clip", "Clip"],
 ] as const;
 
-function cleanFont(f: Font): Font {
+const ARC_PATHS = [
+	["none", "Straight"],
+	["outside", "Outside circle"],
+	["inside", "Inside circle"],
+] as const;
+
+const ARC_ALIGNS = [
+	["start", "Start"],
+	["center", "Center"],
+	["end", "End"],
+] as const;
+
+type Arc = NonNullable<TextProperties["arc"]>;
+
+function clean<T extends object>(f: T): T {
 	const out = { ...f } as Record<string, unknown>;
 	for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
-	return out as Font;
+	return out as T;
 }
 
 /** Family, weight, size, spacing and style all live in `font`. */
@@ -100,7 +114,12 @@ export function TextSection({ ins }: { ins: Inspect }) {
 		fn: (p: TextProperties) => Record<string, unknown>,
 	) => ins.setProps(field, (el) => fn((el as TextElement).properties));
 	const setFont = (field: string, patch: Partial<Font>) =>
-		setText(field, (p) => ({ font: cleanFont({ ...p.font, ...patch }) }));
+		setText(field, (p) => ({ font: clean({ ...p.font, ...patch }) }));
+	const setArc = (field: string, patch: Partial<Arc>) =>
+		setText(field, (p) => ({ arc: clean({ ...p.arc, ...patch }) }));
+	const arcPath = pick((p) =>
+		p.arc ? (p.arc.direction ?? "outside") : "none",
+	);
 
 	const lineHeight = pickFont((f) => f.lineHeight ?? 1.2);
 	const decoration = pickFont((f) => f.decoration ?? "none");
@@ -296,6 +315,90 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					))}
 				</Select>
 			</Row>
+			<Row label="Path" keys={["arc"]}>
+				<Select
+					aria-label="Text path"
+					className="min-w-0 flex-1"
+					placeholder="Mixed"
+					value={arcPath}
+					onChange={(v) =>
+						v === "none"
+							? setText("arc", () => ({ arc: undefined }))
+							: setArc("arc", {
+									direction: v === "inside" ? "inside" : undefined,
+								})
+					}
+				>
+					{ARC_PATHS.map(([id, name]) => (
+						<SelectItem key={id} id={id}>
+							{name}
+						</SelectItem>
+					))}
+				</Select>
+			</Row>
+			{arcPath !== "none" && arcPath !== null && (
+				<>
+					<Row label="Arc" keys={["arc"]}>
+						<NumberField
+							label="Angle"
+							aria-label="Arc start angle"
+							className="min-w-0 flex-1"
+							unit="°"
+							value={pick((p) => p.arc?.startAngle ?? 0)}
+							onChange={(v) =>
+								setArc("arc-angle", { startAngle: v === 0 ? undefined : v })
+							}
+						/>
+						<Select
+							aria-label="Arc alignment"
+							className="min-w-0 flex-1"
+							placeholder="Mixed"
+							value={pick((p) => p.arc?.align ?? "center")}
+							onChange={(v) =>
+								setArc("arc-align", {
+									align: v === "center" ? undefined : (v as Arc["align"]),
+								})
+							}
+						>
+							{ARC_ALIGNS.map(([id, name]) => (
+								<SelectItem key={id} id={id}>
+									{name}
+								</SelectItem>
+							))}
+						</Select>
+					</Row>
+					<Row label="" keys={["arc"]}>
+						<NumberField
+							label="R"
+							aria-label="Arc radius"
+							className="min-w-0 flex-1"
+							min={0}
+							value={pick((p) => p.arc?.radius ?? null)}
+							placeholder={
+								pick((p) => p.arc?.radius ?? 0) === null ? "Mixed" : "Auto"
+							}
+							onChange={(v) =>
+								setArc("arc-radius", { radius: v > 0 ? v : undefined })
+							}
+						/>
+						<NumberField
+							label="Sweep"
+							aria-label="Arc sweep"
+							className="min-w-0 flex-1"
+							unit="°"
+							min={0}
+							max={360}
+							value={pick((p) => p.arc?.sweep ?? null)}
+							placeholder={
+								pick((p) => p.arc?.sweep ?? 0) === null ? "Mixed" : "Auto"
+							}
+							onChange={(v) =>
+								setArc("arc-sweep", { sweep: v > 0 ? v : undefined })
+							}
+						/>
+					</Row>
+				</>
+			)}
 			<Row label="Style" keys={FONT}>
 				<ToggleButton
 					aria-label="Italic"
