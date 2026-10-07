@@ -3917,9 +3917,13 @@ export async function paintScene(
 	};
 }
 
-// Bind to rt.canvas when present (WebGL, SW fallback) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface -> null IS the capability probe
-// (a host canvas that can't back WebGL), so this needs no environment flag.
+// Bind to rt.canvas when present (WebGL, then SW) -> displayable; otherwise an
+// offscreen raster surface. MakeWebGLCanvasSurface throws when the host canvas
+// can't back WebGL (context creation fails, or MakeOnScreenGLSurface fails and its
+// DOM-node swap throws on an OffscreenCanvas), so a failed WebGL attempt is caught
+// on its own and still falls back to SW. A throw may leave a WebGL context on the
+// element, which locks it out of the 2D context SW presents through, so SW gets a
+// fresh element and the old one's context is released.
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
@@ -3929,18 +3933,34 @@ function makeSurface(
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
-	if (rt.canvas) {
-		try {
-			const el = rt.canvas.createCanvas(w, h);
-			// Typed for DOM canvases only; any canvas the host makes is accepted.
-			const target = el as unknown as HTMLCanvasElement;
-			const gl = ck.MakeWebGLCanvasSurface(target);
-			if (gl)
-				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(target);
-			if (sw) return { surface: sw, canvas: el, loseContext: noop };
-		} catch {
-			// Fall through to an offscreen surface.
+	const host = rt.canvas;
+	if (host) {
+		const create = (): CanvasLike | undefined => {
+			try {
+				return host.createCanvas(w, h);
+			} catch {
+				return undefined;
+			}
+		};
+		// Typed for DOM canvases only; any canvas the host makes is accepted.
+		const asTarget = (el: CanvasLike) => el as unknown as HTMLCanvasElement;
+		let el = create();
+		if (el) {
+			const canvas = el;
+			try {
+				const gl = ck.MakeWebGLCanvasSurface(asTarget(canvas));
+				if (gl)
+					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
+			} catch {
+				releaseGL(canvas);
+				el = create();
+			}
+		}
+		if (el) {
+			try {
+				const sw = ck.MakeSWCanvasSurface(asTarget(el));
+				if (sw) return { surface: sw, canvas: el, loseContext: noop };
+			} catch {}
 		}
 	}
 	const surface = ck.MakeSurface(w, h) as Surface;
