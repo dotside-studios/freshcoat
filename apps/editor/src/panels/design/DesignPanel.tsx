@@ -54,7 +54,6 @@ export function DesignPanel() {
 	const template = useEditor(working);
 	const selection = useEditor((s) => s.selection);
 	const side = useEditor((s) => s.side);
-	const geometry = useEditor((s) => s.geometry);
 	// A drag changes the document every frame. Only the geometry sections
 	// follow it live; the rest hold the state the drag started from.
 	const inTx = useEditor((s) => s.doc?.history.tx !== undefined);
@@ -78,11 +77,13 @@ export function DesignPanel() {
 	// Swatches follow the drawing, not metadata edits.
 	const drawing = template?.template_data;
 	const lastSwatches = useRef<string[]>([]);
-	const swatches = useMemo(() => {
-		if (inTx || !drawing) return lastSwatches.current;
-		lastSwatches.current = documentSwatches(drawing);
-		return lastSwatches.current;
-	}, [drawing, inTx]);
+	const swatches = useStableList(
+		useMemo(() => {
+			if (inTx || !drawing) return lastSwatches.current;
+			lastSwatches.current = documentSwatches(drawing);
+			return lastSwatches.current;
+		}, [drawing, inTx]),
+	);
 
 	const live = useMemo<Inspect | null>(() => {
 		if (!template || layers.length === 0) return null;
@@ -96,7 +97,6 @@ export function DesignPanel() {
 			side,
 			keys,
 			layers,
-			geometry,
 			swatches,
 			set,
 			setShared: (field, fn) =>
@@ -110,11 +110,19 @@ export function DesignPanel() {
 					return props ? { properties: props } : null;
 				}),
 		};
-	}, [controller, template, side, keys, layers, geometry, swatches]);
-	const ins =
-		inTx && frozen.current && frozen.current.keys === keys
-			? frozen.current
-			: live;
+	}, [controller, template, side, keys, layers, swatches]);
+	// They also hold through edits that only move or resize the selection,
+	// like a scrub.
+	const held = frozen.current;
+	const hold =
+		held !== null &&
+		held.keys === keys &&
+		(inTx ||
+			(live !== null &&
+				held.side === live.side &&
+				held.swatches === live.swatches &&
+				onlyMoved(held.template, live.template, keys)));
+	const ins = hold ? held : live;
 	frozen.current = ins;
 
 	const body = useMemo(() => (ins ? sections(ins) : null), [ins]);
@@ -128,6 +136,31 @@ export function DesignPanel() {
 			{body}
 		</OverridesContext.Provider>
 	);
+}
+
+const MOVES = new Set(["pos", "size", "rotation"]);
+
+/** Whether `b` differs from `a` only in where the layers at `keys` sit. */
+function onlyMoved(a: Template, b: Template, keys: readonly string[]): boolean {
+	const from = keys.map((k) => getElement(a, k));
+	const to = keys.map((k) => getElement(b, k));
+	const same = (x: unknown, y: unknown): boolean => {
+		if (x === y) return true;
+		if (typeof x !== "object" || typeof y !== "object" || !x || !y)
+			return false;
+		if (Array.isArray(x) !== Array.isArray(y)) return false;
+		const i = from.indexOf(x as Layer);
+		const layer = i !== -1 && to[i] === y;
+		const xs = x as Record<string, unknown>;
+		const ys = y as Record<string, unknown>;
+		const names = new Set([...Object.keys(xs), ...Object.keys(ys)]);
+		for (const n of names) {
+			if (layer && MOVES.has(n)) continue;
+			if (layer ? xs[n] !== ys[n] : !same(xs[n], ys[n])) return false;
+		}
+		return true;
+	};
+	return same(a, b);
 }
 
 /** What the active variant changes on the selected layers, for the markers

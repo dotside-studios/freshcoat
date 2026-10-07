@@ -12,6 +12,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from "react";
 import {
 	Collection,
@@ -34,8 +35,8 @@ import {
 	overrideBackground,
 	workingTemplate,
 } from "~/doc/variant-edit";
-import { useEditor } from "~/state/hooks";
-import { present } from "~/state/store";
+import { useEditor, useStore } from "~/state/hooks";
+import { type EditorStore, present } from "~/state/store";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import LockIcon from "~icons/mingcute/lock-line";
@@ -92,11 +93,56 @@ function ancestorsOf(key: string): string[] {
 	return out;
 }
 
-/** Hidden itself, or inside a hidden layer. */
+/** Whether a row is hidden itself or inside a hidden layer. Only a change of
+ *  `hidden` wakes the rows, and only those whose answer changed re-render. */
+type HiddenInTree = {
+	subscribe(listener: () => void): () => void;
+	has(key: string): boolean;
+};
+const HiddenInTreeContext = createContext<HiddenInTree>({
+	subscribe: () => () => {},
+	has: () => false,
+});
+
+function hiddenInTreeOf(store: EditorStore): HiddenInTree {
+	const listeners = new Set<() => void>();
+	let hidden = store.getState().hidden;
+	let answers = new Map<string, boolean>();
+	let unsubscribe = () => {};
+	const sync = () => {
+		const next = store.getState().hidden;
+		if (next === hidden) return false;
+		hidden = next;
+		answers = new Map();
+		return true;
+	};
+	return {
+		subscribe(listener) {
+			if (listeners.size === 0)
+				unsubscribe = store.subscribe(() => {
+					if (sync()) for (const l of listeners) l();
+				});
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+				if (listeners.size === 0) unsubscribe();
+			};
+		},
+		has(key) {
+			sync();
+			let answer = answers.get(key);
+			if (answer === undefined) {
+				answer = hidden.has(key) || ancestorsOf(key).some((k) => hidden.has(k));
+				answers.set(key, answer);
+			}
+			return answer;
+		},
+	};
+}
+
 function useHiddenInTree(key: string): boolean {
-	return useEditor(
-		(s) => s.hidden.has(key) || ancestorsOf(key).some((k) => s.hidden.has(k)),
-	);
+	const source = useContext(HiddenInTreeContext);
+	return useSyncExternalStore(source.subscribe, () => source.has(key));
 }
 
 function rowSelector(key: string) {
@@ -136,6 +182,8 @@ function setAll(
 
 export function LayersTree() {
 	const controller = useController();
+	const store = useStore();
+	const hiddenInTree = useMemo(() => hiddenInTreeOf(store), [store]);
 	// A drag moves layers without renaming or restacking them, so the tree
 	// shows the state the drag started from until it ends.
 	const template = useEditor((s) => {
@@ -145,7 +193,6 @@ export function LayersTree() {
 	const side = useEditor((s) => s.side);
 	const variantId = useEditor((s) => s.variantId);
 	const selection = useEditor((s) => s.selection);
-	const hover = useEditor((s) => s.hover);
 	const marks = useMemo(
 		() => variantMarks(template, variantId, side),
 		[template, variantId, side],
@@ -215,11 +262,24 @@ export function LayersTree() {
 
 	// A layer hovered on the canvas lights up its row.
 	useEffect(() => {
-		if (!hover || rows.length === 0) return;
-		const el = wrapRef.current?.querySelector(rowSelector(hover));
-		el?.setAttribute("data-canvas-hover", "");
-		return () => el?.removeAttribute("data-canvas-hover");
-	}, [hover, rows]);
+		if (rows.length === 0) return;
+		let hover: string | null = null;
+		let el: Element | null | undefined = null;
+		const apply = () => {
+			const next = store.getState().hover;
+			if (next === hover) return;
+			el?.removeAttribute("data-canvas-hover");
+			hover = next;
+			el = hover ? wrapRef.current?.querySelector(rowSelector(hover)) : null;
+			el?.setAttribute("data-canvas-hover", "");
+		};
+		apply();
+		const unsubscribe = store.subscribe(apply);
+		return () => {
+			unsubscribe();
+			el?.removeAttribute("data-canvas-hover");
+		};
+	}, [store, rows]);
 
 	const onSelectionChange = useCallback(
 		(keys: Selection) => {
@@ -507,23 +567,25 @@ export function LayersTree() {
 							}
 						}}
 					>
-						<Tree
-							aria-label="Layers"
-							data-testid="layers-tree"
-							items={rows}
-							selectionMode="multiple"
-							selectionBehavior="replace"
-							selectedKeys={selectedKeys}
-							onSelectionChange={onSelectionChange}
-							expandedKeys={expanded}
-							onExpandedChange={(keys) =>
-								setExpand((s) => ({ ...s, keys: new Set(keys) }))
-							}
-							dragAndDropHooks={dragAndDropHooks}
-							className="min-h-0 flex-1"
-						>
-							{renderRow}
-						</Tree>
+						<HiddenInTreeContext.Provider value={hiddenInTree}>
+							<Tree
+								aria-label="Layers"
+								data-testid="layers-tree"
+								items={rows}
+								selectionMode="multiple"
+								selectionBehavior="replace"
+								selectedKeys={selectedKeys}
+								onSelectionChange={onSelectionChange}
+								expandedKeys={expanded}
+								onExpandedChange={(keys) =>
+									setExpand((s) => ({ ...s, keys: new Set(keys) }))
+								}
+								dragAndDropHooks={dragAndDropHooks}
+								className="min-h-0 flex-1"
+							>
+								{renderRow}
+							</Tree>
+						</HiddenInTreeContext.Provider>
 					</div>
 				</ContextMenu>
 			</RenamingContext.Provider>
@@ -631,8 +693,11 @@ function RowLabel({ row }: { row: LayerRow }) {
 
 function RowToggles({ rowKey }: { rowKey: string }) {
 	const controller = useController();
-	const hidden = useEditor((s) => s.hidden.has(rowKey));
-	const locked = useEditor((s) => s.locked.has(rowKey));
+	const flags = useEditor(
+		(s) => (s.hidden.has(rowKey) ? 1 : 0) | (s.locked.has(rowKey) ? 2 : 0),
+	);
+	const hidden = (flags & 1) !== 0;
+	const locked = (flags & 2) !== 0;
 	const reveal =
 		"opacity-0 group-data-hovered/row:opacity-100 group-data-focus-visible/row:opacity-100 data-focus-visible:opacity-100 pointer-coarse:opacity-100";
 	const button =
