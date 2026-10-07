@@ -29,6 +29,7 @@ import type {
 	Adjust,
 	Command,
 	PaintRuntime,
+	ResolvedFill,
 	ResolvedFont,
 } from "../src/types";
 
@@ -687,5 +688,167 @@ describe("LUT images", () => {
 		expect(kept.delete).not.toHaveBeenCalled();
 		freeLutImages(luts);
 		expect(kept.delete).toHaveBeenCalledTimes(1);
+	});
+});
+
+const GRADIENT: ResolvedFill[] = [
+	{
+		kind: "linear",
+		from: { x: 0, y: 0 },
+		to: { x: 1, y: 1 },
+		stops: [
+			{ offset: 0, color: "#1e1b4b" },
+			{ offset: 1, color: "#7c3aed" },
+		],
+	},
+	{
+		kind: "radial",
+		center: { x: 0.9, y: 0.05 },
+		radius: 0.6,
+		stops: [
+			{ offset: 0, color: "#f472b699" },
+			{ offset: 1, color: "#f472b600" },
+		],
+	},
+];
+
+function cardScene(
+	name: string,
+	opts: { fills?: ResolvedFill[]; accent?: string } = {},
+): Node {
+	return createFrame({
+		pos: { x: 0, y: 0 },
+		size: SIZE,
+		clip: true,
+		cornerRadius: 6,
+		background: createRect({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			fills: opts.fills ?? GRADIENT,
+		}),
+		children: [
+			createPath({
+				pos: { x: 4, y: 4 },
+				size: { width: 20, height: 20 },
+				d: RING,
+				fillRule: "evenodd",
+				fills: [{ kind: "solid", color: opts.accent ?? "#ffffff" }],
+			}),
+			createText({
+				pos: { x: 28, y: 4 },
+				size: { width: 64, height: 24 },
+				text: name,
+				font: {
+					family: "Geist",
+					weight: 400,
+					style: "normal",
+					size: 16,
+					lineHeight: 1.2,
+				},
+				color: "#ffffff",
+			}),
+		],
+	});
+}
+
+describe("PaintCache background", () => {
+	const fonts = new Map([["Geist", [FONT]]]);
+	const images = new Map<string, Uint8Array>();
+
+	// Paints each scene through one cache and checks it against an uncached
+	// paint of the same scene.
+	async function paintRecords(
+		nodes: Node[],
+		cache: PaintCache,
+		extra?: { supersample?: number },
+	) {
+		const { rt } = runtime(fonts, images, cache);
+		for (const node of nodes) {
+			const commands = compile(node, SIZE, fonts, extra);
+			const plain = await pixels(commands, runtime(fonts, images).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+		}
+	}
+
+	test("a second record reuses the background pixels", async () => {
+		await initCk();
+		for (const extra of [{}, { supersample: 2 }]) {
+			const cache = createPaintCache();
+			await paintRecords(
+				[cardScene("Ada"), cardScene("Grace"), cardScene("Hedy")],
+				cache,
+				extra,
+			);
+			expect(cache.stats()).toMatchObject({
+				backgroundSnapshots: 1,
+				backgroundReuses: 2,
+			});
+			cache.dispose();
+		}
+	});
+
+	test("a different gradient replaces the background", async () => {
+		await initCk();
+		const other = GRADIENT.map((fill, i) =>
+			i === 0 && fill.kind === "linear"
+				? {
+						...fill,
+						stops: [{ offset: 0, color: "#09090b" }, ...fill.stops.slice(1)],
+					}
+				: fill,
+		);
+		const cache = createPaintCache();
+		await paintRecords(
+			[
+				cardScene("Ada"),
+				cardScene("Grace", { fills: other }),
+				cardScene("Hedy", { fills: other }),
+			],
+			cache,
+		);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 2,
+			backgroundReuses: 1,
+		});
+		cache.dispose();
+	});
+
+	test("a record-bound color keeps only the run before it", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		await paintRecords(
+			[
+				cardScene("Ada", { accent: "#ff0000" }),
+				cardScene("Grace", { accent: "#00ff00" }),
+				cardScene("Hedy", { accent: "#0000ff" }),
+			],
+			cache,
+		);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 2,
+			backgroundReuses: 1,
+		});
+		cache.dispose();
+	});
+
+	test("a background over the image budget is not kept", async () => {
+		await initCk();
+		const cache = createPaintCache({ maxImagePixels: 100 });
+		await paintRecords([cardScene("Ada"), cardScene("Grace")], cache);
+		expect(cache.stats()).toMatchObject({ backgroundReuses: 0 });
+		cache.dispose();
+	});
+
+	test("clear() drops the background", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		await paintRecords([cardScene("Ada")], cache);
+		cache.clear();
+		await paintRecords([cardScene("Grace")], cache);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 2,
+			backgroundReuses: 0,
+		});
+		cache.dispose();
 	});
 });

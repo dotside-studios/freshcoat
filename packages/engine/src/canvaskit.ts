@@ -20,6 +20,7 @@ import {
 	type LutImages,
 } from "./lut-images";
 import {
+	cacheBackground,
 	cachedFontProvider,
 	cachedLine,
 	cachedMipmaps,
@@ -2957,6 +2958,105 @@ function paintDrawable(
 	canvas.restore();
 }
 
+// The leading drawables whose pixels depend on nothing but the command and the
+// frame, each as a structural key. Text and images also depend on fonts and
+// decoded bytes the key would not cover, so the run stops at the first one. A
+// group that paints straight onto the canvas is entered, keying each child
+// with the group around it.
+function backgroundKeys(drawables: DrawCommand[], outer = ""): string[] {
+	const keys: string[] = [];
+	for (const cmd of drawables) {
+		if (selfContained(cmd)) {
+			keys.push(outer + JSON.stringify(cmd));
+			continue;
+		}
+		if (cmd.op === "drawGroup" && passThrough(cmd)) {
+			const { children, ...group } = cmd;
+			const inner = backgroundKeys(
+				children,
+				`${outer + JSON.stringify(group)}>`,
+			);
+			keys.push(...inner);
+			if (inner.length === children.length) continue;
+		}
+		break;
+	}
+	return keys;
+}
+
+// The first `count` keyed drawables and the rest. A pass-through group cut
+// between its children becomes two groups with the same props, which paint the
+// same pixels as the one.
+function splitBackground(
+	drawables: DrawCommand[],
+	count: number,
+): { head: DrawCommand[]; tail: DrawCommand[]; taken: number } {
+	let taken = 0;
+	for (let i = 0; i < drawables.length; i++) {
+		if (taken === count)
+			return {
+				head: drawables.slice(0, i),
+				tail: drawables.slice(i),
+				taken,
+			};
+		const cmd = drawables[i] as DrawCommand;
+		if (selfContained(cmd) || cmd.op !== "drawGroup") {
+			taken++;
+			continue;
+		}
+		const inner = splitBackground(cmd.children, count - taken);
+		taken += inner.taken;
+		if (inner.tail.length === 0) continue;
+		const head = drawables.slice(0, i);
+		if (inner.head.length) head.push({ ...cmd, children: inner.head });
+		return {
+			head,
+			tail: [{ ...cmd, children: inner.tail }, ...drawables.slice(i + 1)],
+			taken,
+		};
+	}
+	return { head: drawables, tail: [], taken };
+}
+
+function selfContained(cmd: DrawCommand): boolean {
+	if (cmd.op === "drawRect" || cmd.op === "drawPath") return true;
+	if (cmd.op === "drawGroup") return cmd.children.every(selfContained);
+	if (cmd.op === "drawMasked")
+		return selfContained(cmd.mask) && cmd.children.every(selfContained);
+	return false;
+}
+
+// A group with no layer of its own: its children paint onto the canvas under
+// its transform and clip alone.
+function passThrough(cmd: DrawCommand): boolean {
+	return (
+		!cmd.adjust &&
+		!cmd.shadow &&
+		!(cmd.blur && cmd.blur > 0) &&
+		!(cmd.opacity !== undefined && cmd.opacity < 1) &&
+		(!cmd.blendMode || cmd.blendMode === "normal")
+	);
+}
+
+function sharedLength(a: string[], b: string[]): number {
+	let n = 0;
+	while (n < a.length && n < b.length && a[n] === b[n]) n++;
+	return n;
+}
+
+function writeBackground(canvas: CK, pixels: Uint8Array, info: CK): boolean {
+	return canvas.writePixels(
+		pixels,
+		info.width,
+		info.height,
+		0,
+		0,
+		info.alphaType,
+		info.colorType,
+		info.colorSpace,
+	);
+}
+
 // Collect the unique font requests + image srcs a scene's commands declare.
 function collectAssets(commands: Command[]): {
 	fonts: FontRequest[];
@@ -3133,6 +3233,41 @@ export async function paintScene(
 	const skCanvas = target.getCanvas();
 	skCanvas.clear(ck.TRANSPARENT);
 
+	const drawables = commands.filter(
+		(cmd): cmd is DrawCommand =>
+			cmd.op !== "createCanvas" &&
+			cmd.op !== "loadFonts" &&
+			cmd.op !== "loadImages" &&
+			cmd.op !== "finishFrame", // handled as a post-pass, after the loop
+	);
+	// An offscreen paint whose leading drawables match the cached background's
+	// writes its pixels instead of drawing them. One that shares only part of
+	// that run keeps the shared part for the next paint; one that shares none
+	// keeps its own.
+	const pixelInfo: CK = cache && !rt.canvas ? target.imageInfo() : null;
+	const bgFrame = pixelInfo
+		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
+		: "";
+	const lead = pixelInfo ? backgroundKeys(drawables) : [];
+	const held = cache?.background?.frame === bgFrame ? cache.background : null;
+	const shared = held ? sharedLength(held.keys, lead) : 0;
+	let skip = 0;
+	if (
+		cache &&
+		held &&
+		shared === held.keys.length &&
+		writeBackground(skCanvas, held.pixels, pixelInfo)
+	) {
+		skip = shared;
+		cache.stats.backgroundReuses++;
+		warnings.push(...held.warnings);
+	}
+	const snapAt = skip ? 0 : shared || lead.length;
+	const { head, tail } = splitBackground(drawables, skip || snapAt);
+	const run = skip ? tail : [...head, ...tail];
+	const snapAfter = snapAt ? head.length : 0;
+	const warningsBefore = warnings.length;
+
 	try {
 		// Scoped to the drawable loop: the finishing pass below reads back the
 		// composited pixels and belongs in device space.
@@ -3149,14 +3284,8 @@ export async function paintScene(
 		(provider as { __families?: string[] }).__families = [
 			...new Set(loaded.map((f) => f.family)),
 		];
-		for (const cmd of commands) {
-			if (
-				cmd.op === "createCanvas" ||
-				cmd.op === "loadFonts" ||
-				cmd.op === "loadImages" ||
-				cmd.op === "finishFrame" // handled as a post-pass, after the loop
-			)
-				continue;
+		for (let i = 0; i < run.length; i++) {
+			const cmd = run[i] as DrawCommand;
 			const issues: PaintIssues = {
 				unhandled: [],
 				missingImages: [],
@@ -3168,7 +3297,7 @@ export async function paintScene(
 				provider,
 				imageMap,
 				bin,
-				cmd as DrawCommand,
+				cmd,
 				issues,
 				frame,
 			);
@@ -3186,6 +3315,16 @@ export async function paintScene(
 						error: "no image was loaded for this src",
 					});
 				}
+			}
+			if (cache && i + 1 === snapAfter) {
+				const pixels = skCanvas.readPixels(0, 0, pixelInfo) as Uint8Array | null;
+				if (pixels)
+					cacheBackground(cache, {
+						keys: lead.slice(0, snapAt),
+						frame: bgFrame,
+						pixels,
+						warnings: warnings.slice(warningsBefore),
+					});
 			}
 		}
 		// Whole-frame finishing runs on the composited result, so after every
