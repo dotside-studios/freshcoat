@@ -80,6 +80,7 @@ import { squircleSvg } from "./squircle";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type {
+	AdjustLut,
 	BlendMode,
 	CanvasLike,
 	Command,
@@ -1562,8 +1563,8 @@ function adjustShaderSksl(
 		? `uniform shader lut;
 		   half3 curve(half3 c){ return half3(
 		     lut.eval(float2(c.r*255.0+0.5, 0.5)).r,
-		     lut.eval(float2(c.g*255.0+0.5, 0.5)).r,
-		     lut.eval(float2(c.b*255.0+0.5, 0.5)).r); }`
+		     lut.eval(float2(c.g*255.0+0.5, 0.5)).g,
+		     lut.eval(float2(c.b*255.0+0.5, 0.5)).b); }`
 		: `half3 curve(half3 c){ return c; }`;
 	const lut3dFn = hasLut3d
 		? `uniform float cubeSize;
@@ -2685,7 +2686,8 @@ const FINISH_HASH_SKSL = `uniform float ditherSeed;
 // pipeline: dither first (break banding), then black-extract, then white-clamp.
 // Colors are unpremultiplied for the threshold tests and re-premultiplied out.
 // Disabled ops are signalled by a sentinel threshold of -1 (dither 0).
-const FINISH_SKSL = `uniform shader src;
+const finishSksl = (curve: boolean) => `uniform shader src;
+	${curve ? "uniform shader curve;" : ""}
 	uniform float whiteT;
 	uniform float blackT;
 	uniform float dither;
@@ -2694,6 +2696,14 @@ const FINISH_SKSL = `uniform shader src;
 		half4 s = src.eval(xy);
 		half a = s.a;
 		half3 c = a > 0.0 ? s.rgb/a : s.rgb;
+		${
+			curve
+				? `c = half3(
+			curve.eval(float2(c.r*255.0+0.5, 0.5)).r,
+			curve.eval(float2(c.g*255.0+0.5, 0.5)).g,
+			curve.eval(float2(c.b*255.0+0.5, 0.5)).b);`
+				: ""
+		}
 		if (dither > 0.0) {
 			half n = hash(xy);
 			half3 noise = monochromeDither > 0.5 ? half3(n) : hash3(xy);
@@ -2704,7 +2714,7 @@ const FINISH_SKSL = `uniform shader src;
 		return half4(c*a, a);
 	}`;
 
-// The noise FINISH_SKSL adds, unscaled, for finishOnCpu to read back.
+// The noise the finish shader adds, unscaled, for finishOnCpu to read back.
 const FINISH_NOISE_SKSL = `${FINISH_HASH_SKSL}
 	half4 main(float2 xy){
 		half n = hash(xy);
@@ -2713,7 +2723,7 @@ const FINISH_NOISE_SKSL = `${FINISH_HASH_SKSL}
 
 function finishEffect(
 	ck: CanvasKit,
-	variant: "finish" | "finish-noise",
+	variant: "finish" | "finish-curve" | "finish-noise",
 ): RuntimeEffect | null {
 	let byVariant = effectCache.get(ck);
 	if (!byVariant) {
@@ -2724,7 +2734,9 @@ function finishEffect(
 	if (eff === undefined) {
 		eff =
 			ck.RuntimeEffect.Make(
-				variant === "finish" ? FINISH_SKSL : FINISH_NOISE_SKSL,
+				variant === "finish-noise"
+					? FINISH_NOISE_SKSL
+					: finishSksl(variant === "finish-curve"),
 			) ?? null;
 		byVariant.set(variant, eff);
 	}
@@ -2744,6 +2756,7 @@ function normalizeDither(dither: FrameFinish["dither"]) {
 }
 
 type FinishUniforms = {
+	curve?: AdjustLut;
 	whiteT: number;
 	blackT: number;
 	dither: number;
@@ -2759,6 +2772,7 @@ type FinishUniforms = {
 function finishUniforms(finish: FrameFinish): FinishUniforms {
 	const ditherConfig = normalizeDither(finish.dither);
 	return {
+		...(finish.curve ? { curve: finish.curve } : {}),
 		whiteT:
 			finish.whiteClamp !== undefined ? (finish.whiteClamp + 0.5) / 255 : -1,
 		blackT:
@@ -2785,9 +2799,9 @@ function applyFrameFinish(
 	device: Size,
 	cache: PaintCacheState | null,
 ) {
-	const effect = finishEffect(ck, "finish");
-	if (!effect) return; // rt_effect unavailable — leave the frame as-is.
 	const u = finishUniforms(finish);
+	const effect = finishEffect(ck, u.curve ? "finish-curve" : "finish");
+	if (!effect) return; // rt_effect unavailable — leave the frame as-is.
 	if (
 		cpuFinish &&
 		!surface.reportBackendTypeIsGPU() &&
@@ -2805,10 +2819,25 @@ function applyFrameFinish(
 			ck.MipmapMode.None,
 		),
 	);
+	const children = [srcSh];
+	if (u.curve) {
+		const curve = lutImage(ck, bin, u.curve);
+		if (!curve) return; // the table couldn't be uploaded; leave the frame as-is.
+		children.push(
+			bin.track(
+				curve.makeShaderOptions(
+					ck.TileMode.Clamp,
+					ck.TileMode.Clamp,
+					ck.FilterMode.Nearest,
+					ck.MipmapMode.None,
+				),
+			),
+		);
+	}
 	const shader = bin.track(
 		effect.makeShaderWithChildren(
 			[u.whiteT, u.blackT, u.dither, u.seed, u.monochrome ? 1 : 0],
-			[srcSh],
+			children,
 		),
 	);
 	const paint = bin.track(new ck.Paint());
@@ -2825,7 +2854,7 @@ export function setCpuFinish(enabled: boolean): void {
 	cpuFinish = enabled;
 }
 
-// FINISH_SKSL in float32 on the surface's own pixels, byte for byte what the
+// The finish shader in float32 on the surface's own pixels, byte for byte what the
 // shader writes in software, which runs runtime effects slowly. Exact only
 // where alpha is 255 (unpremultiplying rounds otherwise), so a frame with any
 // translucent pixel answers false and takes the shader. So does a dithered
@@ -2849,6 +2878,14 @@ function finishOnCpu(
 	if (u.dither > 0) {
 		noise = cache && finishNoise(ck, surface, bin, cache, u);
 		if (!noise) return false;
+	}
+	if (u.curve) {
+		const { r, g, b } = u.curve;
+		for (let i = 0; i < px.length; i += 4) {
+			px[i] = r[px[i]];
+			px[i + 1] = g[px[i + 1]];
+			px[i + 2] = b[px[i + 2]];
+		}
 	}
 	const unit = new Float32Array(256);
 	for (let b = 0; b < 256; b++) unit[b] = f32(b * UNIT);
@@ -2899,7 +2936,7 @@ function finishOnCpu(
 	);
 }
 
-// The unscaled noise FINISH_SKSL would add at each pixel of `surface`, one
+// The unscaled noise the finish shader would add at each pixel of `surface`, one
 // value per pixel in monochrome and three otherwise, rendered by the same hash
 // into a float surface and kept on the cache.
 function finishNoise(

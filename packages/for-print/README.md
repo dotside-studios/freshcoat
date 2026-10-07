@@ -21,7 +21,8 @@ or communicate with a printer.
   `classifyIntent`, `printAdjust`).
   A layer's own `Adjust` is kept: the correction is composed after it.
 - **Recommend finishing**: the whole-frame output ops that aren't per-layer
-  (`YMCKO_FINISH` → the coat engine's `FrameFinish`).
+  (`YMCKO_FINISH`, or `printFinish(balance)` with a measured cast → the coat
+  engine's `FrameFinish`).
 - **CR80 geometry**: format spec + crop fitting (`cr80Dimensions`,
   `fitCr80CropToImage`, …).
 
@@ -31,33 +32,36 @@ and frame-finishing operations that implement them.
 
 ## Usage
 
-### Plan a scene (per-layer correction)
+### Plan a scene for print
 
 ```ts
-import { planScene, analyzeScene, YMCKO_FINISH, type ImageSampler } from "@freshcoat-js/for-print";
+import { planForPrint, type ImageSampler } from "@freshcoat-js/for-print";
 import { sampleImageNode, compileScene } from "@freshcoat-js/engine";
 
-// Sync, policy-driven: photos get the YMCKO preset; text/QR/graphics stay pristine.
-const presetScene = planScene(nodeTree);
-
-// Or analyze photos as displayed, including their fit and crop.
+// Analyze photos as displayed: their fit, crop and own adjustment.
 const sample: ImageSampler = async (image) => {
   const pixels = await sampleImageNode(ck, image, loadBytes);
   if (!pixels) throw new Error(`Couldn't decode ${image.src}`);
   return pixels;
 };
-const analyzedScene = await analyzeScene(sample, nodeTree);
+
+const { scene, finish } = await planForPrint(nodeTree, {
+  sample,                     // omit for the fixed YMCKO preset
+  balance: profile?.balance,  // a measured printer, if you have one
+});
 
 // freshcoat does the output: per-layer adjust + the whole-frame finish.
-const commands = compileScene(analyzedScene, {
-  width, height, textEngine, finish: YMCKO_FINISH,
-});
+const commands = compileScene(scene, { width, height, textEngine, finish });
 ```
 
 These examples assume an initialized CanvasKit instance (`ck`), a scene and
 text engine, and a `loadBytes(src)` function supplied by your application.
-Choose `presetScene` for fixed corrections or `analyzedScene` for corrections
-based on each photo. Paint the resulting commands through an engine runtime.
+Paint the resulting commands through an engine runtime.
+
+`planForPrint` also takes `policy`, `finish` (`false` keeps only the balance
+curve), `onAnalysis`, `cache` and `srcKey`. The parts are available on their
+own: `planScene` (sync, preset), `analyzeScene` (per-photo analysis) and
+`printFinish(balance)`.
 
 ### Analyze a single image
 
@@ -74,10 +78,10 @@ const analysis = analyzePixels(pixels); // recommendation + notes
 
 `classifyIntent`: `image → photo`, `text → text`, `bitmap → code` (QR/pixel art),
 `rect|ellipse|path → graphic`, `group|mask → container`. By default, the planner
-attaches photo corrections only to photos. It walks containers and applies
-corrections to leaves. An optional profile's channel balance applies to all
-leaves, including text, vectors and codes. Whole-frame finishing acts on the
-composited image.
+attaches photo corrections only to photos. In `PlanPolicy`, an intent set to
+`null` stays untouched and one left `undefined` takes the default. It walks containers and applies
+corrections to leaves. Whole-frame finishing, including a profile's channel
+balance, acts on the composited image.
 
 For exceptions, pass `PlanPolicy.intentFor`. For example, classify a rasterized
 logo as `graphic` so it remains pristine, or apply a specific graphic policy to
@@ -98,16 +102,30 @@ requests via `YMCKO_FINISH`.
 
 ## Calibration profiles
 
-Use `createPrintProfile(reading, details)` to turn a Gray balance chart reading
-into reusable profile data. It only emits a profile when the capture is usable,
-and records the quality assessment plus printer, ribbon, and stock details beside
-the fitted balance. `parsePrintProfile` remains compatible with older profiles and
-normalizes them to the current `version: 1` schema.
+The chart, measurement and fitting tools live in a separate entry point,
+`@freshcoat-js/for-print/calibration`: chart specs (`grayBalanceChart`,
+`chartScene`, …), reading a photographed chart (`readChart`, `homographyFrom`),
+quality checks (`assessCalibration`) and fitting (`fitChannelBalance`).
+
+`profileFromPhoto(photo, corners, details)` is the whole flow in one call: it
+reads a photo of the printed gray balance chart, given the four fiducial
+centers picked in it, and returns `{ ok: true, profile, assessment, reading }`
+or a `reason` it couldn't (`unreadable-corners`, `unsafe-reading`, …).
+
+`createPrintProfile(reading, details)` does the second half for a reading you
+already have. Either way, a profile is only emitted when the capture is usable,
+and it records the quality assessment plus printer, ribbon, and stock details
+beside the fitted balance.
+
+`parsePrintProfile` returns `{ ok: true, profile }` or `{ ok: false, message }`.
+It remains compatible with older profiles and normalizes them to the current
+`version: 1` schema.
 
 Profiles describe measured channel balance for a printer, ribbon and stock
-combination. They are not ICC profiles. Pass a profile's `balance` through
-`PlanPolicy` to use it in scene planning, or use `withProfile()` to combine
-it with a single-image recommendation.
+combination. They are not ICC profiles. Pass a profile's `balance` to
+`printFinish()` to get the whole-frame finish with the balance as its curve,
+or use `withProfile()` to combine it with a single-image recommendation. Use
+one or the other for a given image, not both.
 
 ## License
 

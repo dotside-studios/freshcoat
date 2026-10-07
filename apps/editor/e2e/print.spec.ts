@@ -6,7 +6,7 @@ import {
 	grayBalanceChart,
 	type PatchReading,
 	type RGB,
-} from "@freshcoat-js/for-print";
+} from "@freshcoat-js/for-print/calibration";
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import { mod, openSample, probePath, settle, state } from "./helpers";

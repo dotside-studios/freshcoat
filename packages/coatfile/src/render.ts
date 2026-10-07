@@ -1,12 +1,12 @@
 import {
 	type AnalysisCache,
-	type AnalyzeSceneOptions,
-	analyzeScene,
+	type ChannelBalance,
 	type ImageAnalysis,
 	type ImageSampler,
 	type PlanPolicy,
-	planScene,
-	YMCKO_FINISH,
+	type PrintPlan,
+	type PrintPlanOptions,
+	planForPrint,
 } from "@freshcoat-js/for-print";
 import {
 	type Command,
@@ -100,6 +100,9 @@ export type PrintRenderOptions = {
 	policy?: PlanPolicy;
 	// Whole-frame finishing pass. Default: YMCKO_FINISH. Pass `false` to disable.
 	finish?: FrameFinish | false;
+	// The printer's measured cast (see for-print PrintProfile), applied as the
+	// finish's curve, including when `finish` is false.
+	balance?: ChannelBalance;
 };
 
 // What to paint out of an already-compiled template.
@@ -138,8 +141,7 @@ export type RenderOptions = ExportOptions & {
 
 type ResolvedPrint = {
 	analyze: boolean;
-	policy?: PlanPolicy;
-	finish?: FrameFinish;
+	plan: PrintPlanOptions;
 };
 
 // Normalize the toggle to concrete settings, or null when off.
@@ -148,8 +150,11 @@ function resolvePrint(print: RenderOptions["print"]): ResolvedPrint | null {
 	const o = print === true ? {} : print;
 	return {
 		analyze: o.analyze ?? false,
-		policy: o.policy,
-		finish: o.finish === false ? undefined : (o.finish ?? YMCKO_FINISH),
+		plan: {
+			...(o.policy ? { policy: o.policy } : {}),
+			...(o.balance ? { balance: o.balance } : {}),
+			...(o.finish !== undefined ? { finish: o.finish } : {}),
+		},
 	};
 }
 
@@ -161,14 +166,14 @@ async function planFrame(
 	root: Node,
 	print: ResolvedPrint,
 	sample: ImageSampler,
-	onAnalysis?: (analysis: ImageAnalysis, node: ImageNode) => void,
-	options?: AnalyzeSceneOptions,
-): Promise<Node> {
-	if (!print.analyze) return planScene(root, print.policy);
+	options: PrintPlanOptions,
+): Promise<PrintPlan> {
+	const plan = { ...print.plan, ...options };
+	if (!print.analyze) return planForPrint(root, plan);
 	try {
-		return await analyzeScene(sample, root, print.policy, onAnalysis, options);
+		return await planForPrint(root, { ...plan, sample });
 	} catch {
-		return planScene(root, print.policy);
+		return planForPrint(root, plan);
 	}
 }
 
@@ -282,7 +287,7 @@ export async function renderCompiled(
 		if (!pixels) throw new Error(`print analyze: could not sample ${node.src}`);
 		return pixels;
 	};
-	const analyzeOptions: AnalyzeSceneOptions = {
+	const analyzeOptions: PrintPlanOptions = {
 		...(runtime.analysisCache ? { cache: runtime.analysisCache } : {}),
 		...(runtime.analysisKey ? { srcKey: runtime.analysisKey } : {}),
 	};
@@ -307,24 +312,21 @@ export async function renderCompiled(
 				? prepareScene(f.root as Node, { textEngine, fontMetrics })
 				: (f.root as Node);
 			const analyses: Array<{ analysis: ImageAnalysis; node: ImageNode }> = [];
-			const root = print
-				? await planFrame(
-						scene,
-						print,
-						sample,
-						(analysis, node) => analyses.push({ analysis, node }),
-						analyzeOptions,
-					)
-				: scene;
+			const plan = print
+				? await planFrame(scene, print, sample, {
+						...analyzeOptions,
+						onAnalysis: (analysis, node) => analyses.push({ analysis, node }),
+					})
+				: { scene, finish: undefined };
 			const planWarnings = gamutWarnings(analyses);
-			const commands = compileScene(root, {
+			const commands = compileScene(plan.scene, {
 				width: compiled.width,
 				height: compiled.height,
 				textEngine,
 				fontMetrics,
 				fonts: f.assets.fonts,
 				images: f.assets.images,
-				finish: print?.finish,
+				finish: plan.finish,
 				prepared,
 			});
 			// One bake, one paint per density: the command stream is identical across

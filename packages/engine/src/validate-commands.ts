@@ -119,6 +119,14 @@ function validateFinish(finish: FrameFinish, path: string, add: Add): void {
 				`${path}.finish.${name}`,
 			);
 	};
+	if (finish.curve)
+		for (const ch of ["r", "g", "b"] as const)
+			if (finish.curve[ch]?.length !== 256)
+				add(
+					"bad_lut",
+					`curve.${ch} must have 256 entries, got ${finish.curve[ch]?.length}`,
+					`${path}.finish.curve.${ch}`,
+				);
 	threshold(finish.whiteClamp, "whiteClamp");
 	threshold(finish.blackExtract, "blackExtract");
 	const amount =

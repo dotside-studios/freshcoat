@@ -2,6 +2,7 @@
 // against the canonical color formulas), the sync tree walk, and the async
 // per-image analyzeScene driven by an injected sampler (no canvas in for-print).
 import {
+	type Adjust,
 	buildAdjust,
 	composeAdjust,
 	createBitmap,
@@ -17,10 +18,12 @@ import {
 	type AnalysisCache,
 	analyzeScene,
 	classifyIntent,
+	planForPrint,
 	planScene,
 	printAdjust,
+	printFinish,
 } from "../src/plan";
-import { NO_PROCESSING, YMCKO_PRESET } from "../src/presets";
+import { NO_PROCESSING, YMCKO_FINISH, YMCKO_PRESET } from "../src/presets";
 import type { PixelData, PrintOptimizeOptions } from "../src/types";
 
 const FONT = {
@@ -221,8 +224,8 @@ describe("planScene (sync)", () => {
 		const own = buildAdjust({ saturation: 1.2 });
 		const scene = (): Node => ({ ...imageNode(), adjust: own });
 		const balance = { r: 0.95, g: 1, b: 1.05 };
-		const a = planScene(scene(), { balance }).adjust;
-		const b = planScene(scene(), { balance }).adjust;
+		const a = planScene(scene()).adjust;
+		const b = planScene(scene()).adjust;
 		expect(a?.lut3d).toBeDefined();
 		expect(b?.lut3d).toBe(a?.lut3d);
 		const pa = printAdjust({ ...YMCKO_PRESET, balance });
@@ -316,6 +319,44 @@ describe("analyzeScene (sampler)", () => {
 		expect(seen).toEqual([{ src: "p.png", fit: "cover" }]);
 	});
 
+	test("analyzes a photo as its own adjustment leaves it", async () => {
+		const own = buildAdjust({ gamma: 3 });
+		const photo = { ...imageNode("p.png"), adjust: own };
+		const planned = await analyzeScene(async () => brightBuffer(), photo);
+		const darkened = brightBuffer();
+		for (let i = 0; i < darkened.data.length; i += 4)
+			for (let c = 0; c < 3; c++)
+				darkened.data[i + c] = (own.lut as { r: Uint8Array }).r[
+					darkened.data[i + c]
+				];
+		const recommendation = analyzePixels(darkened).recommendation;
+		expect(recommendation).not.toEqual(
+			analyzePixels(brightBuffer()).recommendation,
+		);
+		expect(planned.adjust).toEqual(
+			composeAdjust(own, printAdjust(recommendation)),
+		);
+	});
+
+	test("the same photo with another adjustment samples separately", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const photo = (adjust?: Adjust) => ({ ...imageNode("s.png"), adjust });
+		await analyzeScene(
+			sample,
+			createGroup([
+				photo(),
+				photo(buildAdjust({ gamma: 2 })),
+				photo(buildAdjust({ gamma: 2 })),
+				photo(buildAdjust({ saturation: 0.5 })),
+			]),
+		);
+		expect(calls).toBe(3);
+	});
+
 	test("caches by rendered appearance — identical layers sample once", async () => {
 		let calls = 0;
 		const sample = async () => {
@@ -383,9 +424,10 @@ describe("analyzeScene (sampler)", () => {
 			imageNode("dup.png"),
 			textNode(),
 		]);
-		await analyzeScene(sample, tree, {}, (analysis, node) =>
-			seen.push({ src: node.src, clipped: analysis.gamut.clipped }),
-		);
+		await analyzeScene(sample, tree, {
+			onAnalysis: (analysis, node) =>
+				seen.push({ src: node.src, clipped: analysis.gamut.clipped }),
+		});
 		// One sample, one report — the same pixels twice would overstate the share.
 		expect(seen).toHaveLength(1);
 		expect(seen[0].src).toBe("dup.png");
@@ -403,15 +445,15 @@ describe("analyzeScene (sampler)", () => {
 		const report = (_a: unknown, node: { src: string }) =>
 			reports.push(node.src);
 		const tree = createGroup([imageNode("a.png"), imageNode("b.png")]);
-		const first = await analyzeScene(sample, tree, {}, report, { cache });
-		const second = await analyzeScene(sample, tree, {}, report, { cache });
+		const first = await analyzeScene(sample, tree, { onAnalysis: report, cache });
+		const second = await analyzeScene(sample, tree, { onAnalysis: report, cache });
 		expect(calls).toBe(2);
 		expect(cache.size).toBe(2);
 		expect(second).toEqual(first);
 		expect(reports).toEqual(["a.png", "b.png", "a.png", "b.png"]);
 
 		const keyed = new Map() as AnalysisCache;
-		await analyzeScene(sample, tree, {}, undefined, {
+		await analyzeScene(sample, tree, {
 			cache: keyed,
 			srcKey: (src) => `sha:${src.length}`,
 		});
@@ -429,11 +471,11 @@ describe("analyzeScene (sampler)", () => {
 		const cache: AnalysisCache = new Map();
 		const tree = createGroup([imageNode("x.png")]);
 		await expect(
-			analyzeScene(sample, tree, {}, undefined, { cache }),
+			analyzeScene(sample, tree, { cache }),
 		).rejects.toThrow("decode failed");
 		await Promise.resolve();
 		expect(cache.size).toBe(0);
-		await analyzeScene(sample, tree, {}, undefined, { cache });
+		await analyzeScene(sample, tree, { cache });
 		expect(calls).toBe(2);
 	});
 
@@ -452,8 +494,6 @@ describe("analyzeScene (sampler)", () => {
 				imageNode(uri("A")),
 				imageNode(uri("B")),
 			]),
-			{},
-			undefined,
 			{ cache },
 		);
 		expect(calls).toBe(2);
@@ -465,10 +505,29 @@ describe("analyzeScene (sampler)", () => {
 		await analyzeScene(
 			async () => brightBuffer(),
 			createGroup([imageNode()]),
-			{ photo: null },
-			(_a, node) => seen.push(node.src),
+			{
+				policy: { photo: null },
+				onAnalysis: (_a, node) => seen.push(node.src),
+			},
 		);
 		expect(seen).toEqual([]);
+	});
+
+	test("an undefined photo policy still analyzes, and still corrects in planScene", async () => {
+		let calls = 0;
+		const sample = async () => {
+			calls++;
+			return brightBuffer();
+		};
+		const tree = createGroup([imageNode()]);
+		const policy = { photo: undefined, graphic: null };
+		const analyzed = (await analyzeScene(sample, tree, {
+			policy,
+		})) as typeof tree;
+		expect(calls).toBe(1);
+		expect(analyzed.children[0].adjust).toBeDefined();
+		const planned = planScene(tree, policy) as typeof tree;
+		expect(planned.children[0].adjust).toEqual(printAdjust(YMCKO_PRESET));
 	});
 
 	test("explicit photo policy overrides analysis (never samples)", async () => {
@@ -479,7 +538,7 @@ describe("analyzeScene (sampler)", () => {
 		};
 		const tree = createGroup([imageNode()]);
 		const planned = (await analyzeScene(sample, tree, {
-			photo: null,
+			policy: { photo: null },
 		})) as typeof tree;
 		expect(planned.children[0].adjust).toBeUndefined();
 		expect(calls).toBe(0);
@@ -495,14 +554,85 @@ describe("analyzeScene (sampler)", () => {
 			},
 			tree,
 			{
-				intentFor: (node) =>
-					node.kind === "image" && node.src === "logo.png"
-						? "graphic"
-						: undefined,
-				graphic: NO_PROCESSING,
+				policy: {
+					intentFor: (node) =>
+						node.kind === "image" && node.src === "logo.png"
+							? "graphic"
+							: undefined,
+					graphic: NO_PROCESSING,
+				},
 			},
 		)) as typeof tree;
 		expect(calls).toBe(0);
 		expect(planned.children[0].adjust).toBeUndefined();
+	});
+});
+
+describe("printFinish", () => {
+	test("is the YMCKO finish when nothing is measured", () => {
+		expect(printFinish()).toBe(YMCKO_FINISH);
+		expect(printFinish({ r: 1, g: 1, b: 1 })).toBe(YMCKO_FINISH);
+	});
+
+	test("carries the balance as a per-channel curve", () => {
+		const finish = printFinish({ r: 1.1, g: 1, b: 0.9 });
+		expect(finish).toMatchObject(YMCKO_FINISH);
+		const curve = finish.curve;
+		if (!curve) throw new Error("no curve");
+		for (const i of [0, 64, 128, 200, 255]) {
+			expect(curve.r[i]).toBe(Math.round(255 * (i / 255) ** 1.1));
+			expect(curve.g[i]).toBe(i);
+			expect(curve.b[i]).toBe(Math.round(255 * (i / 255) ** 0.9));
+		}
+	});
+
+	test("returns the same tables for the same balance", () => {
+		const balance = { r: 1.05, g: 0.98, b: 1 };
+		expect(printFinish(balance).curve?.r).toBe(printFinish(balance).curve?.r);
+	});
+
+	test("adds the curve to another base finish", () => {
+		const finish = printFinish({ r: 1.1, g: 1, b: 1 }, {});
+		expect(Object.keys(finish)).toEqual(["curve"]);
+	});
+});
+
+describe("planForPrint", () => {
+	const tree = () => createGroup([imageNode("p.png"), textNode()]);
+
+	test("without a sampler: the preset plan and the YMCKO finish", async () => {
+		const plan = await planForPrint(tree());
+		expect(plan.scene).toEqual(planScene(tree()));
+		expect(plan.finish).toBe(YMCKO_FINISH);
+	});
+
+	test("with a sampler: the analyzed plan, reported as it goes", async () => {
+		const seen: string[] = [];
+		const plan = await planForPrint(tree(), {
+			sample: async () => brightBuffer(),
+			onAnalysis: (_a, node) => seen.push(node.src),
+		});
+		expect(plan.scene).toEqual(
+			await analyzeScene(async () => brightBuffer(), tree()),
+		);
+		expect(seen).toEqual(["p.png"]);
+	});
+
+	test("the balance rides the finish, not the layers", async () => {
+		const balance = { r: 1.1, g: 1, b: 0.95 };
+		const plan = await planForPrint(tree(), { balance });
+		expect(plan.scene).toEqual(planScene(tree()));
+		expect(plan.finish).toEqual(printFinish(balance));
+	});
+
+	test("finish: false keeps only the balance curve", async () => {
+		expect((await planForPrint(tree(), { finish: false })).finish).toBe(
+			undefined,
+		);
+		const plan = await planForPrint(tree(), {
+			finish: false,
+			balance: { r: 1.1, g: 1, b: 1 },
+		});
+		expect(Object.keys(plan.finish ?? {})).toEqual(["curve"]);
 	});
 });

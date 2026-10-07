@@ -120,6 +120,23 @@ describe("the finish on the CPU", () => {
 		},
 	);
 
+	test("matches the shader with a curve", async () => {
+		const curve = {
+			r: Uint8Array.from({ length: 256 }, (_, i) => 255 - i),
+			g: Uint8Array.from({ length: 256 }, (_, i) =>
+				Math.round(255 * (i / 255) ** 0.8),
+			),
+			b: Uint8Array.from({ length: 256 }, (_, i) => Math.min(255, i + 40)),
+		};
+		for (const size of SIZES)
+			for (const extra of [
+				{},
+				{ whiteClamp: 240, blackExtract: 16 },
+				{ dither: { amount: 4, seed: 7, mode: "monochrome" as const } },
+			])
+				await expectSame(size, { curve, ...extra });
+	});
+
 	test("matches the shader with a plain numeric dither", async () => {
 		await expectSame(SIZES[2] as Size, { dither: 2.5, whiteClamp: 250 });
 	});
@@ -129,6 +146,13 @@ describe("the finish on the CPU", () => {
 			for (const finish of [
 				{ whiteClamp: 200, blackExtract: 60 },
 				{ dither: { amount: 4, seed: 3 } },
+				{
+					curve: {
+						r: new Uint8Array(256),
+						g: new Uint8Array(256),
+						b: new Uint8Array(256),
+					},
+				},
 			])
 				await expectSame(size, finish, true);
 	});

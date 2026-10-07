@@ -10,7 +10,7 @@
 // have printed as neutral gives the level to send instead. Doing that at every
 // step and reading off the exponent that connects them is the whole of it.
 
-import { assessCalibration } from "./calibration";
+import { assessCalibration } from "./assess";
 import type { ChartReading } from "./measure";
 import type { ChannelBalance } from "./types";
 
