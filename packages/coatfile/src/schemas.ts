@@ -163,6 +163,21 @@ export const FillSchema = z.union([
 		rotation: z.number().optional(),
 		stops: z.array(GradientStopSchema),
 	}),
+	// A procedural texture drawn by a shader, in design units from the
+	// drawable's top-left. Omitted parameters take the pattern's defaults.
+	z.object({
+		kind: z.literal("pattern"),
+		pattern: z.enum(["noise", "paper", "hatching", "dots"]),
+		// Feature size: grain, fibre length, line spacing or dot pitch.
+		scale: z.number().positive().optional(),
+		// Degrees, 0 pointing right and 90 down.
+		angle: z.number().optional(),
+		// How much of the second colour covers the first.
+		density: z.number().min(0).max(1).optional(),
+		seed: z.number().int().optional(),
+		// Background, then ink.
+		colors: z.tuple([z.string(), z.string()]).optional(),
+	}),
 ]);
 
 // A rect or path can carry one or many fills. They paint bottom-up
@@ -1111,11 +1126,12 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 			return;
 		}
 		const f = fill as { kind?: unknown; stops?: unknown };
+		if (f.kind === "pattern") return;
 		if (f.kind !== "linear" && f.kind !== "radial" && f.kind !== "angular") {
 			addKitIssue(
 				ctx,
 				"invalid_fill_kind",
-				'fill.kind must be "linear", "radial", or "angular"',
+				'fill.kind must be "linear", "radial", "angular" or "pattern"',
 				[...path, "kind"],
 			);
 			return;

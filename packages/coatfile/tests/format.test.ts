@@ -247,6 +247,22 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
+	test("1.7: pattern fill, alone or among others", () => {
+		const rect = (fill: unknown) =>
+			({
+				id: "r",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 10, height: 10 },
+				properties: { fill },
+			}) as Element;
+		const need = (fill: unknown) =>
+			minimumFormatVersion(withElements(base(), rect(fill)));
+		expect(need("#fff")).toBe("1.0");
+		expect(need({ kind: "pattern", pattern: "dots" })).toBe("1.7");
+		expect(need(["#fff", { kind: "pattern", pattern: "noise" }])).toBe("1.7");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },

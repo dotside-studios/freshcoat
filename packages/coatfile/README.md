@@ -354,6 +354,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate` |
+| 1.7 | `pattern` fill |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -424,6 +425,33 @@ exactly; they may lie outside the box, and equal points fail validation
 thing it can; `linearGradientPoints(angle)` goes the other way. A radial
 `radius` is a fraction of the box's longest side, and an angular `rotation` has
 0 at twelve o'clock.
+
+## Patterns
+
+A `pattern` fill is a procedural texture drawn by a CanvasKit shader, not an
+image, so it costs no asset and stays sharp at any export density.
+
+```jsonc
+{ "kind": "pattern", "pattern": "noise", "scale": 1.5, "density": 0.5, "seed": 3, "colors": ["#ffffff00", "#00000040"] }
+{ "kind": "pattern", "pattern": "paper", "scale": 24, "density": 0.35, "colors": ["#f7f3ea", "#d9d0bd"] }
+{ "kind": "pattern", "pattern": "hatching", "scale": 8, "angle": 45, "density": 0.25 }
+{ "kind": "pattern", "pattern": "dots", "scale": 10, "density": 0.2 }
+```
+
+| Field | Meaning |
+|---|---|
+| `pattern` | `noise` (film grain), `paper` (fibres and tooth), `hatching` (parallel lines) or `dots` (a grid of dots) |
+| `scale` | feature size in template units: grain, fibre length, line spacing or dot pitch |
+| `angle` | degrees, 0 pointing right and 90 down |
+| `density` | `[0, 1]`, how much of the second colour covers the first: line width over spacing, dot area over cell area, or the noise bias |
+| `seed` | integer; picks a different noise or paper texture |
+| `colors` | `[background, ink]` |
+
+Omitted fields take the pattern's defaults (`PATTERN_DEFAULTS` in the engine).
+Unlike gradients, a pattern is measured in template units from the drawable's
+top-left: resizing the box shows more of it rather than stretching it, and
+`compile` scales it with the target size like every other length. The same
+seed paints the same texture in every renderer. A file that uses one needs 1.7.
 
 ## Constraints
 
