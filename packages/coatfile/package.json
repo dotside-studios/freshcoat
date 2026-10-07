@@ -20,6 +20,7 @@
 		"./svg": "./src/svg.ts",
 		"./normalize": "./src/normalize.ts",
 		"./coat": "./src/coat.ts",
+		"./tokens": "./src/tokens.ts",
 		"./fixtures": "./fixtures/index.ts",
 		"./schema/*": "./schema/*"
 	},
