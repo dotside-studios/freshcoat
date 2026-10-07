@@ -5,6 +5,7 @@ import type {
 	Template,
 } from "@freshcoat-js/coatfile";
 import { applyVariant, base64ToBytes } from "@freshcoat-js/coatfile";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { childEntries, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {
@@ -133,8 +134,6 @@ function build(
 	return { template: tolerate(template), pathIds, images };
 }
 
-const TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-
 /**
  * A document is often briefly invalid while it is edited: a `{{token}}` typed
  * before its field exists, a name cleared before a new one is typed. compile()
@@ -147,8 +146,7 @@ function tolerate(t: Template): Template {
 	const missing = new Set<string>();
 	const walk = (v: unknown) => {
 		if (typeof v === "string") {
-			for (const m of v.matchAll(TOKEN))
-				if (!known.has(m[1] as string)) missing.add(m[1] as string);
+			for (const id of tokenIds(v)) if (!known.has(id)) missing.add(id);
 		} else if (Array.isArray(v)) v.forEach(walk);
 		else if (v && typeof v === "object") {
 			for (const [k, x] of Object.entries(v)) {

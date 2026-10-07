@@ -1,3 +1,4 @@
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import {
 	type BindingResolver,
 	buildFieldMeta,
@@ -5,9 +6,6 @@ import {
 	resolveNodeBinding,
 } from "../binding";
 import type { FigmaNode } from "../types";
-import { extractTokens } from "./fields";
-
-const TOKEN = /\{\{[^{}]*\}\}/g;
 
 // A text field keeps its runs' styling only when the runs spell out the
 // template itself, each token whole inside one run, so every token is filled
@@ -17,8 +15,8 @@ function spansSpellTemplate(spans: unknown, template: string): boolean {
 	if (!Array.isArray(spans)) return false;
 	const texts = (spans as Array<{ text: string }>).map((s) => s.text);
 	if (texts.join("") !== template) return false;
-	const whole = texts.reduce((n, t) => n + (t.match(TOKEN)?.length ?? 0), 0);
-	return whole === (template.match(TOKEN)?.length ?? 0);
+	const whole = texts.reduce((n, t) => n + tokenIds(t).length, 0);
+	return whole === tokenIds(template).length;
 }
 
 // Drive an element from the node's binding (stored pluginData, else live). The
@@ -40,7 +38,7 @@ export function applyBindingOverlay(
 	const props = el.properties as Record<string, unknown>;
 	const applied = new Set<string>();
 	const mark = (tmpl: string): void => {
-		for (const id of extractTokens(tmpl)) applied.add(id);
+		for (const id of tokenIds(tmpl)) applied.add(id);
 	};
 
 	if (el.type === "text" && binding.bind.text !== undefined) {

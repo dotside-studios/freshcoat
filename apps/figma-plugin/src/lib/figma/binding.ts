@@ -3,12 +3,9 @@
 // the marker grammar lives in exactly one place.
 
 import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
-import {
-	extractTokens,
-	isWholeMustacheToken,
-	titleCase,
-} from "./transpiler/fields";
+import { isWholeMustacheToken, titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
@@ -111,7 +108,7 @@ export function parseValue(raw: string): ParsedValue | null {
 	const s = raw.trim();
 	if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
 		const inner = s.slice(1, -1);
-		const ids = extractTokens(inner);
+		const ids = tokenIds(inner);
 		if (ids.length === 0) return null;
 		return { mode: "template", template: inner, ids: dedupe(ids) };
 	}
@@ -347,7 +344,7 @@ export function inferNodeBinding(node: FigmaNode): NodeBinding | null {
 
 	// 3. Inline content tokens (text only).
 	if (node.type === "TEXT") {
-		const ids = extractTokens(node.characters);
+		const ids = tokenIds(node.characters);
 		if (ids.length > 0) {
 			return {
 				bind: { text: node.characters },
@@ -465,7 +462,7 @@ export function storedToNodeBinding(stored: StoredBinding): NodeBinding {
 		if (tmpl === undefined) continue;
 		const format = formatForProperty(property as BindProperty);
 		const widget = widgetForProperty(property as BindProperty);
-		for (const id of extractTokens(tmpl)) {
+		for (const id of tokenIds(tmpl)) {
 			if (seen.has(id)) continue;
 			seen.add(id);
 			fields.push({ id, format, ...(widget ? { widget } : {}) });

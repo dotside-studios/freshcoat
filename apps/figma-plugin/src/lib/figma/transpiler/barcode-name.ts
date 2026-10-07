@@ -9,7 +9,8 @@
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
 import type { Symbology } from "@freshcoat-js/coatfile";
 import { SYMBOLOGIES } from "@freshcoat-js/coatfile/barcode-encoder";
-import { extractTokens, isWholeMustacheToken } from "./fields";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
+import { isWholeMustacheToken } from "./fields";
 
 /** What a `barcode:` layer draws when it names no symbology. */
 export const DEFAULT_SYMBOLOGY: Symbology = "code128";
@@ -104,7 +105,7 @@ function readValue(
 		return { value: `{{${whole.id}}}`, mode: "token", ids: [whole.id] };
 	const unquoted =
 		s.length >= 2 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s;
-	const ids = [...new Set(extractTokens(unquoted))];
+	const ids = [...new Set(tokenIds(unquoted))];
 	return {
 		value: unquoted,
 		mode: ids.length > 0 ? "template" : "literal",

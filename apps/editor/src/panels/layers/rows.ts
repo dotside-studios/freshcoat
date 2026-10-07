@@ -1,4 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
+import { hasToken } from "@freshcoat-js/coatfile/mustache";
 import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";
@@ -17,16 +18,6 @@ export type LayerRow = {
 	children: LayerRow[];
 };
 
-const TOKEN = /\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}/;
-
-function mentionsToken(value: unknown): boolean {
-	if (typeof value === "string") return TOKEN.test(value);
-	if (Array.isArray(value)) return value.some(mentionsToken);
-	if (value && typeof value === "object")
-		return Object.values(value).some(mentionsToken);
-	return false;
-}
-
 /** Whether the layer itself (not what it holds) depends on a field. */
 export function isBound(layer: Layer): boolean {
 	if ("visibleWhen" in layer && layer.visibleWhen) return true;
@@ -35,7 +26,7 @@ export function isBound(layer: Layer): boolean {
 		mask: _m,
 		...own
 	} = (layer.properties ?? {}) as Record<string, unknown>;
-	return mentionsToken(own);
+	return hasToken(own);
 }
 
 // Rows are reused while their element object and key are unchanged, since

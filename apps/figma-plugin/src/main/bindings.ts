@@ -1,3 +1,4 @@
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import {
 	bindableProperties,
 	buildFieldMeta,
@@ -10,7 +11,6 @@ import {
 	type SlotHarvestInput,
 } from "~/lib/figma/harvest";
 import type { ProductRegistryEntry } from "~/lib/figma/transpiler";
-import { extractTokens } from "~/lib/figma/transpiler/fields";
 import { createFieldsOverview } from "~/main/fields-overview";
 import {
 	FIELD_KEY,
@@ -107,7 +107,7 @@ function scanFrameFields(frame: OverviewFrame): FieldOverviewItem[] {
 		const binding = readBinding(node);
 		if (!binding) continue;
 		for (const template of Object.values(binding.bind)) {
-			for (const id of extractTokens(template)) {
+			for (const id of tokenIds(template)) {
 				const list = refs.get(id);
 				if (list) list.push(node.id);
 				else refs.set(id, [node.id]);

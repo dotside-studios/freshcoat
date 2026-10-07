@@ -87,7 +87,18 @@ export {
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
-export { substitute } from "./mustache";
+export {
+	FIELD_ID,
+	hasToken,
+	type MustacheRef,
+	type MustacheSegment,
+	type MustacheText,
+	parseMustache,
+	renameToken,
+	substitute,
+	tokenIds,
+	wholeToken,
+} from "./mustache";
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";

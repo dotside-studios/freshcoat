@@ -1,4 +1,5 @@
 import type { Background, Element, Template } from "@freshcoat-js/coatfile";
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import type { EditorController } from "~/app/controller";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";
 
@@ -153,5 +154,5 @@ export function formatGridLine(line: GridLine | undefined): string {
 /** The field an image's focus is bound to, from "{{key}}", or undefined. */
 export function focusFieldOf(focus: unknown): string | undefined {
 	if (typeof focus !== "string") return undefined;
-	return /^\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}$/.exec(focus)?.[1];
+	return wholeToken(focus);
 }

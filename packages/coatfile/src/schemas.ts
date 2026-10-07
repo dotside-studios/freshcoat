@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
+import { tokenIds } from "./mustache";
 import type {
 	Element,
 	FrameElement,
@@ -750,8 +751,6 @@ export const TemplateSchema = z
 
 type ParsedTemplate = z.infer<typeof TemplateSchema>;
 
-const REF = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-
 function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceFormatVersion(tpl, ctx);
 	enforceRequiredStrings(tpl, ctx);
@@ -1041,11 +1040,7 @@ function enforceMustacheReferences(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 
 	function walk(value: unknown) {
 		if (typeof value === "string") {
-			if (value.indexOf("{{") < 0) return;
-			REF.lastIndex = 0;
-			let m: RegExpExecArray | null;
-			while ((m = REF.exec(value)) !== null) {
-				const id = m[1]!;
+			for (const id of tokenIds(value)) {
 				if (!known.has(id)) {
 					addKitIssue(
 						ctx,
