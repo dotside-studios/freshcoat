@@ -18,7 +18,7 @@ import {
 	type CalibrationBlocker,
 } from "./assess";
 import type { ChartReading } from "./measure";
-import type { ChannelBalance, PrintOptimizeOptions } from "./types";
+import type { ChannelBalance } from "./types";
 import { z } from "zod";
 
 export interface PrintProfileConditions {
@@ -109,16 +109,6 @@ export function createPrintProfile(
 			...(conditions.data ? { conditions: conditions.data } : {}),
 		},
 	};
-}
-
-// Fold a profile into a correction. The profile wins on the fields it owns and
-// leaves every analysis-derived field alone.
-export function withProfile(
-	options: PrintOptimizeOptions,
-	profile: PrintProfile | undefined,
-): PrintOptimizeOptions {
-	if (!profile?.balance) return options;
-	return { ...options, balance: profile.balance };
 }
 
 // Identity for a render cache. A correction is part of what produced a PNG, so a

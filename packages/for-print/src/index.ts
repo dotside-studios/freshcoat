@@ -50,7 +50,6 @@ export {
 	parsePrintProfile,
 	profileCacheKey,
 	UNMEASURED_PROFILE,
-	withProfile,
 } from "./profile";
 export type {
 	CardOrientation,

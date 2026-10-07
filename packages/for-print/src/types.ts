@@ -41,9 +41,6 @@ export interface PrintOptimizeOptions {
 	sharpness: number; // 0-1, amount of unsharp mask
 	gamma: number; // e.g. 0.9 = darken midtones
 	darkness: number; // 0-1, Overlay blend with black at this opacity
-	// Measured cast correction. Absent = no cast known, which is not the same as
-	// no cast: it means nobody has read a gray ramp off this printer yet.
-	balance?: ChannelBalance;
 }
 
 // How hard a correction pushes past the end of the output's range. Measured on
