@@ -20,7 +20,7 @@ import type {
 	PaintCacheOptions,
 	PaintCacheStats,
 } from "./paint-cache";
-import type { CanvasLike } from "./types";
+import type { CanvasLike, PaintWarning } from "./types";
 
 type FontKey = { family: string; bytes: Uint8Array }[];
 
@@ -31,6 +31,16 @@ export type ShapedLine = { para: Paragraph; ascent: number };
 export type CachedImage = {
 	image: Image | SvgPicture;
 	mipped: Image | null;
+};
+
+// The pixels a paint's leading run of drawables left on its render surface,
+// keyed by those drawables and the frame they were drawn into, with the
+// warnings drawing them raised.
+export type CachedBackground = {
+	keys: string[];
+	frame: string;
+	pixels: Uint8Array;
+	warnings: PaintWarning[];
 };
 
 type CachedSurface = {
@@ -60,6 +70,7 @@ export type PaintCacheState = {
 	pathsUsed: Set<string>;
 	luts: LutImages;
 	surface: CachedSurface | null;
+	background: CachedBackground | null;
 	disposed: boolean;
 };
 
@@ -80,6 +91,8 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 			lutImageBuilds: 0,
 			mipmapBuilds: 0,
 			pathBuilds: 0,
+			backgroundSnapshots: 0,
+			backgroundReuses: 0,
 		},
 		fonts: null,
 		images: new Map(),
@@ -89,6 +102,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		pathsUsed: new Set(),
 		luts: createLutImages(),
 		surface: null,
+		background: null,
 		disposed: false,
 	};
 	const clear = () => {
@@ -100,6 +114,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		for (const entry of state.images.values()) freeImage(entry);
 		state.images.clear();
 		freeLutImages(state.luts);
+		state.background = null;
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -180,7 +195,9 @@ export function cachedSurface(
 }
 
 // Deletes the cached images this paint's scene did not use, oldest first, until
-// what is left fits the cache's image budget and entry cap.
+// what is left fits the cache's image budget and entry cap. The background,
+// cheaper to redraw than an image is to decode, goes if it does not fit beside
+// them.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
@@ -207,6 +224,25 @@ export function evictUnusedImages(
 		total -= imagePixels(entry);
 		freeImage(entry);
 	}
+	if (
+		state.maxImagePixels > 0 &&
+		total + backgroundPixels(state) > state.maxImagePixels
+	)
+		state.background = null;
+}
+
+// Keeps one background, replacing any other. With an image budget it counts
+// against that budget (see evictUnusedImages).
+export function cacheBackground(
+	state: PaintCacheState,
+	background: CachedBackground,
+): void {
+	state.background = background;
+	state.stats.backgroundSnapshots++;
+}
+
+function backgroundPixels(state: PaintCacheState): number {
+	return state.background ? state.background.pixels.length / 4 : 0;
 }
 
 function imagePixels(entry: CachedImage): number {
