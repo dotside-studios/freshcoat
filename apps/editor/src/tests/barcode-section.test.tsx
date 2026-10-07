@@ -9,7 +9,6 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -19,7 +18,7 @@ import { insertElements, unwrap } from "~/doc/ops";
 import { getElement } from "~/doc/path";
 import { barcodeMessages } from "~/panels/design/BarcodeSection";
 import { DesignPanel } from "~/panels/design/DesignPanel";
-import { chooseOption } from "./aria";
+import { chooseOption, fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 // The fixture's side 0 holds seven layers, so a barcode appended lands at 0/7.
@@ -43,6 +42,11 @@ function withBarcode(
 	}
 	return t;
 }
+
+// By label, not by role and name: naming every button in the panel costs
+// hundreds of milliseconds in jsdom.
+const button = (label: string) =>
+	screen.getByLabelText(label, { selector: "button" });
 
 function setup(t: Template, selection = [KEY]) {
 	const c = new EditorController();
@@ -86,9 +90,7 @@ describe("BarcodeSection", () => {
 	it("shows a Code 128's type, value and text controls, and no recovery", () => {
 		setup(withBarcode());
 		expect(screen.getByText("Barcode")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: /Barcode type/ }).textContent,
-		).toContain("Code 128");
+		expect(button("Barcode type").textContent).toContain("Code 128");
 		expect(screen.getByLabelText("Barcode value")).toHaveProperty(
 			"value",
 			"FRESHCOAT",
@@ -113,22 +115,18 @@ describe("BarcodeSection", () => {
 	});
 
 	it("inserts a field token at the caret", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const c = setup(withBarcode({ value: "ID " }));
-		await user.click(screen.getByRole("button", { name: "Insert field" }));
+		await user.click(button("Insert field"));
 		const menu = await screen.findByRole("menu");
 		await user.click(within(menu).getByRole("menuitem", { name: /name/ }));
 		expect(code(c).properties.value).toBe("ID {{name}}");
 	});
 
 	it("squares the box and drops old-symbology settings when switching to Data Matrix", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const c = setup(withBarcode({ quietZone: 4, showText: false }));
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Barcode type/ }),
-			"Data Matrix",
-		);
+		await chooseOption(user, button("Barcode type"), "Data Matrix");
 		const el = code(c);
 		expect(el.properties.symbology).toBe("datamatrix");
 		expect(el.properties.quietZone).toBeUndefined();
@@ -143,17 +141,13 @@ describe("BarcodeSection", () => {
 	});
 
 	it("turns a Data Matrix square back into a bar code's box, as one undo step", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const t = withBarcode({ symbology: "datamatrix" });
 		const square = getElement(t, KEY) as BarcodeElement;
 		square.pos = { x: 220, y: 100 };
 		square.size = { width: 120, height: 120 };
 		const c = setup(t);
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Barcode type/ }),
-			"Code 128",
-		);
+		await chooseOption(user, button("Barcode type"), "Code 128");
 		const el = code(c);
 		expect(el.properties.symbology).toBe("code128");
 		// Width kept, a third of it high, centred where the square was.
@@ -169,13 +163,9 @@ describe("BarcodeSection", () => {
 	// Encoding PDF417 in jsdom takes over 3 s alone, and more on a busy
 	// runner, so this one gets more than the default 5 s.
 	it("keeps the box for PDF417 and offers its 0 to 8 levels", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const c = setup(withBarcode());
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Barcode type/ }),
-			"PDF417",
-		);
+		await chooseOption(user, button("Barcode type"), "PDF417");
 		expect(code(c).size).toEqual({ width: 360, height: 120 });
 		const ec = screen.getByRole("spinbutton", { name: "Error correction" });
 		expect(ec.getAttribute("placeholder")).toBe("Auto");
@@ -185,33 +175,42 @@ describe("BarcodeSection", () => {
 		expect(code(c).properties.errorCorrection).toBe(8);
 	}, 20_000);
 
-	it("offers ITF-14 bearer bars, and only for ITF-14", async () => {
-		const user = userEvent.setup();
+	it("offers ITF-14 bearer bars", async () => {
+		const user = fastUser();
 		const c = setup(
 			withBarcode({ symbology: "itf14", value: "1234567890123" }),
 		);
-		const bearers = screen.getByRole("button", { name: /Bearer bars/ });
+		const bearers = button("Bearer bars");
 		expect(bearers.textContent).toContain("None");
 		await chooseOption(user, bearers, "Frame");
 		expect(code(c).properties.bearerBars).toBe("frame");
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Bearer bars/ }),
-			"None",
+	});
+
+	it("clears ITF-14 bearer bars with None", async () => {
+		const user = fastUser();
+		const c = setup(
+			withBarcode({
+				symbology: "itf14",
+				value: "1234567890123",
+				bearerBars: "frame",
+			}),
 		);
+		await chooseOption(user, button("Bearer bars"), "None");
 		expect(code(c).properties.bearerBars).toBeUndefined();
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Bearer bars/ }),
-			"Top and bottom",
+	});
+
+	it("drops bearer bars, and the control, when leaving ITF-14", async () => {
+		const user = fastUser();
+		const c = setup(
+			withBarcode({ symbology: "itf14", value: "1234567890123" }),
 		);
-		await chooseOption(
-			user,
-			screen.getByRole("button", { name: /Barcode type/ }),
-			"Code 128",
-		);
+		await chooseOption(user, button("Bearer bars"), "Top and bottom");
+		expect(code(c).properties.bearerBars).toBe("horizontal");
+		await chooseOption(user, button("Barcode type"), "Code 128");
 		expect(code(c).properties.bearerBars).toBeUndefined();
-		expect(screen.queryByRole("button", { name: /Bearer bars/ })).toBeNull();
+		expect(
+			screen.queryByLabelText("Bearer bars", { selector: "button" }),
+		).toBeNull();
 	});
 
 	it("gives Aztec a percentage", () => {
@@ -222,11 +221,11 @@ describe("BarcodeSection", () => {
 	});
 
 	it("adds and removes a background", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const c = setup(withBarcode());
-		await user.click(screen.getByRole("button", { name: "Add background" }));
+		await user.click(button("Add background"));
 		expect(code(c).properties.background).toBe("#ffffff");
-		await user.click(screen.getByRole("button", { name: "Remove background" }));
+		await user.click(button("Remove background"));
 		expect(code(c).properties.background).toBeUndefined();
 	});
 
@@ -257,9 +256,7 @@ describe("BarcodeSection", () => {
 		const second = getElement(t, "0/8") as BarcodeElement;
 		second.properties = { ...second.properties, symbology: "aztec" };
 		setup(t, [KEY, "0/8"]);
-		expect(
-			screen.getByRole("button", { name: /Barcode type/ }).textContent,
-		).toContain("Mixed");
+		expect(button("Barcode type").textContent).toContain("Mixed");
 		// Aztec has no human-readable line, so the text rows go.
 		expect(screen.queryByText("Human-readable text")).toBeNull();
 	});
@@ -291,7 +288,7 @@ describe("barcodeMessages", () => {
 
 describe("IssuesList", () => {
 	it("lists a barcode the preview can't encode as a hint that selects it", async () => {
-		const user = userEvent.setup();
+		const user = fastUser();
 		const t = withBarcode({ symbology: "ean13", value: "12" });
 		const c = new EditorController();
 		c.open(t, "doc.coat");

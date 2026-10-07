@@ -1,7 +1,21 @@
 import { screen, within } from "@testing-library/react";
-import type userEvent from "@testing-library/user-event";
+import userEvent, {
+	PointerEventsCheckLevel,
+} from "@testing-library/user-event";
 
 type User = ReturnType<typeof userEvent.setup>;
+
+/**
+ * A user that clicks without waiting between events or checking
+ * `pointer-events` up the tree, which jsdom resolves through its slow style
+ * cascade and which none of the app's CSS sets here anyway.
+ */
+export function fastUser(): User {
+	return userEvent.setup({
+		delay: null,
+		pointerEventsCheck: PointerEventsCheckLevel.Never,
+	});
+}
 
 /**
  * Opens a select or combobox and clicks one of its options.
