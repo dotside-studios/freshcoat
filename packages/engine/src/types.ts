@@ -141,7 +141,7 @@ export type Adjust = {
 
 export type ShapeMask =
 	| { kind: "rect"; outset?: ClipOutset }
-	| { kind: "rounded-rect"; radius: CornerRadius }
+	| { kind: "rounded-rect"; radius: CornerRadius; smoothing?: number }
 	| { kind: "circle" }
 	| { kind: "ellipse" }
 	| { kind: "polygon"; sides: number; rotation?: number }

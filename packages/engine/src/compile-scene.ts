@@ -20,6 +20,7 @@ import type {
 	RectNode,
 	TextNode,
 } from "./node";
+import { rectShape } from "./outline";
 import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
 import type { TextEngine } from "./text-engine";
@@ -379,10 +380,10 @@ function lowerMask(
 
 // The fast-path predicate: a rect/ellipse whose painted alpha is exactly 1 over
 // its geometry and 0 outside it, so clipping to the geometry keeps the same
-// pixels. That means one opaque solid fill, no stroke, no adjust, no transform
-// effects, uniform corner radius. Everything else returns null → the offscreen
-// path. It reads the MASK only; the mask node's own `invert`/`channel` are the
-// caller's to check.
+// pixels. That means one opaque solid fill, no stroke, no adjust and no
+// transform effects; the clip is the outline the fill draws. Everything else
+// returns null → the offscreen path. It reads the MASK only; the mask node's
+// own `invert`/`channel` are the caller's to check.
 function fastClip(mask: Node): ShapeMask | null {
 	if (
 		mask.rotation ||
@@ -396,13 +397,7 @@ function fastClip(mask: Node): ShapeMask | null {
 	if (mask.kind !== "rect" && mask.kind !== "ellipse") return null;
 	if (mask.stroke || !opaqueSolid(mask.fills)) return null;
 	if (mask.kind === "ellipse") return { kind: "ellipse" };
-	const cr = mask.cornerRadius;
-	if (Array.isArray(cr)) return null;
-	if (mask.cornerSmoothing && typeof cr === "number" && cr > 0)
-		return { kind: "squircle", radius: cr, smoothing: mask.cornerSmoothing };
-	if (typeof cr === "number" && cr > 0)
-		return { kind: "rounded-rect", radius: cr };
-	return { kind: "rect" };
+	return rectShape(mask.cornerRadius, mask.cornerSmoothing);
 }
 
 function opaqueSolid(fills: RectNode["fills"]): boolean {
@@ -413,8 +408,6 @@ function opaqueSolid(fills: RectNode["fills"]): boolean {
 	return Array.isArray(c) && c[3] >= 1;
 }
 
-// A group's self-clip: clip children to its box, honoring its corner radius.
-// Corner smoothing on the clip is a later refinement.
 // A filled group's background, as an ordinary rect drawn first.
 //
 // Lowering it rather than teaching the painter about group fills keeps one
@@ -441,13 +434,7 @@ function groupBackground(
 
 function groupClip(node: GroupNode): ShapeMask | undefined {
 	if (!node.clip) return undefined;
-	const cr = node.cornerRadius;
-	if (Array.isArray(cr))
-		return cr.some((r) => r > 0)
-			? { kind: "rounded-rect", radius: cr }
-			: { kind: "rect" };
-	const r = typeof cr === "number" ? cr : 0;
-	return r > 0 ? { kind: "rounded-rect", radius: r } : { kind: "rect" };
+	return rectShape(node.cornerRadius, node.cornerSmoothing);
 }
 
 // Box-relative ellipse as an SVG path (two half-arcs), positioned at the node's

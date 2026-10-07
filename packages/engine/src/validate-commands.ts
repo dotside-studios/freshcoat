@@ -188,6 +188,16 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 
 	if (cmd.clip?.kind === "rounded-rect" && Array.isArray(cmd.clip.radius))
 		validateCornerRadius(cmd.clip.radius, `${path}.clip.radius`, add, id);
+	if (cmd.clip?.kind === "rounded-rect" && cmd.clip.smoothing !== undefined) {
+		const smoothing = cmd.clip.smoothing;
+		if (!finite(smoothing) || smoothing < 0)
+			add(
+				"bad_corner_smoothing",
+				`smoothing must be >= 0, got ${smoothing}`,
+				`${path}.clip.smoothing`,
+				id,
+			);
+	}
 
 	for (const shadow of cmd.shadow
 		? Array.isArray(cmd.shadow)
