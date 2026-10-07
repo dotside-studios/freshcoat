@@ -18,8 +18,8 @@ import {
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
-import { jpegHeader } from "./image-fixtures";
 import { templateStem } from "./ids";
+import { jpegHeader } from "./image-fixtures";
 import { exportSize, pdfLayout } from "./plan";
 import {
 	deepFreeze,
