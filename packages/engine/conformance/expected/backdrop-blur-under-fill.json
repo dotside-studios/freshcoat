@@ -1,0 +1,79 @@
+{
+	"caseId": "backdrop-blur-under-fill",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 80,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#000000"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 20
+					},
+					"size": {
+						"width": 80,
+						"height": 80
+					},
+					"backdropBlur": 20,
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#0000ff80"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "026849291be408bd3568b60fb1786729b4a20f776c464ccf79c43867385a2091"
+}

@@ -177,12 +177,29 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 		add("bad_rotation", "rotation must be finite", `${path}.rotation`, id);
 	if (cmd.blur !== undefined && (!finite(cmd.blur) || cmd.blur < 0))
 		add("bad_blur", `blur must be >= 0, got ${cmd.blur}`, `${path}.blur`, id);
+	if (
+		cmd.backdropBlur !== undefined &&
+		(!finite(cmd.backdropBlur) || cmd.backdropBlur < 0)
+	)
+		add(
+			"bad_backdrop_blur",
+			`backdropBlur must be >= 0, got ${cmd.backdropBlur}`,
+			`${path}.backdropBlur`,
+			id,
+		);
 
 	if (cmd.clip && !MASK_KINDS.has(cmd.clip.kind))
 		add(
 			"unknown_clip_kind",
 			`unknown clip kind "${cmd.clip.kind}"`,
 			`${path}.clip`,
+			id,
+		);
+	if (cmd.backdropClip && !MASK_KINDS.has(cmd.backdropClip.kind))
+		add(
+			"unknown_clip_kind",
+			`unknown clip kind "${cmd.backdropClip.kind}"`,
+			`${path}.backdropClip`,
 			id,
 		);
 	if (

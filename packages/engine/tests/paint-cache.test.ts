@@ -1161,6 +1161,87 @@ describe("PaintCache background", () => {
 		cache.dispose();
 	});
 
+	test("a backdrop-blurred group is never split around a record-bound leaf", async () => {
+		await initCk();
+		const glass = (name: string) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: SIZE,
+				background: createRect({
+					pos: { x: 0, y: 0 },
+					size: SIZE,
+					fills: [{ kind: "solid", color: "#f97316" }],
+				}),
+				children: [
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: { width: 48, height: 48 },
+						fills: [{ kind: "solid", color: "#1d4ed8" }],
+					}),
+					createGroup(
+						[
+							createRect({
+								pos: { x: 4, y: 4 },
+								size: { width: 20, height: 20 },
+								fills: [{ kind: "solid", color: "#22c55e" }],
+							}),
+							createText({
+								pos: { x: 4, y: 30 },
+								size: { width: 60, height: 14 },
+								text: name,
+								font: {
+									family: "Geist",
+									weight: 400,
+									style: "normal",
+									size: 10,
+									lineHeight: 1.2,
+								},
+								color: "#101828",
+							}),
+						],
+						{
+							pos: { x: 24, y: 8 },
+							size: { width: 48, height: 40 },
+							backdropBlur: 10,
+						},
+					),
+				],
+			});
+		const cache = createPaintCache();
+		await paintRecords([glass("Alice"), glass("Bob")], cache);
+		cache.dispose();
+	});
+
+	test("a backdrop over a swapped image paints as uncached", async () => {
+		await initCk();
+		const photo = (src: string) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: SIZE,
+				children: [
+					createImage({
+						pos: { x: 0, y: 0 },
+						size: SIZE,
+						src,
+						fit: "cover",
+					}),
+					createRect({
+						pos: { x: 8, y: 8 },
+						size: { width: 40, height: 30 },
+						cornerRadius: 6,
+						fills: [{ kind: "solid", color: "#ffffff40" }],
+						backdropBlur: 8,
+					}),
+				],
+			});
+		const cache = createPaintCache();
+		await paintRecords(
+			[photo("img://a"), photo("img://b"), photo("img://a")],
+			cache,
+		);
+		cache.dispose();
+	});
+
 	test("random scenes differing in text and images paint as uncached", async () => {
 		await initCk();
 		const rand = mulberry32(81);
