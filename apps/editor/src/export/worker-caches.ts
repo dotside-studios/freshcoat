@@ -6,6 +6,12 @@ import {
 	type Template,
 } from "@freshcoat-js/coatfile";
 import {
+	type CachedTextEngine,
+	deriveFontMetrics,
+	memoizeTextEngine,
+	type TextEngine,
+} from "@freshcoat-js/engine";
+import {
 	type AnalysisCache,
 	createAnalysisCache,
 } from "@freshcoat-js/for-print";
@@ -77,6 +83,49 @@ export function createJobCaches(): JobCaches {
 			analysis = undefined;
 			assetKeys = undefined;
 		},
+	};
+}
+
+type Fonts = Map<string, Uint8Array[]>;
+type DisposableTextEngine = TextEngine & { dispose(): void };
+
+/** One render worker's text engine, memoized as the live preview's is. */
+export type WorkerText<E extends DisposableTextEngine> = {
+	/** The engine for `fonts`, rebuilt by `create` when `fonts` is a different
+	 *  map. */
+	get(
+		fonts: Fonts,
+		create: (fonts: Fonts) => E,
+	): {
+		engine: CachedTextEngine<E>;
+		fontMetrics: ReturnType<typeof deriveFontMetrics>;
+	};
+	clear(): void;
+};
+
+export function createWorkerText<
+	E extends DisposableTextEngine,
+>(): WorkerText<E> {
+	let text:
+		| (ReturnType<WorkerText<E>["get"]> & { fonts: Fonts })
+		| undefined;
+	const clear = () => {
+		text?.engine.dispose();
+		text = undefined;
+	};
+	return {
+		get(fonts, create) {
+			if (text?.fonts !== fonts) {
+				clear();
+				text = {
+					fonts,
+					engine: memoizeTextEngine(create(fonts)),
+					fontMetrics: deriveFontMetrics(fonts),
+				};
+			}
+			return text;
+		},
+		clear,
 	};
 }
 
