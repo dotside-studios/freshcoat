@@ -206,6 +206,16 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
+	it("sets and clears a background blur as one shared field", () => {
+		const c = setup(["0/0", "0/1"]);
+		typeInto(spinbutton("Background blur"), "16");
+		expect(el(c, "0/0").backdropBlur).toBe(16);
+		expect(el(c, "0/1").backdropBlur).toBe(16);
+		expect(validate(c.template).ok).toBe(true);
+		typeInto(spinbutton("Background blur"), "0");
+		expect("backdropBlur" in el(c, "0/0")).toBe(false);
+	});
+
 	it("positions an image's stroke outside", () => {
 		const c = setup(["0/2/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add stroke" }));
