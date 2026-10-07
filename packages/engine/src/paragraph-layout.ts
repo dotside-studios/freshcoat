@@ -12,6 +12,15 @@
 // punctuation (em dash etc.); astral/emoji (surrogate pairs) and CJK line-break
 // rules are untested.
 
+import type {
+	CanvasKit,
+	FontWeight,
+	FontWeightEnumValues,
+	Paragraph,
+	ParagraphBuilder,
+	ParagraphStyle,
+	TextStyle,
+} from "canvaskit-wasm";
 import { fontArrayBuffer } from "./font-bytes";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
@@ -28,10 +37,9 @@ import {
 } from "./text-types";
 import type { FontVMetrics } from "./types";
 
-// biome-ignore lint/suspicious/noExplicitAny: caller-supplied CanvasKit instance
-type CK = any;
+type WeightName = Exclude<keyof FontWeightEnumValues, "values">;
 
-const WEIGHTS: Record<number, string> = {
+const WEIGHTS: Record<number, WeightName> = {
 	100: "Thin",
 	200: "ExtraLight",
 	300: "Light",
@@ -64,9 +72,10 @@ const hardLines = (text: string): number => text.split(/\r\n?|\n/).length;
 type Line = { text: string; width: number; hardBreak?: boolean };
 
 export function createParagraphEngine(
-	ck: CK,
+	canvasKit: unknown,
 	fonts: Map<string, Uint8Array[]>,
 ): TextEngine & { dispose(): void } {
+	const ck = canvasKit as CanvasKit;
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const [family, list] of fonts) {
 		for (const bytes of list) {
@@ -80,7 +89,7 @@ export function createParagraphEngine(
 	// registered. Callers order the map so broader fallbacks come after the primary.
 	const fallbackFamilies = [...fonts.keys()];
 
-	function ckWeight(weight: number | undefined): CK {
+	function ckWeight(weight: number | undefined): FontWeight {
 		return ck.FontWeight[
 			WEIGHTS[Math.round((weight || 400) / 100) * 100] ?? "Normal"
 		];
@@ -89,7 +98,7 @@ export function createParagraphEngine(
 	// The CanvasKit TextStyle for a span — the same shape canvaskit.ts paints
 	// with. CanvasKit adds letterSpacing after each glyph, so measuring/breaking
 	// with it here matches the render exactly.
-	function spanTextStyle(font: SpanFont): CK {
+	function spanTextStyle(font: SpanFont): TextStyle {
 		return {
 			fontFamilies: [
 				font.family,
@@ -114,7 +123,10 @@ export function createParagraphEngine(
 		};
 	}
 
-	function paragraphStyle(font: SpanFont, direction?: "ltr" | "rtl"): CK {
+	function paragraphStyle(
+		font: SpanFont,
+		direction?: "ltr" | "rtl",
+	): ParagraphStyle {
 		return new ck.ParagraphStyle({
 			textStyle: spanTextStyle(font),
 			...(direction === "rtl"
@@ -130,7 +142,7 @@ export function createParagraphEngine(
 		text: string,
 		font: SpanFont,
 		direction?: "ltr" | "rtl",
-	): { para: CK; builder: CK } {
+	): { para: Paragraph; builder: ParagraphBuilder } {
 		const style = paragraphStyle(font, direction);
 		const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
 		builder.addText(text);
@@ -155,7 +167,12 @@ export function createParagraphEngine(
 		let cursor = 0;
 		let full = "";
 		spans.forEach((s, i) => {
-			builder.pushStyle(ck.TextStyle(spanTextStyle(s.font)));
+			// Typed as constructor only; CanvasKit also allows the plain call.
+			builder.pushStyle(
+				(ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
+					spanTextStyle(s.font),
+				),
+			);
 			builder.addText(s.text);
 			builder.pop();
 			ranges.push({ start: cursor, end: cursor + s.text.length, spanIndex: i });

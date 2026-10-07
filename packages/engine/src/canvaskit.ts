@@ -4,10 +4,33 @@
 // Figma-matching kerning) for text, the ImageFilter graph for blur/shadow, and
 // drawImageRect/image shaders for images.
 //
-// The caller supplies an initialized CanvasKit instance (this module does not
-// import `canvaskit-wasm`, so it stays runtime-agnostic), the font bytes, and
-// any image bytes keyed by src. Text is drawn at the compile-baked baseline
+// The caller supplies an initialized CanvasKit instance (this module imports
+// only `canvaskit-wasm` types, so it stays runtime-agnostic), the font bytes,
+// and any image bytes keyed by src. Text is drawn at the compile-baked baseline
 // (`line.baseline`).
+import type {
+	BlendModeEnumValues,
+	Blender,
+	Canvas,
+	CanvasKit,
+	ColorFilter,
+	FontWeightEnumValues,
+	Image,
+	ImageFilter,
+	InputMatrix,
+	Paint,
+	Path,
+	Rect,
+	RRect,
+	RuntimeEffect,
+	Shader,
+	SkPicture,
+	StrokeCapEnumValues,
+	StrokeJoinEnumValues,
+	Surface,
+	TextStyle,
+	TypefaceFontProvider,
+} from "canvaskit-wasm";
 import { parseColor } from "./color";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
@@ -31,7 +54,7 @@ import {
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
-} from "./paint-cache";
+} from "./paint-cache-state";
 import {
 	decorationLine,
 	fitRect,
@@ -71,9 +94,7 @@ import type {
 	Stroke,
 } from "./types";
 
-// The CanvasKit ambient API isn't typed here; the caller passes the instance.
-// biome-ignore lint/suspicious/noExplicitAny: external WASM API, untyped
-type CK = any;
+type EnumKey<E> = Exclude<keyof E, "values">;
 
 type LoadedFontBytes = { family: string; bytes: Uint8Array };
 
@@ -91,7 +112,7 @@ type Frame = { width: number; height: number; scale: number; grid?: number };
 const SHADOW_SIGMA = (blur: number) => blur / 2;
 const LAYER_BLUR_SIGMA = (blur: number) => blur / 2.2727;
 
-const WEIGHTS: Record<number, string> = {
+const WEIGHTS: Record<number, EnumKey<FontWeightEnumValues>> = {
 	100: "Thin",
 	200: "ExtraLight",
 	300: "Light",
@@ -114,10 +135,10 @@ type Bin = {
 	luts: LutImages;
 	// A mipmapped copy of `img`, kept with the cached image under `src` when
 	// there is one, else freed with the bin.
-	mipmaps: (src: string, img: CK) => CK;
+	mipmaps: (src: string, img: Image) => Image;
 	// Path.MakeFromSVGString(d), shared through the PaintCache when there is
 	// one. Callers must not mutate the result.
-	path: (ck: CK, d: string, evenOdd?: boolean) => CK;
+	path: (ck: CanvasKit, d: string, evenOdd?: boolean) => Path | null;
 };
 function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
@@ -157,20 +178,20 @@ function makeBin(cache?: PaintCacheState | null): Bin {
 	};
 }
 
-function toColor(ck: CK, input: string) {
+function toColor(ck: CanvasKit, input: string) {
 	const c = parseColor(input);
 	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
 function shaderFor(
-	ck: CK,
+	ck: CanvasKit,
 	bin: Bin,
 	fill: Exclude<ResolvedFill, { kind: "solid" }>,
 	x: number,
 	y: number,
 	w: number,
 	h: number,
-): CK {
+): Shader {
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -257,7 +278,10 @@ function withEnvFonts(
 	return out;
 }
 
-function makeFontProvider(ck: CK, fonts: LoadedFontBytes[]): CK {
+function makeFontProvider(
+	ck: CanvasKit,
+	fonts: LoadedFontBytes[],
+): TypefaceFontProvider {
 	const provider = ck.TypefaceFontProvider.Make();
 	for (const f of fonts) {
 		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
@@ -265,12 +289,12 @@ function makeFontProvider(ck: CK, fonts: LoadedFontBytes[]): CK {
 	return provider;
 }
 
-const STROKE_CAP: Record<string, string> = {
+const STROKE_CAP: Record<string, EnumKey<StrokeCapEnumValues>> = {
 	butt: "Butt",
 	round: "Round",
 	square: "Square",
 };
-const STROKE_JOIN: Record<string, string> = {
+const STROKE_JOIN: Record<string, EnumKey<StrokeJoinEnumValues>> = {
 	miter: "Miter",
 	round: "Round",
 	bevel: "Bevel",
@@ -279,7 +303,7 @@ const STROKE_JOIN: Record<string, string> = {
 // Build a Skia RRect from a uniform or per-corner radius. CanvasKit's RRect is
 // [l,t,r,b, ulX,ulY, urX,urY, lrX,lrY, llX,llY]; our CornerRadius is
 // [topLeft, topRight, bottomRight, bottomLeft] = ul, ur, lr, ll.
-function rrectFor(ck: CK, rect: CK, cr: CornerRadius): CK {
+function rrectFor(ck: CanvasKit, rect: Rect, cr: CornerRadius): RRect {
 	if (typeof cr === "number") return ck.RRectXY(rect, cr, cr);
 	const [tl, tr, br, bl] = cr;
 	return Float32Array.of(
@@ -298,7 +322,7 @@ function rrectFor(ck: CK, rect: CK, cr: CornerRadius): CK {
 	);
 }
 
-function strokePaint(ck: CK, bin: Bin, stroke: Stroke): CK {
+function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	const p = bin.track(new ck.Paint());
 	p.setAntiAlias(true);
 	p.setStyle(ck.PaintStyle.Stroke);
@@ -415,10 +439,10 @@ function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
 // clipped to the path's interior (inside) or its exterior (outside). The
 // path's fill type decides what the interior is.
 function drawClippedStroke(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
-	path: CK,
+	path: Path,
 	stroke: Stroke,
 ) {
 	canvas.save();
@@ -435,19 +459,19 @@ function drawClippedStroke(
 }
 
 function maskPath(
-	ck: CK,
+	ck: CanvasKit,
 	bin: Bin,
 	clip: ShapeMask,
 	x: number,
 	y: number,
 	w: number,
 	h: number,
-): CK {
-	return bin.path(ck, maskSvg(clip, x, y, w, h));
+): Path {
+	return bin.path(ck, maskSvg(clip, x, y, w, h)) as Path;
 }
 
 function textStyleOf(
-	ck: CK,
+	ck: CanvasKit,
 	span: DrawTextCommand["layout"]["lines"][number]["spans"][number],
 	cmd: DrawTextCommand,
 	fallbackFamilies: string[] = [],
@@ -484,12 +508,12 @@ function textStyleOf(
 // Render each baked line with a ParagraphBuilder — HarfBuzz shaping applies the
 // kerning Figma uses — aligning the paragraph's baseline to the baked
 // baseline via getLineMetrics.
-const shapedLines = new WeakMap<CK, PaintCacheState>();
+const shapedLines = new WeakMap<TypefaceFontProvider, PaintCacheState>();
 
 function drawText(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
 ) {
@@ -507,8 +531,8 @@ function drawText(
 					cmd.size.height,
 				)
 			: null;
-	let fgPaint: CK = null;
-	let bgPaint: CK = null;
+	let fgPaint: Paint | null = null;
+	let bgPaint: Paint | null = null;
 	if (fillShader) {
 		fgPaint = bin.track(new ck.Paint());
 		fgPaint.setAntiAlias(true);
@@ -564,13 +588,13 @@ function drawText(
 }
 
 function shapeLine(
-	ck: CK,
-	provider: CK,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
 	cmd: DrawTextCommand,
 	line: DrawTextCommand["layout"]["lines"][number],
 	fallback: string[],
-	fgPaint: CK,
-	bgPaint: CK,
+	fgPaint: Paint | null,
+	bgPaint: Paint | null,
 ): ShapedLine {
 	const first = line.spans[0] as (typeof line.spans)[number];
 	const style = new ck.ParagraphStyle({
@@ -584,10 +608,11 @@ function shapeLine(
 	});
 	const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
 	for (const span of line.spans) {
-		const ts = ck.TextStyle(
+		// Typed as a constructor only; CanvasKit also allows the plain call.
+		const ts = (ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
 			textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
 		);
-		if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint);
+		if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint as Paint);
 		else builder.pushStyle(ts);
 		builder.addText(span.text);
 		builder.pop();
@@ -613,14 +638,14 @@ const MITCHELL = 1 / 3;
 //     mipmapped copy trilinearly, so shrinking doesn't alias or shimmer.
 //   • Otherwise (upscale, or a mild shrink like the OG card): Mitchell cubic.
 function drawImageRectHQ(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
 	src: string,
-	img: CK,
-	rect: CK,
-	dest: CK,
-	paint: CK,
+	img: Image,
+	rect: Rect,
+	dest: Rect,
+	paint: Paint | null,
 	scale: number,
 ) {
 	// Below this ratio, cubic sampling of the full-res image starts to alias;
@@ -643,8 +668,8 @@ function drawImageRectHQ(
 
 // A light-gray field + a centered photo glyph (frame + sun + mountains) for an unresolved image.
 function drawImagePlaceholder(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
 	pos: { x: number; y: number },
 	size: { width: number; height: number },
@@ -672,18 +697,23 @@ function drawImagePlaceholder(
 	const scx = x + icon * 0.32;
 	const scy = y + icon * 0.3;
 	const sun = `M ${scx - sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx + sr} ${scy} A ${sr} ${sr} 0 1 0 ${scx - sr} ${scy} Z`;
-	canvas.drawPath(bin.path(ck, sun), fill);
+	canvas.drawPath(bin.path(ck, sun) as Path, fill);
 	const mtn = `M ${x + icon * 0.08} ${y + icon * 0.85} L ${x + icon * 0.42} ${
 		y + icon * 0.5
 	} L ${x + icon * 0.62} ${y + icon * 0.68} L ${x + icon * 0.8} ${
 		y + icon * 0.45
 	} L ${x + icon * 0.92} ${y + icon * 0.85} Z`;
-	canvas.drawPath(bin.path(ck, mtn), fill);
+	canvas.drawPath(bin.path(ck, mtn) as Path, fill);
 }
 
 // The node's outline stroke, drawn along its mask (or its box when unmasked).
 // Shared by the painted-image and placeholder paths so both get the same border.
-function drawImageStroke(ck: CK, canvas: CK, bin: Bin, cmd: DrawImageCommand) {
+function drawImageStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawImageCommand,
+) {
 	if (!cmd.stroke) return;
 	const { pos, size } = cmd;
 	const clip = cmd.clip ?? { kind: "rect" };
@@ -707,10 +737,10 @@ function drawImageStroke(ck: CK, canvas: CK, bin: Bin, cmd: DrawImageCommand) {
 }
 
 function drawImage(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
-	images: Map<string, CK>,
+	images: Map<string, Image | SvgPicture>,
 	cmd: DrawImageCommand,
 	issues: PaintIssues,
 ) {
@@ -795,11 +825,11 @@ function drawImage(
 // to a whole number and the code centred in its box on whole pixels. Returns the
 // rect in device space, or null to draw as placed.
 function snapBarcode(
-	canvas: CK,
+	canvas: Pick<Canvas, "getTotalMatrix">,
 	cmd: DrawBitmapCommand,
 	grid: number,
 ): { x: number; y: number; width: number; height: number } | null {
-	const m = canvas.getTotalMatrix() as number[];
+	const m = canvas.getTotalMatrix();
 	const [a, b, c, d, e, f, g, h] = m;
 	const eps = 1e-9;
 	if (
@@ -847,8 +877,8 @@ function snapBarcode(
 }
 
 function drawBitmap(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
 	cmd: DrawBitmapCommand,
 	frame: Frame,
@@ -905,8 +935,8 @@ function drawBitmap(
 	canvas.restore();
 }
 
-type SvgPicture = {
-	svgPicture: CK;
+export type SvgPicture = {
+	svgPicture: SkPicture;
 	width: number;
 	height: number;
 	// Pixels of the rasters the recording holds, nested pictures' included.
@@ -952,8 +982,8 @@ function loadSvg(): Promise<SvgModule> {
 // Recorded at the drawing's own size and scaled when drawn, so it stays
 // vector at every density.
 function makeSvgPicture(
-	ck: CK,
-	provider: CK,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
 	bytes: Uint8Array,
 	svg: SvgModule,
 	nesting = 0,
@@ -967,7 +997,7 @@ function makeSvgPicture(
 	});
 	const features = drawing.warnings.map((w) => w.feature);
 	if (contents.text) features.push("text");
-	const images = new Map<string, CK>();
+	const images = new Map<string, Image | SvgPicture>();
 	for (const src of contents.images) {
 		try {
 			const data = dataUrlToBytes(src);
@@ -1026,8 +1056,8 @@ function makeSvgPicture(
 }
 
 function drawSvgPicture(
-	ck: CK,
-	canvas: CK,
+	ck: CanvasKit,
+	canvas: Canvas,
 	bin: Bin,
 	img: SvgPicture,
 	cmd: DrawImageCommand,
@@ -1042,7 +1072,8 @@ function drawSvgPicture(
 					ck.TileMode.Repeat,
 					ck.TileMode.Repeat,
 					ck.FilterMode.Linear,
-					null,
+					// Typed as optional; CanvasKit also takes null.
+					null as unknown as InputMatrix,
 					ck.LTRBRect(0, 0, img.width, img.height),
 				),
 			),
@@ -1067,7 +1098,12 @@ function drawSvgPicture(
 	canvas.drawPicture(img.svgPicture);
 }
 
-function drawPath(ck: CK, canvas: CK, bin: Bin, cmd: DrawPathCommand) {
+function drawPath(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawPathCommand,
+) {
 	const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 	if (!path) return;
 	canvas.save();
@@ -1128,11 +1164,11 @@ function reportAdjustUnsupported(
 }
 
 // Visible local y range, or null when the transform rotates or skews.
-function visibleRows(canvas: CK): { top: number; bottom: number } | null {
-	const [, b, , d, e, f, g, h, i] = canvas.getTotalMatrix() as number[];
+function visibleRows(canvas: Canvas): { top: number; bottom: number } | null {
+	const [, b, , d, e, f, g, h, i] = canvas.getTotalMatrix();
 	if (b !== 0 || d !== 0 || g !== 0 || h !== 0 || i !== 1 || !(e > 0))
 		return null;
-	const clip = canvas.getDeviceClipBounds() as Int32Array;
+	const clip = canvas.getDeviceClipBounds();
 	return { top: (clip[1] - f) / e, bottom: (clip[3] - f) / e };
 }
 
@@ -1162,10 +1198,10 @@ function lineKey(
 }
 
 function drawShape(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawCommand,
 	issues: PaintIssues,
@@ -1215,7 +1251,7 @@ function drawShape(
 						Math.max(0, smoothR - inset),
 						smoothing,
 					),
-				);
+				) as Path;
 				canvas.drawPath(path, sp);
 			} else if (inset === 0) {
 				if (rr) canvas.drawRRect(rr, sp);
@@ -1252,7 +1288,7 @@ function drawShape(
 		// differently from one merged rect, so runs are merged only when the
 		// canvas is axis-aligned. Edges are computed as the per-module rects
 		// computed them.
-		const [, b, , d, , , g, h] = canvas.getTotalMatrix() as number[];
+		const [, b, , d, , , g, h] = canvas.getTotalMatrix();
 		const merge = b === 0 && d === 0 && g === 0 && h === 0;
 		for (let y = 0; y < modules.length; y++) {
 			const top = pos.y + margin + y * m;
@@ -1286,10 +1322,10 @@ function drawShape(
 // (DstOut where it's transparent, for invert); a luminance channel first maps
 // the mask's brightness to alpha via a color matrix.
 function drawMasked(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawMaskedCommand,
 	issues: PaintIssues,
@@ -1305,7 +1341,7 @@ function drawMasked(
 	const bounds = originInvariant(cmd.mask, ctm)
 		? layerBounds(ck, canvas, provider, images, bin, content, frame)
 		: null;
-	canvas.saveLayer(null, bounds);
+	canvas.saveLayer(undefined, bounds);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
 	const maskPaint = bin.track(new ck.Paint());
@@ -1329,7 +1365,11 @@ function drawMasked(
 // per-pixel path, folded into the layer paint. The nonlinear `lut` and spatial
 // `sharpen` components can't be a color filter, so they take the offscreen SkSL
 // path (see paintAdjustedOffscreen); here we handle only the matrix.
-function adjustColorFilter(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
+function adjustColorFilter(
+	ck: CanvasKit,
+	bin: Bin,
+	cmd: DrawCommand,
+): ColorFilter | null {
 	const m = cmd.adjust?.colorMatrix;
 	if (!m) return null;
 	return shaderSideMatrix(cmd.adjust)
@@ -1383,10 +1423,10 @@ function needsShaderAdjust(cmd: DrawCommand): boolean {
 // A 256×1 lookup image encoding a per-channel LUT (x = input 0..255, texel =
 // output). Sampled Nearest/Clamp by the adjust shader.
 function lutImage(
-	ck: CK,
+	ck: CanvasKit,
 	bin: Bin,
 	lut: NonNullable<DrawCommand["adjust"]>["lut"],
-): CK {
+): Image | null {
 	if (!lut) throw new Error("lutImage: no lut");
 	return cachedLutImage(bin.luts, 1, [lut.r, lut.g, lut.b], () =>
 		buildLutImage(ck, lut),
@@ -1394,9 +1434,9 @@ function lutImage(
 }
 
 function buildLutImage(
-	ck: CK,
+	ck: CanvasKit,
 	lut: NonNullable<NonNullable<DrawCommand["adjust"]>["lut"]>,
-): CK {
+): Image | null {
 	const px = new Uint8Array(256 * 4);
 	for (let i = 0; i < 256; i++) {
 		px[i * 4] = lut.r[i];
@@ -1433,17 +1473,17 @@ function validLut3d(lut: Lut3d | undefined): lut is Lut3d {
 // A 3D cube packed into a 2D atlas. Columns are red within blue slices and rows
 // are green: atlas(x = b * size + r, y = g) = cube(r, g, b).
 function lut3dImage(
-	ck: CK,
+	ck: CanvasKit,
 	bin: Bin,
 	lut: NonNullable<DrawCommand["adjust"]>["lut3d"],
-): CK {
+): Image | null {
 	if (!validLut3d(lut)) throw new Error("lut3dImage: invalid LUT");
 	return cachedLutImage(bin.luts, lut.size, [lut.data], () =>
 		buildLut3dImage(ck, lut),
 	);
 }
 
-function buildLut3dImage(ck: CK, lut: Lut3d): CK {
+function buildLut3dImage(ck: CanvasKit, lut: Lut3d): Image | null {
 	const width = lut.size * lut.size;
 	const px = new Uint8Array(width * lut.size * 4);
 	for (let b = 0; b < lut.size; b++) {
@@ -1564,15 +1604,15 @@ function adjustShaderSksl(
 // RuntimeEffect is compiled per (ck, variant) and reused — Make() parses SkSL, so
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
 // instances (e.g. across tests) never share an effect.
-const effectCache = new WeakMap<object, Map<string, CK | null>>();
+const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
 function adjustEffect(
-	ck: CK,
+	ck: CanvasKit,
 	hasMatrix: boolean,
 	preserveHue: boolean,
 	hasLut: boolean,
 	hasLut3d: boolean,
 	hasSharpen: boolean,
-): CK | null {
+): RuntimeEffect | null {
 	let byVariant = effectCache.get(ck);
 	if (!byVariant) {
 		byVariant = new Map();
@@ -1619,10 +1659,10 @@ const f32 = Math.fround;
 // (SVG images, inner shadows, blenders). With `uncut`, nothing is cut to the
 // device and no line is culled.
 function predictedBounds(
-	ck: CK,
-	provider: CK,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
 	bin: Bin,
-	images: Map<string, CK>,
+	images: Map<string, Image | SvgPicture>,
 	inner: DrawCommand,
 	frame: Frame,
 	device: Size,
@@ -1766,13 +1806,13 @@ function predictedBounds(
 				pm = translateAffine(pm, -(vb.x ?? 0), -(vb.y ?? 0));
 			}
 			const inPath = pm === m ? within : [...within, { ctm: m }];
-			const [l, t, r, b] = path.getBounds() as number[];
+			const [l, t, r, b] = path.getBounds();
 			const bounds: Bounds = [l, t, r, b] as Bounds;
 			if (c.fills?.length) add(bounds, pm, inPath);
 			if (c.stroke) {
 				const outline = c.strokeD ? bin.path(ck, c.strokeD) : null;
 				if (outline) {
-					const [ol, ot, or, ob] = outline.getBounds() as number[];
+					const [ol, ot, or, ob] = outline.getBounds();
 					add(strokeBounds([ol, ot, or, ob] as Bounds, c.stroke), pm, inPath);
 				} else if (strokeInset(c.stroke) !== 0) {
 					const stroke = { ...c.stroke, width: c.stroke.width * 2 };
@@ -1874,8 +1914,8 @@ function predictedBounds(
 // line's advance. Lines drawText culls against the clip are skipped here too.
 // Null when a family's box is unknown.
 function textBounds(
-	ck: CK,
-	provider: CK,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
 	ctm: Affine,
@@ -1960,14 +2000,17 @@ function textBounds(
 	return out;
 }
 
-const familyBoxes = new WeakMap<CK, Map<string, Bounds | null | undefined>>();
+const familyBoxes = new WeakMap<
+	TypefaceFontProvider,
+	Map<string, Bounds | null | undefined>
+>();
 
 // A family's font box per unit of size, over every face registered for it:
 // the box SkFontPriv::GetFontBounds scales. Undefined for a family the
 // provider lacks, null when a face reports no box (a variable font).
 function familyBox(
-	ck: CK,
-	provider: CK,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
 	family: string,
 ): Bounds | null | undefined {
 	let byFamily = familyBoxes.get(provider);
@@ -1980,13 +2023,13 @@ function familyBox(
 	for (const slant of [ck.FontSlant.Upright, ck.FontSlant.Italic]) {
 		for (let weight = 100; weight <= 900; weight += 100) {
 			const typeface = provider.matchFamilyStyle(family, {
-				weight: ck.FontWeight[WEIGHTS[weight] as string],
+				weight: ck.FontWeight[WEIGHTS[weight]],
 				width: ck.FontWidth.Normal,
 				slant,
 			});
 			if (!typeface) continue;
 			const font = new ck.Font(typeface, FONT_BOX_SIZE);
-			const b = font.getMetrics().bounds as number[] | undefined;
+			const b = font.getMetrics().bounds;
 			font.delete();
 			typeface.delete();
 			if (!b) {
@@ -2092,8 +2135,8 @@ function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
 	return outsetBounds(b, radius);
 }
 
-function pathBounds(ck: CK, bin: Bin, svg: string): Bounds {
-	const [l, t, r, b] = bin.path(ck, svg).getBounds() as number[];
+function pathBounds(ck: CanvasKit, bin: Bin, svg: string): Bounds {
+	const [l, t, r, b] = (bin.path(ck, svg) as Path).getBounds();
 	return [l, t, r, b] as Bounds;
 }
 
@@ -2249,9 +2292,9 @@ function rotationAffine(degrees: number): Affine {
 // Skia's bounds of a recording of the inner drawable under the main canvas's
 // matrix, for content predictedBounds does not model.
 function recordedBounds(
-	ck: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	inner: DrawCommand,
 	frame: Frame,
@@ -2259,7 +2302,7 @@ function recordedBounds(
 	matrix: number[],
 ): Bounds {
 	const recorder = new ck.PictureRecorder();
-	let picture: CK = null;
+	let picture: SkPicture | null = null;
 	try {
 		const rc = recorder.beginRecording(
 			ck.XYWHRect(0, 0, device.width, device.height),
@@ -2274,7 +2317,7 @@ function recordedBounds(
 		};
 		paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
 		picture = recorder.finishRecordingAsPicture();
-		const [l, t, r, b] = picture.cullRect() as number[];
+		const [l, t, r, b] = picture.cullRect();
 		return [l, t, r, b];
 	} finally {
 		picture?.delete();
@@ -2302,10 +2345,10 @@ export function auditAdjustedBounds(
 // the device clip (grown by `spread`, so a kernel at the clip edge still reads
 // the real pixels beyond it) and the frame. Null when nothing shows.
 function adjustedDeviceRect(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	inner: DrawCommand,
 	frame: Frame,
@@ -2330,7 +2373,7 @@ function adjustedDeviceRect(
 	const [l, t, r, b] =
 		predicted ??
 		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix);
-	const clip = canvas.getDeviceClipBounds() as Int32Array;
+	const clip = canvas.getDeviceClipBounds();
 	const pad = 1 + spread;
 	const x0 = Math.max(Math.floor(l) - pad, clip[0] - spread, 0);
 	const y0 = Math.max(Math.floor(t) - pad, clip[1] - spread, 0);
@@ -2350,10 +2393,10 @@ function adjustedDeviceRect(
 // a matrix-only render (+ an adjust_unsupported warning) if the surface or effect
 // can't be created.
 function paintAdjustedOffscreen(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawCommand,
 	issues: PaintIssues,
@@ -2477,9 +2520,9 @@ function paintAdjustedOffscreen(
 			ck.Matrix.translated(rect.x, rect.y),
 		),
 	);
-	const children: CK[] = [srcSh];
+	const children: Shader[] = [srcSh];
 	if (hasLut) {
-		const lutImg = lutImage(ck, bin, adjust.lut);
+		const lutImg = lutImage(ck, bin, adjust.lut) as Image;
 		children.push(
 			bin.track(
 				lutImg.makeShaderOptions(
@@ -2492,7 +2535,7 @@ function paintAdjustedOffscreen(
 		);
 	}
 	if (hasLut3d) {
-		const cubeImg = lut3dImage(ck, bin, adjust.lut3d);
+		const cubeImg = lut3dImage(ck, bin, adjust.lut3d) as Image;
 		children.push(
 			bin.track(
 				cubeImg.makeShaderOptions(
@@ -2551,16 +2594,16 @@ function paintAdjustedOffscreen(
 // path the draws only sample them then. Surfaces are disposed rather than
 // delete()d, which would strand their pixel buffers.
 function reduceSupersampled(
-	ck: CK,
-	out: CK,
-	src: CK,
+	ck: CanvasKit,
+	out: Surface,
+	src: Surface,
 	bin: Bin,
 	design: Size,
 	exportScale: number,
 	supersample: number,
 ) {
 	const rect = (s: Size) => ck.XYWHRect(0, 0, s.width, s.height);
-	const retire = (s: CK) => bin.track({ delete: () => s.dispose() });
+	const retire = (s: Surface) => bin.track({ delete: () => s.dispose() });
 
 	let level = src;
 	let levelSize = exportPixelSize(design, exportScale * supersample);
@@ -2646,7 +2689,7 @@ const FINISH_SKSL = `uniform shader src;
 		return half4(c*a, a);
 	}`;
 
-function finishEffect(ck: CK): CK | null {
+function finishEffect(ck: CanvasKit): RuntimeEffect | null {
 	let byVariant = effectCache.get(ck);
 	if (!byVariant) {
 		byVariant = new Map();
@@ -2676,8 +2719,8 @@ function normalizeDither(dither: FrameFinish["dither"]) {
 // redraw the snapshot through the finish shader. A no-op finish never reaches
 // here (compileScene only emits the command when something is set).
 function applyFrameFinish(
-	ck: CK,
-	surface: CK,
+	ck: CanvasKit,
+	surface: Surface,
 	bin: Bin,
 	finish: FrameFinish,
 	// The surface's own pixel size — this pass reads and rewrites the composited
@@ -2726,7 +2769,7 @@ function applyFrameFinish(
 }
 
 // Skia's name for each layer blend mode. Figma's linear dodge is Skia's Plus.
-const SKIA_BLEND_MODE: Record<BlendMode, string> = {
+const SKIA_BLEND_MODE: Record<BlendMode, EnumKey<BlendModeEnumValues>> = {
 	normal: "SrcOver",
 	multiply: "Multiply",
 	screen: "Screen",
@@ -2757,7 +2800,7 @@ const LINEAR_BURN_SKSL = `
 			src.a + dst.a * (1.0 - src.a));
 	}`;
 
-function linearBurnBlender(ck: CK, bin: Bin): CK | null {
+function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
 	let byVariant = effectCache.get(ck);
 	if (!byVariant) {
 		byVariant = new Map();
@@ -2784,14 +2827,14 @@ export function setLayerBounds(enabled: boolean): void {
 // the layer unbounded: content that is not modelled or not originInvariant, a
 // matrix that is not a positive scale and translate, or a recording canvas.
 function layerBounds(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	inner: DrawCommand,
 	frame: Frame,
-): CK | null {
+): Rect | null {
 	if (!boundLayers || measuring.has(canvas)) return null;
 	const matrix = canvas.getTotalMatrix() as number[];
 	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
@@ -2871,7 +2914,7 @@ function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
 
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
-function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
+function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	const { blendMode, opacity, blur, shadow } = cmd;
 	const hasBlend = blendMode && blendMode !== "normal";
 	const hasOpacity = opacity !== undefined && opacity < 1;
@@ -2893,7 +2936,7 @@ function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
 			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
 		);
 	}
-	let filter: CK = null;
+	let filter: ImageFilter | null = null;
 	if (typeof blur === "number" && blur > 0)
 		filter = bin.track(
 			ck.ImageFilter.MakeBlur(
@@ -2912,7 +2955,12 @@ function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
 
 // Grow (or shrink) the silhouette a shadow is cast from. Figma's spread, and the
 // third length of a CSS box-shadow.
-function spreadSource(ck: CK, bin: Bin, spread: number, input: CK): CK {
+function spreadSource(
+	ck: CanvasKit,
+	bin: Bin,
+	spread: number,
+	input: ImageFilter | null,
+): ImageFilter | null {
 	if (!spread) return input;
 	const r = Math.abs(spread);
 	return bin.track(
@@ -2926,7 +2974,11 @@ function spreadSource(ck: CK, bin: Bin, spread: number, input: CK): CK {
 // source's alpha: opaque where the drawable is empty, empty where it is solid.
 // That inverted silhouette, offset and blurred, is what an inner shadow casts —
 // the shape's own edges lighting inward.
-function invertedSilhouette(ck: CK, bin: Bin, color: string): CK {
+function invertedSilhouette(
+	ck: CanvasKit,
+	bin: Bin,
+	color: string,
+): ImageFilter {
 	const [r, g, b, a] = toColor(ck, color);
 	// Skia colour matrix, row-major RGBA rows with a bias column: constant colour,
 	// alpha = a·(1 − srcAlpha).
@@ -2971,18 +3023,22 @@ function shadowList(shadow: DrawCommand["shadow"]) {
 // one below it — stacking MakeDropShadow would blur each shadow into the next.
 // So each is built on its own and blended: drop shadows under the contents,
 // inner shadows over them, each list painted bottom-up.
-function shadowFilter(ck: CK, bin: Bin, shadow: DrawCommand["shadow"]): CK {
+function shadowFilter(
+	ck: CanvasKit,
+	bin: Bin,
+	shadow: DrawCommand["shadow"],
+): ImageFilter | null {
 	const list = shadowList(shadow);
 	if (list.length === 0) return null;
 
-	let under: CK = null;
-	let over: CK = null;
+	let under: ImageFilter | null = null;
+	let over: ImageFilter | null = null;
 	for (const s of list) {
 		const sigma = SHADOW_SIGMA(s.blur);
 		if (s.inset) {
 			// Offset + blur the inverted silhouette, then keep only the part that
 			// lands on the drawable — an inner shadow never spills outside it.
-			let f = invertedSilhouette(ck, bin, s.color);
+			let f: ImageFilter | null = invertedSilhouette(ck, bin, s.color);
 			f = spreadSource(ck, bin, s.spread ?? 0, f);
 			if (s.dx || s.dy) f = bin.track(ck.ImageFilter.MakeOffset(s.dx, s.dy, f));
 			if (sigma > 0)
@@ -3015,7 +3071,7 @@ function shadowFilter(ck: CK, bin: Bin, shadow: DrawCommand["shadow"]): CK {
 	}
 
 	// contents over the cast shadows, then the inner ones over that.
-	let out: CK = under
+	let out: ImageFilter | null = under
 		? bin.track(ck.ImageFilter.MakeBlend(ck.BlendMode.SrcOver, under, null))
 		: null;
 	if (over)
@@ -3039,10 +3095,10 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 }
 
 function paintDrawable(
-	ck: CK,
-	canvas: CK,
-	provider: CK,
-	images: Map<string, CK>,
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawCommand,
 	issues: PaintIssues,
@@ -3127,7 +3183,11 @@ function collectAssets(commands: Command[]): {
 	return { fonts: [...fonts.values()], images: [...images] };
 }
 
-function warnSvgFeatures(warnings: PaintWarning[], src: string, img: CK) {
+function warnSvgFeatures(
+	warnings: PaintWarning[],
+	src: string,
+	img: Image | SvgPicture,
+) {
 	if (isSvgPicture(img))
 		for (const feature of img.features)
 			warnings.push({ kind: "svg_unsupported", src, feature });
@@ -3142,10 +3202,11 @@ function warnSvgFeatures(warnings: PaintWarning[], src: string, img: CK) {
 // returned live (the env disposes). encode/dispose defer to the caller/env. With
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
 export async function paintScene(
-	ck: CK,
+	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintRuntime,
 ): Promise<PaintOutput> {
+	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
 	if (cache) cache.stats.paints++;
 	const { fonts, images } = collectAssets(commands);
@@ -3176,7 +3237,7 @@ export async function paintScene(
 		: makeFontProvider(ck, loaded);
 	if (cache) shapedLines.set(provider, cache);
 
-	const imageMap = new Map<string, CK>();
+	const imageMap = new Map<string, Image | SvgPicture>();
 	// Images the runtime lent through loadImage: painted, never freed here.
 	const borrowed = new Set<string>();
 	for (const src of images) {
@@ -3184,7 +3245,7 @@ export async function paintScene(
 			try {
 				const img = await rt.loadImage(src, ck);
 				if (img) {
-					imageMap.set(src, img);
+					imageMap.set(src, img as Image);
 					borrowed.add(src);
 				} else
 					warnings.push({
@@ -3485,25 +3546,27 @@ export async function paintScene(
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
-	ck: CK,
+	ck: CanvasKit,
 	rt: PaintRuntime,
 	w: number,
 	h: number,
-): { surface: CK; canvas: CanvasLike; loseContext: () => void } {
+): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
 	if (rt.canvas) {
 		try {
 			const el = rt.canvas.createCanvas(w, h);
-			const gl = ck.MakeWebGLCanvasSurface(el);
+			// Typed for DOM canvases only; any canvas the host makes is accepted.
+			const target = el as unknown as HTMLCanvasElement;
+			const gl = ck.MakeWebGLCanvasSurface(target);
 			if (gl)
 				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(el);
+			const sw = ck.MakeSWCanvasSurface(target);
 			if (sw) return { surface: sw, canvas: el, loseContext: noop };
 		} catch {
 			// Fall through to an offscreen surface.
 		}
 	}
-	const surface = ck.MakeSurface(w, h);
+	const surface = ck.MakeSurface(w, h) as Surface;
 	return {
 		surface,
 		canvas: { width: w, height: h, getContext: () => null },
@@ -3531,7 +3594,11 @@ function releaseGL(canvas: CanvasLike): void {
 // alpha. Reads the pixels back rather than drawing the snapshot onto a second
 // surface, which works the same whether the frame is on the GPU or in memory.
 // null when the pixels will not read back or the build has no JPEG encoder.
-function encodeJpeg(ck: CK, snap: CK, quality: number): Uint8Array | null {
+function encodeJpeg(
+	ck: CanvasKit,
+	snap: Image,
+	quality: number,
+): Uint8Array | null {
 	const width = snap.width();
 	const height = snap.height();
 	const info = {

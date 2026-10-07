@@ -4,6 +4,7 @@
 // of standing up its own rasterizer. Takes the caller's CanvasKit instance; imports
 // no WASM itself, so it stays in the light barrel.
 
+import type { Canvas, CanvasKit, Image } from "canvaskit-wasm";
 import type { ImageNode } from "./node";
 import { fitRect } from "./paint-helpers";
 
@@ -36,10 +37,8 @@ export type PixelRect = { x: number; y: number; w: number; h: number };
 // (an unsupported ImageInfo, a lost context) — readPixels can return null, so the
 // caller must not assume a buffer.
 function readRGBA(
-	// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
-	c: any,
-	// biome-ignore lint/suspicious/noExplicitAny: an Image or Canvas handle from it
-	source: any,
+	c: CanvasKit,
+	source: Image | Canvas,
 	width: number,
 	height: number,
 ): Uint8Array | null {
@@ -68,15 +67,13 @@ function readRGBA(
 // for analysis.
 export function drawImageToPixels(
 	ck: unknown,
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit Image, untyped
-	img: any,
+	img: unknown,
 	outW: number,
 	outH: number,
 	src: PixelRect,
 	dest: PixelRect,
 ): DecodedPixels | null {
-	// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
-	const c = ck as any;
+	const c = ck as CanvasKit;
 	const surface = c.MakeSurface(outW, outH);
 	if (!surface) return null;
 	const paint = new c.Paint();
@@ -84,7 +81,7 @@ export function drawImageToPixels(
 		const canvas = surface.getCanvas();
 		canvas.clear(c.TRANSPARENT);
 		canvas.drawImageRectCubic(
-			img,
+			img as Image,
 			c.XYWHRect(src.x, src.y, src.w, src.h),
 			c.XYWHRect(dest.x, dest.y, dest.w, dest.h),
 			1 / 3,
@@ -111,8 +108,7 @@ export async function sampleImageNode(
 	loadImageBytes: ImageBytesLoader,
 	opts?: ImageSampleOptions,
 ): Promise<DecodedPixels | null> {
-	// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
-	const c = ck as any;
+	const c = ck as CanvasKit;
 	const img = c.MakeImageFromEncoded(await loadImageBytes(node.src));
 	if (!img) return null;
 	try {
@@ -157,8 +153,7 @@ export function decodePixels(
 	bytes: Uint8Array,
 	opts?: DecodeOptions,
 ): DecodedPixels | null {
-	// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
-	const c = ck as any;
+	const c = ck as CanvasKit;
 	const img = c.MakeImageFromEncoded(bytes);
 	if (!img) return null;
 	try {
