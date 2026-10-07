@@ -1,6 +1,5 @@
-import { loadCanvasKit } from "@freshcoat-js/canvaskit/browser";
 import type { CanvasLike } from "@freshcoat-js/engine";
-import { createBrowserEnv } from "@freshcoat-js/engine/browser";
+import { createBrowserEnv, loadCanvasKit } from "@freshcoat-js/engine/browser";
 import { renderLiveFrame } from "./live-frame";
 import type { PreviewReply, PreviewRequest } from "./preview-protocol";
 import { createPreviewReceiver } from "./preview-sync";

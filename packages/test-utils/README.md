@@ -7,7 +7,7 @@ it. Add it as a `devDependency` with `workspace:*`.
 ## CanvasKit
 
 `loadCanvasKit()` is `initCanvasKit` from
-[`@freshcoat-js/canvaskit/node`](../canvaskit/), so a test does not need to
+[`@freshcoat-js/engine/node`](../engine/), so a test does not need to
 locate the WASM file itself. Pass `"full"` for the build with the JPEG and
 WebP encoders that Studio's export worker uses.
 

@@ -1,6 +1,7 @@
-import type { CanvasKit, CanvasKitInit } from "./index";
+import type { CanvasKit } from "canvaskit-wasm";
+import type { CanvasKitInit } from "./types";
 
-export type { CanvasKit, CanvasKitBuild } from "./index";
+export type { CanvasKitBuild } from "./types";
 
 type InitGlobal = { CanvasKitInit?: CanvasKitInit };
 

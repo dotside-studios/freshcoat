@@ -19,7 +19,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@freshcoat-js/canvaskit": "workspace:*"
+		"@freshcoat-js/engine": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "^1.3.12",

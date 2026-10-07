@@ -37,7 +37,7 @@ beforeEach(() => {
 		join(import.meta.dir, "publish-packages.mjs"),
 		join(directory, "scripts", "publish-packages.mjs"),
 	);
-	artifacts = ["@freshcoat-js/canvaskit", "@freshcoat-js/engine", "@freshcoat-js/for-print", "@freshcoat-js/coatfile"].map(
+	artifacts = ["@freshcoat-js/engine", "@freshcoat-js/for-print", "@freshcoat-js/coatfile"].map(
 		(name) => {
 			const filename = `${name.replace(/^@/, "").replace("/", "-")}-0.1.0.tgz`;
 			const bytes = Buffer.from(name);

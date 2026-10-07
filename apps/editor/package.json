@@ -27,7 +27,6 @@
 		"bench:render": "bun scripts/bench-render.ts"
 	},
 	"dependencies": {
-		"@freshcoat-js/canvaskit": "workspace:*",
 		"@freshcoat-js/coatfile": "workspace:*",
 		"@freshcoat-js/engine": "workspace:*",
 		"@freshcoat-js/for-print": "workspace:*",

@@ -2,4 +2,4 @@ export {
 	type CanvasKitBuild,
 	canvasKitVersion,
 	initCanvasKit as loadCanvasKit,
-} from "@freshcoat-js/canvaskit/node";
+} from "@freshcoat-js/engine/node";

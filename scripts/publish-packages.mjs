@@ -8,7 +8,7 @@ const directory = fileURLToPath(new URL("../dist/releases/", import.meta.url));
 const artifacts = JSON.parse(readFileSync(join(directory, "packages.json"), "utf8"));
 const tag = process.env.RELEASE_TAG;
 const dryRun = process.argv.includes("--dry-run");
-const expectedNames = ["@freshcoat-js/canvaskit", "@freshcoat-js/engine", "@freshcoat-js/for-print", "@freshcoat-js/coatfile"];
+const expectedNames = ["@freshcoat-js/engine", "@freshcoat-js/for-print", "@freshcoat-js/coatfile"];
 if (artifacts.length !== expectedNames.length) throw new Error("Unexpected release package count");
 
 function npm(args) {

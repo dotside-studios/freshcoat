@@ -9,7 +9,6 @@ import {
 describe("release packaging", () => {
 	test("uses the freshcoat-js namespace consistently across workspace packages", () => {
 		const names = new Map([
-			["packages/canvaskit", "@freshcoat-js/canvaskit"],
 			["packages/engine", "@freshcoat-js/engine"],
 			["packages/coatfile", "@freshcoat-js/coatfile"],
 			["packages/for-print", "@freshcoat-js/for-print"],

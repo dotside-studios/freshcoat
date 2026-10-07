@@ -1,4 +1,3 @@
-import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/canvaskit/browser";
 import {
 	compile,
 	createParagraphEngine,
@@ -9,6 +8,7 @@ import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { fetchLoader } from "@freshcoat-js/engine";
+import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/engine/browser";
 import { crc32 } from "@freshcoat-js/workspace/crc";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {

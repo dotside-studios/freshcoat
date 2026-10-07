@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import type { CanvasKit, CanvasKitBuild, CanvasKitInit } from "./index";
+import type { CanvasKit } from "canvaskit-wasm";
+import type { CanvasKitBuild, CanvasKitInit } from "./types";
 
-export type { CanvasKit, CanvasKitBuild } from "./index";
+export type { CanvasKitBuild } from "./types";
+export { type FileLoaderOptions, fileLoader } from "./file-loader";
 
 const require = createRequire(import.meta.url);
 const BIN = dirname(require.resolve("canvaskit-wasm"));

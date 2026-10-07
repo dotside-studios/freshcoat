@@ -95,7 +95,7 @@ const { fixtures } = loaded.get("@freshcoat-js/coatfile/fixtures");
 const { packTemplate, decodeTemplate } = loaded.get("@freshcoat-js/coatfile/coat");
 const { render } = loaded.get("@freshcoat-js/coatfile/render");
 const require = createRequire(join(process.cwd(), "package.json"));
-const { loadCanvasKit } = loaded.get("@freshcoat-js/canvaskit/node");
+const { loadCanvasKit } = loaded.get("@freshcoat-js/engine/node");
 const ck = await loadCanvasKit();
 const root = { kind: "rect", size: { width: 64, height: 36 }, fills: [{ kind: "solid", color: "#1f6fe8" }] };
 assert.ok(compileScene(planScene(root), { width: 64, height: 36 }).length);

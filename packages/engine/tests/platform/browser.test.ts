@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { loadCanvasKit } from "../src/browser";
+import { loadCanvasKit } from "../../src/platform/browser";
 
 type Globals = Record<string, unknown>;
 const globals = globalThis as unknown as Globals;

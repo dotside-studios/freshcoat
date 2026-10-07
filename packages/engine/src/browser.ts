@@ -36,3 +36,4 @@ function domCanvas(width: number, height: number): CanvasLike {
 	c.height = height;
 	return c as unknown as CanvasLike;
 }
+export * from "./platform/browser";

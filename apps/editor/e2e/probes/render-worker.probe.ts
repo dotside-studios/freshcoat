@@ -1,7 +1,7 @@
-import { loadCanvasKit } from "@freshcoat-js/canvaskit/browser";
 import { fixtures } from "@freshcoat-js/coatfile/fixtures";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { render } from "@freshcoat-js/coatfile/render";
+import { loadCanvasKit } from "@freshcoat-js/engine/browser";
 
 self.onmessage = async () => {
 	try {

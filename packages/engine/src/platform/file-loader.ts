@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ByteLoader, fetchLoader } from "./loader";
+import { type ByteLoader, fetchLoader } from "../loader";
 
 export type FileLoaderOptions = {
 	// Directory relative paths resolve against, and outside of which nothing is

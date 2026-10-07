@@ -14,7 +14,7 @@
 		".": "./src/index.ts",
 		"./browser": "./src/browser.ts",
 		"./headless": "./src/headless.ts",
-		"./node": "./src/file-loader.ts",
+		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
 		"./svg": "./src/svg/index.ts",
 		"./svg/sniff": "./src/svg/sniff.ts",
@@ -26,14 +26,13 @@
 		"conformance": "bun run conformance/src/report.ts --goldens",
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
-	"peerDependencies": {
-		"canvaskit-wasm": "^0.41.1"
+	"dependencies": {
+		"canvaskit-wasm": "0.41.1"
 	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@types/bun": "^1.3.12",
 		"@types/node": "^26.6.3",
-		"canvaskit-wasm": "^0.41.1",
 		"typescript": "^5.7.2",
 		"vitest": "^4.1.6"
 	}

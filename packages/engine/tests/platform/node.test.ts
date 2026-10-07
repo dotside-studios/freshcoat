@@ -6,7 +6,7 @@ import {
 	canvasKitVersion,
 	initCanvasKit,
 	loadCanvasKit,
-} from "../src/node";
+} from "../../src/platform/node";
 
 describe("node loader", () => {
 	test("locates both builds", () => {

@@ -23,7 +23,6 @@ the Figma bundle command also uses `zip`.
 |---|---|
 | Template format, compilation and archives | [coatfile](packages/coatfile/README.md) |
 | Scene layout and CanvasKit painting | [engine](packages/engine/README.md) |
-| Loading CanvasKit per platform | [canvaskit](packages/canvaskit/README.md) |
 | Print analysis and correction | [for-print](packages/for-print/README.md) |
 | Dataset and export planning | [workspace](packages/workspace/README.md) |
 | Shared React controls and themes | [UI kit](packages/ui/README.md#contributing) |
@@ -43,7 +42,7 @@ Run these commands from the repository root:
 | `bun run check:boundaries` | Checks declared dependencies and repository boundaries |
 | `bun run check:links` | Checks relative Markdown links and heading anchors |
 | `bun run check:notices` | Verifies third-party notices against installed dependencies |
-| `bun run release:pack` | Compiles and packs the four SDK packages |
+| `bun run release:pack` | Compiles and packs the three SDK packages |
 | `bun run release:check` | Checks those tarballs in an isolated npm consumer |
 
 Not every package defines every script. Inspect its `package.json` or README
@@ -155,8 +154,8 @@ bun run check:notices
 ## Commits and pull requests
 
 Use [Conventional Commits](https://www.conventionalcommits.org), with one focused
-change per commit. Use a scope that identifies the component: `canvaskit`,
-`engine`, `coatfile`, `for-print`, `workspace`, `ui`, `test-utils`, `editor`,
+change per commit. Use a scope that identifies the component: `engine`,
+`coatfile`, `for-print`, `workspace`, `ui`, `test-utils`, `editor`,
 `figma-plugin` or `release`. Repository-wide documentation can use `docs: ...`.
 
 Before opening a pull request:
