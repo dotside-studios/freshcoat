@@ -86,6 +86,10 @@ each one. `fit: "shrink"` works on styled spans as well as single-style text,
 scaling every span by one factor; the approximate engine, which cannot shape
 spans together, does not shrink them.
 
+The Paragraph engine reports the codepoints no registered font covers as
+`missing` on each layout, and `missingGlyphs(commands)` lists the text commands
+that would paint them as boxes, with their node ids, without shaping again.
+
 Gradients, masks, blend modes (linear burn runs as a runtime blender, since
 Skia has no native mode for it) and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations
