@@ -47,7 +47,8 @@ import {
 	encodePng,
 } from "./png";
 import { squircleSvg } from "./squircle";
-import { isSvg, parseSvg, type SvgItem, svgToNode } from "./svg/index";
+import type { SvgItem } from "./svg/index";
+import { isSvg } from "./svg/sniff";
 import type {
 	BlendMode,
 	CanvasLike,
@@ -933,14 +934,27 @@ function svgContents(
 
 const MAX_SVG_NESTING = 4;
 
+type SvgModule = typeof import("./svg/index");
+
+let svgModule: Promise<SvgModule> | undefined;
+function loadSvg(): Promise<SvgModule> {
+	svgModule ??= import("./svg/index").catch((e) => {
+		svgModule = undefined;
+		throw e;
+	});
+	return svgModule;
+}
+
 // Recorded at the drawing's own size and scaled when drawn, so it stays
 // vector at every density.
 function makeSvgPicture(
 	ck: CK,
 	provider: CK,
 	bytes: Uint8Array,
+	svg: SvgModule,
 	nesting = 0,
 ): SvgPicture {
+	const { parseSvg, svgToNode } = svg;
 	const drawing = parseSvg(new TextDecoder().decode(bytes));
 	const { width, height } = drawing;
 	const contents = svgContents(drawing.children, {
@@ -955,7 +969,7 @@ function makeSvgPicture(
 			const data = dataUrlToBytes(src);
 			const img = isSvg(data)
 				? nesting < MAX_SVG_NESTING
-					? makeSvgPicture(ck, provider, data, nesting + 1)
+					? makeSvgPicture(ck, provider, data, svg, nesting + 1)
 					: null
 				: ck.MakeImageFromEncoded(data);
 			if (img) images.set(src, img);
@@ -3038,7 +3052,7 @@ export async function paintScene(
 			const bytes = await rt.loadImageBytes(src);
 			if (cache) cache.stats.imageDecodes++;
 			const img = isSvg(bytes)
-				? makeSvgPicture(ck, provider, bytes)
+				? makeSvgPicture(ck, provider, bytes, await loadSvg())
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);

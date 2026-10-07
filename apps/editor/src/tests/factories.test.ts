@@ -11,6 +11,7 @@ import {
 } from "../doc/factories";
 import { newDocument, PRESETS } from "../doc/new-document";
 import { insertElements, unwrap } from "../doc/ops";
+import { VEND_SANS } from "../samples/vend-sans";
 import { frozenDoc } from "./doc-fixture";
 
 const KINDS: ElementKind[] = [
@@ -41,7 +42,7 @@ describe("createElement", () => {
 			const r = unwrap(insertElements(t, { side: 0 }, 99, [el]));
 			const v = validate(r.template);
 			expect(v.ok ? [] : v.errors).toEqual([]);
-			const empty = newDocument(PRESETS[0]);
+			const empty = newDocument(PRESETS[0], VEND_SANS);
 			const fresh = unwrap(
 				insertElements(empty, { side: 1 }, 0, [
 					createElement(kind, { x: 0, y: 0, width: 5, height: 5 }, empty, 1),

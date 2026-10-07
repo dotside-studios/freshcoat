@@ -1,20 +1,8 @@
-import { isSvg, parseSvg } from "@freshcoat-js/engine/svg";
+import { isSvg } from "@freshcoat-js/engine/svg/sniff";
+import { once } from "./lazy";
 
-type Size = { width: number; height: number };
+export const loadSvgImport = once(() => import("./svg-import"));
 
-/** The trimmed markup when `text` is one well-formed SVG document. */
-export function svgMarkup(text: string): string | null {
-	const trimmed = text.trim();
-	if (!isSvg(trimmed)) return null;
-	try {
-		parseSvg(trimmed);
-		return trimmed;
-	} catch {
-		return null;
-	}
-}
-
-export function svgSize(markup: string): Size {
-	const { width, height } = parseSvg(markup);
-	return { width, height };
+export function looksLikeSvg(text: string): boolean {
+	return isSvg(text.trim());
 }

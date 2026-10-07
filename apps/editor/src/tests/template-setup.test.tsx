@@ -32,6 +32,7 @@ import {
 } from "~/app/TemplateSetupDialog";
 import { newDocument } from "~/doc/new-document";
 import { slugId } from "~/panels/setup/GeneralSection";
+import { VEND_SANS } from "~/samples/vend-sans";
 import { doc } from "./doc-fixture";
 
 const fetches: string[] = [];
@@ -183,7 +184,9 @@ describe("General", () => {
 	});
 
 	test("on an unnamed template the id follows the name until it is edited", async () => {
-		const { t, past, user } = setup(newDocument({ width: 100, height: 100 }));
+		const { t, past, user } = setup(
+			newDocument({ width: 100, height: 100 }, VEND_SANS),
+		);
 		const name = screen.getByRole("textbox", { name: "Name" });
 		await user.clear(name);
 		await user.type(name, "Spring Badge");
@@ -307,7 +310,7 @@ describe("Fonts", () => {
 });
 
 describe("naming on first save", () => {
-	const unnamed = () => newDocument({ width: 200, height: 100 });
+	const unnamed = () => newDocument({ width: 200, height: 100 }, VEND_SANS);
 
 	test("a .coat export of an unnamed template asks for a name, and Save saves it named", async () => {
 		const save = vi.spyOn(download, "downloadBytes").mockResolvedValue();

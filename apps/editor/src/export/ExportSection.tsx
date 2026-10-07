@@ -35,7 +35,6 @@ import { useExportJobs } from "./export-jobs";
 import {
 	boundDataset,
 	labelColumn,
-	newPreset,
 	photoSizedTemplate,
 	recordLabel,
 	recordOutcome,
@@ -54,6 +53,7 @@ import {
 import { JobBar } from "./JobBar";
 import { itemSize, withRecordIds } from "./job";
 import { PresetList } from "./PresetList";
+import { newPreset } from "./preset";
 import {
 	effectiveMode,
 	PREVIEW_MODE_LABEL,

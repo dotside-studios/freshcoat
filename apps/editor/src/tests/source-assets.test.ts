@@ -1,10 +1,7 @@
 // @vitest-environment node
 import { subtleSha256 } from "@freshcoat-js/coatfile";
-import {
-	type DatasetAsset,
-	unpackWorkspace,
-	type Workspace,
-} from "@freshcoat-js/workspace";
+import type { DatasetAsset, Workspace } from "@freshcoat-js/workspace";
+import { unpackWorkspace } from "@freshcoat-js/workspace/archive";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController } from "~/app/controller";
 import * as download from "~/app/download";

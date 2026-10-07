@@ -353,7 +353,7 @@ export type IntentTarget = {
 	openSample(id: string): Promise<unknown> | unknown;
 	openStarter?: (id: string) => Promise<unknown> | unknown;
 	hasStarter?: (id: string) => boolean;
-	newDocument(presetId: string): boolean;
+	newDocument(presetId: string): Promise<boolean> | boolean;
 };
 
 /** Acts on an intent. Resolves false when nothing it names exists. */

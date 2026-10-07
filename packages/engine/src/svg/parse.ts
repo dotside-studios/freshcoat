@@ -30,6 +30,8 @@ import {
 } from "./style";
 import { parseXml, SvgError, textContent, type XmlElement } from "./xml";
 
+export { isSvg } from "./sniff";
+
 export type SvgStop = { offset: number; color: string };
 
 export type SvgPaint =
@@ -240,18 +242,6 @@ type Context = {
 	ancestors: Set<XmlElement>;
 	viewport: Viewport;
 };
-
-const PROLOG =
-	/^﻿?(?:\s+|<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^[>]*(?:\[[\s\S]*?\])?\s*>)*<svg[\s/>]/i;
-
-/** Whether text or bytes look like an SVG document, for sniffing sources. */
-export function isSvg(input: string | Uint8Array): boolean {
-	const text =
-		typeof input === "string"
-			? input
-			: new TextDecoder().decode(input.subarray(0, 65536));
-	return PROLOG.test(text);
-}
 
 function localName(name: string): string {
 	return name.startsWith("svg:") ? name.slice(4) : name;

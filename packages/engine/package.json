@@ -16,6 +16,7 @@
 		"./headless": "./src/headless.ts",
 		"./path": "./src/path-data.ts",
 		"./svg": "./src/svg/index.ts",
+		"./svg/sniff": "./src/svg/sniff.ts",
 		"./runtime": "./src/runtime.ts"
 	},
 	"scripts": {

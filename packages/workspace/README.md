@@ -34,6 +34,7 @@ scheduling and file destinations.
 Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
+The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
 
 ## The shape of a workspace
 

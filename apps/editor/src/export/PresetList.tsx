@@ -16,7 +16,8 @@ import DeleteIcon from "~icons/mingcute/delete-2-line";
 import EditIcon from "~icons/mingcute/edit-2-line";
 import CollapseIcon from "~icons/mingcute/layout-left-line";
 import MoreIcon from "~icons/mingcute/more-2-line";
-import { duplicatePreset, FORMAT_LABEL, newPreset } from "./export-ui";
+import { FORMAT_LABEL } from "./export-ui";
+import { duplicatePreset, newPreset } from "./preset";
 
 const RECORDS_LABEL = {
 	all: "all records",

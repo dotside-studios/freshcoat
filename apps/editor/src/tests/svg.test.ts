@@ -2,7 +2,7 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { afterEach, describe, expect, it } from "vitest";
 import { readClipboard } from "~/app/clipboard";
 import { EditorController } from "~/app/controller";
-import { svgMarkup, svgSize } from "~/app/svg";
+import { svgMarkup, svgSize } from "~/app/svg-import";
 import { doc } from "./doc-fixture";
 
 const ICON =
@@ -162,6 +162,17 @@ describe("pasting SVG", () => {
 		c.setSvgPastePrompt(async () => "cancel");
 		await c.paste();
 		expect(c.template).toEqual(t);
+	});
+
+	it("pastes malformed SVG markup as text", async () => {
+		const broken = '<svg xmlns="http://www.w3.org/2000/svg"><g></svg>';
+		clipboardText(broken);
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		c.setSvgPastePrompt(async () => "layers");
+		await c.paste();
+		const placed = (c.template as Template).template_data[0].elements.at(-1);
+		expect(placed?.type === "text" && placed.properties.value).toBe(broken);
 	});
 
 	it("pastes other text as a text layer", async () => {
