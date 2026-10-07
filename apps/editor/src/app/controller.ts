@@ -868,19 +868,18 @@ export class EditorController {
 		if (!clip) return;
 		if (clip.kind === "svg") {
 			const svg = await this.loadSvgImport(() => this.paste());
-			if (!svg) return;
-			const markup = svg.svgMarkup(clip.svg);
+			const markup = svg?.svgMarkup(clip.svg) ?? null;
 			const answer = !markup
 				? "text"
 				: this.svgPastePrompt
 					? await this.svgPastePrompt()
 					: "layers";
 			if (answer === "cancel") return;
-			if (markup && answer === "layers") {
+			if (svg && markup && answer === "layers") {
 				this.placeSvgLayers(markup, svg.svgToElements);
 				return;
 			}
-			if (markup && answer === "image") {
+			if (svg && markup && answer === "image") {
 				await this.placeSvg(markup, svg.svgSize(markup));
 				return;
 			}
