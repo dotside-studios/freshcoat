@@ -7,7 +7,6 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -17,6 +16,7 @@ import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
 import { LayersTree } from "~/panels/layers/LayersTree";
 import { useEditor } from "~/state/hooks";
+import { fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 beforeEach(() => {
@@ -59,7 +59,7 @@ function Issues() {
 
 function mount(c: EditorController, ui: React.ReactNode) {
 	render(<ControllerProvider controller={c}>{ui}</ControllerProvider>);
-	return userEvent.setup();
+	return fastUser();
 }
 
 const base = (c: EditorController) => c.base as Template;
