@@ -30,6 +30,7 @@ export {
 	textClipOutset,
 } from "./bake-text";
 export { hslToRgb } from "./color";
+export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {
 	type CompileSceneOptions,
 	compileScene,
