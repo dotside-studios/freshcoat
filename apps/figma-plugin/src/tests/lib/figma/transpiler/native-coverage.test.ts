@@ -364,8 +364,9 @@ describe("blend modes", () => {
 
 	it("keeps a Normal frame with a blended child native", () => {
 		expect(
-			classify(frame([rect({ blendMode: "MULTIPLY" })], { blendMode: "NORMAL" }))
-				.kind,
+			classify(
+				frame([rect({ blendMode: "MULTIPLY" })], { blendMode: "NORMAL" }),
+			).kind,
 		).toBe("native-frame");
 		expect(
 			classify(
