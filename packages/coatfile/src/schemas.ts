@@ -163,6 +163,21 @@ export const FillSchema = z.union([
 		rotation: z.number().optional(),
 		stops: z.array(GradientStopSchema),
 	}),
+	// A procedural texture drawn by a shader, in design units from the
+	// drawable's top-left. Omitted parameters take the pattern's defaults.
+	z.object({
+		kind: z.literal("pattern"),
+		pattern: z.enum(["noise", "paper", "hatching", "dots"]),
+		// Feature size: grain, fibre length, line spacing or dot pitch.
+		scale: z.number().positive().optional(),
+		// Degrees, 0 pointing right and 90 down.
+		angle: z.number().optional(),
+		// How much of the second colour covers the first.
+		density: z.number().min(0).max(1).optional(),
+		seed: z.number().int().optional(),
+		// Background, then ink.
+		colors: z.tuple([z.string(), z.string()]).optional(),
+	}),
 ]);
 
 // A rect or path can carry one or many fills. They paint bottom-up
@@ -246,6 +261,25 @@ export const TextPropertiesSchema = z.object({
 	// Figma "Truncate text": cap the wrapped text at N lines, ellipsizing the
 	// last line if content overflows.
 	maxLines: z.number().int().positive().optional(),
+	// Sets the text along a circle centered on the box, for seals and badges.
+	// Each hard line is one ring and nothing wraps. Angles are degrees clockwise
+	// from 12 o'clock.
+	arc: z
+		.object({
+			// Baseline radius of the first ring, in design units. Absent keeps the
+			// glyphs inside the box.
+			radius: z.number().nonnegative().optional(),
+			// Spreads each ring's glyphs across this many degrees.
+			sweep: z.number().positive().max(360).optional(),
+			// Where `align` anchors the ring. Default 0.
+			startAngle: z.number().optional(),
+			// outside reads clockwise, tops outward (the top of a seal); inside reads
+			// counter-clockwise, tops inward (the bottom). Default outside.
+			direction: z.enum(["outside", "inside"]).optional(),
+			// Which part of the ring sits at startAngle. Default center.
+			align: z.enum(["start", "center", "end"]).optional(),
+		})
+		.optional(),
 });
 
 export const ImageMaskSchema = z.union([
@@ -572,6 +606,9 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 		// Figma's `clipsContent`. When true, children are clipped to the frame,
 		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
+		// Figma's Normal on a frame: children blend only with the frame's own
+		// content. Unset is pass-through.
+		isolate: z.boolean().optional(),
 		layout: LayoutSchema.optional(),
 		children: z.array(ElementSchema),
 	}),
@@ -1108,11 +1145,12 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 			return;
 		}
 		const f = fill as { kind?: unknown; stops?: unknown };
+		if (f.kind === "pattern") return;
 		if (f.kind !== "linear" && f.kind !== "radial" && f.kind !== "angular") {
 			addKitIssue(
 				ctx,
 				"invalid_fill_kind",
-				'fill.kind must be "linear", "radial", or "angular"',
+				'fill.kind must be "linear", "radial", "angular" or "pattern"',
 				[...path, "kind"],
 			);
 			return;

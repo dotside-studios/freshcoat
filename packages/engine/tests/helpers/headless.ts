@@ -1,3 +1,4 @@
+import type { Precision } from "../../src/color-policy";
 import { compileScene } from "../../src/compile-scene";
 import { resolveFontRequest } from "../../src/font-bytes";
 import { deriveFontMetrics } from "../../src/font-metrics";
@@ -64,6 +65,8 @@ export async function renderSceneToPng(
 		// ./export-scale). The knob for a fixed output size: same pixel count,
 		// edges resolved from several samples instead of one. Omit = 1×.
 		supersample?: number;
+		// Working precision (see ./color-policy). Omit = "u8".
+		precision?: Precision;
 	},
 ): Promise<EncodedPaintResult> {
 	const fonts = opts.fonts ?? new Map<string, Uint8Array[]>();
@@ -79,6 +82,7 @@ export async function renderSceneToPng(
 			finish: opts.finish,
 			scale: opts.scale,
 			supersample: opts.supersample,
+			precision: opts.precision,
 		});
 		const env = createHeadlessEnv({
 			fonts,

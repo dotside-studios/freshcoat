@@ -662,6 +662,36 @@ describe("compile (frame → group)", () => {
 		expect(findDraw(cmds, "drawGroup")!.clip).toBeUndefined();
 	});
 
+	test("isolate reaches the drawGroup, and absent stays pass-through", () => {
+		const isolated = getCommands(
+			withFrame({ isolate: true, children: [] }),
+			{},
+			{ width: 100, height: 60 },
+		);
+		expect(findDraw(isolated, "drawGroup")!.isolate).toBe(true);
+
+		for (const props of [{ children: [] }, { isolate: false, children: [] }]) {
+			const plain = getCommands(withFrame(props), {}, { width: 100, height: 60 });
+			expect("isolate" in findDraw(plain, "drawGroup")!).toBe(false);
+		}
+	});
+
+	test("an isolated frame with an outside stroke isolates the whole frame", () => {
+		const cmds = getCommands(
+			withFrame({
+				isolate: true,
+				clipsContent: true,
+				stroke: { color: "#000", width: 4, align: "outside" },
+				children: [],
+			}),
+			{},
+			{ width: 100, height: 60 },
+		);
+		const [outer, content] = findDraws(cmds, "drawGroup");
+		expect(outer!.isolate).toBe(true);
+		expect("isolate" in content!).toBe(false);
+	});
+
 	test("text inside a frame contributes its font family to assets.fonts", () => {
 		const out = compile(
 			withFrame({
@@ -1768,5 +1798,53 @@ describe("compile (substitution inside containers)", () => {
 		expect(inner.layout.lines.map((l) => l.text).join(" ")).toBe(
 			"Hi {{secret}}",
 		);
+	});
+});
+
+describe("arc text", () => {
+	const withArc = (arc: TextElement["properties"]["arc"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "seal",
+			type: "text",
+			pos: { x: 20, y: 0 },
+			size: { width: 60, height: 60 },
+			properties: {
+				value: "CERTIFIED ORIGINAL QUALITY",
+				font: { family: "Comfortaa", size: 6 },
+				arc,
+			},
+		});
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.arc)!;
+	};
+
+	test("scales the radius and keeps angles", () => {
+		const text = withArc({
+			radius: 25,
+			startAngle: 180,
+			direction: "inside",
+			align: "end",
+			sweep: 120,
+		});
+		expect(text.arc).toEqual({
+			radius: 50,
+			startAngle: 180,
+			direction: "inside",
+			align: "end",
+			sweep: 120,
+		});
+		expect(text.layout.lines).toHaveLength(1);
+	});
+
+	test("defaults fit the ring inside the box", () => {
+		const text = withArc({});
+		expect(text.arc?.direction).toBe("outside");
+		expect(text.arc?.align).toBe("center");
+		expect(text.arc?.startAngle).toBe(0);
+		expect(text.arc?.radius).toBeGreaterThan(0);
+		expect(text.arc?.radius).toBeLessThan(60);
 	});
 });

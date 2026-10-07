@@ -11,10 +11,12 @@
 // re-derives them via zod (schemas.ts) for authoring/validation; the two are kept
 // structurally identical.
 
+import type { Precision } from "./color-policy";
+
 export type Vec2 = { x: number; y: number };
 export type Size = { width: number; height: number };
-// Figma's layer blend modes, minus pass-through (a group-only compositing
-// choice, not a mode). `plus` is Figma's linear dodge.
+// Figma's layer blend modes, minus pass-through, which is a group's `isolate`
+// left unset rather than a mode. `plus` is Figma's linear dodge.
 export type BlendMode =
 	| "normal"
 	| "multiply"
@@ -59,6 +61,8 @@ export type FontDescriptor =
 	| { kind: "local"; family: string; files: FontFile[] };
 
 export type GradientStop = { offset: number; color: string };
+
+export type PatternKind = "noise" | "paper" | "hatching" | "dots";
 
 export type FontRequest =
 	| { family: string }
@@ -137,11 +141,11 @@ export type Adjust = {
 
 export type ShapeMask =
 	| { kind: "rect"; outset?: ClipOutset }
-	| { kind: "rounded-rect"; radius: CornerRadius }
+	| { kind: "rounded-rect"; radius: CornerRadius; smoothing?: number }
 	| { kind: "circle" }
 	| { kind: "ellipse" }
 	| { kind: "polygon"; sides: number; rotation?: number }
-	| { kind: "squircle"; radius: number };
+	| { kind: "squircle"; radius: number; smoothing?: number };
 
 // A uniform radius, or per-corner [topLeft, topRight, bottomRight, bottomLeft]
 // (matches CSS/Canvas2D roundRect order and Figma's per-corner radii).
@@ -195,6 +199,19 @@ export type ResolvedFill =
 			stops: GradientStop[];
 			center: Vec2;
 			rotation: number;
+	  }
+	// A procedural pattern in design units, anchored at the drawable's top-left,
+	// so it moves with the shape and keeps its size at every export density.
+	// `scale` is the feature size: noise grain, paper fibre, line spacing or dot
+	// pitch. `density` in [0, 1] is how much of colors[1] covers colors[0].
+	| {
+			kind: "pattern";
+			pattern: PatternKind;
+			scale: number;
+			angle: number;
+			density: number;
+			seed: number;
+			colors: [string, string];
 	  };
 
 export type ResolvedFont = {
@@ -219,6 +236,8 @@ export type BakedTextLayout = {
 	lines: TextLine[];
 	totalHeight: number;
 	shrinkApplied: boolean;
+	// See TextLayout.missing.
+	missing?: number[];
 };
 
 // One laid-out visual line. y is the line's top in target pixels (with
@@ -260,12 +279,16 @@ export type SetupCommand =
 	// the size it comes out at: the painter renders at `scale × supersample` and
 	// reduces to `scale` before the finish pass. Absent/1 = render at the export
 	// size (no reduction).
+	//
+	// `precision` is the bit depth of the working surface and offscreen layers
+	// (see ./color-policy). Absent = "u8".
 	| {
 			op: "createCanvas";
 			width: number;
 			height: number;
 			scale?: number;
 			supersample?: number;
+			precision?: Precision;
 	  }
 	| { op: "loadFonts"; requests: FontRequest[] }
 	| { op: "loadImages"; srcs: string[] };
@@ -320,11 +343,26 @@ export type DrawCommandBase = {
 	adjust?: Adjust;
 };
 
+// Text set along a circle centered on the element box. Angles are degrees
+// clockwise from 12 o'clock. outside reads clockwise with glyph tops pointing
+// away from the center; inside reads counter-clockwise with tops pointing in.
+// `align` places the line's start, middle or end at `startAngle`.
+export type TextArc = {
+	// Radius of the first line's baseline, in target px.
+	radius: number;
+	startAngle: number;
+	direction: "outside" | "inside";
+	align: "start" | "center" | "end";
+	// Spreads each line's glyph positions across this many degrees.
+	sweep?: number;
+};
+
 export type DrawTextCommand = DrawCommandBase & {
 	op: "drawText";
 	layout: BakedTextLayout;
 	color: string;
 	fill?: ResolvedFill;
+	arc?: TextArc;
 };
 
 export type DrawImageCommand = DrawCommandBase & {
@@ -385,6 +423,8 @@ export type DrawPathCommand = DrawCommandBase & {
 export type DrawGroupCommand = DrawCommandBase & {
 	op: "drawGroup";
 	children: DrawCommand[];
+	// See GroupNode.isolate.
+	isolate?: boolean;
 };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then

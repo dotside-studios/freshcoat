@@ -17,6 +17,7 @@ import {
 	type FrameFinish,
 	type FrameFor,
 	type ImageNode,
+	missingGlyphs,
 	type Node,
 	type Output,
 	type PaintWarning,
@@ -320,4 +321,34 @@ function fontRequests(requests: FontRequest[]): FontRequest[] {
 			byFamily.set(req.family, req);
 	}
 	return [...byFamily.values()];
+}
+
+export type FrameMissingGlyphs = {
+	frame: string;
+	// The element id of the text that lacks glyphs.
+	id?: string;
+	text: string;
+	codepoints: number[];
+};
+
+// The characters each frame's text shaped without a glyph for, read off the
+// layout compile bakes anyway, so nothing is painted. The renderer's cached
+// text engine makes repeat records nearly free.
+export function findMissingGlyphs(
+	renderer: Renderer,
+	compiled: CompiledTemplate,
+	options: { frameNames?: string[] } = {},
+): FrameMissingGlyphs[] {
+	const out: FrameMissingGlyphs[] = [];
+	for (const f of compiled.frames) {
+		if (options.frameNames && !options.frameNames.includes(f.name)) continue;
+		const commands = renderer.compile(f.root as Node, {
+			width: compiled.width,
+			height: compiled.height,
+			fonts: f.assets.fonts,
+			images: f.assets.images,
+		});
+		for (const m of missingGlyphs(commands)) out.push({ frame: f.name, ...m });
+	}
+	return out;
 }

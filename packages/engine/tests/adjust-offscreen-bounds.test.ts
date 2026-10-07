@@ -12,7 +12,13 @@ import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
 import { renderSceneToPng } from "./helpers/headless";
 import { auditAdjustedBounds } from "../src/canvaskit";
-import { createFrame, createPath, createRect, createText } from "../src/node";
+import {
+	createFrame,
+	createGroup,
+	createPath,
+	createRect,
+	createText,
+} from "../src/node";
 import { BOUNDS_CASES } from "./fixtures/adjust-bounds/scenes";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -147,13 +153,21 @@ describe("adjust offscreen sized to the layer", () => {
 			pos: { x: 0, y: 0 },
 			size: { width: 100, height: 80 },
 			children: [
-				createRect({
-					pos: { x: 10, y: 10 },
-					size: { width: 40, height: 40 },
-					fills: [{ kind: "solid", color: "#808080" }],
-					shadow: { color: "#000000", dx: 2, dy: 2, blur: 3, inset: true },
-					adjust: buildAdjust({ gamma: 2 }),
-				}),
+				createGroup(
+					[
+						createRect({
+							pos: { x: 10, y: 10 },
+							size: { width: 40, height: 40 },
+							fills: [{ kind: "solid", color: "#808080" }],
+							shadow: { color: "#000000", dx: 2, dy: 2, blur: 3, inset: true },
+						}),
+					],
+					{
+						pos: { x: 10, y: 10 },
+						size: { width: 40, height: 40 },
+						adjust: buildAdjust({ gamma: 2 }),
+					},
+				),
 			],
 		});
 		await renderSceneToPng(scene, { width: 100, height: 80, ck });

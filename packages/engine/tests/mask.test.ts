@@ -2,7 +2,7 @@
 // mask IS — a single opaque shape → a drawGroup with a clipPath (fast), anything
 // else → a drawMasked offscreen-coverage command (general). Both render.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 import { createHeadlessEnv } from "./helpers/headless";
 import type { MeasureText } from "../src/index";
 import {
@@ -15,10 +15,15 @@ import {
 	createRect,
 	resolveLayout,
 } from "../src/index";
-import type { GroupNode, MaskNode } from "../src/node";
+import type { GroupNode, MaskNode, Node } from "../src/node";
+import type { Command, DrawCommand } from "../src/types";
 
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 const measure: MeasureText = () => ({ width: 0, height: 0 });
+const clipOf = (cmd: DrawCommand) =>
+	cmd.op === "drawGroup" && cmd.children[0]?.op === "drawGroup"
+		? cmd.children[0].clip
+		: undefined;
 
 describe("mask lowering — fast path (shape → clipPath)", () => {
 	test("ellipse mask → drawGroup with an ellipse clip at the mask box", () => {
@@ -38,13 +43,16 @@ describe("mask lowering — fast path (shape → clipPath)", () => {
 		);
 		const draw = compileScene(scene, { width: 50, height: 50 }).at(-1);
 		if (draw?.op !== "drawGroup") throw new Error("expected drawGroup");
-		expect(draw.clip).toEqual({ kind: "ellipse" });
-		expect(draw.pos).toEqual({ x: 5, y: 5 }); // mask shape's box
-		expect(draw.size).toEqual({ width: 40, height: 40 });
-		expect(draw.children[0].op).toBe("drawRect");
+		expect(draw.clip).toBeUndefined();
+		const inner = draw.children[0];
+		if (inner?.op !== "drawGroup") throw new Error("expected inner drawGroup");
+		expect(inner.clip).toEqual({ kind: "ellipse" });
+		expect(inner.pos).toEqual({ x: 5, y: 5 });
+		expect(inner.size).toEqual({ width: 40, height: 40 });
+		expect(inner.children[0].op).toBe("drawRect");
 	});
 
-	test("rounded rect mask → rounded-rect clip; squircle when smoothed", () => {
+	test("rounded rect mask → rounded-rect clip carrying smoothing", () => {
 		const rounded = compileScene(
 			createMask(
 				createRect({
@@ -57,7 +65,7 @@ describe("mask lowering — fast path (shape → clipPath)", () => {
 			{ width: 20, height: 20 },
 		).at(-1);
 		if (rounded?.op !== "drawGroup") throw new Error("expected drawGroup");
-		expect(rounded.clip).toEqual({ kind: "rounded-rect", radius: 6 });
+		expect(clipOf(rounded)).toEqual({ kind: "rounded-rect", radius: 6 });
 
 		const squircle = compileScene(
 			createMask(
@@ -72,7 +80,11 @@ describe("mask lowering — fast path (shape → clipPath)", () => {
 			{ width: 20, height: 20 },
 		).at(-1);
 		if (squircle?.op !== "drawGroup") throw new Error("expected drawGroup");
-		expect(squircle.clip).toEqual({ kind: "squircle", radius: 6 });
+		expect(clipOf(squircle)).toEqual({
+			kind: "rounded-rect",
+			radius: 6,
+			smoothing: 0.6,
+		});
 	});
 });
 
@@ -286,5 +298,263 @@ describe("mask render smoke", () => {
 			),
 		);
 		expect([png[0], png[1], png[2], png[3]]).toEqual([137, 80, 78, 71]);
+	});
+});
+
+describe("mask fast path preserves pixels", () => {
+	let ck: any;
+	beforeAll(async () => {
+		ck = await loadCanvasKit();
+	});
+	const W = 80;
+	const H = 80;
+
+	async function pixels(scene: MaskNode): Promise<Uint8Array> {
+		return paintPixels(compileScene(scene, { width: W, height: H }));
+	}
+
+	// The general path for a mask the fast path would take: lower it with
+	// `luminance` to get a drawMasked, then paint it on the alpha channel.
+	function generalCommands(scene: MaskNode): Command[] {
+		const commands = compileScene(
+			{ ...scene, channel: "luminance" },
+			{ width: W, height: H },
+		);
+		const last = commands.at(-1);
+		if (last?.op !== "drawMasked") throw new Error("expected drawMasked");
+		return [...commands.slice(0, -1), { ...last, channel: undefined }];
+	}
+
+	async function paintPixels(commands: Command[]): Promise<Uint8Array> {
+		const { bytes } = (await createHeadlessEnv().paint(commands, ck)) as {
+			bytes: Uint8Array;
+		};
+		const img = ck.MakeImageFromEncoded(bytes);
+		const buf = img.readPixels(
+			0,
+			0,
+			{
+				width: W,
+				height: H,
+				colorType: ck.ColorType.RGBA_8888,
+				alphaType: ck.AlphaType.Unpremul,
+				colorSpace: ck.ColorSpace.SRGB,
+			},
+			undefined,
+			W * 4,
+		) as Uint8Array;
+		img.delete();
+		return buf;
+	}
+
+	const at = (buf: Uint8Array, x: number, y: number) =>
+		Array.from(buf.slice((y * W + x) * 4, (y * W + x) * 4 + 4));
+
+	function alphaDiff(a: Uint8Array, b: Uint8Array) {
+		let max = 0;
+		let total = 0;
+		for (let i = 3; i < a.length; i += 4) {
+			const d = Math.abs(a[i] - b[i]);
+			max = Math.max(max, d);
+			total += d;
+		}
+		return { max, total };
+	}
+
+	const content = () => [
+		createRect({
+			pos: { x: 0, y: 0 },
+			size: { width: W, height: H },
+			fills: solid("#ff0000"),
+		}),
+	];
+
+	const shapes: [string, () => Node][] = [
+		[
+			"rect",
+			() =>
+				createRect({
+					pos: { x: 22, y: 14 },
+					size: { width: 34, height: 26 },
+					fills: solid("#fff"),
+				}),
+		],
+		[
+			"rounded rect",
+			() =>
+				createRect({
+					pos: { x: 22, y: 14 },
+					size: { width: 34, height: 26 },
+					cornerRadius: 8,
+					fills: solid("#fff"),
+				}),
+		],
+		[
+			"squircle",
+			() =>
+				createRect({
+					pos: { x: 22, y: 14 },
+					size: { width: 34, height: 26 },
+					cornerRadius: 8,
+					cornerSmoothing: 0.6,
+					fills: solid("#fff"),
+				}),
+		],
+		[
+			"ellipse",
+			() =>
+				createEllipse({
+					pos: { x: 22, y: 14 },
+					size: { width: 34, height: 26 },
+					fills: solid("#fff"),
+				}),
+		],
+	];
+
+	for (const [name, shape] of shapes) {
+		for (const rotation of [undefined, 30]) {
+			test(`${name}${rotation ? " rotated" : ""}: fast and general paths match`, async () => {
+				const opts = {
+					pos: { x: 10, y: 10 },
+					size: { width: 60, height: 60 },
+					rotation,
+				};
+				const fast = createMask(shape(), content(), opts);
+				expect(compileScene(fast, { width: W, height: H }).at(-1)?.op).toBe(
+					"drawGroup",
+				);
+				const a = await pixels(fast);
+				const b = await paintPixels(generalCommands(fast));
+				const d = alphaDiff(a, b);
+				expect(d.max).toBeLessThanOrEqual(8);
+			});
+		}
+	}
+
+	test("a rotated mask pivots around the mask node's box", async () => {
+		const opts = {
+			pos: { x: 10, y: 10 },
+			size: { width: 60, height: 60 },
+			rotation: 90,
+		};
+		const mask = () =>
+			createRect({
+				pos: { x: 10, y: 10 },
+				size: { width: 20, height: 20 },
+				fills: solid("#fff"),
+			});
+		const buf = await pixels(createMask(mask(), content(), opts));
+		expect(at(buf, 60, 20)[3]).toBe(255);
+		expect(at(buf, 20, 20)[3]).toBe(0);
+	});
+
+	const single = (fills: ReturnType<typeof solid> | undefined, extra = {}) =>
+		createMask(
+			createRect({
+				pos: { x: 20, y: 20 },
+				size: { width: 40, height: 40 },
+				fills,
+				...extra,
+			}),
+			content(),
+		);
+
+	test.each([
+		["#ffffff80", 128],
+		["#fff8", 136],
+		["rgba(255, 255, 255, 0.5)", 128],
+		["transparent", 0],
+	])("solid fill %s lowers to drawMasked with its alpha", async (color, a) => {
+		const scene = single(solid(color));
+		expect(compileScene(scene, { width: W, height: H }).at(-1)?.op).toBe(
+			"drawMasked",
+		);
+		const alpha = at(await pixels(scene), 40, 40)[3];
+		expect(Math.abs(alpha - a)).toBeLessThanOrEqual(1);
+	});
+
+	test("a fill-less mask lowers to drawMasked and covers nothing", async () => {
+		const scene = single(undefined);
+		expect(compileScene(scene, { width: W, height: H }).at(-1)?.op).toBe(
+			"drawMasked",
+		);
+		expect(at(await pixels(scene), 40, 40)[3]).toBe(0);
+	});
+
+	test("a stroked mask lowers to drawMasked and its stroke adds coverage", async () => {
+		const scene = single(solid("#fff"), {
+			stroke: { color: "#fff", width: 8, align: "outside" },
+		});
+		expect(compileScene(scene, { width: W, height: H }).at(-1)?.op).toBe(
+			"drawMasked",
+		);
+		const buf = await pixels(scene);
+		expect(at(buf, 40, 40)[3]).toBe(255);
+		expect(at(buf, 16, 40)[3]).toBe(255);
+		expect(at(buf, 8, 40)[3]).toBe(0);
+	});
+
+	test("an adjusted mask lowers to drawMasked and its alpha terms apply", async () => {
+		const colorMatrix = [
+			1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0.5, 0,
+		];
+		const scene = single(solid("#fff"), { adjust: { colorMatrix } });
+		expect(compileScene(scene, { width: W, height: H }).at(-1)?.op).toBe(
+			"drawMasked",
+		);
+		const alpha = at(await pixels(scene), 40, 40)[3];
+		expect(Math.abs(alpha - 128)).toBeLessThanOrEqual(1);
+	});
+});
+
+describe("luminance mask coverage", () => {
+	let ck: any;
+	async function pixel(maskColor: string, invert: boolean) {
+		if (!ck) ck = await loadCanvasKit();
+		const scene = createMask(
+			createRect({ size: { width: 20, height: 20 }, fills: solid(maskColor) }),
+			[
+				createRect({
+					size: { width: 20, height: 20 },
+					fills: solid("#ff0000"),
+				}),
+			],
+			{ channel: "luminance", invert },
+		);
+		const commands = compileScene(scene, { width: 20, height: 20 });
+		const result = (await createHeadlessEnv().paint(commands, ck)) as {
+			bytes: Uint8Array;
+			warnings: unknown[];
+		};
+		const img = ck.MakeImageFromEncoded(result.bytes);
+		const px = img.readPixels(10, 10, {
+			width: 1,
+			height: 1,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		}) as Uint8Array;
+		img.delete();
+		return { px: Array.from(px), warnings: result.warnings };
+	}
+
+	test.each([
+		{ mask: "#ffffff80", invert: false, alpha: 128 },
+		{ mask: "#ffffff", invert: false, alpha: 255 },
+		{ mask: "#000000", invert: false, alpha: 0 },
+		{ mask: "#808080", invert: false, alpha: 128 },
+		{ mask: "#ffffff80", invert: true, alpha: 127 },
+		{ mask: "#ffffff", invert: true, alpha: 0 },
+		{ mask: "#000000", invert: true, alpha: 255 },
+		{ mask: "#808080", invert: true, alpha: 127 },
+	])("mask $mask, invert $invert → alpha $alpha", async ({
+		mask,
+		invert,
+		alpha,
+	}) => {
+		const { px, warnings } = await pixel(mask, invert);
+		expect(Math.abs(px[3] - alpha)).toBeLessThanOrEqual(2);
+		if (px[3] > 0) expect(px.slice(0, 3)).toEqual([255, 0, 0]);
+		expect(warnings).toEqual([]);
 	});
 });

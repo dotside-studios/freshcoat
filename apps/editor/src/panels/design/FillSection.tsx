@@ -25,6 +25,10 @@ import {
 	fillsOf,
 	fillsPatch,
 	type Gradient,
+	isGradient,
+	type Pattern,
+	type PatternName,
+	patternParams,
 	removeAt,
 	replaceAt,
 	reverseStops,
@@ -34,6 +38,7 @@ import {
 	withStops,
 } from "./fills";
 import { GradientSwatch } from "./GradientSwatch";
+import { PatternSwatch } from "./PatternSwatch";
 import { GradientStops } from "./StopBar";
 
 const KINDS: [FillKind, string][] = [
@@ -41,6 +46,14 @@ const KINDS: [FillKind, string][] = [
 	["linear", "Linear"],
 	["radial", "Radial"],
 	["angular", "Angular"],
+	["pattern", "Pattern"],
+];
+
+const PATTERNS: [PatternName, string][] = [
+	["noise", "Noise"],
+	["paper", "Paper"],
+	["hatching", "Hatching"],
+	["dots", "Dots"],
 ];
 
 export function FillSection({
@@ -114,7 +127,7 @@ export function FillSection({
 							update(`fill:${i}:${field}`, (fills) =>
 								replaceAt(fills, i, next),
 							);
-							if (field === "kind" && typeof next !== "string") activate(i);
+							if (field === "kind" && isGradient(next)) activate(i);
 						}}
 						onRemove={() =>
 							update("fill-remove", (fills) => removeAt(fills, i))
@@ -181,6 +194,11 @@ export function FillRow({
 						swatches={swatches}
 						onChange={(c) => onChange("color", c)}
 					/>
+				) : fill.kind === "pattern" ? (
+					<PatternSwatch
+						p={fill}
+						className="h-fc-control min-w-0 flex-1 rounded-[3px]"
+					/>
 				) : (
 					<GradientSwatch
 						g={fill}
@@ -190,7 +208,15 @@ export function FillRow({
 				)}
 				<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
 			</div>
-			{typeof fill !== "string" && (
+			{typeof fill !== "string" && fill.kind === "pattern" && (
+				<PatternEditor
+					p={fill}
+					index={index}
+					swatches={swatches}
+					onChange={onChange}
+				/>
+			)}
+			{isGradient(fill) && (
 				<div
 					className="contents"
 					onFocusCapture={onActivate}
@@ -210,6 +236,97 @@ export function FillRow({
 
 const pct = (n: number | undefined, fallback: number) =>
 	Math.round((n ?? fallback) * 1000) / 10;
+
+function PatternEditor({
+	p,
+	index,
+	swatches,
+	onChange,
+}: {
+	p: Pattern;
+	index: number;
+	swatches: string[];
+	onChange: (field: string, p: Pattern) => void;
+}) {
+	const { scale, angle, density, seed, colors } = patternParams(p);
+	const n = index + 1;
+	return (
+		<div className="flex flex-col gap-1.5">
+			<Select
+				aria-label={`Fill ${n} pattern`}
+				value={p.pattern}
+				onChange={(v) =>
+					onChange("pattern", {
+						kind: "pattern",
+						pattern: v as PatternName,
+						...(p.colors ? { colors: p.colors } : {}),
+					})
+				}
+			>
+				{PATTERNS.map(([id, name]) => (
+					<SelectItem key={id} id={id}>
+						{name}
+					</SelectItem>
+				))}
+			</Select>
+			<Pair>
+				<NumberField
+					label="S"
+					aria-label="Pattern scale"
+					min={0.1}
+					step={0.5}
+					precision={1}
+					value={scale}
+					onChange={(v) => onChange("scale", { ...p, scale: v })}
+				/>
+				<NumberField
+					label="∠"
+					aria-label="Pattern angle"
+					unit="°"
+					value={angle}
+					onChange={(v) => onChange("angle", { ...p, angle: v })}
+				/>
+			</Pair>
+			<Pair>
+				<NumberField
+					label="D"
+					aria-label="Pattern density"
+					unit="%"
+					min={0}
+					max={100}
+					value={Math.round(density * 100)}
+					onChange={(v) => onChange("density", { ...p, density: v / 100 })}
+				/>
+				<NumberField
+					label="#"
+					aria-label="Pattern seed"
+					min={0}
+					precision={0}
+					isDisabled={p.pattern === "hatching" || p.pattern === "dots"}
+					value={seed}
+					onChange={(v) => onChange("seed", { ...p, seed: Math.round(v) })}
+				/>
+			</Pair>
+			{(["Background", "Ink"] as const).map((name, i) => (
+				<ColorInput
+					key={name}
+					aria-label={`Fill ${n} pattern ${name.toLowerCase()}`}
+					value={colors[i] as string}
+					swatches={swatches}
+					onChange={(c) =>
+						onChange(`color${i}`, {
+							...p,
+							colors: (i === 0 ? [c, colors[1]] : [colors[0], c]) as [
+								string,
+								string,
+							],
+						})
+					}
+				/>
+			))}
+		</div>
+	);
+}
 
 function GradientEditor({
 	g,

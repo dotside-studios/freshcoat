@@ -37,8 +37,8 @@ export type FlattenReason =
 	| "paint_flattened"
 	| "stroke_flattened";
 
-// PASS_THROUGH is a container's "no isolation", which is how the painter
-// composites a frame already; on anything else it is plain normal.
+// NORMAL and PASS_THROUGH both composite with plain normal. On a container
+// they differ in isolation, which the walk carries as `isolate`.
 const BLEND_MODES: Partial<
 	Record<FigmaBlendMode, NonNullable<ElementBlendMode> | "normal">
 > = {
@@ -98,23 +98,14 @@ function hasBlendedDescendant(n: FigmaNode): boolean {
 	});
 }
 
-// Figma draws a container set to Normal into a layer of its own, so a blended
-// layer inside mixes only with the container's own content. The painter gives
-// a frame a layer only for opacity, an effect or a blend of its own; without
-// one, the blended layer would mix with whatever lies behind the container.
-function isolationDiffers(n: FigmaNode): boolean {
-	return (
-		isContainerNode(n) &&
-		n.blendMode === "NORMAL" &&
-		(n.opacity ?? 1) >= 1 &&
-		!hasVisibleEffects(n) &&
-		hasBlendedDescendant(n)
-	);
+/** Whether a GROUP set to Normal has to keep its isolation as an element of
+ *  its own. Flattening it away is only lossless while nothing in it blends. */
+export function groupIsolates(n: FigmaNode): boolean {
+	return n.blendMode === "NORMAL" && hasBlendedDescendant(n);
 }
 
 function blendFlattens(n: FigmaNode): boolean {
-	if (!BLEND_MODES[n.blendMode ?? "NORMAL"]) return true;
-	return isolationDiffers(n);
+	return !BLEND_MODES[n.blendMode ?? "NORMAL"];
 }
 
 /** The one fill rule every region of a vector's geometry shares: undefined for

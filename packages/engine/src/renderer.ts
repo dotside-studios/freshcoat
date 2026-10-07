@@ -35,6 +35,7 @@ import type {
 	FrameFinish,
 	PaintWarning,
 } from "./types";
+import type { Precision } from "./color-policy";
 import type { CompileSceneOptions } from "./compile-scene";
 
 /** Font bytes, or srcs read through the renderer's loader, by family. */
@@ -103,6 +104,8 @@ export type RenderOptions<O extends Output = DefaultOutput> = PaintOptions<O> & 
 	export?: ExportSetting;
 	finish?: FrameFinish;
 	leadingTrim?: boolean;
+	/** Working precision of the surface and its layers. Default "u8". */
+	precision?: Precision;
 };
 
 export type RendererCompileOptions = Omit<
@@ -281,6 +284,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 					...design,
 					finish: renderOptions.finish,
 					leadingTrim: renderOptions.leadingTrim,
+					precision: renderOptions.precision,
 					...(scale !== 1 ? { scale } : {}),
 					...(supersample !== 1 ? { supersample } : {}),
 				});

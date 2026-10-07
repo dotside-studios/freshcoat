@@ -10,6 +10,7 @@ import type {
 	FillRule,
 	ImageCrop,
 	ResolvedFill,
+	TextArc,
 	ResolvedFont,
 	Shadows,
 	ShapeMask,
@@ -166,6 +167,10 @@ export type TextNode = Transform & {
 	// against — while coatfile compiles the field explicitly, defaulting to
 	// Figma's own default, which is standard rather than trimmed.
 	leadingTrim?: boolean;
+	// Sets the text along a circle; each hard line is one ring. Defaults:
+	// a radius that keeps the glyphs inside the box, startAngle 0, outside,
+	// center.
+	arc?: Partial<TextArc>;
 	// A pre-baked layout, used as is. Without one, compileScene bakes text/spans
 	// through its TextEngine.
 	layout?: BakedTextLayout;
@@ -188,6 +193,10 @@ export type GroupNode = Transform & {
 	clip?: boolean; // clip children to my box…
 	cornerRadius?: CornerRadius; // …honoring these corners
 	cornerSmoothing?: number;
+	// Composite the children in a layer of their own, so a blended child mixes
+	// only with the group's content (Figma's Normal). Unset is pass-through:
+	// children blend with whatever lies under the group.
+	isolate?: boolean;
 };
 
 // The unified masking primitive: `children` are masked by `mask`'s coverage.
@@ -262,6 +271,7 @@ export function createFrame(
 		clip?: boolean;
 		cornerRadius?: CornerRadius;
 		layout?: Layout;
+		isolate?: boolean;
 	} & Omit<Transform, "layoutChild">,
 ): GroupNode {
 	const { background, children, clip, cornerRadius, layout, ...rest } = opts;

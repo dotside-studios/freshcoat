@@ -10,6 +10,7 @@
 // Not part of the paint path. The conformance harness runs it on every case, and
 // a consumer building scenes by hand can run it in dev; production paints
 // unchecked, as it always has.
+import { PATTERN_KINDS } from "./pattern";
 import type {
 	Adjust,
 	Command,
@@ -93,6 +94,16 @@ export function validateCommands(commands: Command[]): IrIssue[] {
 					"bad_supersample",
 					`supersample must be >= 1, got ${cmd.supersample}`,
 					`${path}.supersample`,
+				);
+			if (
+				cmd.precision !== undefined &&
+				cmd.precision !== "u8" &&
+				cmd.precision !== "f16"
+			)
+				add(
+					"bad_precision",
+					`precision must be "u8" or "f16", got ${String(cmd.precision)}`,
+					`${path}.precision`,
 				);
 			return;
 		}
@@ -188,6 +199,16 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 
 	if (cmd.clip?.kind === "rounded-rect" && Array.isArray(cmd.clip.radius))
 		validateCornerRadius(cmd.clip.radius, `${path}.clip.radius`, add, id);
+	if (cmd.clip?.kind === "rounded-rect" && cmd.clip.smoothing !== undefined) {
+		const smoothing = cmd.clip.smoothing;
+		if (!finite(smoothing) || smoothing < 0)
+			add(
+				"bad_corner_smoothing",
+				`smoothing must be >= 0, got ${smoothing}`,
+				`${path}.clip.smoothing`,
+				id,
+			);
+	}
 
 	for (const shadow of cmd.shadow
 		? Array.isArray(cmd.shadow)
@@ -206,6 +227,13 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 	}
 
 	if (cmd.adjust) validateAdjust(cmd.adjust, `${path}.adjust`, add, id);
+	if (cmd.op !== "drawGroup" && "isolate" in cmd)
+		add(
+			"isolate_not_group",
+			`isolate applies to drawGroup only, not ${cmd.op}`,
+			`${path}.isolate`,
+			id,
+		);
 
 	if ("fills" in cmd && cmd.fills)
 		cmd.fills.forEach((f, i) => {
@@ -308,8 +336,39 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 							id,
 						);
 				});
+			if (cmd.arc) {
+				const { radius, startAngle, sweep } = cmd.arc;
+				if (!finite(radius) || radius < 0)
+					add(
+						"bad_arc",
+						"arc radius must be a finite number >= 0",
+						`${path}.arc.radius`,
+						id,
+					);
+				if (!finite(startAngle))
+					add(
+						"bad_arc",
+						"arc startAngle is not finite",
+						`${path}.arc.startAngle`,
+						id,
+					);
+				if (sweep !== undefined && (!finite(sweep) || sweep <= 0))
+					add(
+						"bad_arc",
+						"arc sweep must be a finite number > 0",
+						`${path}.arc.sweep`,
+						id,
+					);
+			}
 			break;
 		case "drawGroup":
+			if (cmd.isolate !== undefined && typeof cmd.isolate !== "boolean")
+				add(
+					"bad_isolate",
+					`isolate must be a boolean, got ${typeof cmd.isolate}`,
+					`${path}.isolate`,
+					id,
+				);
 			cmd.children.forEach((c, i) => {
 				validateDrawable(c, `${path}.children[${i}]`, add);
 			});
@@ -393,6 +452,49 @@ function validateAdjust(
 		);
 }
 
+function validatePattern(
+	fill: Extract<ResolvedFill, { kind: "pattern" }>,
+	path: string,
+	add: Add,
+	id?: string,
+): void {
+	if (!PATTERN_KINDS.includes(fill.pattern))
+		add(
+			"unknown_pattern",
+			`unknown pattern "${fill.pattern}"`,
+			`${path}.pattern`,
+			id,
+		);
+	if (!finite(fill.scale) || fill.scale <= 0)
+		add(
+			"bad_pattern_scale",
+			`pattern scale must be > 0, got ${fill.scale}`,
+			`${path}.scale`,
+			id,
+		);
+	if (!finite(fill.density) || fill.density < 0 || fill.density > 1)
+		add(
+			"bad_pattern_density",
+			`pattern density must be within 0..1, got ${fill.density}`,
+			`${path}.density`,
+			id,
+		);
+	if (!finite(fill.angle))
+		add(
+			"bad_pattern_angle",
+			"pattern angle must be finite",
+			`${path}.angle`,
+			id,
+		);
+	if (!Number.isInteger(fill.seed))
+		add(
+			"bad_pattern_seed",
+			`pattern seed must be an integer, got ${fill.seed}`,
+			`${path}.seed`,
+			id,
+		);
+}
+
 function validateFill(
 	fill: ResolvedFill,
 	path: string,
@@ -400,6 +502,10 @@ function validateFill(
 	id?: string,
 ): void {
 	if (fill.kind === "solid") return;
+	if (fill.kind === "pattern") {
+		validatePattern(fill, path, add, id);
+		return;
+	}
 	const stops = fill.stops;
 	if (!stops || stops.length === 0) {
 		add("empty_gradient", "gradient has no stops", `${path}.stops`, id);

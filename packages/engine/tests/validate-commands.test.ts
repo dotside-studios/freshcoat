@@ -175,6 +175,16 @@ describe("the checks a backend would otherwise diverge on", () => {
 		).toContain("bad_polygon");
 	});
 
+	test("flags negative clip smoothing", () => {
+		const clip = { kind: "rounded-rect" as const, radius: 4 };
+		expect(
+			codes([canvas(), rect({ clip: { ...clip, smoothing: -1 } })]),
+		).toContain("bad_corner_smoothing");
+		expect(
+			codes([canvas(), rect({ clip: { ...clip, smoothing: 0.6 } })]),
+		).not.toContain("bad_corner_smoothing");
+	});
+
 	test("flags a zero viewBox, which would divide by zero on scale", () => {
 		expect(
 			codes([

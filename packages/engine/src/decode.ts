@@ -5,6 +5,7 @@
 // no WASM itself, so it stays in the light barrel.
 
 import type { Canvas, CanvasKit, Image } from "canvaskit-wasm";
+import { imageInfo } from "./color-policy";
 import type { ByteLoader } from "./loader";
 import type { ImageNode } from "./node";
 import { fitRect } from "./paint-helpers";
@@ -41,22 +42,14 @@ function readRGBA(
 	width: number,
 	height: number,
 ): Uint8Array | null {
-	const info = {
-		width,
-		height,
-		colorType: c.ColorType.RGBA_8888,
-		alphaType: c.AlphaType.Unpremul,
-		colorSpace: c.ColorSpace.SRGB,
-	};
-	const px = source.readPixels(
+	// Without a destination CanvasKit already copies out of the WASM heap.
+	return source.readPixels(
 		0,
 		0,
-		info,
+		imageInfo(c, "pixels", width, height),
 		undefined,
 		width * 4,
 	) as Uint8Array | null;
-	// Copy out of the WASM heap so the result owns its buffer.
-	return px ? px.slice() : null;
 }
 
 // Draw an image's `src` rect into an `outW`×`outH` surface at `dest` (Mitchell

@@ -137,12 +137,8 @@ function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
 		pos: { x: 0, y: 0 },
 		size: SIZE,
 		children: fillRules.map((fillRule, i) =>
-			createFrame({
-				pos: { x: 4 + i * 24, y: 4 },
-				size: { width: 20, height: 20 },
-				clip: true,
-				cornerRadius: 4,
-				children: [
+			createGroup(
+				[
 					createPath({
 						pos: { x: 0, y: 0 },
 						size: { width: 20, height: 20 },
@@ -151,7 +147,14 @@ function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
 						fills: [{ kind: "solid", color: "#101828" }],
 					}),
 				],
-			}),
+				{
+					pos: { x: 4 + i * 24, y: 4 },
+					size: { width: 20, height: 20 },
+					clip: true,
+					cornerRadius: 4,
+					cornerSmoothing: 0.6,
+				},
+			),
 		),
 	});
 }
@@ -555,10 +558,10 @@ describe("PaintCache", () => {
 		const { rt } = runtime(fonts, new Map(), cache);
 		const px = await pixels(commands, rt);
 		expect(px).toEqual(plain);
-		// Each fill rule parses the ring once, and each placement its clip.
-		expect(cache.stats().pathBuilds).toBe(5);
+		// Each fill rule parses the ring once, and the placements share one clip.
+		expect(cache.stats().pathBuilds).toBe(3);
 		expect(await pixels(commands, rt)).toEqual(plain);
-		expect(cache.stats().pathBuilds).toBe(5);
+		expect(cache.stats().pathBuilds).toBe(3);
 		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
 		expect(at(14)).toBe(255);
 		expect(at(38)).toBe(0);
@@ -1099,6 +1102,58 @@ describe("PaintCache background", () => {
 			);
 			cache.dispose();
 		}
+	});
+
+	test("an isolated group is never split around a record-bound leaf", async () => {
+		await initCk();
+		const isolated = (name: string) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: SIZE,
+				background: createRect({
+					pos: { x: 0, y: 0 },
+					size: SIZE,
+					fills: [{ kind: "solid", color: "#f97316" }],
+				}),
+				children: [
+					createGroup(
+						[
+							createRect({
+								pos: { x: 4, y: 4 },
+								size: { width: 40, height: 20 },
+								fills: [{ kind: "solid", color: "#3b82f6" }],
+							}),
+							createText({
+								pos: { x: 4, y: 30 },
+								size: { width: 60, height: 14 },
+								text: name,
+								font: {
+									family: "Geist",
+									weight: 400,
+									style: "normal",
+									size: 10,
+									lineHeight: 1.2,
+								},
+								color: "#101828",
+							}),
+							createRect({
+								pos: { x: 24, y: 10 },
+								size: { width: 40, height: 20 },
+								fills: [{ kind: "solid", color: "#22c55e" }],
+								blendMode: "multiply",
+							}),
+						],
+						{ pos: { x: 0, y: 0 }, size: SIZE, isolate: true },
+					),
+				],
+			});
+		const cache = createPaintCache();
+		await paintRecords([isolated("Alice"), isolated("Bob")], cache);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 1,
+			backgroundReuses: 1,
+		});
+		cache.dispose();
 	});
 
 	test("random scenes differing in text and images paint as uncached", async () => {

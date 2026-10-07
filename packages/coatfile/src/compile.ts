@@ -10,6 +10,7 @@ import {
 	type Node,
 	type PaintWarning,
 	type PathNode,
+	patternFill,
 	type RectNode,
 	scalePathData,
 	type TextNode,
@@ -65,6 +66,7 @@ import type {
 	Symbology,
 	Template,
 	TemplateFrame,
+	TextProperties,
 	Vec2,
 } from "./types";
 import { pruneHiddenElements } from "./visibility";
@@ -222,7 +224,7 @@ function compileFrame(
 		warnings: [],
 	};
 	const children: Node[] = [
-		compileBackground(frame.background, ctx, targetWidth, targetHeight),
+		compileBackground(frame.background, ctx, targetWidth, targetHeight, ratio),
 		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
 	];
 	const root: GroupNode = {
@@ -252,6 +254,7 @@ function compileBackground(
 	ctx: Record<string, unknown>,
 	targetWidth: number,
 	targetHeight: number,
+	ratio: number,
 ): Node {
 	const props = substitute(bg.properties, ctx) as Record<string, unknown>;
 	const pos: Vec2 = { x: 0, y: 0 };
@@ -270,7 +273,7 @@ function compileBackground(
 		return {
 			...transform,
 			kind: "rect",
-			fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+			fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 			stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
 			cornerRadius: scaleCorner(props.cornerRadius, 1),
 			cornerSmoothing:
@@ -322,7 +325,7 @@ function compileElement(
 			return {
 				...transform,
 				kind: "rect",
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 				cornerRadius: scaleCorner(props.cornerRadius, ratio),
 				cornerSmoothing:
@@ -352,7 +355,7 @@ function compileElement(
 				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
 					? { fillRule: props.fillRule }
 					: {}),
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 			} satisfies PathNode;
 		case "text":
@@ -481,6 +484,7 @@ function compileText(
 		// standard — measured against Figma's own absoluteRenderBounds, which
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
+		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
 	};
 	if (single) {
 		node.text = spans[0].text;
@@ -493,9 +497,21 @@ function compileText(
 	}
 
 	// A gradient text fill (mapped to the box) overrides the solid color.
-	const resolvedFill = resolveFill(props.fill as Fill | undefined);
+	const resolvedFill = resolveFill(props.fill as Fill | undefined, ratio);
 	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
 	return node;
+}
+
+type TextArcInput = NonNullable<TextProperties["arc"]>;
+
+function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
+	return {
+		...(arc.radius !== undefined ? { radius: arc.radius * ratio } : {}),
+		...(arc.sweep !== undefined ? { sweep: arc.sweep } : {}),
+		...(arc.startAngle !== undefined ? { startAngle: arc.startAngle } : {}),
+		...(arc.direction ? { direction: arc.direction } : {}),
+		...(arc.align ? { align: arc.align } : {}),
+	};
 }
 
 function mapSpanFont(
@@ -544,7 +560,7 @@ function compileFrameElement(
 	scope: CompileScope,
 ): GroupNode {
 	const size = base.size;
-	const fills = resolveFills(props.fill as Fill | Fill[] | undefined);
+	const fills = resolveFills(props.fill as Fill | Fill[] | undefined, ratio);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
 	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	const clip = props.clipsContent === true;
@@ -584,6 +600,7 @@ function compileFrameElement(
 		layoutChild: base.layoutChild,
 		clip,
 		cornerRadius,
+		...(props.isolate === true ? { isolate: true } : {}),
 	};
 
 	const frame: GroupNode =
@@ -620,6 +637,7 @@ function compileFrameElement(
 		blur,
 		adjust,
 		layoutChild,
+		isolate,
 		...content
 	} = frame;
 	return {
@@ -633,6 +651,7 @@ function compileFrameElement(
 		blur,
 		adjust,
 		layoutChild,
+		...(isolate ? { isolate } : {}),
 		kind: "group",
 		children: [
 			{ ...content, pos: { x: 0, y: 0 } },
@@ -1288,20 +1307,29 @@ function scaleCorner(cr: unknown, ratio: number): CornerRadius | undefined {
 
 function resolveFills(
 	fill: Fill | Fill[] | undefined,
+	ratio: number,
 ): ResolvedFill[] | undefined {
 	if (fill === undefined) return undefined;
 	const arr = Array.isArray(fill) ? fill : [fill];
 	const resolved: ResolvedFill[] = [];
 	for (const f of arr) {
-		const r = resolveFill(f);
+		const r = resolveFill(f, ratio);
 		if (r !== undefined) resolved.push(r);
 	}
 	return resolved.length > 0 ? resolved : undefined;
 }
 
-function resolveFill(fill: Fill | undefined): ResolvedFill | undefined {
+function resolveFill(
+	fill: Fill | undefined,
+	ratio: number,
+): ResolvedFill | undefined {
 	if (fill === undefined) return undefined;
 	if (typeof fill === "string") return { kind: "solid", color: fill };
+	if (fill.kind === "pattern") {
+		const { kind: _, pattern, ...params } = fill;
+		const resolved = patternFill(pattern, params);
+		return { ...resolved, scale: resolved.scale * ratio };
+	}
 	if (fill.kind === "linear") {
 		// Explicit points place the gradient; `angle` is then only what a reader
 		// that predates them draws.

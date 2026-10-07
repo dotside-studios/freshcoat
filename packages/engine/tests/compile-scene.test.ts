@@ -17,6 +17,7 @@ import {
 	createFrame,
 	createGroup,
 	createImage,
+	createMask,
 	createPath,
 	createRect,
 	createText,
@@ -354,6 +355,73 @@ describe("compileScene structural lowering", () => {
 		expect(draw.pixelHeight).toBe(2);
 		expect(draw.pixels).toBe(pixels);
 		expect(draw.pos).toEqual({ x: 1, y: 2 });
+	});
+});
+
+describe("compileScene mask lowering", () => {
+	const content = [
+		createRect({
+			size: { width: 40, height: 40 },
+			fills: [{ kind: "solid", color: "#f00" }],
+		}),
+	];
+	const maskRect = (opts: Partial<Parameters<typeof createRect>[0]>) =>
+		createRect({
+			pos: { x: 5, y: 8 },
+			size: { width: 20, height: 12 },
+			fills: [{ kind: "solid", color: "#fff" }],
+			...opts,
+		});
+	const lowered = (mask: ReturnType<typeof createRect>) =>
+		compileScene(
+			createMask(mask, content, {
+				pos: { x: 0, y: 0 },
+				size: { width: 40, height: 40 },
+				rotation: 30,
+			}),
+			{ width: 40, height: 40 },
+		).at(-1);
+
+	test("the clip shortcut keeps the mask node's box and rotation outside the clip", () => {
+		const draw = lowered(maskRect({}));
+		if (draw?.op !== "drawGroup") throw new Error("expected drawGroup");
+		expect(draw.pos).toEqual({ x: 0, y: 0 });
+		expect(draw.size).toEqual({ width: 40, height: 40 });
+		expect(draw.rotation).toBe(30);
+		expect(draw.clip).toBeUndefined();
+		const inner = draw.children[0];
+		if (inner?.op !== "drawGroup") throw new Error("expected inner drawGroup");
+		expect(inner.pos).toEqual({ x: 5, y: 8 });
+		expect(inner.size).toEqual({ width: 20, height: 12 });
+		expect(inner.rotation).toBeUndefined();
+		expect(inner.clip).toEqual({ kind: "rect" });
+	});
+
+	test.each([
+		["#ffffff80", {}],
+		["#fff8", {}],
+		["rgba(255,255,255,0.5)", {}],
+		["transparent", {}],
+		["#fff", { stroke: { color: "#fff", width: 2 } }],
+		[
+			"#fff",
+			{
+				adjust: {
+					colorMatrix: [
+						1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0.5, 0,
+					],
+				},
+			},
+		],
+	])("a %s mask with %o is not a clip", (color, extra) => {
+		const draw = lowered(
+			maskRect({ fills: [{ kind: "solid", color }], ...extra }),
+		);
+		expect(draw?.op).toBe("drawMasked");
+	});
+
+	test("a fill-less mask is not a clip", () => {
+		expect(lowered(maskRect({ fills: undefined }))?.op).toBe("drawMasked");
 	});
 });
 

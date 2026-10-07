@@ -26,6 +26,7 @@ export {
 	textClipOutset,
 } from "./bake-text";
 export { hslToRgb } from "./color";
+export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {
 	type CompileSceneOptions,
 	compileScene,
@@ -126,6 +127,7 @@ export {
 	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
+export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
 export { scalePathData } from "./path-data";
 export { flattenOverWhite } from "./jpeg";
 export {
@@ -138,7 +140,14 @@ export {
 	encodePng,
 	type PngEffort,
 } from "./png";
+export {
+	PATTERN_DEFAULTS,
+	PATTERN_KINDS,
+	type PatternFill,
+	patternFill,
+} from "./pattern";
 export { resolveLayout } from "./resolve-layout";
+export { outlinePath, rectShape } from "./outline";
 export {
 	type CanvasFrame,
 	createRenderer,

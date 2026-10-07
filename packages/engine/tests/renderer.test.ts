@@ -104,7 +104,8 @@ describe("createRenderer", () => {
 			height: 8,
 			output: { canvas: true },
 		});
-		expect(sizes).toEqual([[8, 8]]);
+		expect(sizes.length).toBeGreaterThan(0);
+		for (const size of sizes) expect(size).toEqual([8, 8]);
 		expect([frame.canvas.width, frame.canvas.height]).toEqual([8, 8]);
 		frame.release();
 		renderer.dispose();

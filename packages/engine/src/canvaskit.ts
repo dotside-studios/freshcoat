@@ -14,7 +14,9 @@ import type {
 	Canvas,
 	CanvasKit,
 	ColorFilter,
+	Font,
 	FontWeightEnumValues,
+	GlyphRun,
 	Image,
 	ImageFilter,
 	ImageInfo,
@@ -32,7 +34,21 @@ import type {
 	TextStyle,
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
+import {
+	type ArcLine,
+	placeOnArc,
+	rsxformBounds,
+	spanAt,
+	spanByteStarts,
+} from "./arc-text";
 import { parseColor } from "./color";
+import {
+	imageInfo,
+	makeImageFromPixels,
+	makeLayerSurface,
+	type Precision,
+	resolvePrecision,
+} from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontArrayBuffer, fontBytes } from "./font-bytes";
@@ -68,7 +84,6 @@ import {
 	fitRect,
 	fontFeatureList,
 	fontVariationList,
-	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
 import { flattenOverWhite } from "./jpeg";
@@ -77,7 +92,8 @@ import {
 	DEFAULT_WEBP_QUALITY,
 	encodePng,
 } from "./png";
-import { squircleSvg } from "./squircle";
+import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
+import { PATTERN_SKSL, type PatternFill } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
@@ -85,7 +101,6 @@ import type {
 	AdjustLut,
 	BlendMode,
 	Command,
-	CornerRadius,
 	DrawBitmapCommand,
 	DrawCommand,
 	DrawImageCommand,
@@ -99,6 +114,8 @@ import type {
 	ShapeMask,
 	Size,
 	Stroke,
+	TextArc,
+	TextLine,
 } from "./types";
 
 type EnumKey<E> = Exclude<keyof E, "values">;
@@ -112,7 +129,13 @@ type LoadedFontBytes = { family: string; bytes: Uint8Array };
 // the canvas matrix do the work.
 // `grid` is how many device pixels make one output pixel: the supersample
 // factor, 1 when the scene is drawn at its export size.
-type Frame = { width: number; height: number; scale: number; grid?: number };
+type Frame = {
+	width: number;
+	height: number;
+	scale: number;
+	grid?: number;
+	precision?: Precision;
+};
 
 // Canvas2D shadowBlur ≈ 2·sigma. Figma's layer-blur value is ~2.27× the
 // Gaussian sigma (bjango blur-radius comparison), so a value of N → sigma N/2.27.
@@ -190,6 +213,57 @@ function toColor(ck: CanvasKit, input: string) {
 	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
+// Device pixels per local unit under the canvas's current matrix.
+function devicePx(canvas: Canvas): number {
+	const m = canvas.getTotalMatrix();
+	const px = Math.sqrt(Math.abs(m[0] * m[4] - m[1] * m[3]));
+	return Number.isFinite(px) && px > 0 ? px : 1;
+}
+
+// `px` is device pixels per design unit and `unit` the local units one design
+// unit spans, which differ from 1 only inside a path's viewBox.
+type PatternSpace = { px: number; unit?: [number, number] };
+
+function patternShader(
+	ck: CanvasKit,
+	bin: Bin,
+	fill: PatternFill,
+	x: number,
+	y: number,
+	space: PatternSpace,
+): Shader {
+	const [c0, c1] = fill.colors;
+	const eff = cachedEffect(ck, `pattern-${fill.pattern}`, () =>
+		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern]),
+	);
+	if (!eff)
+		return bin.track(ck.Shader.MakeColor(toColor(ck, c0), ck.ColorSpace.SRGB));
+	const scale = Math.max(fill.scale, 1e-3);
+	const [ux, uy] = space.unit ?? [1, 1];
+	const local = ck.Matrix.multiply(
+		ck.Matrix.translated(x, y),
+		ck.Matrix.scaled(ux, uy),
+		ck.Matrix.rotated((fill.angle * Math.PI) / 180),
+		ck.Matrix.scaled(scale, scale),
+	);
+	const density = Math.min(Math.max(fill.density, 0), 1);
+	const uniforms = [
+		...toColor(ck, c0),
+		...toColor(ck, c1),
+		density,
+		1 / (scale * space.px),
+	];
+	if (fill.pattern === "hatching" || fill.pattern === "dots")
+		return bin.track(eff.makeShader(uniforms, local));
+	const octaves = fill.pattern === "paper" ? 4 : 3;
+	const noise = bin.track(
+		fill.pattern === "paper"
+			? ck.Shader.MakeTurbulence(1, 1, octaves, fill.seed, 0, 0)
+			: ck.Shader.MakeFractalNoise(1, 1, octaves, fill.seed, 0, 0),
+	);
+	return bin.track(eff.makeShaderWithChildren(uniforms, [noise], local));
+}
+
 function shaderFor(
 	ck: CanvasKit,
 	bin: Bin,
@@ -198,7 +272,9 @@ function shaderFor(
 	y: number,
 	w: number,
 	h: number,
+	space: PatternSpace = { px: 1 },
 ): Shader {
+	if (fill.kind === "pattern") return patternShader(ck, bin, fill, x, y, space);
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -307,28 +383,6 @@ const STROKE_JOIN: Record<string, EnumKey<StrokeJoinEnumValues>> = {
 	bevel: "Bevel",
 };
 
-// Build a Skia RRect from a uniform or per-corner radius. CanvasKit's RRect is
-// [l,t,r,b, ulX,ulY, urX,urY, lrX,lrY, llX,llY]; our CornerRadius is
-// [topLeft, topRight, bottomRight, bottomLeft] = ul, ur, lr, ll.
-function rrectFor(ck: CanvasKit, rect: Rect, cr: CornerRadius): RRect {
-	if (typeof cr === "number") return ck.RRectXY(rect, cr, cr);
-	const [tl, tr, br, bl] = cr;
-	return Float32Array.of(
-		rect[0],
-		rect[1],
-		rect[2],
-		rect[3],
-		tl,
-		tl,
-		tr,
-		tr,
-		br,
-		br,
-		bl,
-		bl,
-	);
-}
-
 function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	const p = bin.track(new ck.Paint());
 	p.setAntiAlias(true);
@@ -342,139 +396,144 @@ function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	return p;
 }
 
-// SVG path string for a clip/stroke shape.
-// This build of CanvasKit exposes no imperative Path builders — only
-// Path.MakeFromSVGString — so we describe shapes as SVG.
-function maskSvg(
-	clip: ShapeMask,
-	x: number,
-	y: number,
-	w: number,
-	h: number,
-): string {
-	switch (clip.kind) {
-		case "rect": {
-			// Outset lets text fit:"clip" keep glyph overshoot whole (see ClipOutset).
-			const top = clip.outset?.top ?? 0;
-			const bottom = clip.outset?.bottom ?? 0;
-			const y0 = y - top;
-			const y1 = y + h + bottom;
-			return `M ${x} ${y0} H ${x + w} V ${y1} H ${x} Z`;
-		}
-		case "rounded-rect": {
-			if (Array.isArray(clip.radius))
-				return perCornerRectSvg(clip.radius, x, y, w, h);
-			const r = Math.min(clip.radius, Math.min(w, h) / 2);
-			return `M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w} ${y + r} V ${y + h - r} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} H ${x + r} A ${r} ${r} 0 0 1 ${x} ${y + h - r} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
-		}
-		case "circle": {
-			const rr = Math.min(w, h) / 2;
-			const cx = x + w / 2;
-			const cy = y + h / 2;
-			return `M ${cx - rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx + rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx - rr} ${cy} Z`;
-		}
-		case "ellipse": {
-			const rx = w / 2;
-			const ry = h / 2;
-			const cy = y + h / 2;
-			return `M ${x} ${cy} A ${rx} ${ry} 0 1 0 ${x + w} ${cy} A ${rx} ${ry} 0 1 0 ${x} ${cy} Z`;
-		}
-		case "polygon": {
-			const cx = x + w / 2;
-			const cy = y + h / 2;
-			const rx = w / 2;
-			const ry = h / 2;
-			const rot = ((clip.rotation ?? 0) * Math.PI) / 180;
-			let d = "";
-			for (let i = 0; i < clip.sides; i++) {
-				const a = -Math.PI / 2 + (i * 2 * Math.PI) / clip.sides + rot;
-				d += `${i === 0 ? "M" : "L"} ${cx + rx * Math.cos(a)} ${cy + ry * Math.sin(a)} `;
-			}
-			return `${d}Z`;
-		}
-		case "squircle": {
-			const max = Math.min(w, h) / 2;
-			const r = Math.min(clip.radius, max);
-			const p = Math.min(r * 1.5, max);
-			const k = p * 0.4;
-			return `M ${x + p} ${y} L ${x + w - p} ${y} C ${x + w - k} ${y} ${x + w} ${y + k} ${x + w} ${y + p} L ${x + w} ${y + h - p} C ${x + w} ${y + h - k} ${x + w - k} ${y + h} ${x + w - p} ${y + h} L ${x + p} ${y + h} C ${x + k} ${y + h} ${x} ${y + h - k} ${x} ${y + h - p} L ${x} ${y + p} C ${x} ${y + k} ${x + k} ${y} ${x + p} ${y} Z`;
-		}
-		default:
-			return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
-	}
-}
-
-// Radii that overflow a side scale down together, as Skia's RRect does.
-function perCornerRectSvg(
-	radius: [number, number, number, number],
-	x: number,
-	y: number,
-	w: number,
-	h: number,
-): string {
-	const [a, b, c, d] = radius.map((r) => Math.max(0, r));
-	const k = Math.min(
-		1,
-		a + b > 0 ? w / (a + b) : 1,
-		d + c > 0 ? w / (d + c) : 1,
-		a + d > 0 ? h / (a + d) : 1,
-		b + c > 0 ? h / (b + c) : 1,
-	);
-	const [tl, tr, br, bl] = [a * k, b * k, c * k, d * k];
-	return `M ${x + tl} ${y} H ${x + w - tr} A ${tr} ${tr} 0 0 1 ${x + w} ${y + tr} V ${y + h - br} A ${br} ${br} 0 0 1 ${x + w - br} ${y + h} H ${x + bl} A ${bl} ${bl} 0 0 1 ${x} ${y + h - bl} V ${y + tl} A ${tl} ${tl} 0 0 1 ${x + tl} ${y} Z`;
-}
-
-// The mask shape an inside/outside stroke follows once the box is inset, or
-// null when insetting the box is not an offset of the outline (a polygon).
-function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
-	switch (clip.kind) {
-		case "rect":
-			return clip.outset ? null : clip;
-		case "rounded-rect":
-			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
-		case "squircle":
-			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
-		case "circle":
-		case "ellipse":
-			return clip;
-		default:
-			return null;
-	}
-}
-
 // An inside/outside stroke along an arbitrary outline: twice the width,
-// clipped to the path's interior (inside) or its exterior (outside). The
+// clipped to the outline's interior (inside) or its exterior (outside). A
 // path's fill type decides what the interior is.
 function drawClippedStroke(
 	ck: CanvasKit,
 	canvas: Canvas,
 	bin: Bin,
-	path: Path,
+	outline: Outline,
 	stroke: Stroke,
 ) {
 	canvas.save();
-	canvas.clipPath(
-		path,
+	clipOutline(
+		ck,
+		canvas,
+		outline,
 		stroke.align === "inside" ? ck.ClipOp.Intersect : ck.ClipOp.Difference,
-		true,
 	);
-	canvas.drawPath(
-		path,
+	drawOutline(
+		canvas,
+		outline,
 		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
 	);
 	canvas.restore();
 }
 
-function maskPath(
+type Outline =
+	| { kind: "rect"; rect: Rect }
+	| { kind: "rrect"; rrect: RRect }
+	| { kind: "path"; path: Path; dx?: number; dy?: number };
+
+// A path outline is built at the origin and placed by the canvas matrix, as
+// drawPath places a node's path. Skia converts an SVG arc between diametric
+// endpoints in float, so an ellipse built at an offset comes out slightly
+// distorted and antialiases differently from the one drawMasked draws.
+function outlineOf(
 	ck: CanvasKit,
 	bin: Bin,
-	clip: ShapeMask,
+	shape: ShapeMask,
 	x: number,
 	y: number,
 	w: number,
 	h: number,
-): Path {
-	return bin.path(ck, maskSvg(clip, x, y, w, h)) as Path;
+	inset = 0,
+): Outline | null {
+	const g = outlineGeometry(shape, x, y, w, h, inset);
+	if (!g) return null;
+	if (g.kind === "path") {
+		const local = outlineGeometry(shape, 0, 0, w, h, inset);
+		if (local?.kind !== "path") return null;
+		const path = bin.path(ck, local.d) as Path;
+		return { kind: "path", path, dx: x, dy: y };
+	}
+	const rect = ck.LTRBRect(...g.ltrb);
+	if (g.kind === "rect") return { kind: "rect", rect };
+	const [tl, tr, br, bl] = g.radii;
+	return {
+		kind: "rrect",
+		rrect: Float32Array.of(...g.ltrb, tl, tl, tr, tr, br, br, bl, bl),
+	};
+}
+
+function drawOutline(canvas: Canvas, o: Outline, paint: Paint) {
+	if (o.kind === "rect") canvas.drawRect(o.rect, paint);
+	else if (o.kind === "rrect") canvas.drawRRect(o.rrect, paint);
+	else if (!o.dx && !o.dy) canvas.drawPath(o.path, paint);
+	else {
+		canvas.save();
+		canvas.translate(o.dx ?? 0, o.dy ?? 0);
+		canvas.drawPath(o.path, paint);
+		canvas.restore();
+	}
+}
+
+function clipOutline(
+	ck: CanvasKit,
+	canvas: Canvas,
+	o: Outline,
+	op = ck.ClipOp.Intersect,
+) {
+	if (o.kind === "rect") canvas.clipRect(o.rect, op, true);
+	else if (o.kind === "rrect") canvas.clipRRect(o.rrect, op, true);
+	else {
+		canvas.translate(o.dx ?? 0, o.dy ?? 0);
+		canvas.clipPath(o.path, op, true);
+		canvas.translate(-(o.dx ?? 0), -(o.dy ?? 0));
+	}
+}
+
+function outlineMatrix(o: Outline, m: Affine): Affine {
+	return o.kind === "path" && (o.dx || o.dy)
+		? translateAffine(m, o.dx ?? 0, o.dy ?? 0)
+		: m;
+}
+
+function clipShape(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	shape: ShapeMask,
+	pos: { x: number; y: number },
+	size: Size,
+) {
+	clipOutline(
+		ck,
+		canvas,
+		outlineOf(ck, bin, shape, pos.x, pos.y, size.width, size.height) as Outline,
+	);
+}
+
+function outlineBounds(o: Outline): Bounds {
+	if (o.kind === "path") {
+		const [l, t, r, b] = o.path.getBounds();
+		return [l, t, r, b] as Bounds;
+	}
+	const r = o.kind === "rect" ? o.rect : o.rrect;
+	return [r[0], r[1], r[2], r[3]].map(f32) as Bounds;
+}
+
+// The stroke along `shape`, offset for inside/outside alignment.
+function drawOutlineStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	shape: ShapeMask,
+	pos: { x: number; y: number },
+	size: Size,
+	stroke: Stroke,
+) {
+	const { x, y } = pos;
+	const { width: w, height: h } = size;
+	const inset = strokeInset(stroke);
+	const o = outlineOf(ck, bin, shape, x, y, w, h, inset);
+	if (o) {
+		drawOutline(canvas, o, strokePaint(ck, bin, stroke));
+		return;
+	}
+	const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+	drawClippedStroke(ck, canvas, bin, whole, stroke);
 }
 
 function textStyleOf(
@@ -536,6 +595,7 @@ function drawText(
 					cmd.pos.y,
 					cmd.size.width,
 					cmd.size.height,
+					{ px: devicePx(canvas) },
 				)
 			: null;
 	let fgPaint: Paint | null = null;
@@ -548,6 +608,10 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	if (cmd.arc) {
+		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+		return;
+	}
 	// Gradient paints depend on position, so those lines are not cached.
 	const cache = fgPaint ? undefined : shapedLines.get(provider);
 	const rows = visibleRows(canvas);
@@ -592,6 +656,163 @@ function drawText(
 			canvas.drawRect(ck.XYWHRect(span.x, top, span.width, thickness), p);
 		}
 	}
+}
+
+// Each baked line shaped once, as drawText shapes it, with its run positions
+// relative to the paragraph baseline and its ring offset from the first line.
+function arcLines(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	fallback: string[],
+): { line: TextLine; arc: ArcLine }[] {
+	const cache = shapedLines.get(provider);
+	const first = cmd.layout.lines[0];
+	const base0 = first ? (first.baseline ?? first.y) : 0;
+	const out: { line: TextLine; arc: ArcLine }[] = [];
+	for (const line of cmd.layout.lines) {
+		if (!line.spans[0]) continue;
+		const shape = () =>
+			shapeLine(ck, provider, cmd, line, fallback, null, null);
+		let shaped: ShapedLine;
+		if (cache)
+			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
+		else {
+			shaped = shape();
+			bin.track(shaped.para);
+		}
+		const sl = shaped.para.getShapedLines()[0];
+		for (const run of sl?.runs ?? []) bin.track(run.typeface);
+		out.push({
+			line,
+			arc: {
+				runs: sl?.runs ?? [],
+				baseline: sl?.baseline ?? 0,
+				offset: (line.baseline ?? line.y) - base0,
+			},
+		});
+	}
+	return out;
+}
+
+function arcCenter(cmd: DrawTextCommand): [number, number] {
+	return [
+		cmd.pos.x + cmd.size.width / 2,
+		cmd.pos.y + cmd.size.height / 2,
+	];
+}
+
+function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
+	const font = bin.track(new ck.Font(run.typeface, run.size));
+	font.setSubpixel(true);
+	font.setEdging(ck.FontEdging.AntiAlias);
+	const scaleX = (run as { scaleX?: number }).scaleX;
+	if (scaleX && scaleX !== 1) font.setScaleX(scaleX);
+	if (run.fakeBold) font.setEmbolden(true);
+	if (run.fakeItalic) font.setSkewX(-FAKE_ITALIC_SKEW);
+	return font;
+}
+
+// Text along a circle: the line's own shaped glyphs, each drawn under an
+// RSXform, colored by the span its cluster belongs to.
+function drawArcText(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	arc: TextArc,
+	fallback: string[],
+	fgPaint: Paint | null,
+) {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const [cx, cy] = arcCenter(cmd);
+	const placed = placeOnArc(
+		lines.map((l) => l.arc),
+		arc,
+		cx,
+		cy,
+	);
+	const paints = new Map<string, Paint>();
+	const paintFor = (color: string) => {
+		let p = paints.get(color);
+		if (!p) {
+			p = bin.track(new ck.Paint());
+			p.setAntiAlias(true);
+			p.setColor(toColor(ck, color));
+			paints.set(color, p);
+		}
+		return p;
+	};
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		shaped.runs.forEach((run, ri) => {
+			const xforms = placed[li]?.[ri];
+			const n = run.glyphs.length;
+			if (!xforms || n === 0) return;
+			const font = runFont(ck, bin, run);
+			let from = 0;
+			while (from < n) {
+				const span = spanAt(starts, run.offsets[from] as number);
+				let to = from + 1;
+				while (to < n && spanAt(starts, run.offsets[to] as number) === span)
+					to++;
+				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
+					run.glyphs.subarray(from, to),
+					xforms.subarray(4 * from, 4 * to),
+					font,
+				);
+				if (blob) {
+					bin.track(blob);
+					const color = line.spans[span]?.color ?? cmd.color ?? "#000000";
+					canvas.drawTextBlob(blob, 0, 0, fgPaint ?? paintFor(color));
+				}
+				from = to;
+			}
+		});
+	});
+}
+
+// The local rects arc text's glyphs can cover: each glyph's font box under its
+// RSXform.
+function arcTextBounds(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	arc: TextArc,
+	fallback: string[],
+	em: Bounds,
+): Bounds[] {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const [cx, cy] = arcCenter(cmd);
+	const placed = placeOnArc(
+		lines.map((l) => l.arc),
+		arc,
+		cx,
+		cy,
+	);
+	const out: Bounds[] = [];
+	lines.forEach(({ arc: shaped }, li) => {
+		shaped.runs.forEach((run, ri) => {
+			const xforms = placed[li]?.[ri];
+			if (!xforms) return;
+			const size = run.size;
+			const skew = run.fakeItalic
+				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * size
+				: 0;
+			const slack = size / 8;
+			const b = rsxformBounds(xforms, [
+				Math.min(0, em[0]) * size - skew - slack,
+				Math.min(0, em[1]) * size - slack,
+				Math.max(0, em[2]) * size + skew + slack,
+				Math.max(0, em[3]) * size + slack,
+			]);
+			if (b) out.push(b);
+		});
+	});
+	return out;
 }
 
 function shapeLine(
@@ -698,7 +919,7 @@ function drawImagePlaceholder(
 	const fill = bin.track(new ck.Paint());
 	fill.setColor(gray);
 	fill.setAntiAlias(true);
-	// This CanvasKit build only exposes Path.MakeFromSVGString (see maskSvg), so
+	// This CanvasKit build only exposes Path.MakeFromSVGString, so
 	// draw the sun as an SVG circle path rather than canvas.drawCircle.
 	const sr = icon * 0.1;
 	const scx = x + icon * 0.32;
@@ -722,25 +943,15 @@ function drawImageStroke(
 	cmd: DrawImageCommand,
 ) {
 	if (!cmd.stroke) return;
-	const { pos, size } = cmd;
-	const clip = cmd.clip ?? { kind: "rect" };
-	const inset = strokeInset(cmd.stroke);
-	const shape = inset === 0 ? clip : insetMask(clip, inset);
-	if (!shape) {
-		const path = maskPath(ck, bin, clip, pos.x, pos.y, size.width, size.height);
-		drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
-		return;
-	}
-	const path = maskPath(
+	drawOutlineStroke(
 		ck,
+		canvas,
 		bin,
-		shape,
-		pos.x + inset,
-		pos.y + inset,
-		Math.max(0, size.width - 2 * inset),
-		Math.max(0, size.height - 2 * inset),
+		cmd.clip ?? { kind: "rect" },
+		cmd.pos,
+		cmd.size,
+		cmd.stroke,
 	);
-	canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
 }
 
 function drawImage(
@@ -762,24 +973,14 @@ function drawImage(
 		// placeholder simply ignore the warning.
 		issues.missingImages.push(cmd.src);
 		canvas.save();
-		if (cmd.clip)
-			canvas.clipPath(
-				maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-				ck.ClipOp.Intersect,
-				true,
-			);
+		if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 		drawImagePlaceholder(ck, canvas, bin, pos, size);
 		canvas.restore();
 		drawImageStroke(ck, canvas, bin, cmd);
 		return;
 	}
 	canvas.save();
-	if (cmd.clip)
-		canvas.clipPath(
-			maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-			ck.ClipOp.Intersect,
-			true,
-		);
+	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 	if (isSvgPicture(img)) {
 		drawSvgPicture(ck, canvas, bin, img, cmd);
 		canvas.restore();
@@ -892,25 +1093,16 @@ function drawBitmap(
 ) {
 	const { pos, size, pixels, pixelWidth, pixelHeight } = cmd;
 	if (pixelWidth <= 0 || pixelHeight <= 0) return;
-	const img = ck.MakeImage(
-		{
-			width: pixelWidth,
-			height: pixelHeight,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
+	const img = makeImageFromPixels(
+		ck,
+		"pixels",
+		pixelWidth,
+		pixelHeight,
 		pixels,
-		pixelWidth * 4,
 	);
 	if (!img) return;
 	canvas.save();
-	if (cmd.clip)
-		canvas.clipPath(
-			maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-			ck.ClipOp.Intersect,
-			true,
-		);
+	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 	const paint = bin.track(new ck.Paint());
 	const snapped =
 		cmd.role === "barcode" ? snapBarcode(canvas, cmd, frame.grid ?? 1) : null;
@@ -1120,16 +1312,22 @@ function drawPath(
 	const vb = cmd.viewBox;
 	let boxW = cmd.size.width;
 	let boxH = cmd.size.height;
+	const space: PatternSpace = { px: devicePx(canvas) };
 	if (vb && vb.width > 0 && vb.height > 0) {
 		canvas.scale(cmd.size.width / vb.width, cmd.size.height / vb.height);
 		if (vb.x || vb.y) canvas.translate(-(vb.x ?? 0), -(vb.y ?? 0));
 		boxW = vb.width;
 		boxH = vb.height;
+		space.unit = [vb.width / cmd.size.width, vb.height / cmd.size.height];
 	}
+	const ox = vb?.x ?? 0;
+	const oy = vb?.y ?? 0;
 	for (const fill of cmd.fills ?? []) {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
 		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
+		else if (fill.kind === "pattern")
+			paint.setShader(patternShader(ck, bin, fill, ox, oy, space));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
@@ -1137,7 +1335,7 @@ function drawPath(
 		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
 		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
 		else if (strokeInset(cmd.stroke) !== 0)
-			drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
+			drawClippedStroke(ck, canvas, bin, { kind: "path", path }, cmd.stroke);
 		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
 	}
 	canvas.restore();
@@ -1217,64 +1415,20 @@ function drawShape(
 	if (cmd.op === "drawRect") {
 		const { x, y } = cmd.pos;
 		const { width: w, height: h } = cmd.size;
-		const rect = ck.XYWHRect(x, y, w, h);
-		const cr = cmd.cornerRadius;
-		// Corner smoothing (superellipse) applies to a uniform radius; otherwise
-		// fall back to a plain (possibly per-corner) rounded rect.
-		const smoothing = cmd.cornerSmoothing ?? 0;
-		const smoothR =
-			smoothing > 0 && typeof cr === "number" && cr > 0 ? cr : null;
-		const rr =
-			smoothR === null &&
-			cr !== undefined &&
-			(typeof cr === "number" ? cr > 0 : cr.some((r) => r > 0))
-				? rrectFor(ck, rect, cr)
-				: null;
-		const fillPath =
-			smoothR !== null
-				? bin.path(ck, squircleSvg(x, y, w, h, smoothR, smoothing))
-				: null;
+		const shape = rectShape(cmd.cornerRadius, cmd.cornerSmoothing);
+		const outline = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 		for (const fill of cmd.fills ?? []) {
 			const paint = bin.track(new ck.Paint());
 			paint.setAntiAlias(true);
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
-			else paint.setShader(shaderFor(ck, bin, fill, x, y, w, h));
-			if (fillPath) canvas.drawPath(fillPath, paint);
-			else if (rr) canvas.drawRRect(rr, paint);
-			else canvas.drawRect(rect, paint);
-		}
-		if (cmd.stroke) {
-			const sp = strokePaint(ck, bin, cmd.stroke);
-			// Offset the stroked rect for inside/outside alignment (center = 0).
-			const inset = strokeInset(cmd.stroke);
-			if (smoothR !== null) {
-				const path = bin.path(
-					ck,
-					squircleSvg(
-						x + inset,
-						y + inset,
-						w - 2 * inset,
-						h - 2 * inset,
-						Math.max(0, smoothR - inset),
-						smoothing,
-					),
-				) as Path;
-				canvas.drawPath(path, sp);
-			} else if (inset === 0) {
-				if (rr) canvas.drawRRect(rr, sp);
-				else canvas.drawRect(rect, sp);
-			} else {
-				const srect = ck.XYWHRect(
-					x + inset,
-					y + inset,
-					w - 2 * inset,
-					h - 2 * inset,
+			else
+				paint.setShader(
+					shaderFor(ck, bin, fill, x, y, w, h, { px: devicePx(canvas) }),
 				);
-				if (rr)
-					canvas.drawRRect(rrectFor(ck, srect, insetCorner(cr, inset)), sp);
-				else canvas.drawRect(srect, sp);
-			}
+			drawOutline(canvas, outline, paint);
 		}
+		if (cmd.stroke)
+			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
 		drawText(ck, canvas, provider, bin, cmd);
 	} else if (cmd.op === "drawImage") {
@@ -1326,8 +1480,13 @@ function drawShape(
 
 // The general mask: draw children to an offscreen content layer, then composite
 // the mask's coverage onto it. DstIn keeps content where the mask is opaque
-// (DstOut where it's transparent, for invert); a luminance channel first maps
-// the mask's brightness to alpha via a color matrix.
+// (DstOut where it's transparent, for invert). Luminance coverage is
+// luminance(straight RGB) × alpha (SVG 1.1 masking), which equals luminance of
+// the premultiplied color. A color matrix sees unpremultiplied color, so the
+// mask is first composited over opaque black: the result is opaque with the
+// premultiplied RGB, and the matrix then maps its luminance to alpha.
+// Luminance is taken on sRGB-encoded values with Rec. 709 weights, not on
+// linearRGB as SVG's default color-interpolation would.
 function drawMasked(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -1356,10 +1515,17 @@ function drawMasked(
 	if (cmd.channel === "luminance")
 		maskPaint.setColorFilter(
 			bin.track(
-				ck.ColorFilter.MakeMatrix([
-					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152, 0.0722,
-					0, 0,
-				]),
+				ck.ColorFilter.MakeCompose(
+					bin.track(
+						ck.ColorFilter.MakeMatrix([
+							0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152,
+							0.0722, 0, 0,
+						]),
+					),
+					bin.track(
+						ck.ColorFilter.MakeBlend(ck.BLACK, ck.BlendMode.DstOver),
+					),
+				),
 			),
 		);
 	canvas.saveLayer(maskPaint, bounds);
@@ -1451,17 +1617,7 @@ function buildLutImage(
 		px[i * 4 + 2] = lut.b[i];
 		px[i * 4 + 3] = 255;
 	}
-	return ck.MakeImage(
-		{
-			width: 256,
-			height: 1,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
-		px,
-		256 * 4,
-	);
+	return makeImageFromPixels(ck, "pixels", 256, 1, px);
 }
 
 type Lut3d = NonNullable<NonNullable<DrawCommand["adjust"]>["lut3d"]>;
@@ -1505,17 +1661,7 @@ function buildLut3dImage(ck: CanvasKit, lut: Lut3d): Image | null {
 			}
 		}
 	}
-	return ck.MakeImage(
-		{
-			width,
-			height: lut.size,
-			colorType: ck.ColorType.RGBA_8888,
-			alphaType: ck.AlphaType.Unpremul,
-			colorSpace: ck.ColorSpace.SRGB,
-		},
-		px,
-		width * 4,
-	);
+	return makeImageFromPixels(ck, "pixels", width, lut.size, px);
 }
 
 // SkSL for the adjust post-pass, generated per feature combination. The source
@@ -1612,6 +1758,24 @@ function adjustShaderSksl(
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
 // instances (e.g. across tests) never share an effect.
 const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
+function cachedEffect(
+	ck: CanvasKit,
+	key: string,
+	make: () => RuntimeEffect | null | undefined,
+): RuntimeEffect | null {
+	let byVariant = effectCache.get(ck);
+	if (!byVariant) {
+		byVariant = new Map();
+		effectCache.set(ck, byVariant);
+	}
+	let eff = byVariant.get(key);
+	if (eff === undefined) {
+		eff = make() ?? null;
+		byVariant.set(key, eff);
+	}
+	return eff;
+}
+
 function adjustEffect(
 	ck: CanvasKit,
 	hasMatrix: boolean,
@@ -1620,22 +1784,13 @@ function adjustEffect(
 	hasLut3d: boolean,
 	hasSharpen: boolean,
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
 	const bit = (b: boolean) => (b ? 1 : 0);
 	const key = `${bit(hasMatrix)}${bit(preserveHue)}${bit(hasLut)}${bit(hasLut3d)}${bit(hasSharpen)}`;
-	let eff = byVariant.get(key);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
-			) ?? null;
-		byVariant.set(key, eff);
-	}
-	return eff;
+	return cachedEffect(ck, key, () =>
+		ck.RuntimeEffect.Make(
+			adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
+		),
+	);
 }
 
 // Recording canvases that adjustedDeviceRect is measuring. An adjusted
@@ -1755,6 +1910,33 @@ function predictedBounds(
 			within = [...within, { ctm: m }];
 		return visitShape(c, m, within);
 	};
+	const addStroke = (
+		shape: ShapeMask,
+		stroke: Stroke,
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		m: Affine,
+		within: RecordedSave[],
+	) => {
+		const o = outlineOf(ck, bin, shape, x, y, w, h, strokeInset(stroke));
+		if (o) {
+			add(
+				strokeBounds(sortBounds(outlineBounds(o)), stroke),
+				outlineMatrix(o, m),
+				within,
+			);
+			return;
+		}
+		const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+		const doubled = { ...stroke, width: stroke.width * 2 };
+		add(
+			strokeBounds(outlineBounds(whole), doubled),
+			outlineMatrix(whole, m),
+			[...within, { ctm: m }],
+		);
+	};
 	const visitShape = (
 		c: DrawCommand,
 		m: Affine,
@@ -1764,39 +1946,12 @@ function predictedBounds(
 		const { width: w, height: h } = c.size;
 		const box: Bounds = [x, y, x + w, y + h].map(f32) as Bounds;
 		if (c.op === "drawRect") {
-			const cr = c.cornerRadius;
-			const smoothing = c.cornerSmoothing ?? 0;
-			const smoothR =
-				smoothing > 0 && typeof cr === "number" && cr > 0 ? cr : null;
-			const fill =
-				smoothR !== null
-					? pathBounds(ck, bin, squircleSvg(x, y, w, h, smoothR, smoothing))
-					: box;
-			if (c.fills?.length) add(fill, m, within);
-			if (c.stroke) {
-				const inset = strokeInset(c.stroke);
-				const geometry =
-					smoothR !== null
-						? pathBounds(
-								ck,
-								bin,
-								squircleSvg(
-									x + inset,
-									y + inset,
-									w - 2 * inset,
-									h - 2 * inset,
-									Math.max(0, smoothR - inset),
-									smoothing,
-								),
-							)
-						: ([
-								x + inset,
-								y + inset,
-								x + inset + (w - 2 * inset),
-								y + inset + (h - 2 * inset),
-							].map(f32) as Bounds);
-				add(strokeBounds(sortBounds(geometry), c.stroke), m, within);
+			const shape = rectShape(c.cornerRadius, c.cornerSmoothing);
+			if (c.fills?.length) {
+				const fill = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+				add(outlineBounds(fill), outlineMatrix(fill, m), within);
 			}
+			if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawText") {
@@ -1848,21 +2003,8 @@ function predictedBounds(
 						inImage,
 					);
 			}
-			if (c.stroke) {
-				const inset = strokeInset(c.stroke);
-				const path = pathBounds(
-					ck,
-					bin,
-					maskSvg(
-						{ kind: "rect" },
-						x + inset,
-						y + inset,
-						Math.max(0, w - 2 * inset),
-						Math.max(0, h - 2 * inset),
-					),
-				);
-				add(strokeBounds(path, c.stroke), m, within);
-			}
+			if (c.stroke)
+				addStroke(c.clip ?? { kind: "rect" }, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawBitmap") {
@@ -1942,6 +2084,10 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
+	if (cmd.arc)
+		return em
+			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
+			: [];
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2080,9 +2226,11 @@ function snapBarcodeAffine(
 	);
 }
 
-// Whether layerPaint would build a paint for this drawable.
+// Whether paintDrawable gives this drawable a layer: an isolated group, or one
+// layerPaint builds a paint for.
 function hasLayerPaint(cmd: DrawCommand): boolean {
 	return (
+		isolates(cmd) ||
 		(!!cmd.blendMode && cmd.blendMode !== "normal") ||
 		(cmd.opacity !== undefined && cmd.opacity < 1) ||
 		(typeof cmd.blur === "number" && cmd.blur > 0) ||
@@ -2144,11 +2292,6 @@ function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
 		radius = f32((width / 2) * multiplier);
 	}
 	return outsetBounds(b, radius);
-}
-
-function pathBounds(ck: CanvasKit, bin: Bin, svg: string): Bounds {
-	const [l, t, r, b] = (bin.path(ck, svg) as Path).getBounds();
-	return [l, t, r, b] as Bounds;
 }
 
 function sortBounds(b: Bounds): Bounds {
@@ -2311,12 +2454,13 @@ function recordedBounds(
 	frame: Frame,
 	device: Size,
 	matrix: number[],
+	reach = 0,
 ): Bounds {
 	const recorder = new ck.PictureRecorder();
 	let picture: SkPicture | null = null;
 	try {
 		const rc = recorder.beginRecording(
-			ck.XYWHRect(0, 0, device.width, device.height),
+			ck.LTRBRect(-reach, -reach, device.width + reach, device.height + reach),
 			true,
 		);
 		measuring.add(rc);
@@ -2348,13 +2492,14 @@ export function auditAdjustedBounds(
 	boundsAudit = audit;
 }
 
-// The device pixels an adjusted layer can touch: Skia's bounds of a recording
-// of the inner drawable under the main canvas's matrix, so stroke, shadow, blur
-// and glyph outsets count exactly as the painter draws them. Predicted from the
+// The device pixels an adjusted layer's content can touch: Skia's bounds of a
+// recording of the inner drawable under the main canvas's matrix, so stroke and
+// glyph outsets count exactly as the painter draws them. Predicted from the
 // commands where possible, recorded otherwise. Rounded out with 1px spare for
 // antialiasing, plus `spread` for a kernel that reads neighbours, then cut to
 // the device clip (grown by `spread`, so a kernel at the clip edge still reads
-// the real pixels beyond it) and the frame. Null when nothing shows.
+// the real pixels beyond it) and the frame. `reach` grows both cuts by how far
+// the layer's shadows and blur carry content into view. Null when nothing shows.
 function adjustedDeviceRect(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -2366,6 +2511,7 @@ function adjustedDeviceRect(
 	device: Size,
 	matrix: number[],
 	spread: number,
+	reach: number,
 ): { x: number; y: number; width: number; height: number } | null {
 	const predicted = predictedBounds(
 		ck,
@@ -2376,33 +2522,44 @@ function adjustedDeviceRect(
 		frame,
 		device,
 		matrix,
+		reach > 0,
 	);
-	boundsAudit?.(
-		predicted,
-		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix),
-	);
-	const [l, t, r, b] =
-		predicted ??
-		recordedBounds(ck, provider, images, bin, inner, frame, device, matrix);
+	const recorded = () =>
+		recordedBounds(
+			ck,
+			provider,
+			images,
+			bin,
+			inner,
+			frame,
+			device,
+			matrix,
+			reach,
+		);
+	boundsAudit?.(predicted, recorded());
+	const [l, t, r, b] = predicted ?? recorded();
 	const clip = canvas.getDeviceClipBounds();
 	const pad = 1 + spread;
-	const x0 = Math.max(Math.floor(l) - pad, clip[0] - spread, 0);
-	const y0 = Math.max(Math.floor(t) - pad, clip[1] - spread, 0);
-	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + spread, device.width);
-	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + spread, device.height);
+	const grow = spread + reach;
+	const x0 = Math.max(Math.floor(l) - pad, clip[0] - grow, -reach);
+	const y0 = Math.max(Math.floor(t) - pad, clip[1] - grow, -reach);
+	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + grow, device.width + reach);
+	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + grow, device.height + reach);
 	if (!(x1 > x0 && y1 > y0)) return null;
 	return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
-// Apply an adjust's LUTs/sharpen via an offscreen SkSL pass: render the drawable
-// (with only its color matrix) to an offscreen surface covering just its device
-// rect, then draw it back through the adjust shader. The color matrix rides the
-// inner render, so ordering is matrix → curve → cube → sharpen — color first,
-// spatial last. The offscreen inherits the main canvas's full CTM, shifted by the
-// rect's whole-pixel origin, and is composited back in device coordinates, so an
-// adjusted descendant follows every parent transform exactly once. Falls back to
-// a matrix-only render (+ an adjust_unsupported warning) if the surface or effect
-// can't be created.
+// Apply an adjust's LUTs/sharpen via an offscreen SkSL pass: render the
+// drawable's content and clip (with only its color matrix) to an offscreen
+// surface covering just its device rect, then draw it back through the adjust
+// shader inside a layer carrying the drawable's shadows, blur, opacity and
+// blend. The color matrix rides the inner render, so ordering is matrix → curve
+// → cube → sharpen, and the shadows are cast from the adjusted result in their
+// own color, as layerPaint orders them. The offscreen inherits the main canvas's
+// full CTM, shifted by the rect's whole-pixel origin, and is composited back in
+// device coordinates, so an adjusted descendant follows every parent transform
+// exactly once. Falls back to a matrix-only render (+ an adjust_unsupported
+// warning) if the surface or effect can't be created.
 function paintAdjustedOffscreen(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -2434,21 +2591,24 @@ function paintAdjustedOffscreen(
 	if (adjust.gamut === "preserve-hue" && !matrixInShader) {
 		reportAdjustUnsupported(issues, cmd, "gamut");
 	}
-	// The inner drawable: same node, but only the (cheap) color matrix survives —
-	// lut/sharpen are this pass's job, so dropping them avoids re-entering here.
+	// The inner drawable: content, rotation and clip, with only the (cheap) color
+	// matrix of the adjust. lut/sharpen are this pass's job, and the layer effects
+	// come after it.
 	const inner: DrawCommand = {
+		...layerContent(cmd),
+		...(cmd.rotation ? { rotation: cmd.rotation } : {}),
+		...(adjust.colorMatrix && !matrixInShader
+			? { adjust: { colorMatrix: adjust.colorMatrix } }
+			: {}),
+	} as DrawCommand;
+	const effects = { ...cmd, adjust: undefined } as DrawCommand;
+	const matrixOnly = {
 		...cmd,
-		adjust:
-			adjust.colorMatrix && !matrixInShader
-				? { colorMatrix: adjust.colorMatrix }
-				: undefined,
+		adjust: adjust.colorMatrix ? { colorMatrix: adjust.colorMatrix } : undefined,
 	} as DrawCommand;
 	if (hasLut3d && !validLut3d(adjust.lut3d)) {
 		reportAdjustUnsupported(issues, cmd, "lut3d");
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
-		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
+		paintDrawable(ck, canvas, provider, images, bin, matrixOnly, issues, frame);
 		return;
 	}
 
@@ -2459,6 +2619,7 @@ function paintAdjustedOffscreen(
 	// allocated, so N adjusted photos hold N photo-sized surfaces, not N frames.
 	const device = exportPixelSize(frame, frame.scale);
 	const matrix = canvas.getTotalMatrix();
+	const reach = Math.ceil(layerReach(effects) * matrixStretch(matrix));
 	const rect = adjustedDeviceRect(
 		ck,
 		canvas,
@@ -2470,16 +2631,16 @@ function paintAdjustedOffscreen(
 		device,
 		matrix,
 		hasSharpen ? 1 : 0,
+		reach,
 	);
 	if (!rect) return;
-	const info = {
-		width: rect.width,
-		height: rect.height,
-		colorType: ck.ColorType.RGBA_8888,
-		alphaType: ck.AlphaType.Premul,
-		colorSpace: ck.ColorSpace.SRGB,
-	};
-	const surface = canvas.makeSurface(info);
+	const surface = makeLayerSurface(
+		ck,
+		canvas,
+		rect.width,
+		rect.height,
+		frame.precision,
+	);
 	const effect = surface
 		? adjustEffect(
 				ck,
@@ -2499,10 +2660,7 @@ function paintAdjustedOffscreen(
 		if (hasSharpen) reportAdjustUnsupported(issues, cmd, "sharpen");
 		if (matrixInShader) reportAdjustUnsupported(issues, cmd, "gamut");
 		surface?.delete();
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
-		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
+		paintDrawable(ck, canvas, provider, images, bin, matrixOnly, issues, frame);
 		return;
 	}
 
@@ -2572,19 +2730,73 @@ function paintAdjustedOffscreen(
 	const shader = bin.track(effect.makeShaderWithChildren(uniforms, children));
 	const paint = bin.track(new ck.Paint());
 	paint.setShader(shader);
-	// Blit in DEVICE pixels — undo the main canvas's complete CTM, not merely the
-	// export scale. The snapshot already includes parent rotations/transforms; a
-	// second application here would move it. The main clip remains in device space,
-	// so clipping semantics are unchanged.
-	const inverse = ck.Matrix.invert(matrix);
-	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
+	// The layer opens under the drawable's own rotated matrix, so its filters
+	// work in local units exactly as paintDrawable's would. Inside it, blit in
+	// DEVICE pixels: undo the complete CTM, not merely the export scale. The
+	// snapshot already includes parent rotations/transforms; a second application
+	// here would move it. The main clip remains in device space, so clipping
+	// semantics are unchanged.
 	canvas.save();
+	if (cmd.rotation) {
+		const cx = cmd.pos.x + cmd.size.width / 2;
+		const cy = cmd.pos.y + cmd.size.height / 2;
+		canvas.translate(cx, cy);
+		canvas.rotate(cmd.rotation, 0, 0);
+		canvas.translate(-cx, -cy);
+	}
+	const local = canvas.getTotalMatrix();
+	const inverse = ck.Matrix.invert(local);
+	if (!inverse) throw new Error("adjust: non-invertible canvas transform");
+	const lp = layerPaint(ck, bin, effects, frame.precision);
+	if (lp) {
+		const back = layerPaintBoundable(effects)
+			? invertAffine(local.slice(0, 6).map(f32) as Affine)
+			: null;
+		const affine = local[6] === 0 && local[7] === 0 && local[8] === 1;
+		const bounds =
+			back && affine
+				? mapAffine(back, [
+						rect.x,
+						rect.y,
+						rect.x + rect.width,
+						rect.y + rect.height,
+					])
+				: null;
+		canvas.saveLayer(lp, bounds ? ck.LTRBRect(...bounds) : null);
+	}
 	canvas.concat(inverse);
 	canvas.drawRect(
 		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
 		paint,
 	);
+	if (lp) canvas.restore();
 	canvas.restore();
+}
+
+// How far, in local units, a layer's blur and shadows can carry its content.
+function layerReach(cmd: DrawCommand): number {
+	const blur =
+		typeof cmd.blur === "number" && cmd.blur > 0
+			? 3 * LAYER_BLUR_SIGMA(cmd.blur)
+			: 0;
+	let shadows = 0;
+	for (const s of shadowList(cmd.shadow))
+		shadows = Math.max(
+			shadows,
+			Math.abs(s.dx) +
+				Math.abs(s.dy) +
+				Math.abs(s.spread ?? 0) +
+				3 * SHADOW_SIGMA(s.blur),
+		);
+	return blur + shadows;
+}
+
+// The most a matrix lengthens a unit vector, bounded above by its row sums.
+function matrixStretch(m: number[]): number {
+	return Math.max(
+		Math.abs(m[0]) + Math.abs(m[1]),
+		Math.abs(m[3]) + Math.abs(m[4]),
+	);
 }
 
 // Collapse the supersampled render into the output surface, so each output pixel
@@ -2612,6 +2824,7 @@ function reduceSupersampled(
 	design: Size,
 	exportScale: number,
 	supersample: number,
+	precision: Precision,
 ) {
 	const rect = (s: Size) => ck.XYWHRect(0, 0, s.width, s.height);
 	const retire = (s: Surface) => bin.track({ delete: () => s.dispose() });
@@ -2620,18 +2833,30 @@ function reduceSupersampled(
 	let levelSize = exportPixelSize(design, exportScale * supersample);
 	retire(src);
 
+	if (supersample === 1) {
+		const canvas = out.getCanvas();
+		canvas.clear(ck.TRANSPARENT);
+		canvas.drawImage(
+			bin.track(src.makeImageSnapshot()),
+			0,
+			0,
+			bin.track(new ck.Paint()),
+		);
+		return;
+	}
+
 	for (let factor = supersample; factor > 1; factor /= 2) {
 		const target = exportPixelSize(design, (exportScale * factor) / 2);
 		const last = factor === 2;
 		const dst = last
 			? out
-			: level.getCanvas().makeSurface({
-					width: target.width,
-					height: target.height,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Premul,
-					colorSpace: ck.ColorSpace.SRGB,
-				});
+			: makeLayerSurface(
+					ck,
+					level.getCanvas(),
+					target.width,
+					target.height,
+					precision,
+				);
 		const img = bin.track(level.makeImageSnapshot());
 		const paint = bin.track(new ck.Paint());
 		if (!dst) {
@@ -2724,22 +2949,13 @@ function finishEffect(
 	ck: CanvasKit,
 	variant: "finish" | "finish-curve" | "finish-noise",
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get(variant);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				variant === "finish-noise"
-					? FINISH_NOISE_SKSL
-					: finishSksl(variant === "finish-curve"),
-			) ?? null;
-		byVariant.set(variant, eff);
-	}
-	return eff;
+	return cachedEffect(ck, variant, () =>
+		ck.RuntimeEffect.Make(
+			variant === "finish-noise"
+				? FINISH_NOISE_SKSL
+				: finishSksl(variant === "finish-curve"),
+		),
+	);
 }
 
 function normalizeDither(dither: FrameFinish["dither"]) {
@@ -2950,13 +3166,9 @@ function finishNoise(
 	if (cache.finishNoise?.key === key) return cache.finishNoise.noise;
 	const effect = finishEffect(ck, "finish-noise");
 	if (!effect) return null;
-	const target = surface.getCanvas().makeSurface({
-		width: info.width,
-		height: info.height,
-		colorType: ck.ColorType.RGBA_F32,
-		alphaType: ck.AlphaType.Unpremul,
-		colorSpace: info.colorSpace,
-	});
+	const target = surface
+		.getCanvas()
+		.makeSurface(imageInfo(ck, "float", info.width, info.height));
 	if (!target) return null;
 	bin.track({ delete: () => target.dispose() });
 	const shader = bin.track(effect.makeShader([u.seed, u.monochrome ? 1 : 0]));
@@ -3015,16 +3227,9 @@ const LINEAR_BURN_SKSL = `
 	}`;
 
 function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get("linear-burn");
-	if (eff === undefined) {
-		eff = ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL) ?? null;
-		byVariant.set("linear-burn", eff);
-	}
+	const eff = cachedEffect(ck, "linear-burn", () =>
+		ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL),
+	);
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
@@ -3079,6 +3284,10 @@ function layerBounds(
 	return ck.LTRBRect(l, t, r, btm);
 }
 
+function isolates(cmd: DrawCommand): boolean {
+	return cmd.op === "drawGroup" && cmd.isolate === true;
+}
+
 // Whether a layer paint keeps the destination wherever its layer is transparent,
 // so bounding the layer cannot change what lands outside it.
 function layerPaintBoundable(cmd: DrawCommand): boolean {
@@ -3100,10 +3309,11 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
 	if (cmd.op === "drawRect")
 		return (
-			!cmd.cornerSmoothing &&
+			!outlineIsPath(rectShape(cmd.cornerRadius, cmd.cornerSmoothing)) &&
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
-	if (cmd.op === "drawText") return !cmd.fill || cmd.fill.kind === "solid";
+	if (cmd.op === "drawText")
+		return !cmd.arc && (!cmd.fill || cmd.fill.kind === "solid");
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
@@ -3128,9 +3338,35 @@ function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
 	return clear(x, w, cmd.pixelWidth) && clear(y, h, cmd.pixelHeight);
 }
 
+function setLayerBlend(
+	ck: CanvasKit,
+	bin: Bin,
+	paint: Paint,
+	blendMode: BlendMode | undefined,
+) {
+	if (!blendMode || blendMode === "normal") return;
+	const blender =
+		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
+	if (blender) paint.setBlender(blender);
+	else
+		paint.setBlendMode(
+			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
+		);
+}
+
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
-// composites onto everything below it exactly like a Figma layer.
-function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
+// composites onto everything below it exactly like a Figma layer. The effects
+// run in the order README.md's "Layer effect order" gives: the color matrix is
+// the first image filter rather than the paint's color filter, which Skia would
+// apply after the shadows and after the paint's alpha. Skia evaluates image
+// filters in 8 bits, so under F16 a matrix with nothing to order against stays
+// on the paint, where the result is the same at full precision.
+function layerPaint(
+	ck: CanvasKit,
+	bin: Bin,
+	cmd: DrawCommand,
+	precision: Precision = "u8",
+): Paint | null {
 	const { blendMode, opacity, blur, shadow } = cmd;
 	const hasBlend = blendMode && blendMode !== "normal";
 	const hasOpacity = opacity !== undefined && opacity < 1;
@@ -3139,27 +3375,22 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	if (!hasBlend && !hasOpacity && !hasBlur && !shadow && !colorFilter)
 		return null;
 	const paint = bin.track(new ck.Paint());
-	// The color filter runs on the layer's contents (before blur/shadow, which are
-	// image filters on the layer result): color-correct first, spatial effects
-	// after.
-	if (colorFilter) paint.setColorFilter(colorFilter);
 	if (hasOpacity) paint.setAlphaf(opacity);
-	const blender =
-		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
-	if (blender) paint.setBlender(blender);
-	else if (blendMode && blendMode !== "normal") {
-		paint.setBlendMode(
-			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
-		);
-	}
-	let filter: ImageFilter | null = null;
+	setLayerBlend(ck, bin, paint, blendMode);
+	const onPaint =
+		precision === "f16" && !hasOpacity && !hasBlur && !shadow;
+	if (colorFilter && onPaint) paint.setColorFilter(colorFilter);
+	let filter: ImageFilter | null =
+		colorFilter && !onPaint
+			? bin.track(ck.ImageFilter.MakeColorFilter(colorFilter, null))
+			: null;
 	if (typeof blur === "number" && blur > 0)
 		filter = bin.track(
 			ck.ImageFilter.MakeBlur(
 				LAYER_BLUR_SIGMA(blur),
 				LAYER_BLUR_SIGMA(blur),
 				ck.TileMode.Decal,
-				null,
+				filter,
 			),
 		);
 	const sh = shadowFilter(ck, bin, shadow);
@@ -3307,6 +3538,10 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		adjust: _a,
 		...rest
 	} = cmd;
+	if (rest.op === "drawGroup") {
+		const { isolate: _i, ...group } = rest;
+		return group as DrawCommand;
+	}
 	return rest as DrawCommand;
 }
 
@@ -3349,9 +3584,16 @@ function paintDrawable(
 		canvas.rotate(cmd.rotation, 0, 0);
 		canvas.translate(-cx, -cy);
 	}
-	const lp = layerPaint(ck, bin, cmd);
-	if (lp) {
-		const bounds = layerPaintBoundable(cmd)
+	const lp = layerPaint(ck, bin, cmd, frame.precision);
+	// drawImage clips/strokes itself so its stroke isn't clipped.
+	const clips = !!cmd.clip && cmd.op !== "drawImage";
+	// Inside the clip, so the clip antialiases the composited children once
+	// rather than each child that overlaps a partly covered edge.
+	const isolated = isolates(cmd);
+	const inner = isolated && clips;
+	const outer = lp !== null || (isolated && !inner);
+	const bounds =
+		(outer || inner) && layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
 					canvas,
@@ -3362,25 +3604,13 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp, bounds);
-	}
-	// drawImage clips/strokes itself so its stroke isn't clipped.
-	if (cmd.clip && cmd.op !== "drawImage")
-		canvas.clipPath(
-			maskPath(
-				ck,
-				bin,
-				cmd.clip,
-				cmd.pos.x,
-				cmd.pos.y,
-				cmd.size.width,
-				cmd.size.height,
-			),
-			ck.ClipOp.Intersect,
-			true,
-		);
+	if (outer) canvas.saveLayer(lp ?? undefined, bounds);
+	if (clips && cmd.clip)
+		clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
+	if (inner) canvas.saveLayer(undefined, bounds);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (lp) canvas.restore();
+	if (inner) canvas.restore();
+	if (outer) canvas.restore();
 	canvas.restore();
 }
 
@@ -3460,6 +3690,7 @@ function selfContained(cmd: DrawCommand): boolean {
 // its transform and clip alone.
 function passThrough(cmd: DrawCommand): boolean {
 	return (
+		!isolates(cmd) &&
 		!cmd.adjust &&
 		!cmd.shadow &&
 		!(cmd.blur && cmd.blur > 0) &&
@@ -3614,6 +3845,7 @@ export async function paintScene(
 				height: number;
 				scale?: number;
 				supersample?: number;
+				precision?: Precision;
 		  }
 		| undefined;
 	if (!create) throw new Error("canvaskit: scene has no createCanvas command");
@@ -3641,24 +3873,33 @@ export async function paintScene(
 	);
 	const renderScale = exportScale * supersample;
 	const render = exportPixelSize(design, renderScale);
-	const frame: Frame = { ...design, scale: renderScale, grid: supersample };
+	const precision = resolvePrecision(create.precision);
+	const frame: Frame = {
+		...design,
+		scale: renderScale,
+		grid: supersample,
+		precision,
+	};
 
-	// Derived from the output surface rather than ck.MakeSurface so it stays on the
-	// same backend (GPU under WebGL). A backend that won't give one degrades to
-	// rendering at the export size — softer than asked for, but a render.
+	// A working surface apart from the output, when the render is denser than
+	// the export or deeper than 8 bits. Derived from the output surface rather
+	// than ck.MakeSurface so it stays on the same backend (GPU under WebGL). A
+	// backend that won't give one degrades to rendering straight into the output
+	// at the export size and 8 bits: softer than asked for, but a render.
 	const superSurface =
-		supersample > 1
-			? surface.getCanvas().makeSurface({
-					width: render.width,
-					height: render.height,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Premul,
-					colorSpace: ck.ColorSpace.SRGB,
-				})
+		supersample > 1 || precision !== "u8"
+			? makeLayerSurface(
+					ck,
+					surface.getCanvas(),
+					render.width,
+					render.height,
+					precision,
+				)
 			: null;
-	if (supersample > 1 && !superSurface) {
+	if (!superSurface) {
 		frame.scale = exportScale;
 		frame.grid = 1;
+		frame.precision = "u8";
 	}
 	// Where the drawables actually land: the supersampled offscreen when there is
 	// one, else the output surface directly (the pre-supersampling path, untouched).
@@ -3678,7 +3919,8 @@ export async function paintScene(
 	// the closest one's run keeps the shared part in its place; one that shares
 	// none keeps its own beside the others. Nothing is read back that the cache
 	// could not keep.
-	const pixelInfo = cache && !rt.canvas ? target.imageInfo() : null;
+	const pixelInfo =
+		cache && !rt.canvas && frame.precision === "u8" ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
 		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
 		: "";
@@ -3791,6 +4033,7 @@ export async function paintScene(
 				design,
 				exportScale,
 				supersample,
+				precision,
 			);
 		const finishCmd = commands.find((c) => c.op === "finishFrame") as
 			| { op: "finishFrame"; finish: FrameFinish }
@@ -3825,13 +4068,11 @@ export async function paintScene(
 			try {
 				const w = snap.width();
 				const h = snap.height();
-				const data = snap.readPixels(0, 0, {
-					width: w,
-					height: h,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Unpremul,
-					colorSpace: ck.ColorSpace.SRGB,
-				}) as Uint8Array | null;
+				const data = snap.readPixels(
+					0,
+					0,
+					imageInfo(ck, "pixels", w, h),
+				) as Uint8Array | null;
 				return data ? { data, width: w, height: h } : null;
 			} finally {
 				snap.delete();
@@ -3873,25 +4114,32 @@ export async function paintScene(
 
 				const w = snap.width();
 				const h = snap.height();
-				const pixels = snap.readPixels(0, 0, {
-					width: w,
-					height: h,
-					colorType: ck.ColorType.RGBA_8888,
-					alphaType: ck.AlphaType.Unpremul,
-					colorSpace: ck.ColorSpace.SRGB,
-				}) as Uint8Array | null;
-				// A surface that won't read back (a lost context) still has Skia's
-				// encoder, which works off the snapshot rather than a pixel buffer —
-				// as does a runtime without CompressionStream. Bigger bytes beat no
-				// bytes, so both fall back to it rather than failing the render.
-				if (!pixels) return skiaPng();
+				// Without a destination CanvasKit copies the frame out to the JS heap.
+				// encodePng copies the rows before it awaits, so a heap growth that
+				// detaches this view cannot reach it.
+				const dest = ck.Malloc(Uint8Array, w * h * 4);
 				try {
-					return {
-						bytes: await encodePng(pixels, w, h, encodeOpts),
-						format: "png" as const,
-					};
-				} catch {
-					return skiaPng();
+					const pixels = snap.readPixels(
+						0,
+						0,
+						imageInfo(ck, "pixels", w, h),
+						dest,
+					) as Uint8Array | null;
+					// A surface that won't read back (a lost context) still has Skia's
+					// encoder, which works off the snapshot rather than a pixel buffer —
+					// as does a runtime without CompressionStream. Bigger bytes beat no
+					// bytes, so both fall back to it rather than failing the render.
+					if (!pixels) return skiaPng();
+					try {
+						return {
+							bytes: await encodePng(pixels, w, h, encodeOpts),
+							format: "png" as const,
+						};
+					} catch {
+						return skiaPng();
+					}
+				} finally {
+					ck.Free(dest);
 				}
 			} finally {
 				snap.delete();
@@ -3911,9 +4159,13 @@ export async function paintScene(
 	};
 }
 
-// Bind to rt.canvas when present (WebGL, SW fallback) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface -> null IS the capability probe
-// (a host canvas that can't back WebGL), so this needs no environment flag.
+// Bind to rt.canvas when present (WebGL, then SW) -> displayable; otherwise an
+// offscreen raster surface. MakeWebGLCanvasSurface throws when the host canvas
+// can't back WebGL (context creation fails, or MakeOnScreenGLSurface fails and its
+// DOM-node swap throws on an OffscreenCanvas), so a failed WebGL attempt is caught
+// on its own and still falls back to SW. A throw may leave a WebGL context on the
+// element, which locks it out of the 2D context SW presents through, so SW gets a
+// fresh element and the old one's context is released.
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
@@ -3923,18 +4175,34 @@ function makeSurface(
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
-	if (rt.canvas) {
-		try {
-			const el = rt.canvas.createCanvas(w, h);
-			// Typed for DOM canvases only; any canvas the host makes is accepted.
-			const target = el as unknown as HTMLCanvasElement;
-			const gl = ck.MakeWebGLCanvasSurface(target);
-			if (gl)
-				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(target);
-			if (sw) return { surface: sw, canvas: el, loseContext: noop };
-		} catch {
-			// Fall through to an offscreen surface.
+	const host = rt.canvas;
+	if (host) {
+		const create = (): CanvasLike | undefined => {
+			try {
+				return host.createCanvas(w, h);
+			} catch {
+				return undefined;
+			}
+		};
+		// Typed for DOM canvases only; any canvas the host makes is accepted.
+		const asTarget = (el: CanvasLike) => el as unknown as HTMLCanvasElement;
+		let el = create();
+		if (el) {
+			const canvas = el;
+			try {
+				const gl = ck.MakeWebGLCanvasSurface(asTarget(canvas));
+				if (gl)
+					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
+			} catch {
+				releaseGL(canvas);
+				el = create();
+			}
+		}
+		if (el) {
+			try {
+				const sw = ck.MakeSWCanvasSurface(asTarget(el));
+				if (sw) return { surface: sw, canvas: el, loseContext: noop };
+			} catch {}
 		}
 	}
 	const surface = ck.MakeSurface(w, h) as Surface;
@@ -3972,19 +4240,18 @@ function encodeJpeg(
 ): Uint8Array | null {
 	const width = snap.width();
 	const height = snap.height();
-	const info = {
+	const pixels = snap.readPixels(
+		0,
+		0,
+		imageInfo(ck, "pixels", width, height),
+	) as Uint8Array | null;
+	if (!pixels) return null;
+	const flat = makeImageFromPixels(
+		ck,
+		"opaque",
 		width,
 		height,
-		colorType: ck.ColorType.RGBA_8888,
-		alphaType: ck.AlphaType.Unpremul,
-		colorSpace: ck.ColorSpace.SRGB,
-	};
-	const pixels = snap.readPixels(0, 0, info) as Uint8Array | null;
-	if (!pixels) return null;
-	const flat = ck.MakeImage(
-		{ ...info, alphaType: ck.AlphaType.Opaque },
 		flattenOverWhite(pixels),
-		width * 4,
 	);
 	if (!flat) return null;
 	try {
