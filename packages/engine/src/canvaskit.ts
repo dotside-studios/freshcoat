@@ -1329,8 +1329,13 @@ function drawShape(
 
 // The general mask: draw children to an offscreen content layer, then composite
 // the mask's coverage onto it. DstIn keeps content where the mask is opaque
-// (DstOut where it's transparent, for invert); a luminance channel first maps
-// the mask's brightness to alpha via a color matrix.
+// (DstOut where it's transparent, for invert). Luminance coverage is
+// luminance(straight RGB) × alpha (SVG 1.1 masking), which equals luminance of
+// the premultiplied color. A color matrix sees unpremultiplied color, so the
+// mask is first composited over opaque black: the result is opaque with the
+// premultiplied RGB, and the matrix then maps its luminance to alpha.
+// Luminance is taken on sRGB-encoded values with Rec. 709 weights, not on
+// linearRGB as SVG's default color-interpolation would.
 function drawMasked(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -1359,10 +1364,17 @@ function drawMasked(
 	if (cmd.channel === "luminance")
 		maskPaint.setColorFilter(
 			bin.track(
-				ck.ColorFilter.MakeMatrix([
-					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152, 0.0722,
-					0, 0,
-				]),
+				ck.ColorFilter.MakeCompose(
+					bin.track(
+						ck.ColorFilter.MakeMatrix([
+							0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152,
+							0.0722, 0, 0,
+						]),
+					),
+					bin.track(
+						ck.ColorFilter.MakeBlend(ck.BLACK, ck.BlendMode.DstOver),
+					),
+				),
 			),
 		);
 	canvas.saveLayer(maskPaint, bounds);

@@ -1,0 +1,170 @@
+{
+	"id": "mask-luminance-alpha",
+	"title": "a luminance mask's coverage is its luminance times its alpha",
+	"profile": "core",
+	"requires": [
+		"mask.luminance",
+		"mask.invert"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "mask",
+				"mask": {
+					"kind": "rect",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 50,
+						"height": 80
+					},
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff80"
+						}
+					]
+				},
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 50,
+							"height": 80
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#2f6fed"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 30,
+					"y": 20
+				},
+				"size": {
+					"width": 50,
+					"height": 80
+				},
+				"channel": "luminance"
+			},
+			{
+				"kind": "mask",
+				"mask": {
+					"kind": "rect",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 50,
+						"height": 80
+					},
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff40"
+						}
+					]
+				},
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 50,
+							"height": 80
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#2f6fed"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 80,
+					"y": 20
+				},
+				"size": {
+					"width": 50,
+					"height": 80
+				},
+				"channel": "luminance",
+				"invert": true
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				55,
+				60
+			],
+			"expect": [
+				151,
+				183,
+				246,
+				255
+			],
+			"why": "white at 50% alpha keeps 50% of the content, not all of it",
+			"tolerance": 3
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				105,
+				60
+			],
+			"expect": [
+				99,
+				147,
+				242,
+				255
+			],
+			"why": "inverted white at 25% alpha keeps 75%",
+			"tolerance": 3
+		}
+	]
+}
