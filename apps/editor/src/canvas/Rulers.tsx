@@ -1,5 +1,6 @@
 import {
 	type KeyboardEvent,
+	memo,
 	type PointerEvent,
 	type RefObject,
 	useEffect,
@@ -22,7 +23,7 @@ type Axis = "x" | "y";
 const EDGE_LABEL_ROOM = 30;
 
 /** Top and left rulers in design px, over the canvas's edges. */
-export function Rulers() {
+export const Rulers = memo(function Rulers() {
 	const on = useEditor((s) => s.rulers && s.doc !== null);
 	if (!on) return null;
 	return (
@@ -38,7 +39,7 @@ export function Rulers() {
 			/>
 		</>
 	);
-}
+});
 
 const ADDS: Record<Axis, { axis: Axis; label: string }> = {
 	x: { axis: "y", label: "Add horizontal guide" },
