@@ -1297,7 +1297,10 @@ function drawMasked(
 		size: cmd.size,
 		children: cmd.children,
 	};
-	const bounds = layerBounds(ck, canvas, provider, images, bin, content, frame);
+	const ctm = (canvas.getTotalMatrix() as number[]).slice(0, 6) as Affine;
+	const bounds = originInvariant(cmd.mask, ctm)
+		? layerBounds(ck, canvas, provider, images, bin, content, frame)
+		: null;
 	canvas.saveLayer(null, bounds);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
@@ -2032,9 +2035,7 @@ function hasLayerPaint(cmd: DrawCommand): boolean {
 // or null for a paint that is not modelled.
 function layerGrow(cmd: DrawCommand): ((b: Bounds) => Bounds) | null {
 	if (cmd.blendMode === "linear-burn") return null;
-	const list = (
-		Array.isArray(cmd.shadow) ? cmd.shadow : cmd.shadow ? [cmd.shadow] : []
-	).filter((s) => s.color !== "transparent");
+	const list = shadowList(cmd.shadow);
 	if (list.some((s) => s.inset)) return null;
 	const blur =
 		typeof cmd.blur === "number" && cmd.blur > 0
@@ -2764,9 +2765,8 @@ function linearBurnBlender(ck: CK, bin: Bin): CK | null {
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
-// Off until bounded layers are accepted: a layer's device origin moves with its
-// bounds, and Skia's curve and clip rasterization is not exact under that shift.
-let boundLayers = false;
+// Test hook: paint every layer unbounded.
+let boundLayers = true;
 
 export function setLayerBounds(enabled: boolean): void {
 	boundLayers = enabled;
@@ -2775,8 +2775,8 @@ export function setLayerBounds(enabled: boolean): void {
 // Conservative local bounds for a layer holding `inner`, so it is allocated and
 // filtered over its content rather than the whole surface. Skia grows them for
 // the layer paint's image filter itself. Padded by a device pixel. Null leaves
-// the layer unbounded: content that is not modelled, a perspective matrix, or a
-// recording canvas.
+// the layer unbounded: content that is not modelled or not originInvariant, a
+// matrix that is not a positive scale and translate, or a recording canvas.
 function layerBounds(
 	ck: CK,
 	canvas: CK,
@@ -2788,6 +2788,10 @@ function layerBounds(
 ): CK | null {
 	if (!boundLayers || measuring.has(canvas)) return null;
 	const matrix = canvas.getTotalMatrix() as number[];
+	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
+	if (!(matrix[0] > 0 && matrix[4] > 0)) return null;
+	const ctm = matrix.slice(0, 6) as Affine;
+	if (!originInvariant(inner, ctm)) return null;
 	const device = exportPixelSize(frame, frame.scale);
 	const b = predictedBounds(
 		ck,
@@ -2801,7 +2805,6 @@ function layerBounds(
 		true,
 	);
 	if (!b || !b.every(Number.isFinite)) return null;
-	const ctm = matrix.slice(0, 6) as Affine;
 	const inverse = invertAffine(ctm);
 	if (!inverse) return null;
 	const [l, t, r, btm] = mapAffine(inverse, [
@@ -2817,7 +2820,47 @@ function layerBounds(
 // so bounding the layer cannot change what lands outside it.
 function layerPaintBoundable(cmd: DrawCommand): boolean {
 	const cm = cmd.adjust?.colorMatrix;
-	return !(cm && !shaderSideMatrix(cmd.adjust) && matrixTouchesTransparent(cm));
+	if (cm && !shaderSideMatrix(cmd.adjust) && matrixTouchesTransparent(cm))
+		return false;
+	return !shadowList(cmd.shadow).some((s) => s.inset);
+}
+
+// Whether `cmd` paints the same in a layer at another whole-pixel origin. Skia
+// maps geometry through the layer's translation in float, so clips, paths,
+// rotations, gradients and sampled images can shift by an edge pixel or a whole
+// column. Rounded corners can move by a few levels and are accepted. `m` is the
+// layer's scale and translate.
+function originInvariant(cmd: DrawCommand, m: Affine): boolean {
+	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd)) return false;
+	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
+	if (cmd.op === "drawRect")
+		return (
+			!cmd.cornerSmoothing &&
+			(cmd.fills ?? []).every((f) => f.kind === "solid")
+		);
+	if (cmd.op === "drawText") return !cmd.fill || cmd.fill.kind === "solid";
+	if (cmd.op === "drawGroup")
+		return cmd.children.every((c) => originInvariant(c, m));
+	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
+	return cmd.op === "drawQr";
+}
+
+// Whether every pixel edge of a nearest-sampled bitmap lands clear of device
+// pixel centers, so float error in the layer's translation cannot flip a column.
+function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
+	if (cmd.role === "barcode") return false;
+	const x = m[0] * cmd.pos.x + m[2];
+	const y = m[4] * cmd.pos.y + m[5];
+	const w = m[0] * cmd.size.width;
+	const h = m[4] * cmd.size.height;
+	const clear = (start: number, extent: number, n: number) => {
+		for (let i = 0; i <= n; i++) {
+			const edge = start + (extent * i) / n;
+			if (Math.abs(edge - Math.floor(edge) - 0.5) < 1 / 256) return false;
+		}
+		return true;
+	};
+	return clear(x, w, cmd.pixelWidth) && clear(y, h, cmd.pixelHeight);
 }
 
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
@@ -2908,6 +2951,13 @@ function invertedSilhouette(ck: CK, bin: Bin, color: string): CK {
 	return bin.track(ck.ImageFilter.MakeColorFilter(cf, null));
 }
 
+// A drawable's visible shadows.
+function shadowList(shadow: DrawCommand["shadow"]) {
+	return (Array.isArray(shadow) ? shadow : shadow ? [shadow] : []).filter(
+		(s) => s.color !== "transparent",
+	);
+}
+
 // The image filter for a drawable's whole shadow stack, or null when it has
 // none. A `null` input anywhere in the graph is the layer's own contents.
 //
@@ -2916,9 +2966,7 @@ function invertedSilhouette(ck: CK, bin: Bin, color: string): CK {
 // So each is built on its own and blended: drop shadows under the contents,
 // inner shadows over them, each list painted bottom-up.
 function shadowFilter(ck: CK, bin: Bin, shadow: DrawCommand["shadow"]): CK {
-	const list = (Array.isArray(shadow) ? shadow : shadow ? [shadow] : []).filter(
-		(s) => s.color !== "transparent",
-	);
+	const list = shadowList(shadow);
 	if (list.length === 0) return null;
 
 	let under: CK = null;
@@ -2969,8 +3017,8 @@ function shadowFilter(ck: CK, bin: Bin, shadow: DrawCommand["shadow"]): CK {
 	return out;
 }
 
-// What paintDrawable draws inside the layer: the drawable under its own
-// rotation, without the layer paint.
+// What paintDrawable draws inside the layer: the drawable without its layer
+// paint, its rotation already on the canvas.
 function layerContent(cmd: DrawCommand): DrawCommand {
 	const {
 		rotation: _r,
