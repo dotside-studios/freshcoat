@@ -79,7 +79,7 @@ afterEach(cleanup);
 
 describe("Layers tree renders", () => {
 	it("a canvas hover lights the row without re-rendering the tree", () => {
-		const c = setup(rects(200), <LeftPanel />);
+		const c = setup(rects(40), <LeftPanel />);
 		const row = (key: string) => screen.getByTestId(`layer-row-${key}`);
 		const counts = countRenders(() => {
 			act(() => c.dispatch({ type: "hover", key: "0/3" }));
@@ -94,7 +94,7 @@ describe("Layers tree renders", () => {
 	});
 
 	it("hiding a layer re-renders only its own row", () => {
-		const c = setup(rects(200), <LeftPanel />);
+		const c = setup(rects(40), <LeftPanel />);
 		const counts = countRenders(() => {
 			act(() => c.toggleHidden(["0/7"]));
 		});

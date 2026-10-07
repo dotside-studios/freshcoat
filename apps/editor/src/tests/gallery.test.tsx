@@ -7,7 +7,6 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import type { Selection } from "react-aria-components";
 import {
@@ -39,6 +38,7 @@ import {
 import { GridUiStore, selectionIds } from "../data/grid-state";
 import { RecordsGallery } from "../data/RecordsGallery";
 import { setThumbnailBackend } from "../data/thumbnails";
+import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 const col = (key: string, type: Column["type"]): Column => ({ key, type });
@@ -244,7 +244,7 @@ function renderGallery(dataset = photos()) {
 	);
 	const selected = () =>
 		selection === "all" ? "all" : [...selection].map(String).sort();
-	return { ui, onOpen, onDelete, selected, user: userEvent.setup() };
+	return { ui, onOpen, onDelete, selected, user: fastUser() };
 }
 
 const card = (id: string) =>
@@ -372,7 +372,7 @@ describe("Data section with a photo dataset", () => {
 				<DataSection />
 			</ControllerProvider>,
 		);
-		return userEvent.setup();
+		return fastUser();
 	}
 
 	it("opens as a gallery, and remembers the table when chosen", async () => {

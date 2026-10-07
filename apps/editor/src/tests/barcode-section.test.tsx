@@ -160,8 +160,6 @@ describe("BarcodeSection", () => {
 		expect(code(c).pos).toEqual({ x: 220, y: 100 });
 	});
 
-	// Encoding PDF417 in jsdom takes over 3 s alone, and more on a busy
-	// runner, so this one gets more than the default 5 s.
 	it("keeps the box for PDF417 and offers its 0 to 8 levels", async () => {
 		const user = fastUser();
 		const c = setup(withBarcode());
@@ -173,7 +171,7 @@ describe("BarcodeSection", () => {
 		fireEvent.change(ec, { target: { value: "12" } });
 		fireEvent.keyDown(ec, { key: "Enter" });
 		expect(code(c).properties.errorCorrection).toBe(8);
-	}, 20_000);
+	});
 
 	it("offers ITF-14 bearer bars", async () => {
 		const user = fastUser();

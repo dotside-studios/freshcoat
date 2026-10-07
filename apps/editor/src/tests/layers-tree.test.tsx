@@ -1,10 +1,10 @@
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
 import { getElement } from "../doc/path";
 import { LeftPanel } from "../panels/LeftPanel";
+import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 let controller: EditorController;
@@ -16,7 +16,7 @@ function row(key: string): HTMLElement {
 function setup() {
 	controller = new EditorController();
 	controller.dispatch({ type: "open", template: doc(), fileName: "doc.coat" });
-	const user = userEvent.setup();
+	const user = fastUser();
 	render(
 		<ControllerProvider controller={controller}>
 			<LeftPanel />

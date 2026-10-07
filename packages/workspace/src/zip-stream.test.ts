@@ -349,6 +349,7 @@ describe("readZip", () => {
 		});
 	});
 
+	// Writes and reads back 66,000 entries, so it takes seconds.
 	it("finds a zip64 directory past 65,535 entries", async () => {
 		const out = blobOutput();
 		const writer = createZipWriter(out, MTIME);

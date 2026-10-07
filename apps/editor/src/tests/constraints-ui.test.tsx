@@ -1,6 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -18,7 +17,7 @@ import { withConstraint } from "~/panels/design/ConstraintsSection";
 import { DesignPanel } from "~/panels/design/DesignPanel";
 import { SizeSection } from "~/panels/setup/SizeSection";
 import { useEditor } from "~/state/hooks";
-import { chooseOption } from "./aria";
+import { chooseOption, fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 beforeEach(() => {
@@ -58,7 +57,7 @@ function design(selection: string[], t?: Template) {
 			<DesignPanel />
 		</ControllerProvider>,
 	);
-	return { c, user: userEvent.setup() };
+	return { c, user: fastUser() };
 }
 
 const el = (c: EditorController, key: string) =>
@@ -155,7 +154,7 @@ describe("Resize with constraints", () => {
 				<Size />
 			</ControllerProvider>,
 		);
-		const user = userEvent.setup();
+		const user = fastUser();
 		await user.click(
 			screen.getByRole("checkbox", { name: "Resize with constraints" }),
 		);
@@ -185,7 +184,7 @@ describe("Resize with constraints", () => {
 				<Size />
 			</ControllerProvider>,
 		);
-		const user = userEvent.setup();
+		const user = fastUser();
 		const w = screen.getByRole("spinbutton", { name: "Template width" });
 		await user.clear(w);
 		await user.type(w, "1200{Enter}");
@@ -199,7 +198,7 @@ describe("Resize with constraints", () => {
 				<Size />
 			</ControllerProvider>,
 		);
-		const user = userEvent.setup();
+		const user = fastUser();
 		const bleed = screen.getByRole("spinbutton", { name: "Template bleed" });
 		await user.clear(bleed);
 		await user.type(bleed, "12{Enter}");
@@ -312,7 +311,7 @@ describe("print guides", () => {
 		expect(rows.length).toBeGreaterThan(0);
 		expect(rows[0]?.getAttribute("data-level")).toBe("info");
 		expect(screen.getByTestId("no-issues")).toBeTruthy();
-		const user = userEvent.setup();
+		const user = fastUser();
 		await user.click(
 			within(list).getByRole("button", { name: /Select front · a$/ }),
 		);
