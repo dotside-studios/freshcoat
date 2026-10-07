@@ -100,7 +100,7 @@ import {
 import {
 	clearAutosave,
 	configureAutosave,
-	readAutosaveAsset,
+	keepAutosaveAsset,
 	writeAutosave,
 } from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
@@ -108,6 +108,7 @@ import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
 import {
+	reportSourceChanged,
 	SourceChangedError,
 	settleAssets,
 	stopSourceAssets,
@@ -122,6 +123,7 @@ configureAutosave({
 			tone: "warning",
 			timeout: 10000,
 		}),
+	onUnreadable: () => reportSourceChanged(),
 });
 
 const loadArchive = once(() => import("@freshcoat-js/workspace/archive"));
@@ -1156,7 +1158,7 @@ export class EditorController {
 		if (bytes instanceof Blob)
 			trackSourceAssets(out.workspace, {
 				fileName: name,
-				backup: readAutosaveAsset,
+				keep: keepAutosaveAsset,
 				onChanged: (err) =>
 					toast(err.message, { tone: "danger", timeout: 12000 }),
 			});
