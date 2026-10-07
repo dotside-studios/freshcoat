@@ -1814,6 +1814,54 @@ add(
 	],
 );
 
+// ─── layer effect order ───────────────────────────────────────────────────────
+
+// Adjust recolors the drawable, not the shadows it casts: a shadow keeps its own
+// color, as in Figma. A backend running the adjust over the finished layer
+// darkens the shadow to (4,16,144) under the LUT and turns it red under the
+// matrix.
+add(
+	"adjust-lut-keeps-shadow-color",
+	"a LUT adjusts the content and leaves the drop shadow's color",
+	"raster",
+	["adjust.lut", "effect.shadow"],
+	frame([
+		createRect({
+			...box(20, 40, 40, 40),
+			fills: solid("#808080"),
+			shadow: { color: "#2040c0", dx: 60, dy: 0, blur: 0 },
+			adjust: buildAdjust({ gamma: 2 }),
+		}),
+	]),
+	[
+		px([40, 60], [64, 64, 64, 255], "128 at gamma 2 is 64", 2),
+		px([100, 60], [32, 64, 192, 255], "the shadow in its own color", 2),
+	],
+);
+
+add(
+	"adjust-matrix-keeps-shadow-color",
+	"a colorMatrix adjusts the content and leaves the drop shadow's color",
+	"core",
+	["adjust.colorMatrix", "effect.shadow"],
+	frame([
+		createRect({
+			...box(20, 40, 40, 40),
+			fills: solid("#2f6fed"),
+			shadow: { color: "#2040c0", dx: 60, dy: 0, blur: 0 },
+			adjust: {
+				colorMatrix: [
+					0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+				],
+			},
+		}),
+	]),
+	[
+		px([40, 60], [237, 111, 47, 255], "(47,111,237) with R and B exchanged", 2),
+		px([100, 60], [32, 64, 192, 255], "the shadow in its own color", 2),
+	],
+);
+
 mkdirSync(CASES_DIR, { recursive: true });
 for (const c of cases)
 	writeFileSync(join(CASES_DIR, `${c.id}.json`), stringifyCase(c));

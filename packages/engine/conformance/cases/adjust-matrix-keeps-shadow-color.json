@@ -1,0 +1,120 @@
+{
+	"id": "adjust-matrix-keeps-shadow-color",
+	"title": "a colorMatrix adjusts the content and leaves the drop shadow's color",
+	"profile": "core",
+	"requires": [
+		"adjust.colorMatrix",
+		"effect.shadow"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 20,
+					"y": 40
+				},
+				"size": {
+					"width": 40,
+					"height": 40
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed"
+					}
+				],
+				"shadow": {
+					"color": "#2040c0",
+					"dx": 60,
+					"dy": 0,
+					"blur": 0
+				},
+				"adjust": {
+					"colorMatrix": [
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0
+					]
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				40,
+				60
+			],
+			"expect": [
+				237,
+				111,
+				47,
+				255
+			],
+			"why": "(47,111,237) with R and B exchanged",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				100,
+				60
+			],
+			"expect": [
+				32,
+				64,
+				192,
+				255
+			],
+			"why": "the shadow in its own color",
+			"tolerance": 2
+		}
+	]
+}

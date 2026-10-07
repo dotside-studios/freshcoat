@@ -1,0 +1,80 @@
+{
+	"caseId": "adjust-lut-keeps-shadow-color",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 20,
+						"y": 40
+					},
+					"size": {
+						"width": 40,
+						"height": 40
+					},
+					"shadow": {
+						"color": "#2040c0",
+						"dx": 60,
+						"dy": 0,
+						"blur": 0
+					},
+					"adjust": {
+						"lut": {
+							"r": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							},
+							"g": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							},
+							"b": {
+								"__u8": "AAAAAAAAAAAAAAAAAQEBAQEBAQECAgICAgIDAwMDBAQEBAUFBQUGBgYHBwcICAgJCQkKCgsLCwwMDQ0ODg8PEBARERISExMUFBUVFhcXGBgZGhobHBwdHh4fICAhIiMjJCUmJicoKSoqKywtLi8vMDEyMzQ1Njc4ODk6Ozw9Pj9AQUJDREVGR0lKS0xNTk9QUVJUVVZXWFlbXF1eX2FiY2RmZ2hpa2xtb3Bxc3R1d3h5e3x+f4CCg4WGiImLjI6PkZKUlZeYmpudnqCio6WmqKqrra+wsrS1t7m6vL7AwcPFx8jKzM7P0dPV19na3N7g4uTm6Onr7e/x8/X3+fv9/w=="
+							}
+						}
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#808080"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "973f62265425311616a8a04d38147e119982eb7de430a0dd77c5b82cf3e94afc"
+}
