@@ -247,13 +247,13 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
-	test("1.7: element backdropBlur", () => {
+	test("1.6: element backdropBlur", () => {
 		expect(minimumFormatVersion(withElements(base(), rect("r")))).toBe("1.0");
 		expect(
 			minimumFormatVersion(
 				withElements(base(), rect("r", { backdropBlur: 8 })),
 			),
-		).toBe("1.7");
+		).toBe("1.6");
 	});
 
 	test("the highest feature wins", () => {
