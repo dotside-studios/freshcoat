@@ -1,7 +1,6 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
+import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
 import { KEY_RULE } from "~/app/copy";
-
-export const FIELD_KEY = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 export const FIELD_FORMATS = [
 	{ id: "text", name: "Text" },
@@ -25,7 +24,7 @@ export function fieldKeyError(
 	taken: (key: string) => boolean,
 ): string | null {
 	if (key === "") return "Enter a key";
-	if (!FIELD_KEY.test(key)) return KEY_RULE;
+	if (!FIELD_ID.test(key)) return KEY_RULE;
 	if (taken(key)) return `"${key}" is already a field`;
 	return null;
 }

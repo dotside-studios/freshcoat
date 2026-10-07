@@ -1,4 +1,5 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 
 export type FieldEntry = { id: string; field: FieldDefinition };
 
@@ -104,8 +105,7 @@ export function referencedFields(template: Template): Set<string> {
 	const found = new Set<string>();
 	const scan = (value: unknown) => {
 		if (typeof value === "string") {
-			for (const m of value.matchAll(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g))
-				found.add(m[1] as string);
+			for (const id of tokenIds(value)) found.add(id);
 			return;
 		}
 		if (Array.isArray(value)) {

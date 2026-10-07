@@ -2,6 +2,7 @@
 // template-global field-metadata map, and compute marker rewrites for renames.
 // No Figma API here: main/bindings.ts supplies real nodes; this stays testable.
 
+import { renameToken } from "@freshcoat-js/coatfile/mustache";
 import {
 	buildFieldMeta,
 	type FieldDraft,
@@ -124,10 +125,6 @@ export function planHarvest(slots: SlotHarvestInput[]): HarvestPlan {
 	return { nodeBindings, slotMeta };
 }
 
-function escapeRegExp(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Rewrite a layer name so every `{{oldId}}` token becomes `{{newId}}`, keeping
  * the kind prefix, quotes, literals, and qr opts intact. Returns null when the
@@ -139,7 +136,6 @@ export function renameInMarker(
 	oldId: string,
 	newId: string,
 ): string | null {
-	const re = new RegExp(`\\{\\{\\s*${escapeRegExp(oldId)}\\s*\\}\\}`, "g");
-	if (!re.test(name)) return null;
-	return name.replace(re, `{{${newId}}}`);
+	const next = renameToken(name, oldId, newId);
+	return next === name ? null : next;
 }

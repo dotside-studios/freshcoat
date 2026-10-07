@@ -23,6 +23,7 @@ import {
 	subtleSha256,
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
+import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
 import { BOOLEAN, INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";
@@ -73,7 +74,6 @@ export type ElementPatch = Partial<Omit<Element, "type" | "properties">> & {
 };
 
 const NOT_FOUND = "That layer no longer exists";
-const FIELD_KEY = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_SIDE = 16384;
 
 // ── Layers ───────────────────────────────────────────────────────────────────
@@ -763,7 +763,7 @@ export function addField(
 	key: string,
 	def: FieldDefinition,
 ): OpResult {
-	if (!FIELD_KEY.test(key)) return refuse("invalid_field_key", KEY_RULE);
+	if (!FIELD_ID.test(key)) return refuse("invalid_field_key", KEY_RULE);
 	if (key in t.fields.properties)
 		return refuse("duplicate_field", `A field called "${key}" already exists`);
 	return ok(setFieldDefinition(t, key, def), []);
@@ -799,19 +799,18 @@ export function renameField(
 	if (!(oldKey in t.fields.properties))
 		return refuse("unknown_field", `No field called "${oldKey}"`);
 	if (oldKey === newKey) return ok(t, []);
-	if (!FIELD_KEY.test(newKey)) return refuse("invalid_field_key", KEY_RULE);
+	if (!FIELD_ID.test(newKey)) return refuse("invalid_field_key", KEY_RULE);
 	if (newKey in t.fields.properties)
 		return refuse(
 			"duplicate_field",
 			`A field called "${newKey}" already exists`,
 		);
-	const token = new RegExp(`\\{\\{(\\s*)${oldKey}(\\s*)\\}\\}`, "g");
 	// Walks the draft, so only the objects holding a rewritten token or
 	// condition are copied.
 	const rewrite = (node: Record<string, unknown>) => {
 		for (const [k, v] of Object.entries(node)) {
 			if (typeof v === "string") {
-				const next = v.replace(token, `{{$1${newKey}$2}}`);
+				const next = renameToken(v, oldKey, newKey);
 				if (next !== v) node[k] = next;
 			} else if (v && typeof v === "object") {
 				rewrite(v as Record<string, unknown>);

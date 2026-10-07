@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { substitute } from "../src/mustache";
+import {
+	FIELD_ID,
+	hasToken,
+	renameToken,
+	substitute,
+	tokenIds,
+	wholeToken,
+} from "../src/mustache";
 
 describe("substitute", () => {
 	test("replaces a simple {{id}} token", () => {
@@ -66,5 +73,85 @@ describe("substitute", () => {
 		expect(substitute(uri, { A: "x" })).toBe(uri);
 		expect(substitute("a {b} }}", { b: "x" })).toBe("a {b} }}");
 		expect(substitute("{{ 1x }}", {})).toBe("{{ 1x }}");
+	});
+});
+
+describe("FIELD_ID", () => {
+	test("accepts identifiers and rejects everything else", () => {
+		expect(FIELD_ID.test("first_name2")).toBe(true);
+		expect(FIELD_ID.test("_x")).toBe(true);
+		expect(FIELD_ID.test("1x")).toBe(false);
+		expect(FIELD_ID.test("a-b")).toBe(false);
+		expect(FIELD_ID.test("")).toBe(false);
+	});
+});
+
+describe("tokenIds", () => {
+	test("lists ids in order, repeats included", () => {
+		expect(tokenIds("{{a}} {{ b }} {{a}}")).toEqual(["a", "b", "a"]);
+	});
+
+	test("skips invalid identifiers", () => {
+		expect(tokenIds("{{1abc}} {{a-b}} {{a.b}} {{ok_one}}")).toEqual([
+			"ok_one",
+		]);
+	});
+
+	test("returns nothing for plain text", () => {
+		expect(tokenIds("Hello world")).toEqual([]);
+	});
+
+	test("is safe to call repeatedly", () => {
+		expect(tokenIds("{{a}}")).toEqual(["a"]);
+		expect(tokenIds("{{a}}")).toEqual(["a"]);
+	});
+});
+
+describe("wholeToken", () => {
+	test("reads a string that is exactly one token", () => {
+		expect(wholeToken("{{name}}")).toBe("name");
+		expect(wholeToken("{{ name }}")).toBe("name");
+	});
+
+	test("rejects surrounding text or whitespace", () => {
+		expect(wholeToken("Hi {{name}}")).toBeUndefined();
+		expect(wholeToken(" {{name}}")).toBeUndefined();
+		expect(wholeToken("{{a}}{{b}}")).toBeUndefined();
+		expect(wholeToken("{{a-b}}")).toBeUndefined();
+	});
+});
+
+describe("hasToken", () => {
+	test("finds a token anywhere in a tree", () => {
+		expect(hasToken("{{a}}")).toBe(true);
+		expect(hasToken({ x: [1, { y: "Hi {{a}}" }] })).toBe(true);
+	});
+
+	test("ignores invalid tokens and non-strings", () => {
+		expect(hasToken({ x: "{{a-b}}", y: 3, z: null })).toBe(false);
+		expect(hasToken(undefined)).toBe(false);
+	});
+
+	test("gives the same answer on repeated calls", () => {
+		expect(hasToken("{{a}}")).toBe(true);
+		expect(hasToken("{{a}}")).toBe(true);
+	});
+});
+
+describe("renameToken", () => {
+	test("renames every matching token and keeps its spacing", () => {
+		expect(renameToken("{{old}} and {{ old }}", "old", "new")).toBe(
+			"{{new}} and {{ new }}",
+		);
+	});
+
+	test("matches the whole id, not a prefix", () => {
+		expect(renameToken("{{old_id}} {{old}}", "old", "new")).toBe(
+			"{{old_id}} {{new}}",
+		);
+	});
+
+	test("leaves other text untouched", () => {
+		expect(renameToken("old {{other}}", "old", "new")).toBe("old {{other}}");
 	});
 });
