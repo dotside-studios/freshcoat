@@ -188,51 +188,108 @@ export function remapKeys(
 	after: Template,
 	keys: Iterable<string>,
 ): string[] {
-	const list = [...keys];
-	if (before === after || list.length === 0) return list;
-	const byObject = new Map<Layer, string>();
-	const byId = new Map<string, string | null>();
-	for (let s = 0; s < after.template_data.length; s++) {
-		for (const entry of walkLayers(after, s)) {
-			byObject.set(entry.element, entry.key);
-			const idKey = `${s}\u0000${entry.element.type}\u0000${entry.element.id}`;
-			byId.set(idKey, byId.has(idKey) ? null : entry.key);
+	return keyRemapper(before, after)(keys);
+}
+
+/** `remapKeys` for several key sets, building the lookups over `after` once,
+ *  on the first set that needs them. */
+export function keyRemapper(
+	before: Template,
+	after: Template,
+): (keys: Iterable<string>) => string[] {
+	let lookups:
+		| {
+				byObject: Map<Layer, string>;
+				byId: Map<string, string | null>;
+				sideMap: Map<number, number>;
+		  }
+		| undefined;
+	const index = () => {
+		const byObject = new Map<Layer, string>();
+		const byId = new Map<string, string | null>();
+		for (let s = 0; s < after.template_data.length; s++) {
+			for (const entry of walkLayers(after, s)) {
+				byObject.set(entry.element, entry.key);
+				const idKey = `${s}\u0000${entry.element.type}\u0000${entry.element.id}`;
+				byId.set(idKey, byId.has(idKey) ? null : entry.key);
+			}
 		}
-	}
-	const sideMap = sideRemap(before, after);
-	const out: string[] = [];
-	for (const key of list) {
-		const old = getElement(before, key);
-		const lp = parseKey(key);
-		if (!old || !lp) continue;
-		const found = byObject.get(old);
-		if (found !== undefined) {
-			out.push(found);
-			continue;
+		return { byObject, byId, sideMap: sideRemap(before, after) };
+	};
+	return (keys) => {
+		const list = [...keys];
+		if (before === after || list.length === 0) return list;
+		lookups ??= index();
+		const { byObject, byId, sideMap } = lookups;
+		const out: string[] = [];
+		for (const key of list) {
+			const old = getElement(before, key);
+			const lp = parseKey(key);
+			if (!old || !lp) continue;
+			const found = byObject.get(old);
+			if (found !== undefined) {
+				out.push(found);
+				continue;
+			}
+			const side = sideMap.get(lp.side);
+			if (side === undefined) continue;
+			const moved = keyOf({ ...lp, side });
+			const same = getElement(after, moved);
+			if (same && same.id === old.id && same.type === old.type) {
+				out.push(moved);
+				continue;
+			}
+			const unique = byId.get(`${side}\u0000${old.type}\u0000${old.id}`);
+			if (unique) {
+				out.push(unique);
+				continue;
+			}
+			// An edit in place (a rename, a replaced element) keeps the position and
+			// the number of siblings, which a structural edit around it would not.
+			if (
+				same &&
+				same.type === old.type &&
+				siblingCount(before, key) === siblingCount(after, moved)
+			)
+				out.push(moved);
 		}
-		const side = sideMap.get(lp.side);
-		if (side === undefined) continue;
-		const moved = keyOf({ ...lp, side });
-		const same = getElement(after, moved);
-		if (same && same.id === old.id && same.type === old.type) {
-			out.push(moved);
-			continue;
-		}
-		const unique = byId.get(`${side}\u0000${old.type}\u0000${old.id}`);
-		if (unique) {
-			out.push(unique);
-			continue;
-		}
-		// An edit in place (a rename, a replaced element) keeps the position and
-		// the number of siblings, which a structural edit around it would not.
-		if (
-			same &&
-			same.type === old.type &&
-			siblingCount(before, key) === siblingCount(after, moved)
-		)
-			out.push(moved);
-	}
-	return [...new Set(out)];
+		return [...new Set(out)];
+	};
+}
+
+/**
+ * Whether every key names the same layer in `a` and `b`: the same sides, and
+ * the same ids, types and nesting at every position. Shared subtrees are not
+ * walked, so an edit to one layer costs its ancestors' siblings.
+ */
+export function sameStructure(a: Template, b: Template): boolean {
+	if (a === b || a.template_data === b.template_data) return true;
+	if (a.template_data.length !== b.template_data.length) return false;
+	return a.template_data.every((f, i) => {
+		const g = b.template_data[i];
+		return (
+			g !== undefined && f.name === g.name && sameLayers(f.elements, g.elements)
+		);
+	});
+}
+
+function sameLayers(a: readonly Element[], b: readonly Element[]): boolean {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	return a.every((x, i) => {
+		const y = b[i] as Element;
+		if (x === y) return true;
+		if (x.id !== y.id || x.type !== y.type) return false;
+		const xs = childEntries(x);
+		const ys = childEntries(y);
+		return (
+			xs.length === ys.length &&
+			sameLayers(
+				xs.map(([, c]) => c),
+				ys.map(([, c]) => c),
+			)
+		);
+	});
 }
 
 function siblingCount(t: Template, key: string): number {
