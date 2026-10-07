@@ -322,14 +322,19 @@ export function createAutosaveStore(
 	}
 
 	/** Puts one photo in its own transaction, so a full disk loses the photo
-	 *  that did not fit rather than the ones before it. */
+	 *  that did not fit rather than the ones before it. The bytes are read
+	 *  first: an in-memory profile stores a picked file's Blob as a reference
+	 *  to the file, which stops reading once the file changes on disk. */
 	function putAsset(db: IDBDatabase, asset: DatasetAsset): Promise<void> {
 		let p = putting.get(asset.sha256);
 		if (!p) {
 			p = (async () => {
+				const copy = new Blob([await asset.blob.arrayBuffer()], {
+					type: asset.blob.type,
+				});
 				const tx = db.transaction(ASSET_STORE, "readwrite");
 				try {
-					tx.objectStore(ASSET_STORE).put(asset.blob, asset.sha256);
+					tx.objectStore(ASSET_STORE).put(copy, asset.sha256);
 					await done(tx);
 				} catch (err) {
 					try {
