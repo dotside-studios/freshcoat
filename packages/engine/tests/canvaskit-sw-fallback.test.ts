@@ -41,10 +41,15 @@ function fakeRt(gl: unknown) {
 				}
 			: null,
 	);
-	const el = { width: 4, height: 4, getContext };
+	const created: unknown[] = [];
+	const createCanvas = vi.fn(() => {
+		const el = { width: 4, height: 4, getContext };
+		created.push(el);
+		return el;
+	});
 	const rt = {
 		canvas: {
-			createCanvas: () => el,
+			createCanvas,
 			decodeImage: async () => ({}),
 			encode: () => new Uint8Array(),
 		},
@@ -52,7 +57,7 @@ function fakeRt(gl: unknown) {
 		loadImageBytes: async () => new Uint8Array(),
 		paint: async () => ({}),
 	} as unknown as PaintRuntime;
-	return { rt, el, loseContext };
+	return { rt, created, loseContext };
 }
 
 describe("makeSurface falls back to SW when MakeWebGLCanvasSurface throws", () => {
@@ -60,14 +65,15 @@ describe("makeSurface falls back to SW when MakeWebGLCanvasSurface throws", () =
 		const { ck, makeWebGL, makeSW, makeSurface } = fakeCk(() => {
 			throw "failed to create webgl context: err 0";
 		});
-		const { rt, el, loseContext } = fakeRt(false);
+		const { rt, created, loseContext } = fakeRt(false);
 
 		const out = await paintScene(ck, commands, rt);
 
-		expect(makeWebGL).toHaveBeenCalledWith(el);
-		expect(makeSW).toHaveBeenCalledWith(el);
+		expect(created).toHaveLength(2);
+		expect(makeWebGL).toHaveBeenCalledWith(created[0]);
+		expect(makeSW).toHaveBeenCalledWith(created[1]);
 		expect(makeSurface).not.toHaveBeenCalled();
-		expect(out.canvas).toBe(el);
+		expect(out.canvas).toBe(created[1]);
 		expect(loseContext).not.toHaveBeenCalled();
 	});
 
@@ -75,15 +81,16 @@ describe("makeSurface falls back to SW when MakeWebGLCanvasSurface throws", () =
 		const { ck, makeWebGL, makeSW, makeSurface } = fakeCk(() => {
 			throw new TypeError("D.cloneNode is not a function");
 		});
-		const { rt, el, loseContext } = fakeRt(true);
+		const { rt, created, loseContext } = fakeRt(true);
 
 		const out = await paintScene(ck, commands, rt);
 
-		expect(makeWebGL).toHaveBeenCalledWith(el);
+		expect(created).toHaveLength(2);
+		expect(makeWebGL).toHaveBeenCalledWith(created[0]);
 		expect(loseContext).toHaveBeenCalledTimes(1);
-		expect(makeSW).toHaveBeenCalledWith(el);
+		expect(makeSW).toHaveBeenCalledWith(created[1]);
 		expect(makeSurface).not.toHaveBeenCalled();
-		expect(out.canvas).toBe(el);
+		expect(out.canvas).toBe(created[1]);
 
 		out.dispose();
 		expect(loseContext).toHaveBeenCalledTimes(1);
