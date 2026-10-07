@@ -12,10 +12,10 @@ const shaped: number[] = [];
 
 beforeAll(async () => {
 	ck = await loadCanvasKit();
-	const make = ck.ParagraphBuilder.MakeFromFontProvider;
-	ck.ParagraphBuilder.MakeFromFontProvider = (style: any, provider: any) => {
+	const make = ck.ParagraphBuilder.MakeFromFontCollection;
+	ck.ParagraphBuilder.MakeFromFontCollection = (style: any, fc: any) => {
 		shaped.push(style.textStyle.fontSize);
-		return make(style, provider);
+		return make(style, fc);
 	};
 	engine = createParagraphEngine(
 		ck,

@@ -35,6 +35,7 @@ import { parseColor } from "./color";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
+import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -606,7 +607,7 @@ function shapeLine(
 				}
 			: {}),
 	});
-	const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
+	const builder = makeParagraphBuilder(ck, style, provider);
 	for (const span of line.spans) {
 		// Typed as a constructor only; CanvasKit also allows the plain call.
 		const ts = (ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
@@ -3287,7 +3288,7 @@ export async function paintScene(
 			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
-			provider.delete();
+			deleteFontProvider(provider);
 			for (const [src, img] of imageMap)
 				if (!borrowed.has(src)) img.delete();
 		}
