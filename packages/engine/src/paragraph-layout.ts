@@ -13,6 +13,7 @@
 // rules are untested.
 
 import { fontArrayBuffer } from "./font-bytes";
+import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	ClusterAdvance,
@@ -132,7 +133,7 @@ export function createParagraphEngine(
 		direction?: "ltr" | "rtl",
 	): { para: CK; builder: CK } {
 		const style = paragraphStyle(font, direction);
-		const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, provider);
+		const builder = makeParagraphBuilder(ck, style, provider);
 		builder.addText(text);
 		return { para: builder.build(), builder };
 	}
@@ -150,7 +151,7 @@ export function createParagraphEngine(
 	): { lines: InlineShapedLine[] } {
 		if (spans.length === 0) return { lines: [] };
 		const pstyle = paragraphStyle(spans[0]!.font, direction);
-		const builder = ck.ParagraphBuilder.MakeFromFontProvider(pstyle, provider);
+		const builder = makeParagraphBuilder(ck, pstyle, provider);
 		const ranges: { start: number; end: number; spanIndex: number }[] = [];
 		let cursor = 0;
 		let full = "";
@@ -403,6 +404,6 @@ export function createParagraphEngine(
 		layoutInline,
 		clusterAdvances,
 		metricsFor,
-		dispose: () => provider.delete(),
+		dispose: () => deleteFontProvider(provider),
 	};
 }

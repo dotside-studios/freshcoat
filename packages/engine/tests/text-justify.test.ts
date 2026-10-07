@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { bakeText } from "../src/bake-text";
+import { deleteFontProvider, makeParagraphBuilder } from "../src/font-collection";
 import { createText, type TextNode } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { ResolvedFont } from "../src/types";
@@ -49,7 +50,8 @@ function paintedWidth(text: string, wordSpacing = 0): number {
 		bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
 		"Geist",
 	);
-	const builder = ck.ParagraphBuilder.MakeFromFontProvider(
+	const builder = makeParagraphBuilder(
+		ck,
 		new ck.ParagraphStyle({
 			textStyle: { fontFamilies: ["Geist"], fontSize: 20, wordSpacing },
 		}),
@@ -61,7 +63,7 @@ function paintedWidth(text: string, wordSpacing = 0): number {
 	const w = para.getLongestLine();
 	para.delete();
 	builder.delete();
-	provider.delete();
+	deleteFontProvider(provider);
 	return w;
 }
 

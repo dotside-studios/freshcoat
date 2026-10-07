@@ -9,6 +9,7 @@
 // a paint did not draw then stay, least recently used first out, until the
 // cached images fit the budget.
 
+import { deleteFontProvider } from "./font-collection";
 import {
 	createLutImages,
 	freeLutImages,
@@ -118,7 +119,7 @@ export function createPaintCache(opts?: PaintCacheOptions): PaintCache {
 		freePaths(state);
 		const fonts = state.fonts;
 		state.fonts = null;
-		if (fonts) tryFree(() => fonts.provider.delete());
+		if (fonts) tryFree(() => deleteFontProvider(fonts.provider));
 		for (const entry of state.images.values()) freeImage(entry);
 		state.images.clear();
 		freeLutImages(state.luts);
@@ -167,7 +168,7 @@ export function cachedFontProvider(
 		return hit.provider;
 	state.fonts = null;
 	freeLines(state);
-	if (hit) tryFree(() => hit.provider.delete());
+	if (hit) tryFree(() => deleteFontProvider(hit.provider));
 	const provider = build();
 	state.stats.fontProviderBuilds++;
 	state.fonts = { key: [...loaded], provider };
