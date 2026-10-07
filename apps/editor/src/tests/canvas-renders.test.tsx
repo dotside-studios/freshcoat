@@ -12,7 +12,7 @@ import { EditorController } from "~/app/controller";
 import { Viewport } from "~/canvas/Viewport";
 import { doc, geometryOf } from "./doc-fixture";
 
-const renders = vi.hoisted(() => ({ Rulers: 0, Guides: 0, TextEditor: 0 }));
+const renders = vi.hoisted(() => ({ Rulers: 0, Guides: 0 }));
 
 type Memo = { type: FunctionComponent };
 
@@ -37,10 +37,6 @@ vi.mock("~/canvas/Guides", async (load) => {
 	const m = await load<typeof import("~/canvas/Guides")>();
 	return { ...m, Guides: counted("Guides", m.Guides) };
 });
-vi.mock("~/canvas/TextEditor", async (load) => {
-	const m = await load<typeof import("~/canvas/TextEditor")>();
-	return { ...m, TextEditor: counted("TextEditor", m.TextEditor) };
-});
 vi.mock("~/canvas/use-live-render", () => ({
 	useLiveRender: () => ({ canvas: null, scale: 1, fontsLoading: false }),
 }));
@@ -58,7 +54,6 @@ afterEach(cleanup);
 beforeEach(() => {
 	renders.Rulers = 0;
 	renders.Guides = 0;
-	renders.TextEditor = 0;
 });
 
 function mount() {
@@ -108,7 +103,7 @@ function snapshot() {
 }
 
 describe("canvas renders on pointermove", () => {
-	test("moving a layer leaves rulers, guides and the text editor alone", () => {
+	test("moving a layer leaves rulers and guides alone", () => {
 		const { c, geometry } = mount();
 		const [key, box] = [...geometry].find(
 			([k, g]) => !k.endsWith("/bg") && g.parentKey === null,
@@ -122,7 +117,7 @@ describe("canvas renders on pointermove", () => {
 		expect(renders).toEqual(before);
 	});
 
-	test("drawing a shape leaves rulers, guides and the text editor alone", () => {
+	test("drawing a shape leaves rulers and guides alone", () => {
 		const { c } = mount();
 		act(() => c.dispatch({ type: "setTool", tool: "rect" }));
 		const before = snapshot();

@@ -2,7 +2,6 @@ import type { TextElement } from "@freshcoat-js/coatfile";
 import {
 	type CSSProperties,
 	type KeyboardEvent,
-	memo,
 	useLayoutEffect,
 	useRef,
 } from "react";
@@ -57,10 +56,10 @@ const CASE: Record<string, CSSProperties["textTransform"]> = {
 /** The layer being edited on the canvas: a textarea over its box, in its
  *  font, holding the raw template text with its `{{tokens}}`. The render
  *  leaves the layer out meanwhile. Blur, Escape or Mod+Enter end the edit. */
-export const TextEditor = memo(function TextEditor() {
+export function TextEditor() {
 	const key = useEditor((s) => s.textEdit);
 	return key ? <EditingText layer={key} /> : null;
-});
+}
 
 function EditingText({ layer }: { layer: string }) {
 	const controller = useController();
