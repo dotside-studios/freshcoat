@@ -11,7 +11,7 @@ Studio or Figma.
 | [`coatfile`](packages/coatfile/) | Template schema, validation, compilation, `.coat` files and rendering helpers | Editor state or batch-job scheduling |
 | [`engine`](packages/engine/) (`@freshcoat-js/engine`) | Scene layout and CanvasKit painting, geometry and render caches | Template fields, datasets or application UI |
 | [`for-print`](packages/for-print/) | Image analysis, correction planning and measured card-printer profiles | General ICC color management or printer transport |
-| [`workspace`](packages/workspace/) | Datasets, bindings, archives, export planning, imposition and PDF assembly | Rendering workers or file destinations |
+| [`workspace`](packages/workspace/) | Datasets, bindings, archives, export planning and execution, imposition and PDF assembly | Workers or platform file pickers |
 | [`ui`](packages/ui/) | Shared React controls, themes and accessibility behavior | Template or workspace models |
 | [`test-utils`](packages/test-utils/) | CanvasKit loading and vendored fonts for test suites | Anything shipped to users |
 | [Studio](apps/editor/) | Interactive editing, history, browser persistence and export execution | A separate template format or renderer |
@@ -43,9 +43,12 @@ files differ by platform, so they live on the engine's `node` and `browser`
 subpaths.
 
 For batch work, `workspace` turns templates, datasets, bindings and presets
-into export plans. A host executes those plans, schedules rendering and writes
-files. Studio supplies workers and output sinks; those are application code,
-not workspace APIs. Print correction uses `for-print` when requested.
+into export plans, and `workspace/export` runs them: `createItemRenderer`
+renders one item, and `runExportJob` renders a whole preset through a pool and
+writes a zip or a PDF. The pool and the destination are the host's. Studio
+runs items in a pool of workers and writes to a folder or file it asks the
+user for; a script can use `inlinePool` and write the zip itself. Print
+correction uses `for-print` when requested.
 
 ## Dependency boundaries
 

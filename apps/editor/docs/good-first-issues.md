@@ -134,9 +134,9 @@ Every image export writes `export-report.csv` with `file`, `record`, `side`,
 `status`, `error`, `print` and `gamut`. With sizes taken from each photo, the
 output size varies per file and is worth recording.
 
-- **Files:** `apps/editor/src/export/job.ts`: `JobItemResult` and `reportCsv`. The
-  worker already returns `width` and `height` in `RenderOutput`
-  (`apps/editor/src/export/protocol.ts`).
+- **Files:** `packages/workspace/src/export/job.ts`: `JobItemResult` and
+  `reportCsv`. Each render already returns `width` and `height` in
+  `RenderOutput` (`packages/workspace/src/export/item.ts`).
 - **Done when:**
   - the report has `width` and `height` columns after `side`, filled for
     rendered items and empty for failed ones;
