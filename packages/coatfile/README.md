@@ -353,7 +353,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate` |
+| 1.6 | frame `isolate`; text `arc` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -841,6 +841,27 @@ Figma: without it the first baseline sits at half the leading plus the ascent,
 which is where Figma puts it. (Compiling the trim by default lifted every block
 by about `ascent − capHeight` — 0.39em in Vend Sans — above the layer it came
 from.)
+
+### Text on an arc
+
+`arc` (1.6) sets a text element along a circle centered on its box, for seals,
+badges and circular labels. Each hard line is one ring and nothing wraps.
+
+```json
+"arc": { "direction": "inside", "startAngle": 180, "align": "center" }
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `radius` | Baseline radius of the first ring, in design units | Fits the glyphs inside the box |
+| `startAngle` | Degrees clockwise from 12 o'clock where `align` anchors the ring | `0` |
+| `direction` | `outside` reads clockwise with tops outward; `inside` reads counter-clockwise with tops inward | `outside` |
+| `align` | `start`, `center` or `end` of the ring at `startAngle` | `center` |
+| `sweep` | Spreads each ring's glyphs across this many degrees | Natural spacing |
+
+Glyphs come from the same shaping as straight text, so ligatures, variable
+axes and per-glyph font fallback carry over. Decorations are not drawn on an
+arc.
 
 ### Per-span line height
 

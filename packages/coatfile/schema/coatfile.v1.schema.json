@@ -4308,6 +4308,38 @@
 											"type": "integer",
 											"exclusiveMinimum": 0,
 											"maximum": 9007199254740991
+										},
+										"arc": {
+											"type": "object",
+											"properties": {
+												"radius": {
+													"type": "number",
+													"minimum": 0
+												},
+												"sweep": {
+													"type": "number",
+													"exclusiveMinimum": 0,
+													"maximum": 360
+												},
+												"startAngle": {
+													"type": "number"
+												},
+												"direction": {
+													"type": "string",
+													"enum": [
+														"outside",
+														"inside"
+													]
+												},
+												"align": {
+													"type": "string",
+													"enum": [
+														"start",
+														"center",
+														"end"
+													]
+												}
+											}
 										}
 									},
 									"required": [

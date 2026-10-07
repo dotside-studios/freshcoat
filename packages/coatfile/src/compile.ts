@@ -66,6 +66,7 @@ import type {
 	Symbology,
 	Template,
 	TemplateFrame,
+	TextProperties,
 	Vec2,
 } from "./types";
 import { pruneHiddenElements } from "./visibility";
@@ -483,6 +484,7 @@ function compileText(
 		// standard — measured against Figma's own absoluteRenderBounds, which
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
+		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
 	};
 	if (single) {
 		node.text = spans[0].text;
@@ -498,6 +500,18 @@ function compileText(
 	const resolvedFill = resolveFill(props.fill as Fill | undefined, ratio);
 	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
 	return node;
+}
+
+type TextArcInput = NonNullable<TextProperties["arc"]>;
+
+function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
+	return {
+		...(arc.radius !== undefined ? { radius: arc.radius * ratio } : {}),
+		...(arc.sweep !== undefined ? { sweep: arc.sweep } : {}),
+		...(arc.startAngle !== undefined ? { startAngle: arc.startAngle } : {}),
+		...(arc.direction ? { direction: arc.direction } : {}),
+		...(arc.align ? { align: arc.align } : {}),
+	};
 }
 
 function mapSpanFont(

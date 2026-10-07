@@ -27,6 +27,7 @@ import { resolveLayout } from "./resolve-layout";
 import type { TextEngine } from "./text-engine";
 import type { MeasureText } from "./text-types";
 import type {
+	BakedTextLayout,
 	Command,
 	DrawCommand,
 	FontRequest,
@@ -34,6 +35,7 @@ import type {
 	FrameFinish,
 	ShapeMask,
 	Size,
+	TextArc,
 } from "./types";
 
 export type CompileSceneOptions = {
@@ -304,7 +306,7 @@ function lowerText(
 	const layout =
 		node.layout ??
 		(ctx.textEngine
-			? bakeText(node, {
+			? bakeText(node.arc ? arcBakeNode(node) : node, {
 					textEngine: ctx.textEngine,
 					leadingTrim: ctx.leadingTrim,
 					fontMetrics: ctx.fontMetrics,
@@ -336,6 +338,50 @@ function lowerText(
 		layout,
 		color: node.color ?? "#000000",
 		fill: node.fill,
+		...(node.arc ? { arc: resolveArc(node, layout) } : {}),
+	};
+}
+
+const ARC_LINE_WIDTH = 1e6;
+
+function arcBakeNode(node: TextNode): TextNode {
+	return {
+		...node,
+		size: { width: ARC_LINE_WIDTH, height: node.size?.height ?? 0 },
+		align: "left",
+		alignLast: undefined,
+		verticalAlign: "top",
+		fit: undefined,
+		maxLines: undefined,
+		leadingTrim: false,
+	};
+}
+
+// Without a radius, the rings sit just inside the box: outside text puts the
+// first line's top on the edge, inside text the last line's bottom.
+function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
+	const arc = node.arc ?? {};
+	const direction = arc.direction ?? "outside";
+	let radius = arc.radius;
+	if (radius === undefined) {
+		const half =
+			Math.min(node.size?.width ?? 0, node.size?.height ?? 0) / 2;
+		const first = layout.lines[0];
+		const last = layout.lines[layout.lines.length - 1];
+		const lineBox = layout.font.size * layout.font.lineHeight;
+		const base = first ? (first.baseline ?? first.y) : 0;
+		const reach =
+			direction === "outside"
+				? base - (first?.y ?? 0)
+				: (last ? last.y + lineBox : 0) - base;
+		radius = Math.max(0, half - reach);
+	}
+	return {
+		radius,
+		startAngle: arc.startAngle ?? 0,
+		direction,
+		align: arc.align ?? "center",
+		...(arc.sweep !== undefined ? { sweep: arc.sweep } : {}),
 	};
 }
 

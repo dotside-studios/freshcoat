@@ -1800,3 +1800,51 @@ describe("compile (substitution inside containers)", () => {
 		);
 	});
 });
+
+describe("arc text", () => {
+	const withArc = (arc: TextElement["properties"]["arc"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "seal",
+			type: "text",
+			pos: { x: 20, y: 0 },
+			size: { width: 60, height: 60 },
+			properties: {
+				value: "CERTIFIED ORIGINAL QUALITY",
+				font: { family: "Comfortaa", size: 6 },
+				arc,
+			},
+		});
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.arc)!;
+	};
+
+	test("scales the radius and keeps angles", () => {
+		const text = withArc({
+			radius: 25,
+			startAngle: 180,
+			direction: "inside",
+			align: "end",
+			sweep: 120,
+		});
+		expect(text.arc).toEqual({
+			radius: 50,
+			startAngle: 180,
+			direction: "inside",
+			align: "end",
+			sweep: 120,
+		});
+		expect(text.layout.lines).toHaveLength(1);
+	});
+
+	test("defaults fit the ring inside the box", () => {
+		const text = withArc({});
+		expect(text.arc?.direction).toBe("outside");
+		expect(text.arc?.align).toBe("center");
+		expect(text.arc?.startAngle).toBe(0);
+		expect(text.arc?.radius).toBeGreaterThan(0);
+		expect(text.arc?.radius).toBeLessThan(60);
+	});
+});

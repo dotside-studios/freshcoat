@@ -261,6 +261,25 @@ export const TextPropertiesSchema = z.object({
 	// Figma "Truncate text": cap the wrapped text at N lines, ellipsizing the
 	// last line if content overflows.
 	maxLines: z.number().int().positive().optional(),
+	// Sets the text along a circle centered on the box, for seals and badges.
+	// Each hard line is one ring and nothing wraps. Angles are degrees clockwise
+	// from 12 o'clock.
+	arc: z
+		.object({
+			// Baseline radius of the first ring, in design units. Absent keeps the
+			// glyphs inside the box.
+			radius: z.number().nonnegative().optional(),
+			// Spreads each ring's glyphs across this many degrees.
+			sweep: z.number().positive().max(360).optional(),
+			// Where `align` anchors the ring. Default 0.
+			startAngle: z.number().optional(),
+			// outside reads clockwise, tops outward (the top of a seal); inside reads
+			// counter-clockwise, tops inward (the bottom). Default outside.
+			direction: z.enum(["outside", "inside"]).optional(),
+			// Which part of the ring sits at startAngle. Default center.
+			align: z.enum(["start", "center", "end"]).optional(),
+		})
+		.optional(),
 });
 
 export const ImageMaskSchema = z.union([

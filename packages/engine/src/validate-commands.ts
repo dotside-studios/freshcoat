@@ -336,6 +336,30 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 							id,
 						);
 				});
+			if (cmd.arc) {
+				const { radius, startAngle, sweep } = cmd.arc;
+				if (!finite(radius) || radius < 0)
+					add(
+						"bad_arc",
+						"arc radius must be a finite number >= 0",
+						`${path}.arc.radius`,
+						id,
+					);
+				if (!finite(startAngle))
+					add(
+						"bad_arc",
+						"arc startAngle is not finite",
+						`${path}.arc.startAngle`,
+						id,
+					);
+				if (sweep !== undefined && (!finite(sweep) || sweep <= 0))
+					add(
+						"bad_arc",
+						"arc sweep must be a finite number > 0",
+						`${path}.arc.sweep`,
+						id,
+					);
+			}
 			break;
 		case "drawGroup":
 			if (cmd.isolate !== undefined && typeof cmd.isolate !== "boolean")

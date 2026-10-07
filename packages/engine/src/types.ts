@@ -346,11 +346,26 @@ export type DrawCommandBase = {
 	adjust?: Adjust;
 };
 
+// Text set along a circle centered on the element box. Angles are degrees
+// clockwise from 12 o'clock. outside reads clockwise with glyph tops pointing
+// away from the center; inside reads counter-clockwise with tops pointing in.
+// `align` places the line's start, middle or end at `startAngle`.
+export type TextArc = {
+	// Radius of the first line's baseline, in target px.
+	radius: number;
+	startAngle: number;
+	direction: "outside" | "inside";
+	align: "start" | "center" | "end";
+	// Spreads each line's glyph positions across this many degrees.
+	sweep?: number;
+};
+
 export type DrawTextCommand = DrawCommandBase & {
 	op: "drawText";
 	layout: BakedTextLayout;
 	color: string;
 	fill?: ResolvedFill;
+	arc?: TextArc;
 };
 
 export type DrawImageCommand = DrawCommandBase & {
