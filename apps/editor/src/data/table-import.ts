@@ -1,9 +1,10 @@
-import type {
-	ApplyMappingResult,
-	DataRecord,
-	Dataset,
-	ImportIssue,
-	ImportPlan,
+import {
+	type ApplyMappingResult,
+	type DataRecord,
+	type Dataset,
+	freshId,
+	type ImportIssue,
+	type ImportPlan,
 } from "@freshcoat-js/workspace";
 import type {
 	TableImportBody,
@@ -117,6 +118,22 @@ export function tableImporter(): TableImporter {
 	return importer;
 }
 
+/** `added` with any id already in `existing` minted again; the worker only
+ *  saw the imported records. */
+function uniqueIds(
+	existing: readonly DataRecord[],
+	added: readonly DataRecord[],
+): DataRecord[] {
+	const taken = new Set([...existing, ...added].map((r) => r.id));
+	const ids = new Set(existing.map((r) => r.id));
+	return added.map((r) => {
+		if (!ids.has(r.id)) return r;
+		const id = freshId("r", taken);
+		taken.add(id);
+		return { ...r, id };
+	});
+}
+
 /**
  * The dataset with the table's rows imported, as `applyMapping` makes it.
  * Records the import cannot touch stay on the page: without a match the
@@ -139,7 +156,10 @@ export async function importTable(
 	const records =
 		matching || plan.mode === "replace"
 			? out.dataset.records
-			: [...dataset.records, ...out.dataset.records];
+			: [
+					...dataset.records,
+					...uniqueIds(dataset.records, out.dataset.records),
+				];
 	return {
 		...out,
 		dataset: { ...out.dataset, records, assets: dataset.assets },
