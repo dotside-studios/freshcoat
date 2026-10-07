@@ -11,6 +11,7 @@
 // re-derives them via zod (schemas.ts) for authoring/validation; the two are kept
 // structurally identical.
 
+import type { Precision } from "./color-policy";
 import type { DecodedPixels } from "./decode";
 import type { PaintCache } from "./paint-cache";
 import type { EncodeFormat, EncodeOptions } from "./png";
@@ -264,12 +265,16 @@ export type SetupCommand =
 	// the size it comes out at: the painter renders at `scale × supersample` and
 	// reduces to `scale` before the finish pass. Absent/1 = render at the export
 	// size (no reduction).
+	//
+	// `precision` is the bit depth of the working surface and offscreen layers
+	// (see ./color-policy). Absent = "u8".
 	| {
 			op: "createCanvas";
 			width: number;
 			height: number;
 			scale?: number;
 			supersample?: number;
+			precision?: Precision;
 	  }
 	| { op: "loadFonts"; requests: FontRequest[] }
 	| { op: "loadImages"; srcs: string[] };

@@ -179,6 +179,47 @@ JPEG and WebP available through its `encode` options. Export scale changes
 the output pixel dimensions; supersampling renders at a higher density and
 reduces to the requested output size.
 
+## Color policy
+
+Every surface and image the painter allocates gets its `ImageInfo` from
+[`src/color-policy.ts`](src/color-policy.ts), which assigns each buffer a role.
+Skia's [color guide](https://docs.skia.org/docs/user/color/) covers the
+underlying model.
+
+- **Working space.** Everything is sRGB, and blending and filtering run on
+  sRGB-encoded values, not linear light. Blend modes, opacity, blur, shadows,
+  color matrices and supersample reduction all work on encoded values, and so
+  does the frame finish. Every surface is tagged `ColorSpace.SRGB`, so Skia
+  does no color conversion between them.
+- **Precision.** By default (`precision: "u8"`) the scene and every offscreen
+  layer (adjust passes, `saveLayer` groups, masks and supersample levels) are
+  premultiplied `RGBA_8888`. With `precision: "f16"` the scene composites
+  into an `RGBA_F16` working surface, and its layers and reduction levels are
+  F16 too. The result is quantized to 8 bits once, when it is copied to the
+  output. Use F16 when a layer goes through several passes in sequence, such as
+  stacked adjusts or a deep group of color-filtered layers, where each 8-bit
+  pass would round again and band smooth gradients. Skia's image filters (layer
+  blur, shadows, and a layer's color matrix when it has to run before those or
+  before opacity) still produce 8-bit results, so F16 does not help those
+  steps. It costs twice the memory per layer, and it turns off the paint
+  cache's background snapshots. Set it with `compileScene`,
+  `renderSceneToPng` or a `createCanvas` command's `precision`.
+- **Gradients.** Stops interpolate between unpremultiplied sRGB-encoded
+  colors, which is Skia's default.
+- **Luminance masks and LUTs.** A luminance mask's coverage is the Rec. 709
+  luminance (0.2126, 0.7152, 0.0722) of the mask's encoded sRGB channels,
+  times its alpha. A per-channel
+  `lut`, a `lut3d` and the finish `curve` are indexed by 8-bit encoded sRGB
+  levels, and their textures are unpremultiplied `RGBA_8888`. Under F16 a
+  layer is still looked up by its nearest 8-bit level, so a LUT carries 8-bit
+  precision whatever the working precision.
+- **Output.** The output surface and every readback (`readPixels`, encoding)
+  are 8-bit, unpremultiplied, sRGB. The engine's PNG writer adds no `sRGB`,
+  `gAMA`, `iCCP` or `cHRM` chunk, and an untagged PNG is read as sRGB.
+  Skia's PNG writer, used only as a fallback, writes an `sRGB` chunk. JPEG and
+  WebP come from Skia's encoders, which embed the snapshot's sRGB ICC profile.
+  JPEG is flattened over white first.
+
 ## Conformance
 
 From this package directory, `bun run conformance` reports the golden-image

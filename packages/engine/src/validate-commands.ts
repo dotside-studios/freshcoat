@@ -94,6 +94,16 @@ export function validateCommands(commands: Command[]): IrIssue[] {
 					`supersample must be >= 1, got ${cmd.supersample}`,
 					`${path}.supersample`,
 				);
+			if (
+				cmd.precision !== undefined &&
+				cmd.precision !== "u8" &&
+				cmd.precision !== "f16"
+			)
+				add(
+					"bad_precision",
+					`precision must be "u8" or "f16", got ${String(cmd.precision)}`,
+					`${path}.precision`,
+				);
 			return;
 		}
 		if (cmd.op === "finishFrame") {
