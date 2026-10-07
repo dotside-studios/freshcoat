@@ -1,5 +1,4 @@
 import { PanelSection } from "@freshcoat-js/ui/panel";
-import { memo } from "react";
 import { INSETS, TEMPLATE_SETUP } from "~/app/copy";
 import { TemplateInsetField, TemplateSizeFields } from "../setup/SizeSection";
 import { Row } from "./controls";
@@ -7,11 +6,7 @@ import type { Inspect } from "./field-helpers";
 
 /** What Design shows with nothing selected: the side itself, and the
  *  template's size, which every side shares. */
-export const SideSection = memo(function SideSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function SideSection({ ins }: { ins: Inspect }) {
 	const t = ins.template;
 	const name = t.template_data[ins.side]?.name ?? "";
 	return (
@@ -41,4 +36,4 @@ export const SideSection = memo(function SideSection({
 			))}
 		</PanelSection>
 	);
-});
+}

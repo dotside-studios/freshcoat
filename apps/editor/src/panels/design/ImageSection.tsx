@@ -13,7 +13,7 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
-import { memo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FileTrigger } from "react-aria-components";
 import { formatBytes } from "~/app/format";
 import { attachImageAsset } from "~/doc/ops";
@@ -121,7 +121,7 @@ export function assetSummary(t: Template, src: string): string | null {
 	return `Embedded · ${type ?? "image"} · ${formatBytes(bytes)}`;
 }
 
-export const ImageSection = memo(function ImageSection({
+export function ImageSection({
 	ins,
 	background = false,
 }: {
@@ -248,7 +248,7 @@ export const ImageSection = memo(function ImageSection({
 			)}
 		</PanelSection>
 	);
-});
+}
 
 function FocusRows({ ins }: { ins: Inspect }) {
 	const props = (ins.layers as ImageElement[]).map((e) => e.properties);

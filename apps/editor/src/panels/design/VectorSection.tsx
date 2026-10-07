@@ -3,7 +3,7 @@ import { scalePathData } from "@freshcoat-js/engine";
 import { TextArea } from "@freshcoat-js/ui/field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { memo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Notice, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 
@@ -21,11 +21,7 @@ export function pathDataError(d: string): string | null {
 	return null;
 }
 
-export const VectorSection = memo(function VectorSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function VectorSection({ ins }: { ins: Inspect }) {
 	const props = (ins.layers as VectorElement[]).map((e) => e.properties);
 	const rule = commonValue(props.map((p) => p.fillRule ?? "nonzero"));
 	return (
@@ -56,7 +52,7 @@ export const VectorSection = memo(function VectorSection({
 			)}
 		</PanelSection>
 	);
-});
+}
 
 function PathField({
 	value,

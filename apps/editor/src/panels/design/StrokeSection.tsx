@@ -5,7 +5,7 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
-import { memo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	AddButton,
 	Notice,
@@ -30,11 +30,7 @@ function clean(s: Stroke): Stroke {
 	return out as Stroke;
 }
 
-export const StrokeSection = memo(function StrokeSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function StrokeSection({ ins }: { ins: Inspect }) {
 	const strokes = ins.layers.map(strokeOf);
 	const all = strokes.every(Boolean);
 	const none = strokes.every((s) => !s);
@@ -159,7 +155,7 @@ export const StrokeSection = memo(function StrokeSection({
 			)}
 		</PanelSection>
 	);
-});
+}
 
 function DashField({
 	value,

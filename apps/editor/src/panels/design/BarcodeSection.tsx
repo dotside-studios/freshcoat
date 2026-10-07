@@ -21,7 +21,7 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { memo, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Header, ListBoxSection, MenuTrigger } from "react-aria-components";
 import { barcodeBoxFor } from "~/doc/factories";
 import { listFields } from "~/doc/values";
@@ -75,11 +75,7 @@ export function barcodeMessages(
 	return [...out];
 }
 
-export const BarcodeSection = memo(function BarcodeSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function BarcodeSection({ ins }: { ins: Inspect }) {
 	const codes = ins.layers as BarcodeElement[];
 	const props = codes.map((e) => e.properties);
 	const pick = <T,>(fn: (p: BarcodeProperties) => T) =>
@@ -296,7 +292,7 @@ export const BarcodeSection = memo(function BarcodeSection({
 			) : null}
 		</PanelSection>
 	);
-});
+}
 
 function ValueField({
 	ins,

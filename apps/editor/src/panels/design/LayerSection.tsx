@@ -4,7 +4,7 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
-import { memo, type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import {
 	applyRect,
 	isAutoLayoutChild,
@@ -146,11 +146,7 @@ function DisabledHint({
 	);
 }
 
-export const LayerSection = memo(function LayerSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function LayerSection({ ins }: { ins: Inspect }) {
 	const t = ins.template;
 	const keys = ins.keys;
 	const els = ins.layers as Element[];
@@ -213,7 +209,7 @@ export const LayerSection = memo(function LayerSection({
 			{inLayout && <ResizingRows ins={ins} grid={inGrid} />}
 		</PanelSection>
 	);
-});
+}
 
 /** Position, size and rotation follow the document live, even while the rest
  *  of the inspector holds still during a drag. */

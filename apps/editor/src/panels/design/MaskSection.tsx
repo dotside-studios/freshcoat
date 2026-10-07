@@ -3,15 +3,10 @@ import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
-import { memo } from "react";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 
-export const MaskSection = memo(function MaskSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function MaskSection({ ins }: { ins: Inspect }) {
 	const masks = (ins.layers as MaskElement[]).map((m) => m.properties);
 	const channel = commonValue(masks.map((m) => m.channel ?? "alpha"));
 	const invert = commonValue(masks.map((m) => m.invert === true));
@@ -58,4 +53,4 @@ export const MaskSection = memo(function MaskSection({
 			)}
 		</PanelSection>
 	);
-});
+}

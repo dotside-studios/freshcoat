@@ -2,7 +2,6 @@ import type { Constraint, Constraints, Element } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { memo } from "react";
 import { isAutoLayoutChild } from "~/doc/geometry";
 import { Row, SharedNotice } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
@@ -45,11 +44,7 @@ export function withConstraint(
 	return Object.keys(next).length > 0 ? next : undefined;
 }
 
-export const ConstraintsSection = memo(function ConstraintsSection({
-	ins,
-}: {
-	ins: Inspect;
-}) {
+export function ConstraintsSection({ ins }: { ins: Inspect }) {
 	const els = ins.layers as Element[];
 	const value = (axis: Axis) =>
 		commonValue(els.map((e) => e.constraints?.[axis] ?? "start"));
@@ -94,7 +89,7 @@ export const ConstraintsSection = memo(function ConstraintsSection({
 			</div>
 		</PanelSection>
 	);
-});
+}
 
 /**
  * A layer in its parent, with the sides it keeps its distance to drawn in the
