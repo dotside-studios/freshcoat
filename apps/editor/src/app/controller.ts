@@ -38,6 +38,7 @@ import {
 	sideGuides,
 	type TemplateGuides,
 } from "~/doc/guides";
+import { MERGE_WINDOW_MS } from "~/doc/history";
 import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
@@ -161,6 +162,8 @@ export class EditorController {
 	private viewport = { width: 0, height: 0 };
 	private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 	private autosaveSeen: Pick<EditorState, "doc" | "workspace">;
+	private validateTimer: ReturnType<typeof setTimeout> | undefined;
+	private validateSeen: EditorState["doc"] = null;
 	private openedListeners = new Set<() => void>();
 	private issuesListeners = new Set<() => void>();
 	private namePrompt: NamePrompt | undefined;
@@ -173,6 +176,7 @@ export class EditorController {
 		const { doc, workspace } = store.getState();
 		this.autosaveSeen = { doc, workspace };
 		this.store.subscribe(() => this.scheduleAutosave());
+		this.store.subscribe(() => this.scheduleValidation());
 	}
 
 	get state(): EditorState {
@@ -1285,6 +1289,18 @@ export class EditorController {
 			if (ws && fileName && isDirty(this.state))
 				void writeAutosave({ workspace: ws, fileName });
 		}, 1000);
+	}
+
+	private scheduleValidation(): void {
+		const { doc } = this.state;
+		if (doc === this.validateSeen) return;
+		this.validateSeen = doc;
+		clearTimeout(this.validateTimer);
+		if (!doc?.issuesStale || doc.history.tx) return;
+		this.validateTimer = setTimeout(
+			() => this.dispatch({ type: "validate" }),
+			MERGE_WINDOW_MS,
+		);
 	}
 
 	// ── View ─────────────────────────────────────────────────────────────────
