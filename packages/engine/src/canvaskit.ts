@@ -92,6 +92,7 @@ import {
 	encodePng,
 } from "./png";
 import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
+import { PATTERN_SKSL, type PatternFill } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type {
@@ -213,6 +214,57 @@ function toColor(ck: CanvasKit, input: string) {
 	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
+// Device pixels per local unit under the canvas's current matrix.
+function devicePx(canvas: Canvas): number {
+	const m = canvas.getTotalMatrix();
+	const px = Math.sqrt(Math.abs(m[0] * m[4] - m[1] * m[3]));
+	return Number.isFinite(px) && px > 0 ? px : 1;
+}
+
+// `px` is device pixels per design unit and `unit` the local units one design
+// unit spans, which differ from 1 only inside a path's viewBox.
+type PatternSpace = { px: number; unit?: [number, number] };
+
+function patternShader(
+	ck: CanvasKit,
+	bin: Bin,
+	fill: PatternFill,
+	x: number,
+	y: number,
+	space: PatternSpace,
+): Shader {
+	const [c0, c1] = fill.colors;
+	const eff = cachedEffect(ck, `pattern-${fill.pattern}`, () =>
+		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern]),
+	);
+	if (!eff)
+		return bin.track(ck.Shader.MakeColor(toColor(ck, c0), ck.ColorSpace.SRGB));
+	const scale = Math.max(fill.scale, 1e-3);
+	const [ux, uy] = space.unit ?? [1, 1];
+	const local = ck.Matrix.multiply(
+		ck.Matrix.translated(x, y),
+		ck.Matrix.scaled(ux, uy),
+		ck.Matrix.rotated((fill.angle * Math.PI) / 180),
+		ck.Matrix.scaled(scale, scale),
+	);
+	const density = Math.min(Math.max(fill.density, 0), 1);
+	const uniforms = [
+		...toColor(ck, c0),
+		...toColor(ck, c1),
+		density,
+		1 / (scale * space.px),
+	];
+	if (fill.pattern === "hatching" || fill.pattern === "dots")
+		return bin.track(eff.makeShader(uniforms, local));
+	const octaves = fill.pattern === "paper" ? 4 : 3;
+	const noise = bin.track(
+		fill.pattern === "paper"
+			? ck.Shader.MakeTurbulence(1, 1, octaves, fill.seed, 0, 0)
+			: ck.Shader.MakeFractalNoise(1, 1, octaves, fill.seed, 0, 0),
+	);
+	return bin.track(eff.makeShaderWithChildren(uniforms, [noise], local));
+}
+
 function shaderFor(
 	ck: CanvasKit,
 	bin: Bin,
@@ -221,7 +273,9 @@ function shaderFor(
 	y: number,
 	w: number,
 	h: number,
+	space: PatternSpace = { px: 1 },
 ): Shader {
+	if (fill.kind === "pattern") return patternShader(ck, bin, fill, x, y, space);
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -542,6 +596,7 @@ function drawText(
 					cmd.pos.y,
 					cmd.size.width,
 					cmd.size.height,
+					{ px: devicePx(canvas) },
 				)
 			: null;
 	let fgPaint: Paint | null = null;
@@ -1258,16 +1313,22 @@ function drawPath(
 	const vb = cmd.viewBox;
 	let boxW = cmd.size.width;
 	let boxH = cmd.size.height;
+	const space: PatternSpace = { px: devicePx(canvas) };
 	if (vb && vb.width > 0 && vb.height > 0) {
 		canvas.scale(cmd.size.width / vb.width, cmd.size.height / vb.height);
 		if (vb.x || vb.y) canvas.translate(-(vb.x ?? 0), -(vb.y ?? 0));
 		boxW = vb.width;
 		boxH = vb.height;
+		space.unit = [vb.width / cmd.size.width, vb.height / cmd.size.height];
 	}
+	const ox = vb?.x ?? 0;
+	const oy = vb?.y ?? 0;
 	for (const fill of cmd.fills ?? []) {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
 		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
+		else if (fill.kind === "pattern")
+			paint.setShader(patternShader(ck, bin, fill, ox, oy, space));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
@@ -1361,7 +1422,10 @@ function drawShape(
 			const paint = bin.track(new ck.Paint());
 			paint.setAntiAlias(true);
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
-			else paint.setShader(shaderFor(ck, bin, fill, x, y, w, h));
+			else
+				paint.setShader(
+					shaderFor(ck, bin, fill, x, y, w, h, { px: devicePx(canvas) }),
+				);
 			drawOutline(canvas, outline, paint);
 		}
 		if (cmd.stroke)
@@ -1695,6 +1759,24 @@ function adjustShaderSksl(
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
 // instances (e.g. across tests) never share an effect.
 const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
+function cachedEffect(
+	ck: CanvasKit,
+	key: string,
+	make: () => RuntimeEffect | null | undefined,
+): RuntimeEffect | null {
+	let byVariant = effectCache.get(ck);
+	if (!byVariant) {
+		byVariant = new Map();
+		effectCache.set(ck, byVariant);
+	}
+	let eff = byVariant.get(key);
+	if (eff === undefined) {
+		eff = make() ?? null;
+		byVariant.set(key, eff);
+	}
+	return eff;
+}
+
 function adjustEffect(
 	ck: CanvasKit,
 	hasMatrix: boolean,
@@ -1703,22 +1785,13 @@ function adjustEffect(
 	hasLut3d: boolean,
 	hasSharpen: boolean,
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
 	const bit = (b: boolean) => (b ? 1 : 0);
 	const key = `${bit(hasMatrix)}${bit(preserveHue)}${bit(hasLut)}${bit(hasLut3d)}${bit(hasSharpen)}`;
-	let eff = byVariant.get(key);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
-			) ?? null;
-		byVariant.set(key, eff);
-	}
-	return eff;
+	return cachedEffect(ck, key, () =>
+		ck.RuntimeEffect.Make(
+			adjustShaderSksl(hasMatrix, preserveHue, hasLut, hasLut3d, hasSharpen),
+		),
+	);
 }
 
 // Recording canvases that adjustedDeviceRect is measuring. An adjusted
@@ -2877,22 +2950,13 @@ function finishEffect(
 	ck: CanvasKit,
 	variant: "finish" | "finish-curve" | "finish-noise",
 ): RuntimeEffect | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get(variant);
-	if (eff === undefined) {
-		eff =
-			ck.RuntimeEffect.Make(
-				variant === "finish-noise"
-					? FINISH_NOISE_SKSL
-					: finishSksl(variant === "finish-curve"),
-			) ?? null;
-		byVariant.set(variant, eff);
-	}
-	return eff;
+	return cachedEffect(ck, variant, () =>
+		ck.RuntimeEffect.Make(
+			variant === "finish-noise"
+				? FINISH_NOISE_SKSL
+				: finishSksl(variant === "finish-curve"),
+		),
+	);
 }
 
 function normalizeDither(dither: FrameFinish["dither"]) {
@@ -3164,16 +3228,9 @@ const LINEAR_BURN_SKSL = `
 	}`;
 
 function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
-	let byVariant = effectCache.get(ck);
-	if (!byVariant) {
-		byVariant = new Map();
-		effectCache.set(ck, byVariant);
-	}
-	let eff = byVariant.get("linear-burn");
-	if (eff === undefined) {
-		eff = ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL) ?? null;
-		byVariant.set("linear-burn", eff);
-	}
+	const eff = cachedEffect(ck, "linear-burn", () =>
+		ck.RuntimeEffect.MakeForBlender?.(LINEAR_BURN_SKSL),
+	);
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
@@ -3529,9 +3586,15 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd, frame.precision);
-	const layered = lp !== null || isolates(cmd);
-	if (layered) {
-		const bounds = layerPaintBoundable(cmd)
+	// drawImage clips/strokes itself so its stroke isn't clipped.
+	const clips = !!cmd.clip && cmd.op !== "drawImage";
+	// Inside the clip, so the clip antialiases the composited children once
+	// rather than each child that overlaps a partly covered edge.
+	const isolated = isolates(cmd);
+	const inner = isolated && clips;
+	const outer = lp !== null || (isolated && !inner);
+	const bounds =
+		(outer || inner) && layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
 					canvas,
@@ -3542,13 +3605,13 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp ?? undefined, bounds);
-	}
-	// drawImage clips/strokes itself so its stroke isn't clipped.
-	if (cmd.clip && cmd.op !== "drawImage")
+	if (outer) canvas.saveLayer(lp ?? undefined, bounds);
+	if (clips && cmd.clip)
 		clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
+	if (inner) canvas.saveLayer(undefined, bounds);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (layered) canvas.restore();
+	if (inner) canvas.restore();
+	if (outer) canvas.restore();
 	canvas.restore();
 }
 
@@ -4052,23 +4115,32 @@ export async function paintScene(
 
 				const w = snap.width();
 				const h = snap.height();
-				const pixels = snap.readPixels(
-					0,
-					0,
-					imageInfo(ck, "pixels", w, h),
-				) as Uint8Array | null;
-				// A surface that won't read back (a lost context) still has Skia's
-				// encoder, which works off the snapshot rather than a pixel buffer —
-				// as does a runtime without CompressionStream. Bigger bytes beat no
-				// bytes, so both fall back to it rather than failing the render.
-				if (!pixels) return skiaPng();
+				// Without a destination CanvasKit copies the frame out to the JS heap.
+				// encodePng copies the rows before it awaits, so a heap growth that
+				// detaches this view cannot reach it.
+				const dest = ck.Malloc(Uint8Array, w * h * 4);
 				try {
-					return {
-						bytes: await encodePng(pixels, w, h, encodeOpts),
-						format: "png" as const,
-					};
-				} catch {
-					return skiaPng();
+					const pixels = snap.readPixels(
+						0,
+						0,
+						imageInfo(ck, "pixels", w, h),
+						dest,
+					) as Uint8Array | null;
+					// A surface that won't read back (a lost context) still has Skia's
+					// encoder, which works off the snapshot rather than a pixel buffer —
+					// as does a runtime without CompressionStream. Bigger bytes beat no
+					// bytes, so both fall back to it rather than failing the render.
+					if (!pixels) return skiaPng();
+					try {
+						return {
+							bytes: await encodePng(pixels, w, h, encodeOpts),
+							format: "png" as const,
+						};
+					} catch {
+						return skiaPng();
+					}
+				} finally {
+					ck.Free(dest);
 				}
 			} finally {
 				snap.delete();
@@ -4088,9 +4160,13 @@ export async function paintScene(
 	};
 }
 
-// Bind to rt.canvas when present (WebGL, SW fallback) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface -> null IS the capability probe
-// (a host canvas that can't back WebGL), so this needs no environment flag.
+// Bind to rt.canvas when present (WebGL, then SW) -> displayable; otherwise an
+// offscreen raster surface. MakeWebGLCanvasSurface throws when the host canvas
+// can't back WebGL (context creation fails, or MakeOnScreenGLSurface fails and its
+// DOM-node swap throws on an OffscreenCanvas), so a failed WebGL attempt is caught
+// on its own and still falls back to SW. A throw may leave a WebGL context on the
+// element, which locks it out of the 2D context SW presents through, so SW gets a
+// fresh element and the old one's context is released.
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
@@ -4100,18 +4176,34 @@ function makeSurface(
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
-	if (rt.canvas) {
-		try {
-			const el = rt.canvas.createCanvas(w, h);
-			// Typed for DOM canvases only; any canvas the host makes is accepted.
-			const target = el as unknown as HTMLCanvasElement;
-			const gl = ck.MakeWebGLCanvasSurface(target);
-			if (gl)
-				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(target);
-			if (sw) return { surface: sw, canvas: el, loseContext: noop };
-		} catch {
-			// Fall through to an offscreen surface.
+	const host = rt.canvas;
+	if (host) {
+		const create = (): CanvasLike | undefined => {
+			try {
+				return host.createCanvas(w, h);
+			} catch {
+				return undefined;
+			}
+		};
+		// Typed for DOM canvases only; any canvas the host makes is accepted.
+		const asTarget = (el: CanvasLike) => el as unknown as HTMLCanvasElement;
+		let el = create();
+		if (el) {
+			const canvas = el;
+			try {
+				const gl = ck.MakeWebGLCanvasSurface(asTarget(canvas));
+				if (gl)
+					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
+			} catch {
+				releaseGL(canvas);
+				el = create();
+			}
+		}
+		if (el) {
+			try {
+				const sw = ck.MakeSWCanvasSurface(asTarget(el));
+				if (sw) return { surface: sw, canvas: el, loseContext: noop };
+			} catch {}
 		}
 	}
 	const surface = ck.MakeSurface(w, h) as Surface;

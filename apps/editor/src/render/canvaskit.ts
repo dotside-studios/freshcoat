@@ -3,6 +3,12 @@
 // session. Both URLs must match the preloads vite.config.ts injects into
 // index.html, or the browser downloads them twice.
 let ckPromise: Promise<unknown> | undefined;
+let loaded: unknown;
+
+/** The session's CanvasKit once it has loaded, for synchronous callers. */
+export function loadedCanvasKit(): unknown {
+	return loaded;
+}
 
 export function getCanvasKit(): Promise<unknown> {
 	if (!ckPromise) {
@@ -20,7 +26,10 @@ export function getCanvasKit(): Promise<unknown> {
 			const init = (globalThis as any).CanvasKitInit;
 			if (typeof init !== "function")
 				throw new Error("CanvasKitInit global missing after script load");
-			return init({ locateFile: () => `${__CANVASKIT_BASE__}/canvaskit.wasm` });
+			loaded = await init({
+				locateFile: () => `${__CANVASKIT_BASE__}/canvaskit.wasm`,
+			});
+			return loaded;
 		})();
 		ckPromise.catch(() => {
 			ckPromise = undefined;

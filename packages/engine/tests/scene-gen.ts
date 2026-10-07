@@ -142,7 +142,7 @@ function fill(r: Rand): ResolvedFill {
 		{ offset: 0, color: r.pick(COLORS) },
 		{ offset: 1, color: r.pick(COLORS) },
 	];
-	switch (r.int(0, 4)) {
+	switch (r.int(0, 5)) {
 		case 0:
 			return {
 				kind: "linear",
@@ -163,6 +163,16 @@ function fill(r: Rand): ResolvedFill {
 				stops,
 				center: { x: 0.5, y: 0.5 },
 				rotation: r.int(0, 359),
+			};
+		case 3:
+			return {
+				kind: "pattern",
+				pattern: r.pick(["noise", "paper", "hatching", "dots"] as const),
+				scale: 2 + r.int(0, 12),
+				angle: r.int(0, 359),
+				density: r.next(),
+				seed: r.int(0, 99),
+				colors: [r.pick(COLORS), r.pick(COLORS)],
 			};
 		default:
 			return { kind: "solid", color: r.pick(COLORS) };
@@ -374,6 +384,11 @@ export function scene(r: Rand, style: Style, size: Size): Node {
 // Keeps the frame opaque, so the finish runs on the CPU.
 function opaque(f: ResolvedFill): ResolvedFill {
 	if (f.kind === "solid") return { ...f, color: f.color.slice(0, 7) };
+	if (f.kind === "pattern")
+		return {
+			...f,
+			colors: [f.colors[0].slice(0, 7), f.colors[1].slice(0, 7)],
+		};
 	return {
 		...f,
 		stops: f.stops.map((s) => ({ ...s, color: s.color.slice(0, 7) })),

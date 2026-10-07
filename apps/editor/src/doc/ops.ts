@@ -1041,7 +1041,12 @@ export function suggestSwatch(t: Template, id?: string): string | undefined {
 	if (bg?.type !== "rect") return undefined;
 	const fills = bg.properties.fill;
 	const fill = Array.isArray(fills) ? fills[0] : fills;
-	const colour = typeof fill === "string" ? fill : fill?.stops[0]?.color;
+	const colour =
+		typeof fill === "string"
+			? fill
+			: fill?.kind === "pattern"
+				? fill.colors?.[0]
+				: fill?.stops[0]?.color;
 	return colour && !colour.includes("{{") ? colour : undefined;
 }
 

@@ -38,6 +38,7 @@ import {
 	type TemplateGuides,
 } from "~/doc/guides";
 import { MERGE_WINDOW_MS } from "~/doc/history";
+import { ShapeHits } from "~/doc/hit-shape";
 import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
@@ -77,7 +78,7 @@ import {
 	isStructuralEdit,
 } from "~/doc/variant-edit";
 import { newPreset } from "~/export/preset";
-import { getCanvasKit } from "~/render/canvaskit";
+import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
 import { findStarter } from "~/samples/starters";
 import { loadVendSans } from "~/samples/vend-sans-file";
@@ -135,6 +136,8 @@ export const NEWER_FORMAT = "Made in a newer version. Saving is off.";
 export const ZOOM_MIN = 0.02;
 export const ZOOM_MAX = 64;
 const FIT_PADDING = 40;
+/** How far outside a stroke, in screen pixels, a click still hits it. */
+const HIT_TOLERANCE_PX = 3;
 const ZOOM_STEPS = [
 	0.02, 0.05, 0.1, 0.125, 0.25, 0.33, 0.5, 0.67, 1, 1.5, 2, 3, 4, 6, 8, 12, 16,
 	24, 32, 48, 64,
@@ -186,6 +189,7 @@ export class EditorController {
 	private namePrompt: NamePrompt | undefined;
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
+	private shapeHits: ShapeHits | undefined;
 	private textEditFrom: string | undefined;
 
 	constructor(store: EditorStore = createEditorStore()) {
@@ -1512,8 +1516,13 @@ export class EditorController {
 	): string | null {
 		const t = this.template;
 		if (!t) return null;
-		const { geometry, locked, hidden, side, selection } = this.state;
-		const hit = hitLayer(t, side, geometry, locked, hidden, point);
+		const { geometry, locked, hidden, side, selection, view } = this.state;
+		const ck = loadedCanvasKit() as CanvasKit | undefined;
+		if (ck) this.shapeHits ??= new ShapeHits(ck);
+		const hit = hitLayer(t, side, geometry, locked, hidden, point, {
+			shapes: this.shapeHits,
+			tolerance: HIT_TOLERANCE_PX / view.zoom,
+		});
 		if (!hit || opts.deep) return hit;
 		return topmostSelectable(hit, selection);
 	}
@@ -1545,7 +1554,8 @@ function warnStructural(
 /**
  * The topmost layer under `point` that is neither locked, under a locked
  * layer, nor hidden. Walks back to front, so the first hit is the answer.
- * Backgrounds and mask sources are never hit.
+ * Backgrounds and mask sources are never hit. With `shapes`, rects and
+ * vectors are hit only where they paint.
  */
 export function hitLayer(
 	t: Template,
@@ -1554,6 +1564,7 @@ export function hitLayer(
 	locked: ReadonlySet<string>,
 	hidden: ReadonlySet<string>,
 	point: { x: number; y: number },
+	opts: { shapes?: ShapeHits; tolerance?: number } = {},
 ): string | null {
 	const frame = t.template_data[side];
 	if (!frame) return null;
@@ -1568,9 +1579,10 @@ export function hitLayer(
 		}
 		if (out || hidden.has(key)) return null;
 		const box = geometry.get(key);
-		return box && containsPoint(box.rect, box.worldRotation, point)
-			? key
-			: null;
+		if (!box || !containsPoint(box.rect, box.worldRotation, point)) return null;
+		if (opts.shapes && !opts.shapes.hits(key, el, box, point, opts.tolerance))
+			return null;
+		return key;
 	};
 	for (let i = frame.elements.length - 1; i >= 0; i--) {
 		const hit = visit(frame.elements[i] as Element, `${side}/${i}`, false);

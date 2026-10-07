@@ -6,11 +6,15 @@
  *   bun run bench:render --update       rewrite the baseline from this machine
  *   bun run bench:render --out <file>   also write the numbers, in the
  *                                       baseline's format, to <file>
+ *   bun run bench:render --batch        time, peak memory and GC pauses of
+ *                                       batch export readback, per strategy;
+ *                                       reports only, no baseline
  *
  * Each time is divided by a calibration loop's, so machines of different
  * speeds compare in the same units. A case fails when that ratio is more than
  * TOLERANCE above the baseline's.
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
@@ -30,6 +34,7 @@ import {
 import {
 	compileScene,
 	deriveFontMetrics,
+	encodePng,
 	memoizeTextEngine,
 	type Node,
 } from "@freshcoat-js/engine";
@@ -242,6 +247,211 @@ async function renderRecords(print: ExportOptions["print"]): Promise<number> {
 	}
 }
 
+const BATCH = process.argv.includes("--batch");
+const BATCH_CHILD_AT = process.argv.indexOf("--batch-child");
+const BATCH_RECORDS = 50;
+const BATCH_EXPORT_RECORDS = 10;
+const BATCH_WIDTH = 4000;
+const BATCH_HEIGHT = 3000;
+
+type Readback = "alloc" | "malloc" | "reuse" | "engine";
+type Consumer = "touch" | "png" | "export";
+type BatchRun = {
+	readback: Readback;
+	consumer: Consumer;
+	msPerRecord: number;
+	totalMs: number;
+	maxRssMiB: number;
+	wasmHeapMiB: number;
+	gcCount: number;
+	gcPauseMs: number;
+	gcMaxPauseMs: number;
+};
+
+// Renders BATCH_RECORDS frames at export size, reads each back and hands the
+// pixels to `consumer`, as an export worker does per record.
+async function batchChild(readback: Readback, consumer: Consumer) {
+	if (consumer === "export") return batchExport();
+	const info = {
+		width: BATCH_WIDTH,
+		height: BATCH_HEIGHT,
+		colorType: ck.ColorType.RGBA_8888,
+		alphaType: ck.AlphaType.Unpremul,
+		colorSpace: ck.ColorSpace.SRGB,
+	};
+	const surface = ck.MakeSurface(BATCH_WIDTH, BATCH_HEIGHT);
+	if (!surface) throw new Error("no software surface");
+	const paint = new ck.Paint();
+	const dest =
+		readback === "reuse"
+			? ck.Malloc(Uint8Array, BATCH_WIDTH * BATCH_HEIGHT * 4)
+			: null;
+	let sink = 0;
+	const times: number[] = [];
+	try {
+		for (let r = 0; r < BATCH_RECORDS; r++) {
+			const t = performance.now();
+			const canvas = surface.getCanvas();
+			canvas.clear(ck.WHITE);
+			for (let i = 0; i < 40; i++) {
+				paint.setColor(ck.Color((r * 31 + i * 7) % 255, (i * 13) % 255, 90, 1));
+				canvas.drawRect(
+					ck.XYWHRect((i * 97) % 3600, (i * 71 + r) % 2700, 400, 300),
+					paint,
+				);
+			}
+			surface.flush();
+			const snap = surface.makeImageSnapshot();
+			const own =
+				readback === "malloc"
+					? ck.Malloc(Uint8Array, BATCH_WIDTH * BATCH_HEIGHT * 4)
+					: null;
+			try {
+				let pixels: Uint8Array | null;
+				try {
+					const into = dest ?? own;
+					pixels = into
+						? (snap.readPixels(0, 0, info, into) as Uint8Array | null)
+						: (snap.readPixels(0, 0, info) as Uint8Array | null);
+				} finally {
+					snap.delete();
+				}
+				if (!pixels) throw new Error("no pixels");
+				if (consumer === "png")
+					sink += (await encodePng(pixels, BATCH_WIDTH, BATCH_HEIGHT)).length;
+				else
+					for (let i = 0; i < pixels.length; i += 4096)
+						sink += pixels[i] as number;
+			} finally {
+				if (own) ck.Free(own);
+			}
+			times.push(performance.now() - t);
+		}
+	} finally {
+		if (dest) ck.Free(dest);
+		paint.delete();
+		surface.dispose();
+	}
+	printBatch(sink, times);
+}
+
+// Both sides of each record exported BATCH_WIDTH wide through one paint cache
+// and encoded to PNG by the engine, with whatever readback it uses.
+async function batchExport() {
+	const paintCache = createPaintCache({ maxImagePixels: 48_000_000 });
+	const env = createHeadlessEnv({ fonts });
+	const exports = [
+		{ constraint: { kind: "width" as const, value: BATCH_WIDTH } },
+	];
+	let sink = 0;
+	const times: number[] = [];
+	try {
+		for (let r = 0; r < BATCH_EXPORT_RECORDS; r++) {
+			const t = performance.now();
+			const [display_name, tier, member_id] = RECORDS[
+				r % RECORDS.length
+			] as (typeof RECORDS)[number];
+			const values = { ...sampleValues(card), display_name, tier, member_id };
+			const frames = await renderCompiled(
+				compile(card, values, size),
+				{ exports },
+				{ ck, env, fonts, fontMetrics, textEngine, paintCache },
+			);
+			for (const frame of frames)
+				if ("bytes" in frame) sink += frame.bytes.length;
+				else frame.dispose();
+			times.push(performance.now() - t);
+		}
+	} finally {
+		paintCache.dispose();
+	}
+	printBatch(sink, times);
+}
+
+function printBatch(sink: number, times: number[]) {
+	const heap = (ck as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+	console.log(
+		JSON.stringify({
+			sink,
+			totalMs: times.reduce((a, b) => a + b, 0),
+			msPerRecord: fastHalf(times),
+			maxRssMiB: process.resourceUsage().maxRSS / 1024,
+			wasmHeapMiB: heap / 2 ** 20,
+		}),
+	);
+}
+
+// Each run gets its own process, so one strategy's heap and peak RSS do not
+// carry into the next. JSC logs every collection and its pause to stderr.
+function batchRun(readback: Readback, consumer: Consumer): BatchRun {
+	const child = spawnSync(
+		process.execPath,
+		[import.meta.path, "--batch-child", readback, consumer],
+		{
+			encoding: "utf8",
+			env: { ...process.env, BUN_JSC_logGC: "1" },
+			maxBuffer: 1 << 28,
+		},
+	);
+	if (child.status !== 0) throw new Error(child.stderr);
+	const line = child.stdout.trim().split("\n").at(-1) as string;
+	const out = JSON.parse(line);
+	const pauses = [...child.stderr.matchAll(/ p=([\d.]+)ms/g)].map((m) =>
+		Number(m[1]),
+	);
+	return {
+		readback,
+		consumer,
+		msPerRecord: round(out.msPerRecord),
+		totalMs: round(out.totalMs, 0),
+		maxRssMiB: round(out.maxRssMiB, 0),
+		wasmHeapMiB: round(out.wasmHeapMiB, 0),
+		gcCount: pauses.length,
+		gcPauseMs: round(pauses.reduce((a, b) => a + b, 0)),
+		gcMaxPauseMs: round(Math.max(0, ...pauses)),
+	};
+}
+
+if (BATCH_CHILD_AT !== -1) {
+	await batchChild(
+		process.argv[BATCH_CHILD_AT + 1] as Readback,
+		process.argv[BATCH_CHILD_AT + 2] as Consumer,
+	);
+	process.exit(0);
+}
+if (BATCH) {
+	const ROUNDS = 3;
+	const PAIRS: [Readback, Consumer][] = [
+		...(["alloc", "malloc", "reuse"] as const).flatMap((r) =>
+			(["touch", "png"] as const).map((c): [Readback, Consumer] => [r, c]),
+		),
+		["engine", "export"],
+	];
+	const runs: BatchRun[] = [];
+	for (let i = 0; i < ROUNDS; i++)
+		for (const [readback, consumer] of PAIRS)
+			runs.push(batchRun(readback, consumer));
+	const rows = [
+		`${BATCH_RECORDS} records at ${BATCH_WIDTH}x${BATCH_HEIGHT} (export: ${BATCH_EXPORT_RECORDS} records of both sides, ${BATCH_WIDTH} wide), median of ${ROUNDS} runs.`,
+		"",
+		"| Readback | Consumer | ms/record | Total ms | Peak RSS MiB | WASM heap MiB | GCs | GC pause ms | Max GC pause ms |",
+		"|---|---|---:|---:|---:|---:|---:|---:|---:|",
+	];
+	for (const [readback, consumer] of PAIRS) {
+		const set = runs.filter(
+			(r) => r.readback === readback && r.consumer === consumer,
+		);
+		const median = (k: keyof BatchRun) =>
+			set.map((r) => r[k] as number).sort((a, b) => a - b)[
+				Math.floor(set.length / 2)
+			] as number;
+		rows.push(
+			`| ${readback} | ${consumer} | ${median("msPerRecord")} | ${median("totalMs")} | ${median("maxRssMiB")} | ${median("wasmHeapMiB")} | ${median("gcCount")} | ${median("gcPauseMs")} | ${median("gcMaxPauseMs")} |`,
+		);
+	}
+	console.log(rows.join("\n"));
+	process.exit(0);
+}
 const layers = countLayers(synthetic.template_data[0]?.elements ?? []);
 const CASES: Record<string, () => Promise<number>> = {
 	"compileScene membership card": () => compileRepeat(card),

@@ -20,6 +20,7 @@ import {
 	type FrameFinish,
 	type ImageNode,
 	type KeptPaintResult,
+	missingGlyphs,
 	type Node,
 	type PaintCache,
 	type PaintResult,
@@ -366,4 +367,39 @@ export async function renderCompiled(
 	} finally {
 		ownEngine?.dispose();
 	}
+}
+
+export type FrameMissingGlyphs = {
+	frame: string;
+	// The element id of the text that lacks glyphs.
+	id?: string;
+	text: string;
+	codepoints: number[];
+};
+
+// The characters each frame's text shaped without a glyph for, read off the
+// layout compileScene bakes anyway, so nothing is painted. A cached
+// `textEngine` makes repeat records nearly free.
+export function findMissingGlyphs(
+	compiled: CompiledTemplate,
+	runtime: {
+		textEngine: TextEngine;
+		fontMetrics?: Record<string, FontVMetrics>;
+		frameNames?: string[];
+	},
+): FrameMissingGlyphs[] {
+	const out: FrameMissingGlyphs[] = [];
+	for (const f of compiled.frames) {
+		if (runtime.frameNames && !runtime.frameNames.includes(f.name)) continue;
+		const commands = compileScene(f.root as Node, {
+			width: compiled.width,
+			height: compiled.height,
+			textEngine: runtime.textEngine,
+			...(runtime.fontMetrics ? { fontMetrics: runtime.fontMetrics } : {}),
+			fonts: f.assets.fonts,
+			images: f.assets.images,
+		});
+		for (const m of missingGlyphs(commands)) out.push({ frame: f.name, ...m });
+	}
+	return out;
 }

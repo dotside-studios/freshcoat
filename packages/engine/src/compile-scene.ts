@@ -415,6 +415,7 @@ function lowerMask(
 					pos: node.mask.pos ?? { x: 0, y: 0 },
 					size: node.mask.size ?? { width: 0, height: 0 },
 					clip: shape,
+					...(children.length > 1 ? { isolate: true } : {}),
 					children,
 				},
 			],
