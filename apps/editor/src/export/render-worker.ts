@@ -33,8 +33,7 @@ type CK = any;
 const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
 let fonts = new Map<string, Uint8Array[]>();
-const text =
-	createWorkerText<ReturnType<typeof createParagraphEngine>>();
+const text = createWorkerText<ReturnType<typeof createParagraphEngine>>();
 /** the template of the last render; the pool sends it only when it changes */
 let current: Template | undefined;
 const caches = createJobCaches();

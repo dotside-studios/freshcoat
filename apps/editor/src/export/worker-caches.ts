@@ -106,9 +106,7 @@ export type WorkerText<E extends DisposableTextEngine> = {
 export function createWorkerText<
 	E extends DisposableTextEngine,
 >(): WorkerText<E> {
-	let text:
-		| (ReturnType<WorkerText<E>["get"]> & { fonts: Fonts })
-		| undefined;
+	let text: (ReturnType<WorkerText<E>["get"]> & { fonts: Fonts }) | undefined;
 	const clear = () => {
 		text?.engine.dispose();
 		text = undefined;
