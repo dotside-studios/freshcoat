@@ -462,7 +462,11 @@ function textStyleOf(
 			...fallbackFamilies.filter((f) => f !== span.font.family),
 		],
 		fontSize: span.font.size,
-		fontStyle: { weight: ck.FontWeight[weight] },
+		fontStyle: {
+			weight: ck.FontWeight[weight],
+			slant:
+				span.font.style === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright,
+		},
 		// Instantiate a variable face at the span's weight and axes instead of
 		// drawing its default instance under synthetic bold — see paragraph-layout's
 		// spanTextStyle, which measures with the identical style.
@@ -1900,10 +1904,12 @@ function textBounds(
 			line.direction === "rtl"
 				? Math.min(...line.spans.map((s) => s.x))
 				: first.x;
+		// Glyph runs carry no fake-italic flag, so any italic span may be synthetic.
+		const italic = line.spans.some((s) => s.font.style === "italic");
 		let x0 = Number.POSITIVE_INFINITY;
 		let x1 = Number.NEGATIVE_INFINITY;
 		for (const run of shaped.para.getShapedLines()[0]?.runs ?? []) {
-			const skew = run.fakeItalic
+			const skew = italic
 				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * run.size
 				: 0;
 			const pos = run.positions as Float32Array;
