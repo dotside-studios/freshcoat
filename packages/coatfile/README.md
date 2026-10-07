@@ -353,6 +353,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
+| 1.6 | frame `isolate` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -487,12 +488,27 @@ source directly; the engine draws it as vector art.
 `hard-light`, `soft-light`, `difference`, `exclusion`, `hue`, `saturation`,
 `color`, `luminosity`, and `plus` (linear dodge).
 
-There is no pass-through mode, because groups and frames are not isolated in
-the first place. Their children blend with whatever is under the group, which
-is what Figma calls pass-through. A group becomes an isolated layer only when it
-carries a layer effect of its own (`opacity` below 1, `blendMode`, `blur`,
-`shadow` or `adjust`), and a separate `pass-through` value would render exactly
-like leaving `blendMode` unset.
+A frame's `isolate` (1.6) is Figma's Normal on a container: its children
+composite in a layer of their own, so a blended child mixes only with the
+frame's own content. Without it the frame is pass-through, and its children
+blend with whatever is under it. `isolate` is separate from `blendMode`, which
+picks the formula the composited frame blends with. A frame with `opacity`
+below 1, `blendMode`, `blur`, `shadow` or `adjust` composites as one layer
+anyway, so `isolate` changes nothing there. Files written before 1.6 have no
+`isolate`, and read as pass-through, as they always rendered.
+
+```jsonc
+{
+  "id": "card", "type": "frame",
+  "pos": { "x": 0, "y": 0 }, "size": { "width": 400, "height": 300 },
+  "properties": {
+    "isolate": true,
+    "children": [
+      { "id": "tint", "type": "rect", "blendMode": "multiply", /* … */ }
+    ]
+  }
+}
+```
 
 ## Barcodes
 

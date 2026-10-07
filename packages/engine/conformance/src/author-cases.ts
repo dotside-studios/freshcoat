@@ -406,6 +406,50 @@ add(
 	],
 );
 
+// A multiply child over the group's own (128,128,255) and over nothing the group
+// drew, on a (255,128,0) ground. Isolated, the empty part has only the child to
+// mix with; passed through, it multiplies the ground.
+const isolationScene = (isolate: boolean) =>
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#ff8000") }),
+		createGroup(
+			[
+				createRect({ ...box(0, 0, 80, H), fills: solid("#8080ff") }),
+				createRect({
+					...box(40, 30, 80, 60),
+					fills: solid("#00ff00"),
+					blendMode: "multiply",
+				}),
+			],
+			{ ...box(0, 0, W, H), ...(isolate ? { isolate: true } : {}) },
+		),
+	]);
+
+add(
+	"group-isolate",
+	"an isolated group's blended child mixes only with the group's content",
+	"core",
+	["group.isolate", "blend.multiply"],
+	isolationScene(true),
+	[
+		px([60, 60], [0, 128, 0, 255], "over the group's own content", 2),
+		px([100, 60], [0, 255, 0, 255], "over nothing the group drew", 2),
+		px([140, 10], [255, 128, 0, 255], "the ground, outside the child"),
+	],
+);
+
+add(
+	"group-pass-through",
+	"a group without isolation lets a blended child mix with the ground",
+	"core",
+	["blend.multiply"],
+	isolationScene(false),
+	[
+		px([60, 60], [0, 128, 0, 255], "over the group's own content", 2),
+		px([100, 60], [0, 128, 0, 255], "over the ground", 2),
+	],
+);
+
 // Per-corner radii on a group's clip: only the top-left corner is rounded.
 add(
 	"clip-per-corner",

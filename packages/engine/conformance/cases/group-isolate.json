@@ -1,0 +1,153 @@
+{
+	"id": "group-isolate",
+	"title": "an isolated group's blended child mixes only with the group's content",
+	"profile": "core",
+	"requires": [
+		"group.isolate",
+		"blend.multiply"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ff8000"
+					}
+				]
+			},
+			{
+				"kind": "group",
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 80,
+							"height": 120
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#8080ff"
+							}
+						]
+					},
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 40,
+							"y": 30
+						},
+						"size": {
+							"width": 80,
+							"height": 60
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#00ff00"
+							}
+						],
+						"blendMode": "multiply"
+					}
+				],
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"isolate": true
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				60,
+				60
+			],
+			"expect": [
+				0,
+				128,
+				0,
+				255
+			],
+			"why": "over the group's own content",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				100,
+				60
+			],
+			"expect": [
+				0,
+				255,
+				0,
+				255
+			],
+			"why": "over nothing the group drew",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				140,
+				10
+			],
+			"expect": [
+				255,
+				128,
+				0,
+				255
+			],
+			"why": "the ground, outside the child"
+		}
+	]
+}
