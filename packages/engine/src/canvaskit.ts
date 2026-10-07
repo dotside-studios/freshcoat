@@ -46,6 +46,7 @@ import {
 } from "./lut-images";
 import {
 	cacheBackground,
+	cacheFinishNoise,
 	cachedFontProvider,
 	cachedLine,
 	cachedMipmaps,
@@ -2661,15 +2662,9 @@ function reduceSupersampled(
 	}
 }
 
-// SkSL for the whole-frame finishing pass. Order mirrors the classic output
-// pipeline: dither first (break banding), then black-extract, then white-clamp.
-// Colors are unpremultiplied for the threshold tests and re-premultiplied out.
-// Disabled ops are signalled by a sentinel threshold of -1 (dither 0).
-const FINISH_SKSL = `uniform shader src;
-	uniform float whiteT;
-	uniform float blackT;
-	uniform float dither;
-	uniform float ditherSeed;
+// The dither noise of the finishing pass. It depends only on the pixel
+// position, the seed and the mode.
+const FINISH_HASH_SKSL = `uniform float ditherSeed;
 	uniform float monochromeDither;
 	half hash(float2 p){
 		p += float2(ditherSeed * 0.1031, ditherSeed * 0.11369);
@@ -2679,7 +2674,17 @@ const FINISH_SKSL = `uniform shader src;
 		return half3(hash(p + float2(19.19, 7.13)),
 		             hash(p + float2(43.31, 31.71)),
 		             hash(p + float2(67.67, 59.59)));
-	}
+	}`;
+
+// SkSL for the whole-frame finishing pass. Order mirrors the classic output
+// pipeline: dither first (break banding), then black-extract, then white-clamp.
+// Colors are unpremultiplied for the threshold tests and re-premultiplied out.
+// Disabled ops are signalled by a sentinel threshold of -1 (dither 0).
+const FINISH_SKSL = `uniform shader src;
+	uniform float whiteT;
+	uniform float blackT;
+	uniform float dither;
+	${FINISH_HASH_SKSL}
 	half4 main(float2 xy){
 		half4 s = src.eval(xy);
 		half a = s.a;
@@ -2694,16 +2699,29 @@ const FINISH_SKSL = `uniform shader src;
 		return half4(c*a, a);
 	}`;
 
-function finishEffect(ck: CanvasKit): RuntimeEffect | null {
+// The noise FINISH_SKSL adds, unscaled, for finishOnCpu to read back.
+const FINISH_NOISE_SKSL = `${FINISH_HASH_SKSL}
+	half4 main(float2 xy){
+		half n = hash(xy);
+		return half4(monochromeDither > 0.5 ? half3(n) : hash3(xy), 1.0);
+	}`;
+
+function finishEffect(
+	ck: CanvasKit,
+	variant: "finish" | "finish-noise",
+): RuntimeEffect | null {
 	let byVariant = effectCache.get(ck);
 	if (!byVariant) {
 		byVariant = new Map();
 		effectCache.set(ck, byVariant);
 	}
-	let eff = byVariant.get("finish");
+	let eff = byVariant.get(variant);
 	if (eff === undefined) {
-		eff = ck.RuntimeEffect.Make(FINISH_SKSL) ?? null;
-		byVariant.set("finish", eff);
+		eff =
+			ck.RuntimeEffect.Make(
+				variant === "finish" ? FINISH_SKSL : FINISH_NOISE_SKSL,
+			) ?? null;
+		byVariant.set(variant, eff);
 	}
 	return eff;
 }
@@ -2720,9 +2738,38 @@ function normalizeDither(dither: FrameFinish["dither"]) {
 	return { amount, seed, monochrome: dither?.mode === "monochrome" };
 }
 
-// Run the finishing pass on the composited surface: snapshot it, clear it, then
-// redraw the snapshot through the finish shader. A no-op finish never reaches
-// here (compileScene only emits the command when something is set).
+type FinishUniforms = {
+	whiteT: number;
+	blackT: number;
+	dither: number;
+	seed: number;
+	monochrome: boolean;
+};
+
+// Thresholds normalized to [0,1]; -1 disables. Dither gets an amplitude, stable
+// seed, and a scalar-vs-per-channel mode flag.
+// The comparisons are integer strict >/< on 8-bit values (matching a 0–255
+// pipeline), so the cutoff sits half a level past the threshold — robust to the
+// float round-trip and exact at the boundary (a pixel == threshold stays put).
+function finishUniforms(finish: FrameFinish): FinishUniforms {
+	const ditherConfig = normalizeDither(finish.dither);
+	return {
+		whiteT:
+			finish.whiteClamp !== undefined ? (finish.whiteClamp + 0.5) / 255 : -1,
+		blackT:
+			finish.blackExtract !== undefined
+				? (finish.blackExtract - 0.5) / 255
+				: -1,
+		dither: ditherConfig.amount > 0 ? ditherConfig.amount / 255 : 0,
+		seed: ditherConfig.seed,
+		monochrome: ditherConfig.monochrome,
+	};
+}
+
+// Run the finishing pass on the composited surface. In memory it runs on the
+// CPU when it can (see finishOnCpu); otherwise it snapshots the surface, clears
+// it, then redraws the snapshot through the finish shader. A no-op finish never
+// reaches here (compileScene only emits the command when something is set).
 function applyFrameFinish(
 	ck: CanvasKit,
 	surface: Surface,
@@ -2731,9 +2778,17 @@ function applyFrameFinish(
 	// The surface's own pixel size — this pass reads and rewrites the composited
 	// pixels, so it works in device pixels whatever density the scene exported at.
 	device: Size,
+	cache: PaintCacheState | null,
 ) {
-	const effect = finishEffect(ck);
+	const effect = finishEffect(ck, "finish");
 	if (!effect) return; // rt_effect unavailable — leave the frame as-is.
+	const u = finishUniforms(finish);
+	if (
+		cpuFinish &&
+		!surface.reportBackendTypeIsGPU() &&
+		finishOnCpu(ck, surface, bin, u, cache)
+	)
+		return;
 	const snap = bin.track(surface.makeImageSnapshot());
 	const canvas = surface.getCanvas();
 	canvas.clear(ck.TRANSPARENT);
@@ -2745,32 +2800,141 @@ function applyFrameFinish(
 			ck.MipmapMode.None,
 		),
 	);
-	// Thresholds normalized to [0,1]; -1 disables. Dither gets an amplitude, stable
-	// seed, and a scalar-vs-per-channel mode flag.
-	// The comparisons are integer strict >/< on 8-bit values (matching a 0–255
-	// pipeline), so the cutoff sits half a level past the threshold — robust to the
-	// float round-trip and exact at the boundary (a pixel == threshold stays put).
-	const whiteT =
-		finish.whiteClamp !== undefined ? (finish.whiteClamp + 0.5) / 255 : -1;
-	const blackT =
-		finish.blackExtract !== undefined ? (finish.blackExtract - 0.5) / 255 : -1;
-	const ditherConfig = normalizeDither(finish.dither);
-	const dither = ditherConfig.amount > 0 ? ditherConfig.amount / 255 : 0;
 	const shader = bin.track(
 		effect.makeShaderWithChildren(
-			[
-				whiteT,
-				blackT,
-				dither,
-				ditherConfig.seed,
-				ditherConfig.monochrome ? 1 : 0,
-			],
+			[u.whiteT, u.blackT, u.dither, u.seed, u.monochrome ? 1 : 0],
 			[srcSh],
 		),
 	);
 	const paint = bin.track(new ck.Paint());
 	paint.setShader(shader);
 	canvas.drawRect(ck.XYWHRect(0, 0, device.width, device.height), paint);
+}
+
+const UNIT = f32(1 / 255);
+
+// Test hook: run every finish through the shader.
+let cpuFinish = true;
+
+export function setCpuFinish(enabled: boolean): void {
+	cpuFinish = enabled;
+}
+
+// FINISH_SKSL in float32 on the surface's own pixels, byte for byte what the
+// shader writes in software, which runs runtime effects slowly. Exact only
+// where alpha is 255 (unpremultiplying rounds otherwise), so a frame with any
+// translucent pixel answers false and takes the shader. So does a dithered
+// frame without a cache to keep its noise, which costs about what the shader
+// does to render.
+function finishOnCpu(
+	ck: CanvasKit,
+	surface: Surface,
+	bin: Bin,
+	u: FinishUniforms,
+	cache: PaintCacheState | null,
+): boolean {
+	const info = surface.imageInfo();
+	if (info.colorType !== ck.ColorType.RGBA_8888) return false;
+	if (u.dither > 0 && !cache) return false;
+	const canvas = surface.getCanvas();
+	const px = canvas.readPixels(0, 0, info) as Uint8Array | null;
+	if (!px) return false;
+	for (let i = 3; i < px.length; i += 4) if (px[i] !== 255) return false;
+	let noise: Float32Array | null = null;
+	if (u.dither > 0) {
+		noise = cache && finishNoise(ck, surface, bin, cache, u);
+		if (!noise) return false;
+	}
+	const unit = new Float32Array(256);
+	for (let b = 0; b < 256; b++) unit[b] = f32(b * UNIT);
+	const whiteT = f32(u.whiteT);
+	const blackT = f32(u.blackT);
+	if (noise) {
+		const d = f32(u.dither);
+		const step = u.monochrome ? 0 : 1;
+		const toByte = (c: number) => Math.floor(f32(f32(c * 255) + 0.5));
+		const dithered = (b: number, n: number) =>
+			Math.min(Math.max(f32(unit[b] + f32(n * d)), 0), 1);
+		for (let i = 0, j = 0; i < px.length; i += 4, j += 1 + 2 * step) {
+			let r = dithered(px[i], noise[j]);
+			let g = dithered(px[i + 1], noise[j + step]);
+			let b = dithered(px[i + 2], noise[j + 2 * step]);
+			if (blackT >= 0 && r < blackT && g < blackT && b < blackT) r = g = b = 0;
+			if (whiteT >= 0 && r > whiteT && g > whiteT && b > whiteT) r = g = b = 1;
+			px[i] = toByte(r);
+			px[i + 1] = toByte(g);
+			px[i + 2] = toByte(b);
+		}
+	} else {
+		// Undithered, a byte that passes both thresholds comes back as itself.
+		const black = new Uint8Array(256);
+		const white = new Uint8Array(256);
+		for (let b = 0; b < 256; b++) {
+			black[b] = blackT >= 0 && unit[b] < blackT ? 1 : 0;
+			white[b] = whiteT >= 0 && unit[b] > whiteT ? 1 : 0;
+		}
+		for (let i = 0; i < px.length; i += 4) {
+			const r = px[i];
+			const g = px[i + 1];
+			const b = px[i + 2];
+			if (black[r] && black[g] && black[b]) px[i] = px[i + 1] = px[i + 2] = 0;
+			else if (white[r] && white[g] && white[b])
+				px[i] = px[i + 1] = px[i + 2] = 255;
+		}
+	}
+	return canvas.writePixels(
+		px,
+		info.width,
+		info.height,
+		0,
+		0,
+		info.alphaType,
+		info.colorType,
+		info.colorSpace,
+	);
+}
+
+// The unscaled noise FINISH_SKSL would add at each pixel of `surface`, one
+// value per pixel in monochrome and three otherwise, rendered by the same hash
+// into a float surface and kept on the cache.
+function finishNoise(
+	ck: CanvasKit,
+	surface: Surface,
+	bin: Bin,
+	cache: PaintCacheState,
+	u: FinishUniforms,
+): Float32Array | null {
+	const info = surface.imageInfo();
+	const key = `${info.width}x${info.height}:${u.seed}:${u.monochrome ? "mono" : "rgb"}`;
+	if (cache.finishNoise?.key === key) return cache.finishNoise.noise;
+	const effect = finishEffect(ck, "finish-noise");
+	if (!effect) return null;
+	const target = surface.getCanvas().makeSurface({
+		width: info.width,
+		height: info.height,
+		colorType: ck.ColorType.RGBA_F32,
+		alphaType: ck.AlphaType.Unpremul,
+		colorSpace: info.colorSpace,
+	});
+	if (!target) return null;
+	bin.track({ delete: () => target.dispose() });
+	const shader = bin.track(effect.makeShader([u.seed, u.monochrome ? 1 : 0]));
+	const paint = bin.track(new ck.Paint());
+	paint.setShader(shader);
+	const canvas = target.getCanvas();
+	canvas.drawRect(ck.XYWHRect(0, 0, info.width, info.height), paint);
+	const rgba = canvas.readPixels(
+		0,
+		0,
+		target.imageInfo(),
+	) as Float32Array | null;
+	if (!rgba) return null;
+	const channels = u.monochrome ? 1 : 3;
+	const noise = new Float32Array((rgba.length / 4) * channels);
+	for (let i = 0, j = 0; i < rgba.length; i += 4)
+		for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
+	cacheFinishNoise(cache, { key, noise });
+	return noise;
 }
 
 // Skia's name for each layer blend mode. Figma's linear dodge is Skia's Plus.
@@ -3573,7 +3737,8 @@ export async function paintScene(
 		const finishCmd = commands.find((c) => c.op === "finishFrame") as
 			| { op: "finishFrame"; finish: FrameFinish }
 			| undefined;
-		if (finishCmd) applyFrameFinish(ck, surface, bin, finishCmd.finish, device);
+		if (finishCmd)
+			applyFrameFinish(ck, surface, bin, finishCmd.finish, device, cache);
 		// Flush before freeing the provider/images below: on the WebGL path the GPU
 		// still references the decoded images until the surface is flushed.
 		surface.flush();

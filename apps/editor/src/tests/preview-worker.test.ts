@@ -161,6 +161,7 @@ const RESULT = {
 		pathBuilds: 0,
 		backgroundSnapshots: 0,
 		backgroundReuses: 0,
+		finishNoiseBuilds: 0,
 	},
 };
 

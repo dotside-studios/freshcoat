@@ -43,6 +43,12 @@ export type CachedBackground = {
 	warnings: PaintWarning[];
 };
 
+// The dither noise of the finishing pass for one frame size, seed and mode.
+export type CachedFinishNoise = {
+	key: string;
+	noise: Float32Array;
+};
+
 type CachedSurface = {
 	surface: Surface;
 	canvas: CanvasLike;
@@ -74,6 +80,7 @@ export type PaintCacheState = {
 	surface: CachedSurface | null;
 	// Most recently used first.
 	backgrounds: CachedBackground[];
+	finishNoise: CachedFinishNoise | null;
 	disposed: boolean;
 };
 
@@ -96,6 +103,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 			pathBuilds: 0,
 			backgroundSnapshots: 0,
 			backgroundReuses: 0,
+			finishNoiseBuilds: 0,
 		},
 		fonts: null,
 		images: new Map(),
@@ -106,6 +114,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		luts: createLutImages(),
 		surface: null,
 		backgrounds: [],
+		finishNoise: null,
 		disposed: false,
 	};
 	const clear = () => {
@@ -118,6 +127,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		state.images.clear();
 		freeLutImages(state.luts);
 		state.backgrounds = [];
+		state.finishNoise = null;
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -200,7 +210,7 @@ export function cachedSurface(
 // Deletes the cached images this paint's scene did not use, oldest first, until
 // what is left fits the cache's image budget and entry cap. Backgrounds, cheaper
 // to redraw than an image is to decode, go least recently used first until they
-// fit beside them.
+// fit beside them, then the finish noise.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
@@ -228,12 +238,15 @@ export function evictUnusedImages(
 		freeImage(entry);
 	}
 	if (state.maxImagePixels <= 0) return;
-	for (const bg of state.backgrounds) total += backgroundPixels(bg);
-	while (total > state.maxImagePixels) {
+	let held = total + finishNoisePixels(state);
+	for (const bg of state.backgrounds) held += backgroundPixels(bg);
+	while (held > state.maxImagePixels) {
 		const bg = state.backgrounds.pop();
 		if (!bg) break;
-		total -= backgroundPixels(bg);
+		held -= backgroundPixels(bg);
 	}
+	if (total + finishNoisePixels(state) > state.maxImagePixels)
+		state.finishNoise = null;
 }
 
 // The background at `frame` sharing the longest leading run with `keys`, the
@@ -284,6 +297,21 @@ function sharedLength(a: string[], b: string[]): number {
 	let n = 0;
 	while (n < a.length && n < b.length && a[n] === b[n]) n++;
 	return n;
+}
+
+// Keeps the noise of one frame, replacing any other. With an image budget it
+// counts against that budget (see evictUnusedImages).
+export function cacheFinishNoise(
+	state: PaintCacheState,
+	noise: CachedFinishNoise,
+): void {
+	state.finishNoise = noise;
+	state.stats.finishNoiseBuilds++;
+}
+
+// In pixels of 8-bit RGBA: a float of noise takes the bytes of one.
+function finishNoisePixels(state: PaintCacheState): number {
+	return state.finishNoise ? state.finishNoise.noise.length : 0;
 }
 
 function backgroundPixels(background: CachedBackground): number {
