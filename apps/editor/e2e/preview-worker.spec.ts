@@ -31,15 +31,18 @@ function previewMode(page: Page) {
 	);
 }
 
-async function onMainThread(page: Page) {
+async function onWorker(page: Page) {
 	await page.addInitScript(() => {
 		(
 			window as unknown as { __freshcoatPreviewWorker: boolean }
-		).__freshcoatPreviewWorker = false;
+		).__freshcoatPreviewWorker = true;
 	});
 }
 
-test("the Edit canvas paints from a worker", async ({ page }) => {
+test("the Edit canvas paints from a worker when opted into", async ({
+	page,
+}) => {
+	await onWorker(page);
 	await openSample(page);
 	expect(await previewMode(page)).toBe("worker");
 	const canvas = page.getByTestId("artboard-canvas");
@@ -60,7 +63,7 @@ for (const sample of ["membership-card", "certificate", "minimal"]) {
 		test.setTimeout(150_000);
 		const worker = await browser.newPage();
 		const main = await browser.newPage();
-		await onMainThread(main);
+		await onWorker(worker);
 		await openSample(worker, sample);
 		await openSample(main, sample);
 		expect(await previewMode(worker)).toBe("worker");
@@ -82,6 +85,7 @@ for (const sample of ["membership-card", "certificate", "minimal"]) {
 test("the worker paints again after losing its GPU context", async ({
 	page,
 }) => {
+	await onWorker(page);
 	await openSample(page);
 	const before = await painted(page);
 	await page.evaluate(() =>
@@ -98,10 +102,9 @@ test("the worker paints again after losing its GPU context", async ({
 	expect(await state<string>(page, "s.render.status")).toBe("ok");
 });
 
-test("without a worker the main thread paints, and drags still move layers", async ({
+test("by default the main thread paints, and drags still move layers", async ({
 	page,
 }) => {
-	await onMainThread(page);
 	await openSample(page);
 	expect(await previewMode(page)).toBe("main");
 	const x = await state<number>(page, `s.geometry.get("0/6").rect.x`);

@@ -16,13 +16,18 @@ export const createPreviewWorker = (): PreviewWorkerLike =>
 		type: "module",
 	}) as unknown as PreviewWorkerLike;
 
-/** Whether this browser can paint the Edit canvas from a worker. Tests force
- *  the main-thread path by setting `window.__freshcoatPreviewWorker = false`. */
-export function previewWorkerSupported(): boolean {
+/** Whether the Edit canvas paints from a worker. Off unless
+ *  `window.__freshcoatPreviewWorker` is true: on a real GPU, handing each
+ *  frame across cost more than the render it moved off the main thread. */
+export function previewWorkerEnabled(): boolean {
 	if (typeof window === "undefined") return false;
 	const flag = (window as { __freshcoatPreviewWorker?: boolean })
 		.__freshcoatPreviewWorker;
-	if (flag === false) return false;
+	return flag === true && previewWorkerSupported();
+}
+
+/** Whether this browser can paint the Edit canvas from a worker. */
+export function previewWorkerSupported(): boolean {
 	return (
 		typeof Worker !== "undefined" &&
 		typeof OffscreenCanvas !== "undefined" &&

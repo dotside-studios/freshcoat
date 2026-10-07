@@ -54,7 +54,7 @@ export type BenchSearch = {
 	sample?: string;
 	frames?: string;
 	theme?: string;
-	/** "main" paints the Edit canvas on the main thread. */
+	/** "worker" paints the Edit canvas from a worker. */
 	preview?: string;
 };
 

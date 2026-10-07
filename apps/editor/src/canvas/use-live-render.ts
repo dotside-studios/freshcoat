@@ -9,7 +9,7 @@ import {
 } from "~/render/live-frame";
 import {
 	createWorkerBackend,
-	previewWorkerSupported,
+	previewWorkerEnabled,
 	type WorkerBackend,
 } from "~/render/preview-client";
 import {
@@ -66,10 +66,10 @@ export function useLiveRender(): {
 		canvas: HTMLCanvasElement;
 		scale: number;
 	} | null>(null);
-	// The worker paints where the browser allows it; the main thread otherwise,
-	// or once the worker has failed.
+	// The main thread paints unless the worker is opted into and the browser
+	// allows it, and again once the worker has failed.
 	const [mode, setMode] = useState<"worker" | "main">(() =>
-		previewWorkerSupported() ? "worker" : "main",
+		previewWorkerEnabled() ? "worker" : "main",
 	);
 	const [ck, setCk] = useState<unknown>(null);
 	const [activeScheduler, setScheduler] =

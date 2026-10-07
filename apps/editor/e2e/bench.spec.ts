@@ -40,7 +40,7 @@ for (const sample of ["membership-card", "certificate"]) {
 
 // The live preview's worst case, painted from the worker and on the main
 // thread, for comparing how each holds the main thread up during a drag. On a
-// real GPU, open /bench?sample=stress and /bench?sample=stress&preview=main
+// real GPU, open /bench?sample=stress and /bench?sample=stress&preview=worker
 // instead: these runs draw through SwiftShader, which takes seconds a frame
 // to raster the selected photo on either path.
 test("bench: stress, worker and main thread", async ({ browser }, info) => {
@@ -48,7 +48,7 @@ test("bench: stress, worker and main thread", async ({ browser }, info) => {
 	const results: Record<string, unknown> = {};
 	for (const preview of ["worker", "main"]) {
 		const page = await browser.newPage();
-		const query = preview === "main" ? "&preview=main" : "";
+		const query = preview === "worker" ? "&preview=worker" : "";
 		await page.goto(`/?bench&sample=stress&frames=6${query}`);
 		const handle = await page.waitForFunction(
 			() =>
