@@ -93,13 +93,32 @@ describe("Layers tree renders", () => {
 		expect(row("0/4").hasAttribute("data-canvas-hover")).toBe(false);
 	});
 
-	it("hiding a layer re-renders one row's toggles, not the tree", () => {
+	it("hiding a layer re-renders only its own row", () => {
 		const c = setup(rects(200), <LeftPanel />);
 		const counts = countRenders(() => {
 			act(() => c.toggleHidden(["0/7"]));
 		});
 		expect(counts.get("LayersTree") ?? 0).toBe(0);
 		expect(counts.get("RowToggles")).toBe(1);
+		expect(counts.get("RowIcon")).toBe(1);
+		expect(counts.get("RowLabel")).toBe(1);
+	});
+
+	it("hiding a frame dims the rows inside it", () => {
+		const c = setup(doc(), <LeftPanel />);
+		act(() => c.select(["0/1/0"]));
+		const name = (key: string) =>
+			screen
+				.getByTestId(`layer-row-${key}`)
+				.querySelector("[data-layer-name]") as HTMLElement;
+		expect(name("0/1/0").className).not.toContain("opacity-45");
+		const counts = countRenders(() => {
+			act(() => c.toggleHidden(["0/1"]));
+		});
+		for (const key of ["0/1", "0/1/0", "0/1/1", "0/1/2"])
+			expect(name(key).className).toContain("opacity-45");
+		expect(name("0/0").className).not.toContain("opacity-45");
+		expect(counts.get("RowLabel")).toBe(4);
 	});
 });
 

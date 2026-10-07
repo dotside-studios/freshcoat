@@ -12,6 +12,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from "react";
 import {
 	Collection,
@@ -35,7 +36,7 @@ import {
 	workingTemplate,
 } from "~/doc/variant-edit";
 import { useEditor, useStore } from "~/state/hooks";
-import { present } from "~/state/store";
+import { type EditorStore, present } from "~/state/store";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import LockIcon from "~icons/mingcute/lock-line";
@@ -92,30 +93,56 @@ function ancestorsOf(key: string): string[] {
 	return out;
 }
 
-/** Rows hidden themselves, or inside a hidden layer. */
-const HiddenInTreeContext = createContext<ReadonlySet<string>>(new Set());
+/** Whether a row is hidden itself or inside a hidden layer. Only a change of
+ *  `hidden` wakes the rows, and only those whose answer changed re-render. */
+type HiddenInTree = {
+	subscribe(listener: () => void): () => void;
+	has(key: string): boolean;
+};
+const HiddenInTreeContext = createContext<HiddenInTree>({
+	subscribe: () => () => {},
+	has: () => false,
+});
 
-function HiddenInTree({
-	rowIndex,
-	children,
-}: {
-	rowIndex: Map<string, LayerRow>;
-	children: ReactNode;
-}) {
-	const hidden = useEditor((s) => s.hidden);
-	const inTree = useMemo(() => {
-		const out = new Set<string>();
-		if (hidden.size === 0) return out;
-		for (const key of rowIndex.keys())
-			if (hidden.has(key) || ancestorsOf(key).some((k) => hidden.has(k)))
-				out.add(key);
-		return out;
-	}, [hidden, rowIndex]);
-	return (
-		<HiddenInTreeContext.Provider value={inTree}>
-			{children}
-		</HiddenInTreeContext.Provider>
-	);
+function hiddenInTreeOf(store: EditorStore): HiddenInTree {
+	const listeners = new Set<() => void>();
+	let hidden = store.getState().hidden;
+	let answers = new Map<string, boolean>();
+	let unsubscribe = () => {};
+	const sync = () => {
+		const next = store.getState().hidden;
+		if (next === hidden) return false;
+		hidden = next;
+		answers = new Map();
+		return true;
+	};
+	return {
+		subscribe(listener) {
+			if (listeners.size === 0)
+				unsubscribe = store.subscribe(() => {
+					if (sync()) for (const l of listeners) l();
+				});
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+				if (listeners.size === 0) unsubscribe();
+			};
+		},
+		has(key) {
+			sync();
+			let answer = answers.get(key);
+			if (answer === undefined) {
+				answer = hidden.has(key) || ancestorsOf(key).some((k) => hidden.has(k));
+				answers.set(key, answer);
+			}
+			return answer;
+		},
+	};
+}
+
+function useHiddenInTree(key: string): boolean {
+	const source = useContext(HiddenInTreeContext);
+	return useSyncExternalStore(source.subscribe, () => source.has(key));
 }
 
 function rowSelector(key: string) {
@@ -156,6 +183,7 @@ function setAll(
 export function LayersTree() {
 	const controller = useController();
 	const store = useStore();
+	const hiddenInTree = useMemo(() => hiddenInTreeOf(store), [store]);
 	// A drag moves layers without renaming or restacking them, so the tree
 	// shows the state the drag started from until it ends.
 	const template = useEditor((s) => {
@@ -539,7 +567,7 @@ export function LayersTree() {
 							}
 						}}
 					>
-						<HiddenInTree rowIndex={rowIndex}>
+						<HiddenInTreeContext.Provider value={hiddenInTree}>
 							<Tree
 								aria-label="Layers"
 								data-testid="layers-tree"
@@ -557,7 +585,7 @@ export function LayersTree() {
 							>
 								{renderRow}
 							</Tree>
-						</HiddenInTree>
+						</HiddenInTreeContext.Provider>
 					</div>
 				</ContextMenu>
 			</RenamingContext.Provider>
@@ -580,9 +608,7 @@ function indexRows(rows: LayerRow[]): Map<string, LayerRow> {
 function RowIcon({ row }: { row: LayerRow }) {
 	const Icon = layerIcon(row.element, row.kind === "background");
 	const marks = useContext(VariantMarksContext);
-	const dim =
-		useContext(HiddenInTreeContext).has(row.key) ||
-		(marks?.hidden.has(row.key) ?? false);
+	const dim = useHiddenInTree(row.key) || (marks?.hidden.has(row.key) ?? false);
 	return <Icon className={cn(dim && "opacity-45")} />;
 }
 
@@ -591,7 +617,7 @@ function RowLabel({ row }: { row: LayerRow }) {
 	const renaming = useContext(RenamingContext);
 	const marks = useContext(VariantMarksContext);
 	const hiddenInVariant = marks?.hidden.has(row.key) ?? false;
-	const dim = useContext(HiddenInTreeContext).has(row.key) || hiddenInVariant;
+	const dim = useHiddenInTree(row.key) || hiddenInVariant;
 
 	if (renaming.key === row.key)
 		return (
