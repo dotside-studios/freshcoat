@@ -1,6 +1,7 @@
 // The one geometry construction behind fills, aligned strokes, clips and
 // predicted bounds, so a shape covers the same pixels whichever draws it.
 
+import type { CanvasKit, Path } from "canvaskit-wasm";
 import { insetCorner } from "./paint-helpers";
 import { squircleSvg } from "./squircle";
 import type { CornerRadius, ShapeMask } from "./types";
@@ -156,4 +157,29 @@ export function outlineGeometry(
 		default:
 			return { kind: "rect", ltrb: [ix, iy, ix + iw, iy + ih] };
 	}
+}
+
+// The outline over the box (0, 0, w, h) as a path, for hit testing. The caller
+// owns and deletes it.
+export function outlinePath(
+	ck: CanvasKit,
+	shape: ShapeMask,
+	w: number,
+	h: number,
+	inset = 0,
+): Path | null {
+	const g = outlineGeometry(shape, 0, 0, w, h, inset);
+	if (!g) return null;
+	if (g.kind === "path") return ck.Path.MakeFromSVGString(g.d);
+	const builder = new ck.PathBuilder();
+	if (g.kind === "rect") builder.addRect(ck.LTRBRect(...g.ltrb));
+	else {
+		const [tl, tr, br, bl] = g.radii;
+		builder.addRRect(
+			Float32Array.of(...g.ltrb, tl, tl, tr, tr, br, br, bl, bl),
+		);
+	}
+	const path = builder.detach();
+	builder.delete();
+	return path;
 }

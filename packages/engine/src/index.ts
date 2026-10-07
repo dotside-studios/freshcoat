@@ -143,6 +143,7 @@ export {
 	type PngEffort,
 } from "./png";
 export { resolveLayout } from "./resolve-layout";
+export { outlinePath, rectShape } from "./outline";
 export { squircleSvg } from "./squircle";
 export {
 	type CachedTextEngine,
