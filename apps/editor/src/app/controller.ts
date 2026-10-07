@@ -10,7 +10,6 @@ import {
 	COAT_JSON_MEDIA_TYPE,
 	COAT_MEDIA_TYPE,
 } from "@freshcoat-js/coatfile/coat";
-import { type SvgElements, svgToElements } from "@freshcoat-js/coatfile/svg";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
 	resolveValues,
@@ -76,10 +75,11 @@ import {
 	isHiddenInVariant,
 	isStructuralEdit,
 } from "~/doc/variant-edit";
-import { newPreset } from "~/export/export-ui";
+import { newPreset } from "~/export/preset";
 import { getCanvasKit } from "~/render/canvaskit";
-import { findSample } from "~/samples";
+import { findSample, type Sample } from "~/samples";
 import { findStarter } from "~/samples/starters";
+import { loadVendSans } from "~/samples/vend-sans-file";
 import {
 	type Action,
 	createEditorStore,
@@ -100,8 +100,9 @@ import { clearAutosave, configureAutosave, writeAutosave } from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
-import { exportSidePng } from "./export-png";
-import { svgMarkup, svgSize } from "./svg";
+import { loadFor, once } from "./lazy";
+import { loadSvgImport } from "./svg";
+import type { SvgElements, svgToElements } from "./svg-import";
 
 configureAutosave({
 	onStorageFull: () =>
@@ -110,6 +111,9 @@ configureAutosave({
 			timeout: 10000,
 		}),
 });
+
+const loadArchive = once(() => import("@freshcoat-js/workspace/archive"));
+const loadExportPng = once(() => import("./export-png"));
 
 /** The notice a file from a newer format opens with. Saving checks for it. */
 export const NEWER_FORMAT = "Made in a newer version. Saving is off.";
@@ -600,8 +604,10 @@ export class EditorController {
 	): Promise<string | null> {
 		if (!this.base) return null;
 		if (file.type === "image/svg+xml") {
-			const svg = svgMarkup(await file.text());
-			if (svg) return this.placeSvg(svg, point);
+			const svg = await this.loadSvgImport(() => this.placeImage(file, point));
+			if (!svg) return null;
+			const markup = svg.svgMarkup(await file.text());
+			if (markup) return this.placeSvg(markup, svg.svgSize(markup), point);
 		}
 		const size = await imageSize(file).catch(() => ({
 			width: 400,
@@ -610,26 +616,42 @@ export class EditorController {
 		return this.placeImageBytes(file, size, point);
 	}
 
-	async placeSvg(
+	private loadSvgImport(retry: () => unknown) {
+		return loadFor(
+			loadSvgImport,
+			{
+				loading: "Loading the SVG importer…",
+				failed: "Couldn't load the SVG importer",
+			},
+			retry,
+		);
+	}
+
+	private placeSvg(
 		svg: string,
+		size: { width: number; height: number },
 		point?: { x: number; y: number },
 	): Promise<string | null> {
 		return this.placeImageBytes(
 			new Blob([svg], { type: "image/svg+xml" }),
-			svgSize(svg),
+			size,
 			point,
 		);
 	}
 
 	/** Converts SVG markup to layers, fitted within half the artboard. */
-	placeSvgLayers(svg: string, point?: { x: number; y: number }): string | null {
+	private placeSvgLayers(
+		svg: string,
+		convert: typeof svgToElements,
+		point?: { x: number; y: number },
+	): string | null {
 		const t = this.base;
 		if (!t) return null;
 		const side = this.state.side;
 		const taken = new Set<string>();
 		let converted: SvgElements;
 		try {
-			converted = svgToElements(svg, {
+			converted = convert(svg, {
 				maxSize: { width: t.width / 2, height: t.height / 2 },
 				uniqueId: (base) => {
 					const id = uniqueId(t, side, base, taken);
@@ -830,16 +852,21 @@ export class EditorController {
 		let clip = await readClipboard();
 		if (!clip) return;
 		if (clip.kind === "svg") {
-			const answer = this.svgPastePrompt
-				? await this.svgPastePrompt()
-				: "layers";
+			const svg = await this.loadSvgImport(() => this.paste());
+			if (!svg) return;
+			const markup = svg.svgMarkup(clip.svg);
+			const answer = !markup
+				? "text"
+				: this.svgPastePrompt
+					? await this.svgPastePrompt()
+					: "layers";
 			if (answer === "cancel") return;
-			if (answer === "layers") {
-				this.placeSvgLayers(clip.svg);
+			if (markup && answer === "layers") {
+				this.placeSvgLayers(markup, svg.svgToElements);
 				return;
 			}
-			if (answer === "image") {
-				await this.placeSvg(clip.svg);
+			if (markup && answer === "image") {
+				await this.placeSvg(markup, svg.svgSize(markup));
 				return;
 			}
 			clip = { kind: "text", text: clip.svg };
@@ -972,15 +999,50 @@ export class EditorController {
 		}
 	}
 
-	newDocument(preset: Preset | { width: number; height: number }): void {
-		const t = newDocument(preset);
+	async newDocument(
+		preset: Preset | { width: number; height: number },
+	): Promise<boolean> {
+		const t = await this.loadNewDocument(preset, () =>
+			this.newDocument(preset),
+		);
+		if (!t) return false;
 		this.open(t, `Untitled${COAT_EXTENSION}`);
+		return true;
+	}
+
+	private loadNewDocument(
+		preset: Preset | { width: number; height: number },
+		retry: () => unknown,
+	): Promise<Template | null> {
+		return loadFor(
+			async () => newDocument(preset, await loadVendSans()),
+			{
+				loading: "Loading Vend Sans…",
+				failed: "Couldn't load Vend Sans for the new template",
+			},
+			retry,
+		);
 	}
 
 	async openSample(id: string): Promise<void> {
 		const sample = findSample(id);
 		if (!sample) return;
-		this.open(await sample.load(), `${sample.id}${COAT_EXTENSION}`);
+		const t = await this.loadSample(sample, () => this.openSample(id));
+		if (t) this.open(t, `${sample.id}${COAT_EXTENSION}`);
+	}
+
+	private loadSample(
+		sample: Sample,
+		retry: () => unknown,
+	): Promise<Template | null> {
+		return loadFor(
+			() => sample.load(),
+			{
+				loading: `Loading ${sample.name}…`,
+				failed: `Couldn't load ${sample.name}`,
+			},
+			retry,
+		);
 	}
 
 	hasStarter(id: string): boolean {
@@ -990,7 +1052,8 @@ export class EditorController {
 	async openStarter(id: string): Promise<void> {
 		const starter = findStarter(id);
 		if (!starter) return;
-		const template = await starter.load();
+		const template = await this.loadSample(starter, () => this.openStarter(id));
+		if (!template) return;
 		const fileName = `${starter.id}${COAT_EXTENSION}`;
 		if (!starter.preset) {
 			this.open(template, fileName);
@@ -1064,14 +1127,28 @@ export class EditorController {
 		bytes: Uint8Array | Blob,
 		name: string,
 	): Promise<boolean> {
-		const { unpackWorkspace } = await import("@freshcoat-js/workspace");
-		const out = await unpackWorkspace(bytes);
+		const archive = await this.loadArchive(() =>
+			this.openWorkspaceBytes(bytes, name),
+		);
+		if (!archive) return false;
+		const out = await archive.unpackWorkspace(bytes);
 		if (!out.ok) {
 			toast(`Couldn't open ${name}: ${out.message}`, { tone: "danger" });
 			return false;
 		}
 		this.openWorkspace(out.workspace, name, out.warnings);
 		return true;
+	}
+
+	private loadArchive(retry: () => unknown) {
+		return loadFor(
+			loadArchive,
+			{
+				loading: "Loading the workspace archive…",
+				failed: "Couldn't load the workspace archive",
+			},
+			retry,
+		);
 	}
 
 	openWorkspace(ws: Workspace, fileName: string, notices: string[] = []): void {
@@ -1114,9 +1191,9 @@ export class EditorController {
 			this.showIssues();
 			return false;
 		}
-		const { packWorkspace, WORKSPACE_MEDIA_TYPE } = await import(
-			"@freshcoat-js/workspace"
-		);
+		const archive = await this.loadArchive(() => this.saveWorkspace());
+		if (!archive) return false;
+		const { packWorkspace, WORKSPACE_MEDIA_TYPE } = archive;
 		try {
 			const bytes = await packWorkspace(ws);
 			const name = workspaceFileName(this.state.workspace?.fileName, ws.name);
@@ -1136,9 +1213,10 @@ export class EditorController {
 	async exportAllTemplates(): Promise<void> {
 		const ws = workspaceSnapshot(this.state);
 		if (!ws) return;
-		const { packTemplates } = await import("@freshcoat-js/workspace");
+		const archive = await this.loadArchive(() => this.exportAllTemplates());
+		if (!archive) return;
 		try {
-			const bytes = await packTemplates(ws);
+			const bytes = await archive.packTemplates(ws);
 			await downloadBytes(
 				bytes,
 				`${slugName(ws.name)}-templates.zip`,
@@ -1170,14 +1248,20 @@ export class EditorController {
 		return true;
 	}
 
-	newTemplate(preset: Preset | { width: number; height: number }): void {
-		const t = newDocument(preset);
+	async newTemplate(
+		preset: Preset | { width: number; height: number },
+	): Promise<boolean> {
+		const t = await this.loadNewDocument(preset, () =>
+			this.newTemplate(preset),
+		);
+		if (!t) return false;
 		this.dispatch({
 			type: "addTemplate",
 			template: t,
 			fileName: `Untitled${COAT_EXTENSION}`,
 		});
 		requestAnimationFrame(() => this.fitView());
+		return true;
 	}
 
 	removeTemplate(id: string): void {
@@ -1255,8 +1339,17 @@ export class EditorController {
 	async exportPng(scale: number): Promise<void> {
 		const t = this.base;
 		if (!t) return;
+		const png = await loadFor(
+			loadExportPng,
+			{
+				loading: "Loading the PNG exporter…",
+				failed: "Couldn't load the PNG exporter",
+			},
+			() => this.exportPng(scale),
+		);
+		if (!png) return;
 		try {
-			await exportSidePng(t, {
+			await png.exportSidePng(t, {
 				side: this.state.side,
 				variantId: this.state.variantId,
 				values: this.state.values,

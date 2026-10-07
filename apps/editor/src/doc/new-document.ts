@@ -1,6 +1,5 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import type { FontDescriptor, Template } from "@freshcoat-js/coatfile";
 import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
-import { VEND_SANS } from "../samples/vend-sans";
 
 export type Preset = {
 	id: string;
@@ -44,10 +43,11 @@ export function isUnnamed(t: Pick<Template, "id">): boolean {
 	return t.id === UNNAMED_ID;
 }
 
-/** An empty document: white sides, no fields, Vend Sans embedded so it
- *  renders offline and stays portable. */
+/** An empty document: white sides, no fields, `font` (Vend Sans, from
+ *  `loadVendSans`) embedded so it renders offline and stays portable. */
 export function newDocument(
 	preset: Pick<Preset, "width" | "height"> & Partial<Preset>,
+	font: FontDescriptor,
 ): Template {
 	const sides = preset.sides?.length ? preset.sides : ["front"];
 	return {
@@ -57,7 +57,7 @@ export function newDocument(
 		width: Math.round(preset.width),
 		height: Math.round(preset.height),
 		fields: { type: "object", properties: {} },
-		fonts: [VEND_SANS],
+		fonts: [font],
 		template_data: sides.map((name) => ({
 			name,
 			background: {

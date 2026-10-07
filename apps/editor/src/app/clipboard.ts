@@ -1,6 +1,6 @@
 import type { Element, InlineAsset, Template } from "@freshcoat-js/coatfile";
 import { parseAssetUri } from "@freshcoat-js/coatfile";
-import { svgMarkup } from "./svg";
+import { looksLikeSvg } from "./svg";
 
 type Payload = { freshcoat: 1; elements: Element[]; assets: InlineAsset[] };
 
@@ -52,8 +52,7 @@ export async function readClipboard(): Promise<Clip | null> {
 			};
 		if (memory && text === JSON.stringify(memory))
 			return { kind: "layers", ...memory };
-		const svg = svgMarkup(text);
-		if (svg) return { kind: "svg", svg };
+		if (looksLikeSvg(text)) return { kind: "svg", svg: text.trim() };
 		return { kind: "text", text };
 	}
 	return memory ? { kind: "layers", ...memory } : null;

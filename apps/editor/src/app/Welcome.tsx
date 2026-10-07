@@ -158,7 +158,7 @@ export function Welcome({
 										detail={`${p.width} × ${p.height}${p.sides.length > 1 ? ` · ${plural(p.sides.length, "side")}` : ""}`}
 										width={p.width}
 										height={p.height}
-										onPress={() => controller.newDocument(p)}
+										onPress={() => void controller.newDocument(p)}
 									/>
 								</li>
 							))}
@@ -191,7 +191,7 @@ export function Welcome({
 									setCustom((c) => ({ ...c, height: Math.round(v) }))
 								}
 							/>
-							<Button onPress={() => controller.newDocument(custom)}>
+							<Button onPress={() => void controller.newDocument(custom)}>
 								<FileIcon />
 								Create
 							</Button>

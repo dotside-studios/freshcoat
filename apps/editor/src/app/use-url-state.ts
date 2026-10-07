@@ -170,10 +170,10 @@ function intentTarget(controller: EditorController): IntentTarget {
 						: {}),
 				}
 			: {}),
-		newDocument: (presetId) => {
+		newDocument: async (presetId) => {
 			const preset = PRESETS.find((p) => p.id === presetId);
 			if (!preset) return false;
-			controller.newDocument(preset);
+			await controller.newDocument(preset);
 			return true;
 		},
 	};

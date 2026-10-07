@@ -5,6 +5,7 @@ import { newDocument, PRESETS } from "../doc/new-document";
 import { walkLayers } from "../doc/path";
 import { sampleValues } from "../doc/values";
 import { SAMPLES } from "../samples";
+import { VEND_SANS } from "../samples/vend-sans";
 
 function expectValid(t: Template) {
 	const v = validate(t);
@@ -112,7 +113,7 @@ describe("samples", () => {
 describe("newDocument", () => {
 	test("every preset validates with Vend Sans embedded", () => {
 		for (const p of PRESETS) {
-			const t = newDocument(p);
+			const t = newDocument(p, VEND_SANS);
 			expectValid(t);
 			expectVendSans(t);
 			expect([t.width, t.height]).toEqual([p.width, p.height]);
@@ -122,10 +123,11 @@ describe("newDocument", () => {
 	test("the CR80 card has a front and a back; a custom size one side", () => {
 		const card = newDocument(
 			PRESETS.find((p) => p.id === "card-cr80") ?? PRESETS[0],
+			VEND_SANS,
 		);
 		expect(card.template_data.map((f) => f.name)).toEqual(["front", "back"]);
 		expect([card.width, card.height]).toEqual([1012, 638]);
-		const custom = newDocument({ width: 300, height: 200 });
+		const custom = newDocument({ width: 300, height: 200 }, VEND_SANS);
 		expect(custom.template_data.map((f) => f.name)).toEqual(["front"]);
 		expectValid(custom);
 	});

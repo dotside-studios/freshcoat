@@ -1,11 +1,14 @@
-import { isSvg, parseSvg } from "@freshcoat-js/engine/svg";
+import { parseSvg } from "@freshcoat-js/engine/svg";
+import { looksLikeSvg } from "./svg";
+
+export { type SvgElements, svgToElements } from "@freshcoat-js/coatfile/svg";
 
 type Size = { width: number; height: number };
 
 /** The trimmed markup when `text` is one well-formed SVG document. */
 export function svgMarkup(text: string): string | null {
 	const trimmed = text.trim();
-	if (!isSvg(trimmed)) return null;
+	if (!looksLikeSvg(trimmed)) return null;
 	try {
 		parseSvg(trimmed);
 		return trimmed;

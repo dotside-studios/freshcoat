@@ -15,11 +15,11 @@ import { describe, expect, it } from "vitest";
 import {
 	packTemplates,
 	packWorkspace,
-	templateStem,
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
 import { jpegHeader } from "./image-fixtures";
+import { templateStem } from "./ids";
 import { exportSize, pdfLayout } from "./plan";
 import {
 	deepFreeze,

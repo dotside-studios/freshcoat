@@ -187,7 +187,7 @@ export function TemplatesHeaderActions() {
 					aria-label="New template"
 					onAction={(id) => {
 						const preset = PRESETS.find((p) => p.id === id);
-						if (preset) controller.newTemplate(preset);
+						if (preset) void controller.newTemplate(preset);
 					}}
 				>
 					{PRESETS.map((p) => (

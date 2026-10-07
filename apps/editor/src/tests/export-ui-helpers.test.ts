@@ -12,7 +12,6 @@ import {
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,
-	duplicatePreset,
 	fileNameExample,
 	filterRecords,
 	formatDuration,
@@ -20,7 +19,6 @@ import {
 	formatPageSize,
 	imageFieldKeys,
 	labelColumn,
-	newPreset,
 	pageSize,
 	photoSizedTemplate,
 	recordLabel,
@@ -30,6 +28,7 @@ import {
 	statusActions,
 } from "~/export/export-ui";
 import type { JobResult } from "~/export/job";
+import { duplicatePreset, newPreset } from "~/export/preset";
 import { photoWatermark } from "~/samples/photo-watermark";
 import { doc } from "./doc-fixture";
 

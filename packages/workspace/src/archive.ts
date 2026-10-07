@@ -26,6 +26,7 @@ import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
+import { templateStem } from "./ids";
 import { readImageInfo } from "./image-info";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import type {
@@ -631,12 +632,6 @@ export async function unpackWorkspace(
 			message: err instanceof Error ? err.message : String(err),
 		};
 	}
-}
-
-/** A template's file name without its extension: `.coat`, `.coat.json`, the
- *  legacy `.tkit` and `.tkit.json`, or plain `.json`. */
-export function templateStem(fileName: string): string {
-	return fileName.replace(/\.(coat\.json|coat|tkit\.json|tkit|json)$/i, "");
 }
 
 /** A file name safe inside a zip, with any template extension removed. */
