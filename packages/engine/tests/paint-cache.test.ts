@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { Image } from "canvaskit-wasm";
 import { describe, expect, test, vi } from "vitest";
@@ -24,7 +25,7 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
-import { SVG_PICTURE_PIXELS } from "../src/paint-cache-state";
+import { paintCacheState, SVG_PICTURE_PIXELS } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {
 	Adjust,
@@ -210,6 +211,11 @@ async function pixels(commands: Command[], rt: PaintRuntime) {
 }
 
 const SIZE = { width: 96, height: 56 };
+
+// So a scene painted before is drawn again rather than restored.
+function dropBackgrounds(cache: PaintCache): void {
+	paintCacheState(cache).backgrounds.length = 0;
+}
 
 describe("PaintCache", () => {
 	test("a cached paint matches an uncached one, pixel for pixel", async () => {
@@ -568,6 +574,7 @@ describe("PaintCache", () => {
 		await pixels(withPath, rt);
 		expect(cache.stats().pathBuilds).toBe(2);
 		await pixels(compile(pathScene([]), SIZE, fonts), rt);
+		dropBackgrounds(cache);
 		const again = await pixels(withPath, rt);
 		expect(cache.stats().pathBuilds).toBe(4);
 		expect(again).toEqual(await pixels(withPath, runtime(fonts, new Map()).rt));
@@ -643,6 +650,7 @@ describe("PaintCache", () => {
 		);
 		await pixels(adjusted, rt);
 		await pixels(compile(adjustScene([{}]), SIZE, fonts), rt);
+		dropBackgrounds(cache);
 		await pixels(adjusted, rt);
 		expect(cache.stats().lutImageBuilds).toBe(2);
 		cache.dispose();
@@ -848,6 +856,85 @@ describe("PaintCache background", () => {
 		await paintRecords([cardScene("Grace")], cache);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 2,
+			backgroundReuses: 0,
+		});
+		cache.dispose();
+	});
+
+	function tinted(color: string): ResolvedFill[] {
+		return GRADIENT.map((fill, i) =>
+			i === 0 && fill.kind === "linear"
+				? {
+						...fill,
+						stops: [{ offset: 0, color }, ...fill.stops.slice(1)],
+					}
+				: fill,
+		);
+	}
+
+	function sides(names: string[]): Node[] {
+		const back = tinted("#09090b");
+		return names.map((name, i) =>
+			i % 2 ? cardScene(name, { fills: back }) : cardScene(name),
+		);
+	}
+
+	test("alternating sides reuse both backgrounds", async () => {
+		await initCk();
+		for (const extra of [{}, { supersample: 2 }]) {
+			const cache = createPaintCache();
+			await paintRecords(
+				sides(["Ada", "Ada", "Grace", "Grace", "Hedy", "Hedy"]),
+				cache,
+				extra,
+			);
+			expect(cache.stats()).toMatchObject({
+				backgroundSnapshots: 2,
+				backgroundReuses: 4,
+			});
+			cache.dispose();
+		}
+	});
+
+	test("alternating sides hash as an uncached paint does", async () => {
+		await initCk();
+		const hash = (px: { data: Uint8Array }) =>
+			createHash("sha256").update(px.data).digest("hex");
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		for (const node of sides(["Ada", "Ada", "Grace", "Grace"])) {
+			const commands = compile(node, SIZE, fonts);
+			const plain = await pixels(commands, runtime(fonts, images).rt);
+			expect(hash(await pixels(commands, rt))).toBe(hash(plain));
+		}
+		expect(cache.stats().backgroundReuses).toBe(2);
+		cache.dispose();
+	});
+
+	test("the least recently used background goes past the cap", async () => {
+		await initCk();
+		const colors = ["#000000", "#111111", "#222222", "#333333", "#444444"];
+		const cache = createPaintCache();
+		await paintRecords(
+			[...colors, colors[1] as string, colors[0] as string].map((c) =>
+				cardScene("Ada", { fills: tinted(c) }),
+			),
+			cache,
+		);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 6,
+			backgroundReuses: 1,
+		});
+		cache.dispose();
+	});
+
+	test("the image budget evicts backgrounds that do not fit together", async () => {
+		await initCk();
+		const one = SIZE.width * SIZE.height;
+		const cache = createPaintCache({ maxImagePixels: one * 1.5 });
+		await paintRecords(sides(["Ada", "Ada", "Grace", "Grace"]), cache);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 4,
 			backgroundReuses: 0,
 		});
 		cache.dispose();
