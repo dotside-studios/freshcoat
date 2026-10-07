@@ -106,10 +106,15 @@ The chart, measurement and fitting tools live in a separate entry point,
 `chartScene`, …), reading a photographed chart (`readChart`, `homographyFrom`),
 quality checks (`assessCalibration`) and fitting (`fitChannelBalance`).
 
-Use `createPrintProfile(reading, details)` from there to turn a Gray balance
-chart reading into reusable profile data. It only emits a profile when the
-capture is usable, and records the quality assessment plus printer, ribbon, and
-stock details beside the fitted balance.
+`profileFromPhoto(photo, corners, details)` is the whole flow in one call: it
+reads a photo of the printed gray balance chart, given the four fiducial
+centers picked in it, and returns `{ ok: true, profile, assessment, reading }`
+or a `reason` it couldn't (`unreadable-corners`, `unsafe-reading`, …).
+
+`createPrintProfile(reading, details)` does the second half for a reading you
+already have. Either way, a profile is only emitted when the capture is usable,
+and it records the quality assessment plus printer, ribbon, and stock details
+beside the fitted balance.
 
 `parsePrintProfile` returns `{ ok: true, profile }` or `{ ok: false, message }`.
 It remains compatible with older profiles and normalizes them to the current

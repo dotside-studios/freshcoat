@@ -1,6 +1,7 @@
 // @freshcoat-js/for-print/calibration: print a chart, read it back from a
 // photo, and turn the reading into a profile's balance.
 
+export { type PhotoCalibration, profileFromPhoto } from "./calibrate";
 export {
 	type FitChannelBalanceOptions,
 	fitChannelBalance,
