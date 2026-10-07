@@ -1,27 +1,12 @@
 // One FontCollection per provider, so Skia's paragraph cache can hit.
 
-// biome-ignore lint/suspicious/noExplicitAny: built and read by untyped callers
-type Untyped = any;
-type ParagraphStyle = Untyped;
-type ParagraphBuilder = Untyped;
-
-type TypefaceFontProvider = { delete(): void };
-
-type FontCollection = {
-	setDefaultFontManager(provider: TypefaceFontProvider): void;
-	enableFontFallback(): void;
-	delete(): void;
-};
-
-type CanvasKit = {
-	FontCollection: { Make(): FontCollection };
-	ParagraphBuilder: {
-		MakeFromFontCollection(
-			style: ParagraphStyle,
-			collection: FontCollection,
-		): ParagraphBuilder;
-	};
-};
+import type {
+	CanvasKit,
+	FontCollection,
+	ParagraphBuilder,
+	ParagraphStyle,
+	TypefaceFontProvider,
+} from "canvaskit-wasm";
 
 const collections = new WeakMap<TypefaceFontProvider, FontCollection>();
 
