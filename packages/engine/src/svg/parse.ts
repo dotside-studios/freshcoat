@@ -234,7 +234,9 @@ type Context = {
 	m: Matrix;
 	style: Declarations;
 	depth: number;
-	uses: Set<string>;
+	// The <use> targets being expanded, with their document ancestors, and the
+	// markers being drawn.
+	uses: Set<XmlElement | string>;
 	ancestors: Set<XmlElement>;
 	viewport: Viewport;
 };
@@ -387,13 +389,18 @@ export function parseSvg(markup: string): SvgDrawing {
 	};
 
 	const byId = new Map<string, XmlElement>();
+	const parents = new Map<XmlElement, XmlElement>();
 	const rules: StyleRule[] = [];
 	const index = (el: XmlElement) => {
 		const id = el.attrs.id;
 		if (id && !byId.has(id)) byId.set(id, el);
 		if (localName(el.name) === "style")
 			rules.push(...parseStyleSheet(textContent(el)));
-		for (const c of el.children) if (!("text" in c)) index(c);
+		for (const c of el.children)
+			if (!("text" in c)) {
+				parents.set(c, el);
+				index(c);
+			}
 	};
 	index(root);
 	const ruleIndex = indexRules(rules);
@@ -1322,14 +1329,16 @@ export function parseSvg(markup: string): SvgDrawing {
 					warn("use-missing", `"#${id}" is not in the document`);
 					return [];
 				}
-				if (ctx.uses.has(id) || ctx.ancestors.has(target)) {
+				if (ctx.uses.has(target) || ctx.ancestors.has(target)) {
 					warn("use-cycle", `"#${id}" refers to itself`);
 					return [];
 				}
 				const x = parseLength(el.attrs.x, "x", ctx.viewport) ?? 0;
 				const y = parseLength(el.attrs.y, "y", ctx.viewport) ?? 0;
 				let um = multiply(m, translate(x, y));
-				const uses = new Set(ctx.uses).add(id);
+				const uses = new Set(ctx.uses);
+				for (let e: XmlElement | undefined = target; e && !uses.has(e); e = parents.get(e))
+					uses.add(e);
 				let content: SvgItem[];
 				if (localName(target.name) === "symbol") {
 					const tStyle = computeStyle(target, style);
@@ -1366,7 +1375,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		m: IDENTITY,
 		style: rootStyle,
 		depth: 0,
-		uses: new Set(),
+		uses: new Set<XmlElement | string>([root]),
 		ancestors: new Set(),
 		viewport: viewBox,
 	});
