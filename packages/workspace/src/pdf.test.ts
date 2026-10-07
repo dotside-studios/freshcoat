@@ -1,15 +1,17 @@
 import {
 	decodePDFRawStream,
 	PDFArray,
+	PDFDict,
 	PDFDocument,
+	PDFName,
 	type PDFPage,
 	PDFRawStream,
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { jpegHeader } from "./image-fixtures";
 import { imposeSheets } from "./impose";
-import { assemblePdf, pageSizePt } from "./pdf";
-import { makePng } from "./test-fixtures";
+import { assemblePdf, pageSizePt, rgbIdat } from "./pdf";
+import { makePng, makeRgbaPng } from "./test-fixtures";
 import type { PdfPage, SheetLayout } from "./types";
 
 const png = "png" as const;
@@ -67,6 +69,40 @@ describe("assemblePdf", () => {
 		expect(new TextDecoder("latin1").decode(bytes)).toContain("/DCTDecode");
 	});
 
+	it("passes an RGB PNG's IDAT through with the PNG predictor", async () => {
+		const bytes = makePng(30, 20);
+		const pdf = await assemblePdf(
+			[{ bytes, format: png, widthPx: 30, heightPx: 20 }],
+			{ dpi: 300 },
+		);
+		const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+		const [image] = images(doc.getPage(0));
+		expect(image?.dict.get(PDFName.of("Width"))?.toString()).toBe("30");
+		expect(image?.dict.get(PDFName.of("Height"))?.toString()).toBe("20");
+		expect(image?.dict.get(PDFName.of("ColorSpace"))?.toString()).toBe(
+			"/DeviceRGB",
+		);
+		expect(image?.dict.get(PDFName.of("DecodeParms"))?.toString()).toMatch(
+			/\/Predictor 15[\s\S]*\/Colors 3[\s\S]*\/Columns 30/,
+		);
+		expect(image?.getContents()).toEqual(rgbIdat(bytes)?.data);
+	});
+
+	it("falls back to embedPng for an RGBA PNG", async () => {
+		const bytes = makeRgbaPng(8, 6);
+		expect(rgbIdat(bytes)).toBeUndefined();
+		const pdf = await assemblePdf(
+			[{ bytes, format: png, widthPx: 8, heightPx: 6 }],
+			{ dpi: 300 },
+		);
+		const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+		const [image] = images(doc.getPage(0));
+		expect(image?.dict.get(PDFName.of("Width"))?.toString()).toBe("8");
+		expect(image?.dict.get(PDFName.of("Height"))?.toString()).toBe("6");
+		expect(image?.dict.has(PDFName.of("DecodeParms"))).toBe(false);
+		expect(image?.dict.has(PDFName.of("SMask"))).toBe(true);
+	});
+
 	it("rejects a non-positive dpi", async () => {
 		await expect(assemblePdf([], { dpi: 0 })).rejects.toThrow(/dpi/);
 	});
@@ -87,6 +123,16 @@ function content(page: PDFPage): string {
 			);
 		})
 		.join("\n");
+}
+
+/** The image XObjects a page's resources name. */
+function images(page: PDFPage): PDFRawStream[] {
+	const xobjects = page.node.Resources()?.lookup(PDFName.of("XObject"));
+	if (!(xobjects instanceof PDFDict)) return [];
+	return xobjects
+		.values()
+		.map((ref) => page.doc.context.lookup(ref))
+		.filter((obj) => obj instanceof PDFRawStream);
 }
 
 type Matrix = [number, number, number, number, number, number];

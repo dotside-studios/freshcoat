@@ -9,6 +9,11 @@ import {
 } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
+type PdfLib = typeof import("pdf-lib");
+type PDFDocument = import("pdf-lib").PDFDocument;
+type PDFPage = import("pdf-lib").PDFPage;
+type PDFRef = import("pdf-lib").PDFRef;
+
 export type AssemblePdfOptions = {
 	/** pixels per inch: a page is `widthPx / dpi` inches wide */
 	dpi: number;
@@ -56,7 +61,8 @@ export async function assemblePdf(
 ): Promise<Uint8Array> {
 	if (!(options.dpi > 0))
 		throw new Error(`dpi must be positive: ${options.dpi}`);
-	const { PDFDocument, rgb } = await import("pdf-lib");
+	const lib = await import("pdf-lib");
+	const { PDFDocument, rgb } = lib;
 	// Left to itself, pdf-lib names itself the producer and stamps the time.
 	const doc = await PDFDocument.create({ updateMetadata: false });
 	const date = options.date ?? new Date();
@@ -67,13 +73,29 @@ export async function assemblePdf(
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);
 	let embedded = 0;
-	const embed = async (page: PdfPage) => {
-		const image =
+	const embed = async (page: PdfPage): Promise<PDFRef> => {
+		const ref =
 			page.format === "jpeg"
-				? await doc.embedJpg(page.bytes)
-				: await doc.embedPng(page.bytes);
+				? (await doc.embedJpg(page.bytes)).ref
+				: (embedRgbPng(lib, doc, page.bytes) ??
+					(await doc.embedPng(page.bytes)).ref);
 		options.onProgress?.(++embedded, pages.length);
-		return image;
+		return ref;
+	};
+	const draw = (
+		out: PDFPage,
+		ref: PDFRef,
+		rect: { x: number; y: number; width: number; height: number },
+	) => {
+		const name = out.node.newXObject("Image", ref);
+		out.pushOperators(
+			...lib.drawImage(name, {
+				...rect,
+				rotate: lib.degrees(0),
+				xSkew: lib.degrees(0),
+				ySkew: lib.degrees(0),
+			}),
+		);
 	};
 	if (options.layout?.kind === "sheet") {
 		const first = pages[0];
@@ -89,7 +111,7 @@ export async function assemblePdf(
 			for (const slot of sheet.slots) {
 				const image = await embed(slot.item);
 				// pdf-lib measures up from the bottom-left corner.
-				out.drawImage(image, {
+				draw(out, image, {
 					x: (slot.xMm - bleed.left) * PT_PER_MM,
 					y: height - (slot.yMm + card.heightMm + bleed.bottom) * PT_PER_MM,
 					width: (card.widthMm + bleed.left + bleed.right) * PT_PER_MM,
@@ -116,7 +138,7 @@ export async function assemblePdf(
 			options.dpi,
 		);
 		const out = doc.addPage([width, height]);
-		out.drawImage(image, { x: 0, y: 0, width, height });
+		draw(out, image, { x: 0, y: 0, width, height });
 		if (Object.values(bleed).some((n) => n > 0)) {
 			out.setBleedBox(0, 0, width, height);
 			out.setTrimBox(
@@ -141,4 +163,89 @@ function trimOf(
 		widthMm: full.widthMm - bleed.left - bleed.right,
 		heightMm: full.heightMm - bleed.top - bleed.bottom,
 	};
+}
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** Embeds an 8-bit RGB, non-interlaced PNG by passing its zlib stream through
+ *  with the PNG predictor, skipping the decode and re-deflate `embedPng` does.
+ *  Returns undefined for any other PNG, which `embedPng` handles instead. */
+export function embedRgbPng(
+	lib: PdfLib,
+	doc: PDFDocument,
+	bytes: Uint8Array,
+): PDFRef | undefined {
+	const idat = rgbIdat(bytes);
+	if (!idat) return undefined;
+	const { context } = doc;
+	const dict = context.obj({
+		Type: "XObject",
+		Subtype: "Image",
+		Width: idat.width,
+		Height: idat.height,
+		ColorSpace: "DeviceRGB",
+		BitsPerComponent: 8,
+		Filter: "FlateDecode",
+		DecodeParms: {
+			Predictor: 15,
+			Colors: 3,
+			BitsPerComponent: 8,
+			Columns: idat.width,
+		},
+	});
+	return context.register(lib.PDFRawStream.of(dict, idat.data));
+}
+
+/** The concatenated IDAT data of a PNG `embedRgbPng` can pass through. */
+export function rgbIdat(
+	bytes: Uint8Array,
+): { width: number; height: number; data: Uint8Array } | undefined {
+	if (bytes.length < 8 || PNG_SIGNATURE.some((b, i) => bytes[i] !== b))
+		return undefined;
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	let width = 0;
+	let height = 0;
+	const parts: Uint8Array[] = [];
+	let size = 0;
+	for (let at = 8; at + 8 <= bytes.length; ) {
+		const length = view.getUint32(at);
+		const type = String.fromCharCode(...bytes.subarray(at + 4, at + 8));
+		const start = at + 8;
+		const end = start + length;
+		if (end + 4 > bytes.length) return undefined;
+		if (type === "IHDR") {
+			if (length < 13) return undefined;
+			width = view.getUint32(start);
+			height = view.getUint32(start + 4);
+			const [depth, colour, compression, filter, interlace] = bytes.subarray(
+				start + 8,
+				start + 13,
+			);
+			if (
+				depth !== 8 ||
+				colour !== 2 ||
+				compression !== 0 ||
+				filter !== 0 ||
+				interlace !== 0
+			)
+				return undefined;
+		} else if (type === "IDAT") {
+			parts.push(bytes.subarray(start, end));
+			size += length;
+		} else if (type === "tRNS" || type === "acTL") {
+			return undefined;
+		} else if (type === "IEND") {
+			break;
+		}
+		at = end + 4;
+	}
+	if (!(width > 0 && height > 0) || parts.length === 0) return undefined;
+	if (parts.length === 1) return { width, height, data: parts[0] };
+	const data = new Uint8Array(size);
+	let at = 0;
+	for (const part of parts) {
+		data.set(part, at);
+		at += part.length;
+	}
+	return { width, height, data };
 }
