@@ -57,19 +57,19 @@ const DataTableContext = createContext<DataTableContextValue>({
 
 const COARSE_QUERY = "(pointer: coarse)";
 
+const coarseQuery =
+	typeof window !== "undefined" && window.matchMedia
+		? window.matchMedia(COARSE_QUERY)
+		: null;
+
 function subscribeCoarse(onChange: () => void) {
-	if (typeof window === "undefined" || !window.matchMedia) return () => {};
-	const mql = window.matchMedia(COARSE_QUERY);
-	mql.addEventListener("change", onChange);
-	return () => mql.removeEventListener("change", onChange);
+	if (!coarseQuery) return () => {};
+	coarseQuery.addEventListener("change", onChange);
+	return () => coarseQuery.removeEventListener("change", onChange);
 }
 
 function readCoarse() {
-	return (
-		typeof window !== "undefined" &&
-		!!window.matchMedia &&
-		window.matchMedia(COARSE_QUERY).matches
-	);
+	return !!coarseQuery?.matches;
 }
 
 /** True on touch-first devices, tracking `(pointer: coarse)`. */

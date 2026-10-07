@@ -34,6 +34,7 @@ import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { constrain45, type PenPath, smoothPoint } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { Tool } from "~/state/store";
+import { createDraftStore } from "./draft-store";
 import { Guides } from "./Guides";
 import { parseGradientHandle } from "./gradient-geometry";
 import {
@@ -44,7 +45,7 @@ import {
 	gradientWithStopAt,
 	withGradient,
 } from "./gradient-handles";
-import { Overlay, type OverlayDraft, type PenDraft } from "./Overlay";
+import { Overlay } from "./Overlay";
 import {
 	printGuidesFor,
 	printGuidesOn,
@@ -152,14 +153,10 @@ export function Viewport() {
 	const gesture = useRef<Gesture | null>(null);
 	const pointers = useRef(new Map<number, Point>());
 	const [spaceHeld, setSpaceHeld] = useState(false);
-	const [draft, setDraft] = useState<OverlayDraft>({});
 	const [cursor, setCursor] = useState<string | undefined>();
-	const penRef = useRef<PenPath | null>(null);
-	const [pen, setPenState] = useState<PenDraft | null>(null);
-	const setPen = useCallback((next: PenDraft | null) => {
-		penRef.current = next?.path ?? null;
-		setPenState(next);
-	}, []);
+	const [drafts] = useState(createDraftStore);
+	const { setDraft, setPen } = drafts;
+	const penPath = useCallback(() => drafts.get().pen?.path ?? null, [drafts]);
 	const finishPen = useCallback(
 		(path: PenPath | null) => {
 			setPen(null);
@@ -172,11 +169,12 @@ export function Viewport() {
 	// last point. Leaving the tool keeps what was drawn.
 	useEffect(() => {
 		if (tool !== "pen") {
-			if (penRef.current) finishPen(penRef.current);
+			const path = penPath();
+			if (path) finishPen(path);
 			return;
 		}
 		const onKey = (e: KeyboardEvent) => {
-			const path = penRef.current;
+			const path = penPath();
 			if (!path || isTyping(e.target)) return;
 			if (e.key === "Enter" || e.key === "Escape") finishPen(path);
 			else if (e.key === "Backspace" || e.key === "Delete") {
@@ -188,7 +186,7 @@ export function Viewport() {
 		};
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
-	}, [tool, finishPen, setPen]);
+	}, [tool, finishPen, setPen, penPath]);
 
 	// Mount the session's canvas; it is replaced when the painted size changes.
 	useLayoutEffect(() => {
@@ -243,7 +241,7 @@ export function Viewport() {
 			window.removeEventListener("keyup", up);
 			window.removeEventListener("keydown", cancel, true);
 		};
-	}, [controller]);
+	}, [controller, setDraft]);
 
 	// Wheel has to be non-passive to stop the page zooming on ctrl+wheel.
 	useEffect(() => {
@@ -322,7 +320,7 @@ export function Viewport() {
 		}
 
 		if (state.tool === "pen") {
-			const path = penRef.current ?? { points: [], closed: false };
+			const path = penPath() ?? { points: [], closed: false };
 			const first = path.points[0];
 			const last = path.points.at(-1);
 			const v = state.view;
@@ -464,7 +462,7 @@ export function Viewport() {
 		const world = toWorld(p);
 
 		if (!g) {
-			const path = penRef.current;
+			const path = penPath();
 			if (state.tool === "pen" && path) {
 				const last = path.points.at(-1);
 				setPen({
@@ -639,7 +637,7 @@ export function Viewport() {
 				return;
 			}
 			case "pen": {
-				const path = penRef.current;
+				const path = penPath();
 				const limit =
 					g.pointerType === "mouse"
 						? DRAG_THRESHOLD.mouse
@@ -844,7 +842,7 @@ export function Viewport() {
 							</div>
 						) : null}
 					</div>
-					<Overlay draft={draft} pen={pen} />
+					<Overlay drafts={drafts} />
 					<TextEditor />
 					<Guides />
 					<Rulers />

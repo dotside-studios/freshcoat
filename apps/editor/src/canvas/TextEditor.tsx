@@ -57,28 +57,33 @@ const CASE: Record<string, CSSProperties["textTransform"]> = {
  *  font, holding the raw template text with its `{{tokens}}`. The render
  *  leaves the layer out meanwhile. Blur, Escape or Mod+Enter end the edit. */
 export function TextEditor() {
-	const controller = useController();
 	const key = useEditor((s) => s.textEdit);
+	return key ? <EditingText layer={key} /> : null;
+}
+
+function EditingText({ layer }: { layer: string }) {
+	const controller = useController();
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const area = useRef<HTMLTextAreaElement>(null);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: refocus when the edited layer changes
 	useLayoutEffect(() => {
 		const el = area.current;
-		if (!key || !el) return;
+		if (!el) return;
 		fitHeight(el);
 		el.focus();
 		el.select();
-	}, [key]);
+	}, [layer]);
 
 	const t = controller.template;
-	const el = key && t ? getElement(t, key) : undefined;
-	const box = key ? geometry.get(key) : undefined;
-	if (!key || !el || !("type" in el) || el.type !== "text" || !box) return null;
+	const el = t ? getElement(t, layer) : undefined;
+	const box = geometry.get(layer);
+	if (!el || !("type" in el) || el.type !== "text" || !box) return null;
 	const props = (el as TextElement).properties;
 	const font = props.font;
 
-	const corners = worldCorners(box.rect, ancestorRects(key, geometry)).map(
+	const corners = worldCorners(box.rect, ancestorRects(layer, geometry)).map(
 		(p) => ({ x: view.x + p.x * view.zoom, y: view.y + p.y * view.zoom }),
 	);
 	const [nw, ne, , sw] = corners as [
@@ -92,7 +97,7 @@ export function TextEditor() {
 	const angle = (Math.atan2(ne.y - nw.y, ne.x - nw.x) * 180) / Math.PI;
 
 	const end = () => {
-		if (controller.state.textEdit === key) controller.endTextEdit();
+		if (controller.state.textEdit === layer) controller.endTextEdit();
 	};
 	const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		// The textarea keeps its own undo while the edit is one history step.

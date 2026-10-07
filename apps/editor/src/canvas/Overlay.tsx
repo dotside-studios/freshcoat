@@ -16,6 +16,7 @@ import {
 import { type PenPath, penPathData } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { View } from "~/state/store";
+import { type DraftStore, useDrafts } from "./draft-store";
 import { GradientHandles } from "./gradient-handles";
 import { PrintGuides } from "./PrintGuides";
 
@@ -42,13 +43,8 @@ const HANDLE_CURSOR: Record<Handle, string> = {
 	se: "nwse-resize",
 };
 
-export function Overlay({
-	draft,
-	pen,
-}: {
-	draft: OverlayDraft;
-	pen?: PenDraft | null;
-}) {
+export function Overlay({ drafts }: { drafts: DraftStore }) {
+	const { draft, pen } = useDrafts(drafts);
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const selection = useEditor((s) => s.selection);
