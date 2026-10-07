@@ -3875,23 +3875,32 @@ export async function paintScene(
 
 				const w = snap.width();
 				const h = snap.height();
-				const pixels = snap.readPixels(
-					0,
-					0,
-					imageInfo(ck, "pixels", w, h),
-				) as Uint8Array | null;
-				// A surface that won't read back (a lost context) still has Skia's
-				// encoder, which works off the snapshot rather than a pixel buffer —
-				// as does a runtime without CompressionStream. Bigger bytes beat no
-				// bytes, so both fall back to it rather than failing the render.
-				if (!pixels) return skiaPng();
+				// Without a destination CanvasKit copies the frame out to the JS heap.
+				// encodePng copies the rows before it awaits, so a heap growth that
+				// detaches this view cannot reach it.
+				const dest = ck.Malloc(Uint8Array, w * h * 4);
 				try {
-					return {
-						bytes: await encodePng(pixels, w, h, encodeOpts),
-						format: "png" as const,
-					};
-				} catch {
-					return skiaPng();
+					const pixels = snap.readPixels(
+						0,
+						0,
+						imageInfo(ck, "pixels", w, h),
+						dest,
+					) as Uint8Array | null;
+					// A surface that won't read back (a lost context) still has Skia's
+					// encoder, which works off the snapshot rather than a pixel buffer —
+					// as does a runtime without CompressionStream. Bigger bytes beat no
+					// bytes, so both fall back to it rather than failing the render.
+					if (!pixels) return skiaPng();
+					try {
+						return {
+							bytes: await encodePng(pixels, w, h, encodeOpts),
+							format: "png" as const,
+						};
+					} catch {
+						return skiaPng();
+					}
+				} finally {
+					ck.Free(dest);
 				}
 			} finally {
 				snap.delete();
