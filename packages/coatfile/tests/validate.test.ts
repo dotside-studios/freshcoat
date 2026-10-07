@@ -851,3 +851,15 @@ test("patterns that only parse without the u flag are still enforced", () => {
 	}
 	expect(compiledPattern("^\\p{L}+$")?.flags).toBe("u");
 });
+
+test("mistyped unicode patterns are invalid instead of literal", () => {
+	const field = (pattern: string) => ({
+		type: "object" as const,
+		properties: { f: { type: "string" as const, pattern } },
+	});
+	const patterns = ["^\\p{Foo}+$", "^\\p{Lu+$", "^\\P{Foo}$", "^\\u{zz}$"];
+	for (const pattern of patterns) {
+		expect(compiledPattern(pattern)).toBeNull();
+		expect(validateValues({ f: "anything" }, field(pattern)).ok).toBe(true);
+	}
+});

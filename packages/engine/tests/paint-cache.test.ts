@@ -1,4 +1,5 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
+import type { Image } from "canvaskit-wasm";
 import { describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
@@ -23,7 +24,7 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
-import { SVG_PICTURE_PIXELS } from "../src/paint-cache";
+import { SVG_PICTURE_PIXELS } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {
 	Adjust,
@@ -649,7 +650,7 @@ describe("PaintCache", () => {
 });
 
 describe("LUT images", () => {
-	const fake = () => ({ delete: vi.fn() });
+	const fake = () => ({ delete: vi.fn() }) as unknown as Image;
 
 	test("equal bytes share an image and different bytes do not", () => {
 		const luts = createLutImages();
@@ -684,10 +685,10 @@ describe("LUT images", () => {
 		evictUnusedLutImages(luts);
 		cachedLutImage(luts, 1, [new Uint8Array([1])], fake);
 		evictUnusedLutImages(luts);
-		expect(dropped.delete).toHaveBeenCalledTimes(1);
-		expect(kept.delete).not.toHaveBeenCalled();
+		expect(dropped?.delete).toHaveBeenCalledTimes(1);
+		expect(kept?.delete).not.toHaveBeenCalled();
 		freeLutImages(luts);
-		expect(kept.delete).toHaveBeenCalledTimes(1);
+		expect(kept?.delete).toHaveBeenCalledTimes(1);
 	});
 });
 
