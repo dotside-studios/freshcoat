@@ -90,6 +90,10 @@ export { formatImageFocus, parseImageFocus } from "./image-focus";
 export {
 	FIELD_ID,
 	hasToken,
+	type MustacheRef,
+	type MustacheSegment,
+	type MustacheText,
+	parseMustache,
 	renameToken,
 	substitute,
 	tokenIds,
