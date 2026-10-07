@@ -142,12 +142,8 @@ function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
 		pos: { x: 0, y: 0 },
 		size: SIZE,
 		children: fillRules.map((fillRule, i) =>
-			createFrame({
-				pos: { x: 4 + i * 24, y: 4 },
-				size: { width: 20, height: 20 },
-				clip: true,
-				cornerRadius: 4,
-				children: [
+			createGroup(
+				[
 					createPath({
 						pos: { x: 0, y: 0 },
 						size: { width: 20, height: 20 },
@@ -156,7 +152,14 @@ function pathScene(fillRules: ("nonzero" | "evenodd")[]): Node {
 						fills: [{ kind: "solid", color: "#101828" }],
 					}),
 				],
-			}),
+				{
+					pos: { x: 4 + i * 24, y: 4 },
+					size: { width: 20, height: 20 },
+					clip: true,
+					cornerRadius: 4,
+					cornerSmoothing: 0.6,
+				},
+			),
 		),
 	});
 }

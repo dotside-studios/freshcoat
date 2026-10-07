@@ -19,6 +19,7 @@ import type {
 	RectNode,
 	TextNode,
 } from "./node";
+import { rectShape } from "./outline";
 import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
 import type { TextEngine } from "./text-engine";
@@ -371,10 +372,10 @@ function lowerMask(
 }
 
 // The conservative fast-path predicate: a mask that is a single opaque vector
-// shape (rect/ellipse, no transform effects, no gradient/partial-alpha fill,
-// uniform corner radius) maps to a ShapeMask clipPath. Everything else (paths,
-// per-corner radii, images, text, groups, any opacity/blur/blend/rotation on
-// the mask) returns null → the offscreen path. It reads the MASK only; the mask
+// shape (rect/ellipse, no transform effects, no gradient/partial-alpha fill)
+// maps to a ShapeMask clipPath with the outline its fill draws. Everything else
+// (paths, images, text, groups, any opacity/blur/blend/rotation on the mask)
+// returns null → the offscreen path. It reads the MASK only; the mask
 // node's own `invert`/`channel` are the caller's to check.
 function fastClip(mask: Node): ShapeMask | null {
 	if (
@@ -387,16 +388,10 @@ function fastClip(mask: Node): ShapeMask | null {
 		return null;
 	if (mask.kind === "ellipse")
 		return solidOrNone(mask.fills) ? { kind: "ellipse" } : null;
-	if (mask.kind === "rect") {
-		if (!solidOrNone(mask.fills)) return null;
-		const cr = mask.cornerRadius;
-		if (Array.isArray(cr)) return null; // per-corner → offscreen
-		if (mask.cornerSmoothing && typeof cr === "number" && cr > 0)
-			return { kind: "squircle", radius: cr };
-		if (typeof cr === "number" && cr > 0)
-			return { kind: "rounded-rect", radius: cr };
-		return { kind: "rect" };
-	}
+	if (mask.kind === "rect")
+		return solidOrNone(mask.fills)
+			? rectShape(mask.cornerRadius, mask.cornerSmoothing)
+			: null;
 	return null;
 }
 
@@ -404,8 +399,6 @@ function solidOrNone(fills: RectNode["fills"]): boolean {
 	return !fills || (fills.length === 1 && fills[0].kind === "solid");
 }
 
-// A group's self-clip: clip children to its box, honoring its corner radius.
-// Corner smoothing on the clip is a later refinement.
 // A filled group's background, as an ordinary rect drawn first.
 //
 // Lowering it rather than teaching the painter about group fills keeps one
@@ -432,13 +425,7 @@ function groupBackground(
 
 function groupClip(node: GroupNode): ShapeMask | undefined {
 	if (!node.clip) return undefined;
-	const cr = node.cornerRadius;
-	if (Array.isArray(cr))
-		return cr.some((r) => r > 0)
-			? { kind: "rounded-rect", radius: cr }
-			: { kind: "rect" };
-	const r = typeof cr === "number" ? cr : 0;
-	return r > 0 ? { kind: "rounded-rect", radius: r } : { kind: "rect" };
+	return rectShape(node.cornerRadius, node.cornerSmoothing);
 }
 
 // Box-relative ellipse as an SVG path (two half-arcs), positioned at the node's

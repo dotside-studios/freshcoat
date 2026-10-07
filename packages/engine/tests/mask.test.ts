@@ -44,7 +44,7 @@ describe("mask lowering — fast path (shape → clipPath)", () => {
 		expect(draw.children[0].op).toBe("drawRect");
 	});
 
-	test("rounded rect mask → rounded-rect clip; squircle when smoothed", () => {
+	test("rounded rect mask → rounded-rect clip carrying smoothing", () => {
 		const rounded = compileScene(
 			createMask(
 				createRect({
@@ -72,7 +72,11 @@ describe("mask lowering — fast path (shape → clipPath)", () => {
 			{ width: 20, height: 20 },
 		).at(-1);
 		if (squircle?.op !== "drawGroup") throw new Error("expected drawGroup");
-		expect(squircle.clip).toEqual({ kind: "squircle", radius: 6 });
+		expect(squircle.clip).toEqual({
+			kind: "rounded-rect",
+			radius: 6,
+			smoothing: 0.6,
+		});
 	});
 });
 

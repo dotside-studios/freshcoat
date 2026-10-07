@@ -67,7 +67,6 @@ import {
 	fitRect,
 	fontFeatureList,
 	fontVariationList,
-	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
 import { flattenOverWhite } from "./jpeg";
@@ -76,7 +75,7 @@ import {
 	DEFAULT_WEBP_QUALITY,
 	encodePng,
 } from "./png";
-import { squircleSvg } from "./squircle";
+import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type {
@@ -84,7 +83,6 @@ import type {
 	BlendMode,
 	CanvasLike,
 	Command,
-	CornerRadius,
 	DrawBitmapCommand,
 	DrawCommand,
 	DrawImageCommand,
@@ -308,28 +306,6 @@ const STROKE_JOIN: Record<string, EnumKey<StrokeJoinEnumValues>> = {
 	bevel: "Bevel",
 };
 
-// Build a Skia RRect from a uniform or per-corner radius. CanvasKit's RRect is
-// [l,t,r,b, ulX,ulY, urX,urY, lrX,lrY, llX,llY]; our CornerRadius is
-// [topLeft, topRight, bottomRight, bottomLeft] = ul, ur, lr, ll.
-function rrectFor(ck: CanvasKit, rect: Rect, cr: CornerRadius): RRect {
-	if (typeof cr === "number") return ck.RRectXY(rect, cr, cr);
-	const [tl, tr, br, bl] = cr;
-	return Float32Array.of(
-		rect[0],
-		rect[1],
-		rect[2],
-		rect[3],
-		tl,
-		tl,
-		tr,
-		tr,
-		br,
-		br,
-		bl,
-		bl,
-	);
-}
-
 function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	const p = bin.track(new ck.Paint());
 	p.setAntiAlias(true);
@@ -343,139 +319,120 @@ function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	return p;
 }
 
-// SVG path string for a clip/stroke shape.
-// This build of CanvasKit exposes no imperative Path builders — only
-// Path.MakeFromSVGString — so we describe shapes as SVG.
-function maskSvg(
-	clip: ShapeMask,
-	x: number,
-	y: number,
-	w: number,
-	h: number,
-): string {
-	switch (clip.kind) {
-		case "rect": {
-			// Outset lets text fit:"clip" keep glyph overshoot whole (see ClipOutset).
-			const top = clip.outset?.top ?? 0;
-			const bottom = clip.outset?.bottom ?? 0;
-			const y0 = y - top;
-			const y1 = y + h + bottom;
-			return `M ${x} ${y0} H ${x + w} V ${y1} H ${x} Z`;
-		}
-		case "rounded-rect": {
-			if (Array.isArray(clip.radius))
-				return perCornerRectSvg(clip.radius, x, y, w, h);
-			const r = Math.min(clip.radius, Math.min(w, h) / 2);
-			return `M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w} ${y + r} V ${y + h - r} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} H ${x + r} A ${r} ${r} 0 0 1 ${x} ${y + h - r} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
-		}
-		case "circle": {
-			const rr = Math.min(w, h) / 2;
-			const cx = x + w / 2;
-			const cy = y + h / 2;
-			return `M ${cx - rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx + rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx - rr} ${cy} Z`;
-		}
-		case "ellipse": {
-			const rx = w / 2;
-			const ry = h / 2;
-			const cy = y + h / 2;
-			return `M ${x} ${cy} A ${rx} ${ry} 0 1 0 ${x + w} ${cy} A ${rx} ${ry} 0 1 0 ${x} ${cy} Z`;
-		}
-		case "polygon": {
-			const cx = x + w / 2;
-			const cy = y + h / 2;
-			const rx = w / 2;
-			const ry = h / 2;
-			const rot = ((clip.rotation ?? 0) * Math.PI) / 180;
-			let d = "";
-			for (let i = 0; i < clip.sides; i++) {
-				const a = -Math.PI / 2 + (i * 2 * Math.PI) / clip.sides + rot;
-				d += `${i === 0 ? "M" : "L"} ${cx + rx * Math.cos(a)} ${cy + ry * Math.sin(a)} `;
-			}
-			return `${d}Z`;
-		}
-		case "squircle": {
-			const max = Math.min(w, h) / 2;
-			const r = Math.min(clip.radius, max);
-			const p = Math.min(r * 1.5, max);
-			const k = p * 0.4;
-			return `M ${x + p} ${y} L ${x + w - p} ${y} C ${x + w - k} ${y} ${x + w} ${y + k} ${x + w} ${y + p} L ${x + w} ${y + h - p} C ${x + w} ${y + h - k} ${x + w - k} ${y + h} ${x + w - p} ${y + h} L ${x + p} ${y + h} C ${x + k} ${y + h} ${x} ${y + h - k} ${x} ${y + h - p} L ${x} ${y + p} C ${x} ${y + k} ${x + k} ${y} ${x + p} ${y} Z`;
-		}
-		default:
-			return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
-	}
-}
-
-// Radii that overflow a side scale down together, as Skia's RRect does.
-function perCornerRectSvg(
-	radius: [number, number, number, number],
-	x: number,
-	y: number,
-	w: number,
-	h: number,
-): string {
-	const [a, b, c, d] = radius.map((r) => Math.max(0, r));
-	const k = Math.min(
-		1,
-		a + b > 0 ? w / (a + b) : 1,
-		d + c > 0 ? w / (d + c) : 1,
-		a + d > 0 ? h / (a + d) : 1,
-		b + c > 0 ? h / (b + c) : 1,
-	);
-	const [tl, tr, br, bl] = [a * k, b * k, c * k, d * k];
-	return `M ${x + tl} ${y} H ${x + w - tr} A ${tr} ${tr} 0 0 1 ${x + w} ${y + tr} V ${y + h - br} A ${br} ${br} 0 0 1 ${x + w - br} ${y + h} H ${x + bl} A ${bl} ${bl} 0 0 1 ${x} ${y + h - bl} V ${y + tl} A ${tl} ${tl} 0 0 1 ${x + tl} ${y} Z`;
-}
-
-// The mask shape an inside/outside stroke follows once the box is inset, or
-// null when insetting the box is not an offset of the outline (a polygon).
-function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
-	switch (clip.kind) {
-		case "rect":
-			return clip.outset ? null : clip;
-		case "rounded-rect":
-			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
-		case "squircle":
-			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
-		case "circle":
-		case "ellipse":
-			return clip;
-		default:
-			return null;
-	}
-}
-
 // An inside/outside stroke along an arbitrary outline: twice the width,
-// clipped to the path's interior (inside) or its exterior (outside). The
+// clipped to the outline's interior (inside) or its exterior (outside). A
 // path's fill type decides what the interior is.
 function drawClippedStroke(
 	ck: CanvasKit,
 	canvas: Canvas,
 	bin: Bin,
-	path: Path,
+	outline: Outline,
 	stroke: Stroke,
 ) {
 	canvas.save();
-	canvas.clipPath(
-		path,
+	clipOutline(
+		ck,
+		canvas,
+		outline,
 		stroke.align === "inside" ? ck.ClipOp.Intersect : ck.ClipOp.Difference,
-		true,
 	);
-	canvas.drawPath(
-		path,
+	drawOutline(
+		canvas,
+		outline,
 		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
 	);
 	canvas.restore();
 }
 
-function maskPath(
+type Outline =
+	| { kind: "rect"; rect: Rect }
+	| { kind: "rrect"; rrect: RRect }
+	| { kind: "path"; path: Path };
+
+function outlineOf(
 	ck: CanvasKit,
 	bin: Bin,
-	clip: ShapeMask,
+	shape: ShapeMask,
 	x: number,
 	y: number,
 	w: number,
 	h: number,
-): Path {
-	return bin.path(ck, maskSvg(clip, x, y, w, h)) as Path;
+	inset = 0,
+): Outline | null {
+	const g = outlineGeometry(shape, x, y, w, h, inset);
+	if (!g) return null;
+	if (g.kind === "path")
+		return { kind: "path", path: bin.path(ck, g.d) as Path };
+	const rect = ck.LTRBRect(...g.ltrb);
+	if (g.kind === "rect") return { kind: "rect", rect };
+	const [tl, tr, br, bl] = g.radii;
+	return {
+		kind: "rrect",
+		rrect: Float32Array.of(...g.ltrb, tl, tl, tr, tr, br, br, bl, bl),
+	};
+}
+
+function drawOutline(canvas: Canvas, o: Outline, paint: Paint) {
+	if (o.kind === "rect") canvas.drawRect(o.rect, paint);
+	else if (o.kind === "rrect") canvas.drawRRect(o.rrect, paint);
+	else canvas.drawPath(o.path, paint);
+}
+
+function clipOutline(
+	ck: CanvasKit,
+	canvas: Canvas,
+	o: Outline,
+	op = ck.ClipOp.Intersect,
+) {
+	if (o.kind === "rect") canvas.clipRect(o.rect, op, true);
+	else if (o.kind === "rrect") canvas.clipRRect(o.rrect, op, true);
+	else canvas.clipPath(o.path, op, true);
+}
+
+function clipShape(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	shape: ShapeMask,
+	pos: { x: number; y: number },
+	size: Size,
+) {
+	clipOutline(
+		ck,
+		canvas,
+		outlineOf(ck, bin, shape, pos.x, pos.y, size.width, size.height) as Outline,
+	);
+}
+
+function outlineBounds(o: Outline): Bounds {
+	if (o.kind === "path") {
+		const [l, t, r, b] = o.path.getBounds();
+		return [l, t, r, b] as Bounds;
+	}
+	const r = o.kind === "rect" ? o.rect : o.rrect;
+	return [r[0], r[1], r[2], r[3]].map(f32) as Bounds;
+}
+
+// The stroke along `shape`, offset for inside/outside alignment.
+function drawOutlineStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	shape: ShapeMask,
+	pos: { x: number; y: number },
+	size: Size,
+	stroke: Stroke,
+) {
+	const { x, y } = pos;
+	const { width: w, height: h } = size;
+	const inset = strokeInset(stroke);
+	const o = outlineOf(ck, bin, shape, x, y, w, h, inset);
+	if (o) {
+		drawOutline(canvas, o, strokePaint(ck, bin, stroke));
+		return;
+	}
+	const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+	drawClippedStroke(ck, canvas, bin, whole, stroke);
 }
 
 function textStyleOf(
@@ -699,7 +656,7 @@ function drawImagePlaceholder(
 	const fill = bin.track(new ck.Paint());
 	fill.setColor(gray);
 	fill.setAntiAlias(true);
-	// This CanvasKit build only exposes Path.MakeFromSVGString (see maskSvg), so
+	// This CanvasKit build only exposes Path.MakeFromSVGString, so
 	// draw the sun as an SVG circle path rather than canvas.drawCircle.
 	const sr = icon * 0.1;
 	const scx = x + icon * 0.32;
@@ -723,25 +680,15 @@ function drawImageStroke(
 	cmd: DrawImageCommand,
 ) {
 	if (!cmd.stroke) return;
-	const { pos, size } = cmd;
-	const clip = cmd.clip ?? { kind: "rect" };
-	const inset = strokeInset(cmd.stroke);
-	const shape = inset === 0 ? clip : insetMask(clip, inset);
-	if (!shape) {
-		const path = maskPath(ck, bin, clip, pos.x, pos.y, size.width, size.height);
-		drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
-		return;
-	}
-	const path = maskPath(
+	drawOutlineStroke(
 		ck,
+		canvas,
 		bin,
-		shape,
-		pos.x + inset,
-		pos.y + inset,
-		Math.max(0, size.width - 2 * inset),
-		Math.max(0, size.height - 2 * inset),
+		cmd.clip ?? { kind: "rect" },
+		cmd.pos,
+		cmd.size,
+		cmd.stroke,
 	);
-	canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
 }
 
 function drawImage(
@@ -763,24 +710,14 @@ function drawImage(
 		// placeholder simply ignore the warning.
 		issues.missingImages.push(cmd.src);
 		canvas.save();
-		if (cmd.clip)
-			canvas.clipPath(
-				maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-				ck.ClipOp.Intersect,
-				true,
-			);
+		if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 		drawImagePlaceholder(ck, canvas, bin, pos, size);
 		canvas.restore();
 		drawImageStroke(ck, canvas, bin, cmd);
 		return;
 	}
 	canvas.save();
-	if (cmd.clip)
-		canvas.clipPath(
-			maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-			ck.ClipOp.Intersect,
-			true,
-		);
+	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 	if (isSvgPicture(img)) {
 		drawSvgPicture(ck, canvas, bin, img, cmd);
 		canvas.restore();
@@ -906,12 +843,7 @@ function drawBitmap(
 	);
 	if (!img) return;
 	canvas.save();
-	if (cmd.clip)
-		canvas.clipPath(
-			maskPath(ck, bin, cmd.clip, pos.x, pos.y, size.width, size.height),
-			ck.ClipOp.Intersect,
-			true,
-		);
+	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
 	const paint = bin.track(new ck.Paint());
 	const snapped =
 		cmd.role === "barcode" ? snapBarcode(canvas, cmd, frame.grid ?? 1) : null;
@@ -1138,7 +1070,7 @@ function drawPath(
 		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
 		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
 		else if (strokeInset(cmd.stroke) !== 0)
-			drawClippedStroke(ck, canvas, bin, path, cmd.stroke);
+			drawClippedStroke(ck, canvas, bin, { kind: "path", path }, cmd.stroke);
 		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
 	}
 	canvas.restore();
@@ -1218,64 +1150,17 @@ function drawShape(
 	if (cmd.op === "drawRect") {
 		const { x, y } = cmd.pos;
 		const { width: w, height: h } = cmd.size;
-		const rect = ck.XYWHRect(x, y, w, h);
-		const cr = cmd.cornerRadius;
-		// Corner smoothing (superellipse) applies to a uniform radius; otherwise
-		// fall back to a plain (possibly per-corner) rounded rect.
-		const smoothing = cmd.cornerSmoothing ?? 0;
-		const smoothR =
-			smoothing > 0 && typeof cr === "number" && cr > 0 ? cr : null;
-		const rr =
-			smoothR === null &&
-			cr !== undefined &&
-			(typeof cr === "number" ? cr > 0 : cr.some((r) => r > 0))
-				? rrectFor(ck, rect, cr)
-				: null;
-		const fillPath =
-			smoothR !== null
-				? bin.path(ck, squircleSvg(x, y, w, h, smoothR, smoothing))
-				: null;
+		const shape = rectShape(cmd.cornerRadius, cmd.cornerSmoothing);
+		const outline = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 		for (const fill of cmd.fills ?? []) {
 			const paint = bin.track(new ck.Paint());
 			paint.setAntiAlias(true);
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
 			else paint.setShader(shaderFor(ck, bin, fill, x, y, w, h));
-			if (fillPath) canvas.drawPath(fillPath, paint);
-			else if (rr) canvas.drawRRect(rr, paint);
-			else canvas.drawRect(rect, paint);
+			drawOutline(canvas, outline, paint);
 		}
-		if (cmd.stroke) {
-			const sp = strokePaint(ck, bin, cmd.stroke);
-			// Offset the stroked rect for inside/outside alignment (center = 0).
-			const inset = strokeInset(cmd.stroke);
-			if (smoothR !== null) {
-				const path = bin.path(
-					ck,
-					squircleSvg(
-						x + inset,
-						y + inset,
-						w - 2 * inset,
-						h - 2 * inset,
-						Math.max(0, smoothR - inset),
-						smoothing,
-					),
-				) as Path;
-				canvas.drawPath(path, sp);
-			} else if (inset === 0) {
-				if (rr) canvas.drawRRect(rr, sp);
-				else canvas.drawRect(rect, sp);
-			} else {
-				const srect = ck.XYWHRect(
-					x + inset,
-					y + inset,
-					w - 2 * inset,
-					h - 2 * inset,
-				);
-				if (rr)
-					canvas.drawRRect(rrectFor(ck, srect, insetCorner(cr, inset)), sp);
-				else canvas.drawRect(srect, sp);
-			}
-		}
+		if (cmd.stroke)
+			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
 		drawText(ck, canvas, provider, bin, cmd);
 	} else if (cmd.op === "drawImage") {
@@ -1756,6 +1641,28 @@ function predictedBounds(
 			within = [...within, { ctm: m }];
 		return visitShape(c, m, within);
 	};
+	const addStroke = (
+		shape: ShapeMask,
+		stroke: Stroke,
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		m: Affine,
+		within: RecordedSave[],
+	) => {
+		const o = outlineOf(ck, bin, shape, x, y, w, h, strokeInset(stroke));
+		if (o) {
+			add(strokeBounds(sortBounds(outlineBounds(o)), stroke), m, within);
+			return;
+		}
+		const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+		const doubled = { ...stroke, width: stroke.width * 2 };
+		add(strokeBounds(outlineBounds(whole), doubled), m, [
+			...within,
+			{ ctm: m },
+		]);
+	};
 	const visitShape = (
 		c: DrawCommand,
 		m: Affine,
@@ -1765,39 +1672,12 @@ function predictedBounds(
 		const { width: w, height: h } = c.size;
 		const box: Bounds = [x, y, x + w, y + h].map(f32) as Bounds;
 		if (c.op === "drawRect") {
-			const cr = c.cornerRadius;
-			const smoothing = c.cornerSmoothing ?? 0;
-			const smoothR =
-				smoothing > 0 && typeof cr === "number" && cr > 0 ? cr : null;
-			const fill =
-				smoothR !== null
-					? pathBounds(ck, bin, squircleSvg(x, y, w, h, smoothR, smoothing))
-					: box;
-			if (c.fills?.length) add(fill, m, within);
-			if (c.stroke) {
-				const inset = strokeInset(c.stroke);
-				const geometry =
-					smoothR !== null
-						? pathBounds(
-								ck,
-								bin,
-								squircleSvg(
-									x + inset,
-									y + inset,
-									w - 2 * inset,
-									h - 2 * inset,
-									Math.max(0, smoothR - inset),
-									smoothing,
-								),
-							)
-						: ([
-								x + inset,
-								y + inset,
-								x + inset + (w - 2 * inset),
-								y + inset + (h - 2 * inset),
-							].map(f32) as Bounds);
-				add(strokeBounds(sortBounds(geometry), c.stroke), m, within);
+			const shape = rectShape(c.cornerRadius, c.cornerSmoothing);
+			if (c.fills?.length) {
+				const fill = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+				add(outlineBounds(fill), m, within);
 			}
+			if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawText") {
@@ -1849,21 +1729,8 @@ function predictedBounds(
 						inImage,
 					);
 			}
-			if (c.stroke) {
-				const inset = strokeInset(c.stroke);
-				const path = pathBounds(
-					ck,
-					bin,
-					maskSvg(
-						{ kind: "rect" },
-						x + inset,
-						y + inset,
-						Math.max(0, w - 2 * inset),
-						Math.max(0, h - 2 * inset),
-					),
-				);
-				add(strokeBounds(path, c.stroke), m, within);
-			}
+			if (c.stroke)
+				addStroke(c.clip ?? { kind: "rect" }, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawBitmap") {
@@ -2145,11 +2012,6 @@ function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
 		radius = f32((width / 2) * multiplier);
 	}
 	return outsetBounds(b, radius);
-}
-
-function pathBounds(ck: CanvasKit, bin: Bin, svg: string): Bounds {
-	const [l, t, r, b] = (bin.path(ck, svg) as Path).getBounds();
-	return [l, t, r, b] as Bounds;
 }
 
 function sortBounds(b: Bounds): Bounds {
@@ -3101,7 +2963,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
 	if (cmd.op === "drawRect")
 		return (
-			!cmd.cornerSmoothing &&
+			!outlineIsPath(rectShape(cmd.cornerRadius, cmd.cornerSmoothing)) &&
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
 	if (cmd.op === "drawText") return !cmd.fill || cmd.fill.kind === "solid";
@@ -3367,19 +3229,7 @@ function paintDrawable(
 	}
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	if (cmd.clip && cmd.op !== "drawImage")
-		canvas.clipPath(
-			maskPath(
-				ck,
-				bin,
-				cmd.clip,
-				cmd.pos.x,
-				cmd.pos.y,
-				cmd.size.width,
-				cmd.size.height,
-			),
-			ck.ClipOp.Intersect,
-			true,
-		);
+		clipShape(ck, canvas, bin, cmd.clip, cmd.pos, cmd.size);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
 	if (lp) canvas.restore();
 	canvas.restore();
