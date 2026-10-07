@@ -11,33 +11,10 @@ export {
 	type ImageStats,
 	measureGamut,
 } from "./analyze";
-export {
-	type FitChannelBalanceOptions,
-	fitChannelBalance,
-	isBalanceMeaningful,
-} from "./balance";
-export {
-	assessCalibration,
-	type CalibrationAssessment,
-	type CalibrationBlocker,
-} from "./calibration";
-export {
-	type Box,
-	type ChartPatch,
-	type ChartSpec,
-	chartScene,
-	chromaRampChart,
-	DIAGNOSTIC_CHARTS,
-	grayBalanceChart,
-	hslToRgb,
-	hueSweepChart,
-	latticeCharts,
-	layoutGrid,
-	type PatchRole,
-	type Point,
-	type RGB,
-	toneWedgeChart,
-} from "./chart";
+export type {
+	CalibrationAssessment,
+	CalibrationBlocker,
+} from "./assess";
 export {
 	CR80_ASPECT,
 	CR80_LONG,
@@ -48,17 +25,6 @@ export {
 	detectOrientation,
 	fitCr80CropToImage,
 } from "./geometry";
-export {
-	applyHomography,
-	type ChartReading,
-	grayCast,
-	type Homography,
-	homographyFrom,
-	type PatchReading,
-	readChart,
-	readingToCsv,
-	repeatSpread,
-} from "./measure";
 export {
 	type AnalysisCache,
 	type AnalyzeSceneOptions,
@@ -75,11 +41,8 @@ export {
 } from "./plan";
 export { NO_PROCESSING, YMCKO_FINISH, YMCKO_PRESET } from "./presets";
 export {
-	createPrintProfile,
 	type PrintProfile,
 	type PrintProfileConditions,
-	type PrintProfileCreation,
-	type PrintProfileDetails,
 	type PrintProfileParse,
 	parsePrintProfile,
 	profileCacheKey,

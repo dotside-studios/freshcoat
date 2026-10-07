@@ -101,11 +101,19 @@ requests via `YMCKO_FINISH`.
 
 ## Calibration profiles
 
-Use `createPrintProfile(reading, details)` to turn a Gray balance chart reading
-into reusable profile data. It only emits a profile when the capture is usable,
-and records the quality assessment plus printer, ribbon, and stock details beside
-the fitted balance. `parsePrintProfile` remains compatible with older profiles and
-normalizes them to the current `version: 1` schema.
+The chart, measurement and fitting tools live in a separate entry point,
+`@freshcoat-js/for-print/calibration`: chart specs (`grayBalanceChart`,
+`chartScene`, …), reading a photographed chart (`readChart`, `homographyFrom`),
+quality checks (`assessCalibration`) and fitting (`fitChannelBalance`).
+
+Use `createPrintProfile(reading, details)` from there to turn a Gray balance
+chart reading into reusable profile data. It only emits a profile when the
+capture is usable, and records the quality assessment plus printer, ribbon, and
+stock details beside the fitted balance.
+
+`parsePrintProfile` returns `{ ok: true, profile }` or `{ ok: false, message }`.
+It remains compatible with older profiles and normalizes them to the current
+`version: 1` schema.
 
 Profiles describe measured channel balance for a printer, ribbon and stock
 combination. They are not ICC profiles. Pass a profile's `balance` to

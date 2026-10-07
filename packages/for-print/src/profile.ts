@@ -16,7 +16,7 @@ import {
 	assessCalibration,
 	type CalibrationAssessment,
 	type CalibrationBlocker,
-} from "./calibration";
+} from "./assess";
 import type { ChartReading } from "./measure";
 import type { ChannelBalance, PrintOptimizeOptions } from "./types";
 import { z } from "zod";

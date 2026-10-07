@@ -11,7 +11,8 @@
 	},
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./calibration": "./src/calibration.ts"
 	},
 	"scripts": {
 		"test": "bun test",
