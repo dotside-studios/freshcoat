@@ -1829,11 +1829,12 @@ function predictedBounds(
 	return out ?? [0, 0, 0, 0];
 }
 
-// The local rects a drawText's glyphs and decorations can cover: each line's
-// shaped advance padded by the font box of every family it may draw from.
-// SkTextBlob bounds a positioned run by that box, so this holds the recorded
-// bounds. Lines drawText culls against the clip are skipped here too. Null when
-// a family's box is unknown.
+// The local rects a drawText's glyphs and decorations can cover: the span of
+// each line's shaped glyph origins padded by the font box of every family it
+// may draw from. SkTextBlob bounds a positioned run by that box, so this holds
+// the recorded bounds even when letter or word spacing moves glyphs past the
+// line's advance. Lines drawText culls against the clip are skipped here too.
+// Null when a family's box is unknown.
 function textBounds(
 	ck: CK,
 	provider: CK,
@@ -1885,12 +1886,25 @@ function textBounds(
 			line.direction === "rtl"
 				? Math.min(...line.spans.map((s) => s.x))
 				: first.x;
-		const advance = shaped.para.getLongestLine() as number;
+		let x0 = Number.POSITIVE_INFINITY;
+		let x1 = Number.NEGATIVE_INFINITY;
+		for (const run of shaped.para.getShapedLines()[0]?.runs ?? []) {
+			const skew = run.fakeItalic
+				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * run.size
+				: 0;
+			const pos = run.positions as Float32Array;
+			for (let i = 0; i < pos.length; i += 2) {
+				const x = pos[i] as number;
+				x0 = Math.min(x0, x + Math.min(0, em[0]) * run.size - skew);
+				x1 = Math.max(x1, x + Math.max(0, em[2]) * run.size + skew);
+			}
+		}
+		if (!(x0 <= x1)) x0 = x1 = 0;
 		const slack = size / 8;
 		out.push([
-			left + Math.min(0, em[0]) * size - slack,
+			left + x0 - slack,
 			baseline + Math.min(0, em[1]) * size - slack,
-			left + advance + Math.max(0, em[2]) * size + slack,
+			left + x1 + slack,
 			baseline + Math.max(0, em[3]) * size + slack,
 		]);
 		for (const span of line.spans) {
@@ -1952,6 +1966,9 @@ function familyBox(
 	byFamily.set(family, box);
 	return box;
 }
+
+// SkFont's synthetic oblique.
+const FAKE_ITALIC_SKEW = 1 / 4;
 
 // SkTypeface::getBounds measures at this size.
 const FONT_BOX_SIZE = 2048;
