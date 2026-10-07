@@ -1,12 +1,13 @@
+import { assetRef } from "../assets";
+import { slug, templateStem } from "../ids";
 import {
-	fitDesignSize,
-	hasInsets,
-	type Sides,
-	type Template,
-} from "@freshcoat-js/coatfile";
+	type BleedMm,
+	type CardSizeMm,
+	cardSizeMm,
+	SheetLayoutError,
+} from "../impose";
+import { DEFAULT_QUALITY, imageFormat, planExport } from "../plan";
 import type {
-	BleedMm,
-	CardSizeMm,
 	Dataset,
 	DatasetAsset,
 	ExportItem,
@@ -14,22 +15,16 @@ import type {
 	PdfPage,
 	SheetLayout,
 	Workspace,
-} from "@freshcoat-js/workspace";
+} from "../types";
 import {
-	assetRef,
-	cardSizeMm,
-	DEFAULT_QUALITY,
-	exportSize,
-	imageFormat,
-	orientedSize,
-	planExport,
-	SheetLayoutError,
-	slug,
-	templateStem,
-} from "@freshcoat-js/workspace";
-import { type AssembleExtras, assemblePdfInWorker } from "./pdf-client";
+	type ItemRenderer,
+	type ItemSize,
+	itemSize,
+	type RenderOutput,
+	type RenderRequest,
+	withBleed,
+} from "./item";
 import { gamutPercent, type PrintOutcome, printRequest } from "./print";
-import type { RenderOutput, RenderRequest } from "./protocol";
 import {
 	planSheets,
 	presetBleed,
@@ -42,10 +37,7 @@ import {
 	type JobFile,
 	type OutputSink,
 	type SinkResult,
-} from "./sinks";
-import type { WorkerPool } from "./worker-pool";
-
-export type { JobFile } from "./sinks";
+} from "./sink";
 
 export type JobProgress = {
 	/** items finished, failed ones included */
@@ -94,7 +86,24 @@ export type JobResult = {
 	stats?: JobStats;
 };
 
-export type JobPool = Pick<WorkerPool, "size" | "render" | "cancel">;
+/** Where a job's items render: a pool of workers, or `inlinePool` on this
+ *  thread. At most `size` renders are asked for at once. */
+export type JobPool = {
+	readonly size: number;
+	render(request: RenderRequest): Promise<RenderOutput>;
+	/** Called when the job stops early; renders still running may be dropped. */
+	cancel(): void;
+};
+
+/** A pool of one that renders on this thread. */
+export function inlinePool(items: Pick<ItemRenderer, "render">): JobPool {
+	return { size: 1, render: (request) => items.render(request), cancel() {} };
+}
+
+export type AssembleExtras = {
+	signal?: AbortSignal;
+	onProgress?: (done: number, total: number) => void;
+};
 
 export type AssemblePdf = (
 	pages: PdfPage[],
@@ -112,8 +121,8 @@ export type ExportJobOptions = {
 	pool: JobPool;
 	onProgress?: (progress: JobProgress) => void;
 	signal?: AbortSignal;
-	/** defaults to a PDF worker, or `@freshcoat-js/workspace/pdf` on this
-	 *  thread where there are no workers */
+	/** defaults to `assemblePdf` from `@freshcoat-js/workspace/pdf`, on this
+	 *  thread */
 	assemblePdf?: AssemblePdf;
 	/** where a zip format's files go; defaults to one zip in memory, handed
 	 *  back as `file` */
@@ -130,12 +139,10 @@ export const PDF_CONFIRM_BYTES = 1024 ** 3;
 const PDF_SAMPLE_PAGES = 3;
 
 const defaultAssemblePdf: AssemblePdf = async (pages, options, extras) =>
-	typeof Worker !== "undefined"
-		? assemblePdfInWorker(pages, options, extras)
-		: (await import("@freshcoat-js/workspace/pdf")).assemblePdf(pages, {
-				...options,
-				...(extras?.onProgress ? { onProgress: extras.onProgress } : {}),
-			});
+	(await import("../pdf")).assemblePdf(pages, {
+		...options,
+		...(extras?.onProgress ? { onProgress: extras.onProgress } : {}),
+	});
 
 /** The job's output name without an extension: the preset's name, else the
  *  template's file name. */
@@ -238,68 +245,6 @@ export function largestImagePixels(
 				largest = Math.max(largest, asset.width * asset.height);
 		}
 	return largest;
-}
-
-type ItemSize = {
-	/** output pixels */
-	width: number;
-	height: number;
-	scale: number;
-	resize?: { width: number; height: number };
-	/** set when the output includes the template's bleed */
-	bleed?: true;
-};
-
-/**
- * What one item renders at. A template size is the design at the preset's
- * scale, with the bleed around it when the preset includes it. A size from an image is the photo's oriented pixels, capped by
- * `maxEdge`: the design is laid out by its constraints at the photo's aspect
- * and rendered at the density that makes it exactly that many pixels.
- */
-export function itemSize(
-	template: Pick<Template, "width" | "height" | "bleed">,
-	preset: ExportPreset,
-	item: ExportItem,
-	assets: ReadonlyMap<string, DatasetAsset>,
-): ItemSize | { error: string } {
-	const size = exportSize(preset);
-	if (size.kind === "template") {
-		const bleed = presetBleed(template, preset);
-		const { width, height } = withBleed(template, bleed);
-		return {
-			width: Math.round(width * preset.scale),
-			height: Math.round(height * preset.scale),
-			scale: preset.scale,
-			...(hasInsets(bleed) ? { bleed: true as const } : {}),
-		};
-	}
-	const asset = assets.get(item.values[size.field] ?? "");
-	if (!asset) return { error: `No image in ${size.field}` };
-	if (!asset.width || !asset.height)
-		return { error: `Image in ${size.field} has no readable size` };
-	const seen = orientedSize({
-		width: asset.width,
-		height: asset.height,
-		orientation: asset.orientation,
-	});
-	const cap =
-		size.maxEdge && size.maxEdge > 0
-			? Math.min(1, size.maxEdge / Math.max(seen.width, seen.height))
-			: 1;
-	const width = Math.max(1, Math.round(seen.width * cap));
-	const height = Math.max(1, Math.round(seen.height * cap));
-	const resize = fitDesignSize(template, width, height);
-	return { width, height, scale: width / resize.width, resize };
-}
-
-function withBleed(
-	template: Pick<Template, "width" | "height">,
-	bleed: Sides,
-): { width: number; height: number } {
-	return {
-		width: template.width + bleed.left + bleed.right,
-		height: template.height + bleed.top + bleed.bottom,
-	};
 }
 
 /** The photos an item's values name, so a worker gets only those. */

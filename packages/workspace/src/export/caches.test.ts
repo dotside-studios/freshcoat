@@ -1,10 +1,9 @@
-// @vitest-environment node
 import { assetUri, type Template } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
-import { createJobCaches } from "~/export/worker-caches";
-import { minimal } from "~/samples/minimal";
+import { memberCard } from "../test-fixtures";
+import { createJobCaches } from "./caches";
 
-describe("render worker job caches", () => {
+describe("job caches", () => {
 	it("are kept across items and emptied at job end", () => {
 		const caches = createJobCaches();
 		const analysis = caches.analysis();
@@ -18,7 +17,7 @@ describe("render worker job caches", () => {
 	it("key a template's assets by their sha256", () => {
 		const sha = "a".repeat(64);
 		const template: Template = {
-			...minimal(),
+			...memberCard,
 			assets: [{ sha256: sha, contentType: "image/png", base64: btoa("png") }],
 		} as Template;
 		const caches = createJobCaches();
@@ -32,7 +31,7 @@ describe("render worker job caches", () => {
 		const b = "b".repeat(64);
 		const body = (mid: string) => `${"A".repeat(500)}${mid}${"A".repeat(500)}`;
 		const template: Template = {
-			...minimal(),
+			...memberCard,
 			assets: [
 				{ sha256: a, contentType: "image/png", base64: body("QUJD") },
 				{ sha256: b, contentType: "image/png", base64: body("REVG") },

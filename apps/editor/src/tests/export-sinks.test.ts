@@ -1,17 +1,20 @@
 // @vitest-environment node
+
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	createPartZipSink,
+	createStreamZipSink,
+	type JobFile,
+} from "@freshcoat-js/workspace/export";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import {
 	createFolderSink,
-	createPartZipSink,
-	createStreamZipSink,
 	destinationSupport,
 	type FolderHandle,
-	type JobFile,
 	openSink,
 	type WritableFile,
 } from "~/export/sinks";

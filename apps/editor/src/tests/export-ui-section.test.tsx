@@ -1,5 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import type { JobFile, JobResult } from "@freshcoat-js/workspace/export";
 import {
 	act,
 	cleanup,
@@ -22,7 +23,6 @@ import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { ExportSection } from "~/export/ExportSection";
 import { exportJobsFor } from "~/export/export-jobs";
-import type { JobFile, JobResult } from "~/export/job";
 import type {
 	ExportRunner,
 	ExportRunnerSnapshot,

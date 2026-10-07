@@ -1,7 +1,10 @@
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { photoDataset, prepareAssets } from "@freshcoat-js/workspace";
-import { largestImagePixels, runExportJob } from "~/export/job";
-import { createPartZipSink } from "~/export/sinks";
+import {
+	createPartZipSink,
+	largestImagePixels,
+	runExportJob,
+} from "@freshcoat-js/workspace/export";
 import { createWorkerPool, defaultPoolSize } from "~/export/worker-pool";
 import { resolveTemplateFonts } from "~/render/fonts";
 import { photoWatermark } from "~/samples/photo-watermark";

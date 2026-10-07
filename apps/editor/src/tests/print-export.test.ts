@@ -1,20 +1,22 @@
 // @vitest-environment node
 import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
-import { strFromU8, unzipSync } from "fflate";
-import { describe, expect, it } from "vitest";
-import { type JobPool, REPORT_FILE_NAME, runExportJob } from "~/export/job";
 import {
 	gamutNotes,
 	gamutPercent,
-	printerFileNote,
+	type JobPool,
 	printFallbacks,
 	printRenderOptions,
 	printRequest,
-	profileLabel,
+	REPORT_FILE_NAME,
+	type RenderOutput,
+	type RenderRequest,
+	runExportJob,
 	withPrintFallback,
-} from "~/export/print";
-import type { RenderOutput, RenderRequest } from "~/export/protocol";
+} from "@freshcoat-js/workspace/export";
+import { strFromU8, unzipSync } from "fflate";
+import { describe, expect, it } from "vitest";
+import { printerFileNote, profileLabel } from "~/export/print";
 import { membershipCard } from "~/samples/membership-card";
 
 const BALANCE = { r: 1.1, g: 1, b: 0.92 };

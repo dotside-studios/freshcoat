@@ -8,12 +8,12 @@ import {
 	createAnalysisCache,
 } from "@freshcoat-js/for-print";
 
-/** Decoded pixels one render worker keeps across items. */
+/** Decoded pixels an item renderer keeps across items. */
 export const IMAGE_CACHE_PIXELS = 48_000_000;
-/** Print analyses one render worker keeps across items. */
+/** Print analyses an item renderer keeps across items. */
 const ANALYSIS_CACHE_ENTRIES = 256;
 
-/** What a render worker keeps across the items of one job, beside its
+/** What an item renderer keeps across the items of one job, beside its
  *  renderer's paint cache. */
 export type JobCaches = {
 	analysis(): AnalysisCache;
