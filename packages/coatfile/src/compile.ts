@@ -584,6 +584,7 @@ function compileFrameElement(
 		layoutChild: base.layoutChild,
 		clip,
 		cornerRadius,
+		...(props.isolate === true ? { isolate: true } : {}),
 	};
 
 	const frame: GroupNode =
@@ -620,6 +621,7 @@ function compileFrameElement(
 		blur,
 		adjust,
 		layoutChild,
+		isolate,
 		...content
 	} = frame;
 	return {
@@ -633,6 +635,7 @@ function compileFrameElement(
 		blur,
 		adjust,
 		layoutChild,
+		...(isolate ? { isolate } : {}),
 		kind: "group",
 		children: [
 			{ ...content, pos: { x: 0, y: 0 } },

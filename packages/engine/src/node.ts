@@ -188,6 +188,10 @@ export type GroupNode = Transform & {
 	clip?: boolean; // clip children to my box…
 	cornerRadius?: CornerRadius; // …honoring these corners
 	cornerSmoothing?: number;
+	// Composite the children in a layer of their own, so a blended child mixes
+	// only with the group's content (Figma's Normal). Unset is pass-through:
+	// children blend with whatever lies under the group.
+	isolate?: boolean;
 };
 
 // The unified masking primitive: `children` are masked by `mask`'s coverage.
@@ -262,6 +266,7 @@ export function createFrame(
 		clip?: boolean;
 		cornerRadius?: CornerRadius;
 		layout?: Layout;
+		isolate?: boolean;
 	} & Omit<Transform, "layoutChild">,
 ): GroupNode {
 	const { background, children, clip, cornerRadius, layout, ...rest } = opts;

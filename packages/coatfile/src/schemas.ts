@@ -572,6 +572,9 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 		// Figma's `clipsContent`. When true, children are clipped to the frame,
 		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
+		// Figma's Normal on a frame: children blend only with the frame's own
+		// content. Unset is pass-through.
+		isolate: z.boolean().optional(),
 		layout: LayoutSchema.optional(),
 		children: z.array(ElementSchema),
 	}),

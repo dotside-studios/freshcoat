@@ -309,6 +309,7 @@ function group(r: Rand, style: Style, size: Size, depth: number): Node {
 		);
 	return createGroup(children, {
 		...(r.chance(style.layers) ? effects(r, 0.4, false) : {}),
+		...(r.chance(0.2) ? { isolate: true } : {}),
 		...(clip ? { clip: true, ...clip, cornerRadius: r.int(0, 8) } : {}),
 	});
 }

@@ -159,6 +159,7 @@ export function transpileFrame(
 			stroke?: StrokeElement;
 			cornerRadius?: number | [number, number, number, number];
 			clipsContent?: boolean;
+			isolate?: boolean;
 			layout?: unknown;
 			children: unknown[];
 		};
@@ -184,6 +185,8 @@ export function transpileFrame(
 	if (node.clipsContent === true) {
 		out.properties.clipsContent = true;
 	}
+
+	if (node.blendMode === "NORMAL") out.properties.isolate = true;
 
 	// A rotated frame keeps its layout: the engine flows children in the frame's
 	// unrotated box, the same box the painter turns.

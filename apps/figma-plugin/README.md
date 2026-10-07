@@ -147,11 +147,12 @@ layers were kept, flattened or skipped.
   corners keeps them unsmoothed (`corner_smoothing_unsupported`). Frames
   keep their radius but not smoothing, which coatfile frames do not carry.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
-  linear dodge as `plus`. Pass through is how the renderer composites
-  a frame already. A frame set to Normal isolates its content in Figma, which
-  the renderer does only when the frame has opacity, an effect or a blend of
-  its own, so one holding a blended layer without those is rasterized
-  (`blend_mode_flattened`). A group with a blend mode gets a layer of its own.
+  linear dodge as `plus`. A frame set to Normal is written with `isolate`, so
+  a blended layer inside it mixes only with the frame's content, as in Figma.
+  A pass-through frame is written without it. A group with a blend mode gets
+  a layer of its own, and so does a Normal group holding a blended layer, with
+  `isolate`. Any other group is flattened into its parent, which changes
+  nothing when none of its layers blend.
 - **Effects.** Drop and inner shadows (stacked, with spread) and layer blur are
   native. Background blur, progressive blur, a shadow with its own blend mode,
   and noise, texture or glass effects are rasterized (`effect_flattened`).

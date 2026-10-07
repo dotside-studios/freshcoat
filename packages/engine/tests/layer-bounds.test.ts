@@ -434,7 +434,11 @@ describe("bounded effect layers, randomized", () => {
 						Array.from({ length: 1 + Math.floor(r() * 3) }, () =>
 							node(depth - 1),
 						),
-						{ ...box(0, 0, W, H), ...effect() },
+						{
+							...box(0, 0, W, H),
+							...effect(),
+							...(r() < 0.3 ? { isolate: true } : {}),
+						},
 					)
 				: leaf();
 		return Array.from({ length: 1 + Math.floor(r() * 3) }, () => node(2));

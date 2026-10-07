@@ -21,6 +21,7 @@ import {
 	classify,
 	elementBlendMode,
 	type FlattenReason,
+	groupIsolates,
 	hasTextStroke,
 	isQrLayerName,
 } from "./classify";
@@ -337,15 +338,17 @@ function walkNode(
 	if (c.kind === "container") {
 		const containerEntry = record(w, n, "container");
 		if (!isContainerNode(n)) return;
-		// A group carrying an effect or a blend mode has to composite as ONE
-		// layer — an inner shadow belongs to the silhouette of everything in
-		// it, and a Multiply group multiplies its composited content, not each
-		// child separately — so it gets an element of its own to hang them on. See groupLayer for the coordinate work that costs.
+		// A group carrying an effect, a blend mode or Normal's isolation has to
+		// composite as ONE layer — an inner shadow belongs to the silhouette of
+		// everything in it, and a Multiply group multiplies its composited
+		// content, not each child separately — so it gets an element of its own
+		// to hang them on. See groupLayer for the coordinate work that costs.
 		const fx = extractEffects(n.effects, scale, localFrame.rotation);
 		if (
 			fx.shadow !== undefined ||
 			fx.blur !== undefined ||
-			elementBlendMode(n) !== undefined
+			elementBlendMode(n) !== undefined ||
+			groupIsolates(n)
 		) {
 			const el = groupLayer(
 				w,
@@ -664,6 +667,8 @@ function groupLayer(
 	if (fx.blur !== undefined) el.blur = fx.blur;
 	const blend = elementBlendMode(n);
 	if (blend) el.blendMode = blend;
+	if (n.blendMode === "NORMAL")
+		(el.properties as { isolate?: boolean }).isolate = true;
 	// The layer composites its subtree as a whole, so its opacity rides here
 	// rather than being folded into each child.
 	applyOpacity(el, inheritedOpacity * opacityOf(n));
