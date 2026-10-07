@@ -1,4 +1,5 @@
 import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { memo } from "react";
 import type { Icon } from "~/app/icons";
 import type { AlignMode } from "~/doc/geometry";
 import { useEditor } from "~/state/hooks";
@@ -23,7 +24,11 @@ const ALIGN: [AlignMode, string, Icon][] = [
 	["vdistribute", "Distribute vertically", DistributeVIcon],
 ];
 
-export function AlignSection({ ins }: { ins: Inspect }) {
+export const AlignSection = memo(function AlignSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	// A count, so a new render result does not re-render the row.
 	const movable = useEditor(
 		(s) => ins.keys.filter((k) => !s.geometry.get(k)?.autoLayoutChild).length,
@@ -50,4 +55,4 @@ export function AlignSection({ ins }: { ins: Inspect }) {
 			))}
 		</div>
 	);
-}
+});

@@ -4,6 +4,7 @@ import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
+import { memo } from "react";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 
@@ -14,7 +15,7 @@ const LEVELS = [
 	["H", "High: 30%"],
 ] as const;
 
-export function QrSection({ ins }: { ins: Inspect }) {
+export const QrSection = memo(function QrSection({ ins }: { ins: Inspect }) {
 	const props = (ins.layers as QrCodeElement[]).map((e) => e.properties);
 	const pick = <T,>(fn: (p: QrCodeProperties) => T) =>
 		commonValue(props.map(fn));
@@ -83,4 +84,4 @@ export function QrSection({ ins }: { ins: Inspect }) {
 			</Row>
 		</PanelSection>
 	);
-}
+});

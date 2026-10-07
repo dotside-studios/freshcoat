@@ -3,7 +3,7 @@ import { Button } from "@freshcoat-js/ui/button";
 import { TextField } from "@freshcoat-js/ui/field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { useContext, useMemo } from "react";
+import { memo, useContext, useMemo } from "react";
 import { VARIANT_UI } from "~/app/copy";
 import { listFields } from "~/doc/values";
 import { useEditor } from "~/state/hooks";
@@ -79,7 +79,11 @@ function HideInVariant({ ins }: { ins: Inspect }) {
 	);
 }
 
-export function VisibilitySection({ ins }: { ins: Inspect }) {
+export const VisibilitySection = memo(function VisibilitySection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const fields = useMemo(() => listFields(ins.template), [ins.template]);
 	const lists = (ins.layers as Element[]).map(conditionsOf);
 	const common = commonValue(lists);
@@ -181,4 +185,4 @@ export function VisibilitySection({ ins }: { ins: Inspect }) {
 			})}
 		</PanelSection>
 	);
-}
+});

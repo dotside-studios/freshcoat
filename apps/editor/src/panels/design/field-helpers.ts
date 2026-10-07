@@ -1,6 +1,5 @@
 import type { Background, Element, Template } from "@freshcoat-js/coatfile";
 import type { EditorController } from "~/app/controller";
-import type { LayerGeometry } from "~/doc/geometry";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";
 
 export type Layer = Element | Background;
@@ -59,7 +58,6 @@ export type Inspect = {
 	side: number;
 	keys: string[];
 	layers: Layer[];
-	geometry: LayerGeometry;
 	/** Patches every selected layer in one undo step; edits to the same
 	 *  `field` within a second merge into it. */
 	set: (field: string, fn: PatchFn) => void;

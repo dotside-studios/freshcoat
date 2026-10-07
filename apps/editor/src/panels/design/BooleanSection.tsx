@@ -1,4 +1,5 @@
 import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { memo } from "react";
 import { BOOLEAN } from "~/app/copy";
 import type { Icon } from "~/app/icons";
 import { BOOLEAN_OPS, type BooleanOp } from "~/doc/boolean";
@@ -15,7 +16,11 @@ const ICONS: Record<BooleanOp, Icon> = {
 	exclude: ExcludeIcon,
 };
 
-export function BooleanSection({ ins }: { ins: Inspect }) {
+export const BooleanSection = memo(function BooleanSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	return (
 		<div
 			role="toolbar"
@@ -38,4 +43,4 @@ export function BooleanSection({ ins }: { ins: Inspect }) {
 			})}
 		</div>
 	);
-}
+});

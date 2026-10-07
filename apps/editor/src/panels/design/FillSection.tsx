@@ -4,6 +4,8 @@ import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { memo, useMemo } from "react";
+import { useEditor } from "~/state/hooks";
 import ClockwiseIcon from "~icons/mingcute/clockwise-line";
 import ReverseIcon from "~icons/mingcute/transfer-horizontal-line";
 import {
@@ -41,7 +43,7 @@ const KINDS: [FillKind, string][] = [
 	["angular", "Angular"],
 ];
 
-export function FillSection({
+export const FillSection = memo(function FillSection({
 	ins,
 	title = "Fill",
 }: {
@@ -74,7 +76,7 @@ export function FillSection({
 				fill: { key: only, index },
 			});
 	};
-	const box = ins.geometry.get(ins.keys[0] ?? "")?.rect;
+	const box = useBox(ins.keys[0] ?? "");
 
 	return (
 		<PanelSection
@@ -121,6 +123,18 @@ export function FillSection({
 				</ItemGroup>
 			))}
 		</PanelSection>
+	);
+});
+
+function useBox(key: string) {
+	const width = useEditor((s) => s.geometry.get(key)?.rect.width);
+	const height = useEditor((s) => s.geometry.get(key)?.rect.height);
+	return useMemo(
+		() =>
+			width === undefined || height === undefined
+				? undefined
+				: { width, height },
+		[width, height],
 	);
 }
 

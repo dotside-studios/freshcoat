@@ -16,7 +16,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@freshcoat-js/ui/toggle";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Button as AriaButton, MenuTrigger } from "react-aria-components";
 import { plural } from "~/app/copy";
 import { addFont } from "~/doc/ops";
@@ -88,7 +88,11 @@ function cleanFont(f: Font): Font {
 /** Family, weight, size, spacing and style all live in `font`. */
 const FONT = ["font"];
 
-export function TextSection({ ins }: { ins: Inspect }) {
+export const TextSection = memo(function TextSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const texts = ins.layers as TextElement[];
 	const props = texts.map((e) => e.properties);
 	const fonts = props.map((p) => p.font);
@@ -402,7 +406,7 @@ export function TextSection({ ins }: { ins: Inspect }) {
 			</Row>
 		</PanelSection>
 	);
-}
+});
 
 function FeaturesField({
 	value,

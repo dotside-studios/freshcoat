@@ -10,6 +10,7 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
+import { memo } from "react";
 import ArrowDownIcon from "~icons/mingcute/arrow-down-line";
 import ArrowRightIcon from "~icons/mingcute/arrow-right-line";
 import { AddButton, Notice, Pair, RemoveButton, Row } from "./controls";
@@ -68,7 +69,11 @@ export function switchLayout(l: Layout, kind: Kind): Layout {
 	return clean({ ...DEFAULT_LAYOUT, gap: gap ?? 8, padding: l.padding });
 }
 
-export function FrameSection({ ins }: { ins: Inspect }) {
+export const FrameSection = memo(function FrameSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const frames = ins.layers as FrameElement[];
 	const layouts = frames.map((f) => f.properties.layout);
 	const all = layouts.every(Boolean);
@@ -197,7 +202,7 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 			</PanelSection>
 		</>
 	);
-}
+});
 
 function FlexRows({
 	pick,

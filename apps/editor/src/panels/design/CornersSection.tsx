@@ -1,6 +1,7 @@
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import { memo } from "react";
 import RadiusIcon from "~icons/mingcute/border-radius-line";
 import SplitIcon from "~icons/mingcute/fullscreen-line";
 import { Pair, sectionActions } from "./controls";
@@ -19,7 +20,11 @@ function uniform(r: Radius): number | null {
 	return r.every((v) => v === r[0]) ? r[0] : null;
 }
 
-export function CornersSection({ ins }: { ins: Inspect }) {
+export const CornersSection = memo(function CornersSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const rectOnly = ins.layers.every((l) => l.type === "rect");
 	const splittable = ins.layers.every(
 		(l) => l.type === "rect" || l.type === "frame",
@@ -117,4 +122,4 @@ export function CornersSection({ ins }: { ins: Inspect }) {
 			)}
 		</PanelSection>
 	);
-}
+});

@@ -3,6 +3,7 @@ import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
+import { memo } from "react";
 import {
 	AddButton,
 	ItemGroup,
@@ -40,7 +41,11 @@ function clean(s: Shadow): Shadow {
 	return out as Shadow;
 }
 
-export function EffectsSection({ ins }: { ins: Inspect }) {
+export const EffectsSection = memo(function EffectsSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const els = ins.layers as Element[];
 	const lists = els.map(shadowsOf);
 	const common = commonValue(lists);
@@ -153,4 +158,4 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 			</Row>
 		</PanelSection>
 	);
-}
+});

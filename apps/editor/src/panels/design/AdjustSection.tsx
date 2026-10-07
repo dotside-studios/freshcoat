@@ -2,6 +2,7 @@ import type { Element, ElementAdjust } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
+import { memo } from "react";
 import {
 	AddButton,
 	Notice,
@@ -30,7 +31,11 @@ export function tidyAdjust(a: ElementAdjust): ElementAdjust {
 	return out;
 }
 
-export function AdjustSection({ ins }: { ins: Inspect }) {
+export const AdjustSection = memo(function AdjustSection({
+	ins,
+}: {
+	ins: Inspect;
+}) {
 	const els = ins.layers as Element[];
 	const adjusts = els.map((e) => e.adjust);
 	const all = adjusts.every(Boolean);
@@ -135,4 +140,4 @@ export function AdjustSection({ ins }: { ins: Inspect }) {
 			)}
 		</PanelSection>
 	);
-}
+});
