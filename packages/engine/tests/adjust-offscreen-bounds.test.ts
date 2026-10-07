@@ -198,6 +198,7 @@ describe("adjust offscreen sized to the layer", () => {
 			"text-negative-spacing",
 			"text-spacing-and-leading",
 			"text-shadow",
+			"text-synthetic-italic",
 			"large-stroke",
 			"path",
 			"clip-and-mask",
