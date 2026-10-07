@@ -12,7 +12,12 @@ import ts from "typescript";
 
 export const root = resolve(import.meta.dir, "..");
 // Dependency order also determines publication order.
-export const packages = ["engine", "for-print", "coatfile"] as const;
+export const packages = [
+	"canvaskit",
+	"engine",
+	"for-print",
+	"coatfile",
+] as const;
 export const stagingRoot = join(root, "dist", "npm");
 export const artifactRoot = join(root, "dist", "releases");
 

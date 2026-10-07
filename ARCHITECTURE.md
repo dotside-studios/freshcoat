@@ -10,6 +10,7 @@ Studio or Figma.
 |---|---|---|
 | [`coatfile`](packages/coatfile/) | Template schema, validation, compilation, `.coat` files and rendering helpers | Editor state or batch-job scheduling |
 | [`engine`](packages/engine/) (`@freshcoat-js/engine`) | Scene layout and CanvasKit painting, geometry and render caches | Template fields, datasets or application UI |
+| [`canvaskit`](packages/canvaskit/) | Loading CanvasKit in Node, browsers and workers | Painting or scene layout |
 | [`for-print`](packages/for-print/) | Image analysis, correction planning and measured card-printer profiles | General ICC color management or printer transport |
 | [`workspace`](packages/workspace/) | Datasets, bindings, archives, export planning, imposition and PDF assembly | Rendering workers or file destinations |
 | [`ui`](packages/ui/) | Shared React controls, themes and accessibility behavior | Template or workspace models |
@@ -49,7 +50,8 @@ not workspace APIs. Print correction uses `for-print` when requested.
 
 Internal dependencies are declared with Bun's `workspace:*` protocol.
 The engine is the foundation; for-print depends on it; coatfile depends on
-both. Workspace builds on coatfile and for-print. The UI package has no
+both. The canvaskit package loads the CanvasKit instance the engine is given
+and depends on no other Freshcoat package. Workspace builds on coatfile and for-print. The UI package has no
 dependency on the template or rendering model. Test suites share fixtures
 through `test-utils`, which packages list only as a dev dependency.
 
@@ -89,7 +91,8 @@ for reusable APIs.
 
 ## Releases
 
-The engine, coatfile and for-print are prepared for npm publication. Generated
+The canvaskit, engine, coatfile and for-print packages are prepared for npm
+publication. Generated
 manifests expose compiled ESM and declarations with concrete dependency
 versions; checked-in manifests export source for workspace development.
 UI and workspace remain internal. Figma is distributed as a plugin bundle,
