@@ -10,6 +10,7 @@
 // Not part of the paint path. The conformance harness runs it on every case, and
 // a consumer building scenes by hand can run it in dev; production paints
 // unchecked, as it always has.
+import { PATTERN_KINDS } from "./pattern";
 import type {
 	Adjust,
 	Command,
@@ -427,6 +428,49 @@ function validateAdjust(
 		);
 }
 
+function validatePattern(
+	fill: Extract<ResolvedFill, { kind: "pattern" }>,
+	path: string,
+	add: Add,
+	id?: string,
+): void {
+	if (!PATTERN_KINDS.includes(fill.pattern))
+		add(
+			"unknown_pattern",
+			`unknown pattern "${fill.pattern}"`,
+			`${path}.pattern`,
+			id,
+		);
+	if (!finite(fill.scale) || fill.scale <= 0)
+		add(
+			"bad_pattern_scale",
+			`pattern scale must be > 0, got ${fill.scale}`,
+			`${path}.scale`,
+			id,
+		);
+	if (!finite(fill.density) || fill.density < 0 || fill.density > 1)
+		add(
+			"bad_pattern_density",
+			`pattern density must be within 0..1, got ${fill.density}`,
+			`${path}.density`,
+			id,
+		);
+	if (!finite(fill.angle))
+		add(
+			"bad_pattern_angle",
+			"pattern angle must be finite",
+			`${path}.angle`,
+			id,
+		);
+	if (!Number.isInteger(fill.seed))
+		add(
+			"bad_pattern_seed",
+			`pattern seed must be an integer, got ${fill.seed}`,
+			`${path}.seed`,
+			id,
+		);
+}
+
 function validateFill(
 	fill: ResolvedFill,
 	path: string,
@@ -434,6 +478,10 @@ function validateFill(
 	id?: string,
 ): void {
 	if (fill.kind === "solid") return;
+	if (fill.kind === "pattern") {
+		validatePattern(fill, path, add, id);
+		return;
+	}
 	const stops = fill.stops;
 	if (!stops || stops.length === 0) {
 		add("empty_gradient", "gradient has no stops", `${path}.stops`, id);

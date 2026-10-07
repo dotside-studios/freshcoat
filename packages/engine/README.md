@@ -93,6 +93,17 @@ table and sharpening) are engine operations. `FrameFinish` applies operations
 is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
+A `pattern` fill is a procedural texture: `noise`, `paper`, `hatching` or
+`dots`, each a runtime effect compiled once per CanvasKit instance. Noise and
+paper sample `Shader.MakeFractalNoise` and `Shader.MakeTurbulence` with the
+fill's `seed`. A pattern is measured in design units from the drawable's
+top-left, so the canvas matrix carries it to every export density and
+supersample level, and the same fill paints the same texture in every
+renderer. Hatching and dots antialias their edges over one device pixel, and
+any pattern whose features shrink below a pixel fades to its mean coverage
+instead of aliasing. `patternFill(kind, params)` builds one with
+`PATTERN_DEFAULTS` for the parameters it omits.
+
 A luminance mask's coverage is its luminance times its alpha, as in SVG 1.1
 masking. Luminance uses Rec. 709 weights on the sRGB-encoded color, not on
 linearRGB as SVG's default `color-interpolation` would.
@@ -206,6 +217,8 @@ underlying model.
   `renderSceneToPng` or a `createCanvas` command's `precision`.
 - **Gradients.** Stops interpolate between unpremultiplied sRGB-encoded
   colors, which is Skia's default.
+- **Patterns.** A pattern mixes its two colors premultiplied, so a
+  transparent color never tints the other's edge.
 - **Luminance masks and LUTs.** A luminance mask's coverage is the Rec. 709
   luminance (0.2126, 0.7152, 0.0722) of the mask's encoded sRGB channels,
   times its alpha. A per-channel
