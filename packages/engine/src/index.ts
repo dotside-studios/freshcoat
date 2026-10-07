@@ -128,6 +128,7 @@ export {
 	insetCorner,
 	strokeInset,
 } from "./paint-helpers";
+export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
 export { createParagraphEngine } from "./paragraph-layout";
 export { scalePathData } from "./path-data";
 export { flattenOverWhite } from "./jpeg";

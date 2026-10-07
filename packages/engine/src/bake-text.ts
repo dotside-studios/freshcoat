@@ -320,6 +320,7 @@ function layoutWrappable(
 		lines,
 		totalHeight: nLines * lineHeightPx + paragraphGaps(mlines) * align.spacing,
 		shrinkApplied: measured.shrinkApplied,
+		...(measured.missing ? { missing: measured.missing } : {}),
 	};
 }
 
@@ -487,7 +488,7 @@ function layoutInline(
 			const totalHeight =
 				(sum(measured.map((l) => l.boxPx)) ||
 					dominant.size * dominant.lineHeight) + gaps;
-			return { measured, gaps, totalHeight };
+			return { measured, gaps, totalHeight, missing: shaped.missing };
 		};
 
 		let shapedSet = shape(resolved);
@@ -589,6 +590,7 @@ function layoutInline(
 			lines,
 			totalHeight: shapedSet.totalHeight,
 			shrinkApplied,
+			...(shapedSet.missing ? { missing: shapedSet.missing } : {}),
 		};
 	}
 

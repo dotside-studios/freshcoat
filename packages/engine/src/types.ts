@@ -224,6 +224,8 @@ export type BakedTextLayout = {
 	lines: TextLine[];
 	totalHeight: number;
 	shrinkApplied: boolean;
+	// See TextLayout.missing.
+	missing?: number[];
 };
 
 // One laid-out visual line. y is the line's top in target pixels (with

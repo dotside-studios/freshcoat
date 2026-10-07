@@ -51,7 +51,7 @@ export type TextEngine = {
 		spans: InlineSpan[],
 		maxWidth: number,
 		direction?: "ltr" | "rtl",
-	) => { lines: InlineShapedLine[] };
+	) => { lines: InlineShapedLine[]; missing?: number[] };
 	// Optional: a family's vertical metrics as the engine's own backend reads
 	// them. The sfnt reader (readFontMetrics) parses ttf/otf only, so a family
 	// delivered as woff2 — what Google Fonts serves a browser — has none; an

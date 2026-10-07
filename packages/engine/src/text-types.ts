@@ -47,4 +47,7 @@ export type TextLayout = {
 	totalHeight: number;
 	effectiveFontSize: number;
 	shrinkApplied: boolean;
+	// Codepoints no registered face covers, in text order. Absent when every
+	// glyph resolved or the engine cannot tell.
+	missing?: number[];
 };

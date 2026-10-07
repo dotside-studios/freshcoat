@@ -5,9 +5,15 @@ import { PDFDocument } from "pdf-lib";
 import { mod, openSample, probePath, state } from "./helpers";
 
 /** Adds a dataset of `count` members whose columns are the template's field keys. */
-async function addDataset(page: Page, id: string, name: string, count: number) {
+async function addDataset(
+	page: Page,
+	id: string,
+	name: string,
+	count: number,
+	names: Record<number, string> = {},
+) {
 	await page.evaluate(
-		({ id, name, count }) => {
+		({ id, name, count, names }) => {
 			const c = (
 				window as unknown as {
 					__freshcoat: {
@@ -22,7 +28,7 @@ async function addDataset(page: Page, id: string, name: string, count: number) {
 			const keys = Object.keys(c.template.fields.properties);
 			const tiers = ["Gold", "Silver", "Bronze"];
 			const values = (i: number): Record<string, string> => ({
-				display_name: `Member ${i + 1}`,
+				display_name: names[i] ?? `Member ${i + 1}`,
 				tier: tiers[i % 3] as string,
 				profile_url: `https://example.com/u/${i + 1}`,
 				member_since: String(2000 + i),
@@ -47,7 +53,7 @@ async function addDataset(page: Page, id: string, name: string, count: number) {
 				datasets: [...c.state.workspace.datasets, dataset],
 			});
 		},
-		{ id, name, count },
+		{ id, name, count, names },
 	);
 }
 
@@ -251,6 +257,33 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	expect(await statuses(page, "d_many")).toEqual(
 		Array.from({ length: 40 }, () => "pending"),
 	);
+});
+
+test("warns about characters the fonts can't draw, without blocking", async ({
+	page,
+}) => {
+	await openSample(page, "membership-card");
+	await addDataset(page, "d_intl", "Intl", 3, { 1: "Ship 🚀 \u{10000}" });
+	await page.keyboard.press(`${mod}+3`);
+	await page
+		.getByTestId("export-presets")
+		.getByRole("button", { name: "New preset" })
+		.click();
+	await chooseDataset(page, "Intl");
+
+	const notice = page.getByTestId("export-missing-glyphs");
+	await expect(notice).toContainText("1 record has characters", {
+		timeout: 30_000,
+	});
+	await expect(notice).toContainText("\u{10000}");
+	await notice.getByRole("button", { expanded: false }).click();
+	const list = page.getByTestId("export-missing-glyphs-list");
+	await expect(list).toContainText("U+10000");
+	await list.getByRole("button", { name: "Ship 🚀 \u{10000}" }).click();
+	await expect(page.getByTestId("export-stepper-position")).toHaveText("2 / 3");
+	await expect(
+		page.getByRole("button", { name: "Export 6 files" }),
+	).toBeEnabled();
 });
 
 test("photos: filmstrip thumbnails, and Source and Split against the output", async ({
