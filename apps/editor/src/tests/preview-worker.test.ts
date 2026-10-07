@@ -159,6 +159,8 @@ const RESULT = {
 		lutImageBuilds: 0,
 		mipmapBuilds: 0,
 		pathBuilds: 0,
+		backgroundSnapshots: 0,
+		backgroundReuses: 0,
 	},
 };
 
