@@ -6,7 +6,7 @@ import { validate } from "../src/validate";
 
 function withFill(fill: unknown): Template {
 	return {
-		format_version: "1.7",
+		format_version: "1.6",
 		id: "p",
 		name: "P",
 		width: 100,

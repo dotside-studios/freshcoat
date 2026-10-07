@@ -20,10 +20,9 @@ import type { Template } from "./types";
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
 //   1.6  frame `isolate`
-//   1.7  `pattern` fill
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 7;
+export const FORMAT_MINOR = 6;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -71,7 +70,6 @@ export function minimumFormatVersion(template: Template): string {
 		const o = node as Record<string, unknown>;
 		if (o.kind === "linear" && (o.from !== undefined || o.to !== undefined))
 			need(2);
-		if (o.kind === "pattern") need(7);
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);

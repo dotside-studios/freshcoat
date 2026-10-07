@@ -1,5 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { minimumFormatVersion, validate } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
@@ -81,7 +81,6 @@ describe("pattern fill controls", () => {
 			angle: 30,
 		});
 		expect(validate(c.template).ok).toBe(true);
-		expect(minimumFormatVersion(c.template as Template)).toBe("1.7");
 	});
 
 	it("keeps authored colours when switching pattern", async () => {

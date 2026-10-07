@@ -354,7 +354,6 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate` |
-| 1.7 | `pattern` fill |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -451,7 +450,7 @@ Omitted fields take the pattern's defaults (`PATTERN_DEFAULTS` in the engine).
 Unlike gradients, a pattern is measured in template units from the drawable's
 top-left: resizing the box shows more of it rather than stretching it, and
 `compile` scales it with the target size like every other length. The same
-seed paints the same texture in every renderer. A file that uses one needs 1.7.
+seed paints the same texture in every renderer.
 
 ## Constraints
 
