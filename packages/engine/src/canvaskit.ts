@@ -95,7 +95,7 @@ import type {
 	FontRequest,
 	FrameFinish,
 	PaintOutput,
-	PaintRuntime,
+	PaintTarget,
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
@@ -3523,7 +3523,7 @@ function warnSvgFeatures(
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
-	rt: PaintRuntime,
+	rt: PaintTarget,
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -3920,7 +3920,7 @@ export async function paintScene(
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
 	ck: CanvasKit,
-	rt: PaintRuntime,
+	rt: PaintTarget,
 	w: number,
 	h: number,
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {

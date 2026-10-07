@@ -657,6 +657,9 @@ export type PaintRuntime = {
 	): Promise<PaintResult>;
 };
 
+// What a paint reads from its runtime: everything but paint itself.
+export type PaintTarget = Omit<PaintRuntime, "paint">;
+
 // The backend seam: a compiled scene becomes an output. CanvasKit is the only
 // implementation, and there is no plan for a second one; the parameter exists so
 // that the conformance suite can grade a Painter without reaching into the

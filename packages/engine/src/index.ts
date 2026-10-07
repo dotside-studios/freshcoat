@@ -145,6 +145,26 @@ export {
 	type PngEffort,
 } from "./png";
 export { resolveLayout } from "./resolve-layout";
+export {
+	type CanvasFrame,
+	createRenderer,
+	type DefaultOutput,
+	type EncodedFrame,
+	type FontLoadReport,
+	type FontSources,
+	type FrameFor,
+	type FrameInfo,
+	type Output,
+	type PaintOptions,
+	type PixelsFrame,
+	type RenderedFrame,
+	type Renderer,
+	type RendererCompileOptions,
+	type RendererOptions,
+	type RendererStats,
+	type RenderOptions,
+	type SurfaceCanvas,
+} from "./renderer";
 export { squircleSvg } from "./squircle";
 export {
 	type CachedTextEngine,
