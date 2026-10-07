@@ -37,7 +37,8 @@ export type PaintCache = {
 
 export type PaintCacheOptions = {
 	// Decoded pixels kept across paints. Images the current paint draws are
-	// always kept, however far over this that leaves the cache.
+	// always kept, however far over this that leaves the cache. Backgrounds
+	// count against it too; without it they hold at most 64 MB.
 	maxImagePixels?: number;
 	// Cached images kept across paints with `maxImagePixels`, whatever their
 	// size. Default 256.

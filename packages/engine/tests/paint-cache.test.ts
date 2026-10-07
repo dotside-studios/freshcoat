@@ -26,7 +26,11 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
-import { paintCacheState, SVG_PICTURE_PIXELS } from "../src/paint-cache-state";
+import {
+	DEFAULT_MAX_BACKGROUND_PIXELS,
+	paintCacheState,
+	SVG_PICTURE_PIXELS,
+} from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type {
 	Adjust,
@@ -1111,5 +1115,61 @@ describe("PaintCache background", () => {
 			await paintRecords([specScene(a), specScene(b), specScene(a)], cache);
 			cache.dispose();
 		}
+	});
+
+	// Paints `commands` and counts the canvas readbacks the paint itself made.
+	async function readbacks(commands: Command[], rt: PaintRuntime) {
+		const spy = vi.spyOn(ck.Canvas.prototype, "readPixels");
+		try {
+			const out = await paintScene(ck, commands, rt);
+			out.dispose();
+			return spy.mock.calls.length;
+		} finally {
+			spy.mockRestore();
+		}
+	}
+
+	test("a background the budget cannot hold is never read back", async () => {
+		await initCk();
+		const cache = createPaintCache({ maxImagePixels: 4096 + 100 });
+		const { rt } = runtime(fonts, images, cache);
+		const commands = compile(
+			specScene([{ rect: "#ef4444" }, { image: "img://b" }]),
+			SIZE,
+			fonts,
+		);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(cache.stats()).toMatchObject({
+			imageDecodes: 1,
+			backgroundSnapshots: 0,
+			backgroundReuses: 0,
+		});
+		cache.dispose();
+	});
+
+	test("an unbudgeted cache keeps no background over the default cap", async () => {
+		await initCk();
+		const side = Math.ceil(Math.sqrt(DEFAULT_MAX_BACKGROUND_PIXELS)) + 1;
+		const size = { width: side, height: side };
+		const commands = compile(
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size,
+				background: createRect({
+					pos: { x: 0, y: 0 },
+					size,
+					fills: [{ kind: "solid", color: "#f5f0e6" }],
+				}),
+				children: [],
+			}),
+			size,
+			fonts,
+		);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		expect(await readbacks(commands, rt)).toBe(0);
+		expect(cache.stats().backgroundSnapshots).toBe(0);
+		cache.dispose();
 	});
 });

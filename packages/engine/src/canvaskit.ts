@@ -45,6 +45,7 @@ import {
 	type LutImages,
 } from "./lut-images";
 import {
+	backgroundFits,
 	cacheBackground,
 	cacheFinishNoise,
 	cachedFontProvider,
@@ -3629,7 +3630,8 @@ export async function paintScene(
 	// An offscreen paint whose leading drawables match a cached background's
 	// writes its pixels instead of drawing them. One that shares only part of
 	// the closest one's run keeps the shared part in its place; one that shares
-	// none keeps its own beside the others.
+	// none keeps its own beside the others. Nothing is read back that the cache
+	// could not keep.
 	const pixelInfo = cache && !rt.canvas ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
 		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
@@ -3651,7 +3653,13 @@ export async function paintScene(
 		touchBackground(cache, held);
 		warnings.push(...held.warnings);
 	}
-	const snapAt = skip ? 0 : shared || lead.length;
+	const snapAt =
+		skip ||
+		!cache ||
+		!pixelInfo ||
+		!backgroundFits(cache, pixelInfo.width * pixelInfo.height)
+			? 0
+			: shared || lead.length;
 	const { head, tail } = splitBackground(drawables, skip || snapAt);
 	const run = skip ? tail : [...head, ...tail];
 	const snapAfter = snapAt ? head.length : 0;
