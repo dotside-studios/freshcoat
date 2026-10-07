@@ -1,25 +1,12 @@
+import { loadCanvasKit } from "@freshcoat-js/canvaskit/browser";
 import { fixtures } from "@freshcoat-js/coatfile/fixtures";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { render } from "@freshcoat-js/coatfile/render";
 
-async function loadCanvasKit(): Promise<unknown> {
-	const src = await (await fetch(`${__CANVASKIT_BASE__}/canvaskit.js`)).text();
-	// Indirect eval runs the classic script at global scope, where its
-	// top-level `var CanvasKitInit` becomes a global, as a script tag would.
-	// biome-ignore lint/security/noGlobalEval: loads canvaskit.js in a module worker
-	const indirectEval = globalThis.eval;
-	indirectEval(src);
-	const init = (
-		globalThis as { CanvasKitInit?: (o: unknown) => Promise<unknown> }
-	).CanvasKitInit;
-	if (!init) throw new Error("CanvasKitInit missing");
-	return init({ locateFile: () => `${__CANVASKIT_BASE__}/canvaskit.wasm` });
-}
-
 self.onmessage = async () => {
 	try {
 		const t0 = performance.now();
-		const ck = await loadCanvasKit();
+		const ck = await loadCanvasKit(__CANVASKIT_BASE__);
 		const t1 = performance.now();
 		const tpl = fixtures.fullFeatureCard;
 		const times: number[] = [];

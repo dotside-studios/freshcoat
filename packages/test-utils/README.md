@@ -6,9 +6,10 @@ it. Add it as a `devDependency` with `workspace:*`.
 
 ## CanvasKit
 
-`loadCanvasKit()` loads CanvasKit from the installed `canvaskit-wasm`, so a
-test does not need to locate the WASM file itself. Pass `"full"` for the
-build with the JPEG and WebP encoders that Studio's export worker uses.
+`loadCanvasKit()` is `initCanvasKit` from
+[`@freshcoat-js/canvaskit/node`](../canvaskit/), so a test does not need to
+locate the WASM file itself. Pass `"full"` for the build with the JPEG and
+WebP encoders that Studio's export worker uses.
 
 ```ts
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
