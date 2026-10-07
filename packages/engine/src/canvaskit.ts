@@ -1291,7 +1291,14 @@ function drawMasked(
 	issues: PaintIssues,
 	frame: Frame,
 ) {
-	canvas.saveLayer();
+	const content: DrawCommand = {
+		op: "drawGroup",
+		pos: cmd.pos,
+		size: cmd.size,
+		children: cmd.children,
+	};
+	const bounds = layerBounds(ck, canvas, provider, images, bin, content, frame);
+	canvas.saveLayer(null, bounds);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
 	const maskPaint = bin.track(new ck.Paint());
@@ -1305,7 +1312,7 @@ function drawMasked(
 				]),
 			),
 		);
-	canvas.saveLayer(maskPaint);
+	canvas.saveLayer(maskPaint, bounds);
 	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
 	canvas.restore();
 	canvas.restore();
@@ -1602,7 +1609,8 @@ const f32 = Math.fround;
 // so they cut nothing. Matching it keeps the offscreen's origin, and so every
 // pixel, as before. Where an op's exact bounds are not known (glyphs), the
 // estimate only ever errs larger. Null for content that is not modelled here
-// (SVG images, inner shadows, blenders).
+// (SVG images, inner shadows, blenders). With `uncut`, nothing is cut to the
+// device and no line is culled.
 function predictedBounds(
 	ck: CK,
 	provider: CK,
@@ -1612,10 +1620,18 @@ function predictedBounds(
 	frame: Frame,
 	device: Size,
 	matrix: number[],
+	uncut = false,
 ): Bounds | null {
 	if (matrix.length !== 9 || matrix[6] !== 0 || matrix[7] !== 0) return null;
 	if (matrix[8] !== 1) return null;
-	const cull: Bounds = [0, 0, f32(device.width), f32(device.height)];
+	const cull: Bounds = uncut
+		? [
+				Number.NEGATIVE_INFINITY,
+				Number.NEGATIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+			]
+		: [0, 0, f32(device.width), f32(device.height)];
 	let out: Bounds | null = null;
 	let singular = false;
 	const throughSaves = (b: Bounds, saves: RecordedSave[]): Bounds | null => {
@@ -1630,7 +1646,7 @@ function predictedBounds(
 		return b;
 	};
 	const include = (b: Bounds) => {
-		const cut = intersectBounds(b, cull);
+		const cut = uncut ? b : intersectBounds(b, cull);
 		if (cut) out = out ? unionBounds(out, cut) : cut;
 	};
 	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
@@ -1726,7 +1742,8 @@ function predictedBounds(
 			return true;
 		}
 		if (c.op === "drawText") {
-			const glyphs = textBounds(ck, provider, bin, c, m, device);
+			const rows = uncut ? null : device;
+			const glyphs = textBounds(ck, provider, bin, c, m, rows);
 			if (!glyphs) return false;
 			for (const b of glyphs) add(b, m, within);
 			return true;
@@ -1855,7 +1872,7 @@ function textBounds(
 	bin: Bin,
 	cmd: DrawTextCommand,
 	ctm: Affine,
-	device: Size,
+	device: Size | null,
 ): Bounds[] | null {
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
 	const families = new Set(fallback);
@@ -1869,7 +1886,7 @@ function textBounds(
 	}
 	if (!em) return [];
 	const rows =
-		ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
+		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
 					top: -ctm[5] / ctm[4],
 					bottom: (Math.ceil(device.height) - ctm[5]) / ctm[4],
@@ -2747,6 +2764,62 @@ function linearBurnBlender(ck: CK, bin: Bin): CK | null {
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
+// Off until bounded layers are accepted: a layer's device origin moves with its
+// bounds, and Skia's curve and clip rasterization is not exact under that shift.
+let boundLayers = false;
+
+export function setLayerBounds(enabled: boolean): void {
+	boundLayers = enabled;
+}
+
+// Conservative local bounds for a layer holding `inner`, so it is allocated and
+// filtered over its content rather than the whole surface. Skia grows them for
+// the layer paint's image filter itself. Padded by a device pixel. Null leaves
+// the layer unbounded: content that is not modelled, a perspective matrix, or a
+// recording canvas.
+function layerBounds(
+	ck: CK,
+	canvas: CK,
+	provider: CK,
+	images: Map<string, CK>,
+	bin: Bin,
+	inner: DrawCommand,
+	frame: Frame,
+): CK | null {
+	if (!boundLayers || measuring.has(canvas)) return null;
+	const matrix = canvas.getTotalMatrix() as number[];
+	const device = exportPixelSize(frame, frame.scale);
+	const b = predictedBounds(
+		ck,
+		provider,
+		bin,
+		images,
+		inner,
+		frame,
+		device,
+		matrix,
+		true,
+	);
+	if (!b || !b.every(Number.isFinite)) return null;
+	const ctm = matrix.slice(0, 6) as Affine;
+	const inverse = invertAffine(ctm);
+	if (!inverse) return null;
+	const [l, t, r, btm] = mapAffine(inverse, [
+		b[0] - 1,
+		b[1] - 1,
+		b[2] + 1,
+		b[3] + 1,
+	]);
+	return ck.LTRBRect(l, t, r, btm);
+}
+
+// Whether a layer paint keeps the destination wherever its layer is transparent,
+// so bounding the layer cannot change what lands outside it.
+function layerPaintBoundable(cmd: DrawCommand): boolean {
+	const cm = cmd.adjust?.colorMatrix;
+	return !(cm && !shaderSideMatrix(cmd.adjust) && matrixTouchesTransparent(cm));
+}
+
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
 function layerPaint(ck: CK, bin: Bin, cmd: DrawCommand): CK | null {
@@ -2896,6 +2969,21 @@ function shadowFilter(ck: CK, bin: Bin, shadow: DrawCommand["shadow"]): CK {
 	return out;
 }
 
+// What paintDrawable draws inside the layer: the drawable under its own
+// rotation, without the layer paint.
+function layerContent(cmd: DrawCommand): DrawCommand {
+	const {
+		rotation: _r,
+		opacity: _o,
+		blendMode: _b,
+		blur: _l,
+		shadow: _s,
+		adjust: _a,
+		...rest
+	} = cmd;
+	return rest as DrawCommand;
+}
+
 function paintDrawable(
 	ck: CK,
 	canvas: CK,
@@ -2936,7 +3024,20 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd);
-	if (lp) canvas.saveLayer(lp);
+	if (lp) {
+		const bounds = layerPaintBoundable(cmd)
+			? layerBounds(
+					ck,
+					canvas,
+					provider,
+					images,
+					bin,
+					layerContent(cmd),
+					frame,
+				)
+			: null;
+		canvas.saveLayer(lp, bounds);
+	}
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	if (cmd.clip && cmd.op !== "drawImage")
 		canvas.clipPath(
