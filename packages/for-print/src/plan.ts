@@ -451,3 +451,39 @@ export async function analyzeScene(
 
 	return walk(root);
 }
+
+export type PrintPlanOptions = Omit<AnalyzeSceneOptions, "policy"> & {
+	policy?: PlanPolicy;
+	// When given, photos are analyzed one by one; otherwise they take the preset.
+	sample?: ImageSampler;
+	// The printer's measured cast, applied as the finish's curve.
+	balance?: ChannelBalance;
+	// Default: YMCKO_FINISH. False keeps only the balance curve, if any.
+	finish?: FrameFinish | false;
+};
+
+export type PrintPlan = {
+	scene: Node;
+	// Pass to compileScene's `finish`. Undefined when there is nothing to apply.
+	finish: FrameFinish | undefined;
+};
+
+// The scene with its per-layer corrections and the finish that goes with it,
+// so neither half is applied without the other.
+export async function planForPrint(
+	root: Node,
+	options: PrintPlanOptions = {},
+): Promise<PrintPlan> {
+	const { sample, balance, finish: base, ...analyze } = options;
+	const scene = sample
+		? await analyzeScene(sample, root, analyze)
+		: planScene(root, analyze.policy);
+	const finish = printFinish(
+		balance,
+		base === false ? {} : (base ?? YMCKO_FINISH),
+	);
+	return {
+		scene,
+		finish: Object.keys(finish).length ? finish : undefined,
+	};
+}

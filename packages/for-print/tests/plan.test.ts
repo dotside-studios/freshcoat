@@ -18,6 +18,7 @@ import {
 	type AnalysisCache,
 	analyzeScene,
 	classifyIntent,
+	planForPrint,
 	planScene,
 	printAdjust,
 	printFinish,
@@ -593,5 +594,45 @@ describe("printFinish", () => {
 	test("adds the curve to another base finish", () => {
 		const finish = printFinish({ r: 1.1, g: 1, b: 1 }, {});
 		expect(Object.keys(finish)).toEqual(["curve"]);
+	});
+});
+
+describe("planForPrint", () => {
+	const tree = () => createGroup([imageNode("p.png"), textNode()]);
+
+	test("without a sampler: the preset plan and the YMCKO finish", async () => {
+		const plan = await planForPrint(tree());
+		expect(plan.scene).toEqual(planScene(tree()));
+		expect(plan.finish).toBe(YMCKO_FINISH);
+	});
+
+	test("with a sampler: the analyzed plan, reported as it goes", async () => {
+		const seen: string[] = [];
+		const plan = await planForPrint(tree(), {
+			sample: async () => brightBuffer(),
+			onAnalysis: (_a, node) => seen.push(node.src),
+		});
+		expect(plan.scene).toEqual(
+			await analyzeScene(async () => brightBuffer(), tree()),
+		);
+		expect(seen).toEqual(["p.png"]);
+	});
+
+	test("the balance rides the finish, not the layers", async () => {
+		const balance = { r: 1.1, g: 1, b: 0.95 };
+		const plan = await planForPrint(tree(), { balance });
+		expect(plan.scene).toEqual(planScene(tree()));
+		expect(plan.finish).toEqual(printFinish(balance));
+	});
+
+	test("finish: false keeps only the balance curve", async () => {
+		expect((await planForPrint(tree(), { finish: false })).finish).toBe(
+			undefined,
+		);
+		const plan = await planForPrint(tree(), {
+			finish: false,
+			balance: { r: 1.1, g: 1, b: 1 },
+		});
+		expect(Object.keys(plan.finish ?? {})).toEqual(["curve"]);
 	});
 });

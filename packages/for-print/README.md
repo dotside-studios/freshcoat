@@ -32,35 +32,36 @@ and frame-finishing operations that implement them.
 
 ## Usage
 
-### Plan a scene (per-layer correction)
+### Plan a scene for print
 
 ```ts
-import { planScene, analyzeScene, YMCKO_FINISH, type ImageSampler } from "@freshcoat-js/for-print";
+import { planForPrint, type ImageSampler } from "@freshcoat-js/for-print";
 import { sampleImageNode, compileScene } from "@freshcoat-js/engine";
 
-// Sync, policy-driven: photos get the YMCKO preset; text/QR/graphics stay pristine.
-const presetScene = planScene(nodeTree);
-
-// Or analyze photos as displayed: their fit, crop and own adjustment.
+// Analyze photos as displayed: their fit, crop and own adjustment.
 const sample: ImageSampler = async (image) => {
   const pixels = await sampleImageNode(ck, image, loadBytes);
   if (!pixels) throw new Error(`Couldn't decode ${image.src}`);
   return pixels;
 };
-const analyzedScene = await analyzeScene(sample, nodeTree);
-// Options: { policy, onAnalysis, cache, srcKey }.
+
+const { scene, finish } = await planForPrint(nodeTree, {
+  sample,                     // omit for the fixed YMCKO preset
+  balance: profile?.balance,  // a measured printer, if you have one
+});
 
 // freshcoat does the output: per-layer adjust + the whole-frame finish.
-// With a measured profile, use `printFinish(profile.balance)` instead.
-const commands = compileScene(analyzedScene, {
-  width, height, textEngine, finish: YMCKO_FINISH,
-});
+const commands = compileScene(scene, { width, height, textEngine, finish });
 ```
 
 These examples assume an initialized CanvasKit instance (`ck`), a scene and
 text engine, and a `loadBytes(src)` function supplied by your application.
-Choose `presetScene` for fixed corrections or `analyzedScene` for corrections
-based on each photo. Paint the resulting commands through an engine runtime.
+Paint the resulting commands through an engine runtime.
+
+`planForPrint` also takes `policy`, `finish` (`false` keeps only the balance
+curve), `onAnalysis`, `cache` and `srcKey`. The parts are available on their
+own: `planScene` (sync, preset), `analyzeScene` (per-photo analysis) and
+`printFinish(balance)`.
 
 ### Analyze a single image
 
