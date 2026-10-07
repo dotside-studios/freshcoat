@@ -340,6 +340,11 @@ export type DrawCommandBase = {
 	clip?: ShapeMask;
 	shadow?: Shadows;
 	blur?: number;
+	// Blurs the pixels beneath the drawable's outline (`backdropClip` on a
+	// group), cut by `clip`, before the drawable paints. Reads only what its
+	// enclosing layer holds.
+	backdropBlur?: number;
+	backdropClip?: ShapeMask;
 	// Per-layer color/tone adjustment, applied to this drawable's pixels as it
 	// composites (see Adjust). On a group/mask it adjusts the whole subtree's
 	// composited result, like a Figma adjustment layer.

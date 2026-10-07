@@ -534,6 +534,7 @@ const elementShellShape = {
 	blendMode: BlendModeSchema.optional(),
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
+	backdropBlur: z.number().optional(),
 	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),

@@ -227,6 +227,7 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 		blendMode: node.blendMode,
 		shadow: node.shadow,
 		blur: node.blur,
+		backdropBlur: node.backdropBlur,
 		adjust: node.adjust,
 	};
 	switch (node.kind) {
@@ -274,6 +275,7 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				...base,
 				op: "drawGroup",
 				clip: groupClip(node),
+				...backdropClip(node),
 				...(node.isolate ? { isolate: true } : {}),
 				children: [
 					...groupBackground(node, base),
@@ -442,6 +444,7 @@ function fastClip(mask: Node): ShapeMask | null {
 		mask.rotation ||
 		(mask.opacity !== undefined && mask.opacity < 1) ||
 		mask.blur ||
+		mask.backdropBlur ||
 		(mask.blendMode && mask.blendMode !== "normal") ||
 		mask.shadow ||
 		mask.adjust
@@ -488,6 +491,11 @@ function groupBackground(
 function groupClip(node: GroupNode): ShapeMask | undefined {
 	if (!node.clip) return undefined;
 	return rectShape(node.cornerRadius, node.cornerSmoothing);
+}
+
+function backdropClip(node: GroupNode): { backdropClip?: ShapeMask } {
+	if (!node.backdropBlur || node.clip || !node.cornerRadius) return {};
+	return { backdropClip: rectShape(node.cornerRadius, node.cornerSmoothing) };
 }
 
 // Box-relative ellipse as an SVG path (two half-arcs), positioned at the node's

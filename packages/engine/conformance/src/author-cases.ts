@@ -562,6 +562,68 @@ add(
 	],
 );
 
+// Black on the left half, white on the right, with `over` painted on top.
+const halves = (over: Node[]): Node =>
+	frame([
+		createRect({ ...box(0, 0, W / 2, H), fills: solid("#000000") }),
+		...over,
+	]);
+
+// The backdrop is blurred with the layer blur's sigma, inside the shape only.
+add(
+	"backdrop-blur",
+	"backdrop blur blurs what lies beneath the shape, with the layer blur's sigma",
+	"core",
+	["effect.backdropBlur"],
+	halves([createRect({ ...box(40, 20, 80, 80), backdropBlur: 20 })]),
+	[
+		px([80, 60], [128, 128, 128, 255], "half intensity at the edge", 22),
+		px(
+			[89, 60],
+			[216, 216, 216, 255],
+			"one sigma (8.8px) inside the white: ~85% white",
+			20,
+		),
+		px([78, 10], [0, 0, 0, 255], "above the shape the edge stays sharp"),
+		px([82, 10], [255, 255, 255, 255], "above the shape the edge stays sharp"),
+	],
+);
+
+// The blurred backdrop is drawn first, then the layer's own fill over it.
+add(
+	"backdrop-blur-under-fill",
+	"the layer's fill paints over its blurred backdrop",
+	"core",
+	["effect.backdropBlur"],
+	halves([
+		createRect({
+			...box(40, 20, 80, 80),
+			fills: solid("#0000ff80"),
+			backdropBlur: 20,
+		}),
+	]),
+	[px([80, 60], [64, 64, 191, 255], "50% blue over the blurred edge", 22)],
+);
+
+// A backdrop reads only what its enclosing layer holds. Inside an isolated
+// group that is the group's own content, here nothing, so the edge stays sharp.
+add(
+	"backdrop-blur-in-isolated-group",
+	"a backdrop inside an isolated group reads only the group's content",
+	"core",
+	["effect.backdropBlur", "group.isolate"],
+	halves([
+		createGroup([createRect({ ...box(40, 20, 80, 80), backdropBlur: 20 })], {
+			...box(0, 0, W, H),
+			isolate: true,
+		}),
+	]),
+	[
+		px([79, 60], [0, 0, 0, 255], "the black half, unblurred"),
+		px([80, 60], [255, 255, 255, 255], "the white half, unblurred"),
+	],
+);
+
 // ─── raster profile ───────────────────────────────────────────────────────────
 
 add(

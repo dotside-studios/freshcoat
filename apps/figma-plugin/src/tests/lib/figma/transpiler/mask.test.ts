@@ -147,7 +147,14 @@ describe("transpile (Figma masks)", () => {
 	it("a mask shape that has to be rasterized becomes the bitmap", async () => {
 		const { elements } = await run([
 			ellipse({
-				effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+				effects: [
+					{
+						type: "LAYER_BLUR",
+						blurType: "PROGRESSIVE",
+						visible: true,
+						radius: 4,
+					},
+				],
 			}),
 			rect("photo", "photo", { x: 90, y: 90, width: 80, height: 80 }),
 		]);

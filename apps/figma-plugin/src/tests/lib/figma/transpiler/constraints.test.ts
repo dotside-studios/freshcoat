@@ -302,7 +302,14 @@ describe("transpile (constraints)", () => {
 		const blurred = rect("5:1", 900, 500, 50, 50, {
 			constraints: cons("MAX", "MAX"),
 			absoluteRenderBounds: { x: 900, y: 500, width: 50, height: 50 },
-			effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+			effects: [
+				{
+					type: "LAYER_BLUR",
+					blurType: "PROGRESSIVE",
+					visible: true,
+					radius: 4,
+				},
+			],
 		});
 		const renderImage = vi.fn().mockResolvedValue({
 			blob: new Blob([new Uint8Array([1])], { type: "image/png" }),

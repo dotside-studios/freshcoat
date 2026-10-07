@@ -111,6 +111,9 @@ Cross-architecture stability is **unverified** — see Gaps.
 
 For one drawable, in this order:
 
+0. backdrop blur: what the enclosing layer already holds beneath the drawable's
+   shape is replaced by its blur, under the drawable's `rotation` and at its
+   `opacity`, before anything of the drawable is drawn
 1. content, under the drawable's `rotation`
 2. clip and mask
 3. color adjust: `colorMatrix`, the `preserve-hue` gamut map, the per-channel
@@ -132,7 +135,7 @@ in full.
 
 ## Coverage
 
-69 cases.
+72 cases.
 
 | Covered | Cases |
 |---|---|
@@ -147,6 +150,7 @@ in full.
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
 | Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
 | Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color` |
+| Backdrop blur | `backdrop-blur`, `backdrop-blur-under-fill`, `backdrop-blur-in-isolated-group` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |
 | Frame finish | `finish-white-clamp`, `finish-black-extract`, `finish-dither` |
 | Export | `export-scale`, `supersample` |

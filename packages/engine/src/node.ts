@@ -85,6 +85,9 @@ export type Transform = {
 	blendMode?: BlendMode;
 	shadow?: Shadows;
 	blur?: number;
+	// Blurs what lies beneath the node's shape before the node paints over it.
+	// The shape is the node's clip or outline, or a group's rounded box.
+	backdropBlur?: number;
 	// Per-layer color/tone adjustment (see Adjust). On a group/mask it adjusts the
 	// whole subtree's composited result.
 	adjust?: Adjust;

@@ -85,7 +85,14 @@ function buildTree(): FigmaContainerNode {
 						visible: true,
 						opacity: 1,
 						blendMode: "NORMAL",
-						effects: [{ type: "BACKGROUND_BLUR", visible: true, radius: 4 }],
+						effects: [
+							{
+								type: "LAYER_BLUR",
+								blurType: "PROGRESSIVE",
+								visible: true,
+								radius: 4,
+							},
+						],
 						width: 20,
 						height: 40,
 						absoluteBoundingBox: { x: 100, y: 80, width: 40, height: 20 },
