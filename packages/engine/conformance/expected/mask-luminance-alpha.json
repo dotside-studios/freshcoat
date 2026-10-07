@@ -1,0 +1,141 @@
+{
+	"caseId": "mask-luminance-alpha",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 30,
+						"y": 20
+					},
+					"size": {
+						"width": 50,
+						"height": 80
+					},
+					"op": "drawMasked",
+					"mask": {
+						"pos": {
+							"x": 30,
+							"y": 20
+						},
+						"size": {
+							"width": 50,
+							"height": 80
+						},
+						"op": "drawRect",
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#ffffff80"
+							}
+						]
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 30,
+								"y": 20
+							},
+							"size": {
+								"width": 50,
+								"height": 80
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					],
+					"channel": "luminance"
+				},
+				{
+					"pos": {
+						"x": 80,
+						"y": 20
+					},
+					"size": {
+						"width": 50,
+						"height": 80
+					},
+					"op": "drawMasked",
+					"mask": {
+						"pos": {
+							"x": 80,
+							"y": 20
+						},
+						"size": {
+							"width": 50,
+							"height": 80
+						},
+						"op": "drawRect",
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#ffffff40"
+							}
+						]
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 80,
+								"y": 20
+							},
+							"size": {
+								"width": 50,
+								"height": 80
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#2f6fed"
+								}
+							]
+						}
+					],
+					"channel": "luminance",
+					"invert": true
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "12625688a8d87986bb213ef9f609f3b64ed0cd3fb96120d720fc952de3ac7da1"
+}

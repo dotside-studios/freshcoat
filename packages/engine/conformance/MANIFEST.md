@@ -4,10 +4,10 @@ The coat engine is the `@freshcoat-js/engine` package, the renderer under the fr
 editor.
 
 What a second backend must do, as cases that fail rather than prose that is not
-read. `Command[]` has no written specification: its semantics are defined
-operationally by `src/canvaskit.ts`, and several of them (the blur sigma
-constants, the order layer effects compose in) appear nowhere a second
-implementer would look. This corpus is that specification.
+read. `Command[]` has no written specification: most of its semantics are
+defined operationally by `src/canvaskit.ts`, and some of them (the blur sigma
+constants) appear nowhere a second implementer would look. This corpus is that
+specification. The order layer effects compose in is written down, below.
 
 ## Running it
 
@@ -107,22 +107,46 @@ bit-identical in-process and across processes (verified over the full corpus on
 x64 Linux), and `tests/conformance.test.ts` keeps checking the in-process half.
 Cross-architecture stability is **unverified** — see Gaps.
 
+## Layer effect order
+
+For one drawable, in this order:
+
+1. content, under the drawable's `rotation`
+2. clip and mask
+3. color adjust: `colorMatrix`, the `preserve-hue` gamut map, the per-channel
+   `lut`, the 3D `lut3d`
+4. sharpen
+5. layer blur
+6. shadows, each cast from the silhouette of steps 1 to 5 in its own color:
+   drop shadows under the content, inner shadows over it
+7. opacity, over the layer and its shadows
+8. blend into the parent
+
+Adjust does not recolor shadows: a shadow's color is set on the shadow, and a
+grade that changed it would leave no way to ask for a color without inverting
+the grade. Figma behaves the same. The order holds whichever path a backend
+takes for a component: in the reference backend a matrix is an image filter on
+the layer and a LUT or sharpen is an offscreen shader pass, and both feed the
+same blur, shadow, opacity and blend stages. `../README.md` gives the reasoning
+in full.
+
 ## Coverage
 
-61 cases.
+69 cases.
 
 | Covered | Cases |
 |---|---|
 | Fills | `fill-solid`, `fill-linear`, `fill-radial`, `fill-angular` |
 | Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `blend-linear-burn`, `opacity` |
-| Clipping and masking | `clip-circle`, `clip-per-corner`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape` |
+| Clipping and masking | `clip-circle`, `clip-per-corner`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape`, `mask-luminance-alpha` |
 | Shapes | `ellipse`, `path-viewbox`, `path-fill-rule`, `corner-radius`, `corner-radius-per-corner` |
 | Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask` |
 | Shadows | `shadow-spread`, `shadow-inset`, `shadow-stacked` |
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing` |
-| Containers | `group-fills` |
+| Containers | `group-fills`, `group-isolate`, `group-pass-through` |
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
-| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group` |
+| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
+| Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |
 | Frame finish | `finish-white-clamp`, `finish-black-extract`, `finish-dither` |
 | Export | `export-scale`, `supersample` |

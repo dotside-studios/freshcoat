@@ -93,9 +93,40 @@ table and sharpening) are engine operations. `FrameFinish` applies operations
 is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
+A luminance mask's coverage is its luminance times its alpha, as in SVG 1.1
+masking. Luminance uses Rec. 709 weights on the sRGB-encoded color, not on
+linearRGB as SVG's default `color-interpolation` would.
+
 A node holds one `Adjust`. `composeAdjust(first, second)` folds a second one
 onto a layer that already has its own, baking the second into a 3D lookup
 table so the result matches applying them in turn.
+
+### Layer effect order
+
+Every paint path applies one drawable's effects in this order:
+
+1. **Content**: the drawable's fills, strokes, text or children, under its
+   `rotation`.
+2. **Clip and mask**: a clipping group's shape or a mask node's coverage.
+3. **Color adjust**: `colorMatrix`, then the `preserve-hue` gamut map, then the
+   per-channel `lut`, then the 3D `lut3d`. Colors are adjusted unpremultiplied,
+   so alpha is untouched unless the matrix has alpha terms.
+4. **Sharpen**: the unsharp mask, on the adjusted colors.
+5. **Layer blur**.
+6. **Shadows**: each cast from the silhouette steps 1 to 5 leave, never from
+   another shadow. Drop shadows go under the content and inner shadows over it,
+   each in its own `color`.
+7. **Opacity**, on the whole layer, shadows included.
+8. **Blend**: the layer composites onto its parent with `blendMode`.
+
+Adjust does not recolor shadows. A shadow's color is set on the shadow, so a
+LUT or matrix that also recolored it would make that color depend on the
+grade: a warm grade would tint a neutral shadow and a gamma curve would darken
+it, and the only way back to the color asked for would be to invert the grade.
+Figma treats them the same way. Sharpen runs before blur, so a blurred layer is
+never re-sharpened. Shadows follow the blur, so a blurred layer casts a soft
+shadow; for drop shadows without spread this is the same as blurring the
+shadow with the layer.
 
 An image node's `crop` selects a region of its source, in fractions of the
 source's width and height, before `fit` places it. `focus` is the point of that
@@ -166,15 +197,18 @@ underlying model.
   into an `RGBA_F16` working surface, and its layers and reduction levels are
   F16 too. The result is quantized to 8 bits once, when it is copied to the
   output. Use F16 when a layer goes through several passes in sequence, such as
-  stacked adjusts, an adjust under a blur, or a deep group of color-filtered
-  layers, where each 8-bit pass would round again and band smooth gradients. It
-  costs twice the memory per layer, and it turns off the paint cache's
-  background snapshots. Set it with `compileScene`, `renderSceneToPng` or a
-  `createCanvas` command's `precision`.
+  stacked adjusts or a deep group of color-filtered layers, where each 8-bit
+  pass would round again and band smooth gradients. Skia's image filters (layer
+  blur, shadows, and a layer's color matrix when it has to run before those or
+  before opacity) still produce 8-bit results, so F16 does not help those
+  steps. It costs twice the memory per layer, and it turns off the paint
+  cache's background snapshots. Set it with `compileScene`,
+  `renderSceneToPng` or a `createCanvas` command's `precision`.
 - **Gradients.** Stops interpolate between unpremultiplied sRGB-encoded
   colors, which is Skia's default.
-- **Luminance masks and LUTs.** A luminance mask takes Rec. 709 weights
-  (0.2126, 0.7152, 0.0722) of the mask's encoded sRGB channels. A per-channel
+- **Luminance masks and LUTs.** A luminance mask's coverage is the Rec. 709
+  luminance (0.2126, 0.7152, 0.0722) of the mask's encoded sRGB channels,
+  times its alpha. A per-channel
   `lut`, a `lut3d` and the finish `curve` are indexed by 8-bit encoded sRGB
   levels, and their textures are unpremultiplied `RGBA_8888`. Under F16 a
   layer is still looked up by its nearest 8-bit level, so a LUT carries 8-bit
