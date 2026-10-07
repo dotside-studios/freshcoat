@@ -1562,8 +1562,8 @@ function adjustShaderSksl(
 		? `uniform shader lut;
 		   half3 curve(half3 c){ return half3(
 		     lut.eval(float2(c.r*255.0+0.5, 0.5)).r,
-		     lut.eval(float2(c.g*255.0+0.5, 0.5)).r,
-		     lut.eval(float2(c.b*255.0+0.5, 0.5)).r); }`
+		     lut.eval(float2(c.g*255.0+0.5, 0.5)).g,
+		     lut.eval(float2(c.b*255.0+0.5, 0.5)).b); }`
 		: `half3 curve(half3 c){ return c; }`;
 	const lut3dFn = hasLut3d
 		? `uniform float cubeSize;

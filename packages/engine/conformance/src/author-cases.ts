@@ -31,6 +31,8 @@ const box = (x: number, y: number, w: number, h: number) => ({
 	size: { width: w, height: h },
 });
 const solid = (color: string) => [{ kind: "solid" as const, color }];
+const table = (f: (i: number) => number) =>
+	Uint8Array.from({ length: 256 }, (_, i) => f(i));
 
 // Every case paints on the same opaque white ground, so an untouched sample is
 // (255,255,255,255) in each of them and "the backend drew nothing here" is one
@@ -556,6 +558,27 @@ add(
 		px([82, 62], [47, 111, 237, 255], "just inside it"),
 	],
 	{ scale: 2 },
+);
+
+add(
+	"adjust-per-channel-lut",
+	"each channel of an adjust LUT reads its own table",
+	"raster",
+	["adjust.lut"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#808080"),
+			adjust: {
+				lut: {
+					r: table(() => 200),
+					g: table(() => 100),
+					b: table(() => 50),
+				},
+			},
+		}),
+	]),
+	[px([80, 60], [200, 100, 50, 255], "a flat table per channel")],
 );
 
 // ─── text ─────────────────────────────────────────────────────────────────────
