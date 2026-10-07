@@ -36,8 +36,11 @@ const neutralReading = (): ChartReading => {
 describe("parsePrintProfile", () => {
 	test("takes a JSON string or an object", () => {
 		const expected = { version: 1, name: "IDP Smart-51 / batch A / Zebra PVC" };
-		expect(parsePrintProfile(JSON.stringify(expected))).toEqual(expected);
-		expect(parsePrintProfile(expected)).toEqual(expected);
+		expect(parsePrintProfile(JSON.stringify(expected))).toEqual({
+			ok: true,
+			profile: expected,
+		});
+		expect(parsePrintProfile(expected)).toEqual({ ok: true, profile: expected });
 	});
 
 	test("keeps a measured balance and its provenance", () => {
@@ -48,11 +51,14 @@ describe("parsePrintProfile", () => {
 			notes: "aircon room, 24C",
 		});
 		expect(profile).toEqual({
-			version: 1,
-			name: "IDP Smart-51",
-			balance: { r: 1.08, g: 0.98, b: 1.02 },
-			measuredAt: "2026-08-12T09:00:00Z",
-			notes: "aircon room, 24C",
+			ok: true,
+			profile: {
+				version: 1,
+				name: "IDP Smart-51",
+				balance: { r: 1.08, g: 0.98, b: 1.02 },
+				measuredAt: "2026-08-12T09:00:00Z",
+				notes: "aircon room, 24C",
+			},
 		});
 	});
 
@@ -79,21 +85,24 @@ describe("parsePrintProfile", () => {
 				assessment,
 			}),
 		).toEqual({
-			version: 1,
-			name: "IDP Smart-51",
-			conditions: {
-				printer: "Smart-51",
-				ribbon: "batch A",
-				stock: "Zebra PVC",
+			ok: true,
+			profile: {
+				version: 1,
+				name: "IDP Smart-51",
+				conditions: {
+					printer: "Smart-51",
+					ribbon: "batch A",
+					stock: "Zebra PVC",
+				},
+				assessment,
 			},
-			assessment,
 		});
 	});
 
 	test("a profile with no balance is valid — measured nothing yet", () => {
-		const profile = parsePrintProfile({ name: "IDP Smart-51" });
-		expect(profile).not.toBeInstanceOf(Error);
-		expect((profile as { balance?: unknown }).balance).toBeUndefined();
+		const result = parsePrintProfile({ name: "IDP Smart-51" });
+		if (!result.ok) throw new Error(result.message);
+		expect(result.profile.balance).toBeUndefined();
 	});
 
 	test("refuses what it cannot apply, and says why", () => {
@@ -109,8 +118,8 @@ describe("parsePrintProfile", () => {
 		};
 		for (const [fragment, input] of Object.entries(cases)) {
 			const result = parsePrintProfile(input);
-			expect(result, fragment).toBeInstanceOf(Error);
-			expect((result as Error).message, fragment).toContain(fragment);
+			if (result.ok) throw new Error(`accepted: ${fragment}`);
+			expect(result.message, fragment).toContain(fragment);
 		}
 	});
 
@@ -121,7 +130,7 @@ describe("parsePrintProfile", () => {
 			name: "p",
 			balance: { r: 1.05, g: 1, b: 0.05 },
 		});
-		expect(result).toBeInstanceOf(Error);
+		expect(result.ok).toBe(false);
 	});
 });
 

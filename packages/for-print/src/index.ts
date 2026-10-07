@@ -80,6 +80,7 @@ export {
 	type PrintProfileConditions,
 	type PrintProfileCreation,
 	type PrintProfileDetails,
+	type PrintProfileParse,
 	parsePrintProfile,
 	profileCacheKey,
 	UNMEASURED_PROFILE,

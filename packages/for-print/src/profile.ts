@@ -88,8 +88,8 @@ export function createPrintProfile(
 	if (details.name.trim() === "") {
 		return { ok: false, reason: "missing-name", assessment };
 	}
-	const conditions = parseConditions(details.conditions);
-	if (conditions instanceof Error) {
+	const conditions = conditionsSchema.nullish().safeParse(details.conditions);
+	if (!conditions.success) {
 		return { ok: false, reason: "invalid-conditions", assessment };
 	}
 	const balance = fitChannelBalance(reading);
@@ -106,7 +106,7 @@ export function createPrintProfile(
 			assessment,
 			...(details.measuredAt ? { measuredAt: details.measuredAt } : {}),
 			...(details.notes ? { notes: details.notes } : {}),
-			...(conditions ? { conditions } : {}),
+			...(conditions.data ? { conditions: conditions.data } : {}),
 		},
 	};
 }
@@ -221,33 +221,32 @@ const profileSchema = z.object(
 	{ error: "profile must be a JSON object" },
 );
 
-function parseConditions(
-	value: unknown,
-): PrintProfileConditions | undefined | Error {
-	const result = conditionsSchema.nullish().safeParse(value);
-	if (!result.success) return new Error(result.error.issues[0]?.message);
-	return result.data ?? undefined;
-}
+export type PrintProfileParse =
+	| { ok: true; profile: PrintProfile }
+	| { ok: false; message: string };
+
+const issue = (error: z.ZodError) => error.issues[0]?.message ?? "invalid";
 
 // Parse a profile from whatever a deploy handed over — an env var, a settings
-// row, a pasted export. Returns the profile or an Error explaining what is wrong
-// with it, never a partially-applied one: a correction that half-loaded would
-// print cards nobody could account for.
-export function parsePrintProfile(input: unknown): PrintProfile | Error {
+// row, a pasted export. Returns the profile or a message explaining what is
+// wrong with it, never a partially-applied one: a correction that half-loaded
+// would print cards nobody could account for.
+export function parsePrintProfile(input: unknown): PrintProfileParse {
 	let value = input;
 	if (typeof value === "string") {
 		const text = value.trim();
-		if (text === "") return new Error("profile is empty");
+		if (text === "") return { ok: false, message: "profile is empty" };
 		try {
 			value = JSON.parse(text);
 		} catch (e) {
-			return new Error(
-				`profile is not valid JSON: ${e instanceof Error ? e.message : "parse failed"}`,
-			);
+			return {
+				ok: false,
+				message: `profile is not valid JSON: ${e instanceof Error ? e.message : "parse failed"}`,
+			};
 		}
 	}
 	const result = profileSchema.safeParse(value);
-	if (!result.success) return new Error(result.error.issues[0]?.message);
+	if (!result.success) return { ok: false, message: issue(result.error) };
 	const raw = result.data;
 
 	const profile: PrintProfile = { version: 1, name: raw.name };
@@ -256,5 +255,5 @@ export function parsePrintProfile(input: unknown): PrintProfile | Error {
 	if (raw.notes !== undefined) profile.notes = raw.notes;
 	if (raw.conditions) profile.conditions = raw.conditions;
 	if (raw.assessment) profile.assessment = raw.assessment;
-	return profile;
+	return { ok: true, profile };
 }
