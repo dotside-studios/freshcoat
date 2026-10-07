@@ -109,7 +109,7 @@ Cross-architecture stability is **unverified** — see Gaps.
 
 ## Coverage
 
-61 cases.
+65 cases.
 
 | Covered | Cases |
 |---|---|
@@ -120,7 +120,7 @@ Cross-architecture stability is **unverified** — see Gaps.
 | Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask` |
 | Shadows | `shadow-spread`, `shadow-inset`, `shadow-stacked` |
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing` |
-| Containers | `group-fills` |
+| Containers | `group-fills`, `group-isolate`, `group-pass-through` |
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
 | Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |

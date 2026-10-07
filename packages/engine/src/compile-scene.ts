@@ -264,6 +264,7 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				...base,
 				op: "drawGroup",
 				clip: groupClip(node),
+				...(node.isolate ? { isolate: true } : {}),
 				children: [
 					...groupBackground(node, base),
 					...node.children.map((c) => lower(c, ctx)),

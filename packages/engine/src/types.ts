@@ -17,8 +17,8 @@ import type { EncodeFormat, EncodeOptions } from "./png";
 
 export type Vec2 = { x: number; y: number };
 export type Size = { width: number; height: number };
-// Figma's layer blend modes, minus pass-through (a group-only compositing
-// choice, not a mode). `plus` is Figma's linear dodge.
+// Figma's layer blend modes, minus pass-through, which is a group's `isolate`
+// left unset rather than a mode. `plus` is Figma's linear dodge.
 export type BlendMode =
 	| "normal"
 	| "multiply"
@@ -389,6 +389,8 @@ export type DrawPathCommand = DrawCommandBase & {
 export type DrawGroupCommand = DrawCommandBase & {
 	op: "drawGroup";
 	children: DrawCommand[];
+	// See GroupNode.isolate.
+	isolate?: boolean;
 };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then

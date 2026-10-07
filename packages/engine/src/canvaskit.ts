@@ -2081,9 +2081,11 @@ function snapBarcodeAffine(
 	);
 }
 
-// Whether layerPaint would build a paint for this drawable.
+// Whether paintDrawable gives this drawable a layer: an isolated group, or one
+// layerPaint builds a paint for.
 function hasLayerPaint(cmd: DrawCommand): boolean {
 	return (
+		isolates(cmd) ||
 		(!!cmd.blendMode && cmd.blendMode !== "normal") ||
 		(cmd.opacity !== undefined && cmd.opacity < 1) ||
 		(typeof cmd.blur === "number" && cmd.blur > 0) ||
@@ -3080,6 +3082,10 @@ function layerBounds(
 	return ck.LTRBRect(l, t, r, btm);
 }
 
+function isolates(cmd: DrawCommand): boolean {
+	return cmd.op === "drawGroup" && cmd.isolate === true;
+}
+
 // Whether a layer paint keeps the destination wherever its layer is transparent,
 // so bounding the layer cannot change what lands outside it.
 function layerPaintBoundable(cmd: DrawCommand): boolean {
@@ -3308,6 +3314,10 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		adjust: _a,
 		...rest
 	} = cmd;
+	if (rest.op === "drawGroup") {
+		const { isolate: _i, ...group } = rest;
+		return group as DrawCommand;
+	}
 	return rest as DrawCommand;
 }
 
@@ -3351,7 +3361,8 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd);
-	if (lp) {
+	const layered = lp !== null || isolates(cmd);
+	if (layered) {
 		const bounds = layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
@@ -3363,7 +3374,7 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp, bounds);
+		canvas.saveLayer(lp ?? undefined, bounds);
 	}
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	if (cmd.clip && cmd.op !== "drawImage")
@@ -3381,7 +3392,7 @@ function paintDrawable(
 			true,
 		);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (lp) canvas.restore();
+	if (layered) canvas.restore();
 	canvas.restore();
 }
 
@@ -3461,6 +3472,7 @@ function selfContained(cmd: DrawCommand): boolean {
 // its transform and clip alone.
 function passThrough(cmd: DrawCommand): boolean {
 	return (
+		!isolates(cmd) &&
 		!cmd.adjust &&
 		!cmd.shadow &&
 		!(cmd.blur && cmd.blur > 0) &&
