@@ -13,49 +13,49 @@ on a UI framework.
 `compile()` resolves fields, variants and template sizing into a
 [`@freshcoat-js/engine`](../engine) node tree. The engine then resolves scene layout,
 shapes text and paints it. The main entry contains the format and compiler;
-the rendering helpers and runtime environments live on separate subpaths.
+the rendering helpers live on the `render` subpath.
 
 ## Quick start
 
-For template-to-image output, use `render()`. Supply a validated template,
-its field values, an initialized CanvasKit instance and a runtime environment.
-The helper derives the painter, Paragraph text engine and font metrics.
-
-These examples assume `template` is already loaded and `initCanvasKit()`
-initializes CanvasKit with the WASM file location for your host.
+For template-to-image output, use `renderTemplate()` with a renderer from the
+coat engine. It loads the fonts the template describes through the renderer,
+loads the barcode encoder when the template draws a barcode, and paints each
+side at the template's own size unless you give another.
 
 ```ts
-import { collectFontBytes } from "@freshcoat-js/coatfile";
-import { render } from "@freshcoat-js/coatfile/render";
-import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless"; // napi-free, offscreen
+import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/node"; // or /browser
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
 
-const ck = await initCanvasKit(); // your CanvasKit-WASM init
-const fonts = await collectFontBytes(template); // Map<family, Uint8Array[]>
-const env = createHeadlessEnv({ fonts });
+const renderer = await createRenderer({ ck: await loadCanvasKit() });
 
-const [result] = await render(
-  template,
-  { displayName: "Alex" },
-  { width: 1012, height: 638, variantId: "amber", frameNames: ["front"] },
-  { ck, env, fonts },
-);
-if (result && "bytes" in result) {
-  // result.bytes — encoded image bytes; result.format is "png" by default
-}
+const [front] = await renderTemplate(renderer, template, { displayName: "Alex" }, {
+  variantId: "amber",
+  frameNames: ["front"],
+});
+// front.bytes: PNG by default; front.name, front.width, front.height, front.warnings
 ```
 
-Need the node tree first (e.g. to pre-load assets before painting)? Use
-`compile()` for the tree and `renderCompiled()` to paint it:
+`output` picks what comes back, as on the renderer: `{ encode: { format: "webp" } }`,
+`{ pixels: true }`, or a live `{ canvas: true }`. `images` supplies bytes for
+one render, such as a logo that changes per request.
+
+Need the node tree first (e.g. to read its image srcs)? Use `compile()` for the
+tree and `renderCompiled()` to paint it:
 
 ```ts
 import { compile } from "@freshcoat-js/coatfile";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 
 const compiled = compile(template, { displayName: "Alex" }, { width: 1012, height: 638 });
-// compiled.frames[i].root — a freshcoat GroupNode
-// compiled.frames[i].assets.images — srcs to pre-load
-const [result] = await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts });
+// compiled.frames[i].root: an engine GroupNode
+// compiled.frames[i].assets.images: the srcs it draws
+const [result] = await renderCompiled(renderer, compiled, { frameNames: ["front"] });
 ```
+
+`renderCompiled()` does not load the barcode encoder, since the barcodes were
+drawn when the template compiled; register it before compiling (see
+[Barcodes](#barcodes)).
 
 ### Rendering many records
 
@@ -65,45 +65,23 @@ records validates and prepares it once. `prepareTemplate(template, { variantId,
 resize })` exposes that step. The cache is keyed by object identity: do not
 mutate a template after compiling it; pass a new object instead.
 
-`frameNames` on `compile()` compiles only those frames. To reuse text shaping
-across renders, build the engine and metrics once and pass them in the runtime.
-`renderCompiled()` never disposes an engine it was given:
+Keep one renderer for the batch. Its text engine reuses shaping across
+records, and its paint cache keeps decoded images, SVG pictures, paths and the
+font provider. A paint frees the cached images it did not draw; with
+`maxImagePixels` it keeps them, least recently used first out, until the cache
+fits that many decoded pixels and at most `maxImages` entries (256 by default).
+An SVG picture counts as the rasters it embeds plus a fixed cost for its
+recorded drawing.
 
 ```ts
-import { createParagraphEngine } from "@freshcoat-js/coatfile";
-import { deriveFontMetrics } from "@freshcoat-js/engine";
-
-const textEngine = createParagraphEngine(ck, fonts);
-const fontMetrics = deriveFontMetrics(fonts);
-for (const record of records) {
-  const compiled = compile(template, record, { width, height, frameNames: ["front"] });
-  await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts, fontMetrics, textEngine });
-}
-textEngine.dispose();
+const renderer = await createRenderer({ ck, cache: { maxImagePixels: 48_000_000 } });
+for (const record of records)
+  await renderTemplate(renderer, template, record, { frameNames: ["front"] });
+renderer.dispose();
 ```
 
-To reuse decoded images, SVG pictures, paths and the paint font provider across
-renders, pass a `paintCache` too. A paint frees the cached images it did not
-draw; with `maxImagePixels` it keeps them, least recently used first out, until
-the cache fits that many decoded pixels and at most `maxImages` entries (256 by
-default). An SVG picture counts as the rasters it embeds plus a fixed cost for
-its recorded drawing. The text engine lays text out and the
-cache paints it, so the two work side by side. The caller owns the cache:
-dispose it when the batch ends or the fonts change.
-
-```ts
-import { createPaintCache } from "@freshcoat-js/coatfile";
-
-const paintCache = createPaintCache({ maxImagePixels: 48_000_000 });
-for (const record of records) {
-  const compiled = compile(template, record, { width, height, frameNames: ["front"] });
-  await renderCompiled(compiled, { frameNames: ["front"] }, { ck, env, fonts, fontMetrics, textEngine, paintCache });
-}
-paintCache.dispose();
-```
-
-To render a compiled node tree yourself (custom paint, inspection, an alternate
-renderer), use the coat engine's `compileScene(root, …)` directly.
+To render a compiled node tree yourself, use the coat engine's renderer or
+`compileScene(root, ...)` directly.
 
 `variantId` draws one of the template's variants; see [Variants](#variants).
 
@@ -114,27 +92,21 @@ and text shaping all happen there. `exports` is the density that compiled scene 
 **rasterized** at, exactly like a row in Figma's export panel:
 
 ```ts
-const results = await render(
-  template,
-  values,
-  {
-    width: 1012,
-    height: 638,
-    exports: [
-      {},                                                        // 1×
-      { constraint: { kind: "scale", value: 2 }, suffix: "@2x" }, // 2024×1276
-      { constraint: { kind: "width", value: 600 }, suffix: "-thumb" },
-    ],
-  },
-  { ck, env, fonts },
-);
+const results = await renderTemplate(renderer, template, values, {
+  width: 1012,
+  height: 638,
+  exports: [
+    {},                                                        // 1×
+    { constraint: { kind: "scale", value: 2 }, suffix: "@2x" }, // 2024×1276
+    { constraint: { kind: "width", value: 600 }, suffix: "-thumb" },
+  ],
+});
 // one result per frame PER setting, grouped by frame, in export order:
 // { name: "front", scale: 2, suffix: "@2x", width: 2024, height: 1276, bytes, format, … }
 ```
 
 Every result includes its frame name, export `scale`, `suffix` and actual pixel
-`width`/`height` after clamping. Encoded results carry `bytes` and `format`;
-browser results carry a live `canvas` and a `dispose()` method. Omitting
+`width`/`height` after clamping, plus what `output` asked for. Omitting
 `exports` produces a single 1× export per frame.
 
 The layout is the compile's at every density: a 2× export is a 2× raster of the
@@ -147,23 +119,15 @@ extra size costs a paint, not a re-bake.
 preserved); a density large enough to exceed the coat engine's `MAX_EXPORT_DIMENSION`
 is lowered to fit, and the `scale` on the result is the one actually used.
 
-Runtime environments live on subpaths so the barrel stays light:
-
-- `@freshcoat-js/coatfile/render` — `render` / `renderCompiled`: compile + paint.
-- `@freshcoat-js/coatfile/headless` — `createHeadlessEnv`: napi-free, renders
-  offscreen to PNG (server previews, OG images).
-- `@freshcoat-js/coatfile/browser` — `createBrowserEnv`: backs a live DOM canvas for
-  the CanvasKit surface (the editor preview).
-
-Each env's `paint(frames, ck)` bakes in the CanvasKit painter — there is no
-separate painter to construct.
+`@freshcoat-js/coatfile/render` holds `renderTemplate` and `renderCompiled`,
+so the main entry stays free of the painter.
 
 ### PNG size
 
-`createHeadlessEnv` uses the engine's PNG writer by default.
-`createHeadlessEnv({ encode: { effort: "best" } })` also searches
-filtered encodings for a smaller file, at the cost of more encoding work.
-Compression gains depend on the image.
+PNG is written by the coat engine's own encoder.
+`output: { encode: { format: "png", effort: "best" } }` also searches filtered
+encodings for a smaller file, at the cost of more encoding work. Compression
+gains depend on the image.
 
 ## Canvas and `product`
 
@@ -536,7 +500,8 @@ added, in the bars and the text. One with the wrong check digit is refused with
 the digit it should be.
 
 **The encoder is registered, not imported.** The main entry does not carry
-bwip-js, which is ~87 KB gzipped. A consumer that draws barcodes registers it
+bwip-js, which is ~87 KB gzipped. `renderTemplate()` loads it on first use when
+a template draws a barcode. A consumer that compiles directly registers it
 once, before compiling:
 
 ```ts
@@ -547,7 +512,7 @@ setBarcodeEncoder(bwipBarcodeEncoder);
 ```
 
 A code that can't be drawn still compiles, and says why in the frame's
-`warnings`, which `render()` passes on with the painter's own:
+`warnings`, which `renderTemplate()` passes on with the painter's own:
 
 | Case | Draws | Warning |
 |---|---|---|

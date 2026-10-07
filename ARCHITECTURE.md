@@ -35,10 +35,12 @@ Studio / Figma / host application
         host preview or output
 ```
 
-Coatfile's rendering helpers join compilation and rendering for callers that
-want that path. Hosts provide assets and runtime setup; the engine does not
-assume browser storage, a network policy or a UI framework. CanvasKit setup
-differs between browser and server environments, as the SDK READMEs explain.
+A host creates a renderer from the engine with a CanvasKit instance, and
+coatfile's `renderTemplate` compiles and paints through it. The renderer reads
+assets through a loader the host can replace, and does not assume browser
+storage, a network policy or a UI framework. Loading CanvasKit and reading
+files differ by platform, so they live on the engine's `node` and `browser`
+subpaths.
 
 For batch work, `workspace` turns templates, datasets, bindings and presets
 into export plans. A host executes those plans, schedules rendering and writes
@@ -56,7 +58,7 @@ through `test-utils`, which packages list only as a dev dependency.
 Both applications consume the shared packages rather than each other's
 source. Repository checks reject undeclared imports and paths that escape
 the repository. Package-level imports keep runtime-specific integrations at
-explicit entry points, such as coatfile's browser and headless helpers.
+explicit entry points, such as the engine's node and browser subpaths.
 
 ## Files and identity
 

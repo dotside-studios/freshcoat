@@ -318,7 +318,7 @@ rows also travel inside the template at `source.report.decisions`.
 
 **Custom (default).** The selected frame supplies the template's canvas size.
 Use this for certificates, posters, badges or any design outside Davi's card
-catalog. Open the result in Studio or use coatfile's `render()` in your own
+catalog. Open the result in Studio or use coatfile's `renderTemplate()` in your own
 application. The export uses the placeholder product label `custom` and is
 not accepted by Davi's order-site importer. Colorways still work: make the
 frame a component and name its instances `<Frame> / <Label>`.

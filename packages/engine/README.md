@@ -9,19 +9,20 @@ generated images or an interactive canvas. For `.coat` templates and field
 substitution, start with [`@freshcoat-js/coatfile`](../coatfile), which compiles
 templates into engine nodes.
 
-The scene and command types are independent of the backend; the supplied
-painter uses CanvasKit. Browser and headless environments share that paint
-path. Template fields, variants and frame selection belong to coatfile;
+The scene and command types are independent of the backend; the painter uses
+CanvasKit, the same in Node, a page and a worker. Template fields, variants and frame selection belong to coatfile;
 card-printer correction policy belongs to
 [`@freshcoat-js/for-print`](../for-print).
 
 ## Quick start
 
-With an initialized CanvasKit instance (`ck`), render a scene offscreen:
+Create a renderer with a CanvasKit instance and render a scene:
 
 ```ts
-import type { RectNode } from "@freshcoat-js/engine";
-import { renderSceneToPng } from "@freshcoat-js/engine/headless";
+import { createRenderer, type RectNode } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/node"; // or /browser
+
+const renderer = await createRenderer({ ck: await loadCanvasKit() });
 
 const root: RectNode = {
   kind: "rect",
@@ -30,16 +31,64 @@ const root: RectNode = {
   fills: [{ kind: "solid", color: "#1f6fe8" }],
 };
 
-const result = await renderSceneToPng(root, { width: 640, height: 360, ck });
-// result.bytes — PNG bytes by default; result.warnings — paint diagnostics
+const result = await renderer.render(root, { width: 640, height: 360 });
+// result.bytes: PNG by default; result.warnings: paint diagnostics
 ```
 
 The engine depends on the `canvaskit-wasm` version its conformance goldens were
-made with. `loadCanvasKit` from `@freshcoat-js/engine/node` or
-`@freshcoat-js/engine/browser` creates the instance in Node, Bun, a page or a
-worker.
-For text, also supply a `fonts` map of family names to font byte arrays; the
-helper derives font metrics and creates the Paragraph text engine.
+made with. `loadCanvasKit` from `@freshcoat-js/engine/node` creates the
+instance in Node or Bun; from `@freshcoat-js/engine/browser` it loads
+`canvaskit.js` and `canvaskit.wasm` from a URL on a page or in a worker.
+
+## Renderer
+
+A renderer owns its CanvasKit instance, its fonts, the Paragraph text engine
+and metrics built from them, and a paint cache that keeps the surface, font
+provider and decoded images between renders. Create one per process or worker
+and keep it; `dispose()` frees everything.
+
+```ts
+const renderer = await createRenderer({
+  ck,
+  fonts: { Geist: [geistBytes] },       // bytes, or srcs read through `load`
+  load: fileLoader({ root: "./assets" }),
+  cache: { maxImagePixels: 48_000_000 }, // or false
+});
+```
+
+The output is chosen per render, and the result's type follows it:
+
+```ts
+await renderer.render(scene, { width, height });                     // { bytes, format }
+await renderer.render(scene, { width, height, scale: 2, output: { encode: { format: "webp", quality: 90 } } });
+await renderer.render(scene, { width, height, output: { pixels: true } }); // { pixels }
+```
+
+`scale` sets the density of the result; `export` takes a Figma-style export
+setting instead. JPEG and WebP need the `full` CanvasKit build; a build
+without the encoder answers in PNG and says so in `format`.
+
+The `canvas` output keeps the painted canvas live for display. It needs a
+`surface` factory, which makes the canvas each surface is painted on: a DOM
+`<canvas>`, or an `OffscreenCanvas` in a worker. With a cache the renderer
+reuses that canvas on the next paint.
+
+Paints run one at a time. `images` on a render supplies bytes for that render
+only; a src whose bytes change between renders is decoded again, so a
+per-request logo is never served from an earlier request. Fonts can be added
+later with `addFonts`, and `loadFonts` loads the families that font requests
+describe, once per descriptor. `clear()` frees the cache, as after a lost GPU
+context.
+
+`prepare`, `compile` and `paint` are the steps `render` runs, for callers that
+read the laid-out scene or the command list in between.
+
+Images and local font files are read through the renderer's byte loader.
+`fetchLoader` (the default) decodes `data:` URLs and fetches the rest;
+`mapLoader(bytes, next)` serves bytes you hold first. In Node or Bun,
+`fileLoader` from `@freshcoat-js/engine/node` reads relative paths and `file:`
+URLs under a root directory and refuses anything outside it, passing other
+URLs to `next`.
 
 ## Node IR
 
@@ -55,55 +104,15 @@ own interior or exterior under its `fillRule`. A clipping group's
 `cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
 
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter
-executes. Use this lower-level path when you need to inspect commands or keep
-a runtime alive across renders. The types in [`src/node.ts`](src/node.ts)
-define the scene model.
-
-```ts
-import { compileScene } from "@freshcoat-js/engine";
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-
-const commands = compileScene(root, { width, height, textEngine });
-const env = createHeadlessEnv({ fonts });
-const result = await env.paint(commands, ck);
-```
-
-An environment reads image bytes and local font files through a byte loader.
-By default `images` is checked first, then `data:` URLs are decoded and other
-sources are fetched. Pass `load` to read from somewhere else, such as a
-worker's own store or the filesystem. `mapLoader(bytes, next)` and
-`fetchLoader` compose the same lookup.
-
-```ts
-import { fetchLoader } from "@freshcoat-js/engine";
-
-const env = createHeadlessEnv({
-	fonts,
-	load: async (src) => store.get(src) ?? fetchLoader(src),
-});
-```
-
-`createBrowserEnv` keeps the painted canvas live instead of encoding it. Each
-surface is made on a DOM `<canvas>` unless you pass `createCanvas`, for
-example to paint on an `OffscreenCanvas` in a worker.
-
-In Node or Bun, `fileLoader` from `@freshcoat-js/engine/node` reads relative
-paths and `file:` URLs under a root directory and refuses anything outside it.
-Other URLs go to `next`, which defaults to `fetchLoader`.
-
-```ts
-import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
-import { fileLoader } from "@freshcoat-js/engine/node";
-
-const env = createHeadlessEnv({ load: fileLoader({ root: "./assets" }) });
-```
+executes. With `approxEngine` as its text engine it needs no CanvasKit, which
+suits a rough preview drawn some other way. The types in
+[`src/node.ts`](src/node.ts) define the scene model.
 
 ## Painting and text
 
 The supplied text engine uses CanvasKit Paragraph for layout and shaping,
-keeping measurement and painting on the same text implementation. On the
-lower-level path, pass a `textEngine` to resolve layout and unbaked text, or
-supply a scene with resolved geometry and baked text.
+keeping measurement and painting on the same text implementation. A renderer
+builds it from its fonts.
 
 A text node's `align` is `left`, `center`, `right`, `justify`, `start` or
 `end`, and its `direction` (`ltr`, `rtl` or `auto`, from the first letter) sets
@@ -137,8 +146,8 @@ region `cover` keeps centred in the box, held inside the source's edges.
 
 ## SVG images
 
-An image node whose bytes are SVG paints as vector art, in the browser,
-workers and headless runtimes alike. The painter reads it with `parseSvg`,
+An image node whose bytes are SVG paints as vector art, on a page, in a
+worker and in Node alike. The painter reads it with `parseSvg`,
 lowers it with `svgToNode` and draws it with the node's fit, mask and stroke,
 so it stays sharp at every export density. Markers and pattern fills are
 expanded into ordinary paths, and images embedded as `data:` URLs are drawn,
@@ -153,31 +162,29 @@ fallback color.
 
 ## Subpaths
 
-The barrel stays free of DOM and WASM weight; the paint target lives on its
-own subpath.
+The barrel stays free of DOM and Node APIs; platform code lives on its own
+subpath.
 
 | Subpath | What it is |
 |---|---|
-| `@freshcoat-js/engine` | node types, `compileScene`, layout, adjust and export-scale math |
-| `@freshcoat-js/engine/browser` | a runtime backing a live DOM canvas — the editor's preview |
-| `@freshcoat-js/engine/headless` | offscreen painting to PNG, napi-free — server previews, OG images |
-| `@freshcoat-js/engine/runtime` | the backend seam: `Painter` and `makeRuntime` |
+| `@freshcoat-js/engine` | `createRenderer`, node types, `compileScene`, layout, adjust and export-scale math, byte loaders |
+| `@freshcoat-js/engine/node` | `loadCanvasKit`, `initCanvasKit`, `fileLoader`, `canvasKitBinDir` for Node and Bun |
+| `@freshcoat-js/engine/browser` | `loadCanvasKit(baseUrl)` for a page or a worker |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 
 ## Staying warm
 
-For repeated renders, reuse a paint runtime with `createPaintCache` and a
-text engine wrapped by `memoizeTextEngine`. The paint cache retains the
-surface, font provider and decoded images; the text cache reuses unchanged
-paragraph layouts. Studio's render session uses both. See
+For repeated renders, keep one renderer. Its paint cache retains the surface,
+font provider and decoded images, and its text engine reuses unchanged
+paragraph layouts. Studio's render session and export workers each keep one.
+See
 [Studio performance](../../apps/editor/docs/performance.md) for historical
 integration benchmarks and their conditions.
 
 For exports, `exportPixelSize` resolves density within
-`MAX_EXPORT_DIMENSION`. The headless runtime encodes PNG by default, with
-JPEG and WebP available through its `encode` options. Export scale changes
+`MAX_EXPORT_DIMENSION`. Export scale changes
 the output pixel dimensions; supersampling renders at a higher density and
 reduces to the requested output size.
 
