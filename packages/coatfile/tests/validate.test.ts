@@ -830,6 +830,24 @@ test("patterns compile with unicode semantics", () => {
 	expect(validateValues({ f: "Äb" }, field("^\\p{L}+$")).ok).toBe(true);
 	expect(validateValues({ f: "p{L}" }, field("^\\p{L}+$")).ok).toBe(false);
 	expect(validateValues({ f: "😀" }, field("^[😀]$")).ok).toBe(true);
-	expect(compiledPattern("^\\a$")).toBeNull();
-	expect(validateValues({ f: "x" }, field("^\\a$")).ok).toBe(true);
+	expect(compiledPattern("^(a$")).toBeNull();
+	expect(validateValues({ f: "x" }, field("^(a$")).ok).toBe(true);
+});
+
+test("patterns that only parse without the u flag are still enforced", () => {
+	const field = (pattern: string) => ({
+		type: "object" as const,
+		properties: { f: { type: "string" as const, pattern } },
+	});
+	const cases: [string, string, string][] = [
+		["^\\d{3}\\-\\d{4}$", "555-1234", "5551234"],
+		["^[\\w-.]+$", "a-b.c", "a b"],
+		["^\\#\\d+$", "#42", "42"],
+	];
+	for (const [pattern, ok, bad] of cases) {
+		expect(compiledPattern(pattern)?.flags).toBe("");
+		expect(validateValues({ f: ok }, field(pattern)).ok).toBe(true);
+		expect(validateValues({ f: bad }, field(pattern)).ok).toBe(false);
+	}
+	expect(compiledPattern("^\\p{L}+$")?.flags).toBe("u");
 });
