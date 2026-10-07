@@ -145,7 +145,7 @@ export type ShapeMask =
 	| { kind: "circle" }
 	| { kind: "ellipse" }
 	| { kind: "polygon"; sides: number; rotation?: number }
-	| { kind: "squircle"; radius: number };
+	| { kind: "squircle"; radius: number; smoothing?: number };
 
 // A uniform radius, or per-corner [topLeft, topRight, bottomRight, bottomLeft]
 // (matches CSS/Canvas2D roundRect order and Figma's per-corner radii).

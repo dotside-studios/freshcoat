@@ -109,7 +109,7 @@ Cross-architecture stability is **unverified** — see Gaps.
 
 ## Coverage
 
-64 cases.
+65 cases.
 
 | Covered | Cases |
 |---|---|
@@ -122,7 +122,7 @@ Cross-architecture stability is **unverified** — see Gaps.
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing` |
 | Containers | `group-fills` |
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
-| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group` |
+| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |
 | Frame finish | `finish-white-clamp`, `finish-black-extract`, `finish-dither` |
 | Export | `export-scale`, `supersample` |

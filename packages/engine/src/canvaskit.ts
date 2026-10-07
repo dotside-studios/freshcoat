@@ -394,6 +394,8 @@ function maskSvg(
 			return `${d}Z`;
 		}
 		case "squircle": {
+			if (clip.smoothing !== undefined)
+				return squircleSvg(x, y, w, h, clip.radius, clip.smoothing);
 			const max = Math.min(w, h) / 2;
 			const r = Math.min(clip.radius, max);
 			const p = Math.min(r * 1.5, max);
@@ -434,7 +436,7 @@ function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
 		case "rounded-rect":
 			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
 		case "squircle":
-			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
+			return { ...clip, radius: Math.max(0, clip.radius - inset) };
 		case "circle":
 		case "ellipse":
 			return clip;
@@ -2449,18 +2451,25 @@ function paintAdjustedOffscreen(
 	}
 	// The inner drawable: same node, but only the (cheap) color matrix survives —
 	// lut/sharpen are this pass's job, so dropping them avoids re-entering here.
-	const inner: DrawCommand = {
+	const direct: DrawCommand = {
 		...cmd,
 		adjust:
 			adjust.colorMatrix && !matrixInShader
 				? { colorMatrix: adjust.colorMatrix }
 				: undefined,
 	} as DrawCommand;
+	// Blend and opacity composite the adjusted snapshot into the parent, so the
+	// offscreen render leaves them out.
+	const inner: DrawCommand = {
+		...direct,
+		blendMode: undefined,
+		opacity: undefined,
+	} as DrawCommand;
+	const fallback: DrawCommand = matrixInShader
+		? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
+		: direct;
 	if (hasLut3d && !validLut3d(adjust.lut3d)) {
 		reportAdjustUnsupported(issues, cmd, "lut3d");
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
 		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
 		return;
 	}
@@ -2512,9 +2521,6 @@ function paintAdjustedOffscreen(
 		if (hasSharpen) reportAdjustUnsupported(issues, cmd, "sharpen");
 		if (matrixInShader) reportAdjustUnsupported(issues, cmd, "gamut");
 		surface?.delete();
-		const fallback: DrawCommand = matrixInShader
-			? ({ ...cmd, adjust: { colorMatrix: adjust.colorMatrix } } as DrawCommand)
-			: inner;
 		paintDrawable(ck, canvas, provider, images, bin, fallback, issues, frame);
 		return;
 	}
@@ -2585,6 +2591,9 @@ function paintAdjustedOffscreen(
 	const shader = bin.track(effect.makeShaderWithChildren(uniforms, children));
 	const paint = bin.track(new ck.Paint());
 	paint.setShader(shader);
+	if (cmd.opacity !== undefined && cmd.opacity < 1)
+		paint.setAlphaf(cmd.opacity);
+	setLayerBlend(ck, bin, paint, cmd.blendMode);
 	// Blit in DEVICE pixels — undo the main canvas's complete CTM, not merely the
 	// export scale. The snapshot already includes parent rotations/transforms; a
 	// second application here would move it. The main clip remains in device space,
@@ -3141,6 +3150,22 @@ function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
 	return clear(x, w, cmd.pixelWidth) && clear(y, h, cmd.pixelHeight);
 }
 
+function setLayerBlend(
+	ck: CanvasKit,
+	bin: Bin,
+	paint: Paint,
+	blendMode: BlendMode | undefined,
+) {
+	if (!blendMode || blendMode === "normal") return;
+	const blender =
+		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
+	if (blender) paint.setBlender(blender);
+	else
+		paint.setBlendMode(
+			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
+		);
+}
+
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer.
 function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
@@ -3157,14 +3182,7 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 	// after.
 	if (colorFilter) paint.setColorFilter(colorFilter);
 	if (hasOpacity) paint.setAlphaf(opacity);
-	const blender =
-		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
-	if (blender) paint.setBlender(blender);
-	else if (blendMode && blendMode !== "normal") {
-		paint.setBlendMode(
-			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
-		);
-	}
+	setLayerBlend(ck, bin, paint, blendMode);
 	let filter: ImageFilter | null = null;
 	if (typeof blur === "number" && blur > 0)
 		filter = bin.track(
