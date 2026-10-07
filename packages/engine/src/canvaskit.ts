@@ -35,7 +35,8 @@ import type {
 import { parseColor } from "./color";
 import { compileScene } from "./compile-scene";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { dataUrlToBytes, fontArrayBuffer, fontBytes } from "./font-bytes";
+import { fontArrayBuffer, fontBytes } from "./font-bytes";
+import { dataUrlToBytes } from "./loader";
 import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
 import {
 	cachedLutImage,
@@ -3495,7 +3496,7 @@ export async function paintScene(
 		try {
 			// CanvasKit has no native font system, so it always materializes bytes
 			// (from the env's pre-supplied resolution or the shared fetch).
-			for (const bytes of await fontBytes(rt.resolveFont(req)))
+			for (const bytes of await fontBytes(rt.resolveFont(req), rt.loadBytes))
 				loaded.push({ family: req.family, bytes });
 		} catch (e) {
 			warnings.push({
@@ -3542,7 +3543,7 @@ export async function paintScene(
 			continue;
 		}
 		try {
-			const bytes = await rt.loadImageBytes(src);
+			const bytes = await rt.loadBytes(src);
 			if (cache) cache.stats.imageDecodes++;
 			const img = isSvg(bytes)
 				? makeSvgPicture(ck, provider, bytes, await loadSvg())

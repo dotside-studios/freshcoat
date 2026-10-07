@@ -276,7 +276,7 @@ export async function renderCompiled(
 	// read those pixels. freshcoat owns the CanvasKit calls, so for-print's analysis
 	// stays canvas-free.
 	const sample: ImageSampler = async (node) => {
-		const pixels = await sampleImageNode(ck, node, runtime.env.loadImageBytes, {
+		const pixels = await sampleImageNode(ck, node, runtime.env.loadBytes, {
 			maxDim: 256,
 		});
 		if (!pixels) throw new Error(`print analyze: could not sample ${node.src}`);

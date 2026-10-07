@@ -16,13 +16,13 @@ afterEach(() => {
 });
 
 describe("createBrowserEnv", () => {
-	test("loadImageBytes fetches encoded bytes", async () => {
+	test("loadBytes fetches encoded bytes", async () => {
 		stub("fetch", async () => ({
 			ok: true,
 			arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
 		}));
 		const rt = createBrowserEnv();
-		expect(Array.from(await rt.loadImageBytes("https://x/y.png"))).toEqual([
+		expect(Array.from(await rt.loadBytes("https://x/y.png"))).toEqual([
 			1, 2, 3,
 		]);
 	});
@@ -47,6 +47,6 @@ describe("createBrowserEnv", () => {
 	test("createBrowserEnv({images}) serves pre-supplied image bytes without fetch", async () => {
 		const bytes = new Uint8Array([9, 9]);
 		const rt = createBrowserEnv({ images: new Map([["/x.png", bytes]]) });
-		expect(await rt.loadImageBytes("/x.png")).toBe(bytes);
+		expect(await rt.loadBytes("/x.png")).toBe(bytes);
 	});
 });

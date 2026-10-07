@@ -145,7 +145,6 @@ export type {
 	GridTrack,
 	ImageCrop,
 	ImageElement,
-	ImageLike,
 	ImageProperties,
 	InlineAsset,
 	Insets,

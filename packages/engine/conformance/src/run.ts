@@ -219,7 +219,7 @@ export async function runConformance(
 					const bytes = opts.fonts?.get(family);
 					return bytes ? { kind: "bytes", bytes } : { kind: "none" };
 				},
-				loadImageBytes: async (src) => {
+				loadBytes: async (src) => {
 					const bytes = opts.images?.get(src);
 					if (!bytes) throw new Error(`no image bytes for ${src}`);
 					return bytes;

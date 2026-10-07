@@ -76,8 +76,8 @@ async function setup() {
 	]);
 	const loads = new Map<string, number>();
 	const env = createHeadlessEnv({ images });
-	const load = env.loadImageBytes;
-	env.loadImageBytes = (src) => {
+	const load = env.loadBytes;
+	env.loadBytes = (src) => {
 		loads.set(src, (loads.get(src) ?? 0) + 1);
 		return load(src);
 	};

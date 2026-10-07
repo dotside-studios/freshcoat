@@ -202,8 +202,8 @@ function runtime(
 	cache?: PaintCache,
 ): { rt: PaintRuntime; load: ReturnType<typeof vi.fn> } {
 	const env = createHeadlessEnv({ fonts, images, cache });
-	const load = vi.fn(env.loadImageBytes);
-	return { rt: { ...env, loadImageBytes: load }, load };
+	const load = vi.fn(env.loadBytes);
+	return { rt: { ...env, loadBytes: load }, load };
 }
 
 async function pixels(commands: Command[], rt: PaintRuntime) {

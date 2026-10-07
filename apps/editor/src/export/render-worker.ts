@@ -7,6 +7,7 @@ import {
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import { fetchLoader } from "@freshcoat-js/engine";
 import { crc32 } from "@freshcoat-js/workspace/crc";
 import { loadWorkerCanvasKit } from "~/render/canvaskit-worker";
 import { gamutNotes, withPrintFallback } from "./print";
@@ -54,9 +55,7 @@ function ownBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 async function bytesOf(src: string, own: Map<string, Blob>) {
 	const blob = own.get(src);
 	if (blob) return new Uint8Array(await blob.arrayBuffer());
-	const res = await fetch(src);
-	if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
-	return new Uint8Array(await res.arrayBuffer());
+	return fetchLoader(src);
 }
 
 function setFonts(next: Map<string, Uint8Array[]>) {
@@ -80,14 +79,13 @@ async function renderSide(req: WorkerRenderRequest) {
 	const own = new Map(req.images);
 	const env = createHeadlessEnv({
 		fonts,
+		// Only this worker holds the bytes; fetch would miss the `ws:` reference.
+		load: (src) => bytesOf(src, own),
 		encode: {
 			format: req.format,
 			...(req.quality !== undefined ? { quality: req.quality } : {}),
 		},
 	});
-	// Only this worker holds the bytes; the default would fetch the `ws:`
-	// reference.
-	env.loadImageBytes = (src) => bytesOf(src, own);
 	const design = req.resize ?? {
 		width: template.width,
 		height: template.height,

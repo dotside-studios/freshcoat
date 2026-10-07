@@ -1,10 +1,9 @@
 import type {
 	CanvasLike,
-	ImageLike,
 	PaintCache,
 	PaintRuntime,
 } from "@freshcoat-js/engine";
-import { resolveFontRequest } from "@freshcoat-js/engine";
+import { mapLoader, resolveFontRequest } from "@freshcoat-js/engine";
 import { makeRuntime } from "@freshcoat-js/engine/runtime";
 
 export type OffscreenEnvOptions = {
@@ -26,27 +25,12 @@ export function createOffscreenEnv(opts: OffscreenEnvOptions): PaintRuntime {
 			cache: opts.cache,
 			fonts: opts.fonts,
 			resolveFont: (req) => resolveFontRequest(req, opts.fonts),
-			async loadImageBytes(src) {
-				const bytes = opts.images.get(src);
-				if (bytes) return bytes;
-				const res = await fetch(src);
-				if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
-				return new Uint8Array(await res.arrayBuffer());
-			},
+			loadBytes: mapLoader(opts.images),
 			canvas: {
 				createCanvas(w, h) {
 					const canvas = new OffscreenCanvas(w, h);
 					opts.onCanvas?.(canvas);
 					return canvas as unknown as CanvasLike;
-				},
-				async decodeImage(bytes) {
-					const bmp = await createImageBitmap(
-						new Blob([bytes as unknown as BlobPart]),
-					);
-					return bmp as unknown as ImageLike;
-				},
-				encode() {
-					throw new Error("the live preview never encodes");
 				},
 			},
 		},

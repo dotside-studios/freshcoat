@@ -331,7 +331,7 @@ describe("main-thread fallback", () => {
 					cache,
 					fonts,
 					resolveFont: (req) => resolveFontRequest(req, fonts),
-					loadImageBytes: async (src) => images.get(src) ?? new Uint8Array(),
+					loadBytes: async (src) => images.get(src) ?? new Uint8Array(),
 				},
 				"keep",
 			),

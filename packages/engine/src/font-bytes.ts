@@ -1,3 +1,4 @@
+import { type ByteLoader, dataUrlToBytes, fetchLoader } from "./loader";
 import type { FontDescriptor, FontRequest, FontResolution } from "./types";
 
 // Resolve a request against the env's pre-supplied bytes, else its descriptor.
@@ -22,29 +23,32 @@ const TTF_UA =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.30 (KHTML, like Gecko)";
 const FONT_FETCH_TIMEOUT_MS = 8000;
 
-// Turn a resolution into raw font-file bytes: stylesheet parsing + fetch. Purely
-// async I/O over data:/http (universal) — local filesystem reads are the env's
-// job, done up-front in its resolveFont (which returns { kind: "bytes" }).
-export async function fontBytes(res: FontResolution): Promise<Uint8Array[]> {
+// Turn a resolution into raw font-file bytes. data: and http(s) sources are
+// handled here; any other local file src goes through `load`.
+export async function fontBytes(
+	res: FontResolution,
+	load: ByteLoader = fetchLoader,
+): Promise<Uint8Array[]> {
 	if (res.kind === "bytes") return res.bytes;
 	if (res.kind === "none") return [];
-	return descriptorBytes(res.descriptor);
+	return descriptorBytes(res.descriptor, load);
 }
 
-async function descriptorBytes(d: FontDescriptor): Promise<Uint8Array[]> {
+async function descriptorBytes(
+	d: FontDescriptor,
+	load: ByteLoader,
+): Promise<Uint8Array[]> {
 	if (d.kind === "local") {
-		return Promise.all(d.files.map((f) => fileBytes(f.src)));
+		return Promise.all(d.files.map((f) => fileBytes(f.src, load)));
 	}
 	// google / fontsource carry a CSS stylesheet, not a font file.
 	return stylesheetFontBytes(d.url);
 }
 
-async function fileBytes(src: string): Promise<Uint8Array> {
+async function fileBytes(src: string, load: ByteLoader): Promise<Uint8Array> {
 	if (src.startsWith("data:")) return dataFontBytes(src);
 	if (/^https?:/i.test(src)) return fetchBytes(src);
-	throw new Error(
-		`cannot fetch local font path "${src}"; a runtime must materialize local files in resolveFont`,
-	);
+	return memoize(loaderMemo(load), src, load);
 }
 
 /**
@@ -177,6 +181,7 @@ async function loadBytes(url: string): Promise<Uint8Array> {
 const fileMemo = new Map<string, Promise<Uint8Array>>();
 const stylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
 const dataMemo = new Map<string, Uint8Array>();
+let loaderMemos = new WeakMap<ByteLoader, Map<string, Promise<Uint8Array>>>();
 export const FONT_MEMO_MAX = 64;
 const DATA_MEMO_MAX = 16;
 
@@ -193,6 +198,15 @@ function memoize<T>(
 		if (memo.get(key) === p) memo.delete(key);
 	});
 	return p;
+}
+
+function loaderMemo(load: ByteLoader): Map<string, Promise<Uint8Array>> {
+	let memo = loaderMemos.get(load);
+	if (!memo) {
+		memo = new Map();
+		loaderMemos.set(load, memo);
+	}
+	return memo;
 }
 
 function dataFontBytes(src: string): Uint8Array {
@@ -226,6 +240,7 @@ export function clearFontBytesCache(): void {
 	fileMemo.clear();
 	stylesheetMemo.clear();
 	dataMemo.clear();
+	loaderMemos = new WeakMap();
 }
 
 // The ArrayBuffer CanvasKit registers a font from, copied only when the view
@@ -239,17 +254,4 @@ export function fontArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	)
 		return buffer;
 	return buffer.slice(byteOffset, byteOffset + byteLength) as ArrayBuffer;
-}
-
-export function dataUrlToBytes(src: string): Uint8Array {
-	const comma = src.indexOf(",");
-	const meta = src.slice(0, comma);
-	const data = src.slice(comma + 1);
-	if (meta.includes(";base64")) {
-		const bin = atob(data);
-		const out = new Uint8Array(bin.length);
-		for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-		return out;
-	}
-	return new TextEncoder().encode(decodeURIComponent(data));
 }

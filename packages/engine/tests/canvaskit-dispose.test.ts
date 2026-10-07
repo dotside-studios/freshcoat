@@ -54,11 +54,9 @@ function fakeRt(loseContext: () => void): {
 	const rt = {
 		canvas: {
 			createCanvas: () => el,
-			decodeImage: async () => ({}),
-			encode: () => new Uint8Array(),
 		},
 		resolveFont: () => ({ kind: "none" }),
-		loadImageBytes: async () => new Uint8Array(),
+		loadBytes: async () => new Uint8Array(),
 		paint: async () => ({}),
 	} as unknown as PaintRuntime;
 	return { rt, getContext };

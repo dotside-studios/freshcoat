@@ -65,6 +65,21 @@ const env = createHeadlessEnv({ fonts });
 const result = await env.paint(commands, ck);
 ```
 
+An environment reads image bytes and local font files through a byte loader.
+By default `images` is checked first, then `data:` URLs are decoded and other
+sources are fetched. Pass `load` to read from somewhere else, such as a
+worker's own store or the filesystem. `mapLoader(bytes, next)` and
+`fetchLoader` compose the same lookup.
+
+```ts
+import { fetchLoader } from "@freshcoat-js/engine";
+
+const env = createHeadlessEnv({
+	fonts,
+	load: async (src) => store.get(src) ?? fetchLoader(src),
+});
+```
+
 ## Painting and text
 
 The supplied text engine uses CanvasKit Paragraph for layout and shaping,

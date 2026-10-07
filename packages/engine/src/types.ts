@@ -12,6 +12,7 @@
 // structurally identical.
 
 import type { DecodedPixels } from "./decode";
+import type { ByteLoader } from "./loader";
 import type { PaintCache } from "./paint-cache";
 import type { EncodeFormat, EncodeOptions } from "./png";
 
@@ -539,11 +540,6 @@ export type CanvasRenderingContext2DLike = {
 	): CanvasPatternLike | null;
 };
 
-export type ImageLike = {
-	width: number;
-	height: number;
-};
-
 export type PaintWarning =
 	| { kind: "image_load_failed"; src: string; error: string }
 	// An SVG source drew without a feature it uses (text, filters, patterns).
@@ -611,14 +607,11 @@ export type PaintOutput = {
 // runtime (createHeadlessEnv) renders offscreen instead.
 export type CanvasHost = {
 	createCanvas(width: number, height: number): CanvasLike;
-	decodeImage(bytes: Uint8Array): Promise<ImageLike>;
-	encode(canvas: CanvasLike): Uint8Array;
 };
 
 // What a runtime knows about a font request without fetching: pre-supplied bytes
 // (env already has them), a descriptor to load from, or nothing (by-name). The
-// shared `fontBytes` helper turns this into bytes; a native font system (Canvas2D)
-// can instead consume the resolution directly (register by path / stylesheet).
+// shared `fontBytes` helper turns this into bytes.
 export type FontResolution =
 	| { kind: "bytes"; bytes: Uint8Array[] }
 	| { kind: "descriptor"; descriptor: FontDescriptor }
@@ -635,17 +628,15 @@ export type PaintRuntime = {
 	// Every family the env holds bytes for. A paint through a cache registers
 	// all of them, so a scene that uses fewer keeps the cached provider.
 	fonts?: Map<string, Uint8Array[]>;
-	loadImageBytes(src: string): Promise<Uint8Array>;
+	// Encoded bytes for an image src or a local font file src.
+	loadBytes: ByteLoader;
 	// Decoded images the runtime owns. When present, paint asks it for each image
-	// instead of decoding loadImageBytes itself, and never frees what it returns:
+	// instead of decoding loadBytes itself, and never frees what it returns:
 	// a caller that keeps its own bounded cache of decoded images (an export
 	// worker reusing a logo across records) frees them on its own schedule. Null
 	// is an image that could not be had, painted as a placeholder.
 	loadImage?(src: string, ck: unknown): Promise<unknown | null>;
 	canvas?: CanvasHost;
-	// Native (DOM) font registration, browser env only: the resolution is loaded
-	// by the platform (FontFace / stylesheet). Absent on a canvas-less runtime.
-	registerFont?(family: string, res: FontResolution): void | Promise<void>;
 	// Keeps the font provider, decoded images and surface across paints (see
 	// ./paint-cache). Absent, every paint builds and frees its own.
 	cache?: PaintCache;

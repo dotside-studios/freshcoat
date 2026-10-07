@@ -47,7 +47,6 @@ export {
 	type DecodeOptions,
 	decodePixels,
 	drawImageToPixels,
-	type ImageBytesLoader,
 	type ImageSampleOptions,
 	type PixelRect,
 	sampleImageNode,
@@ -63,10 +62,15 @@ export {
 } from "./export-scale";
 export {
 	clearFontBytesCache,
-	dataUrlToBytes,
 	fontBytes,
 	resolveFontRequest,
 } from "./font-bytes";
+export {
+	type ByteLoader,
+	dataUrlToBytes,
+	fetchLoader,
+	mapLoader,
+} from "./loader";
 export {
 	deriveFontMetrics,
 	getFontMetrics,
