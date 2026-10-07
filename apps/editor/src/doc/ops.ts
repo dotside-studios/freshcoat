@@ -23,7 +23,7 @@ import {
 	subtleSha256,
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
-import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/tokens";
+import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
 import { BOOLEAN, INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
-import { tokenIds } from "./tokens";
+import { tokenIds } from "./mustache";
 import type {
 	Element,
 	FrameElement,

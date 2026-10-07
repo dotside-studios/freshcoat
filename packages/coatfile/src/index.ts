@@ -94,7 +94,7 @@ export {
 	substitute,
 	tokenIds,
 	wholeToken,
-} from "./tokens";
+} from "./mustache";
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";

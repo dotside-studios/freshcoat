@@ -37,7 +37,7 @@ import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
-import { substitute } from "./tokens";
+import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { childElements } from "./tree";
 import type {

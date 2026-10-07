@@ -3,7 +3,7 @@
 // the marker grammar lives in exactly one place.
 
 import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { isWholeMustacheToken, titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";

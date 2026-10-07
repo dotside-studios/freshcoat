@@ -3,7 +3,7 @@ import type {
 	ImageProperties,
 	TemplateWarning,
 } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import type {
 	FigmaBoundingBox,
 	FigmaImageFilters,

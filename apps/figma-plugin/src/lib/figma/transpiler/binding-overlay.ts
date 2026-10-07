@@ -1,4 +1,4 @@
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import {
 	type BindingResolver,
 	buildFieldMeta,

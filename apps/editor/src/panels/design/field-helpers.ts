@@ -1,5 +1,5 @@
 import type { Background, Element, Template } from "@freshcoat-js/coatfile";
-import { wholeToken } from "@freshcoat-js/coatfile/tokens";
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import type { EditorController } from "~/app/controller";
 import { type ElementPatch, type OpResult, ok, updateElement } from "~/doc/ops";
 

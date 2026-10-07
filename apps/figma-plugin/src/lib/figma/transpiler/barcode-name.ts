@@ -9,7 +9,7 @@
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
 import type { Symbology } from "@freshcoat-js/coatfile";
 import { SYMBOLOGIES } from "@freshcoat-js/coatfile/barcode-encoder";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { isWholeMustacheToken } from "./fields";
 
 /** What a `barcode:` layer draws when it names no symbology. */

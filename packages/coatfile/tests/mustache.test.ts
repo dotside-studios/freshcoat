@@ -6,7 +6,7 @@ import {
 	substitute,
 	tokenIds,
 	wholeToken,
-} from "../src/tokens";
+} from "../src/mustache";
 
 describe("substitute", () => {
 	test("replaces a simple {{id}} token", () => {

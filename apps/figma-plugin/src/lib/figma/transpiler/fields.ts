@@ -1,4 +1,4 @@
-import { wholeToken } from "@freshcoat-js/coatfile/tokens";
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 
 export function isWholeMustacheToken(
 	s: string,

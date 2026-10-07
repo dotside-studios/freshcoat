@@ -5,7 +5,7 @@ import type {
 	Template,
 } from "@freshcoat-js/coatfile";
 import { applyVariant, base64ToBytes } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { childEntries, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {

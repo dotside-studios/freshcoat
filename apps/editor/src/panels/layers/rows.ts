@@ -1,5 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { hasToken } from "@freshcoat-js/coatfile/tokens";
+import { hasToken } from "@freshcoat-js/coatfile/mustache";
 import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";

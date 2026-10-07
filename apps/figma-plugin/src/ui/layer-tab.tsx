@@ -19,7 +19,7 @@ import {
 	type Symbology,
 	symbologyLabel,
 } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {

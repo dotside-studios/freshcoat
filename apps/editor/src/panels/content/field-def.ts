@@ -1,5 +1,5 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
-import { FIELD_ID } from "@freshcoat-js/coatfile/tokens";
+import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
 import { KEY_RULE } from "~/app/copy";
 
 export const FIELD_FORMATS = [

@@ -2,7 +2,7 @@
 // template-global field-metadata map, and compute marker rewrites for renames.
 // No Figma API here: main/bindings.ts supplies real nodes; this stays testable.
 
-import { renameToken } from "@freshcoat-js/coatfile/tokens";
+import { renameToken } from "@freshcoat-js/coatfile/mustache";
 import {
 	buildFieldMeta,
 	type FieldDraft,

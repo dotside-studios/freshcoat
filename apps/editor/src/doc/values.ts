@@ -1,5 +1,5 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/tokens";
+import { tokenIds } from "@freshcoat-js/coatfile/mustache";
 
 export type FieldEntry = { id: string; field: FieldDefinition };
 
