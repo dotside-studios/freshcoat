@@ -264,6 +264,7 @@ function compileBackground(
 		blendMode: bg.blendMode,
 		shadow: scaleShadow(bg.shadow, 1),
 		blur: bg.blur,
+		backdropBlur: bg.backdropBlur,
 		adjust: resolveAdjust(bg.adjust),
 	};
 	if (bg.type === "rect") {
@@ -313,6 +314,10 @@ function compileElement(
 		blendMode: el.blendMode,
 		shadow: scaleShadow(el.shadow, ratio),
 		blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
+		backdropBlur:
+			typeof el.backdropBlur === "number"
+				? el.backdropBlur * ratio
+				: undefined,
 		adjust: resolveAdjust(el.adjust),
 		layoutChild: mapLayoutChild(el.layoutChild, ratio),
 	};
@@ -414,6 +419,7 @@ type Base = {
 	blendMode?: Element["blendMode"];
 	shadow?: Shadows;
 	blur?: number;
+	backdropBlur?: number;
 	adjust?: Adjust;
 	layoutChild?: ChildLayout;
 };
@@ -580,6 +586,7 @@ function compileFrameElement(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		clip,
@@ -619,6 +626,7 @@ function compileFrameElement(
 		blendMode,
 		shadow,
 		blur,
+		backdropBlur,
 		adjust,
 		layoutChild,
 		isolate,
@@ -636,6 +644,7 @@ function compileFrameElement(
 		adjust,
 		layoutChild,
 		...(isolate ? { isolate } : {}),
+		...(backdropBlur ? { backdropBlur, cornerRadius } : {}),
 		kind: "group",
 		children: [
 			{ ...content, pos: { x: 0, y: 0 } },
@@ -693,6 +702,7 @@ function compileQr(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		children,
@@ -754,6 +764,7 @@ function compileBarcode(
 		blendMode: base.blendMode,
 		shadow: base.shadow,
 		blur: base.blur,
+		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		children,

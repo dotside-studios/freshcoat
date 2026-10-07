@@ -692,6 +692,34 @@ describe("compile (frame → group)", () => {
 		expect("isolate" in content!).toBe(false);
 	});
 
+	test("a frame's backdropBlur takes its rounded box", () => {
+		const tpl = withFrame({ fill: "#fff8", cornerRadius: 6, children: [] });
+		tpl.template_data[0].elements[0].backdropBlur = 10;
+		const group = findDraw(
+			getCommands(tpl, {}, { width: 100, height: 60 }),
+			"drawGroup",
+		)!;
+		expect(group.backdropBlur).toBe(10);
+		expect(group.backdropClip).toEqual({ kind: "rounded-rect", radius: 6 });
+	});
+
+	test("a frame with an outside stroke blurs its backdrop on the outer group", () => {
+		const tpl = withFrame({
+			clipsContent: true,
+			cornerRadius: 6,
+			stroke: { color: "#000", width: 4, align: "outside" },
+			children: [],
+		});
+		tpl.template_data[0].elements[0].backdropBlur = 10;
+		const [outer, content] = findDraws(
+			getCommands(tpl, {}, { width: 100, height: 60 }),
+			"drawGroup",
+		);
+		expect(outer!.backdropBlur).toBe(10);
+		expect(outer!.backdropClip).toEqual({ kind: "rounded-rect", radius: 6 });
+		expect(content!.backdropBlur).toBeUndefined();
+	});
+
 	test("text inside a frame contributes its font family to assets.fonts", () => {
 		const out = compile(
 			withFrame({
@@ -1098,6 +1126,13 @@ describe("compile (blur)", () => {
 		tpl.template_data[0].elements[0].blur = 4;
 		const cmds = getCommands(tpl, {}, { width: 200, height: 120 });
 		expect(findDraw(cmds, "drawText")!.blur).toBe(8);
+	});
+
+	test("element backdropBlur scales with ratio", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].backdropBlur = 6;
+		const cmds = getCommands(tpl, {}, { width: 200, height: 120 });
+		expect(findDraw(cmds, "drawText")!.backdropBlur).toBe(12);
 	});
 });
 

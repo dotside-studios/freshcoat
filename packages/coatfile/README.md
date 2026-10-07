@@ -354,6 +354,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate` |
+| 1.7 | element `backdropBlur` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -641,6 +642,23 @@ the layer composites. On a frame or mask it adjusts the composited result.
 
 It compiles through the engine's `buildAdjust`. A print render composes its
 correction after it rather than replacing it.
+
+## Background blur
+
+Any element can carry `backdropBlur` (1.7): what lies beneath it is blurred
+inside its shape before the element paints, so a translucent fill over it reads
+as frosted glass. The value uses the same scale as `blur` and scales with the
+element. The shape is the element's outline: a frame's rounded box, a rect's
+corners, an ellipse, a vector's fill, an image's mask, else its box. It is
+painted at render time, so it follows whatever is placed beneath it, such as a
+record's photo. It sees only what has been composited into the layer it is
+drawn into: inside a frame with `isolate`, `opacity` below 1, `blendMode`,
+`blur`, `shadow` or `adjust`, that is the frame's own content.
+
+```jsonc
+{ "id": "glass", "type": "rect", "backdropBlur": 24,
+  "properties": { "fill": "#ffffff40", "cornerRadius": 16 } /* … */ }
+```
 
 ## Image focus and crop
 
