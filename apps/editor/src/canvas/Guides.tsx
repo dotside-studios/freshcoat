@@ -1,4 +1,8 @@
-import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import {
+	type KeyboardEvent,
+	memo,
+	type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
 import { type GuideAxis, sideGuides } from "~/doc/guides";
@@ -14,7 +18,7 @@ export const GUIDE_LABEL: Record<GuideAxis, string> = {
 };
 
 /** The active side's ruler guides, over the canvas. */
-export function Guides() {
+export const Guides = memo(function Guides() {
 	const controller = useController();
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
@@ -56,7 +60,7 @@ export function Guides() {
 			)}
 		</div>
 	);
-}
+});
 
 function Guide({
 	axis,
