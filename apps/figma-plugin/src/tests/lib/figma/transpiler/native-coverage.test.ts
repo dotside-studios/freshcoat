@@ -362,38 +362,16 @@ describe("blend modes", () => {
 		expect(classify(n).kind).toBe("native-frame");
 	});
 
-	it("rasterizes a Normal frame that would stop isolating a blended child", () => {
+	it("keeps a Normal frame with a blended child native", () => {
 		expect(
-			flattenReason(
-				frame([rect({ blendMode: "MULTIPLY" })], { blendMode: "NORMAL" }),
-			),
-		).toBe("blend_mode_flattened");
-		expect(
-			flattenReason(
-				frame([frame([rect({ blendMode: "SCREEN" })])], {
-					blendMode: "NORMAL",
-				}),
-			),
-		).toBe("blend_mode_flattened");
-	});
-
-	it("keeps a Normal frame native when its own layer already isolates", () => {
-		expect(
-			classify(
-				frame([rect({ blendMode: "MULTIPLY" })], {
-					blendMode: "NORMAL",
-					opacity: 0.5,
-				}),
-			).kind,
+			classify(frame([rect({ blendMode: "MULTIPLY" })], { blendMode: "NORMAL" }))
+				.kind,
 		).toBe("native-frame");
 		expect(
 			classify(
-				frame(
-					[frame([rect({ blendMode: "MULTIPLY" })], { blendMode: "NORMAL" })],
-					{
-						blendMode: "NORMAL",
-					},
-				),
+				frame([frame([rect({ blendMode: "SCREEN" })])], {
+					blendMode: "NORMAL",
+				}),
 			).kind,
 		).toBe("native-frame");
 	});
@@ -491,6 +469,49 @@ describe("in a transpiled card", () => {
 		const [el] = await elementsOf([group]);
 		expect(el.type).toBe("frame");
 		expect(el.blendMode).toBe("multiply");
+	});
+
+	it("isolates a Normal frame and leaves a pass-through one open", async () => {
+		const [normal, passThrough] = await elementsOf([
+			frame([rect({ blendMode: "MULTIPLY" })], {
+				id: "1:6",
+				name: "normal",
+				blendMode: "NORMAL",
+			}),
+			frame([rect({ blendMode: "MULTIPLY" })], {
+				id: "1:7",
+				name: "open",
+			}),
+		]);
+		expect(normal.type).toBe("frame");
+		expect((normal.properties as Record<string, unknown>).isolate).toBe(true);
+		expect(normal.blendMode).toBeUndefined();
+		expect(passThrough.type).toBe("frame");
+		expect(
+			(passThrough.properties as Record<string, unknown>).isolate,
+		).toBeUndefined();
+	});
+
+	it("gives a Normal group with a blended child an isolated layer", async () => {
+		const [el] = await elementsOf([
+			frame([rect({ blendMode: "MULTIPLY" })], {
+				type: "GROUP",
+				name: "tinted",
+				blendMode: "NORMAL",
+			}),
+		]);
+		expect(el.type).toBe("frame");
+		expect((el.properties as Record<string, unknown>).isolate).toBe(true);
+		const [child] = (el.properties as { children: Record<string, unknown>[] })
+			.children;
+		expect(child?.blendMode).toBe("multiply");
+	});
+
+	it("flattens a Normal group when nothing in it blends", async () => {
+		const [el] = await elementsOf([
+			frame([rect()], { type: "GROUP", name: "plain", blendMode: "NORMAL" }),
+		]);
+		expect(el.type).toBe("rect");
 	});
 
 	it("keeps a field's runs when they spell out its template", async () => {
