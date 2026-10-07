@@ -563,10 +563,10 @@ describe("PaintCache", () => {
 		const { rt } = runtime(fonts, new Map(), cache);
 		const px = await pixels(commands, rt);
 		expect(px).toEqual(plain);
-		// Each fill rule parses the ring once, and each placement its clip.
-		expect(cache.stats().pathBuilds).toBe(5);
+		// Each fill rule parses the ring once, and the placements share one clip.
+		expect(cache.stats().pathBuilds).toBe(3);
 		expect(await pixels(commands, rt)).toEqual(plain);
-		expect(cache.stats().pathBuilds).toBe(5);
+		expect(cache.stats().pathBuilds).toBe(3);
 		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
 		expect(at(14)).toBe(255);
 		expect(at(38)).toBe(0);

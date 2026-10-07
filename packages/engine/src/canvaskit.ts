@@ -347,8 +347,12 @@ function drawClippedStroke(
 type Outline =
 	| { kind: "rect"; rect: Rect }
 	| { kind: "rrect"; rrect: RRect }
-	| { kind: "path"; path: Path };
+	| { kind: "path"; path: Path; dx?: number; dy?: number };
 
+// A path outline is built at the origin and placed by the canvas matrix, as
+// drawPath places a node's path. Skia converts an SVG arc between diametric
+// endpoints in float, so an ellipse built at an offset comes out slightly
+// distorted and antialiases differently from the one drawMasked draws.
 function outlineOf(
 	ck: CanvasKit,
 	bin: Bin,
@@ -361,8 +365,12 @@ function outlineOf(
 ): Outline | null {
 	const g = outlineGeometry(shape, x, y, w, h, inset);
 	if (!g) return null;
-	if (g.kind === "path")
-		return { kind: "path", path: bin.path(ck, g.d) as Path };
+	if (g.kind === "path") {
+		const local = outlineGeometry(shape, 0, 0, w, h, inset);
+		if (local?.kind !== "path") return null;
+		const path = bin.path(ck, local.d) as Path;
+		return { kind: "path", path, dx: x, dy: y };
+	}
 	const rect = ck.LTRBRect(...g.ltrb);
 	if (g.kind === "rect") return { kind: "rect", rect };
 	const [tl, tr, br, bl] = g.radii;
@@ -375,7 +383,13 @@ function outlineOf(
 function drawOutline(canvas: Canvas, o: Outline, paint: Paint) {
 	if (o.kind === "rect") canvas.drawRect(o.rect, paint);
 	else if (o.kind === "rrect") canvas.drawRRect(o.rrect, paint);
-	else canvas.drawPath(o.path, paint);
+	else if (!o.dx && !o.dy) canvas.drawPath(o.path, paint);
+	else {
+		canvas.save();
+		canvas.translate(o.dx ?? 0, o.dy ?? 0);
+		canvas.drawPath(o.path, paint);
+		canvas.restore();
+	}
 }
 
 function clipOutline(
@@ -386,7 +400,17 @@ function clipOutline(
 ) {
 	if (o.kind === "rect") canvas.clipRect(o.rect, op, true);
 	else if (o.kind === "rrect") canvas.clipRRect(o.rrect, op, true);
-	else canvas.clipPath(o.path, op, true);
+	else {
+		canvas.translate(o.dx ?? 0, o.dy ?? 0);
+		canvas.clipPath(o.path, op, true);
+		canvas.translate(-(o.dx ?? 0), -(o.dy ?? 0));
+	}
+}
+
+function outlineMatrix(o: Outline, m: Affine): Affine {
+	return o.kind === "path" && (o.dx || o.dy)
+		? translateAffine(m, o.dx ?? 0, o.dy ?? 0)
+		: m;
 }
 
 function clipShape(
@@ -1665,15 +1689,20 @@ function predictedBounds(
 	) => {
 		const o = outlineOf(ck, bin, shape, x, y, w, h, strokeInset(stroke));
 		if (o) {
-			add(strokeBounds(sortBounds(outlineBounds(o)), stroke), m, within);
+			add(
+				strokeBounds(sortBounds(outlineBounds(o)), stroke),
+				outlineMatrix(o, m),
+				within,
+			);
 			return;
 		}
 		const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 		const doubled = { ...stroke, width: stroke.width * 2 };
-		add(strokeBounds(outlineBounds(whole), doubled), m, [
-			...within,
-			{ ctm: m },
-		]);
+		add(
+			strokeBounds(outlineBounds(whole), doubled),
+			outlineMatrix(whole, m),
+			[...within, { ctm: m }],
+		);
 	};
 	const visitShape = (
 		c: DrawCommand,
@@ -1687,7 +1716,7 @@ function predictedBounds(
 			const shape = rectShape(c.cornerRadius, c.cornerSmoothing);
 			if (c.fills?.length) {
 				const fill = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
-				add(outlineBounds(fill), m, within);
+				add(outlineBounds(fill), outlineMatrix(fill, m), within);
 			}
 			if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
 			return true;
