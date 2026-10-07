@@ -104,6 +104,9 @@
         "typescript": "^5.7.2",
         "vitest": "^4.1.6",
       },
+      "peerDependencies": {
+        "canvaskit-wasm": "^0.41.1",
+      },
     },
     "packages/for-print": {
       "name": "@freshcoat-js/for-print",

@@ -57,12 +57,15 @@ const label = "./x";`;
 				private: true,
 				exports: { ".": "./src/index.ts", "./schema/*": "./schema/*" },
 				dependencies: { "@freshcoat-js/engine": "workspace:*", zod: "^4.0.0" },
+				peerDependencies: { "canvaskit-wasm": "^0.41.1" },
 				devDependencies: { typescript: "^5.7.2" },
 				scripts: { test: "bun test" },
 			},
 			new Map([["@freshcoat-js/engine", "0.1.0"]]),
 		);
 		expect(result.private).toBe(false);
+		expect(result.peerDependencies).toEqual({ "canvaskit-wasm": "^0.41.1" });
+		expect(result.devDependencies).toBeUndefined();
 		expect(result.dependencies).toEqual({
 			"@freshcoat-js/engine": "0.1.0",
 			zod: "^4.0.0",

@@ -69,7 +69,6 @@ try {
 			"--no-fund",
 			"--package-lock=false",
 			...tarballs,
-			"canvaskit-wasm@0.41.1",
 		],
 		consumer,
 	);

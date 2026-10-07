@@ -35,6 +35,8 @@ const result = await renderSceneToPng(root, { width: 640, height: 360, ck });
 ```
 
 You supply CanvasKit initialization and the WASM file location for your host.
+`canvaskit-wasm` is a peer dependency: the engine's types refer to it, and
+your application loads the version it installs.
 For text, also supply a `fonts` map of family names to font byte arrays; the
 helper derives font metrics and creates the Paragraph text engine.
 

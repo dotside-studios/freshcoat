@@ -25,6 +25,9 @@
 		"conformance": "bun run conformance/src/report.ts --goldens",
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
+	"peerDependencies": {
+		"canvaskit-wasm": "^0.41.1"
+	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@types/bun": "^1.3.12",
