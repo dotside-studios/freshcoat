@@ -3911,9 +3911,11 @@ export async function paintScene(
 	};
 }
 
-// Bind to rt.canvas when present (WebGL, SW fallback) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface -> null IS the capability probe
-// (a host canvas that can't back WebGL), so this needs no environment flag.
+// Bind to rt.canvas when present (WebGL, then SW on the same element) ->
+// displayable; otherwise an offscreen raster surface. MakeWebGLCanvasSurface
+// throws when the host canvas can't back WebGL (context creation fails, or
+// MakeOnScreenGLSurface fails and its DOM-node swap throws on an OffscreenCanvas),
+// so a failed WebGL attempt is caught on its own and still falls back to SW.
 // `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
 // is a no-op for the SW/offscreen paths, which hold no such context.
 function makeSurface(
@@ -3924,17 +3926,25 @@ function makeSurface(
 ): { surface: Surface; canvas: CanvasLike; loseContext: () => void } {
 	const noop = () => {};
 	if (rt.canvas) {
+		let el: CanvasLike | undefined;
 		try {
-			const el = rt.canvas.createCanvas(w, h);
+			el = rt.canvas.createCanvas(w, h);
+		} catch {}
+		if (el) {
+			const canvas = el;
 			// Typed for DOM canvases only; any canvas the host makes is accepted.
-			const target = el as unknown as HTMLCanvasElement;
-			const gl = ck.MakeWebGLCanvasSurface(target);
-			if (gl)
-				return { surface: gl, canvas: el, loseContext: () => releaseGL(el) };
-			const sw = ck.MakeSWCanvasSurface(target);
-			if (sw) return { surface: sw, canvas: el, loseContext: noop };
-		} catch {
-			// Fall through to an offscreen surface.
+			const target = canvas as unknown as HTMLCanvasElement;
+			try {
+				const gl = ck.MakeWebGLCanvasSurface(target);
+				if (gl)
+					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
+			} catch {
+				releaseGL(canvas);
+			}
+			try {
+				const sw = ck.MakeSWCanvasSurface(target);
+				if (sw) return { surface: sw, canvas, loseContext: noop };
+			} catch {}
 		}
 	}
 	const surface = ck.MakeSurface(w, h) as Surface;
