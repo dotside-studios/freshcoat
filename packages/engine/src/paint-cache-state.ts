@@ -54,6 +54,8 @@ type CachedSurface = {
 
 const DEFAULT_MAX_IMAGES = 256;
 
+const MAX_BACKGROUNDS = 4;
+
 // What an SVG picture costs beyond the rasters it embeds: its recorded ops.
 export const SVG_PICTURE_PIXELS = 65_536;
 
@@ -70,7 +72,8 @@ export type PaintCacheState = {
 	pathsUsed: Set<string>;
 	luts: LutImages;
 	surface: CachedSurface | null;
-	background: CachedBackground | null;
+	// Most recently used first.
+	backgrounds: CachedBackground[];
 	disposed: boolean;
 };
 
@@ -102,7 +105,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		pathsUsed: new Set(),
 		luts: createLutImages(),
 		surface: null,
-		background: null,
+		backgrounds: [],
 		disposed: false,
 	};
 	const clear = () => {
@@ -114,7 +117,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		for (const entry of state.images.values()) freeImage(entry);
 		state.images.clear();
 		freeLutImages(state.luts);
-		state.background = null;
+		state.backgrounds = [];
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -195,9 +198,9 @@ export function cachedSurface(
 }
 
 // Deletes the cached images this paint's scene did not use, oldest first, until
-// what is left fits the cache's image budget and entry cap. The background,
-// cheaper to redraw than an image is to decode, goes if it does not fit beside
-// them.
+// what is left fits the cache's image budget and entry cap. Backgrounds, cheaper
+// to redraw than an image is to decode, go least recently used first until they
+// fit beside them.
 export function evictUnusedImages(
 	state: PaintCacheState,
 	used: string[],
@@ -224,25 +227,67 @@ export function evictUnusedImages(
 		total -= imagePixels(entry);
 		freeImage(entry);
 	}
-	if (
-		state.maxImagePixels > 0 &&
-		total + backgroundPixels(state) > state.maxImagePixels
-	)
-		state.background = null;
+	if (state.maxImagePixels <= 0) return;
+	for (const bg of state.backgrounds) total += backgroundPixels(bg);
+	while (total > state.maxImagePixels) {
+		const bg = state.backgrounds.pop();
+		if (!bg) break;
+		total -= backgroundPixels(bg);
+	}
 }
 
-// Keeps one background, replacing any other. With an image budget it counts
-// against that budget (see evictUnusedImages).
-export function cacheBackground(
+// The background at `frame` sharing the longest leading run with `keys`, the
+// more recently used on a tie.
+export function closestBackground(
+	state: PaintCacheState,
+	frame: string,
+	keys: string[],
+): { held: CachedBackground; shared: number } | null {
+	let best: { held: CachedBackground; shared: number } | null = null;
+	for (const held of state.backgrounds) {
+		if (held.frame !== frame) continue;
+		const shared = sharedLength(held.keys, keys);
+		if (!best || shared > best.shared) best = { held, shared };
+	}
+	return best;
+}
+
+export function touchBackground(
 	state: PaintCacheState,
 	background: CachedBackground,
 ): void {
-	state.background = background;
+	const at = state.backgrounds.indexOf(background);
+	if (at > 0) {
+		state.backgrounds.splice(at, 1);
+		state.backgrounds.unshift(background);
+	}
+	state.stats.backgroundReuses++;
+}
+
+// Keeps `background` as the most recently used, in place of `replaces` when
+// given, else beside the others with the least recently used out past the cap.
+// With an image budget they count against it (see evictUnusedImages).
+export function cacheBackground(
+	state: PaintCacheState,
+	background: CachedBackground,
+	replaces: CachedBackground | null,
+): void {
+	const at = replaces ? state.backgrounds.indexOf(replaces) : -1;
+	if (at >= 0) state.backgrounds.splice(at, 1);
+	state.backgrounds.unshift(background);
+	if (state.backgrounds.length > MAX_BACKGROUNDS)
+		state.backgrounds.length = MAX_BACKGROUNDS;
 	state.stats.backgroundSnapshots++;
 }
 
-function backgroundPixels(state: PaintCacheState): number {
-	return state.background ? state.background.pixels.length / 4 : 0;
+function sharedLength(a: string[], b: string[]): number {
+	let n = 0;
+	while (n < a.length && n < b.length && a[n] === b[n]) n++;
+	return n;
+}
+
+function backgroundPixels(background: CachedBackground): number {
+	return background.pixels.length / 4;
 }
 
 function imagePixels(entry: CachedImage): number {

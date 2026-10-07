@@ -51,12 +51,14 @@ import {
 	cachedMipmaps,
 	cachedPath,
 	cachedSurface,
+	closestBackground,
 	evictUnusedImages,
 	evictUnusedLines,
 	evictUnusedPaths,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
+	touchBackground,
 } from "./paint-cache-state";
 import {
 	decorationLine,
@@ -3251,12 +3253,6 @@ function passThrough(cmd: DrawCommand): boolean {
 	);
 }
 
-function sharedLength(a: string[], b: string[]): number {
-	let n = 0;
-	while (n < a.length && n < b.length && a[n] === b[n]) n++;
-	return n;
-}
-
 function writeBackground(
 	canvas: Canvas,
 	pixels: Uint8Array,
@@ -3462,17 +3458,19 @@ export async function paintScene(
 			cmd.op !== "loadImages" &&
 			cmd.op !== "finishFrame", // handled as a post-pass, after the loop
 	);
-	// An offscreen paint whose leading drawables match the cached background's
+	// An offscreen paint whose leading drawables match a cached background's
 	// writes its pixels instead of drawing them. One that shares only part of
-	// that run keeps the shared part for the next paint; one that shares none
-	// keeps its own.
+	// the closest one's run keeps the shared part in its place; one that shares
+	// none keeps its own beside the others.
 	const pixelInfo = cache && !rt.canvas ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
 		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
 		: "";
 	const lead = pixelInfo ? backgroundKeys(drawables) : [];
-	const held = cache?.background?.frame === bgFrame ? cache.background : null;
-	const shared = held ? sharedLength(held.keys, lead) : 0;
+	const closest =
+		cache && pixelInfo ? closestBackground(cache, bgFrame, lead) : null;
+	const held = closest?.held ?? null;
+	const shared = closest?.shared ?? 0;
 	let skip = 0;
 	if (
 		cache &&
@@ -3482,7 +3480,7 @@ export async function paintScene(
 		writeBackground(skCanvas, held.pixels, pixelInfo)
 	) {
 		skip = shared;
-		cache.stats.backgroundReuses++;
+		touchBackground(cache, held);
 		warnings.push(...held.warnings);
 	}
 	const snapAt = skip ? 0 : shared || lead.length;
@@ -3542,12 +3540,16 @@ export async function paintScene(
 			if (cache && pixelInfo && i + 1 === snapAfter) {
 				const pixels = skCanvas.readPixels(0, 0, pixelInfo) as Uint8Array | null;
 				if (pixels)
-					cacheBackground(cache, {
-						keys: lead.slice(0, snapAt),
-						frame: bgFrame,
-						pixels,
-						warnings: warnings.slice(warningsBefore),
-					});
+					cacheBackground(
+						cache,
+						{
+							keys: lead.slice(0, snapAt),
+							frame: bgFrame,
+							pixels,
+							warnings: warnings.slice(warningsBefore),
+						},
+						shared ? held : null,
+					);
 			}
 		}
 		// Whole-frame finishing runs on the composited result, so after every

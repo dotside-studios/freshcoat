@@ -1,8 +1,8 @@
 // An opt-in cache a runtime carries across paints of the same scene, for an
 // interactive caller that repaints many times a second. It keeps what paintScene
 // would otherwise rebuild on every paint: the font provider, the shaped lines of
-// text, the decoded images, the output surface and, offscreen, the pixels of a
-// leading background the paints share. A runtime without one paints exactly as
+// text, the decoded images, the output surface and, offscreen, the pixels of the
+// leading backgrounds the paints share. A runtime without one paints exactly as
 // it always has, building and freeing all three per paint.
 //
 // By default a paint frees every cached image its scene did not draw. A batch
