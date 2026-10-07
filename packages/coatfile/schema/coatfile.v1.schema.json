@@ -7755,6 +7755,9 @@
 								"clipsContent": {
 									"type": "boolean"
 								},
+								"isolate": {
+									"type": "boolean"
+								},
 								"layout": {
 									"anyOf": [
 										{

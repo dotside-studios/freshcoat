@@ -80,6 +80,7 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 	const clip = commonValue(
 		frames.map((f) => f.properties.clipsContent === true),
 	);
+	const isolate = commonValue(frames.map((f) => f.properties.isolate === true));
 	const pick = <T,>(fn: (l: Layout) => T) => commonValue(present.map(fn));
 
 	const setLayout = (field: string, patch: (l: Layout) => Layout | null) =>
@@ -110,6 +111,17 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 					}
 				>
 					Clip content
+				</Checkbox>
+				<Checkbox
+					isSelected={isolate === true}
+					isIndeterminate={isolate === null}
+					onChange={(on) =>
+						ins.setProps("isolate", () => ({
+							isolate: on ? true : undefined,
+						}))
+					}
+				>
+					Isolate blending
 				</Checkbox>
 			</PanelSection>
 			<PanelSection

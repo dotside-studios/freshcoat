@@ -10,6 +10,7 @@
 // pos/size. freshcoat owns text *shaping* (the TextEngine) but knows nothing
 // about templates — the caller delivers final resolved values on the nodes.
 import { bakeText, resolveLeadingTrim, textClipOutset } from "./bake-text";
+import { parseColor } from "./color";
 import { metricsLookup, resolveAutoLineHeights } from "./line-height";
 import type {
 	EllipseNode,
@@ -264,6 +265,7 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				...base,
 				op: "drawGroup",
 				clip: groupClip(node),
+				...(node.isolate ? { isolate: true } : {}),
 				children: [
 					...groupBackground(node, base),
 					...node.children.map((c) => lower(c, ctx)),
@@ -330,9 +332,9 @@ function lowerText(
 	};
 }
 
-// A mask node lowers by what its mask IS: a single opaque shape → a drawGroup
-// whose clip is the shape (one cheap clipPath, at the mask shape's box); any
-// other mask → a drawMasked command the painter composites via an offscreen
+// A mask node lowers by what its mask IS: a shape whose rendered coverage is
+// exactly its geometry → a drawGroup clipped to that shape (one cheap clipPath);
+// any other mask → a drawMasked command the painter composites via an offscreen
 // coverage layer.
 //
 // `invert` and `channel` disqualify the fast path whatever the shape is. A
@@ -349,15 +351,20 @@ function lowerMask(
 	const shape =
 		node.invert || node.channel === "luminance" ? null : fastClip(node.mask);
 	if (shape) {
-		// The clip is built at the mask SHAPE's box; the mask node's own transform
-		// (opacity/blend/blur/shadow/rotation) still wraps the masked content.
+		// The outer group keeps the mask node's box, so its rotation pivots where
+		// the general path's does; the clip sits inside at the mask shape's box.
 		return {
 			...base,
-			pos: node.mask.pos ?? { x: 0, y: 0 },
-			size: node.mask.size ?? { width: 0, height: 0 },
 			op: "drawGroup",
-			clip: shape,
-			children,
+			children: [
+				{
+					op: "drawGroup",
+					pos: node.mask.pos ?? { x: 0, y: 0 },
+					size: node.mask.size ?? { width: 0, height: 0 },
+					clip: shape,
+					children,
+				},
+			],
 		};
 	}
 	return {
@@ -370,38 +377,40 @@ function lowerMask(
 	};
 }
 
-// The conservative fast-path predicate: a mask that is a single opaque vector
-// shape (rect/ellipse, no transform effects, no gradient/partial-alpha fill,
-// uniform corner radius) maps to a ShapeMask clipPath. Everything else (paths,
-// per-corner radii, images, text, groups, any opacity/blur/blend/rotation on
-// the mask) returns null → the offscreen path. It reads the MASK only; the mask
-// node's own `invert`/`channel` are the caller's to check.
+// The fast-path predicate: a rect/ellipse whose painted alpha is exactly 1 over
+// its geometry and 0 outside it, so clipping to the geometry keeps the same
+// pixels. That means one opaque solid fill, no stroke, no adjust, no transform
+// effects, uniform corner radius. Everything else returns null → the offscreen
+// path. It reads the MASK only; the mask node's own `invert`/`channel` are the
+// caller's to check.
 function fastClip(mask: Node): ShapeMask | null {
 	if (
 		mask.rotation ||
 		(mask.opacity !== undefined && mask.opacity < 1) ||
 		mask.blur ||
 		(mask.blendMode && mask.blendMode !== "normal") ||
-		mask.shadow
+		mask.shadow ||
+		mask.adjust
 	)
 		return null;
-	if (mask.kind === "ellipse")
-		return solidOrNone(mask.fills) ? { kind: "ellipse" } : null;
-	if (mask.kind === "rect") {
-		if (!solidOrNone(mask.fills)) return null;
-		const cr = mask.cornerRadius;
-		if (Array.isArray(cr)) return null; // per-corner → offscreen
-		if (mask.cornerSmoothing && typeof cr === "number" && cr > 0)
-			return { kind: "squircle", radius: cr };
-		if (typeof cr === "number" && cr > 0)
-			return { kind: "rounded-rect", radius: cr };
-		return { kind: "rect" };
-	}
-	return null;
+	if (mask.kind !== "rect" && mask.kind !== "ellipse") return null;
+	if (mask.stroke || !opaqueSolid(mask.fills)) return null;
+	if (mask.kind === "ellipse") return { kind: "ellipse" };
+	const cr = mask.cornerRadius;
+	if (Array.isArray(cr)) return null;
+	if (mask.cornerSmoothing && typeof cr === "number" && cr > 0)
+		return { kind: "squircle", radius: cr, smoothing: mask.cornerSmoothing };
+	if (typeof cr === "number" && cr > 0)
+		return { kind: "rounded-rect", radius: cr };
+	return { kind: "rect" };
 }
 
-function solidOrNone(fills: RectNode["fills"]): boolean {
-	return !fills || (fills.length === 1 && fills[0].kind === "solid");
+function opaqueSolid(fills: RectNode["fills"]): boolean {
+	if (fills?.length !== 1) return false;
+	const fill = fills[0];
+	if (fill.kind !== "solid") return false;
+	const c = parseColor(fill.color);
+	return Array.isArray(c) && c[3] >= 1;
 }
 
 // A group's self-clip: clip children to its box, honoring its corner radius.

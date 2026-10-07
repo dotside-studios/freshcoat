@@ -406,6 +406,50 @@ add(
 	],
 );
 
+// A multiply child over the group's own (128,128,255) and over nothing the group
+// drew, on a (255,128,0) ground. Isolated, the empty part has only the child to
+// mix with; passed through, it multiplies the ground.
+const isolationScene = (isolate: boolean) =>
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#ff8000") }),
+		createGroup(
+			[
+				createRect({ ...box(0, 0, 80, H), fills: solid("#8080ff") }),
+				createRect({
+					...box(40, 30, 80, 60),
+					fills: solid("#00ff00"),
+					blendMode: "multiply",
+				}),
+			],
+			{ ...box(0, 0, W, H), ...(isolate ? { isolate: true } : {}) },
+		),
+	]);
+
+add(
+	"group-isolate",
+	"an isolated group's blended child mixes only with the group's content",
+	"core",
+	["group.isolate", "blend.multiply"],
+	isolationScene(true),
+	[
+		px([60, 60], [0, 128, 0, 255], "over the group's own content", 2),
+		px([100, 60], [0, 255, 0, 255], "over nothing the group drew", 2),
+		px([140, 10], [255, 128, 0, 255], "the ground, outside the child"),
+	],
+);
+
+add(
+	"group-pass-through",
+	"a group without isolation lets a blended child mix with the ground",
+	"core",
+	["blend.multiply"],
+	isolationScene(false),
+	[
+		px([60, 60], [0, 128, 0, 255], "over the group's own content", 2),
+		px([100, 60], [0, 128, 0, 255], "over the ground", 2),
+	],
+);
+
 // Per-corner radii on a group's clip: only the top-left corner is rounded.
 add(
 	"clip-per-corner",
@@ -908,6 +952,39 @@ add(
 			[35, 25],
 			[255, 255, 255, 255],
 			"including where the shape plainly covers it",
+		),
+	],
+);
+
+add(
+	"mask-luminance-alpha",
+	"a luminance mask's coverage is its luminance times its alpha",
+	"core",
+	["mask.luminance", "mask.invert"],
+	frame([
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff80") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(30, 20, 50, 80), channel: "luminance" },
+		),
+		createMask(
+			createRect({ ...box(0, 0, 50, 80), fills: solid("#ffffff40") }),
+			[createRect({ ...box(0, 0, 50, 80), fills: solid("#2f6fed") })],
+			{ ...box(80, 20, 50, 80), channel: "luminance", invert: true },
+		),
+	]),
+	[
+		px(
+			[55, 60],
+			[151, 183, 246, 255],
+			"white at 50% alpha keeps 50% of the content, not all of it",
+			3,
+		),
+		px(
+			[105, 60],
+			[99, 147, 242, 255],
+			"inverted white at 25% alpha keeps 75%",
+			3,
 		),
 	],
 );
@@ -1705,6 +1782,38 @@ add(
 	],
 );
 
+// The LUT is the identity, so the layer still reads as plain multiply: the blend
+// meets the real destination, not the transparent offscreen the LUT runs in.
+const identityLut = () => ({
+	lut: { r: table((i) => i), g: table((i) => i), b: table((i) => i) },
+});
+add(
+	"adjust-lut-keeps-blend",
+	"an adjusted layer keeps its blend mode and opacity",
+	"raster",
+	["adjust.lut", "blend.multiply", "transform.opacity"],
+	frame([
+		createRect({ ...box(0, 0, W, H), fills: solid("#0000ff") }),
+		createRect({
+			...box(20, 30, 50, 60),
+			fills: solid("#ff0000"),
+			blendMode: "multiply",
+			adjust: identityLut(),
+		}),
+		createRect({
+			...box(90, 30, 50, 60),
+			fills: solid("#ffffff"),
+			opacity: 0.5,
+			adjust: identityLut(),
+		}),
+	]),
+	[
+		px([45, 60], [0, 0, 0, 255], "multiply of red over blue", 2),
+		px([115, 60], [128, 128, 255, 255], "half opacity applied once", 2),
+		{ kind: "warning", warning: "adjust_unsupported", absent: true },
+	],
+);
+
 // ─── layer effect order ───────────────────────────────────────────────────────
 
 // Adjust recolors the drawable, not the shadows it casts: a shadow keeps its own
@@ -1750,28 +1859,6 @@ add(
 	[
 		px([40, 60], [237, 111, 47, 255], "(47,111,237) with R and B exchanged", 2),
 		px([100, 60], [32, 64, 192, 255], "the shadow in its own color", 2),
-	],
-);
-
-// Blend mode composites the adjusted layer onto its parent. A backend blending
-// before the adjust pass blends against nothing and lands 64 here.
-add(
-	"adjust-lut-blends-on-composite",
-	"an adjusted layer's blend mode reads the pixels below it",
-	"raster",
-	["adjust.lut", "blend.multiply"],
-	frame([
-		createRect({ ...box(20, 20, 120, 80), fills: solid("#808080") }),
-		createRect({
-			...box(40, 30, 80, 60),
-			fills: solid("#808080"),
-			blendMode: "multiply",
-			adjust: buildAdjust({ gamma: 2 }),
-		}),
-	]),
-	[
-		px([80, 60], [32, 32, 32, 255], "64 multiplied onto 128", 2),
-		px([30, 25], [128, 128, 128, 255], "the layer below, outside the square"),
 	],
 );
 

@@ -96,6 +96,31 @@ test: fix the cache, then add a focused regression test to
 `paint-cache.test.ts`. Do not change the seeds or the generator to get a
 green run.
 
+The random scenes come from [`scene-gen.ts`](packages/engine/tests/scene-gen.ts),
+which covers masks, adjustments and every blend mode. A new node kind or
+effect belongs there too, so both suites below pick it up.
+
+### Feature combination tests
+
+[`combinations.test.ts`](packages/engine/tests/combinations.test.ts) checks
+invariants that hold across features, rather than one feature at a time:
+
+- an identity `lut`, `lut3d`, `colorMatrix` or `sharpen: 0` leaves every
+  blend mode, opacity, blur, shadow and rotated group unchanged;
+- the mask clip shortcut and the general `drawMasked` path paint the same
+  pixels for each mask shape, placement and rotation;
+- mask coverage is luminance times alpha;
+- bounded and unbounded effect layers paint the same `scene-gen.ts` scenes.
+
+Every case also asserts that the paint raised no unexpected warnings.
+
+Each invariant is a set of tables passed to `each`, which registers a test
+per combination of rows, so a new feature is one row. A combination that
+hits a known bug is registered as `test.failing` with the bug in its name.
+When a fix lands, its tests fail as unexpected passes: drop the bug from the
+suite in the same change. Do not widen a
+tolerance or drop a row to get a green run.
+
 ### Render benchmark
 
 [`bench-render.ts`](apps/editor/scripts/bench-render.ts) times `compileScene`

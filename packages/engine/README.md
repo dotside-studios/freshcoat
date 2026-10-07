@@ -93,6 +93,10 @@ table and sharpening) are engine operations. `FrameFinish` applies operations
 is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
+A luminance mask's coverage is its luminance times its alpha, as in SVG 1.1
+masking. Luminance uses Rec. 709 weights on the sRGB-encoded color, not on
+linearRGB as SVG's default `color-interpolation` would.
+
 A node holds one `Adjust`. `composeAdjust(first, second)` folds a second one
 onto a layer that already has its own, baking the second into a 3D lookup
 table so the result matches applying them in turn.

@@ -132,21 +132,21 @@ in full.
 
 ## Coverage
 
-66 cases.
+69 cases.
 
 | Covered | Cases |
 |---|---|
 | Fills | `fill-solid`, `fill-linear`, `fill-radial`, `fill-angular` |
 | Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `blend-linear-burn`, `opacity` |
-| Clipping and masking | `clip-circle`, `clip-per-corner`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape` |
+| Clipping and masking | `clip-circle`, `clip-per-corner`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape`, `mask-luminance-alpha` |
 | Shapes | `ellipse`, `path-viewbox`, `path-fill-rule`, `corner-radius`, `corner-radius-per-corner` |
 | Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask` |
 | Shadows | `shadow-spread`, `shadow-inset`, `shadow-stacked` |
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing` |
-| Containers | `group-fills` |
+| Containers | `group-fills`, `group-isolate`, `group-pass-through` |
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
-| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group` |
-| Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color`, `adjust-lut-blends-on-composite` |
+| Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
+| Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |
 | Frame finish | `finish-white-clamp`, `finish-black-extract`, `finish-dither` |
 | Export | `export-scale`, `supersample` |

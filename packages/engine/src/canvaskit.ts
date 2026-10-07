@@ -394,6 +394,8 @@ function maskSvg(
 			return `${d}Z`;
 		}
 		case "squircle": {
+			if (clip.smoothing !== undefined)
+				return squircleSvg(x, y, w, h, clip.radius, clip.smoothing);
 			const max = Math.min(w, h) / 2;
 			const r = Math.min(clip.radius, max);
 			const p = Math.min(r * 1.5, max);
@@ -434,7 +436,7 @@ function insetMask(clip: ShapeMask, inset: number): ShapeMask | null {
 		case "rounded-rect":
 			return { kind: "rounded-rect", radius: insetCorner(clip.radius, inset) };
 		case "squircle":
-			return { kind: "squircle", radius: Math.max(0, clip.radius - inset) };
+			return { ...clip, radius: Math.max(0, clip.radius - inset) };
 		case "circle":
 		case "ellipse":
 			return clip;
@@ -1327,8 +1329,13 @@ function drawShape(
 
 // The general mask: draw children to an offscreen content layer, then composite
 // the mask's coverage onto it. DstIn keeps content where the mask is opaque
-// (DstOut where it's transparent, for invert); a luminance channel first maps
-// the mask's brightness to alpha via a color matrix.
+// (DstOut where it's transparent, for invert). Luminance coverage is
+// luminance(straight RGB) × alpha (SVG 1.1 masking), which equals luminance of
+// the premultiplied color. A color matrix sees unpremultiplied color, so the
+// mask is first composited over opaque black: the result is opaque with the
+// premultiplied RGB, and the matrix then maps its luminance to alpha.
+// Luminance is taken on sRGB-encoded values with Rec. 709 weights, not on
+// linearRGB as SVG's default color-interpolation would.
 function drawMasked(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -1357,10 +1364,17 @@ function drawMasked(
 	if (cmd.channel === "luminance")
 		maskPaint.setColorFilter(
 			bin.track(
-				ck.ColorFilter.MakeMatrix([
-					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152, 0.0722,
-					0, 0,
-				]),
+				ck.ColorFilter.MakeCompose(
+					bin.track(
+						ck.ColorFilter.MakeMatrix([
+							0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2126, 0.7152,
+							0.0722, 0, 0,
+						]),
+					),
+					bin.track(
+						ck.ColorFilter.MakeBlend(ck.BLACK, ck.BlendMode.DstOver),
+					),
+				),
 			),
 		);
 	canvas.saveLayer(maskPaint, bounds);
@@ -2081,9 +2095,11 @@ function snapBarcodeAffine(
 	);
 }
 
-// Whether layerPaint would build a paint for this drawable.
+// Whether paintDrawable gives this drawable a layer: an isolated group, or one
+// layerPaint builds a paint for.
 function hasLayerPaint(cmd: DrawCommand): boolean {
 	return (
+		isolates(cmd) ||
 		(!!cmd.blendMode && cmd.blendMode !== "normal") ||
 		(cmd.opacity !== undefined && cmd.opacity < 1) ||
 		(typeof cmd.blur === "number" && cmd.blur > 0) ||
@@ -3150,6 +3166,10 @@ function layerBounds(
 	return ck.LTRBRect(l, t, r, btm);
 }
 
+function isolates(cmd: DrawCommand): boolean {
+	return cmd.op === "drawGroup" && cmd.isolate === true;
+}
+
 // Whether a layer paint keeps the destination wherever its layer is transparent,
 // so bounding the layer cannot change what lands outside it.
 function layerPaintBoundable(cmd: DrawCommand): boolean {
@@ -3199,6 +3219,22 @@ function nearestEdgesClear(cmd: DrawBitmapCommand, m: Affine): boolean {
 	return clear(x, w, cmd.pixelWidth) && clear(y, h, cmd.pixelHeight);
 }
 
+function setLayerBlend(
+	ck: CanvasKit,
+	bin: Bin,
+	paint: Paint,
+	blendMode: BlendMode | undefined,
+) {
+	if (!blendMode || blendMode === "normal") return;
+	const blender =
+		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
+	if (blender) paint.setBlender(blender);
+	else
+		paint.setBlendMode(
+			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
+		);
+}
+
 // A layer paint carrying opacity + blend + blur/shadow + adjust, so the element
 // composites onto everything below it exactly like a Figma layer. The effects
 // run in the order README.md's "Layer effect order" gives: the color matrix is
@@ -3214,14 +3250,7 @@ function layerPaint(ck: CanvasKit, bin: Bin, cmd: DrawCommand): Paint | null {
 		return null;
 	const paint = bin.track(new ck.Paint());
 	if (hasOpacity) paint.setAlphaf(opacity);
-	const blender =
-		blendMode === "linear-burn" ? linearBurnBlender(ck, bin) : null;
-	if (blender) paint.setBlender(blender);
-	else if (blendMode && blendMode !== "normal") {
-		paint.setBlendMode(
-			ck.BlendMode[SKIA_BLEND_MODE[blendMode]] ?? ck.BlendMode.SrcOver,
-		);
-	}
+	setLayerBlend(ck, bin, paint, blendMode);
 	let filter: ImageFilter | null = colorFilter
 		? bin.track(ck.ImageFilter.MakeColorFilter(colorFilter, null))
 		: null;
@@ -3379,6 +3408,10 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		adjust: _a,
 		...rest
 	} = cmd;
+	if (rest.op === "drawGroup") {
+		const { isolate: _i, ...group } = rest;
+		return group as DrawCommand;
+	}
 	return rest as DrawCommand;
 }
 
@@ -3422,7 +3455,8 @@ function paintDrawable(
 		canvas.translate(-cx, -cy);
 	}
 	const lp = layerPaint(ck, bin, cmd);
-	if (lp) {
+	const layered = lp !== null || isolates(cmd);
+	if (layered) {
 		const bounds = layerPaintBoundable(cmd)
 			? layerBounds(
 					ck,
@@ -3434,7 +3468,7 @@ function paintDrawable(
 					frame,
 				)
 			: null;
-		canvas.saveLayer(lp, bounds);
+		canvas.saveLayer(lp ?? undefined, bounds);
 	}
 	// drawImage clips/strokes itself so its stroke isn't clipped.
 	if (cmd.clip && cmd.op !== "drawImage")
@@ -3452,7 +3486,7 @@ function paintDrawable(
 			true,
 		);
 	drawShape(ck, canvas, provider, images, bin, cmd, issues, frame);
-	if (lp) canvas.restore();
+	if (layered) canvas.restore();
 	canvas.restore();
 }
 
@@ -3532,6 +3566,7 @@ function selfContained(cmd: DrawCommand): boolean {
 // its transform and clip alone.
 function passThrough(cmd: DrawCommand): boolean {
 	return (
+		!isolates(cmd) &&
 		!cmd.adjust &&
 		!cmd.shadow &&
 		!(cmd.blur && cmd.blur > 0) &&

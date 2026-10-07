@@ -19,9 +19,10 @@ import type { Template } from "./types";
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
+//   1.6  frame `isolate`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 5;
+export const FORMAT_MINOR = 6;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -82,6 +83,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "frame") {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
+				if (usesIsolate(o.properties)) need(6);
 			}
 		}
 		if (o.blendMode === "linear-burn") need(5);
@@ -104,6 +106,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (usesTextLayout(delta.properties)) need(5);
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
+				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
 			}
 		}
 	}
@@ -116,6 +119,14 @@ function usesPerCornerRadius(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		Array.isArray((properties as Record<string, unknown>).cornerRadius)
+	);
+}
+
+function usesIsolate(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).isolate !== undefined
 	);
 }
 
