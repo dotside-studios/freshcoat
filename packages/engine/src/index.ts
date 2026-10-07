@@ -142,6 +142,12 @@ export {
 	encodePng,
 	type PngEffort,
 } from "./png";
+export {
+	PATTERN_DEFAULTS,
+	PATTERN_KINDS,
+	type PatternFill,
+	patternFill,
+} from "./pattern";
 export { resolveLayout } from "./resolve-layout";
 export { outlinePath, rectShape } from "./outline";
 export { squircleSvg } from "./squircle";

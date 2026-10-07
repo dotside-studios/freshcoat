@@ -10,6 +10,7 @@ import {
 	type Node,
 	type PaintWarning,
 	type PathNode,
+	patternFill,
 	type RectNode,
 	scalePathData,
 	type TextNode,
@@ -222,7 +223,7 @@ function compileFrame(
 		warnings: [],
 	};
 	const children: Node[] = [
-		compileBackground(frame.background, ctx, targetWidth, targetHeight),
+		compileBackground(frame.background, ctx, targetWidth, targetHeight, ratio),
 		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
 	];
 	const root: GroupNode = {
@@ -252,6 +253,7 @@ function compileBackground(
 	ctx: Record<string, unknown>,
 	targetWidth: number,
 	targetHeight: number,
+	ratio: number,
 ): Node {
 	const props = substitute(bg.properties, ctx) as Record<string, unknown>;
 	const pos: Vec2 = { x: 0, y: 0 };
@@ -270,7 +272,7 @@ function compileBackground(
 		return {
 			...transform,
 			kind: "rect",
-			fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+			fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 			stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
 			cornerRadius: scaleCorner(props.cornerRadius, 1),
 			cornerSmoothing:
@@ -322,7 +324,7 @@ function compileElement(
 			return {
 				...transform,
 				kind: "rect",
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 				cornerRadius: scaleCorner(props.cornerRadius, ratio),
 				cornerSmoothing:
@@ -352,7 +354,7 @@ function compileElement(
 				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
 					? { fillRule: props.fillRule }
 					: {}),
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined),
+				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 			} satisfies PathNode;
 		case "text":
@@ -493,7 +495,7 @@ function compileText(
 	}
 
 	// A gradient text fill (mapped to the box) overrides the solid color.
-	const resolvedFill = resolveFill(props.fill as Fill | undefined);
+	const resolvedFill = resolveFill(props.fill as Fill | undefined, ratio);
 	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
 	return node;
 }
@@ -544,7 +546,7 @@ function compileFrameElement(
 	scope: CompileScope,
 ): GroupNode {
 	const size = base.size;
-	const fills = resolveFills(props.fill as Fill | Fill[] | undefined);
+	const fills = resolveFills(props.fill as Fill | Fill[] | undefined, ratio);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
 	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	const clip = props.clipsContent === true;
@@ -1291,20 +1293,29 @@ function scaleCorner(cr: unknown, ratio: number): CornerRadius | undefined {
 
 function resolveFills(
 	fill: Fill | Fill[] | undefined,
+	ratio: number,
 ): ResolvedFill[] | undefined {
 	if (fill === undefined) return undefined;
 	const arr = Array.isArray(fill) ? fill : [fill];
 	const resolved: ResolvedFill[] = [];
 	for (const f of arr) {
-		const r = resolveFill(f);
+		const r = resolveFill(f, ratio);
 		if (r !== undefined) resolved.push(r);
 	}
 	return resolved.length > 0 ? resolved : undefined;
 }
 
-function resolveFill(fill: Fill | undefined): ResolvedFill | undefined {
+function resolveFill(
+	fill: Fill | undefined,
+	ratio: number,
+): ResolvedFill | undefined {
 	if (fill === undefined) return undefined;
 	if (typeof fill === "string") return { kind: "solid", color: fill };
+	if (fill.kind === "pattern") {
+		const { kind: _, pattern, ...params } = fill;
+		const resolved = patternFill(pattern, params);
+		return { ...resolved, scale: resolved.scale * ratio };
+	}
 	if (fill.kind === "linear") {
 		// Explicit points place the gradient; `angle` is then only what a reader
 		// that predates them draws.

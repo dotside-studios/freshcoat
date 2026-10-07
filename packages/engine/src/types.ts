@@ -65,6 +65,8 @@ export type FontDescriptor =
 
 export type GradientStop = { offset: number; color: string };
 
+export type PatternKind = "noise" | "paper" | "hatching" | "dots";
+
 export type FontRequest =
 	| { family: string }
 	| { family: string; descriptor: FontDescriptor };
@@ -200,6 +202,19 @@ export type ResolvedFill =
 			stops: GradientStop[];
 			center: Vec2;
 			rotation: number;
+	  }
+	// A procedural pattern in design units, anchored at the drawable's top-left,
+	// so it moves with the shape and keeps its size at every export density.
+	// `scale` is the feature size: noise grain, paper fibre, line spacing or dot
+	// pitch. `density` in [0, 1] is how much of colors[1] covers colors[0].
+	| {
+			kind: "pattern";
+			pattern: PatternKind;
+			scale: number;
+			angle: number;
+			density: number;
+			seed: number;
+			colors: [string, string];
 	  };
 
 export type ResolvedFont = {
