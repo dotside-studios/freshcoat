@@ -815,6 +815,27 @@ which is where Figma puts it. (Compiling the trim by default lifted every block
 by about `ascent − capHeight` — 0.39em in Vend Sans — above the layer it came
 from.)
 
+### Text on an arc
+
+`arc` sets a text element along a circle centered on its box, for seals,
+badges and circular labels. Each hard line is one ring and nothing wraps.
+
+```json
+"arc": { "direction": "inside", "startAngle": 180, "align": "center" }
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `radius` | Baseline radius of the first ring, in design units | Fits the glyphs inside the box |
+| `startAngle` | Degrees clockwise from 12 o'clock where `align` anchors the ring | `0` |
+| `direction` | `outside` reads clockwise with tops outward; `inside` reads counter-clockwise with tops inward | `outside` |
+| `align` | `start`, `center` or `end` of the ring at `startAngle` | `center` |
+| `sweep` | Spreads each ring's glyphs across this many degrees | Natural spacing |
+
+Glyphs come from the same shaping as straight text, so ligatures, variable
+axes and per-glyph font fallback carry over. Decorations are not drawn on an
+arc.
+
 ### Per-span line height
 
 A span's `font.lineHeight` (a number or `"auto"`) is that span's own line box,
