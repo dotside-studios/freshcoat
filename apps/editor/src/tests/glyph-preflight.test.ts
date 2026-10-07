@@ -97,7 +97,12 @@ describe("checkAllGlyphs", () => {
 			item(`r${i}`, { name: "漢", note: "" }),
 		);
 		let checks = 0;
-		const out = await checkAllGlyphs(template, many, renderer, () => ++checks > 1);
+		const out = await checkAllGlyphs(
+			template,
+			many,
+			renderer,
+			() => ++checks > 1,
+		);
 		expect(out).toBeNull();
 	});
 
