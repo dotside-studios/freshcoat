@@ -89,7 +89,8 @@ spans together, does not shrink them.
 Gradients, masks, blend modes (linear burn runs as a runtime blender, since
 Skia has no native mode for it) and per-layer `Adjust` (color matrix, lookup
 table and sharpening) are engine operations. `FrameFinish` applies operations
-after the whole scene is composited. The engine implements these operations;
+(a per-channel curve, white and black thresholds, dither) after the whole scene
+is composited. The engine implements these operations;
 the caller decides when and where to use them.
 
 A node holds one `Adjust`. `composeAdjust(first, second)` folds a second one

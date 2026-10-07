@@ -19,8 +19,9 @@ import {
 	classifyIntent,
 	planScene,
 	printAdjust,
+	printFinish,
 } from "../src/plan";
-import { NO_PROCESSING, YMCKO_PRESET } from "../src/presets";
+import { NO_PROCESSING, YMCKO_FINISH, YMCKO_PRESET } from "../src/presets";
 import type { PixelData, PrintOptimizeOptions } from "../src/types";
 
 const FONT = {
@@ -221,8 +222,8 @@ describe("planScene (sync)", () => {
 		const own = buildAdjust({ saturation: 1.2 });
 		const scene = (): Node => ({ ...imageNode(), adjust: own });
 		const balance = { r: 0.95, g: 1, b: 1.05 };
-		const a = planScene(scene(), { balance }).adjust;
-		const b = planScene(scene(), { balance }).adjust;
+		const a = planScene(scene()).adjust;
+		const b = planScene(scene()).adjust;
 		expect(a?.lut3d).toBeDefined();
 		expect(b?.lut3d).toBe(a?.lut3d);
 		const pa = printAdjust({ ...YMCKO_PRESET, balance });
@@ -504,5 +505,34 @@ describe("analyzeScene (sampler)", () => {
 		)) as typeof tree;
 		expect(calls).toBe(0);
 		expect(planned.children[0].adjust).toBeUndefined();
+	});
+});
+
+describe("printFinish", () => {
+	test("is the YMCKO finish when nothing is measured", () => {
+		expect(printFinish()).toBe(YMCKO_FINISH);
+		expect(printFinish({ r: 1, g: 1, b: 1 })).toBe(YMCKO_FINISH);
+	});
+
+	test("carries the balance as a per-channel curve", () => {
+		const finish = printFinish({ r: 1.1, g: 1, b: 0.9 });
+		expect(finish).toMatchObject(YMCKO_FINISH);
+		const curve = finish.curve;
+		if (!curve) throw new Error("no curve");
+		for (const i of [0, 64, 128, 200, 255]) {
+			expect(curve.r[i]).toBe(Math.round(255 * (i / 255) ** 1.1));
+			expect(curve.g[i]).toBe(i);
+			expect(curve.b[i]).toBe(Math.round(255 * (i / 255) ** 0.9));
+		}
+	});
+
+	test("returns the same tables for the same balance", () => {
+		const balance = { r: 1.05, g: 0.98, b: 1 };
+		expect(printFinish(balance).curve?.r).toBe(printFinish(balance).curve?.r);
+	});
+
+	test("adds the curve to another base finish", () => {
+		const finish = printFinish({ r: 1.1, g: 1, b: 1 }, {});
+		expect(Object.keys(finish)).toEqual(["curve"]);
 	});
 });

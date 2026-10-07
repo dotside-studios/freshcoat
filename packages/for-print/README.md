@@ -21,7 +21,8 @@ or communicate with a printer.
   `classifyIntent`, `printAdjust`).
   A layer's own `Adjust` is kept: the correction is composed after it.
 - **Recommend finishing**: the whole-frame output ops that aren't per-layer
-  (`YMCKO_FINISH` → the coat engine's `FrameFinish`).
+  (`YMCKO_FINISH`, or `printFinish(balance)` with a measured cast → the coat
+  engine's `FrameFinish`).
 - **CR80 geometry**: format spec + crop fitting (`cr80Dimensions`,
   `fitCr80CropToImage`, …).
 
@@ -49,6 +50,7 @@ const sample: ImageSampler = async (image) => {
 const analyzedScene = await analyzeScene(sample, nodeTree);
 
 // freshcoat does the output: per-layer adjust + the whole-frame finish.
+// With a measured profile, use `printFinish(profile.balance)` instead.
 const commands = compileScene(analyzedScene, {
   width, height, textEngine, finish: YMCKO_FINISH,
 });
@@ -75,9 +77,8 @@ const analysis = analyzePixels(pixels); // recommendation + notes
 `classifyIntent`: `image → photo`, `text → text`, `bitmap → code` (QR/pixel art),
 `rect|ellipse|path → graphic`, `group|mask → container`. By default, the planner
 attaches photo corrections only to photos. It walks containers and applies
-corrections to leaves. An optional profile's channel balance applies to all
-leaves, including text, vectors and codes. Whole-frame finishing acts on the
-composited image.
+corrections to leaves. Whole-frame finishing, including a profile's channel
+balance, acts on the composited image.
 
 For exceptions, pass `PlanPolicy.intentFor`. For example, classify a rasterized
 logo as `graphic` so it remains pristine, or apply a specific graphic policy to
@@ -105,9 +106,10 @@ the fitted balance. `parsePrintProfile` remains compatible with older profiles a
 normalizes them to the current `version: 1` schema.
 
 Profiles describe measured channel balance for a printer, ribbon and stock
-combination. They are not ICC profiles. Pass a profile's `balance` through
-`PlanPolicy` to use it in scene planning, or use `withProfile()` to combine
-it with a single-image recommendation.
+combination. They are not ICC profiles. Pass a profile's `balance` to
+`printFinish()` to get the whole-frame finish with the balance as its curve,
+or use `withProfile()` to combine it with a single-image recommendation. Use
+one or the other for a given image, not both.
 
 ## License
 

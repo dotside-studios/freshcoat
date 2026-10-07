@@ -105,6 +105,20 @@ describe("the checks a backend would otherwise diverge on", () => {
 		).toContain("bad_lut");
 	});
 
+	test("a finish curve needs 256 entries per channel", () => {
+		const finish = {
+			op: "finishFrame" as const,
+			finish: {
+				curve: {
+					r: new Uint8Array(256),
+					g: new Uint8Array(256),
+					b: new Uint8Array(10),
+				},
+			},
+		};
+		expect(codes([canvas(), finish])).toContain("bad_lut");
+	});
+
 	test("lut3d data must be size^3 RGB triplets", () => {
 		expect(
 			codes([

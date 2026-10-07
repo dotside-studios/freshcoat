@@ -276,9 +276,10 @@ export type SetupCommand =
 
 // A whole-frame, post-composite output pass — a sibling of the per-layer Adjust,
 // but run once on the flattened result (these ops are conjunctive across channels
-// / spatial, so they can't be a per-layer color transform). Domain-neutral: "snap
-// near-white to white", "snap near-black to black", "add dither to break gradient
-// banding". All optional; absent = skip that op. Thresholds are 0–255.
+// / spatial, so they can't be a per-layer color transform). Domain-neutral: "map
+// every channel through a curve", "snap near-white to white", "snap near-black to
+// black", "add dither to break gradient banding". All optional; absent = skip that
+// op. Thresholds are 0–255.
 //
 // A number is the original, per-channel dither shorthand. The object form adds a
 // stable seed and a monochrome mode that applies one noise value to RGB together,
@@ -292,6 +293,9 @@ export type FrameDither =
 	  };
 
 export type FrameFinish = {
+	// Per-channel curve, applied before dither and the thresholds. Same format as
+	// Adjust.lut.
+	curve?: AdjustLut;
 	whiteClamp?: number; // all channels > threshold → white
 	blackExtract?: number; // all channels < threshold → black
 	dither?: FrameDither;

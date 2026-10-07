@@ -79,4 +79,22 @@ describe("render() print toggle", () => {
 		// Planned, but no finish → the graphic background is untouched.
 		expect(centerR(ck, (front as { bytes: Uint8Array }).bytes)).toBe(250);
 	});
+
+	test("balance curves the frame even without the finish", async () => {
+		const ck = await ckInit();
+		const env = createHeadlessEnv();
+		const [front] = await render(
+			template,
+			{},
+			{
+				width: 40,
+				height: 40,
+				print: { finish: false, balance: { r: 2, g: 1, b: 1 } },
+			},
+			{ ck, env },
+		);
+		const d = decodePixels(ck, (front as { bytes: Uint8Array }).bytes)!;
+		const at = (20 * d.width + 20) * 4;
+		expect([...d.data.slice(at, at + 3)]).toEqual([245, 250, 250]);
+	});
 });

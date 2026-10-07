@@ -2,10 +2,12 @@ import {
 	type AnalysisCache,
 	type AnalyzeSceneOptions,
 	analyzeScene,
+	type ChannelBalance,
 	type ImageAnalysis,
 	type ImageSampler,
 	type PlanPolicy,
 	planScene,
+	printFinish,
 	YMCKO_FINISH,
 } from "@freshcoat-js/for-print";
 import {
@@ -100,6 +102,9 @@ export type PrintRenderOptions = {
 	policy?: PlanPolicy;
 	// Whole-frame finishing pass. Default: YMCKO_FINISH. Pass `false` to disable.
 	finish?: FrameFinish | false;
+	// The printer's measured cast (see for-print PrintProfile), applied as the
+	// finish's curve, including when `finish` is false.
+	balance?: ChannelBalance;
 };
 
 // What to paint out of an already-compiled template.
@@ -149,7 +154,10 @@ function resolvePrint(print: RenderOptions["print"]): ResolvedPrint | null {
 	return {
 		analyze: o.analyze ?? false,
 		policy: o.policy,
-		finish: o.finish === false ? undefined : (o.finish ?? YMCKO_FINISH),
+		finish: printFinish(
+			o.balance,
+			o.finish === false ? {} : (o.finish ?? YMCKO_FINISH),
+		),
 	};
 }
 

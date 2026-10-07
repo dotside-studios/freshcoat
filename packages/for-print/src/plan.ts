@@ -14,11 +14,12 @@
 import {
 	type Adjust,
 	composeAdjust,
+	type FrameFinish,
 	type ImageNode,
 	type Node,
 } from "@freshcoat-js/engine";
 import { analyzePixels, correctionMatrix } from "./analyze";
-import { NO_PROCESSING, YMCKO_PRESET } from "./presets";
+import { YMCKO_FINISH, YMCKO_PRESET } from "./presets";
 import type {
 	ChannelBalance,
 	ImageAnalysis,
@@ -160,6 +161,25 @@ export function printAdjust(o: PrintOptimizeOptions): Adjust {
 	return adjust;
 }
 
+// The whole-frame finish with the printer's measured cast (see ./profile) as its
+// curve. The cast belongs to the printer, not to any layer, so it is corrected
+// once on the composited card, where it also holds across blends and edges.
+export function printFinish(
+	balance?: ChannelBalance,
+	base: FrameFinish = YMCKO_FINISH,
+): FrameFinish {
+	if (NEUTRAL_BALANCE(balance)) return base;
+	const b = balance as ChannelBalance;
+	return {
+		...base,
+		curve: {
+			r: toneLut(1, 0, b.r),
+			g: toneLut(1, 0, b.g),
+			b: toneLut(1, 0, b.b),
+		},
+	};
+}
+
 // Per-intent correction policy. A value corrects that intent; null/undefined
 // leaves it untouched. The default corrects photos with the YMCKO preset and
 // leaves everything else pristine.
@@ -172,16 +192,6 @@ export type PlanPolicy = {
 	graphic?: PrintOptimizeOptions | null;
 	text?: PrintOptimizeOptions | null;
 	code?: PrintOptimizeOptions | null;
-	// The printer's measured cast (see ./profile), applied to EVERY drawable —
-	// including the ones the intents above leave pristine.
-	//
-	// A cast belongs to the printer, not to the art: the ribbon lays down the same
-	// too-warm red under a photo, a brand gradient and a line of text alike. Scoping
-	// it by intent would also miss the layer that shows it most, since a card whose
-	// ground is a vector rect is `graphic` and correcting graphics is off by
-	// default. It is a per-channel curve with no spatial effect, so a text or QR
-	// layer stays exactly as crisp as it was.
-	balance?: ChannelBalance;
 };
 
 function intentFor(node: Node, policy: PlanPolicy): LayerIntent {
@@ -207,22 +217,10 @@ function policyFor(
 }
 
 // Attach an adjust to a leaf if the options produce a non-empty one; otherwise
-// return the node untouched (no empty `adjust` field). A measured `balance`
-// reaches a layer the intent left alone as the only correction it carries.
-function withAdjust(
-	node: Node,
-	opts: PrintOptimizeOptions | null,
-	balance?: ChannelBalance,
-): Node {
-	const merged = opts
-		? balance
-			? { ...opts, balance }
-			: opts
-		: balance
-			? { ...NO_PROCESSING, balance }
-			: null;
-	if (!merged) return node;
-	const adjust = printAdjust(merged);
+// return the node untouched (no empty `adjust` field).
+function withAdjust(node: Node, opts: PrintOptimizeOptions | null): Node {
+	if (!opts) return node;
+	const adjust = printAdjust(opts);
 	if (Object.keys(adjust).length === 0) return node;
 	// A layer's own adjustment is part of its design; the correction applies to
 	// what it produces.
@@ -254,7 +252,7 @@ const DEFAULT_POLICY: PlanPolicy = { photo: YMCKO_PRESET };
 export function planScene(root: Node, policy: PlanPolicy = {}): Node {
 	const p = { ...DEFAULT_POLICY, ...policy };
 	return mapTree(root, (node) =>
-		withAdjust(node, policyFor(intentFor(node, p), p), p.balance),
+		withAdjust(node, policyFor(intentFor(node, p), p)),
 	);
 }
 
@@ -395,9 +393,9 @@ export async function analyzeScene(
 		}
 		const intent = intentFor(node, policy);
 		if (node.kind === "image" && intent === "photo") {
-			return withAdjust(node, await photoOptions(node), policy.balance);
+			return withAdjust(node, await photoOptions(node));
 		}
-		return withAdjust(node, policyFor(intent, policy), policy.balance);
+		return withAdjust(node, policyFor(intent, policy));
 	}
 
 	return walk(root);

@@ -71,6 +71,7 @@ export {
 	type PlanPolicy,
 	planScene,
 	printAdjust,
+	printFinish,
 } from "./plan";
 export { NO_PROCESSING, YMCKO_FINISH, YMCKO_PRESET } from "./presets";
 export {

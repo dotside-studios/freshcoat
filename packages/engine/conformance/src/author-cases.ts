@@ -540,6 +540,27 @@ add(
 	{ finish: { blackExtract: 30 } },
 );
 
+// Each channel reads its own table, then the threshold sees the curved value:
+// 200 maps to 252 on red only, so whiteClamp at 248 leaves the pixel alone.
+add(
+	"finish-curve",
+	"the finish curve maps each channel through its own table first",
+	"raster",
+	["finish.curve", "finish.whiteClamp"],
+	frame([createRect({ ...box(0, 0, W, H), fills: solid("#c8c8c8") })]),
+	[px([80, 60], [252, 200, 100, 255], "200 through r, g and b tables")],
+	{
+		finish: {
+			curve: {
+				r: table((i) => (i === 200 ? 252 : i)),
+				g: table((i) => i),
+				b: table((i) => (i === 200 ? 100 : i)),
+			},
+			whiteClamp: 248,
+		},
+	},
+);
+
 // The layout is the compile's at every density: a 2x export is a 2x raster of the
 // SAME layout, so the rect's edges land at exactly twice their design coordinates.
 add(
