@@ -75,11 +75,25 @@ export function useDocumentFonts(template: Template | null): DocumentFonts {
 	};
 }
 
-export function fontKey(template: Template | null): {
-	key: string;
-	families: string[];
-} {
+type FontKey = { key: string; families: string[] };
+
+const fontKeys = new WeakMap<
+	Template["template_data"],
+	{ fonts: Template["fonts"]; variants: Template["variants"]; value: FontKey }
+>();
+
+export function fontKey(template: Template | null): FontKey {
 	if (!template) return { key: "", families: [] };
+	const { template_data, fonts, variants } = template;
+	const cached = fontKeys.get(template_data);
+	if (cached && cached.fonts === fonts && cached.variants === variants)
+		return cached.value;
+	const value = computeFontKey(template);
+	fontKeys.set(template_data, { fonts, variants, value });
+	return value;
+}
+
+function computeFontKey(template: Template): FontKey {
 	const requests = collectFontRequests(template);
 	return {
 		key: requests
