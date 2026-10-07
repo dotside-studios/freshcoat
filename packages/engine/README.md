@@ -86,6 +86,17 @@ const env = createHeadlessEnv({
 surface is made on a DOM `<canvas>` unless you pass `createCanvas`, for
 example to paint on an `OffscreenCanvas` in a worker.
 
+In Node or Bun, `fileLoader` from `@freshcoat-js/engine/node` reads relative
+paths and `file:` URLs under a root directory and refuses anything outside it.
+Other URLs go to `next`, which defaults to `fetchLoader`.
+
+```ts
+import { createHeadlessEnv } from "@freshcoat-js/engine/headless";
+import { fileLoader } from "@freshcoat-js/engine/node";
+
+const env = createHeadlessEnv({ load: fileLoader({ root: "./assets" }) });
+```
+
 ## Painting and text
 
 The supplied text engine uses CanvasKit Paragraph for layout and shaping,
