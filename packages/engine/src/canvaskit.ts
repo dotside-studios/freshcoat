@@ -1661,7 +1661,7 @@ const f32 = Math.fround;
 // pixel, as before. Where an op's exact bounds are not known (glyphs), the
 // estimate only ever errs larger. Null for content that is not modelled here
 // (SVG images, inner shadows, blenders). With `uncut`, nothing is cut to the
-// device and no line is culled.
+// device, no line is culled, and saves grow the device rect instead.
 function predictedBounds(
 	ck: CanvasKit,
 	provider: TypefaceFontProvider,
@@ -1701,12 +1701,16 @@ function predictedBounds(
 		if (cut) out = out ? unionBounds(out, cut) : cut;
 	};
 	const add = (local: Bounds, ctm: Affine, saves: RecordedSave[]) => {
-		const b = throughSaves(sortBounds(local), saves);
+		// SkRecord grows the local rect through the saves before mapping it; a
+		// layer's real extent needs the mapped rect grown.
+		const b = uncut
+			? throughSaves(mapAffine(ctm, sortBounds(local)), saves)
+			: throughSaves(sortBounds(local), saves);
 		if (!b) {
 			singular = true;
 			return;
 		}
-		include(mapAffine(ctm, b));
+		include(uncut ? b : mapAffine(ctm, b));
 	};
 	// A layer whose paint changes transparent black covers the whole cull.
 	let full = false;
@@ -1935,7 +1939,6 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
-	if (!em) return [];
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -1955,6 +1958,16 @@ function textBounds(
 			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
 				continue;
 		}
+		for (const span of line.spans) {
+			if (!span.font.decoration) continue;
+			const { top, thickness } = decorationLine(
+				span.font.size,
+				span.font.decoration,
+				baseline,
+			);
+			out.push([span.x, top, span.x + span.width, top + thickness]);
+		}
+		if (!em) continue;
 		const shape = () =>
 			shapeLine(ck, provider, cmd, line, fallback, null, null);
 		let shaped: ShapedLine;
@@ -1991,15 +2004,6 @@ function textBounds(
 			left + x1 + slack,
 			baseline + Math.max(0, em[3]) * size + slack,
 		]);
-		for (const span of line.spans) {
-			if (!span.font.decoration) continue;
-			const { top, thickness } = decorationLine(
-				span.font.size,
-				span.font.decoration,
-				baseline,
-			);
-			out.push([span.x, top, span.x + span.width, top + thickness]);
-		}
 	}
 	return out;
 }
@@ -3044,8 +3048,10 @@ function layerPaintBoundable(cmd: DrawCommand): boolean {
 // Whether `cmd` paints the same in a layer at another whole-pixel origin. Skia
 // maps geometry through the layer's translation in float, so clips, paths,
 // rotations, gradients and sampled images can shift by an edge pixel or a whole
-// column. Rounded corners can move by a few levels and are accepted. `m` is the
-// layer's scale and translate.
+// column. Rounded corners are accepted: their antialiased edge pixels can move
+// by up to 1/8 coverage (32 levels), which a blur or shadow carries to nearby
+// pixels. layer-bounds.test.ts holds them to that. `m` is the layer's scale and
+// translate.
 function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd)) return false;
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
