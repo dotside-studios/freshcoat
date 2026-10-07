@@ -5,7 +5,13 @@ import {
 	RGBLuminanceSource,
 } from "@zxing/library";
 import { describe, expect, test } from "vitest";
-import { generateMatrix } from "../src/qr";
+import {
+	generateMatrix,
+	generatePixels,
+	MATRIX_CACHE_BYTES,
+	PIXEL_CACHE_BYTES,
+	qrCacheBytes,
+} from "../src/qr";
 import type { Command, DrawCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
@@ -114,11 +120,62 @@ describe("generateMatrix symbol version", () => {
 	});
 });
 
-describe("generateMatrix memo", () => {
-	test("returns the same matrix for repeated calls", () => {
-		const a = generateMatrix("https://example.com/memo", "Q");
-		expect(generateMatrix("https://example.com/memo", "Q")).toBe(a);
-		expect(generateMatrix("https://example.com/memo", "L")).not.toBe(a);
+describe("QR memo", () => {
+	const v40 = (i: number) => `${i}:${"x".repeat(2900)}`;
+
+	test("stays within its byte budgets across many version-40 symbols", () => {
+		for (let i = 0; i < 200; i++) {
+			const { size } = generatePixels(v40(i), "L", [0, 0, 0]);
+			expect(size).toBe(177);
+			const { matrices, pixels } = qrCacheBytes();
+			expect(matrices).toBeLessThanOrEqual(MATRIX_CACHE_BYTES);
+			expect(pixels).toBeLessThanOrEqual(PIXEL_CACHE_BYTES);
+		}
+		expect(qrCacheBytes().pixels).toBeGreaterThan(PIXEL_CACHE_BYTES / 2);
+	});
+
+	test("keys pixel buffers by value, level and colour", () => {
+		const a = generatePixels("https://example.com/memo", "Q", [0, 0, 0]);
+		expect(
+			generatePixels("https://example.com/memo", "Q", [0, 0, 0]).pixels,
+		).toBe(a.pixels);
+		expect(
+			generatePixels("https://example.com/memo", "L", [0, 0, 0]).pixels,
+		).not.toBe(a.pixels);
+		expect(
+			generatePixels("https://example.com/memo", "Q", [255, 0, 0]).pixels,
+		).not.toBe(a.pixels);
+	});
+
+	test("reuses the pixel buffer on repeated compiles", () => {
+		const pixelsOf = () => {
+			const [front] = compileToCommands(
+				qrTemplate,
+				{ card_url: "https://example.com/c/reuse" },
+				{ width: 100, height: 100 },
+			);
+			return (findDraw(front.commands, "drawBitmap") as { pixels: Uint8Array })
+				.pixels;
+		};
+		const first = pixelsOf();
+		const copy = first.slice();
+		const second = pixelsOf();
+		expect(second).toBe(first);
+		expect(second).toEqual(copy);
+	});
+
+	test("matches the boolean matrix", () => {
+		const value = "https://example.com/c/abc123";
+		const m = generateMatrix(value, "M");
+		const { size, pixels } = generatePixels(value, "M", [1, 2, 3]);
+		expect(size).toBe(m.length);
+		for (let y = 0; y < size; y++)
+			for (let x = 0; x < size; x++) {
+				const i = (y * size + x) * 4;
+				expect([...pixels.subarray(i, i + 4)]).toEqual(
+					m[y][x] ? [1, 2, 3, 255] : [0, 0, 0, 0],
+				);
+			}
 	});
 });
 
