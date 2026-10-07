@@ -12,7 +12,9 @@ import {
 	type FontVMetrics,
 	memoizeTextEngine,
 	type Node,
+	type PaintCache,
 	type PaintCacheStats,
+	type PaintRuntime,
 	type PaintWarning,
 	prepareScene,
 	resolveExportScale,
@@ -53,15 +55,28 @@ export type RenderOutput<G> = {
 export type RenderSession = {
 	render<G>(input: RenderInput<G>): Promise<RenderOutput<G>>;
 	stats(): PaintCacheStats;
+	/** Frees the surface and everything decoded, so the next render starts
+	 *  over, as after a lost GPU context. */
+	reset(): void;
 	dispose(): void;
 };
+
+/** Builds the runtime a session paints through. */
+export type RenderEnvFactory = (opts: {
+	fonts: Map<string, Uint8Array[]>;
+	images: Map<string, Uint8Array>;
+	cache: PaintCache;
+}) => PaintRuntime;
 
 /**
  * One CanvasKit pipeline kept warm across renders: the paint cache owns the
  * surface, font provider and decoded images, and the paragraph engine and font
  * metrics are rebuilt only when the fonts map changes identity.
  */
-export function createRenderSession(ck: unknown): RenderSession {
+export function createRenderSession(
+	ck: unknown,
+	makeEnv: RenderEnvFactory = createBrowserEnv,
+): RenderSession {
 	const cache = createPaintCache();
 	let text: {
 		fonts: Map<string, Uint8Array[]>;
@@ -71,7 +86,7 @@ export function createRenderSession(ck: unknown): RenderSession {
 	let env: {
 		fonts: Map<string, Uint8Array[]>;
 		images: Map<string, Uint8Array>;
-		runtime: ReturnType<typeof createBrowserEnv>;
+		runtime: PaintRuntime;
 	} | null = null;
 	let disposed = false;
 
@@ -95,7 +110,7 @@ export function createRenderSession(ck: unknown): RenderSession {
 			env = {
 				fonts,
 				images,
-				runtime: createBrowserEnv({ fonts, images, cache }),
+				runtime: makeEnv({ fonts, images, cache }),
 			};
 		}
 		return env.runtime;
@@ -167,6 +182,7 @@ export function createRenderSession(ck: unknown): RenderSession {
 			};
 		},
 		stats: () => cache.stats(),
+		reset: () => cache.clear(),
 		dispose() {
 			disposed = true;
 			text?.engine.dispose();

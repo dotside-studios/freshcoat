@@ -9,6 +9,7 @@ import { createHeadlessEnv } from "@freshcoat-js/coatfile/headless";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import { deriveFontMetrics } from "@freshcoat-js/engine";
 import { crc32 } from "@freshcoat-js/workspace/crc";
+import { loadWorkerCanvasKit } from "~/render/canvaskit-worker";
 import { gamutNotes, withPrintFallback } from "./print";
 import type {
 	OutputFormat,
@@ -32,7 +33,6 @@ type CK = any;
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
 const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
-let ckPromise: Promise<CK> | undefined;
 let fonts = new Map<string, Uint8Array[]>();
 let text:
 	| {
@@ -45,24 +45,7 @@ let current: Template | undefined;
 const caches = createJobCaches();
 
 function loadCanvasKit(): Promise<CK> {
-	ckPromise ??= (async () => {
-		const src = await (await fetch(`${CANVASKIT_BASE}/canvaskit.js`)).text();
-		// An indirect eval runs the classic script at global scope, so its
-		// top-level `var CanvasKitInit` becomes a global as it would from a script
-		// tag. A module worker has no importScripts, and the script is our own asset.
-		// biome-ignore lint/security/noGlobalEval: loads canvaskit.js in a module worker
-		const indirectEval = globalThis.eval;
-		indirectEval(src);
-		const init = (
-			globalThis as { CanvasKitInit?: (o: unknown) => Promise<unknown> }
-		).CanvasKitInit;
-		if (typeof init !== "function") throw new Error("CanvasKitInit missing");
-		return init({ locateFile: () => `${CANVASKIT_BASE}/canvaskit.wasm` });
-	})();
-	ckPromise.catch(() => {
-		ckPromise = undefined;
-	});
-	return ckPromise;
+	return loadWorkerCanvasKit(CANVASKIT_BASE);
 }
 
 /** A buffer the worker alone owns, so it can be transferred rather than copied. */
