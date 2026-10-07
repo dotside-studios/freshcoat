@@ -56,7 +56,13 @@ describe("fill list edits", () => {
 		]);
 		expectValid(t);
 
-		for (const kind of ["linear", "radial", "angular", "solid"] as const) {
+		for (const kind of [
+			"linear",
+			"radial",
+			"angular",
+			"pattern",
+			"solid",
+		] as const) {
 			t = editFills(t, [RECT], (f) => replaceAt(f, 1, convertFill(f[1], kind)));
 			expectValid(t);
 		}

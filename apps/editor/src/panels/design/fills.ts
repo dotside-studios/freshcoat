@@ -1,9 +1,28 @@
 import { type Fill, linearGradientAngle } from "@freshcoat-js/coatfile";
+import { PATTERN_DEFAULTS } from "@freshcoat-js/engine";
 import type { Layer } from "./field-helpers";
 
-export type FillKind = "solid" | "linear" | "radial" | "angular";
-export type Gradient = Exclude<Fill, string>;
+export type FillKind = "solid" | "linear" | "radial" | "angular" | "pattern";
+export type Pattern = Extract<Fill, { kind: "pattern" }>;
+export type PatternName = Pattern["pattern"];
+export type Gradient = Exclude<Fill, string | Pattern>;
 export type Stop = { offset: number; color: string };
+
+export function isGradient(f: Fill | undefined): f is Gradient {
+	return typeof f === "object" && f.kind !== "pattern";
+}
+
+/** A pattern's parameters with its defaults filled in. */
+export function patternParams(p: Pattern) {
+	const d = PATTERN_DEFAULTS[p.pattern];
+	return {
+		scale: p.scale ?? d.scale,
+		angle: p.angle ?? d.angle,
+		density: p.density ?? d.density,
+		seed: p.seed ?? d.seed,
+		colors: p.colors ?? d.colors,
+	};
+}
 
 export const DEFAULT_FILL_COLOR = "#d9d9d9";
 
@@ -51,9 +70,12 @@ export function fillsPatch(el: Layer, fills: Fill[]): Record<string, unknown> {
 	};
 }
 
-/** The colour a fill reads as at a glance: a solid, or its first stop. */
+/** The colour a fill reads as at a glance: a solid, its first stop, or a
+ *  pattern's background. */
 export function leadColor(f: Fill): string {
-	return typeof f === "string" ? f : (f.stops[0]?.color ?? DEFAULT_FILL_COLOR);
+	if (typeof f === "string") return f;
+	if (f.kind === "pattern") return patternParams(f).colors[0];
+	return f.stops[0]?.color ?? DEFAULT_FILL_COLOR;
 }
 
 function transparentOf(color: string): string {
@@ -64,13 +86,21 @@ function transparentOf(color: string): string {
 export function convertFill(f: Fill, kind: FillKind): Fill {
 	if (fillKind(f) === kind) return f;
 	if (kind === "solid") return leadColor(f);
+	if (kind === "pattern")
+		return {
+			kind,
+			pattern: "noise",
+			colors: [leadColor(f), PATTERN_DEFAULTS.noise.colors[1]],
+		};
 	const stops: Stop[] =
 		typeof f === "string"
 			? [
 					{ offset: 0, color: f },
 					{ offset: 1, color: transparentOf(f) },
 				]
-			: f.stops;
+			: f.kind === "pattern"
+				? patternParams(f).colors.map((color, i) => ({ offset: i, color }))
+				: f.stops;
 	if (kind === "linear") return { kind, angle: 90, stops };
 	if (kind === "radial")
 		return { kind, center: [0.5, 0.5], radius: 0.5, stops };
@@ -215,9 +245,9 @@ export function editedGradient(
 	fills: readonly Fill[],
 	active: number | null,
 ): number | null {
-	if (active !== null && typeof fills[active] === "object") return active;
+	if (active !== null && isGradient(fills[active])) return active;
 	for (let i = fills.length - 1; i >= 0; i--)
-		if (typeof fills[i] === "object") return i;
+		if (isGradient(fills[i])) return i;
 	return null;
 }
 
