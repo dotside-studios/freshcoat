@@ -83,3 +83,25 @@ export async function runAutosave(probe: AutosaveProbe) {
 		unreadable,
 	};
 }
+
+const keeper = createAutosaveStore(`autosave-keep-${crypto.randomUUID()}`);
+
+/** Keeps `probe`'s first photo; the size of the stored copy, or null. */
+export async function keepFirst(probe: AutosaveProbe): Promise<number | null> {
+	const asset = probe.assets[0];
+	if (!asset) throw new Error("no photo picked");
+	return (await keeper.keep(asset))?.size ?? null;
+}
+
+/** The bytes of the stored copy of `probe`'s first photo, or why not. */
+export async function readKept(
+	probe: AutosaveProbe,
+): Promise<{ bytes: number } | { error: string }> {
+	const blob = await keeper.asset(probe.assets[0]?.sha256 ?? "");
+	if (!blob) return { error: "missing" };
+	try {
+		return { bytes: (await blob.arrayBuffer()).byteLength };
+	} catch (err) {
+		return { error: (err as Error).name };
+	}
+}

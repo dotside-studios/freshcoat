@@ -317,7 +317,7 @@ async function storedKeys(name: string): Promise<string[]> {
 }
 
 describe("copying a workspace's photos into storage", () => {
-	test("swaps in the stored copy without reading the file into memory", async () => {
+	test("swaps in a stored copy read from the file once", async () => {
 		const name = freshDb();
 		const store = createAutosaveStore(name);
 		const a = await photo("alpha");
@@ -333,8 +333,8 @@ describe("copying a workspace's photos into storage", () => {
 		a.source.changed = true;
 		b.source.changed = true;
 		expect(copies.pending).toBe(0);
-		expect(readA).not.toHaveBeenCalled();
-		expect(readB).not.toHaveBeenCalled();
+		expect(readA).toHaveBeenCalledTimes(1);
+		expect(readB).toHaveBeenCalledTimes(1);
 		expect(a.asset.blob).not.toBeInstanceOf(FileSlice);
 		expect((await storedKeys(name)).sort()).toEqual(
 			[a.asset.sha256, b.asset.sha256].sort(),
