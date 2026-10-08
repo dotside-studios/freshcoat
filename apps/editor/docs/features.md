@@ -107,6 +107,9 @@ the records, and **Export** turns templates and records into files.
   - Move, resize and rotate, with snapping to the artboard, to other layers
     and to guides.
   - Arrow keys nudge a layer, and Esc cancels a drag.
+  - Align and distribute from the Object menu or Alt+A, H, D, W, V and S.
+    Several layers align to their combined box; one layer aligns to its
+    parent frame, or to the artboard at the top level.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,

@@ -538,9 +538,16 @@ describe("align and distribute", () => {
 		expect(pos(top.template, "0/1")).toEqual({ x: 200, y: 20 });
 	});
 
-	test("one layer aligns to the artboard, in its parent's space", () => {
-		const out = unwrap(align(t, ["0/1/0"], g, "right"));
-		expect(pos(out.template, "0/1/0")).toEqual({ x: 750, y: 10 });
+	test("a top-level layer alone aligns to the artboard", () => {
+		const out = unwrap(align(t, ["0/0"], g, "right"));
+		expect(pos(out.template, "0/0")).toEqual({ x: 900, y: 20 });
+	});
+
+	test("a child alone aligns to its parent frame", () => {
+		const right = unwrap(align(t, ["0/1/0"], g, "right"));
+		expect(pos(right.template, "0/1/0")).toEqual({ x: 250, y: 10 });
+		const bottom = unwrap(align(t, ["0/1/2/0"], g, "bottom"));
+		expect(pos(bottom.template, "0/1/2/0")).toEqual({ x: 5, y: 70 });
 	});
 
 	test("a rotated layer aligns by its painted bounds", () => {
@@ -551,7 +558,11 @@ describe("align and distribute", () => {
 
 	test("under a rotated parent the delta is turned into the parent's axes", () => {
 		const out = unwrap(align(t, ["0/6/0"], g, "top"));
-		expect(layerBounds("0/6/0", geometryOf(out.template))?.y).toBeCloseTo(0, 1);
+		const g2 = geometryOf(out.template);
+		expect(layerBounds("0/6/0", g2)?.y).toBeCloseTo(
+			layerBounds("0/6", g2)?.y ?? Number.NaN,
+			1,
+		);
 	});
 
 	test("distribute gives equal gaps and keeps the ends", () => {
