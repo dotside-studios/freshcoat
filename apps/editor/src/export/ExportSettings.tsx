@@ -207,6 +207,10 @@ export function ExportSettings({
 	const boundTo = bindingOf
 		? datasets?.find((d) => d.id === bindingOf.datasetId)?.name
 		: undefined;
+	const sharedBy =
+		useEditor((s) => s.workspace?.presets)?.filter(
+			(p) => p.templateId === preset.templateId,
+		).length ?? 0;
 	const unfilled =
 		template && datasets
 			? unfilledRequired(template, bindingOf, datasets).length
@@ -258,10 +262,18 @@ export function ExportSettings({
 					<PanelSection
 						title={
 							<>
-								Binding
+								Template binding
+								{sharedBy > 1 ? (
+									<span
+										className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal"
+										data-testid="binding-shared"
+									>
+										{`used by ${plural(sharedBy, "preset")}`}
+									</span>
+								) : null}
 								{boundTo ? (
 									<span className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal">
-										{boundTo}
+										{sharedBy > 1 ? `· ${boundTo}` : boundTo}
 									</span>
 								) : null}
 							</>

@@ -63,7 +63,7 @@ async function chooseDataset(page: Page, name: string) {
 	if (!(await editor.isVisible()))
 		await page
 			.getByTestId("export-settings")
-			.getByRole("button", { name: /^Binding/ })
+			.getByRole("button", { name: /^Template binding/ })
 			.click();
 	await editor.getByRole("button", { name: /Dataset/ }).click();
 	await page.getByRole("option", { name }).click();
