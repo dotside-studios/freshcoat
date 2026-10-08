@@ -461,7 +461,10 @@ leaves the path different from the resized base's.
 
 A `vector` element's `d` is SVG path data with any number of subpaths, arcs
 included. `fillRule: "evenodd"` keeps the hole in a ring drawn as two subpaths
-wound the same way; the default is SVG's nonzero.
+wound the same way; the default is SVG's nonzero. `cornerRadius` rounds every
+corner between two straight segments by one radius, as Skia's corner path
+effect does; curves and arcs keep their shape. A `polygon` image mask takes the
+same `cornerRadius`.
 
 `svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
 frame of editable `vector`, `frame`, `mask`, `image` and `text` elements in

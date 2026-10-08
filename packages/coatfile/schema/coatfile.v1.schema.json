@@ -1709,6 +1709,10 @@
 															},
 															"rotation": {
 																"type": "number"
+															},
+															"cornerRadius": {
+																"type": "number",
+																"minimum": 0
 															}
 														},
 														"required": [
@@ -3202,6 +3206,10 @@
 																		},
 																		"rotation": {
 																			"type": "number"
+																		},
+																		"cornerRadius": {
+																			"type": "number",
+																			"minimum": 0
 																		}
 																	},
 																	"required": [
@@ -4837,6 +4845,10 @@
 														},
 														"rotation": {
 															"type": "number"
+														},
+														"cornerRadius": {
+															"type": "number",
+															"minimum": 0
 														}
 													},
 													"required": [
@@ -6996,6 +7008,10 @@
 												"nonzero",
 												"evenodd"
 											]
+										},
+										"cornerRadius": {
+											"type": "number",
+											"minimum": 0
 										},
 										"fill": {
 											"anyOf": [
