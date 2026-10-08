@@ -1,0 +1,103 @@
+{
+	"caseId": "backdrop-blur-in-mask",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 80,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#000000"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawMasked",
+					"mask": {
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 160,
+							"height": 120
+						},
+						"op": "drawRect",
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#00000080"
+							}
+						]
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 40,
+								"y": 20
+							},
+							"size": {
+								"width": 80,
+								"height": 80
+							},
+							"backdropBlur": 20,
+							"op": "drawRect"
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "431aeb3ea47cd9c809d3650893564f4aa03eabd19e1de92b66c991929303556c"
+}

@@ -128,8 +128,7 @@ export const GradientStopSchema = z.object({
 	color: z.string(),
 });
 
-export const FillSchema = z.union([
-	z.string(),
+export const GradientSchema = z.union([
 	z.object({
 		kind: z.literal("linear"),
 		// Degrees, 0 pointing right and 90 down, through the centre of the box.
@@ -164,6 +163,11 @@ export const FillSchema = z.union([
 		rotation: z.number().optional(),
 		stops: z.array(GradientStopSchema),
 	}),
+]);
+
+export const FillSchema = z.union([
+	z.string(),
+	...GradientSchema.options,
 	// A procedural texture drawn by a shader, in design units from the
 	// drawable's top-left. Omitted parameters take the pattern's defaults.
 	z.object({
@@ -294,6 +298,7 @@ export const ImageMaskSchema = z.union([
 		kind: z.literal("polygon"),
 		sides: z.number().int().min(3),
 		rotation: z.number().optional(),
+		cornerRadius: z.number().min(0).optional(),
 	}),
 	z.object({ kind: z.literal("squircle"), radius: z.number() }),
 ]);
@@ -302,12 +307,19 @@ export const ImageMaskSchema = z.union([
 // centered on the shape edge (Figma's stroke position); default center (Skia's
 // native alignment). Every stroked element honors it.
 export const StrokeSchema = z.object({
-	color: z.string(),
+	// A solid colour, or a gradient placed in the element's box as a fill is.
+	color: z.union([z.string(), ...GradientSchema.options]),
 	width: z.number(),
 	dash: z.array(z.number()).optional(),
 	cap: z.enum(["butt", "round", "square"]).optional(),
 	join: z.enum(["round", "bevel", "miter"]).optional(),
 	align: z.enum(["inside", "outside", "center"]).optional(),
+	// The drawn part of the outline as fractions of its length, and a rotation
+	// of that part along it. A string binds a field, as "{{progress}}"; it
+	// compiles to a number or, with a trailing %, a percentage.
+	trimStart: z.union([z.number().min(0).max(1), z.string()]).optional(),
+	trimEnd: z.union([z.number().min(0).max(1), z.string()]).optional(),
+	trimOffset: z.union([z.number(), z.string()]).optional(),
 });
 
 // Fractions of the source image's width and height.
@@ -397,6 +409,8 @@ export const VectorPropertiesSchema = z.object({
 	d: z.string(),
 	// Which regions of overlapping subpaths are inside; SVG's default is nonzero.
 	fillRule: z.enum(["nonzero", "evenodd"]).optional(),
+	// Rounds every corner between two straight segments by this radius.
+	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
 });
@@ -538,7 +552,7 @@ const elementShellShape = {
 	blendMode: BlendModeSchema.optional(),
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
-	backdropBlur: z.number().optional(),
+	backdropBlur: z.number().min(0).optional(),
 	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),
@@ -1137,19 +1151,21 @@ function enforceBooleanDefaults(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 }
 
 function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
-	function check(fill: unknown, path: (string | number)[]) {
+	function check(fill: unknown, path: (string | number)[], stroke = false) {
 		if (typeof fill === "string" || fill == null) return;
-		if (Array.isArray(fill)) {
+		if (Array.isArray(fill) && !stroke) {
 			fill.forEach((f, i) => check(f, [...path, i]));
 			return;
 		}
 		const f = fill as { kind?: unknown; stops?: unknown };
-		if (f.kind === "pattern") return;
+		if (f.kind === "pattern" && !stroke) return;
 		if (f.kind !== "linear" && f.kind !== "radial" && f.kind !== "angular") {
 			addKitIssue(
 				ctx,
 				"invalid_fill_kind",
-				'fill.kind must be "linear", "radial", "angular" or "pattern"',
+				stroke
+					? 'stroke color must be a string or a "linear", "radial" or "angular" gradient'
+					: 'fill.kind must be "linear", "radial", "angular" or "pattern"',
 				[...path, "kind"],
 			);
 			return;
@@ -1191,6 +1207,9 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	walkObjects(tpl, (obj, path) => {
 		const fill = obj.fill;
 		if (typeof fill !== "string" && fill != null) check(fill, [...path, "fill"]);
+		const stroke = obj.stroke as { color?: unknown } | null | undefined;
+		if (stroke && typeof stroke === "object")
+			check(stroke.color, [...path, "stroke", "color"], true);
 	});
 }
 

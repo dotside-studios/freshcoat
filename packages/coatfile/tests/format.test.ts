@@ -286,6 +286,41 @@ describe("minimumFormatVersion", () => {
 		).toBe("1.6");
 	});
 
+	test("1.6: a gradient stroke colour, on elements and deltas", () => {
+		const gradient = {
+			kind: "linear",
+			angle: 0,
+			stops: [
+				{ offset: 0, color: "#000" },
+				{ offset: 1, color: "#fff" },
+			],
+		};
+		const stroked = (color: unknown) =>
+			rect("r", { properties: { stroke: { color, width: 2 } } } as never);
+		expect(minimumFormatVersion(withElements(base(), stroked("#000")))).toBe(
+			"1.0",
+		);
+		expect(minimumFormatVersion(withElements(base(), stroked(gradient)))).toBe(
+			"1.6",
+		);
+		const t = withElements(base(), stroked("#000"));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{ id: "r", properties: { stroke: { color: gradient, width: 2 } } },
+						],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.6");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },
