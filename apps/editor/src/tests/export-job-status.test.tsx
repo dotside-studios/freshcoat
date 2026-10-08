@@ -15,7 +15,10 @@ import type {
 import { button, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
-vi.mock("@freshcoat-js/ui/toast", () => ({ toast: vi.fn() }));
+vi.mock("@freshcoat-js/ui/toast", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	toast: vi.fn(),
+}));
 
 afterEach(() => {
 	cleanup();
