@@ -342,6 +342,35 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 	});
 
+	test("the binding is the template's, shared by its presets", () => {
+		const { controller, templateId } = setup();
+		const preset = (id: string) => ({
+			id,
+			name: id,
+			templateId,
+			records: "all" as const,
+			sides: "all" as const,
+			format: "png-zip" as const,
+			scale: 1,
+			dpi: 300,
+			fileName: "{{index}}",
+			markExported: true,
+		});
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("p_1") }),
+		);
+		const header = () =>
+			screen.getByRole("button", { name: /^Template binding/ }).textContent;
+		expect(header()).not.toContain("used by");
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("p_2") }),
+		);
+		expect(header()).toContain("People");
+		expect(screen.getByTestId("binding-shared").textContent).toBe(
+			"used by 2 presets",
+		);
+	});
+
 	test("an unbound template exports its defaults", async () => {
 		const { controller, user } = setup();
 		const templateId = controller.state.workspace?.activeTemplateId as string;

@@ -61,6 +61,7 @@ import {
 } from "./gallery-model";
 import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
+import { announceImport } from "./imported";
 import {
 	addRecords,
 	applySchema,
@@ -305,31 +306,26 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary, issues) => {
+					onImported={(id, summary, isNew, issues) => {
 						setImportIssues(
 							issues.length
 								? { datasetId: id, ids: new Set(issues), shown: 0 }
 								: null,
 						);
-						toast(summary, {
-							tone: "success",
-							timeout: 6000,
-							...(issues.length
-								? {
-										action: {
-											label: "Show issues",
-											onAction: () => {
-												controller.dispatch({ type: "setActiveDataset", id });
-												setImportIssues((p) =>
-													p?.datasetId === id
-														? { ...p, shown: p.shown + 1 }
-														: p,
-												);
-											},
-										},
+						announceImport(
+							controller,
+							id,
+							summary,
+							isNew,
+							issues.length
+								? () => {
+										controller.dispatch({ type: "setActiveDataset", id });
+										setImportIssues((p) =>
+											p?.datasetId === id ? { ...p, shown: p.shown + 1 } : p,
+										);
 									}
-								: {}),
-						});
+								: undefined,
+						);
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document

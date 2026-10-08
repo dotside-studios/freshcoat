@@ -104,8 +104,13 @@ the records, and **Export** turns templates and records into files.
     DPI, with PNG or JPEG page images, or lays the cards out on sheets of
     paper with crop marks (see [Sheets](#sheets)).
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
-  value, or a pattern. In Edit, the record stepper previews real records on
-  the canvas.
+  value, or a pattern. One binding serves every preset that exports the
+  template. Choosing a dataset matches fields to columns by key or title,
+  ignoring case, spaces and punctuation. A dataset imported as new binds to
+  the active template when it has no binding, and is otherwise offered from
+  the import toast. Required fields left unfilled are counted on the binding,
+  under the record stepper and beside the Export button. In Edit, the record
+  stepper previews real records on the canvas.
 - **Canvas:**
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
@@ -197,7 +202,9 @@ the records, and **Export** turns templates and records into files.
   - With nothing selected, the side section edits the template's width and
     height, which every side shares.
 - **Content:** the inspector's second tab, what fills the design.
-  - "Try with <dataset>" steps the canvas through the bound dataset's records.
+  - "Try with <dataset>" steps the canvas through the bound dataset's records,
+    with the binding folded below it. An unbound template picks a dataset
+    there.
   - One list of fields: each row has the key, a required mark, the type and
     its sample value, typed in place. Sample values drive the render without
     touching history, and "Reset to samples" puts them back.

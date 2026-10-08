@@ -17,6 +17,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
+import { rebindDataset } from "~/binding/binding";
 import type { BooleanOp } from "~/doc/boolean";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
@@ -880,6 +881,23 @@ export class EditorController {
 				variant:
 					to === undefined ? { kind: "fixed" } : { kind: "fixed", id: to },
 			},
+		});
+	}
+
+	/** Binds a template to a dataset, its fields matched by name. */
+	bindTemplate(templateId: string, datasetId: string): void {
+		const ws = this.state.workspace;
+		const slot = ws?.templates.find((t) => t.id === templateId);
+		const dataset = ws?.datasets.find((d) => d.id === datasetId);
+		const template =
+			templateId === ws?.activeTemplateId
+				? this.base
+				: (slot?.parked?.doc.history.present ?? slot?.template);
+		if (!slot || !dataset || !template) return;
+		this.dispatch({
+			type: "setBinding",
+			id: templateId,
+			binding: rebindDataset(template, dataset, slot.binding),
 		});
 	}
 

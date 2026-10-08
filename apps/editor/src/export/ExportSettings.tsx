@@ -45,10 +45,12 @@ import {
 	Button as RACButton,
 } from "react-aria-components";
 import { useController } from "~/app/context";
-import { plural, VARIANT_EXPORT } from "~/app/copy";
+import { BINDING, plural, VARIANT_EXPORT } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
+import { unfilledRequired } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
+import WarningIcon from "~icons/mingcute/warning-line";
 import { CalibrateDialog } from "./CalibrateDialog";
 import {
 	DESTINATION_LABEL,
@@ -205,6 +207,14 @@ export function ExportSettings({
 	const boundTo = bindingOf
 		? datasets?.find((d) => d.id === bindingOf.datasetId)?.name
 		: undefined;
+	const sharedBy =
+		useEditor((s) => s.workspace?.presets)?.filter(
+			(p) => p.templateId === preset.templateId,
+		).length ?? 0;
+	const unfilled =
+		template && datasets
+			? unfilledRequired(template, bindingOf, datasets).length
+			: 0;
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col" data-testid="export-settings">
@@ -252,13 +262,32 @@ export function ExportSettings({
 					<PanelSection
 						title={
 							<>
-								Binding
+								Template binding
+								{sharedBy > 1 ? (
+									<span
+										className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal"
+										data-testid="binding-shared"
+									>
+										{`used by ${plural(sharedBy, "preset")}`}
+									</span>
+								) : null}
 								{boundTo ? (
 									<span className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal">
-										{boundTo}
+										{sharedBy > 1 ? `· ${boundTo}` : boundTo}
 									</span>
 								) : null}
 							</>
+						}
+						actions={
+							unfilled > 0 ? (
+								<span
+									className="flex items-center gap-1 whitespace-nowrap text-fc-sm text-fc-warning"
+									data-testid="binding-unfilled"
+								>
+									<WarningIcon className="size-3.5 shrink-0" />
+									{BINDING.unfilled(unfilled)}
+								</span>
+							) : null
 						}
 						// Folded once bound: the settings below are what an export changes.
 						defaultExpanded={!boundTo}

@@ -26,9 +26,10 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { EMPTY, plural } from "~/app/copy";
+import { BINDING, EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
+import { unfilledRequired } from "~/binding/binding";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
 import { workspaceOf } from "~/state/workspace";
@@ -263,6 +264,13 @@ export function ExportSection() {
 				: runCount === 0
 					? "Nothing to export"
 					: null;
+	const unfilled = useMemo(
+		() =>
+			template && workspace
+				? unfilledRequired(template, binding, workspace.datasets).length
+				: 0,
+		[template, binding, workspace],
+	);
 	const onStripSelection = (ids: string[]) =>
 		onSelectionChange(
 			dataset ? selectedIds(new Set(ids), [], dataset.records) : ids,
@@ -954,6 +962,7 @@ export function ExportSection() {
 						? sheets.error
 						: undefined
 				}
+				warning={unfilled > 0 ? BINDING.unfilled(unfilled) : null}
 				onShowFailed={dataset ? showFailed : undefined}
 				recordIds={chosen}
 			/>

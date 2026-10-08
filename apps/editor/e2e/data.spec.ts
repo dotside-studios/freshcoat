@@ -142,6 +142,17 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 	expect(cols.find((c) => c.key === "profile_url")?.type).toBe("url");
 
 	await importCsv(page);
+	await page.getByRole("button", { name: "Show issues" }).click();
+	await expect(page.getByTestId("status-filter")).toHaveAccessibleName(
+		"Show: Import issues",
+	);
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(1);
+	const flagged = await page
+		.locator("[role=row][data-row]")
+		.getAttribute("data-row");
+	await page.getByTestId("status-filter").click();
+	await page.getByRole("menuitemradio", { name: "All records" }).click();
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(3);
 	const recs = await records(page);
 	expect(recs).toHaveLength(3);
 	expect(recs.map((r) => r.values.display_name)).toEqual([
@@ -166,15 +177,7 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 
 	const [ada, grace, alan] = recs.map((r) => r.id) as [string, string, string];
 
-	await page.getByRole("button", { name: "Show issues" }).click();
-	await expect(page.getByTestId("status-filter")).toHaveAccessibleName(
-		"Show: Import issues",
-	);
-	await expect(page.locator("[role=row][data-row]")).toHaveCount(1);
-	await expect(page.locator(`[role=row][data-row="${alan}"]`)).toHaveCount(1);
-	await page.getByTestId("status-filter").click();
-	await page.getByRole("menuitemradio", { name: "All records" }).click();
-	await expect(page.locator("[role=row][data-row]")).toHaveCount(3);
+	expect(flagged).toBe(alan);
 
 	// With the side panels closed every column fits without scrolling.
 	await page.getByRole("button", { name: "Datasets panel" }).click();
@@ -402,6 +405,10 @@ test("a file imports as a new dataset, and photos match image cells", async ({
 	expect(await state<string>(page, "s.workspace.datasets[0].name")).toBe(
 		"people",
 	);
+	const peopleId = await state<string>(page, "s.workspace.datasets[0].id");
+	expect(
+		await state<string>(page, "s.workspace.templates[0].binding.datasetId"),
+	).toBe(peopleId);
 	await expect(page.getByTestId("data-status")).toContainText("2 issues");
 
 	// The photo column is the second, so the dataset opens as a gallery.
@@ -424,6 +431,49 @@ test("a file imports as a new dataset, and photos match image cells", async ({
 	await page.getByRole("radio", { name: "Table" }).click();
 	await expect(cell(page, id, "photo").locator("img")).toBeVisible();
 	await expect(cell(page, id, "photo")).toContainText("ada.png");
+});
+
+test("a new dataset imported for a bound template is offered from the toast", async ({
+	page,
+}) => {
+	await openSample(page);
+	await page.keyboard.press(`${mod}+2`);
+	const importJson = async (name: string) => {
+		const wizard = page.getByTestId("import-wizard");
+		await chooseFile(
+			page,
+			() => wizard.getByRole("button", { name: "Choose file…" }).click(),
+			{
+				name,
+				mimeType: "application/json",
+				buffer: Buffer.from(JSON.stringify([{ "Display Name": "Ada" }])),
+			},
+		);
+		await wizard.getByRole("button", { name: "Next" }).click();
+		await wizard.getByRole("button", { name: "Next" }).click();
+		await wizard.getByRole("button", { name: "Import" }).click();
+		await expect(wizard).toBeHidden();
+	};
+	await page.getByRole("button", { name: "Import file…" }).click();
+	await importJson("first.json");
+	const binding = () =>
+		state<{ datasetId: string; fields: Record<string, unknown> }>(
+			page,
+			"s.workspace.templates[0].binding",
+		);
+	const first = await state<string>(page, "s.workspace.datasets[0].id");
+	expect(await binding()).toMatchObject({
+		datasetId: first,
+		fields: { display_name: { kind: "column", column: "display_name" } },
+	});
+
+	await page.getByRole("button", { name: "New dataset" }).click();
+	await page.getByRole("menuitem", { name: "Import file…" }).click();
+	await importJson("second.json");
+	expect((await binding()).datasetId).toBe(first);
+	await page.getByRole("button", { name: /^Use with / }).click();
+	const second = await state<string>(page, "s.workspace.datasets[1].id");
+	expect((await binding()).datasetId).toBe(second);
 });
 
 test("renaming a column rewrites its values and the binding that reads it", async ({

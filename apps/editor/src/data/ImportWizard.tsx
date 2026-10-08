@@ -83,7 +83,12 @@ export function ImportWizard({
 }: {
 	target: ImportTarget;
 	onClose: () => void;
-	onImported: (datasetId: string, summary: string, issues: string[]) => void;
+	onImported: (
+		datasetId: string,
+		summary: string,
+		isNew: boolean,
+		issues: string[],
+	) => void;
 }) {
 	const controller = useController();
 	const existing = useEditor((s) =>
@@ -308,6 +313,7 @@ export function ImportWizard({
 		onImported(
 			result.dataset.id,
 			`Imported ${plural(result.added, "record")}${result.updated ? `, updated ${formatNumber(result.updated)}` : ""} into ${result.dataset.name}${rowsWithIssues ? ` · ${formatNumber(rowsWithIssues)} with issues` : ""}`,
+			isNew,
 			records,
 		);
 	};
