@@ -18,6 +18,7 @@ import {
 	guessMapping,
 	headersOf,
 	type ImportPlan,
+	inferType,
 	isValidKey,
 	previewMapping,
 } from "@freshcoat-js/workspace";
@@ -624,9 +625,45 @@ function MappingStep({
 			.map((r) => r[i] ?? "")
 			.filter((v) => v.trim() !== "")
 			.slice(0, 3);
+	const inferred = useMemo(
+		() => headers.map((_, i) => inferType(samples.map((r) => r[i] ?? ""))),
+		[headers, samples],
+	);
+	const skipUnmatched = () =>
+		onMapping(mapping.map((m) => (m.kind === "column" ? m : { kind: "skip" })));
+	const allNew = () => {
+		const next = [...mapping];
+		headers.forEach((header, i) => {
+			if (next[i]?.kind !== "skip") return;
+			next[i] = {
+				kind: "new",
+				key: freshKey(header, i, dataset, next),
+				type: inferred[i] ?? "text",
+			};
+		});
+		onMapping(next);
+	};
 
 	return (
 		<div className="flex flex-col">
+			<div className="flex gap-1 border-fc-border border-b px-2 py-1.5">
+				<Button
+					size="sm"
+					variant="ghost"
+					isDisabled={!mapping.some((m) => m.kind === "new")}
+					onPress={skipUnmatched}
+				>
+					Skip all unmatched
+				</Button>
+				<Button
+					size="sm"
+					variant="ghost"
+					isDisabled={!mapping.some((m) => m.kind === "skip")}
+					onPress={allNew}
+				>
+					All as new columns
+				</Button>
+			</div>
 			<table className="w-full border-collapse" data-testid="import-mapping">
 				<thead className="sticky top-0 z-10 bg-fc-raised text-fc-muted text-fc-sm">
 					<tr>

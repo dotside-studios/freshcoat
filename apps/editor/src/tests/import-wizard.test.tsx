@@ -199,4 +199,40 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			"Zed",
 		]);
 	});
+
+	it("skips or adds every unmatched column at once", async () => {
+		const user = fastUser();
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{
+						datasetId: "d_people",
+						file: new File(["name,Tier,Score\nZed,gold,4"], "tier.csv", {
+							type: "text/csv",
+						}),
+					}}
+					onClose={() => {}}
+					onImported={() => {}}
+				/>
+			</ControllerProvider>,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("import-wizard").textContent).toContain(
+				"tier.csv · 1 record",
+			),
+		);
+		await user.click(button("Next"));
+		await user.click(button("Skip all unmatched"));
+		expect(screen.queryByLabelText(/New column key/)).toBeNull();
+		await user.click(button("All as new columns"));
+		await user.click(button("Next"));
+		await user.click(button("Import"));
+		await waitFor(() =>
+			expect(controller.state.workspace?.datasets[0]?.columns).toHaveLength(4),
+		);
+		expect(controller.state.workspace?.datasets[0]?.columns.slice(2)).toEqual([
+			{ key: "tier", type: "text", title: "Tier" },
+			{ key: "score", type: "integer", title: "Score" },
+		]);
+	});
 });
