@@ -1,11 +1,12 @@
-import type {
-	Column,
-	DataRecord,
-	Dataset,
-	RecordStatus,
+import {
+	type Column,
+	type DataRecord,
+	type Dataset,
+	isEmptyValue,
+	type RecordStatus,
 } from "@freshcoat-js/workspace";
 import { STATUS_LABEL } from "~/app/copy";
-import { recordIssues } from "./model";
+import { assetMap, displayText, recordIssues } from "./model";
 import type { ThumbWidth } from "./thumbnails";
 
 // ── Views ─────────────────────────────────────────────────────────────────
@@ -133,6 +134,56 @@ export function filterByStatus(
 	if (filter === "issues")
 		return records.filter((r) => recordIssues(dataset, r).length > 0);
 	return records.filter((r) => r.status === filter);
+}
+
+export type ColumnFilterOp = "contains" | "equals" | "empty";
+
+export type ColumnFilter = {
+	id: string;
+	column: string;
+	op: ColumnFilterOp;
+	value: string;
+};
+
+export const FILTER_OPS: { id: ColumnFilterOp; label: string }[] = [
+	{ id: "contains", label: "contains" },
+	{ id: "equals", label: "equals" },
+	{ id: "empty", label: "is empty" },
+];
+
+/** Whether a filter narrows anything: one that needs a value and has none
+ *  does not. */
+export function filterActive(
+	filter: ColumnFilter,
+	columns: readonly Column[],
+): boolean {
+	if (!columns.some((c) => c.key === filter.column)) return false;
+	return filter.op === "empty" || filter.value.trim() !== "";
+}
+
+/** Records passing every column filter, comparing shown text without case. */
+export function filterByColumns(
+	records: readonly DataRecord[],
+	dataset: Pick<Dataset, "columns" | "assets">,
+	filters: readonly ColumnFilter[],
+): readonly DataRecord[] {
+	const tests = filters
+		.filter((f) => filterActive(f, dataset.columns))
+		.map((f) => {
+			const column = dataset.columns.find((c) => c.key === f.column) as Column;
+			const want = f.value.trim().toLowerCase();
+			return { column, op: f.op, want };
+		});
+	if (tests.length === 0) return records;
+	const assets = assetMap(dataset.assets);
+	return records.filter((r) =>
+		tests.every(({ column, op, want }) => {
+			const value = r.values[column.key] ?? null;
+			if (op === "empty") return isEmptyValue(value);
+			const text = displayText(column, value, assets).toLowerCase();
+			return op === "equals" ? text.trim() === want : text.includes(want);
+		}),
+	);
 }
 
 /** The bytes of every photo the dataset holds. */

@@ -45,6 +45,7 @@ import {
 	photosIntoEmptyDataset,
 	pickFiles,
 } from "./actions";
+import { ColumnFilters } from "./ColumnFilters";
 import { ColumnsPanel } from "./ColumnsPanel";
 import { type Confirm, useConfirm } from "./ConfirmDialog";
 import { type DatasetCreators, DatasetsList } from "./DatasetsList";
@@ -53,6 +54,8 @@ import { DataJobBar, ExportSelected } from "./ExportSelected";
 import { FindReplace } from "./FindReplace";
 import {
 	type CardSize,
+	type ColumnFilter,
+	filterByColumns,
 	filterByStatus,
 	photoBytes,
 	type RecordsView,
@@ -494,6 +497,7 @@ function RecordsPane({
 	const [query, setQuery] = useState("");
 	const deferredQuery = useDeferredValue(query);
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+	const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
 	const [sort, setSort] = useState<SortSpec | undefined>();
 	const [selection, setSelection] = useState<Selection>(() => new Set());
 	const [view, setViewState] = useState<RecordsView>(() => viewFor(dataset));
@@ -522,8 +526,13 @@ function RecordsPane({
 		[dataset, deferredQuery],
 	);
 	const filtered = useMemo(
-		() => filterByStatus(searched, dataset, statusFilter),
-		[searched, dataset, statusFilter],
+		() =>
+			filterByColumns(
+				filterByStatus(searched, dataset, statusFilter),
+				dataset,
+				columnFilters,
+			),
+		[searched, dataset, statusFilter, columnFilters],
 	);
 	const rows = useMemo(
 		() =>
@@ -557,6 +566,7 @@ function RecordsPane({
 		if (importNonce === 0) return;
 		setQuery("");
 		setStatusFilter("all");
+		setColumnFilters([]);
 		setSelection(new Set());
 		const scroller = document.querySelector<HTMLElement>(
 			"[data-testid=records-grid] [role=grid], [data-testid=records-gallery] [role=grid]",
@@ -614,6 +624,7 @@ function RecordsPane({
 		addRow: () => {
 			setQuery("");
 			setStatusFilter("all");
+			setColumnFilters([]);
 			let added: string[] = [];
 			editDataset(controller, datasetId, (d) => {
 				const out = addRecords(d);
@@ -749,6 +760,15 @@ function RecordsPane({
 					panels={panels}
 					onPanels={onPanels}
 					foldData={foldData}
+					columnFilters={
+						dataset.columns.length > 0 ? (
+							<ColumnFilters
+								columns={dataset.columns}
+								filters={columnFilters}
+								onChange={setColumnFilters}
+							/>
+						) : null
+					}
 					findReplace={
 						dataset.columns.length > 0 && !empty ? (
 							<FindReplace

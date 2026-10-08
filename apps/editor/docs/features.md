@@ -82,6 +82,9 @@ the records, and **Export** turns templates and records into files.
     records shown, in every column or one, optionally matching case. It
     counts the matches and the records holding them; Replace all parses
     each changed value by its column's type and is one undo step.
+  - Beside the status filter, column filters narrow the records by one
+    column containing a value, equaling it or being empty, ignoring case.
+    Each is a chip that opens to change it; every filter must match.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.

@@ -890,3 +890,39 @@ test("find and replace counts matches and replaces them in one undo step", async
 		.poll(() => values(page, "tier"))
 		.toEqual(["Gold", "Silver", "Gold"]);
 });
+
+test("column filter chips narrow the records beside the status filter", async ({
+	page,
+}) => {
+	await openPeople(page);
+	await page.getByTestId("add-column-filter").click();
+	const popover = page.getByTestId("column-filter-popover");
+	await popover.getByRole("button", { name: /Column/ }).click();
+	await page.getByRole("option", { name: "tier" }).click();
+	await popover.getByRole("textbox", { name: "Value" }).fill("gold");
+	await page.keyboard.press("Enter");
+	await expect(popover).toBeHidden();
+	await expect(page.getByTestId("column-filter")).toHaveText(
+		"tier contains gold",
+	);
+	await expect.poll(() => columnTexts(page, "name")).toEqual(["Ada", "Alan"]);
+	await expect(page.getByTestId("data-status-records")).toHaveText(
+		"2 of 3 records",
+	);
+
+	await page.getByTestId("add-column-filter").click();
+	await popover.getByRole("button", { name: /Column/ }).click();
+	await page.getByRole("option", { name: "points" }).click();
+	await popover.getByRole("button", { name: /Test/ }).click();
+	await page.getByRole("option", { name: "is empty" }).click();
+	await page.keyboard.press("Escape");
+	await expect.poll(() => columnTexts(page, "name")).toEqual(["Alan"]);
+
+	await page
+		.getByRole("button", { name: "Remove filter tier contains gold" })
+		.click();
+	await page
+		.getByRole("button", { name: "Remove filter points is empty" })
+		.click();
+	await expect.poll(() => columnTexts(page, "name")).toHaveLength(3);
+});

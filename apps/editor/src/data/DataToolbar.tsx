@@ -163,6 +163,7 @@ export function DataToolbar({
 	foldData,
 	exportSelected,
 	findReplace,
+	columnFilters,
 }: {
 	view: RecordsView;
 	onView: (view: RecordsView) => void;
@@ -181,6 +182,7 @@ export function DataToolbar({
 	/** "Export selected", shown while records are selected */
 	exportSelected?: ReactNode;
 	findReplace?: ReactNode;
+	columnFilters?: ReactNode;
 }) {
 	const filtering = statusFilter !== "all";
 	const filterLabel =
@@ -276,6 +278,7 @@ export function DataToolbar({
 						</Menu>
 					</Popover>
 				</MenuTrigger>
+				{columnFilters}
 				{findReplace}
 			</Group>
 			<Divider />
