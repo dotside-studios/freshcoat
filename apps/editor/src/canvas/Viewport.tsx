@@ -807,6 +807,22 @@ export function Viewport() {
 			}}
 			onDoubleClick={onDoubleClick}
 			onContextMenu={(e) => e.preventDefault()}
+			onDrop={(e) => {
+				const images = [...e.dataTransfer.files].filter((f) =>
+					f.type.startsWith("image/"),
+				);
+				if (!template || images.length === 0) return;
+				e.preventDefault();
+				e.stopPropagation();
+				const at = toWorld(local(e));
+				void (async () => {
+					for (const [i, file] of images.entries())
+						await controller.placeImage(file, {
+							x: at.x + i * 20,
+							y: at.y + i * 20,
+						});
+				})();
+			}}
 		>
 			{template ? (
 				<>

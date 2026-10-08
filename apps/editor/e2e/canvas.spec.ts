@@ -265,3 +265,46 @@ test("double-click edits a text layer on the canvas as one undo step", async ({
 		),
 	).toBe(before);
 });
+
+test("images dropped on the canvas land where they are dropped", async ({
+	page,
+}) => {
+	await openSample(page);
+	const p = await artboardPoint(page, 200, 150);
+	await page.evaluate(async ({ x, y }) => {
+		const dt = new DataTransfer();
+		for (const name of ["a.png", "b.png"]) {
+			const c = new OffscreenCanvas(30, 20);
+			const g = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+			g.fillStyle = "#39c";
+			g.fillRect(0, 0, 30, 20);
+			const blob = await c.convertToBlob({ type: "image/png" });
+			dt.items.add(new File([blob], name, { type: "image/png" }));
+		}
+		const el = document.querySelector('[data-testid="viewport"]') as Element;
+		for (const type of ["dragenter", "dragover", "drop"])
+			el.dispatchEvent(
+				new DragEvent(type, {
+					dataTransfer: dt,
+					bubbles: true,
+					cancelable: true,
+					clientX: x,
+					clientY: y,
+				}),
+			);
+	}, p);
+	await expect
+		.poll(() => state<number>(page, "s.doc.history.past.length"))
+		.toBe(2);
+	const placed = await state<Rect[]>(
+		page,
+		"t.template_data[0].elements.slice(-2).map((e) => ({ ...e.pos, ...e.size }))",
+	);
+	const want = [
+		{ x: 185, y: 140, width: 30, height: 20 },
+		{ x: 205, y: 160, width: 30, height: 20 },
+	];
+	for (const [i, rect] of placed.entries())
+		for (const k of ["x", "y", "width", "height"] as const)
+			expect(Math.abs(rect[k] - (want[i]?.[k] ?? 0))).toBeLessThan(1);
+});
