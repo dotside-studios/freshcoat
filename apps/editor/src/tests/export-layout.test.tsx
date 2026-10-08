@@ -233,10 +233,13 @@ function setup(preset: Partial<ExportPreset> = {}) {
 }
 
 const layoutGroup = () => screen.getByTestId("export-layout");
+const openTab = (user: ReturnType<typeof fastUser>, name: string) =>
+	user.click(screen.getByRole("tab", { name }));
 
 describe("the Layout group", { timeout: 20_000 }, () => {
-	test("is offered for a PDF, one per page by default", () => {
-		setup();
+	test("is offered for a PDF, one per page by default", async () => {
+		const { user } = setup();
+		await openTab(user, "Print");
 		const group = within(layoutGroup());
 		expect(
 			group
@@ -249,6 +252,7 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("Sheets takes the defaults and sums up the sheets", async () => {
 		const { current, user } = setup();
+		await openTab(user, "Print");
 		await user.click(
 			within(layoutGroup()).getByRole("radio", { name: "Sheets" }),
 		);
@@ -257,9 +261,11 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-sheet-summary").textContent).toBe(
 			"10 per sheet · 5 sheets",
 		);
+		await openTab(user, "Output");
 		expect(screen.getByTestId("export-page-size").textContent).toMatch(
 			/^Card /,
 		);
+		await openTab(user, "Print");
 		expect(
 			within(layoutGroup()).getByRole("checkbox", { name: "Crop marks" }),
 		).toBeTruthy();
@@ -271,6 +277,7 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("double-sided pairs sheets, with the offset under More", async () => {
 		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
+		await openTab(user, "Print");
 		expect(screen.queryByText("More", { selector: "button" })).toBeNull();
 		await user.click(
 			within(layoutGroup()).getByRole("checkbox", { name: "Double-sided" }),
@@ -292,8 +299,9 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(screen.queryByLabelText("Blank backs")).toBeNull();
 	});
 
-	test("a card that doesn't fit shows inline and blocks Export", () => {
-		const { update } = setup({ layout: DEFAULT_SHEET_LAYOUT });
+	test("a card that doesn't fit shows inline and blocks Export", async () => {
+		const { update, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
+		await openTab(user, "Print");
 		expect(button("Export 42 files")).toHaveProperty("disabled", false);
 		update({ layout: { ...DEFAULT_SHEET_LAYOUT, marginMm: 100 } });
 		const error = screen.getByTestId("export-sheet-error");
@@ -307,8 +315,9 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(bar.getAttribute("title")).toBe(error.textContent);
 	});
 
-	test("Sheets is unavailable for a size from each photo", () => {
-		setup({ size: { kind: "image", field: "photo" } });
+	test("Sheets is unavailable for a size from each photo", async () => {
+		const { user } = setup({ size: { kind: "image", field: "photo" } });
+		await openTab(user, "Print");
 		const option = within(layoutGroup()).getByRole("radio", { name: "Sheets" });
 		expect(option).toHaveProperty("disabled", true);
 	});
