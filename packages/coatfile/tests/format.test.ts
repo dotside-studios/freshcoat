@@ -277,7 +277,7 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
-	test("1.7: text path, on elements and deltas", () => {
+	test("1.6: text path, on elements and deltas", () => {
 		const text = (properties: Record<string, unknown>) =>
 			({
 				id: "t",
@@ -288,7 +288,7 @@ describe("minimumFormatVersion", () => {
 			}) as Element;
 		const need = (properties: Record<string, unknown>) =>
 			minimumFormatVersion(withElements(base(), text(properties)));
-		expect(need({ path: { d: "M0 0 L10 0" } })).toBe("1.7");
+		expect(need({ path: { d: "M0 0 L10 0" } })).toBe("1.6");
 
 		const t = withElements(base(), text({}));
 		t.variants = [
@@ -303,7 +303,7 @@ describe("minimumFormatVersion", () => {
 				],
 			},
 		];
-		expect(minimumFormatVersion(t)).toBe("1.7");
+		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
 	test("1.6: element backdropBlur", () => {
