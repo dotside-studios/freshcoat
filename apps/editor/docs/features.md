@@ -75,7 +75,7 @@ the records, and **Export** turns templates and records into files.
     appending.
   - Photos: see [Photos](#photos).
   - Import and export the schema as JSON Schema 2020-12, and the records as
-    CSV, Excel or JSON.
+    CSV, Excel or JSON (Download data in the toolbar).
 - **Export:**
   - Presets name a template, which records (all, pending, failed or
     selected), which sides, the size (the template's, or each record's
