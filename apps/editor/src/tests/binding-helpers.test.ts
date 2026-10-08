@@ -63,7 +63,7 @@ describe("binding helpers", () => {
 		});
 		expect(sourceOfKind("column", "zzz", ds)).toEqual({
 			kind: "column",
-			column: "Name",
+			column: "",
 		});
 		expect(sourceOfKind("constant", "name", ds)).toEqual({
 			kind: "constant",

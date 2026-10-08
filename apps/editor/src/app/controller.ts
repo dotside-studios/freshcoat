@@ -1333,8 +1333,27 @@ export class EditorController {
 			toast("A workspace needs at least one template", { tone: "warning" });
 			return;
 		}
+		if (ws.activeTemplateId === id) {
+			const index = ws.templates.findIndex((s) => s.id === id);
+			const other = ws.templates[index === 0 ? 1 : index - 1];
+			if (other) this.dispatch({ type: "switchTemplate", id: other.id });
+		}
+		const parked = this.state.workspace ?? ws;
+		const index = parked.templates.findIndex((s) => s.id === id);
+		const slot = parked.templates[index];
+		if (!slot) return;
+		const presets = parked.presets.filter((p) => p.templateId === id);
 		this.dispatch({ type: "removeTemplate", id });
 		requestAnimationFrame(() => this.fitView());
+		toast(`Deleted ${slot.fileName}`, {
+			action: {
+				label: "Undo",
+				onAction: () => {
+					this.dispatch({ type: "restoreTemplate", slot, index, presets });
+					requestAnimationFrame(() => this.fitView());
+				},
+			},
+		});
 	}
 
 	/** Shows one dataset record in the Edit preview, through the active

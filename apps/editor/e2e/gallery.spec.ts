@@ -239,6 +239,42 @@ test("an empty dataset takes a dropped spreadsheet, and no dataset takes dropped
 	]);
 	const wizard = page.getByTestId("import-wizard");
 	await expect(wizard).toContainText("people.csv · 2 records");
+	await page.keyboard.press("Escape");
+	await expect(wizard).toHaveCount(0);
+
+	// So does one with records, over its grid.
+	await page.evaluate(() => {
+		const c = (
+			window as unknown as {
+				__freshcoat: {
+					controller: {
+						state: {
+							workspace: { datasets: { id: string; records: unknown[] }[] };
+						};
+						dispatch(a: unknown): void;
+					};
+				};
+			}
+		).__freshcoat.controller;
+		c.dispatch({
+			type: "datasetEdit",
+			datasets: c.state.workspace.datasets.map((d) =>
+				d.id === "d_people"
+					? {
+							...d,
+							records: [
+								{ id: "r_1", status: "pending", values: { name: "Ada" } },
+							],
+						}
+					: d,
+			),
+		});
+	});
+	await expect(page.getByTestId("dataset-drop-zone")).toHaveCount(0);
+	await drop("section-data", [
+		{ name: "more.csv", type: "text/csv", text: "name\nAlan\n" },
+	]);
+	await expect(wizard).toContainText("more.csv · 1 record");
 });
 
 test("on a tablet the data group folds into More and the inspector is a sheet", async ({

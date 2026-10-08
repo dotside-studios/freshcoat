@@ -723,6 +723,10 @@ export function ExportSection() {
 		</div>
 	);
 
+	const showBinding = () => {
+		setSettingsTab("content");
+		if (narrow) setOverlay("settings");
+	};
 	const bottom = preset ? (
 		<Tabs
 			selectedKey={tab}
@@ -796,7 +800,7 @@ export function ExportSection() {
 						}
 					/>
 				) : (
-					<UnboundHint />
+					<UnboundHint onBind={showBinding} />
 				)}
 			</TabPanel>
 			<TabPanel id="records" className="flex flex-col overflow-hidden">
@@ -812,7 +816,7 @@ export function ExportSection() {
 						selectionIsPreset={preset.records === "selected"}
 					/>
 				) : (
-					<UnboundHint />
+					<UnboundHint onBind={showBinding} />
 				)}
 			</TabPanel>
 		</Tabs>
@@ -864,6 +868,14 @@ export function ExportSection() {
 								{unbound ? (
 									<Notice testId="export-unbound">
 										Not bound to a dataset, exporting defaults
+										<Button
+											variant="ghost"
+											size="sm"
+											className="ml-1 text-fc-warning underline"
+											onPress={showBinding}
+										>
+											Bind a dataset
+										</Button>
 									</Notice>
 								) : null}
 								{glyphIssues ? (
@@ -969,10 +981,13 @@ function ScopeItem({
 	);
 }
 
-function UnboundHint() {
+function UnboundHint({ onBind }: { onBind: () => void }) {
 	return (
-		<div className="grid flex-1 place-items-center p-4 text-center text-fc-faint text-fc-sm">
-			Bind a dataset in Settings to export one file per record
+		<div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center text-fc-faint text-fc-sm">
+			Bind a dataset to export one file per record
+			<Button size="sm" onPress={onBind}>
+				Bind a dataset
+			</Button>
 		</div>
 	);
 }

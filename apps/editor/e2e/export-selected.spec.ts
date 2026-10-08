@@ -205,3 +205,20 @@ test("Export: the filmstrip selects with Shift, Mod and Mod+A, and exports only 
 	);
 	expect(await state<unknown>(page, "s.workspace.presets")).toEqual([preset]);
 });
+
+test("Data: with no preset for the dataset, Export selected opens Export", async ({
+	page,
+}) => {
+	await seed(page);
+	await run(page, `c.dispatch({ type: "removePreset", id: "p_pending" })`);
+	await page.keyboard.press(`${mod}+2`);
+	await page.getByRole("radio", { name: "Gallery" }).click();
+	await page
+		.locator('[data-testid=records-gallery] [role=row][data-row="r1"]')
+		.click();
+	await page.getByTestId("export-selected").click();
+	const popover = page.getByTestId("export-selected-popover");
+	await expect(popover).toContainText("No presets");
+	await popover.getByRole("button", { name: "Open Export" }).click();
+	await expect(page.getByTestId("section-export")).toBeVisible();
+});

@@ -44,8 +44,10 @@ import {
 	type Section,
 	singleTemplateWorkspace,
 	switchTo,
+	type TemplateSlot,
 	undoDatasets,
 	type WorkspaceState,
+	withJobStatus,
 	withRecordStatus,
 	workspaceDirty,
 	workspaceState,
@@ -224,6 +226,12 @@ export type Action =
 			guides?: TemplateGuides;
 	  }
 	| { type: "removeTemplate"; id: string }
+	| {
+			type: "restoreTemplate";
+			slot: TemplateSlot;
+			index: number;
+			presets: ExportPreset[];
+	  }
 	| { type: "renameTemplateEntry"; id: string; fileName: string }
 	| { type: "duplicateTemplate"; id: string; newId?: string }
 	| { type: "setBinding"; id: string; binding?: Binding }
@@ -245,6 +253,7 @@ export type Action =
 			status: RecordStatus;
 			exportedAt?: string;
 			errors?: Record<string, string>;
+			fromJob?: true;
 	  }
 	| { type: "setPreset"; preset: ExportPreset }
 	| { type: "removePreset"; id: string }
@@ -362,6 +371,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
 		case "switchTemplate":
 		case "addTemplate":
 		case "removeTemplate":
+		case "restoreTemplate":
 		case "duplicateTemplate":
 			return withKnownVariant(reduceOpen(validated(state), action));
 		case "commit":
@@ -660,6 +670,20 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 				}),
 			};
 		}
+		case "restoreTemplate": {
+			if (ws.templates.some((s) => s.id === action.slot.id)) return state;
+			const templates = [...ws.templates];
+			templates.splice(action.index, 0, action.slot);
+			const restored: EditorState = {
+				...state,
+				workspace: {
+					...ws,
+					templates,
+					presets: [...ws.presets, ...action.presets],
+				},
+			};
+			return switchTo(restored, action.slot.id, fresh);
+		}
 		case "renameTemplateEntry":
 			return edit((w) => {
 				w.templates = produceAt(
@@ -718,6 +742,13 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 				w.activeDatasetId = action.id;
 			});
 		case "setRecordStatus":
+			if (action.fromJob)
+				return withWs(
+					withJobStatus(ws, action.datasetId, action.ids, action.status, {
+						exportedAt: action.exportedAt,
+						errors: action.errors,
+					}),
+				);
 			return withWs(
 				commitDatasets(
 					ws,

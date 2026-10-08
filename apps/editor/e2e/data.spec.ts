@@ -252,26 +252,25 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 	await expect.poll(async () => (await records(page)).length).toBe(3);
 	expect((await records(page))[1]?.id).toBe(grace);
 
-	// Delete on a focused row with a selection deletes it too.
+	// Delete clears the focused cell, even with rows selected.
 	await page
 		.locator(`[role=row][data-row="${alan}"]`)
 		.getByRole("checkbox")
 		.check({ force: true });
-	await cell(page, alan, "tier").click();
-	await page.keyboard.press("Delete");
-	await expect.poll(async () => (await records(page)).length).toBe(2);
-	await page.keyboard.press(`${mod}+z`);
-	await expect.poll(async () => (await records(page)).length).toBe(3);
-
-	// Delete with nothing selected clears the focused cell.
-	await page.getByTestId("data-status").click();
 	await cell(page, ada, "tier").click();
-	await expect(page.getByTestId("data-status")).not.toContainText("selected");
 	await page.keyboard.press("Delete");
 	await expect
 		.poll(async () => (await records(page))[0]?.values.tier)
 		.toBeUndefined();
 	expect(await records(page)).toHaveLength(3);
+
+	// Mod+Backspace deletes the selected rows.
+	await page.keyboard.press(`${mod}+Backspace`);
+	await expect.poll(async () => (await records(page)).length).toBe(2);
+	await expect(page.locator(`[role=row][data-row="${alan}"]`)).toHaveCount(0);
+	await page.keyboard.press(`${mod}+z`);
+	await expect.poll(async () => (await records(page)).length).toBe(3);
+	await page.getByTestId("data-status").click();
 
 	// A status badge's menu changes that record's status.
 	await page
@@ -444,6 +443,24 @@ test("renaming a column rewrites its values and the binding that reads it", asyn
 			"s.workspace.templates[0].binding.fields.display_name",
 		),
 	).toEqual({ kind: "column", column: "full_name" });
+});
+
+test("a failed record shows its error and opens in Export", async ({
+	page,
+}) => {
+	await openDataFromTemplate(page);
+	await importCsv(page);
+	const id = (await records(page))[1]?.id as string;
+	await run(
+		page,
+		`c.dispatch({ type: "setRecordStatus", datasetId: c.state.workspace.datasets[0].id, ids: ["${id}"], status: "failed", errors: { "${id}": "Font missing" }, fromJob: true })`,
+	);
+	await cell(page, id, "tier").click();
+	const error = page.getByTestId("record-error");
+	await expect(error).toContainText("Font missing");
+	await error.getByRole("button", { name: "Show in Export" }).click();
+	await expect(page.getByTestId("section-export")).toBeVisible();
+	expect(await state<string>(page, "s.exportRecordId")).toBe(id);
 });
 
 /** A real JPEG of this size from the page's own encoder, with an EXIF

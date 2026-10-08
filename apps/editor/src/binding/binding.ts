@@ -73,8 +73,7 @@ export function sourceOfKind(
 			const columns = dataset?.columns ?? [];
 			const match =
 				columns.find((c) => c.key === field) ??
-				columns.find((c) => c.key.toLowerCase() === field.toLowerCase()) ??
-				columns[0];
+				columns.find((c) => c.key.toLowerCase() === field.toLowerCase());
 			return { kind: "column", column: match?.key ?? "" };
 		}
 		case "constant":

@@ -170,6 +170,26 @@ export function RecordPanel({
 					<RightIcon />
 				</IconButton>
 			</div>
+			{record.status === "failed" && record.error ? (
+				<div
+					className="flex shrink-0 items-start gap-2 border-fc-border border-b py-2 pr-1 pl-2.5"
+					data-testid="record-error"
+				>
+					<p className="m-0 min-w-0 flex-1 break-words pt-0.5 text-fc-danger-text text-fc-sm">
+						{record.error}
+					</p>
+					<Button
+						variant="ghost"
+						size="sm"
+						onPress={() => {
+							controller.dispatch({ type: "setExportRecord", id: record.id });
+							controller.dispatch({ type: "setSection", section: "export" });
+						}}
+					>
+						Show in Export
+					</Button>
+				</div>
+			) : null}
 			<div className="min-h-0 flex-1 overflow-auto">
 				{images.length ? (
 					<div className="flex flex-col gap-3 border-fc-border border-b p-2.5">

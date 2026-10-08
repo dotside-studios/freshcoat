@@ -66,15 +66,16 @@ function EditingText({ layer }: { layer: string }) {
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const area = useRef<HTMLTextAreaElement>(null);
+	const placed = geometry.has(layer);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: refocus when the edited layer changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: refocus when the edited layer changes or a new one is first laid out
 	useLayoutEffect(() => {
 		const el = area.current;
 		if (!el) return;
 		fitHeight(el);
 		el.focus();
 		el.select();
-	}, [layer]);
+	}, [layer, placed]);
 
 	const t = controller.template;
 	const el = t ? getElement(t, layer) : undefined;

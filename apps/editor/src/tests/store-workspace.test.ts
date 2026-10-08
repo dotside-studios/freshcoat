@@ -149,6 +149,43 @@ describe("workspace slice", () => {
 		expect(ws(store).activeDatasetId).toBe("a");
 	});
 
+	test("a job's statuses stay through undo and redo of the edits around them", () => {
+		const store = opened();
+		store.dispatch({ type: "datasetEdit", datasets: [dataset("a", 2)] });
+		const renamed = (ws(store).datasets[0] as Dataset).records.map((r) => ({
+			...r,
+			values: { name: `${r.values.name}!` },
+		}));
+		store.dispatch({
+			type: "datasetEdit",
+			datasets: [{ ...(ws(store).datasets[0] as Dataset), records: renamed }],
+		});
+		store.dispatch({ type: "datasetUndo" });
+		store.dispatch({
+			type: "setRecordStatus",
+			datasetId: "a",
+			ids: ["r_a0"],
+			status: "exported",
+			exportedAt: "2026-09-25T00:00:00.000Z",
+			fromJob: true,
+		});
+		const statuses = () =>
+			ws(store).datasets[0]?.records.map((r) => r.status) ?? [];
+		expect(statuses()).toEqual(["exported", "pending"]);
+		expect(ws(store).datasetHistory.past).toHaveLength(1);
+		store.dispatch({ type: "datasetRedo" });
+		expect(ws(store).datasets[0]?.records[0]?.values.name).toBe("N0!");
+		expect(statuses()).toEqual(["exported", "pending"]);
+		store.dispatch({ type: "datasetUndo" });
+		store.dispatch({ type: "datasetUndo" });
+		expect(ws(store).datasets).toEqual([]);
+		store.dispatch({ type: "datasetRedo" });
+		expect(statuses()).toEqual(["exported", "pending"]);
+		expect(ws(store).datasets[0]?.records[0]?.exportedAt).toBe(
+			"2026-09-25T00:00:00.000Z",
+		);
+	});
+
 	test("record status changes stamp the export time and errors", () => {
 		const store = opened();
 		store.dispatch({ type: "datasetEdit", datasets: [dataset("a", 3)] });

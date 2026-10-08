@@ -741,9 +741,10 @@ export function Viewport() {
 				});
 				const zoom = controller.state.view.zoom;
 				const tiny = box.width * zoom < 4 && box.height * zoom < 4;
-				controller.create(g.tool, tiny ? null : box, g.startWorld, {
+				const key = controller.create(g.tool, tiny ? null : box, g.startWorld, {
 					parent: g.parent,
 				});
+				if (key && g.tool === "text") controller.beginTextEdit(key);
 				break;
 			}
 		}
@@ -807,6 +808,22 @@ export function Viewport() {
 			}}
 			onDoubleClick={onDoubleClick}
 			onContextMenu={(e) => e.preventDefault()}
+			onDrop={(e) => {
+				const images = [...e.dataTransfer.files].filter((f) =>
+					f.type.startsWith("image/"),
+				);
+				if (!template || images.length === 0) return;
+				e.preventDefault();
+				e.stopPropagation();
+				const at = toWorld(local(e));
+				void (async () => {
+					for (const [i, file] of images.entries())
+						await controller.placeImage(file, {
+							x: at.x + i * 20,
+							y: at.y + i * 20,
+						});
+				})();
+			}}
 		>
 			{template ? (
 				<>
