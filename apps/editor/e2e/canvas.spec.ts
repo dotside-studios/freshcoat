@@ -308,3 +308,30 @@ test("images dropped on the canvas land where they are dropped", async ({
 		for (const k of ["x", "y", "width", "height"] as const)
 			expect(Math.abs(rect[k] - (want[i]?.[k] ?? 0))).toBeLessThan(1);
 });
+
+test("a new text layer starts in editing, and Enter edits a selected one", async ({
+	page,
+}) => {
+	await openSample(page);
+	await page.getByTestId("artboard").hover();
+	await page.keyboard.press("t");
+	const p = await artboardPoint(page, 300, 200);
+	await page.mouse.click(p.x, p.y);
+	const editor = page.getByLabel("Edit text on canvas");
+	await expect(editor).toBeFocused();
+	await page.keyboard.type("Hello");
+	await page.keyboard.press("Escape");
+	await expect(editor).toBeHidden();
+	const last = "t.template_data[0].elements.at(-1)";
+	await expect
+		.poll(() => state<string>(page, `${last}.properties.value`))
+		.toBe("Hello");
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(2);
+
+	await page.keyboard.press("Enter");
+	await expect(editor).toBeFocused();
+	await expect(editor).toHaveValue("Hello");
+	await page.keyboard.press("Escape");
+	await expect(editor).toBeHidden();
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(2);
+});

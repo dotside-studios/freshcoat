@@ -741,9 +741,10 @@ export function Viewport() {
 				});
 				const zoom = controller.state.view.zoom;
 				const tiny = box.width * zoom < 4 && box.height * zoom < 4;
-				controller.create(g.tool, tiny ? null : box, g.startWorld, {
+				const key = controller.create(g.tool, tiny ? null : box, g.startWorld, {
 					parent: g.parent,
 				});
+				if (key && g.tool === "text") controller.beginTextEdit(key);
 				break;
 			}
 		}

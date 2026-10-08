@@ -280,11 +280,15 @@ export const COMMANDS: Command[] = [
 	},
 	{
 		id: "edit.selectChildren",
-		label: "Select children",
+		label: "Select children or edit text",
 		keys: ["Enter"],
 		group: "Edit",
 		enabled: hasSelection,
-		run: ({ controller }) => controller.selectChildren(),
+		run: ({ controller }) => {
+			const [only, ...rest] = controller.state.selection;
+			if (only && rest.length === 0 && controller.beginTextEdit(only)) return;
+			controller.selectChildren();
+		},
 	},
 	{
 		id: "edit.escape",
