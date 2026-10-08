@@ -179,7 +179,7 @@ export function transpileFrame(
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
 
-	const stroke = strokeToElement(node, ctx.scale);
+	const stroke = strokeToElement(node, ctx.scale, placed.size);
 	if (stroke) out.properties.stroke = stroke;
 
 	if (node.clipsContent === true) {

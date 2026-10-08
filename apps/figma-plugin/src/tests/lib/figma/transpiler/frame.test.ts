@@ -211,22 +211,39 @@ describe("transpileFrame strokes", () => {
 		expect(el.properties.stroke).toBeUndefined();
 	});
 
-	it("rasterizes a frame with a gradient stroke", () => {
+	const radial = {
+		type: "GRADIENT_RADIAL" as const,
+		gradientHandlePositions: [
+			{ x: 0.5, y: 0.5 },
+			{ x: 1, y: 0.5 },
+			{ x: 0.5, y: 1 },
+		],
+		gradientStops: [
+			{ position: 0, color: black },
+			{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+		],
+	};
+
+	it("keeps a radial gradient stroke native, on the frame's box", () => {
+		const node = baseFrame({ strokes: [radial], strokeWeight: 1 });
+		expect(classify(node).kind).toBe("native-frame");
+		const el = transpileFrame(node, { outerFrame: OUTER_FRAME, scale: 1 });
+		expect(el.properties.stroke).toMatchObject({
+			width: 1,
+			color: {
+				kind: "radial",
+				center: [0.5, 0.5],
+				stops: [
+					{ offset: 0, color: "#000000" },
+					{ offset: 1, color: "#ffffff" },
+				],
+			},
+		});
+	});
+
+	it("rasterizes a frame whose gradient stroke is stacked over a solid", () => {
 		const node = baseFrame({
-			strokes: [
-				{
-					type: "GRADIENT_RADIAL",
-					gradientHandlePositions: [
-						{ x: 0.5, y: 0.5 },
-						{ x: 1, y: 0.5 },
-						{ x: 0.5, y: 1 },
-					],
-					gradientStops: [
-						{ position: 0, color: black },
-						{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
-					],
-				},
-			],
+			strokes: [{ type: "SOLID", color: black }, radial],
 			strokeWeight: 1,
 		});
 		expect(classify(node)).toEqual({
