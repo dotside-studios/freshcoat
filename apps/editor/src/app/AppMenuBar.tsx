@@ -1,4 +1,6 @@
 import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
 import {
 	Menu,
 	MenuBar,
@@ -10,13 +12,15 @@ import {
 import { Popover } from "@freshcoat-js/ui/popover";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
 import { isDirty, present } from "~/state/store";
 import type { Section } from "~/state/workspace";
+import UndoIcon from "~icons/mingcute/back-2-line";
 import CheckIcon from "~icons/mingcute/check-line";
+import RedoIcon from "~icons/mingcute/forward-2-line";
 import LeftPanelIcon from "~icons/mingcute/layout-leftbar-open-line";
 import RightPanelIcon from "~icons/mingcute/layout-rightbar-open-line";
 import SendIconFill from "~icons/mingcute/send-fill";
@@ -325,6 +329,14 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 							</Button>
 						) : null}
 						<span className="ml-1 flex items-center gap-0.5">
+							<HistoryButton id="edit.undo" ctx={ctx}>
+								<UndoIcon />
+							</HistoryButton>
+							<HistoryButton id="edit.redo" ctx={ctx}>
+								<RedoIcon />
+							</HistoryButton>
+						</span>
+						<span className="flex items-center gap-0.5">
 							<ToggleButton
 								aria-label="Layers panel"
 								tooltip="Layers panel"
@@ -346,6 +358,32 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 				) : null}
 			</div>
 		</header>
+	);
+}
+
+function HistoryButton({
+	id,
+	ctx,
+	children,
+}: {
+	id: "edit.undo" | "edit.redo";
+	ctx: CommandContext;
+	children: ReactNode;
+}) {
+	const command = COMMAND_BY_ID.get(id);
+	const enabled = useEditor((s) => command?.enabled?.(s) ?? false);
+	if (!command) return null;
+	const key = command.keys?.[0];
+	return (
+		<IconButton
+			aria-label={command.label}
+			tooltip={`${command.label}${key ? `  ${formatShortcut(key)}` : ""}`}
+			isDisabled={!enabled}
+			onPress={() => void command.run(ctx)}
+			className="pointer-coarse:size-7"
+		>
+			{children}
+		</IconButton>
 	);
 }
 

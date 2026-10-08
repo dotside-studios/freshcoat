@@ -220,7 +220,8 @@ the records, and **Export** turns templates and records into files.
   layer or variant it is about, and print and preview hints are listed without
   being counted. A save that fails validation opens it.
 - **Undo and redo:** every command has one undo step. A drag, a burst of typing
-  or a run of nudges is a single step.
+  or a run of nudges is a single step. Undo and redo are also buttons at the
+  right of the menu bar, for touch screens.
 - **SVG paste:** pasted SVG markup can become layers, an image or text.
   As layers, paths and shapes become vectors, groups frames, and clips and
   masks mask layers; embedded images become image layers, `<text>` and
