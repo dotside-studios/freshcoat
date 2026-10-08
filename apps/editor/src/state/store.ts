@@ -44,6 +44,7 @@ import {
 	type Section,
 	singleTemplateWorkspace,
 	switchTo,
+	type TemplateSlot,
 	undoDatasets,
 	type WorkspaceState,
 	withRecordStatus,
@@ -224,6 +225,12 @@ export type Action =
 			guides?: TemplateGuides;
 	  }
 	| { type: "removeTemplate"; id: string }
+	| {
+			type: "restoreTemplate";
+			slot: TemplateSlot;
+			index: number;
+			presets: ExportPreset[];
+	  }
 	| { type: "renameTemplateEntry"; id: string; fileName: string }
 	| { type: "duplicateTemplate"; id: string; newId?: string }
 	| { type: "setBinding"; id: string; binding?: Binding }
@@ -362,6 +369,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
 		case "switchTemplate":
 		case "addTemplate":
 		case "removeTemplate":
+		case "restoreTemplate":
 		case "duplicateTemplate":
 			return withKnownVariant(reduceOpen(validated(state), action));
 		case "commit":
@@ -659,6 +667,20 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 						w.presets = nws.presets.filter((p) => p.templateId !== action.id);
 				}),
 			};
+		}
+		case "restoreTemplate": {
+			if (ws.templates.some((s) => s.id === action.slot.id)) return state;
+			const templates = [...ws.templates];
+			templates.splice(action.index, 0, action.slot);
+			const restored: EditorState = {
+				...state,
+				workspace: {
+					...ws,
+					templates,
+					presets: [...ws.presets, ...action.presets],
+				},
+			};
+			return switchTo(restored, action.slot.id, fresh);
 		}
 		case "renameTemplateEntry":
 			return edit((w) => {
