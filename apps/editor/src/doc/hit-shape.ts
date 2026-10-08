@@ -6,6 +6,7 @@ import {
 import {
 	outlinePath,
 	rectShape,
+	roundCorners,
 	type ShapeMask,
 	type StrokeTrim,
 	strokeInset,
@@ -237,7 +238,9 @@ export class ShapeHits {
 				width,
 				height,
 			);
-		const path = ck.Path.MakeFromSVGString(el.properties.d);
+		const path = ck.Path.MakeFromSVGString(
+			roundCorners(el.properties.d, el.properties.cornerRadius ?? 0),
+		);
 		if (path && el.properties.fillRule === "evenodd")
 			path.setFillType(ck.FillType.EvenOdd);
 		return path;

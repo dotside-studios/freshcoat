@@ -295,6 +295,7 @@ export const ImageMaskSchema = z.union([
 		kind: z.literal("polygon"),
 		sides: z.number().int().min(3),
 		rotation: z.number().optional(),
+		cornerRadius: z.number().min(0).optional(),
 	}),
 	z.object({ kind: z.literal("squircle"), radius: z.number() }),
 ]);
@@ -405,6 +406,8 @@ export const VectorPropertiesSchema = z.object({
 	d: z.string(),
 	// Which regions of overlapping subpaths are inside; SVG's default is nonzero.
 	fillRule: z.enum(["nonzero", "evenodd"]).optional(),
+	// Rounds every corner between two straight segments by this radius.
+	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
 });

@@ -12,6 +12,7 @@ import {
 	type PaintWarning,
 	type PathNode,
 	patternFill,
+	roundCorners,
 	type RectNode,
 	scalePathData,
 	strokeTrim,
@@ -97,7 +98,7 @@ type ImageMaskInput =
 	| "circle"
 	| "ellipse"
 	| { kind: "rounded-rect"; radius: number }
-	| { kind: "polygon"; sides: number; rotation?: number }
+	| { kind: "polygon"; sides: number; rotation?: number; cornerRadius?: number }
 	| { kind: "squircle"; radius: number };
 
 const ASPECT_TOLERANCE = 0.005;
@@ -384,7 +385,10 @@ function compileElement(
 			return {
 				...transform,
 				kind: "path",
-				d: scalePathString(d, ratio),
+				d: scalePathString(
+					roundCorners(d, Number(props.cornerRadius ?? 0)),
+					ratio,
+				),
 				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
 					? { fillRule: props.fillRule }
 					: {}),
@@ -1317,7 +1321,12 @@ function resolveImageClip(
 		if (mask.kind === "squircle") {
 			return { kind: "squircle", radius: mask.radius * ratio };
 		}
-		return { kind: "polygon", sides: mask.sides, rotation: mask.rotation };
+		return {
+			kind: "polygon",
+			sides: mask.sides,
+			rotation: mask.rotation,
+			...(mask.cornerRadius ? { cornerRadius: mask.cornerRadius * ratio } : {}),
+		};
 	}
 	if (typeof cornerRadius === "number") {
 		return { kind: "rounded-rect", radius: cornerRadius * ratio };

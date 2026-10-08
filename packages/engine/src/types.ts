@@ -144,7 +144,7 @@ export type ShapeMask =
 	| { kind: "rounded-rect"; radius: CornerRadius; smoothing?: number }
 	| { kind: "circle" }
 	| { kind: "ellipse" }
-	| { kind: "polygon"; sides: number; rotation?: number }
+	| { kind: "polygon"; sides: number; rotation?: number; cornerRadius?: number }
 	| { kind: "squircle"; radius: number; smoothing?: number };
 
 // A uniform radius, or per-corner [topLeft, topRight, bottomRight, bottomLeft]

@@ -3,6 +3,7 @@
 
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import { insetCorner } from "./paint-helpers";
+import { roundCorners } from "./round-corners";
 import { squircleSvg } from "./squircle";
 import type { CornerRadius, ShapeMask } from "./types";
 
@@ -133,7 +134,10 @@ export function outlineGeometry(
 				const a = -Math.PI / 2 + (i * 2 * Math.PI) / shape.sides + rot;
 				d += `${i === 0 ? "M" : "L"} ${cx + (w / 2) * Math.cos(a)} ${cy + (h / 2) * Math.sin(a)} `;
 			}
-			return { kind: "path", d: `${d}Z` };
+			return {
+				kind: "path",
+				d: roundCorners(`${d}Z`, shape.cornerRadius ?? 0),
+			};
 		}
 		case "squircle": {
 			const sw = Math.max(0, iw);
