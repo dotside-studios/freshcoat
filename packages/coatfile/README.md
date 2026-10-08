@@ -317,7 +317,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate`; text `arc`; element `backdropBlur`; gradient stroke `color` |
+| 1.6 | frame `isolate`; text `arc`; element `backdropBlur`; gradient stroke `color`; variant `size` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -772,6 +772,21 @@ deltas, matched by id at any depth, inside frames and masks too:
 and draws the variant as a recolour only. A frame resized in a variant does not
 re-place its children; a writer that moves them writes each move as its own
 delta.
+
+A variant can have its own `size`, such as a portrait or square version of a
+landscape design:
+
+```jsonc
+{ "id": "portrait", "label": "Portrait", "size": { "width": 1200, "height": 1800 }, "overrides": [] }
+```
+
+The base is laid out at that size by its [constraints](#constraints) first,
+and the variant's deltas apply to that layout, in its units. `variantSize(t,
+variantId)` is the size a variant draws at (the template's when it has none),
+which is what `renderTemplate` compiles at by default; `compile` needs a
+`width` and `height` with that aspect. `variantBase(t, variantId)` is the base
+laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
+sized variant as it is.
 
 `applyVariant(template, variantId, { hidden })` returns the template with one
 variant applied, which is what `compile` draws for `variantId`. A hidden element

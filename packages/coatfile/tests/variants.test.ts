@@ -11,7 +11,9 @@ import type {
 	TextElement,
 } from "../src/types";
 import { validate } from "../src/validate";
-import { applyVariant, checkVariants } from "../src/variants";
+import { resizeTemplate } from "../src/constraints";
+import { minimumFormatVersion } from "../src/format";
+import { applyVariant, checkVariants, variantSize } from "../src/variants";
 
 const rect = (id: string, fill: string): RectElement => ({
 	id,
@@ -504,5 +506,108 @@ describe("checkVariants", () => {
 			{ name: "missing", elements: [{ id: "x", properties: { a: 1 } }] },
 		]);
 		expect(checkVariants(t)).toEqual([]);
+	});
+});
+
+describe("sized variants", () => {
+	const pinned: Template = {
+		...template,
+		template_data: [
+			{
+				name: "front",
+				background: {
+					...rect("bg", "#ffffff"),
+					size: { width: 100, height: 60 },
+				},
+				elements: [
+					{
+						...rect("photo", "#000000"),
+						size: { width: 100, height: 60 },
+						constraints: { horizontal: "stretch", vertical: "stretch" },
+					},
+					{
+						...rect("mark", "#ffffff"),
+						pos: { x: 70, y: 40 },
+						constraints: { horizontal: "end", vertical: "end" },
+					},
+				],
+			},
+		],
+		variants: [
+			{
+				id: "portrait",
+				label: "Portrait",
+				size: { width: 60, height: 100 },
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "mark", properties: {}, pos: { x: 5, y: 85 } }],
+					},
+				],
+			},
+			{
+				id: "square",
+				label: "Square",
+				size: { width: 60, height: 60 },
+				overrides: [],
+			},
+		],
+	};
+
+	test("variantSize is the variant's own size, else the template's", () => {
+		expect(variantSize(pinned, "portrait")).toEqual({ width: 60, height: 100 });
+		expect(variantSize(pinned, undefined)).toEqual({ width: 100, height: 60 });
+		expect(variantSize(pinned, "nope")).toEqual({ width: 100, height: 60 });
+	});
+
+	test("lays the base out at the variant's size before its deltas", () => {
+		const out = applyVariant(pinned, "square");
+		expect(out.width).toBe(60);
+		expect(out.height).toBe(60);
+		const els = frame(out, "front").elements;
+		expect(byId(els, "photo")?.size).toEqual({ width: 60, height: 60 });
+		expect(byId(els, "mark")?.pos).toEqual({ x: 30, y: 40 });
+		expect(frame(out, "front").background.size).toEqual({
+			width: 60,
+			height: 60,
+		});
+
+		const moved = applyVariant(pinned, "portrait");
+		expect(byId(frame(moved, "front").elements, "mark")?.pos).toEqual({
+			x: 5,
+			y: 85,
+		});
+	});
+
+	test("compiles at the variant's aspect", () => {
+		const compiled = compile(
+			pinned,
+			{},
+			{ width: 120, height: 200, variantId: "portrait" },
+		);
+		expect(compiled.width).toBe(120);
+		expect(compiled.height).toBe(200);
+		expect(() =>
+			compile(pinned, {}, { width: 100, height: 60, variantId: "portrait" }),
+		).toThrow(/aspect ratio mismatch/);
+	});
+
+	test("resizeTemplate keeps a sized variant as it is", () => {
+		const out = resizeTemplate(pinned, 200, 120);
+		expect(out.variants?.[0]).toBe(pinned.variants?.[0]);
+	});
+
+	test("validates the size and needs 1.6", () => {
+		expect(validate(pinned).ok).toBe(true);
+		expect(minimumFormatVersion(pinned)).toBe("1.6");
+		const bad = structuredClone(pinned);
+		bad.variants![0]!.size = { width: 0, height: 10.5 };
+		const result = validate(bad);
+		expect(result.ok).toBe(false);
+		if (!result.ok)
+			expect(result.errors.map((e) => e.path)).toEqual([
+				"/variants/0/size/width",
+				"/variants/0/size/height",
+			]);
 	});
 });

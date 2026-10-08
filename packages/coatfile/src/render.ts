@@ -31,6 +31,7 @@ import { loadBarcodeEncoder } from "./barcode-loader";
 import { hasBarcode } from "./has-barcode";
 import { compile } from "./compile";
 import type { CompiledTemplate, Template } from "./types";
+import { variantSize } from "./variants";
 
 // A painted side: what the renderer returned, tagged with the frame it was
 // rendered from and the export setting it was rendered at. `width`/`height`,
@@ -212,9 +213,10 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 	// renders, and the placeholder's warning says why.
 	if (!getBarcodeEncoder() && hasBarcode(template))
 		await loadBarcodeEncoder().catch(() => {});
+	const size = variantSize(template, options.variantId);
 	const compiled = compile(template, values, {
-		width: options.width ?? template.width,
-		height: options.height ?? template.height,
+		width: options.width ?? size.width,
+		height: options.height ?? size.height,
 		variantId: options.variantId,
 		...(options.frameNames ? { frameNames: options.frameNames } : {}),
 		...(options.bleed ? { bleed: true } : {}),

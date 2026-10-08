@@ -2226,6 +2226,21 @@
 					"swatch": {
 						"type": "string"
 					},
+					"size": {
+						"type": "object",
+						"properties": {
+							"width": {
+								"type": "number"
+							},
+							"height": {
+								"type": "number"
+							}
+						},
+						"required": [
+							"width",
+							"height"
+						]
+					},
 					"overrides": {
 						"type": "array",
 						"items": {
