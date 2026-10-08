@@ -156,4 +156,49 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		const after = controller.state.workspace?.datasets[0]?.records;
 		expect(after?.[0]).toBe(before?.[0]);
 	});
+
+	it("shows the records imported so far", async () => {
+		const user = fastUser();
+		const original = apply.getMockImplementation();
+		let finish: () => void = () => {};
+		apply.mockImplementationOnce(
+			async (table, sheet, dataset, plan, onProgress) => {
+				onProgress?.(1000, RECORDS);
+				await new Promise<void>((resolve) => {
+					finish = resolve;
+				});
+				return (original as TableImporter["apply"])(
+					table,
+					sheet,
+					dataset,
+					plan,
+				);
+			},
+		);
+		const onImported = vi.fn();
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{ datasetId: "d_people", file: csv() }}
+					onClose={() => {}}
+					onImported={onImported}
+				/>
+			</ControllerProvider>,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("import-wizard").textContent).toContain(
+				"1,500 records",
+			),
+		);
+		await user.click(button("Next"));
+		await user.click(button("Next"));
+		await user.click(button("Import"));
+		const progress = await screen.findByTestId("import-progress");
+		expect(progress.textContent).toBe("1,000 of 1,500 records");
+		expect(
+			screen.getByRole("progressbar", { name: "Import progress" }),
+		).toHaveProperty("ariaValueNow", "1000");
+		finish();
+		await waitFor(() => expect(onImported).toHaveBeenCalled());
+	});
 });
