@@ -317,8 +317,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate`; text `arc`; element `backdropBlur` |
-| 1.7 | gradient stroke `color` |
+| 1.6 | frame `isolate`; text `arc`; element `backdropBlur`; gradient stroke `color` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -681,7 +680,7 @@ corners or mask. A vector strokes at twice the width, clipped to its own
 interior or exterior under its `fillRule`, so an `evenodd` hole counts as
 outside.
 
-A stroke's `color` is a colour string or, from 1.7, a `linear`, `radial` or
+A stroke's `color` is a colour string or, from 1.6, a `linear`, `radial` or
 `angular` gradient (see [Gradients](#gradients)). The gradient is placed in
 the element's box exactly as a fill is, so an inside, centred or outside
 stroke and its dashes all sample the same gradient as a fill would.

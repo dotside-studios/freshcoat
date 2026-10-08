@@ -19,11 +19,11 @@ import type { Template } from "./types";
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
-//   1.6  frame `isolate`; text `arc`; element `backdropBlur`
-//   1.7  gradient stroke `color`
+//   1.6  frame `isolate`; text `arc`; element `backdropBlur`; gradient
+//        stroke `color`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 7;
+export const FORMAT_MINOR = 6;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -90,7 +90,7 @@ export function minimumFormatVersion(template: Template): string {
 		}
 		if (o.blendMode === "linear-burn") need(5);
 		if (o.backdropBlur !== undefined) need(6);
-		if (usesGradientStroke(o)) need(7);
+		if (usesGradientStroke(o)) need(6);
 		for (const value of Object.values(o)) visit(value);
 	};
 	visit(template.template_data);

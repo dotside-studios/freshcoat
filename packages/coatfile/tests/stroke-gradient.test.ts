@@ -10,7 +10,7 @@ const stops = [
 
 function withStroke(color: unknown): Template {
 	return {
-		format_version: "1.7",
+		format_version: "1.6",
 		id: "s",
 		name: "S",
 		width: 100,

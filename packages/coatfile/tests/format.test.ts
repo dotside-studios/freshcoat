@@ -286,7 +286,7 @@ describe("minimumFormatVersion", () => {
 		).toBe("1.6");
 	});
 
-	test("1.7: a gradient stroke colour, on elements and deltas", () => {
+	test("1.6: a gradient stroke colour, on elements and deltas", () => {
 		const gradient = {
 			kind: "linear",
 			angle: 0,
@@ -301,7 +301,7 @@ describe("minimumFormatVersion", () => {
 			"1.0",
 		);
 		expect(minimumFormatVersion(withElements(base(), stroked(gradient)))).toBe(
-			"1.7",
+			"1.6",
 		);
 		const t = withElements(base(), stroked("#000"));
 		t.variants = [
@@ -318,7 +318,7 @@ describe("minimumFormatVersion", () => {
 				],
 			},
 		];
-		expect(minimumFormatVersion(t)).toBe("1.7");
+		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
 	test("the highest feature wins", () => {
