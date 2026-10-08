@@ -85,21 +85,19 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		const next = () => user.click(button("Next"));
 		const back = () => user.click(button("Back"));
 		await next();
-		await next();
+		expect(screen.queryByTestId("import-mapping")).toBeNull();
 		const totals = () => screen.getByTestId("import-totals").textContent;
 		expect(totals()).toContain(`In the first ${HEAD_ROWS - 1} records:`);
 		expect(totals()).toContain(`${HEAD_ROWS - 1} to add`);
 
 		await back();
-		await back();
 		await user.click(screen.getByRole("radio", { name: "Replace" }));
 		await chooseOption(user, button(/Date order/), /Day first/);
 		await next();
-		await next();
-		await back();
 		await back();
 		await user.click(screen.getByRole("radio", { name: "Append" }));
 		await next();
+		await user.click(button("Review mapping"));
 		await user.click(screen.getByRole("checkbox", { name: /Match existing/ }));
 		await next();
 
@@ -143,7 +141,6 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			),
 		);
 		const before = controller.state.workspace?.datasets[0]?.records;
-		await user.click(button("Next"));
 		await user.click(button("Next"));
 		await user.click(button("Import"));
 		await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));

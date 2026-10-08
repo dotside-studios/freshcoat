@@ -21,7 +21,15 @@ import {
 	isValidKey,
 	previewMapping,
 } from "@freshcoat-js/workspace";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
@@ -93,6 +101,7 @@ export function ImportWizard({
 		null,
 	);
 	const [dragging, setDragging] = useState(false);
+	const [reviewing, setReviewing] = useState(false);
 
 	const base = useMemo<Dataset | undefined>(() => {
 		if (existing) return existing;
@@ -118,6 +127,7 @@ export function ImportWizard({
 		if (!columns) return;
 		setMapping(guessMapping(headers, columns, samples.slice(0, 200)));
 		setMatch(null);
+		setReviewing(false);
 	}, [headers, samples, columns]);
 
 	const open = useRef<number | null>(null);
@@ -218,6 +228,12 @@ export function ImportWizard({
 		(p) => !p.startsWith("Also"),
 	);
 	const nothingMapped = mapping.every((m) => m.kind === "skip");
+	const exact =
+		headerRow >= 0 &&
+		headers.length > 0 &&
+		new Set(headers).size === headers.length &&
+		headers.every((h) => columns?.some((c) => c.key === h));
+	const skipMapping = exact && !reviewing && !blocking && !nothingMapped;
 
 	// Totals over the held rows; Import maps the whole file in the worker.
 	const result = useMemo(
@@ -304,7 +320,11 @@ export function ImportWizard({
 							Cancel
 						</Button>
 						{step > 1 ? (
-							<Button onPress={() => setStep((s) => (s - 1) as 1 | 2)}>
+							<Button
+								onPress={() =>
+									setStep((s) => (s === 3 && skipMapping ? 1 : s - 1) as 1 | 2)
+								}
+							>
 								Back
 							</Button>
 						) : null}
@@ -316,7 +336,9 @@ export function ImportWizard({
 									recordCount === 0 ||
 									(step === 2 && (blocking || nothingMapped))
 								}
-								onPress={() => setStep((s) => (s + 1) as 2 | 3)}
+								onPress={() =>
+									setStep((s) => (s === 1 && skipMapping ? 3 : s + 1) as 2 | 3)
+								}
 							>
 								Next
 							</Button>
@@ -463,6 +485,19 @@ export function ImportWizard({
 								{formatNumber(new Set(result.issues.map((i) => i.row)).size)}
 							</strong>{" "}
 							with issues
+							{skipMapping ? (
+								<>
+									{" · "}
+									<LinkButton
+										onPress={() => {
+											setReviewing(true);
+											setStep(2);
+										}}
+									>
+										Review mapping
+									</LinkButton>
+								</>
+							) : null}
 						</p>
 						<PreviewTable
 							preview={preview}
@@ -483,6 +518,23 @@ export function ImportWizard({
 				) : null}
 			</Dialog>
 		</Modal>
+	);
+}
+
+function LinkButton({
+	onPress,
+	children,
+}: {
+	onPress: () => void;
+	children: ReactNode;
+}) {
+	return (
+		<RACButton
+			onPress={onPress}
+			className="cursor-default rounded-[2px] text-fc-accent-hover underline decoration-fc-accent/50 underline-offset-2 outline-none data-hovered:text-fc-text data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
+		>
+			{children}
+		</RACButton>
 	);
 }
 
