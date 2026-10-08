@@ -247,6 +247,7 @@ describe("record statuses", () => {
 				ids: ["r1"],
 				status: "exported",
 				exportedAt: "2026-09-25T10:00:00.000Z",
+				fromJob: true,
 			},
 			{
 				type: "setRecordStatus",
@@ -254,6 +255,7 @@ describe("record statuses", () => {
 				ids: ["r2", "r3"],
 				status: "failed",
 				errors: { r2: "font", r3: "Failed" },
+				fromJob: true,
 			},
 		]);
 	});

@@ -47,6 +47,7 @@ import {
 	type TemplateSlot,
 	undoDatasets,
 	type WorkspaceState,
+	withJobStatus,
 	withRecordStatus,
 	workspaceDirty,
 	workspaceState,
@@ -252,6 +253,7 @@ export type Action =
 			status: RecordStatus;
 			exportedAt?: string;
 			errors?: Record<string, string>;
+			fromJob?: true;
 	  }
 	| { type: "setPreset"; preset: ExportPreset }
 	| { type: "removePreset"; id: string }
@@ -740,6 +742,13 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 				w.activeDatasetId = action.id;
 			});
 		case "setRecordStatus":
+			if (action.fromJob)
+				return withWs(
+					withJobStatus(ws, action.datasetId, action.ids, action.status, {
+						exportedAt: action.exportedAt,
+						errors: action.errors,
+					}),
+				);
 			return withWs(
 				commitDatasets(
 					ws,

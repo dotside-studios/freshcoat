@@ -358,33 +358,98 @@ export function withRecordStatus(
 	status: RecordStatus,
 	extra: { exportedAt?: string; errors?: Record<string, string> } = {},
 ): Dataset[] {
+	return patchRecords(datasets, datasetId, statusSetter(ids, status, extra));
+}
+
+/** Sets the status a finished job gives some records, outside the undo
+ *  history: every step in it gets the same status, so undo keeps it. */
+export function withJobStatus(
+	ws: WorkspaceState,
+	datasetId: string,
+	ids: readonly string[],
+	status: RecordStatus,
+	extra: { exportedAt?: string; errors?: Record<string, string> } = {},
+): WorkspaceState {
+	const set = statusSetter(ids, status, extra);
+	const records = new Map<DataRecord, DataRecord>();
+	const shared = (r: DataRecord) => {
+		let next = records.get(r);
+		if (!next) {
+			next = set(r);
+			records.set(r, next);
+		}
+		return next;
+	};
+	const lists = new Map<Dataset[], Dataset[]>();
+	const patch = (list: Dataset[]) => {
+		let next = lists.get(list);
+		if (!next) {
+			next = patchRecords(list, datasetId, shared);
+			lists.set(list, next);
+		}
+		return next;
+	};
+	const datasets = patch(ws.datasets);
+	if (datasets === ws.datasets) return ws;
+	const step = (s: DatasetStep): DatasetStep => {
+		const next = patch(s.datasets);
+		return next === s.datasets ? s : { ...s, datasets: next };
+	};
+	const h = ws.datasetHistory;
+	return {
+		...ws,
+		datasets,
+		datasetHistory: {
+			...h,
+			past: h.past.map(step),
+			future: h.future.map(step),
+		},
+	};
+}
+
+function statusSetter(
+	ids: readonly string[],
+	status: RecordStatus,
+	extra: { exportedAt?: string; errors?: Record<string, string> },
+): (r: DataRecord) => DataRecord {
 	const wanted = new Set(ids);
+	return (r) => {
+		if (!wanted.has(r.id)) return r;
+		const error = extra.errors?.[r.id];
+		if (
+			r.status === status &&
+			!extra.exportedAt &&
+			(error ?? undefined) === r.error
+		)
+			return r;
+		const { error: _e, ...rest } = r;
+		return {
+			...rest,
+			status,
+			...(status === "exported" && extra.exportedAt
+				? { exportedAt: extra.exportedAt }
+				: r.exportedAt
+					? { exportedAt: r.exportedAt }
+					: {}),
+			...(error ? { error } : {}),
+		};
+	};
+}
+
+function patchRecords(
+	datasets: Dataset[],
+	datasetId: string,
+	set: (r: DataRecord) => DataRecord,
+): Dataset[] {
 	const at = datasets.findIndex((d) => d.id === datasetId);
 	return produceAt(datasets, at, (d, base) => {
 		// A draft of the records list costs about ten times this map at 10k
 		// records, so the list is built here and assigned whole.
 		let changed = false;
-		const records = base.records.map((r): DataRecord => {
-			if (!wanted.has(r.id)) return r;
-			const error = extra.errors?.[r.id];
-			if (
-				r.status === status &&
-				!extra.exportedAt &&
-				(error ?? undefined) === r.error
-			)
-				return r;
-			changed = true;
-			const { error: _e, ...rest } = r;
-			return {
-				...rest,
-				status,
-				...(status === "exported" && extra.exportedAt
-					? { exportedAt: extra.exportedAt }
-					: r.exportedAt
-						? { exportedAt: r.exportedAt }
-						: {}),
-				...(error ? { error } : {}),
-			};
+		const records = base.records.map((r) => {
+			const next = set(r);
+			if (next !== r) changed = true;
+			return next;
 		});
 		if (changed) d.records = records;
 	});

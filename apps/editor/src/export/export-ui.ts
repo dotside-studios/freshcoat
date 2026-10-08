@@ -321,6 +321,7 @@ export function statusActions(
 			ids: ok,
 			status: "exported",
 			exportedAt: now.toISOString(),
+			fromJob: true,
 		});
 	if (failed.length > 0)
 		actions.push({
@@ -329,6 +330,7 @@ export function statusActions(
 			ids: failed,
 			status: "failed",
 			errors,
+			fromJob: true,
 		});
 	return actions;
 }
