@@ -89,6 +89,9 @@ the records, and **Export** turns templates and records into files.
   - A Records tab beside the filmstrip lists each record's status (pending,
     exported, failed, skipped), which can be set by hand; an export marks
     what it made.
+  - The filmstrip or Records tab, the status filter, what the filmstrip
+    shows, the list's selection and the settings tab stay as they were while
+    another section shows.
   - Rendering runs in a pool of module workers, each with its own CanvasKit.
     The job bar shows progress, items per second, the time left, bytes
     written and where they go, and after a job "Show failed", "Retry
@@ -106,6 +109,9 @@ the records, and **Export** turns templates and records into files.
   the import toast. Required fields left unfilled are counted on the binding,
   under the record stepper and beside the Export button. In Edit, the record
   stepper previews real records on the canvas.
+- **Current record:** Edit's preview, Data's focused record and Export's
+  preview share one current record. Moving to a record in one section moves
+  the others to it when their dataset has it.
 - **Canvas:**
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
@@ -117,7 +123,12 @@ the records, and **Export** turns templates and records into files.
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector.
-  - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
+  - Pan and zoom with the wheel, pinch, Space-drag or the keyboard. The
+    status bar's zoom takes a typed percentage, and its menu zooms to fit, to
+    the selection or to a set level; Mod+0 is 100%.
+  - The side's name above the artboard and in the status bar is a menu of
+    the sides, so they switch with the panels closed; Alt+, and Alt+. step
+    through them.
   - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
     They follow the pan and zoom, and mark the selection's extent with its
     edges' positions.
@@ -200,6 +211,8 @@ the records, and **Export** turns templates and records into files.
   - "Try with <dataset>" steps the canvas through the bound dataset's records,
     with the binding folded below it. An unbound template picks a dataset
     there.
+    The status bar's "◀ 7/120 ▶" and Alt+[ and Alt+] step them from either
+    tab.
   - One list of fields: each row has the key, a required mark, the type and
     its sample value, typed in place. Sample values drive the render without
     touching history, and "Reset to samples" puts them back.
@@ -500,6 +513,8 @@ reaches every variant at once.
 - **Editing in a variant:** selecting a variant makes it the one you edit.
   A bar across the top of the canvas says "Editing Speaker", with how many
   layers it changes and **Back to Default**, and the status bar names it.
+  The name in the bar and in the status bar is a menu of the variants;
+  Alt+Shift+, and Alt+Shift+. step through them, Default first.
   Changes on the canvas and in the inspector become that variant's own and
   leave Default as it was; setting a value back to Default's removes the
   change. One edit is one undo step, as anywhere else.
