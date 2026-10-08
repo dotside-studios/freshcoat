@@ -9,6 +9,10 @@ import {
 	resolveSupersample,
 } from "./export-scale";
 import { fontBytes, resolveFontRequest } from "./font-bytes";
+import {
+	createSharedFontProvider,
+	type SharedFontProvider,
+} from "./font-collection";
 import { deriveFontMetrics } from "./font-metrics";
 import { type ByteLoader, fetchLoader, mapLoader } from "./loader";
 import type { Node } from "./node";
@@ -144,8 +148,8 @@ export type Renderer = {
 	/** Loads the families these requests describe that the renderer lacks. */
 	loadFonts(requests: readonly FontRequest[]): Promise<FontLoadReport>;
 	stats(): RendererStats;
-	/** Frees the cached surface, images and font provider; the next paint
-	 *  rebuilds them, as after a lost GPU context. */
+	/** Frees the cached surface and images; the next paint rebuilds them, as
+	 *  after a lost GPU context. */
 	clear(): void;
 	dispose(): void;
 };
@@ -168,6 +172,11 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 	// another file is loaded again rather than served the old bytes.
 	const fontKeys = new Map<string, string>();
 	let text: Text | null = null;
+	// The one provider layout and paint share, and the fonts map it holds.
+	let fontSet: {
+		fonts: Map<string, Uint8Array[]>;
+		provider: SharedFontProvider;
+	} | null = null;
 	// Bytes a paint was handed per src, compared by identity on the next paint.
 	const perCall = new Map<string, Uint8Array>();
 	// One paint at a time: the cache, its surface and CanvasKit are shared.
@@ -178,12 +187,26 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		if (disposed) throw new Error("renderer is disposed");
 	};
 
+	const fontProvider = (): SharedFontProvider => {
+		if (fontSet?.fonts === fonts) return fontSet.provider;
+		if (fontSet?.provider.extend(fonts)) fontSet.fonts = fonts;
+		else {
+			fontSet?.provider.release();
+			fontSet = null;
+			fontSet = { fonts, provider: createSharedFontProvider(ck, fonts) };
+		}
+		return fontSet.provider;
+	};
+
 	const textFor = (): Text => {
 		if (text?.fonts !== fonts) {
 			text?.engine.dispose();
+			text = null;
 			text = {
 				fonts,
-				engine: memoizeTextEngine(createParagraphEngine(ck, fonts)),
+				engine: memoizeTextEngine(
+					createParagraphEngine(ck, fonts, fontProvider()),
+				),
 				metrics: deriveFontMetrics(fonts),
 			};
 		}
@@ -231,19 +254,33 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				perCall.set(src, bytes);
 			}
 		}
-		const result: PaintOutput = await paintScene(ck, commands, {
-			resolveFont: (req) => resolveFontRequest(req, fonts),
-			fonts,
-			loadBytes: mapLoader(images, load),
-			...(cache ? { cache } : {}),
-			...(factory
-				? {
-						canvas: {
-							createCanvas: (w, h) => factory(w, h) as unknown as CanvasLike,
-						},
-					}
-				: {}),
-		});
+		// Held across the paint's awaits, which a setFonts can land between.
+		const shared = fontProvider();
+		shared.retain();
+		let result: PaintOutput;
+		try {
+			result = await paintScene(
+				ck,
+				commands,
+				{
+					resolveFont: (req) => resolveFontRequest(req, fonts),
+					fonts,
+					loadBytes: mapLoader(images, load),
+					...(cache ? { cache } : {}),
+					...(factory
+						? {
+								canvas: {
+									createCanvas: (w, h) =>
+										factory(w, h) as unknown as CanvasLike,
+								},
+							}
+						: {}),
+				},
+				{ fontProvider: shared },
+			);
+		} finally {
+			shared.release();
+		}
 		const info = frameInfo(commands, result.warnings);
 		if ("canvas" in output) {
 			return {
@@ -363,6 +400,8 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			text?.engine.dispose();
 			text = null;
 			cache?.dispose();
+			fontSet?.provider.release();
+			fontSet = null;
 		},
 	};
 

@@ -9,7 +9,7 @@ import type {
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
 import type { SvgPicture } from "./canvaskit";
-import { deleteFontProvider } from "./font-collection";
+import type { SharedFontProvider } from "./font-collection";
 import {
 	createLutImages,
 	freeLutImages,
@@ -74,7 +74,12 @@ export type PaintCacheState = {
 	stats: PaintCacheStats;
 	maxImagePixels: number;
 	maxImages: number;
-	fonts: { key: FontKey; provider: TypefaceFontProvider } | null;
+	// key is null for a provider the cache was lent rather than built.
+	fonts: {
+		key: FontKey | null;
+		fonts: SharedFontProvider;
+		generation: number;
+	} | null;
 	images: Map<string, CachedImage>;
 	// Freed with the provider whose typefaces they use.
 	lines: Map<string, ShapedLine>;
@@ -127,7 +132,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		freePaths(state);
 		const fonts = state.fonts;
 		state.fonts = null;
-		if (fonts) tryFree(() => deleteFontProvider(fonts.provider));
+		if (fonts) tryFree(() => fonts.fonts.release());
 		for (const entry of state.images.values()) freeImage(entry);
 		state.images.clear();
 		freeLutImages(state.luts);
@@ -159,30 +164,47 @@ export function paintCacheState(cache: PaintCache): PaintCacheState {
 	return state;
 }
 
-// The provider is keyed on the registered list itself, family and byte-array
-// identity in order, so a caller that keeps its fonts map stable keeps its
-// provider, whichever of those families a scene uses.
+// A built provider is keyed on the registered list itself, family and
+// byte-array identity in order, so a caller that keeps its fonts map stable
+// keeps its provider, whichever of those families a scene uses. A lent one is
+// kept while it is the same provider with no faces added since.
 export function cachedFontProvider(
 	state: PaintCacheState,
-	loaded: FontKey,
-	build: () => TypefaceFontProvider,
+	source:
+		| { shared: SharedFontProvider }
+		| { key: FontKey; build: () => SharedFontProvider },
 ): TypefaceFontProvider {
 	const hit = state.fonts;
 	if (
 		hit &&
-		hit.key.length === loaded.length &&
-		hit.key.every(
-			(f, i) => f.family === loaded[i]?.family && f.bytes === loaded[i]?.bytes,
-		)
+		("shared" in source
+			? hit.fonts === source.shared &&
+				hit.generation === source.shared.generation
+			: hit.key !== null && sameFonts(hit.key, source.key))
 	)
-		return hit.provider;
+		return hit.fonts.provider;
 	state.fonts = null;
 	freeLines(state);
-	if (hit) tryFree(() => deleteFontProvider(hit.provider));
-	const provider = build();
+	if (hit) tryFree(() => hit.fonts.release());
+	let fonts: SharedFontProvider;
+	if ("shared" in source) {
+		fonts = source.shared;
+		fonts.retain();
+	} else fonts = source.build();
 	state.stats.fontProviderBuilds++;
-	state.fonts = { key: [...loaded], provider };
-	return provider;
+	state.fonts = {
+		key: "shared" in source ? null : [...source.key],
+		fonts,
+		generation: fonts.generation,
+	};
+	return fonts.provider;
+}
+
+function sameFonts(a: FontKey, b: FontKey): boolean {
+	return (
+		a.length === b.length &&
+		a.every((f, i) => f.family === b[i]?.family && f.bytes === b[i]?.bytes)
+	);
 }
 
 // Reused only when it was made the same way (for a host canvas, or offscreen)
