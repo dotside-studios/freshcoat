@@ -594,9 +594,16 @@ through for-print's card-printer path (photo analysis, gray balance and the
 whole-frame finish), as Davi's card shop does. The Davi card starters open with
 a "Card printer" preset that has it on.
 
-- **Profile:** None, or Import… of a `.json` print profile measured from
-  for-print's print chart, shown with its name and date and removable. A malformed one
-  is refused with a message.
+- **Profile:** None, Measure…, or Import… of a `.json` print profile, shown
+  with its name and date and removable. A malformed one is refused with a
+  message.
+- **Measure printer:** Measure… opens a dialog that makes a profile from the
+  printer itself. Download chart gives the gray balance chart as a PNG to print
+  at 100% with color correction off. Choose photo… takes a photo of the printed
+  card, and the four corner marks are clicked clockwise from top left (Clear
+  corners starts over). Save profile needs a name; printer, ribbon and stock
+  are optional. A photo that can't make a profile says why: overexposed,
+  uneven light, an uneven print, or patches outside the photo.
 - **Printer file:** the preview's "Printer file" toggle renders the current
   record through the same path. The note under it reads "Printer file, not
   a proof of the printed card", and adds how much photo color was pulled
