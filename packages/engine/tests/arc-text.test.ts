@@ -66,7 +66,7 @@ function arcCommand(node: TextNode): DrawTextCommand {
 	return cmd;
 }
 
-async function paint(node: TextNode) {
+async function paintWithWarnings(node: TextNode) {
 	const painter = paintCanvasKit(ck);
 	const rt = makeRuntime(
 		{
@@ -84,18 +84,37 @@ async function paint(node: TextNode) {
 	);
 	const out = await painter(compile(node), rt);
 	const px = out.readPixels?.();
+	const warnings = out.warnings;
 	out.dispose();
 	if (!px) throw new Error("no pixels");
-	return px;
+	return { px, warnings };
 }
+
+const paint = async (node: TextNode) => (await paintWithWarnings(node)).px;
+
+const ink = (px: { data: Uint8Array | Uint8ClampedArray }) => {
+	let n = 0;
+	for (let i = 3; i < px.data.length; i += 4) if ((px.data[i] as number) > 128) n++;
+	return n;
+};
 
 // Glyph IDs of every RSXform blob the painter builds.
 async function drawnGlyphs(node: TextNode): Promise<number[][]> {
-	const calls: number[][] = [];
+	return (await drawnBlobs(node)).map((b) => b.glyphs);
+}
+
+async function drawnBlobs(
+	node: TextNode,
+): Promise<{ glyphs: number[]; xforms: number[] }[]> {
+	const calls: { glyphs: number[]; xforms: number[] }[] = [];
 	const make = ck.TextBlob.MakeFromRSXformGlyphs;
-	ck.TextBlob.MakeFromRSXformGlyphs = (g: Uint16Array, ...rest: unknown[]) => {
-		calls.push(Array.from(g));
-		return make(g, ...rest);
+	ck.TextBlob.MakeFromRSXformGlyphs = (
+		g: Uint16Array,
+		x: Float32Array,
+		...rest: unknown[]
+	) => {
+		calls.push({ glyphs: Array.from(g), xforms: Array.from(x) });
+		return make(g, x, ...rest);
 	};
 	try {
 		await paint(node);
@@ -306,5 +325,144 @@ describe("arc text", () => {
 			{ ...cmd, arc: { ...(cmd.arc as TextArc), radius: Number.NaN } },
 		]);
 		expect(issues.map((i) => i.code)).toContain("bad_arc");
+	});
+	test("underline and strikethrough follow the arc", async () => {
+		const plain = ink(await paint(arcText("SEAL OF QUALITY", {})));
+		for (const decoration of ["underline", "line-through"] as const) {
+			const px = await paint(
+				arcText("SEAL OF QUALITY", {}, { font: { ...font, decoration } }),
+			);
+			expect(ink(px)).toBeGreaterThan(plain + 50);
+			let bottom = 0;
+			for (let y = px.height / 2; y < px.height; y++)
+				for (let x = 0; x < px.width; x++)
+					if ((px.data[(y * px.width + x) * 4 + 3] as number) > 128) bottom++;
+			expect(bottom).toBe(0);
+		}
+	});
+
+	test("predicted bounds hold an arc's decorations", async () => {
+		const pairs: { predicted: number[] | null; recorded: number[] }[] = [];
+		auditAdjustedBounds((predicted, recorded) =>
+			pairs.push({ predicted, recorded }),
+		);
+		try {
+			await paint(
+				arcText(
+					"UNDERLINED",
+					{ startAngle: 45 },
+					{
+						font: { ...font, decoration: "underline" },
+						adjust: buildAdjust({ gamma: 1.8 }),
+					},
+				),
+			);
+		} finally {
+			auditAdjustedBounds(undefined);
+		}
+		const { predicted: p, recorded: r } = pairs[0] as (typeof pairs)[0];
+		const q = p as number[];
+		expect(q[0]).toBeLessThanOrEqual(r[0] + 1e-3);
+		expect(q[1]).toBeLessThanOrEqual(r[1] + 1e-3);
+		expect(q[2]).toBeGreaterThanOrEqual(r[2] - 1e-3);
+		expect(q[3]).toBeGreaterThanOrEqual(r[3] - 1e-3);
+	});
+
+	test("an automatic radius never collapses to the center", () => {
+		const small = { size: { width: 10, height: 10 } };
+		const lineBox = font.size * font.lineHeight;
+		const one = arcCommand(arcText("BIG TEXT", {}, small));
+		expect(one.arc?.radius).toBeGreaterThanOrEqual(lineBox);
+		const rings = arcCommand(
+			arcText("ONE\nTWO\nTHREE", { direction: "outside" }, small),
+		);
+		const lines = rings.layout.lines;
+		const last = lines[lines.length - 1];
+		const step =
+			(last?.baseline ?? last?.y ?? 0) -
+			(lines[0]?.baseline ?? lines[0]?.y ?? 0);
+		expect((rings.arc?.radius ?? 0) - step).toBeGreaterThan(lineBox - 1e-6);
+	});
+
+	test("radius 0 spreads the glyphs on a ring of the font size", async () => {
+		const run = {
+			glyphs: new Uint16Array([1, 2, 3]),
+			positions: new Float32Array([0, 0, 10, 0, 20, 0, 30, 0]),
+			size: 24,
+		} as never;
+		const x = placeOnArc(
+			[{ runs: [run], baseline: 0, offset: 0 }],
+			{ radius: 0, startAngle: 0, direction: "outside", align: "center" },
+			0,
+			0,
+		)[0]?.[0] as Float32Array;
+		const angles = [0, 1, 2].map((i) =>
+			Math.atan2(x[4 * i + 1] as number, x[4 * i] as number),
+		);
+		expect(angles[1] as number).toBeCloseTo(0, 6);
+		expect((angles[2] as number) - (angles[1] as number)).toBeCloseTo(10 / 24, 6);
+		const { warnings } = await paintWithWarnings(
+			arcText("RING", { radius: 0 }),
+		);
+		expect(warnings.map((w) => w.kind)).toContain("arc_radius_clamped");
+	});
+
+	test("text longer than its circle warns, and shrink fits it", async () => {
+		const text = "A RING OF TEXT FAR TOO LONG FOR A CIRCLE THIS SMALL";
+		const over = await paintWithWarnings(arcText(text, { radius: 30 }));
+		const warning = over.warnings.find((w) => w.kind === "arc_text_overflow");
+		expect(warning).toMatchObject({ line: 0 });
+		const w = warning as { width: number; circumference: number };
+		expect(w.width).toBeGreaterThan(w.circumference);
+		expect(w.circumference).toBeCloseTo(2 * Math.PI * 30, 3);
+
+		const fit = arcText(text, { radius: 30, fit: "shrink" });
+		const shrunk = await paintWithWarnings(fit);
+		expect(shrunk.warnings.map((x) => x.kind)).not.toContain(
+			"arc_text_overflow",
+		);
+		const blob = (await drawnBlobs(fit))[0] as { xforms: number[] };
+		const scale = Math.hypot(blob.xforms[0] as number, blob.xforms[1] as number);
+		expect(scale).toBeLessThan(1);
+		expect(scale).toBeCloseTo((2 * Math.PI * 30) / w.width, 4);
+
+		const issues = validateCommands([
+			{ ...arcCommand(fit), arc: { radius: 30, startAngle: 0, direction: "outside", align: "center", fit: "grow" as never } },
+		]);
+		expect(issues.map((i) => i.code)).toContain("bad_arc");
+	});
+
+	test("centered spaced text is symmetric about startAngle", async () => {
+		const run = {
+			glyphs: new Uint16Array([1, 2, 3]),
+			positions: new Float32Array([0, 0, 14, 0, 28, 0, 42, 0]),
+		} as never;
+		const x = placeOnArc(
+			[
+				{
+					runs: [run],
+					baseline: 0,
+					offset: 0,
+					spacing: [new Float32Array([4, 4, 4])],
+				},
+			],
+			{ radius: 50, startAngle: 30, direction: "outside", align: "center" },
+			0,
+			0,
+		)[0]?.[0] as Float32Array;
+		const angle = (i: number) =>
+			Math.atan2(x[4 * i + 1] as number, x[4 * i] as number);
+		const start = Math.PI / 6;
+		expect(angle(1)).toBeCloseTo(start, 6);
+		expect(angle(0) - start).toBeCloseTo(start - angle(2), 6);
+
+		const blobs = await drawnBlobs(
+			arcText("OOO", {}, { font: { ...font, letterSpacing: 12 } }),
+		);
+		const xf = blobs.flatMap((b) => b.xforms);
+		const a0 = Math.atan2(xf[1] as number, xf[0] as number);
+		const a2 = Math.atan2(xf[9] as number, xf[8] as number);
+		expect(a0).toBeLessThan(0);
+		expect(a0).toBeCloseTo(-a2, 6);
 	});
 });

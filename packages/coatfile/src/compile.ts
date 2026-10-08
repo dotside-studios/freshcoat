@@ -550,6 +550,7 @@ function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
 		...(arc.startAngle !== undefined ? { startAngle: arc.startAngle } : {}),
 		...(arc.direction ? { direction: arc.direction } : {}),
 		...(arc.align ? { align: arc.align } : {}),
+		...(arc.fit ? { fit: arc.fit } : {}),
 	};
 }
 

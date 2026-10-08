@@ -361,7 +361,8 @@ function arcBakeNode(node: TextNode): TextNode {
 }
 
 // Without a radius, the rings sit just inside the box: outside text puts the
-// first line's top on the edge, inside text the last line's bottom.
+// first line's top on the edge, inside text the last line's bottom. The
+// innermost ring keeps at least a line height of radius.
 function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 	const arc = node.arc ?? {};
 	const direction = arc.direction ?? "outside";
@@ -377,7 +378,11 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 			direction === "outside"
 				? base - (first?.y ?? 0)
 				: (last ? last.y + lineBox : 0) - base;
-		radius = Math.max(0, half - reach);
+		const inner =
+			direction === "outside" && last && first
+				? (last.baseline ?? last.y) - base
+				: 0;
+		radius = Math.max(half - reach, lineBox + inner);
 	}
 	return {
 		radius,
@@ -385,6 +390,7 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 		direction,
 		align: arc.align ?? "center",
 		...(arc.sweep !== undefined ? { sweep: arc.sweep } : {}),
+		...(arc.fit ? { fit: arc.fit } : {}),
 	};
 }
 

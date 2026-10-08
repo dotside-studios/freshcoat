@@ -376,6 +376,8 @@ export type TextArc = {
 	align: "start" | "center" | "end";
 	// Spreads each line's glyph positions across this many degrees.
 	sweep?: number;
+	// "shrink" scales a line longer than its circle down until it fits.
+	fit?: "shrink";
 };
 
 export type DrawTextCommand = DrawCommandBase & {
@@ -501,6 +503,23 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// A curved text line is longer than its circle, so its ends overlap.
+	| {
+			kind: "arc_text_overflow";
+			layer?: string;
+			line: number;
+			width: number;
+			circumference: number;
+	  }
+	// A curved text ring's radius was below the line's font size and was raised
+	// to it.
+	| {
+			kind: "arc_radius_clamped";
+			layer?: string;
+			line: number;
+			radius: number;
+			min: number;
+	  }
 	// A pattern fill's shader failed to compile, so it painted its first colour.
 	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the

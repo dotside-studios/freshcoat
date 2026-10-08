@@ -354,7 +354,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						);
 				});
 			if (cmd.arc) {
-				const { radius, startAngle, sweep } = cmd.arc;
+				const { radius, startAngle, sweep, fit } = cmd.arc;
 				if (!finite(radius) || radius < 0)
 					add(
 						"bad_arc",
@@ -374,6 +374,13 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						"bad_arc",
 						"arc sweep must be a finite number > 0",
 						`${path}.arc.sweep`,
+						id,
+					);
+				if (fit !== undefined && fit !== "shrink")
+					add(
+						"bad_arc",
+						`arc fit must be "shrink" when set, got ${String(fit)}`,
+						`${path}.arc.fit`,
 						id,
 					);
 			}

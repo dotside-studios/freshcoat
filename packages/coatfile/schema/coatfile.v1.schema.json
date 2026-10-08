@@ -5162,6 +5162,10 @@
 														"center",
 														"end"
 													]
+												},
+												"fit": {
+													"type": "string",
+													"const": "shrink"
 												}
 											}
 										}

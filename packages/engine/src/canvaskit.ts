@@ -39,6 +39,9 @@ import type {
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
+	type ArcRing,
+	arcBandBounds,
+	arcRings,
 	placeOnArc,
 	rsxformBounds,
 	spanAt,
@@ -677,7 +680,18 @@ function drawText(
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
 	if (cmd.arc) {
-		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+		drawArcText(
+			ck,
+			canvas,
+			provider,
+			bin,
+			cmd,
+			cmd.arc,
+			fallback,
+			fgPaint,
+			fillShader,
+			issues,
+		);
 		return;
 	}
 	// Gradient paints depend on position, so those lines are not cached.
@@ -751,13 +765,22 @@ function arcLines(
 			bin.track(shaped.para);
 		}
 		const sl = shaped.para.getShapedLines()[0];
-		for (const run of sl?.runs ?? []) bin.track(run.typeface);
+		const runs = sl?.runs ?? [];
+		for (const run of runs) bin.track(run.typeface);
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const spacing = runs.map((run) =>
+			Float32Array.from(
+				run.offsets.subarray(0, run.glyphs.length),
+				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
+			),
+		);
 		out.push({
 			line,
 			arc: {
-				runs: sl?.runs ?? [],
+				runs,
 				baseline: sl?.baseline ?? 0,
 				offset: (line.baseline ?? line.y) - base0,
+				spacing,
 			},
 		});
 	}
@@ -782,6 +805,65 @@ function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	return font;
 }
 
+type ArcDecoration = {
+	span: TextLine["spans"][number];
+	r: number;
+	a0: number;
+	a1: number;
+	thickness: number;
+};
+
+// Each decorated span's underline or strikethrough as a band along its ring,
+// across the angles its glyphs cover.
+function arcDecorations(
+	lines: { line: TextLine; arc: ArcLine }[],
+	rings: ArcRing[],
+	arc: TextArc,
+): ArcDecoration[] {
+	const turn = arc.direction === "outside" ? 1 : -1;
+	const out: ArcDecoration[] = [];
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const ring = rings[li];
+		if (!ring || !line.spans.some((s) => s.font.decoration)) return;
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const ranges = new Map<number, [number, number]>();
+		shaped.runs.forEach((run, ri) => {
+			const pos = run.positions;
+			for (let i = 0; i < run.glyphs.length; i++) {
+				const span = spanAt(starts, run.offsets[i] as number);
+				const x = pos[2 * i] as number;
+				const end =
+					(pos[2 * i + 2] as number) - (shaped.spacing?.[ri]?.[i] ?? 0);
+				const range = ranges.get(span);
+				ranges.set(
+					span,
+					range
+						? [Math.min(range[0], x), Math.max(range[1], end)]
+						: [x, end],
+				);
+			}
+		});
+		for (const [index, [x0, x1]] of ranges) {
+			const span = line.spans[index];
+			if (!span?.font.decoration || x1 <= x0) continue;
+			const { top, thickness } = decorationLine(
+				span.font.size,
+				span.font.decoration,
+				0,
+			);
+			const dy = (top + thickness / 2) * ring.scale;
+			out.push({
+				span,
+				r: Math.max(ring.r - turn * dy, 0),
+				a0: ring.angle(x0),
+				a1: ring.angle(x1),
+				thickness: thickness * ring.scale,
+			});
+		}
+	});
+	return out;
+}
+
 // Text along a circle: the line's own shaped glyphs, each drawn under an
 // RSXform, colored by the span its cluster belongs to.
 function drawArcText(
@@ -793,9 +875,34 @@ function drawArcText(
 	arc: TextArc,
 	fallback: string[],
 	fgPaint: Paint | null,
+	fillShader: Shader | null,
+	issues?: PaintIssues,
 ) {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
+	const rings = arcRings(
+		lines.map((l) => l.arc),
+		arc,
+	);
+	rings.forEach((ring, line) => {
+		const layer = cmd.id ? { layer: cmd.id } : {};
+		if (ring.overflow)
+			issues?.warnings?.push({
+				kind: "arc_text_overflow",
+				...layer,
+				line,
+				width: ring.width,
+				circumference: ring.circumference,
+			});
+		if (ring.clamped)
+			issues?.warnings?.push({
+				kind: "arc_radius_clamped",
+				...layer,
+				line,
+				radius: arc.radius,
+				min: ring.r,
+			});
+	});
 	const placed = placeOnArc(
 		lines.map((l) => l.arc),
 		arc,
@@ -840,6 +947,24 @@ function drawArcText(
 			}
 		});
 	});
+	for (const d of arcDecorations(lines, rings, arc)) {
+		const p = bin.track(new ck.Paint());
+		p.setAntiAlias(true);
+		p.setStyle(ck.PaintStyle.Stroke);
+		p.setStrokeWidth(d.thickness);
+		if (fillShader) p.setShader(fillShader);
+		else p.setColor(toColor(ck, d.span.color ?? cmd.color ?? "#000000"));
+		const builder = new ck.PathBuilder();
+		const deg = 180 / Math.PI;
+		builder.addArc(
+			ck.LTRBRect(cx - d.r, cy - d.r, cx + d.r, cy + d.r),
+			Math.min(d.a0, d.a1) * deg - 90,
+			Math.abs(d.a1 - d.a0) * deg,
+		);
+		const path = bin.track(builder.detach());
+		builder.delete();
+		canvas.drawPath(path, p);
+	}
 }
 
 // The local rects arc text's glyphs can cover: each glyph's font box under its
@@ -851,17 +976,25 @@ function arcTextBounds(
 	cmd: DrawTextCommand,
 	arc: TextArc,
 	fallback: string[],
-	em: Bounds,
+	em: Bounds | null,
 ): Bounds[] {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
+	const out: Bounds[] = arcDecorations(
+		lines,
+		arcRings(
+			lines.map((l) => l.arc),
+			arc,
+		),
+		arc,
+	).map((d) => arcBandBounds(cx, cy, d.r, d.a0, d.a1, d.thickness));
+	if (!em) return out;
 	const placed = placeOnArc(
 		lines.map((l) => l.arc),
 		arc,
 		cx,
 		cy,
 	);
-	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
 		shaped.runs.forEach((run, ri) => {
 			const xforms = placed[li]?.[ri];
@@ -1420,6 +1553,7 @@ function drawPath(
 type PaintIssues = {
 	unhandled: string[];
 	missingImages: string[];
+	warnings?: PaintWarning[];
 	// `adjust` components this CanvasKit build can't apply (see layerPaint).
 	adjustUnsupported: Map<
 		string,
@@ -2190,9 +2324,7 @@ function textBounds(
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
 	if (cmd.arc)
-		return em
-			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
-			: [];
+		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em);
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -4216,6 +4348,7 @@ export async function paintScene(
 			const issues: PaintIssues = {
 				unhandled: [],
 				missingImages: [],
+				warnings,
 				adjustUnsupported: new Map(),
 				patternUnsupported: new Map(),
 			};
