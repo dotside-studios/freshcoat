@@ -112,6 +112,32 @@ test("the welcome screen offers the starters ahead of the samples", async ({
 	await shot(page, "welcome", false);
 });
 
+test("the starters and samples show a picture of their front side, kept for the next visit", async ({
+	page,
+}) => {
+	await page.goto("/");
+	const ids = [
+		...["davi-card", "photo-watermark", "event-badge"].map(
+			(id) => `starter-${id}`,
+		),
+		...["membership-card", "certificate", "minimal"].map(
+			(id) => `sample-${id}`,
+		),
+	];
+	const drawn = (id: string) =>
+		page
+			.getByTestId(id)
+			.getByTestId("thumbnail")
+			.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth);
+	for (const id of ids)
+		await expect.poll(() => drawn(id), { timeout: 30_000 }).toBeGreaterThan(0);
+	await page.reload();
+	for (const id of ids)
+		await expect(page.getByTestId(id).getByTestId("thumbnail")).toBeVisible({
+			timeout: 2_000,
+		});
+});
+
 test("?starter=davi-card opens the Davi card with print guides, and the parameter goes", async ({
 	page,
 }) => {

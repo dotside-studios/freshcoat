@@ -4,7 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
-import { SAMPLES } from "~/samples";
+import { SAMPLES, type Sample } from "~/samples";
 import { STARTERS } from "~/samples/starters";
 import FileIcon from "~icons/mingcute/file-new-line";
 import OpenIcon from "~icons/mingcute/folder-open-line";
@@ -18,6 +18,24 @@ import {
 import type { CommandContext } from "./commands";
 import { OPEN_HINT, plural } from "./copy";
 import { FreshcoatLogo } from "./Logo";
+import {
+	type ThumbnailSource,
+	templateThumbnail,
+	useThumbnail,
+} from "./template-thumbnails";
+
+const sources = new Map<string, ThumbnailSource>();
+
+/** The thumbnail of a sample or starter, one source per id. */
+function sampleSource(kind: "sample" | "starter", s: Sample): ThumbnailSource {
+	const key = `${kind}:${s.id}`;
+	let source = sources.get(key);
+	if (!source) {
+		source = templateThumbnail(key, () => s.load());
+		sources.set(key, source);
+	}
+	return source;
+}
 
 /** The welcome screen. `openHint` rings "Open file…" and says what to open,
  *  for a template the Figma plugin downloaded because it was too large for a
@@ -132,6 +150,7 @@ export function Welcome({
 											width={s.width}
 											height={s.height}
 											swatch={s.swatch}
+											source={sampleSource("starter", s)}
 											large
 										/>
 									</span>
@@ -208,7 +227,12 @@ export function Welcome({
 										onPress={() => void controller.openSample(s.id)}
 										className="flex w-full items-center gap-3 rounded-[3px] border border-fc-border bg-fc-raised p-2.5 text-left outline-none data-hovered:border-fc-border-strong data-hovered:bg-fc-hover data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
 									>
-										<Thumb width={s.width} height={s.height} />
+										<Thumb
+											width={s.width}
+											height={s.height}
+											source={sampleSource("sample", s)}
+											large
+										/>
 										<span className="min-w-0">
 											<span className="block truncate font-medium">
 												{s.name}
@@ -280,15 +304,31 @@ function Thumb({
 	height,
 	large,
 	swatch,
+	source,
 }: {
 	width: number;
 	height: number;
 	large?: boolean;
-	/** The starter's own color, from its data. */
+	/** The starter's own color, from its data, shown until its picture is. */
 	swatch?: string;
+	source?: ThumbnailSource;
 }) {
+	const url = useThumbnail(source ?? null);
 	const max = large ? 60 : 36;
 	const s = max / Math.max(width, height);
+	if (url)
+		return (
+			<img
+				src={url}
+				alt=""
+				data-testid="thumbnail"
+				className="inline-block shrink-0 rounded-[1px] border border-fc-border object-cover"
+				style={{
+					width: Math.round(width * s),
+					height: Math.round(height * s),
+				}}
+			/>
+		);
 	return (
 		<span
 			aria-hidden="true"

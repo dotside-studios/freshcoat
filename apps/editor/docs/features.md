@@ -30,7 +30,9 @@ the records, and **Export** turns templates and records into files.
     restore it. Photos are stored apart from the templates and data, each once, so an
     edit does not rewrite them.
 - **Starters:** the welcome screen's **Start from** group lists designs meant
-  to be made your own, ahead of the samples:
+  to be made your own, ahead of the samples. Each starter and sample shows its
+  front side in the default variant, drawn in the browser the first time and
+  kept in IndexedDB until its template changes:
   - **Davi card**, CR80: name, position and organization, a QR of the card
     link on the back, the Davi wordmark, and cobalt, sage and plum variants,
     each also in portrait at 638 × 1012 (`cobalt-portrait`, and so on);
