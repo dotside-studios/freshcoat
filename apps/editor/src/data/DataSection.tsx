@@ -191,12 +191,29 @@ export function DataSection() {
 		};
 	}, [controller]);
 
-	// Photos, zips and folders dropped anywhere in the section go to the
-	// open dataset, or make a new one when there is none.
+	const [dropping, setDropping] = useState(false);
+	const dragDepth = useRef(0);
+
+	// Photos, zips, folders and spreadsheets dropped anywhere in the section go
+	// to the open dataset, or make a new one when there is none.
 	const onDrop = (e: DragEvent) => {
-		if (!isPhotoDrop(e.dataTransfer)) return;
+		dragDepth.current = 0;
+		setDropping(false);
+		if (!dragHasFiles(e.dataTransfer)) return;
 		e.preventDefault();
 		e.stopPropagation();
+		if (!isPhotoDrop(e.dataTransfer)) {
+			const table = [...e.dataTransfer.files].find((f) => isTableFile(f.name));
+			if (!table)
+				toast("Drop photos, a folder or a spreadsheet", { tone: "warning" });
+			else
+				setWizard(
+					dataset
+						? { datasetId: dataset.id, file: table }
+						: { newDataset: true, file: table },
+				);
+			return;
+		}
 		const target = dataset;
 		void filesFromDrop(e.dataTransfer).then(async (files) => {
 			if (!target) await newDatasetFromPhotos(controller, files);
@@ -218,8 +235,25 @@ export function DataSection() {
 			onDragOver={(e) => {
 				if (dragHasFiles(e.dataTransfer)) e.preventDefault();
 			}}
+			onDragEnter={(e) => {
+				if (empty || !dragHasFiles(e.dataTransfer)) return;
+				dragDepth.current += 1;
+				setDropping(true);
+			}}
+			onDragLeave={() => {
+				dragDepth.current = Math.max(0, dragDepth.current - 1);
+				if (dragDepth.current === 0) setDropping(false);
+			}}
 			onDrop={onDrop}
 		>
+			{dropping && !empty ? (
+				<div
+					className="pointer-events-none absolute inset-2 z-20 grid place-items-center rounded-[8px] border border-fc-accent border-dashed bg-fc-accent-soft/80 text-fc-base text-fc-text"
+					data-testid="data-drop-overlay"
+				>
+					{`Drop photos or a spreadsheet to add them to ${dataset.name}`}
+				</div>
+			) : null}
 			{empty ? (
 				<EmptyState
 					create={create}
