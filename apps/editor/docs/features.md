@@ -133,7 +133,7 @@ the records, and **Export** turns templates and records into files.
     and filled when closed, whose path data the inspector edits.
   - Boolean operations: select two or more sibling rectangles, ellipses or
     vectors and choose Union, Subtract, Intersect or Exclude selection from
-    the Object menu, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
+    Object > Boolean, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
     X. The shapes become one vector layer in the bottom-most one's place,
     with its fill, stroke and effects, as in Figma: Subtract takes the upper
     shapes away from the bottom-most. Each is one undo step. Rotation and
@@ -154,10 +154,13 @@ the records, and **Export** turns templates and records into files.
   - The filter in the Layers header narrows the tree to layers whose name or
     type matches, with the frames that hold them expanded.
 - **Inspector:**
-  - Align and boolean toolbars at the top, then Layer (geometry, opacity,
-    blend mode with every Figma layer mode, linear burn included, and corner
-    radius), the layer type's own section, Fill, Stroke, Effects,
-    Constraints, Adjust and Visibility. A collapsed section stays collapsed
+  - Align and boolean toolbars at the top. Align left, horizontal centers
+    and right are Alt+A, H and D; top, vertical centers and bottom are
+    Alt+W, V and S; Alt+Shift+H and Alt+Shift+V distribute. The Object menu
+    holds the same commands under Boolean, Arrange and Align and distribute.
+  - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
+    linear burn included, and corner radius), the layer type's own section,
+    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
     as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
