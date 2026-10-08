@@ -143,13 +143,16 @@ the records, and **Export** turns templates and records into files.
     and a dot per stop. Shift snaps directions to 15 degrees, and a click on
     the line adds a stop.
 - **Left panel:** Templates, Sides, Variants and Layers, top to bottom. Each
-  section's header collapses it, and the panel remembers which are collapsed;
-  collapsing one above Layers gives Layers the room.
+  section's header collapses it; collapsing one above Layers gives Layers the
+  room. Templates, Sides and Variants start collapsed while they hold one
+  entry, and once a header is toggled the panel remembers that choice.
 - **Layers:**
   - One side is shown at a time; the Sides list switches between them.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer.
+  - The filter in the Layers header narrows the tree to layers whose name or
+    type matches, with the frames that hold them expanded.
 - **Inspector:**
   - Geometry, blend mode (every Figma layer mode, linear burn included) and
     alignment.

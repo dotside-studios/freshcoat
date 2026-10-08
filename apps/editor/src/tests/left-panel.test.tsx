@@ -86,7 +86,7 @@ async function openMenu(id: string) {
 }
 
 describe("the left panel's sections", () => {
-	it("stacks Templates, Sides, Variants and Layers, all expanded", () => {
+	it("stacks Templates, Sides, Variants and Layers; one with a single entry starts collapsed", () => {
 		mount();
 		const sections = screen.getAllByRole("region");
 		expect(sections.map((s) => s.getAttribute("aria-label"))).toEqual([
@@ -95,15 +95,45 @@ describe("the left panel's sections", () => {
 			"Variants",
 			"Layers",
 		]);
-		for (const s of sections) {
+		const shown = sections.map((s) => {
 			const h = within(s).getByRole("heading", { level: 2 });
 			const toggle = within(h).getByRole("button");
-			expect(toggle.getAttribute("aria-expanded")).toBe("true");
 			const body = document.getElementById(
 				toggle.getAttribute("aria-controls") ?? "",
 			);
-			expect(body?.hidden).toBe(false);
-		}
+			expect(body?.hidden).toBe(
+				toggle.getAttribute("aria-expanded") !== "true",
+			);
+			return toggle.getAttribute("aria-expanded");
+		});
+		expect(shown).toEqual(["false", "true", "true", "true"]);
+	});
+
+	it("a single-entry section keeps the person's choice, and opens when it gains a second entry", async () => {
+		const c = open(noVariants());
+		const user = mount(c);
+		expect(header("Variants").getAttribute("aria-expanded")).toBe("false");
+		await user.click(screen.getByRole("button", { name: "Add variant" }));
+		expect(header("Variants").getAttribute("aria-expanded")).toBe("true");
+
+		cleanup();
+		const again = mount(open(noVariants()));
+		expect(header("Variants").getAttribute("aria-expanded")).toBe("false");
+		await again.click(header("Variants"));
+		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual({
+			variants: false,
+		});
+		cleanup();
+		mount(open(noVariants()));
+		expect(header("Variants").getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("reads the older list of collapsed sections", () => {
+		localStorage.setItem(COLLAPSED_KEY, JSON.stringify(["sides"]));
+		mount();
+		expect(header("Sides").getAttribute("aria-expanded")).toBe("false");
+		expect(header("Templates").getAttribute("aria-expanded")).toBe("false");
+		expect(header("Variants").getAttribute("aria-expanded")).toBe("true");
 	});
 
 	it("a header collapses its section, and remembers it", async () => {
@@ -116,9 +146,9 @@ describe("the left panel's sections", () => {
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
 		expect(body?.hidden).toBe(true);
 		expect(screen.queryByRole("listbox", { name: "Sides" })).toBeNull();
-		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual([
-			"sides",
-		]);
+		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual({
+			sides: true,
+		});
 
 		cleanup();
 		const again = mount();
@@ -126,7 +156,9 @@ describe("the left panel's sections", () => {
 		expect(header("Variants").getAttribute("aria-expanded")).toBe("true");
 		await again.click(header("Sides"));
 		expect(header("Sides").getAttribute("aria-expanded")).toBe("true");
-		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual([]);
+		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual({
+			sides: false,
+		});
 	});
 
 	it("the header's actions work while the section is collapsed", async () => {
@@ -143,13 +175,13 @@ describe("the left panel's sections", () => {
 	it("collapsing Layers keeps it at the bottom; storage it can't read is ignored", async () => {
 		localStorage.setItem(COLLAPSED_KEY, "{not json");
 		const user = mount();
-		for (const name of ["Templates", "Sides", "Variants", "Layers"])
+		for (const name of ["Sides", "Variants", "Layers"])
 			expect(header(name).getAttribute("aria-expanded")).toBe("true");
 		await user.click(header("Layers"));
 		expect(screen.queryByRole("treegrid", { name: "Layers" })).toBeNull();
-		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual([
-			"layers",
-		]);
+		expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "")).toEqual({
+			layers: true,
+		});
 	});
 
 	it("still toggles when storage throws", async () => {
@@ -160,9 +192,9 @@ describe("the left panel's sections", () => {
 			throw new Error("blocked");
 		});
 		const user = mount();
-		expect(header("Templates").getAttribute("aria-expanded")).toBe("true");
-		await user.click(header("Templates"));
 		expect(header("Templates").getAttribute("aria-expanded")).toBe("false");
+		await user.click(header("Templates"));
+		expect(header("Templates").getAttribute("aria-expanded")).toBe("true");
 	});
 });
 
@@ -346,6 +378,7 @@ describe("the Variants list with no variants", () => {
 	it("shows Default and a button that adds one, as + does", async () => {
 		const c = open(noVariants());
 		const user = mount(c);
+		await user.click(header("Variants"));
 		const list = screen.getByRole("listbox", { name: "Variants" });
 		expect(
 			within(list)

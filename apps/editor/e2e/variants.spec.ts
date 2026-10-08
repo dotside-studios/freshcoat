@@ -144,7 +144,7 @@ test("the variants list is a listbox with a keyboard menu", async ({
 	);
 });
 
-test("a template with no variants offers one; collapsed sections stay collapsed", async ({
+test("a template with no variants offers one; a section's toggle is remembered", async ({
 	page,
 }) => {
 	await openSample(page, "membership-card");
@@ -156,6 +156,11 @@ test("a template with no variants offers one; collapsed sections stay collapsed"
 	await settle(page);
 
 	const variants = page.getByRole("region", { name: "Variants" });
+	const variantsToggle = variants
+		.getByRole("heading")
+		.getByRole("button", { name: "Variants" });
+	await expect(variantsToggle).toHaveAttribute("aria-expanded", "false");
+	await variantsToggle.click();
 	await expect(variants.getByRole("option")).toHaveText(["Default"]);
 	await variants
 		.getByRole("button", {
