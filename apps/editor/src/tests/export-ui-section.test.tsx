@@ -363,7 +363,8 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		expect(screen.getByTestId("export-unbound").textContent).toBe(
+		const notice = screen.getByTestId("export-unbound");
+		expect(notice.textContent).toContain(
 			"Not bound to a dataset, exporting defaults",
 		);
 		expect(button("Export 2 files")).toBeTruthy();
@@ -371,6 +372,15 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-front@2x.png",
 		);
+		await user.click(
+			within(notice).getByRole("button", { name: "Bind a dataset" }),
+		);
+		expect(
+			screen
+				.getByRole("tab", { name: "Content" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 
 	/** Runs the All preset and finishes it with two files ok and one failed. */

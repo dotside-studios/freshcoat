@@ -149,6 +149,14 @@ export function ExportSelected({
 							<p className="m-0 text-fc-muted text-fc-sm">
 								Bind a template to this dataset in Export
 							</p>
+							<Button
+								className="self-end"
+								onPress={() =>
+									controller.dispatch({ type: "setSection", section: "export" })
+								}
+							>
+								Open Export
+							</Button>
 						</div>
 					)}
 				</RACDialog>
