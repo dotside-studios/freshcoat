@@ -13,8 +13,10 @@ const commands: Command[] = [
 // assert the dispose() closure only loses a context on the WebGL-backed path.
 function fakeCk(surface: { dispose: () => void }): {
 	ck: unknown;
-	makeWebGL: ReturnType<typeof vi.fn>;
+	getWebGL: ReturnType<typeof vi.fn>;
 	makeSW: ReturnType<typeof vi.fn>;
+	deleteContext: ReturnType<typeof vi.fn>;
+	grDelete: ReturnType<typeof vi.fn>;
 } {
 	const skCanvas = { clear: vi.fn() };
 	const surf = {
@@ -26,18 +28,23 @@ function fakeCk(surface: { dispose: () => void }): {
 		}),
 		...surface,
 	};
-	const makeWebGL = vi.fn(() => surf);
+	const getWebGL = vi.fn(() => 1);
+	const grDelete = vi.fn();
+	const deleteContext = vi.fn();
 	const makeSW = vi.fn(() => surf);
 	const ck = {
 		TRANSPARENT: 0,
 		TypefaceFontProvider: {
 			Make: () => ({ registerFont: vi.fn(), delete: vi.fn() }),
 		},
-		MakeWebGLCanvasSurface: makeWebGL,
+		GetWebGLContext: getWebGL,
+		MakeWebGLContext: () => ({ delete: grDelete }),
+		MakeOnScreenGLSurface: () => surf,
+		deleteContext,
 		MakeSWCanvasSurface: makeSW,
 		MakeSurface: vi.fn(() => surf),
 	};
-	return { ck, makeWebGL, makeSW };
+	return { ck, getWebGL, makeSW, deleteContext, grDelete };
 }
 
 // An rt whose canvas element records the WEBGL_lose_context call so we can prove the
@@ -67,24 +74,28 @@ describe("paintScene dispose() releases the WebGL context", () => {
 	test("WebGL-backed surface: dispose() frees the surface AND loses the GL context", async () => {
 		const disposeSurface = vi.fn();
 		const loseContext = vi.fn();
-		const { ck } = fakeCk({ dispose: disposeSurface });
+		const { ck, deleteContext, grDelete } = fakeCk({ dispose: disposeSurface });
 		const { rt } = fakeRt(loseContext);
 
 		const out = await paintScene(ck, commands, rt);
 		// Nothing is released until the caller disposes.
 		expect(disposeSurface).not.toHaveBeenCalled();
+		expect(grDelete).not.toHaveBeenCalled();
+		expect(deleteContext).not.toHaveBeenCalled();
 		expect(loseContext).not.toHaveBeenCalled();
 
 		out.dispose();
 		expect(disposeSurface).toHaveBeenCalledTimes(1);
+		expect(grDelete).toHaveBeenCalledTimes(1);
+		expect(deleteContext).toHaveBeenCalledWith(1);
 		expect(loseContext).toHaveBeenCalledTimes(1);
 	});
 
 	test("SW-backed surface (WebGL unavailable): dispose() does not touch a GL context", async () => {
 		const disposeSurface = vi.fn();
 		const loseContext = vi.fn();
-		const { ck, makeWebGL } = fakeCk({ dispose: disposeSurface });
-		makeWebGL.mockReturnValue(null); // WebGL binding fails -> SW fallback
+		const { ck, getWebGL } = fakeCk({ dispose: disposeSurface });
+		getWebGL.mockReturnValue(0); // WebGL binding fails -> SW fallback
 		const { rt } = fakeRt(loseContext);
 
 		const out = await paintScene(ck, commands, rt);

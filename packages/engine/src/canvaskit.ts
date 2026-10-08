@@ -14,9 +14,11 @@ import type {
 	Canvas,
 	CanvasKit,
 	ColorFilter,
+	ColorSpace,
 	Font,
 	FontWeightEnumValues,
 	GlyphRun,
+	GrDirectContext,
 	Image,
 	ImageFilter,
 	ImageInfo,
@@ -33,6 +35,7 @@ import type {
 	Surface,
 	TextStyle,
 	TypefaceFontProvider,
+	WebGLContextHandle,
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
@@ -50,6 +53,7 @@ import {
 	resolvePrecision,
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
+import { normalizeDash } from "./dash";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontArrayBuffer, fontBytes } from "./font-bytes";
 import { dataUrlToBytes } from "./loader";
@@ -391,8 +395,8 @@ function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	p.setStrokeWidth(stroke.width);
 	p.setStrokeCap(ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]]);
 	p.setStrokeJoin(ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]]);
-	if (stroke.dash && stroke.dash.length > 0)
-		p.setPathEffect(bin.track(ck.PathEffect.MakeDash(stroke.dash)));
+	const dash = normalizeDash(stroke.dash);
+	if (dash) p.setPathEffect(bin.track(ck.PathEffect.MakeDash(dash)));
 	return p;
 }
 
@@ -4237,14 +4241,13 @@ export async function paintScene(
 }
 
 // Bind to rt.canvas when present (WebGL, then SW) -> displayable; otherwise an
-// offscreen raster surface. MakeWebGLCanvasSurface throws when the host canvas
-// can't back WebGL (context creation fails, or MakeOnScreenGLSurface fails and its
-// DOM-node swap throws on an OffscreenCanvas), so a failed WebGL attempt is caught
-// on its own and still falls back to SW. A throw may leave a WebGL context on the
-// element, which locks it out of the 2D context SW presents through, so SW gets a
-// fresh element and the old one's context is released.
-// `loseContext` drops the DOM canvas's WebGL context on dispose (see releaseGL); it
-// is a no-op for the SW/offscreen paths, which hold no such context.
+// offscreen raster surface. The WebGL steps are run here rather than through
+// MakeWebGLCanvasSurface so a partial failure can free the GL context handle and
+// GrDirectContext it created, and so CanvasKit's DOM clone-and-swap (which throws on
+// an OffscreenCanvas) never runs. A WebGL context locks the element out of the 2D
+// context SW presents through, so SW gets a fresh element after a failed attempt.
+// `loseContext` frees the WebGL state on dispose (see releaseGL); it is a no-op for
+// the SW/offscreen paths, which hold no such state.
 function makeSurface(
 	ck: CanvasKit,
 	rt: PaintTarget,
@@ -4266,14 +4269,27 @@ function makeSurface(
 		let el = create();
 		if (el) {
 			const canvas = el;
+			const gl: WebGLState = {};
 			try {
-				const gl = ck.MakeWebGLCanvasSurface(asTarget(canvas));
-				if (gl)
-					return { surface: gl, canvas, loseContext: () => releaseGL(canvas) };
-			} catch {
-				releaseGL(canvas);
-				el = create();
-			}
+				const handle = ck.GetWebGLContext(asTarget(canvas));
+				if (handle && handle > 0) {
+					gl.handle = handle;
+					gl.context = boundContext(canvas);
+					gl.grCtx = ck.MakeWebGLContext(handle) ?? undefined;
+					const surface =
+						gl.grCtx &&
+						ck.MakeOnScreenGLSurface(
+							gl.grCtx,
+							canvas.width,
+							canvas.height,
+							null as unknown as ColorSpace,
+						);
+					if (surface)
+						return { surface, canvas, loseContext: () => releaseGL(ck, gl) };
+				}
+			} catch {}
+			releaseGL(ck, gl);
+			el = create();
 		}
 		if (el) {
 			try {
@@ -4290,20 +4306,40 @@ function makeSurface(
 	};
 }
 
-// Free the WebGL context MakeWebGLCanvasSurface grabbed on this canvas so it stops
-// counting against the browser's live-context cap (~16 in Chrome). surface.dispose()
-// frees Skia's GPU resources but leaves the DOM canvas's context alive until GC —
-// under repeated repaints that races the cap and the browser force-drops the oldest
-// live context. getContext returns the SAME context Skia bound (a canvas is locked
-// to one context type), so this loses exactly that one and never allocates a new one.
-function releaseGL(canvas: CanvasLike): void {
+type LoseableContext = {
+	getExtension(name: string): { loseContext(): void } | null;
+};
+
+type WebGLState = {
+	handle?: WebGLContextHandle;
+	grCtx?: GrDirectContext;
+	context?: LoseableContext;
+};
+
+// The context GetWebGLContext just bound. The element is locked to that one
+// context type, so the lookup for the other type returns null rather than
+// creating a context.
+function boundContext(canvas: CanvasLike): LoseableContext | undefined {
 	const c = canvas as unknown as {
-		getContext?(id: string): {
-			getExtension(name: string): { loseContext(): void } | null;
-		} | null;
+		getContext?(id: string): LoseableContext | null;
 	};
-	const gl = c.getContext?.("webgl2") ?? c.getContext?.("webgl");
-	gl?.getExtension("WEBGL_lose_context")?.loseContext();
+	return c.getContext?.("webgl2") ?? c.getContext?.("webgl") ?? undefined;
+}
+
+// Free what the WebGL attempt created: the GrDirectContext, CanvasKit's context
+// table slot (which also clears its current-context pointer), and the DOM context
+// itself, so it stops counting against the browser's live-context cap (~16 in
+// Chrome) instead of lingering until GC.
+function releaseGL(ck: CanvasKit, gl: WebGLState): void {
+	const { handle, grCtx, context } = gl;
+	gl.handle = gl.grCtx = gl.context = undefined;
+	try {
+		grCtx?.delete();
+	} catch {}
+	try {
+		if (handle) ck.deleteContext(handle);
+	} catch {}
+	context?.getExtension("WEBGL_lose_context")?.loseContext();
 }
 
 // The snapshot as a JPEG, flattened over white first because JPEG keeps no
