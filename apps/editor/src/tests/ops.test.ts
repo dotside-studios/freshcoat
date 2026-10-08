@@ -6,6 +6,7 @@ import {
 	addFont,
 	addSide,
 	attachImageAsset,
+	attachTextToPath,
 	duplicateElements,
 	fieldReferences,
 	groupElements,
@@ -437,6 +438,53 @@ describe("ungroup", () => {
 		refused(ungroup(t, "0/2", geometry), "not_a_frame");
 		refused(ungroup(t, "0/bg", geometry), "not_a_frame");
 		refused(ungroup(t, "0/99", geometry), "not_found");
+	});
+});
+
+describe("attachTextToPath", () => {
+	const scene = () =>
+		unwrap(
+			insertElements(frozenDoc(), { side: 0 }, 0, [
+				{
+					id: "curve",
+					type: "vector",
+					pos: { x: 40, y: 50 },
+					size: { width: 100, height: 20 },
+					rotation: 15,
+					properties: { d: "M0 20 C 30 0 70 0 100 20" },
+				},
+				{
+					id: "caption",
+					type: "text",
+					pos: { x: 0, y: 0 },
+					size: { width: 80, height: 20 },
+					properties: {
+						value: "Along",
+						font: { family: "Inter", size: 10 },
+						arc: { direction: "inside" },
+					},
+				},
+			]),
+		).template;
+
+	test("sets the text along its sibling vector and grows its box", () => {
+		const r = unwrap(attachTextToPath(scene(), ["0/0", "0/1"]));
+		const text = el(r.template, "0/1") as Extract<Element, { type: "text" }>;
+		expect(text.properties.path).toEqual({ ref: "curve" });
+		expect(text.properties.arc).toBeUndefined();
+		expect(text.pos).toEqual({ x: 28, y: 38 });
+		expect(text.size).toEqual({ width: 124, height: 44 });
+		expect(text.rotation).toBe(15);
+		expectValid(r.template);
+	});
+
+	test("refuses anything but a text and a vector that are siblings", () => {
+		const t = scene();
+		refused(attachTextToPath(t, ["0/1"]), "not_a_shape");
+		refused(attachTextToPath(t, ["0/1", "0/2"]), "not_a_shape");
+		refused(attachTextToPath(t, ["0/0", "0/3/0"]), "not_a_shape");
+		const nested = unwrap(insertElements(t, "0/3", 0, [el(t, "0/0")])).template;
+		refused(attachTextToPath(nested, ["0/3/0", "0/1"]), "not_siblings");
 	});
 });
 

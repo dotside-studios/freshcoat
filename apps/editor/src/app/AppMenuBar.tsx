@@ -71,6 +71,7 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 		items: [
 			"object.group",
 			"object.ungroup",
+			"object.textOnPath",
 			"-",
 			"object.union",
 			"object.subtract",

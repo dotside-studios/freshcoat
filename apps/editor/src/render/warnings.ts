@@ -39,6 +39,8 @@ function describeWarning(w: PaintWarning): string {
 			return `Unhandled draw op: ${w.op}`;
 		case "adjust_unsupported":
 			return `Adjustment skipped: ${w.component}`;
+		case "text_path_overflow":
+			return `Text runs past the end of its path${w.layer ? `: ${w.layer}` : ""}`;
 		default:
 			return w.kind;
 	}

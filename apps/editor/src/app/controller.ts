@@ -46,6 +46,7 @@ import {
 	type AddVariantResult,
 	addVariant,
 	attachImageAsset,
+	attachTextToPath,
 	booleanElements,
 	changeVariantId,
 	duplicateElements,
@@ -364,6 +365,11 @@ export class EditorController {
 			selectResult: true,
 			scope: "base",
 		});
+	}
+
+	attachTextToPath(): void {
+		const keys = this.selectedLayers();
+		this.edit((t) => attachTextToPath(t, keys), { scope: "base" });
 	}
 
 	ungroupSelection(): void {
