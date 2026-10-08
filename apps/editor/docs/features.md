@@ -159,7 +159,9 @@ the records, and **Export** turns templates and records into files.
   - One side is shown at a time; the Sides list switches between them.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
   - Hide and lock layers; neither is written to the file.
-  - A context menu on every layer.
+  - A context menu on every layer, with Arrange, Align and Boolean
+    submenus. Right-clicking a layer on the canvas selects it, unless it is
+    already selected, and opens the same menu.
 - **Inspector:**
   - Geometry, blend mode (every Figma layer mode, linear burn included) and
     alignment.

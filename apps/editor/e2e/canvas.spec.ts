@@ -335,3 +335,38 @@ test("a new text layer starts in editing, and Enter edits a selected one", async
 	await expect(editor).toBeHidden();
 	expect(await state<number>(page, "s.doc.history.past.length")).toBe(2);
 });
+
+test("right-click selects the layer under the pointer and opens its menu", async ({
+	page,
+}) => {
+	await openSample(page);
+	const r = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	const p = await artboardPoint(page, r.x + 40, r.y + 30);
+	await page.mouse.click(p.x, p.y, { button: "right" });
+	expect(await state<string[]>(page, "s.selection")).toEqual([NAME]);
+	const count = await state<number>(page, "t.template_data[0].elements.length");
+	await page.getByRole("menuitem", { name: "Arrange" }).hover();
+	await page.getByRole("menuitem", { name: /Bring to front/ }).click();
+	await settle(page);
+	expect(await state<string[]>(page, "s.selection")).toEqual([
+		`0/${count - 1}`,
+	]);
+});
+
+test("right-click on a selected layer keeps the selection", async ({
+	page,
+}) => {
+	await openSample(page);
+	await run(page, `c.select(["0/2", "${NAME}"])`);
+	const r = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	const p = await artboardPoint(page, r.x + 40, r.y + 30);
+	await page.mouse.click(p.x, p.y, { button: "right" });
+	expect(await state<string[]>(page, "s.selection")).toEqual(["0/2", NAME]);
+	await page.getByRole("menuitem", { name: "Align" }).hover();
+	await page.getByRole("menuitem", { name: /Align top/ }).click();
+	await settle(page);
+	const a = await state<Rect>(page, 's.geometry.get("0/2").rect');
+	const b = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	expect(b.y).toBeCloseTo(a.y, 0);
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(1);
+});

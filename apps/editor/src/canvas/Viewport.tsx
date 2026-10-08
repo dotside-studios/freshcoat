@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { ContextMenu } from "@freshcoat-js/ui/menu";
 import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
@@ -9,6 +10,7 @@ import {
 } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import { LayerMenuItems } from "~/app/LayerMenu";
 import type { ElementKind } from "~/doc/factories";
 import {
 	applyRect,
@@ -140,6 +142,7 @@ export function Viewport() {
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
 	const side = useEditor((s) => s.side);
+	const textEditing = useEditor((s) => s.textEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
 	const { canvas, fontsLoading } = useLiveRender();
 	usePrintGuidesVersion();
@@ -792,80 +795,104 @@ export function Viewport() {
 				: "default");
 
 	return (
-		<div
-			ref={ref}
-			data-testid="viewport"
-			role="application"
-			aria-label="Canvas"
-			className="relative size-full touch-none select-none overflow-hidden bg-fc-pasteboard"
-			style={{ cursor: cursorStyle }}
-			onPointerDown={onPointerDown}
-			onPointerMove={onPointerMove}
-			onPointerUp={onPointerUp}
-			onPointerCancel={onPointerUp}
-			onPointerLeave={() => {
-				if (!gesture.current) controller.dispatch({ type: "hover", key: null });
-			}}
-			onDoubleClick={onDoubleClick}
-			onContextMenu={(e) => e.preventDefault()}
-			onDrop={(e) => {
-				const images = [...e.dataTransfer.files].filter((f) =>
-					f.type.startsWith("image/"),
+		<ContextMenu
+			className="size-full"
+			menu={<LayerMenuItems />}
+			menuProps={{ "aria-label": "Layer actions" }}
+			isDisabled={!template || textEditing}
+			onOpen={(e) => {
+				const r = ref.current?.getBoundingClientRect();
+				if (
+					!r ||
+					e.clientX < r.left ||
+					e.clientX >= r.right ||
+					e.clientY < r.top ||
+					e.clientY >= r.bottom
+				)
+					return;
+				const hit = controller.hitTest(
+					toWorld({ x: e.clientX - r.left, y: e.clientY - r.top }),
 				);
-				if (!template || images.length === 0) return;
-				e.preventDefault();
-				e.stopPropagation();
-				const at = toWorld(local(e));
-				void (async () => {
-					for (const [i, file] of images.entries())
-						await controller.placeImage(file, {
-							x: at.x + i * 20,
-							y: at.y + i * 20,
-						});
-				})();
+				if (!hit) controller.select([]);
+				else if (!controller.state.selection.includes(hit))
+					controller.select([hit]);
 			}}
 		>
-			{template ? (
-				<>
-					<div
-						className="pointer-events-none absolute truncate text-fc-muted text-fc-sm"
-						style={{
-							left: Math.round(view.x),
-							top: Math.round(view.y) - 20,
-							maxWidth: Math.max(40, template.width * view.zoom),
-						}}
-					>
-						{template.template_data[side]?.name}
-					</div>
-					<div
-						ref={artboardRef}
-						data-testid="artboard"
-						className="fc-checkerboard absolute shadow-(--shadow-fc-artboard) ring-1 ring-fc-border"
-						style={{
-							left: Math.round(view.x),
-							top: Math.round(view.y),
-							width: Math.round(template.width * view.zoom),
-							height: Math.round(template.height * view.zoom),
-							// With print guides the overlay masks the corners outside
-							// the trim, so the edge and shadow follow the trim too.
-							borderRadius: guides
-								? printGuidesFor(template).corner * view.zoom || undefined
-								: undefined,
-						}}
-					>
-						{!canvas || fontsLoading ? (
-							<div className="absolute inset-0 grid place-items-center text-fc-faint text-fc-sm">
-								{renderStatus === "error" ? "Couldn't render" : "Rendering…"}
-							</div>
-						) : null}
-					</div>
-					<Overlay drafts={drafts} />
-					<TextEditor />
-					<Guides />
-					<Rulers />
-				</>
-			) : null}
-		</div>
+			<div
+				ref={ref}
+				data-testid="viewport"
+				role="application"
+				aria-label="Canvas"
+				className="relative size-full touch-none select-none overflow-hidden bg-fc-pasteboard"
+				style={{ cursor: cursorStyle }}
+				onPointerDown={onPointerDown}
+				onPointerMove={onPointerMove}
+				onPointerUp={onPointerUp}
+				onPointerCancel={onPointerUp}
+				onPointerLeave={() => {
+					if (!gesture.current)
+						controller.dispatch({ type: "hover", key: null });
+				}}
+				onDoubleClick={onDoubleClick}
+				onDrop={(e) => {
+					const images = [...e.dataTransfer.files].filter((f) =>
+						f.type.startsWith("image/"),
+					);
+					if (!template || images.length === 0) return;
+					e.preventDefault();
+					e.stopPropagation();
+					const at = toWorld(local(e));
+					void (async () => {
+						for (const [i, file] of images.entries())
+							await controller.placeImage(file, {
+								x: at.x + i * 20,
+								y: at.y + i * 20,
+							});
+					})();
+				}}
+			>
+				{template ? (
+					<>
+						<div
+							className="pointer-events-none absolute truncate text-fc-muted text-fc-sm"
+							style={{
+								left: Math.round(view.x),
+								top: Math.round(view.y) - 20,
+								maxWidth: Math.max(40, template.width * view.zoom),
+							}}
+						>
+							{template.template_data[side]?.name}
+						</div>
+						<div
+							ref={artboardRef}
+							data-testid="artboard"
+							className="fc-checkerboard absolute shadow-(--shadow-fc-artboard) ring-1 ring-fc-border"
+							style={{
+								left: Math.round(view.x),
+								top: Math.round(view.y),
+								width: Math.round(template.width * view.zoom),
+								height: Math.round(template.height * view.zoom),
+								// With print guides the overlay masks the corners outside
+								// the trim, so the edge and shadow follow the trim too.
+								borderRadius: guides
+									? printGuidesFor(template).corner * view.zoom || undefined
+									: undefined,
+							}}
+						>
+							{!canvas || fontsLoading ? (
+								<div className="absolute inset-0 grid place-items-center text-fc-faint text-fc-sm">
+									{renderStatus === "error" ? "Couldn't render" : "Rendering…"}
+								</div>
+							) : null}
+						</div>
+						<Overlay drafts={drafts} />
+						<TextEditor />
+						<Guides />
+						<Rulers />
+					</>
+				) : null}
+			</div>
+		</ContextMenu>
 	);
 }
 
