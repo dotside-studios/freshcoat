@@ -215,6 +215,9 @@ describe("the Content tab", () => {
 			fields: { name: { kind: "column", column: "Name" } },
 		});
 		expect(screen.getByTestId("record-stepper")).toBeTruthy();
+		expect(screen.getByTestId("binding-unfilled").textContent).toBe(
+			"1 required field unfilled",
+		);
 		const toggle = button("Binding");
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
 		await user.click(toggle);

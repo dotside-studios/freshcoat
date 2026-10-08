@@ -12,14 +12,15 @@ import {
 	Button as RACButton,
 } from "react-aria-components";
 import { useController } from "~/app/context";
-import { CONTENT, EMPTY, plural } from "~/app/copy";
+import { BINDING, CONTENT, EMPTY, plural } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
-import { readsDataset } from "~/binding/binding";
+import { readsDataset, unfilledRequired } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import { activeSlot } from "~/state/workspace";
 import SamplesIcon from "~icons/mingcute/back-line";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
+import WarningIcon from "~icons/mingcute/warning-line";
 
 /** Steps the Edit preview through the bound dataset's records, or offers the
  *  workspace's datasets to an unbound template. */
@@ -73,6 +74,13 @@ function Stepper({
 }) {
 	const controller = useController();
 	const current = useEditor((s) => s.previewRecordId);
+	const template = useEditor((s) => s.doc?.history.present);
+	const binding = useEditor((s) => activeSlot(s)?.binding);
+	const unfilled = useMemo(
+		() =>
+			template ? unfilledRequired(template, binding, [dataset]).length : 0,
+		[template, binding, dataset],
+	);
 
 	const labelColumn = useMemo(
 		() =>
@@ -168,6 +176,15 @@ function Stepper({
 						</p>
 					</>
 				)}
+				{unfilled > 0 ? (
+					<p
+						className="mt-1 flex items-center gap-1 text-fc-sm text-fc-warning"
+						data-testid="binding-unfilled"
+					>
+						<WarningIcon className="size-3.5 shrink-0" />
+						{BINDING.unfilled(unfilled)}
+					</p>
+				) : null}
 				<Disclosure className="group/binding mt-1">
 					<RACButton
 						slot="trigger"

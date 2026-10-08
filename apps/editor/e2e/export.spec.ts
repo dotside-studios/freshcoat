@@ -113,6 +113,24 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	await expect(
 		page.getByRole("button", { name: "Export 6 files" }),
 	).toBeEnabled();
+	await expect(page.getByTestId("export-warning")).toHaveCount(0);
+
+	// A required field left to its default is flagged, and the export still runs.
+	const editor = page.getByTestId("binding-editor");
+	await editor.getByRole("button", { name: /Source for display_name/ }).click();
+	await page.getByRole("option", { name: "Default" }).click();
+	await expect(page.getByTestId("export-warning")).toHaveText(
+		"1 required field unfilled",
+	);
+	await expect(
+		page.getByTestId("export-settings").getByTestId("binding-unfilled"),
+	).toHaveText("1 required field unfilled");
+	await expect(
+		page.getByRole("button", { name: "Export 6 files" }),
+	).toBeEnabled();
+	await editor.getByRole("button", { name: /Source for display_name/ }).click();
+	await page.getByRole("option", { name: "Column" }).click();
+	await expect(page.getByTestId("export-warning")).toHaveCount(0);
 
 	// The filmstrip holds the three records; a click previews one and the
 	// arrow keys step. Record 2 of 3 in the preview.

@@ -119,6 +119,10 @@ export const LEFT_PANEL = {
 } as const;
 
 /** The inspector's tabs and the Content tab. */
+export const BINDING = {
+	unfilled: (n: number) => `${plural(n, "required field")} unfilled`,
+} as const;
+
 export const CONTENT = {
 	design: "Design",
 	content: "Content",
