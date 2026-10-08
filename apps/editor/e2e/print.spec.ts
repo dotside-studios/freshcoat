@@ -9,7 +9,14 @@ import {
 } from "@freshcoat-js/for-print/calibration";
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
-import { mod, openSample, probePath, settle, state } from "./helpers";
+import {
+	mod,
+	openSample,
+	probePath,
+	settingsTab,
+	settle,
+	state,
+} from "./helpers";
 
 // FRESHCOAT_SHOTS=<dir> also saves pictures of the Print group and the
 // printer file for review.
@@ -83,6 +90,7 @@ async function openExportWithPreset(page: Page) {
 		.getByRole("button", { name: "New preset" })
 		.click();
 	await expect(page.getByTestId("export-preset")).toHaveCount(1);
+	await settingsTab(page, "Print");
 }
 
 const printSwitch = (page: Page) =>

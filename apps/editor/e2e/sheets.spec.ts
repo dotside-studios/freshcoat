@@ -13,7 +13,7 @@ import {
 	type PDFPage,
 	PDFRawStream,
 } from "pdf-lib";
-import { mod, openSample } from "./helpers";
+import { mod, openSample, settingsTab } from "./helpers";
 
 const RECORDS = 21;
 const PT = 72 / 25.4;
@@ -173,10 +173,12 @@ async function openSheetsPreset(page: Page) {
 		.getByRole("button", { name: "New preset" })
 		.click();
 	const settings = page.getByTestId("export-settings");
+	await settingsTab(page, "Output");
 	await settings
 		.getByRole("radiogroup", { name: "Format" })
 		.getByRole("radio", { name: "PDF" })
 		.click();
+	await settingsTab(page, "Print");
 	await settings
 		.getByTestId("export-layout")
 		.getByRole("radio", { name: "Sheets" })
@@ -190,6 +192,7 @@ test("export cards on A4 sheets and read the PDF back", async ({ page }) => {
 	await expect(settings.getByTestId("export-sheet-summary")).toHaveText(
 		"10 per sheet · 5 sheets",
 	);
+	await settingsTab(page, "Output");
 	await expect(settings.getByTestId("export-page-size")).toHaveText(
 		"Card 3.37 × 2.13 in · 85.7 × 54.0 mm",
 	);
@@ -349,6 +352,7 @@ test("the Event badge starter exports badges on A4, four to a landscape sheet", 
 		});
 	});
 	await page.keyboard.press(`${mod}+3`);
+	await settingsTab(page, "Print");
 	await expect(page.getByTestId("export-sheet-summary")).toHaveText(
 		"4 per sheet · 3 sheets",
 	);

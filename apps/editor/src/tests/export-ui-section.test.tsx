@@ -235,6 +235,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(controller.state.workspace?.activePresetId).toBe(presets[0]?.id);
 		// 3 records (the skipped one is left out) × 2 sides.
 		expect(button("Export 6 files")).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-1-front.png",
 		);
@@ -298,6 +299,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(button("Export 2 selected")).toBeTruthy();
 		await user.click(button("Clear selection"));
 		expect(button("Export 2 files")).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Bo-front.png",
 		);
@@ -334,13 +336,14 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.click(within(row).getByRole("checkbox"));
 		expect(controller.state.workspace?.presets[0]?.selected).toEqual(["r2"]);
 		expect(button("Export 1 file")).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.getByTestId("export-page-size").textContent).toBe(
 			"Page 3.33 × 2.00 in · 84.7 × 50.8 mm",
 		);
 	});
 
 	test("an unbound template exports its defaults", async () => {
-		const { controller } = setup();
+		const { controller, user } = setup();
 		const templateId = controller.state.workspace?.activeTemplateId as string;
 		act(() => {
 			controller.dispatch({ type: "setBinding", id: templateId });
@@ -364,6 +367,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			"Not bound to a dataset, exporting defaults",
 		);
 		expect(button("Export 2 files")).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-front@2x.png",
 		);
@@ -581,6 +585,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			"r3:dark",
 		]);
 		expect(button("Export 6 files")).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Ada-default.png",
 		);
@@ -641,7 +646,9 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 		expect(button("Export 1 file")).toBeTruthy();
 		const settings = screen.getByTestId("export-settings");
+		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(within(settings).getByText(/\{\{variant\}\}/)).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "Content" }));
 		await chooseOption(
 			user,
 			within(settings).getByLabelText(/Variant source/, { selector: "button" }),

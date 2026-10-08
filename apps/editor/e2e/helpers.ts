@@ -4,6 +4,10 @@ import { expect, type Page } from "@playwright/test";
 
 type Box = { x: number; y: number; width: number; height: number };
 
+export async function settingsTab(page: Page, name: string) {
+	await page.getByTestId("export-settings").getByRole("tab", { name }).click();
+}
+
 /** Opens a bundled sample from the welcome screen and waits for its first paint. */
 export async function openSample(page: Page, id = "membership-card") {
 	await page.goto("/");

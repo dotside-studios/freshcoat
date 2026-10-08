@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
-import { mod, openSample, probePath, state } from "./helpers";
+import { mod, openSample, probePath, settingsTab, state } from "./helpers";
 
 /** Adds a dataset of `count` members whose columns are the template's field keys. */
 async function addDataset(
@@ -58,10 +58,14 @@ async function addDataset(
 }
 
 async function chooseDataset(page: Page, name: string) {
-	await page
-		.getByTestId("binding-editor")
-		.getByRole("button", { name: /Dataset/ })
-		.click();
+	await settingsTab(page, "Content");
+	const editor = page.getByTestId("binding-editor");
+	if (!(await editor.isVisible()))
+		await page
+			.getByTestId("export-settings")
+			.getByRole("button", { name: /^Binding/ })
+			.click();
+	await editor.getByRole("button", { name: /Dataset/ }).click();
 	await page.getByRole("option", { name }).click();
 }
 
@@ -190,6 +194,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	).toHaveCount(3);
 
 	// PDF at 300 dpi: one CR80-sized page per record and side.
+	await settingsTab(page, "Output");
 	await page
 		.getByTestId("export-settings")
 		.getByRole("radiogroup", { name: "Format" })
@@ -228,6 +233,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	// Cancel a 40-record job: no download, the bar says cancelled.
 	await addDataset(page, "d_many", "Many", 40);
 	await chooseDataset(page, "Many");
+	await settingsTab(page, "Output");
 	await page
 		.getByTestId("export-settings")
 		.getByRole("radiogroup", { name: "Format" })
@@ -405,6 +411,7 @@ test.describe("at tablet width", () => {
 		await page.keyboard.press(`${mod}+3`);
 		await page.getByRole("button", { name: "New preset" }).first().click();
 		await page.getByRole("button", { name: "Settings" }).first().click();
+		await settingsTab(page, "Print");
 		const toggle = page.getByRole("switch", {
 			name: "Optimize for card printer",
 		});

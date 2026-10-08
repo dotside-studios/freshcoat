@@ -7,6 +7,7 @@ import type {
 import {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
+	DEFAULT_SHEET_LAYOUT,
 	planExport,
 } from "@freshcoat-js/workspace";
 import type { JobResult } from "@freshcoat-js/workspace/export";
@@ -26,6 +27,7 @@ import {
 	recordOutcome,
 	retryPreset,
 	selectedIds,
+	settingsSummary,
 	statusActions,
 } from "~/export/export-ui";
 import { duplicatePreset, newPreset } from "~/export/preset";
@@ -147,6 +149,29 @@ describe("readouts", () => {
 			"3.37 × 2.13 in · 85.7 × 54.0 mm",
 		);
 		expect(formatPageSize({ width: 1012, height: 638 }, 0)).toBe("");
+	});
+
+	test("the settings summary names each tab's choices", () => {
+		const preset = newPreset("t_doc", [], "p_1");
+		expect(settingsSummary(preset)).toBe("PNG · 1× · Download");
+		expect(
+			settingsSummary({
+				...preset,
+				format: "jpeg-zip",
+				size: { kind: "image", field: "photo" },
+				destination: "folder",
+				print: { enabled: true },
+			}),
+		).toBe("JPEG · Match image · Card printer · Folder");
+		expect(
+			settingsSummary({
+				...preset,
+				format: "pdf",
+				scale: 2,
+				destination: "folder",
+				layout: DEFAULT_SHEET_LAYOUT,
+			}),
+		).toBe("PDF · 2× · 300 DPI · Sheets · Download");
 	});
 
 	test("durations and ETAs", () => {

@@ -5,6 +5,7 @@ import {
 	mod,
 	probePath,
 	run,
+	settingsTab,
 	settle,
 	state,
 	stubGoogleFonts,
@@ -581,6 +582,7 @@ for (const size of SIZES) {
 				await page.keyboard.press(`${mod}+3`);
 				await page.getByRole("button", { name: "New preset" }).first().click();
 				await reveal(page, "export-settings", "Settings");
+				await settingsTab(page, "Print");
 				await page
 					.getByTestId("export-print")
 					.getByText("Optimize for card printer")
@@ -672,10 +674,12 @@ for (const size of SIZES) {
 				await closeSettingsSheet(page);
 				await reveal(page, "export-settings", "Settings");
 				const settings = page.getByTestId("export-settings");
+				await settingsTab(page, "Output");
 				await settings
 					.getByRole("radiogroup", { name: "Format" })
 					.getByRole("radio", { name: "PDF" })
 					.click();
+				await settingsTab(page, "Print");
 				const layout = settings.getByTestId("export-layout");
 				await layout.getByRole("radio", { name: "Sheets" }).click();
 				await layout.locator("label", { hasText: "Double-sided" }).click();
@@ -722,6 +726,7 @@ for (const size of SIZES) {
 
 				await page.keyboard.press(`${mod}+3`);
 				await reveal(page, "export-settings", "Settings");
+				await settingsTab(page, "Print");
 				await expect(page.getByTestId("export-sheet-summary")).toHaveText(
 					"4 per sheet · 3 sheets",
 				);

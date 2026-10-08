@@ -39,7 +39,7 @@ import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import SettingsIcon from "~icons/mingcute/settings-3-line";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
-import { ExportSettings } from "./ExportSettings";
+import { ExportSettings, type SettingsTab } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
 	boundDataset,
@@ -181,6 +181,7 @@ export function ExportSection() {
 	const [filter, setFilter] = useState<StatusFilter>("all");
 	const [scope, setScope] = useState<FilmstripScope>("export");
 	const [tab, setTab] = useState<"filmstrip" | "records">("filmstrip");
+	const [settingsTab, setSettingsTab] = useState<SettingsTab>("content");
 	const [chosenMode, setChosenMode] = useState<PreviewMode>("output");
 	const [split, setSplit] = useState(0.5);
 	const [listSelection, setListSelection] = useState<string[]>([]);
@@ -521,6 +522,8 @@ export function ExportSection() {
 			listSelection={listSelection}
 			outputSize={outputSize}
 			sheets={sheets}
+			tab={settingsTab}
+			onTabChange={setSettingsTab}
 		/>
 	) : null;
 	const label = labelColumn(dataset);

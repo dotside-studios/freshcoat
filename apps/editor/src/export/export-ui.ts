@@ -19,6 +19,7 @@ import {
 	fileNameFor,
 	orientedSize,
 	parseAssetRef,
+	pdfLayout,
 } from "@freshcoat-js/workspace";
 import type { JobResult } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
@@ -45,6 +46,29 @@ export const DESTINATION_LABEL: Record<ExportDestination, string> = {
 	"zip-file": "Zip file",
 	folder: "Folder",
 };
+
+const FORMAT_NAME: Record<ExportPreset["format"], string> = {
+	"png-zip": "PNG",
+	"jpeg-zip": "JPEG",
+	"webp-zip": "WebP",
+	pdf: "PDF",
+};
+
+export function settingsSummary(preset: ExportPreset): string {
+	const pdf = preset.format === "pdf";
+	const size = exportSize(preset);
+	const parts = [
+		FORMAT_NAME[preset.format],
+		size.kind === "image" ? "Match image" : `${preset.scale}×`,
+	];
+	if (pdf) parts.push(`${preset.dpi} DPI`);
+	if (pdf && pdfLayout(preset).kind === "sheet") parts.push("Sheets");
+	if (preset.print?.enabled) parts.push("Card printer");
+	parts.push(
+		pdf ? "Download" : DESTINATION_LABEL[preset.destination ?? "download"],
+	);
+	return parts.join(" · ");
+}
 
 export type StatusFilter = "all" | RecordStatus;
 
