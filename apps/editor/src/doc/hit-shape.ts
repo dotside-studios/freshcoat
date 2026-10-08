@@ -26,6 +26,22 @@ export function isShapeElement(el: Element): el is ShapeElement {
 	return el.type === "rect" || el.type === "vector";
 }
 
+/**
+ * How far past its box a shape can be hit: the stroke's outward extent plus
+ * `tolerance`. Vector miter joins and square caps use Skia's fast bound.
+ */
+export function hitReach(el: Element, tolerance = 0): number {
+	if (!isShapeElement(el)) return 0;
+	const stroke = el.properties.stroke;
+	if (!stroke || stroke.width <= 0) return tolerance;
+	const outward = stroke.width / 2 - strokeInset(stroke);
+	if (el.type === "rect") return outward + tolerance;
+	let multiplier = 1;
+	if ((stroke.join ?? "miter") === "miter") multiplier = 4;
+	if (stroke.cap === "square") multiplier = Math.max(multiplier, Math.SQRT2);
+	return outward * multiplier + tolerance;
+}
+
 /** `point` in the box's own unrotated space, origin at its top left. */
 export function localPoint(box: LayerBox, point: Point): Point {
 	const { x, y, width, height } = box.rect;
