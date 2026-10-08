@@ -12,7 +12,9 @@ import { treeRow } from "@freshcoat-js/ui/tree";
 import { templateStem } from "@freshcoat-js/workspace";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
+import { COMMAND_BY_ID } from "~/app/commands";
 import { useController } from "~/app/context";
+import { TEMPLATE_SETUP } from "~/app/copy";
 import { readsDataset } from "~/binding/binding";
 import { PRESETS } from "~/doc/new-document";
 import { useEditor } from "~/state/hooks";
@@ -22,7 +24,7 @@ import LinkIcon from "~icons/mingcute/link-line";
 import { RenameInput } from "./RenameInput";
 
 /** The workspace's templates; the active one is what Edit shows. */
-export function TemplatesList() {
+export function TemplatesList({ onSetup }: { onSetup?: () => void }) {
 	const controller = useController();
 	// A string of what the rows show, so edits inside a template do not
 	// rebuild the list.
@@ -63,6 +65,18 @@ export function TemplatesList() {
 			>
 				Duplicate
 			</MenuItem>
+			{onSetup ? (
+				<MenuItem
+					id="setup"
+					shortcut={COMMAND_BY_ID.get("file.templateSetup")?.keys?.[0]}
+					onAction={() => {
+						if (target && target !== active) controller.switchTemplate(target);
+						onSetup();
+					}}
+				>
+					{TEMPLATE_SETUP.command}
+				</MenuItem>
+			) : null}
 			<MenuItem
 				id="export"
 				onAction={() => {

@@ -209,9 +209,10 @@ the records, and **Export** turns templates and records into files.
     (every `{{token}}` is rewritten) and deleted. A field that is still in use
     cannot be deleted, and the editor lists what uses it.
   - Fields a pipeline fills in are listed under "From the system".
-- **Template setup:** File > Template setup… (`Mod+Alt+,`) holds the
-  template's name, id, description, version, product, size and fonts (with
-  whether each one loaded). Saving a template that has never been named opens
+- **Template setup:** File > Template setup… (`Mod+Alt+,`), or the same
+  item in a template's context menu, holds the template's name, id,
+  description, version, product, size and fonts (with whether each one
+  loaded). Saving a template that has never been named opens
   it first as "Name this template", once for each unnamed template in a
   workspace.
 - **Issues:** the status bar's Issues button counts validation, variant,

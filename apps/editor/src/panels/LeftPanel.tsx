@@ -13,7 +13,11 @@ import { SidesHeaderActions, SidesList } from "./layers/SidesList";
 import { TemplatesHeaderActions, TemplatesList } from "./layers/TemplatesList";
 import { VariantsHeaderActions, VariantsList } from "./layers/VariantsList";
 
-export function LeftPanel() {
+export function LeftPanel({
+	onTemplateSetup,
+}: {
+	onTemplateSetup?: () => void;
+}) {
 	const counts: Record<LeftSection, number> = {
 		templates: useEditor((s) => s.workspace?.templates.length ?? 1),
 		sides: useEditor((s) => present(s)?.template_data.length ?? 0),
@@ -49,7 +53,11 @@ export function LeftPanel() {
 			className="flex min-h-0 flex-1 flex-col"
 			data-testid="left-panel-content"
 		>
-			{section("templates", <TemplatesList />, <TemplatesHeaderActions />)}
+			{section(
+				"templates",
+				<TemplatesList onSetup={onTemplateSetup} />,
+				<TemplatesHeaderActions />,
+			)}
 			{section("sides", <SidesList />, <SidesHeaderActions />)}
 			{section(
 				"variants",
