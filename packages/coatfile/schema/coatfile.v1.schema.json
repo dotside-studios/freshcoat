@@ -3892,6 +3892,9 @@
 																	"line-through"
 																]
 															},
+															"skipInk": {
+																"type": "boolean"
+															},
 															"variations": {
 																"type": "object",
 																"propertyNames": {
@@ -4001,6 +4004,9 @@
 														"underline",
 														"line-through"
 													]
+												},
+												"skipInk": {
+													"type": "boolean"
 												},
 												"variations": {
 													"type": "object",
