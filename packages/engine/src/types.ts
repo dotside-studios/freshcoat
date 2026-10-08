@@ -485,6 +485,8 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// A pattern fill's shader failed to compile, so it painted its first colour.
+	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.

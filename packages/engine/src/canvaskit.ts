@@ -97,7 +97,7 @@ import {
 	encodePng,
 } from "./png";
 import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
-import { PATTERN_SKSL, type PatternFill } from "./pattern";
+import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
@@ -114,6 +114,7 @@ import type {
 	FontRequest,
 	FrameFinish,
 	PaintWarning,
+	PatternKind,
 	ResolvedFill,
 	ShapeMask,
 	Size,
@@ -235,13 +236,22 @@ function patternShader(
 	x: number,
 	y: number,
 	space: PatternSpace,
+	issues?: PaintIssues,
 ): Shader {
 	const [c0, c1] = fill.colors;
+	let error = "";
 	const eff = cachedEffect(ck, `pattern-${fill.pattern}`, () =>
-		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern]),
+		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern], (e: string) => {
+			error = e;
+		}),
 	);
-	if (!eff)
+	if (!eff) {
+		issues?.patternUnsupported.set(fill.pattern, {
+			pattern: fill.pattern,
+			error: error || "the pattern shader failed to compile",
+		});
 		return bin.track(ck.Shader.MakeColor(toColor(ck, c0), ck.ColorSpace.SRGB));
+	}
 	const scale = Math.max(fill.scale, 1e-3);
 	const [ux, uy] = space.unit ?? [1, 1];
 	const local = ck.Matrix.multiply(
@@ -256,6 +266,7 @@ function patternShader(
 		...toColor(ck, c1),
 		density,
 		1 / (scale * space.px),
+		patternMean(fill.pattern, density),
 	];
 	if (fill.pattern === "hatching" || fill.pattern === "dots")
 		return bin.track(eff.makeShader(uniforms, local));
@@ -277,8 +288,10 @@ function shaderFor(
 	w: number,
 	h: number,
 	space: PatternSpace = { px: 1 },
+	issues?: PaintIssues,
 ): Shader {
-	if (fill.kind === "pattern") return patternShader(ck, bin, fill, x, y, space);
+	if (fill.kind === "pattern")
+		return patternShader(ck, bin, fill, x, y, space, issues);
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -586,6 +599,7 @@ function drawText(
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
+	issues: PaintIssues,
 ) {
 	// A gradient fill spans the whole text box, applied to every glyph (via a
 	// foreground paint) and its decoration, overriding per-span colors.
@@ -600,6 +614,7 @@ function drawText(
 					cmd.size.width,
 					cmd.size.height,
 					{ px: devicePx(canvas) },
+					issues,
 				)
 			: null;
 	let fgPaint: Paint | null = null;
@@ -1224,6 +1239,7 @@ function makeSvgPicture(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
 		};
 		for (const cmd of commands)
 			if (cmd.op.startsWith("draw"))
@@ -1306,6 +1322,7 @@ function drawPath(
 	canvas: Canvas,
 	bin: Bin,
 	cmd: DrawPathCommand,
+	issues: PaintIssues,
 ) {
 	const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 	if (!path) return;
@@ -1331,7 +1348,7 @@ function drawPath(
 		paint.setAntiAlias(true);
 		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
 		else if (fill.kind === "pattern")
-			paint.setShader(patternShader(ck, bin, fill, ox, oy, space));
+			paint.setShader(patternShader(ck, bin, fill, ox, oy, space, issues));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
@@ -1358,6 +1375,7 @@ type PaintIssues = {
 		string,
 		{ component: "lut" | "lut3d" | "sharpen" | "gamut"; layer?: string }
 	>;
+	patternUnsupported: Map<PatternKind, { pattern: PatternKind; error: string }>;
 };
 
 function reportAdjustUnsupported(
@@ -1427,20 +1445,30 @@ function drawShape(
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
 			else
 				paint.setShader(
-					shaderFor(ck, bin, fill, x, y, w, h, { px: devicePx(canvas) }),
+					shaderFor(
+						ck,
+						bin,
+						fill,
+						x,
+						y,
+						w,
+						h,
+						{ px: devicePx(canvas) },
+						issues,
+					),
 				);
 			drawOutline(canvas, outline, paint);
 		}
 		if (cmd.stroke)
 			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
-		drawText(ck, canvas, provider, bin, cmd);
+		drawText(ck, canvas, provider, bin, cmd, issues);
 	} else if (cmd.op === "drawImage") {
 		drawImage(ck, canvas, bin, images, cmd, issues);
 	} else if (cmd.op === "drawBitmap") {
 		drawBitmap(ck, canvas, bin, cmd, frame);
 	} else if (cmd.op === "drawPath") {
-		drawPath(ck, canvas, bin, cmd);
+		drawPath(ck, canvas, bin, cmd, issues);
 	} else if (cmd.op === "drawQr") {
 		const { pos, size, modules, margin = 0, foreground, background } = cmd;
 		const m = (Math.min(size.width, size.height) - margin * 2) / modules.length;
@@ -1760,8 +1788,9 @@ function adjustShaderSksl(
 
 // RuntimeEffect is compiled per (ck, variant) and reused — Make() parses SkSL, so
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
-// instances (e.g. across tests) never share an effect.
-const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
+// instances (e.g. across tests) never share an effect. A failed compile is not
+// kept, so the next paint tries again.
+const effectCache = new WeakMap<object, Map<string, RuntimeEffect>>();
 function cachedEffect(
 	ck: CanvasKit,
 	key: string,
@@ -1772,11 +1801,11 @@ function cachedEffect(
 		byVariant = new Map();
 		effectCache.set(ck, byVariant);
 	}
-	let eff = byVariant.get(key);
-	if (eff === undefined) {
-		eff = make() ?? null;
-		byVariant.set(key, eff);
-	}
+	const cached = byVariant.get(key);
+	if (cached) return cached;
+	const eff = make();
+	if (!eff) return null;
+	byVariant.set(key, eff);
 	return eff;
 }
 
@@ -2474,6 +2503,7 @@ function recordedBounds(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
 		};
 		paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
 		picture = recorder.finishRecordingAsPicture();
@@ -4056,6 +4086,7 @@ export async function paintScene(
 				unhandled: [],
 				missingImages: [],
 				adjustUnsupported: new Map(),
+				patternUnsupported: new Map(),
 			};
 			paintDrawable(
 				ck,
@@ -4071,6 +4102,8 @@ export async function paintScene(
 				warnings.push({ kind: "unhandled_op", op });
 			for (const warning of issues.adjustUnsupported.values())
 				warnings.push({ kind: "adjust_unsupported", ...warning });
+			for (const warning of issues.patternUnsupported.values())
+				warnings.push({ kind: "pattern_unsupported", ...warning });
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {
