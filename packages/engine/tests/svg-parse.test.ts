@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
 	isSvg,
 	parseSvg,
+	type SvgFilter,
 	type SvgGroup,
 	type SvgItem,
 	type SvgShape,
@@ -418,16 +419,16 @@ describe("clips and masks", () => {
 });
 
 describe("unsupported content and limits", () => {
-	test("foreignObject, media and filters warn once each", () => {
+	test("foreignObject, media and unsupported filters warn once each", () => {
 		const d = parseSvg(
 			svg(
-				'<foreignObject/><foreignObject/><video/><audio/><filter id="f"/><path d="M0 0H1V1Z" filter="url(#f)"/>',
+				'<foreignObject/><foreignObject/><video/><audio/><filter id="f"><feTurbulence/></filter><path d="M0 0H1V1Z" filter="url(#f)"/><path d="M0 0H1V1Z" filter="url(#f)"/>',
 			),
 		);
-		expect(shapes(d.children)).toHaveLength(1);
+		expect(shapes(d.children)).toHaveLength(2);
 		expect(d.warnings.map((w) => w.feature).sort()).toEqual([
 			"audio",
-			"filter",
+			"filter-feTurbulence",
 			"foreignObject",
 			"video",
 		]);
@@ -445,5 +446,151 @@ describe("unsupported content and limits", () => {
 		const d = parseSvg(svg(`<defs>${body}</defs><use href="#l20"/>`));
 		expect(shapes(d.children).length).toBeLessThanOrEqual(20000);
 		expect(d.warnings.map((w) => w.feature)).toContain("item-limit");
+	});
+});
+
+describe("filters", () => {
+	const filterOf = (markup: string): SvgFilter => {
+		const d = parseSvg(markup);
+		const g = d.children[0] as SvgGroup;
+		expect(g.kind).toBe("group");
+		return g.filter as SvgFilter;
+	};
+
+	test("a Figma drop shadow chains its primitives by result name", () => {
+		const f = filterOf(
+			svg(
+				'<g filter="url(#s)"><rect x="20" y="16" width="80" height="80"/></g><defs><filter id="s" x="0" y="0" width="120" height="120" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/><feOffset dy="4"/><feGaussianBlur stdDeviation="2"/><feComposite in2="hardAlpha" operator="out"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/><feBlend mode="normal" in2="BackgroundImageFix" result="effect1"/><feBlend mode="normal" in="SourceGraphic" in2="effect1" result="shape"/></filter></defs>',
+				'width="120" height="120"',
+			),
+		);
+		expect(f.region).toEqual({ x: 0, y: 0, width: 120, height: 120 });
+		expect(f.transform).toEqual([1, 0, 0, 1, 0, 0]);
+		expect(f.primitives).toEqual([
+			{ kind: "flood", color: "#00000000", linear: false },
+			{
+				kind: "colorMatrix",
+				in: "SourceAlpha",
+				matrix: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0],
+				linear: false,
+			},
+			{ kind: "offset", in: 1, dx: 0, dy: 4, linear: false },
+			{ kind: "blur", in: 2, sx: 2, sy: 2, linear: false },
+			{ kind: "composite", operator: "out", in: 3, in2: 1, linear: false },
+			{
+				kind: "colorMatrix",
+				in: 4,
+				matrix: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0],
+				linear: false,
+			},
+			{ kind: "blend", mode: "normal", in: 5, in2: 0, linear: false },
+			{ kind: "blend", mode: "normal", in: "SourceGraphic", in2: 6, linear: false },
+		]);
+	});
+
+	test("the region defaults to the bounding box grown by 10%, and primitives work in linearRGB", () => {
+		const f = filterOf(
+			svg(
+				'<filter id="b"><feGaussianBlur stdDeviation="2 3"/><feDropShadow flood-color="red" flood-opacity="0.5"/></filter><rect x="10" y="20" width="50" height="40" filter="url(#b)"/>',
+			),
+		);
+		expect(f.region).toEqual({ x: 5, y: 16, width: 60, height: 48 });
+		expect(f.primitives).toEqual([
+			{ kind: "blur", in: "SourceGraphic", sx: 2, sy: 3, linear: true },
+			{ kind: "dropShadow", in: 0, dx: 2, dy: 2, sx: 2, sy: 2, color: "#ff000080", linear: true },
+		]);
+	});
+
+	test("primitiveUnits objectBoundingBox scales lengths by the bounding box", () => {
+		const f = filterOf(
+			svg(
+				'<filter id="b" primitiveUnits="objectBoundingBox" x="0" y="0" width="1" height="1"><feOffset dx="0.1" dy="0.5"/><feGaussianBlur stdDeviation="0.1"/></filter><rect x="10" y="20" width="50" height="40" filter="url(#b)"/>',
+			),
+		);
+		expect(f.region).toEqual({ x: 10, y: 20, width: 50, height: 40 });
+		expect(f.primitives).toEqual([
+			{ kind: "offset", in: "SourceGraphic", dx: 5, dy: 20, linear: true },
+			{ kind: "blur", in: 0, sx: 5, sy: 4, linear: true },
+		]);
+	});
+
+	test("the filter keeps the element's transform, with the region in its user space", () => {
+		const d = parseSvg(
+			svg(
+				'<filter id="b"><feGaussianBlur stdDeviation="1"/></filter><g transform="translate(5 5) rotate(90)"><rect width="10" height="20" filter="url(#b)"/></g>',
+			),
+		);
+		const f = ((d.children[0] as SvgGroup).children[0] as SvgGroup).filter as SvgFilter;
+		expect(f.transform.map((v) => Math.round(v * 1e9) / 1e9 + 0)).toEqual([0, 1, -1, 0, 5, 5]);
+		expect(f.region.x).toBeCloseTo(-1);
+		expect(f.region.y).toBeCloseTo(-2);
+		expect(f.region.width).toBeCloseTo(12);
+		expect(f.region.height).toBeCloseTo(24);
+	});
+
+	test("colour matrix types", () => {
+		const matrix = (attrs: string) =>
+			(
+				filterOf(
+					svg(`<filter id="c"><feColorMatrix ${attrs}/></filter><rect width="10" height="10" filter="url(#c)"/>`),
+				).primitives[0] as { matrix: number[] }
+			).matrix.map((v) => Math.round(v * 1000) / 1000 + 0);
+		const identity = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+		expect(matrix('type="saturate" values="1"')).toEqual(identity);
+		expect(matrix('type="hueRotate" values="0"')).toEqual(identity);
+		expect(matrix('type="matrix" values="1 2 3"')).toEqual(identity);
+		expect(matrix('type="saturate" values="0"')).toEqual([
+			0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072, 0, 0, 0, 0, 0, 1, 0,
+		]);
+		expect(matrix('type="luminanceToAlpha"')).toEqual([
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.213, 0.715, 0.072, 0, 0,
+		]);
+	});
+
+	test("merge reads each node's input", () => {
+		const f = filterOf(
+			svg(
+				'<filter id="m"><feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/><feOffset in="blur" dx="4" dy="4" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter><rect width="10" height="10" filter="url(#m)"/>',
+			),
+		);
+		expect(f.primitives.at(-1)).toEqual({ kind: "merge", in: [1, "SourceGraphic"], linear: true });
+	});
+
+	test("an empty filter or an empty region draws nothing", () => {
+		expect(parseSvg(svg('<filter id="f"/><rect width="10" height="10" filter="url(#f)"/>')).children).toEqual([]);
+		expect(
+			parseSvg(
+				svg('<filter id="f" width="0"><feOffset/></filter><rect width="10" height="10" filter="url(#f)"/>'),
+			).children,
+		).toEqual([]);
+	});
+
+	test("unusable filters draw the element unfiltered and warn", () => {
+		const cases: [string, string][] = [
+			['<rect width="10" height="10" filter="url(#nope)"/>', "filter-missing"],
+			['<rect width="10" height="10" filter="blur(2px)"/>', "filter-function"],
+			[
+				'<filter id="f"><feComposite operator="arithmetic" k2="1"/></filter><rect width="10" height="10" filter="url(#f)"/>',
+				"filter-feComposite-arithmetic",
+			],
+			[
+				'<filter id="f"><feOffset in="BackgroundImage"/></filter><rect width="10" height="10" filter="url(#f)"/>',
+				"filter-BackgroundImage",
+			],
+			[
+				'<filter id="f"><feMorphology radius="1"/></filter><rect width="10" height="10" filter="url(#f)"/>',
+				"filter-feMorphology",
+			],
+		];
+		for (const [body, feature] of cases) {
+			const d = parseSvg(svg(body));
+			expect(d.children).toHaveLength(1);
+			expect(d.children[0]?.kind).toBe("shape");
+			expect(d.warnings.map((w) => w.feature)).toEqual([feature]);
+		}
+		expect(
+			parseSvg(svg('<filter id="f"><feMorphology/></filter><rect width="10" height="10" filter="url(#f)"/>'))
+				.warnings[0]?.message,
+		).toContain("<feMorphology>");
 	});
 });

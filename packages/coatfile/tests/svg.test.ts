@@ -186,6 +186,14 @@ describe("svgToElements", () => {
 		});
 	});
 
+	test("filters warn, since layers cannot carry them", () => {
+		const { element, warnings } = svgToElements(
+			svg('<filter id="f"><feGaussianBlur stdDeviation="2"/></filter><rect width="10" height="10" fill="red" filter="url(#f)"/>'),
+		);
+		expect(element.properties.children).toHaveLength(1);
+		expect(warnings.map((w) => w.feature)).toEqual(["filter"]);
+	});
+
 	test("warnings pass through", () => {
 		const { warnings } = svgToElements(svg("<foreignObject/>"));
 		expect(warnings.map((w) => w.feature)).toEqual(["foreignObject"]);

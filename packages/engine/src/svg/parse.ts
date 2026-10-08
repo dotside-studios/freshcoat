@@ -79,7 +79,65 @@ export type SvgGroup = {
 	opacity?: number;
 	clip?: SvgShape[];
 	mask?: SvgItem[];
+	filter?: SvgFilter;
 	children: SvgItem[];
+};
+
+/** A primitive's input: the element's graphic or its alpha, or the result of
+ *  an earlier primitive by index. */
+export type SvgFilterInput = "SourceGraphic" | "SourceAlpha" | number;
+
+export type SvgBlendMode =
+	| "normal"
+	| "multiply"
+	| "screen"
+	| "overlay"
+	| "darken"
+	| "lighten"
+	| "color-dodge"
+	| "color-burn"
+	| "hard-light"
+	| "soft-light"
+	| "difference"
+	| "exclusion"
+	| "hue"
+	| "saturation"
+	| "color"
+	| "luminosity";
+
+/** Lengths are in the filter's user space. `linear` is whether the primitive
+ *  works in linearRGB rather than sRGB. */
+export type SvgFilterPrimitive = { linear: boolean } & (
+	| { kind: "blur"; in: SvgFilterInput; sx: number; sy: number }
+	| { kind: "offset"; in: SvgFilterInput; dx: number; dy: number }
+	| {
+			kind: "dropShadow";
+			in: SvgFilterInput;
+			dx: number;
+			dy: number;
+			sx: number;
+			sy: number;
+			color: string;
+	  }
+	| { kind: "colorMatrix"; in: SvgFilterInput; matrix: number[] }
+	| { kind: "flood"; color: string }
+	| { kind: "merge"; in: SvgFilterInput[] }
+	| {
+			kind: "composite";
+			operator: "over" | "in" | "out" | "atop" | "xor";
+			in: SvgFilterInput;
+			in2: SvgFilterInput;
+	  }
+	| { kind: "blend"; mode: SvgBlendMode; in: SvgFilterInput; in2: SvgFilterInput }
+);
+
+export type SvgFilter = {
+	/** Maps the filter's user space into drawing space. */
+	transform: Matrix;
+	/** The filter region, in the filter's user space. */
+	region: Box;
+	/** The last primitive's result is the filter's output. */
+	primitives: SvgFilterPrimitive[];
 };
 
 export type SvgImage = {
@@ -158,6 +216,7 @@ const INHERITED = new Set([
 	"marker-start",
 	"marker-mid",
 	"marker-end",
+	"color-interpolation-filters",
 ]);
 
 const PRESENTATION = new Set([
@@ -169,6 +228,8 @@ const PRESENTATION = new Set([
 	"filter",
 	"stop-color",
 	"stop-opacity",
+	"flood-color",
+	"flood-opacity",
 	"marker",
 	"overflow",
 ]);
@@ -316,22 +377,21 @@ export function viewBoxMatrix(
 	return [sx, 0, 0, sy, tx, ty];
 }
 
+function unionBox(a: Box, b: Box): Box {
+	const x = Math.min(a.x, b.x);
+	const y = Math.min(a.y, b.y);
+	return {
+		x,
+		y,
+		width: Math.max(a.x + a.width, b.x + b.width) - x,
+		height: Math.max(a.y + a.height, b.y + b.height) - y,
+	};
+}
+
 function boundsOf(items: SvgItem[]): Box | null {
 	let box: Box | null = null;
 	const add = (b: Box | null) => {
-		if (!b) return;
-		if (!box) {
-			box = { ...b };
-			return;
-		}
-		const x = Math.min(box.x, b.x);
-		const y = Math.min(box.y, b.y);
-		box = {
-			x,
-			y,
-			width: Math.max(box.x + box.width, b.x + b.width) - x,
-			height: Math.max(box.y + box.height, b.y + b.height) - y,
-		};
+		if (b) box = box ? unionBox(box, b) : { ...b };
 	};
 	for (const item of items) add(itemBounds(item));
 	return box;
@@ -1197,6 +1257,216 @@ export function parseSvg(markup: string): SvgDrawing {
 		return walkChildren(mask, { ...ctx, m: mm, style, depth: ctx.depth + 1 });
 	};
 
+	const localBounds = (items: SvgItem[], inv: Matrix): Box | null => {
+		let out: Box | null = null;
+		const add = (segs: Segment[]) => {
+			const b = pathBounds(transformPath(segs, inv));
+			if (b) out = out ? unionBox(out, b) : b;
+		};
+		const visit = (list: SvgItem[]) => {
+			for (const item of list) {
+				if (item.kind === "group") visit(item.children);
+				else if (item.kind === "shape") add(normalizePath(item.d));
+				else {
+					const b = itemBounds(item) as Box;
+					add(normalizePath(`M${b.x} ${b.y}h${b.width}v${b.height}h${-b.width}Z`));
+				}
+			}
+		};
+		visit(items);
+		return out;
+	};
+
+	// Undefined draws the content unfiltered; null draws nothing.
+	const resolveFilter = (
+		value: string,
+		ctx: Context,
+		m: Matrix,
+		content: SvgItem[],
+	): SvgFilter | null | undefined => {
+		const ref = urlRef(value);
+		if (!ref) {
+			warn("filter-function", "CSS filter functions are not applied");
+			return undefined;
+		}
+		if (ref.fallback)
+			warn("filter-list", "only the first filter in a list is applied");
+		const target = ref.id ? byId.get(ref.id) : undefined;
+		if (!target || localName(target.name) !== "filter") {
+			warn("filter-missing", `"${value}" is not a filter in the document`);
+			return undefined;
+		}
+		const chain = hrefChain(target, (name) => name === "filter");
+		const attr = (name: string) => {
+			for (const f of chain) if (f.attrs[name] !== undefined) return f.attrs[name];
+			return undefined;
+		};
+		const owner = chain.find((f) => f.children.some((c) => !("text" in c)));
+		if (!owner) return null;
+		const inv = invert(m);
+		if (!inv) return null;
+		let bbox: Box | null | undefined;
+		const bounds = () => {
+			if (bbox === undefined) bbox = localBounds(content, inv);
+			return bbox;
+		};
+		const fraction = (raw: string) =>
+			raw.trim().endsWith("%") ? Number.parseFloat(raw) / 100 : (numberOf(raw) ?? 0);
+
+		let region: Box;
+		const regionAttr = (name: string, fallback: string) => attr(name) ?? fallback;
+		if (attr("filterUnits") === "userSpaceOnUse") {
+			region = {
+				x: parseLength(regionAttr("x", "-10%"), "x", ctx.viewport) ?? 0,
+				y: parseLength(regionAttr("y", "-10%"), "y", ctx.viewport) ?? 0,
+				width: parseLength(regionAttr("width", "120%"), "x", ctx.viewport) ?? 0,
+				height: parseLength(regionAttr("height", "120%"), "y", ctx.viewport) ?? 0,
+			};
+		} else {
+			const b = bounds();
+			if (!b || !(b.width > 0 && b.height > 0)) return null;
+			region = {
+				x: b.x + fraction(regionAttr("x", "-10%")) * b.width,
+				y: b.y + fraction(regionAttr("y", "-10%")) * b.height,
+				width: fraction(regionAttr("width", "120%")) * b.width,
+				height: fraction(regionAttr("height", "120%")) * b.height,
+			};
+		}
+		if (!(region.width > 0 && region.height > 0)) return null;
+
+		const bboxUnits = attr("primitiveUnits") === "objectBoundingBox";
+		if (bboxUnits) {
+			const b = bounds();
+			if (!b || !(b.width > 0 && b.height > 0)) return null;
+		}
+		const unitX = () => (bboxUnits ? (bounds() as Box).width : 1);
+		const unitY = () => (bboxUnits ? (bounds() as Box).height : 1);
+		const pair = (raw: string | undefined, fallback: number): [number, number] => {
+			const n = (raw ?? "").trim().split(/[\s,]+/).filter(Boolean).map(Number);
+			const a = n[0] !== undefined && Number.isFinite(n[0]) ? n[0] : fallback;
+			const b = n[1] !== undefined && Number.isFinite(n[1]) ? n[1] : a;
+			return [a, b];
+		};
+
+		const ownerStyle = computeStyle(owner, rootStyle);
+		const primitives: SvgFilterPrimitive[] = [];
+		const results = new Map<string, number>();
+		const unsupported = (feature: string, what: string) => {
+			warn(`filter-${feature}`, `${what} is not supported, so the filter is not applied`);
+			return undefined;
+		};
+		const input = (raw: string | undefined): SvgFilterInput | string => {
+			const v = raw?.trim();
+			const previous = primitives.length > 0 ? primitives.length - 1 : "SourceGraphic";
+			if (!v) return previous;
+			if (v === "SourceGraphic" || v === "SourceAlpha") return v;
+			if (FILTER_SOURCES.has(v)) return v;
+			return results.get(v) ?? previous;
+		};
+		for (const c of owner.children) {
+			if ("text" in c) continue;
+			const name = localName(c.name);
+			if (!name.startsWith("fe")) continue;
+			const own = computeStyle(c, ownerStyle);
+			const space = (own["color-interpolation-filters"] ?? "linearRGB").toLowerCase();
+			const linear = space !== "srgb" && space !== "auto";
+			const inputs: (SvgFilterInput | string)[] = [];
+			const take = (raw: string | undefined) => {
+				const i = input(raw);
+				inputs.push(i);
+				return i as SvgFilterInput;
+			};
+			const flood = () => {
+				const color = parseColor(own["flood-color"] ?? "black", currentColor(own));
+				return toHex(Array.isArray(color) ? color : [0, 0, 0, 1], opacityOf(own["flood-opacity"]));
+			};
+			let p: SvgFilterPrimitive;
+			switch (name) {
+				case "feGaussianBlur": {
+					let [sx, sy] = pair(c.attrs.stdDeviation, 0);
+					if (sx < 0 || sy < 0) [sx, sy] = [0, 0];
+					p = { kind: "blur", in: take(c.attrs.in), sx: sx * unitX(), sy: sy * unitY(), linear };
+					break;
+				}
+				case "feOffset":
+					p = {
+						kind: "offset",
+						in: take(c.attrs.in),
+						dx: (numberOf(c.attrs.dx) ?? 0) * unitX(),
+						dy: (numberOf(c.attrs.dy) ?? 0) * unitY(),
+						linear,
+					};
+					break;
+				case "feDropShadow": {
+					const [sx, sy] = pair(c.attrs.stdDeviation, 2);
+					p = {
+						kind: "dropShadow",
+						in: take(c.attrs.in),
+						dx: (numberOf(c.attrs.dx) ?? 2) * unitX(),
+						dy: (numberOf(c.attrs.dy) ?? 2) * unitY(),
+						sx: Math.max(0, sx) * unitX(),
+						sy: Math.max(0, sy) * unitY(),
+						color: flood(),
+						linear,
+					};
+					break;
+				}
+				case "feColorMatrix":
+					p = {
+						kind: "colorMatrix",
+						in: take(c.attrs.in),
+						matrix: colorMatrix(c.attrs.type, c.attrs.values),
+						linear,
+					};
+					break;
+				case "feFlood":
+					p = { kind: "flood", color: flood(), linear };
+					break;
+				case "feMerge": {
+					const list: SvgFilterInput[] = [];
+					for (const n of c.children)
+						if (!("text" in n) && localName(n.name) === "feMergeNode")
+							list.push(take(n.attrs.in));
+					p = { kind: "merge", in: list, linear };
+					break;
+				}
+				case "feComposite": {
+					const operator = (c.attrs.operator ?? "over").trim();
+					if (operator === "arithmetic") return unsupported("feComposite-arithmetic", '<feComposite operator="arithmetic">');
+					p = {
+						kind: "composite",
+						operator: COMPOSITE_OPERATORS.has(operator)
+							? (operator as "over")
+							: "over",
+						in: take(c.attrs.in),
+						in2: take(c.attrs.in2),
+						linear,
+					};
+					break;
+				}
+				case "feBlend": {
+					const mode = (c.attrs.mode ?? "normal").trim();
+					p = {
+						kind: "blend",
+						mode: BLEND_MODES.has(mode) ? (mode as SvgBlendMode) : "normal",
+						in: take(c.attrs.in),
+						in2: take(c.attrs.in2),
+						linear,
+					};
+					break;
+				}
+				default:
+					return unsupported(name, `<${name}>`);
+			}
+			const source = inputs.find((i) => typeof i === "string" && FILTER_SOURCES.has(i));
+			if (source) return unsupported(source as string, `in="${source}"`);
+			if (c.attrs.result) results.set(c.attrs.result.trim(), primitives.length);
+			primitives.push(p);
+		}
+		if (primitives.length === 0) return null;
+		return { transform: m, region, primitives };
+	};
+
 	const decorate = (
 		el: XmlElement,
 		style: Declarations,
@@ -1206,24 +1476,28 @@ export function parseSvg(markup: string): SvgDrawing {
 		group: boolean,
 	): SvgItem[] => {
 		if (content.length === 0) return [];
-		if (style.filter && style.filter !== "none")
-			warn("filter", "filters are not applied");
+		const filter =
+			style.filter && style.filter !== "none"
+				? resolveFilter(style.filter, ctx, m, content)
+				: undefined;
+		if (filter === null) return [];
 		const opacity = opacityOf(style.opacity);
 		const clip = clipShapes(style["clip-path"], ctx, m, content);
 		const mask = maskItems(style.mask, ctx, m, content);
 		if (clip && clip.length === 0) return [];
 		const only = content[0] as SvgItem;
-		if (!group && content.length === 1 && only.kind !== "group") {
+		if (!group && !filter && content.length === 1 && only.kind !== "group") {
 			if (opacity < 1) only.opacity = opacity;
 			if (!clip && !mask) return content;
 			return [{ kind: "group", ...(clip ? { clip } : {}), ...(mask ? { mask } : {}), children: content }];
 		}
-		if (!group && !clip && !mask && opacity === 1) return content;
+		if (!group && !filter && !clip && !mask && opacity === 1) return content;
 		const g: SvgGroup = { kind: "group", children: content };
 		if (el.attrs.id) g.id = el.attrs.id;
 		if (opacity < 1) g.opacity = opacity;
 		if (clip) g.clip = clip;
 		if (mask) g.mask = mask;
+		if (filter) g.filter = filter;
 		return [g];
 	};
 
@@ -1375,6 +1649,63 @@ export function parseSvg(markup: string): SvgDrawing {
 	if (root.attrs.preserveAspectRatio)
 		drawing.preserveAspectRatio = root.attrs.preserveAspectRatio;
 	return drawing;
+}
+
+const FILTER_SOURCES = new Set(["BackgroundImage", "BackgroundAlpha", "FillPaint", "StrokePaint"]);
+
+const COMPOSITE_OPERATORS = new Set(["over", "in", "out", "atop", "xor"]);
+
+const BLEND_MODES = new Set<string>([
+	"normal",
+	"multiply",
+	"screen",
+	"overlay",
+	"darken",
+	"lighten",
+	"color-dodge",
+	"color-burn",
+	"hard-light",
+	"soft-light",
+	"difference",
+	"exclusion",
+	"hue",
+	"saturation",
+	"color",
+	"luminosity",
+]);
+
+const IDENTITY_COLOR_MATRIX = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+
+// feColorMatrix as 20 row-major values, with the offsets in 0..1.
+function colorMatrix(type: string | undefined, values: string | undefined): number[] {
+	const v = (values ?? "").trim().split(/[\s,]+/).filter(Boolean).map(Number);
+	const one = v.length === 1 && Number.isFinite(v[0]) ? (v[0] as number) : undefined;
+	switch ((type ?? "matrix").trim()) {
+		case "saturate": {
+			const s = one ?? 1;
+			return [
+				0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0, 0,
+				0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0, 0,
+				0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s, 0, 0,
+				0, 0, 0, 1, 0,
+			];
+		}
+		case "hueRotate": {
+			const a = ((one ?? 0) * Math.PI) / 180;
+			const cos = Math.cos(a);
+			const sin = Math.sin(a);
+			return [
+				0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928, 0, 0,
+				0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.14, 0.072 - cos * 0.072 - sin * 0.283, 0, 0,
+				0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072, 0, 0,
+				0, 0, 0, 1, 0,
+			];
+		}
+		case "luminanceToAlpha":
+			return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2125, 0.7154, 0.0721, 0, 0];
+		default:
+			return v.length === 20 && v.every(Number.isFinite) ? v : [...IDENTITY_COLOR_MATRIX];
+	}
 }
 
 const MARKABLE = new Set(["path", "line", "polyline", "polygon"]);
