@@ -125,6 +125,7 @@ export function svgToElements(
 				from,
 				to,
 				stops,
+				...(p.spread ? { spread: p.spread } : {}),
 			};
 		}
 		const longest = Math.max(w, h);
@@ -134,7 +135,12 @@ export function svgToElements(
 			radius: round((p.rx * Math.abs(sx)) / longest),
 			radiusY: round((p.ry * Math.abs(sy)) / longest),
 			...(p.rotation ? { rotation: round(p.rotation) } : {}),
+			...(p.fx !== undefined && p.fy !== undefined
+				? { focus: at(p.fx, p.fy) }
+				: {}),
+			...(p.fr ? { focusRadius: round((p.fr * Math.abs(sx)) / longest) } : {}),
 			stops,
+			...(p.spread ? { spread: p.spread } : {}),
 		};
 	};
 

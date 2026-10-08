@@ -35,6 +35,8 @@ export { isSvg } from "./sniff";
 
 export type SvgStop = { offset: number; color: string };
 
+export type SvgSpread = "reflect" | "repeat";
+
 export type SvgPaint =
 	| { kind: "solid"; color: string }
 	| {
@@ -44,6 +46,7 @@ export type SvgPaint =
 			x2: number;
 			y2: number;
 			stops: SvgStop[];
+			spread?: SvgSpread;
 	  }
 	| {
 			kind: "radial";
@@ -52,7 +55,11 @@ export type SvgPaint =
 			rx: number;
 			ry: number;
 			rotation: number;
+			fx?: number;
+			fy?: number;
+			fr?: number;
 			stops: SvgStop[];
+			spread?: SvgSpread;
 	  };
 
 export type SvgStroke = {
@@ -532,9 +539,11 @@ export function parseSvg(markup: string): SvgDrawing {
 		}
 		const gt = attr("gradientTransform");
 		if (gt) total = multiply(total, parseTransform(gt));
-		const spread = attr("spreadMethod");
-		if (spread && spread !== "pad")
-			warn("gradient-spread", `spreadMethod="${spread}" is drawn as pad`);
+		const method = attr("spreadMethod")?.trim();
+		const spread =
+			method === "reflect" || method === "repeat"
+				? { spread: method as SvgSpread }
+				: {};
 		const unitViewport = bbox ? { width: 1, height: 1 } : viewport;
 		const len = (name: string, fallback: string, axis: Axis) => {
 			const raw = attr(name) ?? fallback;
@@ -548,18 +557,14 @@ export function parseSvg(markup: string): SvgDrawing {
 		if (localName(el.name) === "linearGradient") {
 			const [x1, y1] = map(len("x1", "0%", "x"), len("y1", "0%", "y"));
 			const [x2, y2] = map(len("x2", "100%", "x"), len("y2", "0%", "y"));
-			return { kind: "linear", x1, y1, x2, y2, stops };
+			return { kind: "linear", x1, y1, x2, y2, stops, ...spread };
 		}
 		const cxl = len("cx", "50%", "x");
 		const cyl = len("cy", "50%", "y");
 		const r = len("r", "50%", "d");
-		const fx = attr("fx");
-		const fy = attr("fy");
-		if (
-			(fx !== undefined && len("fx", fx, "x") !== cxl) ||
-			(fy !== undefined && len("fy", fy, "y") !== cyl)
-		)
-			warn("radial-focal", "radial gradient focal points are drawn centred");
+		const fxl = attr("fx") === undefined ? cxl : len("fx", "50%", "x");
+		const fyl = attr("fy") === undefined ? cyl : len("fy", "50%", "y");
+		const frl = Math.max(0, len("fr", "0%", "d"));
 		const [cx, cy] = map(cxl, cyl);
 		const [a, b, c, d] = total;
 		const e11 = a * a + c * c;
@@ -568,15 +573,24 @@ export function parseSvg(markup: string): SvgDrawing {
 		const mean = (e11 + e22) / 2;
 		const diff = Math.sqrt(((e11 - e22) / 2) ** 2 + e12 * e12);
 		const rotation = (0.5 * Math.atan2(2 * e12, e11 - e22) * 180) / Math.PI;
-		return {
+		const major = Math.sqrt(mean + diff);
+		const paint: SvgPaint = {
 			kind: "radial",
 			cx,
 			cy,
-			rx: Math.sqrt(mean + diff) * r,
+			rx: major * r,
 			ry: Math.sqrt(Math.max(0, mean - diff)) * r,
 			rotation: Object.is(rotation, -0) ? 0 : rotation,
 			stops,
+			...spread,
 		};
+		if (fxl !== cxl || fyl !== cyl || frl > 0) {
+			const [fx, fy] = map(fxl, fyl);
+			paint.fx = fx;
+			paint.fy = fy;
+			paint.fr = major * frl;
+		}
+		return paint;
 	};
 
 	const resolvePaint = (

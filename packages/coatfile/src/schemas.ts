@@ -128,6 +128,9 @@ export const GradientStopSchema = z.object({
 	color: z.string(),
 });
 
+// What paints past the last stop. Omitted means pad, the last color held.
+export const GradientSpreadSchema = z.enum(["pad", "reflect", "repeat"]);
+
 export const FillSchema = z.union([
 	z.string(),
 	z.object({
@@ -141,6 +144,7 @@ export const FillSchema = z.union([
 		from: z.tuple([z.number(), z.number()]).optional(),
 		to: z.tuple([z.number(), z.number()]).optional(),
 		stops: z.array(GradientStopSchema),
+		spread: GradientSpreadSchema.optional(),
 	}),
 	z.object({
 		kind: z.literal("radial"),
@@ -156,7 +160,14 @@ export const FillSchema = z.union([
 		// Degrees the primary axis is turned from +x. Only meaningful alongside
 		// radiusY, since a circle looks the same at every angle.
 		rotation: z.number().optional(),
+		// Where the first stop sits, in the same units as `center`. Omitted means
+		// the center.
+		focus: z.tuple([z.number(), z.number()]).optional(),
+		// Radius of the first stop's circle around `focus`, in the units of
+		// `radius`. Omitted means 0.
+		focusRadius: z.number().nonnegative().optional(),
 		stops: z.array(GradientStopSchema),
+		spread: GradientSpreadSchema.optional(),
 	}),
 	z.object({
 		kind: z.literal("angular"),

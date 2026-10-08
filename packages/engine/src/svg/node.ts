@@ -43,6 +43,7 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 				from: { x: fx(p.x1), y: fy(p.y1) },
 				to: { x: fx(p.x2), y: fy(p.y2) },
 				stops: p.stops,
+				...(p.spread ? { spread: p.spread } : {}),
 			};
 		const longest = Math.max(viewBox.width, viewBox.height);
 		return {
@@ -52,6 +53,13 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 			radiusY: p.ry / longest,
 			rotation: p.rotation,
 			stops: p.stops,
+			...(p.fx !== undefined && p.fy !== undefined
+				? {
+						focus: { x: fx(p.fx), y: fy(p.fy) },
+						focusRadius: (p.fr ?? 0) / longest,
+					}
+				: {}),
+			...(p.spread ? { spread: p.spread } : {}),
 		};
 	};
 

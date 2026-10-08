@@ -387,7 +387,10 @@ exactly; they may lie outside the box, and equal points fail validation
 `linearGradientAngle(from, to)`, so a reader older than 1.2 draws the nearest
 thing it can; `linearGradientPoints(angle)` goes the other way. A radial
 `radius` is a fraction of the box's longest side, and an angular `rotation` has
-0 at twelve o'clock.
+0 at twelve o'clock. A radial `focus` moves where the first stop sits (same
+units as `center`) and `focusRadius` gives it a circle (units of `radius`).
+Linear and radial fills take `spread`: `pad` (the default) holds the end
+colors, `reflect` mirrors the stops and `repeat` tiles them.
 
 ## Patterns
 

@@ -11,6 +11,7 @@ export {
 	type SvgItem,
 	type SvgPaint,
 	type SvgShape,
+	type SvgSpread,
 	type SvgStop,
 	type SvgStroke,
 	type SvgText,

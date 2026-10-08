@@ -175,15 +175,25 @@ export type Stroke = {
 	align?: "inside" | "outside" | "center";
 };
 
-// Gradient endpoints are in [0, 1] of the drawable's bbox.
+export type GradientSpread = "pad" | "reflect" | "repeat";
+
+// Gradient endpoints are in [0, 1] of the drawable's bbox. `spread` is what
+// paints past the last stop; omitted means pad.
 export type ResolvedFill =
 	| { kind: "solid"; color: string }
-	| { kind: "linear"; stops: GradientStop[]; from: Vec2; to: Vec2 }
+	| {
+			kind: "linear";
+			stops: GradientStop[];
+			from: Vec2;
+			to: Vec2;
+			spread?: GradientSpread;
+	  }
 	// `radius` is a fraction of the drawable's LONGEST side, so one number means
 	// the same distance whichever axis it describes. `radiusY` is the reach along
 	// the axis perpendicular to the primary one and `rotation` the degrees that
 	// primary axis is turned from +x; together they make the gradient an ellipse.
-	// Omit both for a circle.
+	// Omit both for a circle. `focus` is where the first stop sits, in the same
+	// units as `center`, and `focusRadius` its circle, in the units of `radius`.
 	| {
 			kind: "radial";
 			stops: GradientStop[];
@@ -191,6 +201,9 @@ export type ResolvedFill =
 			radius: number;
 			radiusY?: number;
 			rotation?: number;
+			focus?: Vec2;
+			focusRadius?: number;
+			spread?: GradientSpread;
 	  }
 	// Angular (conic) gradient. `rotation` is the start angle in degrees, 0 = top
 	// (12 o'clock), sweeping clockwise — matching Figma's angular gradient.
