@@ -111,7 +111,9 @@ the records, and **Export** turns templates and records into files.
     the layer's font stands in for it, with the raw template text and its
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
-    text is edited in the inspector.
+    text is edited in the inspector. Typing `{{` there, or in the inspector's
+    text content, suggests field keys: arrows choose, Enter or Tab inserts,
+    Esc dismisses, and a key that isn't a field yet can be created.
   - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
   - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
     They follow the pan and zoom, and mark the selection's extent with its
@@ -150,6 +152,8 @@ the records, and **Export** turns templates and records into files.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer.
+  - A layer that reads a field shows `{}`, which names those fields and opens
+    them in Content.
 - **Inspector:**
   - Geometry, blend mode (every Figma layer mode, linear burn included) and
     alignment.
@@ -164,6 +168,9 @@ the records, and **Export** turns templates and records into files.
     applies its corners to its fill, its stroke and its clip.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
+  - Text content, image source, QR value and barcode value have an Insert
+    field menu; an image source lists image and URL fields first. Its last
+    item, "New field…", creates a field and inserts it.
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to
     left, or taken from the text. OpenType features are typed as tags
@@ -198,7 +205,9 @@ the records, and **Export** turns templates and records into files.
     touching history, and "Reset to samples" puts them back.
   - Expanding a row edits the field's definition. Fields can be added, renamed
     (every `{{token}}` is rewritten) and deleted. A field that is still in use
-    cannot be deleted, and the editor lists what uses it.
+    cannot be deleted, and the editor lists what uses it. An expanded row
+    lists the layers that use the field, each selecting its layer, and, when
+    the template is bound, the column or source that fills it.
   - Fields a pipeline fills in are listed under "From the system".
 - **Template setup:** File > Template setup… (`Mod+Alt+,`) holds the
   template's name, id, description, version, product, size and fonts (with
@@ -208,7 +217,8 @@ the records, and **Export** turns templates and records into files.
 - **Issues:** the status bar's Issues button counts validation, variant,
   file, render and loading issues, and opens the list: each issue links to the
   layer or variant it is about, and print and preview hints are listed without
-  being counted. A save that fails validation opens it.
+  being counted. A save that fails validation opens it. A `{{key}}` or
+  condition naming a field that doesn't exist offers "Create field".
 - **Undo and redo:** every command has one undo step. A drag, a burst of typing
   or a run of nudges is a single step.
 - **SVG paste:** pasted SVG markup can become layers, an image or text.
