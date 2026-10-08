@@ -4355,6 +4355,43 @@
 													]
 												}
 											}
+										},
+										"path": {
+											"type": "object",
+											"properties": {
+												"d": {
+													"type": "string"
+												},
+												"ref": {
+													"type": "string"
+												},
+												"startOffset": {
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "string",
+															"pattern": "^-?\\d+(\\.\\d+)?%$"
+														}
+													]
+												},
+												"side": {
+													"type": "string",
+													"enum": [
+														"left",
+														"right"
+													]
+												},
+												"align": {
+													"type": "string",
+													"enum": [
+														"start",
+														"center",
+														"end"
+													]
+												}
+											}
 										}
 									},
 									"required": [

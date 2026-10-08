@@ -20,9 +20,10 @@ import type { Template } from "./types";
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc`; element `backdropBlur`
+//   1.7  text `path`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 6;
+export const FORMAT_MINOR = 7;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -81,6 +82,7 @@ export function minimumFormatVersion(template: Template): string {
 				need(5);
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 			if (o.type === "text" && usesArc(o.properties)) need(6);
+			if (o.type === "text" && usesTextPath(o.properties)) need(7);
 			if (o.type === "frame") {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
@@ -107,6 +109,7 @@ export function minimumFormatVersion(template: Template): string {
 					need(4);
 				if (usesTextLayout(delta.properties)) need(5);
 				if (usesArc(delta.properties)) need(6);
+				if (usesTextPath(delta.properties)) need(7);
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
@@ -138,6 +141,14 @@ function usesArc(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).arc !== undefined
+	);
+}
+
+function usesTextPath(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).path !== undefined
 	);
 }
 

@@ -289,6 +289,34 @@ describe("svgToElements", () => {
 		expect(validate(template(element)).ok).toBe(true);
 	});
 
+	test("a textPath becomes text along inline path data", () => {
+		const { element, warnings } = svgToElements(
+			svg(
+				'<defs><path id="arc" d="M10 80 C 30 20 170 20 190 80"/></defs>' +
+					'<text font-size="10" text-anchor="middle"><textPath href="#arc" startOffset="50%">On a curve</textPath></text>' +
+					'<text font-size="10"><textPath href="#arc" startOffset="4" side="right">Back</textPath></text>',
+				'width="100" height="50" viewBox="0 0 200 100"',
+			),
+		);
+		expect(warnings).toEqual([]);
+		const [a, b] = element.properties.children as TextElement[];
+		expect(a?.properties.value).toBe("On a curve");
+		expect(a?.properties.font.size).toBe(5);
+		expect(a?.pos).toEqual({ x: 0, y: 11.5 });
+		expect(a?.properties.path).toEqual({
+			d: "M5 28.5C15 -1.5 85 -1.5 95 28.5",
+			startOffset: "50%",
+			align: "center",
+		});
+		expect(a?.properties.align).toBeUndefined();
+		expect(b?.properties.path).toEqual({
+			d: "M5 28.5C15 -1.5 85 -1.5 95 28.5",
+			startOffset: 2,
+			side: "right",
+		});
+		expect(validate(template(element)).ok).toBe(true);
+	});
+
 	test("the result is a valid element", () => {
 		const { element } = svgToElements(ICON);
 		expect(ElementSchema.safeParse(element).success).toBe(true);
