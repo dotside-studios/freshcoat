@@ -146,6 +146,7 @@ export function svgToElements(
 		});
 
 	const rootId = uniqueId(options.id ?? "svg");
+	const warnings = [...drawing.warnings];
 
 	const fill = (p: SvgPaint, b: Box): Fill => {
 		if (p.kind === "solid") return color(p.color);
@@ -344,6 +345,8 @@ export function svgToElements(
 		if (it.kind === "shape") return shape(it);
 		if (it.kind === "image") return image(it);
 		if (it.kind === "text") return text(it);
+		if (it.filter && !warnings.some((w) => w.feature === "filter"))
+			warnings.push({ feature: "filter", message: "filters are not applied to editable layers" });
 		if (!it.id && it.opacity === undefined && !it.clip && !it.mask && it.children.length === 1)
 			return item(it.children[0] as SvgItem);
 		const children = it.children.map(item).filter((p): p is Placed => !!p);
@@ -410,5 +413,5 @@ export function svgToElements(
 			...(spills ? { clipsContent: true } : {}),
 		},
 	};
-	return { element, warnings: drawing.warnings };
+	return { element, warnings };
 }

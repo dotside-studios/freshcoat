@@ -117,7 +117,13 @@ import {
 	rectShape,
 } from "./outline";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
-import type { SvgItem } from "./svg/index";
+import type {
+	SvgDrawing,
+	SvgFilter,
+	SvgFilterInput,
+	SvgFilterPrimitive,
+	SvgItem,
+} from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
 import type {
@@ -1571,6 +1577,223 @@ function loadSvg(): Promise<SvgModule> {
 	return svgModule;
 }
 
+const SVG_COMPOSITE: Record<
+	Extract<SvgFilterPrimitive, { kind: "composite" }>["operator"],
+	EnumKey<BlendModeEnumValues>
+> = { over: "SrcOver", in: "SrcIn", out: "SrcOut", atop: "SrcATop", xor: "Xor" };
+
+const SOURCE_ALPHA = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0];
+
+const srgbToLinear = (v: number) =>
+	v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+
+// An SVG filter's primitives as one ImageFilter taking and giving sRGB. A null
+// filter stands for the layer's own content, and a result whose `linear` is
+// null reads the same in either space.
+function svgImageFilter(
+	ck: CanvasKit,
+	bin: Bin,
+	filter: SvgFilter,
+): ImageFilter | null {
+	type Result = { f: ImageFilter | null; linear: boolean | null };
+	const withColor = (cf: ColorFilter, input: ImageFilter | null) =>
+		bin.track(ck.ImageFilter.MakeColorFilter(cf, input));
+	const source: Result = { f: null, linear: false };
+	let alpha: Result | undefined;
+	const results: Result[] = [];
+	const get = (i: SvgFilterInput): Result => {
+		if (i === "SourceGraphic") return source;
+		if (i !== "SourceAlpha") return results[i] as Result;
+		alpha ??= {
+			f: withColor(bin.track(ck.ColorFilter.MakeMatrix(SOURCE_ALPHA)), null),
+			linear: null,
+		};
+		return alpha;
+	};
+	const inSpace = (r: Result, linear: boolean) =>
+		r.linear === null || r.linear === linear
+			? r.f
+			: withColor(
+					bin.track(
+						linear
+							? ck.ColorFilter.MakeSRGBToLinearGamma()
+							: ck.ColorFilter.MakeLinearToSRGBGamma(),
+					),
+					r.f,
+				);
+	const color = (hex: string, linear: boolean) => {
+		const c = parseColor(hex);
+		const [r, g, b, a] = Array.isArray(c) ? c : [0, 0, 0, 1];
+		const ch = (v: number) => (linear ? srgbToLinear(v / 255) : v / 255);
+		return ck.Color4f(ch(r), ch(g), ch(b), a);
+	};
+	const blend = (
+		mode: EnumKey<BlendModeEnumValues>,
+		background: ImageFilter | null,
+		foreground: ImageFilter | null,
+	) => bin.track(ck.ImageFilter.MakeBlend(ck.BlendMode[mode], background, foreground));
+	for (const p of filter.primitives) {
+		const at = (i: SvgFilterInput) => inSpace(get(i), p.linear);
+		let linear: boolean | null = p.linear;
+		let f: ImageFilter | null;
+		switch (p.kind) {
+			case "blur":
+				f =
+					p.sx > 0 || p.sy > 0
+						? bin.track(ck.ImageFilter.MakeBlur(p.sx, p.sy, ck.TileMode.Decal, at(p.in)))
+						: at(p.in);
+				break;
+			case "offset": {
+				const r = get(p.in);
+				f = bin.track(ck.ImageFilter.MakeOffset(p.dx, p.dy, r.f));
+				linear = r.linear;
+				break;
+			}
+			case "dropShadow":
+				f = bin.track(
+					ck.ImageFilter.MakeDropShadow(
+						p.dx,
+						p.dy,
+						p.sx,
+						p.sy,
+						color(p.color, p.linear),
+						at(p.in),
+					),
+				);
+				break;
+			case "colorMatrix":
+				f = withColor(bin.track(ck.ColorFilter.MakeMatrix(p.matrix)), at(p.in));
+				break;
+			case "flood":
+				f = bin.track(
+					ck.ImageFilter.MakeShader(
+						bin.track(ck.Shader.MakeColor(color(p.color, false), ck.ColorSpace.SRGB)),
+					),
+				);
+				linear = false;
+				break;
+			case "merge": {
+				const [first, ...rest] = p.in;
+				f =
+					first === undefined
+						? bin.track(
+								ck.ImageFilter.MakeShader(
+									bin.track(ck.Shader.MakeColor(ck.TRANSPARENT, ck.ColorSpace.SRGB)),
+								),
+							)
+						: rest.reduce((acc, i) => blend("SrcOver", acc, at(i)), at(first));
+				break;
+			}
+			case "composite":
+				f = blend(SVG_COMPOSITE[p.operator], at(p.in2), at(p.in));
+				break;
+			case "blend":
+				f = blend(SKIA_BLEND_MODE[p.mode], at(p.in2), at(p.in));
+				break;
+		}
+		results.push({ f, linear });
+	}
+	return inSpace(results.at(-1) ?? source, false);
+}
+
+const svgMatrix = (m: number[]) => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1] as number[];
+
+// Records `children`, each filtered group drawn from a picture of its own
+// content inside a layer carrying the filter. Those pictures join `images`.
+function recordSvg(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	svg: SvgModule,
+	drawing: SvgDrawing,
+	children: SvgItem[],
+	images: Map<string, Image | SvgPicture>,
+	bin: Bin,
+	filter?: SvgFilter,
+): SkPicture {
+	const { width, height } = drawing;
+	const vbm = svg.viewBoxMatrix(drawing.viewBox, width, height, drawing.preserveAspectRatio);
+	const [sx, , , sy, tx, ty] = vbm;
+	const lift = (items: SvgItem[]): SvgItem[] =>
+		items.map((item) => {
+			if (item.kind !== "group") return item;
+			const { filter: own, ...group } = item;
+			if (group.mask) group.mask = lift(group.mask);
+			if (!own) return { ...group, children: lift(item.children) };
+			const key = `svg-filter:${images.size}`;
+			const picture = recordSvg(ck, provider, svg, drawing, item.children, images, bin, own);
+			images.set(key, {
+				svgPicture: picture,
+				width,
+				height,
+				rasterPixels: 0,
+				features: [],
+				delete: () => picture.delete(),
+			});
+			return {
+				...group,
+				children: [
+					{
+						kind: "image",
+						href: key,
+						x: -tx / sx,
+						y: -ty / sy,
+						width: width / sx,
+						height: height / sy,
+						fit: "fill",
+					},
+				],
+			};
+		});
+	const commands = compileScene(svg.svgToNode({ ...drawing, children: lift(children) }), {
+		width,
+		height,
+	});
+	const recorder = new ck.PictureRecorder();
+	try {
+		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
+		const toUser = filter
+			? ck.Matrix.multiply(svgMatrix(vbm), svgMatrix(filter.transform))
+			: null;
+		const fromUser = toUser && ck.Matrix.invert(toUser);
+		const layer = filter && fromUser ? svgImageFilter(ck, bin, filter) : null;
+		if (filter && toUser && fromUser) {
+			const { x, y, width: w, height: h } = filter.region;
+			canvas.save();
+			canvas.concat(toUser);
+			canvas.clipRect(ck.XYWHRect(x, y, w, h), ck.ClipOp.Intersect, true);
+			const paint = bin.track(new ck.Paint());
+			if (layer) paint.setImageFilter(layer);
+			canvas.saveLayer(paint);
+			canvas.concat(fromUser);
+		}
+		const issues: PaintIssues = {
+			unhandled: [],
+			missingImages: [],
+			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
+		};
+		for (const cmd of commands)
+			if (cmd.op.startsWith("draw"))
+				paintDrawable(
+					ck,
+					canvas,
+					provider,
+					images,
+					bin,
+					cmd as DrawCommand,
+					issues,
+					{ width, height, scale: 1, grid: 1 },
+				);
+		if (filter && toUser && fromUser) {
+			canvas.restore();
+			canvas.restore();
+		}
+		return recorder.finishRecordingAsPicture();
+	} finally {
+		recorder.delete();
+	}
+}
+
 // Recorded at the drawing's own size and scaled when drawn, so it stays
 // vector at every density.
 function makeSvgPicture(
@@ -1580,8 +1803,7 @@ function makeSvgPicture(
 	svg: SvgModule,
 	nesting = 0,
 ): SvgPicture {
-	const { parseSvg, svgToNode } = svg;
-	const drawing = parseSvg(new TextDecoder().decode(bytes));
+	const drawing = svg.parseSvg(new TextDecoder().decode(bytes));
 	const { width, height } = drawing;
 	const contents = svgContents(drawing.children, {
 		images: new Set(),
@@ -1604,30 +1826,9 @@ function makeSvgPicture(
 			if (!features.includes("image-decode")) features.push("image-decode");
 		}
 	}
-	const commands = compileScene(svgToNode(drawing), { width, height });
-	const recorder = new ck.PictureRecorder();
 	const bin = makeBin();
 	try {
-		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
-		const issues: PaintIssues = {
-			unhandled: [],
-			missingImages: [],
-			adjustUnsupported: new Map(),
-			patternUnsupported: new Map(),
-		};
-		for (const cmd of commands)
-			if (cmd.op.startsWith("draw"))
-				paintDrawable(
-					ck,
-					canvas,
-					provider,
-					images,
-					bin,
-					cmd as DrawCommand,
-					issues,
-					{ width, height, scale: 1, grid: 1 },
-				);
-		const picture = recorder.finishRecordingAsPicture();
+		const picture = recordSvg(ck, provider, svg, drawing, drawing.children, images, bin);
 		let rasterPixels = 0;
 		for (const img of images.values())
 			rasterPixels += isSvgPicture(img)
@@ -1644,7 +1845,6 @@ function makeSvgPicture(
 	} finally {
 		for (const img of images.values()) img.delete();
 		bin.free();
-		recorder.delete();
 	}
 }
 
