@@ -41,7 +41,7 @@ import { GradientSwatch } from "./GradientSwatch";
 import { PatternSwatch } from "./PatternSwatch";
 import { GradientStops } from "./StopBar";
 
-const KINDS: [FillKind, string][] = [
+export const KINDS: [FillKind, string][] = [
 	["solid", "Solid"],
 	["linear", "Linear"],
 	["radial", "Radial"],
@@ -139,7 +139,7 @@ export function FillSection({
 	);
 }
 
-function useBox(key: string) {
+export function useBox(key: string) {
 	const width = useEditor((s) => s.geometry.get(key)?.rect.width);
 	const height = useEditor((s) => s.geometry.get(key)?.rect.height);
 	return useMemo(
@@ -224,7 +224,7 @@ export function FillRow({
 				>
 					<GradientEditor
 						g={fill}
-						index={index}
+						name={`fill ${index + 1}`}
 						swatches={swatches}
 						onChange={(field, g) => onChange(field, g)}
 					/>
@@ -328,14 +328,15 @@ function PatternEditor({
 	);
 }
 
-function GradientEditor({
+export function GradientEditor({
 	g,
-	index,
+	name,
 	swatches,
 	onChange,
 }: {
 	g: Gradient;
-	index: number;
+	/** Names the paint in control labels, such as "fill 1". */
+	name: string;
 	swatches: string[];
 	onChange: (field: string, g: Gradient) => void;
 }) {
@@ -432,7 +433,7 @@ function GradientEditor({
 			<div className="flex h-5 items-center gap-0.5 pointer-coarse:h-8">
 				<span className="flex-1 text-fc-muted text-fc-sm">Stops</span>
 				<IconButton
-					aria-label={`Reverse fill ${index + 1} stops`}
+					aria-label={`Reverse ${name} stops`}
 					tooltip="Reverse stops"
 					className="size-5 pointer-coarse:size-8"
 					onPress={() =>
@@ -443,7 +444,7 @@ function GradientEditor({
 				</IconButton>
 				{g.kind === "linear" && (
 					<IconButton
-						aria-label={`Rotate fill ${index + 1} 90°`}
+						aria-label={`Rotate ${name} 90°`}
 						tooltip="Rotate 90°"
 						className="size-5 pointer-coarse:size-8"
 						onPress={() => onChange("rotate90", rotateQuarter(g))}
