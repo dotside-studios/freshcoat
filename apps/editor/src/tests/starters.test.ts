@@ -5,9 +5,9 @@ import {
 	checkVariants,
 	compile,
 	isElementVisible,
-	resizeTemplate,
 	setBarcodeEncoder,
 	validate,
+	variantSize,
 } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createRenderer, type Node, type Renderer } from "@freshcoat-js/engine";
@@ -90,9 +90,9 @@ describe("starters", () => {
 		for (const variantId of variantIds) {
 			test(`${s.id} renders every side of ${variantId ?? "the default"} without warnings`, async () => {
 				const t = await s.load();
+				const size = variantSize(t, variantId);
 				const out = compile(t, sampleValues(t), {
-					width: t.width,
-					height: t.height,
+					...size,
 					variantId,
 				});
 				expect(out.frames.map((f) => f.name)).toEqual(
@@ -100,10 +100,7 @@ describe("starters", () => {
 				);
 				for (const frame of out.frames) {
 					expect(frame.warnings ?? []).toEqual([]);
-					const result = await renderer.render(frame.root as Node, {
-						width: t.width,
-						height: t.height,
-					});
+					const result = await renderer.render(frame.root as Node, size);
 					expect(result.warnings).toEqual([]);
 					expect(Array.from(result.bytes.slice(0, 4))).toEqual([
 						137, 80, 78, 71,
@@ -255,16 +252,20 @@ describe("the Event badge", () => {
 });
 
 describe("the photo watermark", () => {
-	test("pins the mark to the bottom-right and follows a resize", async () => {
+	test("pins the mark to the bottom-right, with portrait and square variants", async () => {
 		const t = await load("photo-watermark");
-		expect([t.width, t.height]).toEqual([1600, 1200]);
+		expect([t.width, t.height]).toEqual([1800, 1200]);
 		const photo = byId(t, 0, "photo");
 		expect(photo).toMatchObject({
 			type: "image",
 			pos: { x: 0, y: 0 },
-			size: { width: 1600, height: 1200 },
+			size: { width: 1800, height: 1200 },
 			constraints: { horizontal: "stretch", vertical: "stretch" },
-			properties: { src: "{{photo}}", fit: "cover" },
+			properties: {
+				src: "{{photo}}",
+				fit: "cover",
+				focus: "{{photo_focus}}",
+			},
 		});
 		const mark = byId(t, 0, "watermark");
 		expect(mark.opacity).toBe(0.6);
@@ -272,15 +273,28 @@ describe("the photo watermark", () => {
 		expect(t.fields.properties.photo.format).toBe("image");
 		expect(t.fields.properties.logo.format).toBe("image");
 		expect(t.fields.required).toEqual(["photo"]);
+		expect(t.variants?.map((v) => [v.id, v.size])).toEqual([
+			["portrait", { width: 1200, height: 1800 }],
+			["square", { width: 1200, height: 1200 }],
+		]);
 
-		const tall = resizeTemplate(t, 1200, 1600);
-		const m = byId(tall, 0, "watermark");
+		const square = applyVariant(t, "square");
+		const m = byId(square, 0, "watermark");
 		expect((m.pos?.x ?? 0) + (m.size?.width ?? 0)).toBe(1200 - 48);
-		expect((m.pos?.y ?? 0) + (m.size?.height ?? 0)).toBe(1600 - 48);
-		expect(byId(tall, 0, "photo").size).toEqual({ width: 1200, height: 1600 });
-		const logo = byId(tall, 0, "logo");
-		expect((logo.pos?.x ?? 0) + (logo.size?.width ?? 0)).toBe(1200 - 48);
-		expect(logo.pos?.y ?? 0).toBeLessThan(m.pos?.y ?? 0);
+		expect((m.pos?.y ?? 0) + (m.size?.height ?? 0)).toBe(1200 - 48);
+		expect(byId(square, 0, "photo").size).toEqual({
+			width: 1200,
+			height: 1200,
+		});
+
+		const portrait = applyVariant(t, "portrait");
+		const p = byId(portrait, 0, "watermark");
+		expect(p.pos).toEqual({ x: 48, y: 1800 - 48 - 56 });
+		expect(p.size?.width).toBe(1200 - 96);
+		expect(p.type === "text" && p.properties.align).toBe("center");
+		const logo = byId(portrait, 0, "logo");
+		expect((logo.pos?.x ?? 0) * 2 + (logo.size?.width ?? 0)).toBe(1200);
+		expect(logo.pos?.y ?? 0).toBeLessThan(p.pos?.y ?? 0);
 	});
 });
 
@@ -335,12 +349,11 @@ describe("the photo watermark's mark", () => {
 		return t;
 	};
 
-	for (const [w, h] of [
-		[1600, 1200],
-		[1200, 1600],
-	] as const) {
-		test(`ends 48 units from the right edge, whole, at ${w} x ${h}`, async () => {
-			const t = resizeTemplate(await bare(), w, h);
+	for (const variant of [undefined, "square"] as const) {
+		test(`ends 48 units from the right edge, whole, in ${variant ?? "Default"}`, async () => {
+			const base = await bare();
+			const t = variant ? applyVariant(base, variant) : base;
+			const { width: w, height: h } = t;
 			const mark = byId(t, 0, "watermark");
 			const top = mark.pos?.y ?? 0;
 			const bottom = top + (mark.size?.height ?? 0);

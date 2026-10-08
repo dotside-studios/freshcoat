@@ -3,14 +3,15 @@ import { EditorController } from "~/app/controller";
 import { workspaceDirty } from "~/state/workspace";
 
 describe("the photo watermark starter", () => {
-	it("opens with a preset sized by its photo, as JPEG 90", async () => {
+	it("opens with a preset at each variant's size, as JPEG 90", async () => {
 		const c = new EditorController();
 		await c.openStarter("photo-watermark");
 		const ws = c.state.workspace;
 		expect(ws?.presets).toHaveLength(1);
+		expect(ws?.presets[0]).not.toHaveProperty("size");
 		expect(ws?.presets[0]).toMatchObject({
 			templateId: ws?.activeTemplateId,
-			size: { kind: "image", field: "photo" },
+			scale: 2,
 			format: "jpeg-zip",
 			quality: 90,
 			fileName: "{{file_name}}",

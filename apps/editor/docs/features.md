@@ -35,8 +35,10 @@ the records, and **Export** turns templates and records into files.
     position and organization, a QR of the card link on the back, the Davi
     wordmark, and cobalt, sage and plum variants;
   - **Photo watermark**: a full-bleed photo with a mark pinned to its
-    bottom-right corner, opening with a "Watermarked photos" preset that
-    sizes each output from its photo, as JPEG at 90, named after the photo;
+    bottom-right corner, in landscape, portrait and square variants that
+    each record picks by its photo's shape, with a `photo_focus` field that
+    keeps a point in view when the photo is cropped. It opens with a
+    "Watermarked photos" preset, as JPEG at 90 and 2x, named after the photo;
   - **Event badge**: a 4 × 3 in badge with a ticket barcode and Speaker and
     Staff variants, opening with a "Badges on A4" preset that prints four to
     a sheet with crop marks.
@@ -339,7 +341,11 @@ to fill cards with records.
   click, Shift, Ctrl/Cmd and Ctrl/Cmd+A. The table is one click away.
 - **Record tab:** opening a record shows each of its photos large, with its
   size, file size and format, and a form for every field with the grid's
-  editors. It steps through the shown records and sets their status.
+  editors. It steps through the shown records and sets their status. When
+  the template bound to the dataset crops a photo with Cover and its focus
+  is bound to a column, the photo shows what the record's variant keeps:
+  drag it, or use the arrow keys, to move the photo in its box, and the
+  point is written to that column.
 - **Size from the photo:** an export preset can take each item's size from a
   bound photo, capped by "Limit long edge" if set. The design is laid out at
   the photo's aspect by its constraints, with its shorter side kept, so a
@@ -479,8 +485,10 @@ reaches every variant at once.
   none, the row under Default that says what a variant is for) adds one and
   opens its name for editing. A variant's menu (right-click, the context-menu
   key or Shift+F10) renames it (also F2 or a double-click), duplicates it,
-  sets its swatch (or suggests one from the side's background), moves it up
-  or down, changes its id and deletes it. The list is a listbox: the arrow
+  sets its swatch (or suggests one from the side's background), gives it its
+  own size (**Make portrait**, **Make landscape**, **Make square**, or
+  **Use Default's size**), moves it up or down, changes its id and deletes
+  it. A variant with its own size shows it beside its change count. The list is a listbox: the arrow
   keys move between variants.
 - **Editing in a variant:** selecting a variant makes it the one you edit.
   A bar across the top of the canvas says "Editing Speaker", with how many
@@ -494,6 +502,11 @@ reaches every variant at once.
   adjustments, blend mode, constraints, auto-layout sizing, grid cells and
   visibility conditions are the same in every variant: their sections say so
   while a variant is active, and edits there change Default.
+- **Sizes:** a variant with its own size lays the design out at that size
+  by its constraints, and its changes are made at that size. The canvas,
+  rulers and the Side section's size fields follow the active variant, so
+  its size can be typed there. A card in landscape and portrait, or a post
+  in square and story, is one template.
 - **Structure is shared:** adding, deleting, duplicating, grouping,
   reordering and renaming layers and sides applies to every variant, and
   keeps each variant's changes with the layers they belong to.
@@ -514,7 +527,12 @@ reaches every variant at once.
   one shows that variant and layer, and **Remove unused changes** drops
   every orphaned change in one step.
 - **Exporting:** a binding picks the variant each record gets: Default, a
-  fixed variant, a column naming the variant id, or **All variants**. All
+  fixed variant, a column naming the variant id, **Photo shape** (the
+  variant, or Default, whose size is closest to the shape of the record's
+  photo, as seen), or **All variants**. Binding a dataset to a template
+  whose variants differ in shape picks Photo shape for its first photo
+  field. Each item exports at its variant's size; sheets need one card
+  size. All
   variants exports each record in Default and then in every variant that
   changes something, each variant's sides together, so duplex sheets pair
   them. A template with no dataset picks its variant in the Export section.
@@ -523,7 +541,8 @@ reaches every variant at once.
   share a name. The filmstrip and the preview show each item in its own
   variant.
 
-In the file, variants are coatfile 1.4 deltas. `@freshcoat-js/coatfile`'s
+In the file, variants are coatfile 1.4 deltas, and a variant's size is
+coatfile 1.6. `@freshcoat-js/coatfile`'s
 README documents them, and `checkVariants`, the lint behind the Issues
 entries.
 

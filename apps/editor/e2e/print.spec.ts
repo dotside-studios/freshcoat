@@ -317,7 +317,12 @@ test("a photo pulled into printer range says how much, in the preview and the re
 		const preset = c.state.workspace.presets[0];
 		c.dispatch({
 			type: "setPreset",
-			preset: { ...preset, format: "png-zip", print: { enabled: true } },
+			preset: {
+				...preset,
+				format: "png-zip",
+				scale: 1,
+				print: { enabled: true },
+			},
 		});
 	}, probePath("app-probe"));
 	await settle(page);

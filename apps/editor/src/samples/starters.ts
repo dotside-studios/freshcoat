@@ -38,16 +38,17 @@ export const STARTERS: Starter[] = [
 	{
 		id: "photo-watermark",
 		name: "Photo watermark",
-		description: "A mark pinned to the corner of any photo's size",
-		width: 1600,
+		description:
+			"A corner mark in landscape, portrait and square, by photo shape",
+		width: 1800,
 		height: 1200,
 		swatch: "#1f2328",
 		load: () => import("./photo-watermark").then((m) => m.photoWatermark()),
 		preset: {
 			name: "Watermarked photos",
 			fileName: "{{file_name}}",
-			size: { kind: "image", field: "photo" },
 			format: "jpeg-zip",
+			scale: 2,
 			quality: 90,
 		},
 	},
