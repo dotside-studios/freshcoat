@@ -55,9 +55,13 @@ import {
 import { compileScene } from "./compile-scene";
 import { normalizeDash } from "./dash";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { fontArrayBuffer, fontBytes } from "./font-bytes";
+import { fontBytes } from "./font-bytes";
 import { dataUrlToBytes } from "./loader";
-import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
+import {
+	createSharedFontProvider,
+	makeParagraphBuilder,
+	type SharedFontProvider,
+} from "./font-collection";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -351,8 +355,6 @@ function shaderFor(
 	);
 }
 
-// A TypefaceFontProvider registered from explicit font bytes (no global font
-// registry, no cache poisoning) — Paragraph resolves families against it.
 // The env's whole fonts map, then whatever the scene loaded from elsewhere.
 function withEnvFonts(
 	loaded: LoadedFontBytes[],
@@ -363,17 +365,6 @@ function withEnvFonts(
 		for (const bytes of faces) out.push({ family, bytes });
 	for (const f of loaded) if (!fonts.has(f.family)) out.push(f);
 	return out;
-}
-
-function makeFontProvider(
-	ck: CanvasKit,
-	fonts: LoadedFontBytes[],
-): TypefaceFontProvider {
-	const provider = ck.TypefaceFontProvider.Make();
-	for (const f of fonts) {
-		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
-	}
-	return provider;
 }
 
 const STROKE_CAP: Record<string, EnumKey<StrokeCapEnumValues>> = {
@@ -3893,10 +3884,13 @@ function warnSvgFeatures(
 // the surface is bound to rt.canvas when present (displayable) else offscreen, and
 // returned live (the env disposes). encode/dispose defer to the caller/env. With
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
+// `fontProvider` holds every face in rt.fonts; a paint whose fonts all come
+// from there uses it rather than registering its own.
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintTarget,
+	opts?: { fontProvider?: SharedFontProvider },
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -3922,11 +3916,26 @@ export async function paintScene(
 	}
 	const registered =
 		cache && rt.fonts ? withEnvFonts(loaded, rt.fonts) : loaded;
+	const sharedFonts =
+		opts?.fontProvider && loaded.every((f) => rt.fonts?.has(f.family))
+			? opts.fontProvider
+			: null;
+	let owned: SharedFontProvider | null = null;
+	if (!cache) {
+		sharedFonts?.retain();
+		owned = sharedFonts ?? createSharedFontProvider(ck, loaded);
+	}
 	const provider = cache
-		? cachedFontProvider(cache, registered, () =>
-				makeFontProvider(ck, registered),
+		? cachedFontProvider(
+				cache,
+				sharedFonts
+					? { shared: sharedFonts }
+					: {
+							key: registered,
+							build: () => createSharedFontProvider(ck, registered),
+						},
 			)
-		: makeFontProvider(ck, loaded);
+		: (owned as SharedFontProvider).provider;
 	if (cache) shapedLines.set(provider, cache);
 
 	const imageMap = new Map<string, Image | SvgPicture>();
@@ -4194,7 +4203,7 @@ export async function paintScene(
 			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
-			deleteFontProvider(provider);
+			owned?.release();
 			for (const [src, img] of imageMap)
 				if (!borrowed.has(src)) img.delete();
 		}
