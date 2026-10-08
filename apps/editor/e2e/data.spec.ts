@@ -445,6 +445,24 @@ test("renaming a column rewrites its values and the binding that reads it", asyn
 	).toEqual({ kind: "column", column: "full_name" });
 });
 
+test("a failed record shows its error and opens in Export", async ({
+	page,
+}) => {
+	await openDataFromTemplate(page);
+	await importCsv(page);
+	const id = (await records(page))[1]?.id as string;
+	await run(
+		page,
+		`c.dispatch({ type: "setRecordStatus", datasetId: c.state.workspace.datasets[0].id, ids: ["${id}"], status: "failed", errors: { "${id}": "Font missing" }, fromJob: true })`,
+	);
+	await cell(page, id, "tier").click();
+	const error = page.getByTestId("record-error");
+	await expect(error).toContainText("Font missing");
+	await error.getByRole("button", { name: "Show in Export" }).click();
+	await expect(page.getByTestId("section-export")).toBeVisible();
+	expect(await state<string>(page, "s.exportRecordId")).toBe(id);
+});
+
 /** A real JPEG of this size from the page's own encoder, with an EXIF
  *  orientation and capture time spliced in after its start marker. */
 async function makeJpeg(
