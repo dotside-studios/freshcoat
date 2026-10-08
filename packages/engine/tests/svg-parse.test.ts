@@ -341,6 +341,43 @@ describe("gradients", () => {
 			rotation: 0,
 		});
 	});
+	test("a gradient stroke keeps its gradient, first stop as its colour", () => {
+		const d = parseSvg(
+			svg(
+				'<linearGradient id="g"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><radialGradient id="r"><stop stop-color="lime"/><stop offset="1" stop-color="blue"/></radialGradient><rect x="10" y="10" width="20" height="10" fill="none" stroke="url(#g)" stroke-width="2" stroke-dasharray="3 1"/><rect width="40" height="20" fill="none" stroke="url(#r)" stroke-opacity="0.5"/>',
+			),
+		);
+		expect(d.warnings).toEqual([]);
+		const [lin, rad] = shapes(d.children);
+		expect(lin?.stroke).toEqual({
+			color: "#ff0000ff",
+			paint: {
+				kind: "linear",
+				x1: 10,
+				y1: 10,
+				x2: 30,
+				y2: 10,
+				stops: [
+					{ offset: 0, color: "#ff0000ff" },
+					{ offset: 1, color: "#0000ffff" },
+				],
+			},
+			width: 2,
+			dash: [3, 1],
+		});
+		expect(rad?.stroke).toMatchObject({
+			color: "#00ff0080",
+			paint: { kind: "radial", cx: 20, cy: 10, rx: 20, ry: 10 },
+		});
+	});
+	test("a one-stop gradient stroke is a solid colour", () => {
+		const s = only(
+			svg(
+				'<linearGradient id="g"><stop stop-color="red"/></linearGradient><path d="M0 0H5" stroke="url(#g)"/>',
+			),
+		);
+		expect(s.stroke).toEqual({ color: "#ff0000ff", width: 1 });
+	});
 	test("stop offsets are clamped and never decrease", () => {
 		const s = only(
 			svg(
