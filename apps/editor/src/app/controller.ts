@@ -190,6 +190,7 @@ export class EditorController {
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
 	private shapeHits: ShapeHits | undefined;
+	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
 
 	constructor(store: EditorStore = createEditorStore()) {
@@ -198,6 +199,19 @@ export class EditorController {
 		this.autosaveSeen = { doc, workspace };
 		this.store.subscribe(() => this.scheduleAutosave());
 		this.store.subscribe(() => this.scheduleValidation());
+		this.store.subscribe(() => this.releaseStaleShapes());
+	}
+
+	/** Frees what the controller holds outside the store. It stays usable. */
+	dispose(): void {
+		this.shapeHits?.clear();
+	}
+
+	private releaseStaleShapes(): void {
+		const opened = this.state.doc?.saved;
+		if (opened === this.shapesFor) return;
+		this.shapesFor = opened;
+		this.shapeHits?.clear();
 	}
 
 	get state(): EditorState {
