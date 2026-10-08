@@ -54,6 +54,7 @@ import {
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { normalizeDash } from "./dash";
+import { strokeTrim, trimPath } from "./trim";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontArrayBuffer, fontBytes } from "./font-bytes";
 import { dataUrlToBytes } from "./loader";
@@ -96,7 +97,12 @@ import {
 	DEFAULT_WEBP_QUALITY,
 	encodePng,
 } from "./png";
-import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
+import {
+	boxPath,
+	outlineGeometry,
+	outlineIsPath,
+	rectShape,
+} from "./outline";
 import { PATTERN_SKSL, type PatternFill } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
@@ -417,12 +423,41 @@ function drawClippedStroke(
 		outline,
 		stroke.align === "inside" ? ck.ClipOp.Intersect : ck.ClipOp.Difference,
 	);
-	drawOutline(
-		canvas,
-		outline,
-		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
-	);
+	drawStroke(ck, canvas, bin, outline, { ...stroke, width: stroke.width * 2 });
 	canvas.restore();
+}
+
+// `stroke` along `o`, cut to its trim.
+function drawStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	o: Outline,
+	stroke: Stroke,
+) {
+	const paint = strokePaint(ck, bin, stroke);
+	const trim = strokeTrim(stroke);
+	if (!trim) {
+		drawOutline(canvas, o, paint);
+		return;
+	}
+	let whole: Path;
+	if (o.kind === "path") whole = o.path;
+	else {
+		const r = o.kind === "rect" ? o.rect : o.rrect;
+		const ltrb = [r[0], r[1], r[2], r[3]] as [number, number, number, number];
+		const radii =
+			o.kind === "rrect"
+				? ([r[4], r[6], r[8], r[10]] as [number, number, number, number])
+				: undefined;
+		whole = bin.track(boxPath(ck, ltrb, radii));
+	}
+	const path = trimPath(ck, whole, trim);
+	if (!path) return;
+	bin.track(path);
+	const dx = o.kind === "path" ? o.dx : 0;
+	const dy = o.kind === "path" ? o.dy : 0;
+	drawOutline(canvas, { kind: "path", path, dx, dy }, paint);
 }
 
 type Outline =
@@ -443,11 +478,12 @@ function outlineOf(
 	w: number,
 	h: number,
 	inset = 0,
+	fromTop = false,
 ): Outline | null {
-	const g = outlineGeometry(shape, x, y, w, h, inset);
+	const g = outlineGeometry(shape, x, y, w, h, inset, fromTop);
 	if (!g) return null;
 	if (g.kind === "path") {
-		const local = outlineGeometry(shape, 0, 0, w, h, inset);
+		const local = outlineGeometry(shape, 0, 0, w, h, inset, fromTop);
 		if (local?.kind !== "path") return null;
 		const path = bin.path(ck, local.d) as Path;
 		return { kind: "path", path, dx: x, dy: y };
@@ -531,12 +567,13 @@ function drawOutlineStroke(
 	const { x, y } = pos;
 	const { width: w, height: h } = size;
 	const inset = strokeInset(stroke);
-	const o = outlineOf(ck, bin, shape, x, y, w, h, inset);
+	const fromTop = strokeTrim(stroke) !== null;
+	const o = outlineOf(ck, bin, shape, x, y, w, h, inset, fromTop);
 	if (o) {
-		drawOutline(canvas, o, strokePaint(ck, bin, stroke));
+		drawStroke(ck, canvas, bin, o, stroke);
 		return;
 	}
-	const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
+	const whole = outlineOf(ck, bin, shape, x, y, w, h, 0, fromTop) as Outline;
 	drawClippedStroke(ck, canvas, bin, whole, stroke);
 }
 
@@ -1337,10 +1374,10 @@ function drawPath(
 	}
 	if (cmd.stroke) {
 		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
-		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
-		else if (strokeInset(cmd.stroke) !== 0)
-			drawClippedStroke(ck, canvas, bin, { kind: "path", path }, cmd.stroke);
-		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
+		const o: Outline = { kind: "path", path: outline ?? path };
+		if (!outline && strokeInset(cmd.stroke) !== 0)
+			drawClippedStroke(ck, canvas, bin, o, cmd.stroke);
+		else drawStroke(ck, canvas, bin, o, cmd.stroke);
 	}
 	canvas.restore();
 }

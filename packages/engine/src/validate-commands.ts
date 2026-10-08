@@ -577,6 +577,18 @@ function validateStroke(
 			`${path}.dash`,
 			id,
 		);
+	for (const key of ["trimStart", "trimEnd", "trimOffset"] as const) {
+		const v = stroke[key];
+		if (v === undefined) continue;
+		const inRange = key === "trimOffset" || (v >= 0 && v <= 1);
+		if (!finite(v) || !inRange)
+			add(
+				"bad_trim",
+				`${key} must be finite${key === "trimOffset" ? "" : " and in [0, 1]"}, got ${v}`,
+				`${path}.${key}`,
+				id,
+			);
+	}
 }
 
 function validateCornerRadius(

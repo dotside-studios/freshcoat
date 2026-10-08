@@ -21,10 +21,11 @@ import type {
 	RectNode,
 	TextNode,
 } from "./node";
-import { rectShape } from "./outline";
+import { ellipseFromTop, rectShape } from "./outline";
 import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
 import type { TextEngine } from "./text-engine";
+import { strokeTrim } from "./trim";
 import type { MeasureText } from "./text-types";
 import type {
 	BakedTextLayout,
@@ -509,17 +510,19 @@ function ellipseSvg(size: Size): string {
 }
 
 // An inside/outside stroke on an ellipse follows the ellipse inset or outset
-// by half the stroke width.
+// by half the stroke width. A trimmed one starts at the top.
 function ellipseStroke(
 	node: EllipseNode,
 	size: Size,
 ): { strokeD?: string } {
 	const inset = node.stroke ? strokeInset(node.stroke) : 0;
-	if (inset === 0) return {};
+	const trimmed = node.stroke ? strokeTrim(node.stroke) !== null : false;
+	if (inset === 0 && !trimmed) return {};
 	const cx = size.width / 2;
 	const cy = size.height / 2;
 	const rx = Math.max(0, cx - inset);
 	const ry = Math.max(0, cy - inset);
+	if (trimmed) return { strokeD: ellipseFromTop(cx, cy, rx, ry) };
 	return {
 		strokeD: `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`,
 	};
