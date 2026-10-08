@@ -1,4 +1,9 @@
-import type { Template, ValidationError } from "@freshcoat-js/coatfile";
+import type {
+	FieldDefinition,
+	Template,
+	ValidationError,
+} from "@freshcoat-js/coatfile";
+import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
 import { getElement, keyOf, MASK_SOURCE } from "~/doc/path";
 import { ISSUE_COPY as C } from "./copy";
 
@@ -99,9 +104,11 @@ export function issueMessage(
 	const name = quoted(issue.message);
 	switch (issue.code) {
 		case "unknown_field_reference": {
-			const mustache = /\{\{\s*([^}]+?)\s*\}\}/.exec(issue.message)?.[1];
-			if (mustache) return C.unknownField(mustache);
-			return name ? C.unknownConditionField(name) : issue.message;
+			const missing = missingField(issue);
+			if (!missing) return issue.message;
+			return missing.condition
+				? C.unknownConditionField(missing.id)
+				: C.unknownField(missing.id);
 		}
 		case "duplicate_element_id":
 			return name ? C.duplicateLayer(name) : issue.message;
@@ -177,4 +184,29 @@ export function issueMessage(
 		default:
 			return issue.message;
 	}
+}
+
+/** The field an `unknown_field_reference` names, and the format a field made
+ *  for it starts with: an image source's is an image, a condition's yes / no. */
+export function missingField(issue: ValidationError): {
+	id: string;
+	condition: boolean;
+	format?: FieldDefinition["format"];
+} | null {
+	if (issue.code !== "unknown_field_reference") return null;
+	const mustache = /\{\{\s*([^}]+?)\s*\}\}/.exec(issue.message)?.[1];
+	if (mustache) {
+		const src = pathSegments(issue.path).at(-1) === "src";
+		return {
+			id: mustache,
+			condition: false,
+			format: src ? "image" : undefined,
+		};
+	}
+	const name = quoted(issue.message);
+	return name ? { id: name, condition: true, format: "boolean" } : null;
+}
+
+export function canCreateField(id: string, template: Template): boolean {
+	return FIELD_ID.test(id) && !(id in template.fields.properties);
 }
