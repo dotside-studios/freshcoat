@@ -23,6 +23,7 @@ import {
 	changeVariantId,
 	moveVariant,
 	renameVariant,
+	setVariantSize,
 	setVariantSwatch,
 	suggestSwatch,
 } from "~/doc/ops";
@@ -42,7 +43,18 @@ type Item = {
 	label: string;
 	swatch?: string;
 	changes: number;
+	size?: { width: number; height: number };
 };
+
+/** The sizes a variant's menu offers: Default's turned a quarter, and a
+ *  square on Default's shorter side. */
+export function variantSizeChoices(t: Pick<Template, "width" | "height">) {
+	const short = Math.min(t.width, t.height);
+	return {
+		turned: { width: t.height, height: t.width },
+		square: { width: short, height: short },
+	};
+}
 
 /** A label no variant has yet: "Variant 2", "Variant 3", … */
 export function nextVariantLabel(t: Template): string {
@@ -109,6 +121,7 @@ export function VariantsList({
 							label: v.label,
 							swatch: v.swatch,
 							changes: changedLayerCount(t, v.id),
+							...(v.size ? { size: v.size } : {}),
 						})),
 					]
 				: [],
@@ -163,6 +176,10 @@ export function VariantsList({
 
 	const target = byId(menuFor);
 	const index = target ? variants.indexOf(target) : -1;
+	const base = controller.base;
+	const choices = base ? variantSizeChoices(base) : undefined;
+	const resize = (id: string, size?: { width: number; height: number }) =>
+		controller.edit((t) => setVariantSize(t, id, size), { scope: "base" });
 
 	const menu = target ? (
 		<>
@@ -182,6 +199,32 @@ export function VariantsList({
 			</MenuItem>
 			<MenuItem id="swatch" onAction={() => setSwatchFor(target.id)}>
 				Swatch…
+			</MenuItem>
+			<MenuSeparator />
+			{choices && base && base.width !== base.height ? (
+				<MenuItem
+					id="size-turned"
+					onAction={() => resize(target.id, choices.turned)}
+				>
+					{base.width > base.height
+						? VARIANT_UI.sizePortrait
+						: VARIANT_UI.sizeLandscape}
+				</MenuItem>
+			) : null}
+			{choices && base && base.width !== base.height ? (
+				<MenuItem
+					id="size-square"
+					onAction={() => resize(target.id, choices.square)}
+				>
+					{VARIANT_UI.sizeSquare}
+				</MenuItem>
+			) : null}
+			<MenuItem
+				id="size-default"
+				isDisabled={!target.size}
+				onAction={() => resize(target.id, undefined)}
+			>
+				{VARIANT_UI.sizeDefault}
 			</MenuItem>
 			<MenuSeparator />
 			<MenuItem
@@ -312,7 +355,9 @@ export function VariantsList({
 								)}
 								{item.id !== DEFAULT && renaming !== item.id ? (
 									<span className="shrink-0 text-fc-faint text-fc-sm tabular-nums group-data-selected/row:text-fc-muted">
-										{VARIANT_UI.changes(item.changes)}
+										{item.size
+											? `${VARIANT_UI.size(item.size)} · ${VARIANT_UI.changes(item.changes)}`
+											: VARIANT_UI.changes(item.changes)}
 									</span>
 								) : null}
 							</ListBoxItem>

@@ -86,7 +86,8 @@ covers shared checks and pull requests.
   TSV, Excel, `.ods`, `.numbers`, JSON and NDJSON through a mapping wizard.
   Step through real records on the canvas while you design.
 - **Photos:** import hundreds of camera photos from files, zips or folders,
-  browse them in a gallery, and export each one watermarked at its own size.
+  browse them in a gallery, export each one watermarked in the variant that
+  fits its shape, and drag a cropped photo to frame it.
   Export uses a bounded queue of active renders and finished outputs.
 - **Export:** presets pick a template, records, sides, size and format (PNG,
   JPEG or WebP zips, or a PDF). A pool of workers renders in parallel, and

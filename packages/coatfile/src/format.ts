@@ -20,7 +20,7 @@ import type { Template } from "./types";
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
-//        gradient stroke `color`
+//        gradient stroke `color`; variant `size`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 6;
@@ -98,6 +98,7 @@ export function minimumFormatVersion(template: Template): string {
 	visit(template.variants);
 
 	for (const variant of template.variants ?? []) {
+		if (variant.size !== undefined) need(6);
 		for (const override of variant.overrides) {
 			for (const delta of override.elements ?? []) {
 				if (

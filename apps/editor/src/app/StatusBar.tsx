@@ -5,7 +5,7 @@ import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { getElement } from "~/doc/path";
 import { activeVariantId } from "~/doc/variant-edit";
 import { useEditor, useThrottledEditor } from "~/state/hooks";
-import type { EditorState } from "~/state/store";
+import { type EditorState, working } from "~/state/store";
 import { useController } from "./context";
 import { plural } from "./copy";
 import { IssuesPopover } from "./IssuesPopover";
@@ -20,6 +20,7 @@ export function StatusBar() {
 	const zoom = useEditor((s) => s.view.zoom);
 	const showStats = useRenderStats();
 	const frame = template?.template_data[side];
+	const size = useEditor(working);
 	const variant = useEditor((s) => {
 		const t = s.doc?.history.present;
 		const id = t ? activeVariantId(t, s.variantId) : undefined;
@@ -56,7 +57,7 @@ export function StatusBar() {
 							</span>
 						</>
 					) : null}{" "}
-					· {template.width} × {template.height}
+					· {size?.width} × {size?.height}
 				</span>
 			) : null}
 			{summary ? <span className="truncate">{summary}</span> : null}

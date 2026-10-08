@@ -99,6 +99,7 @@ const BindingSchema = z.object({
 			z.object({ kind: z.literal("fixed"), id: z.string().optional() }),
 			z.object({ kind: z.literal("column"), column: z.string() }),
 			z.object({ kind: z.literal("all") }),
+			z.object({ kind: z.literal("image"), field: z.string() }),
 		])
 		.optional(),
 });

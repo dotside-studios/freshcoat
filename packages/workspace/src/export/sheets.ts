@@ -3,6 +3,7 @@ import {
 	type Sides,
 	type Template,
 	templateBleed,
+	variantSize,
 } from "@freshcoat-js/coatfile";
 import {
 	bleedMm,
@@ -74,6 +75,10 @@ export function sheetLayout(
  *  slot is the template's size, so a photo's aspect would be stretched. */
 export const SHEETS_NEED_TEMPLATE_SIZE = "Sheets need Template size";
 
+/** Why a plan whose variants differ in size can't be laid out on sheets:
+ *  every slot is one card's size. */
+export const SHEETS_NEED_ONE_SIZE = "Sheets need one card size";
+
 /** What the job bar says for a card that doesn't fit, where the full
  *  message, with both sizes in it, would be cut off. */
 export const SHEETS_DONT_FIT = "Doesn't fit the paper";
@@ -105,7 +110,9 @@ export function shortSheetError(e: SheetLayoutError): string {
  *  preset is not on sheets. */
 export function planSheets(
 	plan: readonly ExportItem[],
-	template: Pick<Template, "width" | "height" | "bleed"> | undefined,
+	template:
+		| Pick<Template, "width" | "height" | "bleed" | "variants">
+		| undefined,
 	preset: ExportPreset,
 ): SheetPlan | null {
 	const layout = sheetLayout(preset);
@@ -115,6 +122,16 @@ export function planSheets(
 			layout,
 			error: SHEETS_NEED_TEMPLATE_SIZE,
 			shortError: SHEETS_NEED_TEMPLATE_SIZE,
+		};
+	const sized = (id?: string) => {
+		const size = variantSize(template, id);
+		return size.width === template.width && size.height === template.height;
+	};
+	if (!plan.every((item) => sized(item.variantId)))
+		return {
+			layout,
+			error: SHEETS_NEED_ONE_SIZE,
+			shortError: SHEETS_NEED_ONE_SIZE,
 		};
 	try {
 		const imposition = imposeSheets(

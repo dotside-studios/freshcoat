@@ -11,6 +11,7 @@ import {
 	type TemplateFrame,
 	type Variant,
 	type VariantElementDelta,
+	variantBase,
 } from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
 import { childEntries, walkLayers } from "./path";
@@ -339,7 +340,13 @@ export function foldVariantEdit(
 	if (isStructuralEdit(working, next)) return foldStructural(base, id, next);
 
 	const variant = base.variants?.find((v) => v.id === id) as Variant;
-	const overrides = recomputeOverrides(base, variant, working, next);
+	const overrides = recomputeOverrides(
+		base,
+		variantBase(base, id),
+		variant,
+		working,
+		next,
+	);
 	const variants = (next.variants ?? base.variants ?? []).map((v) =>
 		v.id !== id
 			? v
@@ -349,6 +356,8 @@ export function foldVariantEdit(
 	);
 	const out: Template = {
 		...next,
+		width: base.width,
+		height: base.height,
 		template_data: base.template_data,
 		variants,
 	};
@@ -376,6 +385,7 @@ function structuralProps(type: Element["type"]): readonly string[] {
 
 function recomputeOverrides(
 	base: Template,
+	laid: Template,
 	variant: Variant,
 	working: Template,
 	next: Template,
@@ -389,7 +399,8 @@ function recomputeOverrides(
 		const n = next.template_data[side] as TemplateFrame;
 		const w = working.template_data[side] as TemplateFrame;
 		if (n === w) untouched.add(frame.name);
-		else computed.set(frame.name, sideOverride(base, variant, side, w, n));
+		else
+			computed.set(frame.name, sideOverride(base, laid, variant, side, w, n));
 	});
 
 	const out: VariantOverride[] = [];
@@ -410,12 +421,13 @@ function recomputeOverrides(
 
 function sideOverride(
 	base: Template,
+	laid: Template,
 	variant: Variant,
 	side: number,
 	working: TemplateFrame,
 	next: TemplateFrame,
 ): VariantOverride | null {
-	const frame = base.template_data[side] as TemplateFrame;
+	const frame = laid.template_data[side] as TemplateFrame;
 	const deltas: VariantElementDelta[] = [];
 	const seen = new Set<string>();
 	// `w` is the layer as the working template had it: a layer the edit did
@@ -520,6 +532,7 @@ function foldStructural(
 		};
 	};
 	const template_data = next.template_data.map(restoreSide);
+	const size = { width: base.width, height: base.height };
 	const ids = new Map<string, Set<string>>();
 	template_data.forEach((f, side) => {
 		const set = new Set<string>();
@@ -542,7 +555,12 @@ function foldStructural(
 					}),
 				},
 	);
-	return { ...next, template_data, ...(variants ? { variants } : {}) };
+	return {
+		...next,
+		...size,
+		template_data,
+		...(variants ? { variants } : {}),
+	};
 }
 
 // ── Geometry for structural ops ──────────────────────────────────────────────
@@ -552,7 +570,8 @@ function foldStructural(
  * base: boxes of layers the variant moves, resizes or turns, and of
  * everything inside them, are left out, so the op reads those from the base
  * instead. Anything else the variant changes (a text's size, say) is kept, as
- * the nearest the base's geometry that is on hand.
+ * the nearest the base's geometry that is on hand. A variant drawn at its own
+ * size lays every layer out anew, so none of its boxes are kept.
  */
 export function geometryForBase(
 	base: Template,
@@ -561,6 +580,7 @@ export function geometryForBase(
 ): LayerGeometry {
 	const id = activeVariantId(base, variantId);
 	if (id === undefined) return geometry;
+	if (variantBase(base, id) !== base) return new Map();
 	const deltas = variantDeltas(base, id);
 	const moved = new Set<string>();
 	base.template_data.forEach((frame, side) => {

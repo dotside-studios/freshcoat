@@ -18,36 +18,28 @@ export const STARTERS: Starter[] = [
 	{
 		id: "davi-card",
 		name: "Davi card",
-		description: "CR80 landscape, front and back, card link QR, three colors",
+		description:
+			"CR80 landscape and portrait, front and back, card link QR, three colors",
 		width: 1012,
 		height: 638,
 		swatch: "#1d4ed8",
-		load: () => import("./davi-card").then((m) => m.daviCard("landscape")),
-		preset: CARD_PRINTER,
-	},
-	{
-		id: "davi-card-portrait",
-		name: "Davi card, portrait",
-		description: "The same card standing up",
-		width: 638,
-		height: 1012,
-		swatch: "#5b2a55",
-		load: () => import("./davi-card").then((m) => m.daviCard("portrait")),
+		load: () => import("./davi-card").then((m) => m.daviCard()),
 		preset: CARD_PRINTER,
 	},
 	{
 		id: "photo-watermark",
 		name: "Photo watermark",
-		description: "A mark pinned to the corner of any photo's size",
-		width: 1600,
+		description:
+			"A corner mark in landscape, portrait and square, by photo shape",
+		width: 1800,
 		height: 1200,
 		swatch: "#1f2328",
 		load: () => import("./photo-watermark").then((m) => m.photoWatermark()),
 		preset: {
 			name: "Watermarked photos",
 			fileName: "{{file_name}}",
-			size: { kind: "image", field: "photo" },
 			format: "jpeg-zip",
+			scale: 2,
 			quality: 90,
 		},
 	},
@@ -68,6 +60,10 @@ export const STARTERS: Starter[] = [
 	},
 ];
 
+/** Starters that became a variant of another, by their old id. */
+const MERGED: Record<string, string> = { "davi-card-portrait": "davi-card" };
+
 export function findStarter(id: string): Starter | undefined {
-	return STARTERS.find((s) => s.id === id);
+	const own = MERGED[id] ?? id;
+	return STARTERS.find((s) => s.id === own);
 }

@@ -923,3 +923,54 @@ describe("bleed", () => {
 		expect(presetBleed({ bleed: 5 }, { bleed: true }).left).toBe(5);
 	});
 });
+
+describe("a variant with its own size", () => {
+	const sized = () => {
+		const t = membershipCard();
+		return {
+			...t,
+			variants: [
+				...(t.variants ?? []),
+				{
+					id: "tall",
+					label: "Tall",
+					size: { width: 638, height: 1012 },
+					overrides: [],
+				},
+			],
+		};
+	};
+
+	it("sizes its items at the variant's size", () => {
+		const t = sized();
+		const at = (variantId?: string) =>
+			itemSize(
+				t,
+				preset({ scale: 2 }),
+				{ values: {}, ...(variantId ? { variantId } : {}) },
+				new Map(),
+			);
+		expect(at()).toEqual({ width: 2024, height: 1276, scale: 2 });
+		expect(at("tall")).toEqual({ width: 1276, height: 2024, scale: 2 });
+	});
+
+	it("pages a PDF at the variant's size", async () => {
+		const ws = workspace(1);
+		const entry = ws.templates[0] as Workspace["templates"][number];
+		entry.template = sized();
+		entry.binding = {
+			...(entry.binding as NonNullable<typeof entry.binding>),
+			variant: { kind: "fixed", id: "tall" },
+		};
+		const assemblePdf = vi.fn(
+			async (_p: PdfPage[], _o: { dpi: number; title?: string }) =>
+				new Uint8Array(),
+		);
+		await runExportJob(ws, preset({ format: "pdf" }), {
+			pool: fakePool(),
+			assemblePdf,
+		});
+		const pages = assemblePdf.mock.calls[0]?.[0] ?? [];
+		expect(pages[0]).toMatchObject({ widthPx: 638, heightPx: 1012 });
+	});
+});

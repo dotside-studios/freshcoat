@@ -38,6 +38,7 @@ import {
 import { GridUiStore, selectionIds } from "../data/grid-state";
 import { RecordsGallery } from "../data/RecordsGallery";
 import { setThumbnailBackend } from "../data/thumbnails";
+import { photoWatermark } from "../samples/photo-watermark";
 import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
@@ -383,6 +384,44 @@ describe("Data section with a photo dataset", () => {
 		cleanup();
 		setup();
 		expect(screen.getByTestId("records-grid")).toBeTruthy();
+	});
+
+	it("moves a cropped photo in its box, as the bound template frames it", async () => {
+		const d = photos();
+		d.columns.push({ key: "photo_focus", type: "text" });
+		controller = new EditorController();
+		controller.dispatch({
+			type: "open",
+			template: photoWatermark(),
+			fileName: "watermark.coat",
+		});
+		controller.dispatch({ type: "datasetEdit", datasets: [d] });
+		controller.dispatch({
+			type: "setBinding",
+			id: controller.state.workspace?.activeTemplateId ?? "",
+			binding: {
+				datasetId: d.id,
+				fields: {
+					photo: { kind: "column", column: "photo" },
+					photo_focus: { kind: "column", column: "photo_focus" },
+				},
+				variant: { kind: "image", field: "photo" },
+			},
+		});
+		render(
+			<ControllerProvider controller={controller}>
+				<DataSection />
+			</ControllerProvider>,
+		);
+		doubleClick(card("r_1"));
+		const handle = await screen.findByTestId("photo-framing");
+		expect(handle.style.width).toBe("75%");
+		expect(handle.style.left).toBe("12.5%");
+		act(() => {
+			fireEvent.keyDown(handle, { key: "ArrowRight" });
+		});
+		const record = controller.state.workspace?.datasets[0]?.records[0];
+		expect(record?.values.photo_focus).toBe("0.51,0.5");
 	});
 
 	it("opens a record in the Record tab and edits a field there", async () => {

@@ -103,12 +103,7 @@ test("the welcome screen offers the starters ahead of the samples", async ({
 	await page.goto("/");
 	const start = page.getByRole("region", { name: "Start from" });
 	await expect(start).toBeVisible();
-	for (const id of [
-		"davi-card",
-		"davi-card-portrait",
-		"photo-watermark",
-		"event-badge",
-	])
+	for (const id of ["davi-card", "photo-watermark", "event-badge"])
 		await expect(start.getByTestId(`starter-${id}`)).toBeVisible();
 	const startTop = (await start.boundingBox())?.y ?? 0;
 	const sampleTop =
@@ -195,12 +190,18 @@ test("the Davi card's QR encodes card_url, and the guides stay out of exports", 
 	expect(await exportPng(page)).toEqual([1012, 638]);
 });
 
-test("the portrait card", async ({ page }) => {
-	await openStarter(page, "davi-card-portrait");
+test("the portrait card is a variant of the Davi card", async ({ page }) => {
+	await openStarter(page, "davi-card");
+	await run(page, `c.setVariant("cobalt-portrait")`);
+	await settle(page);
 	expect(await state<number[]>(page, "[t.width, t.height]")).toEqual([
 		638, 1012,
 	]);
+	expect(await state<number[]>(page, "[c.base.width, c.base.height]")).toEqual([
+		1012, 638,
+	]);
 	await expect(page.getByTestId("print-guides")).toBeVisible();
+	expect(await exportPng(page)).toEqual([638, 1012]);
 	await shot(page, "davi-card-portrait-front");
 	await run(page, `c.dispatch({ type: "setSide", side: 1 })`);
 	await shot(page, "davi-card-portrait-back");

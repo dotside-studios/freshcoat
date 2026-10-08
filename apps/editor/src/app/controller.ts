@@ -770,7 +770,20 @@ export class EditorController {
 
 	/** Shows and edits `id`, or Default with undefined. */
 	setVariant(id: string | undefined): void {
-		this.dispatch({ type: "setVariant", variantId: id });
+		this.refitAfter(() => this.dispatch({ type: "setVariant", variantId: id }));
+	}
+
+	/** Runs `change` and fits the view when it changed the canvas's size. */
+	private refitAfter(change: () => void): void {
+		const before = this.template;
+		change();
+		const after = this.template;
+		if (
+			before &&
+			after &&
+			(before.width !== after.width || before.height !== after.height)
+		)
+			requestAnimationFrame(() => this.fitView());
 	}
 
 	/** Appends a variant (a copy of `from`'s changes, when given) as one undo
@@ -1340,12 +1353,14 @@ export class EditorController {
 		const index = dataset?.records.findIndex((r) => r.id === recordId) ?? -1;
 		const record = dataset?.records[index];
 		if (!t || !binding || !dataset || !record) return;
-		this.dispatch({
-			type: "previewRecord",
-			id: record.id,
-			values: resolveValues(t, binding, dataset, record, index),
-			variantId: variantFor(t, binding, dataset, record),
-		});
+		this.refitAfter(() =>
+			this.dispatch({
+				type: "previewRecord",
+				id: record.id,
+				values: resolveValues(t, binding, dataset, record, index),
+				variantId: variantFor(t, binding, dataset, record),
+			}),
+		);
 	}
 
 	switchTemplate(id: string): void {
@@ -1467,7 +1482,7 @@ export class EditorController {
 	}
 
 	fitView(): void {
-		const t = this.base;
+		const t = this.template;
 		const { width, height } = this.viewport;
 		if (!t || width === 0) return;
 		const zoom = Math.max(

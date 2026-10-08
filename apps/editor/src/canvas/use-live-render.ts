@@ -20,6 +20,7 @@ import {
 import { createRenderSession, displayDensity } from "~/render/session";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
+import { working } from "~/state/store";
 import { activeSlot } from "~/state/workspace";
 
 /**
@@ -35,6 +36,7 @@ export function useLiveRender(): {
 } {
 	const controller = useController();
 	const template = useEditor((s) => s.doc?.history.present ?? null);
+	const shown = useEditor(working);
 	const side = useEditor((s) => s.side);
 	const variantId = useEditor((s) => s.variantId);
 	const hiddenLayers = useEditor((s) => s.hidden);
@@ -176,8 +178,8 @@ export function useLiveRender(): {
 	const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
 	const density = template
 		? displayDensity(zoom, dpr, {
-				width: template.width,
-				height: template.height,
+				width: shown?.width ?? template.width,
+				height: shown?.height ?? template.height,
 			})
 		: 1;
 

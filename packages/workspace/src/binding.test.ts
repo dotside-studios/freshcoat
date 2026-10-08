@@ -2,6 +2,7 @@ import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	autoBinding,
+	closestVariant,
 	imagesFor,
 	isEmptyVariant,
 	resolveValues,
@@ -33,6 +34,27 @@ describe("autoBinding", () => {
 				photo: { kind: "column", column: "photo" },
 			},
 		});
+	});
+});
+
+describe("autoBinding with shaped variants", () => {
+	it("lets the variant follow the bound photo", () => {
+		const shaped: Template = {
+			...template,
+			variants: [
+				{
+					id: "tall",
+					label: "Tall",
+					size: { width: 638, height: 1012 },
+					overrides: [],
+				},
+			],
+		};
+		expect(autoBinding(shaped, dataset).variant).toEqual({
+			kind: "image",
+			field: "photo",
+		});
+		expect(autoBinding(template, dataset).variant).toBeUndefined();
 	});
 });
 
@@ -144,6 +166,75 @@ describe("variantFor", () => {
 		expect(variantFor(template, fixed("silver"), dataset, ana)).toBe("silver");
 		expect(variantFor(template, fixed("bronze"), dataset, ana)).toBeUndefined();
 		expect(variantFor(template, fixed(), dataset, ana)).toBeUndefined();
+	});
+});
+
+describe("variant from the photo's shape", () => {
+	const shaped: Template = {
+		...template,
+		variants: [
+			{ id: "gold", label: "Gold", overrides: [] },
+			{
+				id: "portrait",
+				label: "Portrait",
+				size: { width: 638, height: 1012 },
+				overrides: [],
+			},
+			{
+				id: "square",
+				label: "Square",
+				size: { width: 800, height: 800 },
+				overrides: [],
+			},
+		],
+	};
+	const byPhoto: Binding = {
+		datasetId: "d_members",
+		fields: { photo: { kind: "column", column: "photo" } },
+		variant: { kind: "image", field: "photo" },
+	};
+	const withPhoto = (width: number, height: number, orientation?: number) => {
+		const [asset] = dataset.assets;
+		if (!asset) throw new Error("no photo");
+		return {
+			...dataset,
+			assets: [
+				{
+					...asset,
+					width,
+					height,
+					...(orientation ? { orientation } : {}),
+				},
+			],
+		};
+	};
+
+	it("picks the closest aspect, Default on a tie", () => {
+		expect(closestVariant(shaped, 1.6)).toBeUndefined();
+		expect(closestVariant(shaped, 0.6)).toBe("portrait");
+		expect(closestVariant(shaped, 1.1)).toBe("square");
+	});
+
+	it("reads the bound photo as seen", () => {
+		expect(variantFor(shaped, byPhoto, withPhoto(3000, 2000), ana)).toBe(
+			undefined,
+		);
+		expect(variantFor(shaped, byPhoto, withPhoto(2000, 3000), ana)).toBe(
+			"portrait",
+		);
+		expect(variantFor(shaped, byPhoto, withPhoto(3000, 2000, 6), ana)).toBe(
+			"portrait",
+		);
+		expect(variantFor(shaped, byPhoto, withPhoto(2000, 2000), ana)).toBe(
+			"square",
+		);
+	});
+
+	it("is Default without a readable photo", () => {
+		expect(variantFor(shaped, byPhoto, withPhoto(2000, 3000), ben)).toBe(
+			undefined,
+		);
+		expect(variantFor(shaped, byPhoto, withPhoto(0, 0), ana)).toBeUndefined();
 	});
 });
 

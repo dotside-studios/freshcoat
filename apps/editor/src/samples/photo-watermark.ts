@@ -2,16 +2,17 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
 import { VEND_SANS, VEND_SANS_FAMILY } from "./vend-sans";
 
-const W = 1600;
+const W = 1800;
 const H = 1200;
 const MARGIN = 48;
 const MARK = { width: 720, height: 56 };
 const LOGO = { width: 200, height: 96 };
+const GAP = 16;
 
 /**
- * A photo with a mark in its bottom-right corner. The photo stretches with the
- * design and the mark and logo keep their offset from the bottom-right, so the
- * same template follows every photo's size and orientation.
+ * A photo with a mark in its bottom-right corner, in a landscape, portrait
+ * and square variant. Each record takes the variant closest to its photo's
+ * shape, and its photo is cropped around the point in `photo_focus`.
  */
 export function photoWatermark(): Template {
 	const markY = H - MARGIN - MARK.height;
@@ -20,8 +21,8 @@ export function photoWatermark(): Template {
 		id: "photo-watermark",
 		name: "Photo watermark",
 		description:
-			"A full-bleed photo with a text mark and an optional logo pinned to the bottom-right corner.",
-		version: "1.0.0",
+			"A full-bleed photo with a text mark and an optional logo, in landscape, portrait and square.",
+		version: "2.0.0",
 		width: W,
 		height: H,
 		fonts: [VEND_SANS],
@@ -29,6 +30,12 @@ export function photoWatermark(): Template {
 			type: "object",
 			properties: {
 				photo: { type: "string", title: "Photo", format: "image" },
+				photo_focus: {
+					type: "string",
+					title: "Photo focus",
+					description: "The point kept in view when the photo is cropped",
+					default: "",
+				},
 				watermark: {
 					type: "string",
 					title: "Watermark",
@@ -55,14 +62,18 @@ export function photoWatermark(): Template {
 						pos: { x: 0, y: 0 },
 						size: { width: W, height: H },
 						constraints: { horizontal: "stretch", vertical: "stretch" },
-						properties: { src: "{{photo}}", fit: "cover" },
+						properties: {
+							src: "{{photo}}",
+							fit: "cover",
+							focus: "{{photo_focus}}",
+						},
 					},
 					{
 						id: "logo",
 						type: "image",
 						pos: {
 							x: W - MARGIN - LOGO.width,
-							y: markY - 16 - LOGO.height,
+							y: markY - GAP - LOGO.height,
 						},
 						size: LOGO,
 						opacity: 0.6,
@@ -89,6 +100,40 @@ export function photoWatermark(): Template {
 						},
 					},
 				],
+			},
+		],
+		variants: [
+			{
+				id: "portrait",
+				label: "Portrait",
+				size: { width: H, height: W },
+				overrides: [
+					{
+						name: "photo",
+						elements: [
+							{
+								id: "watermark",
+								properties: { align: "center" },
+								pos: { x: MARGIN, y: W - MARGIN - MARK.height },
+								size: { width: H - 2 * MARGIN, height: MARK.height },
+							},
+							{
+								id: "logo",
+								properties: {},
+								pos: {
+									x: (H - LOGO.width) / 2,
+									y: W - MARGIN - MARK.height - GAP - LOGO.height,
+								},
+							},
+						],
+					},
+				],
+			},
+			{
+				id: "square",
+				label: "Square",
+				size: { width: H, height: H },
+				overrides: [],
 			},
 		],
 	};

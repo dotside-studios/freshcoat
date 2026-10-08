@@ -15,6 +15,7 @@ import {
 	type RenderOutput,
 	type RenderRequest,
 	runExportJob,
+	SHEETS_NEED_ONE_SIZE,
 	withSideIndex,
 } from "@freshcoat-js/workspace/export";
 import { assemblePdf } from "@freshcoat-js/workspace/pdf";
@@ -345,5 +346,30 @@ describe("an export on sheets with bleed", () => {
 		});
 		expect(without?.imposition?.gapMm).toBe(0);
 		expect(withBleed?.imposition?.gapMm).toBeCloseTo((72 / 300) * 25.4, 9);
+	});
+});
+
+describe("sheets and sized variants", () => {
+	it("refuses a plan whose cards differ in size", () => {
+		const t = membershipCard();
+		const template = {
+			...t,
+			variants: [
+				...(t.variants ?? []),
+				{
+					id: "tall",
+					label: "Tall",
+					size: { width: 638, height: 1012 },
+					overrides: [],
+				},
+			],
+		};
+		const preset = sheetPreset();
+		const plan = planExport(workspace(1), preset);
+		expect(planSheets(plan, template, preset)?.error).toBeUndefined();
+		const tall = plan.map((item) => ({ ...item, variantId: "tall" }));
+		expect(planSheets(tall, template, preset)?.error).toBe(
+			SHEETS_NEED_ONE_SIZE,
+		);
 	});
 });

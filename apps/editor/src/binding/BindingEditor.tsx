@@ -16,6 +16,7 @@ import { EMPTY, VARIANT_EXPORT } from "~/app/copy";
 import { useEditor } from "~/state/hooks";
 import WarningIcon from "~icons/mingcute/warning-line";
 import {
+	imageFields,
 	readsDataset,
 	rebindDataset,
 	SOURCE_KINDS,
@@ -355,7 +356,13 @@ function ColumnSelect({
 	);
 }
 
-const VARIANT_KINDS: VariantKind[] = ["none", "fixed", "column", "all"];
+const VARIANT_KINDS: VariantKind[] = [
+	"none",
+	"fixed",
+	"column",
+	"image",
+	"all",
+];
 
 function VariantRow({
 	template,
@@ -370,10 +377,13 @@ function VariantRow({
 }) {
 	const variants = template.variants ?? [];
 	const kind: VariantKind = source?.kind ?? "none";
-	// Without a dataset there is no column to read a variant from.
+	const photos = imageFields(template);
+	// Without a dataset there is no column or photo to read a variant from.
 	const kinds = dataset
 		? VARIANT_KINDS
-		: VARIANT_KINDS.filter((k) => k !== "column" || kind === "column");
+		: VARIANT_KINDS.filter(
+				(k) => (k !== "column" && k !== "image") || kind === k,
+			);
 	const exported = variants.filter((v) => !isEmptyVariant(v)).length;
 	return (
 		<div className="flex flex-col gap-1" data-testid="binding-variant">
@@ -400,7 +410,9 @@ function VariantRow({
 							id={k}
 							textValue={VARIANT_EXPORT.kinds[k]}
 							isDisabled={
-								(k === "fixed" || k === "all") && variants.length === 0
+								((k === "fixed" || k === "all" || k === "image") &&
+									variants.length === 0) ||
+								(k === "image" && photos.length === 0)
 							}
 						>
 							{VARIANT_EXPORT.kinds[k]}
@@ -427,6 +439,21 @@ function VariantRow({
 							{variants.map((v) => (
 								<SelectItem key={v.id} id={v.id} textValue={v.label}>
 									{v.label}
+								</SelectItem>
+							))}
+						</Select>
+					) : source?.kind === "image" ? (
+						<Select
+							aria-label="Variant photo"
+							value={source.field || null}
+							placeholder={VARIANT_EXPORT.noPhoto}
+							onChange={(key) =>
+								onChange({ kind: "image", field: String(key) })
+							}
+						>
+							{photos.map((f) => (
+								<SelectItem key={f.key} id={f.key} textValue={f.title}>
+									{f.title}
 								</SelectItem>
 							))}
 						</Select>

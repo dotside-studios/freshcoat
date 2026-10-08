@@ -1,5 +1,5 @@
 import { useEditor } from "~/state/hooks";
-import { present, type View } from "~/state/store";
+import { type View, working } from "~/state/store";
 import {
 	type PrintGuideSet,
 	printGuidesFor,
@@ -16,7 +16,7 @@ import {
 export function PrintGuides({ view }: { view: View }) {
 	usePrintGuidesVersion();
 	const key = useEditor((s) => {
-		const t = present(s);
+		const t = working(s);
 		if (!t || !printGuidesOn(s.workspace?.activeTemplateId, t)) return null;
 		return JSON.stringify([t.width, t.height, printGuidesFor(t)]);
 	});
