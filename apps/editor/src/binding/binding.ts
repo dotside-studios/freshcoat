@@ -131,6 +131,13 @@ export function withVariantSource(
 	return source ? { ...rest, variant: source } : rest;
 }
 
+/** The template's photo fields: those with `format: "image"`. */
+export function imageFields(template: Template): TemplateField[] {
+	return templateFields(template).filter(
+		(f) => template.fields.properties[f.key]?.format === "image",
+	);
+}
+
 export function variantSourceOfKind(
 	kind: VariantKind,
 	template: Template,
@@ -140,6 +147,8 @@ export function variantSourceOfKind(
 	if (kind === "none") return undefined;
 	if (previous?.kind === kind) return previous;
 	if (kind === "all") return { kind: "all" };
+	if (kind === "image")
+		return { kind: "image", field: imageFields(template)[0]?.key ?? "" };
 	if (kind === "fixed")
 		return { kind: "fixed", id: template.variants?.[0]?.id };
 	const columns = dataset?.columns ?? [];

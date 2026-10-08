@@ -110,6 +110,28 @@ describe("binding helpers", () => {
 		);
 	});
 
+	test("Photo shape reads the template's first photo field", () => {
+		const t = withVariants();
+		const photo = {
+			...t,
+			fields: {
+				...t.fields,
+				properties: {
+					...t.fields.properties,
+					photo: { type: "string" as const, format: "image" as const },
+				},
+			},
+		};
+		expect(variantSourceOfKind("image", photo, dataset())).toEqual({
+			kind: "image",
+			field: "photo",
+		});
+		expect(variantSourceOfKind("image", t, dataset())).toEqual({
+			kind: "image",
+			field: "",
+		});
+	});
+
 	test("All variants is its own source, not a column", () => {
 		expect(variantSourceOfKind("all", withVariants(), dataset())).toEqual({
 			kind: "all",

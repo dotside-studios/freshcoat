@@ -210,6 +210,8 @@ export {
 	checkVariants,
 	type VariantElementDelta,
 	type VariantIssue,
+	variantBase,
+	variantSize,
 } from "./variants";
 export {
 	fieldIsSet,

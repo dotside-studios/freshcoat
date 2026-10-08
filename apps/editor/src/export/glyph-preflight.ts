@@ -1,4 +1,4 @@
-import { compile, type Template } from "@freshcoat-js/coatfile";
+import { compile, type Template, variantSize } from "@freshcoat-js/coatfile";
 import { findMissingGlyphs } from "@freshcoat-js/coatfile/render";
 import type { Renderer } from "@freshcoat-js/engine";
 import type { ExportItem } from "@freshcoat-js/workspace";
@@ -27,8 +27,7 @@ export function checkGlyphs(
 			? item.variantId
 			: undefined;
 	const compiled = compile(template, item.values, {
-		width: template.width,
-		height: template.height,
+		...variantSize(template, variantId),
 		...(variantId ? { variantId } : {}),
 		frameNames: [item.side],
 	});

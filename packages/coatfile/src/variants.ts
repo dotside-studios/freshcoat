@@ -1,4 +1,5 @@
-import type { Element, Template, TemplateFrame, Variant } from "./types";
+import { resizeFrames } from "./relayout";
+import type { Element, Size, Template, TemplateFrame, Variant } from "./types";
 
 /** One element delta in a variant override. */
 export type VariantElementDelta = NonNullable<
@@ -15,11 +16,36 @@ export type ApplyVariantOptions = {
 	hidden?: "drop" | "keep";
 };
 
+/** The size a variant is drawn at: its own `size`, else the template's. An
+ *  absent or unknown id is the template's size. */
+export function variantSize(
+	t: Pick<Template, "width" | "height" | "variants">,
+	variantId?: string,
+): Size {
+	const size =
+		variantId === undefined
+			? undefined
+			: t.variants?.find((v) => v.id === variantId)?.size;
+	return size
+		? { width: size.width, height: size.height }
+		: { width: t.width, height: t.height };
+}
+
+/** The base design as a variant starts from: laid out by its constraints at
+ *  the variant's `size`, or the template itself when it has none. */
+export function variantBase(t: Template, variantId: string): Template {
+	const size = t.variants?.find((v) => v.id === variantId)?.size;
+	if (!size || (size.width === t.width && size.height === t.height)) return t;
+	return resizeFrames(t, size.width, size.height);
+}
+
 // Returns `t` with one variant's overrides applied: each override replaces the
 // background of the first frame with its name and applies its element deltas by
 // id. Overrides naming no frame are skipped, and several naming the same frame
-// apply in order. The input is not mutated; frames and elements an override
-// does not reach are shared with it. `variants` is kept.
+// apply in order. A variant with a `size` starts from the base laid out at that
+// size (`variantBase`), and its deltas are in that size's units. The input is
+// not mutated; frames and elements an override does not reach are shared with
+// it. `variants` is kept.
 export function applyVariant(
 	t: Template,
 	variantId: string,
@@ -28,8 +54,9 @@ export function applyVariant(
 	const variant = t.variants?.find((v) => v.id === variantId);
 	if (!variant) throw new Error(`unknown_variant: ${variantId}`);
 	const dropHidden = (opts.hidden ?? "drop") === "drop";
+	const base = variantBase(t, variantId);
 
-	const frames = [...t.template_data];
+	const frames = [...base.template_data];
 	for (const ov of variant.overrides) {
 		const target = frames.find((f) => f.name === ov.name);
 		if (!target) continue;
@@ -43,7 +70,7 @@ export function applyVariant(
 		}
 		frames[frames.indexOf(target)] = next;
 	}
-	return { ...t, template_data: frames };
+	return { ...base, template_data: frames };
 }
 
 // Applies element deltas by id, recursing into frame children and a mask's

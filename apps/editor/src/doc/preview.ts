@@ -71,7 +71,7 @@ function build(
 			...v,
 			overrides: v.overrides.filter((ov) => ov.name === frame.name),
 		}))
-		.filter((v) => v.overrides.length > 0);
+		.filter((v) => v.overrides.length > 0 || v.size !== undefined);
 	const { assets, variants: _v, ...rest } = t;
 	let one: Template = {
 		...rest,

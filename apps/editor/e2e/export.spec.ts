@@ -323,6 +323,7 @@ test("photos: filmstrip thumbnails, and Source and Split against the output", as
 				binding: {
 					datasetId: dataset.id,
 					fields: { photo: { kind: "column", column: "photo" } },
+					variant: { kind: "image", field: "photo" },
 				},
 			});
 		},
@@ -350,8 +351,9 @@ test("photos: filmstrip thumbnails, and Source and Split against the output", as
 	await expect(preview).toHaveAttribute("data-state", "ready", {
 		timeout: 30_000,
 	});
+	// The portrait variant, closest to the photo's shape, at 2x.
 	await expect(page.getByTestId("export-preview-size")).toHaveText(
-		"900 × 1200",
+		"2400 × 3600",
 	);
 
 	await page.getByRole("radio", { name: "Source" }).click();

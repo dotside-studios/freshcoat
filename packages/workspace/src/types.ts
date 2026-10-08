@@ -85,11 +85,14 @@ export type FieldSource =
 
 /** Which variant a record renders in. `fixed` without an id, or naming a
  *  variant the template lacks, is Default. `all` renders each record in
- *  Default and then every variant that changes something. */
+ *  Default and then every variant that changes something. `image` picks,
+ *  from Default and every variant, the one whose size is closest in aspect
+ *  to the photo in `field`, as seen. */
 export type VariantSource =
 	| { kind: "fixed"; id?: string }
 	| { kind: "column"; column: string }
-	| { kind: "all" };
+	| { kind: "all" }
+	| { kind: "image"; field: string };
 
 export type Binding = {
 	datasetId: string;

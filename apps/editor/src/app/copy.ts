@@ -77,6 +77,12 @@ export const VARIANT_UI = {
 	changed: (layers: number) =>
 		layers === 0 ? "No changes" : `${plural(layers, "layer")} changed`,
 	backToDefault: "Back to Default",
+	size: (size: { width: number; height: number }) =>
+		`${size.width} × ${size.height}`,
+	sizePortrait: "Make portrait",
+	sizeLandscape: "Make landscape",
+	sizeSquare: "Make square",
+	sizeDefault: "Use Default's size",
 	changedIn: (label: string) => `Changed in ${label}`,
 	resetToDefault: "Reset to Default",
 	hideIn: (label: string) => `Hide in ${label}`,
@@ -136,6 +142,7 @@ export const TEMPLATE_SETUP = {
 	naming: "Name this template",
 	unnamed: (fileName: string) => `${fileName} has no name yet`,
 	sharedSize: "Every side shares this size",
+	variantSize: "This variant's own size, shared by every side",
 } as const;
 
 /** Bleed and safe area, in the template's size settings. */
@@ -157,8 +164,10 @@ export const VARIANT_EXPORT = {
 		none: "Default",
 		fixed: "Fixed",
 		column: "Column",
+		image: "Photo shape",
 		all: "All variants",
 	},
+	noPhoto: "Choose a photo",
 	default: "Default",
 	defaultHint: "The template's default look",
 	noVariants: "No variants",

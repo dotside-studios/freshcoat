@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { type Template, variantSize } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import type { DatasetAsset, ExportPreset } from "@freshcoat-js/workspace";
@@ -179,17 +179,12 @@ export function ExportItemPreview({
 		};
 	}, [ck]);
 
+	const shown = variantSize(template, item.variantId);
 	const fit = box
-		? Math.min(box.width / template.width, box.height / template.height)
+		? Math.min(box.width / shown.width, box.height / shown.height)
 		: 0;
 	const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-	const density =
-		fit > 0
-			? displayDensity(fit, dpr, {
-					width: template.width,
-					height: template.height,
-				})
-			: 0;
+	const density = fit > 0 ? displayDensity(fit, dpr, shown) : 0;
 
 	const sideIndex = template.template_data.findIndex(
 		(f) => f.name === item.side,
@@ -251,8 +246,8 @@ export function ExportItemPreview({
 		: error
 			? { text: error, tone: "danger" }
 			: null;
-	const width = Math.floor(template.width * fit);
-	const height = Math.floor(template.height * fit);
+	const width = Math.floor(shown.width * fit);
+	const height = Math.floor(shown.height * fit);
 	const dragSplit = (e: ReactPointerEvent<HTMLElement>) => {
 		const host = hostRef.current;
 		if (!host || !onSplitChange) return;

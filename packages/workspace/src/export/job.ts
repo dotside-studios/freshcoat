@@ -1,3 +1,4 @@
+import { variantSize } from "@freshcoat-js/coatfile";
 import { assetRef } from "../assets";
 import { slug, templateStem } from "../ids";
 import {
@@ -334,7 +335,9 @@ export function runExportJob(
 	const sheet = pdf ? sheetLayout(preset) : null;
 	const cardMm = cardSizeMm(template.width, template.height, preset.dpi);
 	const pageBleedMm = pdf ? presetBleedMm(template, preset) : undefined;
-	const page = withBleed(template, presetBleed(template, preset));
+	const pageBleed = presetBleed(template, preset);
+	const pageOf = (item: ExportItem) =>
+		withBleed(variantSize(template, item.variantId), pageBleed);
 	const sideIndex = withSideIndex(plan).map((item) => item.sideIndex);
 	if (sheet) {
 		// Refused before anything renders, rather than after every page has.
@@ -471,9 +474,14 @@ export function runExportJob(
 							collector.add({
 								bytes: out.bytes,
 								format: out.format === "jpeg" ? "jpeg" : "png",
-								widthPx: size?.resize !== undefined ? size.width : page.width,
+								widthPx:
+									size?.resize !== undefined
+										? size.width
+										: pageOf(plan[index]).width,
 								heightPx:
-									size?.resize !== undefined ? size.height : page.height,
+									size?.resize !== undefined
+										? size.height
+										: pageOf(plan[index]).height,
 								...(sheet
 									? {
 											recordId: plan[index].recordId,

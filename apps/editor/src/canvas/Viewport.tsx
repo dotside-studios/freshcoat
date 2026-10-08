@@ -33,7 +33,7 @@ import { duplicateElements } from "~/doc/ops";
 import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { constrain45, type PenPath, smoothPoint } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
-import type { Tool } from "~/state/store";
+import { type Tool, working } from "~/state/store";
 import { createDraftStore } from "./draft-store";
 import { Guides } from "./Guides";
 import { parseGradientHandle } from "./gradient-geometry";
@@ -136,7 +136,7 @@ export function Viewport() {
 	const controller = useController();
 	const ref = useRef<HTMLDivElement>(null);
 	const artboardRef = useRef<HTMLDivElement>(null);
-	const template = useEditor((s) => s.doc?.history.present ?? null);
+	const template = useEditor(working);
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
 	const side = useEditor((s) => s.side);

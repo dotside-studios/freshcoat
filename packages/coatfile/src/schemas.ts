@@ -706,6 +706,8 @@ export const VariantSchema = z.object({
 	id: z.string(),
 	label: z.string(),
 	swatch: z.string().optional(),
+	// Drawn at this size, with the base laid out to it by its constraints.
+	size: SizeSchema.optional(),
 	overrides: z.array(
 		z.object({
 			name: z.string(),
@@ -815,6 +817,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceBackgroundFrameFill(tpl, ctx);
 	enforceElementIdUniqueness(tpl, ctx);
 	enforceVariantIdUniqueness(tpl, ctx);
+	enforceVariantSizes(tpl, ctx);
 	enforceVariantOverrideFrameResolution(tpl, ctx);
 	enforceMustacheReferences(tpl, ctx);
 	enforceVisibilityReferences(tpl, ctx);
@@ -889,6 +892,22 @@ function enforceDimensions(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 			"height",
 		]);
 	}
+}
+
+function enforceVariantSizes(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	tpl.variants?.forEach((v, vi) => {
+		if (!v.size) return;
+		for (const key of ["width", "height"] as const) {
+			const n = v.size[key];
+			if (Number.isInteger(n) && n > 0) continue;
+			addKitIssue(
+				ctx,
+				"invalid_dimension",
+				`variant size ${key} must be a positive integer`,
+				["variants", vi, "size", key],
+			);
+		}
+	});
 }
 
 function enforceInsets(tpl: ParsedTemplate, ctx: z.RefinementCtx) {

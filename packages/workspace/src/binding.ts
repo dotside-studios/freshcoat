@@ -1,6 +1,11 @@
-import type { Template, Variant } from "@freshcoat-js/coatfile";
+import {
+	type Template,
+	type Variant,
+	variantSize,
+} from "@freshcoat-js/coatfile";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
+import { orientedSize } from "./image-info";
 import type {
 	Binding,
 	Column,
@@ -30,7 +35,9 @@ function columnOf(
 }
 
 /** Each template field bound to the column with the same key, exactly or
- *  ignoring case. Fields with no such column are left to their default. */
+ *  ignoring case. Fields with no such column are left to their default. When
+ *  the template's variants differ in shape, the variant follows the first
+ *  bound photo field. */
 export function autoBinding(template: Template, dataset: Dataset): Binding {
 	const fields: Record<string, FieldSource> = {};
 	for (const key of Object.keys(template.fields.properties)) {
@@ -39,7 +46,26 @@ export function autoBinding(template: Template, dataset: Dataset): Binding {
 			dataset.columns.find((c) => c.key.toLowerCase() === key.toLowerCase());
 		if (column) fields[key] = { kind: "column", column: column.key };
 	}
-	return { datasetId: dataset.id, fields };
+	const photo = Object.entries(template.fields.properties).find(
+		([key, field]) => field.format === "image" && fields[key] !== undefined,
+	)?.[0];
+	return {
+		datasetId: dataset.id,
+		fields,
+		...(photo !== undefined && hasShapedVariants(template)
+			? { variant: { kind: "image" as const, field: photo } }
+			: {}),
+	};
+}
+
+/** Whether a variant's size differs in aspect from the template's. */
+export function hasShapedVariants(template: Template): boolean {
+	const aspect = template.width / template.height;
+	return (template.variants ?? []).some(
+		(v) =>
+			v.size !== undefined &&
+			Math.abs(v.size.width / v.size.height - aspect) > 1e-6,
+	);
 }
 
 export function serialValue(
@@ -102,6 +128,25 @@ export function variantFor(
 	if (source.kind === "fixed") {
 		return variants.some((v) => v.id === source.id) ? source.id : undefined;
 	}
+	if (source.kind === "image") {
+		const values = resolveValues(
+			template,
+			binding,
+			dataset,
+			record,
+			0,
+			columns,
+		);
+		const ref = values[source.field] ?? "";
+		const asset = dataset?.assets.find((a) => assetRef(a.sha256) === ref);
+		if (!asset?.width || !asset.height) return undefined;
+		const seen = orientedSize({
+			width: asset.width,
+			height: asset.height,
+			orientation: asset.orientation,
+		});
+		return closestVariant(template, seen.width / seen.height);
+	}
 	const column = columnOf(dataset, source.column, columns);
 	const cell = record?.values[source.column] ?? null;
 	if (column === undefined || isEmptyValue(cell)) return undefined;
@@ -110,6 +155,28 @@ export function variantFor(
 		variants.find((v) => v.id.toLowerCase() === wanted) ??
 		variants.find((v) => v.label.trim().toLowerCase() === wanted)
 	)?.id;
+}
+
+/** The variant, or undefined for Default, whose size is closest to
+ *  `aspect`. Default wins a tie, then the first in list order. */
+export function closestVariant(
+	template: Template,
+	aspect: number,
+): string | undefined {
+	const distance = (id?: string) => {
+		const size = variantSize(template, id);
+		return Math.abs(Math.log(size.width / size.height / aspect));
+	};
+	let best: string | undefined;
+	let bestDistance = distance(undefined);
+	for (const v of template.variants ?? []) {
+		const d = distance(v.id);
+		if (d < bestDistance - 1e-9) {
+			best = v.id;
+			bestDistance = d;
+		}
+	}
+	return best;
 }
 
 /**

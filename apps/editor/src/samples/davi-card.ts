@@ -1,9 +1,15 @@
-import type { Element, FontDescriptor, Template } from "@freshcoat-js/coatfile";
-import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import type {
+	Element,
+	FontDescriptor,
+	Template,
+	Variant,
+	VariantElementDelta,
+} from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION, resizeTemplate } from "@freshcoat-js/coatfile";
 import { daviWordmark } from "./davi-wordmark";
 
 // The Davi card as Davi's production card templates draw it (the Vista design
-// for the landscape card, Editorial and Monolith for the portrait rhythm):
+// for the landscape card, Editorial and Monolith for the portrait variants):
 // Playfair Display for the name, Roboto for everything else, a solid variant
 // colour, and a 64 px margin.
 
@@ -394,20 +400,68 @@ function portrait(w: number, h: number): Template["template_data"] {
 	];
 }
 
-/** The Davi card, landscape (1012 x 638) or portrait (638 x 1012). */
-export function daviCard(orientation: "landscape" | "portrait"): Template {
-	const wide = orientation === "landscape";
-	const [width, height] = wide ? [1012, 638] : [638, 1012];
-	return {
+const WIDE = { width: 1012, height: 638 };
+const TALL = { width: 638, height: 1012 };
+
+function byId(elements: Element[], out = new Map<string, Element>()) {
+	for (const el of elements) {
+		out.set(el.id, el);
+		if (el.type === "frame") byId(el.properties.children, out);
+		if (el.type === "mask")
+			byId([el.properties.mask, ...el.properties.children], out);
+	}
+	return out;
+}
+
+const same = (a: unknown, b: unknown) =>
+	JSON.stringify(a) === JSON.stringify(b);
+
+/** What turns the landscape card, laid out at portrait size, into the
+ *  portrait design: each layer's own box and the properties it sets apart. */
+function portraitDeltas(base: Template): Map<string, VariantElementDelta[]> {
+	const laid = resizeTemplate(base, TALL.width, TALL.height);
+	const want = portrait(TALL.width, TALL.height);
+	const out = new Map<string, VariantElementDelta[]>();
+	for (const frame of want) {
+		const from = byId(
+			laid.template_data.find((f) => f.name === frame.name)?.elements ?? [],
+		);
+		const deltas: VariantElementDelta[] = [];
+		for (const el of byId(frame.elements).values()) {
+			const was = from.get(el.id);
+			if (!was) throw new Error(`portrait layer ${el.id} is not on the card`);
+			const own = el.properties as Record<string, unknown>;
+			const old = was.properties as Record<string, unknown>;
+			const properties: Record<string, unknown> = {};
+			for (const k of Object.keys(own))
+				if (k !== "children" && k !== "mask" && !same(own[k], old[k]))
+					properties[k] = own[k];
+			const d: VariantElementDelta = {
+				id: el.id,
+				properties,
+				...(same(el.pos, was.pos) ? {} : { pos: el.pos }),
+				...(same(el.size, was.size) ? {} : { size: el.size }),
+			};
+			if (d.pos || d.size || Object.keys(properties).length > 0) deltas.push(d);
+		}
+		out.set(frame.name, deltas);
+	}
+	return out;
+}
+
+/** The Davi card, landscape at 1012 x 638, with each colour in landscape and
+ *  in portrait at 638 x 1012. */
+export function daviCard(): Template {
+	const base: Template = {
 		format_version: FORMAT_VERSION,
-		id: wide ? "davi-card" : "davi-card-portrait",
-		name: wide ? "Davi card" : "Davi card, portrait",
+		id: "davi-card",
+		name: "Davi card",
 		description:
 			"A CR80 Davi card: the holder's name and role on the front, and a QR of their card link on the back.",
-		version: "1.0.0",
+		version: "2.0.0",
 		product: "card_cr80",
-		width,
-		height,
+		width: WIDE.width,
+		height: WIDE.height,
 		fonts: FONTS,
 		fields: {
 			type: "object",
@@ -441,15 +495,28 @@ export function daviCard(orientation: "landscape" | "portrait"): Template {
 			},
 			required: ["name"],
 		},
-		template_data: wide ? landscape(width, height) : portrait(width, height),
-		variants: VARIANTS.map((v) => ({
-			id: v.id,
-			label: v.label,
-			swatch: v.color,
-			overrides: [
-				{ name: "front", background: background("front_bg", v.color) },
-				{ name: "back", background: background("back_bg", v.color) },
-			],
+		template_data: landscape(WIDE.width, WIDE.height),
+	};
+	const tall = portraitDeltas(base);
+	const colour = (
+		v: (typeof VARIANTS)[number],
+		portrait: boolean,
+	): Variant => ({
+		id: portrait ? `${v.id}-portrait` : v.id,
+		label: portrait ? `${v.label}, portrait` : v.label,
+		swatch: v.color,
+		...(portrait ? { size: TALL } : {}),
+		overrides: (["front", "back"] as const).map((side) => ({
+			name: side,
+			background: background(`${side}_bg`, v.color),
+			...(portrait ? { elements: tall.get(side) ?? [] } : {}),
 		})),
+	});
+	return {
+		...base,
+		variants: [
+			...VARIANTS.map((v) => colour(v, false)),
+			...VARIANTS.map((v) => colour(v, true)),
+		],
 	};
 }
