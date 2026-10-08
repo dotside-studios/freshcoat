@@ -93,6 +93,11 @@ describe("shortcut matching", () => {
 		).toBe("edit.redo");
 	});
 
+	test("paste in place has its own chord", () => {
+		const e = key({ key: "V", code: "KeyV", metaKey: true, shiftKey: true });
+		expect(findCommand(e, true, false)?.id).toBe("edit.pasteInPlace");
+	});
+
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
 		for (const c of COMMANDS)

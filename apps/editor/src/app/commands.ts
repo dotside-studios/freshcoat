@@ -255,6 +255,14 @@ export const COMMANDS: Command[] = [
 		run: ({ controller }) => controller.paste(),
 	},
 	{
+		id: "edit.pasteInPlace",
+		label: "Paste in place",
+		keys: ["Mod+Shift+V"],
+		group: "Edit",
+		enabled: hasDoc,
+		run: ({ controller }) => controller.paste({ inPlace: true }),
+	},
+	{
 		id: "edit.duplicate",
 		label: "Duplicate",
 		keys: ["Mod+D"],

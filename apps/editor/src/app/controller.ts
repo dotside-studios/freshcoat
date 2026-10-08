@@ -23,6 +23,8 @@ import {
 	type AlignMode,
 	align,
 	type LayerGeometry,
+	parentOrigin,
+	type Rect,
 	rectOf,
 	translateLayers,
 	unionRects,
@@ -889,10 +891,18 @@ export class EditorController {
 		const t = this.template;
 		const keys = this.selectedLayers();
 		if (!t || keys.length === 0) return;
-		const elements = keys
-			.map((k) => getElement(t, k))
-			.filter((e): e is Element => !!e && "type" in e);
-		await writeClipboard(t, elements);
+		const geometry = this.state.geometry;
+		const picked = keys.flatMap((k) => {
+			const el = getElement(t, k);
+			return el && "type" in el
+				? [{ el, origin: parentOrigin(t, k, geometry) }]
+				: [];
+		});
+		await writeClipboard(
+			t,
+			picked.map((p) => p.el),
+			picked.map((p) => p.origin),
+		);
 	}
 
 	async cut(): Promise<void> {
@@ -900,13 +910,18 @@ export class EditorController {
 		this.deleteSelection();
 	}
 
-	async paste(): Promise<void> {
+	/**
+	 * Pastes beside the first selected layer, or on top inside the selected
+	 * frame when it is the only one selected and not itself on the clipboard.
+	 * `inPlace` keeps the copied layers where they were on the artboard.
+	 */
+	async paste(opts: { inPlace?: boolean } = {}): Promise<void> {
 		const t = this.base;
 		if (!t) return;
 		let clip = await readClipboard();
 		if (!clip) return;
 		if (clip.kind === "svg") {
-			const svg = await this.loadSvgImport(() => this.paste());
+			const svg = await this.loadSvgImport(() => this.paste(opts));
 			const markup = svg?.svgMarkup(clip.svg) ?? null;
 			const answer = !markup
 				? "text"
@@ -946,23 +961,62 @@ export class EditorController {
 							: el,
 					)
 				: clip.elements;
-		const anchor = this.selectedLayers()[0];
-		const parent = anchor ? parentKeyOf(anchor) : null;
+		const layers = this.selectedLayers();
+		const anchor = layers[0];
+		const only =
+			layers.length === 1 ? getElement(base, anchor as string) : null;
+		const into =
+			only?.type === "frame" && !elements.some((el) => el.id === only.id)
+				? only
+				: null;
+		const parent = into
+			? (anchor as string)
+			: anchor
+				? parentKeyOf(anchor)
+				: null;
 		const ref: ParentRef = parent ?? { side: this.state.side };
-		const index = anchor
-			? ((parseKey(anchor) as { path: number[] }).path.at(-1) ?? 0) + 1
-			: (base.template_data[this.state.side]?.elements.length ?? 0);
+		const index = into
+			? into.properties.children.length
+			: anchor
+				? ((parseKey(anchor) as { path: number[] }).path.at(-1) ?? 0) + 1
+				: (base.template_data[this.state.side]?.elements.length ?? 0);
+		const geometry = this.baseGeometry();
+		const parentRect = parent ? rectOf(base, parent, geometry) : undefined;
+		const to = { x: parentRect?.x ?? 0, y: parentRect?.y ?? 0 };
+		const origins = clip.kind === "layers" ? clip.origins : [{ x: 0, y: 0 }];
+		const boxes = elements.map((el, i): Rect | null => {
+			if (!el.pos) return null;
+			const from = origins?.[i] ?? to;
+			return {
+				x: from.x + el.pos.x,
+				y: from.y + el.pos.y,
+				width: el.size?.width ?? 0,
+				height: el.size?.height ?? 0,
+				rotation: 0,
+			};
+		});
+		let shift = { x: 0, y: 0 };
+		const placedBoxes = boxes.filter((b): b is Rect => b !== null);
+		if (!opts.inPlace && into && parentRect && placedBoxes.length) {
+			const all = unionRects(placedBoxes);
+			if (!overlaps(all, parentRect))
+				shift = {
+					x: parentRect.x + parentRect.width / 2 - (all.x + all.width / 2),
+					y: parentRect.y + parentRect.height / 2 - (all.y + all.height / 2),
+				};
+		}
 		const occupied = new Set(
 			[...this.state.geometry.values()].map((b) => boxKey(b.rect)),
 		);
-		const placed = elements.map((el) =>
-			el.pos &&
-			occupied.has(
-				boxKey({ ...el.pos, ...(el.size ?? { width: 0, height: 0 }) }),
-			)
-				? { ...el, pos: { x: el.pos.x + 10, y: el.pos.y + 10 } }
-				: el,
-		);
+		const placed = elements.map((el, i) => {
+			const box = boxes[i];
+			if (!box) return el;
+			const x = box.x + shift.x;
+			const y = box.y + shift.y;
+			const nudge =
+				!opts.inPlace && occupied.has(boxKey({ ...box, x, y })) ? 10 : 0;
+			return { ...el, pos: { x: x + nudge - to.x, y: y + nudge - to.y } };
+		});
 		this.edit(() => insertElements(base, ref, index, placed), {
 			selectResult: true,
 			scope: "base",
@@ -1692,6 +1746,15 @@ function containsPoint(
 	return (
 		Math.abs(lx) <= rect.width / 2 + margin &&
 		Math.abs(ly) <= rect.height / 2 + margin
+	);
+}
+
+function overlaps(a: Rect, b: Rect): boolean {
+	return (
+		a.x < b.x + b.width &&
+		b.x < a.x + a.width &&
+		a.y < b.y + b.height &&
+		b.y < a.y + a.height
 	);
 }
 

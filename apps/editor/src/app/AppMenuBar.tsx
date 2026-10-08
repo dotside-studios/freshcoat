@@ -59,6 +59,7 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"edit.cut",
 			"edit.copy",
 			"edit.paste",
+			"edit.pasteInPlace",
 			"edit.duplicate",
 			"edit.delete",
 			"-",

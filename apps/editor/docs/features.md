@@ -110,6 +110,10 @@ the records, and **Export** turns templates and records into files.
   - Align and distribute from the Object menu or Alt+A, H, D, W, V and S.
     Several layers align to their combined box; one layer aligns to its
     parent frame, or to the artboard at the top level.
+  - Paste puts the copy beside the selected layer, or inside the selected
+    frame when one frame is selected, centred in it if it would land outside.
+    Paste in place (Mod+Shift+V) keeps the copy where it was on the
+    artboard. Each paste is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
