@@ -50,6 +50,7 @@ import {
 	resolvePrecision,
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
+import { normalizeDash } from "./dash";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontArrayBuffer, fontBytes } from "./font-bytes";
 import { dataUrlToBytes } from "./loader";
@@ -391,8 +392,8 @@ function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
 	p.setStrokeWidth(stroke.width);
 	p.setStrokeCap(ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]]);
 	p.setStrokeJoin(ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]]);
-	if (stroke.dash && stroke.dash.length > 0)
-		p.setPathEffect(bin.track(ck.PathEffect.MakeDash(stroke.dash)));
+	const dash = normalizeDash(stroke.dash);
+	if (dash) p.setPathEffect(bin.track(ck.PathEffect.MakeDash(dash)));
 	return p;
 }
 
