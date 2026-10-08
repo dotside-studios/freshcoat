@@ -88,6 +88,7 @@ type TextSpanInput = {
 		letterSpacing?: number;
 		lineHeight?: number;
 		decoration?: ResolvedFont["decoration"];
+		skipInk?: boolean;
 		variations?: ResolvedFont["variations"];
 		features?: ResolvedFont["features"];
 	};
@@ -473,6 +474,7 @@ function compileText(
 		lineHeight?: number | "auto";
 		letterSpacing?: number;
 		decoration?: ResolvedFont["decoration"];
+		skipInk?: boolean;
 		variations?: ResolvedFont["variations"];
 		features?: ResolvedFont["features"];
 	};
@@ -487,6 +489,7 @@ function compileText(
 				: undefined,
 		...lineHeightOf(inputFont.lineHeight),
 		decoration: inputFont.decoration,
+		...(inputFont.skipInk !== undefined ? { skipInk: inputFont.skipInk } : {}),
 		...(inputFont.variations ? { variations: inputFont.variations } : {}),
 		...(inputFont.features ? { features: inputFont.features } : {}),
 	};
@@ -524,6 +527,9 @@ function compileText(
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
 		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
+		...(props.path
+			? { path: compileTextPath(props.path as TextPathInput, ratio) }
+			: {}),
 	};
 	if (single) {
 		node.text = spans[0].text;
@@ -550,6 +556,29 @@ function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
 		...(arc.startAngle !== undefined ? { startAngle: arc.startAngle } : {}),
 		...(arc.direction ? { direction: arc.direction } : {}),
 		...(arc.align ? { align: arc.align } : {}),
+		...(arc.fit ? { fit: arc.fit } : {}),
+	};
+}
+
+type TextPathInput = NonNullable<TextProperties["path"]>;
+
+function compileTextPath(
+	path: TextPathInput,
+	ratio: number,
+): TextNode["path"] {
+	return {
+		...(path.d !== undefined ? { d: scalePathString(path.d, ratio) } : {}),
+		...(path.ref !== undefined ? { ref: path.ref } : {}),
+		...(path.startOffset !== undefined
+			? {
+					startOffset:
+						typeof path.startOffset === "number"
+							? path.startOffset * ratio
+							: path.startOffset,
+				}
+			: {}),
+		...(path.side ? { side: path.side } : {}),
+		...(path.align ? { align: path.align } : {}),
 	};
 }
 
@@ -566,6 +595,7 @@ function mapSpanFont(
 			typeof f.letterSpacing === "number" ? f.letterSpacing * ratio : undefined,
 		...(f.lineHeight === undefined ? {} : lineHeightOf(f.lineHeight)),
 		decoration: f.decoration,
+		...(f.skipInk !== undefined ? { skipInk: f.skipInk } : {}),
 		...(f.variations ? { variations: f.variations } : {}),
 		...(f.features ? { features: f.features } : {}),
 	};
@@ -1398,6 +1428,7 @@ function resolveFill(
 			stops: fill.stops,
 			from: { x: from[0], y: from[1] },
 			to: { x: to[0], y: to[1] },
+			...(fill.spread ? { spread: fill.spread } : {}),
 		};
 	}
 	if (fill.kind === "angular") {
@@ -1418,6 +1449,9 @@ function resolveFill(
 		radius,
 		radiusY: fill.radiusY ?? radius,
 		rotation: fill.rotation ?? 0,
+		...(fill.focus ? { focus: { x: fill.focus[0], y: fill.focus[1] } } : {}),
+		...(fill.focusRadius ? { focusRadius: fill.focusRadius } : {}),
+		...(fill.spread ? { spread: fill.spread } : {}),
 	};
 }
 

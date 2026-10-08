@@ -208,8 +208,13 @@ worker and in Node alike. The painter reads it with `parseSvg`,
 lowers it with `svgToNode` and draws it with the node's fit, mask and stroke,
 so it stays sharp at every export density. Markers and pattern fills are
 expanded into ordinary paths, and images embedded as `data:` URLs are drawn,
-raster or SVG. Text, `foreignObject`, video, audio and filters are not drawn;
-each one used is reported once per source as an `svg_unsupported` warning.
+raster or SVG. Filters built from `feGaussianBlur`, `feDropShadow`,
+`feOffset`, `feColorMatrix`, `feFlood`, `feMerge`, `feComposite` (except
+`arithmetic`) and `feBlend` are applied, in sRGB or linearRGB as
+`color-interpolation-filters` asks; an element whose filter uses any other
+primitive is drawn unfiltered, with a warning naming the primitive. Text,
+`foreignObject`, video and audio are not drawn; each one used is reported once
+per source as an `svg_unsupported` warning.
 
 `parseSvg` itself reads `<text>` and `<tspan>` as lines of styled runs (font
 family, size, weight, style and fill, anchored at the baseline) for callers

@@ -46,6 +46,7 @@ import {
 	isBackgroundPath,
 	keyOf,
 	MASK_SOURCE,
+	parentKeyOf,
 	parseKey,
 	walkLayers,
 } from "./path";
@@ -557,6 +558,42 @@ export function ungroup(
 }
 
 /** Renames a layer, and the variant overrides on its side that name it. */
+/** Sets the selected text along the selected vector, its sibling. The text's
+ *  box becomes the vector's grown by a line on every side, so the glyphs on
+ *  the path stay inside it. */
+export function attachTextToPath(t: Template, keys: string[]): OpResult {
+	const layers = keys.map((k) => [k, getElement(t, k)] as const);
+	const text = layers.find(([, el]) => el?.type === "text");
+	const vector = layers.find(([, el]) => el?.type === "vector");
+	if (keys.length !== 2 || !text || !vector)
+		return refuse("not_a_shape", "Select one text layer and one vector");
+	const [textKey, textEl] = text as [string, Element & { type: "text" }];
+	const [vectorKey, vectorEl] = vector as [string, Element];
+	if (
+		parentKeyOf(textKey) !== parentKeyOf(vectorKey) ||
+		[textKey, vectorKey].some((k) => k.endsWith(`/${MASK_SOURCE}`))
+	)
+		return refuse(
+			"not_siblings",
+			"The text and the vector must share a parent",
+		);
+	const font = textEl.properties.font;
+	const pad = round2(
+		font.size * (typeof font.lineHeight === "number" ? font.lineHeight : 1.2),
+	);
+	const pos = vectorEl.pos ?? { x: 0, y: 0 };
+	const size = vectorEl.size ?? { width: 0, height: 0 };
+	return updateElement(t, textKey, {
+		pos: { x: round2(pos.x - pad), y: round2(pos.y - pad) },
+		size: {
+			width: round2(size.width + 2 * pad),
+			height: round2(size.height + 2 * pad),
+		},
+		rotation: vectorEl.rotation,
+		properties: { arc: undefined, path: { ref: vectorEl.id } },
+	});
+}
+
 export function renameElement(
 	t: Template,
 	key: string,

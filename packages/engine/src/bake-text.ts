@@ -426,6 +426,9 @@ function layoutInline(
 			letterSpacing: f.letterSpacing ?? defaultFont.letterSpacing,
 			lineHeight: f.lineHeight ?? defaultFont.lineHeight,
 			decoration: f.decoration ?? defaultFont.decoration,
+			...((f.skipInk ?? defaultFont.skipInk) !== undefined
+				? { skipInk: f.skipInk ?? defaultFont.skipInk }
+				: {}),
 			// A span's axes adjust the element's rather than replacing them.
 			variations:
 				f.variations || defaultFont.variations

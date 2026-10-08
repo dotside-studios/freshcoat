@@ -39,12 +39,19 @@ import type {
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
+	type ArcPlacement,
+	type ArcRing,
+	arcBandBounds,
+	arcRings,
+	isHidden,
 	placeOnArc,
+	placeOnPath,
 	rsxformBounds,
 	spanAt,
 	spanByteStarts,
 } from "./arc-text";
 import { parseColor } from "./color";
+import { withPathMeasure } from "./path-measure";
 import {
 	imageInfo,
 	makeImageFromPixels,
@@ -89,10 +96,12 @@ import {
 	touchBackground,
 } from "./paint-cache-state";
 import {
+	type DecorationMetrics,
 	decorationLine,
 	fitRect,
 	fontFeatureList,
 	fontVariationList,
+	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
 import { flattenOverWhite } from "./jpeg";
@@ -108,7 +117,13 @@ import {
 	rectShape,
 } from "./outline";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
-import type { SvgItem } from "./svg/index";
+import type {
+	SvgDrawing,
+	SvgFilter,
+	SvgFilterInput,
+	SvgFilterPrimitive,
+	SvgItem,
+} from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
 import type {
@@ -123,6 +138,7 @@ import type {
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
+	GradientSpread,
 	PaintWarning,
 	PatternKind,
 	ResolvedFill,
@@ -130,6 +146,7 @@ import type {
 	Size,
 	Stroke,
 	TextArc,
+	TextPath,
 	TextLine,
 } from "./types";
 
@@ -309,7 +326,7 @@ function shaderFor(
 				[x + fill.to.x * w, y + fill.to.y * h],
 				fill.stops.map((s) => toColor(ck, s.color)),
 				fill.stops.map((s) => s.offset),
-				ck.TileMode.Clamp,
+				tileMode(ck, fill.spread),
 			),
 		);
 	}
@@ -343,35 +360,70 @@ function shaderFor(
 	const rotation = fill.rotation ?? 0;
 	const colors = fill.stops.map((s) => toColor(ck, s.color));
 	const offsets = fill.stops.map((s) => s.offset);
+	const mode = tileMode(ck, fill.spread);
 	// Skia only draws circles, so an elliptical gradient is that circle under a
 	// local matrix: squash the secondary axis to ry/rx, then turn the whole thing
 	// to where the primary axis points. Both operate about the center so the
 	// gradient stays put. A circular gradient skips the matrix entirely.
-	if (rx <= 0 || (ry === rx && rotation % 180 === 0)) {
+	const circular = rx <= 0 || (ry === rx && rotation % 180 === 0);
+	const localMatrix = circular
+		? undefined
+		: ck.Matrix.multiply(
+				ck.Matrix.rotated((rotation * Math.PI) / 180, cx, cy),
+				ck.Matrix.scaled(1, ry / rx, cx, cy),
+			);
+	const focus = focalPoint(fill, cx, cy, w, h, rx, ry, rotation);
+	const fr = (fill.focusRadius ?? 0) * longest;
+	if (focus && rx > 0 && ry > 0)
 		return bin.track(
-			ck.Shader.MakeRadialGradient(
+			ck.Shader.MakeTwoPointConicalGradient(
+				focus,
+				fr,
 				[cx, cy],
 				rx,
 				colors,
 				offsets,
-				ck.TileMode.Clamp,
+				mode,
+				localMatrix,
 			),
 		);
-	}
-	const localMatrix = ck.Matrix.multiply(
-		ck.Matrix.rotated((rotation * Math.PI) / 180, cx, cy),
-		ck.Matrix.scaled(1, ry / rx, cx, cy),
-	);
 	return bin.track(
 		ck.Shader.MakeRadialGradient(
 			[cx, cy],
 			rx,
 			colors,
 			offsets,
-			ck.TileMode.Clamp,
+			mode,
 			localMatrix,
 		),
 	);
+}
+
+function tileMode(ck: CanvasKit, spread: GradientSpread | undefined) {
+	if (spread === "reflect") return ck.TileMode.Mirror;
+	if (spread === "repeat") return ck.TileMode.Repeat;
+	return ck.TileMode.Clamp;
+}
+
+// The focus in the circle's own space, before the ellipse's local matrix, or
+// null when the gradient starts from a point at its centre.
+function focalPoint(
+	fill: Extract<ResolvedFill, { kind: "radial" }>,
+	cx: number,
+	cy: number,
+	w: number,
+	h: number,
+	rx: number,
+	ry: number,
+	rotation: number,
+): [number, number] | null {
+	const dx = fill.focus ? (fill.focus.x - fill.center.x) * w : 0;
+	const dy = fill.focus ? (fill.focus.y - fill.center.y) * h : 0;
+	if (dx === 0 && dy === 0 && !((fill.focusRadius ?? 0) > 0)) return null;
+	const t = (-rotation * Math.PI) / 180;
+	const ux = dx * Math.cos(t) - dy * Math.sin(t);
+	const uy = dx * Math.sin(t) + dy * Math.cos(t);
+	return [cx + ux, cy + (uy * rx) / ry];
 }
 
 // The env's whole fonts map, then whatever the scene loaded from elsewhere.
@@ -676,8 +728,29 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	if (cmd.path) {
+		const lines = arcLines(ck, provider, bin, cmd, fallback);
+		const placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+		if (drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, fgPaint))
+			issues.warnings?.push({
+				kind: "text_path_overflow",
+				...(cmd.id ? { layer: cmd.id } : {}),
+			});
+		return;
+	}
 	if (cmd.arc) {
-		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+		drawArcText(
+			ck,
+			canvas,
+			provider,
+			bin,
+			cmd,
+			cmd.arc,
+			fallback,
+			fgPaint,
+			fillShader,
+			issues,
+		);
 		return;
 	}
 	// Gradient paints depend on position, so those lines are not cached.
@@ -710,20 +783,103 @@ function drawText(
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
 		const baseline = line.baseline ?? line.y;
+		let runs: GlyphRun[] | undefined;
 		for (const span of line.spans) {
 			if (!span.font.decoration) continue;
-			const { top, thickness } = decorationLine(
-				span.font.size,
-				span.font.decoration,
-				baseline,
-			);
+			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 			const p = bin.track(new ck.Paint());
 			p.setAntiAlias(true);
 			if (fillShader) p.setShader(fillShader);
 			else p.setColor(toColor(ck, span.color));
-			canvas.drawRect(ck.XYWHRect(span.x, top, span.width, thickness), p);
+			let segments: [number, number][] = [[span.x, span.x + span.width]];
+			if (span.font.decoration === "underline" && span.font.skipInk !== false) {
+				if (!runs) {
+					runs = para.getShapedLines()[0]?.runs ?? [];
+					for (const run of runs) bin.track(run.typeface);
+				}
+				const y0 = baseline - ascent;
+				const gaps: number[] = [];
+				for (const run of runs) {
+					const hits = runFont(ck, bin, run).getGlyphIntercepts(
+						run.glyphs,
+						run.positions,
+						top - y0,
+						top + thickness - y0,
+					);
+					for (const x of hits) gaps.push(left + x);
+				}
+				segments = skipInkSegments(
+					span.x,
+					span.x + span.width,
+					gaps,
+					Math.max(thickness, span.font.size * 0.05),
+				);
+			}
+			for (const [x0, x1] of segments)
+				canvas.drawRect(ck.LTRBRect(x0, top, x1, top + thickness), p);
 		}
 	}
+}
+
+const decorationMetrics = new WeakMap<
+	TypefaceFontProvider,
+	Map<string, DecorationMetrics | undefined>
+>();
+
+// The decoration geometry of a span, from the metrics of the face its own
+// family and style select. Glyphs that fall back to another family keep the
+// span's line, so one span draws one straight decoration.
+function spanDecoration(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	span: TextLine["spans"][number],
+	baseline: number,
+): { top: number; thickness: number } {
+	const { family, weight, style, size, decoration } = span.font;
+	let byFace = decorationMetrics.get(provider);
+	if (!byFace) {
+		byFace = new Map();
+		decorationMetrics.set(provider, byFace);
+	}
+	const w = WEIGHTS[Math.round((weight || 400) / 100) * 100] ?? "Normal";
+	const key = `${w}|${style}|${family}`;
+	if (!byFace.has(key)) {
+		const typeface = provider.matchFamilyStyle(family, {
+			weight: ck.FontWeight[w],
+			width: ck.FontWidth.Normal,
+			slant: style === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright,
+		});
+		let em: DecorationMetrics | undefined;
+		if (typeface) {
+			const font = new ck.Font(typeface, FONT_BOX_SIZE);
+			const m = font.getMetrics();
+			font.delete();
+			typeface.delete();
+			const per = (v: number | undefined) =>
+				v === undefined ? undefined : v / FONT_BOX_SIZE;
+			em = {
+				underlinePosition: per(m.underlinePosition),
+				underlineThickness: per(m.underlineThickness),
+				strikeoutPosition: per(m.strikeoutPosition),
+				strikeoutThickness: per(m.strikeoutThickness),
+			};
+		}
+		byFace.set(key, em);
+	}
+	const em = byFace.get(key);
+	const scale = (v: number | undefined) =>
+		v === undefined ? undefined : v * size;
+	return decorationLine(
+		size,
+		decoration as string,
+		baseline,
+		em && {
+			underlinePosition: scale(em.underlinePosition),
+			underlineThickness: scale(em.underlineThickness),
+			strikeoutPosition: scale(em.strikeoutPosition),
+			strikeoutThickness: scale(em.strikeoutThickness),
+		},
+	);
 }
 
 // Each baked line shaped once, as drawText shapes it, with its run positions
@@ -751,13 +907,22 @@ function arcLines(
 			bin.track(shaped.para);
 		}
 		const sl = shaped.para.getShapedLines()[0];
-		for (const run of sl?.runs ?? []) bin.track(run.typeface);
+		const runs = sl?.runs ?? [];
+		for (const run of runs) bin.track(run.typeface);
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const spacing = runs.map((run) =>
+			Float32Array.from(
+				run.offsets.subarray(0, run.glyphs.length),
+				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
+			),
+		);
 		out.push({
 			line,
 			arc: {
-				runs: sl?.runs ?? [],
+				runs,
 				baseline: sl?.baseline ?? 0,
 				offset: (line.baseline ?? line.y) - base0,
+				spacing,
 			},
 		});
 	}
@@ -782,26 +947,77 @@ function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	return font;
 }
 
-// Text along a circle: the line's own shaped glyphs, each drawn under an
-// RSXform, colored by the span its cluster belongs to.
-function drawArcText(
+type ArcDecoration = {
+	span: TextLine["spans"][number];
+	r: number;
+	a0: number;
+	a1: number;
+	thickness: number;
+};
+
+// Each decorated span's underline or strikethrough as a band along its ring,
+// across the angles its glyphs cover.
+function arcDecorations(
+	lines: { line: TextLine; arc: ArcLine }[],
+	rings: ArcRing[],
+	arc: TextArc,
+): ArcDecoration[] {
+	const turn = arc.direction === "outside" ? 1 : -1;
+	const out: ArcDecoration[] = [];
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const ring = rings[li];
+		if (!ring || !line.spans.some((s) => s.font.decoration)) return;
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const ranges = new Map<number, [number, number]>();
+		shaped.runs.forEach((run, ri) => {
+			const pos = run.positions;
+			for (let i = 0; i < run.glyphs.length; i++) {
+				const span = spanAt(starts, run.offsets[i] as number);
+				const x = pos[2 * i] as number;
+				const end =
+					(pos[2 * i + 2] as number) - (shaped.spacing?.[ri]?.[i] ?? 0);
+				const range = ranges.get(span);
+				ranges.set(
+					span,
+					range
+						? [Math.min(range[0], x), Math.max(range[1], end)]
+						: [x, end],
+				);
+			}
+		});
+		for (const [index, [x0, x1]] of ranges) {
+			const span = line.spans[index];
+			if (!span?.font.decoration || x1 <= x0) continue;
+			const { top, thickness } = decorationLine(
+				span.font.size,
+				span.font.decoration,
+				0,
+			);
+			const dy = (top + thickness / 2) * ring.scale;
+			out.push({
+				span,
+				r: Math.max(ring.r - turn * dy, 0),
+				a0: ring.angle(x0),
+				a1: ring.angle(x1),
+				thickness: thickness * ring.scale,
+			});
+		}
+	});
+	return out;
+}
+
+// Each shaped glyph drawn under its RSXform, colored by the span its cluster
+// belongs to. Hidden glyphs are skipped; returns whether there were any.
+function drawPlacedGlyphs(
 	ck: CanvasKit,
 	canvas: Canvas,
-	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
-	arc: TextArc,
-	fallback: string[],
+	lines: { line: TextLine; arc: ArcLine }[],
+	placed: ArcPlacement,
 	fgPaint: Paint | null,
-) {
-	const lines = arcLines(ck, provider, bin, cmd, fallback);
-	const [cx, cy] = arcCenter(cmd);
-	const placed = placeOnArc(
-		lines.map((l) => l.arc),
-		arc,
-		cx,
-		cy,
-	);
+): boolean {
+	let hidden = false;
 	const paints = new Map<string, Paint>();
 	const paintFor = (color: string) => {
 		let p = paints.get(color);
@@ -822,9 +1038,18 @@ function drawArcText(
 			const font = runFont(ck, bin, run);
 			let from = 0;
 			while (from < n) {
+				if (isHidden(xforms, from)) {
+					hidden = true;
+					from++;
+					continue;
+				}
 				const span = spanAt(starts, run.offsets[from] as number);
 				let to = from + 1;
-				while (to < n && spanAt(starts, run.offsets[to] as number) === span)
+				while (
+					to < n &&
+					!isHidden(xforms, to) &&
+					spanAt(starts, run.offsets[to] as number) === span
+				)
 					to++;
 				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
 					run.glyphs.subarray(from, to),
@@ -840,6 +1065,94 @@ function drawArcText(
 			}
 		});
 	});
+	return hidden;
+}
+
+// Each line's glyphs along the command's path, measured in its local frame.
+function placeOnCommandPath(
+	ck: CanvasKit,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	spec: TextPath,
+	lines: { arc: ArcLine }[],
+): ArcPlacement {
+	const shaped = lines.map((l) => l.arc);
+	const path = spec.d ? bin.path(ck, spec.d) : null;
+	if (!path)
+		return placeOnPath(shaped, spec, {
+			length: 0,
+			closed: false,
+			at: () => ({ x: 0, y: 0, cos: 1, sin: 0 }),
+		});
+	return withPathMeasure(ck, path, (m) =>
+		placeOnPath(shaped, spec, m, cmd.pos.x, cmd.pos.y),
+	);
+}
+
+// Text along a circle: the line's own shaped glyphs, each drawn under an
+// RSXform, plus its decorations along the ring.
+function drawArcText(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	arc: TextArc,
+	fallback: string[],
+	fgPaint: Paint | null,
+	fillShader: Shader | null,
+	issues?: PaintIssues,
+) {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const [cx, cy] = arcCenter(cmd);
+	const rings = arcRings(
+		lines.map((l) => l.arc),
+		arc,
+	);
+	rings.forEach((ring, line) => {
+		const layer = cmd.id ? { layer: cmd.id } : {};
+		if (ring.overflow)
+			issues?.warnings?.push({
+				kind: "arc_text_overflow",
+				...layer,
+				line,
+				width: ring.width,
+				circumference: ring.circumference,
+			});
+		if (ring.clamped)
+			issues?.warnings?.push({
+				kind: "arc_radius_clamped",
+				...layer,
+				line,
+				radius: arc.radius,
+				min: ring.r,
+			});
+	});
+	const placed = placeOnArc(
+		lines.map((l) => l.arc),
+		arc,
+		cx,
+		cy,
+	);
+	drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, fgPaint);
+	for (const d of arcDecorations(lines, rings, arc)) {
+		const p = bin.track(new ck.Paint());
+		p.setAntiAlias(true);
+		p.setStyle(ck.PaintStyle.Stroke);
+		p.setStrokeWidth(d.thickness);
+		if (fillShader) p.setShader(fillShader);
+		else p.setColor(toColor(ck, d.span.color ?? cmd.color ?? "#000000"));
+		const builder = new ck.PathBuilder();
+		const deg = 180 / Math.PI;
+		builder.addArc(
+			ck.LTRBRect(cx - d.r, cy - d.r, cx + d.r, cy + d.r),
+			Math.min(d.a0, d.a1) * deg - 90,
+			Math.abs(d.a1 - d.a0) * deg,
+		);
+		const path = bin.track(builder.detach());
+		builder.delete();
+		canvas.drawPath(path, p);
+	}
 }
 
 // The local rects arc text's glyphs can cover: each glyph's font box under its
@@ -851,16 +1164,34 @@ function arcTextBounds(
 	cmd: DrawTextCommand,
 	arc: TextArc,
 	fallback: string[],
-	em: Bounds,
+	em: Bounds | null,
 ): Bounds[] {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
+	const out: Bounds[] = arcDecorations(
+		lines,
+		arcRings(
+			lines.map((l) => l.arc),
+			arc,
+		),
+		arc,
+	).map((d) => arcBandBounds(cx, cy, d.r, d.a0, d.a1, d.thickness));
+	if (!em) return out;
 	const placed = placeOnArc(
 		lines.map((l) => l.arc),
 		arc,
 		cx,
 		cy,
 	);
+	return [...out, ...placedGlyphBounds(lines, placed, em)];
+}
+
+// Each placed glyph's font box under its RSXform.
+function placedGlyphBounds(
+	lines: { arc: ArcLine }[],
+	placed: ArcPlacement,
+	em: Bounds,
+): Bounds[] {
 	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
 		shaped.runs.forEach((run, ri) => {
@@ -1246,6 +1577,223 @@ function loadSvg(): Promise<SvgModule> {
 	return svgModule;
 }
 
+const SVG_COMPOSITE: Record<
+	Extract<SvgFilterPrimitive, { kind: "composite" }>["operator"],
+	EnumKey<BlendModeEnumValues>
+> = { over: "SrcOver", in: "SrcIn", out: "SrcOut", atop: "SrcATop", xor: "Xor" };
+
+const SOURCE_ALPHA = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0];
+
+const srgbToLinear = (v: number) =>
+	v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+
+// An SVG filter's primitives as one ImageFilter taking and giving sRGB. A null
+// filter stands for the layer's own content, and a result whose `linear` is
+// null reads the same in either space.
+function svgImageFilter(
+	ck: CanvasKit,
+	bin: Bin,
+	filter: SvgFilter,
+): ImageFilter | null {
+	type Result = { f: ImageFilter | null; linear: boolean | null };
+	const withColor = (cf: ColorFilter, input: ImageFilter | null) =>
+		bin.track(ck.ImageFilter.MakeColorFilter(cf, input));
+	const source: Result = { f: null, linear: false };
+	let alpha: Result | undefined;
+	const results: Result[] = [];
+	const get = (i: SvgFilterInput): Result => {
+		if (i === "SourceGraphic") return source;
+		if (i !== "SourceAlpha") return results[i] as Result;
+		alpha ??= {
+			f: withColor(bin.track(ck.ColorFilter.MakeMatrix(SOURCE_ALPHA)), null),
+			linear: null,
+		};
+		return alpha;
+	};
+	const inSpace = (r: Result, linear: boolean) =>
+		r.linear === null || r.linear === linear
+			? r.f
+			: withColor(
+					bin.track(
+						linear
+							? ck.ColorFilter.MakeSRGBToLinearGamma()
+							: ck.ColorFilter.MakeLinearToSRGBGamma(),
+					),
+					r.f,
+				);
+	const color = (hex: string, linear: boolean) => {
+		const c = parseColor(hex);
+		const [r, g, b, a] = Array.isArray(c) ? c : [0, 0, 0, 1];
+		const ch = (v: number) => (linear ? srgbToLinear(v / 255) : v / 255);
+		return ck.Color4f(ch(r), ch(g), ch(b), a);
+	};
+	const blend = (
+		mode: EnumKey<BlendModeEnumValues>,
+		background: ImageFilter | null,
+		foreground: ImageFilter | null,
+	) => bin.track(ck.ImageFilter.MakeBlend(ck.BlendMode[mode], background, foreground));
+	for (const p of filter.primitives) {
+		const at = (i: SvgFilterInput) => inSpace(get(i), p.linear);
+		let linear: boolean | null = p.linear;
+		let f: ImageFilter | null;
+		switch (p.kind) {
+			case "blur":
+				f =
+					p.sx > 0 || p.sy > 0
+						? bin.track(ck.ImageFilter.MakeBlur(p.sx, p.sy, ck.TileMode.Decal, at(p.in)))
+						: at(p.in);
+				break;
+			case "offset": {
+				const r = get(p.in);
+				f = bin.track(ck.ImageFilter.MakeOffset(p.dx, p.dy, r.f));
+				linear = r.linear;
+				break;
+			}
+			case "dropShadow":
+				f = bin.track(
+					ck.ImageFilter.MakeDropShadow(
+						p.dx,
+						p.dy,
+						p.sx,
+						p.sy,
+						color(p.color, p.linear),
+						at(p.in),
+					),
+				);
+				break;
+			case "colorMatrix":
+				f = withColor(bin.track(ck.ColorFilter.MakeMatrix(p.matrix)), at(p.in));
+				break;
+			case "flood":
+				f = bin.track(
+					ck.ImageFilter.MakeShader(
+						bin.track(ck.Shader.MakeColor(color(p.color, false), ck.ColorSpace.SRGB)),
+					),
+				);
+				linear = false;
+				break;
+			case "merge": {
+				const [first, ...rest] = p.in;
+				f =
+					first === undefined
+						? bin.track(
+								ck.ImageFilter.MakeShader(
+									bin.track(ck.Shader.MakeColor(ck.TRANSPARENT, ck.ColorSpace.SRGB)),
+								),
+							)
+						: rest.reduce((acc, i) => blend("SrcOver", acc, at(i)), at(first));
+				break;
+			}
+			case "composite":
+				f = blend(SVG_COMPOSITE[p.operator], at(p.in2), at(p.in));
+				break;
+			case "blend":
+				f = blend(SKIA_BLEND_MODE[p.mode], at(p.in2), at(p.in));
+				break;
+		}
+		results.push({ f, linear });
+	}
+	return inSpace(results.at(-1) ?? source, false);
+}
+
+const svgMatrix = (m: number[]) => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1] as number[];
+
+// Records `children`, each filtered group drawn from a picture of its own
+// content inside a layer carrying the filter. Those pictures join `images`.
+function recordSvg(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	svg: SvgModule,
+	drawing: SvgDrawing,
+	children: SvgItem[],
+	images: Map<string, Image | SvgPicture>,
+	bin: Bin,
+	filter?: SvgFilter,
+): SkPicture {
+	const { width, height } = drawing;
+	const vbm = svg.viewBoxMatrix(drawing.viewBox, width, height, drawing.preserveAspectRatio);
+	const [sx, , , sy, tx, ty] = vbm;
+	const lift = (items: SvgItem[]): SvgItem[] =>
+		items.map((item) => {
+			if (item.kind !== "group") return item;
+			const { filter: own, ...group } = item;
+			if (group.mask) group.mask = lift(group.mask);
+			if (!own) return { ...group, children: lift(item.children) };
+			const key = `svg-filter:${images.size}`;
+			const picture = recordSvg(ck, provider, svg, drawing, item.children, images, bin, own);
+			images.set(key, {
+				svgPicture: picture,
+				width,
+				height,
+				rasterPixels: 0,
+				features: [],
+				delete: () => picture.delete(),
+			});
+			return {
+				...group,
+				children: [
+					{
+						kind: "image",
+						href: key,
+						x: -tx / sx,
+						y: -ty / sy,
+						width: width / sx,
+						height: height / sy,
+						fit: "fill",
+					},
+				],
+			};
+		});
+	const commands = compileScene(svg.svgToNode({ ...drawing, children: lift(children) }), {
+		width,
+		height,
+	});
+	const recorder = new ck.PictureRecorder();
+	try {
+		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
+		const toUser = filter
+			? ck.Matrix.multiply(svgMatrix(vbm), svgMatrix(filter.transform))
+			: null;
+		const fromUser = toUser && ck.Matrix.invert(toUser);
+		const layer = filter && fromUser ? svgImageFilter(ck, bin, filter) : null;
+		if (filter && toUser && fromUser) {
+			const { x, y, width: w, height: h } = filter.region;
+			canvas.save();
+			canvas.concat(toUser);
+			canvas.clipRect(ck.XYWHRect(x, y, w, h), ck.ClipOp.Intersect, true);
+			const paint = bin.track(new ck.Paint());
+			if (layer) paint.setImageFilter(layer);
+			canvas.saveLayer(paint);
+			canvas.concat(fromUser);
+		}
+		const issues: PaintIssues = {
+			unhandled: [],
+			missingImages: [],
+			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
+		};
+		for (const cmd of commands)
+			if (cmd.op.startsWith("draw"))
+				paintDrawable(
+					ck,
+					canvas,
+					provider,
+					images,
+					bin,
+					cmd as DrawCommand,
+					issues,
+					{ width, height, scale: 1, grid: 1 },
+				);
+		if (filter && toUser && fromUser) {
+			canvas.restore();
+			canvas.restore();
+		}
+		return recorder.finishRecordingAsPicture();
+	} finally {
+		recorder.delete();
+	}
+}
+
 // Recorded at the drawing's own size and scaled when drawn, so it stays
 // vector at every density.
 function makeSvgPicture(
@@ -1255,8 +1803,7 @@ function makeSvgPicture(
 	svg: SvgModule,
 	nesting = 0,
 ): SvgPicture {
-	const { parseSvg, svgToNode } = svg;
-	const drawing = parseSvg(new TextDecoder().decode(bytes));
+	const drawing = svg.parseSvg(new TextDecoder().decode(bytes));
 	const { width, height } = drawing;
 	const contents = svgContents(drawing.children, {
 		images: new Set(),
@@ -1279,30 +1826,9 @@ function makeSvgPicture(
 			if (!features.includes("image-decode")) features.push("image-decode");
 		}
 	}
-	const commands = compileScene(svgToNode(drawing), { width, height });
-	const recorder = new ck.PictureRecorder();
 	const bin = makeBin();
 	try {
-		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
-		const issues: PaintIssues = {
-			unhandled: [],
-			missingImages: [],
-			adjustUnsupported: new Map(),
-			patternUnsupported: new Map(),
-		};
-		for (const cmd of commands)
-			if (cmd.op.startsWith("draw"))
-				paintDrawable(
-					ck,
-					canvas,
-					provider,
-					images,
-					bin,
-					cmd as DrawCommand,
-					issues,
-					{ width, height, scale: 1, grid: 1 },
-				);
-		const picture = recorder.finishRecordingAsPicture();
+		const picture = recordSvg(ck, provider, svg, drawing, drawing.children, images, bin);
 		let rasterPixels = 0;
 		for (const img of images.values())
 			rasterPixels += isSvgPicture(img)
@@ -1319,7 +1845,6 @@ function makeSvgPicture(
 	} finally {
 		for (const img of images.values()) img.delete();
 		bin.free();
-		recorder.delete();
 	}
 }
 
@@ -1420,6 +1945,7 @@ function drawPath(
 type PaintIssues = {
 	unhandled: string[];
 	missingImages: string[];
+	warnings?: PaintWarning[];
 	// `adjust` components this CanvasKit build can't apply (see layerPaint).
 	adjustUnsupported: Map<
 		string,
@@ -2189,10 +2715,14 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
+	if (cmd.path) {
+		if (!em) return [];
+		const lines = arcLines(ck, provider, bin, cmd, fallback);
+		const placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+		return placedGlyphBounds(lines, placed, em);
+	}
 	if (cmd.arc)
-		return em
-			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
-			: [];
+		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em);
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2214,11 +2744,7 @@ function textBounds(
 		}
 		for (const span of line.spans) {
 			if (!span.font.decoration) continue;
-			const { top, thickness } = decorationLine(
-				span.font.size,
-				span.font.decoration,
-				baseline,
-			);
+			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 			out.push([span.x, top, span.x + span.width, top + thickness]);
 		}
 		if (!em) continue;
@@ -3419,7 +3945,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
 	if (cmd.op === "drawText")
-		return !cmd.arc && (!cmd.fill || cmd.fill.kind === "solid");
+		return !cmd.arc && !cmd.path && (!cmd.fill || cmd.fill.kind === "solid");
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
@@ -4216,6 +4742,7 @@ export async function paintScene(
 			const issues: PaintIssues = {
 				unhandled: [],
 				missingImages: [],
+				warnings,
 				adjustUnsupported: new Map(),
 				patternUnsupported: new Map(),
 			};

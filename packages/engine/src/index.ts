@@ -97,6 +97,7 @@ export type {
 	PathNode,
 	RectNode,
 	TextNode,
+	TextPathNode,
 	TrackSize,
 	Transform,
 } from "./node";
@@ -121,10 +122,12 @@ export {
 	type PaintCacheStats,
 } from "./paint-cache";
 export {
+	type DecorationMetrics,
 	decorationLine,
 	type FitOptions,
 	fitRect,
 	insetCorner,
+	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";

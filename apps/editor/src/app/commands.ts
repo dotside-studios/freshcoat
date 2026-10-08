@@ -313,6 +313,13 @@ export const COMMANDS: Command[] = [
 		enabled: hasSelection,
 		run: ({ controller }) => controller.ungroupSelection(),
 	},
+	{
+		id: "object.textOnPath",
+		label: "Attach text to path",
+		group: "Object",
+		enabled: (s) => s.selection.filter((k) => !k.endsWith("/bg")).length === 2,
+		run: ({ controller }) => controller.attachTextToPath(),
+	},
 	booleanCommand("union", "Alt+Shift+U"),
 	booleanCommand("subtract", "Alt+Shift+S"),
 	booleanCommand("intersect", "Alt+Shift+I"),

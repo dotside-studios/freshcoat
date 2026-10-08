@@ -760,6 +760,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -798,6 +806,24 @@
 																	"rotation": {
 																		"type": "number"
 																	},
+																	"focus": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "number"
+																			},
+																			{
+																				"type": "number"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	},
+																	"focusRadius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
 																	"stops": {
 																		"type": "array",
 																		"items": {
@@ -815,6 +841,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -987,6 +1021,14 @@
 																					"color"
 																				]
 																			}
+																		},
+																		"spread": {
+																			"type": "string",
+																			"enum": [
+																				"pad",
+																				"reflect",
+																				"repeat"
+																			]
 																		}
 																	},
 																	"required": [
@@ -1025,6 +1067,24 @@
 																		"rotation": {
 																			"type": "number"
 																		},
+																		"focus": {
+																			"type": "array",
+																			"prefixItems": [
+																				{
+																					"type": "number"
+																				},
+																				{
+																					"type": "number"
+																				}
+																			],
+																			"items": false,
+																			"minItems": 2,
+																			"maxItems": 2
+																		},
+																		"focusRadius": {
+																			"type": "number",
+																			"minimum": 0
+																		},
 																		"stops": {
 																			"type": "array",
 																			"items": {
@@ -1042,6 +1102,14 @@
 																					"color"
 																				]
 																			}
+																		},
+																		"spread": {
+																			"type": "string",
+																			"enum": [
+																				"pad",
+																				"reflect",
+																				"repeat"
+																			]
 																		}
 																	},
 																	"required": [
@@ -1218,6 +1286,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -1256,6 +1332,24 @@
 																	"rotation": {
 																		"type": "number"
 																	},
+																	"focus": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "number"
+																			},
+																			{
+																				"type": "number"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	},
+																	"focusRadius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
 																	"stops": {
 																		"type": "array",
 																		"items": {
@@ -1273,6 +1367,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -2002,6 +2104,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -2040,6 +2150,24 @@
 																	"rotation": {
 																		"type": "number"
 																	},
+																	"focus": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "number"
+																			},
+																			{
+																				"type": "number"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	},
+																	"focusRadius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
 																	"stops": {
 																		"type": "array",
 																		"items": {
@@ -2057,6 +2185,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -2672,6 +2808,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -2710,6 +2854,24 @@
 																				"rotation": {
 																					"type": "number"
 																				},
+																				"focus": {
+																					"type": "array",
+																					"prefixItems": [
+																						{
+																							"type": "number"
+																						},
+																						{
+																							"type": "number"
+																						}
+																					],
+																					"items": false,
+																					"minItems": 2,
+																					"maxItems": 2
+																				},
+																				"focusRadius": {
+																					"type": "number",
+																					"minimum": 0
+																				},
 																				"stops": {
 																					"type": "array",
 																					"items": {
@@ -2727,6 +2889,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -2899,6 +3069,14 @@
 																								"color"
 																							]
 																						}
+																					},
+																					"spread": {
+																						"type": "string",
+																						"enum": [
+																							"pad",
+																							"reflect",
+																							"repeat"
+																						]
 																					}
 																				},
 																				"required": [
@@ -2937,6 +3115,24 @@
 																					"rotation": {
 																						"type": "number"
 																					},
+																					"focus": {
+																						"type": "array",
+																						"prefixItems": [
+																							{
+																								"type": "number"
+																							},
+																							{
+																								"type": "number"
+																							}
+																						],
+																						"items": false,
+																						"minItems": 2,
+																						"maxItems": 2
+																					},
+																					"focusRadius": {
+																						"type": "number",
+																						"minimum": 0
+																					},
 																					"stops": {
 																						"type": "array",
 																						"items": {
@@ -2954,6 +3150,14 @@
 																								"color"
 																							]
 																						}
+																					},
+																					"spread": {
+																						"type": "string",
+																						"enum": [
+																							"pad",
+																							"reflect",
+																							"repeat"
+																						]
 																					}
 																				},
 																				"required": [
@@ -3130,6 +3334,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -3168,6 +3380,24 @@
 																				"rotation": {
 																					"type": "number"
 																				},
+																				"focus": {
+																					"type": "array",
+																					"prefixItems": [
+																						{
+																							"type": "number"
+																						},
+																						{
+																							"type": "number"
+																						}
+																					],
+																					"items": false,
+																					"minItems": 2,
+																					"maxItems": 2
+																				},
+																				"focusRadius": {
+																					"type": "number",
+																					"minimum": 0
+																				},
 																				"stops": {
 																					"type": "array",
 																					"items": {
@@ -3185,6 +3415,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -3914,6 +4152,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -3952,6 +4198,24 @@
 																				"rotation": {
 																					"type": "number"
 																				},
+																				"focus": {
+																					"type": "array",
+																					"prefixItems": [
+																						{
+																							"type": "number"
+																						},
+																						{
+																							"type": "number"
+																						}
+																					],
+																					"items": false,
+																					"minItems": 2,
+																					"maxItems": 2
+																				},
+																				"focusRadius": {
+																					"type": "number",
+																					"minimum": 0
+																				},
 																				"stops": {
 																					"type": "array",
 																					"items": {
@@ -3969,6 +4233,14 @@
 																							"color"
 																						]
 																					}
+																				},
+																				"spread": {
+																					"type": "string",
+																					"enum": [
+																						"pad",
+																						"reflect",
+																						"repeat"
+																					]
 																				}
 																			},
 																			"required": [
@@ -4716,6 +4988,9 @@
 																	"line-through"
 																]
 															},
+															"skipInk": {
+																"type": "boolean"
+															},
 															"variations": {
 																"type": "object",
 																"propertyNames": {
@@ -4826,6 +5101,9 @@
 														"line-through"
 													]
 												},
+												"skipInk": {
+													"type": "boolean"
+												},
 												"variations": {
 													"type": "object",
 													"propertyNames": {
@@ -4917,6 +5195,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [
@@ -4955,6 +5241,24 @@
 														"rotation": {
 															"type": "number"
 														},
+														"focus": {
+															"type": "array",
+															"prefixItems": [
+																{
+																	"type": "number"
+																},
+																{
+																	"type": "number"
+																}
+															],
+															"items": false,
+															"minItems": 2,
+															"maxItems": 2
+														},
+														"focusRadius": {
+															"type": "number",
+															"minimum": 0
+														},
 														"stops": {
 															"type": "array",
 															"items": {
@@ -4972,6 +5276,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [
@@ -5168,6 +5480,47 @@
 													"enum": [
 														"outside",
 														"inside"
+													]
+												},
+												"align": {
+													"type": "string",
+													"enum": [
+														"start",
+														"center",
+														"end"
+													]
+												},
+												"fit": {
+													"type": "string",
+													"const": "shrink"
+												}
+											}
+										},
+										"path": {
+											"type": "object",
+											"properties": {
+												"d": {
+													"type": "string"
+												},
+												"ref": {
+													"type": "string"
+												},
+												"startOffset": {
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "string",
+															"pattern": "^-?\\d+(\\.\\d+)?%$"
+														}
+													]
+												},
+												"side": {
+													"type": "string",
+													"enum": [
+														"left",
+														"right"
 													]
 												},
 												"align": {
@@ -5754,6 +6107,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -5792,6 +6153,24 @@
 																"rotation": {
 																	"type": "number"
 																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
 																"stops": {
 																	"type": "array",
 																	"items": {
@@ -5809,6 +6188,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -7179,6 +7566,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -7217,6 +7612,24 @@
 																"rotation": {
 																	"type": "number"
 																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
 																"stops": {
 																	"type": "array",
 																	"items": {
@@ -7234,6 +7647,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -7406,6 +7827,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -7444,6 +7873,24 @@
 																	"rotation": {
 																		"type": "number"
 																	},
+																	"focus": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "number"
+																			},
+																			{
+																				"type": "number"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	},
+																	"focusRadius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
 																	"stops": {
 																		"type": "array",
 																		"items": {
@@ -7461,6 +7908,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -7637,6 +8092,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -7675,6 +8138,24 @@
 																"rotation": {
 																	"type": "number"
 																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
 																"stops": {
 																	"type": "array",
 																	"items": {
@@ -7692,6 +8173,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -8294,6 +8783,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -8332,6 +8829,24 @@
 																"rotation": {
 																	"type": "number"
 																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
 																"stops": {
 																	"type": "array",
 																	"items": {
@@ -8349,6 +8864,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -8521,6 +9044,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -8559,6 +9090,24 @@
 																	"rotation": {
 																		"type": "number"
 																	},
+																	"focus": {
+																		"type": "array",
+																		"prefixItems": [
+																			{
+																				"type": "number"
+																			},
+																			{
+																				"type": "number"
+																			}
+																		],
+																		"items": false,
+																		"minItems": 2,
+																		"maxItems": 2
+																	},
+																	"focusRadius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
 																	"stops": {
 																		"type": "array",
 																		"items": {
@@ -8576,6 +9125,14 @@
 																				"color"
 																			]
 																		}
+																	},
+																	"spread": {
+																		"type": "string",
+																		"enum": [
+																			"pad",
+																			"reflect",
+																			"repeat"
+																		]
 																	}
 																},
 																"required": [
@@ -8752,6 +9309,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -8790,6 +9355,24 @@
 																"rotation": {
 																	"type": "number"
 																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
 																"stops": {
 																	"type": "array",
 																	"items": {
@@ -8807,6 +9390,14 @@
 																			"color"
 																		]
 																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
 																}
 															},
 															"required": [
@@ -9368,6 +9959,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [
@@ -9406,6 +10005,24 @@
 														"rotation": {
 															"type": "number"
 														},
+														"focus": {
+															"type": "array",
+															"prefixItems": [
+																{
+																	"type": "number"
+																},
+																{
+																	"type": "number"
+																}
+															],
+															"items": false,
+															"minItems": 2,
+															"maxItems": 2
+														},
+														"focusRadius": {
+															"type": "number",
+															"minimum": 0
+														},
 														"stops": {
 															"type": "array",
 															"items": {
@@ -9423,6 +10040,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [
@@ -9595,6 +10220,14 @@
 																		"color"
 																	]
 																}
+															},
+															"spread": {
+																"type": "string",
+																"enum": [
+																	"pad",
+																	"reflect",
+																	"repeat"
+																]
 															}
 														},
 														"required": [
@@ -9633,6 +10266,24 @@
 															"rotation": {
 																"type": "number"
 															},
+															"focus": {
+																"type": "array",
+																"prefixItems": [
+																	{
+																		"type": "number"
+																	},
+																	{
+																		"type": "number"
+																	}
+																],
+																"items": false,
+																"minItems": 2,
+																"maxItems": 2
+															},
+															"focusRadius": {
+																"type": "number",
+																"minimum": 0
+															},
 															"stops": {
 																"type": "array",
 																"items": {
@@ -9650,6 +10301,14 @@
 																		"color"
 																	]
 																}
+															},
+															"spread": {
+																"type": "string",
+																"enum": [
+																	"pad",
+																	"reflect",
+																	"repeat"
+																]
 															}
 														},
 														"required": [
@@ -9826,6 +10485,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [
@@ -9864,6 +10531,24 @@
 														"rotation": {
 															"type": "number"
 														},
+														"focus": {
+															"type": "array",
+															"prefixItems": [
+																{
+																	"type": "number"
+																},
+																{
+																	"type": "number"
+																}
+															],
+															"items": false,
+															"minItems": 2,
+															"maxItems": 2
+														},
+														"focusRadius": {
+															"type": "number",
+															"minimum": 0
+														},
 														"stops": {
 															"type": "array",
 															"items": {
@@ -9881,6 +10566,14 @@
 																	"color"
 																]
 															}
+														},
+														"spread": {
+															"type": "string",
+															"enum": [
+																"pad",
+																"reflect",
+																"repeat"
+															]
 														}
 													},
 													"required": [

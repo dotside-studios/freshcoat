@@ -354,7 +354,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						);
 				});
 			if (cmd.arc) {
-				const { radius, startAngle, sweep } = cmd.arc;
+				const { radius, startAngle, sweep, fit } = cmd.arc;
 				if (!finite(radius) || radius < 0)
 					add(
 						"bad_arc",
@@ -374,6 +374,39 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						"bad_arc",
 						"arc sweep must be a finite number > 0",
 						`${path}.arc.sweep`,
+						id,
+					);
+				if (fit !== undefined && fit !== "shrink")
+					add(
+						"bad_arc",
+						`arc fit must be "shrink" when set, got ${String(fit)}`,
+						`${path}.arc.fit`,
+						id,
+					);
+			}
+			if (cmd.path) {
+				const { d, startOffset, side, align } = cmd.path;
+				if (typeof d !== "string")
+					add("bad_text_path", "path d must be a string", `${path}.path.d`, id);
+				if (!finite(startOffset))
+					add(
+						"bad_text_path",
+						"path startOffset is not finite",
+						`${path}.path.startOffset`,
+						id,
+					);
+				if (side !== "left" && side !== "right")
+					add(
+						"bad_text_path",
+						`path side must be "left" or "right", got ${String(side)}`,
+						`${path}.path.side`,
+						id,
+					);
+				if (align !== "start" && align !== "center" && align !== "end")
+					add(
+						"bad_text_path",
+						`path align must be "start", "center" or "end", got ${String(align)}`,
+						`${path}.path.align`,
 						id,
 					);
 			}

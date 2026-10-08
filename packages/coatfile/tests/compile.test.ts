@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
+import { validate } from "../src/validate";
 import type {
 	Command,
 	CompileOptions,
@@ -474,6 +475,21 @@ describe("compile (CompiledTemplate)", () => {
 			expect(f.radiusY).toBe(0.2);
 			expect(f.rotation).toBe(90);
 		}
+	});
+
+	test("radial gradient carries its focus and spread to the painter", () => {
+		const f = radialFill({
+			focus: [0.3, 0.4],
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(f).toMatchObject({
+			kind: "radial",
+			focus: { x: 0.3, y: 0.4 },
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(radialFill({})).not.toHaveProperty("focus");
 	});
 
 	test("radial gradient carries a declared radius through to the painter", () => {
@@ -1911,5 +1927,80 @@ describe("arc text", () => {
 		expect(text.arc?.startAngle).toBe(0);
 		expect(text.arc?.radius).toBeGreaterThan(0);
 		expect(text.arc?.radius).toBeLessThan(60);
+	});
+});
+
+describe("path text", () => {
+	const withPath = (path: TextElement["properties"]["path"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push(
+			{
+				id: "swoosh",
+				type: "vector",
+				pos: { x: 10, y: 30 },
+				size: { width: 40, height: 10 },
+				properties: { d: "M0 10 C 10 0 30 0 40 10" },
+			},
+			{
+				id: "label",
+				type: "text",
+				pos: { x: 0, y: 20 },
+				size: { width: 60, height: 30 },
+				properties: {
+					value: "ON A PATH",
+					font: { family: "Comfortaa", size: 6 },
+					arc: {},
+					path,
+				},
+			},
+		);
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.path)!;
+	};
+
+	test("scales inline path data and numeric offsets", () => {
+		const text = withPath({
+			d: "M0 10 L50 10",
+			startOffset: 5,
+			side: "right",
+			align: "center",
+		});
+		expect(text.path).toEqual({
+			d: "M0 20 L100 20",
+			startOffset: 10,
+			side: "right",
+			align: "center",
+		});
+		expect(text.arc).toBeUndefined();
+		expect(text.layout.lines).toHaveLength(1);
+	});
+
+	test("a ref resolves to the sibling vector in the text's frame", () => {
+		const text = withPath({ ref: "swoosh", startOffset: "50%" });
+		expect(text.path).toEqual({
+			d: "M20 40C40 20 80 20 100 40",
+			startOffset: 50,
+			percent: true,
+			side: "left",
+			align: "start",
+		});
+	});
+
+	test("a path needs d or ref", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "label",
+			type: "text",
+			pos: { x: 0, y: 0 },
+			size: { width: 60, height: 30 },
+			properties: {
+				value: "X",
+				font: { family: "Comfortaa", size: 6 },
+				path: { startOffset: 3 },
+			},
+		});
+		expect(validate(tpl).ok).toBe(false);
 	});
 });

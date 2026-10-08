@@ -11,6 +11,8 @@ import {
 	type SvgPaint,
 	type SvgShape,
 	type SvgText,
+	type SvgTextPath,
+	type SvgTextRun,
 	type SvgWarning,
 	serializePath,
 	transformPath,
@@ -60,6 +62,43 @@ function color(hex: string): string {
 	return hex.length === 9 && hex.endsWith("ff") ? hex.slice(0, 7) : hex;
 }
 
+type TextRuns = { text: string; color: string; font: SvgTextRun["font"] }[];
+
+function textProperties(runs: TextRuns): TextElement["properties"] {
+	const base = runs[0] as TextRuns[number];
+	const fontOf = (f: TextRuns[number]["font"]) => ({
+		family: f.family,
+		size: round(f.size),
+		...(f.weight !== 400 ? { weight: f.weight as FontWeight } : {}),
+		...(f.style === "italic" ? { style: "italic" as const } : {}),
+	});
+	const same = runs.every(
+		(r) =>
+			r.color === base.color &&
+			r.font.family === base.font.family &&
+			r.font.size === base.font.size &&
+			r.font.weight === base.font.weight &&
+			r.font.style === base.font.style,
+	);
+	const properties: TextElement["properties"] = {
+		font: { ...fontOf(base.font), lineHeight: LINE_HEIGHT },
+		color: color(base.color),
+	};
+	if (same) properties.value = runs.map((r) => r.text).join("");
+	else
+		properties.spans = runs.map((r) => ({
+			text: r.text,
+			font: {
+				family: r.font.family,
+				size: round(r.font.size),
+				weight: r.font.weight as FontWeight,
+				style: r.font.style,
+			},
+			color: color(r.color),
+		}));
+	return properties;
+}
+
 function union(boxes: Box[]): Box | null {
 	if (boxes.length === 0) return null;
 	const x = Math.min(...boxes.map((b) => b.x));
@@ -107,6 +146,7 @@ export function svgToElements(
 		});
 
 	const rootId = uniqueId(options.id ?? "svg");
+	const warnings = [...drawing.warnings];
 
 	const fill = (p: SvgPaint, b: Box): Fill => {
 		if (p.kind === "solid") return color(p.color);
@@ -126,6 +166,7 @@ export function svgToElements(
 				from,
 				to,
 				stops,
+				...(p.spread ? { spread: p.spread } : {}),
 			};
 		}
 		const longest = Math.max(w, h);
@@ -135,7 +176,12 @@ export function svgToElements(
 			radius: round((p.rx * Math.abs(sx)) / longest),
 			radiusY: round((p.ry * Math.abs(sy)) / longest),
 			...(p.rotation ? { rotation: round(p.rotation) } : {}),
+			...(p.fx !== undefined && p.fy !== undefined
+				? { focus: at(p.fx, p.fy) }
+				: {}),
+			...(p.fr ? { focusRadius: round((p.fr * Math.abs(sx)) / longest) } : {}),
 			stops,
+			...(p.spread ? { spread: p.spread } : {}),
 		};
 	};
 
@@ -203,13 +249,13 @@ export function svgToElements(
 		return { element, box };
 	};
 
-	const text = (t: SvgText): Placed => {
+	const text = (t: SvgText): Placed | null => {
 		const runs = t.runs.map((r) => ({
 			...r,
 			font: { ...r.font, size: r.font.size * k },
 		}));
-		const base = runs[0] as (typeof runs)[number];
 		const size = Math.max(...runs.map((r) => r.font.size));
+		if (t.path) return pathText(t, t.path, runs, size);
 		const width = estimateTextWidth(runs) * WIDTH_ALLOWANCE + size;
 		const anchor = at(t.x, t.y);
 		const left =
@@ -223,37 +269,9 @@ export function svgToElements(
 			t.rotation,
 			anchor,
 		);
-		const fontOf = (f: (typeof runs)[number]["font"]) => ({
-			family: f.family,
-			size: round(f.size),
-			...(f.weight !== 400 ? { weight: f.weight as FontWeight } : {}),
-			...(f.style === "italic" ? { style: "italic" as const } : {}),
-		});
-		const same = runs.every(
-			(r) =>
-				r.color === base.color &&
-				r.font.family === base.font.family &&
-				r.font.size === base.font.size &&
-				r.font.weight === base.font.weight &&
-				r.font.style === base.font.style,
-		);
-		const properties: TextElement["properties"] = {
-			font: { ...fontOf(base.font), lineHeight: LINE_HEIGHT },
-			color: color(base.color),
-			align: t.anchor === "middle" ? "center" : t.anchor === "end" ? "right" : "left",
-		};
-		if (same) properties.value = runs.map((r) => r.text).join("");
-		else
-			properties.spans = runs.map((r) => ({
-				text: r.text,
-				font: {
-					family: r.font.family,
-					size: round(r.font.size),
-					weight: r.font.weight as FontWeight,
-					style: r.font.style,
-				},
-				color: color(r.color),
-			}));
+		const properties = textProperties(runs);
+		properties.align =
+			t.anchor === "middle" ? "center" : t.anchor === "end" ? "right" : "left";
 		const element: TextElement = {
 			id: uniqueId(t.id ?? "text"),
 			type: "text",
@@ -262,6 +280,41 @@ export function svgToElements(
 			properties,
 		};
 		if (t.rotation) element.rotation = round(t.rotation);
+		if (t.opacity !== undefined) element.opacity = t.opacity;
+		return { element, box };
+	};
+
+	// The element's box is the path's bounds grown by a line on every side, so
+	// the glyphs on it fall inside, kept within the drawing.
+	const pathText = (t: SvgText, path: SvgTextPath, runs: TextRuns, size: number): Placed | null => {
+		const segs = transformPath(normalizePath(path.d), m);
+		const b = pathBounds(segs);
+		if (!b) return null;
+		const pad = LINE_HEIGHT * size;
+		const x0 = Math.max(0, b.x - pad);
+		const y0 = Math.max(0, b.y - pad);
+		const x1 = Math.min(width, b.x + b.width + pad);
+		const y1 = Math.min(height, b.y + b.height + pad);
+		const box =
+			x1 > x0 && y1 > y0
+				? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
+				: { x: b.x - pad, y: b.y - pad, width: b.width + 2 * pad, height: b.height + 2 * pad };
+		const properties = textProperties(runs);
+		properties.path = {
+			d: serializePath(transformPath(segs, [1, 0, 0, 1, -box.x, -box.y])),
+			...(path.startOffset
+				? { startOffset: path.percent ? `${round(path.startOffset)}%` : round(path.startOffset * k) }
+				: {}),
+			...(path.side === "right" ? { side: "right" as const } : {}),
+			...(t.anchor !== "start" ? { align: t.anchor === "middle" ? ("center" as const) : ("end" as const) } : {}),
+		};
+		const element: TextElement = {
+			id: uniqueId(t.id ?? "text"),
+			type: "text",
+			pos: { x: round(box.x), y: round(box.y) },
+			size: { width: round(box.width), height: round(box.height) },
+			properties,
+		};
 		if (t.opacity !== undefined) element.opacity = t.opacity;
 		return { element, box };
 	};
@@ -292,6 +345,8 @@ export function svgToElements(
 		if (it.kind === "shape") return shape(it);
 		if (it.kind === "image") return image(it);
 		if (it.kind === "text") return text(it);
+		if (it.filter && !warnings.some((w) => w.feature === "filter"))
+			warnings.push({ feature: "filter", message: "filters are not applied to editable layers" });
 		if (!it.id && it.opacity === undefined && !it.clip && !it.mask && it.children.length === 1)
 			return item(it.children[0] as SvgItem);
 		const children = it.children.map(item).filter((p): p is Placed => !!p);
@@ -358,5 +413,5 @@ export function svgToElements(
 			...(spills ? { clipsContent: true } : {}),
 		},
 	};
-	return { element, warnings: drawing.warnings };
+	return { element, warnings };
 }

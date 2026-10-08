@@ -128,6 +128,9 @@ export const GradientStopSchema = z.object({
 	color: z.string(),
 });
 
+// What paints past the last stop. Omitted means pad, the last color held.
+export const GradientSpreadSchema = z.enum(["pad", "reflect", "repeat"]);
+
 export const GradientSchema = z.union([
 	z.object({
 		kind: z.literal("linear"),
@@ -140,6 +143,7 @@ export const GradientSchema = z.union([
 		from: z.tuple([z.number(), z.number()]).optional(),
 		to: z.tuple([z.number(), z.number()]).optional(),
 		stops: z.array(GradientStopSchema),
+		spread: GradientSpreadSchema.optional(),
 	}),
 	z.object({
 		kind: z.literal("radial"),
@@ -155,7 +159,14 @@ export const GradientSchema = z.union([
 		// Degrees the primary axis is turned from +x. Only meaningful alongside
 		// radiusY, since a circle looks the same at every angle.
 		rotation: z.number().optional(),
+		// Where the first stop sits, in the same units as `center`. Omitted means
+		// the center.
+		focus: z.tuple([z.number(), z.number()]).optional(),
+		// Radius of the first stop's circle around `focus`, in the units of
+		// `radius`. Omitted means 0.
+		focusRadius: z.number().nonnegative().optional(),
 		stops: z.array(GradientStopSchema),
+		spread: GradientSpreadSchema.optional(),
 	}),
 	z.object({
 		kind: z.literal("angular"),
@@ -200,6 +211,8 @@ const FontDescriptorObjectSchema = z.object({
 	// per family at render time; see freshcoat's line-height.
 	lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 	decoration: z.enum(["underline", "line-through"]).optional(),
+	// Break an underline where glyphs cross it. Defaults to true.
+	skipInk: z.boolean().optional(),
 	// Merged over the element's own axes.
 	variations: FontVariationsSchema.optional(),
 	// Merged over the element's own features.
@@ -230,6 +243,7 @@ export const TextPropertiesSchema = z.object({
 		// A number, or "auto" — see FontDescriptorObjectSchema above.
 		lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 		decoration: z.enum(["underline", "line-through"]).optional(),
+		skipInk: z.boolean().optional(),
 		variations: FontVariationsSchema.optional(),
 		features: FontFeaturesSchema.optional(),
 	}),
@@ -283,6 +297,32 @@ export const TextPropertiesSchema = z.object({
 			direction: z.enum(["outside", "inside"]).optional(),
 			// Which part of the ring sits at startAngle. Default center.
 			align: z.enum(["start", "center", "end"]).optional(),
+			// "shrink" scales a ring longer than its circle down until it fits.
+			// Without it, such a ring overlaps itself and the render warns.
+			fit: z.literal("shrink").optional(),
+		})
+		.optional(),
+	// Sets the text along a path, as SVG's <textPath>. Wins over `arc`. Each hard
+	// line is one baseline below the last; nothing wraps. Glyphs that run past
+	// an open path's ends, or a whole lap of a closed one, are hidden.
+	path: z
+		.object({
+			// Path data in the element's own design units, or `ref`, the id of a
+			// sibling vector. `d` wins when both are set.
+			d: z.string().optional(),
+			ref: z.string().optional(),
+			// Where `align` anchors the text along the path: design units, or a
+			// share of its length as "50%". Default 0.
+			startOffset: z
+				.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?%$/)])
+				.optional(),
+			// left follows the path's direction, right reverses it. Default left.
+			side: z.enum(["left", "right"]).optional(),
+			// Which part of the text sits at startOffset. Default start.
+			align: z.enum(["start", "center", "end"]).optional(),
+		})
+		.refine((p) => p.d !== undefined || p.ref !== undefined, {
+			message: "a text path needs `d` or `ref`",
 		})
 		.optional(),
 });
