@@ -18,13 +18,14 @@ import {
 	Collection,
 	type DropOperation,
 	type Key,
+	Button as RACButton,
 	type Selection,
 	useDragAndDrop,
 } from "react-aria-components";
 import { COMMAND_BY_ID, type CommandContext } from "~/app/commands";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
-import { VARIANT_UI } from "~/app/copy";
+import { CONTENT, VARIANT_UI } from "~/app/copy";
 import { layerIcon } from "~/app/icons";
 import { moveElements, renameElement } from "~/doc/ops";
 import { parentKeyOf, remapKeys, walkLayers } from "~/doc/path";
@@ -677,15 +678,19 @@ function RowLabel({ row }: { row: LayerRow }) {
 				/>
 			) : null}
 			{row.bound && (
-				<span
-					title="Uses a field"
+				<RACButton
+					aria-label={CONTENT.usesFields(row.fields)}
+					data-testid="layer-fields"
+					onPress={() =>
+						controller.dispatch({ type: "showFields", fields: row.fields })
+					}
 					className={cn(
-						"shrink-0 rounded-[2px] bg-fc-accent-soft px-[3px] font-mono text-[10px] text-fc-accent-hover leading-[14px]",
+						"shrink-0 cursor-default rounded-[2px] bg-fc-accent-soft px-[3px] font-mono text-[10px] text-fc-accent-hover leading-[14px] outline-none data-hovered:text-fc-text data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent",
 						dim && "opacity-45",
 					)}
 				>
-					{"{}"}
-				</span>
+					<span title={CONTENT.usesFields(row.fields)}>{"{}"}</span>
+				</RACButton>
 			)}
 		</span>
 	);

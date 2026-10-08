@@ -132,6 +132,8 @@ export type EditorState = {
 	panels: { left: boolean; right: boolean };
 	rulers: boolean;
 	rightTab: RightTab;
+	/** Fields the Content tab is asked to expand and scroll to. */
+	shownFields: string[] | null;
 	geometry: LayerGeometry;
 	render: RenderState;
 	section: Section;
@@ -198,6 +200,7 @@ export type Action =
 	| { type: "setPanels"; panels: Partial<EditorState["panels"]> }
 	| { type: "setRulers"; on: boolean }
 	| { type: "setRightTab"; tab: RightTab }
+	| { type: "showFields"; fields: string[] | null }
 	| { type: "setActiveFill"; fill: { key: string; index: number } | null }
 	| {
 			type: "rendered";
@@ -285,6 +288,7 @@ export function initialState(
 		panels,
 		rulers: false,
 		rightTab: "design",
+		shownFields: null,
 		geometry: new Map(),
 		render: { status: "idle", warnings: [] },
 		section: "edit",
@@ -574,6 +578,17 @@ function reduceView(state: EditorState, action: Action): EditorState {
 			const tab = LEGACY_TAB[action.tab] ?? action.tab;
 			return state.rightTab === tab ? state : { ...state, rightTab: tab };
 		}
+		case "showFields":
+			return action.fields
+				? {
+						...state,
+						rightTab: "content",
+						panels: { ...state.panels, right: true },
+						shownFields: action.fields,
+					}
+				: state.shownFields
+					? { ...state, shownFields: null }
+					: state;
 		case "setActiveFill": {
 			const a = state.activeFill;
 			const b = action.fill;

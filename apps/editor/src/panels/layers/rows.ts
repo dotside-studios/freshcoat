@@ -1,5 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { hasToken } from "@freshcoat-js/coatfile/mustache";
+import { hasToken, tokenIds } from "@freshcoat-js/coatfile/mustache";
 import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";
@@ -12,6 +12,8 @@ export type LayerRow = {
 	element: Layer;
 	/** Reads a field through a token in its own properties, or has `visibleWhen`. */
 	bound: boolean;
+	/** The fields it reads, in the order it names them. */
+	fields: string[];
 	/** A frame or mask, which accepts a drop "on" it. */
 	container: boolean;
 	/** Topmost first, a mask's source last. */
@@ -27,6 +29,26 @@ export function isBound(layer: Layer): boolean {
 		...own
 	} = (layer.properties ?? {}) as Record<string, unknown>;
 	return hasToken(own);
+}
+
+/** The fields the layer itself reads, through tokens or `visibleWhen`. */
+export function layerFields(layer: Layer): string[] {
+	const found = new Set<string>();
+	const scan = (value: unknown) => {
+		if (typeof value === "string")
+			for (const id of tokenIds(value)) found.add(id);
+		else if (value && typeof value === "object")
+			for (const item of Object.values(value)) scan(item);
+	};
+	const {
+		children: _c,
+		mask: _m,
+		...own
+	} = (layer.properties ?? {}) as Record<string, unknown>;
+	scan(own);
+	if ("visibleWhen" in layer && layer.visibleWhen)
+		for (const cond of [layer.visibleWhen].flat()) found.add(cond.field);
+	return [...found];
 }
 
 // Rows are reused while their element object and key are unchanged, since
@@ -49,6 +71,7 @@ function rowFor(
 		kind,
 		element,
 		bound: isBound(element),
+		fields: layerFields(element),
 		container,
 		children: children(),
 	};
