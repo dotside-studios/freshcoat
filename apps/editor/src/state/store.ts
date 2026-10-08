@@ -114,6 +114,24 @@ export type RenderState = {
 	barcodes?: BarcodeIssue[];
 };
 
+/** What Export shows around its preview, kept while another section shows. */
+export type ExportView = {
+	tab: "filmstrip" | "records";
+	filter: "all" | RecordStatus;
+	scope: "export" | "all" | "failed";
+	/** Records chosen in the list, when the preset does not keep its own. */
+	selection: string[];
+	settingsTab: "content" | "output" | "print" | "files";
+};
+
+const EXPORT_VIEW: ExportView = {
+	tab: "filmstrip",
+	filter: "all",
+	scope: "export",
+	selection: [],
+	settingsTab: "content",
+};
+
 export type EditorState = {
 	doc: DocState | null;
 	side: number;
@@ -142,6 +160,7 @@ export type EditorState = {
 	/** The current dataset record, shared by Edit's preview, Data's focused
 	 *  record and Export's preview; each shows it when its dataset has it. */
 	recordId: string | null;
+	exportView: ExportView;
 	/** The gradient fill last opened in the inspector, which the canvas
 	 *  handles edit while its layer is the one selected. */
 	activeFill: { key: string; index: number } | null;
@@ -261,6 +280,7 @@ export type Action =
 	| { type: "setActivePreset"; id: string | null }
 	| { type: "setPreviewRecord"; id: string | null }
 	| { type: "setRecord"; id: string | null }
+	| { type: "setExportView"; view: Partial<ExportView> }
 	| {
 			type: "previewRecord";
 			id: string;
@@ -292,6 +312,7 @@ export function initialState(
 		workspace: null,
 		previewRecordId: null,
 		recordId: null,
+		exportView: EXPORT_VIEW,
 		activeFill: null,
 		textEdit: null,
 	};
@@ -790,6 +811,14 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 			return state.previewRecordId === action.id
 				? state
 				: { ...state, previewRecordId: action.id };
+		case "setExportView": {
+			const next = { ...state.exportView, ...action.view };
+			return (Object.keys(next) as (keyof ExportView)[]).every(
+				(k) => next[k] === state.exportView[k],
+			)
+				? state
+				: { ...state, exportView: next };
+		}
 		case "setRecord":
 			return state.recordId === action.id
 				? state

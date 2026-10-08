@@ -305,6 +305,29 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 	});
 
+	test("keeps its tabs and selection after another section shows", async () => {
+		const { controller, user, list } = await recordsTab();
+		const rowOf = (name: string) =>
+			within(list).getByText(name).closest('[role="row"]') as HTMLElement;
+		await user.click(within(rowOf("Ada")).getByRole("checkbox"));
+		await user.click(screen.getByRole("tab", { name: "Files" }));
+		cleanup();
+		act(() => controller.dispatch({ type: "setSection", section: "edit" }));
+		act(() => controller.dispatch({ type: "setSection", section: "export" }));
+		render(
+			<ControllerProvider controller={controller}>
+				<ExportSection />
+			</ControllerProvider>,
+		);
+		expect(
+			screen.getByRole("tab", { name: "Records", selected: true }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("tab", { name: "Files", selected: true }),
+		).toBeTruthy();
+		expect(button("Export 1 selected")).toBeTruthy();
+	});
+
 	test("with records set to selected, the list selection is the preset's", async () => {
 		const { controller, user } = setup();
 		const templateId = controller.state.workspace?.activeTemplateId as string;
