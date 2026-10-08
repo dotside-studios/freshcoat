@@ -53,6 +53,8 @@ function smoothedRadius(
 // every side (out when negative), as an inside/outside stroke follows it. Null
 // when insetting the box is not an offset of the outline (a polygon, an
 // outset rect); such a stroke clips a doubled stroke to the uninset outline.
+// `fromTop` starts a circle or ellipse at its top, running clockwise, as a
+// trimmed stroke measures it.
 export function outlineGeometry(
 	shape: ShapeMask,
 	x: number,
@@ -60,6 +62,7 @@ export function outlineGeometry(
 	w: number,
 	h: number,
 	inset = 0,
+	fromTop = false,
 ): OutlineGeometry | null {
 	const ix = x + inset;
 	const iy = y + inset;
@@ -101,6 +104,7 @@ export function outlineGeometry(
 			const rr = Math.min(cw, ch) / 2;
 			const cx = ix + cw / 2;
 			const cy = iy + ch / 2;
+			if (fromTop) return { kind: "path", d: ellipseFromTop(cx, cy, rr, rr) };
 			return {
 				kind: "path",
 				d: `M ${cx - rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx + rr} ${cy} A ${rr} ${rr} 0 1 0 ${cx - rr} ${cy} Z`,
@@ -112,6 +116,8 @@ export function outlineGeometry(
 			const rx = ew / 2;
 			const ry = eh / 2;
 			const cy = iy + eh / 2;
+			if (fromTop)
+				return { kind: "path", d: ellipseFromTop(ix + rx, cy, rx, ry) };
 			return {
 				kind: "path",
 				d: `M ${ix} ${cy} A ${rx} ${ry} 0 1 0 ${ix + ew} ${cy} A ${rx} ${ry} 0 1 0 ${ix} ${cy} Z`,
@@ -159,6 +165,15 @@ export function outlineGeometry(
 	}
 }
 
+export function ellipseFromTop(
+	cx: number,
+	cy: number,
+	rx: number,
+	ry: number,
+): string {
+	return `M ${cx} ${cy - ry} A ${rx} ${ry} 0 1 1 ${cx} ${cy + ry} A ${rx} ${ry} 0 1 1 ${cx} ${cy - ry} Z`;
+}
+
 // The outline over the box (0, 0, w, h) as a path, for hit testing. The caller
 // owns and deletes it.
 export function outlinePath(
@@ -167,17 +182,45 @@ export function outlinePath(
 	w: number,
 	h: number,
 	inset = 0,
+	fromTop = false,
 ): Path | null {
-	const g = outlineGeometry(shape, 0, 0, w, h, inset);
+	const g = outlineGeometry(shape, 0, 0, w, h, inset, fromTop);
 	if (!g) return null;
 	if (g.kind === "path") return ck.Path.MakeFromSVGString(g.d);
+	return boxPath(ck, g.ltrb, g.kind === "rrect" ? g.radii : undefined);
+}
+
+// A rect, or a rect with circular corners [topLeft, topRight, bottomRight,
+// bottomLeft], as a clockwise path from the top left. The caller owns and
+// deletes it.
+export function boxPath(
+	ck: CanvasKit,
+	ltrb: readonly [number, number, number, number],
+	radii?: readonly [number, number, number, number],
+): Path {
 	const builder = new ck.PathBuilder();
-	if (g.kind === "rect") builder.addRect(ck.LTRBRect(...g.ltrb));
+	const [l, t, r, b] = ltrb;
+	if (!radii) builder.addRect(ck.LTRBRect(l, t, r, b));
 	else {
-		const [tl, tr, br, bl] = g.radii;
-		builder.addRRect(
-			Float32Array.of(...g.ltrb, tl, tl, tr, tr, br, br, bl, bl),
+		const fit = Math.min(
+			1,
+			(r - l) / (radii[0] + radii[1]) || 1,
+			(b - t) / (radii[1] + radii[2]) || 1,
+			(r - l) / (radii[2] + radii[3]) || 1,
+			(b - t) / (radii[3] + radii[0]) || 1,
 		);
+		const [tl, tr, br, bl] = radii.map((v) => Math.max(0, v) * fit);
+		const w = Math.SQRT1_2;
+		builder.moveTo(l + tl, t);
+		builder.lineTo(r - tr, t);
+		if (tr > 0) builder.conicTo(r, t, r, t + tr, w);
+		builder.lineTo(r, b - br);
+		if (br > 0) builder.conicTo(r, b, r - br, b, w);
+		builder.lineTo(l + bl, b);
+		if (bl > 0) builder.conicTo(l, b, l, b - bl, w);
+		builder.lineTo(l, t + tl);
+		if (tl > 0) builder.conicTo(l, t, l + tl, t, w);
+		builder.close();
 	}
 	const path = builder.detach();
 	builder.delete();

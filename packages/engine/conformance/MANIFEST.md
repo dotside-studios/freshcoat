@@ -178,7 +178,7 @@ correctly:
 Honest list of what is not covered yet, so a backend author knows what passing
 does and does not prove.
 
-- **Strokes**: `dash`, `cap` and `join`. Width and `align` are covered; the
+- **Strokes**: `dash`, `cap`, `join` and trims. Width and `align` are covered; the
   rest are geometry whose exact coverage is harder to assert on a flat sample.
 - **Shapes**: `cornerSmoothing` (squircles). The corner of a smoothed rect
   differs from a circular arc by a couple of pixels, which needs a sample chosen

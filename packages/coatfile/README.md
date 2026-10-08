@@ -694,6 +694,19 @@ A `rect` or `frame` takes `cornerRadius` as one number or per corner,
 fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
 an `outside` stroke beyond its clip, so the clip never hides it.
 
+`trimStart` and `trimEnd` draw only part of a stroke, as fractions of
+the outline's length from its start; `trimOffset` rotates that part along the
+outline and wraps past its end. A start after the end swaps them. Each takes a
+number or a string, so a field can drive it: `"trimEnd": "{{progress}}"`. A
+string reads as a number, or with a trailing `%` as a percentage; one that
+reads as neither leaves the default. Start and end clamp to `[0, 1]`.
+
+A rect or frame trims clockwise from its top left corner. An image trims along
+its mask. A vector trims along its own path, except that a vector drawing an
+ellipse across its box, as Studio draws one, trims clockwise from the top like
+a progress ring. The trim cuts the outline before any `dash`, so the pattern
+starts at the trimmed start, and `cap` applies to the trimmed ends.
+
 ## Ellipses
 
 There is no ellipse element. An ellipse is a `vector` whose `d` is two arcs

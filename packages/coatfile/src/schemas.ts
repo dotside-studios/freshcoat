@@ -310,6 +310,12 @@ export const StrokeSchema = z.object({
 	cap: z.enum(["butt", "round", "square"]).optional(),
 	join: z.enum(["round", "bevel", "miter"]).optional(),
 	align: z.enum(["inside", "outside", "center"]).optional(),
+	// The drawn part of the outline as fractions of its length, and a rotation
+	// of that part along it. A string binds a field, as "{{progress}}"; it
+	// compiles to a number or, with a trailing %, a percentage.
+	trimStart: z.union([z.number().min(0).max(1), z.string()]).optional(),
+	trimEnd: z.union([z.number().min(0).max(1), z.string()]).optional(),
+	trimOffset: z.union([z.number(), z.string()]).optional(),
 });
 
 // Fractions of the source image's width and height.

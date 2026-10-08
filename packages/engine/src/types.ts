@@ -177,6 +177,13 @@ export type Stroke = {
 	// Stroke position relative to the shape edge (Figma). Omitted = center (the
 	// native canvas/Skia alignment). Honored by every stroked drawable.
 	align?: "inside" | "outside" | "center";
+	// The drawn part of the outline, as fractions of its length from its start.
+	// Omitted = 0 and 1. `trimOffset` rotates that part along the outline,
+	// wrapping past its end. Circles and ellipses start at the top and run
+	// clockwise when trimmed; other outlines follow their own direction.
+	trimStart?: number;
+	trimEnd?: number;
+	trimOffset?: number;
 };
 
 export type GradientFill = Extract<

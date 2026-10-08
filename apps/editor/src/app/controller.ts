@@ -1530,12 +1530,14 @@ export class EditorController {
 	): string | null {
 		const t = this.template;
 		if (!t) return null;
-		const { geometry, locked, hidden, side, selection, view } = this.state;
+		const { geometry, locked, hidden, side, selection, view, values } =
+			this.state;
 		const ck = loadedCanvasKit() as CanvasKit | undefined;
 		if (ck) this.shapeHits ??= new ShapeHits(ck);
 		const hit = hitLayer(t, side, geometry, locked, hidden, point, {
 			shapes: this.shapeHits,
 			tolerance: HIT_TOLERANCE_PX / view.zoom,
+			values,
 		});
 		if (!hit || opts.deep) return hit;
 		return topmostSelectable(hit, selection);
@@ -1569,7 +1571,8 @@ function warnStructural(
  * The topmost layer under `point` that is neither locked, under a locked
  * layer, nor hidden. Walks back to front, so the first hit is the answer.
  * Backgrounds and mask sources are never hit. With `shapes`, rects and
- * vectors are hit only where they paint.
+ * vectors are hit only where they paint, with field-bound trims read from
+ * `values`.
  */
 export function hitLayer(
 	t: Template,
@@ -1578,7 +1581,11 @@ export function hitLayer(
 	locked: ReadonlySet<string>,
 	hidden: ReadonlySet<string>,
 	point: { x: number; y: number },
-	opts: { shapes?: ShapeHits; tolerance?: number } = {},
+	opts: {
+		shapes?: ShapeHits;
+		tolerance?: number;
+		values?: Record<string, unknown>;
+	} = {},
 ): string | null {
 	const frame = t.template_data[side];
 	if (!frame) return null;
@@ -1596,7 +1603,10 @@ export function hitLayer(
 		if (!box) return null;
 		const reach = opts.shapes ? hitReach(el, opts.tolerance) : 0;
 		if (!containsPoint(box.rect, box.worldRotation, point, reach)) return null;
-		if (opts.shapes && !opts.shapes.hits(key, el, box, point, opts.tolerance))
+		if (
+			opts.shapes &&
+			!opts.shapes.hits(key, el, box, point, opts.tolerance, opts.values)
+		)
 			return null;
 		return key;
 	};
