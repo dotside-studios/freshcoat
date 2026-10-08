@@ -20,6 +20,7 @@ import {
 	orientedSize,
 	parseAssetRef,
 	pdfLayout,
+	planExport,
 } from "@freshcoat-js/workspace";
 import type { JobResult } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
@@ -351,6 +352,24 @@ export function retryPreset(
 		records: "selected",
 		selected: recordOutcome(result).failed,
 	};
+}
+
+/** The records a job left unwritten, in plan order: all of them for a PDF,
+ *  which is written only once whole. */
+export function unwrittenRecordIds(
+	workspace: Workspace,
+	preset: ExportPreset,
+	result: JobResult,
+): string[] {
+	const written = new Set(
+		preset.format === "pdf"
+			? []
+			: result.items.filter((i) => i.ok).map((i) => i.key),
+	);
+	const out = new Set<string>();
+	for (const item of planExport(workspace, preset))
+		if (item.recordId && !written.has(item.key)) out.add(item.recordId);
+	return [...out];
 }
 
 export function formatTime(iso: string | number | undefined): string {

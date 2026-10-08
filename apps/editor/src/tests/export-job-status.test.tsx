@@ -5,6 +5,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
+import { DataJobBar } from "~/data/ExportSelected";
 import { exportJobsFor } from "~/export/export-jobs";
 import { JobIndicator } from "~/export/JobIndicator";
 import type {
@@ -213,5 +214,73 @@ describe("finished job toast", () => {
 			await run;
 		});
 		expect(toast).not.toHaveBeenCalled();
+	});
+});
+
+describe("after a job stops", () => {
+	function renderBar(controller: EditorController) {
+		render(
+			<ControllerProvider controller={controller}>
+				<DataJobBar onShowFailed={() => {}} />
+			</ControllerProvider>,
+		);
+	}
+
+	test("a canceled job exports the records it did not write", async () => {
+		const { controller, preset, jobs, fake, user } = setup();
+		renderBar(controller);
+		const run = jobs.run(preset);
+		await waitFor(() => expect(fake.started).toHaveLength(1));
+		await act(async () => {
+			fake.finish({
+				items: [
+					{
+						key: "r1:front",
+						recordId: "r1",
+						side: "front",
+						fileName: "a",
+						ok: true,
+					},
+					{
+						key: "r2:front",
+						recordId: "r2",
+						side: "front",
+						fileName: "b",
+						ok: false,
+					},
+				],
+				cancelled: true,
+				ms: 1,
+			});
+			await run;
+		});
+		expect(jobs.getSnapshot().unwritten).toEqual(["r2", "r3"]);
+		await user.click(button("Export the rest"));
+		await waitFor(() => expect(fake.started).toHaveLength(2));
+		expect(fake.started[1]).toMatchObject({
+			records: "selected",
+			selected: ["r2", "r3"],
+		});
+		expect(jobs.getSnapshot().job).toMatchObject({
+			presetName: "All (rest)",
+			scope: "2 selected records",
+		});
+	});
+
+	test("a job that failed to run is retried", async () => {
+		const { controller, preset, jobs, fake, user } = setup();
+		renderBar(controller);
+		const run = jobs.run(preset);
+		await waitFor(() => expect(fake.started).toHaveLength(1));
+		await act(async () => {
+			fake.finish(null);
+			await run;
+		});
+		expect(screen.getByTestId("export-summary").textContent).toBe(
+			"Couldn't export: boom",
+		);
+		await user.click(button("Retry"));
+		await waitFor(() => expect(fake.started).toHaveLength(2));
+		expect(fake.started[1]).toEqual(preset);
 	});
 });

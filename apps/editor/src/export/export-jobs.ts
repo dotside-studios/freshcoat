@@ -19,6 +19,7 @@ import {
 	retryPreset,
 	selectedRunLabel,
 	statusActions,
+	unwrittenRecordIds,
 } from "./export-ui";
 import { openSink } from "./sinks";
 import {
@@ -64,6 +65,8 @@ export type ExportJobsSnapshot = {
 	 *  over chosen records, the preset with those records. */
 	lastPreset: ExportPreset | null;
 	lastResult: JobResult | null;
+	/** the records a cancelled job did not write, for "Export the rest" */
+	unwritten: readonly string[];
 	history: JobHistoryEntry[];
 };
 
@@ -119,6 +122,7 @@ export function createExportJobs(
 		job: null,
 		lastPreset: null,
 		lastResult: null,
+		unwritten: [],
 		history: [],
 	};
 	const set = (patch: Partial<ExportJobsSnapshot>) => {
@@ -209,6 +213,9 @@ export function createExportJobs(
 			set({
 				lastPreset: preset,
 				lastResult: result,
+				unwritten: result?.cancelled
+					? unwrittenRecordIds(workspace, preset, result)
+					: [],
 				history: [entry, ...snapshot.history].slice(0, HISTORY_SIZE),
 			});
 			if (result?.file && !result.cancelled) download(result.file);
