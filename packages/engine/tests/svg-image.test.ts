@@ -112,6 +112,28 @@ describe("svgToNode", () => {
 		});
 	});
 
+	test("a gradient stroke becomes the stroke's gradient", () => {
+		const node = svgToNode(
+			parseSvg(
+				'<svg width="10" height="10"><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" x2="10"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><rect x="2" y="2" width="6" height="6" fill="none" stroke="url(#g)" stroke-width="2"/></svg>',
+			),
+		);
+		const path = node.children[0] as PathNode;
+		expect(path.stroke).toEqual({
+			color: "#ff0000ff",
+			gradient: {
+				kind: "linear",
+				from: { x: 0, y: 0 },
+				to: { x: 1, y: 0 },
+				stops: [
+					{ offset: 0, color: "#ff0000ff" },
+					{ offset: 1, color: "#0000ffff" },
+				],
+			},
+			width: 2,
+		});
+	});
+
 	test("clips and masks become mask nodes", () => {
 		const node = svgToNode(
 			parseSvg(

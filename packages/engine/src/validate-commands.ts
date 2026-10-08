@@ -577,7 +577,19 @@ function validateStroke(
 			`${path}.dash`,
 			id,
 		);
+	const gradient = stroke.gradient;
+	if (gradient === undefined) return;
+	if (!STROKE_GRADIENTS.includes(gradient.kind))
+		add(
+			"bad_stroke_gradient",
+			`stroke gradient must be linear, radial or angular, got "${gradient.kind}"`,
+			`${path}.gradient.kind`,
+			id,
+		);
+	else validateFill(gradient, `${path}.gradient`, add, id);
 }
+
+const STROKE_GRADIENTS: readonly string[] = ["linear", "radial", "angular"];
 
 function validateCornerRadius(
 	radius: CornerRadius,

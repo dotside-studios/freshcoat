@@ -52,6 +52,8 @@ import type {
 	Fill,
 	FontRequest,
 	FrameFlexLayout,
+	Gradient,
+	GradientFill,
 	GridTrack,
 	ImageCrop,
 	Layout,
@@ -1200,7 +1202,7 @@ function hasOverrides(span: TextSpanInput): boolean {
 // ─────────────── fills / strokes / shadows / clips ───────────────
 
 type StrokeInput = {
-	color: string;
+	color: string | Gradient;
 	width: number;
 	dash?: number[];
 	cap?: Stroke["cap"];
@@ -1213,8 +1215,14 @@ function resolveStroke(
 	ratio: number,
 ): Stroke | undefined {
 	if (!stroke) return undefined;
+	const { color } = stroke;
 	return {
-		color: stroke.color,
+		...(typeof color === "string"
+			? { color }
+			: {
+					color: color.stops[0]?.color ?? "#000000",
+					gradient: resolveFill(color, ratio) as GradientFill,
+				}),
 		width: stroke.width * ratio,
 		dash: stroke.dash?.map((d) => d * ratio),
 		cap: stroke.cap,

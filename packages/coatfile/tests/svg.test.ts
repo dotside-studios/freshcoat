@@ -160,6 +160,36 @@ describe("svgToElements", () => {
 		});
 	});
 
+	test("a gradient stroke keeps its gradient, on the vector's own box", () => {
+		const { element, warnings } = svgToElements(
+			svg(
+				'<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="10" y1="0" x2="30" y2="0"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><radialGradient id="r"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><rect x="10" width="20" height="10" fill="none" stroke="url(#g)" stroke-width="2"/><rect width="40" height="20" fill="none" stroke="url(#r)"/>',
+			),
+		);
+		expect(warnings).toEqual([]);
+		const [lin, rad] = element.properties.children as VectorElement[];
+		expect(lin?.properties.stroke).toEqual({
+			color: {
+				kind: "linear",
+				angle: 0,
+				from: [0, 0],
+				to: [1, 0],
+				stops: [
+					{ offset: 0, color: "#ff0000" },
+					{ offset: 1, color: "#0000ff" },
+				],
+			},
+			width: 2,
+		});
+		expect(rad?.properties.stroke?.color).toMatchObject({
+			kind: "radial",
+			center: [0.5, 0.5],
+			radius: 0.5,
+			radiusY: 0.25,
+		});
+		expect(validate(template(element)).ok).toBe(true);
+	});
+
 	test("clip paths and masks become mask elements", () => {
 		const { element } = svgToElements(
 			svg(

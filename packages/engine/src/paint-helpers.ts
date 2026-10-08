@@ -123,7 +123,9 @@ function clamp01(v: number): number {
 }
 
 // Stroke-edge offset for alignment: +w/2 pulls it inside, -w/2 outside, 0 center.
-export function strokeInset(stroke: Stroke): number {
+export function strokeInset<S extends Pick<Stroke, "width" | "align">>(
+	stroke: S,
+): number {
 	if (stroke.align === "inside") return stroke.width / 2;
 	if (stroke.align === "outside") return -stroke.width / 2;
 	return 0;

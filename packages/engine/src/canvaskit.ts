@@ -391,11 +391,22 @@ const STROKE_JOIN: Record<string, EnumKey<StrokeJoinEnumValues>> = {
 	bevel: "Bevel",
 };
 
-function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
+type PaintBox = { x: number; y: number; w: number; h: number };
+
+function strokePaint(
+	ck: CanvasKit,
+	bin: Bin,
+	stroke: Stroke,
+	box: PaintBox,
+): Paint {
 	const p = bin.track(new ck.Paint());
 	p.setAntiAlias(true);
 	p.setStyle(ck.PaintStyle.Stroke);
-	p.setColor(toColor(ck, stroke.color));
+	if (stroke.gradient)
+		p.setShader(
+			shaderFor(ck, bin, stroke.gradient, box.x, box.y, box.w, box.h),
+		);
+	else p.setColor(toColor(ck, stroke.color));
 	p.setStrokeWidth(stroke.width);
 	p.setStrokeCap(ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]]);
 	p.setStrokeJoin(ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]]);
@@ -413,6 +424,7 @@ function drawClippedStroke(
 	bin: Bin,
 	outline: Outline,
 	stroke: Stroke,
+	box: PaintBox,
 ) {
 	canvas.save();
 	clipOutline(
@@ -424,7 +436,7 @@ function drawClippedStroke(
 	drawOutline(
 		canvas,
 		outline,
-		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
+		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }, box),
 	);
 	canvas.restore();
 }
@@ -535,13 +547,14 @@ function drawOutlineStroke(
 	const { x, y } = pos;
 	const { width: w, height: h } = size;
 	const inset = strokeInset(stroke);
+	const box = { x, y, w, h };
 	const o = outlineOf(ck, bin, shape, x, y, w, h, inset);
 	if (o) {
-		drawOutline(canvas, o, strokePaint(ck, bin, stroke));
+		drawOutline(canvas, o, strokePaint(ck, bin, stroke, box));
 		return;
 	}
 	const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
-	drawClippedStroke(ck, canvas, bin, whole, stroke);
+	drawClippedStroke(ck, canvas, bin, whole, stroke, box);
 }
 
 function textStyleOf(
@@ -1344,11 +1357,20 @@ function drawPath(
 		canvas.drawPath(path, paint);
 	}
 	if (cmd.stroke) {
+		const box = { x: 0, y: 0, w: boxW, h: boxH };
 		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
-		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
+		if (outline)
+			canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke, box));
 		else if (strokeInset(cmd.stroke) !== 0)
-			drawClippedStroke(ck, canvas, bin, { kind: "path", path }, cmd.stroke);
-		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
+			drawClippedStroke(
+				ck,
+				canvas,
+				bin,
+				{ kind: "path", path },
+				cmd.stroke,
+				box,
+			);
+		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke, box));
 	}
 	canvas.restore();
 }

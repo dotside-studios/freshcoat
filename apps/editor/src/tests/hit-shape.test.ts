@@ -195,6 +195,42 @@ describe("hitLayer with shapes", () => {
 		expect(tolerant(36, 100)).toBe("0/0");
 	});
 
+	it("hits a gradient stroke as it hits a solid one", () => {
+		const gradient = {
+			kind: "linear" as const,
+			angle: 0,
+			stops: [
+				{ offset: 0, color: "#ff0000" },
+				{ offset: 1, color: "#0000ff" },
+			],
+		};
+		const shape = (
+			type: "rect" | "vector",
+			align: "inside" | "outside",
+			dash?: number[],
+		): Element =>
+			({
+				id: `${type}-${align}`,
+				type,
+				pos: { x: 50, y: 50 },
+				size: { width: 100, height: 100 },
+				properties: {
+					...(type === "vector" ? { d: "M0 0H100V100H0Z" } : {}),
+					stroke: { color: gradient, width: 10, align, dash },
+				},
+			}) as Element;
+		for (const type of ["rect", "vector"] as const) {
+			const inside = hitter(scene(under, shape(type, "inside")));
+			expect(inside(55, 100)).toBe("0/1");
+			expect(inside(100, 100)).toBe("0/0");
+			const outside = hitter(scene(under, shape(type, "outside")));
+			expect(outside(45, 100)).toBe("0/1");
+			expect(outside(39, 100)).toBe("0/0");
+			const dashed = hitter(scene(under, shape(type, "inside", [4, 4])));
+			expect(dashed(55, 100)).toBe("0/1");
+		}
+	});
+
 	it("hits strokes outside a rotated box", () => {
 		const hit = hitter(
 			scene(under, {

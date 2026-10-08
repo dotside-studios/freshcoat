@@ -163,7 +163,11 @@ export type ViewBox = { x?: number; y?: number; width: number; height: number };
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 
 export type Stroke = {
+	// The solid colour, and the fallback when `gradient` is set.
 	color: string;
+	// Painted along the stroke in place of `color`, placed in the drawable's box
+	// as a fill is.
+	gradient?: GradientFill;
 	width: number;
 	// Empty array or undefined = solid line.
 	dash?: number[];
@@ -174,6 +178,11 @@ export type Stroke = {
 	// native canvas/Skia alignment). Honored by every stroked drawable.
 	align?: "inside" | "outside" | "center";
 };
+
+export type GradientFill = Extract<
+	ResolvedFill,
+	{ kind: "linear" | "radial" | "angular" }
+>;
 
 // Gradient endpoints are in [0, 1] of the drawable's bbox.
 export type ResolvedFill =

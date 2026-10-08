@@ -243,7 +243,7 @@ describe("dynamic image shape", () => {
 		});
 	});
 
-	it("leaves out a gradient stroke, and warns", () => {
+	it("keeps a gradient stroke", () => {
 		const r = dynamicElement(
 			baseImage({
 				name: "{{avatar}}",
@@ -261,6 +261,27 @@ describe("dynamic image shape", () => {
 						],
 					},
 				],
+				strokeWeight: 4,
+			}),
+		);
+		expect(r.element.properties.stroke?.color).toEqual({
+			kind: "linear",
+			angle: 0,
+			from: [0, 0.5],
+			to: [1, 0.5],
+			stops: [
+				{ offset: 0, color: "#000000" },
+				{ offset: 1, color: "#ffffff" },
+			],
+		});
+		expect(r.warnings).toEqual([]);
+	});
+
+	it("leaves out an image stroke, and warns", () => {
+		const r = dynamicElement(
+			baseImage({
+				name: "{{avatar}}",
+				strokes: [{ type: "IMAGE", scaleMode: "FILL", imageRef: "h" }],
 				strokeWeight: 4,
 			}),
 		);

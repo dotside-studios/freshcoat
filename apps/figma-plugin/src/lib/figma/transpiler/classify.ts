@@ -188,14 +188,17 @@ function fillsFlattenReason(
 	return undefined;
 }
 
-// coatfile strokes take one colour, so only solid paints composite into one.
-function strokeFlattens(n: {
-	strokes?: FigmaPaint[];
-	strokeWeight?: number;
-}): boolean {
+// A coatfile stroke takes one paint: solids composited into one colour, or a
+// single gradient.
+function strokeFlattens(n: FigmaNode & { strokeWeight?: number }): boolean {
 	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
 	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
-	return visible.length > 0 && compositeSolids(visible) === null;
+	if (visible.length === 0 || compositeSolids(visible) !== null) return false;
+	return !(
+		visible.length === 1 &&
+		visible[0].type !== "IMAGE" &&
+		isMappablePaint(visible[0], paintBox(n))
+	);
 }
 
 // coatfile carries a colour per span but a gradient only for the whole
