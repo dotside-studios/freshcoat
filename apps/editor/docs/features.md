@@ -31,9 +31,9 @@ the records, and **Export** turns templates and records into files.
     edit does not rewrite them.
 - **Starters:** the welcome screen's **Start from** group lists designs meant
   to be made your own, ahead of the samples:
-  - **Davi card**, CR80 landscape, and **Davi card, portrait**: name,
-    position and organization, a QR of the card link on the back, the Davi
-    wordmark, and cobalt, sage and plum variants;
+  - **Davi card**, CR80: name, position and organization, a QR of the card
+    link on the back, the Davi wordmark, and cobalt, sage and plum variants,
+    each also in portrait at 638 × 1012 (`cobalt-portrait`, and so on);
   - **Photo watermark**: a full-bleed photo with a mark pinned to its
     bottom-right corner, in landscape, portrait and square variants that
     each record picks by its photo's shape, with a `photo_focus` field that
@@ -256,7 +256,7 @@ action.
 | Parameter | Opens |
 |---|---|
 | `?sample=<id>` | a bundled sample: `membership-card`, `certificate`, `minimal` |
-| `?starter=<id>` | a starter: `davi-card`, `davi-card-portrait`, `photo-watermark`, `event-badge` |
+| `?starter=<id>` | a starter: `davi-card`, `photo-watermark`, `event-badge`; `davi-card-portrait` opens `davi-card` |
 | `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge` |
 
 A template can also arrive in the fragment, as the Figma plugin sends it:

@@ -38,7 +38,7 @@ describe("the Davi card starters", () => {
 	it.each([
 		"davi-card",
 		"davi-card-portrait",
-	])("%s opens with a preset that prints", async (id) => {
+	])("%s opens the one Davi card with a preset that prints", async (id) => {
 		const c = new EditorController();
 		await c.openStarter(id);
 		const ws = c.state.workspace;
@@ -48,6 +48,7 @@ describe("the Davi card starters", () => {
 			format: "png-zip",
 			print: { enabled: true },
 		});
+		expect(c.base?.id).toBe("davi-card");
 		expect(workspaceDirty(c.state)).toBe(false);
 	});
 });

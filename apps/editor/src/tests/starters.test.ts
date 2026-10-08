@@ -65,12 +65,7 @@ const CATALOGUE = await Promise.all(
 describe("starters", () => {
 	test("ids are unique, distinct from the samples, and each lists its size", async () => {
 		const ids = STARTERS.map((s) => s.id);
-		expect(ids).toEqual([
-			"davi-card",
-			"davi-card-portrait",
-			"photo-watermark",
-			"event-badge",
-		]);
+		expect(ids).toEqual(["davi-card", "photo-watermark", "event-badge"]);
 		for (const s of SAMPLES) expect(ids).not.toContain(s.id);
 		for (const s of STARTERS) {
 			const t = await s.load();
@@ -132,10 +127,13 @@ describe("the Davi card", () => {
 			["google", "Playfair Display"],
 			["google", "Roboto"],
 		]);
-		expect(t.variants?.map((v) => [v.id, v.swatch])).toEqual([
-			["cobalt", "#1d4ed8"],
-			["sage", "#3f6f4a"],
-			["plum", "#5b2a55"],
+		expect(t.variants?.map((v) => [v.id, v.swatch, v.size])).toEqual([
+			["cobalt", "#1d4ed8", undefined],
+			["sage", "#3f6f4a", undefined],
+			["plum", "#5b2a55", undefined],
+			["cobalt-portrait", "#1d4ed8", { width: 638, height: 1012 }],
+			["sage-portrait", "#3f6f4a", { width: 638, height: 1012 }],
+			["plum-portrait", "#5b2a55", { width: 638, height: 1012 }],
 		]);
 	});
 
@@ -161,20 +159,30 @@ describe("the Davi card", () => {
 		expect(footer.pos?.x).toBe(64);
 	});
 
-	test("the portrait card carries the same content at 638 x 1012", async () => {
-		const [wide, tall] = await Promise.all([
-			load("davi-card"),
-			load("davi-card-portrait"),
-		]);
+	test("the portrait variants lay the same card out at 638 x 1012", async () => {
+		const t = await load("davi-card");
+		const tall = applyVariant(t, "sage-portrait");
 		expect([tall.width, tall.height]).toEqual([638, 1012]);
-		expect(tall.fields).toEqual(wide.fields);
-		expect(tall.fonts).toEqual(wide.fonts);
-		expect(tall.variants?.map((v) => v.id)).toEqual(
-			wide.variants?.map((v) => v.id),
-		);
-		const tokens = (t: Template) =>
-			new Set(JSON.stringify(t.template_data).match(/\{\{\w+\}\}/g));
-		expect(tokens(tall)).toEqual(tokens(wide));
+		expect(tall.template_data[0]?.background.properties).toEqual({
+			fill: "#3f6f4a",
+		});
+
+		const mark = byId(tall, 0, "davi_wordmark");
+		expect(mark.pos).toEqual({ x: 64, y: 64 });
+		const name = byId(tall, 0, "name_text");
+		expect(name.pos).toEqual({ x: 64, y: 628 });
+		expect(name.properties).toMatchObject({
+			verticalAlign: "bottom",
+			maxLines: 2,
+		});
+		const tap = byId(tall, 0, "tap_footer");
+		expect(tap.pos?.y).toBe(1012 - 64 - 24);
+
+		const tile = byId(tall, 1, "qr_tile");
+		expect(tile.size).toEqual({ width: 320, height: 320 });
+		expect(tile.pos).toEqual({ x: (638 - 320) / 2, y: (1012 - 320) / 2 });
+		expect(byId(tall, 1, "back_qr").size).toEqual({ width: 266, height: 266 });
+		expect(byId(tall, 1, "back_footer").size?.width).toBe(638 - 128);
 	});
 
 	test("the wordmark scales its path to the width asked for", () => {
