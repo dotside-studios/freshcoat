@@ -360,6 +360,8 @@ export type TextArc = {
 	align: "start" | "center" | "end";
 	// Spreads each line's glyph positions across this many degrees.
 	sweep?: number;
+	// "shrink" scales a line longer than its circle down until it fits.
+	fit?: "shrink";
 };
 
 export type DrawTextCommand = DrawCommandBase & {
@@ -485,6 +487,23 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// A curved text line is longer than its circle, so its ends overlap.
+	| {
+			kind: "arc_text_overflow";
+			layer?: string;
+			line: number;
+			width: number;
+			circumference: number;
+	  }
+	// A curved text ring's radius was below the line's font size and was raised
+	// to it.
+	| {
+			kind: "arc_radius_clamped";
+			layer?: string;
+			line: number;
+			radius: number;
+			min: number;
+	  }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.

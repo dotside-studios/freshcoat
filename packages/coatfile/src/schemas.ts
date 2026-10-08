@@ -279,6 +279,9 @@ export const TextPropertiesSchema = z.object({
 			direction: z.enum(["outside", "inside"]).optional(),
 			// Which part of the ring sits at startAngle. Default center.
 			align: z.enum(["start", "center", "end"]).optional(),
+			// "shrink" scales a ring longer than its circle down until it fits.
+			// Without it, such a ring overlaps itself and the render warns.
+			fit: z.literal("shrink").optional(),
 		})
 		.optional(),
 });
