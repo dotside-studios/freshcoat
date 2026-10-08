@@ -457,6 +457,7 @@ function SrcField({
 			<InsertFieldMenu
 				template={template}
 				prefer={IMAGE_FORMATS}
+				newFormat="image"
 				onInsert={(id) => onCommit(`{{${id}}}`)}
 			/>
 		</div>

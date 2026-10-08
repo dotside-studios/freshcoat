@@ -3,6 +3,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
+import { CONTENT } from "~/app/copy";
 import { createElement } from "~/doc/factories";
 import { insertElements, unwrap } from "~/doc/ops";
 import { getElement } from "~/doc/path";
@@ -83,5 +84,42 @@ describe("Insert field", () => {
 		const menu = await screen.findByRole("menu");
 		await user.click(within(menu).getByRole("menuitem", { name: /name/ }));
 		expect(props(c).value).toBe("https://x.io/{{name}}");
+	});
+
+	it("creates a field from the menu and inserts it", async () => {
+		const user = fastUser();
+		const c = setup(withLayer("image", { src: "https://example.com/a.png" }));
+		await user.click(button("Insert field"));
+		const menu = await screen.findByRole("menu");
+		await user.click(
+			within(menu).getByRole("menuitem", { name: CONTENT.newField }),
+		);
+		const key = await screen.findByRole("textbox", { name: CONTENT.newKey });
+		await user.type(key, "logo{Enter}");
+		const t = c.template as Template;
+		expect(t.fields.properties.logo).toEqual({
+			type: "string",
+			title: "Logo",
+			format: "image",
+		});
+		expect(props(c).src).toBe("{{logo}}");
+		expect(c.state.values.logo).toBeTruthy();
+	});
+
+	it("offers New field even when the template has none", async () => {
+		const user = fastUser();
+		const t = withLayer("qr", { value: "" });
+		t.fields = { type: "object", properties: {} };
+		const c = setup(t);
+		await user.click(button("Insert field"));
+		const menu = await screen.findByRole("menu");
+		await user.click(
+			within(menu).getByRole("menuitem", { name: CONTENT.newField }),
+		);
+		await user.type(
+			await screen.findByRole("textbox", { name: CONTENT.newKey }),
+			"code{Enter}",
+		);
+		expect(props(c).value).toBe("{{code}}");
 	});
 });

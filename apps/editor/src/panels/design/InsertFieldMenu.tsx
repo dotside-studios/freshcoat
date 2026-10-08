@@ -1,11 +1,16 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
-import { useMemo } from "react";
-import { MenuTrigger } from "react-aria-components";
+import { useMemo, useRef, useState } from "react";
+import { MenuTrigger, Dialog as RACDialog } from "react-aria-components";
+import { useController } from "~/app/context";
+import { CONTENT } from "~/app/copy";
 import { type FieldEntry, listFields } from "~/doc/values";
+import { createField } from "~/panels/content/field-def";
+import { NewFieldKey } from "~/panels/content/shared";
+import AddIcon from "~icons/mingcute/add-line";
 import BracesIcon from "~icons/mingcute/braces-line";
 
 type Format = FieldDefinition["format"];
@@ -43,42 +48,82 @@ export function spliceToken(
 	});
 }
 
+const NEW_FIELD = "\0new";
+
 export function InsertFieldMenu({
 	template,
 	onInsert,
 	prefer,
+	newFormat,
 	isDisabled,
 	className,
 }: {
 	template: Template;
 	onInsert: (id: string) => void;
 	prefer?: readonly Format[];
+	/** The format a field made from the menu starts with. */
+	newFormat?: Format;
 	isDisabled?: boolean;
 	className?: string;
 }) {
+	const controller = useController();
+	const anchor = useRef<HTMLSpanElement>(null);
+	const [naming, setNaming] = useState(false);
 	const fields = useMemo(
 		() => orderFields(listFields(template), prefer),
 		[template, prefer],
 	);
+	const create = (key: string) => {
+		if (!createField(controller, key, newFormat)) return false;
+		setNaming(false);
+		onInsert(key);
+		return true;
+	};
 	return (
-		<MenuTrigger>
-			<IconButton
-				aria-label="Insert field"
-				tooltip="Insert field"
-				className={cn("size-5 shrink-0 pointer-coarse:size-8", className)}
-				isDisabled={isDisabled || fields.length === 0}
-			>
-				<BracesIcon />
-			</IconButton>
-			<Popover placement="bottom end">
-				<Menu onAction={(k) => onInsert(String(k))}>
-					{fields.map((f) => (
-						<MenuItem key={f.id} id={f.id} textValue={f.id}>
-							{fieldLabel(f)}
+		<span ref={anchor} className="inline-flex shrink-0">
+			<MenuTrigger>
+				<IconButton
+					aria-label="Insert field"
+					tooltip="Insert field"
+					className={cn("size-5 shrink-0 pointer-coarse:size-8", className)}
+					isDisabled={isDisabled}
+				>
+					<BracesIcon />
+				</IconButton>
+				<Popover placement="bottom end">
+					<Menu
+						onAction={(k) => {
+							if (k === NEW_FIELD) setNaming(true);
+							else onInsert(String(k));
+						}}
+					>
+						{fields.map((f) => (
+							<MenuItem key={f.id} id={f.id} textValue={f.id}>
+								{fieldLabel(f)}
+							</MenuItem>
+						))}
+						{fields.length > 0 ? <MenuSeparator /> : null}
+						<MenuItem id={NEW_FIELD} icon={<AddIcon />}>
+							{CONTENT.newField}
 						</MenuItem>
-					))}
-				</Menu>
+					</Menu>
+				</Popover>
+			</MenuTrigger>
+			<Popover
+				triggerRef={anchor}
+				isOpen={naming}
+				onOpenChange={setNaming}
+				placement="bottom end"
+				className="w-56 p-1.5"
+			>
+				<RACDialog aria-label={CONTENT.newField} className="outline-none">
+					<NewFieldKey
+						taken={(k) => k in template.fields.properties}
+						onCreate={create}
+						onCancel={() => setNaming(false)}
+					/>
+				</RACDialog>
 			</Popover>
-		</MenuTrigger>
+		</span>
 	);
 }

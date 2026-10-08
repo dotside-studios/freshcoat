@@ -17,7 +17,6 @@ import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { CONTENT } from "~/app/copy";
 import {
-	addField,
 	fieldReferences,
 	refuse,
 	removeField,
@@ -38,13 +37,20 @@ import DeleteIcon from "~icons/mingcute/delete-2-line";
 import ResetIcon from "~icons/mingcute/refresh-2-line";
 import ChevronIcon from "~icons/mingcute/right-line";
 import {
+	createField,
 	FIELD_FORMATS,
 	FIELD_SOURCES,
 	fieldKeyError,
 	setRequired,
 	withPatch,
 } from "./field-def";
-import { Badge, DraftTextField, RefusalNotice, Subheading } from "./shared";
+import {
+	Badge,
+	DraftTextField,
+	NewFieldKey,
+	RefusalNotice,
+	Subheading,
+} from "./shared";
 
 /** Every field in one list: its key, type and sample value on one line, and
  *  its definition when expanded. Fields a pipeline fills come last. */
@@ -70,16 +76,7 @@ export function FieldList({ template }: { template: Template }) {
 		});
 
 	const create = (key: string): boolean => {
-		const result = controller.edit(
-			(t) => addField(t, key, { type: "string", title: humanize(key) }),
-			{ scope: "base" },
-		);
-		if (!result?.ok) return false;
-		controller.dispatch({
-			type: "setValue",
-			field: key,
-			value: sampleValues(result.template)[key] ?? "",
-		});
+		if (!createField(controller, key)) return false;
 		setAdding(false);
 		toggle(key, true);
 		return true;
@@ -219,45 +216,6 @@ function EmptyFields() {
 			<code className="font-fc-mono">{"{{key}}"}</code>
 			{after}
 		</p>
-	);
-}
-
-function NewFieldKey({
-	taken,
-	onCreate,
-	onCancel,
-}: {
-	taken: (key: string) => boolean;
-	onCreate: (key: string) => boolean;
-	onCancel: () => void;
-}) {
-	const [key, setKey] = useState("");
-	const [touched, setTouched] = useState(false);
-	const error = touched ? fieldKeyError(key, taken) : null;
-	return (
-		<TextField
-			aria-label={CONTENT.newKey}
-			placeholder="Key, e.g. first_name"
-			autoFocus
-			value={key}
-			onChange={(v) => {
-				setKey(v);
-				setTouched(v !== "");
-			}}
-			isInvalid={!!error}
-			errorMessage={error ?? undefined}
-			inputClassName="font-fc-mono"
-			onKeyDown={(e) => {
-				if (e.key === "Enter") {
-					e.preventDefault();
-					setTouched(true);
-					if (!fieldKeyError(key, taken)) onCreate(key);
-				} else if (e.key === "Escape") onCancel();
-			}}
-			onBlur={() => {
-				if (key === "") onCancel();
-			}}
-		/>
 	);
 }
 
