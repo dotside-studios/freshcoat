@@ -229,7 +229,9 @@ the records, and **Export** turns templates and records into files.
   becomes a mask of its tiles. Anything skipped (filters, `foreignObject`,
   video, audio, external images) raises one "Some SVG features were
   skipped" toast.
-- **Keyboard:** everything has a shortcut; press `?` to list them.
+- **Keyboard:** everything has a shortcut; press `?` to list them. The list
+  has a filter, and its Canvas group covers the modifier keys for dragging
+  and clicking on the canvas.
 - **Themes:** light (the default), dark, or following the system, from
   View > Theme and remembered per browser under `freshcoat.theme`. The
   theme is set before first paint, so a dark user never sees a light flash,
