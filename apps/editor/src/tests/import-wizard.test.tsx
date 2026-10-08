@@ -273,4 +273,46 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			}),
 		);
 	});
+
+	it("counts issues per column and narrows the preview to them", async () => {
+		const user = fastUser();
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{
+						datasetId: "d_people",
+						file: new File(
+							["name,joined\nZed,3/4/2025\nYe,soon\nXi,later\nWu,5/6/2025"],
+							"bad.csv",
+							{ type: "text/csv" },
+						),
+					}}
+					onClose={() => {}}
+					onImported={() => {}}
+				/>
+			</ControllerProvider>,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("import-wizard").textContent).toContain(
+				"bad.csv · 4 records",
+			),
+		);
+		await user.click(button("Next"));
+		expect(screen.getByTestId("column-issues-joined").textContent).toBe("2");
+		const rows = () =>
+			screen.getByTestId("import-preview").querySelectorAll("tbody tr");
+		expect(rows()).toHaveLength(4);
+		await user.click(
+			screen.getByRole("checkbox", { name: "Only rows with issues" }),
+		);
+		expect(rows()).toHaveLength(2);
+		expect(screen.queryByTestId("cell-issue")).toBeNull();
+		const bad = screen
+			.getByTestId("import-preview")
+			.querySelector<HTMLElement>("[data-bad]");
+		bad?.focus();
+		expect((await screen.findByTestId("cell-issue")).textContent).toBe(
+			"Not a date",
+		);
+	});
 });

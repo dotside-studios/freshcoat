@@ -106,6 +106,7 @@ export function ImportWizard({
 	);
 	const [dragging, setDragging] = useState(false);
 	const [reviewing, setReviewing] = useState(false);
+	const [onlyIssues, setOnlyIssues] = useState(false);
 
 	const base = useMemo<Dataset | undefined>(() => {
 		if (existing) return existing;
@@ -253,11 +254,24 @@ export function ImportWizard({
 		[step, base, rows, plan],
 	);
 	const partial = samples.length < recordCount;
-	const preview = useMemo(
-		() =>
-			step === 3 && base ? previewMapping(rows, plan, base.columns, 20) : [],
-		[step, base, rows, plan],
+	const issueRows = useMemo(
+		() => new Set(result?.issues.map((i) => i.row)),
+		[result],
 	);
+	const columnIssues = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const i of result?.issues ?? [])
+			counts.set(i.column, (counts.get(i.column) ?? 0) + 1);
+		return counts;
+	}, [result]);
+	const showIssues = onlyIssues && issueRows.size > 0;
+	const preview = useMemo(() => {
+		if (step !== 3 || !base) return [];
+		if (!showIssues) return previewMapping(rows, plan, base.columns, 20);
+		return previewMapping(rows, plan, base.columns, rows.length)
+			.filter((r) => issueRows.has(r.row) || r.cells.some((c) => !c.ok))
+			.slice(0, 20);
+	}, [step, base, rows, plan, showIssues, issueRows]);
 
 	const runImport = async (close: () => void) => {
 		if (!file || !base) return;
@@ -486,40 +500,54 @@ export function ImportWizard({
 					/>
 				) : step === 3 && result ? (
 					<div className="flex flex-col gap-2 p-3">
-						<p data-testid="import-totals" className="tabular-nums">
-							{partial
-								? `In the first ${formatNumber(samples.length)} records: `
-								: null}
-							<strong>{formatNumber(result.added)}</strong> to add ·{" "}
-							<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
-							<strong
-								className={result.issues.length ? "text-fc-danger" : undefined}
+						<div className="flex flex-wrap items-center gap-2">
+							<p data-testid="import-totals" className="tabular-nums">
+								{partial
+									? `In the first ${formatNumber(samples.length)} records: `
+									: null}
+								<strong>{formatNumber(result.added)}</strong> to add ·{" "}
+								<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
+								<strong
+									className={
+										result.issues.length ? "text-fc-danger" : undefined
+									}
+								>
+									{formatNumber(issueRows.size)}
+								</strong>{" "}
+								with issues
+								{skipMapping ? (
+									<>
+										{" · "}
+										<LinkButton
+											onPress={() => {
+												setReviewing(true);
+												setStep(2);
+											}}
+										>
+											Review mapping
+										</LinkButton>
+									</>
+								) : null}
+							</p>
+							<Checkbox
+								className="ml-auto"
+								isSelected={showIssues}
+								isDisabled={issueRows.size === 0}
+								onChange={setOnlyIssues}
 							>
-								{formatNumber(new Set(result.issues.map((i) => i.row)).size)}
-							</strong>{" "}
-							with issues
-							{skipMapping ? (
-								<>
-									{" · "}
-									<LinkButton
-										onPress={() => {
-											setReviewing(true);
-											setStep(2);
-										}}
-									>
-										Review mapping
-									</LinkButton>
-								</>
-							) : null}
-						</p>
+								Only rows with issues
+							</Checkbox>
+						</div>
 						<PreviewTable
 							preview={preview}
 							mapping={mapping}
 							headers={headers}
+							columnIssues={columnIssues}
 						/>
-						{recordCount > preview.length ? (
+						{(showIssues ? issueRows.size : recordCount) > preview.length ? (
 							<p className="text-fc-faint text-fc-sm">
-								Showing {preview.length} of {formatNumber(recordCount)}
+								Showing {preview.length} of{" "}
+								{formatNumber(showIssues ? issueRows.size : recordCount)}
 							</p>
 						) : null}
 						{error ? (
@@ -899,11 +927,14 @@ function PreviewTable({
 	preview,
 	mapping,
 	headers,
+	columnIssues,
 }: {
 	preview: ReturnType<typeof previewMapping>;
 	mapping: ColumnMapping[];
 	headers: string[];
+	columnIssues: ReadonlyMap<string, number>;
 }) {
+	const [focused, setFocused] = useState<string | null>(null);
 	const keys = mapping.flatMap((m, i) =>
 		m.kind === "skip"
 			? []
@@ -926,6 +957,15 @@ function PreviewTable({
 								title={k.header}
 							>
 								{k.key}
+								{columnIssues.get(k.key) ? (
+									<Badge
+										tone="danger"
+										className="ml-1 font-sans tabular-nums"
+										testId={`column-issues-${k.key}`}
+									>
+										{formatNumber(columnIssues.get(k.key) ?? 0)}
+									</Badge>
+								) : null}
 							</th>
 						))}
 					</tr>
@@ -936,26 +976,47 @@ function PreviewTable({
 							<td className="px-1.5 py-0.5 text-right text-fc-faint tabular-nums">
 								{row.row + 1}
 							</td>
-							{row.cells.map((cell, i) => (
-								<td
-									// biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
-									key={i}
-									title={cell.message}
-									data-bad={cell.ok ? undefined : ""}
-									className={cn(
-										"relative max-w-48 truncate border-fc-border border-l px-1.5 py-0.5",
-										!cell.ok && "bg-fc-danger/15 text-fc-danger-text",
-									)}
-								>
-									{cell.value === null
-										? ""
-										: typeof cell.value === "boolean"
-											? cell.value
-												? "true"
-												: "false"
-											: String(cell.value)}
-								</td>
-							))}
+							{row.cells.map((cell, i) => {
+								const id = `${row.row}:${i}`;
+								const open = !cell.ok && focused === id;
+								return (
+									<td
+										// biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
+										key={i}
+										title={cell.message}
+										data-bad={cell.ok ? undefined : ""}
+										tabIndex={cell.ok ? undefined : 0}
+										onFocus={cell.ok ? undefined : () => setFocused(id)}
+										onBlur={
+											cell.ok
+												? undefined
+												: () => setFocused((f) => (f === id ? null : f))
+										}
+										className={cn(
+											"relative max-w-48 border-fc-border border-l px-1.5 py-0.5",
+											!open && "truncate",
+											!cell.ok &&
+												"bg-fc-danger/15 text-fc-danger-text outline-none focus-visible:outline-1 focus-visible:outline-fc-danger focus-visible:outline-solid",
+										)}
+									>
+										{cell.value === null
+											? ""
+											: typeof cell.value === "boolean"
+												? cell.value
+													? "true"
+													: "false"
+												: String(cell.value)}
+										{open ? (
+											<span
+												data-testid="cell-issue"
+												className="block whitespace-normal text-[10px]"
+											>
+												{cell.message}
+											</span>
+										) : null}
+									</td>
+								);
+							})}
 						</tr>
 					))}
 				</tbody>
