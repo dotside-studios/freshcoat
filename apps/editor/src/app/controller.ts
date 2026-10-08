@@ -74,6 +74,7 @@ import {
 	siblingsOf,
 } from "~/doc/path";
 import { type PenPath, penElement } from "~/doc/pen";
+import { type LayerStyle, pasteStyle, readStyle } from "~/doc/style";
 import {
 	activeVariantId,
 	geometryForBase,
@@ -192,6 +193,7 @@ export class EditorController {
 	private namePrompt: NamePrompt | undefined;
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
+	private copiedStyle: LayerStyle | null = null;
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
@@ -903,6 +905,25 @@ export class EditorController {
 			picked.map((p) => p.el),
 			picked.map((p) => p.origin),
 		);
+	}
+
+	copyStyle(): void {
+		const t = this.template;
+		const key = this.state.selection[0];
+		const el = t && key ? getElement(t, key) : undefined;
+		if (el) this.copiedStyle = readStyle(el);
+	}
+
+	/** Gives the selection the copied style, as one undo step. */
+	pasteStyle(): void {
+		const style = this.copiedStyle;
+		const keys = this.state.selection;
+		if (!style || keys.length === 0) return;
+		this.edit((t) => pasteStyle(t, keys, style));
+	}
+
+	get hasCopiedStyle(): boolean {
+		return this.copiedStyle !== null;
 	}
 
 	async cut(): Promise<void> {

@@ -263,6 +263,22 @@ export const COMMANDS: Command[] = [
 		run: ({ controller }) => controller.paste({ inPlace: true }),
 	},
 	{
+		id: "edit.copyStyle",
+		label: "Copy style",
+		keys: ["Mod+Alt+C"],
+		group: "Edit",
+		enabled: (s) => s.selection.length > 0,
+		run: ({ controller }) => controller.copyStyle(),
+	},
+	{
+		id: "edit.pasteStyle",
+		label: "Paste style",
+		keys: ["Mod+Alt+V"],
+		group: "Edit",
+		enabled: (s) => s.selection.length > 0,
+		run: ({ controller }) => controller.pasteStyle(),
+	},
+	{
 		id: "edit.duplicate",
 		label: "Duplicate",
 		keys: ["Mod+D"],

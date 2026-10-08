@@ -60,6 +60,8 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"edit.copy",
 			"edit.paste",
 			"edit.pasteInPlace",
+			"edit.copyStyle",
+			"edit.pasteStyle",
 			"edit.duplicate",
 			"edit.delete",
 			"-",

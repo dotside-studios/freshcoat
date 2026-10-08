@@ -114,6 +114,9 @@ the records, and **Export** turns templates and records into files.
     frame when one frame is selected, centred in it if it would land outside.
     Paste in place (Mod+Shift+V) keeps the copy where it was on the
     artboard. Each paste is one undo step.
+  - Copy style (Mod+Alt+C) and Paste style (Mod+Alt+V) carry fills, stroke,
+    shadows and blurs, corner radius and, between text layers, the text
+    style, without the content. Pasting a style is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
