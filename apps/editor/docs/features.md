@@ -85,6 +85,8 @@ the records, and **Export** turns templates and records into files.
   - Beside the status filter, column filters narrow the records by one
     column containing a value, equaling it or being empty, ignoring case.
     Each is a chip that opens to change it; every filter must match.
+  - Each dataset keeps its search, filters, sort and selection while the
+    workspace is open, through switching datasets and sections.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.
@@ -603,6 +605,8 @@ refreshes it.
 - **Export:** the filmstrip selects with Shift-click, Mod-click and Mod+A
   (a plain click still only previews), and the Records tab's checkboxes
   share the selection. The button reads "Export N selected".
+- With records selected in Data, Export's Records tab offers "Use N
+  selected" to make them its selection.
 - The preset is never changed: the run replaces its record filter with
   exactly the chosen ids, in dataset order. The summary and history name
 

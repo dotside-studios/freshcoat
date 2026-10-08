@@ -1,9 +1,11 @@
 import type { Dataset } from "@freshcoat-js/workspace";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_DATA_VIEW } from "~/data/data-view";
 import {
 	type ColumnFilter,
 	filterActive,
 	filterByColumns,
+	selectedInView,
 } from "~/data/gallery-model";
 
 function people(): Dataset {
@@ -68,5 +70,26 @@ describe("column filters", () => {
 			d.records,
 		);
 		expect(filterActive(f("gone", "empty"), d.columns)).toBe(false);
+	});
+});
+
+describe("selection in a view", () => {
+	it("resolves to dataset order, and all to what the view shows", () => {
+		const d = people();
+		expect(
+			selectedInView(d, {
+				...DEFAULT_DATA_VIEW,
+				selection: new Set(["r_3", "r_1", "r_9"]),
+			}),
+		).toEqual(["r_1", "r_3"]);
+		expect(
+			selectedInView(d, {
+				...DEFAULT_DATA_VIEW,
+				query: "gold",
+				sort: { column: "name", direction: "descending" },
+				selection: "all",
+			}),
+		).toEqual(["r_1", "r_2"]);
+		expect(selectedInView(d, undefined)).toEqual([]);
 	});
 });

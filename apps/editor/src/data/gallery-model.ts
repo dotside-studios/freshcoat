@@ -6,7 +6,15 @@ import {
 	type RecordStatus,
 } from "@freshcoat-js/workspace";
 import { STATUS_LABEL } from "~/app/copy";
-import { assetMap, displayText, recordIssues } from "./model";
+import type { DataViewState } from "./data-view";
+import {
+	assetMap,
+	displayText,
+	filterRecords,
+	recordIndexMap,
+	recordIssues,
+	sortRecords,
+} from "./model";
 import type { ThumbWidth } from "./thumbnails";
 
 // ── Views ─────────────────────────────────────────────────────────────────
@@ -184,6 +192,45 @@ export function filterByColumns(
 			return op === "equals" ? text.trim() === want : text.includes(want);
 		}),
 	);
+}
+
+/** The records the view shows, in the order it shows them. */
+export function shownRecords(
+	dataset: Dataset,
+	view: DataViewState,
+	query = view.query,
+) {
+	const filtered = filterByColumns(
+		filterByStatus(
+			filterRecords(dataset.records, dataset, query),
+			dataset,
+			view.statusFilter,
+		),
+		dataset,
+		view.columnFilters,
+	);
+	const indexMap = recordIndexMap(dataset.records);
+	return sortRecords(
+		filtered,
+		dataset.columns,
+		view.sort,
+		(id) => indexMap.get(id) ?? 0,
+	);
+}
+
+/** The records selected in the view, in dataset order. */
+export function selectedInView(
+	dataset: Dataset,
+	view: DataViewState | undefined,
+): string[] {
+	const selection = view?.selection;
+	if (!view || !selection) return [];
+	if (selection === "all") {
+		const shown = new Set(shownRecords(dataset, view).map((r) => r.id));
+		return dataset.records.filter((r) => shown.has(r.id)).map((r) => r.id);
+	}
+	if (selection.size === 0) return [];
+	return dataset.records.filter((r) => selection.has(r.id)).map((r) => r.id);
 }
 
 /** The bytes of every photo the dataset holds. */

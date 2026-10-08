@@ -50,6 +50,7 @@ import { ColumnsPanel } from "./ColumnsPanel";
 import { type Confirm, useConfirm } from "./ConfirmDialog";
 import { type DatasetCreators, DatasetsList } from "./DatasetsList";
 import { DataToolbar, FOLD_DATA_BELOW } from "./DataToolbar";
+import { type DataViewState, DEFAULT_DATA_VIEW } from "./data-view";
 import { DataJobBar, ExportSelected } from "./ExportSelected";
 import { FindReplace } from "./FindReplace";
 import {
@@ -494,12 +495,43 @@ function RecordsPane({
 	importNonce: number;
 }) {
 	const controller = useController();
-	const [query, setQuery] = useState("");
+	const dataView =
+		useEditor((s) => s.dataViews[dataset.id]) ?? DEFAULT_DATA_VIEW;
+	const { query, statusFilter, columnFilters, sort } = dataView;
+	const selection = dataView.selection as Selection;
 	const deferredQuery = useDeferredValue(query);
-	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-	const [columnFilters, setColumnFilters] = useState<ColumnFilter[]>([]);
-	const [sort, setSort] = useState<SortSpec | undefined>();
-	const [selection, setSelection] = useState<Selection>(() => new Set());
+	const patchView = useCallback(
+		(patch: Partial<DataViewState>) =>
+			controller.dispatch({
+				type: "setDataView",
+				datasetId: dataset.id,
+				patch,
+			}),
+		[controller, dataset.id],
+	);
+	const setQuery = useCallback(
+		(next: string) => patchView({ query: next }),
+		[patchView],
+	);
+	const setStatusFilter = useCallback(
+		(next: StatusFilter) => patchView({ statusFilter: next }),
+		[patchView],
+	);
+	const setColumnFilters = useCallback(
+		(next: ColumnFilter[]) => patchView({ columnFilters: next }),
+		[patchView],
+	);
+	const setSort = useCallback(
+		(next: SortSpec | undefined) => patchView({ sort: next }),
+		[patchView],
+	);
+	const setSelection = useCallback(
+		(next: Selection) =>
+			patchView({
+				selection: next === "all" ? "all" : new Set([...next].map(String)),
+			}),
+		[patchView],
+	);
 	const [view, setViewState] = useState<RecordsView>(() => viewFor(dataset));
 	const [cardSize, setCardSizeState] = useState<CardSize>(savedCardSize);
 	const ui = useMemo(() => new GridUiStore(), []);
@@ -562,17 +594,22 @@ function RecordsPane({
 		});
 	}, [ui, recordFocused]);
 
+	// An import clears the view; a view kept from an earlier visit stays.
+	const seenImport = useRef(importNonce);
 	useEffect(() => {
-		if (importNonce === 0) return;
-		setQuery("");
-		setStatusFilter("all");
-		setColumnFilters([]);
-		setSelection(new Set());
+		if (importNonce === seenImport.current) return;
+		seenImport.current = importNonce;
+		patchView({
+			query: "",
+			statusFilter: "all",
+			columnFilters: [],
+			selection: new Set(),
+		});
 		const scroller = document.querySelector<HTMLElement>(
 			"[data-testid=records-grid] [role=grid], [data-testid=records-gallery] [role=grid]",
 		);
 		if (scroller) scroller.scrollTop = 0;
-	}, [importNonce]);
+	}, [importNonce, patchView]);
 
 	const deleteRows = useCallback(
 		async (ids: string[]) => {
@@ -591,7 +628,7 @@ function RecordsPane({
 			const active = ui.get().active;
 			if (active && ids.includes(active.row)) ui.set({ active: null });
 		},
-		[confirm, controller, datasetId, ui],
+		[confirm, controller, datasetId, ui, setSelection],
 	);
 
 	const onImportPhotos = useCallback(
@@ -622,9 +659,7 @@ function RecordsPane({
 
 	const actions = {
 		addRow: () => {
-			setQuery("");
-			setStatusFilter("all");
-			setColumnFilters([]);
+			patchView({ query: "", statusFilter: "all", columnFilters: [] });
 			let added: string[] = [];
 			editDataset(controller, datasetId, (d) => {
 				const out = addRecords(d);

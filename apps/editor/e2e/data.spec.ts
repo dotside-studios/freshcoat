@@ -926,3 +926,53 @@ test("column filter chips narrow the records beside the status filter", async ({
 		.click();
 	await expect.poll(() => columnTexts(page, "name")).toHaveLength(3);
 });
+
+test("Data keeps its search, filters, sort and selection per dataset, and Export can use the selection", async ({
+	page,
+}) => {
+	await openPeople(page);
+	const search = page.getByRole("searchbox", { name: "Search records" });
+	await search.fill("a");
+	await page.getByRole("columnheader", { name: /^name/ }).click();
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	await expect(page.getByTestId("data-status-selected")).toHaveText(
+		"2 selected",
+	);
+
+	await page.keyboard.press(`${mod}+1`);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(search).toHaveValue("a");
+	await expect(page.getByTestId("data-status-selected")).toHaveText(
+		"2 selected",
+	);
+	await expect
+		.poll(() => columnTexts(page, "name"))
+		.toEqual(["Ada", "Alan", "Grace"]);
+
+	await page.keyboard.press(`${mod}+3`);
+	await page
+		.getByTestId("export-presets")
+		.getByRole("button", { name: "New preset" })
+		.click();
+	await page
+		.getByTestId("binding-editor")
+		.getByRole("button", { name: /Dataset/ })
+		.click();
+	await page.getByRole("option", { name: "People" }).click();
+	await page.getByRole("tab", { name: "Records" }).click();
+	const use = page.getByTestId("use-data-selection");
+	await expect(use).toHaveText("Use 2 selected");
+	await use.click();
+	await expect(use).toBeHidden();
+	await expect(page.getByTestId("export-selection")).toHaveText("2 selected");
+	await expect(
+		page
+			.getByTestId("export-records")
+			.locator('[role=row][data-row="r3"]')
+			.getByRole("checkbox"),
+	).toBeChecked();
+});

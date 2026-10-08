@@ -29,6 +29,7 @@ import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
+import { selectedInView } from "~/data/gallery-model";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
 import { workspaceOf } from "~/state/workspace";
@@ -225,6 +226,13 @@ export function ExportSection() {
 		const known = new Set(dataset.records.map((r) => r.id));
 		return ids.filter((id) => known.has(id));
 	}, [preset, listSelection, dataset]);
+	const dataView = useEditor((s) =>
+		dataset ? s.dataViews[dataset.id] : undefined,
+	);
+	const dataSelection = useMemo(
+		() => (dataset ? selectedInView(dataset, dataView) : NONE),
+		[dataset, dataView],
+	);
 	const onSelectionChange = (ids: string[]) => {
 		if (preset?.records === "selected")
 			controller.dispatch({
@@ -814,6 +822,7 @@ export function ExportSection() {
 						previewId={currentId ?? null}
 						onPreview={pickRecord}
 						selectionIsPreset={preset.records === "selected"}
+						dataSelection={dataSelection}
 					/>
 				) : (
 					<UnboundHint onBind={showBinding} />
