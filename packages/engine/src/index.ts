@@ -129,6 +129,7 @@ export {
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
 export { scalePathData } from "./path-data";
+export { roundCorners } from "./round-corners";
 export { flattenOverWhite } from "./jpeg";
 export {
 	DEFAULT_JPEG_QUALITY,
