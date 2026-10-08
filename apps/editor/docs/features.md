@@ -66,6 +66,12 @@ the records, and **Export** turns templates and records into files.
     yes/no, date, color, URL, email, image) and the records that follow it.
   - A virtualized grid edits cells in place, with an editor per type, and
     marks every value the schema rejects.
+  - Mod+C copies the focused cell, or every column of the selected records,
+    as tab-separated text. Mod+V pastes a block copied from a spreadsheet
+    from the focused cell down the shown records, adding records past the
+    last one; each value is parsed by its column's type. One value pasted
+    into a selected record fills every selected record. A paste is one undo
+    step.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.

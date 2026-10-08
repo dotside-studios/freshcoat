@@ -701,3 +701,91 @@ test("autosave keeps photos apart from the document and restores them", async ({
 		await state<number>(page, "s.workspace.datasets[0].assets[0].blob.size"),
 	).toBe(PNG.length);
 });
+
+const PEOPLE = `{
+	id: "d_people",
+	name: "People",
+	columns: [
+		{ key: "name", type: "text", required: true },
+		{ key: "tier", type: "text" },
+		{ key: "points", type: "integer" },
+	],
+	records: [
+		{ id: "r1", values: { name: "Ada", tier: "Gold", points: 120 }, status: "pending" },
+		{ id: "r2", values: { name: "Grace", tier: "Silver", points: 95 }, status: "pending" },
+		{ id: "r3", values: { name: "Alan", tier: "Gold" }, status: "pending" },
+	],
+	assets: [],
+}`;
+
+async function openPeople(page: Page) {
+	await openSample(page);
+	await run(page, `c.dispatch({ type: "datasetEdit", datasets: [${PEOPLE}] })`);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(cell(page, "r1", "name")).toBeVisible();
+}
+
+const values = (page: Page, key: string) =>
+	state<unknown[]>(
+		page,
+		`s.workspace.datasets[0].records.map((r) => r.values[${JSON.stringify(key)}] ?? null)`,
+	);
+
+/** Fires a clipboard event at the focused element and returns what a copy
+ *  put on the clipboard. */
+function clipboard(page: Page, type: "copy" | "paste", text = "") {
+	return page.evaluate(
+		({ type, text }) => {
+			const data = new DataTransfer();
+			if (text) data.setData("text/plain", text);
+			const target = document.activeElement ?? document.body;
+			target.dispatchEvent(
+				new ClipboardEvent(type, {
+					clipboardData: data,
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+			return data.getData("text/plain");
+		},
+		{ type, text },
+	);
+}
+
+test("cells copy and paste as tab-separated blocks, in one undo step", async ({
+	page,
+}) => {
+	await openPeople(page);
+
+	await cell(page, "r2", "tier").click();
+	expect(await clipboard(page, "copy")).toBe("Silver");
+
+	await page
+		.locator('[role=row][data-row="r1"]')
+		.getByRole("checkbox")
+		.check({ force: true });
+	await page
+		.locator('[role=row][data-row="r2"]')
+		.getByRole("checkbox")
+		.check({ force: true });
+	await cell(page, "r1", "name").click();
+	expect(await clipboard(page, "copy")).toBe(
+		"Ada\tGold\t120\nGrace\tSilver\t95",
+	);
+	await page.keyboard.press("Escape");
+
+	// A block from a spreadsheet goes in from the focused cell, adding a
+	// record past the last one; a value that does not parse is flagged.
+	await cell(page, "r2", "tier").click();
+	await clipboard(page, "paste", "Bronze\t7\r\nPlatinum\tlots\r\nNew\t3\r\n");
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Bronze", "Platinum", "New"]);
+	expect(await values(page, "points")).toEqual([120, 7, "lots", 3]);
+	await expect(page.getByTestId("data-status")).toContainText("4 records");
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+	expect(await values(page, "points")).toEqual([120, 95, null]);
+});
