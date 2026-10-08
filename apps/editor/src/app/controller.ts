@@ -38,7 +38,7 @@ import {
 	type TemplateGuides,
 } from "~/doc/guides";
 import { MERGE_WINDOW_MS } from "~/doc/history";
-import { ShapeHits } from "~/doc/hit-shape";
+import { hitReach, ShapeHits } from "~/doc/hit-shape";
 import { uniqueId } from "~/doc/ids";
 import { openFile, saveCoat, saveFileName, saveJson } from "~/doc/io";
 import { isUnnamed, newDocument, type Preset } from "~/doc/new-document";
@@ -1579,7 +1579,9 @@ export function hitLayer(
 		}
 		if (out || hidden.has(key)) return null;
 		const box = geometry.get(key);
-		if (!box || !containsPoint(box.rect, box.worldRotation, point)) return null;
+		if (!box) return null;
+		const reach = opts.shapes ? hitReach(el, opts.tolerance) : 0;
+		if (!containsPoint(box.rect, box.worldRotation, point, reach)) return null;
 		if (opts.shapes && !opts.shapes.hits(key, el, box, point, opts.tolerance))
 			return null;
 		return key;
@@ -1614,6 +1616,7 @@ function containsPoint(
 	rect: { x: number; y: number; width: number; height: number },
 	rotation: number,
 	p: { x: number; y: number },
+	margin = 0,
 ): boolean {
 	const cx = rect.x + rect.width / 2;
 	const cy = rect.y + rect.height / 2;
@@ -1622,7 +1625,10 @@ function containsPoint(
 	const dy = p.y - cy;
 	const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
 	const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
-	return Math.abs(lx) <= rect.width / 2 && Math.abs(ly) <= rect.height / 2;
+	return (
+		Math.abs(lx) <= rect.width / 2 + margin &&
+		Math.abs(ly) <= rect.height / 2 + margin
+	);
 }
 
 function boxKey(r: { x: number; y: number; width: number; height: number }) {

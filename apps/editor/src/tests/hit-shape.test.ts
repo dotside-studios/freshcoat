@@ -169,6 +169,75 @@ describe("hitLayer with shapes", () => {
 		expect(rect(51, 51)).toBe("0/0");
 	});
 
+	it("hits strokes painted outside the box", () => {
+		const square = (
+			align: "outside" | "center",
+			rotation?: number,
+		): Element => ({
+			id: align,
+			type: "rect",
+			pos: { x: 50, y: 50 },
+			size: { width: 100, height: 100 },
+			rotation,
+			properties: { stroke: { color: "#000000", width: 10, align } },
+		});
+		const outside = hitter(scene(under, square("outside")));
+		expect(outside(47, 100)).toBe("0/1");
+		expect(outside(100, 46)).toBe("0/1");
+		expect(outside(42, 100)).toBe("0/1");
+		expect(outside(39, 100)).toBe("0/0");
+		const center = hitter(scene(under, square("center")));
+		expect(center(47, 100)).toBe("0/1");
+		expect(center(46, 100)).toBe("0/1");
+		expect(center(44, 100)).toBe("0/0");
+		const tolerant = hitter(scene(under, square("outside")), 3);
+		expect(tolerant(38, 100)).toBe("0/1");
+		expect(tolerant(36, 100)).toBe("0/0");
+	});
+
+	it("hits strokes outside a rotated box", () => {
+		const hit = hitter(
+			scene(under, {
+				id: "tilted",
+				type: "rect",
+				pos: { x: 50, y: 50 },
+				size: { width: 100, height: 100 },
+				rotation: 45,
+				properties: {
+					stroke: { color: "#000000", width: 10, align: "outside" },
+				},
+			}),
+		);
+		const at = (d: number) => 100 - d * Math.SQRT1_2;
+		expect(hit(at(53), at(53))).toBe("0/1");
+		expect(hit(at(59), at(59))).toBe("0/1");
+		expect(hit(at(62), at(62))).toBe("0/0");
+	});
+
+	it("hits thin lines within tolerance", () => {
+		const line = (height: number, rotation?: number): Element => ({
+			id: `line${height}`,
+			type: "vector",
+			pos: { x: 50, y: 100 - height / 2 },
+			size: { width: 100, height },
+			rotation,
+			properties: {
+				d: `M0 ${height / 2}H100`,
+				stroke: { color: "#000000", width: 1 },
+			},
+		});
+		for (const height of [0, 2]) {
+			const hit = hitter(scene(under, line(height)), 3);
+			expect(hit(100, 100)).toBe("0/1");
+			expect(hit(100, 102.5)).toBe("0/1");
+			expect(hit(100, 97.5)).toBe("0/1");
+			expect(hit(100, 104)).toBe("0/0");
+			const upright = hitter(scene(under, line(height, 90)), 3);
+			expect(upright(102.5, 100)).toBe("0/1");
+			expect(upright(104, 100)).toBe("0/0");
+		}
+	});
+
 	it("tests a rotated shape in its own space", () => {
 		const hit = hitter(
 			scene(under, {
