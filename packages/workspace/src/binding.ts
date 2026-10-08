@@ -35,7 +35,9 @@ function columnOf(
 }
 
 /** Each template field bound to the column with the same key, exactly or
- *  ignoring case. Fields with no such column are left to their default. */
+ *  ignoring case. Fields with no such column are left to their default. When
+ *  the template's variants differ in shape, the variant follows the first
+ *  bound photo field. */
 export function autoBinding(template: Template, dataset: Dataset): Binding {
 	const fields: Record<string, FieldSource> = {};
 	for (const key of Object.keys(template.fields.properties)) {
@@ -44,7 +46,26 @@ export function autoBinding(template: Template, dataset: Dataset): Binding {
 			dataset.columns.find((c) => c.key.toLowerCase() === key.toLowerCase());
 		if (column) fields[key] = { kind: "column", column: column.key };
 	}
-	return { datasetId: dataset.id, fields };
+	const photo = Object.entries(template.fields.properties).find(
+		([key, field]) => field.format === "image" && fields[key] !== undefined,
+	)?.[0];
+	return {
+		datasetId: dataset.id,
+		fields,
+		...(photo !== undefined && hasShapedVariants(template)
+			? { variant: { kind: "image" as const, field: photo } }
+			: {}),
+	};
+}
+
+/** Whether a variant's size differs in aspect from the template's. */
+export function hasShapedVariants(template: Template): boolean {
+	const aspect = template.width / template.height;
+	return (template.variants ?? []).some(
+		(v) =>
+			v.size !== undefined &&
+			Math.abs(v.size.width / v.size.height - aspect) > 1e-6,
+	);
 }
 
 export function serialValue(

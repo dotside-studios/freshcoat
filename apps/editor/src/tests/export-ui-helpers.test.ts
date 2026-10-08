@@ -305,6 +305,21 @@ describe("photo export helpers", () => {
 		).toBe(watermark);
 	});
 
+	test("a photo-sized preview lays out the item's sized variant", () => {
+		const sized = photoSizedTemplate(
+			photoWatermark(),
+			preset({ size: { kind: "image", field: "photo" } }),
+			{ values: { photo: "ws:p" }, variantId: "portrait" },
+			dataset,
+		);
+		expect([sized.width, sized.height]).toEqual([1200, 1600]);
+		expect(sized.variants).toBeUndefined();
+		const mark = sized.template_data[0]?.elements.find(
+			(e) => e.id === "watermark",
+		);
+		expect(mark?.type === "text" && mark.properties.align).toBe("center");
+	});
+
 	test("a photo whose aspect gives a fractional design size still previews", () => {
 		const odd = {
 			...photo,

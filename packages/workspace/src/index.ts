@@ -25,6 +25,7 @@ export {
 export {
 	autoBinding,
 	closestVariant,
+	hasShapedVariants,
 	imagesFor,
 	isEmptyVariant,
 	resolveValues,

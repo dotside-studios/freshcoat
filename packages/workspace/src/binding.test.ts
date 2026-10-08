@@ -37,6 +37,27 @@ describe("autoBinding", () => {
 	});
 });
 
+describe("autoBinding with shaped variants", () => {
+	it("lets the variant follow the bound photo", () => {
+		const shaped: Template = {
+			...template,
+			variants: [
+				{
+					id: "tall",
+					label: "Tall",
+					size: { width: 638, height: 1012 },
+					overrides: [],
+				},
+			],
+		};
+		expect(autoBinding(shaped, dataset).variant).toEqual({
+			kind: "image",
+			field: "photo",
+		});
+		expect(autoBinding(template, dataset).variant).toBeUndefined();
+	});
+});
+
 describe("resolveValues", () => {
 	const binding: Binding = {
 		datasetId: "d_members",

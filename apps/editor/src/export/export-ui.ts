@@ -1,4 +1,5 @@
 import {
+	applyVariant,
 	fitDesignSize,
 	resizeTemplate,
 	type Template,
@@ -86,11 +87,12 @@ export function fileNameExample(
 
 /** The template laid out at the aspect of the photo a size-from-image preset
  *  follows for this item, as the export will render it; the template itself
- *  otherwise. */
+ *  otherwise. An item in a variant with its own size gets that variant laid
+ *  out, without its variants. */
 export function photoSizedTemplate(
 	template: Template,
 	preset: ExportPreset,
-	item: { values: Record<string, string> } | null,
+	item: { values: Record<string, string>; variantId?: string } | null,
 	dataset: Dataset | undefined,
 ): Template {
 	const size = exportSize(preset);
@@ -103,15 +105,22 @@ export function photoSizedTemplate(
 		height: asset.height,
 		orientation: asset.orientation,
 	});
-	const design = fitDesignSize(template, seen.width, seen.height);
+	const sized = item.variantId
+		? template.variants?.find((v) => v.id === item.variantId && v.size)
+		: undefined;
+	const { variants: _v, ...applied } = sized
+		? applyVariant(template, sized.id)
+		: template;
+	const base = sized ? applied : template;
+	const design = fitDesignSize(base, seen.width, seen.height);
 	if (
-		Math.abs(design.width - template.width) < 0.5 &&
-		Math.abs(design.height - template.height) < 0.5
+		Math.abs(design.width - base.width) < 0.5 &&
+		Math.abs(design.height - base.height) < 0.5
 	)
-		return template;
+		return base;
 	// A template's size is whole design units, and most photo aspects are not.
 	return resizeTemplate(
-		template,
+		base,
 		Math.max(1, Math.round(design.width)),
 		Math.max(1, Math.round(design.height)),
 	);
