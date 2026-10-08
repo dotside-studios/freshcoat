@@ -110,6 +110,13 @@ describe("shortcut matching", () => {
 		expect(at("Period", true)).toBe("view.nextVariant");
 	});
 
+	test("Mod+0 zooms to 100%", () => {
+		expect(
+			findCommand(key({ key: "0", code: "Digit0", metaKey: true }), true, false)
+				?.id,
+		).toBe("view.zoom100");
+	});
+
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
 		for (const c of COMMANDS)

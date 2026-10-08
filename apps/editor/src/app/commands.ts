@@ -423,7 +423,7 @@ export const COMMANDS: Command[] = [
 	{
 		id: "view.zoom100",
 		label: "Zoom to 100%",
-		keys: ["Shift+0"],
+		keys: ["Mod+0", "Shift+0"],
 		group: "View",
 		enabled: hasDoc,
 		run: ({ controller }) => controller.zoomTo(1),

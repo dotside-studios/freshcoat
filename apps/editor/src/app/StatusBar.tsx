@@ -1,7 +1,8 @@
 import { IconButton } from "@freshcoat-js/ui/icon-button";
-import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
+import { useState } from "react";
 import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { SideMenu, VariantMenu } from "~/canvas/SideVariantMenus";
 import { getElement } from "~/doc/path";
@@ -11,6 +12,7 @@ import { type EditorState, working } from "~/state/store";
 import { activeSlot } from "~/state/workspace";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
+import ChevronUpIcon from "~icons/mingcute/up-line";
 import { useController } from "./context";
 import { plural, VARIANT_UI } from "./copy";
 import { formatNumber } from "./format";
@@ -24,6 +26,7 @@ export function StatusBar() {
 	const selection = useEditor((s) => s.selection);
 	const render = useThrottledEditor(selectRender, 250);
 	const zoom = useEditor((s) => s.view.zoom);
+	const hasSelection = selection.some((k) => !k.endsWith("/bg"));
 	const showStats = useRenderStats();
 	const frame = template?.template_data[side];
 	const size = useEditor(working);
@@ -114,37 +117,81 @@ export function StatusBar() {
 					</Tooltip>
 				</TooltipTrigger>
 			) : null}
-			<MenuTrigger>
-				<RACButton
-					aria-label="Zoom"
-					data-testid="zoom-menu"
-					className="w-12 rounded-[3px] text-right outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-hovered:text-fc-text"
-				>
-					{Math.round(zoom * 100)}%
-				</RACButton>
-				<Popover placement="top end">
-					<Menu
-						onAction={(id) => {
-							if (id === "fit") controller.fitView();
-							else controller.zoomTo(Number(id));
-						}}
+			<span className="flex items-center">
+				<ZoomField zoom={zoom} />
+				<MenuTrigger>
+					<RACButton
+						aria-label="Zoom"
+						data-testid="zoom-menu"
+						className="grid size-5 place-items-center rounded-[3px] outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-hovered:text-fc-text pointer-coarse:size-7"
 					>
-						<MenuItem id="fit" shortcut="Shift+1">
-							Zoom to fit
-						</MenuItem>
-						{[0.5, 1, 2, 4].map((z) => (
-							<MenuItem
-								key={z}
-								id={String(z)}
-								shortcut={z === 1 ? "Shift+0" : undefined}
-							>
-								{`${z * 100}%`}
+						<ChevronUpIcon className="size-3" />
+					</RACButton>
+					<Popover placement="top end">
+						<Menu
+							disabledKeys={hasSelection ? [] : ["selection"]}
+							onAction={(id) => {
+								if (id === "fit") controller.fitView();
+								else if (id === "selection") controller.zoomToSelection();
+								else controller.zoomTo(Number(id));
+							}}
+						>
+							<MenuItem id="fit" shortcut="Shift+1">
+								Zoom to fit
 							</MenuItem>
-						))}
-					</Menu>
-				</Popover>
-			</MenuTrigger>
+							<MenuItem id="selection" shortcut="Shift+2">
+								Zoom to selection
+							</MenuItem>
+							<MenuSeparator />
+							{[0.5, 1, 2, 4].map((z) => (
+								<MenuItem
+									key={z}
+									id={String(z)}
+									shortcut={z === 1 ? "Mod+0" : undefined}
+								>
+									{`${z * 100}%`}
+								</MenuItem>
+							))}
+						</Menu>
+					</Popover>
+				</MenuTrigger>
+			</span>
 		</footer>
+	);
+}
+
+/** The zoom as a percentage that takes a typed one. */
+function ZoomField({ zoom }: { zoom: number }) {
+	const controller = useController();
+	const shown = `${Math.round(zoom * 100)}%`;
+	const [draft, setDraft] = useState<string | null>(null);
+	const commit = () => {
+		const percent = Number.parseFloat(draft ?? "");
+		if (Number.isFinite(percent) && percent > 0)
+			controller.zoomTo(percent / 100);
+		setDraft(null);
+	};
+	return (
+		<input
+			aria-label="Zoom percentage"
+			data-testid="zoom-field"
+			inputMode="decimal"
+			className="w-11 rounded-[3px] bg-transparent text-right outline-none hover:text-fc-text focus:bg-fc-raised focus:text-fc-text focus:outline-solid focus:outline-1 focus:outline-fc-accent"
+			value={draft ?? shown}
+			onFocus={(e) => {
+				setDraft(shown);
+				e.currentTarget.select();
+			}}
+			onChange={(e) => setDraft(e.currentTarget.value)}
+			onBlur={commit}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") e.currentTarget.blur();
+				else if (e.key === "Escape") {
+					setDraft(null);
+					e.currentTarget.blur();
+				}
+			}}
+		/>
 	);
 }
 
