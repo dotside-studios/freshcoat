@@ -527,6 +527,9 @@ function compileText(
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
 		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
+		...(props.path
+			? { path: compileTextPath(props.path as TextPathInput, ratio) }
+			: {}),
 	};
 	if (single) {
 		node.text = spans[0].text;
@@ -554,6 +557,28 @@ function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
 		...(arc.direction ? { direction: arc.direction } : {}),
 		...(arc.align ? { align: arc.align } : {}),
 		...(arc.fit ? { fit: arc.fit } : {}),
+	};
+}
+
+type TextPathInput = NonNullable<TextProperties["path"]>;
+
+function compileTextPath(
+	path: TextPathInput,
+	ratio: number,
+): TextNode["path"] {
+	return {
+		...(path.d !== undefined ? { d: scalePathString(path.d, ratio) } : {}),
+		...(path.ref !== undefined ? { ref: path.ref } : {}),
+		...(path.startOffset !== undefined
+			? {
+					startOffset:
+						typeof path.startOffset === "number"
+							? path.startOffset * ratio
+							: path.startOffset,
+				}
+			: {}),
+		...(path.side ? { side: path.side } : {}),
+		...(path.align ? { align: path.align } : {}),
 	};
 }
 

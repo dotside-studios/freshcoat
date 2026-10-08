@@ -39,15 +39,19 @@ import type {
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
+	type ArcPlacement,
 	type ArcRing,
 	arcBandBounds,
 	arcRings,
+	isHidden,
 	placeOnArc,
+	placeOnPath,
 	rsxformBounds,
 	spanAt,
 	spanByteStarts,
 } from "./arc-text";
 import { parseColor } from "./color";
+import { withPathMeasure } from "./path-measure";
 import {
 	imageInfo,
 	makeImageFromPixels,
@@ -135,6 +139,7 @@ import type {
 	Size,
 	Stroke,
 	TextArc,
+	TextPath,
 	TextLine,
 } from "./types";
 
@@ -681,6 +686,16 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	if (cmd.path) {
+		const lines = arcLines(ck, provider, bin, cmd, fallback);
+		const placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+		if (drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, fgPaint))
+			issues.warnings?.push({
+				kind: "text_path_overflow",
+				...(cmd.id ? { layer: cmd.id } : {}),
+			});
+		return;
+	}
 	if (cmd.arc) {
 		drawArcText(
 			ck,
@@ -949,8 +964,91 @@ function arcDecorations(
 	return out;
 }
 
+// Each shaped glyph drawn under its RSXform, colored by the span its cluster
+// belongs to. Hidden glyphs are skipped; returns whether there were any.
+function drawPlacedGlyphs(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	lines: { line: TextLine; arc: ArcLine }[],
+	placed: ArcPlacement,
+	fgPaint: Paint | null,
+): boolean {
+	let hidden = false;
+	const paints = new Map<string, Paint>();
+	const paintFor = (color: string) => {
+		let p = paints.get(color);
+		if (!p) {
+			p = bin.track(new ck.Paint());
+			p.setAntiAlias(true);
+			p.setColor(toColor(ck, color));
+			paints.set(color, p);
+		}
+		return p;
+	};
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		shaped.runs.forEach((run, ri) => {
+			const xforms = placed[li]?.[ri];
+			const n = run.glyphs.length;
+			if (!xforms || n === 0) return;
+			const font = runFont(ck, bin, run);
+			let from = 0;
+			while (from < n) {
+				if (isHidden(xforms, from)) {
+					hidden = true;
+					from++;
+					continue;
+				}
+				const span = spanAt(starts, run.offsets[from] as number);
+				let to = from + 1;
+				while (
+					to < n &&
+					!isHidden(xforms, to) &&
+					spanAt(starts, run.offsets[to] as number) === span
+				)
+					to++;
+				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
+					run.glyphs.subarray(from, to),
+					xforms.subarray(4 * from, 4 * to),
+					font,
+				);
+				if (blob) {
+					bin.track(blob);
+					const color = line.spans[span]?.color ?? cmd.color ?? "#000000";
+					canvas.drawTextBlob(blob, 0, 0, fgPaint ?? paintFor(color));
+				}
+				from = to;
+			}
+		});
+	});
+	return hidden;
+}
+
+// Each line's glyphs along the command's path, measured in its local frame.
+function placeOnCommandPath(
+	ck: CanvasKit,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	spec: TextPath,
+	lines: { arc: ArcLine }[],
+): ArcPlacement {
+	const shaped = lines.map((l) => l.arc);
+	const path = spec.d ? bin.path(ck, spec.d) : null;
+	if (!path)
+		return placeOnPath(shaped, spec, {
+			length: 0,
+			closed: false,
+			at: () => ({ x: 0, y: 0, cos: 1, sin: 0 }),
+		});
+	return withPathMeasure(ck, path, (m) =>
+		placeOnPath(shaped, spec, m, cmd.pos.x, cmd.pos.y),
+	);
+}
+
 // Text along a circle: the line's own shaped glyphs, each drawn under an
-// RSXform, colored by the span its cluster belongs to.
+// RSXform, plus its decorations along the ring.
 function drawArcText(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -994,44 +1092,7 @@ function drawArcText(
 		cx,
 		cy,
 	);
-	const paints = new Map<string, Paint>();
-	const paintFor = (color: string) => {
-		let p = paints.get(color);
-		if (!p) {
-			p = bin.track(new ck.Paint());
-			p.setAntiAlias(true);
-			p.setColor(toColor(ck, color));
-			paints.set(color, p);
-		}
-		return p;
-	};
-	lines.forEach(({ line, arc: shaped }, li) => {
-		const starts = spanByteStarts(line.spans.map((s) => s.text));
-		shaped.runs.forEach((run, ri) => {
-			const xforms = placed[li]?.[ri];
-			const n = run.glyphs.length;
-			if (!xforms || n === 0) return;
-			const font = runFont(ck, bin, run);
-			let from = 0;
-			while (from < n) {
-				const span = spanAt(starts, run.offsets[from] as number);
-				let to = from + 1;
-				while (to < n && spanAt(starts, run.offsets[to] as number) === span)
-					to++;
-				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
-					run.glyphs.subarray(from, to),
-					xforms.subarray(4 * from, 4 * to),
-					font,
-				);
-				if (blob) {
-					bin.track(blob);
-					const color = line.spans[span]?.color ?? cmd.color ?? "#000000";
-					canvas.drawTextBlob(blob, 0, 0, fgPaint ?? paintFor(color));
-				}
-				from = to;
-			}
-		});
-	});
+	drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, fgPaint);
 	for (const d of arcDecorations(lines, rings, arc)) {
 		const p = bin.track(new ck.Paint());
 		p.setAntiAlias(true);
@@ -1080,6 +1141,16 @@ function arcTextBounds(
 		cx,
 		cy,
 	);
+	return [...out, ...placedGlyphBounds(lines, placed, em)];
+}
+
+// Each placed glyph's font box under its RSXform.
+function placedGlyphBounds(
+	lines: { arc: ArcLine }[],
+	placed: ArcPlacement,
+	em: Bounds,
+): Bounds[] {
+	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
 		shaped.runs.forEach((run, ri) => {
 			const xforms = placed[li]?.[ri];
@@ -2408,6 +2479,12 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
+	if (cmd.path) {
+		if (!em) return [];
+		const lines = arcLines(ck, provider, bin, cmd, fallback);
+		const placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+		return placedGlyphBounds(lines, placed, em);
+	}
 	if (cmd.arc)
 		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em);
 	const rows =
@@ -3632,7 +3709,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
 	if (cmd.op === "drawText")
-		return !cmd.arc && (!cmd.fill || cmd.fill.kind === "solid");
+		return !cmd.arc && !cmd.path && (!cmd.fill || cmd.fill.kind === "solid");
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);

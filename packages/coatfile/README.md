@@ -317,7 +317,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate`; text `arc`; element `backdropBlur`; gradient stroke `color` |
+| 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -869,6 +869,31 @@ badges and circular labels. Each hard line is one ring and nothing wraps.
 Glyphs come from the same shaping as straight text, so ligatures, variable
 axes and per-glyph font fallback carry over. Decorations are not drawn on an
 arc.
+
+### Text on a path
+
+`path` (1.6) sets a text element along any path, as SVG's `<textPath>`. It
+wins over `arc`. Each hard line is one baseline, the next a line height below
+it, and nothing wraps.
+
+```json
+"path": { "ref": "swoosh", "startOffset": "50%", "align": "center" }
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `d` | Path data in the element's own design units | |
+| `ref` | Id of a sibling `vector` whose outline the text follows, rotation included | |
+| `startOffset` | Where `align` anchors the text along the path: design units, or a share of its length as `"50%"` | `0` |
+| `side` | `left` follows the path's direction; `right` reverses it | `left` |
+| `align` | `start`, `center` or `end` of the text at `startOffset` | `start` |
+
+One of `d` and `ref` is required; `d` wins when both are set. Each glyph is
+placed by the middle of its advance. On an open path, a glyph whose middle
+falls past either end is hidden; on a closed path the text wraps past the
+start point, and only what would run more than a whole lap is hidden. Either
+way the render reports a `text_path_overflow` warning naming the layer. A
+`ref` that names no sibling vector hides the whole text the same way.
 
 ### Per-span line height
 

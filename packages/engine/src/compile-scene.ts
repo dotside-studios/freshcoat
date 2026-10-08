@@ -20,10 +20,20 @@ import type {
 	Node,
 	RectNode,
 	TextNode,
+	TextPathNode,
 } from "./node";
 import { ellipseFromTop, rectShape } from "./outline";
 import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
+import {
+	invert,
+	type Matrix,
+	multiply,
+	rotate,
+	scale,
+	translate,
+} from "./svg/matrix";
+import { normalizePath, serializePath, transformPath } from "./svg/path";
 import type { TextEngine } from "./text-engine";
 import { strokeTrim } from "./trim";
 import type { MeasureText } from "./text-types";
@@ -37,6 +47,7 @@ import type {
 	ShapeMask,
 	Size,
 	TextArc,
+	TextPath,
 } from "./types";
 
 export type CompileSceneOptions = {
@@ -218,7 +229,7 @@ function collectAssets(
 	}
 }
 
-function lower(node: Node, ctx: BakeCtx): DrawCommand {
+function lower(node: Node, ctx: BakeCtx, siblings: Node[] = []): DrawCommand {
 	const base = {
 		id: node.id,
 		pos: node.pos ?? { x: 0, y: 0 },
@@ -280,13 +291,13 @@ function lower(node: Node, ctx: BakeCtx): DrawCommand {
 				...(node.isolate ? { isolate: true } : {}),
 				children: [
 					...groupBackground(node, base),
-					...node.children.map((c) => lower(c, ctx)),
+					...node.children.map((c) => lower(c, ctx, node.children)),
 				],
 			};
 		case "mask":
 			return lowerMask(node, base, ctx);
 		case "text":
-			return lowerText(node, base, ctx);
+			return lowerText(node, base, ctx, siblings);
 		case "bitmap":
 			return {
 				...base,
@@ -303,13 +314,14 @@ function lowerText(
 	node: TextNode,
 	base: Omit<DrawCommand, "op">,
 	ctx: BakeCtx,
+	siblings: Node[],
 ): DrawCommand {
 	// Pre-baked layout wins (the caller already shaped it); otherwise bake now
 	// via the injected engine. Only when neither is present is it an error.
 	const layout =
 		node.layout ??
 		(ctx.textEngine
-			? bakeText(node.arc ? arcBakeNode(node) : node, {
+			? bakeText(node.arc || node.path ? arcBakeNode(node) : node, {
 					textEngine: ctx.textEngine,
 					leadingTrim: ctx.leadingTrim,
 					fontMetrics: ctx.fontMetrics,
@@ -341,8 +353,75 @@ function lowerText(
 		layout,
 		color: node.color ?? "#000000",
 		fill: node.fill,
-		...(node.arc ? { arc: resolveArc(node, layout) } : {}),
+		...(node.path
+			? { path: resolveTextPath(node, node.path, siblings) }
+			: node.arc
+				? { arc: resolveArc(node, layout) }
+				: {}),
 	};
+}
+
+function resolveTextPath(
+	node: TextNode,
+	spec: TextPathNode,
+	siblings: Node[],
+): TextPath {
+	const raw = spec.startOffset ?? 0;
+	const percent = typeof raw === "string" && raw.trim().endsWith("%");
+	const startOffset = typeof raw === "number" ? raw : Number.parseFloat(raw);
+	return {
+		d: spec.d ?? refPathData(node, spec.ref, siblings),
+		startOffset: Number.isFinite(startOffset) ? startOffset : 0,
+		...(percent ? { percent: true } : {}),
+		side: spec.side ?? "left",
+		align: spec.align ?? "start",
+	};
+}
+
+// A sibling path's outline in the text node's own unrotated frame, or "" when
+// there is no such sibling.
+function refPathData(
+	node: TextNode,
+	ref: string | undefined,
+	siblings: Node[],
+): string {
+	const target = ref
+		? siblings.find((n) => n.id === ref && n.kind === "path")
+		: undefined;
+	if (!target || target.kind !== "path") return "";
+	const pos = target.pos ?? { x: 0, y: 0 };
+	const size = target.size ?? { width: 0, height: 0 };
+	let m: Matrix = translate(pos.x, pos.y);
+	const vb = target.viewBox;
+	if (vb && vb.width > 0 && vb.height > 0)
+		m = multiply(
+			m,
+			multiply(
+				scale(size.width / vb.width, size.height / vb.height),
+				translate(-(vb.x ?? 0), -(vb.y ?? 0)),
+			),
+		);
+	m = multiply(aboutCenter(target.rotation, pos, size), m);
+	const own = node.pos ?? { x: 0, y: 0 };
+	const back = invert(
+		multiply(
+			aboutCenter(node.rotation, own, node.size ?? { width: 0, height: 0 }),
+			translate(own.x, own.y),
+		),
+	);
+	if (!back) return "";
+	return serializePath(transformPath(normalizePath(target.d), multiply(back, m)));
+}
+
+function aboutCenter(
+	rotation: number | undefined,
+	pos: { x: number; y: number },
+	size: Size,
+): Matrix {
+	if (!rotation) return [1, 0, 0, 1, 0, 0];
+	const cx = pos.x + size.width / 2;
+	const cy = pos.y + size.height / 2;
+	return multiply(translate(cx, cy), multiply(rotate(rotation), translate(-cx, -cy)));
 }
 
 const ARC_LINE_WIDTH = 1e6;
@@ -409,7 +488,7 @@ function lowerMask(
 	base: Omit<DrawCommand, "op">,
 	ctx: BakeCtx,
 ): DrawCommand {
-	const children = node.children.map((c) => lower(c, ctx));
+	const children = node.children.map((c) => lower(c, ctx, node.children));
 	const shape =
 		node.invert || node.channel === "luminance" || node.backdropBlur
 			? null

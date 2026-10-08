@@ -291,6 +291,29 @@ export const TextPropertiesSchema = z.object({
 			fit: z.literal("shrink").optional(),
 		})
 		.optional(),
+	// Sets the text along a path, as SVG's <textPath>. Wins over `arc`. Each hard
+	// line is one baseline below the last; nothing wraps. Glyphs that run past
+	// an open path's ends, or a whole lap of a closed one, are hidden.
+	path: z
+		.object({
+			// Path data in the element's own design units, or `ref`, the id of a
+			// sibling vector. `d` wins when both are set.
+			d: z.string().optional(),
+			ref: z.string().optional(),
+			// Where `align` anchors the text along the path: design units, or a
+			// share of its length as "50%". Default 0.
+			startOffset: z
+				.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?%$/)])
+				.optional(),
+			// left follows the path's direction, right reverses it. Default left.
+			side: z.enum(["left", "right"]).optional(),
+			// Which part of the text sits at startOffset. Default start.
+			align: z.enum(["start", "center", "end"]).optional(),
+		})
+		.refine((p) => p.d !== undefined || p.ref !== undefined, {
+			message: "a text path needs `d` or `ref`",
+		})
+		.optional(),
 });
 
 export const ImageMaskSchema = z.union([

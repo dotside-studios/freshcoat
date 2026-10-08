@@ -384,6 +384,32 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						id,
 					);
 			}
+			if (cmd.path) {
+				const { d, startOffset, side, align } = cmd.path;
+				if (typeof d !== "string")
+					add("bad_text_path", "path d must be a string", `${path}.path.d`, id);
+				if (!finite(startOffset))
+					add(
+						"bad_text_path",
+						"path startOffset is not finite",
+						`${path}.path.startOffset`,
+						id,
+					);
+				if (side !== "left" && side !== "right")
+					add(
+						"bad_text_path",
+						`path side must be "left" or "right", got ${String(side)}`,
+						`${path}.path.side`,
+						id,
+					);
+				if (align !== "start" && align !== "center" && align !== "end")
+					add(
+						"bad_text_path",
+						`path align must be "start", "center" or "end", got ${String(align)}`,
+						`${path}.path.align`,
+						id,
+					);
+			}
 			break;
 		case "drawGroup":
 			if (cmd.isolate !== undefined && typeof cmd.isolate !== "boolean")

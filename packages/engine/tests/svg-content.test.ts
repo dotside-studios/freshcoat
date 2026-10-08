@@ -192,6 +192,39 @@ describe("text", () => {
 		).toEqual(["text-glyph-position", "text-stroke", "textPath"]);
 	});
 
+	test("textPath follows its shape, transforms and offset included", () => {
+		const d = parseSvg(
+			svg(
+				'<defs><path id="p" d="M0 0 L50 0" transform="translate(0 10)"/></defs>' +
+					'<g transform="scale(2)"><text font-size="8" text-anchor="middle">' +
+					'<textPath href="#p" startOffset="50%" side="right">on a <tspan fill="red">path</tspan></textPath>' +
+					"</text></g>" +
+					'<text><textPath xlink:href="#p" startOffset="5">second</textPath></text>',
+			),
+		);
+		const [a, b] = ofKind(d.children, "text");
+		expect(d.warnings).toEqual([]);
+		expect(a?.path).toEqual({ d: "M0 20L100 20", startOffset: 50, percent: true, side: "right" });
+		expect(a?.anchor).toBe("middle");
+		expect(a?.runs.map((r) => r.text)).toEqual(["on a ", "path"]);
+		expect(a?.runs[0]?.font.size).toBeCloseTo(16);
+		expect(a?.rotation).toBeUndefined();
+		expect(b?.path).toEqual({ d: "M0 10L50 10", startOffset: 5, side: "left" });
+	});
+
+	test("a textPath on a basic shape or inline path", () => {
+		const d = parseSvg(
+			svg(
+				'<circle id="c" cx="50" cy="50" r="40"/>' +
+					'<text><textPath href="#c">round</textPath></text>' +
+					'<text><textPath path="M0 0 H10">inline</textPath></text>',
+			),
+		);
+		const [round, inline] = ofKind(d.children, "text");
+		expect(round?.path?.d.startsWith("M90 50C")).toBe(true);
+		expect(inline?.path?.d).toBe("M0 0L10 0");
+	});
+
 	test("text in a clip path is skipped", () => {
 		expect(
 			features(
