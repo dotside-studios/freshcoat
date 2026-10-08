@@ -15,6 +15,7 @@ import type { ElementKind } from "~/doc/factories";
 import {
 	applyRect,
 	canTransform,
+	centreOf,
 	type Guide,
 	type Handle,
 	type LayerGeometry,
@@ -24,6 +25,7 @@ import {
 	type Rect,
 	resizeRect,
 	rotateFromPointer,
+	rotateRectAbout,
 	type SnapCandidates,
 	snapCandidates,
 	snapMove,
@@ -110,10 +112,11 @@ type Gesture =
 	| {
 			kind: "rotate";
 			startWorld: Point;
-			key: string;
+			keys: string[];
 			base: Template;
 			geometry: LayerGeometry;
-			rect: Rect;
+			box: Rect;
+			rects: Map<string, Rect>;
 	  }
 	| {
 			kind: "gradient";
@@ -419,21 +422,6 @@ export function Viewport() {
 			state.hidden,
 			controller.sideGuides(),
 		);
-		if (name === "rotate") {
-			const key = keys[0] as string;
-			const rect = geometry.get(key)?.rect;
-			if (!rect || keys.length > 1) return;
-			controller.beginTx();
-			gesture.current = {
-				kind: "rotate",
-				startWorld: world,
-				key,
-				base: t,
-				geometry,
-				rect,
-			};
-			return;
-		}
 		const rects = new Map<string, Rect>();
 		for (const k of keys) {
 			const r = geometry.get(k)?.rect;
@@ -444,6 +432,18 @@ export function Viewport() {
 				? (rects.get(keys[0] as string) as Rect)
 				: unionRects([...rects.values()]);
 		controller.beginTx();
+		if (name === "rotate") {
+			gesture.current = {
+				kind: "rotate",
+				startWorld: world,
+				keys,
+				base: t,
+				geometry,
+				box,
+				rects,
+			};
+			return;
+		}
 		gesture.current = {
 			kind: "resize",
 			handle: name as Handle,
@@ -593,19 +593,25 @@ export function Viewport() {
 			}
 			case "rotate": {
 				const rotation = rotateFromPointer(
-					g.rect,
+					g.box,
 					g.startWorld,
 					world,
-					g.rect.rotation,
+					g.box.rotation,
 					{ snap: e.shiftKey },
 				);
-				const out = applyRect(
-					g.base,
-					g.key,
-					{ ...g.rect, rotation },
-					g.geometry,
-				);
-				if (out.ok) controller.previewTx(out.template);
+				const turn = rotation - g.box.rotation;
+				const pivot = centreOf(g.box);
+				let next = g.base;
+				for (const [key, r] of g.rects) {
+					const out = applyRect(
+						next,
+						key,
+						rotateRectAbout(r, pivot, turn),
+						g.geometry,
+					);
+					if (out.ok) next = out.template;
+				}
+				controller.previewTx(next);
 				setDraft({ angle: { at: world, value: rotation } });
 				return;
 			}

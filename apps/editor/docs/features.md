@@ -105,7 +105,8 @@ the records, and **Export** turns templates and records into files.
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
   - Move, resize and rotate, with snapping to the artboard, to other layers
-    and to guides.
+    and to guides. Several selected layers rotate together about their
+    bounding box's centre.
   - Arrow keys nudge a layer, and Esc cancels a drag.
   - Align and distribute from the Object menu or Alt+A, H, D, W, V and S.
     Several layers align to their combined box; one layer aligns to its

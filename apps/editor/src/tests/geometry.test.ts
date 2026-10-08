@@ -17,6 +17,7 @@ import {
 	resizeRect,
 	rotateFromPointer,
 	rotatePoint,
+	rotateRectAbout,
 	snapCandidates,
 	snapMove,
 	snapResize,
@@ -514,6 +515,23 @@ describe("snapping", () => {
 			6,
 		);
 		expect(s.dx).toBeCloseTo(-20 - left);
+	});
+});
+
+describe("rotateRectAbout", () => {
+	test("turns the centre round the pivot and adds to the rotation", () => {
+		expectRect(
+			rotateRectAbout(r(90, -10, 20, 20, 10), { x: 0, y: 0 }, 90),
+			r(-10, 90, 20, 20, 100),
+		);
+	});
+
+	test("about its own centre only the rotation changes", () => {
+		const rect = r(10, 20, 100, 50, 170);
+		expectRect(
+			rotateRectAbout(rect, centreOf(rect), 30),
+			r(10, 20, 100, 50, -160),
+		);
 	});
 });
 

@@ -413,6 +413,18 @@ export function rotateFromPointer(
 	return normalizeAngle(deg);
 }
 
+/** Turns `rect` `deg` degrees about `pivot`: its centre moves round the pivot
+ *  and its own rotation grows by the same angle. */
+export function rotateRectAbout(rect: Rect, pivot: Point, deg: number): Rect {
+	const c = rotatePoint(centreOf(rect), deg, pivot);
+	return {
+		...rect,
+		x: c.x - rect.width / 2,
+		y: c.y - rect.height / 2,
+		rotation: normalizeAngle(rect.rotation + deg),
+	};
+}
+
 /** Maps `rect` from `from` to `to` proportionally: a multi-selection's
  *  members when its bounding box is resized. */
 export function mapRectInBox(rect: Rect, from: Rect, to: Rect): Rect {
