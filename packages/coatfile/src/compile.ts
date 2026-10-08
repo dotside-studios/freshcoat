@@ -3,6 +3,7 @@ import {
 	type BitmapNode,
 	buildAdjust,
 	type ChildLayout,
+	type EllipseNode,
 	FALLBACK_LINE_HEIGHT,
 	type GroupNode,
 	type ImageNode,
@@ -13,6 +14,7 @@ import {
 	patternFill,
 	type RectNode,
 	scalePathData,
+	strokeTrim,
 	type TextNode,
 	type TrackSize,
 	type Layout as SceneLayout,
@@ -35,10 +37,12 @@ import {
 } from "./bleed";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
+import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
+import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { childElements } from "./tree";
 import type {
 	Background,
@@ -352,17 +356,40 @@ function compileElement(
 					ratio,
 				),
 			} satisfies ImageNode;
-		case "vector":
+		case "vector": {
+			const stroke = resolveStroke(
+				props.stroke as StrokeInput | undefined,
+				ratio,
+			);
+			const d = String(props.d ?? "");
+			const fills = resolveFills(
+				props.fill as Fill | Fill[] | undefined,
+				ratio,
+			);
+			// A trimmed ellipse runs from its top, as a progress ring does.
+			if (
+				stroke &&
+				strokeTrim(stroke) &&
+				el.size &&
+				isEllipsePath(d, el.size.width, el.size.height)
+			)
+				return {
+					...transform,
+					kind: "ellipse",
+					fills,
+					stroke,
+				} satisfies EllipseNode;
 			return {
 				...transform,
 				kind: "path",
-				d: scalePathString(String(props.d ?? ""), ratio),
+				d: scalePathString(d, ratio),
 				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
 					? { fillRule: props.fillRule }
 					: {}),
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
-				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				fills,
+				stroke,
 			} satisfies PathNode;
+		}
 		case "text":
 			return compileText(transform, props, ratio);
 		case "qr_code":
@@ -1206,7 +1233,7 @@ type StrokeInput = {
 	cap?: Stroke["cap"];
 	join?: Stroke["join"];
 	align?: Stroke["align"];
-};
+} & StrokeTrimInput;
 
 function resolveStroke(
 	stroke: StrokeInput | undefined,
@@ -1220,6 +1247,7 @@ function resolveStroke(
 		cap: stroke.cap,
 		join: stroke.join,
 		align: stroke.align,
+		...resolveStrokeTrim(stroke),
 	};
 }
 

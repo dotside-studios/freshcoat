@@ -1192,6 +1192,36 @@
 															"outside",
 															"center"
 														]
+													},
+													"trimStart": {
+														"anyOf": [
+															{
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															{
+																"type": "string"
+															}
+														]
+													},
+													"trimEnd": {
+														"anyOf": [
+															{
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															{
+																"type": "string"
+															}
+														]
+													},
+													"trimOffset": {
+														"type": [
+															"number",
+															"string"
+														]
 													}
 												},
 												"required": [
@@ -1771,6 +1801,36 @@
 															"inside",
 															"outside",
 															"center"
+														]
+													},
+													"trimStart": {
+														"anyOf": [
+															{
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															{
+																"type": "string"
+															}
+														]
+													},
+													"trimEnd": {
+														"anyOf": [
+															{
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															{
+																"type": "string"
+															}
+														]
+													},
+													"trimOffset": {
+														"type": [
+															"number",
+															"string"
 														]
 													}
 												},
@@ -2685,6 +2745,36 @@
 																		"outside",
 																		"center"
 																	]
+																},
+																"trimStart": {
+																	"anyOf": [
+																		{
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		{
+																			"type": "string"
+																		}
+																	]
+																},
+																"trimEnd": {
+																	"anyOf": [
+																		{
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		{
+																			"type": "string"
+																		}
+																	]
+																},
+																"trimOffset": {
+																	"type": [
+																		"number",
+																		"string"
+																	]
 																}
 															},
 															"required": [
@@ -3264,6 +3354,36 @@
 																		"inside",
 																		"outside",
 																		"center"
+																	]
+																},
+																"trimStart": {
+																	"anyOf": [
+																		{
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		{
+																			"type": "string"
+																		}
+																	]
+																},
+																"trimEnd": {
+																	"anyOf": [
+																		{
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		{
+																			"type": "string"
+																		}
+																	]
+																},
+																"trimOffset": {
+																	"type": [
+																		"number",
+																		"string"
 																	]
 																}
 															},
@@ -4899,6 +5019,36 @@
 														"inside",
 														"outside",
 														"center"
+													]
+												},
+												"trimStart": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimEnd": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimOffset": {
+													"type": [
+														"number",
+														"string"
 													]
 												}
 											},
@@ -6581,6 +6731,36 @@
 														"outside",
 														"center"
 													]
+												},
+												"trimStart": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimEnd": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimOffset": {
+													"type": [
+														"number",
+														"string"
+													]
 												}
 											},
 											"required": [
@@ -7492,6 +7672,36 @@
 														"outside",
 														"center"
 													]
+												},
+												"trimStart": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimEnd": {
+													"anyOf": [
+														{
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														{
+															"type": "string"
+														}
+													]
+												},
+												"trimOffset": {
+													"type": [
+														"number",
+														"string"
+													]
 												}
 											},
 											"required": [
@@ -8365,6 +8575,36 @@
 												"inside",
 												"outside",
 												"center"
+											]
+										},
+										"trimStart": {
+											"anyOf": [
+												{
+													"type": "number",
+													"minimum": 0,
+													"maximum": 1
+												},
+												{
+													"type": "string"
+												}
+											]
+										},
+										"trimEnd": {
+											"anyOf": [
+												{
+													"type": "number",
+													"minimum": 0,
+													"maximum": 1
+												},
+												{
+													"type": "string"
+												}
+											]
+										},
+										"trimOffset": {
+											"type": [
+												"number",
+												"string"
 											]
 										}
 									},
