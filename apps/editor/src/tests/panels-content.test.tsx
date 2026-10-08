@@ -16,7 +16,7 @@ import { ContentPanel } from "~/panels/ContentPanel";
 import { setRequired, withPatch } from "~/panels/content/field-def";
 import { RightPanel } from "~/panels/RightPanel";
 import type { RightTab } from "~/state/store";
-import { fastUser } from "./aria";
+import { button, chooseOption, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 beforeAll(() => {
@@ -186,6 +186,40 @@ describe("the Content tab", () => {
 			stepper.compareDocumentPosition(screen.getByTestId("field-name")) &
 				Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy();
+	});
+
+	test("an unbound template offers the datasets and binds the one picked", async () => {
+		const { controller, user } = setup();
+		const dataset = {
+			id: "d_m",
+			name: "Members",
+			columns: [{ key: "Name", type: "text" as const }],
+			records: [
+				{ id: "r_0", values: { Name: "Grace" }, status: "pending" as const },
+			],
+			assets: [],
+		};
+		act(() =>
+			controller.dispatch({ type: "datasetEdit", datasets: [dataset] }),
+		);
+		expect(screen.queryByTestId("record-stepper")).toBeNull();
+		await chooseOption(
+			user,
+			screen.getByLabelText("Dataset to try", { selector: "button" }),
+			"Members",
+		);
+		const id = controller.state.workspace?.activeTemplateId;
+		const slot = controller.state.workspace?.templates.find((t) => t.id === id);
+		expect(slot?.binding).toMatchObject({
+			datasetId: "d_m",
+			fields: { name: { kind: "column", column: "Name" } },
+		});
+		expect(screen.getByTestId("record-stepper")).toBeTruthy();
+		const toggle = button("Binding");
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		await user.click(toggle);
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 });
 

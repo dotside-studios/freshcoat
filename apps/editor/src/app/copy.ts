@@ -124,6 +124,8 @@ export const CONTENT = {
 	content: "Content",
 	/** The record stepper's heading, before the dataset's name. */
 	tryWith: "Try with",
+	chooseDataset: "Choose a dataset",
+	binding: "Binding",
 	samples: "Samples",
 	fields: "Fields",
 	addField: "Add field",
