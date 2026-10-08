@@ -18,6 +18,7 @@ import {
 	guessMapping,
 	headersOf,
 	type ImportPlan,
+	INFER_SAMPLE,
 	inferType,
 	isValidKey,
 	previewMapping,
@@ -34,6 +35,7 @@ import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
+import { Badge } from "~/panels/content/shared";
 import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
@@ -626,7 +628,15 @@ function MappingStep({
 			.filter((v) => v.trim() !== "")
 			.slice(0, 3);
 	const inferred = useMemo(
-		() => headers.map((_, i) => inferType(samples.map((r) => r[i] ?? ""))),
+		() =>
+			headers.map((_, i) => {
+				const values = samples.map((r) => r[i] ?? "");
+				const filled = values.filter((v) => v.trim() !== "").length;
+				return {
+					type: inferType(values),
+					from: Math.min(filled, INFER_SAMPLE),
+				};
+			}),
 		[headers, samples],
 	);
 	const skipUnmatched = () =>
@@ -638,7 +648,7 @@ function MappingStep({
 			next[i] = {
 				kind: "new",
 				key: freshKey(header, i, dataset, next),
-				type: inferred[i] ?? "text",
+				type: inferred[i]?.type ?? "text",
 			};
 		});
 		onMapping(next);
@@ -679,6 +689,7 @@ function MappingStep({
 						const m = mapping[i] ?? { kind: "skip" };
 						const newKey = m.kind === "new" ? m.key : "";
 						const problem = problems.get(i);
+						const guess = inferred[i];
 						return (
 							<tr
 								// biome-ignore lint/suspicious/noArrayIndexKey: source columns are positional
@@ -695,6 +706,12 @@ function MappingStep({
 									<div className="truncate text-fc-faint text-fc-sm sm:hidden">
 										{sampleOf(i).join(" · ")}
 									</div>
+									{guess?.from ? (
+										<Badge className="mt-1" testId={`inferred-${i}`}>
+											{TYPE_LABELS[guess.type]} · inferred from{" "}
+											{plural(guess.from, "row")}
+										</Badge>
+									) : null}
 								</td>
 								<td className="hidden max-w-56 px-2 py-1.5 text-fc-muted text-fc-sm sm:table-cell">
 									{sampleOf(i).map((s, k) => (
@@ -719,7 +736,7 @@ function MappingStep({
 														: {
 																kind: "new",
 																key: freshKey(header, i, dataset, mapping),
-																type: "text",
+																type: inferred[i]?.type ?? "text",
 															},
 												);
 											else set(i, { kind: "column", column: key.slice(4) });
@@ -733,7 +750,7 @@ function MappingStep({
 											)),
 											<SelectItem key="new" id="new">
 												{m.kind === "new"
-													? `New column: ${m.key} (${TYPE_LABELS[m.type].toLowerCase()})`
+													? `New column: ${m.key}`
 													: "New column"}
 											</SelectItem>,
 											<SelectItem key="skip" id="skip">

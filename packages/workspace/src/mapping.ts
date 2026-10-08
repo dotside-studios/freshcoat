@@ -20,7 +20,7 @@ import type {
 	ImportPlan,
 } from "./types";
 
-const INFER_SAMPLE = 200;
+export const INFER_SAMPLE = 200;
 const LONG_TEXT = 120;
 
 const INTEGER_TEXT = /^[-+]?(0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)$/;

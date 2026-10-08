@@ -148,7 +148,7 @@ const COPY = ROOTS.flatMap(sourceFiles).flatMap(copyIn);
 const ALLOWED: { file: RegExp; text: RegExp }[] = [
 	{
 		file: /data\/ImportWizard\.tsx$/,
-		text: /^(No header row|Header row|Row)$/,
+		text: /^(No header row|Header row|Row|row|Only rows with issues)$/,
 	},
 	{
 		file: /panels\/design\/FrameSection\.tsx$/,

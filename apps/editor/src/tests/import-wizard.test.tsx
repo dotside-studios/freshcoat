@@ -235,4 +235,42 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			{ key: "score", type: "integer", title: "Score" },
 		]);
 	});
+
+	it("shows the inferred type and keeps it for a new column", async () => {
+		const user = fastUser();
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{
+						datasetId: "d_people",
+						file: new File(["name,Photo\nZed,zed.jpg\nYe,ye.png"], "p.csv", {
+							type: "text/csv",
+						}),
+					}}
+					onClose={() => {}}
+					onImported={() => {}}
+				/>
+			</ControllerProvider>,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("import-wizard").textContent).toContain(
+				"p.csv · 2 records",
+			),
+		);
+		await user.click(button("Next"));
+		expect(screen.getByTestId("inferred-1").textContent).toBe(
+			"Image · inferred from 2 rows",
+		);
+		await chooseOption(user, button(/Target for Photo/), /^Skip$/);
+		await chooseOption(user, button(/Target for Photo/), /^New column/);
+		await user.click(button("Next"));
+		await user.click(button("Import"));
+		await waitFor(() =>
+			expect(controller.state.workspace?.datasets[0]?.columns[2]).toEqual({
+				key: "photo",
+				type: "image",
+				title: "Photo",
+			}),
+		);
+	});
 });
