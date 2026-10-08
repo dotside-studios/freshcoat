@@ -1,4 +1,5 @@
 import { parseColor, type Rgba, toHex } from "../color";
+import { normalizeDash } from "../dash";
 import {
 	applyMatrix,
 	decompose,
@@ -637,18 +638,13 @@ export function parseSvg(markup: string): SvgDrawing {
 		else if (join === "miter-clip" || join === "arcs") stroke.join = "miter";
 		const dashRaw = style["stroke-dasharray"];
 		if (dashRaw && dashRaw !== "none") {
-			const dash = dashRaw
-				.split(/[\s,]+/)
-				.filter(Boolean)
-				.map((v) => parseLength(v, "d", viewport) ?? Number.NaN);
-			if (
-				dash.length > 0 &&
-				dash.every((v) => Number.isFinite(v) && v >= 0) &&
-				dash.some((v) => v > 0)
-			) {
-				const full = dash.length % 2 ? [...dash, ...dash] : dash;
-				stroke.dash = full.map((v) => v * k);
-			}
+			const dash = normalizeDash(
+				dashRaw
+					.split(/[\s,]+/)
+					.filter(Boolean)
+					.map((v) => parseLength(v, "d", viewport) ?? Number.NaN),
+			);
+			if (dash) stroke.dash = dash.map((v) => v * k);
 		}
 		return stroke;
 	};
