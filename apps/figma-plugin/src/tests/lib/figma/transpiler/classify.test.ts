@@ -53,6 +53,74 @@ describe("classify", () => {
 		expect(classify(n).kind).toBe("native-text");
 	});
 
+	describe("RECTANGLE with a gradient stroke", () => {
+		const stops = [
+			{ position: 0, color: { r: 0, g: 0, b: 0, a: 1 } },
+			{ position: 1, color: { r: 1, g: 1, b: 1, a: 1 } },
+		];
+		const stroked = (stroke: Record<string, unknown>): FigmaNode =>
+			({
+				...baseAttrs,
+				id: "1",
+				name: "x",
+				type: "RECTANGLE",
+				fills: [],
+				strokes: [stroke],
+				strokeWeight: 2,
+			}) as unknown as FigmaNode;
+		const handles = (b: { x: number; y: number }) => [
+			{ x: 0.5, y: 0.5 },
+			{ x: 1, y: 0.5 },
+			b,
+		];
+
+		it.each([
+			"GRADIENT_LINEAR",
+			"GRADIENT_RADIAL",
+			"GRADIENT_ANGULAR",
+		])("%s → native-rect", (type) => {
+			const n = stroked({
+				type,
+				gradientHandlePositions: handles({ x: 0.5, y: 1 }),
+				gradientStops: stops,
+			});
+			expect(classify(n).kind).toBe("native-rect");
+		});
+
+		it.each([
+			[
+				"an uneven angular sweep",
+				{
+					type: "GRADIENT_ANGULAR",
+					gradientHandlePositions: handles({ x: 0.5, y: 0.6 }),
+					gradientStops: stops,
+				},
+			],
+			[
+				"a blended gradient",
+				{
+					type: "GRADIENT_LINEAR",
+					blendMode: "MULTIPLY",
+					gradientHandlePositions: handles({ x: 0.5, y: 1 }),
+					gradientStops: stops,
+				},
+			],
+			[
+				"a diamond gradient",
+				{
+					type: "GRADIENT_DIAMOND",
+					gradientHandlePositions: handles({ x: 0.5, y: 1 }),
+					gradientStops: stops,
+				},
+			],
+		])("%s → stroke_flattened", (_, stroke) => {
+			expect(classify(stroked(stroke))).toEqual({
+				kind: "flatten",
+				reason: "stroke_flattened",
+			});
+		});
+	});
+
 	describe("TEXT with a stroke", () => {
 		const stroked = (over: Record<string, unknown> = {}): FigmaNode => ({
 			...baseAttrs,
@@ -589,7 +657,7 @@ describe("classify", () => {
 				fills: IMAGE,
 				fillGeometry: GEOMETRY,
 				...extra,
-			}) as FigmaNode;
+			}) as unknown as FigmaNode;
 
 		it("a full ellipse → native-image", () => {
 			expect(classify(shape({ type: "ELLIPSE" })).kind).toBe("native-image");

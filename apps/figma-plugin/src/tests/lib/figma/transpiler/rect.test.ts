@@ -290,9 +290,57 @@ describe("transpileRect strokes and corners", () => {
 		expect(el.properties.stroke).toEqual({ color: "#0000ff", width: 2 });
 	});
 
-	it("does not throw on a gradient stroke", () => {
+	it("maps a gradient stroke to a gradient colour", () => {
 		const el = transpileRect(
-			baseRect({ strokes: [gradient], strokeWeight: 2 }),
+			baseRect({ strokes: [gradient], strokeWeight: 2, dashPattern: [4, 2] }),
+			{ frame: FRAME, scale: 2 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: {
+				kind: "linear",
+				angle: 0,
+				from: [0, 0],
+				to: [1, 0],
+				stops: [
+					{ offset: 0, color: "#ff0000" },
+					{ offset: 1, color: "#0000ff" },
+				],
+			},
+			width: 4,
+			dash: [8, 4],
+		});
+	});
+
+	it("maps an angular gradient stroke on the rect's own box", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [
+					{
+						type: "GRADIENT_ANGULAR",
+						gradientHandlePositions: [
+							{ x: 0.5, y: 0.5 },
+							{ x: 0.75, y: 0.5 },
+							{ x: 0.5, y: 1 },
+						],
+						gradientStops: gradient.gradientStops,
+					},
+				],
+				strokeWeight: 2,
+			}),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke?.color).toMatchObject({
+			kind: "angular",
+			center: [0.5, 0.5],
+		});
+	});
+
+	it("leaves out a stroke stack mixing a gradient and a solid", () => {
+		const el = transpileRect(
+			baseRect({
+				strokes: [gradient, { type: "SOLID", color: black }],
+				strokeWeight: 2,
+			}),
 			{ frame: FRAME, scale: 1 },
 		);
 		expect(el.properties.stroke).toBeUndefined();

@@ -39,6 +39,9 @@ import type {
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
+	type ArcRing,
+	arcBandBounds,
+	arcRings,
 	placeOnArc,
 	rsxformBounds,
 	spanAt,
@@ -54,10 +57,15 @@ import {
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { normalizeDash } from "./dash";
+import { strokeTrim, trimPath } from "./trim";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
-import { fontArrayBuffer, fontBytes } from "./font-bytes";
+import { fontBytes } from "./font-bytes";
 import { dataUrlToBytes } from "./loader";
-import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
+import {
+	createSharedFontProvider,
+	makeParagraphBuilder,
+	type SharedFontProvider,
+} from "./font-collection";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -98,8 +106,13 @@ import {
 	DEFAULT_WEBP_QUALITY,
 	encodePng,
 } from "./png";
-import { outlineGeometry, outlineIsPath, rectShape } from "./outline";
-import { PATTERN_SKSL, type PatternFill } from "./pattern";
+import {
+	boxPath,
+	outlineGeometry,
+	outlineIsPath,
+	rectShape,
+} from "./outline";
+import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
 import type { SvgItem } from "./svg/index";
 import { isSvg } from "./svg/sniff";
 import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
@@ -116,6 +129,7 @@ import type {
 	FontRequest,
 	FrameFinish,
 	PaintWarning,
+	PatternKind,
 	ResolvedFill,
 	ShapeMask,
 	Size,
@@ -237,13 +251,22 @@ function patternShader(
 	x: number,
 	y: number,
 	space: PatternSpace,
+	issues?: PaintIssues,
 ): Shader {
 	const [c0, c1] = fill.colors;
+	let error = "";
 	const eff = cachedEffect(ck, `pattern-${fill.pattern}`, () =>
-		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern]),
+		ck.RuntimeEffect.Make(PATTERN_SKSL[fill.pattern], (e: string) => {
+			error = e;
+		}),
 	);
-	if (!eff)
+	if (!eff) {
+		issues?.patternUnsupported.set(fill.pattern, {
+			pattern: fill.pattern,
+			error: error || "the pattern shader failed to compile",
+		});
 		return bin.track(ck.Shader.MakeColor(toColor(ck, c0), ck.ColorSpace.SRGB));
+	}
 	const scale = Math.max(fill.scale, 1e-3);
 	const [ux, uy] = space.unit ?? [1, 1];
 	const local = ck.Matrix.multiply(
@@ -258,6 +281,7 @@ function patternShader(
 		...toColor(ck, c1),
 		density,
 		1 / (scale * space.px),
+		patternMean(fill.pattern, density),
 	];
 	if (fill.pattern === "hatching" || fill.pattern === "dots")
 		return bin.track(eff.makeShader(uniforms, local));
@@ -279,8 +303,10 @@ function shaderFor(
 	w: number,
 	h: number,
 	space: PatternSpace = { px: 1 },
+	issues?: PaintIssues,
 ): Shader {
-	if (fill.kind === "pattern") return patternShader(ck, bin, fill, x, y, space);
+	if (fill.kind === "pattern")
+		return patternShader(ck, bin, fill, x, y, space, issues);
 	if (fill.kind === "linear") {
 		return bin.track(
 			ck.Shader.MakeLinearGradient(
@@ -353,8 +379,6 @@ function shaderFor(
 	);
 }
 
-// A TypefaceFontProvider registered from explicit font bytes (no global font
-// registry, no cache poisoning) — Paragraph resolves families against it.
 // The env's whole fonts map, then whatever the scene loaded from elsewhere.
 function withEnvFonts(
 	loaded: LoadedFontBytes[],
@@ -365,17 +389,6 @@ function withEnvFonts(
 		for (const bytes of faces) out.push({ family, bytes });
 	for (const f of loaded) if (!fonts.has(f.family)) out.push(f);
 	return out;
-}
-
-function makeFontProvider(
-	ck: CanvasKit,
-	fonts: LoadedFontBytes[],
-): TypefaceFontProvider {
-	const provider = ck.TypefaceFontProvider.Make();
-	for (const f of fonts) {
-		provider.registerFont(fontArrayBuffer(f.bytes), f.family);
-	}
-	return provider;
 }
 
 const STROKE_CAP: Record<string, EnumKey<StrokeCapEnumValues>> = {
@@ -389,11 +402,22 @@ const STROKE_JOIN: Record<string, EnumKey<StrokeJoinEnumValues>> = {
 	bevel: "Bevel",
 };
 
-function strokePaint(ck: CanvasKit, bin: Bin, stroke: Stroke): Paint {
+type PaintBox = { x: number; y: number; w: number; h: number };
+
+function strokePaint(
+	ck: CanvasKit,
+	bin: Bin,
+	stroke: Stroke,
+	box: PaintBox,
+): Paint {
 	const p = bin.track(new ck.Paint());
 	p.setAntiAlias(true);
 	p.setStyle(ck.PaintStyle.Stroke);
-	p.setColor(toColor(ck, stroke.color));
+	if (stroke.gradient)
+		p.setShader(
+			shaderFor(ck, bin, stroke.gradient, box.x, box.y, box.w, box.h),
+		);
+	else p.setColor(toColor(ck, stroke.color));
 	p.setStrokeWidth(stroke.width);
 	p.setStrokeCap(ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]]);
 	p.setStrokeJoin(ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]]);
@@ -411,6 +435,7 @@ function drawClippedStroke(
 	bin: Bin,
 	outline: Outline,
 	stroke: Stroke,
+	box: PaintBox,
 ) {
 	canvas.save();
 	clipOutline(
@@ -419,12 +444,49 @@ function drawClippedStroke(
 		outline,
 		stroke.align === "inside" ? ck.ClipOp.Intersect : ck.ClipOp.Difference,
 	);
-	drawOutline(
+	drawStroke(
+		ck,
 		canvas,
+		bin,
 		outline,
-		strokePaint(ck, bin, { ...stroke, width: stroke.width * 2 }),
+		{ ...stroke, width: stroke.width * 2 },
+		box,
 	);
 	canvas.restore();
+}
+
+// `stroke` along `o`, cut to its trim.
+function drawStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	o: Outline,
+	stroke: Stroke,
+	box: PaintBox,
+) {
+	const paint = strokePaint(ck, bin, stroke, box);
+	const trim = strokeTrim(stroke);
+	if (!trim) {
+		drawOutline(canvas, o, paint);
+		return;
+	}
+	let whole: Path;
+	if (o.kind === "path") whole = o.path;
+	else {
+		const r = o.kind === "rect" ? o.rect : o.rrect;
+		const ltrb = [r[0], r[1], r[2], r[3]] as [number, number, number, number];
+		const radii =
+			o.kind === "rrect"
+				? ([r[4], r[6], r[8], r[10]] as [number, number, number, number])
+				: undefined;
+		whole = bin.track(boxPath(ck, ltrb, radii));
+	}
+	const path = trimPath(ck, whole, trim);
+	if (!path) return;
+	bin.track(path);
+	const dx = o.kind === "path" ? o.dx : 0;
+	const dy = o.kind === "path" ? o.dy : 0;
+	drawOutline(canvas, { kind: "path", path, dx, dy }, paint);
 }
 
 type Outline =
@@ -445,11 +507,12 @@ function outlineOf(
 	w: number,
 	h: number,
 	inset = 0,
+	fromTop = false,
 ): Outline | null {
-	const g = outlineGeometry(shape, x, y, w, h, inset);
+	const g = outlineGeometry(shape, x, y, w, h, inset, fromTop);
 	if (!g) return null;
 	if (g.kind === "path") {
-		const local = outlineGeometry(shape, 0, 0, w, h, inset);
+		const local = outlineGeometry(shape, 0, 0, w, h, inset, fromTop);
 		if (local?.kind !== "path") return null;
 		const path = bin.path(ck, local.d) as Path;
 		return { kind: "path", path, dx: x, dy: y };
@@ -533,13 +596,15 @@ function drawOutlineStroke(
 	const { x, y } = pos;
 	const { width: w, height: h } = size;
 	const inset = strokeInset(stroke);
-	const o = outlineOf(ck, bin, shape, x, y, w, h, inset);
+	const box = { x, y, w, h };
+	const fromTop = strokeTrim(stroke) !== null;
+	const o = outlineOf(ck, bin, shape, x, y, w, h, inset, fromTop);
 	if (o) {
-		drawOutline(canvas, o, strokePaint(ck, bin, stroke));
+		drawStroke(ck, canvas, bin, o, stroke, box);
 		return;
 	}
-	const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
-	drawClippedStroke(ck, canvas, bin, whole, stroke);
+	const whole = outlineOf(ck, bin, shape, x, y, w, h, 0, fromTop) as Outline;
+	drawClippedStroke(ck, canvas, bin, whole, stroke, box);
 }
 
 function textStyleOf(
@@ -588,6 +653,7 @@ function drawText(
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
+	issues: PaintIssues,
 ) {
 	// A gradient fill spans the whole text box, applied to every glyph (via a
 	// foreground paint) and its decoration, overriding per-span colors.
@@ -602,6 +668,7 @@ function drawText(
 					cmd.size.width,
 					cmd.size.height,
 					{ px: devicePx(canvas) },
+					issues,
 				)
 			: null;
 	let fgPaint: Paint | null = null;
@@ -615,7 +682,18 @@ function drawText(
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
 	if (cmd.arc) {
-		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+		drawArcText(
+			ck,
+			canvas,
+			provider,
+			bin,
+			cmd,
+			cmd.arc,
+			fallback,
+			fgPaint,
+			fillShader,
+			issues,
+		);
 		return;
 	}
 	// Gradient paints depend on position, so those lines are not cached.
@@ -772,13 +850,22 @@ function arcLines(
 			bin.track(shaped.para);
 		}
 		const sl = shaped.para.getShapedLines()[0];
-		for (const run of sl?.runs ?? []) bin.track(run.typeface);
+		const runs = sl?.runs ?? [];
+		for (const run of runs) bin.track(run.typeface);
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const spacing = runs.map((run) =>
+			Float32Array.from(
+				run.offsets.subarray(0, run.glyphs.length),
+				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
+			),
+		);
 		out.push({
 			line,
 			arc: {
-				runs: sl?.runs ?? [],
+				runs,
 				baseline: sl?.baseline ?? 0,
 				offset: (line.baseline ?? line.y) - base0,
+				spacing,
 			},
 		});
 	}
@@ -803,6 +890,65 @@ function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	return font;
 }
 
+type ArcDecoration = {
+	span: TextLine["spans"][number];
+	r: number;
+	a0: number;
+	a1: number;
+	thickness: number;
+};
+
+// Each decorated span's underline or strikethrough as a band along its ring,
+// across the angles its glyphs cover.
+function arcDecorations(
+	lines: { line: TextLine; arc: ArcLine }[],
+	rings: ArcRing[],
+	arc: TextArc,
+): ArcDecoration[] {
+	const turn = arc.direction === "outside" ? 1 : -1;
+	const out: ArcDecoration[] = [];
+	lines.forEach(({ line, arc: shaped }, li) => {
+		const ring = rings[li];
+		if (!ring || !line.spans.some((s) => s.font.decoration)) return;
+		const starts = spanByteStarts(line.spans.map((s) => s.text));
+		const ranges = new Map<number, [number, number]>();
+		shaped.runs.forEach((run, ri) => {
+			const pos = run.positions;
+			for (let i = 0; i < run.glyphs.length; i++) {
+				const span = spanAt(starts, run.offsets[i] as number);
+				const x = pos[2 * i] as number;
+				const end =
+					(pos[2 * i + 2] as number) - (shaped.spacing?.[ri]?.[i] ?? 0);
+				const range = ranges.get(span);
+				ranges.set(
+					span,
+					range
+						? [Math.min(range[0], x), Math.max(range[1], end)]
+						: [x, end],
+				);
+			}
+		});
+		for (const [index, [x0, x1]] of ranges) {
+			const span = line.spans[index];
+			if (!span?.font.decoration || x1 <= x0) continue;
+			const { top, thickness } = decorationLine(
+				span.font.size,
+				span.font.decoration,
+				0,
+			);
+			const dy = (top + thickness / 2) * ring.scale;
+			out.push({
+				span,
+				r: Math.max(ring.r - turn * dy, 0),
+				a0: ring.angle(x0),
+				a1: ring.angle(x1),
+				thickness: thickness * ring.scale,
+			});
+		}
+	});
+	return out;
+}
+
 // Text along a circle: the line's own shaped glyphs, each drawn under an
 // RSXform, colored by the span its cluster belongs to.
 function drawArcText(
@@ -814,9 +960,34 @@ function drawArcText(
 	arc: TextArc,
 	fallback: string[],
 	fgPaint: Paint | null,
+	fillShader: Shader | null,
+	issues?: PaintIssues,
 ) {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
+	const rings = arcRings(
+		lines.map((l) => l.arc),
+		arc,
+	);
+	rings.forEach((ring, line) => {
+		const layer = cmd.id ? { layer: cmd.id } : {};
+		if (ring.overflow)
+			issues?.warnings?.push({
+				kind: "arc_text_overflow",
+				...layer,
+				line,
+				width: ring.width,
+				circumference: ring.circumference,
+			});
+		if (ring.clamped)
+			issues?.warnings?.push({
+				kind: "arc_radius_clamped",
+				...layer,
+				line,
+				radius: arc.radius,
+				min: ring.r,
+			});
+	});
 	const placed = placeOnArc(
 		lines.map((l) => l.arc),
 		arc,
@@ -861,6 +1032,24 @@ function drawArcText(
 			}
 		});
 	});
+	for (const d of arcDecorations(lines, rings, arc)) {
+		const p = bin.track(new ck.Paint());
+		p.setAntiAlias(true);
+		p.setStyle(ck.PaintStyle.Stroke);
+		p.setStrokeWidth(d.thickness);
+		if (fillShader) p.setShader(fillShader);
+		else p.setColor(toColor(ck, d.span.color ?? cmd.color ?? "#000000"));
+		const builder = new ck.PathBuilder();
+		const deg = 180 / Math.PI;
+		builder.addArc(
+			ck.LTRBRect(cx - d.r, cy - d.r, cx + d.r, cy + d.r),
+			Math.min(d.a0, d.a1) * deg - 90,
+			Math.abs(d.a1 - d.a0) * deg,
+		);
+		const path = bin.track(builder.detach());
+		builder.delete();
+		canvas.drawPath(path, p);
+	}
 }
 
 // The local rects arc text's glyphs can cover: each glyph's font box under its
@@ -872,17 +1061,25 @@ function arcTextBounds(
 	cmd: DrawTextCommand,
 	arc: TextArc,
 	fallback: string[],
-	em: Bounds,
+	em: Bounds | null,
 ): Bounds[] {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
+	const out: Bounds[] = arcDecorations(
+		lines,
+		arcRings(
+			lines.map((l) => l.arc),
+			arc,
+		),
+		arc,
+	).map((d) => arcBandBounds(cx, cy, d.r, d.a0, d.a1, d.thickness));
+	if (!em) return out;
 	const placed = placeOnArc(
 		lines.map((l) => l.arc),
 		arc,
 		cx,
 		cy,
 	);
-	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
 		shaped.runs.forEach((run, ri) => {
 			const xforms = placed[li]?.[ri];
@@ -1309,6 +1506,7 @@ function makeSvgPicture(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
 		};
 		for (const cmd of commands)
 			if (cmd.op.startsWith("draw"))
@@ -1391,6 +1589,7 @@ function drawPath(
 	canvas: Canvas,
 	bin: Bin,
 	cmd: DrawPathCommand,
+	issues: PaintIssues,
 ) {
 	const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 	if (!path) return;
@@ -1416,16 +1615,17 @@ function drawPath(
 		paint.setAntiAlias(true);
 		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
 		else if (fill.kind === "pattern")
-			paint.setShader(patternShader(ck, bin, fill, ox, oy, space));
+			paint.setShader(patternShader(ck, bin, fill, ox, oy, space, issues));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
 		canvas.drawPath(path, paint);
 	}
 	if (cmd.stroke) {
+		const box = { x: 0, y: 0, w: boxW, h: boxH };
 		const outline = cmd.strokeD ? bin.path(ck, cmd.strokeD) : null;
-		if (outline) canvas.drawPath(outline, strokePaint(ck, bin, cmd.stroke));
-		else if (strokeInset(cmd.stroke) !== 0)
-			drawClippedStroke(ck, canvas, bin, { kind: "path", path }, cmd.stroke);
-		else canvas.drawPath(path, strokePaint(ck, bin, cmd.stroke));
+		const o: Outline = { kind: "path", path: outline ?? path };
+		if (!outline && strokeInset(cmd.stroke) !== 0)
+			drawClippedStroke(ck, canvas, bin, o, cmd.stroke, box);
+		else drawStroke(ck, canvas, bin, o, cmd.stroke, box);
 	}
 	canvas.restore();
 }
@@ -1438,11 +1638,13 @@ function drawPath(
 type PaintIssues = {
 	unhandled: string[];
 	missingImages: string[];
+	warnings?: PaintWarning[];
 	// `adjust` components this CanvasKit build can't apply (see layerPaint).
 	adjustUnsupported: Map<
 		string,
 		{ component: "lut" | "lut3d" | "sharpen" | "gamut"; layer?: string }
 	>;
+	patternUnsupported: Map<PatternKind, { pattern: PatternKind; error: string }>;
 };
 
 function reportAdjustUnsupported(
@@ -1512,20 +1714,30 @@ function drawShape(
 			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
 			else
 				paint.setShader(
-					shaderFor(ck, bin, fill, x, y, w, h, { px: devicePx(canvas) }),
+					shaderFor(
+						ck,
+						bin,
+						fill,
+						x,
+						y,
+						w,
+						h,
+						{ px: devicePx(canvas) },
+						issues,
+					),
 				);
 			drawOutline(canvas, outline, paint);
 		}
 		if (cmd.stroke)
 			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
-		drawText(ck, canvas, provider, bin, cmd);
+		drawText(ck, canvas, provider, bin, cmd, issues);
 	} else if (cmd.op === "drawImage") {
 		drawImage(ck, canvas, bin, images, cmd, issues);
 	} else if (cmd.op === "drawBitmap") {
 		drawBitmap(ck, canvas, bin, cmd, frame);
 	} else if (cmd.op === "drawPath") {
-		drawPath(ck, canvas, bin, cmd);
+		drawPath(ck, canvas, bin, cmd, issues);
 	} else if (cmd.op === "drawQr") {
 		const { pos, size, modules, margin = 0, foreground, background } = cmd;
 		const m = (Math.min(size.width, size.height) - margin * 2) / modules.length;
@@ -1596,13 +1808,28 @@ function drawMasked(
 	const bounds = originInvariant(cmd.mask, ctm)
 		? layerBounds(ck, canvas, provider, images, bin, content, frame)
 		: null;
-	canvas.saveLayer(undefined, bounds);
+	// A backdrop child blurs what lies beneath the mask, as Figma's does, so the
+	// content layer starts from the parent's pixels. Composited back through the
+	// mask this matches the plain layer wherever the parent is opaque or empty.
+	canvas.saveLayer(
+		undefined,
+		bounds,
+		null,
+		cmd.children.some(holdsBackdrop) ? ck.SaveLayerInitWithPrevious : 0,
+	);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
-	const maskPaint = bin.track(new ck.Paint());
-	maskPaint.setBlendMode(cmd.invert ? ck.BlendMode.DstOut : ck.BlendMode.DstIn);
+	canvas.saveLayer(maskPaint(ck, bin, cmd), bounds);
+	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
+	canvas.restore();
+	canvas.restore();
+}
+
+function maskPaint(ck: CanvasKit, bin: Bin, cmd: DrawMaskedCommand): Paint {
+	const paint = bin.track(new ck.Paint());
+	paint.setBlendMode(cmd.invert ? ck.BlendMode.DstOut : ck.BlendMode.DstIn);
 	if (cmd.channel === "luminance")
-		maskPaint.setColorFilter(
+		paint.setColorFilter(
 			bin.track(
 				ck.ColorFilter.MakeCompose(
 					bin.track(
@@ -1617,10 +1844,16 @@ function drawMasked(
 				),
 			),
 		);
-	canvas.saveLayer(maskPaint, bounds);
-	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
-	canvas.restore();
-	canvas.restore();
+	return paint;
+}
+
+// Whether a backdrop reads the canvas beneath `cmd`: its own, or a child's
+// painted straight onto the same layer.
+function holdsBackdrop(cmd: DrawCommand): boolean {
+	if (hasBackdrop(cmd)) return true;
+	if (cmd.op === "drawGroup" && passThrough(cmd))
+		return cmd.children.some(holdsBackdrop);
+	return false;
 }
 
 // The color-matrix component of an `adjust` as a Skia ColorFilter — the cheap
@@ -1845,8 +2078,9 @@ function adjustShaderSksl(
 
 // RuntimeEffect is compiled per (ck, variant) and reused — Make() parses SkSL, so
 // caching keeps the hot path free of recompiles. Keyed by ck so distinct CanvasKit
-// instances (e.g. across tests) never share an effect.
-const effectCache = new WeakMap<object, Map<string, RuntimeEffect | null>>();
+// instances (e.g. across tests) never share an effect. A failed compile is not
+// kept, so the next paint tries again.
+const effectCache = new WeakMap<object, Map<string, RuntimeEffect>>();
 function cachedEffect(
 	ck: CanvasKit,
 	key: string,
@@ -1857,11 +2091,11 @@ function cachedEffect(
 		byVariant = new Map();
 		effectCache.set(ck, byVariant);
 	}
-	let eff = byVariant.get(key);
-	if (eff === undefined) {
-		eff = make() ?? null;
-		byVariant.set(key, eff);
-	}
+	const cached = byVariant.get(key);
+	if (cached) return cached;
+	const eff = make();
+	if (!eff) return null;
+	byVariant.set(key, eff);
 	return eff;
 }
 
@@ -2175,9 +2409,7 @@ function textBounds(
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
 	if (cmd.arc)
-		return em
-			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
-			: [];
+		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em);
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2555,6 +2787,7 @@ function recordedBounds(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			patternUnsupported: new Map(),
 		};
 		paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
 		picture = recorder.finishRecordingAsPicture();
@@ -3647,8 +3880,12 @@ function withoutBackdrop(cmd: DrawCommand): DrawCommand {
 function paintBackdrop(
 	ck: CanvasKit,
 	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawCommand,
+	issues: PaintIssues,
+	frame: Frame,
 ) {
 	const sigma = LAYER_BLUR_SIGMA(cmd.backdropBlur as number);
 	canvas.save();
@@ -3659,7 +3896,14 @@ function paintBackdrop(
 		canvas.rotate(cmd.rotation, 0, 0);
 		canvas.translate(-cx, -cy);
 	}
-	if (cmd.op === "drawPath") {
+	const cover = coverage(cmd);
+	if (cover) {
+		const inverted = cmd.op === "drawMasked" && cmd.invert;
+		const bounds = inverted
+			? null
+			: layerBounds(ck, canvas, provider, images, bin, cover, frame);
+		if (bounds) canvas.clipRect(bounds, ck.ClipOp.Intersect, false);
+	} else if (cmd.op === "drawPath") {
 		const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 		if (path) {
 			const vb = cmd.viewBox;
@@ -3698,8 +3942,39 @@ function paintBackdrop(
 		ck.ImageFilter.MakeBlur(sigma, sigma, ck.TileMode.Clamp, null),
 	);
 	canvas.saveLayer(paint, null, blur, 0, ck.TileMode.Clamp);
+	if (cover) {
+		let keep: Paint;
+		if (cmd.op === "drawMasked") keep = maskPaint(ck, bin, cmd);
+		else {
+			keep = bin.track(new ck.Paint());
+			keep.setBlendMode(ck.BlendMode.DstIn);
+		}
+		canvas.saveLayer(keep, null);
+		paintDrawable(ck, canvas, provider, images, bin, cover, issues, frame);
+		canvas.restore();
+	}
 	canvas.restore();
 	canvas.restore();
+}
+
+// What a backdrop's coverage is drawn from when its outline is not a shape: a
+// text's glyphs, opaque so the text's own color doesn't thin the blur, or a
+// mask's drawable.
+function coverage(cmd: DrawCommand): DrawCommand | null {
+	if (cmd.op === "drawMasked") return cmd.mask;
+	if (cmd.op !== "drawText") return null;
+	const { clip: _c, fill: _f, ...text } = layerContent(cmd) as DrawTextCommand;
+	return {
+		...text,
+		color: "#000000",
+		layout: {
+			...text.layout,
+			lines: text.layout.lines.map((line) => ({
+				...line,
+				spans: line.spans.map((span) => ({ ...span, color: "#000000" })),
+			})),
+		},
+	};
 }
 
 function paintDrawable(
@@ -3713,7 +3988,7 @@ function paintDrawable(
 	frame: Frame,
 ) {
 	if (hasBackdrop(cmd)) {
-		paintBackdrop(ck, canvas, bin, cmd);
+		paintBackdrop(ck, canvas, provider, images, bin, cmd, issues, frame);
 		cmd = withoutBackdrop(cmd);
 	}
 	// lut/sharpen can't be a color filter — route the whole drawable through an
@@ -3911,10 +4186,13 @@ function warnSvgFeatures(
 // the surface is bound to rt.canvas when present (displayable) else offscreen, and
 // returned live (the env disposes). encode/dispose defer to the caller/env. With
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
+// `fontProvider` holds every face in rt.fonts; a paint whose fonts all come
+// from there uses it rather than registering its own.
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintTarget,
+	opts?: { fontProvider?: SharedFontProvider },
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -3940,11 +4218,26 @@ export async function paintScene(
 	}
 	const registered =
 		cache && rt.fonts ? withEnvFonts(loaded, rt.fonts) : loaded;
+	const sharedFonts =
+		opts?.fontProvider && loaded.every((f) => rt.fonts?.has(f.family))
+			? opts.fontProvider
+			: null;
+	let owned: SharedFontProvider | null = null;
+	if (!cache) {
+		sharedFonts?.retain();
+		owned = sharedFonts ?? createSharedFontProvider(ck, loaded);
+	}
 	const provider = cache
-		? cachedFontProvider(cache, registered, () =>
-				makeFontProvider(ck, registered),
+		? cachedFontProvider(
+				cache,
+				sharedFonts
+					? { shared: sharedFonts }
+					: {
+							key: registered,
+							build: () => createSharedFontProvider(ck, registered),
+						},
 			)
-		: makeFontProvider(ck, loaded);
+		: (owned as SharedFontProvider).provider;
 	if (cache) shapedLines.set(provider, cache);
 
 	const imageMap = new Map<string, Image | SvgPicture>();
@@ -4136,7 +4429,9 @@ export async function paintScene(
 			const issues: PaintIssues = {
 				unhandled: [],
 				missingImages: [],
+				warnings,
 				adjustUnsupported: new Map(),
+				patternUnsupported: new Map(),
 			};
 			paintDrawable(
 				ck,
@@ -4152,6 +4447,8 @@ export async function paintScene(
 				warnings.push({ kind: "unhandled_op", op });
 			for (const warning of issues.adjustUnsupported.values())
 				warnings.push({ kind: "adjust_unsupported", ...warning });
+			for (const warning of issues.patternUnsupported.values())
+				warnings.push({ kind: "pattern_unsupported", ...warning });
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {
@@ -4212,7 +4509,7 @@ export async function paintScene(
 			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
 		} else {
-			deleteFontProvider(provider);
+			owned?.release();
 			for (const [src, img] of imageMap)
 				if (!borrowed.has(src)) img.delete();
 		}

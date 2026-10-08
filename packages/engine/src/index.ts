@@ -131,6 +131,7 @@ export {
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
 export { scalePathData } from "./path-data";
+export { roundCorners } from "./round-corners";
 export { flattenOverWhite } from "./jpeg";
 export {
 	DEFAULT_JPEG_QUALITY,
@@ -150,6 +151,7 @@ export {
 } from "./pattern";
 export { resolveLayout } from "./resolve-layout";
 export { outlinePath, rectShape } from "./outline";
+export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {
 	type CanvasFrame,
 	createRenderer,

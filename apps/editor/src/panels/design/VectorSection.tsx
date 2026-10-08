@@ -1,9 +1,11 @@
 import type { VectorElement } from "@freshcoat-js/coatfile";
 import { scalePathData } from "@freshcoat-js/engine";
 import { TextArea } from "@freshcoat-js/ui/field";
+import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useEffect, useState } from "react";
+import RadiusIcon from "~icons/mingcute/border-radius-line";
 import { Notice, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 
@@ -24,6 +26,7 @@ export function pathDataError(d: string): string | null {
 export function VectorSection({ ins }: { ins: Inspect }) {
 	const props = (ins.layers as VectorElement[]).map((e) => e.properties);
 	const rule = commonValue(props.map((p) => p.fillRule ?? "nonzero"));
+	const radius = commonValue(props.map((p) => p.cornerRadius ?? 0));
 	return (
 		<PanelSection title="Vector">
 			<Row label="Fill rule">
@@ -42,6 +45,17 @@ export function VectorSection({ ins }: { ins: Inspect }) {
 					<SelectItem id="evenodd">Even-odd</SelectItem>
 				</Select>
 			</Row>
+			<NumberField
+				label={<RadiusIcon />}
+				aria-label="Corner radius"
+				min={0}
+				value={radius}
+				onChange={(v) =>
+					ins.setProps("corner-radius", () => ({
+						cornerRadius: v === 0 ? undefined : v,
+					}))
+				}
+			/>
 			{props.length === 1 ? (
 				<PathField
 					value={props[0].d}

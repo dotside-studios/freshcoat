@@ -13,6 +13,7 @@ import {
 	validateCommands,
 } from "../src/index";
 import type { Node, PatternKind, ResolvedFill } from "../src/index";
+import { patternMean } from "../src/pattern";
 
 const SIZE = 80;
 const GOLDENS = join(
@@ -87,6 +88,28 @@ function halve(p: Pixels): Pixels {
 				red(p, 2 * x, 2 * y + 1) +
 				red(p, 2 * x + 1, 2 * y + 1);
 			px[(y * width + x) * 4] = Math.round(v / 4);
+		}
+	return { width, height, px };
+}
+
+function deviation(p: Pixels): number {
+	const m = mean(p);
+	let sum = 0;
+	for (let i = 0; i < p.px.length; i += 4) sum += (p.px[i] - m) ** 2;
+	return Math.sqrt(sum / (p.px.length / 4));
+}
+
+// A render reduced by `k` in each axis, averaging each k×k block.
+function reduce(p: Pixels, k: number): Pixels {
+	const width = Math.floor(p.width / k);
+	const height = Math.floor(p.height / k);
+	const px = new Uint8Array(width * height * 4);
+	for (let y = 0; y < height; y++)
+		for (let x = 0; x < width; x++) {
+			let v = 0;
+			for (let j = 0; j < k; j++)
+				for (let i = 0; i < k; i++) v += red(p, k * x + i, k * y + j);
+			px[(y * width + x) * 4] = Math.round(v / (k * k));
 		}
 	return { width, height, px };
 }
@@ -263,6 +286,95 @@ describe.each(["noise", "paper"] as const)("%s seed", (pattern) => {
 		const a = await paint(rect(kindFill(pattern, { seed: 1 })));
 		const b = await paint(rect(kindFill(pattern, { seed: 2 })));
 		expect(differing(a, b)).toBeGreaterThan(SIZE * SIZE);
+	});
+});
+
+describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
+	const AREA = 320;
+	const fill = kindFill(pattern);
+	const full = 255 * (1 - patternMean(pattern, fill.density));
+	const meanTolerance = { noise: 1.5, paper: 6, hatching: 1.5, dots: 3 }[
+		pattern
+	];
+	const shot = async (scale: number) => {
+		const out = await renderSceneToPng(
+			createRect({
+				pos: { x: 0, y: 0 },
+				size: { width: AREA, height: AREA },
+				fills: [{ kind: "solid", color: "#ffffff" }, fill],
+			}),
+			{ width: AREA, height: AREA, scale, ck },
+		);
+		const img = ck.MakeImageFromEncoded(out.bytes);
+		const width = img.width();
+		const height = img.height();
+		const px = img.readPixels(0, 0, {
+			width,
+			height,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		});
+		img.delete();
+		return { width, height, px } as Pixels;
+	};
+
+	test.each([1, 0.5, 0.25])(
+		"holds its mean and contrast at zoom %d",
+		async (zoom) => {
+			const at = await shot(zoom);
+			const reference = reduce(await shot(zoom * 4), 4);
+			expect(Math.abs(mean(at) - full)).toBeLessThan(meanTolerance);
+			expect(Math.abs(mean(reference) - full)).toBeLessThan(meanTolerance);
+			expect(deviation(at)).toBeGreaterThan(deviation(reference) * 0.8);
+			expect(deviation(at)).toBeLessThan(deviation(reference) * 1.2);
+		},
+	);
+
+	test("holds its mean once faded out at zoom 1/8", async () => {
+		expect(Math.abs(mean(await shot(0.125)) - full)).toBeLessThan(
+			meanTolerance,
+		);
+	});
+
+	test("a 1x render matches a 3x render reduced to 1x", async () => {
+		const one = await shot(1);
+		const three = reduce(await shot(3), 3);
+		expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
+		expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
+		expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
+	});
+});
+
+describe("pattern compile failure", () => {
+	test("reports a warning and retries on the next paint", async () => {
+		let calls = 0;
+		let fail = true;
+		const failing = Object.create(ck);
+		failing.RuntimeEffect = Object.create(ck.RuntimeEffect);
+		failing.RuntimeEffect.Make = (
+			sksl: string,
+			onError?: (e: string) => void,
+		) => {
+			if (!fail || !sksl.includes("uniform float mean"))
+				return ck.RuntimeEffect.Make(sksl, onError);
+			calls++;
+			onError?.("boom");
+			return null;
+		};
+		const render = () =>
+			renderSceneToPng(rect(kindFill("hatching")), {
+				width: SIZE,
+				height: SIZE,
+				ck: failing,
+			});
+		for (let i = 0; i < 2; i++)
+			expect((await render()).warnings).toEqual([
+				{ kind: "pattern_unsupported", pattern: "hatching", error: "boom" },
+			]);
+		expect(calls).toBe(2);
+		fail = false;
+		expect((await render()).warnings ?? []).toEqual([]);
 	});
 });
 
