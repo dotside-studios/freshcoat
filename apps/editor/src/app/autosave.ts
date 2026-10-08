@@ -17,6 +17,8 @@ export type Autosave = {
 	missingAssets?: number;
 	/** datasets the document names that storage did not hold */
 	missingDatasets?: number;
+	/** the recent entry of the workspace it was written for */
+	recentId?: string;
 };
 
 /** What restoring `saved` has to tell the user. */
@@ -58,6 +60,7 @@ type StoredAutosave = {
 	fileName: string;
 	savedAt: number;
 	writer?: WriterStamp;
+	recentId?: string;
 };
 
 /** What version 2 stored: the whole workspace under one key. Rewritten as
@@ -254,6 +257,7 @@ export function createAutosaveStore(
 	opts: AutosaveOptions = {},
 ): AutosaveStore {
 	let last: Workspace | null = null;
+	let lastRecent: string | undefined;
 	/** each dataset's assets as of the last write that saved its photos */
 	let savedAssets: DatasetAsset[][] | null = null;
 	/** the dataset each key holds, by identity, or null when written before
@@ -440,7 +444,12 @@ export function createAutosaveStore(
 		retried = false,
 	): Promise<void> {
 		const ws = entry.workspace;
-		if (last !== null && sameWorkspace(last, ws)) return;
+		if (
+			last !== null &&
+			sameWorkspace(last, ws) &&
+			lastRecent === entry.recentId
+		)
+			return;
 		const db = await connect();
 		let raced = false;
 		try {
@@ -483,12 +492,14 @@ export function createAutosaveStore(
 				fileName: entry.fileName,
 				savedAt: Date.now(),
 				writer: { tabId, generation: generation + 1 },
+				...(entry.recentId ? { recentId: entry.recentId } : {}),
 			};
 			docs.put(doc, KEY);
 			await done(tx);
 			generation += 1;
 			written = now;
 			last = ws;
+			lastRecent = entry.recentId;
 			if (raced) {
 				last = null;
 				savedAssets = null;
@@ -601,6 +612,7 @@ export function createAutosaveStore(
 				};
 				if (missing) out.missingAssets = missing;
 				if (missingDatasets) out.missingDatasets = missingDatasets;
+				if (v.version === 3 && v.recentId) out.recentId = v.recentId;
 				return out;
 			} catch {
 				await disconnect();

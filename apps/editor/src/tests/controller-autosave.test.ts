@@ -51,3 +51,33 @@ describe("autosave scheduling", () => {
 		expect(writeAutosave).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("recent workspaces", () => {
+	it("writes the autosave for the recent entry of the workspace it opened", async () => {
+		const record = vi.fn(async () => {});
+		const { recentStore } = await import("~/app/recent");
+		vi.spyOn(recentStore(), "record").mockImplementation(record);
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		expect(record).toHaveBeenCalledOnce();
+		const [entry] = record.mock.calls[0] as unknown as [
+			{ id: string; source: { kind: string } },
+		];
+		expect(entry.source.kind).toBe("workspace");
+		c.select(["0/0"]);
+		c.deleteSelection();
+		vi.advanceTimersByTime(2000);
+		expect(vi.mocked(writeAutosave).mock.calls[0]?.[0].recentId).toBe(entry.id);
+
+		const saved = {
+			...(vi.mocked(writeAutosave).mock.calls[0]?.[0] as Parameters<
+				typeof writeAutosave
+			>[0]),
+			savedAt: 1,
+		};
+		c.restore(saved);
+		expect(record).toHaveBeenLastCalledWith(
+			expect.objectContaining({ id: entry.id }),
+		);
+	});
+});

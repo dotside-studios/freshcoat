@@ -1,11 +1,13 @@
 import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Fragment, useEffect, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
 import { SAMPLES, type Sample } from "~/samples";
-import { STARTERS } from "~/samples/starters";
+import { findStarter, STARTERS } from "~/samples/starters";
+import CloseIcon from "~icons/mingcute/close-line";
 import FileIcon from "~icons/mingcute/file-new-line";
 import OpenIcon from "~icons/mingcute/folder-open-line";
 import RestoreIcon from "~icons/mingcute/history-line";
@@ -18,11 +20,15 @@ import {
 import type { CommandContext } from "./commands";
 import { OPEN_HINT, plural } from "./copy";
 import { FreshcoatLogo } from "./Logo";
+import { type RecentItem, recentStore, reopenable } from "./recent";
 import {
+	renderThumbnail,
 	type ThumbnailSource,
 	templateThumbnail,
 	useThumbnail,
 } from "./template-thumbnails";
+
+const RECENT_SHOWN = 6;
 
 const sources = new Map<string, ThumbnailSource>();
 
@@ -35,6 +41,55 @@ function sampleSource(kind: "sample" | "starter", s: Sample): ThumbnailSource {
 		sources.set(key, source);
 	}
 	return source;
+}
+
+function listed(source: { kind: "sample" | "starter"; id: string }): boolean {
+	return source.kind === "sample"
+		? SAMPLES.some((s) => s.id === source.id)
+		: findStarter(source.id) !== undefined;
+}
+
+/** The size and thumbnail of what a recent entry opens. */
+function recentPreview(item: RecentItem): {
+	width: number;
+	height: number;
+	source: ThumbnailSource | undefined;
+} {
+	const { entry, reopen } = item;
+	if (reopen.kind !== "restore") {
+		const s =
+			reopen.kind === "sample"
+				? SAMPLES.find((x) => x.id === reopen.id)
+				: findStarter(reopen.id);
+		if (!s) return { width: 1, height: 1, source: undefined };
+		return {
+			width: s.width,
+			height: s.height,
+			source: sampleSource(reopen.kind, s),
+		};
+	}
+	const { saved } = reopen;
+	const t = saved.workspace.templates[0]?.template;
+	if (!t) return { width: 1, height: 1, source: undefined };
+	const key = `recent:${entry.id}:${saved.savedAt}`;
+	let source = sources.get(key);
+	if (!source) {
+		const kept = () =>
+			entry.thumbnailFor === saved.savedAt ? (entry.thumbnail ?? null) : null;
+		source = {
+			key,
+			cached: async () => kept(),
+			async fresh() {
+				const have = kept();
+				if (have) return have;
+				const blob = await renderThumbnail(t);
+				await recentStore().setThumbnail(entry.id, blob, saved.savedAt);
+				return blob;
+			},
+		};
+		sources.set(key, source);
+	}
+	return { width: t.width, height: t.height, source };
 }
 
 /** The welcome screen. `openHint` rings "Open file…" and says what to open,
@@ -50,12 +105,17 @@ export function Welcome({
 	const { controller } = ctx;
 	const [custom, setCustom] = useState({ width: 1080, height: 1080 });
 	const [autosave, setAutosave] = useState<Autosave | null>(null);
+	const [recent, setRecent] = useState<RecentItem[]>([]);
 
 	useEffect(() => {
 		let live = true;
-		void readAutosave().then((a) => {
-			if (live) setAutosave(a);
-		});
+		void (async () => {
+			const a = await readAutosave();
+			const entries = await recentStore().list();
+			if (!live) return;
+			setAutosave(a);
+			setRecent(reopenable(entries, a, listed).slice(0, RECENT_SHOWN));
+		})();
 		return () => {
 			live = false;
 		};
@@ -113,6 +173,7 @@ export function Welcome({
 							onPress={() => {
 								void clearAutosave();
 								setAutosave(null);
+								setRecent((r) => r.filter((i) => i.reopen.kind !== "restore"));
 							}}
 						>
 							Dismiss
@@ -120,16 +181,47 @@ export function Welcome({
 						<Button
 							variant="primary"
 							onPress={() =>
-								controller.openWorkspace(
-									autosave.workspace,
-									autosave.fileName,
-									restoreNotices(autosave),
-								)
+								controller.restore(autosave, restoreNotices(autosave))
 							}
 						>
 							Restore
 						</Button>
 					</div>
+				) : null}
+
+				{recent.length > 0 ? (
+					<section
+						className="mb-4 rounded-md border border-fc-border bg-fc-panel"
+						aria-labelledby="recent"
+					>
+						<SectionTitle id="recent">Recent</SectionTitle>
+						<ul className="grid gap-2 p-3 sm:grid-cols-3">
+							{recent.map((item) => (
+								<li key={item.entry.id} className="relative">
+									<RecentTile
+										item={item}
+										onOpen={() => {
+											const { reopen } = item;
+											if (reopen.kind === "restore")
+												controller.restore(
+													reopen.saved,
+													restoreNotices(reopen.saved),
+												);
+											else if (reopen.kind === "sample")
+												void controller.openSample(reopen.id);
+											else void controller.openStarter(reopen.id);
+										}}
+										onRemove={() => {
+											void recentStore().remove(item.entry.id);
+											setRecent((r) =>
+												r.filter((i) => i.entry.id !== item.entry.id),
+											);
+										}}
+									/>
+								</li>
+							))}
+						</ul>
+					</section>
 				) : null}
 
 				<section
@@ -260,6 +352,57 @@ function SectionTitle({ children, id }: { children: string; id?: string }) {
 		>
 			{children}
 		</h2>
+	);
+}
+
+function RecentTile({
+	item,
+	onOpen,
+	onRemove,
+}: {
+	item: RecentItem;
+	onOpen: () => void;
+	onRemove: () => void;
+}) {
+	const { entry, reopen } = item;
+	const { width, height, source } = recentPreview(item);
+	const when = formatDate(
+		new Date(reopen.kind === "restore" ? reopen.saved.savedAt : entry.openedAt),
+		{ month: "short", day: "numeric", hour: "numeric", minute: "2-digit" },
+	);
+	const what =
+		reopen.kind === "restore"
+			? "Unsaved work"
+			: reopen.kind === "sample"
+				? "Sample"
+				: "Starter";
+	return (
+		<>
+			<RACButton
+				data-testid={`recent-${entry.id}`}
+				onPress={onOpen}
+				className="flex h-full w-full items-center gap-3 rounded-[3px] border border-fc-border bg-fc-raised p-2.5 pr-8 text-left outline-none data-hovered:border-fc-border-strong data-hovered:bg-fc-hover data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
+			>
+				<span className="grid size-16 shrink-0 place-items-center">
+					<Thumb width={width} height={height} source={source} large />
+				</span>
+				<span className="min-w-0">
+					<span className="block truncate font-medium">{entry.name}</span>
+					<span className="line-clamp-2 text-fc-muted text-fc-sm">
+						{what} · {when}
+					</span>
+				</span>
+			</RACButton>
+			<IconButton
+				aria-label={`Remove ${entry.name} from recent`}
+				tooltip="Remove from recent"
+				data-testid={`recent-remove-${entry.id}`}
+				onPress={onRemove}
+				className="absolute top-1.5 right-1.5"
+			>
+				<CloseIcon />
+			</IconButton>
+		</>
 	);
 }
 
