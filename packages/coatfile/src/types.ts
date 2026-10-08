@@ -21,6 +21,7 @@ import type {
 	FieldsSchemaSchema,
 	FillSchema,
 	FlexLayoutSchema,
+	GradientSchema,
 	GridLayoutSchema,
 	GridTrackSchema,
 	ImageElementSchema,
@@ -63,6 +64,7 @@ export type FieldDefinition = z.infer<typeof FieldDefinitionSchema>;
 export type FieldsSchema = z.infer<typeof FieldsSchemaSchema>;
 
 export type Fill = z.infer<typeof FillSchema>;
+export type Gradient = z.infer<typeof GradientSchema>;
 
 export type TextProperties = z.infer<typeof TextPropertiesSchema>;
 export type ImageProperties = z.infer<typeof ImagePropertiesSchema>;

@@ -624,6 +624,80 @@ add(
 	],
 );
 
+// A soft mask takes the offscreen path; a backdrop inside it still reads what
+// lies beneath the mask, and the mask then fades it in.
+add(
+	"backdrop-blur-in-mask",
+	"a backdrop inside a soft mask blurs what lies beneath the mask",
+	"core",
+	["effect.backdropBlur", "mask.alpha"],
+	halves([
+		createMask(
+			createRect({ ...box(0, 0, W, H), fills: solid("#00000080") }),
+			[createRect({ ...box(40, 20, 80, 80), backdropBlur: 20 })],
+			{ ...box(0, 0, W, H) },
+		),
+	]),
+	[
+		px([80, 60], [191, 191, 191, 255], "half the blurred edge over the white", 22),
+		px([78, 10], [0, 0, 0, 255], "above the shape the edge stays sharp"),
+		px([82, 10], [255, 255, 255, 255], "above the shape the edge stays sharp"),
+	],
+);
+
+// A mask node's own backdrop follows the mask's coverage, not the node's box.
+add(
+	"backdrop-blur-mask-node",
+	"a mask node's backdrop is cut to the mask",
+	"core",
+	["effect.backdropBlur", "mask.alpha"],
+	halves([
+		createMask(
+			createEllipse({ ...box(0, 0, 80, 80), fills: solid("#000000") }),
+			[],
+			{ ...box(40, 20, 80, 80), backdropBlur: 20 },
+		),
+	]),
+	[
+		px([80, 60], [128, 128, 128, 255], "half intensity at the edge", 22),
+		px(
+			[118, 22],
+			[255, 255, 255, 255],
+			"a corner of the box the ellipse does not reach",
+		),
+	],
+);
+
+// On text the backdrop follows the glyphs, not the text box.
+add(
+	"backdrop-blur-text",
+	"a text's backdrop is cut to its glyphs",
+	"core",
+	["effect.backdropBlur", "draw.text"],
+	halves([
+		createText({
+			...box(40, 0, 80, H),
+			text: "I",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 96,
+				lineHeight: 96,
+			},
+			align: "center",
+			verticalAlign: "middle",
+			color: "#00000000",
+			backdropBlur: 20,
+		}),
+	]),
+	[
+		px([80, 60], [128, 128, 128, 255], "half intensity inside the stem", 40),
+		px([96, 60], [255, 255, 255, 255], "beside the stem, unblurred"),
+		px([64, 60], [0, 0, 0, 255], "beside the stem, unblurred"),
+	],
+);
+
 // ─── raster profile ───────────────────────────────────────────────────────────
 
 add(

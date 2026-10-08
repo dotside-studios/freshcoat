@@ -3,6 +3,7 @@ import {
 	type BitmapNode,
 	buildAdjust,
 	type ChildLayout,
+	type EllipseNode,
 	FALLBACK_LINE_HEIGHT,
 	type GroupNode,
 	type ImageNode,
@@ -14,6 +15,7 @@ import {
 	roundCorners,
 	type RectNode,
 	scalePathData,
+	strokeTrim,
 	type TextNode,
 	type TrackSize,
 	type Layout as SceneLayout,
@@ -36,10 +38,12 @@ import {
 } from "./bleed";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
 import { linearGradientPoints } from "./gradient";
+import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
+import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { childElements } from "./tree";
 import type {
 	Background,
@@ -53,6 +57,8 @@ import type {
 	Fill,
 	FontRequest,
 	FrameFlexLayout,
+	Gradient,
+	GradientFill,
 	GridTrack,
 	ImageCrop,
 	Layout,
@@ -353,20 +359,43 @@ function compileElement(
 					ratio,
 				),
 			} satisfies ImageNode;
-		case "vector":
+		case "vector": {
+			const stroke = resolveStroke(
+				props.stroke as StrokeInput | undefined,
+				ratio,
+			);
+			const d = String(props.d ?? "");
+			const fills = resolveFills(
+				props.fill as Fill | Fill[] | undefined,
+				ratio,
+			);
+			// A trimmed ellipse runs from its top, as a progress ring does.
+			if (
+				stroke &&
+				strokeTrim(stroke) &&
+				el.size &&
+				isEllipsePath(d, el.size.width, el.size.height)
+			)
+				return {
+					...transform,
+					kind: "ellipse",
+					fills,
+					stroke,
+				} satisfies EllipseNode;
 			return {
 				...transform,
 				kind: "path",
 				d: scalePathString(
-					roundCorners(String(props.d ?? ""), Number(props.cornerRadius ?? 0)),
+					roundCorners(d, Number(props.cornerRadius ?? 0)),
 					ratio,
 				),
 				...(props.fillRule === "evenodd" || props.fillRule === "nonzero"
 					? { fillRule: props.fillRule }
 					: {}),
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
-				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				fills,
+				stroke,
 			} satisfies PathNode;
+		}
 		case "text":
 			return compileText(transform, props, ratio);
 		case "qr_code":
@@ -1204,26 +1233,33 @@ function hasOverrides(span: TextSpanInput): boolean {
 // ─────────────── fills / strokes / shadows / clips ───────────────
 
 type StrokeInput = {
-	color: string;
+	color: string | Gradient;
 	width: number;
 	dash?: number[];
 	cap?: Stroke["cap"];
 	join?: Stroke["join"];
 	align?: Stroke["align"];
-};
+} & StrokeTrimInput;
 
 function resolveStroke(
 	stroke: StrokeInput | undefined,
 	ratio: number,
 ): Stroke | undefined {
 	if (!stroke) return undefined;
+	const { color } = stroke;
 	return {
-		color: stroke.color,
+		...(typeof color === "string"
+			? { color }
+			: {
+					color: color.stops[0]?.color ?? "#000000",
+					gradient: resolveFill(color, ratio) as GradientFill,
+				}),
 		width: stroke.width * ratio,
 		dash: stroke.dash?.map((d) => d * ratio),
 		cap: stroke.cap,
 		join: stroke.join,
 		align: stroke.align,
+		...resolveStrokeTrim(stroke),
 	};
 }
 

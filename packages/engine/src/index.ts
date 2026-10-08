@@ -149,6 +149,7 @@ export {
 } from "./pattern";
 export { resolveLayout } from "./resolve-layout";
 export { outlinePath, rectShape } from "./outline";
+export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {
 	type CanvasFrame,
 	createRenderer,

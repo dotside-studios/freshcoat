@@ -252,11 +252,12 @@ describe("transpileVector strokes", () => {
 		expect(el.properties.stroke).toBeUndefined();
 	});
 
-	it("rasterizes a vector with a gradient stroke", () => {
+	it("keeps a linear gradient stroke native", () => {
 		const node = baseVector({
 			strokes: [
 				{
 					type: "GRADIENT_LINEAR",
+					opacity: 0.5,
 					gradientHandlePositions: [
 						{ x: 0, y: 0 },
 						{ x: 1, y: 0 },
@@ -267,6 +268,30 @@ describe("transpileVector strokes", () => {
 					],
 				},
 			],
+			strokeWeight: 2,
+			strokeAlign: "OUTSIDE",
+		});
+		expect(classify(node).kind).toBe("native-vector");
+		const el = transpileVector(node, { frame: FRAME, scale: 1 });
+		expect(el.properties.stroke).toEqual({
+			color: {
+				kind: "linear",
+				angle: 0,
+				from: [0, 0],
+				to: [1, 0],
+				stops: [
+					{ offset: 0, color: "#00000080" },
+					{ offset: 1, color: "#ffffff80" },
+				],
+			},
+			width: 2,
+			align: "outside",
+		});
+	});
+
+	it("rasterizes a vector with a visible image stroke", () => {
+		const node = baseVector({
+			strokes: [{ type: "IMAGE", scaleMode: "FILL", imageRef: "h" }],
 			strokeWeight: 2,
 		});
 		expect(classify(node)).toEqual({

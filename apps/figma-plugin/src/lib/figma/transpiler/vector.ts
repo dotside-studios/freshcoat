@@ -56,7 +56,7 @@ export function transpileVector(
 	if (painted.fill !== undefined) out.properties.fill = painted.fill;
 	if (painted.opacity !== undefined) out.opacity = painted.opacity;
 
-	const stroke = strokeToElement(node, ctx.scale);
+	const stroke = strokeToElement(node, ctx.scale, size);
 	if (stroke) out.properties.stroke = stroke;
 
 	return out;

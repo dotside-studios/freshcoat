@@ -155,7 +155,9 @@ the records, and **Export** turns templates and records into files.
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - A stroke sits inside, centered on or outside the edge of any stroked
-    layer: rectangle, frame, image or vector.
+    layer: rectangle, frame, image or vector. Its paint is a solid colour or a
+    linear, radial or angular gradient, edited with the same controls as a
+    gradient fill. The canvas gradient handles follow fills only.
   - Rectangles and frames can set each corner's radius on its own. A frame
     applies its corners to its fill, its stroke and its clip.
   - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
