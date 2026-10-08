@@ -392,8 +392,8 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 // any other mask → a drawMasked command the painter composites via an offscreen
 // coverage layer.
 //
-// `invert` and `channel` disqualify the fast path whatever the shape is. A
-// clipPath keeps what the geometry covers, which is the alpha channel,
+// `invert`, `channel` and a backdrop blur, which follows the mask's coverage,
+// disqualify the fast path whatever the shape is. A clipPath keeps what the geometry covers, which is the alpha channel,
 // uninverted: there is no inverse clip, and an OPAQUE shape's luminance coverage
 // is its colour rather than its geometry (a black rect masks everything out
 // under `luminance` and nothing out under a clip).
@@ -404,7 +404,9 @@ function lowerMask(
 ): DrawCommand {
 	const children = node.children.map((c) => lower(c, ctx));
 	const shape =
-		node.invert || node.channel === "luminance" ? null : fastClip(node.mask);
+		node.invert || node.channel === "luminance" || node.backdropBlur
+			? null
+			: fastClip(node.mask);
 	if (shape) {
 		// The outer group keeps the mask node's box, so its rotation pivots where
 		// the general path's does; the clip sits inside at the mask shape's box.

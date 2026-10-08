@@ -144,6 +144,32 @@ describe("validate (frames + elements)", () => {
 		}
 	});
 
+	test("rejects a negative backdropBlur", () => {
+		const withBlur = (backdropBlur: number) => {
+			const tpl = structuredClone(minimalValid) as unknown as {
+				format_version: string;
+				template_data: { elements: unknown[] }[];
+			};
+			tpl.format_version = "1.6";
+			tpl.template_data[0].elements = [
+				{
+					id: "r",
+					type: "rect",
+					pos: { x: 0, y: 0 },
+					size: { width: 10, height: 10 },
+					properties: { fill: "#000000" },
+					backdropBlur,
+				},
+			];
+			return validate(tpl);
+		};
+		expect(withBlur(4).ok).toBe(true);
+		const r = withBlur(-1);
+		expect(r.ok).toBe(false);
+		if (!r.ok)
+			expect(r.errors.some((e) => e.path.includes("backdropBlur"))).toBe(true);
+	});
+
 	test("rejects background with non-frame-fill pos", () => {
 		const bad = structuredClone(minimalValid);
 		bad.template_data[0].background.pos = { x: 10, y: 0 };
