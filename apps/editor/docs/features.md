@@ -72,7 +72,12 @@ the records, and **Export** turns templates and records into files.
   - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, `.numbers`, JSON or
     NDJSON through a wizard that maps each source column to a schema column
     or a new one, and can match existing records by a key column instead of
-    appending.
+    appending. When every header names a column, or the dataset's last
+    mapping covers them, the wizard goes straight to the preview. New columns
+    take an inferred type, including image for photo file names and color
+    for hex values. The preview counts issues per column and can show only
+    the rows with issues; the import toast's "Show issues" filters the
+    records to those it flagged.
   - Photos: see [Photos](#photos).
   - Import and export the schema as JSON Schema 2020-12, and the records as
     CSV, Excel or JSON.
