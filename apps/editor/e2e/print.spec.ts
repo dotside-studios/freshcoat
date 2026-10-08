@@ -336,3 +336,110 @@ test("a photo pulled into printer range says how much, in the preview and the re
 	expect(out.report).toHaveLength(2);
 	expect(out.report[1]).toMatch(/,ok,,on,\d+%$/);
 });
+
+/** The PNG with every color channel scaled, as a photo exposed below the
+ *  paper white would read. */
+async function exposed(page: Page, png: Uint8Array, gain: number) {
+	const bytes = await page.evaluate(
+		async ([input, k]) => {
+			const bitmap = await createImageBitmap(
+				new Blob([new Uint8Array(input)], { type: "image/png" }),
+			);
+			const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+			const ctx = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
+			ctx.drawImage(bitmap, 0, 0);
+			const img = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+			for (let i = 0; i < img.data.length; i += 4)
+				for (let c = 0; c < 3; c++) img.data[i + c] = img.data[i + c] * k;
+			ctx.putImageData(img, 0, 0);
+			const blob = await canvas.convertToBlob({ type: "image/png" });
+			return Array.from(new Uint8Array(await blob.arrayBuffer()));
+		},
+		[Array.from(png), gain] as const,
+	);
+	return new Uint8Array(bytes);
+}
+
+test("a printer is measured from a photo of the printed chart", async ({
+	page,
+}) => {
+	test.setTimeout(240_000);
+	await openExportWithPreset(page);
+	await page
+		.getByTestId("export-print")
+		.getByText("Optimize for card printer")
+		.click();
+	const group = page.getByTestId("export-print-profile");
+	await group.getByRole("button", { name: "Measure…" }).click();
+	const dialog = page.getByRole("dialog", { name: "Measure printer" });
+	await expect(dialog).toBeVisible();
+
+	const spec = grayBalanceChart();
+	const chart = await download(page, () =>
+		dialog.getByRole("button", { name: "Download chart" }).click(),
+	);
+	const choosePhoto = async (bytes: Uint8Array) => {
+		const chooser = page.waitForEvent("filechooser");
+		await dialog
+			.getByRole("button", { name: /^(Choose|Replace) photo…$/ })
+			.click();
+		await (await chooser).setFiles({
+			name: "chart.png",
+			mimeType: "image/png",
+			buffer: Buffer.from(bytes),
+		});
+		await expect(dialog.getByTestId("calibrate-target")).toBeVisible();
+	};
+	const markCorners = async () => {
+		const target = dialog.getByTestId("calibrate-target");
+		const box = await target.boundingBox();
+		if (!box) throw new Error("no photo");
+		for (const p of spec.registration)
+			await target.click({
+				position: {
+					x: (p.x / spec.width) * box.width,
+					y: (p.y / spec.height) * box.height,
+				},
+			});
+		await expect(dialog).toContainText("All four corners marked");
+	};
+	const save = dialog.getByRole("button", { name: "Save profile" });
+
+	await choosePhoto(chart);
+	await expect(dialog).toContainText("Click the top left corner mark");
+	await markCorners();
+	await expect(save).toBeDisabled();
+	await dialog
+		.getByRole("textbox", { name: "Name" })
+		.fill("Smart-51 / ribbon A");
+	await dialog.getByRole("textbox", { name: "Printer" }).fill("Smart-51");
+	await save.click();
+	const alert = dialog.getByRole("alert");
+	await expect(alert).toContainText("Couldn't measure this photo");
+	await expect(alert).toContainText("The card is overexposed");
+
+	await choosePhoto(await exposed(page, chart, 0.9));
+	await expect(dialog).toContainText("Click the top left corner mark");
+	await markCorners();
+	if (SHOTS) {
+		await shot(page, "measure-printer-light");
+		await page.evaluate(() => {
+			document.documentElement.dataset.theme = "dark";
+		});
+		await shot(page, "measure-printer-dark");
+		await page.evaluate(() => {
+			document.documentElement.dataset.theme = "light";
+		});
+	}
+	await save.click();
+	await expect(dialog).toHaveCount(0);
+	await expect(group).toContainText("Smart-51 / ribbon A");
+	const saved = await state<{
+		profile?: {
+			conditions?: { printer?: string };
+			assessment?: { usable: boolean };
+		};
+	}>(page, "s.workspace.presets[0].print");
+	expect(saved.profile?.conditions?.printer).toBe("Smart-51");
+	expect(saved.profile?.assessment?.usable).toBe(true);
+});

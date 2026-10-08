@@ -48,6 +48,7 @@ import { plural, VARIANT_EXPORT } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
+import { CalibrateDialog } from "./CalibrateDialog";
 import {
 	DESTINATION_LABEL,
 	fileNameExample,
@@ -596,6 +597,7 @@ function PrintGroup({
 }) {
 	const print = preset.print ?? { enabled: false };
 	const [error, setError] = useState<string | null>(null);
+	const [measuring, setMeasuring] = useState(false);
 	const profile = print.profile;
 	const label = profile ? profileLabel(profile) : null;
 	const importProfile = async (files: FileList | null) => {
@@ -656,6 +658,7 @@ function PrintGroup({
 										<span className="min-w-0 flex-1 text-fc-muted text-fc-sm">
 											None
 										</span>
+										<Button onPress={() => setMeasuring(true)}>Measure…</Button>
 										<FileTrigger
 											acceptedFileTypes={["application/json", ".json"]}
 											onSelect={(files) => void importProfile(files)}
@@ -666,6 +669,14 @@ function PrintGroup({
 								)}
 							</div>
 						</Row>
+						<CalibrateDialog
+							isOpen={measuring}
+							onOpenChange={setMeasuring}
+							onSave={(measured) => {
+								setError(null);
+								onChange({ ...print, profile: measured });
+							}}
+						/>
 						{error ? (
 							<p
 								role="alert"
