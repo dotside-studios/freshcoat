@@ -787,6 +787,25 @@ export class EditorController {
 		this.refitAfter(() => this.dispatch({ type: "setVariant", variantId: id }));
 	}
 
+	/** Shows the side `by` sides on, wrapping round. */
+	stepSide(by: number): void {
+		const count = this.base?.template_data.length ?? 0;
+		if (count < 2) return;
+		const side = (((this.state.side + by) % count) + count) % count;
+		this.dispatch({ type: "setSide", side });
+	}
+
+	/** Shows the variant `by` on from the active one, Default first,
+	 *  wrapping round. */
+	stepVariant(by: number): void {
+		const t = this.base;
+		const ids = [undefined, ...(t?.variants ?? []).map((v) => v.id)];
+		if (!t || ids.length < 2) return;
+		const at = ids.indexOf(activeVariantId(t, this.state.variantId));
+		const next = (((at + by) % ids.length) + ids.length) % ids.length;
+		this.setVariant(ids[next]);
+	}
+
 	/** Runs `change` and fits the view when it changed the canvas's size. */
 	private refitAfter(change: () => void): void {
 		const before = this.template;

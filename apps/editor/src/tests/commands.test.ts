@@ -100,6 +100,16 @@ describe("shortcut matching", () => {
 		expect(at("BracketRight")).toBe("view.nextRecord");
 	});
 
+	test("Alt+, and Alt+. step sides, and with Shift variants", () => {
+		const at = (code: string, shiftKey = false) =>
+			findCommand(key({ key: "≤", code, altKey: true, shiftKey }), true, false)
+				?.id;
+		expect(at("Comma")).toBe("view.previousSide");
+		expect(at("Period")).toBe("view.nextSide");
+		expect(at("Comma", true)).toBe("view.previousVariant");
+		expect(at("Period", true)).toBe("view.nextVariant");
+	});
+
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
 		for (const c of COMMANDS)

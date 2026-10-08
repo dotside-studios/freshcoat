@@ -81,6 +81,34 @@ describe("the canvas bar", () => {
 	});
 });
 
+describe("stepping sides and variants", () => {
+	it("picks a variant from the bar's name", async () => {
+		const c = open();
+		c.setVariant("dark");
+		const user = mount(c, <VariantBar />);
+		await user.click(screen.getByRole("button", { name: "Variant: Dark" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Light" }));
+		expect(c.state.variantId).toBe("light");
+	});
+
+	it("wraps round the variants, Default first, and the sides", () => {
+		const c = open();
+		c.stepVariant(1);
+		expect(c.variantId).toBe("dark");
+		c.stepVariant(1);
+		c.stepVariant(1);
+		expect(c.variantId).toBeUndefined();
+		c.stepVariant(-1);
+		expect(c.variantId).toBe("light");
+		const sides = base(c).template_data.length;
+		expect(sides).toBeGreaterThan(1);
+		c.stepSide(-1);
+		expect(c.state.side).toBe(sides - 1);
+		c.stepSide(1);
+		expect(c.state.side).toBe(0);
+	});
+});
+
 describe("override markers", () => {
 	function inspect(selection: string[], variant = "dark") {
 		const c = open();

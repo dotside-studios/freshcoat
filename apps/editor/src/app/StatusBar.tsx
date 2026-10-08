@@ -3,6 +3,7 @@ import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import { MenuTrigger, Button as RACButton } from "react-aria-components";
+import { SideMenu, VariantMenu } from "~/canvas/SideVariantMenus";
 import { getElement } from "~/doc/path";
 import { activeVariantId } from "~/doc/variant-edit";
 import { useEditor, useThrottledEditor } from "~/state/hooks";
@@ -11,7 +12,7 @@ import { activeSlot } from "~/state/workspace";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import { useController } from "./context";
-import { plural } from "./copy";
+import { plural, VARIANT_UI } from "./copy";
 import { formatNumber } from "./format";
 import { IssuesPopover } from "./IssuesPopover";
 import { useRenderStats } from "./render-stats";
@@ -26,6 +27,9 @@ export function StatusBar() {
 	const showStats = useRenderStats();
 	const frame = template?.template_data[side];
 	const size = useEditor(working);
+	const hasVariants = useEditor(
+		(s) => (s.doc?.history.present.variants?.length ?? 0) > 0,
+	);
 	const variant = useEditor((s) => {
 		const t = s.doc?.history.present;
 		const id = t ? activeVariantId(t, s.variantId) : undefined;
@@ -49,20 +53,31 @@ export function StatusBar() {
 	return (
 		<footer className="flex h-6 shrink-0 items-center gap-4 border-fc-border border-t bg-fc-app px-3 text-fc-muted text-fc-sm tabular-nums pointer-coarse:h-8">
 			{frame && template ? (
-				<span>
-					{frame.name}
-					{variant ? (
+				<span className="flex min-w-0 items-center gap-1">
+					<SideMenu
+						placement="top start"
+						className="data-hovered:text-fc-text"
+					/>
+					{hasVariants ? (
 						<>
-							{" · "}
-							<span
-								data-testid="status-variant"
-								className="text-fc-accent-hover"
+							<span>·</span>
+							<VariantMenu
+								placement="top start"
+								className={
+									variant
+										? "text-fc-accent-hover data-hovered:text-fc-accent"
+										: "data-hovered:text-fc-text"
+								}
 							>
-								{variant}
-							</span>
+								<span data-testid={variant ? "status-variant" : undefined}>
+									{variant ?? VARIANT_UI.default}
+								</span>
+							</VariantMenu>
 						</>
-					) : null}{" "}
-					· {size?.width} × {size?.height}
+					) : null}
+					<span className="shrink-0">
+						· {size?.width} × {size?.height}
+					</span>
 				</span>
 			) : null}
 			{summary ? <span className="truncate">{summary}</span> : null}

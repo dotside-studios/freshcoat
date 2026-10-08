@@ -43,6 +43,10 @@ export type Command = {
 const hasDoc = (s: EditorState) => s.doc !== null;
 const hasSelection = (s: EditorState) =>
 	s.selection.some((k) => !k.endsWith("/bg"));
+const hasSides = (s: EditorState) =>
+	(s.doc?.history.present.template_data.length ?? 0) > 1;
+const hasVariants = (s: EditorState) =>
+	(s.doc?.history.present.variants?.length ?? 0) > 0;
 const hasRecords = (s: EditorState) => {
 	const id = activeSlot(s)?.binding?.datasetId;
 	return !!s.workspace?.datasets.find((d) => d.id === id)?.records.length;
@@ -441,6 +445,38 @@ export const COMMANDS: Command[] = [
 		run: ({ controller }) => controller.zoomToSelection(),
 	},
 	{
+		id: "view.previousSide",
+		label: "Previous side",
+		keys: ["Alt+,"],
+		group: "View",
+		enabled: hasSides,
+		run: ({ controller }) => controller.stepSide(-1),
+	},
+	{
+		id: "view.nextSide",
+		label: "Next side",
+		keys: ["Alt+."],
+		group: "View",
+		enabled: hasSides,
+		run: ({ controller }) => controller.stepSide(1),
+	},
+	{
+		id: "view.previousVariant",
+		label: "Previous variant",
+		keys: ["Alt+Shift+,"],
+		group: "View",
+		enabled: hasVariants,
+		run: ({ controller }) => controller.stepVariant(-1),
+	},
+	{
+		id: "view.nextVariant",
+		label: "Next variant",
+		keys: ["Alt+Shift+."],
+		group: "View",
+		enabled: hasVariants,
+		run: ({ controller }) => controller.stepVariant(1),
+	},
+	{
 		id: "view.previousRecord",
 		label: "Previous record",
 		keys: ["Alt+["],
@@ -576,6 +612,7 @@ export function matchesChord(e: KeyLike, spec: string, mac: boolean): boolean {
 		return e.code === (key === "[" ? "BracketLeft" : "BracketRight");
 	if (key === "\\") return e.code === "Backslash";
 	if (key === ",") return e.code === "Comma";
+	if (key === ".") return e.code === "Period";
 	if (key === "=" || key === "-")
 		return e.code === (key === "=" ? "Equal" : "Minus") && !e.shiftKey;
 	return e.key === key;
