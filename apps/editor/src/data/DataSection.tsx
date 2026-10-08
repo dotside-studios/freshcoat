@@ -61,6 +61,7 @@ import {
 } from "./gallery-model";
 import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
+import { announceImport } from "./imported";
 import {
 	addRecords,
 	applySchema,
@@ -293,8 +294,8 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary) => {
-						toast(summary, { tone: "success", timeout: 6000 });
+					onImported={(id, summary, isNew) => {
+						announceImport(controller, id, summary, isNew);
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document

@@ -121,9 +121,10 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 			name: "P0",
 			joined: "2025-04-03",
 		});
-		expect(onImported.mock.calls[0]?.[1]).toBe(
+		expect(onImported.mock.calls[0]?.slice(1)).toEqual([
 			"Imported 1,500 records into People",
-		);
+			false,
+		]);
 	});
 
 	it("leaves the existing records on the page when nothing is matched", async () => {
