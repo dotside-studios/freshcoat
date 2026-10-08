@@ -91,6 +91,14 @@ export type InspectorTab = "record" | "columns";
 
 type Panels = { left: boolean; right: boolean };
 
+/** The records the last import left with issues, and how many times the
+ *  toast's action asked to show them. */
+type ImportIssues = {
+	datasetId: string;
+	ids: ReadonlySet<string>;
+	shown: number;
+};
+
 function selectActive(s: EditorState): Dataset | undefined {
 	const ws = s.workspace;
 	if (!ws) return undefined;
@@ -113,6 +121,7 @@ export function DataSection() {
 	const [wizard, setWizard] = useState<ImportTarget | null>(null);
 	const [column, setColumn] = useState<string | null>(null);
 	const [importNonce, setImportNonce] = useState(0);
+	const [importIssues, setImportIssues] = useState<ImportIssues | null>(null);
 	const [tab, setTab] = useState<InspectorTab>("record");
 	// Once someone picks a tab, focusing a record no longer changes it.
 	const tabChosen = useRef(false);
@@ -286,6 +295,9 @@ export function DataSection() {
 						}
 						confirm={confirm}
 						importNonce={importNonce}
+						importIssues={
+							importIssues?.datasetId === dataset.id ? importIssues : null
+						}
 					/>
 				</div>
 			)}
@@ -293,8 +305,31 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary) => {
-						toast(summary, { tone: "success", timeout: 6000 });
+					onImported={(id, summary, issues) => {
+						setImportIssues(
+							issues.length
+								? { datasetId: id, ids: new Set(issues), shown: 0 }
+								: null,
+						);
+						toast(summary, {
+							tone: "success",
+							timeout: 6000,
+							...(issues.length
+								? {
+										action: {
+											label: "Show issues",
+											onAction: () => {
+												controller.dispatch({ type: "setActiveDataset", id });
+												setImportIssues((p) =>
+													p?.datasetId === id
+														? { ...p, shown: p.shown + 1 }
+														: p,
+												);
+											},
+										},
+									}
+								: {}),
+						});
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document
@@ -475,6 +510,7 @@ function RecordsPane({
 	onImport,
 	confirm,
 	importNonce,
+	importIssues,
 }: {
 	dataset: Dataset;
 	panels: Panels;
@@ -488,6 +524,7 @@ function RecordsPane({
 	onImport: (file?: File) => void;
 	confirm: Confirm;
 	importNonce: number;
+	importIssues: ImportIssues | null;
 }) {
 	const controller = useController();
 	const [query, setQuery] = useState("");
@@ -521,8 +558,8 @@ function RecordsPane({
 		[dataset, deferredQuery],
 	);
 	const filtered = useMemo(
-		() => filterByStatus(searched, dataset, statusFilter),
-		[searched, dataset, statusFilter],
+		() => filterByStatus(searched, dataset, statusFilter, importIssues?.ids),
+		[searched, dataset, statusFilter, importIssues],
 	);
 	const rows = useMemo(
 		() =>
@@ -562,6 +599,14 @@ function RecordsPane({
 		);
 		if (scroller) scroller.scrollTop = 0;
 	}, [importNonce]);
+
+	const shownIssues = importIssues?.shown ?? 0;
+	useEffect(() => {
+		if (shownIssues === 0) return;
+		setQuery("");
+		setStatusFilter("imported");
+		setSelection(new Set());
+	}, [shownIssues]);
 
 	const deleteRows = useCallback(
 		async (ids: string[]) => {
@@ -740,6 +785,7 @@ function RecordsPane({
 					onCardSize={setCardSize}
 					statusFilter={statusFilter}
 					onStatusFilter={setStatusFilter}
+					importIssues={importIssues !== null}
 					query={query}
 					onQuery={setQuery}
 					selected={selectedIds.length}

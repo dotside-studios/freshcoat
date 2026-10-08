@@ -166,6 +166,16 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 
 	const [ada, grace, alan] = recs.map((r) => r.id) as [string, string, string];
 
+	await page.getByRole("button", { name: "Show issues" }).click();
+	await expect(page.getByTestId("status-filter")).toHaveAccessibleName(
+		"Show: Import issues",
+	);
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(1);
+	await expect(page.locator(`[role=row][data-row="${alan}"]`)).toHaveCount(1);
+	await page.getByTestId("status-filter").click();
+	await page.getByRole("menuitemradio", { name: "All records" }).click();
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(3);
+
 	// With the side panels closed every column fits without scrolling.
 	await page.getByRole("button", { name: "Datasets panel" }).click();
 	await page.getByRole("button", { name: "Record and columns panel" }).click();

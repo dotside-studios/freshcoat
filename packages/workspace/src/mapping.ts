@@ -10,6 +10,7 @@ import {
 import { freshId, slug, uniqueKey } from "./ids";
 import type {
 	ApplyMappingResult,
+	CellIssue,
 	CellValue,
 	Column,
 	ColumnMapping,
@@ -287,13 +288,11 @@ export function applyMapping(
 	const updatedIds = new Set<string>();
 	for (const { index: rowIndex, cells } of dataRows(rows, plan)) {
 		const values: Record<string, CellValue> = {};
-		const failed = new Set<string>();
+		const failed: CellIssue[] = [];
 		for (const { source, column } of targets) {
 			const result = coerce(column, cells[source] ?? "", options);
 			if (!result.ok) {
-				failed.add(column.key);
-				issues.push({
-					row: rowIndex,
+				failed.push({
 					column: column.key,
 					message: result.message ?? "Invalid",
 				});
@@ -339,13 +338,16 @@ export function applyMapping(
 			}
 		}
 
+		for (const issue of failed) {
+			issues.push({ row: rowIndex, record: record.id, ...issue });
+		}
 		for (const issue of validateRecord(
 			columns,
 			record.values,
 			dataset.assets,
 		)) {
-			if (!failed.has(issue.column)) {
-				issues.push({ row: rowIndex, ...issue });
+			if (!failed.some((f) => f.column === issue.column)) {
+				issues.push({ row: rowIndex, record: record.id, ...issue });
 			}
 		}
 	}

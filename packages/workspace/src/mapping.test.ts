@@ -190,10 +190,21 @@ describe("applyMapping", () => {
 			tier: "silver",
 		});
 		expect(added[2]?.values).toEqual({ email: "e@x.co", points: 3 });
+		const [, dee, empty] = added;
 		expect(result.issues).toEqual([
-			{ row: 3, column: "points", message: "Not a whole number" },
-			{ row: 3, column: "email", message: "Not an email address" },
-			{ row: 4, column: "first_name", message: "Required" },
+			{
+				row: 3,
+				record: dee?.id,
+				column: "points",
+				message: "Not a whole number",
+			},
+			{
+				row: 3,
+				record: dee?.id,
+				column: "email",
+				message: "Not an email address",
+			},
+			{ row: 4, record: empty?.id, column: "first_name", message: "Required" },
 		]);
 		expect(result.dataset.records[0]).toBe(base.records[0]);
 	});
@@ -272,7 +283,7 @@ describe("applyMapping", () => {
 		});
 		expect(result.dataset.records).toHaveLength(4);
 		expect(result.issues).toEqual([
-			{ row: 2, column: "points", message: "Not a number" },
+			{ row: 2, record: lower?.id, column: "points", message: "Not a number" },
 		]);
 		expect(base.records[0]?.values.points).toBe(5);
 	});

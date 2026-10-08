@@ -83,7 +83,7 @@ export function ImportWizard({
 }: {
 	target: ImportTarget;
 	onClose: () => void;
-	onImported: (datasetId: string, summary: string) => void;
+	onImported: (datasetId: string, summary: string, issues: string[]) => void;
 }) {
 	const controller = useController();
 	const existing = useEditor((s) =>
@@ -304,9 +304,11 @@ export function ImportWizard({
 			activeId: result.dataset.id,
 		});
 		const rowsWithIssues = new Set(result.issues.map((i) => i.row)).size;
+		const records = [...new Set(result.issues.map((i) => i.record))];
 		onImported(
 			result.dataset.id,
 			`Imported ${plural(result.added, "record")}${result.updated ? `, updated ${formatNumber(result.updated)}` : ""} into ${result.dataset.name}${rowsWithIssues ? ` · ${formatNumber(rowsWithIssues)} with issues` : ""}`,
+			records,
 		);
 	};
 
