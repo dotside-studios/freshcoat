@@ -122,6 +122,24 @@ describe("hitLayer with shapes", () => {
 		expect(hit(300, 250)).toBe(null);
 	});
 
+	it("follows the rounded corner of a vector with cornerRadius", () => {
+		const corner = (cornerRadius?: number): Element => ({
+			id: "corner",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: { d: "M0 0H100V100H0Z", fill: "#ff0000", cornerRadius },
+		});
+		const sharp = hitter(scene(under, corner()));
+		expect(sharp(3, 3)).toBe("0/1");
+		const zero = hitter(scene(under, corner(0)));
+		expect(zero(3, 3)).toBe("0/1");
+		const rounded = hitter(scene(under, corner(40)));
+		expect(rounded(3, 3)).toBe("0/0");
+		expect(rounded(15, 15)).toBe("0/1");
+		expect(rounded(50, 1)).toBe("0/1");
+	});
+
 	it("hits an unfilled vector only along its stroke, with tolerance", () => {
 		const t = scene(under, {
 			id: "line",

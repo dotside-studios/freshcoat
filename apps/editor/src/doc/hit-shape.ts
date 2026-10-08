@@ -1,5 +1,10 @@
 import type { Element } from "@freshcoat-js/coatfile";
-import { outlinePath, rectShape, strokeInset } from "@freshcoat-js/engine";
+import {
+	outlinePath,
+	rectShape,
+	roundCorners,
+	strokeInset,
+} from "@freshcoat-js/engine";
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import type { LayerBox, Point } from "./geometry";
 
@@ -179,7 +184,9 @@ export class ShapeHits {
 				width,
 				height,
 			);
-		const path = ck.Path.MakeFromSVGString(el.properties.d);
+		const path = ck.Path.MakeFromSVGString(
+			roundCorners(el.properties.d, el.properties.cornerRadius ?? 0),
+		);
 		if (path && el.properties.fillRule === "evenodd")
 			path.setFillType(ck.FillType.EvenOdd);
 		return path;
