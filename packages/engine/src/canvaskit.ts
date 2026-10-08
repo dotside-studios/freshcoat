@@ -1511,13 +1511,28 @@ function drawMasked(
 	const bounds = originInvariant(cmd.mask, ctm)
 		? layerBounds(ck, canvas, provider, images, bin, content, frame)
 		: null;
-	canvas.saveLayer(undefined, bounds);
+	// A backdrop child blurs what lies beneath the mask, as Figma's does, so the
+	// content layer starts from the parent's pixels. Composited back through the
+	// mask this matches the plain layer wherever the parent is opaque or empty.
+	canvas.saveLayer(
+		undefined,
+		bounds,
+		null,
+		cmd.children.some(holdsBackdrop) ? ck.SaveLayerInitWithPrevious : 0,
+	);
 	for (const child of cmd.children)
 		paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
-	const maskPaint = bin.track(new ck.Paint());
-	maskPaint.setBlendMode(cmd.invert ? ck.BlendMode.DstOut : ck.BlendMode.DstIn);
+	canvas.saveLayer(maskPaint(ck, bin, cmd), bounds);
+	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
+	canvas.restore();
+	canvas.restore();
+}
+
+function maskPaint(ck: CanvasKit, bin: Bin, cmd: DrawMaskedCommand): Paint {
+	const paint = bin.track(new ck.Paint());
+	paint.setBlendMode(cmd.invert ? ck.BlendMode.DstOut : ck.BlendMode.DstIn);
 	if (cmd.channel === "luminance")
-		maskPaint.setColorFilter(
+		paint.setColorFilter(
 			bin.track(
 				ck.ColorFilter.MakeCompose(
 					bin.track(
@@ -1532,10 +1547,16 @@ function drawMasked(
 				),
 			),
 		);
-	canvas.saveLayer(maskPaint, bounds);
-	paintDrawable(ck, canvas, provider, images, bin, cmd.mask, issues, frame);
-	canvas.restore();
-	canvas.restore();
+	return paint;
+}
+
+// Whether a backdrop reads the canvas beneath `cmd`: its own, or a child's
+// painted straight onto the same layer.
+function holdsBackdrop(cmd: DrawCommand): boolean {
+	if (hasBackdrop(cmd)) return true;
+	if (cmd.op === "drawGroup" && passThrough(cmd))
+		return cmd.children.some(holdsBackdrop);
+	return false;
 }
 
 // The color-matrix component of an `adjust` as a Skia ColorFilter — the cheap
@@ -3566,8 +3587,12 @@ function withoutBackdrop(cmd: DrawCommand): DrawCommand {
 function paintBackdrop(
 	ck: CanvasKit,
 	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
 	bin: Bin,
 	cmd: DrawCommand,
+	issues: PaintIssues,
+	frame: Frame,
 ) {
 	const sigma = LAYER_BLUR_SIGMA(cmd.backdropBlur as number);
 	canvas.save();
@@ -3578,7 +3603,14 @@ function paintBackdrop(
 		canvas.rotate(cmd.rotation, 0, 0);
 		canvas.translate(-cx, -cy);
 	}
-	if (cmd.op === "drawPath") {
+	const cover = coverage(cmd);
+	if (cover) {
+		const inverted = cmd.op === "drawMasked" && cmd.invert;
+		const bounds = inverted
+			? null
+			: layerBounds(ck, canvas, provider, images, bin, cover, frame);
+		if (bounds) canvas.clipRect(bounds, ck.ClipOp.Intersect, false);
+	} else if (cmd.op === "drawPath") {
 		const path = bin.path(ck, cmd.d, cmd.fillRule === "evenodd");
 		if (path) {
 			const vb = cmd.viewBox;
@@ -3617,8 +3649,39 @@ function paintBackdrop(
 		ck.ImageFilter.MakeBlur(sigma, sigma, ck.TileMode.Clamp, null),
 	);
 	canvas.saveLayer(paint, null, blur, 0, ck.TileMode.Clamp);
+	if (cover) {
+		let keep: Paint;
+		if (cmd.op === "drawMasked") keep = maskPaint(ck, bin, cmd);
+		else {
+			keep = bin.track(new ck.Paint());
+			keep.setBlendMode(ck.BlendMode.DstIn);
+		}
+		canvas.saveLayer(keep, null);
+		paintDrawable(ck, canvas, provider, images, bin, cover, issues, frame);
+		canvas.restore();
+	}
 	canvas.restore();
 	canvas.restore();
+}
+
+// What a backdrop's coverage is drawn from when its outline is not a shape: a
+// text's glyphs, opaque so the text's own color doesn't thin the blur, or a
+// mask's drawable.
+function coverage(cmd: DrawCommand): DrawCommand | null {
+	if (cmd.op === "drawMasked") return cmd.mask;
+	if (cmd.op !== "drawText") return null;
+	const { clip: _c, fill: _f, ...text } = layerContent(cmd) as DrawTextCommand;
+	return {
+		...text,
+		color: "#000000",
+		layout: {
+			...text.layout,
+			lines: text.layout.lines.map((line) => ({
+				...line,
+				spans: line.spans.map((span) => ({ ...span, color: "#000000" })),
+			})),
+		},
+	};
 }
 
 function paintDrawable(
@@ -3632,7 +3695,7 @@ function paintDrawable(
 	frame: Frame,
 ) {
 	if (hasBackdrop(cmd)) {
-		paintBackdrop(ck, canvas, bin, cmd);
+		paintBackdrop(ck, canvas, provider, images, bin, cmd, issues, frame);
 		cmd = withoutBackdrop(cmd);
 	}
 	// lut/sharpen can't be a color filter — route the whole drawable through an
