@@ -1,10 +1,15 @@
-import { type Fill, linearGradientAngle } from "@freshcoat-js/coatfile";
+import {
+	type Fill,
+	type Gradient,
+	linearGradientAngle,
+} from "@freshcoat-js/coatfile";
 import type { FigmaNode, FigmaPaint, FigmaSolidPaint } from "../types";
 import {
 	angularPlacement,
 	channel,
 	compositeSolids,
 	figmaColorToHex,
+	isMappablePaint,
 	type PaintBox,
 	rgbHex,
 	round4,
@@ -241,7 +246,7 @@ export function fillsToElement(
 }
 
 export type StrokeElement = {
-	color: string;
+	color: string | Gradient;
 	width: number;
 	dash?: number[];
 	cap?: "round" | "square";
@@ -249,11 +254,22 @@ export type StrokeElement = {
 	align?: "inside" | "outside";
 };
 
-// Non-solid strokes are rasterized by classify (`stroke_flattened`).
-function strokeColor(paints: FigmaPaint[] | undefined): string | undefined {
+// Solids composite into one colour, and a lone gradient maps as a fill would.
+// classify rasterizes anything else (`stroke_flattened`).
+function strokeColor(
+	paints: FigmaPaint[] | undefined,
+	box: PaintBox | undefined,
+): string | Gradient | undefined {
 	const visible = (paints ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0) return undefined;
-	return compositeSolids(visible) ?? undefined;
+	const solid = compositeSolids(visible);
+	if (solid !== null) return solid;
+	if (visible.length !== 1 || !isMappablePaint(visible[0], box))
+		return undefined;
+	const result = figmaPaintToFill(visible[0], box);
+	return result.kind === "fill" && result.value.kind !== "pattern"
+		? result.value
+		: undefined;
 }
 
 // An odd-length pattern repeats to even, as SVG does.
@@ -278,11 +294,12 @@ export function strokeToElement(
 		dashPattern?: number[];
 	},
 	scale: number,
+	box?: PaintBox,
 ): StrokeElement | undefined {
 	if (node.strokeWeight === undefined) return undefined;
 	const width = Math.round(node.strokeWeight * scale * 2) / 2;
 	if (!(width > 0)) return undefined;
-	const color = strokeColor(node.strokes);
+	const color = strokeColor(node.strokes, box);
 	if (color === undefined) return undefined;
 	const dash = scaleDash(node.dashPattern, scale);
 	const cap = mapStrokeCap(node.strokeCap);

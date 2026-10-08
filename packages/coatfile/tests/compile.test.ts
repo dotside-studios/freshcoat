@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
+import { validate } from "../src/validate";
 import type {
 	Command,
 	CompileOptions,
@@ -476,6 +477,21 @@ describe("compile (CompiledTemplate)", () => {
 		}
 	});
 
+	test("radial gradient carries its focus and spread to the painter", () => {
+		const f = radialFill({
+			focus: [0.3, 0.4],
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(f).toMatchObject({
+			kind: "radial",
+			focus: { x: 0.3, y: 0.4 },
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(radialFill({})).not.toHaveProperty("focus");
+	});
+
 	test("radial gradient carries a declared radius through to the painter", () => {
 		// A glow that keeps fading well past its shape renders as a hard-edged
 		// disc when its reach is pinned to the shape's own half-size.
@@ -927,6 +943,20 @@ describe("compile (image masks → draw command clip)", () => {
 		});
 	});
 
+	test("polygon mask cornerRadius scales with ratio", () => {
+		const cmds = getCommands(
+			withImage({ mask: { kind: "polygon", sides: 3, cornerRadius: 4 } }),
+			{},
+			{ width: 200, height: 120 },
+		);
+		expect(findDraw(cmds, "drawImage")!.clip).toEqual({
+			kind: "polygon",
+			sides: 3,
+			rotation: undefined,
+			cornerRadius: 8,
+		});
+	});
+
 	test("polygon mask without rotation defaults to undefined", () => {
 		const cmds = getCommands(
 			withImage({ mask: { kind: "polygon", sides: 5 } }),
@@ -1215,6 +1245,22 @@ describe("compile (vector path)", () => {
 			{ width: 200, height: 120 },
 		);
 		expect(findDraw(cmds, "drawPath")!.d).toBe("M0 0 A10 10 90 1 0 20 0");
+	});
+
+	test("cornerRadius rounds the path, scaled with ratio", () => {
+		const d = "M0 0H6V8Z";
+		const at = (cornerRadius: number, width: number) =>
+			findDraw(
+				getCommands(
+					withVector({ d, cornerRadius }),
+					{},
+					{ width, height: (width * 60) / 100 },
+				),
+				"drawPath",
+			)!.d;
+		expect(at(0, 100)).toBe(d);
+		expect(at(5, 100)).toBe("M 3 0 Q 6 0 6 4 Q 6 8 3 4 Q 0 0 3 0 Z");
+		expect(at(5, 200)).toBe("M 6 0 Q 12 0 12 8 Q 12 16 6 8 Q 0 0 6 0 Z");
 	});
 
 	test("fillRule lowers onto drawPath", () => {
@@ -1881,5 +1927,80 @@ describe("arc text", () => {
 		expect(text.arc?.startAngle).toBe(0);
 		expect(text.arc?.radius).toBeGreaterThan(0);
 		expect(text.arc?.radius).toBeLessThan(60);
+	});
+});
+
+describe("path text", () => {
+	const withPath = (path: TextElement["properties"]["path"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push(
+			{
+				id: "swoosh",
+				type: "vector",
+				pos: { x: 10, y: 30 },
+				size: { width: 40, height: 10 },
+				properties: { d: "M0 10 C 10 0 30 0 40 10" },
+			},
+			{
+				id: "label",
+				type: "text",
+				pos: { x: 0, y: 20 },
+				size: { width: 60, height: 30 },
+				properties: {
+					value: "ON A PATH",
+					font: { family: "Comfortaa", size: 6 },
+					arc: {},
+					path,
+				},
+			},
+		);
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.path)!;
+	};
+
+	test("scales inline path data and numeric offsets", () => {
+		const text = withPath({
+			d: "M0 10 L50 10",
+			startOffset: 5,
+			side: "right",
+			align: "center",
+		});
+		expect(text.path).toEqual({
+			d: "M0 20 L100 20",
+			startOffset: 10,
+			side: "right",
+			align: "center",
+		});
+		expect(text.arc).toBeUndefined();
+		expect(text.layout.lines).toHaveLength(1);
+	});
+
+	test("a ref resolves to the sibling vector in the text's frame", () => {
+		const text = withPath({ ref: "swoosh", startOffset: "50%" });
+		expect(text.path).toEqual({
+			d: "M20 40C40 20 80 20 100 40",
+			startOffset: 50,
+			percent: true,
+			side: "left",
+			align: "start",
+		});
+	});
+
+	test("a path needs d or ref", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "label",
+			type: "text",
+			pos: { x: 0, y: 0 },
+			size: { width: 60, height: 30 },
+			properties: {
+				value: "X",
+				font: { family: "Comfortaa", size: 6 },
+				path: { startOffset: 3 },
+			},
+		});
+		expect(validate(tpl).ok).toBe(false);
 	});
 });

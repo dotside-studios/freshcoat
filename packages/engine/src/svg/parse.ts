@@ -35,6 +35,8 @@ export { isSvg } from "./sniff";
 
 export type SvgStop = { offset: number; color: string };
 
+export type SvgSpread = "reflect" | "repeat";
+
 export type SvgPaint =
 	| { kind: "solid"; color: string }
 	| {
@@ -44,6 +46,7 @@ export type SvgPaint =
 			x2: number;
 			y2: number;
 			stops: SvgStop[];
+			spread?: SvgSpread;
 	  }
 	| {
 			kind: "radial";
@@ -52,11 +55,17 @@ export type SvgPaint =
 			rx: number;
 			ry: number;
 			rotation: number;
+			fx?: number;
+			fy?: number;
+			fr?: number;
 			stops: SvgStop[];
+			spread?: SvgSpread;
 	  };
 
 export type SvgStroke = {
+	// A gradient's first stop when `paint` is set.
 	color: string;
+	paint?: Exclude<SvgPaint, { kind: "solid" }>;
 	width: number;
 	dash?: number[];
 	cap?: "butt" | "round" | "square";
@@ -165,9 +174,19 @@ export type SvgFont = {
 
 export type SvgTextRun = { text: string; font: SvgFont; color: string };
 
+/** The path a line of text follows, from `<textPath>`. `d` is in drawing
+ *  space; a percent `startOffset` is a share of the path's length. */
+export type SvgTextPath = {
+	d: string;
+	startOffset: number;
+	percent?: boolean;
+	side: "left" | "right";
+};
+
 export type SvgText = {
 	kind: "text";
 	id?: string;
+	path?: SvgTextPath;
 	/** The start of the baseline in drawing space, which `anchor` aligns the
 	 *  line to and `rotation` turns it about. */
 	x: number;
@@ -592,9 +611,11 @@ export function parseSvg(markup: string): SvgDrawing {
 		}
 		const gt = attr("gradientTransform");
 		if (gt) total = multiply(total, parseTransform(gt));
-		const spread = attr("spreadMethod");
-		if (spread && spread !== "pad")
-			warn("gradient-spread", `spreadMethod="${spread}" is drawn as pad`);
+		const method = attr("spreadMethod")?.trim();
+		const spread =
+			method === "reflect" || method === "repeat"
+				? { spread: method as SvgSpread }
+				: {};
 		const unitViewport = bbox ? { width: 1, height: 1 } : viewport;
 		const len = (name: string, fallback: string, axis: Axis) => {
 			const raw = attr(name) ?? fallback;
@@ -608,18 +629,14 @@ export function parseSvg(markup: string): SvgDrawing {
 		if (localName(el.name) === "linearGradient") {
 			const [x1, y1] = map(len("x1", "0%", "x"), len("y1", "0%", "y"));
 			const [x2, y2] = map(len("x2", "100%", "x"), len("y2", "0%", "y"));
-			return { kind: "linear", x1, y1, x2, y2, stops };
+			return { kind: "linear", x1, y1, x2, y2, stops, ...spread };
 		}
 		const cxl = len("cx", "50%", "x");
 		const cyl = len("cy", "50%", "y");
 		const r = len("r", "50%", "d");
-		const fx = attr("fx");
-		const fy = attr("fy");
-		if (
-			(fx !== undefined && len("fx", fx, "x") !== cxl) ||
-			(fy !== undefined && len("fy", fy, "y") !== cyl)
-		)
-			warn("radial-focal", "radial gradient focal points are drawn centred");
+		const fxl = attr("fx") === undefined ? cxl : len("fx", "50%", "x");
+		const fyl = attr("fy") === undefined ? cyl : len("fy", "50%", "y");
+		const frl = Math.max(0, len("fr", "0%", "d"));
 		const [cx, cy] = map(cxl, cyl);
 		const [a, b, c, d] = total;
 		const e11 = a * a + c * c;
@@ -628,15 +645,24 @@ export function parseSvg(markup: string): SvgDrawing {
 		const mean = (e11 + e22) / 2;
 		const diff = Math.sqrt(((e11 - e22) / 2) ** 2 + e12 * e12);
 		const rotation = (0.5 * Math.atan2(2 * e12, e11 - e22) * 180) / Math.PI;
-		return {
+		const major = Math.sqrt(mean + diff);
+		const paint: SvgPaint = {
 			kind: "radial",
 			cx,
 			cy,
-			rx: Math.sqrt(mean + diff) * r,
+			rx: major * r,
 			ry: Math.sqrt(Math.max(0, mean - diff)) * r,
 			rotation: Object.is(rotation, -0) ? 0 : rotation,
 			stops,
+			...spread,
 		};
+		if (fxl !== cxl || fyl !== cyl || frl > 0) {
+			const [fx, fy] = map(fxl, fyl);
+			paint.fx = fx;
+			paint.fy = fy;
+			paint.fr = major * frl;
+		}
+		return paint;
 	};
 
 	const resolvePaint = (
@@ -680,16 +706,13 @@ export function parseSvg(markup: string): SvgDrawing {
 			viewport,
 		);
 		if (!paint) return undefined;
-		let color: string;
-		if (paint.kind === "solid") color = paint.color;
-		else {
-			warn("gradient-stroke", "gradient strokes use their first stop color");
-			color = (paint.stops[0] as SvgStop).color;
-		}
 		const k = lengthScale(m);
 		const width = (parseLength(style["stroke-width"] ?? "1", "d", viewport) ?? 1) * k;
 		if (!(width > 0)) return undefined;
-		const stroke: SvgStroke = { color, width };
+		const stroke: SvgStroke =
+			paint.kind === "solid"
+				? { color: paint.color, width }
+				: { color: (paint.stops[0] as SvgStop).color, paint, width };
 		const cap = style["stroke-linecap"];
 		if (cap === "round" || cap === "square" || cap === "butt") stroke.cap = cap;
 		const join = style["stroke-linejoin"];
@@ -751,7 +774,13 @@ export function parseSvg(markup: string): SvgDrawing {
 		if (!similar || Math.abs(sx - sy) > 1e-9 * Math.max(1, sx))
 			warn("text-transform", "skewed, mirrored or stretched text is drawn upright");
 		const k = Math.sqrt(sx * sy);
-		type Line = { x: number; y: number; anchor: SvgText["anchor"]; runs: SvgTextRun[] };
+		type Line = {
+			x: number;
+			y: number;
+			anchor: SvgText["anchor"];
+			runs: SvgTextRun[];
+			path?: SvgTextPath;
+		};
 		const lines: Line[] = [];
 		let line: Line | null = null;
 		const first = (node: XmlElement, attr: string, axis: Axis) => {
@@ -763,6 +792,38 @@ export function parseSvg(markup: string): SvgDrawing {
 		const anchorOf = (s: Declarations): SvgText["anchor"] => {
 			const a = s["text-anchor"];
 			return a === "middle" || a === "end" ? a : "start";
+		};
+		const textPathOf = (node: XmlElement): SvgTextPath | null => {
+			let segs: Segment[] = [];
+			if (node.attrs.path !== undefined) segs = normalizePath(node.attrs.path);
+			else {
+				const href = (node.attrs.href ?? node.attrs["xlink:href"])?.trim();
+				const target = href?.startsWith("#") ? byId.get(href.slice(1)) : undefined;
+				const name = target ? localName(target.name) : "";
+				if (!target || !TEXT_PATH_SHAPES.has(name)) {
+					warn("textPath", `<textPath> "${href ?? ""}" is not a shape in the document; its text is skipped`);
+					return null;
+				}
+				segs = shapeSegments(target, name, ctx.viewport);
+				if (target.attrs.transform)
+					segs = transformPath(segs, parseTransform(target.attrs.transform));
+			}
+			if (segs.length === 0) {
+				warn("textPath", "a <textPath> with an empty path is skipped");
+				return null;
+			}
+			const raw = (node.attrs.startOffset ?? "").trim();
+			const percent = raw.endsWith("%");
+			const value = percent
+				? Number.parseFloat(raw)
+				: (parseLength(raw || undefined, "d", ctx.viewport) ?? 0);
+			const out: SvgTextPath = {
+				d: serializePath(transformPath(segs, m)),
+				startOffset: Number.isFinite(value) ? (percent ? value : value * k) : 0,
+				side: node.attrs.side?.trim() === "right" ? "right" : "left",
+			};
+			if (percent) out.percent = true;
+			return out;
 		};
 		const visit = (node: XmlElement, own: Declarations, depth: number) => {
 			if (depth > MAX_DEPTH) return;
@@ -810,7 +871,16 @@ export function parseSvg(markup: string): SvgDrawing {
 				}
 				const name = localName(c.name);
 				if (name === "textPath") {
-					warn("textPath", "<textPath> is not supported");
+					const childStyle = computeStyle(c, own);
+					if (childStyle.display === "none") continue;
+					const path = textPathOf(c);
+					if (!path) continue;
+					const before: Line = line;
+					line = { x: before.x, y: before.y, anchor: anchorOf(childStyle), runs: [], path };
+					lines.push(line);
+					visit(c, childStyle, depth + 1);
+					line = { x: before.x, y: before.y, anchor: before.anchor, runs: [] };
+					lines.push(line);
 					continue;
 				}
 				if (name !== "tspan" && name !== "a") continue;
@@ -845,7 +915,8 @@ export function parseSvg(markup: string): SvgDrawing {
 			const [x, y] = applyMatrix(m, l.x, l.y);
 			const text: SvgText = { kind: "text", x, y, anchor: l.anchor, runs };
 			if (el.attrs.id) text.id = el.attrs.id;
-			if (similar && rotation) text.rotation = rotation;
+			if (l.path) text.path = l.path;
+			else if (similar && rotation) text.rotation = rotation;
 			out.push(text);
 		}
 		return out;
@@ -1709,6 +1780,15 @@ function colorMatrix(type: string | undefined, values: string | undefined): numb
 }
 
 const MARKABLE = new Set(["path", "line", "polyline", "polygon"]);
+const TEXT_PATH_SHAPES = new Set([
+	"path",
+	"rect",
+	"circle",
+	"ellipse",
+	"line",
+	"polyline",
+	"polygon",
+]);
 
 type MarkerVertex = { x: number; y: number; angle: number };
 

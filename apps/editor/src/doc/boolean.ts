@@ -1,4 +1,5 @@
 import type { Element } from "@freshcoat-js/coatfile";
+import { roundCorners } from "@freshcoat-js/engine";
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import { round2 } from "./factories";
 
@@ -30,7 +31,9 @@ function radiiOf(el: Extract<Element, { type: "rect" }>): Radii {
 /** A shape's outline in its own box, fill rule applied. */
 function localPath(ck: CanvasKit, el: Element): Path | null {
 	if (el.type === "vector") {
-		const path = ck.Path.MakeFromSVGString(el.properties.d);
+		const path = ck.Path.MakeFromSVGString(
+			roundCorners(el.properties.d, el.properties.cornerRadius ?? 0),
+		);
 		if (path && el.properties.fillRule === "evenodd")
 			path.setFillType(ck.FillType.EvenOdd);
 		return path;

@@ -14,11 +14,22 @@ import {
 	Row,
 	sectionActions,
 } from "./controls";
+import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
+import { convertFill, type FillKind, fillKind, isGradient } from "./fills";
+import { GradientSwatch } from "./GradientSwatch";
 
 export type Stroke = NonNullable<RectProperties["stroke"]>;
 
+const STROKE_KINDS = KINDS.filter(([kind]) => kind !== "pattern");
+
 export const DEFAULT_STROKE: Stroke = { color: "#000000", width: 1 };
+
+const TRIMS = [
+	{ key: "trimStart", label: "Trim start", fallback: 0 },
+	{ key: "trimEnd", label: "Trim end", fallback: 1 },
+	{ key: "trimOffset", label: "Trim offset", fallback: 0 },
+] as const;
 
 const strokeOf = (el: Inspect["layers"][number]) =>
 	propsOf(el).stroke as Stroke | undefined;
@@ -61,6 +72,10 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 
 	const pick = <K extends keyof Stroke>(k: K) =>
 		commonValue(strokes.map((s) => s?.[k]));
+	const color = pick("color") ?? undefined;
+	const gradient = isGradient(color) ? color : null;
+	const kind = commonValue(strokes.map((s) => (s ? fillKind(s.color) : null)));
+	const box = useBox(ins.keys[0] ?? "");
 	// Unset reads as the renderer's default, so it is not Mixed against it.
 	const align = commonValue(strokes.map((s) => s?.align ?? "center"));
 	const cap = commonValue(strokes.map((s) => s?.cap ?? "butt"));
@@ -72,13 +87,49 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 			{all && (
 				<>
 					<div className="flex min-w-0 items-center gap-1.5">
-						<ColorInput
-							aria-label="Stroke color"
-							className="min-w-0 flex-1"
-							value={(pick("color") as string | null) ?? ""}
-							swatches={ins.swatches}
-							onChange={(c) => set("stroke-color", { color: c })}
-						/>
+						<Select
+							aria-label="Stroke kind"
+							className="w-[76px] shrink-0"
+							value={kind}
+							placeholder="Mixed"
+							onChange={(v) =>
+								ins.setProps("stroke-kind", (el) => {
+									const s = strokeOf(el);
+									return s
+										? {
+												stroke: {
+													...s,
+													color: convertFill(
+														s.color,
+														v as FillKind,
+													) as Stroke["color"],
+												},
+											}
+										: null;
+								})
+							}
+						>
+							{STROKE_KINDS.map(([id, name]) => (
+								<SelectItem key={id} id={id}>
+									{name}
+								</SelectItem>
+							))}
+						</Select>
+						{gradient ? (
+							<GradientSwatch
+								g={gradient}
+								box={box}
+								className="h-fc-control min-w-0 flex-1 rounded-[3px]"
+							/>
+						) : (
+							<ColorInput
+								aria-label="Stroke color"
+								className="min-w-0 flex-1"
+								value={typeof color === "string" ? color : ""}
+								swatches={ins.swatches}
+								onChange={(c) => set("stroke-color", { color: c })}
+							/>
+						)}
 						<NumberField
 							label="W"
 							aria-label="Stroke width"
@@ -88,6 +139,14 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 							onChange={(v) => set("stroke-width", { width: v })}
 						/>
 					</div>
+					{gradient && (
+						<GradientEditor
+							g={gradient}
+							name="stroke"
+							swatches={ins.swatches}
+							onChange={(field, g) => set(`stroke-${field}`, { color: g })}
+						/>
+					)}
 					<Row label="Position">
 						<ToggleGroup
 							aria-label="Stroke position"
@@ -109,6 +168,30 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 						value={commonValue(strokes.map((s) => s?.dash ?? []))}
 						onCommit={(dash) => set("stroke-dash", { dash })}
 					/>
+					<Row label="Trim">
+						{TRIMS.map(({ key, label, fallback }) => {
+							const v = commonValue(strokes.map((s) => s?.[key] ?? fallback));
+							return (
+								<NumberField
+									key={key}
+									aria-label={label}
+									className="min-w-0 flex-1"
+									unit="%"
+									precision={0}
+									min={key === "trimOffset" ? undefined : 0}
+									max={key === "trimOffset" ? undefined : 100}
+									value={typeof v === "number" ? Math.round(v * 100) : null}
+									placeholder={typeof v === "string" ? v : "Mixed"}
+									onChange={(pct) => {
+										const f = pct / 100;
+										set(`stroke-${key}`, {
+											[key]: f === fallback ? undefined : f,
+										});
+									}}
+								/>
+							);
+						})}
+					</Row>
 					<Pair>
 						<Select
 							aria-label="Stroke cap"

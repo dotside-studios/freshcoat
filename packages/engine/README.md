@@ -100,7 +100,12 @@ to each kind. Groups support flex and grid layout.
 A stroke's `align` (`center`, `inside` or `outside`) is honored on every
 stroked node. Rects, ellipses and masked images stroke their outline inset or
 outset by half the width; a path strokes at twice the width, clipped to its
-own interior or exterior under its `fillRule`. A clipping group's
+own interior or exterior under its `fillRule`. `trimStart`, `trimEnd` and
+`trimOffset` draw part of the stroke, as fractions of the outline's length. A
+rect trims clockwise from its top left, an ellipse clockwise from its top and a
+path along its own direction. The trim cuts the outline before the `dash`
+pattern, so dashes start at the trimmed start and caps sit on the trimmed
+ends. A clipping group's
 `cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
 
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter

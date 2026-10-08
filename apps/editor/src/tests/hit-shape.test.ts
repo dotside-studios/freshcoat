@@ -122,6 +122,24 @@ describe("hitLayer with shapes", () => {
 		expect(hit(300, 250)).toBe(null);
 	});
 
+	it("follows the rounded corner of a vector with cornerRadius", () => {
+		const corner = (cornerRadius?: number): Element => ({
+			id: "corner",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: { d: "M0 0H100V100H0Z", fill: "#ff0000", cornerRadius },
+		});
+		const sharp = hitter(scene(under, corner()));
+		expect(sharp(3, 3)).toBe("0/1");
+		const zero = hitter(scene(under, corner(0)));
+		expect(zero(3, 3)).toBe("0/1");
+		const rounded = hitter(scene(under, corner(40)));
+		expect(rounded(3, 3)).toBe("0/0");
+		expect(rounded(15, 15)).toBe("0/1");
+		expect(rounded(50, 1)).toBe("0/1");
+	});
+
 	it("hits an unfilled vector only along its stroke, with tolerance", () => {
 		const t = scene(under, {
 			id: "line",
@@ -193,6 +211,42 @@ describe("hitLayer with shapes", () => {
 		const tolerant = hitter(scene(under, square("outside")), 3);
 		expect(tolerant(38, 100)).toBe("0/1");
 		expect(tolerant(36, 100)).toBe("0/0");
+	});
+
+	it("hits a gradient stroke as it hits a solid one", () => {
+		const gradient = {
+			kind: "linear" as const,
+			angle: 0,
+			stops: [
+				{ offset: 0, color: "#ff0000" },
+				{ offset: 1, color: "#0000ff" },
+			],
+		};
+		const shape = (
+			type: "rect" | "vector",
+			align: "inside" | "outside",
+			dash?: number[],
+		): Element =>
+			({
+				id: `${type}-${align}`,
+				type,
+				pos: { x: 50, y: 50 },
+				size: { width: 100, height: 100 },
+				properties: {
+					...(type === "vector" ? { d: "M0 0H100V100H0Z" } : {}),
+					stroke: { color: gradient, width: 10, align, dash },
+				},
+			}) as Element;
+		for (const type of ["rect", "vector"] as const) {
+			const inside = hitter(scene(under, shape(type, "inside")));
+			expect(inside(55, 100)).toBe("0/1");
+			expect(inside(100, 100)).toBe("0/0");
+			const outside = hitter(scene(under, shape(type, "outside")));
+			expect(outside(45, 100)).toBe("0/1");
+			expect(outside(39, 100)).toBe("0/0");
+			const dashed = hitter(scene(under, shape(type, "inside", [4, 4])));
+			expect(dashed(55, 100)).toBe("0/1");
+		}
 	});
 
 	it("hits strokes outside a rotated box", () => {
@@ -288,5 +342,74 @@ describe("hitLayer with shapes", () => {
 			properties: { d: "M0 0H100V100H0Z", fill: "#ff0000" },
 		} as Element;
 		expect(shapes.hits("0/1", square, box, { x: 5, y: 5 })).toBe(true);
+	});
+
+	it("hits a trimmed stroke only where it paints", () => {
+		const ring: Element = {
+			id: "ring",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: {
+				d: "M0 50A50 50 0 1 0 100 50A50 50 0 1 0 0 50Z",
+				stroke: { color: "#000000", width: 10, trimEnd: 0.25 },
+			},
+		};
+		const hit = hitter(scene(under, ring));
+		expect(hit(85, 15)).toBe("0/1");
+		expect(hit(15, 85)).toBe("0/0");
+		expect(hit(85, 85)).toBe("0/0");
+		expect(hit(15, 15)).toBe("0/0");
+		const rect = hitter(
+			scene(under, {
+				id: "rect",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 100 },
+				properties: {
+					stroke: {
+						color: "#000000",
+						width: 10,
+						align: "inside",
+						trimEnd: 0.25,
+						trimOffset: 0.5,
+					},
+				},
+			}),
+		);
+		expect(rect(50, 97)).toBe("0/1");
+		expect(rect(50, 3)).toBe("0/0");
+	});
+
+	it("reads a field-bound trim from the preview values", () => {
+		const t = scene(under, {
+			id: "ring",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: {
+				d: "M0 50A50 50 0 1 0 100 50A50 50 0 1 0 0 50Z",
+				stroke: { color: "#000000", width: 10, trimEnd: "{{progress}}" },
+			},
+		});
+		shapes = new ShapeHits(ck);
+		const geometry = geometryOf(t);
+		const none = new Set<string>();
+		const hit = (progress: string) =>
+			hitLayer(
+				t,
+				0,
+				geometry,
+				none,
+				none,
+				{ x: 15, y: 85 },
+				{
+					shapes,
+					values: { progress },
+				},
+			);
+		expect(hit("0.25")).toBe("0/0");
+		expect(hit("75%")).toBe("0/1");
+		expect(hit("")).toBe("0/1");
 	});
 });

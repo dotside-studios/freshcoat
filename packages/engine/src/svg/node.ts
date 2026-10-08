@@ -1,5 +1,11 @@
 import type { GroupNode, ImageNode, MaskNode, Node, PathNode } from "../node";
-import type { ResolvedFill, Size, Stroke, ViewBox } from "../types";
+import type {
+	GradientFill,
+	ResolvedFill,
+	Size,
+	Stroke,
+	ViewBox,
+} from "../types";
 import { translate } from "./matrix";
 import {
 	type SvgDrawing,
@@ -43,6 +49,7 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 				from: { x: fx(p.x1), y: fy(p.y1) },
 				to: { x: fx(p.x2), y: fy(p.y2) },
 				stops: p.stops,
+				...(p.spread ? { spread: p.spread } : {}),
 			};
 		const longest = Math.max(viewBox.width, viewBox.height);
 		return {
@@ -52,6 +59,13 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 			radiusY: p.ry / longest,
 			rotation: p.rotation,
 			stops: p.stops,
+			...(p.fx !== undefined && p.fy !== undefined
+				? {
+						focus: { x: fx(p.fx), y: fy(p.fy) },
+						focusRadius: (p.fr ?? 0) / longest,
+					}
+				: {}),
+			...(p.spread ? { spread: p.spread } : {}),
 		};
 	};
 
@@ -66,7 +80,12 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 		};
 		if (s.id) node.id = s.id;
 		if (s.fillRule === "evenodd") node.fillRule = "evenodd";
-		if (s.stroke) node.stroke = s.stroke satisfies Stroke;
+		if (s.stroke) {
+			const { paint, ...stroke } = s.stroke;
+			node.stroke = paint
+				? { ...stroke, gradient: fill(paint) as GradientFill }
+				: (stroke satisfies Stroke);
+		}
 		if (s.opacity !== undefined) node.opacity = s.opacity;
 		return node;
 	};
