@@ -841,3 +841,52 @@ test("with several records selected the Record tab sets a value in all of them",
 		.toEqual(["Gold", "Silver", "Gold"]);
 	expect(await values(page, "points")).toEqual([10, 95, 10]);
 });
+
+test("find and replace counts matches and replaces them in one undo step", async ({
+	page,
+}) => {
+	await openPeople(page);
+	await cell(page, "r1", "name").click();
+	await page.keyboard.press(`${mod}+f`);
+	const popover = page.getByTestId("find-replace-popover");
+	const find = popover.getByRole("textbox", { name: "Find" });
+	await expect(find).toBeFocused();
+	await find.fill("gold");
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"2 matches in 2 records",
+	);
+	await popover.getByRole("checkbox", { name: "Match case" }).click({
+		force: true,
+	});
+	await expect(page.getByTestId("find-replace-count")).toHaveText("No matches");
+	await popover.getByRole("checkbox", { name: "Match case" }).click({
+		force: true,
+	});
+
+	await page.keyboard.press(`${mod}+h`);
+	const replace = popover.getByRole("textbox", { name: "Replace" });
+	await expect(replace).toBeFocused();
+	await replace.fill("Platinum");
+	await popover.getByRole("button", { name: "Replace all" }).click();
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Platinum", "Silver", "Platinum"]);
+	await expect(page.getByTestId("find-replace-count")).toHaveText("No matches");
+
+	// Limited to one column.
+	await find.fill("a");
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"7 matches in 3 records",
+	);
+	await popover.getByRole("button", { name: /All columns/ }).click();
+	await page.getByRole("option", { name: "name" }).click();
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"5 matches in 3 records",
+	);
+	await page.keyboard.press("Escape");
+	await expect(popover).toBeHidden();
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+});

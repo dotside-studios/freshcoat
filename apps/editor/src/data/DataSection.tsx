@@ -50,6 +50,7 @@ import { type Confirm, useConfirm } from "./ConfirmDialog";
 import { type DatasetCreators, DatasetsList } from "./DatasetsList";
 import { DataToolbar, FOLD_DATA_BELOW } from "./DataToolbar";
 import { DataJobBar, ExportSelected } from "./ExportSelected";
+import { FindReplace } from "./FindReplace";
 import {
 	type CardSize,
 	filterByStatus,
@@ -748,6 +749,15 @@ function RecordsPane({
 					panels={panels}
 					onPanels={onPanels}
 					foldData={foldData}
+					findReplace={
+						dataset.columns.length > 0 && !empty ? (
+							<FindReplace
+								dataset={dataset}
+								rows={rows}
+								filtered={rows.length !== dataset.records.length}
+							/>
+						) : null
+					}
 					exportSelected={
 						selectedIds.length > 0 ? (
 							<ExportSelected datasetId={datasetId} ids={selectedIds} />

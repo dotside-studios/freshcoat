@@ -78,6 +78,10 @@ the records, and **Export** turns templates and records into files.
   - With several records selected, the Record tab reads "Set value for N
     selected": one form per column, showing the value they share or Mixed,
     that sets a value in all of them as one undo step.
+  - Find and replace (Mod+F, or Mod+H to start at Replace) works on the
+    records shown, in every column or one, optionally matching case. It
+    counts the matches and the records holding them; Replace all parses
+    each changed value by its column's type and is one undo step.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.

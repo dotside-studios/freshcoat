@@ -1,5 +1,6 @@
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
+import { openFindReplace } from "~/data/find-replace";
 import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
 import { loadBarcodeEncoder } from "~/render/barcode";
@@ -196,6 +197,30 @@ export const COMMANDS: Command[] = [
 		enabled: hasDoc,
 		run: () => {
 			openExportSelected();
+		},
+	},
+	{
+		id: "data.find",
+		label: "Find",
+		keys: ["Mod+F"],
+		group: "Data",
+		global: true,
+		sections: ["data"],
+		enabled: hasDoc,
+		run: () => {
+			openFindReplace("find");
+		},
+	},
+	{
+		id: "data.replace",
+		label: "Find and replace",
+		keys: ["Mod+H"],
+		group: "Data",
+		global: true,
+		sections: ["data"],
+		enabled: hasDoc,
+		run: () => {
+			openFindReplace("replace");
 		},
 	},
 	{
