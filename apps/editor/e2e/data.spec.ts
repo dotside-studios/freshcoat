@@ -789,3 +789,26 @@ test("cells copy and paste as tab-separated blocks, in one undo step", async ({
 		.toEqual(["Gold", "Silver", "Gold"]);
 	expect(await values(page, "points")).toEqual([120, 95, null]);
 });
+
+test("Mod+D fills down from the first selected record", async ({ page }) => {
+	await openPeople(page);
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	await cell(page, "r3", "points").click();
+	await page.keyboard.press(`${mod}+d`);
+	await expect.poll(() => values(page, "points")).toEqual([120, 95, 120]);
+
+	// With one record or none selected, the value above fills the cell.
+	await page.keyboard.press("Escape");
+	await cell(page, "r2", "name").click();
+	await page.keyboard.press(`${mod}+d`);
+	await expect.poll(() => values(page, "name")).toEqual(["Ada", "Ada", "Alan"]);
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "name"))
+		.toEqual(["Ada", "Grace", "Alan"]);
+	expect(await values(page, "points")).toEqual([120, 95, 120]);
+});

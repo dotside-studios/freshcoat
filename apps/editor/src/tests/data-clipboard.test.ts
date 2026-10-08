@@ -6,8 +6,8 @@ import {
 	pasteBlock,
 	pasteInto,
 	toTsv,
-	writeCells,
 } from "~/data/clipboard";
+import { fillDown, writeCells } from "~/data/model";
 
 function people(): Dataset {
 	return {
@@ -113,5 +113,17 @@ describe("copy and paste", () => {
 		expect(
 			pasteBlock(d, ["r_1"], { row: "r_9", col: "age" }, [["1"]]).dataset,
 		).toBe(d);
+	});
+});
+
+describe("fill down", () => {
+	it("copies the first record's value into the others", () => {
+		const d = people();
+		const out = fillDown(d, ["r_2", "r_1", "r_3"], "age");
+		expect(out.cells).toBe(2);
+		expect(out.dataset.records.map((r) => r.values.age)).toEqual([85, 85, 85]);
+		const cleared = fillDown(d, ["r_3", "r_1"], "age").dataset;
+		expect(cleared.records[0]?.values).toEqual({ name: "Ada" });
+		expect(fillDown(d, ["r_1"], "age").dataset).toBe(d);
 	});
 });

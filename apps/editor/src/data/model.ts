@@ -339,6 +339,57 @@ export function setCell(
 	return changed ? { ...dataset, records } : dataset;
 }
 
+export type CellWrite = { id: string; key: string; value: CellValue };
+
+/** Sets many cells in one pass over the records. */
+export function writeCells(
+	dataset: Dataset,
+	writes: readonly CellWrite[],
+): Dataset {
+	if (writes.length === 0) return dataset;
+	const byRecord = new Map<string, Map<string, CellValue>>();
+	for (const w of writes) {
+		let m = byRecord.get(w.id);
+		if (!m) {
+			m = new Map();
+			byRecord.set(w.id, m);
+		}
+		m.set(w.key, w.value);
+	}
+	let changed = false;
+	const records = dataset.records.map((r) => {
+		const m = byRecord.get(r.id);
+		if (!m) return r;
+		let values: DataRecord["values"] | undefined;
+		for (const [key, value] of m) {
+			if ((r.values[key] ?? null) === value) continue;
+			values ??= { ...r.values };
+			if (value === null) delete values[key];
+			else values[key] = value;
+		}
+		if (!values) return r;
+		changed = true;
+		return { ...r, values };
+	});
+	return changed ? { ...dataset, records } : dataset;
+}
+
+/** The first record's value in column `key` copied to the others. */
+export function fillDown(
+	dataset: Dataset,
+	ids: readonly string[],
+	key: string,
+): { dataset: Dataset; cells: number } {
+	const [first, ...rest] = ids;
+	if (first === undefined || rest.length === 0) return { dataset, cells: 0 };
+	const value = recordByIdMap(dataset.records).get(first)?.values[key] ?? null;
+	const next = writeCells(
+		dataset,
+		rest.map((id) => ({ id, key, value })),
+	);
+	return { dataset: next, cells: rest.length };
+}
+
 /** A cell's value for typed text, coerced by its column. A value that does
  *  not fit keeps its text, which validation then flags. */
 export function valueFromText(

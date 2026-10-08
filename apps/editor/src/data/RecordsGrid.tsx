@@ -47,6 +47,7 @@ import { GridContext, type GridContextValue } from "./grid-context";
 import type { CellRef, GridUiStore } from "./grid-state";
 import {
 	assetMap,
+	fillDown,
 	INDEX_COLUMN,
 	NUMERIC_TYPES,
 	recordByIdMap,
@@ -300,6 +301,22 @@ export const RecordsGrid = memo(function RecordsGrid({
 		[controller, datasetId],
 	);
 
+	/** Mod+D: the first selected record's value into the other selected
+	 *  ones, or with fewer selected, the value above into the focused cell. */
+	const fillDownTo = useCallback(
+		(row: string, col: string) => {
+			const { rows, selectedIds } = latest.current;
+			let ids: readonly string[] = selectedIds;
+			if (ids.length < 2) {
+				const above = rows[rows.findIndex((r) => r.id === row) - 1];
+				if (!above) return;
+				ids = [above.id, row];
+			}
+			editDataset(controller, datasetId, (d) => fillDown(d, ids, col).dataset);
+		},
+		[controller, datasetId],
+	);
+
 	const ctx = useMemo<GridContextValue>(
 		() => ({
 			dataset,
@@ -488,6 +505,12 @@ export const RecordsGrid = memo(function RecordsGrid({
 				e.stopPropagation();
 				onDeleteRows([row]);
 			}
+			return;
+		}
+		if (mod && e.code === "KeyD") {
+			e.preventDefault();
+			e.stopPropagation();
+			if (row && col) fillDownTo(row, col);
 			return;
 		}
 		if (!cellEl?.dataset.row || !cellEl.dataset.col) return;

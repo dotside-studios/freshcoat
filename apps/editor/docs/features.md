@@ -72,6 +72,9 @@ the records, and **Export** turns templates and records into files.
     last one; each value is parsed by its column's type. One value pasted
     into a selected record fills every selected record. A paste is one undo
     step.
+  - Mod+D fills down: the first selected record's value in the focused
+    column goes into the other selected records, or with fewer than two
+    selected, the value above goes into the focused cell.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.

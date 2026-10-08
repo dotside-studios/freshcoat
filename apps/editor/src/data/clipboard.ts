@@ -6,10 +6,12 @@ import {
 } from "@freshcoat-js/workspace";
 import {
 	assetMap,
+	type CellWrite,
 	cellIssue,
 	displayText,
 	recordByIdMap,
 	valueFromText,
+	writeCells,
 } from "./model";
 
 /**
@@ -96,41 +98,6 @@ export function pastedValue(
 	if (!column) return undefined;
 	if (text.trim() === "") return null;
 	return valueFromText(column, text, dataset.assets);
-}
-
-export type CellWrite = { id: string; key: string; value: CellValue };
-
-/** Sets many cells in one pass over the records. */
-export function writeCells(
-	dataset: Dataset,
-	writes: readonly CellWrite[],
-): Dataset {
-	if (writes.length === 0) return dataset;
-	const byRecord = new Map<string, Map<string, CellValue>>();
-	for (const w of writes) {
-		let m = byRecord.get(w.id);
-		if (!m) {
-			m = new Map();
-			byRecord.set(w.id, m);
-		}
-		m.set(w.key, w.value);
-	}
-	let changed = false;
-	const records = dataset.records.map((r) => {
-		const m = byRecord.get(r.id);
-		if (!m) return r;
-		let values: DataRecord["values"] | undefined;
-		for (const [key, value] of m) {
-			if ((r.values[key] ?? null) === value) continue;
-			values ??= { ...r.values };
-			if (value === null) delete values[key];
-			else values[key] = value;
-		}
-		if (!values) return r;
-		changed = true;
-		return { ...r, values };
-	});
-	return changed ? { ...dataset, records } : dataset;
 }
 
 /** How many of the written cells fail their column's validation. */
