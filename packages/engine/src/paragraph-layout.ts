@@ -58,12 +58,15 @@ const NATURAL_WIDTH = 1e7; // effectively unbounded — single-line advance
 // divides back to a per-em ratio without rounding noise.
 const PROBE_EM = 1000;
 
+function normalizeNewlines(text: string): string {
+	return text.replace(/\r\n?/g, "\n");
+}
+
 // CSS white-space: pre-line: collapse every other run of whitespace to a
 // single space and keep each newline as a hard break. Line-edge trimming is
 // handled per line via endExcludingWhitespaces.
 function collapse(text: string): string {
-	return text
-		.replace(/\r\n?/g, "\n")
+	return normalizeNewlines(text)
 		.replace(/[^\S\n]+/g, " ")
 		.replace(/ ?\n ?/g, "\n");
 }
@@ -164,9 +167,8 @@ export function createParagraphEngine(
 
 	// Shape every styled span as ONE paragraph and wrap at maxWidth, so cross-span
 	// shaping, per-fragment geometry, and wrapping of mixed-style text all match
-	// what canvaskit.ts paints. Spans are added verbatim
-	// — the painter does the same — and each line's fragments are sliced by the
-	// intersection of the span's text range with the line, positioned via
+	// what canvaskit.ts paints. Spans are added with newlines normalized, and
+	// each line's fragments are sliced by the intersection of the span's text range with the line, positioned via
 	// getRectsForRange (advance-based selection rects) relative to the line's left.
 	function layoutInline(
 		spans: InlineSpan[],
@@ -186,11 +188,12 @@ export function createParagraphEngine(
 					spanTextStyle(s.font),
 				),
 			);
-			builder.addText(s.text);
+			const text = normalizeNewlines(s.text);
+			builder.addText(text);
 			builder.pop();
-			ranges.push({ start: cursor, end: cursor + s.text.length, spanIndex: i });
-			cursor += s.text.length;
-			full += s.text;
+			ranges.push({ start: cursor, end: cursor + text.length, spanIndex: i });
+			cursor += text.length;
+			full += text;
 		});
 		const para = builder.build();
 		try {

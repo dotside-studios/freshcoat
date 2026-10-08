@@ -163,3 +163,30 @@ describe("measureText natural (hug) width does not wrap when baked", () => {
 		});
 	}
 });
+
+describe("layoutInline normalizes span line endings", () => {
+	const font = (weight: number) => ({ family: FAMILY, size: 20, weight });
+	const layout = (first: string) =>
+		engine.layoutInline!(
+			[
+				{ text: first, font: font(400) },
+				{ text: "World", font: font(700) },
+			],
+			1000,
+		);
+
+	for (const [name, eol] of [
+		["CRLF", "\r\n"],
+		["lone CR", "\r"],
+	] as const) {
+		test(name, () => {
+			const got = layout(`Hello${eol}`);
+			const want = layout("Hello\n");
+			expect(got.missing).toBeUndefined();
+			expect(got.lines.length).toBe(want.lines.length);
+			expect(got.lines.length).toBe(2);
+			const joined = got.lines.flatMap((l) => l.fragments.map((f) => f.text));
+			expect(joined.join("")).not.toMatch(/[\r\n]/);
+		});
+	}
+});
