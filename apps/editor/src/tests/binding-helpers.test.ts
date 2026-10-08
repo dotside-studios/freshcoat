@@ -10,6 +10,7 @@ import {
 	sourceProblem,
 	templateFields,
 	unboundBinding,
+	unfilledRequired,
 	unmatchedRequired,
 	variantSourceOfKind,
 	withFieldSource,
@@ -205,5 +206,16 @@ describe("binding helpers", () => {
 			),
 		).toEqual([]);
 		expect(unmatchedRequired(doc(), undefined, ds)).toEqual([]);
+	});
+
+	test("only a binding that reads a dataset leaves required fields unfilled", () => {
+		const ds = dataset();
+		const b = bindingForDataset(doc(), ds);
+		expect(unfilledRequired(doc(), b, [ds])).toEqual(["title"]);
+		expect(unfilledRequired(doc(), b, [])).toEqual(["name", "title"]);
+		expect(
+			unfilledRequired(doc(), unboundBinding({ kind: "all" }), [ds]),
+		).toEqual([]);
+		expect(unfilledRequired(doc(), undefined, [ds])).toEqual([]);
 	});
 });
