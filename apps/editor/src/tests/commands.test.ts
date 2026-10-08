@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
+	COMMAND_BY_ID,
 	COMMANDS,
 	findCommand,
 	type KeyLike,
 	matchesChord,
 } from "~/app/commands";
+import type { EditorState } from "~/state/store";
 
 const key = (k: Partial<KeyLike> & { key: string }): KeyLike => ({
 	code: "",
@@ -66,6 +68,19 @@ describe("shortcut matching", () => {
 		expect(findCommand(del, true, true)).toBeUndefined();
 		const undo = key({ key: "z", code: "KeyZ", metaKey: true });
 		expect(findCommand(undo, true, true)?.id).toBe("edit.undo");
+	});
+
+	test("undo and redo are off in Export, which has no history of its own", () => {
+		const undo = key({ key: "z", code: "KeyZ", metaKey: true });
+		expect(findCommand(undo, true, false, "data")?.id).toBe("edit.undo");
+		expect(findCommand(undo, true, true, "export")).toBeUndefined();
+		const command = COMMAND_BY_ID.get("edit.undo");
+		const s = {
+			section: "export",
+			doc: { history: { past: [{}], future: [] } },
+		} as unknown as EditorState;
+		expect(command?.enabled?.(s)).toBe(false);
+		expect(command?.enabled?.({ ...s, section: "edit" })).toBe(true);
 	});
 
 	test("tool keys and redo alternatives resolve", () => {

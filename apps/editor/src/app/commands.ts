@@ -204,10 +204,11 @@ export const COMMANDS: Command[] = [
 		keys: ["Mod+Z"],
 		group: "Edit",
 		global: true,
+		sections: ["edit", "data"],
 		enabled: (s) =>
 			s.section === "data"
 				? (s.workspace?.datasetHistory.past.length ?? 0) > 0
-				: (s.doc?.history.past.length ?? 0) > 0,
+				: s.section === "edit" && (s.doc?.history.past.length ?? 0) > 0,
 		run: ({ controller }) =>
 			controller.state.section === "data"
 				? controller.dispatch({ type: "datasetUndo" })
@@ -219,10 +220,11 @@ export const COMMANDS: Command[] = [
 		keys: ["Mod+Shift+Z", "Mod+Y"],
 		group: "Edit",
 		global: true,
+		sections: ["edit", "data"],
 		enabled: (s) =>
 			s.section === "data"
 				? (s.workspace?.datasetHistory.future.length ?? 0) > 0
-				: (s.doc?.history.future.length ?? 0) > 0,
+				: s.section === "edit" && (s.doc?.history.future.length ?? 0) > 0,
 		run: ({ controller }) =>
 			controller.state.section === "data"
 				? controller.dispatch({ type: "datasetRedo" })
@@ -519,12 +521,7 @@ const EVERYWHERE: readonly Section[] = ["edit", "data", "export"];
 const EDIT_ONLY: readonly Section[] = ["edit"];
 
 for (const c of COMMANDS)
-	c.sections ??=
-		/^(file|section|help)\./.test(c.id) ||
-		c.id === "edit.undo" ||
-		c.id === "edit.redo"
-			? EVERYWHERE
-			: EDIT_ONLY;
+	c.sections ??= /^(file|section|help)\./.test(c.id) ? EVERYWHERE : EDIT_ONLY;
 
 export const COMMAND_BY_ID = new Map(COMMANDS.map((c) => [c.id, c]));
 
