@@ -277,6 +277,35 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
+	test("1.6: text path, on elements and deltas", () => {
+		const text = (properties: Record<string, unknown>) =>
+			({
+				id: "t",
+				type: "text",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 100 },
+				properties: { value: "Swoosh", font: { family: "A", size: 10 }, ...properties },
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), text(properties)));
+		expect(need({ path: { d: "M0 0 L10 0" } })).toBe("1.6");
+
+		const t = withElements(base(), text({}));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "t", properties: { path: { ref: "v" } } }],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.6");
+	});
+
 	test("1.6: element backdropBlur", () => {
 		expect(minimumFormatVersion(withElements(base(), rect("r")))).toBe("1.0");
 		expect(
@@ -284,6 +313,41 @@ describe("minimumFormatVersion", () => {
 				withElements(base(), rect("r", { backdropBlur: 8 })),
 			),
 		).toBe("1.6");
+	});
+
+	test("1.6: a gradient stroke colour, on elements and deltas", () => {
+		const gradient = {
+			kind: "linear",
+			angle: 0,
+			stops: [
+				{ offset: 0, color: "#000" },
+				{ offset: 1, color: "#fff" },
+			],
+		};
+		const stroked = (color: unknown) =>
+			rect("r", { properties: { stroke: { color, width: 2 } } } as never);
+		expect(minimumFormatVersion(withElements(base(), stroked("#000")))).toBe(
+			"1.0",
+		);
+		expect(minimumFormatVersion(withElements(base(), stroked(gradient)))).toBe(
+			"1.6",
+		);
+		const t = withElements(base(), stroked("#000"));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{ id: "r", properties: { stroke: { color: gradient, width: 2 } } },
+						],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
 	test("the highest feature wins", () => {

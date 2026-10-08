@@ -21,8 +21,11 @@ import type {
 	ParagraphStyle,
 	TextStyle,
 } from "canvaskit-wasm";
-import { fontArrayBuffer } from "./font-bytes";
-import { deleteFontProvider, makeParagraphBuilder } from "./font-collection";
+import {
+	createSharedFontProvider,
+	makeParagraphBuilder,
+	type SharedFontProvider,
+} from "./font-collection";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	ClusterAdvance,
@@ -87,17 +90,18 @@ function missingIn(para: Paragraph, text: string): number[] | undefined {
 	return [...out, ...unresolved];
 }
 
+// `shared`, when given, must hold every face in `fonts`; the engine holds a
+// reference to it until disposed.
 export function createParagraphEngine(
 	canvasKit: unknown,
 	fonts: Map<string, Uint8Array[]>,
+	shared?: SharedFontProvider,
 ): TextEngine & { dispose(): void } {
 	const ck = canvasKit as CanvasKit;
-	const provider = ck.TypefaceFontProvider.Make();
-	for (const [family, list] of fonts) {
-		for (const bytes of list) {
-			provider.registerFont(fontArrayBuffer(bytes), family);
-		}
-	}
+	shared?.retain();
+	const fontSet = shared ?? createSharedFontProvider(ck, fonts);
+	const provider = fontSet.provider;
+	let disposed = false;
 	// Every registered family, in insertion order, used as the per-glyph fallback
 	// chain: a span names one family, but CanvasKit only falls back to families it
 	// sees in `fontFamilies`, so append the rest. Without this, any glyph the span's
@@ -440,6 +444,10 @@ export function createParagraphEngine(
 		layoutInline,
 		clusterAdvances,
 		metricsFor,
-		dispose: () => deleteFontProvider(provider),
+		dispose: () => {
+			if (disposed) return;
+			disposed = true;
+			fontSet.release();
+		},
 	};
 }

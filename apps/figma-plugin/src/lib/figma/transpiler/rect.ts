@@ -55,7 +55,7 @@ export function transpileRect(
 	if (corners !== undefined && node.cornerSmoothing)
 		out.properties.cornerSmoothing = Math.min(1, node.cornerSmoothing);
 
-	const stroke = strokeToElement(node, ctx.scale);
+	const stroke = strokeToElement(node, ctx.scale, size);
 	if (stroke) out.properties.stroke = stroke;
 
 	return out;

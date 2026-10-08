@@ -20,6 +20,7 @@ import type {
 	BlendMode,
 	FrameFinish,
 	ResolvedFill,
+	Stroke,
 } from "../src/types";
 
 const SRCS = [
@@ -269,12 +270,24 @@ function field(r: Rand, style: Style, size: Size): Node {
 	});
 }
 
+function strokeOf(r: Rand): Stroke {
+	const stroke: Stroke = { color: r.pick(COLORS), width: r.int(1, 3) };
+	if (!r.chance(0.5)) return stroke;
+	let gradient = fill(r);
+	while (gradient.kind === "solid" || gradient.kind === "pattern")
+		gradient = fill(r);
+	return {
+		...stroke,
+		gradient,
+		align: r.pick(["inside", "center", "outside"] as const),
+		...(r.chance(0.3) ? { dash: [r.int(1, 4), r.int(1, 4)] } : {}),
+	};
+}
+
 function shape(r: Rand, style: Style, size: Size): Node {
 	const b = box(r, size, 0.4);
 	const fx = effects(r, style.effects);
-	const stroke = r.chance(0.25)
-		? { stroke: { color: r.pick(COLORS), width: r.int(1, 3) } }
-		: {};
+	const stroke = r.chance(0.25) ? { stroke: strokeOf(r) } : {};
 	switch (r.int(0, 2)) {
 		case 0:
 			return createPath({

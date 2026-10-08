@@ -32,6 +32,7 @@ import AlignRightIcon from "~icons/mingcute/align-right-line";
 import AlignTopIcon from "~icons/mingcute/align-top-line";
 import AlignMiddleIcon from "~icons/mingcute/align-vertical-center-line";
 import BracesIcon from "~icons/mingcute/braces-line";
+import FlipIcon from "~icons/mingcute/flip-vertical-line";
 import ItalicIcon from "~icons/mingcute/italic-line";
 import LetterSpacingIcon from "~icons/mingcute/letter-spacing-line";
 import LineHeightIcon from "~icons/mingcute/line-height-line";
@@ -85,6 +86,8 @@ const ARC_PATHS = [
 	["inside", "Inside circle"],
 ] as const;
 
+const ON_PATH = ["path", "Along a vector"] as const;
+
 const ARC_ALIGNS = [
 	["start", "Start"],
 	["center", "Center"],
@@ -92,6 +95,7 @@ const ARC_ALIGNS = [
 ] as const;
 
 type Arc = NonNullable<TextProperties["arc"]>;
+type TextPath = NonNullable<TextProperties["path"]>;
 
 function clean<T extends object>(f: T): T {
 	const out = { ...f } as Record<string, unknown>;
@@ -117,9 +121,14 @@ export function TextSection({ ins }: { ins: Inspect }) {
 		setText(field, (p) => ({ font: clean({ ...p.font, ...patch }) }));
 	const setArc = (field: string, patch: Partial<Arc>) =>
 		setText(field, (p) => ({ arc: clean({ ...p.arc, ...patch }) }));
+	const setPath = (field: string, patch: Partial<TextPath>) =>
+		setText(field, (p) =>
+			p.path ? { path: clean({ ...p.path, ...patch }) } : {},
+		);
 	const arcPath = pick((p) =>
-		p.arc ? (p.arc.direction ?? "outside") : "none",
+		p.path ? "path" : p.arc ? (p.arc.direction ?? "outside") : "none",
 	);
+	const onPath = props.some((p) => p.path);
 
 	const lineHeight = pickFont((f) => f.lineHeight ?? 1.2);
 	const decoration = pickFont((f) => f.decoration ?? "none");
@@ -315,28 +324,76 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					))}
 				</Select>
 			</Row>
-			<Row label="Path" keys={["arc"]}>
+			<Row label="Path" keys={["arc", "path"]}>
 				<Select
 					aria-label="Text path"
 					className="min-w-0 flex-1"
 					placeholder="Mixed"
 					value={arcPath}
-					onChange={(v) =>
-						v === "none"
-							? setText("arc", () => ({ arc: undefined }))
-							: setArc("arc", {
+					onChange={(v) => {
+						if (v === "path") return;
+						if (v === "none")
+							setText("arc", () => ({ arc: undefined, path: undefined }));
+						else
+							setText("arc", (p) => ({
+								path: undefined,
+								arc: clean({
+									...p.arc,
 									direction: v === "inside" ? "inside" : undefined,
-								})
-					}
+								}),
+							}));
+					}}
 				>
-					{ARC_PATHS.map(([id, name]) => (
+					{(onPath ? [...ARC_PATHS, ON_PATH] : ARC_PATHS).map(([id, name]) => (
 						<SelectItem key={id} id={id}>
 							{name}
 						</SelectItem>
 					))}
 				</Select>
 			</Row>
-			{arcPath !== "none" && arcPath !== null && (
+			{arcPath === "path" && (
+				<Row label="Along" keys={["path"]}>
+					<NumberField
+						label="Offset"
+						aria-label="Path start offset"
+						className="min-w-0 flex-1"
+						value={pick((p) =>
+							typeof p.path?.startOffset === "number" ? p.path.startOffset : 0,
+						)}
+						onChange={(v) =>
+							setPath("path-offset", { startOffset: v === 0 ? undefined : v })
+						}
+					/>
+					<Select
+						aria-label="Path alignment"
+						className="min-w-0 flex-1"
+						placeholder="Mixed"
+						value={pick((p) => p.path?.align ?? "start")}
+						onChange={(v) =>
+							setPath("path-align", {
+								align: v === "start" ? undefined : (v as TextPath["align"]),
+							})
+						}
+					>
+						{ARC_ALIGNS.map(([id, name]) => (
+							<SelectItem key={id} id={id}>
+								{name}
+							</SelectItem>
+						))}
+					</Select>
+					<ToggleButton
+						aria-label="Flip to the other side"
+						tooltip="Flip side"
+						isSelected={pick((p) => p.path?.side === "right") === true}
+						onChange={(on) =>
+							setPath("path-side", { side: on ? "right" : undefined })
+						}
+					>
+						<FlipIcon />
+					</ToggleButton>
+				</Row>
+			)}
+			{arcPath !== "none" && arcPath !== "path" && arcPath !== null && (
 				<>
 					<Row label="Arc" keys={["arc"]}>
 						<NumberField

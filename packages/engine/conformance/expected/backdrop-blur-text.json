@@ -1,0 +1,115 @@
+{
+	"caseId": "backdrop-blur-text",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"op": "loadFonts",
+			"requests": [
+				{
+					"family": "ConformanceFont"
+				}
+			]
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 80,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#000000"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 0
+					},
+					"size": {
+						"width": 80,
+						"height": 120
+					},
+					"backdropBlur": 20,
+					"op": "drawText",
+					"layout": {
+						"font": {
+							"family": "ConformanceFont",
+							"weight": 400,
+							"style": "normal",
+							"size": 96,
+							"lineHeight": 96
+						},
+						"lines": [
+							{
+								"text": "I",
+								"y": 25.92,
+								"baseline": 94.08,
+								"spans": [
+									{
+										"text": "I",
+										"x": 67.03999996185303,
+										"width": 25.920000076293945,
+										"font": {
+											"family": "ConformanceFont",
+											"weight": 400,
+											"style": "normal",
+											"size": 96,
+											"lineHeight": 96
+										},
+										"color": "#00000000"
+									}
+								]
+							}
+						],
+						"totalHeight": 9216,
+						"shrinkApplied": false
+					},
+					"color": "#00000000"
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "e68b624efcc5e1ab3fff72b1a0cd3aad2f710098fdfa30608260c8a7bb8abaa0"
+}

@@ -317,7 +317,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate`; text `arc`; element `backdropBlur` |
+| 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -464,7 +464,10 @@ leaves the path different from the resized base's.
 
 A `vector` element's `d` is SVG path data with any number of subpaths, arcs
 included. `fillRule: "evenodd"` keeps the hole in a ring drawn as two subpaths
-wound the same way; the default is SVG's nonzero.
+wound the same way; the default is SVG's nonzero. `cornerRadius` rounds every
+corner between two straight segments by one radius, as Skia's corner path
+effect does; curves and arcs keep their shape. A `polygon` image mask takes the
+same `cornerRadius`.
 
 `svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
 frame of editable `vector`, `frame`, `mask`, `image` and `text` elements in
@@ -683,10 +686,32 @@ corners or mask. A vector strokes at twice the width, clipped to its own
 interior or exterior under its `fillRule`, so an `evenodd` hole counts as
 outside.
 
+A stroke's `color` is a colour string or, from 1.6, a `linear`, `radial` or
+`angular` gradient (see [Gradients](#gradients)). The gradient is placed in
+the element's box exactly as a fill is, so an inside, centred or outside
+stroke and its dashes all sample the same gradient as a fill would.
+
+```jsonc
+"stroke": { "width": 4, "align": "inside", "color": { "kind": "linear", "angle": 0, "stops": [ … ] } }
+```
+
 A `rect` or `frame` takes `cornerRadius` as one number or per corner,
 `[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
 fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
 an `outside` stroke beyond its clip, so the clip never hides it.
+
+`trimStart` and `trimEnd` draw only part of a stroke, as fractions of
+the outline's length from its start; `trimOffset` rotates that part along the
+outline and wraps past its end. A start after the end swaps them. Each takes a
+number or a string, so a field can drive it: `"trimEnd": "{{progress}}"`. A
+string reads as a number, or with a trailing `%` as a percentage; one that
+reads as neither leaves the default. Start and end clamp to `[0, 1]`.
+
+A rect or frame trims clockwise from its top left corner. An image trims along
+its mask. A vector trims along its own path, except that a vector drawing an
+ellipse across its box, as Studio draws one, trims clockwise from the top like
+a progress ring. The trim cuts the outline before any `dash`, so the pattern
+starts at the trimmed start, and `cap` applies to the trimmed ends.
 
 ## Ellipses
 
@@ -847,6 +872,31 @@ badges and circular labels. Each hard line is one ring and nothing wraps.
 Glyphs come from the same shaping as straight text, so ligatures, variable
 axes and per-glyph font fallback carry over. Decorations are not drawn on an
 arc.
+
+### Text on a path
+
+`path` (1.6) sets a text element along any path, as SVG's `<textPath>`. It
+wins over `arc`. Each hard line is one baseline, the next a line height below
+it, and nothing wraps.
+
+```json
+"path": { "ref": "swoosh", "startOffset": "50%", "align": "center" }
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `d` | Path data in the element's own design units | |
+| `ref` | Id of a sibling `vector` whose outline the text follows, rotation included | |
+| `startOffset` | Where `align` anchors the text along the path: design units, or a share of its length as `"50%"` | `0` |
+| `side` | `left` follows the path's direction; `right` reverses it | `left` |
+| `align` | `start`, `center` or `end` of the text at `startOffset` | `start` |
+
+One of `d` and `ref` is required; `d` wins when both are set. Each glyph is
+placed by the middle of its advance. On an open path, a glyph whose middle
+falls past either end is hidden; on a closed path the text wraps past the
+start point, and only what would run more than a whole lap is hidden. Either
+way the render reports a `text_path_overflow` warning naming the layer. A
+`ref` that names no sibling vector hides the whole text the same way.
 
 ### Per-span line height
 

@@ -178,6 +178,36 @@ describe("svgToElements", () => {
 		expect(ElementSchema.safeParse(element).success).toBe(true);
 	});
 
+	test("a gradient stroke keeps its gradient, on the vector's own box", () => {
+		const { element, warnings } = svgToElements(
+			svg(
+				'<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="10" y1="0" x2="30" y2="0"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><radialGradient id="r"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><rect x="10" width="20" height="10" fill="none" stroke="url(#g)" stroke-width="2"/><rect width="40" height="20" fill="none" stroke="url(#r)"/>',
+			),
+		);
+		expect(warnings).toEqual([]);
+		const [lin, rad] = element.properties.children as VectorElement[];
+		expect(lin?.properties.stroke).toEqual({
+			color: {
+				kind: "linear",
+				angle: 0,
+				from: [0, 0],
+				to: [1, 0],
+				stops: [
+					{ offset: 0, color: "#ff0000" },
+					{ offset: 1, color: "#0000ff" },
+				],
+			},
+			width: 2,
+		});
+		expect(rad?.properties.stroke?.color).toMatchObject({
+			kind: "radial",
+			center: [0.5, 0.5],
+			radius: 0.5,
+			radiusY: 0.25,
+		});
+		expect(validate(template(element)).ok).toBe(true);
+	});
+
 	test("clip paths and masks become mask elements", () => {
 		const { element } = svgToElements(
 			svg(
@@ -304,6 +334,34 @@ describe("svgToElements", () => {
 		expect(kinds).toEqual(["vector", "vector", "mask"]);
 		const tiles = element.properties.children[2] as MaskElement;
 		expect(tiles.properties.children).toHaveLength(4);
+		expect(validate(template(element)).ok).toBe(true);
+	});
+
+	test("a textPath becomes text along inline path data", () => {
+		const { element, warnings } = svgToElements(
+			svg(
+				'<defs><path id="arc" d="M10 80 C 30 20 170 20 190 80"/></defs>' +
+					'<text font-size="10" text-anchor="middle"><textPath href="#arc" startOffset="50%">On a curve</textPath></text>' +
+					'<text font-size="10"><textPath href="#arc" startOffset="4" side="right">Back</textPath></text>',
+				'width="100" height="50" viewBox="0 0 200 100"',
+			),
+		);
+		expect(warnings).toEqual([]);
+		const [a, b] = element.properties.children as TextElement[];
+		expect(a?.properties.value).toBe("On a curve");
+		expect(a?.properties.font.size).toBe(5);
+		expect(a?.pos).toEqual({ x: 0, y: 11.5 });
+		expect(a?.properties.path).toEqual({
+			d: "M5 28.5C15 -1.5 85 -1.5 95 28.5",
+			startOffset: "50%",
+			align: "center",
+		});
+		expect(a?.properties.align).toBeUndefined();
+		expect(b?.properties.path).toEqual({
+			d: "M5 28.5C15 -1.5 85 -1.5 95 28.5",
+			startOffset: 2,
+			side: "right",
+		});
 		expect(validate(template(element)).ok).toBe(true);
 	});
 

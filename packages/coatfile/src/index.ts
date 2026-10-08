@@ -86,7 +86,14 @@ export {
 	raiseFormatVersion,
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
+export { isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
+export {
+	parseTrimValue,
+	type ResolvedStrokeTrim,
+	resolveStrokeTrim,
+	type StrokeTrimInput,
+} from "./stroke-trim";
 export {
 	FIELD_ID,
 	hasToken,
@@ -146,6 +153,7 @@ export type {
 	FrameFlexLayout,
 	FrameGridLayout,
 	FrameProperties,
+	Gradient,
 	GradientStop,
 	GridTrack,
 	ImageCrop,

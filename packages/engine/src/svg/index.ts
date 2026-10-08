@@ -15,6 +15,7 @@ export {
 	type SvgStop,
 	type SvgStroke,
 	type SvgText,
+	type SvgTextPath,
 	type SvgTextRun,
 	type SvgWarning,
 	viewBoxMatrix,

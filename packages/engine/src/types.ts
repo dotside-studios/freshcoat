@@ -144,7 +144,7 @@ export type ShapeMask =
 	| { kind: "rounded-rect"; radius: CornerRadius; smoothing?: number }
 	| { kind: "circle" }
 	| { kind: "ellipse" }
-	| { kind: "polygon"; sides: number; rotation?: number }
+	| { kind: "polygon"; sides: number; rotation?: number; cornerRadius?: number }
 	| { kind: "squircle"; radius: number; smoothing?: number };
 
 // A uniform radius, or per-corner [topLeft, topRight, bottomRight, bottomLeft]
@@ -163,7 +163,11 @@ export type ViewBox = { x?: number; y?: number; width: number; height: number };
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 
 export type Stroke = {
+	// The solid colour, and the fallback when `gradient` is set.
 	color: string;
+	// Painted along the stroke in place of `color`, placed in the drawable's box
+	// as a fill is.
+	gradient?: GradientFill;
 	width: number;
 	// Empty array or undefined = solid line.
 	dash?: number[];
@@ -173,9 +177,21 @@ export type Stroke = {
 	// Stroke position relative to the shape edge (Figma). Omitted = center (the
 	// native canvas/Skia alignment). Honored by every stroked drawable.
 	align?: "inside" | "outside" | "center";
+	// The drawn part of the outline, as fractions of its length from its start.
+	// Omitted = 0 and 1. `trimOffset` rotates that part along the outline,
+	// wrapping past its end. Circles and ellipses start at the top and run
+	// clockwise when trimmed; other outlines follow their own direction.
+	trimStart?: number;
+	trimEnd?: number;
+	trimOffset?: number;
 };
 
 export type GradientSpread = "pad" | "reflect" | "repeat";
+
+export type GradientFill = Extract<
+	ResolvedFill,
+	{ kind: "linear" | "radial" | "angular" }
+>;
 
 // Gradient endpoints are in [0, 1] of the drawable's bbox. `spread` is what
 // paints past the last stop; omitted means pad.
@@ -240,6 +256,8 @@ export type ResolvedFont = {
 	autoLineHeight?: boolean;
 	// Figma text decoration; absent = none.
 	decoration?: "underline" | "line-through";
+	// Break an underline where glyphs cross it; absent = on.
+	skipInk?: boolean;
 	variations?: FontVariations;
 	features?: FontFeatures;
 };
@@ -373,6 +391,22 @@ export type TextArc = {
 	align: "start" | "center" | "end";
 	// Spreads each line's glyph positions across this many degrees.
 	sweep?: number;
+	// "shrink" scales a line longer than its circle down until it fits.
+	fit?: "shrink";
+};
+
+// Text set along a path, as SVG's <textPath>. Each hard line is one baseline
+// offset below the path.
+export type TextPath = {
+	// Path data relative to the command's pos.
+	d: string;
+	// Where `align` anchors the text, along the path in target px, or as a
+	// percentage of the path's length when `percent` is set.
+	startOffset: number;
+	percent?: boolean;
+	// left keeps the path's direction; right reverses it.
+	side: "left" | "right";
+	align: "start" | "center" | "end";
 };
 
 export type DrawTextCommand = DrawCommandBase & {
@@ -381,6 +415,7 @@ export type DrawTextCommand = DrawCommandBase & {
 	color: string;
 	fill?: ResolvedFill;
 	arc?: TextArc;
+	path?: TextPath;
 };
 
 export type DrawImageCommand = DrawCommandBase & {
@@ -498,6 +533,28 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// Text on a path ran past the path's end; the glyphs that did not fit are
+	// hidden.
+	| { kind: "text_path_overflow"; layer?: string }
+	// A curved text line is longer than its circle, so its ends overlap.
+	| {
+			kind: "arc_text_overflow";
+			layer?: string;
+			line: number;
+			width: number;
+			circumference: number;
+	  }
+	// A curved text ring's radius was below the line's font size and was raised
+	// to it.
+	| {
+			kind: "arc_radius_clamped";
+			layer?: string;
+			line: number;
+			radius: number;
+			min: number;
+	  }
+	// A pattern fill's shader failed to compile, so it painted its first colour.
+	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.
