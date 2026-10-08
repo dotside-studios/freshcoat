@@ -7,7 +7,7 @@ import {
 	pasteInto,
 	toTsv,
 } from "~/data/clipboard";
-import { fillDown, writeCells } from "~/data/model";
+import { fillDown, sharedValues, writeCells } from "~/data/model";
 
 function people(): Dataset {
 	return {
@@ -125,5 +125,19 @@ describe("fill down", () => {
 		const cleared = fillDown(d, ["r_3", "r_1"], "age").dataset;
 		expect(cleared.records[0]?.values).toEqual({ name: "Ada" });
 		expect(fillDown(d, ["r_1"], "age").dataset).toBe(d);
+	});
+});
+
+describe("shared values", () => {
+	it("names the columns where every record agrees", () => {
+		const d = people();
+		const both = sharedValues(d, ["r_1", "r_2"]);
+		expect([...both]).toEqual([["member", null]]);
+		const one = sharedValues(d, ["r_3"]);
+		expect(Object.fromEntries(one)).toEqual({
+			name: "Alan",
+			age: null,
+			member: null,
+		});
 	});
 });

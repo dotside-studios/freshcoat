@@ -847,6 +847,7 @@ function RecordsPane({
 						<RecordPanel
 							dataset={dataset}
 							rows={rows}
+							selectedIds={selectedIds}
 							ui={ui}
 							onImportPhotos={onImportPhotos}
 							onFocusRecord={(id) => {

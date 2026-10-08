@@ -812,3 +812,32 @@ test("Mod+D fills down from the first selected record", async ({ page }) => {
 		.toEqual(["Ada", "Grace", "Alan"]);
 	expect(await values(page, "points")).toEqual([120, 95, 120]);
 });
+
+test("with several records selected the Record tab sets a value in all of them", async ({
+	page,
+}) => {
+	await openPeople(page);
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	const bulk = page.getByTestId("bulk-panel");
+	await expect(bulk).toContainText("Set value for 2 selected");
+	await expect(bulk.getByLabel("tier", { exact: true })).toHaveValue("Gold");
+	await expect(bulk.getByLabel("points", { exact: true })).toHaveAttribute(
+		"placeholder",
+		"Mixed",
+	);
+	await bulk.getByLabel("points", { exact: true }).fill("10");
+	await page.keyboard.press("Enter");
+	await expect.poll(() => values(page, "points")).toEqual([10, 95, 10]);
+	await bulk.getByLabel("tier", { exact: true }).fill("");
+	await bulk.getByRole("button", { name: "Set tier" }).click();
+	await expect.poll(() => values(page, "tier")).toEqual([null, "Silver", null]);
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+	expect(await values(page, "points")).toEqual([10, 95, 10]);
+});

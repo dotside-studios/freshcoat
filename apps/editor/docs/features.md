@@ -75,6 +75,9 @@ the records, and **Export** turns templates and records into files.
   - Mod+D fills down: the first selected record's value in the focused
     column goes into the other selected records, or with fewer than two
     selected, the value above goes into the focused cell.
+  - With several records selected, the Record tab reads "Set value for N
+    selected": one form per column, showing the value they share or Mixed,
+    that sets a value in all of them as one undo step.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.

@@ -390,6 +390,33 @@ export function fillDown(
 	return { dataset: next, cells: rest.length };
 }
 
+/** The value each column has in every one of the records, for the columns
+ *  where they agree; an empty cell is null. */
+export function sharedValues(
+	dataset: Dataset,
+	ids: readonly string[],
+): Map<string, CellValue> {
+	const byId = recordByIdMap(dataset.records);
+	const out = new Map<string, CellValue>();
+	const open = new Set(dataset.columns.map((c) => c.key));
+	let first = true;
+	for (const id of ids) {
+		const r = byId.get(id);
+		if (!r) continue;
+		for (const key of open) {
+			const v = r.values[key] ?? null;
+			if (first) out.set(key, v);
+			else if (out.get(key) !== v) {
+				out.delete(key);
+				open.delete(key);
+			}
+		}
+		first = false;
+		if (open.size === 0) break;
+	}
+	return out;
+}
+
 /** A cell's value for typed text, coerced by its column. A value that does
  *  not fit keeps its text, which validation then flags. */
 export function valueFromText(
