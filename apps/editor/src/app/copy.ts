@@ -129,6 +129,7 @@ export const CONTENT = {
 	addField: "Add field",
 	newKey: "New field key",
 	newField: "New field…",
+	createField: "Create field",
 	resetSamples: "Reset to samples",
 	/** Fields a pipeline fills in rather than a person. */
 	system: "From the system",

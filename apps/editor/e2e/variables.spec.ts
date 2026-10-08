@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { openSample, run, settle, state } from "./helpers";
+import { artboardPoint, mod, openSample, run, settle, state } from "./helpers";
 
 /** A checksum of the painted artboard, or of one template-space box on it. */
 async function paint(
@@ -85,6 +85,34 @@ test("preview values, a new field bound into a text, and variants repaint", asyn
 	expect(await paint(page)).not.toBe(whole);
 	await page.getByTestId("variant-__default").click();
 	expect(await state<unknown>(page, "s.variantId ?? null")).toBeNull();
+});
+
+test("{{ suggests field keys in the on-canvas text editor", async ({
+	page,
+}) => {
+	await openSample(page, "membership-card");
+	const box = await nameBox(page);
+	const p = await artboardPoint(page, box.x + 4, box.y + box.height / 2);
+	await page.mouse.click(p.x, p.y);
+	await page.mouse.dblclick(p.x, p.y);
+	const editor = page.getByLabel("Edit text on canvas");
+	await expect(editor).toBeFocused();
+	await page.keyboard.press(`${mod}+a`);
+	await page.keyboard.type("Hi {{disp");
+	const list = page.getByTestId("field-completion");
+	await expect(list.getByRole("option").first()).toContainText("display_name");
+	await page.keyboard.press("Enter");
+	await expect(list).toBeHidden();
+	await expect(editor).toHaveValue("Hi {{display_name}}");
+	await expect(editor).toBeFocused();
+	await page.keyboard.press("Escape");
+	await expect(editor).toBeHidden();
+	expect(
+		await state<string>(
+			page,
+			`t.template_data[0].elements.find((e) => e.id === "name").properties.value`,
+		),
+	).toBe("Hi {{display_name}}");
 });
 
 test("Template setup renames and resizes", async ({ page }) => {

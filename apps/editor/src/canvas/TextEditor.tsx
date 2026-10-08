@@ -8,6 +8,7 @@ import {
 import { useController } from "~/app/context";
 import { ancestorRects, worldCorners } from "~/doc/geometry";
 import { getElement } from "~/doc/path";
+import { useFieldCompletion } from "~/panels/design/field-completion";
 import { useEditor } from "~/state/hooks";
 
 const faces = new Map<string, string>();
@@ -66,7 +67,17 @@ function EditingText({ layer }: { layer: string }) {
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const area = useRef<HTMLTextAreaElement>(null);
+	const wrap = useRef<HTMLDivElement>(null);
 	const placed = geometry.has(layer);
+	const template = useEditor((s) => s.doc?.history.present ?? null);
+	const completion = useFieldCompletion(wrap, template, (next, caret) => {
+		const el = area.current;
+		if (!el) return;
+		el.value = next;
+		el.setSelectionRange(caret, caret);
+		fitHeight(el);
+		controller.setEditedText(next);
+	});
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refocus when the edited layer changes or a new one is first laid out
 	useLayoutEffect(() => {
@@ -112,6 +123,7 @@ function EditingText({ layer }: { layer: string }) {
 
 	return (
 		<div
+			ref={wrap}
 			className="absolute flex flex-col"
 			style={{
 				left: nw.x,
@@ -157,6 +169,7 @@ function EditingText({ layer }: { layer: string }) {
 				onPointerDown={(e) => e.stopPropagation()}
 				onDoubleClick={(e) => e.stopPropagation()}
 			/>
+			{completion}
 		</div>
 	);
 }

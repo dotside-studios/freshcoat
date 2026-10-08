@@ -34,6 +34,7 @@ import LineHeightIcon from "~icons/mingcute/line-height-line";
 import StrikeIcon from "~icons/mingcute/strikethrough-line";
 import UnderlineIcon from "~icons/mingcute/underline-line";
 import { OverrideMarker, Row } from "./controls";
+import { useFieldCompletion } from "./field-completion";
 import {
 	commonValue,
 	formatFeatures,
@@ -628,6 +629,15 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 
 	const write = (v: string) => ins.setProps("text-value", () => ({ value: v }));
 
+	const completion = useFieldCompletion(wrap, ins.template, (next, caret) => {
+		write(next);
+		requestAnimationFrame(() => {
+			const area = wrap.current?.querySelector("textarea");
+			area?.focus();
+			area?.setSelectionRange(caret, caret);
+		});
+	});
+
 	const insertToken = (id: string) =>
 		spliceToken(
 			wrap.current?.querySelector("textarea"),
@@ -656,7 +666,7 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 		);
 
 	return (
-		<div ref={wrap} className="flex flex-col gap-1.5">
+		<div ref={wrap} className="relative flex flex-col gap-1.5">
 			<div className="flex h-5 items-center justify-between pointer-coarse:h-8">
 				<span className="flex items-center gap-1 text-fc-muted text-fc-sm">
 					<OverrideMarker keys={["value", "spans"]} className="-ml-1" />
@@ -686,6 +696,7 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 					onChange={write}
 				/>
 			)}
+			{completion}
 		</div>
 	);
 }
