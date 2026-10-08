@@ -7,7 +7,6 @@ import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem, triggerButton } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
@@ -47,6 +46,7 @@ import {
 	patchLayers,
 } from "./field-helpers";
 import { isDeclared, verifyGoogleFamily, WEIGHTS } from "./fonts";
+import { InspectorSection } from "./InspectorSection";
 
 type Font = TextProperties["font"];
 
@@ -134,7 +134,7 @@ export function TextSection({ ins }: { ins: Inspect }) {
 	const decoration = pickFont((f) => f.decoration ?? "none");
 
 	return (
-		<PanelSection title="Text">
+		<InspectorSection title="Text">
 			<ContentField ins={ins} texts={texts} />
 			<Row label="Font" keys={FONT}>
 				<FontFamilyField ins={ins} value={pickFont((f) => f.family)} />
@@ -560,7 +560,7 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					Vertical trim
 				</Checkbox>
 			</Row>
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

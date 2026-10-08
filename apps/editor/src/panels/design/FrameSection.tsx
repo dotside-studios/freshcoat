@@ -7,13 +7,13 @@ import type {
 } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import ArrowDownIcon from "~icons/mingcute/arrow-down-line";
 import ArrowRightIcon from "~icons/mingcute/arrow-right-line";
 import { AddButton, Notice, Pair, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 export const DEFAULT_LAYOUT: Layout = { direction: "row", gap: 8 };
 
@@ -100,7 +100,7 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 
 	return (
 		<>
-			<PanelSection title="Frame">
+			<InspectorSection title="Frame">
 				<Checkbox
 					isSelected={clip === true}
 					isIndeterminate={clip === null}
@@ -123,8 +123,8 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 				>
 					Isolate blending
 				</Checkbox>
-			</PanelSection>
-			<PanelSection
+			</InspectorSection>
+			<InspectorSection
 				title="Auto layout"
 				actions={
 					all ? (
@@ -206,7 +206,7 @@ export function FrameSection({ ins }: { ins: Inspect }) {
 						)}
 					</>
 				)}
-			</PanelSection>
+			</InspectorSection>
 		</>
 	);
 }

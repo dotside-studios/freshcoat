@@ -2,12 +2,12 @@ import type { VectorElement } from "@freshcoat-js/coatfile";
 import { scalePathData } from "@freshcoat-js/engine";
 import { TextArea } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useEffect, useState } from "react";
 import RadiusIcon from "~icons/mingcute/border-radius-line";
 import { Notice, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 /** Why the coat engine would refuse this path data, or null when it reads. */
 export function pathDataError(d: string): string | null {
@@ -28,7 +28,7 @@ export function VectorSection({ ins }: { ins: Inspect }) {
 	const rule = commonValue(props.map((p) => p.fillRule ?? "nonzero"));
 	const radius = commonValue(props.map((p) => p.cornerRadius ?? 0));
 	return (
-		<PanelSection title="Vector">
+		<InspectorSection title="Vector">
 			<Row label="Fill rule">
 				<Select
 					aria-label="Fill rule"
@@ -64,7 +64,7 @@ export function VectorSection({ ins }: { ins: Inspect }) {
 			) : (
 				<Notice>Select one vector to edit its path</Notice>
 			)}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

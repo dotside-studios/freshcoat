@@ -154,8 +154,11 @@ the records, and **Export** turns templates and records into files.
   - The filter in the Layers header narrows the tree to layers whose name or
     type matches, with the frames that hold them expanded.
 - **Inspector:**
-  - Geometry, blend mode (every Figma layer mode, linear burn included) and
-    alignment.
+  - Align and boolean toolbars at the top, then Layer (geometry, opacity,
+    blend mode with every Figma layer mode, linear burn included, and corner
+    radius), the layer type's own section, Fill, Stroke, Effects,
+    Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
@@ -165,7 +168,7 @@ the records, and **Export** turns templates and records into files.
     gradient fill. The canvas gradient handles follow fills only.
   - Rectangles and frames can set each corner's radius on its own. A frame
     applies its corners to its fill, its stroke and its clip.
-  - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
+  - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to

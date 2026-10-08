@@ -2,7 +2,6 @@ import type { Element } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import {
 	AddButton,
 	ItemGroup,
@@ -14,6 +13,7 @@ import {
 } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 import { removeAt, replaceAt } from "./fills";
+import { InspectorSection } from "./InspectorSection";
 
 type Shadow = Extract<NonNullable<Element["shadow"]>, { dx: number }>;
 
@@ -53,7 +53,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 		}));
 
 	return (
-		<PanelSection
+		<InspectorSection
 			title="Effects"
 			actions={
 				<AddButton
@@ -165,6 +165,6 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 					}
 				/>
 			</Row>
-		</PanelSection>
+		</InspectorSection>
 	);
 }
