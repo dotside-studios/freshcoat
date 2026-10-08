@@ -1,3 +1,4 @@
+import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
@@ -6,8 +7,12 @@ import { getElement } from "~/doc/path";
 import { activeVariantId } from "~/doc/variant-edit";
 import { useEditor, useThrottledEditor } from "~/state/hooks";
 import { type EditorState, working } from "~/state/store";
+import { activeSlot } from "~/state/workspace";
+import PrevIcon from "~icons/mingcute/left-line";
+import NextIcon from "~icons/mingcute/right-line";
 import { useController } from "./context";
 import { plural } from "./copy";
+import { formatNumber } from "./format";
 import { IssuesPopover } from "./IssuesPopover";
 import { useRenderStats } from "./render-stats";
 
@@ -63,6 +68,7 @@ export function StatusBar() {
 			{summary ? <span className="truncate">{summary}</span> : null}
 			<IssuesPopover />
 			<span className="flex-1" />
+			<RecordStep />
 			{render.status === "error" ? (
 				<span className="truncate text-fc-danger" title={render.error}>
 					Couldn't render: {render.error}
@@ -124,6 +130,55 @@ export function StatusBar() {
 				</Popover>
 			</MenuTrigger>
 		</footer>
+	);
+}
+
+/** "◀ 7/120 ▶": steps the Edit preview through the bound dataset. */
+function RecordStep() {
+	const controller = useController();
+	const shown = useEditor((s) => {
+		const id = activeSlot(s)?.binding?.datasetId;
+		const records = s.workspace?.datasets.find((d) => d.id === id)?.records;
+		if (!records?.length) return null;
+		const at = s.previewRecordId
+			? records.findIndex((r) => r.id === s.previewRecordId)
+			: -1;
+		return `${at}/${records.length}`;
+	});
+	if (!shown) return null;
+	const [at, count] = shown.split("/").map(Number) as [number, number];
+	const step = "size-5 pointer-coarse:size-7 [&_svg]:size-3.5";
+	return (
+		<span className="flex items-center" data-testid="status-record">
+			<IconButton
+				aria-label="Previous record"
+				tooltip="Previous record"
+				className={step}
+				isDisabled={at === 0}
+				onPress={() => controller.stepRecord(-1)}
+			>
+				<PrevIcon />
+			</IconButton>
+			<RACButton
+				aria-label="Choose a record"
+				className="rounded-[3px] px-1 outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-hovered:text-fc-text"
+				onPress={() => {
+					controller.dispatch({ type: "setPanels", panels: { right: true } });
+					controller.dispatch({ type: "setRightTab", tab: "content" });
+				}}
+			>
+				{at < 0 ? "–" : formatNumber(at + 1)}/{formatNumber(count)}
+			</RACButton>
+			<IconButton
+				aria-label="Next record"
+				tooltip="Next record"
+				className={step}
+				isDisabled={at === count - 1}
+				onPress={() => controller.stepRecord(1)}
+			>
+				<NextIcon />
+			</IconButton>
+		</span>
 	);
 }
 

@@ -4,7 +4,7 @@ import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
 import { loadBarcodeEncoder } from "~/render/barcode";
 import type { EditorState, Tool } from "~/state/store";
-import type { Section } from "~/state/workspace";
+import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
 import { toggleRenderStats } from "./render-stats";
@@ -43,6 +43,10 @@ export type Command = {
 const hasDoc = (s: EditorState) => s.doc !== null;
 const hasSelection = (s: EditorState) =>
 	s.selection.some((k) => !k.endsWith("/bg"));
+const hasRecords = (s: EditorState) => {
+	const id = activeSlot(s)?.binding?.datasetId;
+	return !!s.workspace?.datasets.find((d) => d.id === id)?.records.length;
+};
 const tool = (t: Tool, label: string, key: string): Command => ({
 	id: `tool.${t}`,
 	label,
@@ -435,6 +439,22 @@ export const COMMANDS: Command[] = [
 		group: "View",
 		enabled: hasSelection,
 		run: ({ controller }) => controller.zoomToSelection(),
+	},
+	{
+		id: "view.previousRecord",
+		label: "Previous record",
+		keys: ["Alt+["],
+		group: "View",
+		enabled: hasRecords,
+		run: ({ controller }) => controller.stepRecord(-1),
+	},
+	{
+		id: "view.nextRecord",
+		label: "Next record",
+		keys: ["Alt+]"],
+		group: "View",
+		enabled: hasRecords,
+		run: ({ controller }) => controller.stepRecord(1),
 	},
 	{
 		id: "view.panels",

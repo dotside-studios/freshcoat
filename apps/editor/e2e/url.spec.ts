@@ -196,7 +196,9 @@ test("stepping records adds no history entries", async ({ page }) => {
 		Array.from({ length: 25 }, (_, i) => `Member ${i + 1}`),
 	);
 	const before = await page.evaluate(() => history.length);
-	const next = page.getByRole("button", { name: "Next record" });
+	const next = page
+		.getByTestId("status-record")
+		.getByRole("button", { name: "Next record" });
 	for (let i = 0; i < 20; i++) await next.click();
 	await settle(page);
 	expect(await state<string>(page, "s.previewRecordId")).toBe("r_19");

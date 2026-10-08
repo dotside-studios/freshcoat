@@ -93,6 +93,13 @@ describe("shortcut matching", () => {
 		).toBe("edit.redo");
 	});
 
+	test("Alt+[ and Alt+] step the previewed record", () => {
+		const at = (code: string) =>
+			findCommand(key({ key: "“", code, altKey: true }), true, false)?.id;
+		expect(at("BracketLeft")).toBe("view.previousRecord");
+		expect(at("BracketRight")).toBe("view.nextRecord");
+	});
+
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
 		for (const c of COMMANDS)

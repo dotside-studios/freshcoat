@@ -69,4 +69,17 @@ describe("current record", () => {
 		expect(controller.state.values.name).toBe("Typed");
 		expect(controller.state.recordId).toBe("d_m_1");
 	});
+
+	test("stepping starts at the current record and stops at the ends", () => {
+		const controller = bound();
+		controller.previewRecord("d_m_1");
+		controller.previewRecord(null);
+		controller.stepRecord(1);
+		expect(controller.state.previewRecordId).toBe("d_m_1");
+		controller.stepRecord(1);
+		controller.stepRecord(1);
+		expect(controller.state.previewRecordId).toBe("d_m_2");
+		controller.stepRecord(-1);
+		expect(controller.state.previewRecordId).toBe("d_m_1");
+	});
 });

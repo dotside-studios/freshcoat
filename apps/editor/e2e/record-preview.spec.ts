@@ -20,14 +20,14 @@ test("stepping records in Edit repaints the card with each record", async ({
 		return out;
 	};
 	const samples = await stripe();
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await state<string | null>(page, "s.previewRecordId")).toBe("r_0");
 	expect(await state<string>(page, "s.values.display_name")).toBe("A");
 	const first = await stripe();
 	expect(first).not.toEqual(samples);
 
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await state<string>(page, "s.values.display_name")).toBe(
 		"WWWWWWWWWWWW",
@@ -101,7 +101,10 @@ test("an unbound template picks a dataset to try in Edit", async ({ page }) => {
 	await page.getByRole("button", { name: "Binding", exact: true }).click();
 	await expect(page.getByTestId("binding-editor")).toBeVisible();
 
-	await page.getByRole("button", { name: "Next record" }).click();
+	await page
+		.getByTestId("record-stepper")
+		.getByRole("button", { name: "Next record" })
+		.click();
 	await settle(page);
 	expect(await state<string>(page, "s.values.display_name")).toBe("Grace");
 });

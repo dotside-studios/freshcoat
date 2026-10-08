@@ -1413,6 +1413,28 @@ export class EditorController {
 		);
 	}
 
+	/** The records the Edit preview steps through: the bound dataset's. */
+	previewRecords(): readonly { id: string }[] {
+		const id = activeSlot(this.state)?.binding?.datasetId;
+		return (
+			this.state.workspace?.datasets.find((d) => d.id === id)?.records ?? []
+		);
+	}
+
+	/** Steps the Edit preview `by` records, from the current record when
+	 *  nothing is previewed yet. */
+	stepRecord(by: number): void {
+		const records = this.previewRecords();
+		if (records.length === 0) return;
+		const s = this.state;
+		const from = records.findIndex(
+			(r) => r.id === (s.previewRecordId ?? s.recordId),
+		);
+		const at = from < 0 ? 0 : s.previewRecordId === null ? from : from + by;
+		const next = records[Math.max(0, Math.min(records.length - 1, at))];
+		if (next) this.previewRecord(next.id);
+	}
+
 	switchTemplate(id: string): void {
 		this.dispatch({ type: "switchTemplate", id });
 		requestAnimationFrame(() => this.fitView());
