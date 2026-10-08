@@ -200,6 +200,8 @@ const FontDescriptorObjectSchema = z.object({
 	// per family at render time; see freshcoat's line-height.
 	lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 	decoration: z.enum(["underline", "line-through"]).optional(),
+	// Break an underline where glyphs cross it. Defaults to true.
+	skipInk: z.boolean().optional(),
 	// Merged over the element's own axes.
 	variations: FontVariationsSchema.optional(),
 	// Merged over the element's own features.
@@ -230,6 +232,7 @@ export const TextPropertiesSchema = z.object({
 		// A number, or "auto" — see FontDescriptorObjectSchema above.
 		lineHeight: z.union([z.number(), z.literal("auto")]).optional(),
 		decoration: z.enum(["underline", "line-through"]).optional(),
+		skipInk: z.boolean().optional(),
 		variations: FontVariationsSchema.optional(),
 		features: FontFeaturesSchema.optional(),
 	}),

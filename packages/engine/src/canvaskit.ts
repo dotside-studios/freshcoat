@@ -92,10 +92,12 @@ import {
 	touchBackground,
 } from "./paint-cache-state";
 import {
+	type DecorationMetrics,
 	decorationLine,
 	fitRect,
 	fontFeatureList,
 	fontVariationList,
+	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
 import { flattenOverWhite } from "./jpeg";
@@ -724,20 +726,103 @@ function drawText(
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
 		const baseline = line.baseline ?? line.y;
+		let runs: GlyphRun[] | undefined;
 		for (const span of line.spans) {
 			if (!span.font.decoration) continue;
-			const { top, thickness } = decorationLine(
-				span.font.size,
-				span.font.decoration,
-				baseline,
-			);
+			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 			const p = bin.track(new ck.Paint());
 			p.setAntiAlias(true);
 			if (fillShader) p.setShader(fillShader);
 			else p.setColor(toColor(ck, span.color));
-			canvas.drawRect(ck.XYWHRect(span.x, top, span.width, thickness), p);
+			let segments: [number, number][] = [[span.x, span.x + span.width]];
+			if (span.font.decoration === "underline" && span.font.skipInk !== false) {
+				if (!runs) {
+					runs = para.getShapedLines()[0]?.runs ?? [];
+					for (const run of runs) bin.track(run.typeface);
+				}
+				const y0 = baseline - ascent;
+				const gaps: number[] = [];
+				for (const run of runs) {
+					const hits = runFont(ck, bin, run).getGlyphIntercepts(
+						run.glyphs,
+						run.positions,
+						top - y0,
+						top + thickness - y0,
+					);
+					for (const x of hits) gaps.push(left + x);
+				}
+				segments = skipInkSegments(
+					span.x,
+					span.x + span.width,
+					gaps,
+					Math.max(thickness, span.font.size * 0.05),
+				);
+			}
+			for (const [x0, x1] of segments)
+				canvas.drawRect(ck.LTRBRect(x0, top, x1, top + thickness), p);
 		}
 	}
+}
+
+const decorationMetrics = new WeakMap<
+	TypefaceFontProvider,
+	Map<string, DecorationMetrics | undefined>
+>();
+
+// The decoration geometry of a span, from the metrics of the face its own
+// family and style select. Glyphs that fall back to another family keep the
+// span's line, so one span draws one straight decoration.
+function spanDecoration(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	span: TextLine["spans"][number],
+	baseline: number,
+): { top: number; thickness: number } {
+	const { family, weight, style, size, decoration } = span.font;
+	let byFace = decorationMetrics.get(provider);
+	if (!byFace) {
+		byFace = new Map();
+		decorationMetrics.set(provider, byFace);
+	}
+	const w = WEIGHTS[Math.round((weight || 400) / 100) * 100] ?? "Normal";
+	const key = `${w}|${style}|${family}`;
+	if (!byFace.has(key)) {
+		const typeface = provider.matchFamilyStyle(family, {
+			weight: ck.FontWeight[w],
+			width: ck.FontWidth.Normal,
+			slant: style === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright,
+		});
+		let em: DecorationMetrics | undefined;
+		if (typeface) {
+			const font = new ck.Font(typeface, FONT_BOX_SIZE);
+			const m = font.getMetrics();
+			font.delete();
+			typeface.delete();
+			const per = (v: number | undefined) =>
+				v === undefined ? undefined : v / FONT_BOX_SIZE;
+			em = {
+				underlinePosition: per(m.underlinePosition),
+				underlineThickness: per(m.underlineThickness),
+				strikeoutPosition: per(m.strikeoutPosition),
+				strikeoutThickness: per(m.strikeoutThickness),
+			};
+		}
+		byFace.set(key, em);
+	}
+	const em = byFace.get(key);
+	const scale = (v: number | undefined) =>
+		v === undefined ? undefined : v * size;
+	return decorationLine(
+		size,
+		decoration as string,
+		baseline,
+		em && {
+			underlinePosition: scale(em.underlinePosition),
+			underlineThickness: scale(em.underlineThickness),
+			strikeoutPosition: scale(em.strikeoutPosition),
+			strikeoutThickness: scale(em.strikeoutThickness),
+		},
+	);
 }
 
 // Each baked line shaped once, as drawText shapes it, with its run positions
@@ -2346,11 +2431,7 @@ function textBounds(
 		}
 		for (const span of line.spans) {
 			if (!span.font.decoration) continue;
-			const { top, thickness } = decorationLine(
-				span.font.size,
-				span.font.decoration,
-				baseline,
-			);
+			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 			out.push([span.x, top, span.x + span.width, top + thickness]);
 		}
 		if (!em) continue;

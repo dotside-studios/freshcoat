@@ -243,6 +243,8 @@ export type ResolvedFont = {
 	autoLineHeight?: boolean;
 	// Figma text decoration; absent = none.
 	decoration?: "underline" | "line-through";
+	// Break an underline where glyphs cross it; absent = on.
+	skipInk?: boolean;
 	variations?: FontVariations;
 	features?: FontFeatures;
 };

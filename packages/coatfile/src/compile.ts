@@ -88,6 +88,7 @@ type TextSpanInput = {
 		letterSpacing?: number;
 		lineHeight?: number;
 		decoration?: ResolvedFont["decoration"];
+		skipInk?: boolean;
 		variations?: ResolvedFont["variations"];
 		features?: ResolvedFont["features"];
 	};
@@ -473,6 +474,7 @@ function compileText(
 		lineHeight?: number | "auto";
 		letterSpacing?: number;
 		decoration?: ResolvedFont["decoration"];
+		skipInk?: boolean;
 		variations?: ResolvedFont["variations"];
 		features?: ResolvedFont["features"];
 	};
@@ -487,6 +489,7 @@ function compileText(
 				: undefined,
 		...lineHeightOf(inputFont.lineHeight),
 		decoration: inputFont.decoration,
+		...(inputFont.skipInk !== undefined ? { skipInk: inputFont.skipInk } : {}),
 		...(inputFont.variations ? { variations: inputFont.variations } : {}),
 		...(inputFont.features ? { features: inputFont.features } : {}),
 	};
@@ -567,6 +570,7 @@ function mapSpanFont(
 			typeof f.letterSpacing === "number" ? f.letterSpacing * ratio : undefined,
 		...(f.lineHeight === undefined ? {} : lineHeightOf(f.lineHeight)),
 		decoration: f.decoration,
+		...(f.skipInk !== undefined ? { skipInk: f.skipInk } : {}),
 		...(f.variations ? { variations: f.variations } : {}),
 		...(f.features ? { features: f.features } : {}),
 	};

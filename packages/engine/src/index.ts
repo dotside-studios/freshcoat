@@ -121,10 +121,12 @@ export {
 	type PaintCacheStats,
 } from "./paint-cache";
 export {
+	type DecorationMetrics,
 	decorationLine,
 	type FitOptions,
 	fitRect,
 	insetCorner,
+	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
