@@ -498,7 +498,18 @@ function RecordsPane({
 	const [selection, setSelection] = useState<Selection>(() => new Set());
 	const [view, setViewState] = useState<RecordsView>(() => viewFor(dataset));
 	const [cardSize, setCardSizeState] = useState<CardSize>(savedCardSize);
-	const ui = useMemo(() => new GridUiStore(), []);
+	const [startRecord] = useState(() => {
+		const id = controller.state.recordId;
+		return dataset.records.some((r) => r.id === id) ? id : null;
+	});
+	const [ui] = useState(
+		() =>
+			new GridUiStore(
+				startRecord
+					? { row: startRecord, col: dataset.columns[0]?.key ?? "" }
+					: null,
+			),
+	);
 	const grid = useRef<GridHandle>(null);
 	const datasetId = dataset.id;
 
@@ -549,9 +560,17 @@ function RecordsPane({
 			const row = ui.get().active?.row ?? null;
 			if (row === last) return;
 			last = row;
-			if (row) recordFocused();
+			if (!row) return;
+			recordFocused();
+			controller.dispatch({ type: "setRecord", id: row });
 		});
-	}, [ui, recordFocused]);
+	}, [ui, recordFocused, controller]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the current record is revealed once, on opening
+	useEffect(() => {
+		if (startRecord && view === "table")
+			requestAnimationFrame(() => grid.current?.reveal(startRecord));
+	}, []);
 
 	useEffect(() => {
 		if (importNonce === 0) return;

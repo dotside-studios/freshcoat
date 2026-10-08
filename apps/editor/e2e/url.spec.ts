@@ -258,6 +258,6 @@ test("a phase 3 hash left in a tab still restores its view", async ({
 		.getByRole("button", { name: "Restore" })
 		.click();
 	await expect(page.getByTestId("section-export")).toBeVisible();
-	expect(await state<string>(page, "s.exportRecordId")).toBe("r_1");
+	expect(await state<string>(page, "s.recordId")).toBe("r_1");
 	await expect.poll(() => url(page)).toBe("/export?record=r_1");
 });

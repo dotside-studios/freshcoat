@@ -186,9 +186,9 @@ export function ExportSection() {
 	const [chosenMode, setChosenMode] = useState<PreviewMode>("output");
 	const [split, setSplit] = useState(0.5);
 	const [listSelection, setListSelection] = useState<string[]>([]);
-	const previewId = useEditor((s) => s.exportRecordId);
+	const previewId = useEditor((s) => s.recordId);
 	const setPreviewId = (id: string | null) =>
-		controller.dispatch({ type: "setExportRecord", id });
+		controller.dispatch({ type: "setRecord", id });
 	const [previewSide, setPreviewSide] = useState<string | null>(null);
 	// The variant the preview shows under All variants, as a token; null
 	// is the record's first.

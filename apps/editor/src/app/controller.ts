@@ -247,7 +247,20 @@ export class EditorController {
 	}
 
 	dispatch(action: Action): void {
+		const before = this.store.getState();
 		this.store.dispatch(action);
+		if (action.type === "setSection" || action.type === "setRecord")
+			this.followRecord(before);
+	}
+
+	/** Brings Edit's preview to the current record when Edit comes into view
+	 *  or the record moves while it shows, and its dataset has the record. */
+	private followRecord(before: EditorState): void {
+		const s = this.state;
+		if (s.section !== "edit" || !s.recordId) return;
+		if (s.recordId === s.previewRecordId) return;
+		if (before.section === "edit" && before.recordId === s.recordId) return;
+		this.previewRecord(s.recordId);
 	}
 
 	// ── Editing ──────────────────────────────────────────────────────────────

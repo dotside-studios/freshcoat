@@ -139,8 +139,9 @@ export type EditorState = {
 	workspace: WorkspaceState | null;
 	/** The dataset record the Edit preview shows, when bound. */
 	previewRecordId: string | null;
-	/** The record the Export preview shows; null is the plan's first. */
-	exportRecordId: string | null;
+	/** The current dataset record, shared by Edit's preview, Data's focused
+	 *  record and Export's preview; each shows it when its dataset has it. */
+	recordId: string | null;
 	/** The gradient fill last opened in the inspector, which the canvas
 	 *  handles edit while its layer is the one selected. */
 	activeFill: { key: string; index: number } | null;
@@ -259,7 +260,7 @@ export type Action =
 	| { type: "removePreset"; id: string }
 	| { type: "setActivePreset"; id: string | null }
 	| { type: "setPreviewRecord"; id: string | null }
-	| { type: "setExportRecord"; id: string | null }
+	| { type: "setRecord"; id: string | null }
 	| {
 			type: "previewRecord";
 			id: string;
@@ -290,7 +291,7 @@ export function initialState(
 		section: "edit",
 		workspace: null,
 		previewRecordId: null,
-		exportRecordId: null,
+		recordId: null,
 		activeFill: null,
 		textEdit: null,
 	};
@@ -789,16 +790,17 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 			return state.previewRecordId === action.id
 				? state
 				: { ...state, previewRecordId: action.id };
-		case "setExportRecord":
-			return state.exportRecordId === action.id
+		case "setRecord":
+			return state.recordId === action.id
 				? state
-				: { ...state, exportRecordId: action.id };
+				: { ...state, recordId: action.id };
 		case "previewRecord":
 			return withKnownVariant({
 				...state,
 				values: action.values,
 				variantId: action.variantId,
 				previewRecordId: action.id,
+				recordId: action.id,
 				variantBeforeRecord: state.variantBeforeRecord ?? {
 					variantId: state.variantId,
 				},
