@@ -401,19 +401,24 @@ export const RecordsGrid = memo(function RecordsGrid({
 		}
 
 		const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
+		const mod = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
 		const cellEl = target.closest<HTMLElement>("[data-col]");
-		if ((e.key === "Delete" || e.key === "Backspace") && plain) {
+		const row = cellEl?.dataset.row;
+		const col = cellEl?.dataset.col;
+		if (e.key === "Delete" || e.key === "Backspace") {
 			const selected = latest.current.selectedIds;
-			if (selected.length > 0) {
+			if (row && col && plain) {
+				e.preventDefault();
+				e.stopPropagation();
+				setValue(row, col, null);
+			} else if (selected.length > 0 && (plain || mod)) {
 				e.preventDefault();
 				e.stopPropagation();
 				onDeleteRows([...selected]);
-				return;
-			}
-			if (cellEl?.dataset.row && cellEl.dataset.col) {
+			} else if (row && mod) {
 				e.preventDefault();
 				e.stopPropagation();
-				setValue(cellEl.dataset.row, cellEl.dataset.col, null);
+				onDeleteRows([row]);
 			}
 			return;
 		}

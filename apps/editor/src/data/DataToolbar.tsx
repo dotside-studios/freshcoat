@@ -1,6 +1,7 @@
 import { Button } from "@freshcoat-js/ui/button";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import {
 	Menu,
@@ -73,6 +74,7 @@ export function ToolButton({
 	testId,
 	menu,
 	showLabel = "wide",
+	shortcut,
 	className,
 }: {
 	icon: ReactNode;
@@ -84,6 +86,7 @@ export function ToolButton({
 	/** `wide` and `wider`: the label shows once the toolbar has room;
 	 *  `never`: a tooltip instead. */
 	showLabel?: "wide" | "wider" | "always" | "never";
+	shortcut?: string;
 	className?: string;
 }) {
 	const button = (
@@ -116,7 +119,9 @@ export function ToolButton({
 	return (
 		<TooltipTrigger>
 			{button}
-			<Tooltip>{label.replace(/…$/, "")}</Tooltip>
+			<Tooltip>
+				{`${label.replace(/…$/, "")}${shortcut ? `  ${formatShortcut(shortcut)}` : ""}`}
+			</Tooltip>
 		</TooltipTrigger>
 	);
 }
@@ -333,6 +338,7 @@ export function DataToolbar({
 					label="Delete"
 					testId="delete-rows"
 					showLabel="never"
+					shortcut="Mod+Backspace"
 					isDisabled={selected === 0}
 					onPress={actions.remove}
 				/>
