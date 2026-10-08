@@ -27,6 +27,7 @@ import {
 	setFrameProp,
 	setHiddenInVariant,
 	setTemplateMeta,
+	setVariantSize,
 	setVariantSwatch,
 	suggestSwatch,
 	ungroup,
@@ -917,5 +918,62 @@ describe("variant change counts", () => {
 		expect(out.has("0/1/2")).toBe(false);
 		expect(out.has("0/1/2/0")).toBe(false);
 		expect(out.has("0/1/0")).toBe(true);
+	});
+});
+
+describe("a variant with its own size", () => {
+	const sized = () => {
+		const t = doc();
+		const front = t.template_data[0];
+		if (front)
+			front.elements = front.elements.map((e) =>
+				e.id === "a"
+					? { ...e, constraints: { horizontal: "end", vertical: "end" } }
+					: e,
+			);
+		const out = setVariantSize(t, "dark", { width: 600, height: 1000 });
+		if (!out.ok) throw new Error("refused");
+		return out.template;
+	};
+
+	test("setVariantSize sets it, and Default's size clears it", () => {
+		const t = sized();
+		expect(t.variants?.[0]?.size).toEqual({ width: 600, height: 1000 });
+		expect(t.width).toBe(1000);
+		const back = setVariantSize(t, "dark", { width: 1000, height: 600 });
+		expect(back.ok && back.template.variants?.[0]?.size).toBeUndefined();
+		expect(setVariantSize(t, "dark", { width: 0, height: 10 }).ok).toBe(false);
+		expect(setVariantSize(t, "nope", undefined).ok).toBe(false);
+	});
+
+	test("the canvas shows the base laid out at that size", () => {
+		const c = opened(sized());
+		expect(shown(c).width).toBe(600);
+		expect(shown(c).height).toBe(1000);
+		expect(el(shown(c), "0/0").pos).toEqual({ x: -390, y: 420 });
+	});
+
+	test("an edit lands as a delta in the variant's units, the base unchanged", () => {
+		const c = opened(sized());
+		c.edit((t) => updateElement(t, "0/0", { pos: { x: 40, y: 900 } }));
+		expect(base(c).width).toBe(1000);
+		expect(base(c).height).toBe(600);
+		expect(el(base(c), "0/0").pos).toEqual({ x: 10, y: 20 });
+		expect(delta(base(c), "a")?.pos).toEqual({ x: 40, y: 900 });
+		c.edit((t) => updateElement(t, "0/0", { pos: { x: -390, y: 420 } }));
+		expect(delta(base(c), "a")?.pos).toBeUndefined();
+	});
+
+	test("a structural op keeps the base's size", () => {
+		const c = opened(sized());
+		c.edit((t) => removeElements(t, ["0/4"]), { scope: "base" });
+		expect(base(c).template_data[0]?.elements).toHaveLength(6);
+		expect(base(c).width).toBe(1000);
+		expect(base(c).variants?.[0]?.size).toEqual({ width: 600, height: 1000 });
+	});
+
+	test("no laid-out box is kept for an op on the base", () => {
+		const t = sized();
+		expect(geometryForBase(t, "dark", geometryOf(t)).size).toBe(0);
 	});
 });

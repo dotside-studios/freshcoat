@@ -7,7 +7,7 @@ import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
 import { type GuideAxis, sideGuides } from "~/doc/guides";
 import { useEditor } from "~/state/hooks";
-import { present } from "~/state/store";
+import { present, working } from "~/state/store";
 import { RULER_SIZE } from "./ruler-geometry";
 
 const HIT = 7;
@@ -23,7 +23,7 @@ export const Guides = memo(function Guides() {
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
 	const size = useEditor((s) => {
-		const t = present(s);
+		const t = working(s);
 		return t ? `${t.width}x${t.height}` : "";
 	});
 	const guides = useEditor((s) => {

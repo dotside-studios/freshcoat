@@ -710,7 +710,8 @@ export function resizeTemplate(t: Template, w: number, h: number): OpResult {
 		d.width = w;
 		d.height = h;
 		for (const f of d.template_data) follow(f.background);
-		for (const ov of overridesOf(d)) follow(ov.background);
+		for (const v of d.variants ?? [])
+			if (!v.size) for (const ov of v.overrides) follow(ov.background);
 	});
 	return ok(next, []);
 }
@@ -1101,6 +1102,39 @@ export function setVariantSwatch(
 	if (clean === v.swatch) return ok(t, []);
 	const { swatch: _old, ...rest } = v;
 	return ok(withVariant(t, id, clean ? { ...rest, swatch: clean } : rest), []);
+}
+
+/** Gives a variant its own size, or with none, the template's again. Its
+ *  replaced backgrounds follow. */
+export function setVariantSize(
+	t: Template,
+	id: string,
+	size: { width: number; height: number } | undefined,
+): OpResult {
+	const v = findVariant(t, id);
+	if (!v) return unknownVariant();
+	const valid = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_SIDE;
+	if (size && (!valid(size.width) || !valid(size.height)))
+		return refuse(
+			"invalid_size",
+			`Width and height must be whole numbers from 1 to ${MAX_SIDE}`,
+		);
+	const own =
+		size && (size.width !== t.width || size.height !== t.height)
+			? { width: size.width, height: size.height }
+			: undefined;
+	if (sameJson(own, v.size)) return ok(t, []);
+	const to = own ?? { width: t.width, height: t.height };
+	const { size: _old, ...rest } = v;
+	const overrides = v.overrides.map((ov) =>
+		ov.background?.size && !sameJson(ov.background.size, to)
+			? { ...ov, background: { ...ov.background, size: to } }
+			: ov,
+	);
+	return ok(
+		withVariant(t, id, { ...rest, ...(own ? { size: own } : {}), overrides }),
+		[],
+	);
 }
 
 export function moveVariant(

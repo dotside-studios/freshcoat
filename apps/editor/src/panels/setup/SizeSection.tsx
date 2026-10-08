@@ -1,12 +1,19 @@
-import { resolveInsets, type Template } from "@freshcoat-js/coatfile";
+import {
+	resolveInsets,
+	type Template,
+	variantSize,
+} from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { INSETS } from "~/app/copy";
-import { resizeTemplate, setTemplateInsets } from "~/doc/ops";
+import { resizeTemplate, setTemplateInsets, setVariantSize } from "~/doc/ops";
 import { resizeWithConstraints } from "~/doc/resize";
+import { activeVariantId } from "~/doc/variant-edit";
+import { useEditor } from "~/state/hooks";
+import { present } from "~/state/store";
 import LinkIcon from "~icons/mingcute/link-line";
 import UnlinkIcon from "~icons/mingcute/unlink-line";
 
@@ -102,9 +109,21 @@ export function TemplateInsetField({
 	);
 }
 
+/** The active variant when it has its own size, else undefined. */
+export function useSizedVariant(): string | undefined {
+	return useEditor((s) => {
+		const t = present(s);
+		const id = t ? activeVariantId(t, s.variantId) : undefined;
+		return id !== undefined && t?.variants?.some((v) => v.id === id && v.size)
+			? id
+			: undefined;
+	});
+}
+
 /**
- * The template's W and H fields. Every side shares the size, so this is the
- * same edit wherever it is shown: one undo step per run of changes.
+ * The template's W and H fields, or the active variant's when it has its own
+ * size. Every side shares the size, so this is the same edit wherever it is
+ * shown: one undo step per run of changes.
  */
 export function TemplateSizeFields({
 	template,
@@ -118,10 +137,17 @@ export function TemplateSizeFields({
 	ratio?: number;
 }) {
 	const controller = useController();
+	const sized = useSizedVariant();
+	const base = useEditor(present);
+	const shown = sized && base ? variantSize(base, sized) : template;
 	const resize = (w: number, h: number) =>
 		controller.edit(
 			(t) =>
-				constrained ? resizeWithConstraints(t, w, h) : resizeTemplate(t, w, h),
+				sized
+					? setVariantSize(t, sized, { width: w, height: h })
+					: constrained
+						? resizeWithConstraints(t, w, h)
+						: resizeTemplate(t, w, h),
 			{ mergeKey: "resize", scope: "base" },
 		);
 
@@ -129,26 +155,26 @@ export function TemplateSizeFields({
 		<>
 			<NumberField
 				label="W"
-				aria-label="Template width"
+				aria-label={sized ? "Variant width" : "Template width"}
 				className="min-w-0 flex-1"
-				value={template.width}
+				value={shown.width}
 				min={1}
 				max={MAX_SIDE}
 				precision={0}
 				onChange={(w) =>
-					resize(w, ratio ? clampSide(Math.round(w / ratio)) : template.height)
+					resize(w, ratio ? clampSide(Math.round(w / ratio)) : shown.height)
 				}
 			/>
 			<NumberField
 				label="H"
-				aria-label="Template height"
+				aria-label={sized ? "Variant height" : "Template height"}
 				className="min-w-0 flex-1"
-				value={template.height}
+				value={shown.height}
 				min={1}
 				max={MAX_SIDE}
 				precision={0}
 				onChange={(h) =>
-					resize(ratio ? clampSide(Math.round(h * ratio)) : template.width, h)
+					resize(ratio ? clampSide(Math.round(h * ratio)) : shown.width, h)
 				}
 			/>
 		</>
