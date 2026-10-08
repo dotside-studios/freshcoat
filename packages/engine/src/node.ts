@@ -11,6 +11,7 @@ import type {
 	ImageCrop,
 	ResolvedFill,
 	TextArc,
+	TextPath,
 	ResolvedFont,
 	Shadows,
 	ShapeMask,
@@ -143,6 +144,15 @@ export type BitmapNode = Transform & {
 	pixelHeight: number;
 	role?: BitmapRole;
 };
+export type TextPathNode = {
+	d?: string;
+	ref?: string;
+	// Target px, or a percentage of the path's length as "50%".
+	startOffset?: number | string;
+	side?: TextPath["side"];
+	align?: TextPath["align"];
+};
+
 export type TextNode = Transform & {
 	kind: "text";
 	text?: string; // single-style …
@@ -174,6 +184,9 @@ export type TextNode = Transform & {
 	// a radius that keeps the glyphs inside the box, startAngle 0, outside,
 	// center.
 	arc?: Partial<TextArc>;
+	// Sets the text along a path: inline `d` relative to the node's pos, or
+	// `ref`, the id of a sibling path node. Wins over `arc`.
+	path?: TextPathNode;
 	// A pre-baked layout, used as is. Without one, compileScene bakes text/spans
 	// through its TextEngine.
 	layout?: BakedTextLayout;

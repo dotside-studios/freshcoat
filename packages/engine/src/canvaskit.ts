@@ -39,12 +39,16 @@ import type {
 } from "canvaskit-wasm";
 import {
 	type ArcLine,
+	type ArcPlacement,
+	isHidden,
 	placeOnArc,
+	placeOnPath,
 	rsxformBounds,
 	spanAt,
 	spanByteStarts,
 } from "./arc-text";
 import { parseColor } from "./color";
+import { withPathMeasure } from "./path-measure";
 import {
 	imageInfo,
 	makeImageFromPixels,
@@ -586,6 +590,7 @@ function drawText(
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
+	issues: PaintIssues,
 ) {
 	// A gradient fill spans the whole text box, applied to every glyph (via a
 	// foreground paint) and its decoration, overriding per-span colors.
@@ -612,8 +617,17 @@ function drawText(
 		bgPaint.setColor(ck.TRANSPARENT);
 	}
 	const fallback = (provider as { __families?: string[] }).__families ?? [];
-	if (cmd.arc) {
-		drawArcText(ck, canvas, provider, bin, cmd, cmd.arc, fallback, fgPaint);
+	if (cmd.arc || cmd.path) {
+		const overflow = drawCurvedText(
+			ck,
+			canvas,
+			provider,
+			bin,
+			cmd,
+			fallback,
+			fgPaint,
+		);
+		if (overflow && cmd.path) issues.textPathOverflow.add(cmd.id ?? "");
 		return;
 	}
 	// Gradient paints depend on position, so those lines are not cached.
@@ -707,6 +721,46 @@ function arcCenter(cmd: DrawTextCommand): [number, number] {
 	];
 }
 
+// Each line's glyphs placed along the command's arc or path. `overflow` is
+// set when a path could not hold every glyph.
+function curvedText(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	fallback: string[],
+): {
+	lines: { line: TextLine; arc: ArcLine }[];
+	placed: ArcPlacement;
+	overflow: boolean;
+} {
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const shaped = lines.map((l) => l.arc);
+	let placed: ArcPlacement;
+	if (cmd.path) {
+		const spec = cmd.path;
+		const path = spec.d ? bin.path(ck, spec.d) : null;
+		placed = path
+			? withPathMeasure(ck, path, (m) =>
+					placeOnPath(shaped, spec, m, cmd.pos.x, cmd.pos.y),
+				)
+			: placeOnPath(shaped, spec, {
+					length: 0,
+					closed: false,
+					at: () => ({ x: 0, y: 0, cos: 1, sin: 0 }),
+				});
+	} else {
+		const [cx, cy] = arcCenter(cmd);
+		placed = placeOnArc(shaped, cmd.arc as TextArc, cx, cy);
+	}
+	let overflow = false;
+	for (const runs of placed)
+		for (const xforms of runs)
+			for (let i = 0; 4 * i < xforms.length && !overflow; i++)
+				overflow = isHidden(xforms, i);
+	return { lines, placed, overflow };
+}
+
 function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	const font = bin.track(new ck.Font(run.typeface, run.size));
 	font.setSubpixel(true);
@@ -718,25 +772,23 @@ function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	return font;
 }
 
-// Text along a circle: the line's own shaped glyphs, each drawn under an
-// RSXform, colored by the span its cluster belongs to.
-function drawArcText(
+// Text along a circle or path: the line's own shaped glyphs, each drawn under
+// an RSXform, colored by the span its cluster belongs to.
+function drawCurvedText(
 	ck: CanvasKit,
 	canvas: Canvas,
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
-	arc: TextArc,
 	fallback: string[],
 	fgPaint: Paint | null,
-) {
-	const lines = arcLines(ck, provider, bin, cmd, fallback);
-	const [cx, cy] = arcCenter(cmd);
-	const placed = placeOnArc(
-		lines.map((l) => l.arc),
-		arc,
-		cx,
-		cy,
+): boolean {
+	const { lines, placed, overflow } = curvedText(
+		ck,
+		provider,
+		bin,
+		cmd,
+		fallback,
 	);
 	const paints = new Map<string, Paint>();
 	const paintFor = (color: string) => {
@@ -758,9 +810,17 @@ function drawArcText(
 			const font = runFont(ck, bin, run);
 			let from = 0;
 			while (from < n) {
+				if (isHidden(xforms, from)) {
+					from++;
+					continue;
+				}
 				const span = spanAt(starts, run.offsets[from] as number);
 				let to = from + 1;
-				while (to < n && spanAt(starts, run.offsets[to] as number) === span)
+				while (
+					to < n &&
+					!isHidden(xforms, to) &&
+					spanAt(starts, run.offsets[to] as number) === span
+				)
 					to++;
 				const blob = ck.TextBlob.MakeFromRSXformGlyphs(
 					run.glyphs.subarray(from, to),
@@ -776,27 +836,20 @@ function drawArcText(
 			}
 		});
 	});
+	return overflow;
 }
 
-// The local rects arc text's glyphs can cover: each glyph's font box under its
-// RSXform.
-function arcTextBounds(
+// The local rects curved text's glyphs can cover: each placed glyph's font box
+// under its RSXform.
+function curvedTextBounds(
 	ck: CanvasKit,
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	cmd: DrawTextCommand,
-	arc: TextArc,
 	fallback: string[],
 	em: Bounds,
 ): Bounds[] {
-	const lines = arcLines(ck, provider, bin, cmd, fallback);
-	const [cx, cy] = arcCenter(cmd);
-	const placed = placeOnArc(
-		lines.map((l) => l.arc),
-		arc,
-		cx,
-		cy,
-	);
+	const { lines, placed } = curvedText(ck, provider, bin, cmd, fallback);
 	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
 		shaped.runs.forEach((run, ri) => {
@@ -1224,6 +1277,7 @@ function makeSvgPicture(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			textPathOverflow: new Set(),
 		};
 		for (const cmd of commands)
 			if (cmd.op.startsWith("draw"))
@@ -1358,6 +1412,8 @@ type PaintIssues = {
 		string,
 		{ component: "lut" | "lut3d" | "sharpen" | "gamut"; layer?: string }
 	>;
+	// Ids of path text layers whose glyphs ran past the path ("" when unnamed).
+	textPathOverflow: Set<string>;
 };
 
 function reportAdjustUnsupported(
@@ -1434,7 +1490,7 @@ function drawShape(
 		if (cmd.stroke)
 			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
-		drawText(ck, canvas, provider, bin, cmd);
+		drawText(ck, canvas, provider, bin, cmd, issues);
 	} else if (cmd.op === "drawImage") {
 		drawImage(ck, canvas, bin, images, cmd, issues);
 	} else if (cmd.op === "drawBitmap") {
@@ -2089,10 +2145,8 @@ function textBounds(
 		if (box === null) return null;
 		if (box) em = em ? unionBounds(em, box) : box;
 	}
-	if (cmd.arc)
-		return em
-			? arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em)
-			: [];
+	if (cmd.arc || cmd.path)
+		return em ? curvedTextBounds(ck, provider, bin, cmd, fallback, em) : [];
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2474,6 +2528,7 @@ function recordedBounds(
 			unhandled: [],
 			missingImages: [],
 			adjustUnsupported: new Map(),
+			textPathOverflow: new Set(),
 		};
 		paintDrawable(ck, rc, provider, images, bin, inner, scratch, frame);
 		picture = recorder.finishRecordingAsPicture();
@@ -3318,7 +3373,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
 	if (cmd.op === "drawText")
-		return !cmd.arc && (!cmd.fill || cmd.fill.kind === "solid");
+		return !cmd.arc && !cmd.path && (!cmd.fill || cmd.fill.kind === "solid");
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
@@ -4056,6 +4111,7 @@ export async function paintScene(
 				unhandled: [],
 				missingImages: [],
 				adjustUnsupported: new Map(),
+				textPathOverflow: new Set(),
 			};
 			paintDrawable(
 				ck,
@@ -4071,6 +4127,11 @@ export async function paintScene(
 				warnings.push({ kind: "unhandled_op", op });
 			for (const warning of issues.adjustUnsupported.values())
 				warnings.push({ kind: "adjust_unsupported", ...warning });
+			for (const layer of issues.textPathOverflow)
+				warnings.push({
+					kind: "text_path_overflow",
+					...(layer ? { layer } : {}),
+				});
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {

@@ -362,12 +362,27 @@ export type TextArc = {
 	sweep?: number;
 };
 
+// Text set along a path, as SVG's <textPath>. Each hard line is one baseline
+// offset below the path.
+export type TextPath = {
+	// Path data relative to the command's pos.
+	d: string;
+	// Where `align` anchors the text, along the path in target px, or as a
+	// percentage of the path's length when `percent` is set.
+	startOffset: number;
+	percent?: boolean;
+	// left keeps the path's direction; right reverses it.
+	side: "left" | "right";
+	align: "start" | "center" | "end";
+};
+
 export type DrawTextCommand = DrawCommandBase & {
 	op: "drawText";
 	layout: BakedTextLayout;
 	color: string;
 	fill?: ResolvedFill;
 	arc?: TextArc;
+	path?: TextPath;
 };
 
 export type DrawImageCommand = DrawCommandBase & {
@@ -485,6 +500,9 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// Text on a path ran past the path's end; the glyphs that did not fit are
+	// hidden.
+	| { kind: "text_path_overflow"; layer?: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.

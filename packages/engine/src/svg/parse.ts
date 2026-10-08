@@ -107,9 +107,19 @@ export type SvgFont = {
 
 export type SvgTextRun = { text: string; font: SvgFont; color: string };
 
+/** The path a line of text follows, from `<textPath>`. `d` is in drawing
+ *  space; a percent `startOffset` is a share of the path's length. */
+export type SvgTextPath = {
+	d: string;
+	startOffset: number;
+	percent?: boolean;
+	side: "left" | "right";
+};
+
 export type SvgText = {
 	kind: "text";
 	id?: string;
+	path?: SvgTextPath;
 	/** The start of the baseline in drawing space, which `anchor` aligns the
 	 *  line to and `rotation` turns it about. */
 	x: number;
@@ -691,7 +701,13 @@ export function parseSvg(markup: string): SvgDrawing {
 		if (!similar || Math.abs(sx - sy) > 1e-9 * Math.max(1, sx))
 			warn("text-transform", "skewed, mirrored or stretched text is drawn upright");
 		const k = Math.sqrt(sx * sy);
-		type Line = { x: number; y: number; anchor: SvgText["anchor"]; runs: SvgTextRun[] };
+		type Line = {
+			x: number;
+			y: number;
+			anchor: SvgText["anchor"];
+			runs: SvgTextRun[];
+			path?: SvgTextPath;
+		};
 		const lines: Line[] = [];
 		let line: Line | null = null;
 		const first = (node: XmlElement, attr: string, axis: Axis) => {
@@ -703,6 +719,38 @@ export function parseSvg(markup: string): SvgDrawing {
 		const anchorOf = (s: Declarations): SvgText["anchor"] => {
 			const a = s["text-anchor"];
 			return a === "middle" || a === "end" ? a : "start";
+		};
+		const textPathOf = (node: XmlElement): SvgTextPath | null => {
+			let segs: Segment[] = [];
+			if (node.attrs.path !== undefined) segs = normalizePath(node.attrs.path);
+			else {
+				const href = (node.attrs.href ?? node.attrs["xlink:href"])?.trim();
+				const target = href?.startsWith("#") ? byId.get(href.slice(1)) : undefined;
+				const name = target ? localName(target.name) : "";
+				if (!target || !TEXT_PATH_SHAPES.has(name)) {
+					warn("textPath", `<textPath> "${href ?? ""}" is not a shape in the document; its text is skipped`);
+					return null;
+				}
+				segs = shapeSegments(target, name, ctx.viewport);
+				if (target.attrs.transform)
+					segs = transformPath(segs, parseTransform(target.attrs.transform));
+			}
+			if (segs.length === 0) {
+				warn("textPath", "a <textPath> with an empty path is skipped");
+				return null;
+			}
+			const raw = (node.attrs.startOffset ?? "").trim();
+			const percent = raw.endsWith("%");
+			const value = percent
+				? Number.parseFloat(raw)
+				: (parseLength(raw || undefined, "d", ctx.viewport) ?? 0);
+			const out: SvgTextPath = {
+				d: serializePath(transformPath(segs, m)),
+				startOffset: Number.isFinite(value) ? (percent ? value : value * k) : 0,
+				side: node.attrs.side?.trim() === "right" ? "right" : "left",
+			};
+			if (percent) out.percent = true;
+			return out;
 		};
 		const visit = (node: XmlElement, own: Declarations, depth: number) => {
 			if (depth > MAX_DEPTH) return;
@@ -750,7 +798,16 @@ export function parseSvg(markup: string): SvgDrawing {
 				}
 				const name = localName(c.name);
 				if (name === "textPath") {
-					warn("textPath", "<textPath> is not supported");
+					const childStyle = computeStyle(c, own);
+					if (childStyle.display === "none") continue;
+					const path = textPathOf(c);
+					if (!path) continue;
+					const before: Line = line;
+					line = { x: before.x, y: before.y, anchor: anchorOf(childStyle), runs: [], path };
+					lines.push(line);
+					visit(c, childStyle, depth + 1);
+					line = { x: before.x, y: before.y, anchor: before.anchor, runs: [] };
+					lines.push(line);
 					continue;
 				}
 				if (name !== "tspan" && name !== "a") continue;
@@ -785,7 +842,8 @@ export function parseSvg(markup: string): SvgDrawing {
 			const [x, y] = applyMatrix(m, l.x, l.y);
 			const text: SvgText = { kind: "text", x, y, anchor: l.anchor, runs };
 			if (el.attrs.id) text.id = el.attrs.id;
-			if (similar && rotation) text.rotation = rotation;
+			if (l.path) text.path = l.path;
+			else if (similar && rotation) text.rotation = rotation;
 			out.push(text);
 		}
 		return out;
@@ -1378,6 +1436,15 @@ export function parseSvg(markup: string): SvgDrawing {
 }
 
 const MARKABLE = new Set(["path", "line", "polyline", "polygon"]);
+const TEXT_PATH_SHAPES = new Set([
+	"path",
+	"rect",
+	"circle",
+	"ellipse",
+	"line",
+	"polyline",
+	"polygon",
+]);
 
 type MarkerVertex = { x: number; y: number; angle: number };
 

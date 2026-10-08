@@ -97,6 +97,7 @@ export type {
 	PathNode,
 	RectNode,
 	TextNode,
+	TextPathNode,
 	TrackSize,
 	Transform,
 } from "./node";
