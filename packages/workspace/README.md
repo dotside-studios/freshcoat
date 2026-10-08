@@ -66,6 +66,13 @@ and writes the outputs in plan order to a zip, or into one PDF, with a report
 of what succeeded or failed. Rendering goes through
 [`@freshcoat-js/coatfile`](../coatfile) and [`@freshcoat-js/engine`](../engine).
 
+A binding's `variant` picks the variant each record renders in: a fixed one,
+the one a column names, every one, or `{ kind: "image", field }`, the one
+whose size is closest in aspect to the record's photo, so a template with
+landscape, portrait and square variants follows each photo's orientation.
+Each item renders at its variant's size; sheets need every card in a plan to
+share one size.
+
 ```ts
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
 import {

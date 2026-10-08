@@ -1,6 +1,11 @@
-import type { Template, Variant } from "@freshcoat-js/coatfile";
+import {
+	type Template,
+	type Variant,
+	variantSize,
+} from "@freshcoat-js/coatfile";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
+import { orientedSize } from "./image-info";
 import type {
 	Binding,
 	Column,
@@ -102,6 +107,25 @@ export function variantFor(
 	if (source.kind === "fixed") {
 		return variants.some((v) => v.id === source.id) ? source.id : undefined;
 	}
+	if (source.kind === "image") {
+		const values = resolveValues(
+			template,
+			binding,
+			dataset,
+			record,
+			0,
+			columns,
+		);
+		const ref = values[source.field] ?? "";
+		const asset = dataset?.assets.find((a) => assetRef(a.sha256) === ref);
+		if (!asset?.width || !asset.height) return undefined;
+		const seen = orientedSize({
+			width: asset.width,
+			height: asset.height,
+			orientation: asset.orientation,
+		});
+		return closestVariant(template, seen.width / seen.height);
+	}
 	const column = columnOf(dataset, source.column, columns);
 	const cell = record?.values[source.column] ?? null;
 	if (column === undefined || isEmptyValue(cell)) return undefined;
@@ -110,6 +134,28 @@ export function variantFor(
 		variants.find((v) => v.id.toLowerCase() === wanted) ??
 		variants.find((v) => v.label.trim().toLowerCase() === wanted)
 	)?.id;
+}
+
+/** The variant, or undefined for Default, whose size is closest to
+ *  `aspect`. Default wins a tie, then the first in list order. */
+export function closestVariant(
+	template: Template,
+	aspect: number,
+): string | undefined {
+	const distance = (id?: string) => {
+		const size = variantSize(template, id);
+		return Math.abs(Math.log(size.width / size.height / aspect));
+	};
+	let best: string | undefined;
+	let bestDistance = distance(undefined);
+	for (const v of template.variants ?? []) {
+		const d = distance(v.id);
+		if (d < bestDistance - 1e-9) {
+			best = v.id;
+			bestDistance = d;
+		}
+	}
+	return best;
 }
 
 /**

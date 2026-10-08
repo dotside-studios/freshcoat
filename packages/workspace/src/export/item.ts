@@ -4,6 +4,7 @@ import {
 	hasInsets,
 	type Sides,
 	type Template,
+	variantSize,
 } from "@freshcoat-js/coatfile";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import {
@@ -77,22 +78,23 @@ export type ItemSize = {
 };
 
 /**
- * What one item renders at. A template size is the design at the preset's
- * scale, with the bleed around it when the preset includes it. A size from an
- * image is the photo's oriented pixels, capped by `maxEdge`: the design is
- * laid out by its constraints at the photo's aspect and rendered at the
- * density that makes it exactly that many pixels.
+ * What one item renders at. A template size is the item's variant's size at
+ * the preset's scale, with the bleed around it when the preset includes it. A
+ * size from an image is the photo's oriented pixels, capped by `maxEdge`: the
+ * variant is laid out by its constraints at the photo's aspect and rendered at
+ * the density that makes it exactly that many pixels.
  */
 export function itemSize(
-	template: Pick<Template, "width" | "height" | "bleed">,
+	template: Pick<Template, "width" | "height" | "bleed" | "variants">,
 	preset: ExportPreset,
-	item: ExportItem,
+	item: Pick<ExportItem, "values" | "variantId">,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): ItemSize | { error: string } {
 	const size = exportSize(preset);
+	const design = variantSize(template, item.variantId);
 	if (size.kind === "template") {
 		const bleed = presetBleed(template, preset);
-		const { width, height } = withBleed(template, bleed);
+		const { width, height } = withBleed(design, bleed);
 		return {
 			width: Math.round(width * preset.scale),
 			height: Math.round(height * preset.scale),
@@ -115,7 +117,7 @@ export function itemSize(
 			: 1;
 	const width = Math.max(1, Math.round(seen.width * cap));
 	const height = Math.max(1, Math.round(seen.height * cap));
-	const resize = fitDesignSize(template, width, height);
+	const resize = fitDesignSize(design, width, height);
 	return { width, height, scale: width / resize.width, resize };
 }
 
@@ -192,10 +194,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					? req.variantId
 					: undefined;
 			own = new Map(req.images);
-			const design = req.resize ?? {
-				width: template.width,
-				height: template.height,
-			};
+			const design = req.resize ?? variantSize(template, variantId);
 			const compiled = compile(template, req.values, {
 				width: design.width,
 				height: design.height,

@@ -24,6 +24,7 @@ export {
 } from "./assets";
 export {
 	autoBinding,
+	closestVariant,
 	imagesFor,
 	isEmptyVariant,
 	resolveValues,
