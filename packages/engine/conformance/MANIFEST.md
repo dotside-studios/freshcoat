@@ -150,7 +150,7 @@ in full.
 | Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
 | Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
 | Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color` |
-| Backdrop blur | `backdrop-blur`, `backdrop-blur-under-fill`, `backdrop-blur-in-isolated-group` |
+| Backdrop blur | `backdrop-blur`, `backdrop-blur-under-fill`, `backdrop-blur-in-isolated-group`, `backdrop-blur-in-mask`, `backdrop-blur-mask-node`, `backdrop-blur-text` |
 | **Painter semantics (D6)** | `rotation-rotates-the-shadow`, `clip-shapes-the-shadow`, `blur-sigma` |
 | Frame finish | `finish-white-clamp`, `finish-black-extract`, `finish-dither` |
 | Export | `export-scale`, `supersample` |

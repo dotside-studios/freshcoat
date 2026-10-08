@@ -163,7 +163,11 @@ export type ViewBox = { x?: number; y?: number; width: number; height: number };
 export type ImageCrop = { x: number; y: number; width: number; height: number };
 
 export type Stroke = {
+	// The solid colour, and the fallback when `gradient` is set.
 	color: string;
+	// Painted along the stroke in place of `color`, placed in the drawable's box
+	// as a fill is.
+	gradient?: GradientFill;
 	width: number;
 	// Empty array or undefined = solid line.
 	dash?: number[];
@@ -181,6 +185,11 @@ export type Stroke = {
 	trimEnd?: number;
 	trimOffset?: number;
 };
+
+export type GradientFill = Extract<
+	ResolvedFill,
+	{ kind: "linear" | "radial" | "angular" }
+>;
 
 // Gradient endpoints are in [0, 1] of the drawable's bbox.
 export type ResolvedFill =
@@ -492,6 +501,8 @@ export type PaintWarning =
 			layer?: string;
 	  }
 	| { kind: "unhandled_op"; op: string }
+	// A pattern fill's shader failed to compile, so it painted its first colour.
+	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.

@@ -153,6 +153,7 @@ export type {
 	FrameFlexLayout,
 	FrameGridLayout,
 	FrameProperties,
+	Gradient,
 	GradientStop,
 	GridTrack,
 	ImageCrop,

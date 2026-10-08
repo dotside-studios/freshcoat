@@ -1,0 +1,145 @@
+{
+	"id": "backdrop-blur-in-mask",
+	"title": "a backdrop inside a soft mask blurs what lies beneath the mask",
+	"profile": "core",
+	"requires": [
+		"effect.backdropBlur",
+		"mask.alpha"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 80,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#000000"
+					}
+				]
+			},
+			{
+				"kind": "mask",
+				"mask": {
+					"kind": "rect",
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#00000080"
+						}
+					]
+				},
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 40,
+							"y": 20
+						},
+						"size": {
+							"width": 80,
+							"height": 80
+						},
+						"backdropBlur": 20
+					}
+				],
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				191,
+				191,
+				191,
+				255
+			],
+			"why": "half the blurred edge over the white",
+			"tolerance": 22
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				78,
+				10
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "above the shape the edge stays sharp"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				82,
+				10
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "above the shape the edge stays sharp"
+		}
+	]
+}
