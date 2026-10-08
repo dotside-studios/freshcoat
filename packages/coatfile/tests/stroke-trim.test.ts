@@ -1,7 +1,6 @@
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { minimumFormatVersion } from "../src/format";
 import { parseTrimValue, resolveStrokeTrim } from "../src/stroke-trim";
 import type {
 	Command,
@@ -19,7 +18,7 @@ const ELLIPSE = "M0 40A40 40 0 1 0 80 40A40 40 0 1 0 0 40Z";
 
 function card(element: Element): Template {
 	return {
-		format_version: "1.7",
+		format_version: "1.6",
 		version: "1.0.0",
 		id: "t",
 		name: "T",
@@ -94,12 +93,6 @@ describe("stroke trim schema", () => {
 		expect(validate(card(ring({ trimEnd: "{{progress}}" }))).ok).toBe(true);
 		expect(validate(card(ring({ trimEnd: 1.5 }))).ok).toBe(false);
 		expect(validate(card(ring({ trimStart: -0.1 }))).ok).toBe(false);
-	});
-
-	test("needs format 1.7", () => {
-		const t = card(ring({ trimEnd: 0.5 }));
-		expect(minimumFormatVersion(t)).toBe("1.7");
-		expect(minimumFormatVersion(card(ring({})))).toBe("1.0");
 	});
 });
 

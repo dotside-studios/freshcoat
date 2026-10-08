@@ -20,10 +20,9 @@ import type { Template } from "./types";
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc`; element `backdropBlur`
-//   1.7  stroke `trimStart`, `trimEnd` and `trimOffset`
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 7;
+export const FORMAT_MINOR = 6;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -90,7 +89,6 @@ export function minimumFormatVersion(template: Template): string {
 		}
 		if (o.blendMode === "linear-burn") need(5);
 		if (o.backdropBlur !== undefined) need(6);
-		if (usesTrim(o.stroke)) need(7);
 		for (const value of Object.values(o)) visit(value);
 	};
 	visit(template.template_data);
@@ -132,16 +130,6 @@ function usesIsolate(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).isolate !== undefined
-	);
-}
-
-function usesTrim(stroke: unknown): boolean {
-	if (stroke === null || typeof stroke !== "object") return false;
-	const s = stroke as Record<string, unknown>;
-	return (
-		s.trimStart !== undefined ||
-		s.trimEnd !== undefined ||
-		s.trimOffset !== undefined
 	);
 }
 

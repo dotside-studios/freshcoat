@@ -318,7 +318,6 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc`; element `backdropBlur` |
-| 1.7 | stroke `trimStart`, `trimEnd` and `trimOffset` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -686,7 +685,7 @@ A `rect` or `frame` takes `cornerRadius` as one number or per corner,
 fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
 an `outside` stroke beyond its clip, so the clip never hides it.
 
-`trimStart` and `trimEnd` (1.7) draw only part of a stroke, as fractions of
+`trimStart` and `trimEnd` draw only part of a stroke, as fractions of
 the outline's length from its start; `trimOffset` rotates that part along the
 outline and wraps past its end. A start after the end swaps them. Each takes a
 number or a string, so a field can drive it: `"trimEnd": "{{progress}}"`. A
