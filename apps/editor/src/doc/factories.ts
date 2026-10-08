@@ -1,5 +1,6 @@
 import {
 	type Element,
+	isEllipsePath,
 	isLinearSymbology,
 	isSquareSymbology,
 	type Symbology,
@@ -180,19 +181,11 @@ export function ellipsePath(w: number, h: number): string {
 	return `M0 ${cy}A${rx} ${ry} 0 1 0 ${fmt(w)} ${cy}A${rx} ${ry} 0 1 0 0 ${cy}Z`;
 }
 
-const ELLIPSE =
-	/^M\s*(\S+)[\s,]+(\S+)\s*A\s*(\S+)[\s,]+(\S+)[\s,]+0[\s,]+1[\s,]+0[\s,]+(\S+)[\s,]+(\S+)\s*A\s*(\S+)[\s,]+(\S+)[\s,]+0[\s,]+1[\s,]+0[\s,]+(\S+)[\s,]+(\S+)\s*Z$/i;
-
 /** Whether `el` is a vector whose path is `ellipsePath` of its own size. The
  *  format carries no editor metadata, so this is a structural match. */
 export function isEllipseVector(el: Element): boolean {
 	if (el.type !== "vector" || !el.size) return false;
-	const m = ELLIPSE.exec(el.properties.d.trim());
-	if (!m) return false;
-	const n = m.slice(1).map(Number);
-	const { width: w, height: h } = el.size;
-	const want = [0, h / 2, w / 2, h / 2, w, h / 2, w / 2, h / 2, 0, h / 2];
-	return want.every((v, i) => Math.abs(n[i] - v) < 0.01);
+	return isEllipsePath(el.properties.d, el.size.width, el.size.height);
 }
 
 export function round2(n: number): number {

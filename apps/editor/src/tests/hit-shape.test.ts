@@ -289,4 +289,73 @@ describe("hitLayer with shapes", () => {
 		} as Element;
 		expect(shapes.hits("0/1", square, box, { x: 5, y: 5 })).toBe(true);
 	});
+
+	it("hits a trimmed stroke only where it paints", () => {
+		const ring: Element = {
+			id: "ring",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: {
+				d: "M0 50A50 50 0 1 0 100 50A50 50 0 1 0 0 50Z",
+				stroke: { color: "#000000", width: 10, trimEnd: 0.25 },
+			},
+		};
+		const hit = hitter(scene(under, ring));
+		expect(hit(85, 15)).toBe("0/1");
+		expect(hit(15, 85)).toBe("0/0");
+		expect(hit(85, 85)).toBe("0/0");
+		expect(hit(15, 15)).toBe("0/0");
+		const rect = hitter(
+			scene(under, {
+				id: "rect",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 100 },
+				properties: {
+					stroke: {
+						color: "#000000",
+						width: 10,
+						align: "inside",
+						trimEnd: 0.25,
+						trimOffset: 0.5,
+					},
+				},
+			}),
+		);
+		expect(rect(50, 97)).toBe("0/1");
+		expect(rect(50, 3)).toBe("0/0");
+	});
+
+	it("reads a field-bound trim from the preview values", () => {
+		const t = scene(under, {
+			id: "ring",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: {
+				d: "M0 50A50 50 0 1 0 100 50A50 50 0 1 0 0 50Z",
+				stroke: { color: "#000000", width: 10, trimEnd: "{{progress}}" },
+			},
+		});
+		shapes = new ShapeHits(ck);
+		const geometry = geometryOf(t);
+		const none = new Set<string>();
+		const hit = (progress: string) =>
+			hitLayer(
+				t,
+				0,
+				geometry,
+				none,
+				none,
+				{ x: 15, y: 85 },
+				{
+					shapes,
+					values: { progress },
+				},
+			);
+		expect(hit("0.25")).toBe("0/0");
+		expect(hit("75%")).toBe("0/1");
+		expect(hit("")).toBe("0/1");
+	});
 });

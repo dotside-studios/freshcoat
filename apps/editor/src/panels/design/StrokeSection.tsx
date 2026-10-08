@@ -20,6 +20,12 @@ export type Stroke = NonNullable<RectProperties["stroke"]>;
 
 export const DEFAULT_STROKE: Stroke = { color: "#000000", width: 1 };
 
+const TRIMS = [
+	{ key: "trimStart", label: "Trim start", fallback: 0 },
+	{ key: "trimEnd", label: "Trim end", fallback: 1 },
+	{ key: "trimOffset", label: "Trim offset", fallback: 0 },
+] as const;
+
 const strokeOf = (el: Inspect["layers"][number]) =>
 	propsOf(el).stroke as Stroke | undefined;
 
@@ -109,6 +115,30 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 						value={commonValue(strokes.map((s) => s?.dash ?? []))}
 						onCommit={(dash) => set("stroke-dash", { dash })}
 					/>
+					<Row label="Trim">
+						{TRIMS.map(({ key, label, fallback }) => {
+							const v = commonValue(strokes.map((s) => s?.[key] ?? fallback));
+							return (
+								<NumberField
+									key={key}
+									aria-label={label}
+									className="min-w-0 flex-1"
+									unit="%"
+									precision={0}
+									min={key === "trimOffset" ? undefined : 0}
+									max={key === "trimOffset" ? undefined : 100}
+									value={typeof v === "number" ? Math.round(v * 100) : null}
+									placeholder={typeof v === "string" ? v : "Mixed"}
+									onChange={(pct) => {
+										const f = pct / 100;
+										set(`stroke-${key}`, {
+											[key]: f === fallback ? undefined : f,
+										});
+									}}
+								/>
+							);
+						})}
+					</Row>
 					<Pair>
 						<Select
 							aria-label="Stroke cap"
