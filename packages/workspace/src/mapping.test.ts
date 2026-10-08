@@ -79,6 +79,17 @@ describe("inferType", () => {
 		expect(inferType(["", " "])).toBe("text");
 	});
 
+	it("infers image file names and hex colors", () => {
+		expect(inferType(["ada.png", "Grace Hopper.JPG", "photos/cy.webp"])).toBe(
+			"image",
+		);
+		expect(inferType(["ada.png", "notes.txt"])).toBe("text");
+		expect(inferType(["https://a.co/ada.png"])).toBe("url");
+		expect(inferType(["#fff", "#00FF7f", "#11223344"])).toBe("color");
+		expect(inferType(["#fff", "red"])).toBe("text");
+		expect(inferType(["#12345"])).toBe("text");
+	});
+
 	it("reads only the first 200 values", () => {
 		expect(inferType([...Array(200).fill("1"), "x"])).toBe("integer");
 	});

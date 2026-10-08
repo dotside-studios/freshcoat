@@ -1,6 +1,7 @@
 import {
 	coerce,
 	EMAIL_PATTERN,
+	HEX_COLOR,
 	isEmptyValue,
 	isUrl,
 	parseDateText,
@@ -26,6 +27,8 @@ const INTEGER_TEXT = /^[-+]?(0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)$/;
 const NUMBER_TEXT =
 	/^[-+]?((0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)(\.\d+)?|\.\d+)(e[-+]?\d+)?$/i;
 const BOOLEAN_WORDS = new Set(["true", "false", "yes", "no", "✓"]);
+const IMAGE_FILE =
+	/^[^:?#\r\n]+\.(jpe?g|jfif|png|webp|gif|avif|heic|heif|tiff?|bmp|svg)$/i;
 
 /** `A`, `B`, … `Z`, `AA`: what a column is called when the file has no
  *  header row. */
@@ -98,6 +101,8 @@ export function inferType(values: readonly string[]): ColumnType {
 	}
 	if (all((v) => /^https?:\/\//i.test(v) && isUrl(v))) return "url";
 	if (all((v) => EMAIL_PATTERN.test(v))) return "email";
+	if (all((v) => IMAGE_FILE.test(v))) return "image";
+	if (all((v) => HEX_COLOR.test(v))) return "color";
 	const long = values.some((v) => v.length > LONG_TEXT || /[\r\n]/.test(v));
 	return long ? "longText" : "text";
 }
