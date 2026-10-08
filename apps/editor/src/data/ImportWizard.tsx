@@ -36,6 +36,7 @@ import { formatNumber } from "~/app/format";
 import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
+import { recallMapping, rememberMapping } from "./import-memory";
 import { emptyDataset, replaceDataset, TYPE_LABELS, uniqueName } from "./model";
 import { importTable, tableImporter } from "./table-import";
 import { dataRowCount, type OpenedTable } from "./table-store";
@@ -121,14 +122,20 @@ export function ImportWizard({
 	const samples = useMemo(() => dataRowsOf(rows, headerRow), [rows, headerRow]);
 	const recordCount = sheet ? dataRowCount(sheet, headerRow) : 0;
 	const columns = base?.columns;
+	const baseId = base?.id;
+	const recalled = useMemo(
+		() => (baseId && columns ? recallMapping(baseId, headers, columns) : []),
+		[baseId, headers, columns],
+	);
 
 	// A new file, sheet or header row starts the mapping over.
 	useEffect(() => {
 		if (!columns) return;
-		setMapping(guessMapping(headers, columns, samples.slice(0, 200)));
+		const guess = guessMapping(headers, columns, samples.slice(0, 200));
+		setMapping(guess.map((m, i) => recalled[i] ?? m));
 		setMatch(null);
 		setReviewing(false);
-	}, [headers, samples, columns]);
+	}, [headers, samples, columns, recalled]);
 
 	const open = useRef<number | null>(null);
 	const closed = useRef(false);
@@ -228,12 +235,14 @@ export function ImportWizard({
 		(p) => !p.startsWith("Also"),
 	);
 	const nothingMapped = mapping.every((m) => m.kind === "skip");
-	const exact =
+	const known =
 		headerRow >= 0 &&
 		headers.length > 0 &&
 		new Set(headers).size === headers.length &&
-		headers.every((h) => columns?.some((c) => c.key === h));
-	const skipMapping = exact && !reviewing && !blocking && !nothingMapped;
+		headers.every(
+			(h, i) => recalled[i] !== undefined || columns?.some((c) => c.key === h),
+		);
+	const skipMapping = known && !reviewing && !blocking && !nothingMapped;
 
 	// Totals over the held rows; Import maps the whole file in the worker.
 	const result = useMemo(
@@ -255,6 +264,7 @@ export function ImportWizard({
 			const result = await importTable(file.table.id, sheetIndex, base, plan);
 			if (closed.current) return;
 			commit(result);
+			rememberMapping(result.dataset.id, headers, plan.mapping);
 			close();
 		} catch (err) {
 			setError(

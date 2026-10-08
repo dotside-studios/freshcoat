@@ -50,6 +50,7 @@ beforeEach(() => {
 	const inner = inPageImporter();
 	apply = vi.fn<TableImporter["apply"]>(inner.apply);
 	setTableImporter({ ...inner, apply });
+	localStorage.clear();
 	vi.mocked(ws.applyMapping).mockClear();
 	Element.prototype.scrollIntoView ??= () => {};
 	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
@@ -152,5 +153,50 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		);
 		const after = controller.state.workspace?.datasets[0]?.records;
 		expect(after?.[0]).toBe(before?.[0]);
+	});
+
+	it("reuses the last mapping for the next import into the dataset", async () => {
+		const user = fastUser();
+		const file = () =>
+			new File(["Full name,joined\nZed,3/4/2025"], "more.csv", {
+				type: "text/csv",
+			});
+		const run = async () => {
+			const onImported = vi.fn();
+			render(
+				<ControllerProvider controller={controller}>
+					<ImportWizard
+						target={{ datasetId: "d_people", file: file() }}
+						onClose={() => {}}
+						onImported={onImported}
+					/>
+				</ControllerProvider>,
+			);
+			await waitFor(() =>
+				expect(screen.getByTestId("import-wizard").textContent).toContain(
+					"more.csv · 1 record",
+				),
+			);
+			await user.click(button("Next"));
+			return onImported;
+		};
+
+		await run();
+		await chooseOption(user, button(/Target for Full name/), /^name$/);
+		await user.click(button("Next"));
+		await user.click(button("Import"));
+		cleanup();
+
+		const onImported = await run();
+		expect(screen.queryByTestId("import-mapping")).toBeNull();
+		await user.click(button("Import"));
+		await waitFor(() => expect(onImported).toHaveBeenCalled());
+		const records = controller.state.workspace?.datasets[0]?.records ?? [];
+		expect(records.map((r) => r.values.name)).toEqual([
+			"Ada",
+			"Grace",
+			"Zed",
+			"Zed",
+		]);
 	});
 });
