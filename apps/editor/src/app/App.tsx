@@ -1,11 +1,11 @@
 import { RouterProvider } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EditorController } from "./controller";
 import { createAppRouter } from "./router";
 
 export function App() {
-	const [router] = useState(() =>
-		createAppRouter({ controller: new EditorController() }),
-	);
+	const [controller] = useState(() => new EditorController());
+	const [router] = useState(() => createAppRouter({ controller }));
+	useEffect(() => () => controller.dispose(), [controller]);
 	return <RouterProvider router={router} />;
 }

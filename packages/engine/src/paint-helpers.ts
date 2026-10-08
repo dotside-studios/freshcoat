@@ -123,7 +123,9 @@ function clamp01(v: number): number {
 }
 
 // Stroke-edge offset for alignment: +w/2 pulls it inside, -w/2 outside, 0 center.
-export function strokeInset(stroke: Stroke): number {
+export function strokeInset<S extends Pick<Stroke, "width" | "align">>(
+	stroke: S,
+): number {
 	if (stroke.align === "inside") return stroke.width / 2;
 	if (stroke.align === "outside") return -stroke.width / 2;
 	return 0;
@@ -144,17 +146,55 @@ export function insetCorner(
 	];
 }
 
-// Underline/strike geometry from the alphabetic baseline + font size. Kept in
-// lockstep between both painters so they draw the same line.
+// A font's own decoration metrics in pixels at `size`, as Skia reports them:
+// positions are the stroke centre relative to the baseline (y down), which is
+// how Skia's Paragraph places its own decorations.
+export type DecorationMetrics = {
+	underlinePosition?: number;
+	underlineThickness?: number;
+	strikeoutPosition?: number;
+	strikeoutThickness?: number;
+};
+
+// Underline/strike geometry from the alphabetic baseline + font size. Uses the
+// font's metrics when given, and fixed ratios for any that are missing or zero.
 export function decorationLine(
 	size: number,
 	decoration: string,
 	baseline: number,
+	metrics?: DecorationMetrics,
 ): { top: number; thickness: number } {
-	const thickness = Math.max(1, size * 0.06);
+	const strike = decoration === "line-through";
+	const usable = (v: number | undefined): v is number =>
+		v !== undefined && Number.isFinite(v) && v !== 0;
+	const t = strike ? metrics?.strikeoutThickness : metrics?.underlineThickness;
+	const p = strike ? metrics?.strikeoutPosition : metrics?.underlinePosition;
+	const thickness = Math.max(1, usable(t) && t > 0 ? t : size * 0.06);
 	const center =
-		decoration === "line-through"
-			? baseline - size * 0.28
-			: baseline + size * 0.1;
+		baseline + (usable(p) ? p : strike ? -size * 0.28 : size * 0.1);
 	return { top: center - thickness / 2, thickness };
+}
+
+// The parts of [x0, x1] outside every gap, each gap widened by `pad` per side.
+// Gaps are flat [start, end, start, end, ...] pairs as getGlyphIntercepts gives.
+export function skipInkSegments(
+	x0: number,
+	x1: number,
+	gaps: ArrayLike<number>,
+	pad: number,
+): [number, number][] {
+	const sorted: [number, number][] = [];
+	for (let i = 0; i + 1 < gaps.length; i += 2)
+		sorted.push([(gaps[i] as number) - pad, (gaps[i + 1] as number) + pad]);
+	sorted.sort((a, b) => a[0] - b[0]);
+	const out: [number, number][] = [];
+	let x = x0;
+	for (const [a, b] of sorted) {
+		if (b <= x) continue;
+		if (a >= x1) break;
+		if (a > x) out.push([x, a]);
+		x = Math.max(x, b);
+	}
+	if (x < x1) out.push([x, x1]);
+	return out;
 }

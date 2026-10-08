@@ -24,6 +24,7 @@ import type {
 	Fill,
 	FontWeight,
 	FrameElement,
+	Gradient,
 	ImageElement,
 	MaskElement,
 	TextElement,
@@ -187,9 +188,9 @@ export function svgToElements(
 		if (s.fillRule === "evenodd") props.fillRule = "evenodd";
 		if (s.fill) props.fill = fill(s.fill, b);
 		if (s.stroke) {
-			const { color: c, width, dash, cap, join } = s.stroke;
+			const { color: c, paint, width, dash, cap, join } = s.stroke;
 			props.stroke = {
-				color: color(c),
+				color: paint ? (fill(paint, b) as Gradient) : color(c),
 				width: round(width * k),
 				...(dash ? { dash: dash.map((d) => round(d * k)) } : {}),
 				...(cap ? { cap } : {}),

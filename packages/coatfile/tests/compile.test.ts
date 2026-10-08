@@ -928,6 +928,20 @@ describe("compile (image masks → draw command clip)", () => {
 		});
 	});
 
+	test("polygon mask cornerRadius scales with ratio", () => {
+		const cmds = getCommands(
+			withImage({ mask: { kind: "polygon", sides: 3, cornerRadius: 4 } }),
+			{},
+			{ width: 200, height: 120 },
+		);
+		expect(findDraw(cmds, "drawImage")!.clip).toEqual({
+			kind: "polygon",
+			sides: 3,
+			rotation: undefined,
+			cornerRadius: 8,
+		});
+	});
+
 	test("polygon mask without rotation defaults to undefined", () => {
 		const cmds = getCommands(
 			withImage({ mask: { kind: "polygon", sides: 5 } }),
@@ -1216,6 +1230,22 @@ describe("compile (vector path)", () => {
 			{ width: 200, height: 120 },
 		);
 		expect(findDraw(cmds, "drawPath")!.d).toBe("M0 0 A10 10 90 1 0 20 0");
+	});
+
+	test("cornerRadius rounds the path, scaled with ratio", () => {
+		const d = "M0 0H6V8Z";
+		const at = (cornerRadius: number, width: number) =>
+			findDraw(
+				getCommands(
+					withVector({ d, cornerRadius }),
+					{},
+					{ width, height: (width * 60) / 100 },
+				),
+				"drawPath",
+			)!.d;
+		expect(at(0, 100)).toBe(d);
+		expect(at(5, 100)).toBe("M 3 0 Q 6 0 6 4 Q 6 8 3 4 Q 0 0 3 0 Z");
+		expect(at(5, 200)).toBe("M 6 0 Q 12 0 12 8 Q 12 16 6 8 Q 0 0 6 0 Z");
 	});
 
 	test("fillRule lowers onto drawPath", () => {

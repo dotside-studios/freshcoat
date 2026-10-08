@@ -1,4 +1,4 @@
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds, setLayerBounds } from "../src/canvaskit";
@@ -8,7 +8,9 @@ import {
 	createEllipse,
 	createFrame,
 	createGroup,
+	createMask,
 	createRect,
+	createText,
 	type Node,
 } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
@@ -69,11 +71,12 @@ function stripes(over: Node[], left = "#000000"): Node {
 	});
 }
 
-async function paint(node: Node) {
+async function paint(node: Node, fonts?: Map<string, Uint8Array[]>) {
 	const r = (await renderSceneToPng(node, {
 		width: W,
 		height: H,
 		ck,
+		fonts,
 	})) as EncodedPaintResult;
 	expect(r.warnings).toEqual([]);
 	return decode(r.bytes);
@@ -165,6 +168,132 @@ describe("backdrop blur", () => {
 		);
 		expect(px(W / 2, H / 2)).toEqual([255, 255, 255, 255]);
 		expect(px(W / 2 - 1, H / 2)).toEqual([0, 0, 0, 255]);
+	});
+
+	test("inside a soft mask it blurs what lies beneath the mask", async () => {
+		const px = await paint(
+			stripes([
+				createMask(
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: { width: W, height: H },
+						fills: [{ kind: "solid", color: "#00000080" }],
+					}),
+					[glass()],
+				),
+			]),
+		);
+		expect(px(W / 2, H / 2)[0]).toBeLessThan(250);
+		expect(px(W / 2 - 1, H / 2)[0]).toBeGreaterThan(10);
+		expect(px(W / 2, 10)).toEqual([255, 255, 255, 255]);
+		expect(px(W / 2 - 1, 10)).toEqual([0, 0, 0, 255]);
+	});
+
+	test("inside a mask it is cut to the mask", async () => {
+		const px = await paint(
+			stripes([
+				createMask(
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: { width: W, height: H / 2 },
+						fills: [{ kind: "solid", color: "#000000" }],
+						opacity: 0.999,
+					}),
+					[glass()],
+				),
+			]),
+		);
+		expect(px(W / 2, H / 2 - 4)[0]).toBeLessThan(250);
+		expect(px(W / 2, H / 2 + 4)).toEqual([255, 255, 255, 255]);
+	});
+
+	test("on a mask node it follows the mask's outline", async () => {
+		const px = await paint(
+			stripes([
+				createMask(
+					createEllipse({
+						pos: { x: 0, y: 0 },
+						size: { width: 40, height: 40 },
+						fills: [{ kind: "solid", color: "#000000" }],
+					}),
+					[],
+					{
+						pos: { x: 20, y: 20 },
+						size: { width: 40, height: 40 },
+						backdropBlur: 40,
+					},
+				),
+			]),
+		);
+		expect(px(58, 21)).toEqual([255, 255, 255, 255]);
+		expect(px(W / 2, H / 2)[0]).toBeLessThan(250);
+	});
+
+	test("on an inverted mask node it follows what the mask leaves out", async () => {
+		const px = await paint(
+			stripes([
+				createMask(
+					createEllipse({
+						pos: { x: 20, y: 20 },
+						size: { width: 40, height: 40 },
+						fills: [{ kind: "solid", color: "#000000" }],
+					}),
+					[],
+					{
+						pos: { x: 0, y: 0 },
+						size: { width: W, height: H },
+						backdropBlur: 40,
+						invert: true,
+					},
+				),
+			]),
+		);
+		expect(px(W / 2, H / 2)).toEqual([255, 255, 255, 255]);
+		expect(px(W / 2, 4)[0]).toBeLessThan(250);
+	});
+
+	test("a mask node with a backdrop lowers to drawMasked", () => {
+		const commands = compileScene(
+			createMask(
+				createEllipse({
+					pos: { x: 0, y: 0 },
+					size: { width: 10, height: 10 },
+					fills: [{ kind: "solid", color: "#000000" }],
+				}),
+				[],
+				{ backdropBlur: 2 },
+			),
+			{ width: 10, height: 10 },
+		);
+		expect(commands.some((c) => c.op === "drawMasked")).toBe(true);
+	});
+
+	test("on text it follows the glyphs", async () => {
+		const fonts = new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
+		const text = (backdropBlur?: number) =>
+			stripes([
+				createText({
+					pos: { x: 0, y: 0 },
+					size: { width: W, height: H },
+					font: {
+						family: "Geist",
+						weight: 400,
+						style: "normal",
+						size: 72,
+						lineHeight: 1,
+					},
+					color: "#00000000",
+					align: "center",
+					verticalAlign: "middle",
+					text: "I",
+					backdropBlur,
+				}),
+			]);
+		const plain = await paint(text(), fonts);
+		const px = await paint(text(40), fonts);
+		expect(px(W / 2, H / 2)[0]).toBeLessThan(250);
+		expect(px(W / 2 + 10, H / 2)).toEqual(plain(W / 2 + 10, H / 2));
+		expect(px(W / 2 - 10, H / 2)).toEqual(plain(W / 2 - 10, H / 2));
 	});
 
 	test("zero is no backdrop", async () => {

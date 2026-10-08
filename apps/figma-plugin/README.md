@@ -137,9 +137,11 @@ layers were kept, flattened or skipped.
   a stack).
 - **Strokes.** Visible solid stroke paints are composited into one colour,
   keeping their opacity (a 50% stroke stays translucent); hidden ones are
-  ignored. A dashed stroke keeps its pattern as `dash`. A rectangle, vector or
-  frame with a visible gradient or image stroke is rasterized
-  (`stroke_flattened`). A stroke with a different weight per side is dropped
+  ignored. A single linear, radial or angular gradient stroke is kept as a
+  gradient `color`, placed in the layer's box as a gradient fill is. A dashed
+  stroke keeps its pattern as `dash`. A rectangle, vector or frame with a
+  visible image stroke, or a stack mixing a gradient with other paints, is
+  rasterized (`stroke_flattened`). A stroke with a different weight per side is dropped
   (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
   zero is left out.
 - **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. The
@@ -187,8 +189,9 @@ layers were kept, flattened or skipped.
   `circle` or `ellipse` mask and a polygon a `polygon` mask, its box grown so
   the vertices land where Figma draws them; the photo fills that box. Partial
   arcs, donuts and polygons with rounded corners are rasterized and cannot
-  hold a field. A gradient or image stroke on a bound image is left out
-  (`image_stroke_unsupported`) so the field survives.
+  hold a field. An image stroke, or a stack of strokes that are not all solid,
+  on a bound image is left out (`image_stroke_unsupported`) so the field
+  survives.
 - **Colorways.** Each instance of the card component named `<Card> / <Label>`
   becomes a variant, after a first **Default** that is the card itself. What
   the instance changes is diffed against the card, layer by layer: its

@@ -22,7 +22,7 @@ import type {
 	TextNode,
 	TextPathNode,
 } from "./node";
-import { rectShape } from "./outline";
+import { ellipseFromTop, rectShape } from "./outline";
 import { strokeInset } from "./paint-helpers";
 import { resolveLayout } from "./resolve-layout";
 import {
@@ -35,6 +35,7 @@ import {
 } from "./svg/matrix";
 import { normalizePath, serializePath, transformPath } from "./svg/path";
 import type { TextEngine } from "./text-engine";
+import { strokeTrim } from "./trim";
 import type { MeasureText } from "./text-types";
 import type {
 	BakedTextLayout,
@@ -439,7 +440,8 @@ function arcBakeNode(node: TextNode): TextNode {
 }
 
 // Without a radius, the rings sit just inside the box: outside text puts the
-// first line's top on the edge, inside text the last line's bottom.
+// first line's top on the edge, inside text the last line's bottom. The
+// innermost ring keeps at least a line height of radius.
 function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 	const arc = node.arc ?? {};
 	const direction = arc.direction ?? "outside";
@@ -455,7 +457,11 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 			direction === "outside"
 				? base - (first?.y ?? 0)
 				: (last ? last.y + lineBox : 0) - base;
-		radius = Math.max(0, half - reach);
+		const inner =
+			direction === "outside" && last && first
+				? (last.baseline ?? last.y) - base
+				: 0;
+		radius = Math.max(half - reach, lineBox + inner);
 	}
 	return {
 		radius,
@@ -463,6 +469,7 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 		direction,
 		align: arc.align ?? "center",
 		...(arc.sweep !== undefined ? { sweep: arc.sweep } : {}),
+		...(arc.fit ? { fit: arc.fit } : {}),
 	};
 }
 
@@ -471,8 +478,8 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 // any other mask → a drawMasked command the painter composites via an offscreen
 // coverage layer.
 //
-// `invert` and `channel` disqualify the fast path whatever the shape is. A
-// clipPath keeps what the geometry covers, which is the alpha channel,
+// `invert`, `channel` and a backdrop blur, which follows the mask's coverage,
+// disqualify the fast path whatever the shape is. A clipPath keeps what the geometry covers, which is the alpha channel,
 // uninverted: there is no inverse clip, and an OPAQUE shape's luminance coverage
 // is its colour rather than its geometry (a black rect masks everything out
 // under `luminance` and nothing out under a clip).
@@ -483,7 +490,9 @@ function lowerMask(
 ): DrawCommand {
 	const children = node.children.map((c) => lower(c, ctx, node.children));
 	const shape =
-		node.invert || node.channel === "luminance" ? null : fastClip(node.mask);
+		node.invert || node.channel === "luminance" || node.backdropBlur
+			? null
+			: fastClip(node.mask);
 	if (shape) {
 		// The outer group keeps the mask node's box, so its rotation pivots where
 		// the general path's does; the clip sits inside at the mask shape's box.
@@ -588,17 +597,19 @@ function ellipseSvg(size: Size): string {
 }
 
 // An inside/outside stroke on an ellipse follows the ellipse inset or outset
-// by half the stroke width.
+// by half the stroke width. A trimmed one starts at the top.
 function ellipseStroke(
 	node: EllipseNode,
 	size: Size,
 ): { strokeD?: string } {
 	const inset = node.stroke ? strokeInset(node.stroke) : 0;
-	if (inset === 0) return {};
+	const trimmed = node.stroke ? strokeTrim(node.stroke) !== null : false;
+	if (inset === 0 && !trimmed) return {};
 	const cx = size.width / 2;
 	const cy = size.height / 2;
 	const rx = Math.max(0, cx - inset);
 	const ry = Math.max(0, cy - inset);
+	if (trimmed) return { strokeD: ellipseFromTop(cx, cy, rx, ry) };
 	return {
 		strokeD: `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`,
 	};

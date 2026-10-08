@@ -56,7 +56,9 @@ export type SvgPaint =
 	  };
 
 export type SvgStroke = {
+	// A gradient's first stop when `paint` is set.
 	color: string;
+	paint?: Exclude<SvgPaint, { kind: "solid" }>;
 	width: number;
 	dash?: number[];
 	cap?: "butt" | "round" | "square";
@@ -630,16 +632,13 @@ export function parseSvg(markup: string): SvgDrawing {
 			viewport,
 		);
 		if (!paint) return undefined;
-		let color: string;
-		if (paint.kind === "solid") color = paint.color;
-		else {
-			warn("gradient-stroke", "gradient strokes use their first stop color");
-			color = (paint.stops[0] as SvgStop).color;
-		}
 		const k = lengthScale(m);
 		const width = (parseLength(style["stroke-width"] ?? "1", "d", viewport) ?? 1) * k;
 		if (!(width > 0)) return undefined;
-		const stroke: SvgStroke = { color, width };
+		const stroke: SvgStroke =
+			paint.kind === "solid"
+				? { color: paint.color, width }
+				: { color: (paint.stops[0] as SvgStop).color, paint, width };
 		const cap = style["stroke-linecap"];
 		if (cap === "round" || cap === "square" || cap === "butt") stroke.cap = cap;
 		const join = style["stroke-linejoin"];

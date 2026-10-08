@@ -354,7 +354,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						);
 				});
 			if (cmd.arc) {
-				const { radius, startAngle, sweep } = cmd.arc;
+				const { radius, startAngle, sweep, fit } = cmd.arc;
 				if (!finite(radius) || radius < 0)
 					add(
 						"bad_arc",
@@ -374,6 +374,13 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 						"bad_arc",
 						"arc sweep must be a finite number > 0",
 						`${path}.arc.sweep`,
+						id,
+					);
+				if (fit !== undefined && fit !== "shrink")
+					add(
+						"bad_arc",
+						`arc fit must be "shrink" when set, got ${String(fit)}`,
+						`${path}.arc.fit`,
 						id,
 					);
 			}
@@ -603,7 +610,31 @@ function validateStroke(
 			`${path}.dash`,
 			id,
 		);
+	for (const key of ["trimStart", "trimEnd", "trimOffset"] as const) {
+		const v = stroke[key];
+		if (v === undefined) continue;
+		const inRange = key === "trimOffset" || (v >= 0 && v <= 1);
+		if (!finite(v) || !inRange)
+			add(
+				"bad_trim",
+				`${key} must be finite${key === "trimOffset" ? "" : " and in [0, 1]"}, got ${v}`,
+				`${path}.${key}`,
+				id,
+			);
+	}
+	const gradient = stroke.gradient;
+	if (gradient === undefined) return;
+	if (!STROKE_GRADIENTS.includes(gradient.kind))
+		add(
+			"bad_stroke_gradient",
+			`stroke gradient must be linear, radial or angular, got "${gradient.kind}"`,
+			`${path}.gradient.kind`,
+			id,
+		);
+	else validateFill(gradient, `${path}.gradient`, add, id);
 }
+
+const STROKE_GRADIENTS: readonly string[] = ["linear", "radial", "angular"];
 
 function validateCornerRadius(
 	radius: CornerRadius,

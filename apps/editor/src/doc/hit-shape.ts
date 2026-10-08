@@ -1,5 +1,18 @@
-import type { Element } from "@freshcoat-js/coatfile";
-import { outlinePath, rectShape, strokeInset } from "@freshcoat-js/engine";
+import {
+	type Element,
+	isEllipsePath,
+	resolveStrokeTrim,
+} from "@freshcoat-js/coatfile";
+import {
+	outlinePath,
+	rectShape,
+	roundCorners,
+	type ShapeMask,
+	type StrokeTrim,
+	strokeInset,
+	strokeTrim,
+	trimPath,
+} from "@freshcoat-js/engine";
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import type { LayerBox, Point } from "./geometry";
 
@@ -10,14 +23,20 @@ type Entry = {
 	el: Element;
 	width: number;
 	height: number;
-	tolerance: number;
+	trim: string;
 	outline: Path | null;
 	paintsFill: boolean;
-	stroke: Path | null;
+	/** The path the stroke outlines: `outline`, or an offset copy of it. */
+	strokeBase: Path | null;
+	strokeWidth: number;
 	clip: "inside" | "outside" | null;
+	tolerance: number;
+	stroke: Path | null;
 };
 
-const MAX_ENTRIES = 512;
+export const MAX_ENTRIES = 512;
+
+const TOLERANCE_STEPS = 4;
 
 const CAP = { butt: "Butt", round: "Round", square: "Square" } as const;
 const JOIN = { miter: "Miter", round: "Round", bevel: "Bevel" } as const;
@@ -56,11 +75,21 @@ export function localPoint(box: LayerBox, point: Point): Point {
 	};
 }
 
+/** `tolerance` rounded up to a quarter octave. */
+export function toleranceBucket(tolerance: number): number {
+	if (!(tolerance > 0)) return 0;
+	return (
+		2 ** (Math.ceil(Math.log2(tolerance) * TOLERANCE_STEPS) / TOLERANCE_STEPS)
+	);
+}
+
 /**
  * Tests rects and vectors against the pixels they paint: the fill by its
- * outline and fill rule, the stroke by its stroked outline grown by
- * `tolerance` on each side. Paths are cached per layer key until the element,
- * its box or the tolerance changes.
+ * outline and fill rule, the stroke by its trimmed, stroked outline grown by
+ * `tolerance` on each side. A trim bound to a field reads it from `values`.
+ * Outlines are cached per layer key until the element, its box or its trim
+ * changes, stroked outlines until the tolerance bucket does too. The least
+ * recently used key is evicted past `MAX_ENTRIES`.
  */
 export class ShapeHits {
 	private entries = new Map<string, Entry>();
@@ -73,9 +102,10 @@ export class ShapeHits {
 		box: LayerBox,
 		point: Point,
 		tolerance = 0,
+		values: Record<string, unknown> = {},
 	): boolean {
 		if (!isShapeElement(el)) return true;
-		const entry = this.entry(key, el, box, tolerance);
+		const entry = this.entry(key, el, box, tolerance, values);
 		if (!entry.outline) return true;
 		const p = localPoint(box, point);
 		if (entry.stroke?.contains(p.x, p.y)) {
@@ -96,24 +126,43 @@ export class ShapeHits {
 		el: ShapeElement,
 		box: LayerBox,
 		tolerance: number,
+		values: Record<string, unknown>,
 	): Entry {
 		const { width, height } = box.rect;
-		const cached = this.entries.get(key);
-		if (
-			cached &&
-			cached.el === el &&
-			cached.width === width &&
-			cached.height === height &&
-			cached.tolerance === tolerance
-		)
-			return cached;
-		if (cached) {
-			release(cached);
+		const stroke = el.properties.stroke;
+		const trim = stroke ? strokeTrim(resolveStrokeTrim(stroke, values)) : null;
+		let entry = this.entries.get(key);
+		if (entry) {
 			this.entries.delete(key);
+			if (
+				entry.el !== el ||
+				entry.width !== width ||
+				entry.height !== height ||
+				entry.trim !== trimKey(trim)
+			) {
+				release(entry);
+				entry = undefined;
+			}
 		}
-		if (this.entries.size >= MAX_ENTRIES) this.clear();
-		const entry = this.build(el, width, height, tolerance);
+		if (!entry) {
+			for (const [oldest, old] of this.entries) {
+				if (this.entries.size < MAX_ENTRIES) break;
+				release(old);
+				this.entries.delete(oldest);
+			}
+			entry = this.build(el, width, height, trim);
+		}
 		this.entries.set(key, entry);
+		const bucket = toleranceBucket(tolerance);
+		if (entry.strokeBase && entry.tolerance !== bucket) {
+			entry.stroke?.delete();
+			entry.stroke = this.stroke(
+				entry.strokeBase,
+				el.properties.stroke as Stroke,
+				entry.strokeWidth + 2 * bucket,
+			);
+			entry.tolerance = bucket;
+		}
 		return entry;
 	}
 
@@ -121,9 +170,8 @@ export class ShapeHits {
 		el: ShapeElement,
 		width: number,
 		height: number,
-		tolerance: number,
+		trim: StrokeTrim | null,
 	): Entry {
-		const ck = this.ck;
 		const outline = this.outline(el, width, height);
 		const stroke = el.properties.stroke;
 		const stroked = stroke && stroke.width > 0;
@@ -133,41 +181,52 @@ export class ShapeHits {
 			el,
 			width,
 			height,
-			tolerance,
+			trim: trimKey(trim),
 			outline,
 			paintsFill: hasFill || !stroked,
-			stroke: null,
+			strokeBase: null,
+			strokeWidth: 0,
 			clip: null,
+			tolerance: Number.NaN,
+			stroke: null,
 		};
 		if (!outline || !stroke || !stroked) return entry;
 		const inset = strokeInset(stroke);
-		if (inset === 0) {
-			entry.stroke = this.stroke(outline, stroke, stroke.width + 2 * tolerance);
+		entry.strokeWidth = stroke.width;
+		const shape = this.shape(el, trim);
+		let base: Path = outline;
+		if (shape && (inset !== 0 || trim)) {
+			const offset = outlinePath(this.ck, shape, width, height, inset, !!trim);
+			if (offset) base = offset;
+		}
+		if (base === outline && inset !== 0) {
+			entry.strokeWidth = stroke.width * 2;
+			entry.clip = stroke.align === "inside" ? "inside" : "outside";
+		}
+		if (!trim) {
+			entry.strokeBase = base;
 			return entry;
 		}
-		if (el.type === "rect") {
-			const shape = rectShape(
+		entry.strokeBase = trimPath(this.ck, base, trim);
+		if (base !== outline) base.delete();
+		return entry;
+	}
+
+	/** The shape the engine strokes in place of the element's own path: a
+	 *  rect's, or a trimmed ellipse vector's, which runs from its top. */
+	private shape(el: ShapeElement, trim: StrokeTrim | null): ShapeMask | null {
+		if (el.type === "rect")
+			return rectShape(
 				el.properties.cornerRadius,
 				el.properties.cornerSmoothing,
 			);
-			const offset = outlinePath(ck, shape, width, height, inset);
-			if (offset) {
-				entry.stroke = this.stroke(
-					offset,
-					stroke,
-					stroke.width + 2 * tolerance,
-				);
-				offset.delete();
-				return entry;
-			}
-		}
-		entry.stroke = this.stroke(
-			outline,
-			stroke,
-			stroke.width * 2 + 2 * tolerance,
-		);
-		entry.clip = stroke.align === "inside" ? "inside" : "outside";
-		return entry;
+		if (
+			trim &&
+			el.size &&
+			isEllipsePath(el.properties.d, el.size.width, el.size.height)
+		)
+			return { kind: "ellipse" };
+		return null;
 	}
 
 	private outline(el: ShapeElement, width: number, height: number) {
@@ -179,7 +238,9 @@ export class ShapeHits {
 				width,
 				height,
 			);
-		const path = ck.Path.MakeFromSVGString(el.properties.d);
+		const path = ck.Path.MakeFromSVGString(
+			roundCorners(el.properties.d, el.properties.cornerRadius ?? 0),
+		);
 		if (path && el.properties.fillRule === "evenodd")
 			path.setFillType(ck.FillType.EvenOdd);
 		return path;
@@ -195,7 +256,12 @@ export class ShapeHits {
 	}
 }
 
+function trimKey(trim: StrokeTrim | null): string {
+	return trim ? `${trim.start},${trim.end}` : "";
+}
+
 function release(entry: Entry): void {
+	if (entry.strokeBase !== entry.outline) entry.strokeBase?.delete();
 	entry.outline?.delete();
 	entry.stroke?.delete();
 }
