@@ -132,6 +132,7 @@ import type {
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
+	GradientSpread,
 	PaintWarning,
 	PatternKind,
 	ResolvedFill,
@@ -319,7 +320,7 @@ function shaderFor(
 				[x + fill.to.x * w, y + fill.to.y * h],
 				fill.stops.map((s) => toColor(ck, s.color)),
 				fill.stops.map((s) => s.offset),
-				ck.TileMode.Clamp,
+				tileMode(ck, fill.spread),
 			),
 		);
 	}
@@ -353,35 +354,70 @@ function shaderFor(
 	const rotation = fill.rotation ?? 0;
 	const colors = fill.stops.map((s) => toColor(ck, s.color));
 	const offsets = fill.stops.map((s) => s.offset);
+	const mode = tileMode(ck, fill.spread);
 	// Skia only draws circles, so an elliptical gradient is that circle under a
 	// local matrix: squash the secondary axis to ry/rx, then turn the whole thing
 	// to where the primary axis points. Both operate about the center so the
 	// gradient stays put. A circular gradient skips the matrix entirely.
-	if (rx <= 0 || (ry === rx && rotation % 180 === 0)) {
+	const circular = rx <= 0 || (ry === rx && rotation % 180 === 0);
+	const localMatrix = circular
+		? undefined
+		: ck.Matrix.multiply(
+				ck.Matrix.rotated((rotation * Math.PI) / 180, cx, cy),
+				ck.Matrix.scaled(1, ry / rx, cx, cy),
+			);
+	const focus = focalPoint(fill, cx, cy, w, h, rx, ry, rotation);
+	const fr = (fill.focusRadius ?? 0) * longest;
+	if (focus && rx > 0 && ry > 0)
 		return bin.track(
-			ck.Shader.MakeRadialGradient(
+			ck.Shader.MakeTwoPointConicalGradient(
+				focus,
+				fr,
 				[cx, cy],
 				rx,
 				colors,
 				offsets,
-				ck.TileMode.Clamp,
+				mode,
+				localMatrix,
 			),
 		);
-	}
-	const localMatrix = ck.Matrix.multiply(
-		ck.Matrix.rotated((rotation * Math.PI) / 180, cx, cy),
-		ck.Matrix.scaled(1, ry / rx, cx, cy),
-	);
 	return bin.track(
 		ck.Shader.MakeRadialGradient(
 			[cx, cy],
 			rx,
 			colors,
 			offsets,
-			ck.TileMode.Clamp,
+			mode,
 			localMatrix,
 		),
 	);
+}
+
+function tileMode(ck: CanvasKit, spread: GradientSpread | undefined) {
+	if (spread === "reflect") return ck.TileMode.Mirror;
+	if (spread === "repeat") return ck.TileMode.Repeat;
+	return ck.TileMode.Clamp;
+}
+
+// The focus in the circle's own space, before the ellipse's local matrix, or
+// null when the gradient starts from a point at its centre.
+function focalPoint(
+	fill: Extract<ResolvedFill, { kind: "radial" }>,
+	cx: number,
+	cy: number,
+	w: number,
+	h: number,
+	rx: number,
+	ry: number,
+	rotation: number,
+): [number, number] | null {
+	const dx = fill.focus ? (fill.focus.x - fill.center.x) * w : 0;
+	const dy = fill.focus ? (fill.focus.y - fill.center.y) * h : 0;
+	if (dx === 0 && dy === 0 && !((fill.focusRadius ?? 0) > 0)) return null;
+	const t = (-rotation * Math.PI) / 180;
+	const ux = dx * Math.cos(t) - dy * Math.sin(t);
+	const uy = dx * Math.sin(t) + dy * Math.cos(t);
+	return [cx + ux, cy + (uy * rx) / ry];
 }
 
 // The env's whole fonts map, then whatever the scene loaded from elsewhere.

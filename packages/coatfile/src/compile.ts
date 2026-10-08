@@ -1428,6 +1428,7 @@ function resolveFill(
 			stops: fill.stops,
 			from: { x: from[0], y: from[1] },
 			to: { x: to[0], y: to[1] },
+			...(fill.spread ? { spread: fill.spread } : {}),
 		};
 	}
 	if (fill.kind === "angular") {
@@ -1448,6 +1449,9 @@ function resolveFill(
 		radius,
 		radiusY: fill.radiusY ?? radius,
 		rotation: fill.rotation ?? 0,
+		...(fill.focus ? { focus: { x: fill.focus[0], y: fill.focus[1] } } : {}),
+		...(fill.focusRadius ? { focusRadius: fill.focusRadius } : {}),
+		...(fill.spread ? { spread: fill.spread } : {}),
 	};
 }
 

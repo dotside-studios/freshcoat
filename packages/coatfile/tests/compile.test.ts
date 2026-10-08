@@ -477,6 +477,21 @@ describe("compile (CompiledTemplate)", () => {
 		}
 	});
 
+	test("radial gradient carries its focus and spread to the painter", () => {
+		const f = radialFill({
+			focus: [0.3, 0.4],
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(f).toMatchObject({
+			kind: "radial",
+			focus: { x: 0.3, y: 0.4 },
+			focusRadius: 0.05,
+			spread: "reflect",
+		});
+		expect(radialFill({})).not.toHaveProperty("focus");
+	});
+
 	test("radial gradient carries a declared radius through to the painter", () => {
 		// A glow that keeps fading well past its shape renders as a hard-edged
 		// disc when its reach is pinned to the shape's own half-size.

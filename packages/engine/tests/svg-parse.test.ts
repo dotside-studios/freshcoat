@@ -341,6 +341,79 @@ describe("gradients", () => {
 			rotation: 0,
 		});
 	});
+	test("radial focal point in bounding-box units", () => {
+		const d = parseSvg(
+			svg(
+				'<radialGradient id="g" fx="0.25" fy="0.5" fr="0.1"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><rect width="40" height="20" fill="url(#g)"/>',
+			),
+		);
+		expect(shapes(d.children)[0]?.fill).toMatchObject({
+			kind: "radial",
+			cx: 20,
+			cy: 10,
+			rx: 20,
+			ry: 10,
+			fx: 10,
+			fy: 10,
+			fr: 4,
+		});
+		expect(d.warnings).toEqual([]);
+	});
+	test("radial focal point in user space under a gradient transform", () => {
+		const s = only(
+			svg(
+				'<radialGradient id="g" gradientUnits="userSpaceOnUse" cx="50" cy="50" r="40" fx="30" fy="50" fr="5" gradientTransform="translate(10 0) scale(2)"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><rect width="100" height="100" fill="url(#g)"/>',
+			),
+		);
+		expect(s.fill).toMatchObject({
+			kind: "radial",
+			cx: 110,
+			cy: 100,
+			rx: 80,
+			ry: 80,
+			fx: 70,
+			fy: 100,
+			fr: 10,
+		});
+	});
+	test("a focal point at the centre is left out", () => {
+		const s = only(
+			svg(
+				'<radialGradient id="g" fx="50%" fy="0.5"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><rect width="40" height="20" fill="url(#g)"/>',
+			),
+		);
+		expect(s.fill).not.toHaveProperty("fx");
+		expect(s.fill).not.toHaveProperty("fr");
+	});
+	test("focal attributes and spreadMethod inherit through href", () => {
+		const d = parseSvg(
+			svg(
+				'<radialGradient id="base" fx="0" spreadMethod="reflect"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><radialGradient id="g" href="#base" r="0.25"/><rect width="40" height="40" fill="url(#g)"/>',
+			),
+		);
+		expect(shapes(d.children)[0]?.fill).toMatchObject({
+			kind: "radial",
+			fx: 0,
+			fy: 20,
+			spread: "reflect",
+		});
+		expect(d.warnings).toEqual([]);
+	});
+	test("spreadMethod carries onto linear gradients", () => {
+		const fills = ["pad", "reflect", "repeat"].map(
+			(m) =>
+				only(
+					svg(
+						`<linearGradient id="g" spreadMethod="${m}" x2="0.5"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><rect width="10" height="10" fill="url(#g)"/>`,
+					),
+				).fill,
+		);
+		expect(fills.map((f) => f && "spread" in f && f.spread)).toEqual([
+			false,
+			"reflect",
+			"repeat",
+		]);
+	});
 	test("a gradient stroke keeps its gradient, first stop as its colour", () => {
 		const d = parseSvg(
 			svg(

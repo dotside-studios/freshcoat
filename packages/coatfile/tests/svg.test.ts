@@ -160,6 +160,24 @@ describe("svgToElements", () => {
 		});
 	});
 
+	test("radial focal points and spread methods survive into the document", () => {
+		const { element } = svgToElements(
+			svg(
+				'<radialGradient id="r" fx="0.25" fr="0.1" spreadMethod="repeat"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient><linearGradient id="l" spreadMethod="reflect"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient><rect width="40" height="20" fill="url(#r)"/><rect width="40" height="20" fill="url(#l)"/>',
+			),
+		);
+		const [rad, lin] = element.properties.children as VectorElement[];
+		expect(rad?.properties.fill).toMatchObject({
+			kind: "radial",
+			center: [0.5, 0.5],
+			focus: [0.25, 0.5],
+			focusRadius: 0.1,
+			spread: "repeat",
+		});
+		expect(lin?.properties.fill).toMatchObject({ kind: "linear", spread: "reflect" });
+		expect(ElementSchema.safeParse(element).success).toBe(true);
+	});
+
 	test("a gradient stroke keeps its gradient, on the vector's own box", () => {
 		const { element, warnings } = svgToElements(
 			svg(
