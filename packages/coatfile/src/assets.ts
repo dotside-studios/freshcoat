@@ -41,6 +41,36 @@ export type PendingAsset = {
 
 // ── Encoding ─────────────────────────────────────────────────────────────────
 
+const EXTENSION_BY_TYPE: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/webp": "webp",
+	"image/gif": "gif",
+	"image/avif": "avif",
+	"image/svg+xml": "svg",
+	"font/woff2": "woff2",
+	"font/woff": "woff",
+	"font/ttf": "ttf",
+	"font/otf": "otf",
+};
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+	...Object.fromEntries(
+		Object.entries(EXTENSION_BY_TYPE).map(([type, ext]) => [ext, type]),
+	),
+	jpeg: "image/jpeg",
+};
+
+/** The file extension, without its dot, for an image or font media type. */
+export function mediaExtension(contentType: string): string | undefined {
+	return EXTENSION_BY_TYPE[contentType];
+}
+
+/** The image or font media type a file extension names, in any case. */
+export function mediaType(extension: string): string | undefined {
+	return TYPE_BY_EXTENSION[extension.toLowerCase()];
+}
+
 /** The `data:` URL for an inline asset. */
 export function assetDataUri(asset: InlineAsset): string {
 	return `${dataPrefix(asset)}${asset.base64}`;

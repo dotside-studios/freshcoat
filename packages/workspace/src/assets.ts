@@ -1,4 +1,8 @@
-import { subtleSha256 } from "@freshcoat-js/coatfile";
+import {
+	mediaExtension,
+	mediaType,
+	subtleSha256,
+} from "@freshcoat-js/coatfile";
 import {
 	orientedSize,
 	readImageInfo,
@@ -44,25 +48,6 @@ export type AddAssetsResult = {
 	appended: number;
 };
 
-const TYPE_BY_EXTENSION: Record<string, string> = {
-	png: "image/png",
-	jpg: "image/jpeg",
-	jpeg: "image/jpeg",
-	webp: "image/webp",
-	gif: "image/gif",
-	avif: "image/avif",
-	svg: "image/svg+xml",
-};
-
-const EXTENSION_BY_TYPE: Record<string, string> = {
-	"image/png": "png",
-	"image/jpeg": "jpg",
-	"image/webp": "webp",
-	"image/gif": "gif",
-	"image/avif": "avif",
-	"image/svg+xml": "svg",
-};
-
 export function assetRef(sha256: string): string {
 	return `${ASSET_REF_PREFIX}${sha256}`;
 }
@@ -83,7 +68,7 @@ export async function sha256Hex(data: Uint8Array | Blob): Promise<string> {
 }
 
 export function assetExtension(contentType: string): string {
-	return EXTENSION_BY_TYPE[contentType] ?? "bin";
+	return mediaExtension(contentType) ?? "bin";
 }
 
 /** The media type of an image, from its leading bytes, then its name. */
@@ -92,7 +77,8 @@ export function imageContentType(name: string, bytes?: Uint8Array): string {
 		const sniffed = sniffImageType(bytes);
 		if (sniffed !== null) return sniffed;
 	}
-	return TYPE_BY_EXTENSION[extensionOf(name)] ?? "application/octet-stream";
+	const type = mediaType(extensionOf(name));
+	return type?.startsWith("image/") ? type : "application/octet-stream";
 }
 
 function extensionOf(name: string): string {
@@ -254,8 +240,6 @@ export type CollectPhotoOptions = {
 	signal?: AbortSignal;
 };
 
-const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
-
 /** The images among picked or dropped files, zips opened, with each file
  *  left out and why: hidden, not an image, or a zip that could not be read. */
 export async function collectPhotoFiles(
@@ -289,7 +273,10 @@ export async function collectPhotoFiles(
 			continue;
 		}
 		let contentType = file.type.startsWith("image/") ? file.type : undefined;
-		if (contentType === undefined && !IMAGE_EXTENSION.test(file.name)) {
+		if (
+			contentType === undefined &&
+			!mediaType(extensionOf(file.name))?.startsWith("image/")
+		) {
 			const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
 			const sniffed = imageContentType(file.name, head);
 			if (!sniffed.startsWith("image/")) {

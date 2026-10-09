@@ -33,6 +33,8 @@ export {
 	inlineAssetUrls,
 	inlinedAssetUri,
 	mapAssetSrcs,
+	mediaExtension,
+	mediaType,
 	type PendingAsset,
 	parseAssetUri,
 	readAssets,

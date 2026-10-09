@@ -8,6 +8,8 @@ import {
 	detachAssets,
 	inlineAssetUrls,
 	inlinedAssetUri,
+	mediaExtension,
+	mediaType,
 	type PendingAsset,
 	parseAssetUri,
 	readAssets,
@@ -172,6 +174,17 @@ describe("inline asset URLs", () => {
 		for (const [sha, url] of inlineAssetUrls(t))
 			expect(uri(url)).toBe(`asset:${sha}`);
 		expect(uri("data:image/png;base64,AAAA")).toBeUndefined();
+	});
+});
+
+describe("media types", () => {
+	test("map between extensions and types both ways", () => {
+		expect(mediaExtension("image/jpeg")).toBe("jpg");
+		expect(mediaExtension("font/woff2")).toBe("woff2");
+		expect(mediaExtension("text/plain")).toBeUndefined();
+		expect(mediaType("JPEG")).toBe("image/jpeg");
+		expect(mediaType("ttf")).toBe("font/ttf");
+		expect(mediaType("txt")).toBeUndefined();
 	});
 });
 
