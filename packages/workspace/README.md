@@ -136,6 +136,13 @@ passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
 stream.
 
+`itemRequest` builds the render request `runExportJob` sends for one item,
+with the size `itemSize` gives it, and `imagesOf` lists the photos that item
+references. `itemTemplate` returns the template laid out at the size
+`itemSize` gives an item whose size follows a photo, with `maxEdge` applied,
+so a preview shows what the export will render. Studio builds its export
+preview and printer file from these.
+
 ### Export from Node
 
 The same job runs in Bun or Node without a DOM, starting from a

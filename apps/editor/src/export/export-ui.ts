@@ -1,10 +1,4 @@
-import {
-	applyVariant,
-	cardSizeMm,
-	fitDesignSize,
-	resizeTemplate,
-	type Template,
-} from "@freshcoat-js/coatfile";
+import { cardSizeMm, type Template } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
 	Dataset,
@@ -17,8 +11,6 @@ import {
 	exportSize,
 	fileExtension,
 	fileNameFor,
-	orientedSize,
-	parseAssetRef,
 	pdfLayout,
 } from "@freshcoat-js/workspace";
 import { type JobResult, recordOutcome } from "@freshcoat-js/workspace/export";
@@ -107,47 +99,6 @@ export function fileNameExample(
 			? ""
 			: `@${preset.scale}x`;
 	return `${base}${suffix}.${fileExtension(preset.format)}`;
-}
-
-/** The template laid out at the aspect of the photo a size-from-image preset
- *  follows for this item, as the export will render it; the template itself
- *  otherwise. An item in a variant with its own size gets that variant laid
- *  out, without its variants. */
-export function photoSizedTemplate(
-	template: Template,
-	preset: ExportPreset,
-	item: { values: Record<string, string>; variantId?: string } | null,
-	dataset: Dataset | undefined,
-): Template {
-	const size = exportSize(preset);
-	if (size.kind !== "image" || !item || !dataset) return template;
-	const sha = parseAssetRef(item.values[size.field]);
-	const asset = sha ? dataset.assets.find((a) => a.sha256 === sha) : undefined;
-	if (!asset?.width || !asset.height) return template;
-	const seen = orientedSize({
-		width: asset.width,
-		height: asset.height,
-		orientation: asset.orientation,
-	});
-	const sized = item.variantId
-		? template.variants?.find((v) => v.id === item.variantId && v.size)
-		: undefined;
-	const { variants: _v, ...applied } = sized
-		? applyVariant(template, sized.id)
-		: template;
-	const base = sized ? applied : template;
-	const design = fitDesignSize(base, seen.width, seen.height);
-	if (
-		Math.abs(design.width - base.width) < 0.5 &&
-		Math.abs(design.height - base.height) < 0.5
-	)
-		return base;
-	// A template's size is whole design units, and most photo aspects are not.
-	return resizeTemplate(
-		base,
-		Math.max(1, Math.round(design.width)),
-		Math.max(1, Math.round(design.height)),
-	);
 }
 
 /** The template's image fields, which a size can follow. */

@@ -142,6 +142,11 @@ dataset's selection from there to offer it.
   runs it over Studio's worker pool. On sheets,
   `../../packages/workspace/src/export/sheets.ts` and
   `../../packages/workspace/src/impose.ts` place each card on paper.
+- **Preview** (`src/export/ExportSection.tsx`, `src/export/printer-file.ts`):
+  the preview template comes from `itemTemplate` and the printer file's
+  request from `itemRequest`, the functions the job itself uses, so both show
+  what the export renders. The printer file only switches a PDF's pages to
+  PNG and caps the long edge at `PRINTER_FILE_MAX_EDGE`.
 - **Statuses** (`../../packages/workspace/src/export/status.ts`): a finished
   job's `recordOutcome` marks records exported or failed when the preset has
   `markExported`. `statusActions` in `src/export/export-ui.ts` turns it into

@@ -9,14 +9,19 @@ export {
 	summarizeGlyphs,
 } from "./glyph-preflight";
 export {
+	assetsByRef,
 	createItemRenderer,
 	type ItemRenderer,
 	type ItemRendererOptions,
 	type ItemSize,
+	imagesOf,
+	itemRequest,
 	itemSize,
+	itemTemplate,
 	type OutputFormat,
 	type RenderOutput,
 	type RenderRequest,
+	referencedAssets,
 } from "./item";
 export {
 	type AssembleExtras,

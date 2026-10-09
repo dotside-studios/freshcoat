@@ -1,6 +1,7 @@
-import { validate } from "@freshcoat-js/coatfile";
+import { type Template, validate } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
+	Dataset,
 	ExportItem,
 	ExportPreset,
 } from "@freshcoat-js/workspace";
@@ -10,7 +11,11 @@ import {
 	DEFAULT_SHEET_LAYOUT,
 	planExport,
 } from "@freshcoat-js/workspace";
-import type { JobResult } from "@freshcoat-js/workspace/export";
+import {
+	assetsByRef,
+	itemTemplate,
+	type JobResult,
+} from "@freshcoat-js/workspace/export";
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,
@@ -21,7 +26,6 @@ import {
 	formatPageSize,
 	imageFieldKeys,
 	labelColumn,
-	photoSizedTemplate,
 	recordLabel,
 	selectedIds,
 	settingsSummary,
@@ -262,6 +266,12 @@ describe("photo export helpers", () => {
 		records: [],
 		assets: [photo],
 	};
+	const photoSizedTemplate = (
+		template: Template,
+		p: ExportPreset,
+		it: { values: Record<string, string>; variantId?: string },
+		d: Dataset,
+	) => itemTemplate(template, p, it, assetsByRef(d.assets));
 
 	test("the example file name follows the format and the size", () => {
 		expect(

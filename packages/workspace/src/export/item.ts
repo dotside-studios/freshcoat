@@ -1,21 +1,25 @@
 import {
+	applyVariant,
 	compile,
 	fitDesignSize,
 	hasInsets,
 	type Renderer,
+	resizeTemplate,
 	type Sides,
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import { assetRef } from "../assets";
 import { crc32 } from "../crc";
 import { orientedSize } from "../image-info";
-import { exportSize } from "../plan";
+import { DEFAULT_QUALITY, exportSize, imageFormat } from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
 import { createJobCaches } from "./caches";
 import {
 	type GamutNote,
 	gamutNotes,
+	printRequest,
 	type RenderPrint,
 	withPrintFallback,
 } from "./print";
@@ -113,6 +117,105 @@ export function itemSize(
 	const height = Math.max(1, Math.round(seen.height * cap));
 	const resize = fitDesignSize(design, width, height);
 	return { width, height, scale: width / resize.width, resize };
+}
+
+/** A dataset's photos by their `ws:` reference. */
+export function assetsByRef(
+	assets: readonly DatasetAsset[] | undefined,
+): Map<string, DatasetAsset> {
+	return new Map((assets ?? []).map((a) => [assetRef(a.sha256), a] as const));
+}
+
+/** The photos an item's values name, each once, in value order. */
+export function referencedAssets(
+	item: Pick<ExportItem, "values">,
+	assets: ReadonlyMap<string, DatasetAsset>,
+): DatasetAsset[] {
+	const out: DatasetAsset[] = [];
+	for (const value of new Set(Object.values(item.values))) {
+		const asset = assets.get(value);
+		if (asset) out.push(asset);
+	}
+	return out;
+}
+
+/** The photos an item's values name, so a worker gets only those. */
+export function imagesOf(
+	item: Pick<ExportItem, "values">,
+	assets: ReadonlyMap<string, DatasetAsset>,
+): [string, Blob][] {
+	return referencedAssets(item, assets).map((a) => [
+		assetRef(a.sha256),
+		a.blob,
+	]);
+}
+
+/** The render request for one item as the export makes it, with the size it
+ *  renders at. */
+export function itemRequest(
+	template: Template,
+	preset: ExportPreset,
+	item: Pick<ExportItem, "values" | "variantId" | "side">,
+	assets: ReadonlyMap<string, DatasetAsset>,
+): { request: RenderRequest; size: ItemSize } | { error: string } {
+	const size = itemSize(template, preset, item, assets);
+	if ("error" in size) return size;
+	const format = imageFormat(preset);
+	const print = printRequest(preset.print);
+	return {
+		size,
+		request: {
+			template,
+			values: item.values,
+			...(item.variantId !== undefined ? { variantId: item.variantId } : {}),
+			side: item.side,
+			scale: size.scale,
+			images: imagesOf(item, assets),
+			...(size.resize ? { resize: size.resize } : {}),
+			...(size.bleed ? { bleed: true } : {}),
+			format,
+			...(format !== "png"
+				? { quality: preset.quality ?? DEFAULT_QUALITY }
+				: {}),
+			...(print ? { print } : {}),
+		},
+	};
+}
+
+/**
+ * The template laid out at the size `itemSize` gives an item whose size
+ * follows a photo, as the export will render it; the template itself
+ * otherwise. An item in a variant with its own size gets that variant laid
+ * out, without its variants. A template's size is whole design units, so the
+ * layout size is rounded.
+ */
+export function itemTemplate(
+	template: Template,
+	preset: ExportPreset,
+	item: Pick<ExportItem, "values" | "variantId">,
+	assets: ReadonlyMap<string, DatasetAsset>,
+): Template {
+	const size = itemSize(template, preset, item, assets);
+	if ("error" in size || !size.resize) return template;
+	const sized = item.variantId
+		? template.variants?.find((v) => v.id === item.variantId && v.size)
+		: undefined;
+	let base = template;
+	if (sized) {
+		const { variants: _v, ...applied } = applyVariant(template, sized.id);
+		base = applied;
+	}
+	const { resize } = size;
+	if (
+		Math.abs(resize.width - base.width) < 0.5 &&
+		Math.abs(resize.height - base.height) < 0.5
+	)
+		return base;
+	return resizeTemplate(
+		base,
+		Math.max(1, Math.round(resize.width)),
+		Math.max(1, Math.round(resize.height)),
+	);
 }
 
 export function withBleed(
