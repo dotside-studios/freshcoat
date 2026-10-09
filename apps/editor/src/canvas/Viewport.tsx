@@ -69,6 +69,7 @@ const CREATE_KIND: Partial<Record<Tool, ElementKind>> = {
 	rect: "rect",
 	ellipse: "ellipse",
 	text: "text",
+	placeholder: "image",
 	qr: "qr",
 	barcode: "barcode",
 };

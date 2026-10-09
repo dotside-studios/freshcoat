@@ -19,7 +19,12 @@ import {
 import type { CanvasKit } from "canvaskit-wasm";
 import { rebindDataset } from "~/binding/binding";
 import type { BooleanOp } from "~/doc/boolean";
-import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
+import {
+	createElement,
+	defaultRect,
+	type ElementKind,
+	placeholderSrc,
+} from "~/doc/factories";
 import {
 	type AlignMode,
 	align,
@@ -642,7 +647,7 @@ export class EditorController {
 			? { ...rect, x: rect.x - origin.x, y: rect.y - origin.y }
 			: rect;
 		const element = createElement(kind, local, t, this.state.side, {
-			src: opts.src,
+			src: opts.src ?? (kind === "image" ? placeholderSrc(t) : undefined),
 		});
 		const key = this.insert(element, opts.parent);
 		this.dispatch({ type: "setTool", tool: "move" });

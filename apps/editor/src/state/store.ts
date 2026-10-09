@@ -62,6 +62,7 @@ export type Tool =
 	| "text"
 	| "pen"
 	| "image"
+	| "placeholder"
 	| "qr"
 	| "barcode";
 

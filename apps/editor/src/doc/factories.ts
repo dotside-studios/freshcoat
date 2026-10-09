@@ -121,6 +121,13 @@ export function defaultRect(
 	};
 }
 
+export function placeholderSrc(t: Pick<Template, "fields">): string {
+	const key = Object.entries(t.fields.properties).find(
+		([, f]) => f.format === "image",
+	)?.[0];
+	return key ? `{{${key}}}` : "";
+}
+
 export const BARCODE_SIZE = { width: 360, height: 120 };
 
 /** The default barcode box, shrunk to fit a small artboard at the same aspect. */
