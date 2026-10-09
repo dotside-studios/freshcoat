@@ -18,6 +18,7 @@ import {
 	missingGlyphs,
 	type Node,
 	type Output,
+	type PdfFrame,
 	type Renderer,
 	resolveExportScale,
 	resolveSupersample,
@@ -293,6 +294,52 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 	return results;
 }
 
+// A side painted as one PDF page of vectors.
+export type TemplatePdfFrame = Omit<PdfFrame, "warnings"> & {
+	warnings: FrameWarning[];
+	name: string;
+};
+
+export type RenderCompiledPdfOptions = {
+	frameNames?: string[];
+	images?: Map<string, Uint8Array>;
+	/** Design units per inch, which sets the page size. Default 72. */
+	dpi?: number;
+	title?: string;
+	date?: Date;
+};
+
+// Paint each side of a compiled template as one PDF page of vectors. What a
+// PDF cannot draw is left out and warned as `vector_unsupported`; rendering
+// that side with `renderCompiled` keeps it.
+export async function renderCompiledPdf(
+	renderer: Renderer,
+	compiled: CompiledTemplate,
+	options: RenderCompiledPdfOptions = {},
+): Promise<TemplatePdfFrame[]> {
+	const frames = compiled.frames.filter(
+		(f) => !options.frameNames || options.frameNames.includes(f.name),
+	);
+	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
+	const { images, dpi, title, date } = options;
+	const results: TemplatePdfFrame[] = [];
+	for (const f of frames) {
+		const commands = renderer.compile(f.root as Node, {
+			width: compiled.width,
+			height: compiled.height,
+			fonts: f.assets.fonts,
+			images: f.assets.images,
+		});
+		const page = await renderer.paintPdf(commands, { images, dpi, title, date });
+		results.push({
+			...page,
+			warnings: [...(f.warnings ?? []), ...page.warnings],
+			name: f.name,
+		});
+	}
+	return results;
+}
+
 export type FrameMissingGlyphs = {
 	frame: string;
 	// The element id of the text that lacks glyphs.
@@ -342,6 +389,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Curved text is longer than its circle${w.layer ? `: ${w.layer}` : ""}`;
 		case "arc_radius_clamped":
 			return `Curved text radius raised to its font size${w.layer ? `: ${w.layer}` : ""}`;
+		case "vector_unsupported":
+			return `PDF has no vector equivalent for ${w.feature}${w.layer ? `: ${w.layer}` : ""}`;
 		case "pattern_unsupported":
 			return `Pattern shader failed, painted solid: ${w.pattern}`;
 		case "barcode_invalid":
