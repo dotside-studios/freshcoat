@@ -856,6 +856,20 @@ template hands them the font. Embed only a font whose license allows that.
 `collectFontRequests` lists the families a template needs and where each is
 declared, including the families a variant's deltas and barcodes bring in.
 
+`fontUsage(template)` maps each family to the weights it is used at and
+whether any of it is italic, across text, spans, barcodes and variants.
+`googleCss2Url(family, weights?, italic?)` builds the Google Fonts css2
+stylesheet URL for those, and `fontRequestKey(request)` names the bytes a
+request resolves to, for a cache. All three, with `defaultFontFamily`, also
+come from `@freshcoat-js/coatfile/fonts`, which leaves out the font loaders:
+
+```ts
+import { fontUsage, googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+
+for (const [family, { weights, italic }] of fontUsage(template))
+	console.log(googleCss2Url(family, weights, italic));
+```
+
 ### Resolving fonts
 
 `resolveTemplateFonts(template, options)` loads every font a template needs and
@@ -1064,6 +1078,15 @@ sets to `left`, or to `start` when a `direction` is given. A justified paragraph
 stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
+
+### Text case
+
+`case` is `upper`, `lower`, `title` or `original`. Title case capitalises a
+letter whose preceding character is not a Unicode letter, number or underscore,
+looking across span boundaries, so `élan émile` becomes `Élan Émile` and a word
+split over two spans keeps one capital. `applyCase(text, mode, prevChar?)`
+applies the same rule; pass `{ preserveLength: true }` to keep a character whose
+cased form changes length (`ß` in upper case), so string indices stay stable.
 
 ## Spec
 

@@ -1,13 +1,9 @@
-const CSS2 = "https://fonts.googleapis.com/css2";
+import { googleCss2Url } from "@freshcoat-js/coatfile";
 
 /** The css2 stylesheet URLs to try for a family: 400 and 700 first, then
  *  whatever weights the family has (for single-weight families). */
 export function googleFontUrls(family: string): string[] {
-	const name = family.trim().split(/\s+/).map(encodeURIComponent).join("+");
-	return [
-		`${CSS2}?family=${name}:wght@400;700&display=swap`,
-		`${CSS2}?family=${name}&display=swap`,
-	];
+	return [googleCss2Url(family, [400, 700]), googleCss2Url(family)];
 }
 
 /** The first URL that serves a stylesheet with a face in it, or null. */

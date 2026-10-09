@@ -157,6 +157,12 @@ it cannot. `readWorkspace` on `archive` does the same for a Blob or bytes.
 Pass `fontOptions: { fetch }` to serve fonts from a cache or a mirror instead
 of the network.
 
+Pass `checkGlyphs: true` to also get `result.glyphs`: each item's text that
+the template's fonts have no glyphs for, by record, side and element, so a CLI
+can warn before the cards print with boxes. `checkGlyphs` and
+`checkAllGlyphs` run the same check on given items with a renderer that holds
+the fonts, and `summarizeGlyphs` and `codepointLabel` shape it for display.
+
 `src/export/node-export.test.ts` runs this path end to end.
 
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
