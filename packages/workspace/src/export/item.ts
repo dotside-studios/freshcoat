@@ -1,6 +1,7 @@
 import {
 	applyVariant,
 	compile,
+	type FrameWarning,
 	fitDesignSize,
 	hasInsets,
 	type Renderer,
@@ -9,7 +10,10 @@ import {
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import {
+	describeWarning,
+	renderCompiled,
+} from "@freshcoat-js/coatfile/render";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
 import { orientedSize } from "../image-info";
@@ -63,7 +67,24 @@ export type RenderOutput = {
 	printError?: string;
 	/** photo layers the print path pulled into the printer's range */
 	gamut?: GamutNote[];
+	/** the render's other warnings, described, each once */
+	warnings?: string[];
 };
+
+/** The warnings an item reports but still renders with: all but a refused
+ *  barcode, which fails it, gamut notes, which `gamut` carries, and an image
+ *  with no source, which is an unfilled field. */
+function noted(warnings: readonly FrameWarning[]): string[] {
+	const out = new Set<string>();
+	for (const w of warnings)
+		if (
+			w.kind !== "barcode_invalid" &&
+			w.kind !== "gamut_compressed" &&
+			!(w.kind === "image_load_failed" && w.src === "")
+		)
+			out.add(describeWarning(w));
+	return [...out];
+}
 
 export type ItemSize = {
 	/** output pixels */
@@ -318,9 +339,9 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			// A placeholder in place of a code would print as if it scanned; the
 			// item fails instead, with the encoder's reason.
 			for (const w of result.warnings)
-				if (w.kind === "barcode_invalid")
-					throw new Error(`Barcode: ${w.message}`);
+				if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
+			const warnings = noted(result.warnings);
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),
@@ -331,6 +352,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(painted.print !== "off" ? { print: painted.print } : {}),
 				...(painted.error ? { printError: painted.error } : {}),
 				...(gamut.length > 0 ? { gamut } : {}),
+				...(warnings.length > 0 ? { warnings } : {}),
 			};
 		},
 		setFonts(next) {

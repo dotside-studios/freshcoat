@@ -115,7 +115,9 @@ preserved); a density large enough to exceed the coat engine's `MAX_EXPORT_DIMEN
 is lowered to fit, and the `scale` on the result is the one actually used.
 
 `@freshcoat-js/coatfile/render` holds `renderTemplate` and `renderCompiled`,
-so the main entry stays free of the painter.
+so the main entry stays free of the painter. `describeWarning(w)` there turns
+one of a result's `warnings` into a line of readable text, such as
+`Couldn't load image: logo.png`.
 
 ### PNG size
 

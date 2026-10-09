@@ -74,8 +74,8 @@ describe("exportWorkspace with fileOutput", () => {
 			.decode(zip[REPORT_FILE_NAME])
 			.trim()
 			.split("\r\n");
-		expect(report[0]?.endsWith(",unfilled")).toBe(true);
-		expect(report.slice(1).every((row) => row.endsWith(",name"))).toBe(true);
+		expect(report[0]?.endsWith(",unfilled,warnings")).toBe(true);
+		expect(report.slice(1).every((row) => row.endsWith(",name,"))).toBe(true);
 	});
 
 	it("writes a PDF to the same kind of path", async () => {

@@ -67,6 +67,8 @@ export type JobItemResult = {
 	gamut?: number;
 	/** required fields rendered with their defaults, as `ExportItem` says */
 	unfilled?: string[];
+	/** what the render warned about without failing */
+	warnings?: string[];
 };
 
 export type JobStats = {
@@ -182,7 +184,17 @@ function csvCell(value: string): string {
 
 export function reportCsv(items: JobItemResult[]): string {
 	const rows = [
-		["file", "record", "side", "status", "error", "print", "gamut", "unfilled"],
+		[
+			"file",
+			"record",
+			"side",
+			"status",
+			"error",
+			"print",
+			"gamut",
+			"unfilled",
+			"warnings",
+		],
 	];
 	for (const item of items)
 		rows.push([
@@ -194,6 +206,7 @@ export function reportCsv(items: JobItemResult[]): string {
 			item.print ?? "",
 			item.gamut ? `${item.gamut}%` : "",
 			item.unfilled?.join(" ") ?? "",
+			(item.warnings ?? []).join("; "),
 		]);
 	return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }
@@ -201,12 +214,13 @@ export function reportCsv(items: JobItemResult[]): string {
 /** What a rendered item's report says about printing. */
 function printResult(
 	out: RenderOutput,
-): Pick<JobItemResult, "print" | "printError" | "gamut"> {
+): Pick<JobItemResult, "print" | "printError" | "gamut" | "warnings"> {
 	const gamut = gamutPercent(out.gamut);
 	return {
 		print: out.print ?? "off",
 		...(out.printError ? { printError: out.printError } : {}),
 		...(gamut > 0 ? { gamut } : {}),
+		...(out.warnings?.length ? { warnings: out.warnings } : {}),
 	};
 }
 
