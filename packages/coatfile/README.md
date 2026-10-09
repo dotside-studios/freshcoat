@@ -180,6 +180,12 @@ either form into four sides, `compactInsets` turns four sides back into one
 number when they agree, and `maxInsets` takes the largest on each side. These
 also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
 
+`safeAreaIssues(t, { safe })` lists the top-level layers with an edge between
+the trim and the safe line, with the edges that cross it. A layer that runs to
+the trim or past it counts as bleed and is not listed. `safe` defaults to the
+template's `safeArea`; a consumer with its own product rules, such as Studio's
+3 mm for a CR80 card, passes them in.
+
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
 
