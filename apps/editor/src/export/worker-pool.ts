@@ -1,6 +1,7 @@
-import type {
-	RenderOutput,
-	RenderRequest,
+import {
+	exportPoolSize,
+	type RenderOutput,
+	type RenderRequest,
 } from "@freshcoat-js/workspace/export";
 import type { WorkerReply, WorkerRequest } from "./protocol";
 
@@ -32,31 +33,6 @@ export class RenderCancelledError extends Error {
 		super("cancelled");
 		this.name = "AbortError";
 	}
-}
-
-/** Past this many pixels in one image the pool is capped at two workers: each
- *  worker holds the decoded photo, the surface it renders to and the pixels
- *  it reads back to encode, so a 50 MP photo is several hundred MB a worker. */
-export const LARGE_IMAGE_PIXELS = 24_000_000;
-
-export type PoolSizeInput = {
-	/** navigator.hardwareConcurrency */
-	cores?: number;
-	/** navigator.deviceMemory, in GB; Chromium only */
-	memoryGb?: number;
-	/** the largest image the job will decode, in pixels */
-	largestImagePixels?: number;
-};
-
-/** One worker per core but one, at most four, and at most one per GB of
- *  memory; two at most when an image is over 24 MP. */
-export function exportPoolSize(input: PoolSizeInput = {}): number {
-	const cores = input.cores || 2;
-	const memory = input.memoryGb ?? 4;
-	let size = Math.max(1, Math.min(cores - 1, 4, Math.floor(memory / 1)));
-	if ((input.largestImagePixels ?? 0) > LARGE_IMAGE_PIXELS)
-		size = Math.min(size, 2);
-	return size;
 }
 
 /** The pool size for this browser, for a job whose largest image is this many

@@ -151,7 +151,8 @@ the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
-stream.
+stream. `exportPoolSize` picks how many workers from the
+cores, memory and `largestImagePixels` of the job.
 
 `itemRequest` builds the render request `runExportJob` sends for one item,
 with the size `itemSize` gives it, and `imagesOf` lists the photos that item
