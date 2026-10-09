@@ -110,25 +110,19 @@ stream.
 
 ### Export from Node
 
-The same job runs in Bun or Node without a DOM. The host does what Studio's
-workers do: it resolves the template's fonts, registers the barcode encoder,
-and gives the renderer a loader for image sources that are file paths.
-Dataset photos (`ws:<sha256>`) come from the archive and need no loader.
+The same job runs in Bun or Node without a DOM, starting from a
+`.coatworkspace` on disk. Dataset photos (`ws:<sha256>`) come from the
+archive; other image sources, such as relative paths and `file:` URLs, go
+through the renderer's `load`.
 
 ```ts
-import { createWriteStream, openAsBlob } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
-import { Writable } from "node:stream";
-import { resolveTemplateFonts, setBarcodeEncoder } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import { openAsBlob } from "node:fs";
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
+import { createRenderer } from "@freshcoat-js/engine";
 import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
 import { unpackWorkspace } from "@freshcoat-js/workspace/archive";
-import {
-  createItemRenderer,
-  createStreamZipSink,
-  inlinePool,
-  runExportJob,
-} from "@freshcoat-js/workspace/export";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { fileOutput } from "@freshcoat-js/workspace/export/node";
 
 const unpacked = await unpackWorkspace(await openAsBlob("club.coatworkspace"));
 if (!unpacked.ok) throw new Error(unpacked.message);
@@ -136,31 +130,19 @@ const { workspace } = unpacked;
 const preset = workspace.presets[0];
 const entry = workspace.templates.find((t) => t.id === preset.templateId);
 
-// Pass `fetch` to serve fonts from a cache or a mirror instead of the network.
-const { fonts, missing } = await resolveTemplateFonts(entry.template);
-setBarcodeEncoder(bwipBarcodeEncoder);
+// `fetch` serves fonts from a cache or a mirror instead of the network.
+const { fonts, missing } = await resolveTemplateFonts(entry.template, { fetch });
 
-const items = createItemRenderer({
+const renderer = await createRenderer({
   ck: await loadCanvasKit("full"),
-  fonts,
-  // relative paths and file: URLs in the template, read under this directory
   load: fileLoader({ root: "." }),
 });
-
-const out = preset.format === "pdf" ? "club.pdf" : "club.zip";
-const result = await runExportJob(workspace, preset, {
-  pool: inlinePool(items),
-  sink:
-    preset.format === "pdf"
-      ? undefined
-      : createStreamZipSink(Writable.toWeb(createWriteStream(out))),
+const result = await exportWorkspace(workspace, preset, {
+  renderer,
+  fonts,
+  output: fileOutput(preset.format === "pdf" ? "club.pdf" : "club.zip"),
 });
-items.dispose();
-
-// A PDF is assembled in memory and comes back as `file`.
-if (result.file) await writeFile(out, await result.file.blob.bytes());
-// A cancelled zip leaves a partial file behind.
-if (result.cancelled) await unlink(out).catch(() => {});
+renderer.dispose();
 ```
 
 `src/export/node-export.test.ts` runs this path end to end.

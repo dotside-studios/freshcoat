@@ -1,16 +1,14 @@
-import { createWriteStream, openAsBlob } from "node:fs";
+import { openAsBlob } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
+import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
 import {
-	resolveTemplateFonts,
-	setBarcodeEncoder,
-	type Template,
-} from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-import { decodePixels, type FontFetch } from "@freshcoat-js/engine";
+	createRenderer,
+	decodePixels,
+	type FontFetch,
+} from "@freshcoat-js/engine";
 import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
 import { testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
@@ -20,13 +18,8 @@ import { packWorkspace, unpackWorkspace } from "../archive";
 import { planExport } from "../plan";
 import { makePng, sha256 } from "../test-fixtures";
 import type { ExportPreset, Workspace } from "../types";
-import {
-	createItemRenderer,
-	createStreamZipSink,
-	inlinePool,
-	REPORT_FILE_NAME,
-	runExportJob,
-} from "./index";
+import { exportWorkspace, REPORT_FILE_NAME } from "./index";
+import { fileOutput } from "./node";
 
 const FONT_CSS = "https://fonts.example/css2?family=Inter";
 const FONT_FILE = "https://fonts.example/inter.ttf";
@@ -189,7 +182,6 @@ let dir: string;
 beforeAll(async () => {
 	dir = await mkdtemp(join(tmpdir(), "freshcoat-export-"));
 	await writeFile(join(dir, "logo.png"), logo);
-	setBarcodeEncoder(bwipBarcodeEncoder);
 });
 
 afterAll(async () => {
@@ -206,24 +198,19 @@ async function exportFrom(file: string, job: ExportPreset, out: string) {
 		fetch: fontFetch,
 	});
 	expect(missing).toEqual([]);
-	const items = createItemRenderer({
+	const renderer = await createRenderer({
 		ck: await loadCanvasKit("full"),
-		fonts,
 		load: fileLoader({ root: dir }),
 	});
 	try {
-		const sink =
-			job.format === "pdf"
-				? undefined
-				: createStreamZipSink(Writable.toWeb(createWriteStream(out)));
-		const result = await runExportJob(workspace, job, {
-			pool: inlinePool(items),
-			...(sink ? { sink } : {}),
+		const result = await exportWorkspace(workspace, job, {
+			renderer,
+			fonts,
+			output: fileOutput(out),
 		});
-		if (result.file) await writeFile(out, await result.file.blob.bytes());
 		return { workspace, result };
 	} finally {
-		items.dispose();
+		renderer.dispose();
 	}
 }
 
