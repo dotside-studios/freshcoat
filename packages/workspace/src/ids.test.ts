@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freshId, isValidKey, newId, slug, uniqueKey } from "./ids";
+import { freshId, isValidKey, newId, slug, uniqueKey, uniqueName } from "./ids";
 
 describe("ids", () => {
 	it("mints prefixed 16-hex ids", () => {
@@ -35,5 +35,14 @@ describe("ids", () => {
 	it("finds a free key", () => {
 		expect(uniqueKey("a", ["b"])).toBe("a");
 		expect(uniqueKey("a", ["a", "a_2"])).toBe("a_3");
+	});
+
+	it("numbers a taken name", () => {
+		expect(uniqueName("Set", [])).toBe("Set");
+		expect(uniqueName("Set", ["Set", "Set 2"])).toBe("Set 3");
+		expect(uniqueName("Set", ["set"])).toBe("Set");
+		expect(uniqueName("Set", ["set", "SET 2"], { caseInsensitive: true })).toBe(
+			"Set 3",
+		);
 	});
 });

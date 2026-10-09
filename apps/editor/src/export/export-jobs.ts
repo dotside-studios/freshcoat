@@ -1,6 +1,7 @@
 import { toast } from "@freshcoat-js/ui/toast";
 import type { ExportPreset } from "@freshcoat-js/workspace";
 import {
+	boundDatasetOf,
 	type JobFile,
 	type JobResult,
 	jobStem,
@@ -15,7 +16,6 @@ import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
 import { workspaceSnapshot } from "~/state/workspace";
 import {
-	boundDataset,
 	retryPreset,
 	selectedRunLabel,
 	statusActions,
@@ -148,7 +148,7 @@ export function createExportJobs(
 			let scope: string | undefined;
 			if (options.recordIds) {
 				const wanted = new Set(preset.selected);
-				const records = boundDataset(workspace, preset)?.records ?? [];
+				const records = boundDatasetOf(workspace, preset)?.records ?? [];
 				scope = selectedRunLabel(
 					records.filter((r) => wanted.has(r.id)).length,
 				);
@@ -190,7 +190,7 @@ export function createExportJobs(
 			if (!result) await sink?.abort();
 			const error = runner.getSnapshot().error;
 			if (result && preset.markExported) {
-				const dataset = boundDataset(workspace, preset);
+				const dataset = boundDatasetOf(workspace, preset);
 				for (const action of statusActions(result, dataset?.id))
 					controller.dispatch(action);
 			}

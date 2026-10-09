@@ -1,7 +1,7 @@
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import type { FigmaBoundingBox, FigmaTextNode, FigmaTextStyle } from "../types";
 import { compositeSolids, figmaPaintToFill } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
-import { isWholeMustacheToken } from "./fields";
 
 export function textLayoutSizing(
 	mode: FigmaTextNode["style"]["textAutoResize"] | undefined,
@@ -84,8 +84,8 @@ export function transpileText(
 	// layer too, so the base and the variant stop lining up by id and the
 	// override is dropped as a structure mismatch. A binding that is one whole
 	// token is the field, so it is the id.
-	const boundTokenMatch = isWholeMustacheToken(textTemplate ?? "");
-	const nameTokenMatch = isWholeMustacheToken(node.name);
+	const boundToken = wholeToken((textTemplate ?? "").trim());
+	const nameToken = wholeToken(node.name.trim());
 
 	// Figma reports neither field when the layer's line height is AUTO, and AUTO
 	// is the FONT's own line box — 1.48 for Vend Sans, something else for the next
@@ -181,11 +181,10 @@ export function transpileText(
 	}
 
 	return {
-		id: boundTokenMatch.ok
-			? boundTokenMatch.id
-			: nameTokenMatch.ok
-				? nameTokenMatch.id
-				: node.name.replace(/[^a-zA-Z0-9_]/g, "_") || node.id.replace(":", "_"),
+		id:
+			boundToken ??
+			nameToken ??
+			(node.name.replace(/[^a-zA-Z0-9_]/g, "_") || node.id.replace(":", "_")),
 		type: "text" as const,
 		pos,
 		size,

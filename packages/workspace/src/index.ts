@@ -56,6 +56,7 @@ export {
 	newId,
 	slug,
 	uniqueKey,
+	uniqueName,
 } from "./ids";
 export {
 	type ImageInfo,
@@ -75,6 +76,7 @@ export {
 	imposeSheets,
 	minGapMm,
 	PAPER_SIZES_MM,
+	paperSize,
 	type SheetLayoutAxis,
 	SheetLayoutError,
 	type SheetPage,

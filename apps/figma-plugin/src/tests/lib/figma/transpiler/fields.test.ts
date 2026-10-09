@@ -1,22 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isWholeMustacheToken, titleCase } from "~/lib/figma/transpiler/fields";
-
-describe("isWholeMustacheToken", () => {
-	it("matches a clean token", () => {
-		expect(isWholeMustacheToken("{{name}}")).toEqual({ ok: true, id: "name" });
-	});
-
-	it("matches with surrounding whitespace", () => {
-		expect(isWholeMustacheToken("  {{name}}  ")).toEqual({
-			ok: true,
-			id: "name",
-		});
-	});
-
-	it("rejects token with extra literal text", () => {
-		expect(isWholeMustacheToken("Hi {{name}}")).toEqual({ ok: false });
-	});
-});
+import { titleCase } from "~/lib/figma/transpiler/fields";
 
 describe("titleCase", () => {
 	it("converts snake_case to Title Case", () => {

@@ -1,5 +1,6 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
 import { bytesToBase64, FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import { sha256Hex } from "@freshcoat-js/workspace";
 import { VEND_SANS, VEND_SANS_FAMILY } from "./vend-sans";
 
 const W = 2400;
@@ -132,9 +133,8 @@ async function noisePhoto(width: number, height: number) {
 	ctx.putImageData(image, 0, 0);
 	const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.9 });
 	const bytes = new Uint8Array(await blob.arrayBuffer());
-	const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
 	return {
-		sha256: [...digest].map((b) => b.toString(16).padStart(2, "0")).join(""),
+		sha256: await sha256Hex(bytes),
 		base64: bytesToBase64(bytes),
 		contentType: "image/jpeg",
 	};
