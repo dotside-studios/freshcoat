@@ -70,7 +70,9 @@ data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
 
 Templates inside are ordinary `.coat` files: a template opened on its own
 becomes a one-template workspace, and a workspace's template can be exported
-on its own again. Editor state that is not part of the design, such as a
+on its own again. Templates are read through coatfile's `loadTemplate`,
+and written without the assets nothing in them references
+(`pruneUnusedAssets`). Editor state that is not part of the design, such as a
 template's ruler guides, stays in the manifest's template entry, so the
 template format and its renders are unchanged.
 

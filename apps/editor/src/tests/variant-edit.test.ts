@@ -4,6 +4,7 @@ import {
 	type Template,
 	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
+import { pruneUnusedAssets } from "@freshcoat-js/coatfile/coat";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController } from "~/app/controller";
 import type { LayerGeometry } from "~/doc/geometry";
@@ -19,7 +20,6 @@ import {
 	insertElements,
 	moveElements,
 	moveVariant,
-	pruneUnusedAssets,
 	removeElements,
 	removeFont,
 	removeVariant,

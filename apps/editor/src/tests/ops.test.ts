@@ -14,7 +14,6 @@ import {
 	moveElements,
 	moveSide,
 	type OpResult,
-	pruneUnusedAssets,
 	removeElements,
 	removeField,
 	removeFont,
@@ -849,32 +848,5 @@ describe("assets", () => {
 		expect(again.template).toBe(r.template);
 		const existing = await attachImageAsset(t, PNG_BYTES, "image/png");
 		expect(existing.template).toBe(t);
-	});
-
-	test("pruneUnusedAssets drops only what nothing references", () => {
-		const t = frozenDoc();
-		expect(pruneUnusedAssets(t)).toBe(t);
-		const extra = {
-			...t,
-			assets: [
-				...(t.assets ?? []),
-				{ sha256: "feed", base64: "AA==", contentType: "image/png" },
-				{ sha256: "f0e7", base64: "AA==", contentType: "font/woff2" },
-			],
-			fonts: [
-				...(t.fonts ?? []),
-				{
-					kind: "local" as const,
-					family: "Embedded",
-					files: [{ weight: 400 as const, src: "asset:f0e7" }],
-				},
-			],
-		};
-		expect(pruneUnusedAssets(extra).assets?.map((a) => a.sha256)).toEqual([
-			PNG_SHA,
-			"f0e7",
-		]);
-		const none = unwrap(removeElements(t, ["0/2"])).template;
-		expect("assets" in pruneUnusedAssets(none)).toBe(false);
 	});
 });

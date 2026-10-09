@@ -368,6 +368,30 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
 
+`loadTemplate` runs those steps in order: it decodes the input, validates
+it, heals element ids only when the file does not validate as written, and
+validates again. Studio and the workspace archive both read templates
+through it.
+
+```ts
+import { loadTemplate } from "@freshcoat-js/coatfile";
+
+const loaded = await loadTemplate(fileBytes);
+if (loaded.ok) {
+  loaded.template; // valid
+  loaded.healed; // ids were renamed; loaded.renamedIds says which
+} else if (loaded.reason === "unreadable") {
+  loaded.code; // a CoatErrorCode, with loaded.message
+} else {
+  loaded.errors; // the file's validation errors as written
+}
+```
+
+`pruneUnusedAssets` (on `./coat` and the root) drops carried assets nothing
+references. Image srcs in frames and variant overrides, and local font files,
+count as references. Studio prunes before it saves, and the workspace archive
+prunes each template it packs.
+
 `templateStem(fileName)` is a file name without its template extension
 (`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
 

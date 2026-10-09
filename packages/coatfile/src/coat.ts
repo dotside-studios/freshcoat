@@ -19,6 +19,8 @@ import { strFromU8, strToU8, type Unzipped, unzipSync, zipSync } from "fflate";
 import {
 	base64ToBytes,
 	bytesToBase64,
+	collectAssetRefs,
+	parseAssetUri,
 	rehashAssets,
 	type Sha256,
 	subtleSha256,
@@ -347,6 +349,24 @@ export async function decodeTemplate(
 			message: err instanceof Error ? err.message : String(err),
 		};
 	}
+}
+
+/** The template without the carried assets nothing references: image srcs
+ *  in frames and variant overrides, and local font files, are kept. */
+export function pruneUnusedAssets(template: Template): Template {
+	if (!template.assets) return template;
+	const used = collectAssetRefs(template);
+	for (const f of template.fonts ?? [])
+		if (f.kind === "local")
+			for (const file of f.files) {
+				const sha = parseAssetUri(file.src);
+				if (sha) used.add(sha);
+			}
+	const assets = template.assets.filter((a) => used.has(a.sha256));
+	if (assets.length === template.assets.length) return template;
+	if (assets.length > 0) return { ...template, assets };
+	const { assets: _dropped, ...rest } = template;
+	return rest as Template;
 }
 
 function assetEntryName(asset: InlineAsset): string {

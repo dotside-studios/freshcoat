@@ -1,7 +1,7 @@
 import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import {
 	formatVersionStatus,
-	healElementIds,
+	loadTemplate,
 	raiseFormatVersion,
 	validate,
 	verifyAssets,
@@ -10,11 +10,10 @@ import {
 	type COAT_EXTENSION,
 	type COAT_JSON_EXTENSION,
 	CoatError,
-	decodeTemplate,
 	packTemplate,
+	pruneUnusedAssets,
 	serializeTemplate,
 } from "@freshcoat-js/coatfile/coat";
-import { pruneUnusedAssets } from "./ops";
 
 export type LoadOutcome =
 	| {
@@ -40,50 +39,23 @@ export async function openFile(
 	fileName: string,
 ): Promise<LoadOutcome> {
 	try {
-		const decoded = await decodeTemplate(input);
-		if (!decoded.ok)
-			return { kind: "unreadable", fileName, message: decoded.message };
-		const raw = decoded.document;
-		const asWritten = validate(raw);
-		let template: Template;
-		let healed: string[] = [];
-		if (asWritten.ok) {
-			template = asWritten.value;
-		} else {
-			const healedResult = validate(healElementIds(raw));
-			if (!healedResult.ok)
-				return { kind: "invalid", fileName, errors: asWritten.errors };
-			template = healedResult.value;
-			healed = renamedIds(raw, template);
-		}
+		const loaded = await loadTemplate(input);
+		if (!loaded.ok)
+			return loaded.reason === "unreadable"
+				? { kind: "unreadable", fileName, message: loaded.message }
+				: { kind: "invalid", fileName, errors: loaded.errors };
+		const { template } = loaded;
 		return {
 			kind: "ok",
 			fileName,
 			template,
-			healed,
+			healed: loaded.renamedIds,
 			newerFormat: formatVersionStatus(template.format_version) === "newer",
 			misKeyedAssets: (await verifyAssets(template)).map((m) => m.declared),
 		};
 	} catch (err) {
 		return { kind: "unreadable", fileName, message: String(err) };
 	}
-}
-
-function renamedIds(raw: unknown, healed: Template): string[] {
-	const before = frameElementIds(raw);
-	const after = frameElementIds(healed);
-	return after.filter((id, i) => before[i] !== undefined && before[i] !== id);
-}
-
-function frameElementIds(template: unknown): string[] {
-	const frames = (template as { template_data?: unknown }).template_data;
-	if (!Array.isArray(frames)) return [];
-	return frames.flatMap((frame) => {
-		const elements = (frame as { elements?: unknown }).elements;
-		return Array.isArray(elements)
-			? elements.map((el) => String((el as { id?: unknown }).id))
-			: [];
-	});
 }
 
 export type SaveResult<T> =

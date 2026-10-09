@@ -12,15 +12,15 @@
 // written with `templates/<entryId>.tkit` entries opens unchanged.
 
 import {
-	healElementIds,
+	loadTemplate,
 	raiseFormatVersion,
 	subtleSha256,
-	validate,
+	type Template,
 } from "@freshcoat-js/coatfile";
 import {
 	COAT_EXTENSION,
-	decodeTemplate,
 	packTemplate,
+	pruneUnusedAssets,
 	templateStem,
 } from "@freshcoat-js/coatfile/coat";
 import { parsePrintProfile } from "@freshcoat-js/for-print";
@@ -307,7 +307,7 @@ async function* workspaceEntries(ws: Workspace): AsyncGenerator<ZipEntry> {
 	for (const entry of ws.templates) {
 		yield {
 			name: templatePath(entry),
-			data: await packTemplate(raiseFormatVersion(entry.template)),
+			data: await packTemplate(writableTemplate(entry.template)),
 			level: 0,
 		};
 	}
@@ -480,32 +480,27 @@ async function readTemplate(
 	item: WorkspaceManifest["templates"][number],
 	warnings: string[],
 ): Promise<TemplateEntry> {
-	const decoded = await decodeTemplate(entry(read, item.path));
-	if (!decoded.ok) {
+	const loaded = await loadTemplate(entry(read, item.path));
+	if (!loaded.ok) {
+		if (loaded.reason === "unreadable")
+			throw new UnpackError(
+				loaded.code === "asset_hash_mismatch"
+					? "asset_hash_mismatch"
+					: "invalid_template",
+				`${item.path}: ${loaded.message}`,
+			);
+		const first = loaded.errors[0];
 		throw new UnpackError(
-			decoded.code === "asset_hash_mismatch"
-				? "asset_hash_mismatch"
-				: "invalid_template",
-			`${item.path}: ${decoded.message}`,
+			"invalid_template",
+			`${item.fileName}: ${first ? `${first.path} ${first.message}` : "invalid"}`,
 		);
 	}
-	let result = validate(decoded.document);
-	if (!result.ok) {
-		const healed = validate(healElementIds(decoded.document));
-		if (!healed.ok) {
-			const first = result.errors[0];
-			throw new UnpackError(
-				"invalid_template",
-				`${item.fileName}: ${first ? `${first.path} ${first.message}` : "invalid"}`,
-			);
-		}
+	if (loaded.healed)
 		warnings.push(`${item.fileName}: renamed duplicate element ids`);
-		result = healed;
-	}
 	return {
 		id: item.id,
 		fileName: item.fileName,
-		template: result.value,
+		template: loaded.template,
 		...(item.binding !== undefined ? { binding: item.binding } : {}),
 		...(item.guides !== undefined ? { guides: item.guides } : {}),
 	};
@@ -688,6 +683,12 @@ function templateFileStem(fileName: string): string {
 	return stem === "" || /^\.+$/.test(stem) ? "template" : stem;
 }
 
+/** A template as it is written: unused assets pruned, `format_version`
+ *  raised to cover the fields used. */
+function writableTemplate(template: Template): Template {
+	return raiseFormatVersion(pruneUnusedAssets(template));
+}
+
 /** Every template as `templates/<fileName>.coat`, in one zip. */
 export async function packTemplates(ws: Workspace): Promise<Uint8Array> {
 	const entries: Entries = {};
@@ -698,7 +699,7 @@ export async function packTemplates(ws: Workspace): Promise<Uint8Array> {
 		for (let n = 2; used.has(name.toLowerCase()); n++) name = `${stem}-${n}`;
 		used.add(name.toLowerCase());
 		entries[`templates/${name}${COAT_EXTENSION}`] = [
-			await packTemplate(raiseFormatVersion(entry.template)),
+			await packTemplate(writableTemplate(entry.template)),
 			{ level: 0 },
 		];
 	}
