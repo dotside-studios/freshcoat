@@ -1,4 +1,4 @@
-import { fitDesignSize } from "@freshcoat-js/coatfile";
+import { fitDesignSize, MAX_EXPORT_DIMENSION } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import { planExport } from "../plan";
 import {
@@ -47,6 +47,20 @@ describe("imagesOf", () => {
 				([ref]) => ref,
 			),
 		).toEqual([photo]);
+	});
+});
+
+describe("itemSize", () => {
+	it("stays within the longest edge the render allows", () => {
+		const big = itemSize(memberCard, { ...preset, scale: 100 }, item, assets);
+		if ("error" in big) throw new Error(big.error);
+		expect(Math.max(big.width, big.height)).toBe(MAX_EXPORT_DIMENSION);
+
+		const huge = assetsByRef([{ ...wide, width: 16000, height: 10000 }]);
+		const uncapped = { ...preset, size: { kind: "image", field: "photo" } };
+		const photo = itemSize(memberCard, uncapped as ExportPreset, item, huge);
+		if ("error" in photo) throw new Error(photo.error);
+		expect([photo.width, photo.height]).toEqual([MAX_EXPORT_DIMENSION, 5120]);
 	});
 });
 

@@ -1,10 +1,13 @@
 import {
 	applyVariant,
 	compile,
+	exportPixelSize,
 	fitDesignSize,
 	hasInsets,
+	MAX_EXPORT_DIMENSION,
 	type Renderer,
 	resizeTemplate,
+	resolveExportScale,
 	type Sides,
 	type Template,
 	variantSize,
@@ -80,7 +83,8 @@ export type ItemSize = {
  * the preset's scale, with the bleed around it when the preset includes it. A
  * size from an image is the photo's oriented pixels, capped by `maxEdge`: the
  * variant is laid out by its constraints at the photo's aspect and rendered at
- * the density that makes it exactly that many pixels.
+ * the density that makes it exactly that many pixels. Neither goes past
+ * `MAX_EXPORT_DIMENSION`, the longest edge the render allows.
  */
 export function itemSize(
 	template: Pick<Template, "width" | "height" | "bleed" | "variants">,
@@ -92,11 +96,14 @@ export function itemSize(
 	const design = variantSize(template, item.variantId);
 	if (size.kind === "template") {
 		const bleed = presetBleed(template, preset);
-		const { width, height } = withBleed(design, bleed);
+		const full = withBleed(design, bleed);
+		const scale = resolveExportScale(
+			{ kind: "scale", value: preset.scale },
+			full,
+		);
 		return {
-			width: Math.round(width * preset.scale),
-			height: Math.round(height * preset.scale),
-			scale: preset.scale,
+			...exportPixelSize(full, scale),
+			scale,
 			...(hasInsets(bleed) ? { bleed: true as const } : {}),
 		};
 	}
@@ -109,10 +116,12 @@ export function itemSize(
 		height: asset.height,
 		orientation: asset.orientation,
 	});
-	const cap =
+	const longest = Math.max(seen.width, seen.height);
+	const maxEdge =
 		size.maxEdge && size.maxEdge > 0
-			? Math.min(1, size.maxEdge / Math.max(seen.width, seen.height))
-			: 1;
+			? Math.min(size.maxEdge, MAX_EXPORT_DIMENSION)
+			: MAX_EXPORT_DIMENSION;
+	const cap = Math.min(1, maxEdge / longest);
 	const width = Math.max(1, Math.round(seen.width * cap));
 	const height = Math.max(1, Math.round(seen.height * cap));
 	const resize = fitDesignSize(design, width, height);
