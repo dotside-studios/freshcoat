@@ -526,15 +526,19 @@ describe("validate (mustache references)", () => {
 				expect(
 					r.errors
 						.filter((e) => e.code === "unknown_field_reference")
-						.map((e) => [e.path, e.message]),
+						.map((e) => [e.path, e.message, e.field, e.role]),
 				).toEqual([
 					[
 						"/template_data/0/elements/0/properties/value",
 						"mustache reference {{nope}} has no matching field",
+						"nope",
+						"text",
 					],
 					[
 						"/template_data/0/elements/0/properties/value",
 						"mustache reference {{also}} has no matching field",
+						"also",
+						"text",
 					],
 				]);
 			}
@@ -577,10 +581,14 @@ describe("validate (mustache references)", () => {
 			expect(
 				r.errors
 					.filter((e) => e.code === "unknown_field_reference")
-					.map((e) => e.path),
+					.map((e) => [e.path, e.field, e.role]),
 			).toEqual([
-				"/variants/0/overrides/0/background/properties/src",
-				"/variants/0/overrides/0/elements/0/properties/value",
+				["/variants/0/overrides/0/background/properties/src", "photo", "src"],
+				[
+					"/variants/0/overrides/0/elements/0/properties/value",
+					"nope",
+					"text",
+				],
 			]);
 		}
 		bad.fields.properties = {

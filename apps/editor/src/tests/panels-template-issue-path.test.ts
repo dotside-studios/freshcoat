@@ -1,6 +1,11 @@
 import { validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
-import { issueMessage, issuePathToKey, pathSegments } from "~/app/issue-path";
+import {
+	issueMessage,
+	issuePathToKey,
+	missingField,
+	pathSegments,
+} from "~/app/issue-path";
 import { unwrap, updateElement } from "~/doc/ops";
 import { googleFontUrls, verifyGoogleFont } from "~/panels/setup/google-font";
 import { doc } from "./doc-fixture";
@@ -86,6 +91,33 @@ describe("issuePathToKey", () => {
 			"/template_data/0/elements/1/properties/children/1/properties/value",
 		);
 		expect(issuePathToKey(issue?.path ?? "", broken)).toBe("0/1/1");
+	});
+});
+
+describe("missingField", () => {
+	const issue = {
+		path: "/template_data/0/elements/0/properties/src",
+		code: "unknown_field_reference",
+		message: "reworded",
+	};
+
+	test("reads the field and its role, not the message", () => {
+		expect(missingField({ ...issue, field: "photo", role: "src" })).toEqual({
+			id: "photo",
+			condition: false,
+			format: "image",
+		});
+		expect(missingField({ ...issue, field: "vip", role: "condition" })).toEqual(
+			{ id: "vip", condition: true, format: "boolean" },
+		);
+		expect(missingField({ ...issue, field: "name", role: "text" })).toEqual({
+			id: "name",
+			condition: false,
+		});
+	});
+
+	test("is null without a field", () => {
+		expect(missingField(issue)).toBeNull();
 	});
 });
 

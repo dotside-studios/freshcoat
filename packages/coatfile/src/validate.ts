@@ -2,6 +2,7 @@ import { TemplateSchema } from "./schemas";
 import { type TextRuleBreak, textRuleBreaks } from "./text-rules";
 import type {
 	FieldDefinition,
+	FieldReferenceRole,
 	FieldsSchema,
 	Template,
 	ValidationError,
@@ -55,9 +56,19 @@ const TOP_LEVEL_FIELD_CODES: Record<string, string> = {
 function issueToError(issue: ZodIssueLite): ValidationError {
 	const path = pathToPointer(issue.path);
 	if (issue.code === "custom") {
-		const kitCode = (issue.params as { kitCode?: string } | undefined)?.kitCode;
+		const { kitCode, field, role } = (issue.params ?? {}) as {
+			kitCode?: string;
+			field?: string;
+			role?: FieldReferenceRole;
+		};
 		if (kitCode) {
-			return { path, code: kitCode, message: issue.message };
+			return {
+				path,
+				code: kitCode,
+				message: issue.message,
+				...(field !== undefined ? { field } : {}),
+				...(role ? { role } : {}),
+			};
 		}
 	}
 	if (

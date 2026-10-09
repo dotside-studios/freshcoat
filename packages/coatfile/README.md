@@ -1232,6 +1232,11 @@ cased form changes length (`ß` in upper case), so string indices stay stable.
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is
 the reference check, including the cross-field rules zod alone does not express.
 
+Each error is `{ path, code, message }`, with `path` a JSON pointer. The
+message is for people and may be reworded. An `unknown_field_reference` also
+carries `field`, the id it names, and `role`: `"src"` for an image source,
+`"condition"` for a `visibleWhen`, and `"text"` for a `{{token}}` anywhere else.
+
 ## Fixtures
 
 `@freshcoat-js/coatfile/fixtures` exports two canonical templates and their expected

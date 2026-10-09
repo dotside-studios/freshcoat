@@ -187,18 +187,15 @@ export function missingField(issue: ValidationError): {
 	condition: boolean;
 	format?: FieldDefinition["format"];
 } | null {
-	if (issue.code !== "unknown_field_reference") return null;
-	const mustache = /\{\{\s*([^}]+?)\s*\}\}/.exec(issue.message)?.[1];
-	if (mustache) {
-		const src = pathSegments(issue.path).at(-1) === "src";
-		return {
-			id: mustache,
-			condition: false,
-			format: src ? "image" : undefined,
-		};
+	if (issue.code !== "unknown_field_reference" || !issue.field) return null;
+	switch (issue.role) {
+		case "condition":
+			return { id: issue.field, condition: true, format: "boolean" };
+		case "src":
+			return { id: issue.field, condition: false, format: "image" };
+		default:
+			return { id: issue.field, condition: false };
 	}
-	const name = quoted(issue.message);
-	return name ? { id: name, condition: true, format: "boolean" } : null;
 }
 
 export function canCreateField(id: string, template: Template): boolean {

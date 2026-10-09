@@ -4,6 +4,7 @@ import { parseImageFocus } from "./image-focus";
 import { FIELD_FORMATS, tokenIds } from "./mustache";
 import type {
 	Element,
+	FieldReferenceRole,
 	FrameElement,
 	FrameProperties,
 	MaskElement,
@@ -835,12 +836,13 @@ function addKitIssue(
 	kitCode: string,
 	message: string,
 	path: (string | number)[],
+	reference?: { field: string; role: FieldReferenceRole },
 ) {
 	ctx.addIssue({
 		code: "custom",
 		message,
 		path,
-		params: { kitCode },
+		params: { kitCode, ...reference },
 	});
 }
 
@@ -1120,6 +1122,7 @@ function enforceMustacheReferences(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 						"unknown_field_reference",
 						`mustache reference {{${id}}} has no matching field`,
 						[...path],
+						{ field: id, role: path.at(-1) === "src" ? "src" : "text" },
 					);
 				}
 			}
@@ -1180,6 +1183,7 @@ function enforceVisibilityReferences(
 						"unknown_field_reference",
 						`visibleWhen names "${c.field}", which has no matching field`,
 						[...path, i, "visibleWhen", ...(Array.isArray(when) ? [ci] : [])],
+						{ field: c.field, role: "condition" },
 					);
 				}
 			});
