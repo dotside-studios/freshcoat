@@ -11,17 +11,24 @@ import type {
 import {
 	applyVariant,
 	assetUri,
+	backgroundSwatch,
 	bytesToBase64,
 	checkVariants,
 	collectAssetRefs,
+	DEFAULT_VARIANT_ID,
 	FORMAT_MINOR,
 	FORMAT_VERSION,
 	formatVersionStatus,
 	hasInsets,
+	isEmptyDelta,
 	parseAssetUri,
 	resolveInsets,
+	sameJson,
 	subtleSha256,
+	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
+	type VariantShellKey,
+	variantIdFor,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -59,7 +66,6 @@ import {
 	updateList,
 	updateSide,
 } from "./tree";
-import { DELTA_SHELL, type DeltaShellKey, sameJson } from "./variant-edit";
 
 export type { OpOk, OpRefused, OpResult, RefusalCode } from "./result";
 export { ok, refuse, unwrap } from "./result";
@@ -1025,8 +1031,6 @@ export function pruneUnusedAssets(t: Template): Template {
 // ── Variants ─────────────────────────────────────────────────────────────────
 
 const VARIANT_ID = /^[a-z0-9-]+$/;
-/** Export file names and bindings say `default` for Default. */
-const RESERVED_VARIANT_ID = "default";
 
 export type AddVariantResult =
 	| (OpOk & { variantId: string })
@@ -1048,24 +1052,6 @@ function withVariant(t: Template, id: string, next: Variant): Template {
 	};
 }
 
-/** A variant id from a label: lowercase, `-` between words, `variant` when
- *  nothing is left, and `-2`, `-3` until no other variant has it. */
-export function variantIdFor(t: Template, label: string): string {
-	const slug =
-		label
-			.normalize("NFKD")
-			.replace(/[\u0300-\u036f]/g, "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "") || "variant";
-	const used = new Set((t.variants ?? []).map((v) => v.id));
-	used.add(RESERVED_VARIANT_ID);
-	if (!used.has(slug)) return slug;
-	let n = 2;
-	while (used.has(`${slug}-${n}`)) n++;
-	return `${slug}-${n}`;
-}
-
 /**
  * The swatch a variant would suggest: the first side's background colour with
  * the variant applied (Default without an id), or its first gradient stop.
@@ -1074,17 +1060,7 @@ export function variantIdFor(t: Template, label: string): string {
 export function suggestSwatch(t: Template, id?: string): string | undefined {
 	const applied =
 		id !== undefined && findVariant(t, id) ? applyVariant(t, id) : t;
-	const bg = applied.template_data[0]?.background;
-	if (bg?.type !== "rect") return undefined;
-	const fills = bg.properties.fill;
-	const fill = Array.isArray(fills) ? fills[0] : fills;
-	const colour =
-		typeof fill === "string"
-			? fill
-			: fill?.kind === "pattern"
-				? fill.colors?.[0]
-				: fill?.stops[0]?.color;
-	return colour && !colour.includes("{{") ? colour : undefined;
+	return backgroundSwatch(applied.template_data[0]?.background);
 }
 
 /** Appends a variant labelled `label`. With `from`, it starts as a copy of
@@ -1099,7 +1075,10 @@ export function addVariant(
 	const source =
 		opts.from === undefined ? undefined : findVariant(t, opts.from);
 	if (opts.from !== undefined && !source) return unknownVariant();
-	const id = variantIdFor(t, label);
+	const id = variantIdFor(
+		label,
+		(t.variants ?? []).map((v) => v.id),
+	);
 	const swatch = source ? source.swatch : suggestSwatch(t);
 	const variant: Variant = {
 		id,
@@ -1213,7 +1192,7 @@ export function changeVariantId(
 	if (clean === id) return ok(t, []);
 	if (!VARIANT_ID.test(clean))
 		return refuse("invalid_variant_id", VARIANT_COPY.idRule);
-	if (clean === RESERVED_VARIANT_ID)
+	if (clean === DEFAULT_VARIANT_ID)
 		return refuse("invalid_variant_id", VARIANT_COPY.reservedId);
 	if (findVariant(t, clean))
 		return refuse("duplicate_variant_id", VARIANT_COPY.idTaken(clean));
@@ -1250,8 +1229,11 @@ export function resetOverride(
 			const properties = { ...d.properties };
 			const next: Record<string, unknown> = { ...d };
 			for (const k of keys) {
-				if ((DELTA_SHELL as readonly string[]).includes(k) || k === "hidden")
-					delete next[k as DeltaShellKey | "hidden"];
+				if (
+					(VARIANT_SHELL_KEYS as readonly string[]).includes(k) ||
+					k === "hidden"
+				)
+					delete next[k as VariantShellKey | "hidden"];
 				else delete properties[k];
 			}
 			const out = { ...next, properties } as Delta;
@@ -1317,14 +1299,6 @@ export function removeUnusedChanges(t: Template): OpResult {
 		next = r.template;
 	}
 	return ok(next, []);
-}
-
-function isEmptyDelta(d: Delta): boolean {
-	return (
-		Object.keys(d.properties).length === 0 &&
-		DELTA_SHELL.every((k) => d[k] === undefined) &&
-		d.hidden === undefined
-	);
 }
 
 function sameOverrides(a: Override[], b: Override[]): boolean {

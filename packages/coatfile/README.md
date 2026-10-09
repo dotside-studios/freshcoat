@@ -783,6 +783,12 @@ which is what `renderTemplate` compiles at by default; `compile` needs a
 laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
 sized variant as it is.
 
+`DEFAULT_VARIANT_ID` (`"default"`) is how export file names, bindings and
+pickers name Default, so no variant may take it. `variantIdFor(label, taken)`
+makes an id from a label: accents stripped, lowercased, `-` between words,
+`variant` when nothing is left, then `-2`, `-3` until it is neither in `taken`
+nor `DEFAULT_VARIANT_ID`. It does not add the id to `taken`.
+
 `closestVariant(t, aspect)` is the variant whose size is closest in aspect,
 or undefined for Default, which wins a tie. `hasShapedVariants(t)` says
 whether any variant's size changes the aspect. `isEmptyVariant(variant)` says
@@ -796,6 +802,35 @@ itself, so hiding it has no effect. The input is not mutated, `variants` is
 kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
 everything else.
+
+Several overrides may name the same side; they apply in order. Reading them
+back follows the same rule `applyVariant` draws by: `variantDeltas(t,
+variantId)` maps each side's name to its `SideDeltas`, `{ background,
+elements }`, with the last background and one merged delta per element id;
+`sideDeltas(t, variantId, sideName)` is one side's. `mergedElementDelta(t,
+variantId, sideName, elementId)` is one element's merged delta: later
+`properties` merge over earlier ones, and a later shell field replaces an
+earlier one only when it is set. An element is hidden when any of its deltas
+says `hidden: true`, so a later `hidden: false` does not show it again.
+`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, and
+`sideBackground(t, variantId, sideName)` is the background it sets. An absent
+or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
+fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
+nothing beyond its id.
+
+`diffElement(base, next, { epsilon })` is the delta that turns one version of
+an element into another, or undefined when they draw the same. `properties`
+holds each key `next` sets to a different value; a key it removes is left out,
+since a delta cannot remove one. A frame's `children` and a mask's `mask` and
+`children` are never diffed, because each element inside gets its own delta.
+A shell field is kept where `next` sets it and it differs from `base`'s, an
+omitted one read as compile draws it: `pos` `{ x: 0, y: 0 }`, `rotation` 0,
+`opacity` 1. It never sets `hidden`. Values compare with `sameJson(a, b, {
+epsilon })`, which ignores key order, reads a missing key as `undefined` and
+treats numbers less than `epsilon` apart as equal (exact by default).
+`backgroundSwatch(background)` is the colour a background suggests for a
+variant's swatch: a rect's fill, its first gradient stop or pattern colour,
+undefined for an image or a `{{field}}` colour.
 
 `validate` checks `{{field}}` references in variant backgrounds and deltas as it
 does in the design, with paths under `/variants/<i>/overrides/<j>/`.

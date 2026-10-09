@@ -1,5 +1,6 @@
 import {
 	closestVariant,
+	DEFAULT_VARIANT_ID,
 	hasShapedVariants,
 	isEmptyVariant,
 	type Template,
@@ -183,7 +184,7 @@ export function variantFor(
 }
 
 /** What a variant column holds to pick Default. */
-export const DEFAULT_VARIANT = "default";
+export const DEFAULT_VARIANT = DEFAULT_VARIANT_ID;
 
 /**
  * Every variant a record renders in, in export order; undefined is Default.
