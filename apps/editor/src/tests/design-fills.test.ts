@@ -1,23 +1,17 @@
 import type { Fill, Template } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
-import { describe, expect, it } from "vitest";
-import { getElement } from "~/doc/path";
-import { patchLayers } from "~/panels/design/field-helpers";
 import {
 	addStop,
-	colorAt,
 	convertFill,
-	editedGradient,
 	fillsOf,
 	fillsPatch,
 	type Gradient,
-	removeAt,
 	removeStop,
-	replaceAt,
-	reverseStops,
-	rotateQuarter,
-	withLinearAngle,
-} from "~/panels/design/fills";
+} from "@freshcoat-js/coatfile/fills";
+import { describe, expect, it } from "vitest";
+import { getElement } from "~/doc/path";
+import { patchLayers } from "~/panels/design/field-helpers";
+import { editedGradient, removeAt, replaceAt } from "~/panels/design/fills";
 import { conditionsOf, opOf, withOp } from "~/panels/design/VisibilitySection";
 import { doc } from "./doc-fixture";
 
@@ -132,56 +126,11 @@ describe("visibility conditions", () => {
 	});
 });
 
-describe("gradient helpers", () => {
+describe("gradient handles", () => {
 	const stops = [
 		{ offset: 0, color: "#000000" },
 		{ offset: 1, color: "#ff000080" },
 	];
-
-	it("interpolates colours between stops, alpha included", () => {
-		expect(colorAt(stops, 0.5)).toBe("#800000c0");
-		expect(colorAt(stops, -1)).toBe("#000000");
-		expect(colorAt(stops, 2)).toBe("#ff000080");
-		expect(
-			colorAt([{ offset: 0, color: "{{c}}" }, ...stops.slice(1)], 0.2),
-		).toBe("{{c}}");
-	});
-
-	it("reverses stops into rising offsets", () => {
-		expect(
-			reverseStops([...stops, { offset: 0.2, color: "#00ff00" }]).map(
-				(s) => s.offset,
-			),
-		).toEqual([0, 0.8, 1]);
-	});
-
-	it("turns a linear gradient and its points a quarter clockwise", () => {
-		const g: Gradient = {
-			kind: "linear",
-			angle: 0,
-			from: [0, 0.5],
-			to: [1, 0.5],
-			stops,
-		};
-		expect(rotateQuarter(g)).toMatchObject({
-			angle: 90,
-			from: [0.5, 0],
-			to: [0.5, 1],
-		});
-		expect(rotateQuarter({ kind: "linear", angle: 300, stops })).toMatchObject({
-			angle: 30,
-		});
-	});
-
-	it("points a gradient with points along a typed angle about their midpoint", () => {
-		const g = withLinearAngle(
-			{ kind: "linear", angle: 0, from: [0.2, 0.5], to: [0.6, 0.5], stops },
-			90,
-		);
-		expect(g.kind === "linear" && g.from?.[0]).toBeCloseTo(0.4, 9);
-		expect(g.kind === "linear" && g.from?.[1]).toBeCloseTo(0.3, 9);
-		expect(g.kind === "linear" && g.to?.[1]).toBeCloseTo(0.7, 9);
-	});
 
 	it("edits the opened gradient, else the topmost", () => {
 		const lin: Gradient = { kind: "linear", angle: 0, stops };

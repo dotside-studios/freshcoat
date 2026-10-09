@@ -5,7 +5,11 @@ import type {
 	Variant,
 	VariantElementDelta,
 } from "@freshcoat-js/coatfile";
-import { FORMAT_VERSION, resizeTemplate } from "@freshcoat-js/coatfile";
+import {
+	allElements,
+	FORMAT_VERSION,
+	resizeTemplate,
+} from "@freshcoat-js/coatfile";
 import { daviWordmark } from "./davi-wordmark";
 
 // The Davi card as Davi's production card templates draw it (the Vista design
@@ -403,14 +407,8 @@ function portrait(w: number, h: number): Template["template_data"] {
 const WIDE = { width: 1012, height: 638 };
 const TALL = { width: 638, height: 1012 };
 
-function byId(elements: Element[], out = new Map<string, Element>()) {
-	for (const el of elements) {
-		out.set(el.id, el);
-		if (el.type === "frame") byId(el.properties.children, out);
-		if (el.type === "mask")
-			byId([el.properties.mask, ...el.properties.children], out);
-	}
-	return out;
+function byId(elements: Element[]) {
+	return new Map(allElements(elements).map((el) => [el.id, el]));
 }
 
 const same = (a: unknown, b: unknown) =>

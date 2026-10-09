@@ -1,6 +1,6 @@
+import { type PatternFill, patternParams } from "@freshcoat-js/coatfile/fills";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useId } from "react";
-import { type Pattern, patternParams } from "./fills";
 
 /**
  * A fill row's preview of a pattern at its design size. Hatching and dots are
@@ -11,7 +11,7 @@ export function PatternSwatch({
 	p,
 	className,
 }: {
-	p: Pattern;
+	p: PatternFill;
 	className?: string;
 }) {
 	const id = `pattern${useId().replace(/[^\w-]/g, "")}`;

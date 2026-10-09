@@ -77,10 +77,12 @@ export {
 } from "./bleed";
 export { compile } from "./compile";
 export {
+	barcodeBox,
 	constrainBox,
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorPath,
 } from "./constraints";
 export {
 	collectFontBytes,
@@ -108,7 +110,7 @@ export {
 	raiseFormatVersion,
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
-export { isEllipsePath } from "./ellipse-path";
+export { ellipsePath, isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
@@ -140,7 +142,7 @@ export {
 	applyCase,
 	type TextCase,
 } from "./text-case";
-export { childElements } from "./tree";
+export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,
 	BakedTextLayout,

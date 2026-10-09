@@ -426,6 +426,21 @@ units as `center`) and `focusRadius` gives it a circle (units of `radius`).
 Linear and radial fills take `spread`: `pad` (the default) holds the end
 colors, `reflect` mirrors the stops and `repeat` tiles them.
 
+### Editing fills
+
+`@freshcoat-js/coatfile/fills` reads and writes a layer's fills the way the
+format stores them. `fillsOf(layer)` lists them bottom first: text has at most
+one, its gradient `fill` or else its solid `color`, and a shape, frame or
+background has `fill` as one value or a list. `fillsPatch(layer, fills)` is the
+`properties` patch that writes a list back in that shape. `convertFill(fill,
+kind)` turns a fill into another kind and keeps its colours, and
+`linearPoints(gradient)` is where a linear gradient runs, from its points or
+else its `angle`. The stop helpers (`addStop`, `removeStop`, `insertStop`,
+`moveStop`, `reverseStops`, `sortedStops`) keep a gradient at two stops or
+more with rising offsets, `colorAt(stops, offset)` is the colour a gradient
+paints at an offset, and `rotateQuarter` and `withLinearAngle` turn a linear
+gradient and its points.
+
 ## Patterns
 
 A `pattern` fill is a procedural texture drawn by a CanvasKit shader, not an
@@ -493,6 +508,11 @@ leaves the path different from the resized base's.
   background always covers it.
 - A vector's `d` scales with its box on each axis, arcs included. Path data
   that does not parse keeps its authored coordinates.
+
+`resizeVectorPath(vector, size)` is that path for one vector at a new size, and
+`barcodeBox(elementOrSymbology, box)` is the box a code takes in `box`: the
+square of its shorter side, centred, for a code that only reads square, and
+`box` itself for any other.
 
 ## Vectors and blend modes
 
@@ -748,6 +768,9 @@ There is no ellipse element. An ellipse is a `vector` whose `d` is two arcs
 across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
+
+`ellipsePath(width, height)` writes that path, and `isEllipsePath(d, width,
+height)` tells whether a path is one.
 
 ## Field keys
 
@@ -1129,6 +1152,14 @@ sets to `left`, or to `start` when a `direction` is given. A justified paragraph
 stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
+
+## Walking elements
+
+`childElements(el)` is what one element holds: a frame's children, or a mask's
+shape followed by the content it masks. `walkElements(elements, visit)` visits
+every element and everything nested in it, each before what it holds; a visit
+that returns `false` skips that element's contents. `allElements(elements)` is
+the same walk as a list.
 
 ### Text case
 

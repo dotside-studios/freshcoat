@@ -15,6 +15,7 @@
 		"./assets": "./src/assets.ts",
 		"./barcode-encoder": "./src/barcode-encoder.ts",
 		"./bleed": "./src/bleed.ts",
+		"./fills": "./src/fills.ts",
 		"./fonts": "./src/font-usage.ts",
 		"./render": "./src/render.ts",
 		"./svg": "./src/svg.ts",

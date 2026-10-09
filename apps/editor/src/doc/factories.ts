@@ -1,5 +1,7 @@
 import {
+	barcodeBox,
 	type Element,
+	ellipsePath,
 	isEllipsePath,
 	isLinearSymbology,
 	isSquareSymbology,
@@ -111,7 +113,7 @@ export function defaultRect(
 		kind === "text"
 			? [240, 48]
 			: kind === "barcode"
-				? barcodeBox(t)
+				? defaultBarcodeSize(t)
 				: Array(2).fill(Math.min(200, Math.min(t.width, t.height) / 4));
 	return {
 		x: round2(point.x - width / 2),
@@ -131,7 +133,9 @@ export function placeholderSrc(t: Pick<Template, "fields">): string {
 export const BARCODE_SIZE = { width: 360, height: 120 };
 
 /** The default barcode box, shrunk to fit a small artboard at the same aspect. */
-function barcodeBox(t: Pick<Template, "width" | "height">): [number, number] {
+function defaultBarcodeSize(
+	t: Pick<Template, "width" | "height">,
+): [number, number] {
 	const fit = Math.min(1, (t.width * 0.8) / BARCODE_SIZE.width);
 	return [round2(BARCODE_SIZE.width * fit), round2(BARCODE_SIZE.height * fit)];
 }
@@ -155,37 +159,26 @@ export function barcodeBoxFor(
 	to: Symbology,
 ): BarcodeBox | null {
 	const { width, height } = box.size;
-	let next: { width: number; height: number } | null = null;
+	let next: BarcodeBox | null = null;
 	if (isSquareSymbology(to)) {
-		const side = Math.min(width, height);
-		next = { width: side, height: side };
+		next = barcodeBox(to, box);
 	} else if (isSquareSymbology(from) && isLinearSymbology(to)) {
+		const h = round2((width * BARCODE_SIZE.height) / BARCODE_SIZE.width);
 		next = {
-			width,
-			height: round2((width * BARCODE_SIZE.height) / BARCODE_SIZE.width),
+			pos: { x: box.pos.x, y: box.pos.y + (height - h) / 2 },
+			size: { width, height: h },
 		};
 	}
 	if (
 		!next ||
-		(Math.abs(next.width - width) < 0.01 &&
-			Math.abs(next.height - height) < 0.01)
+		(Math.abs(next.size.width - width) < 0.01 &&
+			Math.abs(next.size.height - height) < 0.01)
 	)
 		return null;
 	return {
-		pos: {
-			x: round2(box.pos.x + (width - next.width) / 2),
-			y: round2(box.pos.y + (height - next.height) / 2),
-		},
-		size: next,
+		pos: { x: round2(next.pos.x), y: round2(next.pos.y) },
+		size: next.size,
 	};
-}
-
-/** An ellipse filling a `w`×`h` box, as two half-ellipse arcs. */
-export function ellipsePath(w: number, h: number): string {
-	const rx = fmt(w / 2);
-	const ry = fmt(h / 2);
-	const cy = fmt(h / 2);
-	return `M0 ${cy}A${rx} ${ry} 0 1 0 ${fmt(w)} ${cy}A${rx} ${ry} 0 1 0 0 ${cy}Z`;
 }
 
 /** Whether `el` is a vector whose path is `ellipsePath` of its own size. The
@@ -198,8 +191,4 @@ export function isEllipseVector(el: Element): boolean {
 export function round2(n: number): number {
 	const r = Math.round(n * 100) / 100;
 	return r === 0 ? 0 : r;
-}
-
-function fmt(n: number): string {
-	return String(Math.round(n * 1000) / 1000);
 }

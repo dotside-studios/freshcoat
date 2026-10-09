@@ -1,7 +1,5 @@
-import {
-	linearGradientAngle,
-	linearGradientPoints,
-} from "@freshcoat-js/coatfile";
+import { linearGradientAngle } from "@freshcoat-js/coatfile";
+import { type Gradient, linearPoints } from "@freshcoat-js/coatfile/fills";
 import {
 	ancestorRects,
 	centreOf,
@@ -10,7 +8,6 @@ import {
 	type Rect,
 	rotatePoint,
 } from "~/doc/geometry";
-import type { Gradient } from "~/panels/design/fills";
 
 /**
  * Where a gradient sits on the canvas, matching the coat engine's `shaderFor`:
@@ -125,16 +122,6 @@ export function wrapDegrees(d: number): number {
 }
 
 // ── Reading a gradient ───────────────────────────────────────────────────────
-
-/** A linear gradient's endpoints in box fractions, derived from `angle` when
- *  it has none, exactly as `resolveFill` does. */
-export function linearPoints(g: Extract<Gradient, { kind: "linear" }>): {
-	from: Vec;
-	to: Vec;
-} {
-	if (g.from && g.to) return { from: g.from, to: g.to };
-	return linearGradientPoints(g.angle);
-}
 
 const centerOf = (g: Gradient): Vec =>
 	g.kind === "linear" ? [0.5, 0.5] : (g.center ?? [0.5, 0.5]);

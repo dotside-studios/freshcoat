@@ -25,7 +25,7 @@ export {
 	resolveLeadingTrim,
 	textClipOutset,
 } from "./bake-text";
-export { hslToRgb } from "./color";
+export { hslToRgb, parseColor, type Rgba, toHex } from "./color";
 export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {
 	type CompileSceneOptions,

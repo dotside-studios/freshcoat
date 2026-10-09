@@ -469,6 +469,19 @@ describe("compile", () => {
 		expect(set).toEqual([0x12, 0x34, 0x56, 255]);
 	});
 
+	test("reads a foreground in any colour syntax", () => {
+		for (const [foreground, rgb] of [
+			["#12345680", [0x12, 0x34, 0x56]],
+			["red", [255, 0, 0]],
+			["rgb(1, 2, 3)", [1, 2, 3]],
+		] as const) {
+			const tpl = barcodeTemplate({ symbology: "code128", foreground });
+			const bitmap = findBitmap(compiledGroup(tpl, { code: "ABC" }).group);
+			if (!bitmap) throw new Error();
+			expect([...bitmap.pixels].slice(0, 4)).toEqual([...rgb, 255]);
+		}
+	});
+
 	test("the text line uses the template's first font, and requests it", () => {
 		const tpl = {
 			...barcodeTemplate({ symbology: "code128" }),

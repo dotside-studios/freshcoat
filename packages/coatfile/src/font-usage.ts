@@ -1,6 +1,5 @@
-import { childElements } from "./tree";
+import { walkElements } from "./tree";
 import type {
-	Background,
 	BarcodeElement,
 	Element,
 	FontRequest,
@@ -19,18 +18,11 @@ export function defaultFontFamily(template: Template): string | undefined {
 	const declared = template.fonts?.[0]?.family;
 	if (declared) return declared;
 	let found: string | undefined;
-	const walk = (el: Element | Background) => {
-		if (found) return;
-		if (el.type === "text") {
-			found = el.properties.font.family;
-			return;
-		}
-		for (const child of childElements(el)) walk(child);
-	};
-	for (const frame of template.template_data) {
-		walk(frame.background);
-		for (const el of frame.elements) walk(el);
-	}
+	for (const frame of template.template_data)
+		walkElements(frame.elements, (el) => {
+			if (found) return false;
+			if (el.type === "text") found = el.properties.font.family;
+		});
 	return found;
 }
 
@@ -64,7 +56,7 @@ export function fontUsage(template: Template): Map<string, FontUsage> {
 	};
 	for (const t of withVariants(template)) {
 		const fallbackFamily = defaultFontFamily(t);
-		const walk = (el: Element | Background) => {
+		const visit = (el: Element) => {
 			if (el.type === "text") {
 				const { font, spans } = el.properties;
 				add(font.family, font.weight ?? 400, font.style === "italic");
@@ -81,12 +73,8 @@ export function fontUsage(template: Template): Map<string, FontUsage> {
 				const family = barcodeFontFamily(el, fallbackFamily);
 				if (family) add(family, 400, false);
 			}
-			for (const child of childElements(el)) walk(child);
 		};
-		for (const frame of t.template_data) {
-			walk(frame.background);
-			for (const el of frame.elements) walk(el);
-		}
+		for (const frame of t.template_data) walkElements(frame.elements, visit);
 	}
 	const out = new Map<string, FontUsage>();
 	for (const [family, u] of used)

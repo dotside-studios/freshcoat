@@ -2,10 +2,12 @@ import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import { compile } from "../src/compile";
 import {
+	barcodeBox,
 	constrainBox,
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorPath,
 } from "../src/constraints";
 import type {
 	Command,
@@ -15,6 +17,7 @@ import type {
 	GroupNode,
 	Node,
 	Template,
+	VectorElement,
 } from "../src/types";
 import { validate } from "../src/validate";
 import { applyVariant } from "../src/variants";
@@ -539,5 +542,57 @@ describe("compile with resize", () => {
 			);
 			expect(resized).toEqual(plain);
 		}
+	});
+});
+
+describe("resizeVectorPath", () => {
+	const vector = (d: string, size?: { width: number; height: number }) =>
+		({ id: "v", type: "vector", size, properties: { d } }) as VectorElement;
+
+	test("scales the path by the box's change on each axis", () => {
+		expect(
+			resizeVectorPath(vector("M0 0L10 0L10 20Z", { width: 10, height: 20 }), {
+				width: 20,
+				height: 10,
+			}),
+		).toBe("M0 0L20 0L20 10Z");
+	});
+
+	test("an empty axis is not scaled", () => {
+		expect(
+			resizeVectorPath(vector("M0 0L10 0", { width: 10, height: 0 }), {
+				width: 30,
+				height: 5,
+			}),
+		).toBe("M0 0L30 0");
+	});
+
+	test("keeps the path without a size or when it does not parse", () => {
+		expect(resizeVectorPath(vector("M0 0L10 0"), { width: 5, height: 5 })).toBe(
+			"M0 0L10 0",
+		);
+		expect(
+			resizeVectorPath(vector("M0 0X10", { width: 10, height: 10 }), {
+				width: 5,
+				height: 5,
+			}),
+		).toBe("M0 0X10");
+	});
+});
+
+describe("barcodeBox", () => {
+	const box = { pos: { x: 10, y: 20 }, size: { width: 300, height: 100 } };
+
+	test("a square symbology takes the shorter side, centred", () => {
+		expect(barcodeBox("datamatrix", box)).toEqual({
+			pos: { x: 110, y: 20 },
+			size: { width: 100, height: 100 },
+		});
+	});
+
+	test("a QR code stays square and a 1D code keeps its box", () => {
+		const qr = { id: "q", type: "qr_code" } as Element;
+		expect(barcodeBox(qr, box).size).toEqual({ width: 100, height: 100 });
+		expect(barcodeBox("code128", box)).toBe(box);
 	});
 });
