@@ -57,9 +57,16 @@ export {
 } from "./barcode-encoder";
 export { hasBarcode } from "./has-barcode";
 export {
+	type BleedMm,
+	bleedMm,
 	bleedSize,
+	type CardSizeMm,
+	cardSizeMm,
 	extendIntoBleed,
 	hasInsets,
+	MM_PER_INCH,
+	NO_BLEED,
+	resolveBleedMm,
 	resolveInsets,
 	templateBleed,
 	templateSafeArea,
@@ -75,6 +82,10 @@ export {
 	collectFontBytes,
 	collectFontRequests,
 	defaultFontFamily,
+	type FontCache,
+	type ResolvedTemplateFonts,
+	type ResolveTemplateFontsOptions,
+	resolveTemplateFonts,
 } from "./fonts";
 export {
 	FORMAT_MAJOR,
@@ -208,6 +219,9 @@ export {
 	type ApplyVariantOptions,
 	applyVariant,
 	checkVariants,
+	closestVariant,
+	hasShapedVariants,
+	isEmptyVariant,
 	type VariantElementDelta,
 	type VariantIssue,
 	variantBase,

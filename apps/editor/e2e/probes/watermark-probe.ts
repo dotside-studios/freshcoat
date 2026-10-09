@@ -1,3 +1,4 @@
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { photoDataset, prepareAssets } from "@freshcoat-js/workspace";
 import {
@@ -6,7 +7,7 @@ import {
 	runExportJob,
 } from "@freshcoat-js/workspace/export";
 import { createWorkerPool, defaultPoolSize } from "~/export/worker-pool";
-import { resolveTemplateFonts } from "~/render/fonts";
+import { fontCache } from "~/render/font-cache";
 import { photoWatermark } from "~/samples/photo-watermark";
 
 export type PhotoSpec = {
@@ -247,7 +248,9 @@ export async function runWatermarkExport(opts: {
 
 	const largest = largestImagePixels(ws, PRESET);
 	const pool = createWorkerPool(defaultPoolSize(largest));
-	const { fonts } = await resolveTemplateFonts(photoWatermark());
+	const { fonts } = await resolveTemplateFonts(photoWatermark(), {
+		cache: fontCache,
+	});
 	await pool.init(fonts);
 
 	const parts: { name: string; bytes: number }[] = [];

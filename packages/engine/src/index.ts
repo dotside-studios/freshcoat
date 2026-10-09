@@ -59,6 +59,7 @@ export {
 } from "./export-scale";
 export {
 	clearFontBytesCache,
+	type FontFetch,
 	fontBytes,
 	resolveFontRequest,
 } from "./font-bytes";
@@ -68,6 +69,11 @@ export {
 	fetchLoader,
 	mapLoader,
 } from "./loader";
+export {
+	createSharedFontProvider,
+	makeParagraphBuilder,
+	type SharedFontProvider,
+} from "./font-collection";
 export {
 	getFontMetrics,
 	readFontMetrics,
@@ -175,6 +181,13 @@ export {
 } from "./renderer";
 export { squircleSvg } from "./squircle";
 export type { TextEngineCacheStats } from "./text-cache";
+export {
+	type FontWeightName,
+	fontWeight,
+	fontWeightName,
+	spanTextStyle,
+	toColor,
+} from "./text-style";
 export type {
 	ClusterAdvance,
 	SpanFont,

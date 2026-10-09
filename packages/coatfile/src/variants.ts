@@ -211,3 +211,56 @@ function elementIds(elements: Element[]): Set<string> {
 	elements.forEach(walk);
 	return ids;
 }
+
+/** Whether a variant's size differs in aspect from the template's. */
+export function hasShapedVariants(template: Template): boolean {
+	const aspect = template.width / template.height;
+	return (template.variants ?? []).some(
+		(v) =>
+			v.size !== undefined &&
+			Math.abs(v.size.width / v.size.height - aspect) > 1e-6,
+	);
+}
+
+/** The variant, or undefined for Default, whose size is closest to
+ *  `aspect`. Default wins a tie, then the first in list order. */
+export function closestVariant(
+	template: Template,
+	aspect: number,
+): string | undefined {
+	const distance = (id?: string) => {
+		const size = variantSize(template, id);
+		return Math.abs(Math.log(size.width / size.height / aspect));
+	};
+	let best: string | undefined;
+	let bestDistance = distance(undefined);
+	for (const v of template.variants ?? []) {
+		const d = distance(v.id);
+		if (d < bestDistance - 1e-9) {
+			best = v.id;
+			bestDistance = d;
+		}
+	}
+	return best;
+}
+
+/** Whether a variant renders exactly as Default: no override replaces a
+ *  background, and no element delta carries anything beyond its id and an
+ *  empty `properties`. */
+export function isEmptyVariant(variant: Variant): boolean {
+	return variant.overrides.every(
+		(override) =>
+			override.background === undefined &&
+			(override.elements ?? []).every((delta) =>
+				Object.entries(delta).every(
+					([key, value]) =>
+						key === "id" ||
+						value === undefined ||
+						(key === "properties" &&
+							Object.values(value as Record<string, unknown>).every(
+								(v) => v === undefined,
+							)),
+				),
+			),
+	);
+}

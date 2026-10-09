@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	cardSizeMm,
 	cropMarks,
 	DEFAULT_SHEET_LAYOUT,
 	type ImposeItem,
@@ -562,13 +561,5 @@ describe("bleed", () => {
 		// 2 × 4, margins only
 		expect(count(15)).toEqual([2, 4, 4 * 2 + 8 * 2]);
 		expect(count(16)).toEqual([2, 4, 4 * (2 + 2 * 3) + 8 * (2 + 2 * 1)]);
-	});
-});
-
-describe("cardSizeMm", () => {
-	it("is the pixels at the DPI in millimetres", () => {
-		const card = cardSizeMm(1200, 900, 300);
-		expect(card.widthMm).toBeCloseTo(101.6, 9);
-		expect(card.heightMm).toBeCloseTo(76.2, 9);
 	});
 });

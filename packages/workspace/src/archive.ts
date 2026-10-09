@@ -21,12 +21,12 @@ import {
 	COAT_EXTENSION,
 	decodeTemplate,
 	packTemplate,
+	templateStem,
 } from "@freshcoat-js/coatfile/coat";
 import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
-import { templateStem } from "./ids";
 import { readImageInfo } from "./image-info";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import type {

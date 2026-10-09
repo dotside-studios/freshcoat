@@ -3,6 +3,7 @@ import type { FontResolution } from "../src/types";
 import {
 	clearFontBytesCache,
 	FONT_MEMO_MAX,
+	type FontFetch,
 	fontBytes,
 } from "../src/font-bytes";
 
@@ -239,5 +240,36 @@ describe("fontBytes memo", () => {
 		const [b] = await fontBytes(http(src));
 		expect(b).toBe(a);
 		expect([...(a ?? [])]).toEqual([97, 98, 99]);
+	});
+});
+
+describe("fontBytes with a fetcher", () => {
+	test("sends every request through it, with memos of its own", async () => {
+		const file = {
+			kind: "descriptor",
+			descriptor: {
+				kind: "local",
+				family: "X",
+				files: [{ src: "https://f/a.ttf", weight: 400, style: "normal" }],
+			},
+		} satisfies FontResolution;
+		const requested = stubFetch("", { "https://f/a.ttf": 1 });
+		const seen: string[] = [];
+		const fetcher: FontFetch = async (url) => {
+			seen.push(url);
+			return {
+				ok: true,
+				status: 200,
+				text: async () => "",
+				arrayBuffer: async () => new Uint8Array([2]).buffer,
+			};
+		};
+		const [global] = await fontBytes(file);
+		const [own] = await fontBytes(file, undefined, fetcher);
+		await fontBytes(file, undefined, fetcher);
+		expect(global?.[0]).toBe(1);
+		expect(own?.[0]).toBe(2);
+		expect(requested).toEqual(["https://f/a.ttf"]);
+		expect(seen).toEqual(["https://f/a.ttf"]);
 	});
 });

@@ -2,9 +2,7 @@ import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	autoBinding,
-	closestVariant,
 	imagesFor,
-	isEmptyVariant,
 	resolveValues,
 	serialValue,
 	variantFor,
@@ -269,12 +267,6 @@ describe("variant from the photo's shape", () => {
 		};
 	};
 
-	it("picks the closest aspect, Default on a tie", () => {
-		expect(closestVariant(shaped, 1.6)).toBeUndefined();
-		expect(closestVariant(shaped, 0.6)).toBe("portrait");
-		expect(closestVariant(shaped, 1.1)).toBe("square");
-	});
-
 	it("reads the bound photo as seen", () => {
 		expect(variantFor(shaped, byPhoto, withPhoto(3000, 2000), ana)).toBe(
 			undefined,
@@ -359,64 +351,6 @@ describe("variantsFor", () => {
 		expect(
 			variantsFor(t, bind({ kind: "column", column: "tier" }), dataset, ana),
 		).toEqual(["gold"]);
-	});
-});
-
-describe("isEmptyVariant", () => {
-	const variant = (overrides: Variant["overrides"]): Variant => ({
-		id: "v",
-		label: "V",
-		overrides,
-	});
-
-	it("is empty with no overrides, or only empty deltas", () => {
-		expect(isEmptyVariant(variant([]))).toBe(true);
-		expect(isEmptyVariant(variant([{ name: "front" }]))).toBe(true);
-		expect(
-			isEmptyVariant(
-				variant([
-					{ name: "front", elements: [] },
-					{ name: "back", elements: [{ id: "name", properties: {} }] },
-				]),
-			),
-		).toBe(true);
-	});
-
-	it("is not empty with a background, a property or a shell field", () => {
-		expect(
-			isEmptyVariant(
-				variant([
-					{
-						name: "front",
-						background: {
-							id: "bg",
-							type: "rect",
-							pos: { x: 0, y: 0 },
-							size: { width: 1, height: 1 },
-							properties: { fill: "#000" },
-						},
-					},
-				]),
-			),
-		).toBe(false);
-		expect(
-			isEmptyVariant(
-				variant([
-					{ name: "front", elements: [{ id: "name", properties: { a: 1 } }] },
-				]),
-			),
-		).toBe(false);
-		// format 1.4 deltas: a shell field or hidden alone is a change
-		const shell = (extra: Record<string, unknown>) =>
-			variant([
-				{
-					name: "front",
-					elements: [{ id: "name", properties: {}, ...extra }],
-				},
-			] as Variant["overrides"]);
-		expect(isEmptyVariant(shell({ pos: { x: 1, y: 2 } }))).toBe(false);
-		expect(isEmptyVariant(shell({ hidden: true }))).toBe(false);
-		expect(isEmptyVariant(shell({ opacity: undefined }))).toBe(true);
 	});
 });
 

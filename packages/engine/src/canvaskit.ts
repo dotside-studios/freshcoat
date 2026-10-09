@@ -16,7 +16,6 @@ import type {
 	ColorFilter,
 	ColorSpace,
 	Font,
-	FontWeightEnumValues,
 	GlyphRun,
 	GrDirectContext,
 	Image,
@@ -51,6 +50,12 @@ import {
 	spanByteStarts,
 } from "./arc-text";
 import { parseColor } from "./color";
+import {
+	fontWeight,
+	fontWeightName,
+	spanTextStyle,
+	toColor,
+} from "./text-style";
 import { withPathMeasure } from "./path-measure";
 import {
 	imageInfo,
@@ -99,8 +104,6 @@ import {
 	type DecorationMetrics,
 	decorationLine,
 	fitRect,
-	fontFeatureList,
-	fontVariationList,
 	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
@@ -174,18 +177,6 @@ type Frame = {
 const SHADOW_SIGMA = (blur: number) => blur / 2;
 const LAYER_BLUR_SIGMA = (blur: number) => blur / 2.2727;
 
-const WEIGHTS: Record<number, EnumKey<FontWeightEnumValues>> = {
-	100: "Thin",
-	200: "ExtraLight",
-	300: "Light",
-	400: "Normal",
-	500: "Medium",
-	600: "SemiBold",
-	700: "Bold",
-	800: "ExtraBold",
-	900: "Black",
-};
-
 // A per-frame bin of CanvasKit handles to free after the snapshot is taken —
 // shaders, filters, paths, images, etc. leak native memory otherwise.
 type Bin = {
@@ -238,11 +229,6 @@ function makeBin(cache?: PaintCacheState | null): Bin {
 				: track(build());
 		},
 	};
-}
-
-function toColor(ck: CanvasKit, input: string) {
-	const c = parseColor(input);
-	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
 }
 
 // Device pixels per local unit under the canvas's current matrix.
@@ -661,30 +647,9 @@ function textStyleOf(
 	fallbackFamilies: string[] = [],
 	wordSpacing?: number,
 ) {
-	const weight =
-		WEIGHTS[Math.round((span.font.weight || 400) / 100) * 100] ?? "Normal";
 	return {
 		color: toColor(ck, span.color ?? cmd.color ?? "#000000"),
-		fontFamilies: [
-			span.font.family,
-			...fallbackFamilies.filter((f) => f !== span.font.family),
-		],
-		fontSize: span.font.size,
-		fontStyle: {
-			weight: ck.FontWeight[weight],
-			slant:
-				span.font.style === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright,
-		},
-		// Instantiate a variable face at the span's weight and axes instead of
-		// drawing its default instance under synthetic bold — see paragraph-layout's
-		// spanTextStyle, which measures with the identical style.
-		fontVariations: fontVariationList(span.font.weight, span.font.variations),
-		...(span.font.features
-			? { fontFeatures: fontFeatureList(span.font.features) }
-			: {}),
-		...(span.font.letterSpacing
-			? { letterSpacing: span.font.letterSpacing }
-			: {}),
+		...spanTextStyle(ck, span.font, fallbackFamilies),
 		...(wordSpacing ? { wordSpacing } : {}),
 	};
 }
@@ -841,7 +806,7 @@ function spanDecoration(
 		byFace = new Map();
 		decorationMetrics.set(provider, byFace);
 	}
-	const w = WEIGHTS[Math.round((weight || 400) / 100) * 100] ?? "Normal";
+	const w = fontWeightName(weight);
 	const key = `${w}|${style}|${family}`;
 	if (!byFace.has(key)) {
 		const typeface = provider.matchFamilyStyle(family, {
@@ -2811,7 +2776,7 @@ function familyBox(
 	for (const slant of [ck.FontSlant.Upright, ck.FontSlant.Italic]) {
 		for (let weight = 100; weight <= 900; weight += 100) {
 			const typeface = provider.matchFamilyStyle(family, {
-				weight: ck.FontWeight[WEIGHTS[weight]],
+				weight: fontWeight(ck, weight),
 				width: ck.FontWidth.Normal,
 				slant,
 			});

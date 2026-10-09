@@ -5,21 +5,21 @@ import { doc } from "./doc-fixture";
 
 vi.mock("@freshcoat-js/coatfile", async (load) => {
 	const m = await load<typeof import("@freshcoat-js/coatfile")>();
-	return { ...m, collectFontRequests: vi.fn(m.collectFontRequests) };
+	return {
+		...m,
+		collectFontRequests: vi.fn(m.collectFontRequests),
+		resolveTemplateFonts: vi.fn(async () => ({
+			fonts: new Map(),
+			declared: [],
+			guessed: [],
+			missing: [],
+		})),
+	};
 });
-
-vi.mock("~/render/fonts", () => ({
-	resolveTemplateFonts: vi.fn(async () => ({
-		fonts: new Map(),
-		declared: [],
-		guessed: [],
-		missing: [],
-	})),
-}));
 
 describe("useDocumentFonts", () => {
 	test("an edit that leaves the fonts alone does not refetch", async () => {
-		const { resolveTemplateFonts } = await import("~/render/fonts");
+		const { resolveTemplateFonts } = await import("@freshcoat-js/coatfile");
 		const { useDocumentFonts } = await import("~/render/use-document-fonts");
 		const t = doc();
 		const { rerender, result } = renderHook(({ t }) => useDocumentFonts(t), {

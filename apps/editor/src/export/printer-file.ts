@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
 import {
 	type DatasetAsset,
 	DEFAULT_QUALITY,
@@ -14,7 +14,7 @@ import {
 	type RenderRequest,
 } from "@freshcoat-js/workspace/export";
 import { useEffect, useRef, useState } from "react";
-import { resolveTemplateFonts } from "~/render/fonts";
+import { fontCache } from "~/render/font-cache";
 import { createWorkerPool, type WorkerPool } from "./worker-pool";
 
 /** A printer file is shown, not handed over, so past this long edge it is
@@ -142,8 +142,8 @@ export function usePrinterFile(
 			const own = pool.current;
 			if (own.template !== template) {
 				own.template = template;
-				own.fonts = resolveTemplateFonts(template).then(({ fonts }) =>
-					own.pool.init(fonts),
+				own.fonts = resolveTemplateFonts(template, { cache: fontCache }).then(
+					({ fonts }) => own.pool.init(fonts),
 				);
 			}
 			await own.fonts;

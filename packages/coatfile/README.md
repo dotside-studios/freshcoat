@@ -182,6 +182,9 @@ With bleed:
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
 insets; `extendIntoBleed` is the edge rule on its own.
 
+For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
+millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
+
 ## Inline assets
 
 A template normally points at its rasters by URL. An authoring tool has none —
@@ -366,6 +369,9 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
+
+`templateStem(fileName)` is a file name without its template extension
+(`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
 
 ## Gradients
 
@@ -791,6 +797,11 @@ which is what `renderTemplate` compiles at by default; `compile` needs a
 laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
 sized variant as it is.
 
+`closestVariant(t, aspect)` is the variant whose size is closest in aspect,
+or undefined for Default, which wins a tie. `hasShapedVariants(t)` says
+whether any variant's size changes the aspect. `isEmptyVariant(variant)` says
+whether a variant draws exactly as Default.
+
 `applyVariant(template, variantId, { hidden })` returns the template with one
 variant applied, which is what `compile` draws for `variantId`. A hidden element
 and everything inside it is removed by default (`hidden: "drop"`); `"keep"`
@@ -821,9 +832,88 @@ implementation. See [`@freshcoat-js/engine`](../engine) for the scene model and 
 A `local` font's files travel inside the template, so handing someone the
 template hands them the font. Embed only a font whose license allows that.
 
-`collectFontBytes(template)` fetches every family a template uses as bytes;
-`collectFontRequests` lists the families it needs and where each is declared.
-Both include the families a variant's deltas bring in.
+`collectFontRequests` lists the families a template needs and where each is
+declared, including the families a variant's deltas and barcodes bring in.
+
+### Resolving fonts
+
+`resolveTemplateFonts(template, options)` loads every font a template needs and
+says where each came from. Studio resolves fonts this way, and a script or
+server gets the same result:
+
+```ts
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
+
+const { fonts, declared, guessed, missing } = await resolveTemplateFonts(template);
+// fonts: Map<family, bytes[]>
+// declared: families the `fonts` block describes
+// guessed: undeclared families found on Google Fonts by name
+// missing: families nothing produced bytes for; their text uses a fallback face
+```
+
+A family the `fonts` block does not describe is looked up on Google Fonts by
+name, at only the weights the template uses it at (text, spans, barcodes, in the
+base design and every variant). Pass `guessGoogle: false` to load declared fonts
+only. A family that fails to load is reported as missing and never takes the
+others with it.
+
+The options leave network and storage to the host:
+
+- `fetch` carries every http(s) request. Use it to block the network, add a
+  proxy or redirect to a mirror. The global `fetch` is used when it is omitted.
+- `load` reads a `local` font file whose `src` is a path rather than a data: or
+  http(s) URL, as the engine's loaders do.
+- `cache` keeps bytes across calls. A `Map<string, Promise<Uint8Array[]>>`
+  works as is. `get` may also return a promise of `undefined` for a miss, so a
+  cache can sit on disk. An empty result is deleted again, so a family that
+  failed is retried on the next call.
+
+```ts
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { resolveTemplateFonts, type FontCache } from "@freshcoat-js/coatfile";
+import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/node";
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+
+const dir = ".font-cache";
+const file = (key: string) => join(dir, encodeURIComponent(key));
+const diskCache: FontCache = {
+  get: (key) =>
+    readFile(file(key), "utf8").then(
+      (json) => (JSON.parse(json) as number[][]).map((b) => new Uint8Array(b)),
+      () => undefined,
+    ),
+  set: async (key, pending) => {
+    const bytes = await pending;
+    if (bytes.length === 0) return;
+    await mkdir(dir, { recursive: true });
+    await writeFile(file(key), JSON.stringify(bytes.map((b) => [...b])));
+  },
+  delete: () => {},
+};
+
+const { fonts, missing } = await resolveTemplateFonts(template, {
+  cache: diskCache,
+  guessGoogle: !process.env.OFFLINE,
+});
+if (missing.length) console.warn("no font for", missing.join(", "));
+
+const renderer = await createRenderer({
+  ck: await loadCanvasKit(),
+  fonts: Object.fromEntries(fonts),
+});
+const frames = await renderTemplate(renderer, template, values);
+```
+
+`renderTemplate` loads only the families the template declares, through the
+renderer and its loader, and reports one that fails as a `font_load_failed`
+warning. It does not guess. Fonts given to the renderer first, through its
+`fonts` option or `addFonts`, take the place of the declared ones, so resolving
+first and handing the map over is how a render gets the Google guess.
+
+`collectFontBytes(template, options)` is the declared-only form: the `fonts`
+map of `resolveTemplateFonts` with `guessGoogle: false`.
 
 A `google` / `fontsource` descriptor points at a **stylesheet**, not a font
 file, and what that stylesheet contains depends on who asks. Servers send an old

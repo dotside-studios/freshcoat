@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
 import { useEffect, useState } from "react";
 import { sampleValues } from "~/doc/values";
-import { resolveTemplateFonts } from "~/render/fonts";
+import { fontCache } from "~/render/font-cache";
 import { once } from "./lazy";
 
 /** Device pixels along a thumbnail's longer edge. */
@@ -17,7 +17,7 @@ const loadExportPng = once(() => import("./export-png"));
 export async function renderThumbnail(t: Template): Promise<Blob> {
 	const [{ renderSidePng }, { fonts }] = await Promise.all([
 		loadExportPng(),
-		resolveTemplateFonts(t),
+		resolveTemplateFonts(t, { cache: fontCache }),
 	]);
 	const { png } = await renderSidePng(t, {
 		side: 0,
