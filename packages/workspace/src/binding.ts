@@ -123,6 +123,20 @@ export function resolveValues(
 	return values;
 }
 
+/** The option whose id, then label, is `text`, ignoring case and
+ *  surrounding space. */
+export function matchVariant<T extends { label: string }>(
+	options: readonly T[],
+	text: string,
+	idOf: (option: T) => string,
+): T | undefined {
+	const wanted = text.trim().toLowerCase();
+	return (
+		options.find((o) => idOf(o).toLowerCase() === wanted) ??
+		options.find((o) => o.label.trim().toLowerCase() === wanted)
+	);
+}
+
 /**
  * The variant a record renders in, or undefined for the default. Under `all`
  * a record has no single variant, so this is Default, the first of the ones
@@ -167,10 +181,7 @@ export function variantFor(
 			? ""
 			: toTemplateValue(column, cell).trim().toLowerCase();
 	const picked = wanted
-		? (
-				variants.find((v) => v.id.toLowerCase() === wanted) ??
-				variants.find((v) => v.label.trim().toLowerCase() === wanted)
-			)?.id
+		? matchVariant(variants, wanted, (v) => v.id)?.id
 		: undefined;
 	if (picked !== undefined || wanted === DEFAULT_VARIANT) return picked;
 	if (!binding || source.fallback === undefined) return undefined;

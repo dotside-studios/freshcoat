@@ -15,6 +15,12 @@ import {
 	parseAssetRef,
 	type RecordStatus,
 } from "@freshcoat-js/workspace";
+import {
+	cellIssue,
+	displayText,
+	editText,
+	NUMERIC_TYPES,
+} from "@freshcoat-js/workspace/dataset";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type KeyboardEvent,
@@ -37,7 +43,6 @@ import { AssetThumb } from "./AssetThumb";
 import { type ColumnChoices, choiceOf } from "./column-options";
 import { useGrid } from "./grid-context";
 import { useGridUi } from "./grid-state";
-import { cellIssue, displayText, editText, NUMERIC_TYPES } from "./model";
 
 export const STATUSES: { id: RecordStatus; label: string; tone: string }[] = [
 	{

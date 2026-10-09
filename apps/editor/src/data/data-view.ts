@@ -1,5 +1,5 @@
+import type { SortSpec } from "@freshcoat-js/workspace/dataset";
 import type { ColumnFilter, StatusFilter } from "./gallery-model";
-import type { SortSpec } from "./model";
 
 /** How Data shows one dataset: kept in the store per dataset, so it
  *  survives leaving the section. */

@@ -26,6 +26,7 @@ export {
 	autoBinding,
 	DEFAULT_VARIANT,
 	imagesFor,
+	matchVariant,
 	resolveValues,
 	serialValue,
 	variantFor,

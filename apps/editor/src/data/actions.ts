@@ -14,6 +14,11 @@ import {
 	type TableFormat,
 	uniqueName,
 } from "@freshcoat-js/workspace";
+import {
+	rebindColumn,
+	renameColumn,
+	replaceDataset,
+} from "@freshcoat-js/workspace/dataset";
 import { TABLE_EXTENSIONS } from "@freshcoat-js/workspace/tabular";
 import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
@@ -21,7 +26,6 @@ import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
 import type { BindingPatch } from "~/state/workspace";
-import { rebindColumn, renameColumn, replaceDataset } from "./model";
 
 export function currentDataset(
 	controller: EditorController,

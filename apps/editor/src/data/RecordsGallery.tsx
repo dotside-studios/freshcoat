@@ -7,6 +7,13 @@ import {
 	orientedSize,
 	parseAssetRef,
 } from "@freshcoat-js/workspace";
+import {
+	assetMap,
+	displayText,
+	recordByIdMap,
+	recordIndexMap,
+	recordIssues,
+} from "@freshcoat-js/workspace/dataset";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	createContext,
@@ -34,13 +41,6 @@ import {
 	titleColumn,
 } from "./gallery-model";
 import type { GridUiStore } from "./grid-state";
-import {
-	assetMap,
-	displayText,
-	recordByIdMap,
-	recordIndexMap,
-	recordIssues,
-} from "./model";
 import { useRowItems } from "./RecordsGrid";
 import { type ThumbWidth, useThumbnail } from "./thumbnails";
 

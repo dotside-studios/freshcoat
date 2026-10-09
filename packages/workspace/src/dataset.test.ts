@@ -1,11 +1,4 @@
-import type {
-	Binding,
-	Column,
-	DataRecord,
-	Dataset,
-} from "@freshcoat-js/workspace";
 import { describe, expect, it } from "vitest";
-import { guessDateOrder } from "~/data/ImportWizard";
 import {
 	addRecords,
 	applySchema,
@@ -17,7 +10,6 @@ import {
 	displayText,
 	duplicateRecords,
 	filterRecords,
-	INDEX_COLUMN,
 	issueCount,
 	keyProblem,
 	moveColumn,
@@ -26,15 +18,16 @@ import {
 	recordIndexMap,
 	recordIssues,
 	renameColumn,
-	STATUS_COLUMN,
 	schemaChanges,
 	setCell,
+	sortByStatus,
 	sortRecords,
 	templatesUsing,
 	updateColumn,
 	valueFromText,
-} from "~/data/model";
-import { doc } from "./doc-fixture";
+} from "./dataset";
+import { memberCard } from "./test-fixtures";
+import type { Binding, Column, DataRecord, Dataset } from "./types";
 
 function rec(
 	id: string,
@@ -73,8 +66,6 @@ function people(): Dataset {
 }
 
 const ids = (records: readonly DataRecord[]) => records.map((r) => r.id);
-const indexOf = (d: Dataset) => (id: string) =>
-	d.records.findIndex((r) => r.id === id);
 
 describe("search", () => {
 	it("matches any cell, ignoring case", () => {
@@ -104,69 +95,51 @@ describe("search", () => {
 describe("sort", () => {
 	it("sorts text naturally, ignoring case, in both directions", () => {
 		const d = people();
-		const asc = sortRecords(
-			d.records,
-			d.columns,
-			{ column: "name", direction: "ascending" },
-			indexOf(d),
-		);
+		const asc = sortRecords(d.records, d.columns, {
+			column: "name",
+			direction: "ascending",
+		});
 		expect(ids(asc)).toEqual(["r_2", "r_3", "r_1", "r_4"]);
-		const desc = sortRecords(
-			d.records,
-			d.columns,
-			{ column: "name", direction: "descending" },
-			indexOf(d),
-		);
+		const desc = sortRecords(d.records, d.columns, {
+			column: "name",
+			direction: "descending",
+		});
 		// Empty cells stay last either way.
 		expect(ids(desc)).toEqual(["r_1", "r_3", "r_2", "r_4"]);
 	});
 
 	it("sorts numbers by value, with values that failed to convert after them", () => {
 		const d = people();
-		const asc = sortRecords(
-			d.records,
-			d.columns,
-			{ column: "age", direction: "ascending" },
-			indexOf(d),
-		);
+		const asc = sortRecords(d.records, d.columns, {
+			column: "age",
+			direction: "ascending",
+		});
 		expect(ids(asc)).toEqual(["r_4", "r_2", "r_1", "r_3"]);
 	});
 
-	it("sorts by status, by dataset position, and is off without a descriptor", () => {
+	it("sorts by status, and is off without a descriptor or column", () => {
 		const d = people();
+		expect(ids(sortByStatus(d.records, "ascending"))).toEqual([
+			"r_1",
+			"r_3",
+			"r_2",
+			"r_4",
+		]);
+		expect(sortRecords(d.records, d.columns, undefined)).toBe(d.records);
 		expect(
-			ids(
-				sortRecords(
-					d.records,
-					d.columns,
-					{ column: STATUS_COLUMN, direction: "ascending" },
-					indexOf(d),
-				),
-			),
-		).toEqual(["r_1", "r_3", "r_2", "r_4"]);
-		expect(
-			ids(
-				sortRecords(
-					d.records,
-					d.columns,
-					{ column: INDEX_COLUMN, direction: "descending" },
-					indexOf(d),
-				),
-			),
-		).toEqual(["r_4", "r_3", "r_2", "r_1"]);
-		expect(sortRecords(d.records, d.columns, undefined, indexOf(d))).toBe(
-			d.records,
-		);
+			sortRecords(d.records, d.columns, {
+				column: "missing",
+				direction: "ascending",
+			}),
+		).toBe(d.records);
 	});
 
 	it("keeps ties in dataset order", () => {
 		const d = people();
-		const sorted = sortRecords(
-			d.records,
-			d.columns,
-			{ column: "vip", direction: "ascending" },
-			indexOf(d),
-		);
+		const sorted = sortRecords(d.records, d.columns, {
+			column: "vip",
+			direction: "ascending",
+		});
 		expect(ids(sorted)).toEqual(["r_1", "r_2", "r_3", "r_4"]);
 	});
 });
@@ -353,7 +326,18 @@ describe("columns", () => {
 	});
 
 	it("makes one column per template field, typed by its format", () => {
-		const columns = columnsFromTemplate(doc());
+		const columns = columnsFromTemplate({
+			...memberCard,
+			fields: {
+				type: "object",
+				properties: {
+					name: { type: "string", title: "Name", default: "Ada" },
+					title: { type: "string" },
+					show: { type: "string", format: "boolean", default: "true" },
+				},
+				required: ["name", "title"],
+			},
+		});
 		expect(columns).toEqual([
 			{
 				key: "name",
@@ -420,12 +404,6 @@ describe("helpers", () => {
 		];
 		expect(templatesUsing(templates, "d_1")).toEqual([templates[0]]);
 		expect(templatesUsing(templates, "d_2")).toEqual([]);
-	});
-
-	it("guesses the date order from a date only one order can read", () => {
-		expect(guessDateOrder([["a"], ["31/03/2025"]])).toBe("dmy");
-		expect(guessDateOrder([["03/31/2025"]])).toBe("mdy");
-		expect(guessDateOrder([["03/04/2025"]])).toBe("mdy");
 	});
 });
 

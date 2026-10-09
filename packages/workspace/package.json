@@ -12,6 +12,7 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./dataset": "./src/dataset.ts",
 		"./archive": "./src/archive.ts",
 		"./tabular": "./src/tabular.ts",
 		"./pdf": "./src/pdf.ts",
