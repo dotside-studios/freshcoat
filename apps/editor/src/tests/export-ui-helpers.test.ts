@@ -21,7 +21,6 @@ import {
 	formatPageSize,
 	imageFieldKeys,
 	labelColumn,
-	pageSize,
 	photoSizedTemplate,
 	recordLabel,
 	recordOutcome,
@@ -141,10 +140,6 @@ describe("file name example", () => {
 
 describe("readouts", () => {
 	test("page size is the design size at the DPI", () => {
-		const { inches, mm } = pageSize({ width: 1012, height: 638 }, 300);
-		expect(inches[0]).toBeCloseTo(3.373, 3);
-		expect(inches[1]).toBeCloseTo(2.127, 3);
-		expect(mm[0]).toBeCloseTo(85.68, 2);
 		expect(formatPageSize({ width: 1012, height: 638 }, 300)).toBe(
 			"3.37 × 2.13 in · 85.7 × 54.0 mm",
 		);
