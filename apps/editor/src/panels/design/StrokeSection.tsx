@@ -2,7 +2,6 @@ import type { RectProperties } from "@freshcoat-js/coatfile";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { useEffect, useState } from "react";
@@ -18,6 +17,7 @@ import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
 import { convertFill, type FillKind, fillKind, isGradient } from "./fills";
 import { GradientSwatch } from "./GradientSwatch";
+import { InspectorSection } from "./InspectorSection";
 
 export type Stroke = NonNullable<RectProperties["stroke"]>;
 
@@ -82,7 +82,10 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 	const join = commonValue(strokes.map((s) => s?.join ?? "miter"));
 
 	return (
-		<PanelSection title="Stroke" actions={sectionActions(["stroke"], actions)}>
+		<InspectorSection
+			title="Stroke"
+			actions={sectionActions(["stroke"], actions)}
+		>
 			{!all && !none && <Notice>Some layers have no stroke</Notice>}
 			{all && (
 				<>
@@ -236,7 +239,7 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 					</Pair>
 				</>
 			)}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

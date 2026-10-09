@@ -17,6 +17,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
+import { rebindDataset } from "~/binding/binding";
 import type { BooleanOp } from "~/doc/boolean";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
@@ -84,7 +85,7 @@ import {
 import { newPreset } from "~/export/preset";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
-import { findStarter } from "~/samples/starters";
+import { findStarter, type Starter } from "~/samples/starters";
 import { loadVendSans } from "~/samples/vend-sans-file";
 import {
 	type Action,
@@ -99,10 +100,12 @@ import {
 } from "~/state/store";
 import {
 	activeSlot,
+	newId,
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";
 import {
+	type Autosave,
 	clearAutosave,
 	configureAutosave,
 	keepAutosaveAsset,
@@ -112,6 +115,7 @@ import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
+import { type RecentSource, recentStore } from "./recent";
 import {
 	reportSourceChanged,
 	SourceChangedError,
@@ -197,6 +201,8 @@ export class EditorController {
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
+	private recentId: string | undefined;
+	private openingFrom: { source: RecentSource; id?: string } | null = null;
 
 	constructor(store: EditorStore = createEditorStore()) {
 		this.store = store;
@@ -250,7 +256,20 @@ export class EditorController {
 	}
 
 	dispatch(action: Action): void {
+		const before = this.store.getState();
 		this.store.dispatch(action);
+		if (action.type === "setSection" || action.type === "setRecord")
+			this.followRecord(before);
+	}
+
+	/** Brings Edit's preview to the current record when Edit comes into view
+	 *  or the record moves while it shows, and its dataset has the record. */
+	private followRecord(before: EditorState): void {
+		const s = this.state;
+		if (s.section !== "edit" || !s.recordId) return;
+		if (s.recordId === s.previewRecordId) return;
+		if (before.section === "edit" && before.recordId === s.recordId) return;
+		this.previewRecord(s.recordId);
 	}
 
 	// ── Editing ──────────────────────────────────────────────────────────────
@@ -777,6 +796,25 @@ export class EditorController {
 		this.refitAfter(() => this.dispatch({ type: "setVariant", variantId: id }));
 	}
 
+	/** Shows the side `by` sides on, wrapping round. */
+	stepSide(by: number): void {
+		const count = this.base?.template_data.length ?? 0;
+		if (count < 2) return;
+		const side = (((this.state.side + by) % count) + count) % count;
+		this.dispatch({ type: "setSide", side });
+	}
+
+	/** Shows the variant `by` on from the active one, Default first,
+	 *  wrapping round. */
+	stepVariant(by: number): void {
+		const t = this.base;
+		const ids = [undefined, ...(t?.variants ?? []).map((v) => v.id)];
+		if (!t || ids.length < 2) return;
+		const at = ids.indexOf(activeVariantId(t, this.state.variantId));
+		const next = (((at + by) % ids.length) + ids.length) % ids.length;
+		this.setVariant(ids[next]);
+	}
+
 	/** Runs `change` and fits the view when it changed the canvas's size. */
 	private refitAfter(change: () => void): void {
 		const before = this.template;
@@ -884,6 +922,23 @@ export class EditorController {
 				variant:
 					to === undefined ? { kind: "fixed" } : { kind: "fixed", id: to },
 			},
+		});
+	}
+
+	/** Binds a template to a dataset, its fields matched by name. */
+	bindTemplate(templateId: string, datasetId: string): void {
+		const ws = this.state.workspace;
+		const slot = ws?.templates.find((t) => t.id === templateId);
+		const dataset = ws?.datasets.find((d) => d.id === datasetId);
+		const template =
+			templateId === ws?.activeTemplateId
+				? this.base
+				: (slot?.parked?.doc.history.present ?? slot?.template);
+		if (!slot || !dataset || !template) return;
+		this.dispatch({
+			type: "setBinding",
+			id: templateId,
+			binding: rebindDataset(template, dataset, slot.binding),
 		});
 	}
 
@@ -1062,7 +1117,27 @@ export class EditorController {
 	}
 
 	private emitOpened(): void {
+		const from = this.openingFrom ?? { source: { kind: "workspace" } };
+		this.recentId = from.id ?? newId("recent");
+		const name = this.state.workspace?.name;
+		if (name)
+			void recentStore().record({
+				id: this.recentId,
+				name,
+				openedAt: Date.now(),
+				source: from.source,
+			});
 		for (const fn of this.openedListeners) fn();
+	}
+
+	/** Runs `open` with what a workspace it starts is recorded as. */
+	private openingAs<T>(source: RecentSource, open: () => T, id?: string): T {
+		this.openingFrom = { source, ...(id ? { id } : {}) };
+		try {
+			return open();
+		} finally {
+			this.openingFrom = null;
+		}
 	}
 
 	/** Calls `fn` when the issues list should be shown, as when a save fails
@@ -1156,7 +1231,10 @@ export class EditorController {
 		const sample = findSample(id);
 		if (!sample) return;
 		const t = await this.loadSample(sample, () => this.openSample(id));
-		if (t) this.open(t, `${sample.id}${COAT_EXTENSION}`);
+		if (t)
+			this.openingAs({ kind: "sample", id: sample.id }, () =>
+				this.open(t, `${sample.id}${COAT_EXTENSION}`),
+			);
 	}
 
 	private loadSample(
@@ -1182,6 +1260,12 @@ export class EditorController {
 		if (!starter) return;
 		const template = await this.loadSample(starter, () => this.openStarter(id));
 		if (!template) return;
+		this.openingAs({ kind: "starter", id: starter.id }, () =>
+			this.openStarterTemplate(starter, template),
+		);
+	}
+
+	private openStarterTemplate(starter: Starter, template: Template): void {
 		const fileName = `${starter.id}${COAT_EXTENSION}`;
 		if (!starter.preset) {
 			this.open(template, fileName);
@@ -1284,6 +1368,15 @@ export class EditorController {
 				failed: "Couldn't load the workspace archive",
 			},
 			retry,
+		);
+	}
+
+	/** Opens the autosaved workspace as the workspace it was written for. */
+	restore(saved: Autosave, notices: string[] = []): void {
+		this.openingAs(
+			{ kind: "workspace" },
+			() => this.openWorkspace(saved.workspace, saved.fileName, notices),
+			saved.recentId,
 		);
 	}
 
@@ -1457,6 +1550,28 @@ export class EditorController {
 		);
 	}
 
+	/** The records the Edit preview steps through: the bound dataset's. */
+	previewRecords(): readonly { id: string }[] {
+		const id = activeSlot(this.state)?.binding?.datasetId;
+		return (
+			this.state.workspace?.datasets.find((d) => d.id === id)?.records ?? []
+		);
+	}
+
+	/** Steps the Edit preview `by` records, from the current record when
+	 *  nothing is previewed yet. */
+	stepRecord(by: number): void {
+		const records = this.previewRecords();
+		if (records.length === 0) return;
+		const s = this.state;
+		const from = records.findIndex(
+			(r) => r.id === (s.previewRecordId ?? s.recordId),
+		);
+		const at = from < 0 ? 0 : s.previewRecordId === null ? from : from + by;
+		const next = records[Math.max(0, Math.min(records.length - 1, at))];
+		if (next) this.previewRecord(next.id);
+	}
+
 	switchTemplate(id: string): void {
 		this.dispatch({ type: "switchTemplate", id });
 		requestAnimationFrame(() => this.fitView());
@@ -1535,7 +1650,11 @@ export class EditorController {
 			const ws = workspaceSnapshot(this.state);
 			const fileName = this.state.workspace?.fileName;
 			if (ws && fileName && isDirty(this.state))
-				void writeAutosave({ workspace: ws, fileName });
+				void writeAutosave({
+					workspace: ws,
+					fileName,
+					...(this.recentId ? { recentId: this.recentId } : {}),
+				});
 		}, 1000);
 	}
 

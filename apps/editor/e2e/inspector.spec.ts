@@ -135,3 +135,33 @@ test("double-clicking a selected text layer focuses its content", async ({
 		inspector(page).getByRole("textbox", { name: "Text content" }),
 	).toBeFocused();
 });
+
+test("the Object menu groups align and distribute, which have shortcuts", async ({
+	page,
+}) => {
+	await openSample(page);
+	await run(page, `c.select(["0/0", "0/1", "0/2"])`);
+	await page
+		.getByRole("toolbar", { name: "Align" })
+		.getByRole("button", { name: "Align left" })
+		.hover();
+	await expect(page.getByRole("tooltip")).toContainText(/Align left\s+(Alt|⌥)/);
+
+	await page.getByRole("button", { name: "Object", exact: true }).click();
+	const menu = page.getByRole("menu", { name: "Object" });
+	await expect(menu.getByRole("menuitem")).toHaveText([
+		/Group into frame/,
+		/Ungroup/,
+		/Attach text to path/,
+		"Boolean",
+		"Arrange",
+		"Align and distribute",
+		/Hide \/ show/,
+		/Lock \/ unlock/,
+	]);
+	await menu.getByRole("menuitem", { name: "Align and distribute" }).click();
+	const sub = page.getByRole("menu", { name: "Align and distribute" });
+	await expect(
+		sub.getByRole("menuitem", { name: /Distribute horizontally/ }),
+	).toContainText(/Alt|⌥/);
+});

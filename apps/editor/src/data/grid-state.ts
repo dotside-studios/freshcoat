@@ -13,8 +13,12 @@ export type GridUiState = {
 /** The grid's cursor, kept outside React state so a cell re-renders only
  *  when it starts or stops being active or edited. */
 export class GridUiStore {
-	private state: GridUiState = { active: null, editing: null };
+	private state: GridUiState;
 	private listeners = new Set<() => void>();
+
+	constructor(active: CellRef | null = null) {
+		this.state = { active, editing: null };
+	}
 
 	get = (): GridUiState => this.state;
 

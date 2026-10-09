@@ -1,4 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { ContextMenu } from "@freshcoat-js/ui/menu";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
@@ -36,13 +38,15 @@ import {
 } from "~/doc/variant-edit";
 import { useEditor, useStore } from "~/state/hooks";
 import { type EditorStore, present } from "~/state/store";
+import CloseIcon from "~icons/mingcute/close-line";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import LockIcon from "~icons/mingcute/lock-line";
+import SearchIcon from "~icons/mingcute/search-line";
 import UnlockIcon from "~icons/mingcute/unlock-line";
 import { dropToMove } from "./drop";
 import { RenameInput } from "./RenameInput";
-import { buildLayerRows, flattenRows, type LayerRow } from "./rows";
+import { buildLayerRows, filterRows, flattenRows, type LayerRow } from "./rows";
 
 const LAYER_TYPE = "application/x-freshcoat-layer";
 
@@ -148,7 +152,7 @@ function rowSelector(key: string) {
 	return `[data-layer-key="${key}"]`;
 }
 
-export function LayersTree() {
+export function LayersTree({ filter = "" }: { filter?: string }) {
 	const controller = useController();
 	const store = useStore();
 	const hiddenInTree = useMemo(() => hiddenInTreeOf(store), [store]);
@@ -176,6 +180,7 @@ export function LayersTree() {
 		[template, side],
 	);
 	const rowIndex = useMemo(() => indexRows(rows), [rows]);
+	const filtered = useMemo(() => filterRows(rows, filter), [rows, filter]);
 	// Handing RAC back its own Selection keeps its anchor, which Shift-click
 	// ranges start from.
 	const lastSelection = useRef<Selection | null>(null);
@@ -212,6 +217,13 @@ export function LayersTree() {
 		expanded = keys;
 		setExpand({ t: template, sel: selection, keys });
 	}
+	const shownExpanded = useMemo(
+		() =>
+			filtered.ancestors.length > 0
+				? new Set<Key>([...expanded, ...filtered.ancestors])
+				: expanded,
+		[expanded, filtered],
+	);
 
 	// A selection made elsewhere scrolls its row into view.
 	useEffect(() => {
@@ -230,7 +242,7 @@ export function LayersTree() {
 
 	// A layer hovered on the canvas lights up its row.
 	useEffect(() => {
-		if (rows.length === 0) return;
+		if (filtered.rows.length === 0) return;
 		let hover: string | null = null;
 		let el: Element | null | undefined = null;
 		const apply = () => {
@@ -247,12 +259,13 @@ export function LayersTree() {
 			unsubscribe();
 			el?.removeAttribute("data-canvas-hover");
 		};
-	}, [store, rows]);
+	}, [store, filtered]);
 
 	const onSelectionChange = useCallback(
 		(keys: Selection) => {
 			lastSelection.current = keys;
-			const next = keys === "all" ? flattenRows(rows) : [...keys].map(String);
+			const next =
+				keys === "all" ? flattenRows(filtered.rows) : [...keys].map(String);
 			const prev = controller.state.selection;
 			const ordered = [
 				...prev.filter((k) => next.includes(k)),
@@ -261,7 +274,7 @@ export function LayersTree() {
 			controller.select(ordered);
 			fromTree.current = controller.state.selection !== prev;
 		},
-		[controller, rows],
+		[controller, filtered],
 	);
 
 	const { dragAndDropHooks } = useDragAndDrop<LayerRow>({
@@ -421,16 +434,21 @@ export function LayersTree() {
 							<Tree
 								aria-label="Layers"
 								data-testid="layers-tree"
-								items={rows}
+								items={filtered.rows}
 								selectionMode="multiple"
 								selectionBehavior="replace"
 								selectedKeys={selectedKeys}
 								onSelectionChange={onSelectionChange}
-								expandedKeys={expanded}
+								expandedKeys={shownExpanded}
 								onExpandedChange={(keys) =>
 									setExpand((s) => ({ ...s, keys: new Set(keys) }))
 								}
 								dragAndDropHooks={dragAndDropHooks}
+								renderEmptyState={() => (
+									<p className="px-2.5 py-1.5 text-fc-faint text-fc-sm">
+										No matching layers
+									</p>
+								)}
 								className="min-h-0 flex-1"
 							>
 								{renderRow}
@@ -571,5 +589,46 @@ function RowToggles({ rowKey }: { rowKey: string }) {
 				{hidden ? <EyeOffIcon /> : <EyeIcon />}
 			</ToggleButton>
 		</>
+	);
+}
+
+/** The Layers header's filter, which narrows the tree to layers whose name
+ *  or type matches. */
+export function LayersFilter({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<div className="relative flex w-28 min-w-16 shrink items-center">
+			<SearchIcon className="pointer-events-none absolute left-1.5 size-3 text-fc-faint" />
+			<input
+				type="search"
+				aria-label="Filter layers"
+				placeholder="Filter"
+				data-testid="layers-filter"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => {
+					e.stopPropagation();
+					if (e.key === "Escape") onChange("");
+				}}
+				className={cn(
+					inputBase,
+					"h-5 pr-5 pl-5 text-fc-sm hover:border-fc-border-strong focus:border-fc-accent pointer-coarse:h-7 [&::-webkit-search-cancel-button]:hidden",
+				)}
+			/>
+			{value ? (
+				<IconButton
+					aria-label="Clear filter"
+					onPress={() => onChange("")}
+					className="absolute right-0 size-5 [&_svg]:size-3"
+				>
+					<CloseIcon />
+				</IconButton>
+			) : null}
+		</div>
 	);
 }

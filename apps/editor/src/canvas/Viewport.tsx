@@ -56,6 +56,7 @@ import {
 	usePrintGuidesVersion,
 } from "./print-guides";
 import { Rulers } from "./Rulers";
+import { SideMenu } from "./SideVariantMenus";
 import { TextEditor } from "./TextEditor";
 import { useLiveRender } from "./use-live-render";
 
@@ -144,7 +145,6 @@ export function Viewport() {
 	const template = useEditor(working);
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
-	const side = useEditor((s) => s.side);
 	const textEditing = useEditor((s) => s.textEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
 	const { canvas, fontsLoading } = useLiveRender();
@@ -285,7 +285,7 @@ export function Viewport() {
 	);
 
 	const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-		if (!template) return;
+		if (!template || onControl(e)) return;
 		const el = ref.current;
 		if (!el) return;
 		el.setPointerCapture?.(e.pointerId);
@@ -761,6 +761,7 @@ export function Viewport() {
 	};
 
 	const onDoubleClick = (e: React.MouseEvent) => {
+		if (onControl(e)) return;
 		const t = controller.template;
 		if (!t || controller.state.tool !== "move") return;
 		const world = toWorld(local(e));
@@ -810,6 +811,7 @@ export function Viewport() {
 				const r = ref.current?.getBoundingClientRect();
 				if (
 					!r ||
+					onControl(e) ||
 					e.clientX < r.left ||
 					e.clientX >= r.right ||
 					e.clientY < r.top ||
@@ -860,14 +862,15 @@ export function Viewport() {
 				{template ? (
 					<>
 						<div
-							className="pointer-events-none absolute truncate text-fc-muted text-fc-sm"
+							className="absolute flex text-fc-muted text-fc-sm"
 							style={{
 								left: Math.round(view.x),
 								top: Math.round(view.y) - 20,
 								maxWidth: Math.max(40, template.width * view.zoom),
 							}}
+							data-canvas-control
 						>
-							{template.template_data[side]?.name}
+							<SideMenu className="data-hovered:text-fc-text" />
 						</div>
 						<div
 							ref={artboardRef}
@@ -899,6 +902,13 @@ export function Viewport() {
 				) : null}
 			</div>
 		</ContextMenu>
+	);
+}
+
+/** Whether `e` is on a control drawn over the canvas, not on the canvas. */
+function onControl(e: { target: EventTarget }): boolean {
+	return (
+		e.target instanceof Element && !!e.target.closest("[data-canvas-control]")
 	);
 }
 

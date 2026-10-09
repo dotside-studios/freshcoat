@@ -10,9 +10,17 @@ import {
 import { useSyncExternalStore } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
+import { formatNumber } from "~/app/format";
 import { workspaceSnapshot } from "~/state/workspace";
-import { boundDataset, selectedRunLabel, statusActions } from "./export-ui";
+import {
+	boundDataset,
+	retryPreset,
+	selectedRunLabel,
+	statusActions,
+	unwrittenRecordIds,
+} from "./export-ui";
 import { openSink } from "./sinks";
 import {
 	createExportRunner,
@@ -57,6 +65,8 @@ export type ExportJobsSnapshot = {
 	 *  over chosen records, the preset with those records. */
 	lastPreset: ExportPreset | null;
 	lastResult: JobResult | null;
+	/** the records a cancelled job did not write, for "Export the rest" */
+	unwritten: readonly string[];
 	history: JobHistoryEntry[];
 };
 
@@ -112,6 +122,7 @@ export function createExportJobs(
 		job: null,
 		lastPreset: null,
 		lastResult: null,
+		unwritten: [],
 		history: [],
 	};
 	const set = (patch: Partial<ExportJobsSnapshot>) => {
@@ -122,7 +133,7 @@ export function createExportJobs(
 		set({ runner: runner.getSnapshot() }),
 	);
 
-	return {
+	const jobs: ExportJobs = {
 		getSnapshot: () => snapshot,
 		subscribe(listener) {
 			listeners.add(listener);
@@ -202,9 +213,44 @@ export function createExportJobs(
 			set({
 				lastPreset: preset,
 				lastResult: result,
+				unwritten: result?.cancelled
+					? unwrittenRecordIds(workspace, preset, result)
+					: [],
 				history: [entry, ...snapshot.history].slice(0, HISTORY_SIZE),
 			});
 			if (result?.file && !result.cancelled) download(result.file);
+			if (controller.state.section !== "export") {
+				if (!result) {
+					if (runner.getSnapshot().state === "error")
+						toast(`Couldn't export ${job.presetName}: ${error}`, {
+							tone: "danger",
+						});
+				} else if (!result.cancelled)
+					toast(
+						[
+							`${job.presetName}: ${plural(entry.ok, "file")} exported`,
+							entry.failed > 0 ? `${formatNumber(entry.failed)} failed` : "",
+						]
+							.filter(Boolean)
+							.join(", "),
+						{
+							tone: entry.failed > 0 ? "warning" : "success",
+							...(entry.failed > 0
+								? {
+										timeout: 12000,
+										action: {
+											label: "Retry failed",
+											onAction: () =>
+												void jobs.run(
+													retryPreset(preset, result),
+													`${preset.name} (retry)`,
+												),
+										},
+									}
+								: {}),
+						},
+					);
+			}
 			return result;
 		},
 		cancel: () => runner.cancel(),
@@ -214,6 +260,7 @@ export function createExportJobs(
 			runner.dispose();
 		},
 	};
+	return jobs;
 }
 
 const sessions = new WeakMap<object, ExportJobs>();

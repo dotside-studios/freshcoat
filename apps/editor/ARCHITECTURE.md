@@ -91,7 +91,9 @@ Saving, autosave and exports read the base.
 active one lives in the store's `doc`; the others are parked with their own
 history, side and view, and restored when switched to. Autosave
 (`app/autosave.ts`) writes the workspace to IndexedDB, and each photo once,
-apart from the templates and data.
+apart from the templates and data. Each opened workspace gets a recent entry
+(`app/recent.ts`), and its autosave names that entry, so the welcome screen
+lists only what it can still open.
 
 ## Data
 
@@ -102,6 +104,11 @@ and a mapping wizard. Photos stay as the browser's `Blob`s, referenced from
 records as `ws:<sha256>`; thumbnails are made in a worker
 (`thumbnail-worker.ts`) and kept in a bounded LRU, so no grid decodes a whole
 photo.
+
+The section unmounts when another is shown, so how it shows each dataset (the
+search, filters, sort and selection) lives in the store's `dataViews`, by
+dataset id, outside the undo history and the saved workspace. Export reads a
+dataset's selection from there to offer it.
 
 ## Export
 

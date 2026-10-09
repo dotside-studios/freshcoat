@@ -34,6 +34,28 @@ test("templates can be added, switched and keep their own undo", async ({
 	expect(await state<number>(page, "s.doc.history.past.length")).toBe(1);
 });
 
+test("the menu bar's undo and redo buttons step through history", async ({
+	page,
+}) => {
+	await openSample(page);
+	const undo = page.getByRole("button", { name: "Undo", exact: true });
+	const redo = page.getByRole("button", { name: "Redo", exact: true });
+	await expect(undo).toBeDisabled();
+	await expect(redo).toBeDisabled();
+	const x = await state<number>(page, "t.template_data[0].elements[6].pos.x");
+	await run(page, `c.select(["0/6"]); c.nudge(5, 0)`);
+	await undo.click();
+	expect(
+		await state<number>(page, "t.template_data[0].elements[6].pos.x"),
+	).toBe(x);
+	await expect(undo).toBeDisabled();
+	await redo.click();
+	expect(
+		await state<number>(page, "t.template_data[0].elements[6].pos.x"),
+	).toBe(x + 5);
+	await expect(redo).toBeDisabled();
+});
+
 test("save a .coatworkspace, reopen it, and get the same workspace", async ({
 	page,
 }) => {

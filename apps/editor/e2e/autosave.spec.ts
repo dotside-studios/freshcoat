@@ -2,7 +2,7 @@ import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, expect, test } from "@playwright/test";
-import { probePath } from "./helpers";
+import { openSample, probePath, run, state } from "./helpers";
 
 const PROBE = probePath("autosave-probe");
 
@@ -114,4 +114,72 @@ test("a kept photo stays readable after its file changes in an incognito profile
 	} finally {
 		await context.close();
 	}
+});
+
+test("Recent lists the autosaved workspace and the samples opened, and reopens them", async ({
+	page,
+}) => {
+	await openSample(page, "certificate");
+	await page.goto("/");
+	const recent = page.getByRole("region", { name: "Recent" });
+	await expect(recent.getByText("Certificate")).toBeVisible();
+	await expect(recent.getByText(/^Sample · /)).toBeVisible();
+
+	await openSample(page, "minimal");
+	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
+	await expect
+		.poll(
+			() =>
+				page.evaluate(async (path) => {
+					const { readAutosave } = await import(/* @vite-ignore */ path);
+					return (await readAutosave())?.recentId ?? null;
+				}, probePath("app-probe")),
+			{ timeout: 10_000 },
+		)
+		.not.toBeNull();
+	await page.goto("/");
+	await expect(page.getByTestId("restore-banner")).toBeVisible();
+	const unsaved = recent.getByRole("button", { name: /Unsaved work · / });
+	await expect(unsaved).toBeVisible();
+	await expect(
+		unsaved.getByTestId("thumbnail"),
+		"draws the autosaved template",
+	).toBeVisible({ timeout: 30_000 });
+
+	await unsaved.click();
+	await expect(page.getByTestId("artboard-canvas")).toBeAttached();
+	expect(await state<number>(page, "t.template_data[0].elements.length")).toBe(
+		0,
+	);
+
+	await page.goto("/");
+	await recent.getByRole("button", { name: /^Remove Certificate/ }).click();
+	await expect(recent.getByText("Certificate")).toBeHidden();
+	await expect
+		.poll(() =>
+			page.evaluate(async (path) => {
+				const { recentStore } = await import(/* @vite-ignore */ path);
+				const entries: { name: string }[] = await recentStore().list();
+				return entries.map((e) => e.name);
+			}, probePath("app-probe")),
+		)
+		.not.toContain("Certificate");
+	await page.reload();
+	await expect(
+		recent.getByRole("button", { name: /Unsaved work · / }),
+	).toBeVisible();
+	await expect(recent.getByText("Certificate")).toBeHidden();
+
+	await page.getByRole("button", { name: "Dismiss" }).click();
+	await expect
+		.poll(() =>
+			page.evaluate(async (path) => {
+				const { readAutosave } = await import(/* @vite-ignore */ path);
+				return await readAutosave();
+			}, probePath("app-probe")),
+		)
+		.toBeNull();
+	await page.reload();
+	await expect(page.getByTestId("starter-davi-card")).toBeVisible();
+	await expect(recent.getByText("Unsaved work", { exact: false })).toBeHidden();
 });

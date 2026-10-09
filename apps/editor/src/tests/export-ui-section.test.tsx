@@ -305,6 +305,29 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 	});
 
+	test("keeps its tabs and selection after another section shows", async () => {
+		const { controller, user, list } = await recordsTab();
+		const rowOf = (name: string) =>
+			within(list).getByText(name).closest('[role="row"]') as HTMLElement;
+		await user.click(within(rowOf("Ada")).getByRole("checkbox"));
+		await user.click(screen.getByRole("tab", { name: "Files" }));
+		cleanup();
+		act(() => controller.dispatch({ type: "setSection", section: "edit" }));
+		act(() => controller.dispatch({ type: "setSection", section: "export" }));
+		render(
+			<ControllerProvider controller={controller}>
+				<ExportSection />
+			</ControllerProvider>,
+		);
+		expect(
+			screen.getByRole("tab", { name: "Records", selected: true }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("tab", { name: "Files", selected: true }),
+		).toBeTruthy();
+		expect(button("Export 1 selected")).toBeTruthy();
+	});
+
 	test("with records set to selected, the list selection is the preset's", async () => {
 		const { controller, user } = setup();
 		const templateId = controller.state.workspace?.activeTemplateId as string;
@@ -339,6 +362,35 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.getByTestId("export-page-size").textContent).toBe(
 			"Page 3.33 × 2.00 in · 84.7 × 50.8 mm",
+		);
+	});
+
+	test("the binding is the template's, shared by its presets", () => {
+		const { controller, templateId } = setup();
+		const preset = (id: string) => ({
+			id,
+			name: id,
+			templateId,
+			records: "all" as const,
+			sides: "all" as const,
+			format: "png-zip" as const,
+			scale: 1,
+			dpi: 300,
+			fileName: "{{index}}",
+			markExported: true,
+		});
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("p_1") }),
+		);
+		const header = () =>
+			screen.getByRole("button", { name: /^Template binding/ }).textContent;
+		expect(header()).not.toContain("used by");
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("p_2") }),
+		);
+		expect(header()).toContain("People");
+		expect(screen.getByTestId("binding-shared").textContent).toBe(
+			"used by 2 presets",
 		);
 	});
 
@@ -523,12 +575,12 @@ describe("export section", { timeout: 20_000 }, () => {
 				.map((o) => o.dataset.record),
 		).toEqual(["r1", "r2", "r3"]);
 		await user.click(within(strip).getAllByRole("option")[1] as HTMLElement);
-		expect(controller.state.exportRecordId).toBe("r2");
+		expect(controller.state.recordId).toBe("r2");
 		expect(screen.getByTestId("export-stepper-position").textContent).toBe(
 			"2 / 3",
 		);
 		await user.keyboard("{ArrowRight}");
-		expect(controller.state.exportRecordId).toBe("r3");
+		expect(controller.state.recordId).toBe("r3");
 		expect(screen.getByTestId("export-record-error").textContent).toBe(
 			"font missing",
 		);
@@ -540,7 +592,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 		const skipped = within(strip).getAllByRole("option")[3] as HTMLElement;
 		await user.click(skipped);
-		expect(controller.state.exportRecordId).toBe("r4");
+		expect(controller.state.recordId).toBe("r4");
 		expect(screen.getByText("not in this export")).toBeTruthy();
 	});
 
@@ -606,7 +658,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		);
 
 		await user.click(within(strip).getAllByRole("option")[1] as HTMLElement);
-		expect(controller.state.exportRecordId).toBe("r1");
+		expect(controller.state.recordId).toBe("r1");
 		expect(screen.getByTestId("export-preview").dataset.renderKey).toMatch(
 			/^r1:front:dark\|/,
 		);
@@ -617,7 +669,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			"2 / 6",
 		);
 		await user.keyboard("{ArrowRight}");
-		expect(controller.state.exportRecordId).toBe("r2");
+		expect(controller.state.recordId).toBe("r2");
 		expect(screen.getByTestId("export-preview").dataset.renderKey).toMatch(
 			/^r2:front:default\|/,
 		);
@@ -725,7 +777,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				.getAllByRole("option")
 				.map((o) => o.dataset.record),
 		).toEqual(["r1", "r3"]);
-		expect(controller.state.exportRecordId).toBe("r1");
+		expect(controller.state.recordId).toBe("r1");
 		expect(
 			screen
 				.getByRole("radio", { name: /^Failed/ })

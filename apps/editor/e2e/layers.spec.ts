@@ -41,6 +41,18 @@ test("clicking a row selects the layer", async ({ page }) => {
 	await expect(row(page, "0/5/0/1")).toBeInViewport();
 });
 
+test("the filter narrows the tree by name or type", async ({ page }) => {
+	await openSample(page);
+	const filter = page.getByRole("searchbox", { name: "Filter layers" });
+	await filter.fill("qr code");
+	await expect(row(page, "0/9")).toBeVisible();
+	await expect(row(page, "0/0")).toHaveCount(0);
+	await filter.fill("ring");
+	expect(await topLevel(page)).toEqual(["ring-inner", "ring-outer"]);
+	await filter.press("Escape");
+	expect(await topLevel(page)).toHaveLength(11);
+});
+
 test("rename by double-clicking the name", async ({ page }) => {
 	await openSample(page);
 	await row(page, "0/3").getByText("wordmark").dblclick();

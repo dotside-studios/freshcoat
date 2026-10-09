@@ -82,10 +82,7 @@ export function useUrlState(
 				timeout: 0,
 				action: {
 					label: "Restore",
-					onAction: () =>
-						ctx.confirmDiscard(() =>
-							controller.openWorkspace(saved.workspace, saved.fileName),
-						),
+					onAction: () => ctx.confirmDiscard(() => controller.restore(saved)),
 				},
 			});
 		})();
@@ -135,12 +132,7 @@ async function openHandoff(
 		return;
 	}
 	const restored = saved !== null && !controller.state.workspace;
-	if (restored)
-		controller.openWorkspace(
-			saved.workspace,
-			saved.fileName,
-			restoreNotices(saved),
-		);
+	if (restored) controller.restore(saved, restoreNotices(saved));
 	controller.open(result.template, result.fileName, result.notices);
 	const templateId = controller.state.workspace?.activeTemplateId;
 	if (returnTo && templateId)
@@ -283,7 +275,7 @@ class RouteSync {
 				if (s.previewRecordId !== step.id) c.previewRecord(step.id);
 				return;
 			case "exportRecord":
-				c.dispatch({ type: "setExportRecord", id: step.id });
+				c.dispatch({ type: "setRecord", id: step.id });
 				return;
 		}
 	}

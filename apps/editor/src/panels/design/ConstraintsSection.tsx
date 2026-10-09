@@ -1,10 +1,10 @@
 import type { Constraint, Constraints, Element } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { isAutoLayoutChild } from "~/doc/geometry";
 import { Row, SharedNotice } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 type Axis = "horizontal" | "vertical";
 
@@ -78,7 +78,7 @@ export function ConstraintsSection({ ins }: { ins: Inspect }) {
 	);
 
 	return (
-		<PanelSection title="Constraints">
+		<InspectorSection title="Constraints">
 			<SharedNotice />
 			<div className="flex items-center gap-2">
 				<PinDiagram horizontal={h} vertical={v} />
@@ -87,7 +87,7 @@ export function ConstraintsSection({ ins }: { ins: Inspect }) {
 					<Row label="V">{select("vertical", v)}</Row>
 				</div>
 			</div>
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

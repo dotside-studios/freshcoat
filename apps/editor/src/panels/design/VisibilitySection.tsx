@@ -1,7 +1,6 @@
 import type { Element, VisibilityCondition } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { TextField } from "@freshcoat-js/ui/field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useContext, useMemo } from "react";
 import { VARIANT_UI } from "~/app/copy";
@@ -18,6 +17,7 @@ import {
 } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 import { removeAt, replaceAt } from "./fills";
+import { InspectorSection } from "./InspectorSection";
 
 export type ConditionOp = "set" | "unset" | "equals" | "differs";
 
@@ -94,7 +94,7 @@ export function VisibilitySection({ ins }: { ins: Inspect }) {
 
 	const first = fields[0]?.id;
 	return (
-		<PanelSection
+		<InspectorSection
 			title="Visibility"
 			actions={
 				<AddButton
@@ -179,6 +179,6 @@ export function VisibilitySection({ ins }: { ins: Inspect }) {
 					</ItemGroup>
 				);
 			})}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
