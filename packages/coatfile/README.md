@@ -393,6 +393,21 @@ units as `center`) and `focusRadius` gives it a circle (units of `radius`).
 Linear and radial fills take `spread`: `pad` (the default) holds the end
 colors, `reflect` mirrors the stops and `repeat` tiles them.
 
+### Editing fills
+
+`@freshcoat-js/coatfile/fills` reads and writes a layer's fills the way the
+format stores them. `fillsOf(layer)` lists them bottom first: text has at most
+one, its gradient `fill` or else its solid `color`, and a shape, frame or
+background has `fill` as one value or a list. `fillsPatch(layer, fills)` is the
+`properties` patch that writes a list back in that shape. `convertFill(fill,
+kind)` turns a fill into another kind and keeps its colours, and
+`linearPoints(gradient)` is where a linear gradient runs, from its points or
+else its `angle`. The stop helpers (`addStop`, `removeStop`, `insertStop`,
+`moveStop`, `reverseStops`, `sortedStops`) keep a gradient at two stops or
+more with rising offsets, `colorAt(stops, offset)` is the colour a gradient
+paints at an offset, and `rotateQuarter` and `withLinearAngle` turn a linear
+gradient and its points.
+
 ## Patterns
 
 A `pattern` fill is a procedural texture drawn by a CanvasKit shader, not an

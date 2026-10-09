@@ -1,7 +1,10 @@
+import {
+	type Gradient,
+	linearPoints,
+	sortedStops,
+} from "@freshcoat-js/coatfile/fills";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { type ReactNode, useId } from "react";
-import { linearPoints } from "~/canvas/gradient-geometry";
-import { type Gradient, sortedStops } from "./fills";
 import { gradientCss } from "./StopBar";
 
 /**

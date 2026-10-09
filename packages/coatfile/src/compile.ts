@@ -10,6 +10,7 @@ import {
 	type MaskNode,
 	type Node,
 	type PathNode,
+	parseColor,
 	patternFill,
 	roundCorners,
 	type RectNode,
@@ -35,8 +36,8 @@ import {
 	offsetElements,
 	templateBleed,
 } from "./bleed";
+import { linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./fonts";
-import { linearGradientPoints } from "./gradient";
 import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
@@ -760,7 +761,7 @@ function compileQr(
 	const { size: n, pixels } = generatePixels(
 		value,
 		ec,
-		parseHexColor(foreground),
+		foregroundRgb(foreground),
 	);
 	children.push({
 		kind: "bitmap",
@@ -902,7 +903,7 @@ function compileBarcode(
 		return group();
 	}
 
-	const [r, g, b] = parseHexColor(foreground);
+	const [r, g, b] = foregroundRgb(foreground);
 	const paint = (pixels: Uint8Array, i: number) => {
 		pixels[i * 4] = r;
 		pixels[i * 4 + 1] = g;
@@ -1106,23 +1107,10 @@ function barcodePlaceholder(
 	};
 }
 
-// #rgb / #rrggbb → [r, g, b]. Unknown formats fall back to black.
-function parseHexColor(hex: string): [number, number, number] {
-	const h = hex.replace(/^#/, "");
-	if (h.length === 3) {
-		const r = parseInt(h[0] + h[0], 16);
-		const g = parseInt(h[1] + h[1], 16);
-		const b = parseInt(h[2] + h[2], 16);
-		return [r, g, b];
-	}
-	if (h.length === 6) {
-		return [
-			parseInt(h.slice(0, 2), 16),
-			parseInt(h.slice(2, 4), 16),
-			parseInt(h.slice(4, 6), 16),
-		];
-	}
-	return [0, 0, 0];
+// The foreground's colour channels. Anything unreadable falls back to black.
+function foregroundRgb(color: string): [number, number, number] {
+	const c = parseColor(color);
+	return c && c !== "none" ? [c[0], c[1], c[2]] : [0, 0, 0];
 }
 
 // ─────────────── layout mapping (template Layout → freshcoat Layout) ───────────────
@@ -1408,10 +1396,7 @@ function resolveFill(
 	if (fill.kind === "linear") {
 		// Explicit points place the gradient; `angle` is then only what a reader
 		// that predates them draws.
-		const { from, to } =
-			fill.from && fill.to
-				? { from: fill.from, to: fill.to }
-				: linearGradientPoints(fill.angle);
+		const { from, to } = linearPoints(fill);
 		return {
 			kind: "linear",
 			stops: fill.stops,
