@@ -7,6 +7,7 @@ import {
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,
+	inlinedAssetUri,
 	type PendingAsset,
 	parseAssetUri,
 	readAssets,
@@ -162,6 +163,15 @@ describe("inline asset URLs", () => {
 	test("inlineAssetUrls maps every carried hash", async () => {
 		const t = await attachAssets(template(), [pending("bg"), pending("logo")]);
 		expect([...inlineAssetUrls(t).keys()]).toEqual(["bg", "logo"]);
+	});
+
+	test("inlinedAssetUri maps each inlined data URL back to its asset", async () => {
+		const logo = { ...pending("logo"), blob: new Blob([new Uint8Array([9])]) };
+		const t = await attachAssets(template(), [pending("bg"), logo]);
+		const uri = inlinedAssetUri(t);
+		for (const [sha, url] of inlineAssetUrls(t))
+			expect(uri(url)).toBe(`asset:${sha}`);
+		expect(uri("data:image/png;base64,AAAA")).toBeUndefined();
 	});
 });
 

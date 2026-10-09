@@ -31,6 +31,7 @@ export {
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,
+	inlinedAssetUri,
 	mapAssetSrcs,
 	type PendingAsset,
 	parseAssetUri,
