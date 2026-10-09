@@ -4,10 +4,9 @@ import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { DialogTrigger, Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import type { Column } from "@freshcoat-js/workspace";
+import { type Column, newId } from "@freshcoat-js/workspace";
 import { useState } from "react";
 import { Dialog as RACDialog } from "react-aria-components";
-import { newId } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
 import CloseIcon from "~icons/mingcute/close-line";
 import {
