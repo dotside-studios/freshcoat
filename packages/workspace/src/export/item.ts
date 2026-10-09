@@ -10,10 +10,7 @@ import {
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import {
-	describeWarning,
-	renderCompiled,
-} from "@freshcoat-js/coatfile/render";
+import { describeWarning, renderCompiled } from "@freshcoat-js/coatfile/render";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
 import { orientedSize } from "../image-info";
