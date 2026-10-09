@@ -115,6 +115,24 @@ export type RenderState = {
 	barcodes?: BarcodeIssue[];
 };
 
+/** What Export shows around its preview, kept while another section shows. */
+export type ExportView = {
+	tab: "filmstrip" | "records";
+	filter: "all" | RecordStatus;
+	scope: "export" | "all" | "failed";
+	/** Records chosen in the list, when the preset does not keep its own. */
+	selection: string[];
+	settingsTab: "content" | "output" | "print" | "files";
+};
+
+const EXPORT_VIEW: ExportView = {
+	tab: "filmstrip",
+	filter: "all",
+	scope: "export",
+	selection: [],
+	settingsTab: "content",
+};
+
 export type EditorState = {
 	doc: DocState | null;
 	side: number;
@@ -140,8 +158,10 @@ export type EditorState = {
 	workspace: WorkspaceState | null;
 	/** The dataset record the Edit preview shows, when bound. */
 	previewRecordId: string | null;
-	/** The record the Export preview shows; null is the plan's first. */
-	exportRecordId: string | null;
+	/** The current dataset record, shared by Edit's preview, Data's focused
+	 *  record and Export's preview; each shows it when its dataset has it. */
+	recordId: string | null;
+	exportView: ExportView;
 	/** Data's search, filters, sort and selection, by dataset id. */
 	dataViews: Readonly<Record<string, DataViewState>>;
 	/** The gradient fill last opened in the inspector, which the canvas
@@ -262,7 +282,8 @@ export type Action =
 	| { type: "removePreset"; id: string }
 	| { type: "setActivePreset"; id: string | null }
 	| { type: "setPreviewRecord"; id: string | null }
-	| { type: "setExportRecord"; id: string | null }
+	| { type: "setRecord"; id: string | null }
+	| { type: "setExportView"; view: Partial<ExportView> }
 	| { type: "setDataView"; datasetId: string; patch: Partial<DataViewState> }
 	| {
 			type: "previewRecord";
@@ -294,7 +315,8 @@ export function initialState(
 		section: "edit",
 		workspace: null,
 		previewRecordId: null,
-		exportRecordId: null,
+		recordId: null,
+		exportView: EXPORT_VIEW,
 		dataViews: {},
 		activeFill: null,
 		textEdit: null,
@@ -794,10 +816,18 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 			return state.previewRecordId === action.id
 				? state
 				: { ...state, previewRecordId: action.id };
-		case "setExportRecord":
-			return state.exportRecordId === action.id
+		case "setExportView": {
+			const next = { ...state.exportView, ...action.view };
+			return (Object.keys(next) as (keyof ExportView)[]).every(
+				(k) => next[k] === state.exportView[k],
+			)
 				? state
-				: { ...state, exportRecordId: action.id };
+				: { ...state, exportView: next };
+		}
+		case "setRecord":
+			return state.recordId === action.id
+				? state
+				: { ...state, recordId: action.id };
 		case "setDataView": {
 			const current = state.dataViews[action.datasetId];
 			const base = current ?? DEFAULT_DATA_VIEW;
@@ -822,6 +852,7 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 				values: action.values,
 				variantId: action.variantId,
 				previewRecordId: action.id,
+				recordId: action.id,
 				variantBeforeRecord: state.variantBeforeRecord ?? {
 					variantId: state.variantId,
 				},

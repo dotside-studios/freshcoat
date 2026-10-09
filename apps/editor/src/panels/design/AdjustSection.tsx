@@ -1,7 +1,6 @@
 import type { Element, ElementAdjust } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import {
 	AddButton,
 	Notice,
@@ -11,6 +10,7 @@ import {
 	SharedNotice,
 } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 type Factor = "saturation" | "contrast" | "brightness";
 
@@ -47,7 +47,7 @@ export function AdjustSection({ ins }: { ins: Inspect }) {
 	const hue = pick((a) => a.preserveHue === true);
 
 	return (
-		<PanelSection
+		<InspectorSection
 			title="Adjust"
 			actions={
 				all ? (
@@ -133,6 +133,6 @@ export function AdjustSection({ ins }: { ins: Inspect }) {
 					</Row>
 				</>
 			)}
-		</PanelSection>
+		</InspectorSection>
 	);
 }

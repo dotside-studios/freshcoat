@@ -144,7 +144,7 @@ test("the variants list is a listbox with a keyboard menu", async ({
 	);
 });
 
-test("a template with no variants offers one; collapsed sections stay collapsed", async ({
+test("a template with no variants offers one; a section's toggle is remembered", async ({
 	page,
 }) => {
 	await openSample(page, "membership-card");
@@ -156,6 +156,11 @@ test("a template with no variants offers one; collapsed sections stay collapsed"
 	await settle(page);
 
 	const variants = page.getByRole("region", { name: "Variants" });
+	const variantsToggle = variants
+		.getByRole("heading")
+		.getByRole("button", { name: "Variants" });
+	await expect(variantsToggle).toHaveAttribute("aria-expanded", "false");
+	await variantsToggle.click();
 	await expect(variants.getByRole("option")).toHaveText(["Default"]);
 	await variants
 		.getByRole("button", {
@@ -181,4 +186,28 @@ test("a template with no variants offers one; collapsed sections stay collapsed"
 	await expect(sides).toHaveAttribute("aria-expanded", "false");
 	await sides.click();
 	await expect(page.getByRole("listbox", { name: "Sides" })).toBeVisible();
+});
+
+test("sides and variants switch with the panels closed", async ({ page }) => {
+	await openSample(page, "membership-card");
+	await page.keyboard.press("ControlOrMeta+Backslash");
+	await expect(page.getByTestId("panel-left")).toHaveCount(0);
+	const sides = await state<string[]>(
+		page,
+		"c.base.template_data.map((f) => f.name)",
+	);
+
+	await page.locator("[data-canvas-control]").getByTestId("side-menu").click();
+	await page.getByRole("menuitem", { name: sides[1] }).click();
+	expect(await state<number>(page, "s.side")).toBe(1);
+	await page.keyboard.press("Alt+Period");
+	expect(await state<number>(page, "s.side")).toBe(sides.length > 2 ? 2 : 0);
+
+	await page.locator("footer").getByTestId("variant-menu").click();
+	const variant = await state<string>(page, "c.base.variants[0].label");
+	await page.getByRole("menuitem", { name: variant }).click();
+	await expect(page.getByTestId("variant-bar")).toContainText(variant);
+	await page.keyboard.press("Alt+Shift+Comma");
+	await expect(page.getByTestId("variant-bar")).toHaveCount(0);
+	await settle(page);
 });

@@ -76,7 +76,8 @@ export function detectHeaderRow(
 	return -1;
 }
 
-function normalize(text: string): string {
+/** A name compared ignoring case, spaces and punctuation. */
+export function normalizeName(text: string): string {
 	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
@@ -124,13 +125,13 @@ export function guessMapping(
 	});
 	headers.forEach((header, i) => {
 		if (out[i] !== undefined) return;
-		const wanted = normalize(header);
+		const wanted = normalizeName(header);
 		if (wanted === "") return;
 		const loose = columns.find(
 			(c) =>
 				!claimed.has(c.key) &&
-				(normalize(c.key) === wanted ||
-					(c.title !== undefined && normalize(c.title) === wanted)),
+				(normalizeName(c.key) === wanted ||
+					(c.title !== undefined && normalizeName(c.title) === wanted)),
 		);
 		if (loose) {
 			claimed.add(loose.key);

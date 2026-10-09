@@ -2,10 +2,10 @@ import type { QrCodeElement, QrCodeProperties } from "@freshcoat-js/coatfile";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 const LEVELS = [
 	["L", "Low: 7% of the code can be lost"],
@@ -24,7 +24,7 @@ export function QrSection({ ins }: { ins: Inspect }) {
 	const value = pick((p) => p.value);
 
 	return (
-		<PanelSection title="QR code">
+		<InspectorSection title="QR code">
 			<Row label="Value" keys={["value"]}>
 				<TextField
 					aria-label="QR value"
@@ -81,6 +81,6 @@ export function QrSection({ ins }: { ins: Inspect }) {
 					}
 				/>
 			</Row>
-		</PanelSection>
+		</InspectorSection>
 	);
 }

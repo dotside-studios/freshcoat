@@ -66,6 +66,7 @@ import {
 } from "./gallery-model";
 import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
+import { announceImport } from "./imported";
 import {
 	addRecords,
 	applySchema,
@@ -298,8 +299,8 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary) => {
-						toast(summary, { tone: "success", timeout: 6000 });
+					onImported={(id, summary, isNew) => {
+						announceImport(controller, id, summary, isNew);
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document
@@ -534,7 +535,18 @@ function RecordsPane({
 	);
 	const [view, setViewState] = useState<RecordsView>(() => viewFor(dataset));
 	const [cardSize, setCardSizeState] = useState<CardSize>(savedCardSize);
-	const ui = useMemo(() => new GridUiStore(), []);
+	const [startRecord] = useState(() => {
+		const id = controller.state.recordId;
+		return dataset.records.some((r) => r.id === id) ? id : null;
+	});
+	const [ui] = useState(
+		() =>
+			new GridUiStore(
+				startRecord
+					? { row: startRecord, col: dataset.columns[0]?.key ?? "" }
+					: null,
+			),
+	);
 	const grid = useRef<GridHandle>(null);
 	const datasetId = dataset.id;
 
@@ -590,9 +602,17 @@ function RecordsPane({
 			const row = ui.get().active?.row ?? null;
 			if (row === last) return;
 			last = row;
-			if (row) recordFocused();
+			if (!row) return;
+			recordFocused();
+			controller.dispatch({ type: "setRecord", id: row });
 		});
-	}, [ui, recordFocused]);
+	}, [ui, recordFocused, controller]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the current record is revealed once, on opening
+	useEffect(() => {
+		if (startRecord && view === "table")
+			requestAnimationFrame(() => grid.current?.reveal(startRecord));
+	}, []);
 
 	// An import clears the view; a view kept from an earlier visit stays.
 	const seenImport = useRef(importNonce);

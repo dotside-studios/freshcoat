@@ -1,17 +1,17 @@
 import type { MaskElement } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 export function MaskSection({ ins }: { ins: Inspect }) {
 	const masks = (ins.layers as MaskElement[]).map((m) => m.properties);
 	const channel = commonValue(masks.map((m) => m.channel ?? "alpha"));
 	const invert = commonValue(masks.map((m) => m.invert === true));
 	return (
-		<PanelSection title="Mask">
+		<InspectorSection title="Mask">
 			<Row label="Channel">
 				<ToggleGroup
 					aria-label="Mask channel"
@@ -51,6 +51,6 @@ export function MaskSection({ ins }: { ins: Inspect }) {
 					</Button>
 				</Row>
 			)}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
