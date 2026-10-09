@@ -11,8 +11,10 @@ import {
 	orientedSize,
 	parseImageInfo,
 	readImageInfo,
+	rgbIdat,
 	sniffImageType,
 } from "../src/image-info";
+import { encodePng } from "../src/png";
 
 const blob = (bytes: Uint8Array) => new Blob([bytes as BlobPart]);
 
@@ -146,5 +148,20 @@ describe("sniffImageType", () => {
 		]);
 		expect(sniffImageType(avif)).toBe("image/avif");
 		expect(parseImageInfo(avif)).toBeNull();
+	});
+});
+
+describe("rgbIdat", () => {
+	it("passes through what encodePng writes for an opaque image", async () => {
+		const pixels = new Uint8Array(3 * 2 * 4).fill(255);
+		const idat = rgbIdat(await encodePng(pixels, 3, 2));
+		expect(idat).toMatchObject({ width: 3, height: 2 });
+		expect(idat?.data.length).toBeGreaterThan(0);
+	});
+
+	it("refuses a translucent image or another format", async () => {
+		const pixels = new Uint8Array(3 * 2 * 4).fill(128);
+		expect(rgbIdat(await encodePng(pixels, 3, 2))).toBeUndefined();
+		expect(rgbIdat(gifHeader(3, 2))).toBeUndefined();
 	});
 });

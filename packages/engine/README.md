@@ -235,7 +235,7 @@ subpath.
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
-| `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, and image type sniffing |
+| `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, and `rgbIdat` for passing an RGB PNG's data through as is |
 
 ## Staying warm
 
