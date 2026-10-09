@@ -1,5 +1,10 @@
 export { createJobCaches, IMAGE_CACHE_PIXELS, type JobCaches } from "./caches";
 export {
+	createFolderSink,
+	type FolderHandle,
+	type WritableFile,
+} from "./folder-sink";
+export {
 	checkAllGlyphs,
 	checkGlyphs,
 	codepointLabel,
@@ -9,20 +14,26 @@ export {
 	summarizeGlyphs,
 } from "./glyph-preflight";
 export {
+	assetsByRef,
 	createItemRenderer,
 	type ItemRenderer,
 	type ItemRendererOptions,
 	type ItemSize,
+	imagesOf,
+	itemRequest,
 	itemSize,
+	itemTemplate,
 	type OutputFormat,
 	type RenderOutput,
 	type RenderRequest,
+	referencedAssets,
 } from "./item";
 export {
 	type AssembleExtras,
 	type AssemblePdf,
 	boundDatasetOf,
 	type ExportJobOptions,
+	exportPoolSize,
 	inlinePool,
 	type JobItemResult,
 	type JobPool,
@@ -31,8 +42,10 @@ export {
 	type JobStats,
 	jobFileName,
 	jobStem,
+	LARGE_IMAGE_PIXELS,
 	largestImagePixels,
 	PDF_CONFIRM_BYTES,
+	type PoolSizeInput,
 	REPORT_FILE_NAME,
 	reportCsv,
 	runExportJob,
@@ -56,6 +69,7 @@ export {
 	type ExportWorkspaceResult,
 	exportWorkspace,
 	findPreset,
+	markExported,
 } from "./run";
 export {
 	BLEED_NEEDS_TEMPLATE_SIZE,
@@ -83,3 +97,10 @@ export {
 	type PartZipSinkOptions,
 	type SinkResult,
 } from "./sink";
+export {
+	applyJobResult,
+	type RecordOutcome,
+	recordOutcome,
+	retryPreset,
+	unwrittenRecordIds,
+} from "./status";

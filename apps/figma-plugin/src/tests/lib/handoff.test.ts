@@ -1,14 +1,14 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { Template } from "@freshcoat-js/coatfile";
 import { unpackTemplate } from "@freshcoat-js/coatfile/coat";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
+import {
+	encodeHandoff,
+	HANDOFF_MAX_CHARS,
+} from "@freshcoat-js/coatfile/handoff";
 import { sha256 } from "js-sha256";
 import { describe, expect, it, vi } from "vitest";
 import {
 	checkFreshcoatAddress,
-	decodeHandoff,
-	encodeHandoff,
-	HANDOFF_MAX_CHARS,
 	handoffUrl,
 	openFileUrl,
 	openInFreshcoat,
@@ -16,10 +16,7 @@ import {
 } from "~/lib/handoff";
 import type { UiToMain } from "~/shared/protocol";
 
-const fixtures = resolve(__dirname, "fixtures");
-const read = (name: string) =>
-	readFileSync(resolve(fixtures, name), "utf8").trim();
-const fixtureTemplate = JSON.parse(read("handoff-template.json")) as Template;
+const fixtureTemplate = fixtures.minimalCard as Template;
 
 /** Bytes deflate cannot shrink, the way a PNG raster behaves. */
 function noise(length: number, seed = 1): Uint8Array {
@@ -60,48 +57,6 @@ function io() {
 	};
 }
 
-describe("encodeHandoff", () => {
-	it("round-trips template JSON, including text outside ASCII", () => {
-		const json = JSON.stringify(fixtureTemplate);
-		const data = encodeHandoff(json);
-		expect(data).toMatch(/^[A-Za-z0-9_-]+$/);
-		expect(decodeHandoff(data)).toBe(json);
-	});
-
-	it("writes exactly the checked-in fixture the editor decodes", () => {
-		expect(encodeHandoff(JSON.stringify(fixtureTemplate))).toBe(
-			read("handoff-fflate.txt"),
-		);
-	});
-
-	it("reads raw deflate from another implementation (zlib)", () => {
-		expect(decodeHandoff(read("handoff-zlib.txt"))).toBe(
-			JSON.stringify(fixtureTemplate),
-		);
-	});
-
-	it("keeps its fixtures identical to the editor's copies", () => {
-		const editor = resolve(__dirname, "../../../../editor/src/tests/fixtures");
-		for (const name of [
-			"handoff-template.json",
-			"handoff-fflate.txt",
-			"handoff-zlib.txt",
-		]) {
-			expect(readFileSync(resolve(editor, name), "utf8")).toBe(
-				readFileSync(resolve(fixtures, name), "utf8"),
-			);
-		}
-	});
-
-	it("round-trips a 1 MB template and fits it in a link", () => {
-		const json = JSON.stringify(templateWithRaster(750_000));
-		expect(json.length).toBeGreaterThan(1_000_000);
-		const data = encodeHandoff(json);
-		expect(data.length).toBeLessThanOrEqual(HANDOFF_MAX_CHARS);
-		expect(decodeHandoff(data)).toBe(json);
-	});
-});
-
 describe("checkFreshcoatAddress", () => {
 	it.each([
 		["https://freshcoat.example", "https://freshcoat.example"],
@@ -131,6 +86,7 @@ describe("checkFreshcoatAddress", () => {
 			"https://me:secret@freshcoat.example",
 			"Leave the sign-in out of the address",
 		],
+		["http://me@freshcoat.example", "Use an https address"],
 	])("rejects %j", (input, reason) => {
 		expect(checkFreshcoatAddress(input)).toEqual({ ok: false, reason });
 	});

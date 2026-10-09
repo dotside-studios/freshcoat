@@ -51,6 +51,7 @@ export {
 	errorCorrectionRange,
 	isLinearSymbology,
 	isSquareSymbology,
+	parseSymbology,
 	SYMBOLOGIES,
 	symbologyLabel,
 } from "./barcode-encoder";
@@ -60,21 +61,28 @@ export {
 	bleedSize,
 	type CardSizeMm,
 	cardSizeMm,
+	compactInsets,
 	extendIntoBleed,
 	hasInsets,
 	MM_PER_INCH,
+	maxInsets,
 	NO_BLEED,
 	resolveBleedMm,
 	resolveInsets,
+	type SafeAreaEdge,
+	type SafeAreaIssue,
+	safeAreaIssues,
 	templateBleed,
 	templateSafeArea,
 } from "./bleed";
 export { compile } from "./compile";
 export {
+	barcodeBox,
 	constrainBox,
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorPath,
 } from "./constraints";
 export {
 	collectFontBytes,
@@ -101,9 +109,21 @@ export {
 	minimumFormatVersion,
 	raiseFormatVersion,
 } from "./format";
+export {
+	defaultFieldValues,
+	elementFieldRefs,
+	fieldTitle,
+	isSystemField,
+	PLACEHOLDER_IMAGE,
+	sampleValues,
+	templateFieldRefs,
+	variantFieldRefs,
+	visibilityFieldRefs,
+} from "./fields";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
-export { isEllipsePath } from "./ellipse-path";
+export { ellipsePath, isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
+export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
 	parseTrimValue,
 	type ResolvedStrokeTrim,
@@ -111,7 +131,9 @@ export {
 	type StrokeTrimInput,
 } from "./stroke-trim";
 export {
+	FIELD_FORMATS,
 	FIELD_ID,
+	fieldKeyFrom,
 	hasToken,
 	type MustacheRef,
 	type MustacheSegment,
@@ -122,7 +144,16 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
-export { healElementIds, uniquifyElementIds } from "./normalize";
+export { pruneUnusedAssets } from "./coat";
+export {
+	type HealOptions,
+	healElementIds,
+	type IdSeparator,
+	nextFreeId,
+	type UniquifyOptions,
+	uniquifyElementIds,
+	uniquifyElementIdsDeep,
+} from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
 export {
@@ -130,7 +161,7 @@ export {
 	applyCase,
 	type TextCase,
 } from "./text-case";
-export { childElements } from "./tree";
+export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,
 	BakedTextLayout,
@@ -163,6 +194,7 @@ export type {
 	ExportSetting,
 	FieldDefinition,
 	FieldFormat,
+	FieldReferenceRole,
 	FieldsSchema,
 	Fill,
 	FontDescriptor,

@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { hasFills } from "@freshcoat-js/coatfile/fills";
 import { useMemo, useRef } from "react";
 import { useController } from "~/app/context";
 import { isBooleanShape } from "~/doc/boolean";
@@ -23,7 +24,6 @@ import {
 	mergeKeyOf,
 	patchLayers,
 } from "./field-helpers";
-import { hasFills } from "./fills";
 import { ImageSection } from "./ImageSection";
 import {
 	InspectorCollapsedProvider,

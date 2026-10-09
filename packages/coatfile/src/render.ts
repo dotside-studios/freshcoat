@@ -356,3 +356,33 @@ export function findMissingGlyphs(
 	}
 	return out;
 }
+
+/** A render warning as one line of readable text. */
+export function describeWarning(w: FrameWarning): string {
+	switch (w.kind) {
+		case "image_load_failed":
+			return `Couldn't load image: ${w.src.startsWith("data:") ? "inline data" : w.src}`;
+		case "svg_unsupported":
+			return `SVG drawn without ${w.feature}: ${w.src.startsWith("data:") ? "inline data" : w.src}`;
+		case "font_load_failed":
+			return `Couldn't load font: ${w.family}`;
+		case "unhandled_op":
+			return `Unhandled draw op: ${w.op}`;
+		case "adjust_unsupported":
+			return `Adjustment skipped: ${w.component}`;
+		case "text_path_overflow":
+			return `Text runs past the end of its path${w.layer ? `: ${w.layer}` : ""}`;
+		case "arc_text_overflow":
+			return `Curved text is longer than its circle${w.layer ? `: ${w.layer}` : ""}`;
+		case "arc_radius_clamped":
+			return `Curved text radius raised to its font size${w.layer ? `: ${w.layer}` : ""}`;
+		case "pattern_unsupported":
+			return `Pattern shader failed, painted solid: ${w.pattern}`;
+		case "barcode_invalid":
+			return `Barcode: ${w.message}`;
+		case "gamut_compressed":
+			return `Colour pulled into printer range: ${Math.round(w.clipped * 100)}%${w.layer ? ` of ${w.layer}` : ""}`;
+		default:
+			return (w as { kind: string }).kind;
+	}
+}

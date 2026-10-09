@@ -1,4 +1,5 @@
 import type { FrameWarning } from "@freshcoat-js/coatfile";
+import { describeWarning } from "@freshcoat-js/coatfile/render";
 import type { BarcodeIssue } from "~/state/store";
 
 const NO_WARNINGS = Object.freeze([]) as unknown as string[];
@@ -23,23 +24,4 @@ export function splitWarnings(
 	}
 	if (out.warnings.length === 0) out.warnings = NO_WARNINGS;
 	return out;
-}
-
-function describeWarning(w: FrameWarning): string {
-	switch (w.kind) {
-		case "image_load_failed":
-			return `Couldn't load image: ${w.src.startsWith("data:") ? "inline data" : w.src}`;
-		case "font_load_failed":
-			return `Couldn't load font: ${w.family}`;
-		case "unhandled_op":
-			return `Unhandled draw op: ${w.op}`;
-		case "adjust_unsupported":
-			return `Adjustment skipped: ${w.component}`;
-		case "text_path_overflow":
-			return `Text runs past the end of its path${w.layer ? `: ${w.layer}` : ""}`;
-		case "pattern_unsupported":
-			return `Pattern shader failed, painted solid: ${w.pattern}`;
-		default:
-			return w.kind;
-	}
 }

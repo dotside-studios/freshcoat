@@ -1,16 +1,20 @@
-import { validate } from "@freshcoat-js/coatfile";
+import { type Template, validate } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
+	Dataset,
 	ExportItem,
 	ExportPreset,
 } from "@freshcoat-js/workspace";
 import {
-	DEFAULT_DPI,
-	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_SHEET_LAYOUT,
+	newPreset,
 	planExport,
 } from "@freshcoat-js/workspace";
-import type { JobResult } from "@freshcoat-js/workspace/export";
+import {
+	assetsByRef,
+	itemTemplate,
+	type JobResult,
+} from "@freshcoat-js/workspace/export";
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,
@@ -21,15 +25,11 @@ import {
 	formatPageSize,
 	imageFieldKeys,
 	labelColumn,
-	photoSizedTemplate,
 	recordLabel,
-	recordOutcome,
-	retryPreset,
 	selectedIds,
 	settingsSummary,
 	statusActions,
 } from "~/export/export-ui";
-import { duplicatePreset, newPreset } from "~/export/preset";
 import { photoWatermark } from "~/samples/photo-watermark";
 import { doc } from "./doc-fixture";
 
@@ -55,58 +55,6 @@ const item = (recordId: string, side: string, ok: boolean, error?: string) => ({
 	fileName: `${recordId}-${side}.png`,
 	ok,
 	...(error ? { error } : {}),
-});
-
-describe("presets", () => {
-	test("a new preset takes the spec's defaults", () => {
-		expect(newPreset("t_doc", [], "p_1")).toEqual({
-			id: "p_1",
-			name: "New preset",
-			templateId: "t_doc",
-			records: "all",
-			sides: "all",
-			format: "png-zip",
-			scale: 1,
-			dpi: DEFAULT_DPI,
-			fileName: DEFAULT_FILE_NAME_PATTERN,
-			markExported: true,
-		});
-		expect(DEFAULT_DPI).toBe(300);
-	});
-
-	test("new and duplicated presets get unique names", () => {
-		const first = preset();
-		const second = newPreset("t_doc", [first], "p_2");
-		expect(second.name).toBe("New preset 2");
-		expect(newPreset("t_doc", [first, second]).name).toBe("New preset 3");
-		expect(newPreset("t_doc", []).id).toMatch(/^p_[0-9a-f]{16}$/);
-		const copy = duplicatePreset(
-			{ ...first, records: "selected", selected: ["r1"] },
-			[first],
-			"p_3",
-		);
-		expect(copy).toMatchObject({
-			id: "p_3",
-			name: "New preset copy",
-			records: "selected",
-			selected: ["r1"],
-		});
-		expect(duplicatePreset(first, [first, copy]).name).toBe(
-			"New preset copy 2",
-		);
-	});
-
-	test("retrying failed items reruns failed records", () => {
-		const r = result([item("r1", "front", true), item("r3", "front", false)]);
-		expect(retryPreset(preset({ selected: ["x"] }), r)).toEqual({
-			...preset(),
-			records: "failed",
-		});
-		expect(retryPreset(preset({ markExported: false }), r)).toMatchObject({
-			records: "selected",
-			selected: ["r3"],
-		});
-	});
 });
 
 describe("file name example", () => {
@@ -230,11 +178,6 @@ describe("record statuses", () => {
 			item("r2", "back", false, "font"),
 			item("r3", "front", false),
 		]);
-		expect(recordOutcome(r)).toEqual({
-			ok: ["r1"],
-			failed: ["r2", "r3"],
-			errors: { r2: "font", r3: "Failed" },
-		});
 		expect(statusActions(r, "d", now)).toEqual([
 			{
 				type: "setRecordStatus",
@@ -281,6 +224,12 @@ describe("photo export helpers", () => {
 		records: [],
 		assets: [photo],
 	};
+	const photoSizedTemplate = (
+		template: Template,
+		p: ExportPreset,
+		it: { values: Record<string, string>; variantId?: string },
+		d: Dataset,
+	) => itemTemplate(template, p, it, assetsByRef(d.assets));
 
 	test("the example file name follows the format and the size", () => {
 		expect(

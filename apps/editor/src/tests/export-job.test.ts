@@ -312,13 +312,13 @@ describe("runExportJob", () => {
 		]);
 		expect(strFromU8(files["2-back.png"])).toBe("Member 2|back");
 		expect(strFromU8(files[REPORT_FILE_NAME]).split("\r\n")).toEqual([
-			"file,record,side,status,error,print,gamut",
-			"1-front.png,r_1,front,ok,,off,",
-			"1-back.png,r_1,back,ok,,off,",
-			"2-front.png,r_2,front,ok,,off,",
-			"2-back.png,r_2,back,ok,,off,",
-			"3-front.png,r_3,front,ok,,off,",
-			"3-back.png,r_3,back,ok,,off,",
+			"file,record,side,status,error,print,gamut,unfilled,warnings",
+			"1-front.png,r_1,front,ok,,off,,,",
+			"1-back.png,r_1,back,ok,,off,,,",
+			"2-front.png,r_2,front,ok,,off,,,",
+			"2-back.png,r_2,back,ok,,off,,,",
+			"3-front.png,r_3,front,ok,,off,,,",
+			"3-back.png,r_3,back,ok,,off,,,",
 			"",
 		]);
 		expect(result.items).toHaveLength(6);

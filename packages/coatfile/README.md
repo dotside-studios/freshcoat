@@ -115,7 +115,9 @@ preserved); a density large enough to exceed the coat engine's `MAX_EXPORT_DIMEN
 is lowered to fit, and the `scale` on the result is the one actually used.
 
 `@freshcoat-js/coatfile/render` holds `renderTemplate` and `renderCompiled`,
-so the main entry stays free of the painter.
+so the main entry stays free of the painter. `describeWarning(w)` there turns
+one of a result's `warnings` into a line of readable text, such as
+`Couldn't load image: logo.png`.
 
 ### PNG size
 
@@ -175,7 +177,16 @@ With bleed:
   the trim by hand.
 
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
-insets; `extendIntoBleed` is the edge rule on its own.
+insets; `extendIntoBleed` is the edge rule on its own. `resolveInsets` turns
+either form into four sides, `compactInsets` turns four sides back into one
+number when they agree, and `maxInsets` takes the largest on each side. These
+also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
+
+`safeAreaIssues(t, { safe })` lists the top-level layers with an edge between
+the trim and the safe line, with the edges that cross it. A layer that runs to
+the trim or past it counts as bleed and is not listed. `safe` defaults to the
+template's `safeArea`; a consumer with its own product rules, such as Studio's
+3 mm for a CR80 card, passes them in.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
@@ -299,6 +310,32 @@ keys without changing anything.
 Hashing defaults to `crypto.subtle`, which exists only in a secure context. A
 Figma plugin's iframe is not one, so the plugin passes its own `sha256`.
 
+## Hand-off links
+
+`./handoff` is the format the Figma plugin uses to open a template in Studio
+without a server: `<address>/edit#coat=<data>`, where `data` is the template
+JSON, raw-deflated at level 9 and base64url-encoded without padding. The
+fragment never reaches a server.
+
+```ts
+import {
+	decodeHandoff,
+	encodeHandoff,
+	HANDOFF_MAX_CHARS,
+	isHandoffOrigin,
+} from "@freshcoat-js/coatfile/handoff";
+
+const data = encodeHandoff(JSON.stringify(template));
+if (data.length <= HANDOFF_MAX_CHARS) open(`${base}/edit#coat=${data}`);
+
+const read = decodeHandoff(data); // { ok: true, json } or { ok: false, reason }
+```
+
+`decodeHandoff` refuses data that inflates past `HANDOFF_MAX_JSON_BYTES`
+(64 MB). `isHandoffOrigin(url)` accepts https anywhere, or http on `localhost`
+and `127.0.0.1`, with no sign-in in the address. Its only dependency is
+`fflate`.
+
 ## Format versions
 
 `FORMAT_VERSION` is what a writer stamps; `formatVersionStatus(v)` says whether
@@ -360,10 +397,43 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 
 - `healElementIds` suffixes ids that repeat within a frame. `validate` rejects
   those, and a design with three layers named "Vector" produces three elements
-  called `Vector` — so this is the common case, not the exotic one.
+  called `Vector` — so this is the common case, not the exotic one. It renames
+  only the top-level repeats `validate` refuses; `{ deep: true }` also renames
+  repeats anywhere in a side's tree.
+- `uniquifyElementIdsDeep(elements, options)` is the walk behind it: the first
+  occurrence keeps its id and later ones get the next free suffix, depth
+  first with a mask's shape before its content, so the same tree always gets
+  the same ids. `separator` is `_` (`Vector_2`, the default) or `-`
+  (`title-2`), `fromStem` counts on from a numbered id (`title-2` to
+  `title-3`), `used` seeds and collects the ids taken, and `inPlace` renames
+  the elements themselves. `nextFreeId(base, isTaken, options)` picks one id.
 
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
+
+`loadTemplate` runs those steps in order: it decodes the input, validates
+it, heals element ids only when the file does not validate as written, and
+validates again. Studio and the workspace archive both read templates
+through it.
+
+```ts
+import { loadTemplate } from "@freshcoat-js/coatfile";
+
+const loaded = await loadTemplate(fileBytes);
+if (loaded.ok) {
+  loaded.template; // valid
+  loaded.healed; // ids were renamed; loaded.renamedIds says which
+} else if (loaded.reason === "unreadable") {
+  loaded.code; // a CoatErrorCode, with loaded.message
+} else {
+  loaded.errors; // the file's validation errors as written
+}
+```
+
+`pruneUnusedAssets` (on `./coat` and the root) drops carried assets nothing
+references. Image srcs in frames and variant overrides, and local font files,
+count as references. Studio prunes before it saves, and the workspace archive
+prunes each template it packs.
 
 `templateStem(fileName)` is a file name without its template extension
 (`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
@@ -392,6 +462,21 @@ thing it can; `linearGradientPoints(angle)` goes the other way. A radial
 units as `center`) and `focusRadius` gives it a circle (units of `radius`).
 Linear and radial fills take `spread`: `pad` (the default) holds the end
 colors, `reflect` mirrors the stops and `repeat` tiles them.
+
+### Editing fills
+
+`@freshcoat-js/coatfile/fills` reads and writes a layer's fills the way the
+format stores them. `fillsOf(layer)` lists them bottom first: text has at most
+one, its gradient `fill` or else its solid `color`, and a shape, frame or
+background has `fill` as one value or a list. `fillsPatch(layer, fills)` is the
+`properties` patch that writes a list back in that shape. `convertFill(fill,
+kind)` turns a fill into another kind and keeps its colours, and
+`linearPoints(gradient)` is where a linear gradient runs, from its points or
+else its `angle`. The stop helpers (`addStop`, `removeStop`, `insertStop`,
+`moveStop`, `reverseStops`, `sortedStops`) keep a gradient at two stops or
+more with rising offsets, `colorAt(stops, offset)` is the colour a gradient
+paints at an offset, and `rotateQuarter` and `withLinearAngle` turn a linear
+gradient and its points.
 
 ## Patterns
 
@@ -460,6 +545,11 @@ leaves the path different from the resized base's.
   background always covers it.
 - A vector's `d` scales with its box on each axis, arcs included. Path data
   that does not parse keeps its authored coordinates.
+
+`resizeVectorPath(vector, size)` is that path for one vector at a new size, and
+`barcodeBox(elementOrSymbology, box)` is the box a code takes in `box`: the
+square of its shorter side, centred, for a code that only reads square, and
+`box` itself for any other.
 
 ## Vectors and blend modes
 
@@ -551,7 +641,11 @@ the digit it should be.
 
 Barcodes are encoded with bwip-js as part of compile, as QR codes are with
 lean-qr. `encodeBarcode()` is the same encoder on its own, for checking a value
-before it reaches a template.
+before it reaches a template. `symbologyLabel("ean13")` is a symbology's usual
+name ("EAN-13"), and `parseSymbology` reads one back from what a person typed:
+an id, a label or a common alias (`upc`, `ean`, `itf`, `aztec code`), with
+case, spaces, hyphens and underscores ignored. Both also come from
+`@freshcoat-js/coatfile/barcode-encoder`, which has no runtime imports.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:
@@ -712,6 +806,23 @@ across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
 
+`ellipsePath(width, height)` writes that path, and `isEllipsePath(d, width,
+height)` tells whether a path is one.
+
+## Field keys
+
+A field's key, and the id in a `{{id}}` token, matches `FIELD_ID`: a letter or
+`_`, then letters, digits and `_`. `fieldKeyFrom(text)` makes one from any
+text, such as a layer or column name: `First Name` and `firstName` give
+`first_name`, `Año` gives `ano`, and `2nd` gives `_2nd`. Text with nothing
+usable in it gives `field`, or the fallback passed as the second argument.
+
+`FIELD_FORMATS` lists the values a field's `format` may take: `longText`,
+`color`, `url`, `image` and `boolean`. A field without one is plain text.
+
+All three come from `@freshcoat-js/coatfile/mustache`, which has no runtime
+imports.
+
 ## Field patterns
 
 A field's `pattern` is a JavaScript regular expression that `validateValues`
@@ -720,6 +831,26 @@ and workspace column checks enforce. It compiles with the `u` flag, so
 `u`, such as `^\#\d+$` or `^[\w-.]+$`, compiles without flags instead. A
 pattern invalid in both modes imposes no constraint, and the editor flags it as
 not a valid regular expression.
+
+## Fields a template reads
+
+`./fields` (also on the main entry) answers which fields a design uses, with
+no runtime dependency beyond the mustache parser.
+
+- `elementFieldRefs(element)` lists the fields one element reads itself:
+  `{{tokens}}` in its own properties (text, image, QR and barcode sources,
+  colors) and the fields its `visibleWhen` tests. What it holds is left out.
+- `templateFieldRefs(template)` lists every field the template reads: each
+  side's background and elements, nested frame and mask children, and each
+  variant's overrides (`variantFieldRefs`). `visibilityFieldRefs` lists only
+  the fields a `visibleWhen` tests.
+- `sampleValues(template)` is the declared defaults plus a stand-in for every
+  blank field (`PLACEHOLDER_IMAGE` for a photo), so a template renders
+  complete. A visibility field whose default is empty stays empty.
+- `fieldTitle(id)` names a field in sentence case: `first_name` and
+  `firstName` read "First name".
+- `isSystemField(id, field)` is true for a field a pipeline fills rather
+  than a person: `readOnly`, `x-source: "system"` or an id starting `$$`.
 
 ## Conditional visibility
 
@@ -1079,6 +1210,14 @@ stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
 
+## Walking elements
+
+`childElements(el)` is what one element holds: a frame's children, or a mask's
+shape followed by the content it masks. `walkElements(elements, visit)` visits
+every element and everything nested in it, each before what it holds; a visit
+that returns `false` skips that element's contents. `allElements(elements)` is
+the same walk as a list.
+
 ### Text case
 
 `case` is `upper`, `lower`, `title` or `original`. Title case capitalises a
@@ -1092,6 +1231,11 @@ cased form changes length (`ß` in upper case), so string indices stay stable.
 
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is
 the reference check, including the cross-field rules zod alone does not express.
+
+Each error is `{ path, code, message }`, with `path` a JSON pointer. The
+message is for people and may be reworded. An `unknown_field_reference` also
+carries `field`, the id it names, and `role`: `"src"` for an image source,
+`"condition"` for a `visibleWhen`, and `"text"` for a `{{token}}` anywhere else.
 
 ## Fixtures
 

@@ -1,15 +1,12 @@
 import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
-import {
-	type DatasetAsset,
-	DEFAULT_QUALITY,
-	type ExportItem,
-	type ExportPreset,
-	imageFormat,
+import type {
+	DatasetAsset,
+	ExportItem,
+	ExportPreset,
 } from "@freshcoat-js/workspace";
 import {
 	gamutPercent,
-	itemSize,
-	printRequest,
+	itemRequest,
 	type RenderOutput,
 	type RenderRequest,
 } from "@freshcoat-js/workspace/export";
@@ -27,43 +24,28 @@ export type PrinterFileItem = Pick<
 > & { key: string };
 
 /** The render request for one item's printer file: the export's own, through
- *  the print path, as PNG, at most `PRINTER_FILE_MAX_EDGE` on its long edge. */
+ *  the print path, as PNG for a PDF, at most `PRINTER_FILE_MAX_EDGE` on its
+ *  long edge. */
 export function printerFileRequest(
 	template: Template,
 	preset: ExportPreset,
 	item: PrinterFileItem,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): RenderRequest | { error: string } {
-	const size = itemSize(template, preset, item as ExportItem, assets);
-	if ("error" in size) return size;
+	const built = itemRequest(template, preset, item, assets);
+	if ("error" in built) return built;
+	const { request, size } = built;
 	const cap = Math.min(
 		1,
 		PRINTER_FILE_MAX_EDGE / Math.max(size.width, size.height),
 	);
-	const images: [string, Blob][] = [];
-	for (const value of new Set(Object.values(item.values))) {
-		const asset = assets.get(value);
-		if (asset) images.push([value, asset.blob]);
+	// A PDF's pages are PNG unless it embeds JPEG, and the preview shows the
+	// pixels the file holds.
+	if (preset.format === "pdf") {
+		const { quality: _q, ...png } = request;
+		return { ...png, scale: size.scale * cap, format: "png" };
 	}
-	const format = imageFormat(preset);
-	const print = printRequest(preset.print);
-	return {
-		template,
-		values: item.values,
-		...(item.variantId !== undefined ? { variantId: item.variantId } : {}),
-		side: item.side,
-		scale: size.scale * cap,
-		images,
-		...(size.resize ? { resize: size.resize } : {}),
-		...(size.bleed ? { bleed: true } : {}),
-		// A PDF's pages are PNG unless it embeds JPEG, and the preview shows
-		// the pixels the file holds.
-		format: preset.format === "pdf" ? "png" : format,
-		...(format !== "png" && preset.format !== "pdf"
-			? { quality: preset.quality ?? DEFAULT_QUALITY }
-			: {}),
-		...(print ? { print } : {}),
-	};
+	return { ...request, scale: size.scale * cap };
 }
 
 export type PrinterFile = {

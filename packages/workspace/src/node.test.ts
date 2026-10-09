@@ -49,6 +49,35 @@ describe("exportWorkspace with fileOutput", () => {
 		);
 	});
 
+	it("reports records rendered without a required field", async () => {
+		const [entry] = workspace.templates;
+		if (!entry?.binding) throw new Error("fixture has no binding");
+		const { name: _, ...fields } = entry.binding.fields;
+		const unbound: Workspace = {
+			...workspace,
+			templates: [{ ...entry, binding: { ...entry.binding, fields } }],
+		};
+		const one: ExportPreset = {
+			...small,
+			records: "selected",
+			selected: ["r_00000001"],
+		};
+		const result = await exportWorkspace(unbound, one, { renderer, fonts });
+		expect(result.items.map((i) => [i.ok, i.unfilled])).toEqual([
+			[true, ["name"]],
+			[true, ["name"]],
+		]);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no zip");
+		const zip = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+		const report = new TextDecoder()
+			.decode(zip[REPORT_FILE_NAME])
+			.trim()
+			.split("\r\n");
+		expect(report[0]?.endsWith(",unfilled,warnings")).toBe(true);
+		expect(report.slice(1).every((row) => row.endsWith(",name,"))).toBe(true);
+	});
+
 	it("writes a PDF to the same kind of path", async () => {
 		const out = join(dir, "club.pdf");
 		const pdf: ExportPreset = {
@@ -65,6 +94,38 @@ describe("exportWorkspace with fileOutput", () => {
 		expect(result.items.map((i) => i.ok)).toEqual([true, true]);
 		const head = new TextDecoder().decode((await readFile(out)).subarray(0, 5));
 		expect(head).toBe("%PDF-");
+	});
+
+	it("writes record statuses back when the preset marks exports", async () => {
+		const now = new Date("2026-10-01T09:00:00Z");
+		const selected: ExportPreset = {
+			...small,
+			records: "selected",
+			selected: ["r_00000001", "r_00000005"],
+		};
+		const result = await exportWorkspace(workspace, selected, {
+			renderer,
+			fonts,
+			output: fileOutput(join(dir, "marked.zip")),
+			now,
+		});
+		const records = result.workspace.datasets[0]?.records ?? [];
+		expect(
+			records
+				.filter((r) => selected.selected?.includes(r.id))
+				.map((r) => [r.status, r.exportedAt]),
+		).toEqual([
+			["exported", now.toISOString()],
+			["exported", now.toISOString()],
+		]);
+		expect(workspace.datasets[0]?.records[0]?.status).toBe("pending");
+
+		const unmarked = await exportWorkspace(
+			workspace,
+			{ ...selected, markExported: false },
+			{ renderer, fonts, output: fileOutput(join(dir, "unmarked.zip")) },
+		);
+		expect(unmarked.workspace).toBe(workspace);
 	});
 
 	it("removes the partial zip when cancelled", async () => {

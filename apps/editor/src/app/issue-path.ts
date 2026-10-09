@@ -3,6 +3,7 @@ import type {
 	Template,
 	ValidationError,
 } from "@freshcoat-js/coatfile";
+import { fieldTitle } from "@freshcoat-js/coatfile";
 import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
 import { getElement, keyOf, MASK_SOURCE } from "~/doc/path";
 import { ISSUE_COPY as C } from "./copy";
@@ -62,14 +63,7 @@ const KEY_NAMES: Record<string, string> = {
 
 /** A schema key as words: `fontSize` and `font_size` read "Font size". */
 function keyName(key: string): string {
-	const known = KEY_NAMES[key];
-	if (known) return known;
-	const words = key
-		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-		.replace(/[_-]+/g, " ")
-		.trim()
-		.toLowerCase();
-	return words.charAt(0).toUpperCase() + words.slice(1);
+	return KEY_NAMES[key] ?? fieldTitle(key);
 }
 
 /** What an invalid value is called: the key it sits under, or, for one item
@@ -193,18 +187,15 @@ export function missingField(issue: ValidationError): {
 	condition: boolean;
 	format?: FieldDefinition["format"];
 } | null {
-	if (issue.code !== "unknown_field_reference") return null;
-	const mustache = /\{\{\s*([^}]+?)\s*\}\}/.exec(issue.message)?.[1];
-	if (mustache) {
-		const src = pathSegments(issue.path).at(-1) === "src";
-		return {
-			id: mustache,
-			condition: false,
-			format: src ? "image" : undefined,
-		};
+	if (issue.code !== "unknown_field_reference" || !issue.field) return null;
+	switch (issue.role) {
+		case "condition":
+			return { id: issue.field, condition: true, format: "boolean" };
+		case "src":
+			return { id: issue.field, condition: false, format: "image" };
+		default:
+			return { id: issue.field, condition: false };
 	}
-	const name = quoted(issue.message);
-	return name ? { id: name, condition: true, format: "boolean" } : null;
 }
 
 export function canCreateField(id: string, template: Template): boolean {

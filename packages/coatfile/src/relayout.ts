@@ -9,9 +9,11 @@ import type {
 	Constraint,
 	Element,
 	Size,
+	Symbology,
 	Template,
 	TemplateFrame,
 	Vec2,
+	VectorElement,
 } from "./types";
 
 type Axis = { pos: number; size: number };
@@ -75,6 +77,8 @@ export function sameSize(a: Size, b: Size): boolean {
 	return a.width === b.width && a.height === b.height;
 }
 
+type Box = { pos: Vec2; size: Size };
+
 // A QR code is only readable square, and so are Data Matrix and Aztec. When
 // constraints would stretch one on one axis more than the other, it takes the
 // shorter side of the box they give it and sits at that box's centre. 1D codes
@@ -86,7 +90,7 @@ function staysSquare(el: Element): boolean {
 	);
 }
 
-function squareBox(box: { pos: Vec2; size: Size }): { pos: Vec2; size: Size } {
+function squareBox(box: Box): Box {
 	const side = Math.min(box.size.width, box.size.height);
 	return {
 		pos: {
@@ -97,8 +101,24 @@ function squareBox(box: { pos: Vec2; size: Size }): { pos: Vec2; size: Size } {
 	};
 }
 
-// A vector's path is drawn at its authored coordinates, so it is scaled by the
-// box's change on each axis. Path data that does not parse is left as it was.
+/** The box a QR code or barcode takes in `box`. A code that only reads square
+ *  takes the shorter side, centred in `box`; any other keeps `box`. */
+export function barcodeBox(subject: Element | Symbology, box: Box): Box {
+	const square =
+		typeof subject === "string"
+			? isSquareSymbology(subject)
+			: staysSquare(subject);
+	return square ? squareBox(box) : box;
+}
+
+/** A vector's path for its box at `size`. The path is drawn at its authored
+ *  coordinates, so it is scaled by the box's change on each axis. A vector
+ *  without a size, or path data that does not parse, keeps its path. */
+export function resizeVectorPath(el: VectorElement, size: Size): string {
+	if (!el.size) return el.properties.d;
+	return resizePath(el.properties.d, el.size, size);
+}
+
 function resizePath(d: string, before: Size, after: Size): string {
 	const sx = before.width === 0 ? 1 : after.width / before.width;
 	const sy = before.height === 0 ? 1 : after.height / before.height;
@@ -121,7 +141,7 @@ function resizeElement(
 
 	let box = constrainBox(el, from, to);
 	const before = el.size ?? { width: 0, height: 0 };
-	if (staysSquare(el) && !sameSize(box.size, before)) box = squareBox(box);
+	if (!sameSize(box.size, before)) box = barcodeBox(el, box);
 
 	const next = {
 		...el,
@@ -132,12 +152,12 @@ function resizeElement(
 	} as Element;
 
 	if (el.size === undefined || sameSize(box.size, before)) return next;
-	if (next.type === "vector") {
+	if (next.type === "vector" && el.type === "vector") {
 		return {
 			...next,
 			properties: {
 				...next.properties,
-				d: resizePath(next.properties.d, before, box.size),
+				d: resizeVectorPath(el, box.size),
 			},
 		};
 	}

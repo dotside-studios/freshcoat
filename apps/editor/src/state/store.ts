@@ -1,5 +1,5 @@
 import type { Template, ValidationError } from "@freshcoat-js/coatfile";
-import { validate } from "@freshcoat-js/coatfile";
+import { sampleValues, validate } from "@freshcoat-js/coatfile";
 import { COAT_EXTENSION, templateStem } from "@freshcoat-js/coatfile/coat";
 import {
 	type Binding,
@@ -8,6 +8,7 @@ import {
 	newId,
 	type RecordStatus,
 	type Workspace,
+	withRecordStatus,
 } from "@freshcoat-js/workspace";
 import { type DataViewState, DEFAULT_DATA_VIEW } from "~/data/data-view";
 import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
@@ -25,7 +26,6 @@ import {
 	undo,
 } from "~/doc/history";
 import { getElement, keyRemapper, sameStructure } from "~/doc/path";
-import { sampleValues } from "~/doc/values";
 import {
 	activeVariantId,
 	foldVariantEdit,
@@ -48,7 +48,6 @@ import {
 	undoDatasets,
 	type WorkspaceState,
 	withJobStatus,
-	withRecordStatus,
 	workspaceDirty,
 	workspaceState,
 } from "./workspace";

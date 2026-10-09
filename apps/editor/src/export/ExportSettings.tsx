@@ -30,6 +30,7 @@ import {
 	paperSize,
 	pdfLayout,
 	sheetSummary,
+	unfilledRequired,
 } from "@freshcoat-js/workspace";
 import {
 	BLEED_NEEDS_TEMPLATE_SIZE,
@@ -48,7 +49,6 @@ import {
 import { useController } from "~/app/context";
 import { BINDING, plural, VARIANT_EXPORT } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
-import { unfilledRequired } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
 import WarningIcon from "~icons/mingcute/warning-line";

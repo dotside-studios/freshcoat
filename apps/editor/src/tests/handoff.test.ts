@@ -1,30 +1,11 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { Template } from "@freshcoat-js/coatfile";
-import { deflateSync, strToU8 } from "fflate";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
+import { encodeHandoff as encode } from "@freshcoat-js/coatfile/handoff";
 import { describe, expect, test } from "vitest";
-import {
-	decodeHandoff,
-	HANDOFF_MAX_JSON_BYTES,
-	readHandoff,
-} from "../app/handoff";
+import { readHandoff } from "../app/handoff";
 
-const fixtures = resolve(__dirname, "fixtures");
-const read = (name: string) =>
-	readFileSync(resolve(fixtures, name), "utf8").trim();
-const fixtureTemplate = JSON.parse(read("handoff-template.json")) as Template;
-
-/** The plugin's encoding, restated here only to build inputs for the
- *  decoder. The fixtures are what hold the two implementations together. */
-function encode(json: string | Uint8Array): string {
-	const bytes = typeof json === "string" ? strToU8(json) : json;
-	return Buffer.from(deflateSync(bytes, { level: 9 }))
-		.toString("base64")
-		.replace(/\+/g, "-")
-		.replace(/\//g, "_")
-		.replace(/=+$/, "");
-}
+const fixtureTemplate = fixtures.minimalCard as Template;
 
 function noise(length: number): Uint8Array {
 	const out = new Uint8Array(length);
@@ -36,58 +17,12 @@ function noise(length: number): Uint8Array {
 	return out;
 }
 
-describe("decodeHandoff", () => {
-	test("reads what the plugin's encoder wrote", () => {
-		expect(decodeHandoff(read("handoff-fflate.txt"))).toEqual({
-			ok: true,
-			json: JSON.stringify(fixtureTemplate),
-		});
-	});
-
-	test("reads raw deflate from another implementation (zlib)", () => {
-		expect(decodeHandoff(read("handoff-zlib.txt"))).toEqual({
-			ok: true,
-			json: JSON.stringify(fixtureTemplate),
-		});
-	});
-
-	test("refuses characters outside base64url", () => {
-		expect(decodeHandoff("abc+def")).toEqual({
-			ok: false,
-			reason: "the link is incomplete or damaged",
-		});
-		expect(decodeHandoff("")).toMatchObject({ ok: false });
-	});
-
-	test("refuses a link cut short", () => {
-		const data = read("handoff-fflate.txt");
-		expect(decodeHandoff(data.slice(0, data.length >> 1))).toEqual({
-			ok: false,
-			reason: "the link is incomplete or damaged",
-		});
-	});
-
-	test("refuses data that is not deflate", () => {
-		expect(decodeHandoff("AAAAAAAAAAAAAAAA")).toMatchObject({ ok: false });
-	});
-
-	test("refuses a link that inflates past the limit", () => {
-		const bomb = encode(new Uint8Array(HANDOFF_MAX_JSON_BYTES + 1));
-		expect(bomb.length).toBeLessThan(200_000);
-		expect(decodeHandoff(bomb)).toEqual({
-			ok: false,
-			reason: "it is too large to open from a link",
-		});
-	});
-});
-
 describe("readHandoff", () => {
-	test("opens the fixture as a validated template named by its id", async () => {
-		const result = await readHandoff(read("handoff-fflate.txt"));
+	test("opens a template as a validated template named by its id", async () => {
+		const result = await readHandoff(encode(JSON.stringify(fixtureTemplate)));
 		if (!result.ok) throw new Error(result.reason);
-		expect(result.template.name).toBe("Café card from Figma");
-		expect(result.template.description).toBe("Straße ✓ 日本");
-		expect(result.fileName).toBe("figma-handoff.coat");
+		expect(result.template.name).toBe(fixtureTemplate.name);
+		expect(result.fileName).toBe("minimal-card.coat");
 		expect(result.notices).toEqual([]);
 	});
 
@@ -134,6 +69,13 @@ describe("readHandoff", () => {
 		expect(result).toEqual({
 			ok: false,
 			reason: "Invalid input: expected number, received undefined at /width",
+		});
+	});
+
+	test("passes on why a link could not be decoded", async () => {
+		expect(await readHandoff("abc+def")).toEqual({
+			ok: false,
+			reason: "the link is incomplete or damaged",
 		});
 	});
 

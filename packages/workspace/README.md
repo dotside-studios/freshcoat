@@ -21,22 +21,29 @@ scheduling and file destinations.
 | `columns` | the column types (text, number, date, color, URL, email, image, …), coercion and validation |
 | `json-schema` | a dataset's schema as JSON Schema 2020-12, in and out |
 | `tabular` | CSV, TSV, Excel, `.ods`, JSON and NDJSON in and out |
+| `dataset` | editing a dataset the way Studio does: cells, records and columns, renames that keep bindings in step, retyping, schema import, search, sort and per-record issues |
 | `mapping` | the import wizard's mapping of source columns to schema columns |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
+| `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
 | `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
-| `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
+| `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
-| `ids` | the stable ids, keys and slugs the workspace is addressed by |
-| `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
+| `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
+| `node` | Bun and Node only: `readWorkspaceFile`, `fileOutput` and `folderOutput` for files on disk |
 
-Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
+Most utilities are exported from `@freshcoat-js/workspace`. Dataset editing
+lives at `@freshcoat-js/workspace/dataset`; its functions take a `Dataset`
+and return a new one, so a script or `node` host edits a dataset as Studio
+does. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Image header reading lives at `@freshcoat-js/workspace/image-info` too, which
+imports nothing, for hosts that need only that.
 Reading and writing files on disk differs by platform, so it lives at
 `@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
 `node` subpath.
@@ -68,7 +75,9 @@ data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
 
 Templates inside are ordinary `.coat` files: a template opened on its own
 becomes a one-template workspace, and a workspace's template can be exported
-on its own again. Editor state that is not part of the design, such as a
+on its own again. Templates are read through coatfile's `loadTemplate`,
+and written without the assets nothing in them references
+(`pruneUnusedAssets`). Editor state that is not part of the design, such as a
 template's ruler guides, stays in the manifest's template entry, so the
 template format and its renders are unchanged.
 
@@ -80,6 +89,15 @@ values, variants and file names. `@freshcoat-js/workspace/export` runs them:
 and writes the outputs in plan order to a zip, or into one PDF, with a report
 of what succeeded or failed. Rendering goes through
 [`@freshcoat-js/coatfile`](../coatfile) and [`@freshcoat-js/engine`](../engine).
+
+A binding fills each field from a column, a fixed value or a serial.
+`autoBinding()` matches fields to columns by key, then by title, and
+`unfilledRequired()` names the template's required fields that a binding
+reading a dataset leaves without a source, or bound to a missing column. A
+binding whose `datasetId` is `NO_DATASET` holds only a variant choice. Those
+fields still render with their defaults, so an export is a warning rather
+than a failure: every planned item lists them in `unfilled`, as does each
+job result and the report's `unfilled` column.
 
 A binding's `variant` picks the variant each record renders in: a fixed one,
 the one a column names, every one, or `{ kind: "image", field }`, the one
@@ -107,7 +125,8 @@ const result = await exportWorkspace(workspace, preset, {
   renderer,
   output: fileOutput("club.zip"),
 });
-// result.items says how each item went.
+// result.items says how each item went, and which required fields it left
+// to their defaults.
 ```
 
 `exportWorkspace` takes a preset, its id or a name no other preset has
@@ -120,10 +139,36 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
 job is cancelled or fails.
 
+When the preset has `markExported`, `result.workspace` is the workspace with
+the job's record statuses written: `exported` with the time for records whose
+every item rendered, `failed` with the first error for the rest. The workspace
+passed in is not changed, and nothing is written for a cancelled job. Save
+`result.workspace` with `packWorkspace` to keep them. `applyJobResult` does
+the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
+`retryPreset` gives the preset that reruns a job's failed records, and
+`unwrittenRecordIds` lists the records a cancelled job left unwritten.
+
+Each item in `result.items` says how it went, and `export-report.csv` in a
+zip has a row per item with the same columns: `file`, `record`, `side`,
+`status`, `error`, `print`, `gamut`, `unfilled` and `warnings`. A barcode
+the encoder refuses fails its item, since a placeholder would print as if it
+scanned. Other render warnings, such as an image or font that failed to
+load, leave the item rendered and are listed in its `warnings`, described by
+coatfile's `describeWarning` and joined with `; ` in the report. An image
+field left empty is not reported.
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
-stream.
+stream. `exportPoolSize` picks how many workers from the
+cores, memory and `largestImagePixels` of the job.
+
+`itemRequest` builds the render request `runExportJob` sends for one item,
+with the size `itemSize` gives it, and `imagesOf` lists the photos that item
+references. `itemTemplate` returns the template laid out at the size
+`itemSize` gives an item whose size follows a photo, with `maxEdge` applied,
+so a preview shows what the export will render. Studio builds its export
+preview and printer file from these.
 
 ### Export from Node
 
@@ -149,6 +194,60 @@ const result = await exportWorkspace(workspace, "All cards", {
 });
 renderer.dispose();
 // result.fonts.missing, result.items
+```
+
+`folderOutput(dir)` writes one file per item into a folder instead, with the
+report beside them, and a PDF as one file in it. Like a folder in Studio, a
+cancelled job keeps the files already written. Studio writes to a folder the
+user picks through `createFolderSink` on `export`, which takes any
+`FolderHandle`; `folderOutput` hands it one over `node:fs`.
+
+A script can also start from a folder of photos and a template, making the
+dataset and preset as Studio does:
+
+```ts
+import { openAsBlob } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  autoBinding,
+  collectPhotoFiles,
+  newPreset,
+  photoDataset,
+  prepareAssets,
+  type Workspace,
+} from "@freshcoat-js/workspace";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { folderOutput } from "@freshcoat-js/workspace/node";
+
+const picked = await Promise.all(
+  (await readdir("photos", { recursive: true })).map(async (path) => ({
+    file: new File([await openAsBlob(join("photos", path))], path),
+    path,
+  })),
+);
+// skipped names each hidden file, non-image and unreadable zip, and why
+const { files, skipped } = await collectPhotoFiles(picked);
+const dataset = photoDataset("Photos", await prepareAssets(files));
+const workspace: Workspace = {
+  formatVersion: "1.0",
+  name: "Photos",
+  templates: [
+    {
+      id: "t_card",
+      fileName: "card.coat",
+      template,
+      binding: autoBinding(template, dataset),
+    },
+  ],
+  datasets: [dataset],
+  presets: [],
+};
+const preset = { ...newPreset("t_card", []), format: "jpeg-zip" as const };
+await exportWorkspace(workspace, preset, {
+  renderer,
+  output: folderOutput("out"),
+});
 ```
 
 `readWorkspaceFile` reads the archive without loading it into memory first

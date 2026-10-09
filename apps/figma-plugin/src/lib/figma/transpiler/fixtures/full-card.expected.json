@@ -12,10 +12,10 @@
 			"user_avatar": {
 				"type": "string",
 				"format": "image",
-				"title": "User Avatar",
+				"title": "User avatar",
 				"x-image-aspect": [1, 1]
 			},
-			"display_name": { "type": "string", "title": "Display Name" }
+			"display_name": { "type": "string", "title": "Display name" }
 		},
 		"required": ["user_avatar", "display_name"]
 	},

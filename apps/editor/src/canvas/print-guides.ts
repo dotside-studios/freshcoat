@@ -1,13 +1,12 @@
 import {
-	type Element,
 	hasInsets,
 	type Sides,
+	safeAreaIssues,
 	type Template,
 	templateBleed,
 	templateSafeArea,
 } from "@freshcoat-js/coatfile";
 import { useSyncExternalStore } from "react";
-import { worldCorners } from "~/doc/geometry";
 import { keyOf } from "~/doc/path";
 import { type EditorState, present } from "~/state/store";
 
@@ -132,61 +131,22 @@ export type SafeAreaHint = {
 	message: string;
 };
 
-type Box = { left: number; top: number; right: number; bottom: number };
-
-function boxOf(el: Element): Box | null {
-	if (!el.size) return null;
-	const pts = worldCorners({
-		x: el.pos?.x ?? 0,
-		y: el.pos?.y ?? 0,
-		width: el.size.width,
-		height: el.size.height,
-		rotation: el.rotation ?? 0,
-	});
-	const xs = pts.map((p) => p.x);
-	const ys = pts.map((p) => p.y);
-	return {
-		left: Math.min(...xs),
-		top: Math.min(...ys),
-		right: Math.max(...xs),
-		bottom: Math.max(...ys),
-	};
-}
-
-const EDGE_NAMES = ["left", "top", "right", "bottom"] as const;
-
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/**
- * Top-level layers with an edge between the trim and the safe line: close
- * enough to the cut that it may take part of them. A layer that runs to the
- * trim or past it is bleed, drawn to be cut, and is left alone. Only a
- * template with a safe area gets hints.
- */
+/** Top-level layers too close to the trim, as hints. Only a template with a
+ *  safe area gets hints. */
 export function safeAreaHints(t: Template): SafeAreaHint[] {
 	const { safe } = printGuidesFor(t);
 	if (!safe) return [];
-	const eps = 0.5;
-	const insets = [safe.left, safe.top, safe.right, safe.bottom];
-	const inBand = (d: number, i: number) =>
-		d > eps && d < (insets[i] as number) - eps;
-	const even = insets.every((n) => n === safe.top);
+	const even =
+		safe.left === safe.top &&
+		safe.right === safe.top &&
+		safe.bottom === safe.top;
 	const where = even ? `, ${Math.round(safe.top)} units in from the trim` : "";
-	const out: SafeAreaHint[] = [];
-	t.template_data.forEach((frame, side) => {
-		frame.elements.forEach((el, index) => {
-			const b = boxOf(el);
-			if (!b) return;
-			const gaps = [b.left, b.top, t.width - b.right, t.height - b.bottom];
-			const edges = EDGE_NAMES.filter((_, i) => inBand(gaps[i] as number, i));
-			if (edges.length === 0) return;
-			out.push({
-				key: keyOf({ side, path: [index] }),
-				side,
-				id: el.id,
-				message: `${capitalize(edges.join(" and "))} edge${edges.length > 1 ? "s cross" : " crosses"} the safe area${where}`,
-			});
-		});
-	});
-	return out;
+	return safeAreaIssues(t, { safe }).map(({ side, index, id, edges }) => ({
+		key: keyOf({ side, path: [index] }),
+		side,
+		id,
+		message: `${capitalize(edges.join(" and "))} edge${edges.length > 1 ? "s cross" : " crosses"} the safe area${where}`,
+	}));
 }

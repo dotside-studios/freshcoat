@@ -1,8 +1,8 @@
+import { type DatasetAsset, orientedSize } from "@freshcoat-js/workspace";
 import {
-	type DatasetAsset,
-	orientedSize,
-	parseAssetRef,
-} from "@freshcoat-js/workspace";
+	assetsByRef,
+	referencedAssets as itemAssets,
+} from "@freshcoat-js/workspace/export";
 import { useEffect, useMemo, useState } from "react";
 import { recoverAsset } from "~/app/source-assets";
 import { Lru } from "./lru";
@@ -381,23 +381,10 @@ export function previewImage(
 	return loading;
 }
 
-const shaMaps = new WeakMap<
+const refMaps = new WeakMap<
 	readonly DatasetAsset[],
 	ReadonlyMap<string, DatasetAsset>
 >();
-
-function assetsBySha(
-	assets: readonly DatasetAsset[],
-): ReadonlyMap<string, DatasetAsset> {
-	let map = shaMaps.get(assets);
-	if (!map) {
-		const first = new Map<string, DatasetAsset>();
-		for (const a of assets) if (!first.has(a.sha256)) first.set(a.sha256, a);
-		map = first;
-		shaMaps.set(assets, map);
-	}
-	return map;
-}
 
 /** The `ws:` references among a record's values that name one of `assets`. */
 export function referencedAssets(
@@ -405,16 +392,12 @@ export function referencedAssets(
 	values: Record<string, string>,
 ): DatasetAsset[] {
 	if (!assets || assets.length === 0) return [];
-	const out: DatasetAsset[] = [];
-	const seen = new Set<string>();
-	for (const value of Object.values(values)) {
-		const sha = parseAssetRef(value);
-		if (sha === null || seen.has(sha)) continue;
-		seen.add(sha);
-		const asset = assetsBySha(assets).get(sha);
-		if (asset) out.push(asset);
+	let map = refMaps.get(assets);
+	if (!map) {
+		map = assetsByRef(assets);
+		refMaps.set(assets, map);
 	}
-	return out;
+	return itemAssets({ values }, map);
 }
 
 /**

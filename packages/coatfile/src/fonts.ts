@@ -12,8 +12,8 @@ import {
 	googleCss2Url,
 	withVariants,
 } from "./font-usage";
-import { childElements } from "./tree";
-import type { Background, Element, FontRequest, Template } from "./types";
+import { walkElements } from "./tree";
+import type { FontRequest, Template } from "./types";
 
 // The FontRequests a template needs, gathered exactly as compileFrame does: every
 // family referenced by a text element (walking nested frames and backgrounds,
@@ -29,18 +29,14 @@ export function collectFontRequests(template: Template): FontRequest[] {
 	const usedFamilies = new Set<string>();
 	for (const t of withVariants(template)) {
 		const fallbackFamily = defaultFontFamily(t);
-		const walk = (el: Element | Background) => {
-			if (el.type === "text") usedFamilies.add(el.properties.font.family);
-			if (el.type === "barcode") {
-				const family = barcodeFontFamily(el, fallbackFamily);
-				if (family) usedFamilies.add(family);
-			}
-			for (const child of childElements(el)) walk(child);
-		};
-		for (const frame of t.template_data) {
-			walk(frame.background);
-			for (const el of frame.elements) walk(el);
-		}
+		for (const frame of t.template_data)
+			walkElements(frame.elements, (el) => {
+				if (el.type === "text") usedFamilies.add(el.properties.font.family);
+				if (el.type === "barcode") {
+					const family = barcodeFontFamily(el, fallbackFamily);
+					if (family) usedFamilies.add(family);
+				}
+			});
 	}
 
 	return [...usedFamilies].map((family) => {

@@ -13,12 +13,13 @@ import {
 import { toast } from "@freshcoat-js/ui/toast";
 import {
 	newId,
+	newPreset,
+	rebindDataset,
 	resolveValues,
 	variantFor,
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
-import { rebindDataset } from "~/binding/binding";
 import type { BooleanOp } from "~/doc/boolean";
 import {
 	createElement,
@@ -88,7 +89,6 @@ import {
 	isHiddenInVariant,
 	isStructuralEdit,
 } from "~/doc/variant-edit";
-import { newPreset } from "~/export/preset";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
 import { findStarter, type Starter } from "~/samples/starters";

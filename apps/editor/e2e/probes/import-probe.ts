@@ -1,5 +1,5 @@
 import { guessMapping, headersOf } from "@freshcoat-js/workspace";
-import { emptyDataset } from "~/data/model";
+import { emptyDataset } from "@freshcoat-js/workspace/dataset";
 import {
 	importTable,
 	inPageImporter,

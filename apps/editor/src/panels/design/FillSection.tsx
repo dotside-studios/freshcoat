@@ -1,4 +1,22 @@
 import type { Fill } from "@freshcoat-js/coatfile";
+import {
+	addStop,
+	convertFill,
+	type FillKind,
+	fillKind,
+	fillsOf,
+	fillsPatch,
+	type Gradient,
+	type GradientStop,
+	isGradient,
+	type PatternFill,
+	type PatternName,
+	patternParams,
+	reverseStops,
+	rotateQuarter,
+	withLinearAngle,
+	withStops,
+} from "@freshcoat-js/coatfile/fills";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
@@ -15,27 +33,7 @@ import {
 	sectionActions,
 } from "./controls";
 import { commonValue, type Inspect, type Layer } from "./field-helpers";
-import {
-	addStop,
-	convertFill,
-	DEFAULT_FILL_COLOR,
-	type FillKind,
-	fillKind,
-	fillsOf,
-	fillsPatch,
-	type Gradient,
-	isGradient,
-	type Pattern,
-	type PatternName,
-	patternParams,
-	removeAt,
-	replaceAt,
-	reverseStops,
-	rotateQuarter,
-	type Stop,
-	withLinearAngle,
-	withStops,
-} from "./fills";
+import { DEFAULT_FILL_COLOR, removeAt, replaceAt } from "./fills";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
 import { PatternSwatch } from "./PatternSwatch";
@@ -243,10 +241,10 @@ function PatternEditor({
 	swatches,
 	onChange,
 }: {
-	p: Pattern;
+	p: PatternFill;
 	index: number;
 	swatches: string[];
-	onChange: (field: string, p: Pattern) => void;
+	onChange: (field: string, p: PatternFill) => void;
 }) {
 	const { scale, angle, density, seed, colors } = patternParams(p);
 	const n = index + 1;
@@ -460,7 +458,7 @@ export function GradientEditor({
 			<GradientStops
 				stops={g.stops}
 				swatches={swatches}
-				onChange={(field, stops: Stop[]) =>
+				onChange={(field, stops: GradientStop[]) =>
 					onChange(field, withStops(g, stops))
 				}
 			/>

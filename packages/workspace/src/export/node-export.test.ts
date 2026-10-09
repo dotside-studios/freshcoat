@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,11 +14,11 @@ import { unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { packWorkspace } from "../archive";
-import { fileOutput, readWorkspaceFile } from "../node";
+import { fileOutput, folderOutput, readWorkspaceFile } from "../node";
 import { planExport } from "../plan";
 import { makePng, sha256 } from "../test-fixtures";
 import type { ExportPreset, Workspace } from "../types";
-import { exportWorkspace, REPORT_FILE_NAME } from "./index";
+import { type ExportOutput, exportWorkspace, REPORT_FILE_NAME } from "./index";
 
 const FONT_CSS = "https://fonts.example/css2?family=Inter";
 const FONT_FILE = "https://fonts.example/inter.ttf";
@@ -187,7 +187,11 @@ afterAll(async () => {
 	await rm(dir, { recursive: true, force: true });
 });
 
-async function exportFrom(file: string, job: ExportPreset, out: string) {
+async function exportFrom(
+	file: string,
+	job: ExportPreset,
+	output: ExportOutput,
+) {
 	const { workspace } = await readWorkspaceFile(file);
 	const renderer = await createRenderer({
 		ck: await loadCanvasKit("full"),
@@ -197,7 +201,7 @@ async function exportFrom(file: string, job: ExportPreset, out: string) {
 		const result = await exportWorkspace(workspace, job, {
 			renderer,
 			fontOptions: { fetch: fontFetch },
-			output: fileOutput(out),
+			output,
 		});
 		expect(result.fonts?.missing).toEqual([]);
 		return { workspace, result };
@@ -218,7 +222,7 @@ describe("export from a workspace file in Node", () => {
 		const { workspace, result } = await exportFrom(
 			await packTo("logo.png"),
 			preset,
-			out,
+			fileOutput(out),
 		);
 		expect(result.cancelled).toBe(false);
 		expect(result.items.filter((i) => !i.ok)).toEqual([]);
@@ -232,8 +236,8 @@ describe("export from a workspace file in Node", () => {
 		expect(
 			new TextDecoder().decode(zip[REPORT_FILE_NAME]).trim().split("\r\n"),
 		).toEqual([
-			"file,record,side,status,error,print,gamut",
-			...plan.map((i) => `${i.fileName},${i.recordId},${i.side},ok,,off,`),
+			"file,record,side,status,error,print,gamut,unfilled,warnings",
+			...plan.map((i) => `${i.fileName},${i.recordId},${i.side},ok,,off,,,`),
 		]);
 
 		const ck = await loadCanvasKit("full");
@@ -259,7 +263,7 @@ describe("export from a workspace file in Node", () => {
 		const { result } = await exportFrom(
 			await packTo(pathToFileURL(join(dir, "logo.png")).href),
 			preset,
-			out,
+			fileOutput(out),
 		);
 		expect(result.items.filter((i) => !i.ok)).toEqual([]);
 		const zip = unzipSync(new Uint8Array(await readFile(out)));
@@ -277,7 +281,7 @@ describe("export from a workspace file in Node", () => {
 		const { result } = await exportFrom(
 			await packTo("logo.png"),
 			{ ...preset, format: "pdf" },
-			out,
+			fileOutput(out),
 		);
 		expect(result.items.map((i) => i.ok)).toEqual([true, true]);
 		const pdf = await PDFDocument.load(await readFile(out));
@@ -310,5 +314,38 @@ describe("export from a workspace file in Node", () => {
 		} finally {
 			renderer.dispose();
 		}
+	});
+
+	it("writes one file per item into a folder", async () => {
+		const out = join(dir, "badges");
+		const { workspace, result } = await exportFrom(
+			await packTo("logo.png"),
+			preset,
+			folderOutput(out),
+		);
+		expect(result.items.filter((i) => !i.ok)).toEqual([]);
+		expect(result.sink).toMatchObject({ kind: "folder", files: 3 });
+		const plan = planExport(workspace, preset);
+		expect((await readdir(out)).sort()).toEqual(
+			[...plan.map((i) => i.fileName), REPORT_FILE_NAME].sort(),
+		);
+		const ck = await loadCanvasKit("full");
+		for (const item of plan) {
+			const pixels = decodePixels(ck, await readFile(join(out, item.fileName)));
+			expect([pixels?.width, pixels?.height]).toEqual([200, 125]);
+		}
+	});
+
+	it("puts a PDF into the folder", async () => {
+		const out = join(dir, "badges-pdf");
+		const { result } = await exportFrom(
+			await packTo("logo.png"),
+			{ ...preset, format: "pdf" },
+			folderOutput(out),
+		);
+		const name = result.file?.name ?? "";
+		expect(await readdir(out)).toEqual([name]);
+		const pdf = await PDFDocument.load(await readFile(join(out, name)));
+		expect(pdf.getPageCount()).toBe(2);
 	});
 });

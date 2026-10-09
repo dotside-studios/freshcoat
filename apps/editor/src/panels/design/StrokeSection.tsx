@@ -1,4 +1,10 @@
 import type { RectProperties } from "@freshcoat-js/coatfile";
+import {
+	convertFill,
+	type FillKind,
+	fillKind,
+	isGradient,
+} from "@freshcoat-js/coatfile/fills";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
@@ -15,7 +21,6 @@ import {
 } from "./controls";
 import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
-import { convertFill, type FillKind, fillKind, isGradient } from "./fills";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
 

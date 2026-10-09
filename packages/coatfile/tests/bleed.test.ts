@@ -1,11 +1,20 @@
-import { createRenderer, decodePixels, type GroupNode, type Node } from "@freshcoat-js/engine";
+import {
+	createRenderer,
+	decodePixels,
+	type GroupNode,
+	type Node,
+} from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import {
 	bleedMm,
 	bleedSize,
 	cardSizeMm,
+	compactInsets,
 	extendIntoBleed,
+	maxInsets,
+	resolveInsets,
+	safeAreaIssues,
 	templateBleed,
 	templateSafeArea,
 } from "../src/bleed";
@@ -294,5 +303,66 @@ describe("print size in millimetres", () => {
 		expect(bleed.top).toBeCloseTo(2.54, 9);
 		expect(bleed.right).toBeCloseTo(5.08, 9);
 		expect(bleed.left).toBe(0);
+	});
+});
+
+describe("safe area issues", () => {
+	const els = () => [
+		rect("near", 3, 4, 20, 10),
+		rect("clear", 30, 20, 20, 10),
+		rect("full", -2, -2, 104, 64),
+		rect("edge", 40, 1, 20, 4),
+	];
+
+	test("name the edges between the trim and the safe line", () => {
+		const t = card({ safeArea: 6 }, els());
+		expect(safeAreaIssues(t)).toEqual([
+			{ side: 0, index: 0, id: "near", edges: ["left", "top"] },
+			{ side: 0, index: 3, id: "edge", edges: ["top"] },
+		]);
+	});
+
+	test("measure a rotated layer by its painted box", () => {
+		const turned = { ...rect("r", 40, 20, 20, 4), rotation: 90 } as Element;
+		expect(safeAreaIssues(card({ safeArea: 30 }, [turned]))).toEqual([
+			{ side: 0, index: 0, id: "r", edges: ["top", "bottom"] },
+		]);
+	});
+
+	test("take the safe area from the caller over the template", () => {
+		expect(safeAreaIssues(card({}, els()))).toEqual([]);
+		const safe = { top: 0, right: 0, bottom: 0, left: 5 };
+		expect(safeAreaIssues(card({ safeArea: 6 }, els()), { safe })).toEqual([
+			{ side: 0, index: 0, id: "near", edges: ["left"] },
+		]);
+	});
+});
+
+describe("compactInsets", () => {
+	const even = { top: 3, right: 3, bottom: 3, left: 3 };
+
+	test("writes one number when every side agrees", () => {
+		expect(compactInsets(even)).toBe(3);
+		expect(compactInsets({ ...even, left: 4 })).toEqual({ ...even, left: 4 });
+	});
+
+	test("is the inverse of resolveInsets", () => {
+		expect(resolveInsets(compactInsets(even))).toEqual(even);
+		expect(compactInsets(resolveInsets(7))).toBe(7);
+	});
+});
+
+describe("maxInsets", () => {
+	test("takes the largest inset on each side", () => {
+		expect(
+			maxInsets([
+				{ top: 1, right: 5, bottom: 2, left: 0 },
+				{ top: 4, right: 2, bottom: 2, left: 3 },
+			]),
+		).toEqual({ top: 4, right: 5, bottom: 2, left: 3 });
+	});
+
+	test("is no insets for an empty list", () => {
+		expect(maxInsets([])).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
 });

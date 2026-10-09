@@ -1,9 +1,13 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { applyVariant, compile, validate } from "@freshcoat-js/coatfile";
+import {
+	applyVariant,
+	compile,
+	sampleValues,
+	validate,
+} from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { newDocument, PRESETS } from "../doc/new-document";
 import { walkLayers } from "../doc/path";
-import { sampleValues } from "../doc/values";
 import { SAMPLES } from "../samples";
 import { VEND_SANS } from "../samples/vend-sans";
 

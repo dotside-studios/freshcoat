@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import type { Gradient, GradientStop } from "@freshcoat-js/coatfile/fills";
 import {
 	act,
 	cleanup,
@@ -13,7 +14,6 @@ import { EditorController } from "~/app/controller";
 import { updateElement } from "~/doc/ops";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
-import type { Gradient, Stop } from "~/panels/design/fills";
 import { StopBar } from "~/panels/design/StopBar";
 import { doc, geometryOf } from "./doc-fixture";
 
@@ -37,7 +37,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-const BW: Stop[] = [
+const BW: GradientStop[] = [
 	{ offset: 0, color: "#000000" },
 	{ offset: 1, color: "#ffffff" },
 ];
@@ -46,8 +46,8 @@ function Harness({
 	initial,
 	log,
 }: {
-	initial: Stop[];
-	log: { field: string; stops: Stop[] }[];
+	initial: GradientStop[];
+	log: { field: string; stops: GradientStop[] }[];
 }) {
 	const [stops, setStops] = useState(initial);
 	const [selected, setSelected] = useState(0);
@@ -67,8 +67,8 @@ function Harness({
 	);
 }
 
-function setup(initial: Stop[] = BW) {
-	const log: { field: string; stops: Stop[] }[] = [];
+function setup(initial: GradientStop[] = BW) {
+	const log: { field: string; stops: GradientStop[] }[] = [];
 	render(<Harness initial={initial} log={log} />);
 	const bar = screen.getByTestId("stop-bar");
 	const last = () => log.at(-1)?.stops;

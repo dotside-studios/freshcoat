@@ -9,6 +9,28 @@ export function resolveInsets(insets: Insets | undefined): Sides {
 	return insets;
 }
 
+/** The inverse of `resolveInsets`: one number when every side is the same. */
+export function compactInsets(sides: Sides): Insets {
+	return sides.top === sides.right &&
+		sides.top === sides.bottom &&
+		sides.top === sides.left
+		? sides.top
+		: { ...sides };
+}
+
+/** The largest inset on each side. */
+export function maxInsets(all: readonly Sides[]): Sides {
+	return all.reduce(
+		(m, s) => ({
+			top: Math.max(m.top, s.top),
+			right: Math.max(m.right, s.right),
+			bottom: Math.max(m.bottom, s.bottom),
+			left: Math.max(m.left, s.left),
+		}),
+		all[0] ?? NO_INSETS,
+	);
+}
+
 export function hasInsets(sides: Sides): boolean {
 	return sides.top > 0 || sides.right > 0 || sides.bottom > 0 || sides.left > 0;
 }
@@ -49,10 +71,7 @@ export function resolveBleedMm(bleed: number | BleedMm | undefined): BleedMm {
 }
 
 /** The bleed a template of this many pixels of bleed prints at at this DPI. */
-export function bleedMm(
-	bleedPx: Sides,
-	dpi: number,
-): BleedMm {
+export function bleedMm(bleedPx: Sides, dpi: number): BleedMm {
 	const mm = (px: number) => (px / dpi) * MM_PER_INCH;
 	return {
 		top: mm(bleedPx.top),
@@ -144,4 +163,61 @@ export function offsetElements(
 		...el,
 		pos: { x: (el.pos?.x ?? 0) + dx, y: (el.pos?.y ?? 0) + dy },
 	}));
+}
+
+export type SafeAreaEdge = "left" | "top" | "right" | "bottom";
+
+export type SafeAreaIssue = {
+	/** Frame index in `template_data`. */
+	side: number;
+	/** Index of the top-level layer in its frame. */
+	index: number;
+	id: string;
+	/** The edges that lie between the trim and the safe line. */
+	edges: SafeAreaEdge[];
+};
+
+const SAFE_EDGES: SafeAreaEdge[] = ["left", "top", "right", "bottom"];
+
+function rotatedBox(el: Element): [number, number, number, number] | null {
+	if (!el.size) return null;
+	const x = el.pos?.x ?? 0;
+	const y = el.pos?.y ?? 0;
+	const { width, height } = el.size;
+	const rad = ((el.rotation ?? 0) * Math.PI) / 180;
+	const hw =
+		(Math.abs(Math.cos(rad)) * width + Math.abs(Math.sin(rad)) * height) / 2;
+	const hh =
+		(Math.abs(Math.sin(rad)) * width + Math.abs(Math.cos(rad)) * height) / 2;
+	const cx = x + width / 2;
+	const cy = y + height / 2;
+	return [cx - hw, cy - hh, cx + hw, cy + hh];
+}
+
+/**
+ * Top-level layers with an edge between the trim and the safe line: close
+ * enough to the cut that it may take part of them. A layer that runs to the
+ * trim or past it is bleed, drawn to be cut, and is left alone. `safe`
+ * defaults to the template's own safe area; with none there are no issues.
+ */
+export function safeAreaIssues(
+	t: Pick<Template, "width" | "height" | "safeArea" | "template_data">,
+	options: { safe?: Sides } = {},
+): SafeAreaIssue[] {
+	const safe = options.safe ?? templateSafeArea(t);
+	if (!hasInsets(safe)) return [];
+	const insets = [safe.left, safe.top, safe.right, safe.bottom];
+	const inBand = (d: number, i: number) =>
+		d > EDGE_EPSILON && d < (insets[i] as number) - EDGE_EPSILON;
+	const out: SafeAreaIssue[] = [];
+	t.template_data.forEach((frame, side) => {
+		frame.elements.forEach((el, index) => {
+			const b = rotatedBox(el);
+			if (!b) return;
+			const gaps = [b[0], b[1], t.width - b[2], t.height - b[3]];
+			const edges = SAFE_EDGES.filter((_, i) => inBand(gaps[i] as number, i));
+			if (edges.length > 0) out.push({ side, index, id: el.id, edges });
+		});
+	});
+	return out;
 }

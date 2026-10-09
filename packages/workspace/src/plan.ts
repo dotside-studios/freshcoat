@@ -1,5 +1,10 @@
 import { DEFAULT_VARIANT_ID, type Template } from "@freshcoat-js/coatfile";
-import { columnsByKey, resolveValues, variantsFor } from "./binding";
+import {
+	columnsByKey,
+	resolveValues,
+	unfilledRequired,
+	variantsFor,
+} from "./binding";
 import { toTemplateValue } from "./columns";
 import type {
 	DataRecord,
@@ -195,6 +200,9 @@ function sidesOf(template: Template, preset: ExportPreset): string[] {
  * something), each with all its sides before the next variant's. Those items'
  * keys end in the variant (`default` for Default), and their file names carry
  * it (`fileNamePattern`).
+ *
+ * When the binding reads a dataset but leaves required fields unfilled, as
+ * `unfilledRequired` finds them, every item lists them in `unfilled`.
  */
 export function planExport(
 	workspace: Workspace,
@@ -223,6 +231,7 @@ export function planExport(
 		records.length,
 	);
 	const columns = dataset ? columnsByKey(dataset) : undefined;
+	const unfilled = unfilledRequired(template, binding, workspace.datasets);
 
 	// lowercased name -> the next suffix to try for it
 	const used = new Map<string, number>();
@@ -277,6 +286,7 @@ export function planExport(
 					fileName: `${unique(base)}${suffix}.${extension}`,
 					values,
 					...(variantId !== undefined ? { variantId } : {}),
+					...(unfilled.length > 0 ? { unfilled } : {}),
 				});
 			}
 		}

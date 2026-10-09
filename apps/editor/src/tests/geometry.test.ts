@@ -1,7 +1,7 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { validate } from "@freshcoat-js/coatfile";
+import { ellipsePath, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
-import { ellipsePath, isEllipseVector } from "../doc/factories";
+import { isEllipseVector } from "../doc/factories";
 import {
 	align,
 	applyRect,
@@ -374,7 +374,7 @@ describe("applyRect", () => {
 		).toBe("M0 0L20 0L20 10Z");
 	});
 
-	test("regenerates an ellipse instead of scaling it", () => {
+	test("an ellipse stays an ellipse of its new box", () => {
 		const ellipse = unwrap(
 			updateElement(t, "0/2/-1", { size: { width: 200, height: 100 } }),
 		).template;

@@ -1,19 +1,21 @@
 import { toast } from "@freshcoat-js/ui/toast";
 import {
 	type AddAssetsResult,
-	type AssetFile,
 	addPreparedAssets,
+	collectPhotoFiles,
 	columnsToJsonSchema,
 	type Dataset,
-	filesFromZip,
-	imageContentType,
-	isHiddenPath,
 	type PreparedAsset,
 	photoDataset,
 	prepareAssets,
 	type TableFormat,
 	uniqueName,
 } from "@freshcoat-js/workspace";
+import {
+	rebindColumn,
+	renameColumn,
+	replaceDataset,
+} from "@freshcoat-js/workspace/dataset";
 import { TABLE_EXTENSIONS } from "@freshcoat-js/workspace/tabular";
 import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
@@ -21,7 +23,6 @@ import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
 import type { BindingPatch } from "~/state/workspace";
-import { rebindColumn, renameColumn, replaceDataset } from "./model";
 
 export function currentDataset(
 	controller: EditorController,
@@ -262,70 +263,6 @@ export function usePhotoImportProgress(): PhotoImportProgress | null {
 	);
 }
 
-/** Resolves on a fresh task once 16 ms of work have run since the last one,
- *  so a long loop leaves the page able to paint and take input. */
-function yielder(): () => Promise<void> {
-	let since = performance.now();
-	return async () => {
-		if (performance.now() - since < 16) return;
-		await new Promise<void>((resolve) => setTimeout(resolve, 0));
-		since = performance.now();
-	};
-}
-
-const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
-
-export type CollectedPhotos = {
-	files: AssetFile[];
-	/** hidden files and anything that is not an image */
-	skipped: number;
-};
-
-/** The images among picked or dropped files, zips opened. */
-export async function photoFiles(
-	files: readonly (File | PickedFile)[],
-	signal?: AbortSignal,
-): Promise<CollectedPhotos> {
-	const out: AssetFile[] = [];
-	let skipped = 0;
-	const pause = yielder();
-	for (const item of files) {
-		await pause();
-		signal?.throwIfAborted();
-		const { file, path } = picked(item);
-		if (isHiddenPath(path)) {
-			skipped += 1;
-			continue;
-		}
-		if (/\.zip$/i.test(file.name)) {
-			try {
-				const zip = await filesFromZip(file);
-				out.push(...zip.files);
-				skipped += zip.skipped;
-			} catch {
-				toast(`Couldn't read ${file.name}`, { tone: "danger" });
-			}
-			continue;
-		}
-		let contentType = file.type.startsWith("image/") ? file.type : undefined;
-		if (contentType === undefined && !IMAGE_EXTENSION.test(file.name)) {
-			const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-			const sniffed = imageContentType(file.name, head);
-			if (sniffed.startsWith("image/")) contentType = sniffed;
-		}
-		if (contentType === undefined && !IMAGE_EXTENSION.test(file.name)) {
-			skipped += 1;
-			continue;
-		}
-		out.push({
-			name: file.name,
-			blob: file,
-			...(contentType ? { contentType } : {}),
-		});
-	}
-	return { files: out, skipped };
-}
-
 const collator = new Intl.Collator(undefined, {
 	numeric: true,
 	sensitivity: "base",
@@ -346,7 +283,17 @@ async function preparePhotos(
 		});
 	report(0, source.length);
 	try {
-		const { files, skipped } = await photoFiles(source, aborter.signal);
+		const { files, skipped: leftOut } = await collectPhotoFiles(source, {
+			signal: aborter.signal,
+		});
+		let skipped = 0;
+		for (const { path, reason } of leftOut) {
+			if (reason === "unreadable")
+				toast(`Couldn't read ${path.slice(path.lastIndexOf("/") + 1)}`, {
+					tone: "danger",
+				});
+			else skipped += 1;
+		}
 		if (files.length === 0) {
 			toast(
 				skipped

@@ -1,6 +1,9 @@
-import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
+import {
+	resolveTemplateFonts,
+	sampleValues,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { useEffect, useState } from "react";
-import { sampleValues } from "~/doc/values";
 import { fontCache } from "~/render/font-cache";
 import { once } from "./lazy";
 

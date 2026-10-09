@@ -1,6 +1,6 @@
 import { toast } from "@freshcoat-js/ui/toast";
+import { readsDataset } from "@freshcoat-js/workspace";
 import type { EditorController } from "~/app/controller";
-import { readsDataset } from "~/binding/binding";
 import { activeSlot } from "~/state/workspace";
 
 /** Reports an import. A new dataset is bound to the active template when it

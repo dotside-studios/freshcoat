@@ -1,3 +1,10 @@
+import {
+	type GradientStop,
+	insertStop,
+	moveStop,
+	removeStop,
+	sortedStops,
+} from "@freshcoat-js/coatfile/fills";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { NumberField } from "@freshcoat-js/ui/number-field";
@@ -10,14 +17,7 @@ import {
 } from "react";
 import { RemoveButton } from "./controls";
 import { sameValue } from "./field-helpers";
-import {
-	insertStop,
-	moveStop,
-	removeStop,
-	replaceAt,
-	type Stop,
-	sortedStops,
-} from "./fills";
+import { replaceAt } from "./fills";
 
 /** How far past the bar, in pixels, a dragged stop is pulled off it. */
 const TEAR_OFF = 28;
@@ -26,7 +26,10 @@ const INSET = 6;
 
 let dragSerial = 0;
 
-export function gradientCss(stops: readonly Stop[], head = "90deg"): string {
+export function gradientCss(
+	stops: readonly GradientStop[],
+	head = "90deg",
+): string {
 	const list = sortedStops(stops)
 		.map((s) => `${s.color} ${Math.round(s.offset * 1000) / 10}%`)
 		.join(", ");
@@ -37,7 +40,7 @@ type Drag = {
 	pointerId: number;
 	field: string;
 	/** The stops the drag started from, after any stop it added. */
-	base: Stop[];
+	base: GradientStop[];
 	index: number;
 };
 
@@ -54,10 +57,10 @@ export function StopBar({
 	onSelect,
 	onChange,
 }: {
-	stops: Stop[];
+	stops: GradientStop[];
 	selected: number;
 	onSelect: (index: number) => void;
-	onChange: (field: string, stops: Stop[]) => void;
+	onChange: (field: string, stops: GradientStop[]) => void;
 }) {
 	const strip = useRef<HTMLDivElement>(null);
 	const markers = useRef<(HTMLDivElement | null)[]>([]);
@@ -71,7 +74,7 @@ export function StopBar({
 		markers.current[selected]?.focus();
 	});
 
-	const write = (field: string, next: Stop[]) => {
+	const write = (field: string, next: GradientStop[]) => {
 		if (!sameValue(next, stops)) onChange(field, next);
 	};
 
@@ -221,9 +224,9 @@ export function GradientStops({
 	swatches,
 	onChange,
 }: {
-	stops: Stop[];
+	stops: GradientStop[];
 	swatches: string[];
-	onChange: (field: string, stops: Stop[]) => void;
+	onChange: (field: string, stops: GradientStop[]) => void;
 }) {
 	const [picked, setPicked] = useState(0);
 	const selected = Math.min(picked, stops.length - 1);

@@ -1,4 +1,5 @@
 import { linearGradientAngle } from "@freshcoat-js/coatfile";
+import type { Gradient } from "@freshcoat-js/coatfile/fills";
 import { describe, expect, test } from "vitest";
 import {
 	boxToWorld,
@@ -13,7 +14,6 @@ import {
 	worldToLocal,
 } from "../canvas/gradient-geometry";
 import { type Point, type Rect, worldCorners } from "../doc/geometry";
-import type { Gradient } from "../panels/design/fills";
 import { doc, geometryOf } from "./doc-fixture";
 
 const rect = (

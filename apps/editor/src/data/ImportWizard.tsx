@@ -25,6 +25,7 @@ import {
 	previewMapping,
 	uniqueName,
 } from "@freshcoat-js/workspace";
+import { emptyDataset, replaceDataset } from "@freshcoat-js/workspace/dataset";
 import {
 	type DragEvent,
 	type ReactNode,
@@ -42,7 +43,7 @@ import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
 import { recallMapping, rememberMapping } from "./import-memory";
-import { emptyDataset, replaceDataset, TYPE_LABELS } from "./model";
+import { TYPE_LABELS } from "./model";
 import { importTable, tableImporter } from "./table-import";
 import { dataRowCount, type OpenedTable } from "./table-store";
 

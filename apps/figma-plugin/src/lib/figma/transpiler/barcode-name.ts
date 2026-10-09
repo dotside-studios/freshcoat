@@ -8,21 +8,14 @@
 //   barcode:code39:"ID {{id}}"      a template, quoted as in the other markers
 //   …;text=0;fg=#123;bg=#fff;margin=4;ec=5
 import type { Symbology } from "@freshcoat-js/coatfile";
-import { SYMBOLOGIES } from "@freshcoat-js/coatfile/barcode-encoder";
+import {
+	parseSymbology,
+	SYMBOLOGIES,
+} from "@freshcoat-js/coatfile/barcode-encoder";
 import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 
 /** What a `barcode:` layer draws when it names no symbology. */
 export const DEFAULT_SYMBOLOGY: Symbology = "code128";
-
-// Names are compared with case, spaces, hyphens and underscores ignored, so
-// `Code-128`, `EAN_13` and `data matrix` all read. These are the other names a
-// symbology commonly goes by.
-const ALIASES: Record<string, Symbology> = {
-	azteccode: "aztec",
-	upc: "upca",
-	ean: "ean13",
-	itf: "itf14",
-};
 
 const QR_NAMES = new Set(["qr", "qrcode"]);
 
@@ -34,11 +27,9 @@ export type SymbologyResult =
 	| { ok: false; message: string };
 
 export function resolveSymbology(name: string): SymbologyResult {
-	const key = normalize(name);
-	const direct = SYMBOLOGIES.find((s) => s === key);
-	if (direct) return { ok: true, symbology: direct };
-	if (ALIASES[key]) return { ok: true, symbology: ALIASES[key] };
-	if (QR_NAMES.has(key)) {
+	const symbology = parseSymbology(name);
+	if (symbology) return { ok: true, symbology };
+	if (QR_NAMES.has(normalize(name))) {
 		return {
 			ok: false,
 			message: `A QR code is its own layer: name it qr:{{id}} instead`,

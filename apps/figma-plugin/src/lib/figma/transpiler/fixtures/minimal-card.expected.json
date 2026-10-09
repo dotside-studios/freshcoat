@@ -9,7 +9,7 @@
 	"fields": {
 		"type": "object",
 		"properties": {
-			"display_name": { "type": "string", "title": "Display Name" }
+			"display_name": { "type": "string", "title": "Display name" }
 		},
 		"required": ["display_name"]
 	},

@@ -1,19 +1,18 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import type { Point } from "~/doc/geometry";
-import { updateElement } from "~/doc/ops";
-import { getElement, keyOf, parentKeyOf } from "~/doc/path";
 import {
 	colorAt,
-	editedGradient,
 	fillsOf,
 	fillsPatch,
 	type Gradient,
 	hasFills,
 	insertStop,
 	moveStop,
-	replaceAt,
 	withStops,
-} from "~/panels/design/fills";
+} from "@freshcoat-js/coatfile/fills";
+import type { Point } from "~/doc/geometry";
+import { updateElement } from "~/doc/ops";
+import { getElement, keyOf, parentKeyOf } from "~/doc/path";
+import { editedGradient, replaceAt } from "~/panels/design/fills";
 import { useEditor } from "~/state/hooks";
 import { type EditorState, type View, working } from "~/state/store";
 import {

@@ -146,7 +146,17 @@ describe("validation", () => {
 		);
 		expect(r.ok).toBe(false);
 		if (!r.ok)
-			expect(r.errors.map((e) => e.code)).toContain("unknown_field_reference");
+			expect(
+				r.errors.filter((e) => e.code === "unknown_field_reference"),
+			).toEqual([
+				{
+					path: "/template_data/0/elements/0/properties/children/0/visibleWhen/0",
+					code: "unknown_field_reference",
+					message: 'visibleWhen names "nope", which has no matching field',
+					field: "nope",
+					role: "condition",
+				},
+			]);
 	});
 
 	test("rejects a boolean default that is not true or false", () => {

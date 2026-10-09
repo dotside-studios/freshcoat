@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { isHandoffOrigin } from "@freshcoat-js/coatfile/handoff";
 import type { EditorState } from "~/state/store";
 import type { Section } from "~/state/workspace";
 
@@ -108,7 +109,6 @@ export function readIntent(search: string): {
 }
 
 const HANDOFF_PARAMS = ["coat", "open", "drop"] as const;
-const LOOPBACK = new Set(["localhost", "127.0.0.1"]);
 
 export function returnOrigin(value: string): string | null {
 	let url: URL;
@@ -117,11 +117,7 @@ export function returnOrigin(value: string): string | null {
 	} catch {
 		return null;
 	}
-	const local = LOOPBACK.has(url.hostname);
-	if (url.protocol !== "https:" && !(url.protocol === "http:" && local))
-		return null;
-	if (url.username || url.password) return null;
-	return url.origin;
+	return isHandoffOrigin(url) ? url.origin : null;
 }
 
 /**

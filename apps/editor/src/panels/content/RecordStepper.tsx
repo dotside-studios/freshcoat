@@ -5,6 +5,7 @@ import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import type { Dataset } from "@freshcoat-js/workspace";
+import { readsDataset, unfilledRequired } from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import {
 	Disclosure,
@@ -14,7 +15,6 @@ import {
 import { useController } from "~/app/context";
 import { BINDING, CONTENT, EMPTY, plural } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
-import { readsDataset, unfilledRequired } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import { activeSlot } from "~/state/workspace";
 import SamplesIcon from "~icons/mingcute/back-line";

@@ -1,18 +1,31 @@
-import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
-import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
+import {
+	type FieldDefinition,
+	fieldTitle,
+	sampleValues,
+	type Template,
+} from "@freshcoat-js/coatfile";
+import {
+	FIELD_ID,
+	FIELD_FORMATS as FORMAT_IDS,
+} from "@freshcoat-js/coatfile/mustache";
 import type { EditorController } from "~/app/controller";
 import { KEY_RULE } from "~/app/copy";
 import { addField } from "~/doc/ops";
-import { humanize, sampleValues } from "~/doc/values";
 
-export const FIELD_FORMATS = [
-	{ id: "text", name: "Text" },
-	{ id: "longText", name: "Long text" },
-	{ id: "color", name: "Color" },
-	{ id: "url", name: "URL" },
-	{ id: "image", name: "Image" },
-	{ id: "boolean", name: "Yes / no" },
-] as const;
+type FormatId = "text" | (typeof FORMAT_IDS)[number];
+
+const FORMAT_NAME: Record<FormatId, string> = {
+	text: "Text",
+	longText: "Long text",
+	color: "Color",
+	url: "URL",
+	image: "Image",
+	boolean: "Yes / no",
+};
+
+export const FIELD_FORMATS: readonly { id: FormatId; name: string }[] = (
+	["text", ...FORMAT_IDS] as const
+).map((id) => ({ id, name: FORMAT_NAME[id] }));
 
 export const FIELD_SOURCES = [
 	{ id: "unset", name: "Not set" },
@@ -63,7 +76,7 @@ export function createField(
 	key: string,
 	format?: FieldDefinition["format"],
 ): boolean {
-	const def: FieldDefinition = { type: "string", title: humanize(key) };
+	const def: FieldDefinition = { type: "string", title: fieldTitle(key) };
 	if (format) def.format = format;
 	const result = controller.edit((t) => addField(t, key, def), {
 		scope: "base",

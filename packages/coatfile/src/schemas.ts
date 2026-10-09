@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
-import { tokenIds } from "./mustache";
+import { FIELD_FORMATS, tokenIds } from "./mustache";
 import type {
 	Element,
+	FieldReferenceRole,
 	FrameElement,
 	FrameProperties,
 	MaskElement,
@@ -102,7 +103,7 @@ export const FieldDefinitionSchema = z.object({
 	description: z.string().optional(),
 	default: z.string().optional(),
 	// "boolean" is a toggle whose value is the string "true" or "false".
-	format: z.enum(["color", "url", "image", "longText", "boolean"]).optional(),
+	format: z.enum(FIELD_FORMATS).optional(),
 	maxLength: z.number().optional(),
 	minLength: z.number().optional(),
 	pattern: z
@@ -835,12 +836,13 @@ function addKitIssue(
 	kitCode: string,
 	message: string,
 	path: (string | number)[],
+	reference?: { field: string; role: FieldReferenceRole },
 ) {
 	ctx.addIssue({
 		code: "custom",
 		message,
 		path,
-		params: { kitCode },
+		params: { kitCode, ...reference },
 	});
 }
 
@@ -1120,6 +1122,7 @@ function enforceMustacheReferences(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 						"unknown_field_reference",
 						`mustache reference {{${id}}} has no matching field`,
 						[...path],
+						{ field: id, role: path.at(-1) === "src" ? "src" : "text" },
 					);
 				}
 			}
@@ -1180,6 +1183,7 @@ function enforceVisibilityReferences(
 						"unknown_field_reference",
 						`visibleWhen names "${c.field}", which has no matching field`,
 						[...path, i, "visibleWhen", ...(Array.isArray(when) ? [ci] : [])],
+						{ field: c.field, role: "condition" },
 					);
 				}
 			});

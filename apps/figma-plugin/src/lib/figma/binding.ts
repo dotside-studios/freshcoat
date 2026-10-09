@@ -2,21 +2,19 @@
 // run at harvest time (write pluginData) and at export time (live fallback), so
 // the marker grammar lives in exactly one place.
 
-import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
+import type {
+	FieldFormat as CoatFieldFormat,
+	Symbology,
+	VisibilityCondition,
+} from "@freshcoat-js/coatfile";
+import { fieldTitle } from "@freshcoat-js/coatfile/fields";
 import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
-import { titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
 /** Schema format a field lowers to (coatfile). */
-export type FieldFormat =
-	| "text"
-	| "longText"
-	| "image"
-	| "color"
-	| "url"
-	| "boolean";
+export type FieldFormat = "text" | CoatFieldFormat;
 
 /** What on a node a template drives. The layer-name marker seeds one; the
  * plugin may add extras (e.g. `textColor` alongside `text`). */
@@ -387,7 +385,7 @@ export function buildFieldMeta(
 	return {
 		id: draft.id,
 		format: draft.format,
-		title: titleCase(draft.id),
+		title: fieldTitle(draft.id),
 		// A toggle always has an answer (unset is its default), so it is never
 		// the thing a buyer forgot to fill in.
 		required: draft.format !== "boolean",

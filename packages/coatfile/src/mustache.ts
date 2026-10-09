@@ -1,5 +1,29 @@
 export const FIELD_ID = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+/** The values a field's `format` may take. A field without one is plain text. */
+export const FIELD_FORMATS = [
+	"longText",
+	"color",
+	"url",
+	"image",
+	"boolean",
+] as const;
+
+/** A key `FIELD_ID` accepts, made from any text: `First Name` and `firstName`
+ *  give `first_name`, `Año` gives `ano`, `2nd` gives `_2nd`. `fallback` when
+ *  nothing is left. */
+export function fieldKeyFrom(text: string, fallback = "field"): string {
+	const key = text
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "");
+	if (key === "") return fallback;
+	return /^[0-9]/.test(key) ? `_${key}` : key;
+}
+
 export type MustacheText = {
 	kind: "text";
 	value: string;

@@ -5,24 +5,27 @@ import { cn } from "@freshcoat-js/ui/lib/cn";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import {
-	assetRef,
 	type DataRecord,
-	type DatasetAsset,
 	type ExportItem,
 	type ExportPreset,
+	newPreset,
 	parseAssetRef,
 	planExport,
 	resolveValues,
 	sheetSummary,
+	unfilledRequired,
 	variantFor,
 	variantsFor,
 } from "@freshcoat-js/workspace";
 import {
 	boundDatasetOf,
 	itemSize,
+	itemTemplate,
 	pagesPerSheet,
 	planSheets,
+	recordOutcome,
 	sheetOf,
+	assetsByRef as toAssetsByRef,
 	withRecordIds,
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +33,6 @@ import { useController } from "~/app/context";
 import { BINDING, EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
-import { unfilledRequired } from "~/binding/binding";
 import { selectedInView } from "~/data/gallery-model";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
@@ -47,9 +49,7 @@ import { ExportSettings, type SettingsTab } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
 	labelColumn,
-	photoSizedTemplate,
 	recordLabel,
-	recordOutcome,
 	type StatusFilter,
 	selectedIds,
 } from "./export-ui";
@@ -66,7 +66,6 @@ import { GlyphNotice } from "./GlyphNotice";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
 import { PresetList } from "./PresetList";
-import { newPreset } from "./preset";
 import {
 	effectiveMode,
 	PREVIEW_MODE_LABEL,
@@ -454,21 +453,17 @@ export function ExportSection() {
 		currentToken,
 	]);
 
-	// A preset sized by a photo previews each record at that photo's aspect.
+	const assetsByRef = useMemo(
+		() => toAssetsByRef(dataset?.assets),
+		[dataset?.assets],
+	);
+	// A preset sized by a photo previews each record as the export lays it out.
 	const previewTemplate = useMemo(
 		() =>
-			template && preset
-				? photoSizedTemplate(template, preset, item, dataset)
+			template && preset && item
+				? itemTemplate(template, preset, item, assetsByRef)
 				: template,
-		[template, preset, item, dataset],
-	);
-
-	const assetsByRef = useMemo(
-		() =>
-			new Map<string, DatasetAsset>(
-				(dataset?.assets ?? []).map((a) => [assetRef(a.sha256), a]),
-			),
-		[dataset?.assets],
+		[template, preset, item, assetsByRef],
 	);
 	const outputSize = useMemo(() => {
 		if (!template || !preset || !item || preset.format === "pdf") return null;

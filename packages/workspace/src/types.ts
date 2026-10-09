@@ -280,6 +280,9 @@ export type ExportItem = {
 	fileName: string;
 	values: Record<string, string>;
 	variantId?: string;
+	/** required fields the binding leaves to their defaults: unbound, or
+	 *  bound to a missing column. The item still renders. */
+	unfilled?: string[];
 };
 
 export type TableSheet = { name: string; rows: string[][] };

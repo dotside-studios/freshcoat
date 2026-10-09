@@ -1,12 +1,11 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { validate } from "@freshcoat-js/coatfile";
+import { ellipsePath, validate } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import {
 	barcodeBoxFor,
 	createElement,
 	defaultRect,
 	type ElementKind,
-	ellipsePath,
 	isEllipseVector,
 } from "../doc/factories";
 import { newDocument, PRESETS } from "../doc/new-document";
@@ -149,15 +148,6 @@ describe("defaultRect", () => {
 });
 
 describe("ellipses", () => {
-	test("ellipsePath is two arcs spanning the box", () => {
-		expect(ellipsePath(200, 100)).toBe(
-			"M0 50A100 50 0 1 0 200 50A100 50 0 1 0 0 50Z",
-		);
-		expect(ellipsePath(1 / 3, 1)).toBe(
-			"M0 0.5A0.167 0.5 0 1 0 0.333 0.5A0.167 0.5 0 1 0 0 0.5Z",
-		);
-	});
-
 	test("isEllipseVector matches its own size only", () => {
 		const t = frozenDoc();
 		const e = createElement(

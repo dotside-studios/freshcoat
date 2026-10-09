@@ -14,21 +14,22 @@ import {
 	backgroundSwatch,
 	bytesToBase64,
 	checkVariants,
-	collectAssetRefs,
 	DEFAULT_VARIANT_ID,
+	elementFieldRefs,
 	FORMAT_MINOR,
 	FORMAT_VERSION,
 	formatVersionStatus,
 	hasInsets,
 	isEmptyDelta,
-	parseAssetUri,
 	resolveInsets,
 	sameJson,
 	subtleSha256,
 	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
 	type VariantShellKey,
+	variantFieldRefs,
 	variantIdFor,
+	walkElements,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -906,28 +907,13 @@ export function removeField(t: Template, key: string): OpResult {
 /** Layer keys that read a field through a token or `visibleWhen`, plus
  *  `variant:<id>` for variant overrides that do. */
 export function fieldReferences(t: Template, field: string): string[] {
-	const token = new RegExp(`\\{\\{\\s*${field}\\s*\\}\\}`);
-	const mentions = (v: unknown): boolean => {
-		if (typeof v === "string") return token.test(v);
-		if (Array.isArray(v)) return v.some(mentions);
-		if (v && typeof v === "object") return Object.values(v).some(mentions);
-		return false;
-	};
 	const out: string[] = [];
 	t.template_data.forEach((_, side) => {
-		for (const { key, element } of walkLayers(t, side)) {
-			const {
-				children: _c,
-				mask: _m,
-				...own
-			} = element.properties as Record<string, unknown>;
-			const when = (element as Element).visibleWhen;
-			const conds = when ? (Array.isArray(when) ? when : [when]) : [];
-			if (mentions(own) || conds.some((c) => c.field === field)) out.push(key);
-		}
+		for (const { key, element } of walkLayers(t, side))
+			if (elementFieldRefs(element).includes(field)) out.push(key);
 	});
 	for (const v of t.variants ?? [])
-		if (v.overrides.some(mentions)) out.push(`variant:${v.id}`);
+		if (variantFieldRefs(v).includes(field)) out.push(`variant:${v.id}`);
 	return out;
 }
 
@@ -1009,23 +995,6 @@ export async function attachImageAsset(
 		},
 		src,
 	};
-}
-
-/** Drops carried assets nothing references, local font files included. */
-export function pruneUnusedAssets(t: Template): Template {
-	if (!t.assets) return t;
-	const used = collectAssetRefs(t);
-	for (const f of t.fonts ?? [])
-		if (f.kind === "local")
-			for (const file of f.files) {
-				const sha = parseAssetUri(file.src);
-				if (sha) used.add(sha);
-			}
-	const assets = t.assets.filter((a) => used.has(a.sha256));
-	if (assets.length === t.assets.length) return t;
-	if (assets.length > 0) return { ...t, assets };
-	const { assets: _dropped, ...rest } = t;
-	return rest as Template;
 }
 
 // ── Variants ─────────────────────────────────────────────────────────────────
@@ -1391,8 +1360,9 @@ function usedIds(t: Template, side: number): Set<string> {
 }
 
 function subtreeIds(el: Element, out: Set<string>): void {
-	out.add(el.id);
-	for (const [, c] of childEntries(el)) subtreeIds(c, out);
+	walkElements([el], (c) => {
+		out.add(c.id);
+	});
 }
 
 /** Maps each id in `from` to the id at the same place in `to`, its copy. */
