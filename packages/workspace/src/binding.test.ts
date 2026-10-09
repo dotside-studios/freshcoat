@@ -35,6 +35,66 @@ describe("autoBinding", () => {
 			},
 		});
 	});
+	it("matches names ignoring case and punctuation, then field titles", () => {
+		const loose: Template = {
+			...template,
+			fields: {
+				type: "object",
+				properties: {
+					firstName: { type: "string" },
+					surname: { type: "string", title: "Last name" },
+					city: { type: "string" },
+				},
+			},
+		};
+		const ds: Dataset = {
+			...dataset,
+			columns: [
+				{ key: "First Name", type: "text" },
+				{ key: "last_name", type: "text" },
+				{ key: "town", type: "text", title: "City" },
+			],
+		};
+		expect(autoBinding(loose, ds).fields).toEqual({
+			firstName: { kind: "column", column: "First Name" },
+			surname: { kind: "column", column: "last_name" },
+			city: { kind: "column", column: "town" },
+		});
+	});
+
+	it("gives each loosely matched column to one field", () => {
+		const loose: Template = {
+			...template,
+			fields: {
+				type: "object",
+				properties: {
+					first_name: { type: "string" },
+					firstName: { type: "string" },
+				},
+			},
+		};
+		const ds: Dataset = {
+			...dataset,
+			columns: [{ key: "First Name", type: "text" }],
+		};
+		expect(autoBinding(loose, ds).fields).toEqual({
+			first_name: { kind: "column", column: "First Name" },
+		});
+	});
+
+	it("keeps exact matches ahead of loose ones", () => {
+		const ds: Dataset = {
+			...dataset,
+			columns: [
+				{ key: "Name!", type: "text" },
+				{ key: "name", type: "text" },
+			],
+		};
+		expect(autoBinding(template, ds).fields.name).toEqual({
+			kind: "column",
+			column: "name",
+		});
+	});
 });
 
 describe("autoBinding with shaped variants", () => {

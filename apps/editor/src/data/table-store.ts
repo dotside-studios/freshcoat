@@ -19,6 +19,9 @@ export type SheetHead = {
 	blankRows: number[];
 };
 
+/** Data rows imported so far, of all. */
+export type ImportProgress = (done: number, total: number) => void;
+
 export type OpenedTable = { id: number; sheets: SheetHead[] };
 
 /** The data records below `headerRow`, counted without the rows themselves. */
@@ -61,10 +64,16 @@ export function createTableStore() {
 			sheet: number,
 			dataset: Dataset,
 			plan: ImportPlan,
+			onProgress?: ImportProgress,
 		): ApplyMappingResult {
 			const rows = tables.get(table)?.[sheet]?.rows;
 			if (rows === undefined) throw new Error("The file is no longer open");
-			return applyMapping(dataset, rows, plan);
+			return applyMapping(
+				dataset,
+				rows,
+				plan,
+				onProgress ? { onProgress } : {},
+			);
 		},
 		close(table: number): void {
 			tables.delete(table);

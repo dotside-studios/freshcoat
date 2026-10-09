@@ -101,7 +101,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 					geometry={geometry}
 					view={view}
 					handles={transformable}
-					rotate={transformable && selected.length === 1}
+					rotate={transformable}
 					coarse={coarse}
 					between={gradient}
 				/>

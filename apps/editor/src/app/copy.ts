@@ -119,11 +119,17 @@ export const LEFT_PANEL = {
 } as const;
 
 /** The inspector's tabs and the Content tab. */
+export const BINDING = {
+	unfilled: (n: number) => `${plural(n, "required field")} unfilled`,
+} as const;
+
 export const CONTENT = {
 	design: "Design",
 	content: "Content",
 	/** The record stepper's heading, before the dataset's name. */
 	tryWith: "Try with",
+	chooseDataset: "Choose a dataset",
+	binding: "Binding",
 	samples: "Samples",
 	fields: "Fields",
 	addField: "Add field",

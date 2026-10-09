@@ -185,3 +185,14 @@ export function unmatchedRequired(
 		})
 		.map((f) => f.key);
 }
+
+/** The required fields a binding that reads a dataset leaves unfilled. */
+export function unfilledRequired(
+	template: Template,
+	binding: Binding | undefined,
+	datasets: readonly Dataset[],
+): string[] {
+	if (!readsDataset(binding)) return [];
+	const dataset = datasets.find((d) => d.id === binding.datasetId);
+	return unmatchedRequired(template, binding, dataset);
+}

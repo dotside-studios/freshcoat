@@ -56,7 +56,10 @@ beforeAll(() => {
 	g.CSS ??= {};
 	g.CSS.escape ??= (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 });
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	localStorage.clear();
+});
 
 describe("DesignPanel", () => {
 	it("shows a text layer's position, content and type sections", () => {
@@ -147,6 +150,42 @@ describe("DesignPanel", () => {
 		typeInto(x, "123");
 		expect(el(c, "0/0").pos).toEqual({ x: 123, y: 20 });
 		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("orders a rect's sections Layer, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
+		setup(["0/0"]);
+		const titles = screen
+			.getAllByRole("heading", { level: 3 })
+			.map((h) => h.textContent);
+		expect(titles).toEqual([
+			"Layer",
+			"Fill",
+			"Stroke",
+			"Effects",
+			"Constraints",
+			"Adjust",
+			"Visibility",
+		]);
+		expect(spinbutton("Corner radius")).toBeTruthy();
+	});
+
+	it("remembers a collapsed section across selections", async () => {
+		const c = setup(["0/0"]);
+		const user = fastUser();
+		const stroke = () => screen.getByRole("button", { name: "Stroke" });
+		await user.click(stroke());
+		expect(stroke().getAttribute("aria-expanded")).toBe("false");
+		act(() => c.select(["0/1/1"]));
+		expect(screen.queryByRole("button", { name: "Stroke" })).toBeNull();
+		act(() => c.select(["0/1"]));
+		expect(stroke().getAttribute("aria-expanded")).toBe("false");
+		expect(
+			screen
+				.getByRole("button", { name: "Fill" })
+				.getAttribute("aria-expanded"),
+		).toBe("true");
+		await user.click(stroke());
+		expect(stroke().getAttribute("aria-expanded")).toBe("true");
 	});
 
 	it("shows Mixed for differing values and writes every layer", () => {

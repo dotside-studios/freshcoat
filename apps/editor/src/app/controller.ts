@@ -17,12 +17,15 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
+import { rebindDataset } from "~/binding/binding";
 import type { BooleanOp } from "~/doc/boolean";
 import { createElement, defaultRect, type ElementKind } from "~/doc/factories";
 import {
 	type AlignMode,
 	align,
 	type LayerGeometry,
+	parentOrigin,
+	type Rect,
 	rectOf,
 	translateLayers,
 	unionRects,
@@ -72,6 +75,7 @@ import {
 	siblingsOf,
 } from "~/doc/path";
 import { type PenPath, penElement } from "~/doc/pen";
+import { type LayerStyle, pasteStyle, readStyle } from "~/doc/style";
 import {
 	activeVariantId,
 	geometryForBase,
@@ -81,7 +85,7 @@ import {
 import { newPreset } from "~/export/preset";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
-import { findStarter } from "~/samples/starters";
+import { findStarter, type Starter } from "~/samples/starters";
 import { loadVendSans } from "~/samples/vend-sans-file";
 import {
 	type Action,
@@ -96,10 +100,12 @@ import {
 } from "~/state/store";
 import {
 	activeSlot,
+	newId,
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";
 import {
+	type Autosave,
 	clearAutosave,
 	configureAutosave,
 	keepAutosaveAsset,
@@ -109,6 +115,7 @@ import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
+import { type RecentSource, recentStore } from "./recent";
 import {
 	reportSourceChanged,
 	SourceChangedError,
@@ -190,9 +197,12 @@ export class EditorController {
 	private namePrompt: NamePrompt | undefined;
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
+	private copiedStyle: LayerStyle | null = null;
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
+	private recentId: string | undefined;
+	private openingFrom: { source: RecentSource; id?: string } | null = null;
 
 	constructor(store: EditorStore = createEditorStore()) {
 		this.store = store;
@@ -246,7 +256,20 @@ export class EditorController {
 	}
 
 	dispatch(action: Action): void {
+		const before = this.store.getState();
 		this.store.dispatch(action);
+		if (action.type === "setSection" || action.type === "setRecord")
+			this.followRecord(before);
+	}
+
+	/** Brings Edit's preview to the current record when Edit comes into view
+	 *  or the record moves while it shows, and its dataset has the record. */
+	private followRecord(before: EditorState): void {
+		const s = this.state;
+		if (s.section !== "edit" || !s.recordId) return;
+		if (s.recordId === s.previewRecordId) return;
+		if (before.section === "edit" && before.recordId === s.recordId) return;
+		this.previewRecord(s.recordId);
 	}
 
 	// ── Editing ──────────────────────────────────────────────────────────────
@@ -773,6 +796,25 @@ export class EditorController {
 		this.refitAfter(() => this.dispatch({ type: "setVariant", variantId: id }));
 	}
 
+	/** Shows the side `by` sides on, wrapping round. */
+	stepSide(by: number): void {
+		const count = this.base?.template_data.length ?? 0;
+		if (count < 2) return;
+		const side = (((this.state.side + by) % count) + count) % count;
+		this.dispatch({ type: "setSide", side });
+	}
+
+	/** Shows the variant `by` on from the active one, Default first,
+	 *  wrapping round. */
+	stepVariant(by: number): void {
+		const t = this.base;
+		const ids = [undefined, ...(t?.variants ?? []).map((v) => v.id)];
+		if (!t || ids.length < 2) return;
+		const at = ids.indexOf(activeVariantId(t, this.state.variantId));
+		const next = (((at + by) % ids.length) + ids.length) % ids.length;
+		this.setVariant(ids[next]);
+	}
+
 	/** Runs `change` and fits the view when it changed the canvas's size. */
 	private refitAfter(change: () => void): void {
 		const before = this.template;
@@ -883,16 +925,60 @@ export class EditorController {
 		});
 	}
 
+	/** Binds a template to a dataset, its fields matched by name. */
+	bindTemplate(templateId: string, datasetId: string): void {
+		const ws = this.state.workspace;
+		const slot = ws?.templates.find((t) => t.id === templateId);
+		const dataset = ws?.datasets.find((d) => d.id === datasetId);
+		const template =
+			templateId === ws?.activeTemplateId
+				? this.base
+				: (slot?.parked?.doc.history.present ?? slot?.template);
+		if (!slot || !dataset || !template) return;
+		this.dispatch({
+			type: "setBinding",
+			id: templateId,
+			binding: rebindDataset(template, dataset, slot.binding),
+		});
+	}
+
 	// ── Clipboard ────────────────────────────────────────────────────────────
 
 	async copy(): Promise<void> {
 		const t = this.template;
 		const keys = this.selectedLayers();
 		if (!t || keys.length === 0) return;
-		const elements = keys
-			.map((k) => getElement(t, k))
-			.filter((e): e is Element => !!e && "type" in e);
-		await writeClipboard(t, elements);
+		const geometry = this.state.geometry;
+		const picked = keys.flatMap((k) => {
+			const el = getElement(t, k);
+			return el && "type" in el
+				? [{ el, origin: parentOrigin(t, k, geometry) }]
+				: [];
+		});
+		await writeClipboard(
+			t,
+			picked.map((p) => p.el),
+			picked.map((p) => p.origin),
+		);
+	}
+
+	copyStyle(): void {
+		const t = this.template;
+		const key = this.state.selection[0];
+		const el = t && key ? getElement(t, key) : undefined;
+		if (el) this.copiedStyle = readStyle(el);
+	}
+
+	/** Gives the selection the copied style, as one undo step. */
+	pasteStyle(): void {
+		const style = this.copiedStyle;
+		const keys = this.state.selection;
+		if (!style || keys.length === 0) return;
+		this.edit((t) => pasteStyle(t, keys, style));
+	}
+
+	get hasCopiedStyle(): boolean {
+		return this.copiedStyle !== null;
 	}
 
 	async cut(): Promise<void> {
@@ -900,13 +986,18 @@ export class EditorController {
 		this.deleteSelection();
 	}
 
-	async paste(): Promise<void> {
+	/**
+	 * Pastes beside the first selected layer, or on top inside the selected
+	 * frame when it is the only one selected and not itself on the clipboard.
+	 * `inPlace` keeps the copied layers where they were on the artboard.
+	 */
+	async paste(opts: { inPlace?: boolean } = {}): Promise<void> {
 		const t = this.base;
 		if (!t) return;
 		let clip = await readClipboard();
 		if (!clip) return;
 		if (clip.kind === "svg") {
-			const svg = await this.loadSvgImport(() => this.paste());
+			const svg = await this.loadSvgImport(() => this.paste(opts));
 			const markup = svg?.svgMarkup(clip.svg) ?? null;
 			const answer = !markup
 				? "text"
@@ -946,23 +1037,62 @@ export class EditorController {
 							: el,
 					)
 				: clip.elements;
-		const anchor = this.selectedLayers()[0];
-		const parent = anchor ? parentKeyOf(anchor) : null;
+		const layers = this.selectedLayers();
+		const anchor = layers[0];
+		const only =
+			layers.length === 1 ? getElement(base, anchor as string) : null;
+		const into =
+			only?.type === "frame" && !elements.some((el) => el.id === only.id)
+				? only
+				: null;
+		const parent = into
+			? (anchor as string)
+			: anchor
+				? parentKeyOf(anchor)
+				: null;
 		const ref: ParentRef = parent ?? { side: this.state.side };
-		const index = anchor
-			? ((parseKey(anchor) as { path: number[] }).path.at(-1) ?? 0) + 1
-			: (base.template_data[this.state.side]?.elements.length ?? 0);
+		const index = into
+			? into.properties.children.length
+			: anchor
+				? ((parseKey(anchor) as { path: number[] }).path.at(-1) ?? 0) + 1
+				: (base.template_data[this.state.side]?.elements.length ?? 0);
+		const geometry = this.baseGeometry();
+		const parentRect = parent ? rectOf(base, parent, geometry) : undefined;
+		const to = { x: parentRect?.x ?? 0, y: parentRect?.y ?? 0 };
+		const origins = clip.kind === "layers" ? clip.origins : [{ x: 0, y: 0 }];
+		const boxes = elements.map((el, i): Rect | null => {
+			if (!el.pos) return null;
+			const from = origins?.[i] ?? to;
+			return {
+				x: from.x + el.pos.x,
+				y: from.y + el.pos.y,
+				width: el.size?.width ?? 0,
+				height: el.size?.height ?? 0,
+				rotation: 0,
+			};
+		});
+		let shift = { x: 0, y: 0 };
+		const placedBoxes = boxes.filter((b): b is Rect => b !== null);
+		if (!opts.inPlace && into && parentRect && placedBoxes.length) {
+			const all = unionRects(placedBoxes);
+			if (!overlaps(all, parentRect))
+				shift = {
+					x: parentRect.x + parentRect.width / 2 - (all.x + all.width / 2),
+					y: parentRect.y + parentRect.height / 2 - (all.y + all.height / 2),
+				};
+		}
 		const occupied = new Set(
 			[...this.state.geometry.values()].map((b) => boxKey(b.rect)),
 		);
-		const placed = elements.map((el) =>
-			el.pos &&
-			occupied.has(
-				boxKey({ ...el.pos, ...(el.size ?? { width: 0, height: 0 }) }),
-			)
-				? { ...el, pos: { x: el.pos.x + 10, y: el.pos.y + 10 } }
-				: el,
-		);
+		const placed = elements.map((el, i) => {
+			const box = boxes[i];
+			if (!box) return el;
+			const x = box.x + shift.x;
+			const y = box.y + shift.y;
+			const nudge =
+				!opts.inPlace && occupied.has(boxKey({ ...box, x, y })) ? 10 : 0;
+			return { ...el, pos: { x: x + nudge - to.x, y: y + nudge - to.y } };
+		});
 		this.edit(() => insertElements(base, ref, index, placed), {
 			selectResult: true,
 			scope: "base",
@@ -987,7 +1117,27 @@ export class EditorController {
 	}
 
 	private emitOpened(): void {
+		const from = this.openingFrom ?? { source: { kind: "workspace" } };
+		this.recentId = from.id ?? newId("recent");
+		const name = this.state.workspace?.name;
+		if (name)
+			void recentStore().record({
+				id: this.recentId,
+				name,
+				openedAt: Date.now(),
+				source: from.source,
+			});
 		for (const fn of this.openedListeners) fn();
+	}
+
+	/** Runs `open` with what a workspace it starts is recorded as. */
+	private openingAs<T>(source: RecentSource, open: () => T, id?: string): T {
+		this.openingFrom = { source, ...(id ? { id } : {}) };
+		try {
+			return open();
+		} finally {
+			this.openingFrom = null;
+		}
 	}
 
 	/** Calls `fn` when the issues list should be shown, as when a save fails
@@ -1081,7 +1231,10 @@ export class EditorController {
 		const sample = findSample(id);
 		if (!sample) return;
 		const t = await this.loadSample(sample, () => this.openSample(id));
-		if (t) this.open(t, `${sample.id}${COAT_EXTENSION}`);
+		if (t)
+			this.openingAs({ kind: "sample", id: sample.id }, () =>
+				this.open(t, `${sample.id}${COAT_EXTENSION}`),
+			);
 	}
 
 	private loadSample(
@@ -1107,6 +1260,12 @@ export class EditorController {
 		if (!starter) return;
 		const template = await this.loadSample(starter, () => this.openStarter(id));
 		if (!template) return;
+		this.openingAs({ kind: "starter", id: starter.id }, () =>
+			this.openStarterTemplate(starter, template),
+		);
+	}
+
+	private openStarterTemplate(starter: Starter, template: Template): void {
 		const fileName = `${starter.id}${COAT_EXTENSION}`;
 		if (!starter.preset) {
 			this.open(template, fileName);
@@ -1209,6 +1368,15 @@ export class EditorController {
 				failed: "Couldn't load the workspace archive",
 			},
 			retry,
+		);
+	}
+
+	/** Opens the autosaved workspace as the workspace it was written for. */
+	restore(saved: Autosave, notices: string[] = []): void {
+		this.openingAs(
+			{ kind: "workspace" },
+			() => this.openWorkspace(saved.workspace, saved.fileName, notices),
+			saved.recentId,
 		);
 	}
 
@@ -1382,6 +1550,28 @@ export class EditorController {
 		);
 	}
 
+	/** The records the Edit preview steps through: the bound dataset's. */
+	previewRecords(): readonly { id: string }[] {
+		const id = activeSlot(this.state)?.binding?.datasetId;
+		return (
+			this.state.workspace?.datasets.find((d) => d.id === id)?.records ?? []
+		);
+	}
+
+	/** Steps the Edit preview `by` records, from the current record when
+	 *  nothing is previewed yet. */
+	stepRecord(by: number): void {
+		const records = this.previewRecords();
+		if (records.length === 0) return;
+		const s = this.state;
+		const from = records.findIndex(
+			(r) => r.id === (s.previewRecordId ?? s.recordId),
+		);
+		const at = from < 0 ? 0 : s.previewRecordId === null ? from : from + by;
+		const next = records[Math.max(0, Math.min(records.length - 1, at))];
+		if (next) this.previewRecord(next.id);
+	}
+
 	switchTemplate(id: string): void {
 		this.dispatch({ type: "switchTemplate", id });
 		requestAnimationFrame(() => this.fitView());
@@ -1460,7 +1650,11 @@ export class EditorController {
 			const ws = workspaceSnapshot(this.state);
 			const fileName = this.state.workspace?.fileName;
 			if (ws && fileName && isDirty(this.state))
-				void writeAutosave({ workspace: ws, fileName });
+				void writeAutosave({
+					workspace: ws,
+					fileName,
+					...(this.recentId ? { recentId: this.recentId } : {}),
+				});
 		}, 1000);
 	}
 
@@ -1692,6 +1886,15 @@ function containsPoint(
 	return (
 		Math.abs(lx) <= rect.width / 2 + margin &&
 		Math.abs(ly) <= rect.height / 2 + margin
+	);
+}
+
+function overlaps(a: Rect, b: Rect): boolean {
+	return (
+		a.x < b.x + b.width &&
+		b.x < a.x + a.width &&
+		a.y < b.y + b.height &&
+		b.y < a.y + a.height
 	);
 }
 

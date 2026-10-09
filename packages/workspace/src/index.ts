@@ -99,11 +99,13 @@ export {
 	jsonSchemaToColumns,
 } from "./json-schema";
 export {
+	type ApplyMappingOptions,
 	applyMapping,
 	columnLetter,
 	detectHeaderRow,
 	guessMapping,
 	headersOf,
+	INFER_SAMPLE,
 	inferType,
 	type PreviewCell,
 	type PreviewRow,

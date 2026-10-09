@@ -23,6 +23,7 @@ import FailedIcon from "~icons/mingcute/filter-line";
 import HistoryIcon from "~icons/mingcute/history-line";
 import RetryIcon from "~icons/mingcute/refresh-2-line";
 import ExportIconFill from "~icons/mingcute/upload-2-fill";
+import ExportIcon from "~icons/mingcute/upload-2-line";
 import WarningIcon from "~icons/mingcute/warning-line";
 import type { ExportJobs, ExportJobsSnapshot } from "./export-jobs";
 import {
@@ -140,6 +141,7 @@ export function JobBar({
 	count,
 	blocked,
 	blockedDetail,
+	warning,
 	onShowFailed,
 	recordIds,
 	hideRun,
@@ -154,6 +156,8 @@ export function JobBar({
 	blocked: string | null;
 	/** the whole of a `blocked` reason that is a short form, for its hover */
 	blockedDetail?: string;
+	/** what the export will miss though it can run */
+	warning?: string | null;
 	/** narrows the section to the records the last job failed */
 	onShowFailed?: () => void;
 	/** chosen records: the button exports only these, and says so */
@@ -163,7 +167,7 @@ export function JobBar({
 	/** puts the bar away until the next job */
 	onDismiss?: () => void;
 }) {
-	const { runner, job, lastPreset, lastResult, history } = snapshot;
+	const { runner, job, lastPreset, lastResult, unwritten, history } = snapshot;
 	const running = runner.state === "running";
 	const progress = runner.progress;
 	const rate = useRate(progress?.done, running);
@@ -231,6 +235,15 @@ export function JobBar({
 				>
 					<WarningIcon className="size-3.5 shrink-0" />
 					<span className="truncate">{reason}</span>
+				</span>
+			) : warning && !running && !hideRun ? (
+				<span
+					className="inline-flex min-w-0 items-center gap-1 text-fc-sm text-fc-warning"
+					title={warning}
+					data-testid="export-warning"
+				>
+					<WarningIcon className="size-3.5 shrink-0" />
+					<span className="truncate">{warning}</span>
 				</span>
 			) : null}
 
@@ -398,24 +411,50 @@ export function JobBar({
 						</span>
 					</>
 				) : runner.state === "cancelled" ? (
-					<span
-						className="min-w-0 truncate text-fc-muted text-fc-sm tabular-nums"
-						data-testid="export-summary"
-					>
-						{`Canceled${progress ? ` after ${progress.done} of ${progress.total}` : ""}${
-							sink?.kind === "folder"
-								? ` · ${plural(sink.files, "file")} kept in the folder`
-								: ""
-						}`}
-					</span>
+					<>
+						<span
+							className="min-w-0 truncate text-fc-muted text-fc-sm tabular-nums"
+							data-testid="export-summary"
+						>
+							{`Canceled${progress ? ` after ${progress.done} of ${progress.total}` : ""}${
+								sink?.kind === "folder"
+									? ` · ${plural(sink.files, "file")} kept in the folder`
+									: ""
+							}`}
+						</span>
+						{lastPreset && lastResult && unwritten.length > 0 ? (
+							<span className="ml-auto flex shrink-0 items-center gap-1.5">
+								<BarAction
+									icon={<ExportIcon />}
+									label="Export the rest"
+									onPress={() =>
+										void jobs.run(lastPreset, `${lastPreset.name} (rest)`, {
+											recordIds: unwritten,
+										})
+									}
+								/>
+							</span>
+						) : null}
+					</>
 				) : runner.state === "error" ? (
-					<span
-						className="min-w-0 truncate text-fc-danger-text text-fc-sm"
-						data-testid="export-summary"
-						title={runner.error ?? undefined}
-					>
-						{`Couldn't export: ${runner.error ?? "unknown error"}`}
-					</span>
+					<>
+						<span
+							className="min-w-0 truncate text-fc-danger-text text-fc-sm"
+							data-testid="export-summary"
+							title={runner.error ?? undefined}
+						>
+							{`Couldn't export: ${runner.error ?? "unknown error"}`}
+						</span>
+						{lastPreset ? (
+							<span className="ml-auto flex shrink-0 items-center gap-1.5">
+								<BarAction
+									icon={<RetryIcon />}
+									label="Retry"
+									onPress={() => void jobs.run(lastPreset, job?.presetName)}
+								/>
+							</span>
+						) : null}
+					</>
 				) : null}
 			</div>
 

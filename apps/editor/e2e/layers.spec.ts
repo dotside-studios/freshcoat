@@ -41,6 +41,18 @@ test("clicking a row selects the layer", async ({ page }) => {
 	await expect(row(page, "0/5/0/1")).toBeInViewport();
 });
 
+test("the filter narrows the tree by name or type", async ({ page }) => {
+	await openSample(page);
+	const filter = page.getByRole("searchbox", { name: "Filter layers" });
+	await filter.fill("qr code");
+	await expect(row(page, "0/9")).toBeVisible();
+	await expect(row(page, "0/0")).toHaveCount(0);
+	await filter.fill("ring");
+	expect(await topLevel(page)).toEqual(["ring-inner", "ring-outer"]);
+	await filter.press("Escape");
+	expect(await topLevel(page)).toHaveLength(11);
+});
+
 test("rename by double-clicking the name", async ({ page }) => {
 	await openSample(page);
 	await row(page, "0/3").getByText("wordmark").dblclick();
@@ -171,6 +183,22 @@ test("the context menu acts on the row it opened on", async ({ page }) => {
 	await settle(page);
 	expect((await ids(page)).slice(2, 4)).toEqual(["logo", "logo-2"]);
 	expect(await state<string[]>(page, "s.selection")).toEqual(["0/3"]);
+});
+
+test("the context menu arranges and offers booleans", async ({ page }) => {
+	await openSample(page);
+	await row(page, "0/2").click({ button: "right" });
+	await expect(
+		page.getByRole("menuitem", { name: "Attach text to path" }),
+	).toBeDisabled();
+	await page.getByRole("menuitem", { name: "Boolean" }).hover();
+	await expect(
+		page.getByRole("menuitem", { name: /Union selection/ }),
+	).toBeDisabled();
+	await page.getByRole("menuitem", { name: "Arrange" }).hover();
+	await page.getByRole("menuitem", { name: /Send to back/ }).click();
+	await settle(page);
+	expect((await ids(page))[0]).toBe("logo");
 });
 
 test("dragging a row onto a frame reparents it", async ({ page }) => {

@@ -147,6 +147,19 @@ test("Template setup renames and resizes", async ({ page }) => {
 	);
 });
 
+test("the template context menu opens Template setup", async ({ page }) => {
+	await openSample(page, "membership-card");
+	const templates = page.getByRole("region", { name: "Templates" });
+	await templates.getByRole("heading").getByRole("button").click();
+	await page
+		.getByTestId("templates-list")
+		.getByRole("option")
+		.first()
+		.click({ button: "right" });
+	await page.getByRole("menuitem", { name: /Template setup…/ }).click();
+	await expect(page.getByTestId("template-setup")).toBeVisible();
+});
+
 test("an issue path selects the layer it points into", async ({ page }) => {
 	await openSample(page, "membership-card");
 	await run(

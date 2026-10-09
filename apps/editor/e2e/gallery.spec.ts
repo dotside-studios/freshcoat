@@ -287,7 +287,9 @@ test("on a tablet the data group folds into More and the inspector is a sheet", 
 	await expect(page.getByTestId("data-panel-right")).toHaveCount(0);
 	await page.getByTestId("data-more").click();
 	await expect(page.getByRole("menuitem", { name: "Import…" })).toBeVisible();
-	await expect(page.getByRole("menuitem", { name: "Download" })).toBeVisible();
+	await expect(
+		page.getByRole("menuitem", { name: "Download data" }),
+	).toBeVisible();
 	await page.keyboard.press("Escape");
 
 	await card(page, recs[1]?.id as string).dblclick();

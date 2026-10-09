@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openSample, pixel, probePath, settle, state } from "./helpers";
+import { openSample, pixel, probePath, run, settle, state } from "./helpers";
 
 test("stepping records in Edit repaints the card with each record", async ({
 	page,
@@ -20,14 +20,14 @@ test("stepping records in Edit repaints the card with each record", async ({
 		return out;
 	};
 	const samples = await stripe();
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await state<string | null>(page, "s.previewRecordId")).toBe("r_0");
 	expect(await state<string>(page, "s.values.display_name")).toBe("A");
 	const first = await stripe();
 	expect(first).not.toEqual(samples);
 
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await state<string>(page, "s.values.display_name")).toBe(
 		"WWWWWWWWWWWW",
@@ -71,4 +71,40 @@ test("a record's photo paints on the Edit canvas at preview resolution", async (
 		(r as number) < 30 && (g as number) < 30 && (b as number) > 225;
 	expect(isBlue(await pixel(page, 200, 150))).toBe(true);
 	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
+});
+
+test("an unbound template picks a dataset to try in Edit", async ({ page }) => {
+	await openSample(page);
+	await run(
+		page,
+		`c.dispatch({ type: "datasetEdit", datasets: [{
+			id: "d_m",
+			name: "Members",
+			columns: [{ key: "Display Name", type: "text" }],
+			records: [{ id: "r_0", values: { "Display Name": "Grace" }, status: "pending" }],
+			assets: [],
+		}] });
+		c.dispatch({ type: "setRightTab", tab: "content" });`,
+	);
+	await expect(page.getByTestId("record-stepper")).toBeHidden();
+	await page.getByRole("button", { name: /Dataset to try/ }).click();
+	await page.getByRole("option", { name: "Members", exact: true }).click();
+	await expect(page.getByTestId("record-stepper")).toBeVisible();
+	expect(
+		await state<unknown>(
+			page,
+			"s.workspace.templates[0].binding.fields.display_name",
+		),
+	).toEqual({ kind: "column", column: "Display Name" });
+
+	await expect(page.getByTestId("binding-editor")).toBeHidden();
+	await page.getByRole("button", { name: "Binding", exact: true }).click();
+	await expect(page.getByTestId("binding-editor")).toBeVisible();
+
+	await page
+		.getByTestId("record-stepper")
+		.getByRole("button", { name: "Next record" })
+		.click();
+	await settle(page);
+	expect(await state<string>(page, "s.values.display_name")).toBe("Grace");
 });

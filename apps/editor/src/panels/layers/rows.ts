@@ -123,3 +123,34 @@ export function flattenRows(rows: LayerRow[]): string[] {
 	visit(rows);
 	return out;
 }
+
+/** Whether a row's name or layer type contains `query`, ignoring case. */
+export function rowMatches(row: LayerRow, query: string): boolean {
+	const q = query.trim().toLowerCase();
+	if (!q) return true;
+	const type =
+		row.kind === "background"
+			? "background"
+			: row.element.type.replaceAll("_", " ");
+	return row.id.toLowerCase().includes(q) || type.includes(q);
+}
+
+/** The rows that match `query`, with the ancestors that lead to them, and the
+ *  keys of those ancestors so they can be shown expanded. */
+export function filterRows(
+	rows: LayerRow[],
+	query: string,
+): { rows: LayerRow[]; ancestors: string[] } {
+	if (!query.trim()) return { rows, ancestors: [] };
+	const ancestors: string[] = [];
+	const visit = (list: LayerRow[]): LayerRow[] =>
+		list.flatMap((r) => {
+			const children = visit(r.children);
+			if (children.length > 0) {
+				ancestors.push(r.key);
+				return [{ ...r, children }];
+			}
+			return rowMatches(r, query) ? [r] : [];
+		});
+	return { rows: visit(rows), ancestors };
+}

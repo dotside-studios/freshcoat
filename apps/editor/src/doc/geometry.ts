@@ -413,6 +413,18 @@ export function rotateFromPointer(
 	return normalizeAngle(deg);
 }
 
+/** Turns `rect` `deg` degrees about `pivot`: its centre moves round the pivot
+ *  and its own rotation grows by the same angle. */
+export function rotateRectAbout(rect: Rect, pivot: Point, deg: number): Rect {
+	const c = rotatePoint(centreOf(rect), deg, pivot);
+	return {
+		...rect,
+		x: c.x - rect.width / 2,
+		y: c.y - rect.height / 2,
+		rotation: normalizeAngle(rect.rotation + deg),
+	};
+}
+
 /** Maps `rect` from `from` to `to` proportionally: a multi-selection's
  *  members when its bounding box is resized. */
 export function mapRectInBox(rect: Rect, from: Rect, to: Rect): Rect {
@@ -696,8 +708,8 @@ export type AlignMode =
 	| "vdistribute";
 
 /**
- * Aligns painted bounds to the selection's box, or to the artboard when one
- * layer is selected; distributing gives equal gaps and needs three layers.
+ * Aligns painted bounds to the selection's box, or when one layer is selected,
+ * to its parent's painted bounds (the artboard at the top level); distributing gives equal gaps and needs three layers.
  * Auto-layout children, the background, and layers inside another selected
  * layer are skipped.
  */
@@ -744,10 +756,17 @@ export function align(
 			cursor += len(o.r) + gap;
 		}
 	} else {
+		const parentKey = geometry.get(targets[0] as string)?.parentKey ?? null;
 		const box =
-			keys.length === 1
-				? { x: 0, y: 0, width: t.width, height: t.height, rotation: 0 }
-				: unionRects(bounds);
+			keys.length !== 1
+				? unionRects(bounds)
+				: (parentKey !== null && layerBounds(parentKey, geometry)) || {
+						x: 0,
+						y: 0,
+						width: t.width,
+						height: t.height,
+						rotation: 0,
+					};
 		const cx = (r: Rect) => r.x + r.width / 2;
 		const cy = (r: Rect) => r.y + r.height / 2;
 		const delta: Record<typeof mode, (r: Rect) => [number, number]> = {

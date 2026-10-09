@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { unwrap, updateElement } from "../doc/ops";
 import {
 	buildLayerRows,
+	filterRows,
 	flattenRows,
 	isBound,
 	type LayerRow,
@@ -163,3 +164,31 @@ function byKey(rows: LayerRow[], key: string): LayerRow | undefined {
 	}
 	return undefined;
 }
+
+describe("filterRows", () => {
+	it("keeps matches by name and the ancestors that lead to them", () => {
+		const { rows, ancestors } = filterRows(
+			buildLayerRows(frozenDoc(), 0),
+			"DEEP",
+		);
+		expect(flattenRows(rows)).toEqual(["0/1", "0/1/2", "0/1/2/0"]);
+		expect(ancestors.sort()).toEqual(["0/1", "0/1/2"]);
+	});
+
+	it("matches the layer type, and the background by its role", () => {
+		const all = buildLayerRows(frozenDoc(), 0);
+		const { rows, ancestors } = filterRows(all, "text");
+		const matched = flattenRows(rows).filter((k) => !ancestors.includes(k));
+		expect(matched).toContain("0/1/1");
+		expect(matched.every((k) => byKey(all, k)?.element.type === "text")).toBe(
+			true,
+		);
+		expect(flattenRows(filterRows(all, "background").rows)).toEqual(["0/bg"]);
+	});
+
+	it("an empty query keeps every row; no match keeps none", () => {
+		const all = buildLayerRows(frozenDoc(), 0);
+		expect(filterRows(all, "  ").rows).toBe(all);
+		expect(filterRows(all, "nothing-like-this").rows).toEqual([]);
+	});
+});

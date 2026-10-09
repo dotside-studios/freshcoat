@@ -1,6 +1,7 @@
 import {
 	coerce,
 	EMAIL_PATTERN,
+	HEX_COLOR,
 	isEmptyValue,
 	isUrl,
 	parseDateText,
@@ -9,6 +10,7 @@ import {
 import { freshId, slug, uniqueKey } from "./ids";
 import type {
 	ApplyMappingResult,
+	CellIssue,
 	CellValue,
 	Column,
 	ColumnMapping,
@@ -19,13 +21,15 @@ import type {
 	ImportPlan,
 } from "./types";
 
-const INFER_SAMPLE = 200;
+export const INFER_SAMPLE = 200;
 const LONG_TEXT = 120;
 
 const INTEGER_TEXT = /^[-+]?(0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)$/;
 const NUMBER_TEXT =
 	/^[-+]?((0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)(\.\d+)?|\.\d+)(e[-+]?\d+)?$/i;
 const BOOLEAN_WORDS = new Set(["true", "false", "yes", "no", "✓"]);
+const IMAGE_FILE =
+	/^[^:?#\r\n]+\.(jpe?g|jfif|png|webp|gif|avif|heic|heif|tiff?|bmp|svg)$/i;
 
 /** `A`, `B`, … `Z`, `AA`: what a column is called when the file has no
  *  header row. */
@@ -76,7 +80,8 @@ export function detectHeaderRow(
 	return -1;
 }
 
-function normalize(text: string): string {
+/** A name compared ignoring case, spaces and punctuation. */
+export function normalizeName(text: string): string {
 	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
@@ -98,6 +103,8 @@ export function inferType(values: readonly string[]): ColumnType {
 	}
 	if (all((v) => /^https?:\/\//i.test(v) && isUrl(v))) return "url";
 	if (all((v) => EMAIL_PATTERN.test(v))) return "email";
+	if (all((v) => IMAGE_FILE.test(v))) return "image";
+	if (all((v) => HEX_COLOR.test(v))) return "color";
 	const long = values.some((v) => v.length > LONG_TEXT || /[\r\n]/.test(v));
 	return long ? "longText" : "text";
 }
@@ -124,13 +131,13 @@ export function guessMapping(
 	});
 	headers.forEach((header, i) => {
 		if (out[i] !== undefined) return;
-		const wanted = normalize(header);
+		const wanted = normalizeName(header);
 		if (wanted === "") return;
 		const loose = columns.find(
 			(c) =>
 				!claimed.has(c.key) &&
-				(normalize(c.key) === wanted ||
-					(c.title !== undefined && normalize(c.title) === wanted)),
+				(normalizeName(c.key) === wanted ||
+					(c.title !== undefined && normalizeName(c.title) === wanted)),
 		);
 		if (loose) {
 			claimed.add(loose.key);
@@ -243,17 +250,25 @@ function matchKey(value: CellValue | undefined): string | null {
 	return typeof value === "string" ? value.trim() : String(value);
 }
 
+export const PROGRESS_ROWS = 1000;
+
+export type ApplyMappingOptions = {
+	onProgress?: (done: number, total: number) => void;
+};
+
 /**
  * The dataset with the rows imported: new columns added, every cell coerced,
  * new records `pending`. `replace` drops the existing records and keeps the
  * columns. With `match`, a row whose cell equals an existing record's value in
  * that column updates it in place; its empty cells leave the record's values
  * alone. An empty cell in a new record takes the column's default. Issue rows are indexes into `rows`.
+ * `onProgress` hears the data rows done every `PROGRESS_ROWS` and at the end.
  */
 export function applyMapping(
 	dataset: Dataset,
 	rows: readonly (readonly string[])[],
 	plan: ImportPlan,
+	{ onProgress }: ApplyMappingOptions = {},
 ): ApplyMappingResult {
 	const headers = headersOf(rows, plan.headerRow);
 	const { columns, targets } = targetsFor(plan, dataset.columns, headers);
@@ -280,15 +295,17 @@ export function applyMapping(
 	const ids = new Set(records.map((r) => r.id));
 	const addedIds = new Set<string>();
 	const updatedIds = new Set<string>();
-	for (const { index: rowIndex, cells } of dataRows(rows, plan)) {
+	const data = dataRows(rows, plan);
+	let done = 0;
+	for (const { index: rowIndex, cells } of data) {
+		if (done > 0 && done % PROGRESS_ROWS === 0) onProgress?.(done, data.length);
+		done += 1;
 		const values: Record<string, CellValue> = {};
-		const failed = new Set<string>();
+		const failed: CellIssue[] = [];
 		for (const { source, column } of targets) {
 			const result = coerce(column, cells[source] ?? "", options);
 			if (!result.ok) {
-				failed.add(column.key);
-				issues.push({
-					row: rowIndex,
+				failed.push({
 					column: column.key,
 					message: result.message ?? "Invalid",
 				});
@@ -334,17 +351,21 @@ export function applyMapping(
 			}
 		}
 
+		for (const issue of failed) {
+			issues.push({ row: rowIndex, record: record.id, ...issue });
+		}
 		for (const issue of validateRecord(
 			columns,
 			record.values,
 			dataset.assets,
 		)) {
-			if (!failed.has(issue.column)) {
-				issues.push({ row: rowIndex, ...issue });
+			if (!failed.some((f) => f.column === issue.column)) {
+				issues.push({ row: rowIndex, record: record.id, ...issue });
 			}
 		}
 	}
 
+	onProgress?.(data.length, data.length);
 	return {
 		dataset: { ...dataset, columns, records },
 		added: addedIds.size,

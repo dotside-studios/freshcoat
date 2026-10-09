@@ -1,6 +1,8 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { inputBase } from "@freshcoat-js/ui/field";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { ContextMenu } from "@freshcoat-js/ui/menu";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { Tree, TreeItem } from "@freshcoat-js/ui/tree";
 import {
@@ -22,11 +24,10 @@ import {
 	type Selection,
 	useDragAndDrop,
 } from "react-aria-components";
-import { COMMAND_BY_ID, type CommandContext } from "~/app/commands";
 import { useController } from "~/app/context";
-import type { EditorController } from "~/app/controller";
 import { CONTENT, VARIANT_UI } from "~/app/copy";
 import { layerIcon } from "~/app/icons";
+import { LayerMenuItems } from "~/app/LayerMenu";
 import { moveElements, renameElement } from "~/doc/ops";
 import { parentKeyOf, remapKeys, walkLayers } from "~/doc/path";
 import {
@@ -38,13 +39,15 @@ import {
 } from "~/doc/variant-edit";
 import { useEditor, useStore } from "~/state/hooks";
 import { type EditorStore, present } from "~/state/store";
+import CloseIcon from "~icons/mingcute/close-line";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import LockIcon from "~icons/mingcute/lock-line";
+import SearchIcon from "~icons/mingcute/search-line";
 import UnlockIcon from "~icons/mingcute/unlock-line";
 import { dropToMove } from "./drop";
 import { RenameInput } from "./RenameInput";
-import { buildLayerRows, flattenRows, type LayerRow } from "./rows";
+import { buildLayerRows, filterRows, flattenRows, type LayerRow } from "./rows";
 
 const LAYER_TYPE = "application/x-freshcoat-layer";
 
@@ -150,38 +153,7 @@ function rowSelector(key: string) {
 	return `[data-layer-key="${key}"]`;
 }
 
-// Commands whose implementation only needs the controller.
-function runCommand(controller: EditorController, id: string) {
-	const ctx: CommandContext = {
-		controller,
-		pickFile() {},
-		pickTemplate() {},
-		pickImage() {},
-		showShortcuts() {},
-		showTemplateSetup() {},
-		confirmDiscard: (then) => then(),
-	};
-	void COMMAND_BY_ID.get(id)?.run(ctx);
-}
-
-function shortcut(id: string, which = 0): string | undefined {
-	return COMMAND_BY_ID.get(id)?.keys?.[which];
-}
-
-/** Sets every key to the same state: on if any of them is off. */
-function setAll(
-	controller: EditorController,
-	which: "hidden" | "locked",
-	keys: string[],
-) {
-	const set = controller.state[which];
-	const turnOn = keys.some((k) => !set.has(k));
-	const flip = keys.filter((k) => set.has(k) !== turnOn);
-	if (which === "hidden") controller.toggleHidden(flip);
-	else controller.toggleLocked(flip);
-}
-
-export function LayersTree() {
+export function LayersTree({ filter = "" }: { filter?: string }) {
 	const controller = useController();
 	const store = useStore();
 	const hiddenInTree = useMemo(() => hiddenInTreeOf(store), [store]);
@@ -209,6 +181,7 @@ export function LayersTree() {
 		[template, side],
 	);
 	const rowIndex = useMemo(() => indexRows(rows), [rows]);
+	const filtered = useMemo(() => filterRows(rows, filter), [rows, filter]);
 	// Handing RAC back its own Selection keeps its anchor, which Shift-click
 	// ranges start from.
 	const lastSelection = useRef<Selection | null>(null);
@@ -245,6 +218,13 @@ export function LayersTree() {
 		expanded = keys;
 		setExpand({ t: template, sel: selection, keys });
 	}
+	const shownExpanded = useMemo(
+		() =>
+			filtered.ancestors.length > 0
+				? new Set<Key>([...expanded, ...filtered.ancestors])
+				: expanded,
+		[expanded, filtered],
+	);
 
 	// A selection made elsewhere scrolls its row into view.
 	useEffect(() => {
@@ -263,7 +243,7 @@ export function LayersTree() {
 
 	// A layer hovered on the canvas lights up its row.
 	useEffect(() => {
-		if (rows.length === 0) return;
+		if (filtered.rows.length === 0) return;
 		let hover: string | null = null;
 		let el: Element | null | undefined = null;
 		const apply = () => {
@@ -280,12 +260,13 @@ export function LayersTree() {
 			unsubscribe();
 			el?.removeAttribute("data-canvas-hover");
 		};
-	}, [store, rows]);
+	}, [store, filtered]);
 
 	const onSelectionChange = useCallback(
 		(keys: Selection) => {
 			lastSelection.current = keys;
-			const next = keys === "all" ? flattenRows(rows) : [...keys].map(String);
+			const next =
+				keys === "all" ? flattenRows(filtered.rows) : [...keys].map(String);
 			const prev = controller.state.selection;
 			const ordered = [
 				...prev.filter((k) => next.includes(k)),
@@ -294,7 +275,7 @@ export function LayersTree() {
 			controller.select(ordered);
 			fromTree.current = controller.state.selection !== prev;
 		},
-		[controller, rows],
+		[controller, filtered],
 	);
 
 	const { dragAndDropHooks } = useDragAndDrop<LayerRow>({
@@ -404,128 +385,10 @@ export function LayersTree() {
 	);
 
 	const menuTarget = menuKey ?? selection[0] ?? null;
-	const layers = controller.selectedLayers();
-	const hasLayers = layers.length > 0;
-	const allHidden =
-		selection.length > 0 &&
-		selection.every((k) => controller.state.hidden.has(k));
-	const allLocked =
-		selection.length > 0 &&
-		selection.every((k) => controller.state.locked.has(k));
-	const inVariant = marks ? controller.variantVisibility(layers) : [];
-	const allHiddenInVariant =
-		inVariant.length > 0 && inVariant.every((l) => l.hidden);
-
 	const menu = (
-		<>
-			<MenuItem
-				id="rename"
-				shortcut="F2"
-				isDisabled={!menuTarget}
-				onAction={() => menuTarget && renameCtx.start(menuTarget)}
-			>
-				Rename
-			</MenuItem>
-			<MenuItem
-				id="duplicate"
-				shortcut={shortcut("edit.duplicate")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "edit.duplicate")}
-			>
-				Duplicate
-			</MenuItem>
-			<MenuItem
-				id="delete"
-				shortcut={shortcut("edit.delete", 1)}
-				isDisabled={!hasLayers}
-				destructive
-				onAction={() => runCommand(controller, "edit.delete")}
-			>
-				Delete
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="group"
-				shortcut={shortcut("object.group")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.group")}
-			>
-				Group
-			</MenuItem>
-			<MenuItem
-				id="ungroup"
-				shortcut={shortcut("object.ungroup")}
-				isDisabled={
-					!layers.some((k) => rowIndex.get(k)?.element.type === "frame")
-				}
-				onAction={() => runCommand(controller, "object.ungroup")}
-			>
-				Ungroup
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="forward"
-				shortcut={shortcut("object.forward")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.forward")}
-			>
-				Bring forward
-			</MenuItem>
-			<MenuItem
-				id="backward"
-				shortcut={shortcut("object.backward")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.backward")}
-			>
-				Send backward
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="hide"
-				shortcut={shortcut("object.hide")}
-				isDisabled={selection.length === 0}
-				onAction={() => setAll(controller, "hidden", selection)}
-			>
-				{allHidden ? "Show" : "Hide"}
-			</MenuItem>
-			<MenuItem
-				id="lock"
-				shortcut={shortcut("object.lock")}
-				isDisabled={selection.length === 0}
-				onAction={() => setAll(controller, "locked", selection)}
-			>
-				{allLocked ? "Unlock" : "Lock"}
-			</MenuItem>
-			{marks ? (
-				<MenuItem
-					id="hide-in-variant"
-					isDisabled={inVariant.length === 0}
-					onAction={() =>
-						controller.setHiddenInVariant(layers, !allHiddenInVariant)
-					}
-				>
-					{allHiddenInVariant
-						? VARIANT_UI.showIn(marks.label)
-						: VARIANT_UI.hideIn(marks.label)}
-				</MenuItem>
-			) : null}
-			<MenuSeparator />
-			<MenuItem
-				id="copy"
-				shortcut={shortcut("edit.copy")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "edit.copy")}
-			>
-				Copy
-			</MenuItem>
-			<MenuItem
-				id="paste"
-				shortcut={shortcut("edit.paste")}
-				onAction={() => runCommand(controller, "edit.paste")}
-			>
-				Paste
-			</MenuItem>
-		</>
+		<LayerMenuItems
+			onRename={() => menuTarget && renameCtx.start(menuTarget)}
+		/>
 	);
 
 	return (
@@ -572,16 +435,21 @@ export function LayersTree() {
 							<Tree
 								aria-label="Layers"
 								data-testid="layers-tree"
-								items={rows}
+								items={filtered.rows}
 								selectionMode="multiple"
 								selectionBehavior="replace"
 								selectedKeys={selectedKeys}
 								onSelectionChange={onSelectionChange}
-								expandedKeys={expanded}
+								expandedKeys={shownExpanded}
 								onExpandedChange={(keys) =>
 									setExpand((s) => ({ ...s, keys: new Set(keys) }))
 								}
 								dragAndDropHooks={dragAndDropHooks}
+								renderEmptyState={() => (
+									<p className="px-2.5 py-1.5 text-fc-faint text-fc-sm">
+										No matching layers
+									</p>
+								)}
 								className="min-h-0 flex-1"
 							>
 								{renderRow}
@@ -726,5 +594,46 @@ function RowToggles({ rowKey }: { rowKey: string }) {
 				{hidden ? <EyeOffIcon /> : <EyeIcon />}
 			</ToggleButton>
 		</>
+	);
+}
+
+/** The Layers header's filter, which narrows the tree to layers whose name
+ *  or type matches. */
+export function LayersFilter({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<div className="relative flex w-28 min-w-16 shrink items-center">
+			<SearchIcon className="pointer-events-none absolute left-1.5 size-3 text-fc-faint" />
+			<input
+				type="search"
+				aria-label="Filter layers"
+				placeholder="Filter"
+				data-testid="layers-filter"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => {
+					e.stopPropagation();
+					if (e.key === "Escape") onChange("");
+				}}
+				className={cn(
+					inputBase,
+					"h-5 pr-5 pl-5 text-fc-sm hover:border-fc-border-strong focus:border-fc-accent pointer-coarse:h-7 [&::-webkit-search-cancel-button]:hidden",
+				)}
+			/>
+			{value ? (
+				<IconButton
+					aria-label="Clear filter"
+					onPress={() => onChange("")}
+					className="absolute right-0 size-5 [&_svg]:size-3"
+				>
+					<CloseIcon />
+				</IconButton>
+			) : null}
+		</div>
 	);
 }

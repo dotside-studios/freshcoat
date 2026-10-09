@@ -11,7 +11,11 @@ import type {
 	TableImportReply,
 	TableImportRequest,
 } from "./table-import-worker";
-import { createTableStore, type OpenedTable } from "./table-store";
+import {
+	createTableStore,
+	type ImportProgress,
+	type OpenedTable,
+} from "./table-store";
 
 /** Where table files are read and imported. The default is a module worker;
  *  tests and browsers without workers read them on the page. */
@@ -22,6 +26,7 @@ export type TableImporter = {
 		sheet: number,
 		dataset: Dataset,
 		plan: ImportPlan,
+		onProgress?: ImportProgress,
 	): Promise<ApplyMappingResult>;
 	close(table: number): void;
 };
@@ -30,8 +35,8 @@ export function inPageImporter(): TableImporter {
 	const store = createTableStore();
 	return {
 		open: (file, name) => store.open(file, name),
-		apply: async (table, sheet, dataset, plan) =>
-			store.apply(table, sheet, dataset, plan),
+		apply: async (table, sheet, dataset, plan, onProgress) =>
+			store.apply(table, sheet, dataset, plan, onProgress),
 		close: (table) => store.close(table),
 	};
 }
@@ -41,7 +46,11 @@ function workerImporter(): TableImporter {
 	let nextId = 1;
 	const replies = new Map<
 		number,
-		{ resolve: (v: unknown) => void; reject: (e: Error) => void }
+		{
+			resolve: (v: unknown) => void;
+			reject: (e: Error) => void;
+			onProgress?: ImportProgress;
+		}
 	>();
 	const parts = new Map<
 		number,
@@ -53,6 +62,12 @@ function workerImporter(): TableImporter {
 		});
 		w.onmessage = (event: MessageEvent<TableImportReply>) => {
 			const reply = event.data;
+			if ("progress" in reply) {
+				replies
+					.get(reply.id)
+					?.onProgress?.(reply.progress.done, reply.progress.total);
+				return;
+			}
 			if ("part" in reply) {
 				const got = parts.get(reply.id) ?? { records: [], issues: [] };
 				for (const r of reply.part.records) got.records.push(r);
@@ -87,18 +102,25 @@ function workerImporter(): TableImporter {
 		};
 		return w;
 	};
-	const send = <T>(body: TableImportBody): Promise<T> => {
+	const send = <T>(
+		body: TableImportBody,
+		onProgress?: ImportProgress,
+	): Promise<T> => {
 		worker ??= start();
 		const id = nextId++;
 		return new Promise<T>((resolve, reject) => {
-			replies.set(id, { resolve: resolve as (v: unknown) => void, reject });
+			replies.set(id, {
+				resolve: resolve as (v: unknown) => void,
+				reject,
+				...(onProgress ? { onProgress } : {}),
+			});
 			worker?.postMessage({ ...body, id } satisfies TableImportRequest);
 		});
 	};
 	return {
 		open: (file, name) => send({ kind: "open", file, name }),
-		apply: (table, sheet, dataset, plan) =>
-			send({ kind: "apply", table, sheet, dataset, plan }),
+		apply: (table, sheet, dataset, plan, onProgress) =>
+			send({ kind: "apply", table, sheet, dataset, plan }, onProgress),
 		close: (table) => {
 			if (worker) void send({ kind: "close", table });
 		},
@@ -145,6 +167,7 @@ export async function importTable(
 	sheet: number,
 	dataset: Dataset,
 	plan: ImportPlan,
+	onProgress?: ImportProgress,
 ): Promise<ApplyMappingResult> {
 	const matching = plan.mode === "append" && plan.match !== undefined;
 	const out = await tableImporter().apply(
@@ -152,6 +175,7 @@ export async function importTable(
 		sheet,
 		matching ? dataset : { ...dataset, records: [] },
 		plan,
+		onProgress,
 	);
 	const records =
 		matching || plan.mode === "replace"

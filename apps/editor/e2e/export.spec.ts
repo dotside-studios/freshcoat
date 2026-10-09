@@ -57,13 +57,25 @@ async function addDataset(
 	);
 }
 
+/** Whether leaving the page would warn, with the work counted as saved. */
+async function unloadWarns(page: Page): Promise<boolean> {
+	return page.evaluate(() => {
+		const c = (window as unknown as { __freshcoat: { controller: object } })
+			.__freshcoat.controller;
+		Object.defineProperty(c, "dirty", { configurable: true, get: () => false });
+		const event = new Event("beforeunload", { cancelable: true });
+		window.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+}
+
 async function chooseDataset(page: Page, name: string) {
 	await settingsTab(page, "Content");
 	const editor = page.getByTestId("binding-editor");
 	if (!(await editor.isVisible()))
 		await page
 			.getByTestId("export-settings")
-			.getByRole("button", { name: /^Binding/ })
+			.getByRole("button", { name: /^Template binding/ })
 			.click();
 	await editor.getByRole("button", { name: /Dataset/ }).click();
 	await page.getByRole("option", { name }).click();
@@ -113,6 +125,24 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	await expect(
 		page.getByRole("button", { name: "Export 6 files" }),
 	).toBeEnabled();
+	await expect(page.getByTestId("export-warning")).toHaveCount(0);
+
+	// A required field left to its default is flagged, and the export still runs.
+	const editor = page.getByTestId("binding-editor");
+	await editor.getByRole("button", { name: /Source for display_name/ }).click();
+	await page.getByRole("option", { name: "Default" }).click();
+	await expect(page.getByTestId("export-warning")).toHaveText(
+		"1 required field unfilled",
+	);
+	await expect(
+		page.getByTestId("export-settings").getByTestId("binding-unfilled"),
+	).toHaveText("1 required field unfilled");
+	await expect(
+		page.getByRole("button", { name: "Export 6 files" }),
+	).toBeEnabled();
+	await editor.getByRole("button", { name: /Source for display_name/ }).click();
+	await page.getByRole("option", { name: "Column" }).click();
+	await expect(page.getByTestId("export-warning")).toHaveCount(0);
 
 	// The filmstrip holds the three records; a click previews one and the
 	// arrow keys step. Record 2 of 3 in the preview.
@@ -249,6 +279,11 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	await expect(page.getByTestId("export-progress")).toHaveText(/^\d+ \/ 80/, {
 		timeout: 30_000,
 	});
+	// Outside Export, the menu bar shows the job, and leaving the page warns.
+	await page.getByTestId("section-switcher").getByText("Edit").click();
+	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	expect(await unloadWarns(page)).toBe(true);
+	await page.getByTestId("job-indicator").click();
 	await page
 		.getByTestId("export-job")
 		.getByRole("button", { name: "Cancel" })
@@ -258,6 +293,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		"cancelled",
 	);
 	await expect(page.getByTestId("export-summary")).toHaveText(/^Canceled/);
+	expect(await unloadWarns(page)).toBe(false);
 	await page.waitForTimeout(1500);
 	expect(downloads).toBe(0);
 	expect(await statuses(page, "d_many")).toEqual(

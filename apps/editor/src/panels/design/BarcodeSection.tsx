@@ -16,7 +16,6 @@ import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
 import { Header, ListBoxSection } from "react-aria-components";
@@ -26,6 +25,7 @@ import { useEditor } from "~/state/hooks";
 import { AddButton, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 import { InsertFieldMenu, spliceToken } from "./InsertFieldMenu";
+import { InspectorSection } from "./InspectorSection";
 
 const GROUPS: [string, Symbology[]][] = [
 	["1D", SYMBOLOGIES.filter(isLinearSymbology)],
@@ -121,7 +121,7 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 		});
 
 	return (
-		<PanelSection title="Barcode">
+		<InspectorSection title="Barcode">
 			<Row label="Type">
 				<Select
 					aria-label="Barcode type"
@@ -286,7 +286,7 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 					</p>
 				</>
 			) : null}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

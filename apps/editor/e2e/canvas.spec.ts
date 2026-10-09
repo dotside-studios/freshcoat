@@ -335,3 +335,76 @@ test("a new text layer starts in editing, and Enter edits a selected one", async
 	await expect(editor).toBeHidden();
 	expect(await state<number>(page, "s.doc.history.past.length")).toBe(2);
 });
+
+test("right-click selects the layer under the pointer and opens its menu", async ({
+	page,
+}) => {
+	await openSample(page);
+	const r = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	const p = await artboardPoint(page, r.x + 40, r.y + 30);
+	await page.mouse.click(p.x, p.y, { button: "right" });
+	expect(await state<string[]>(page, "s.selection")).toEqual([NAME]);
+	const count = await state<number>(page, "t.template_data[0].elements.length");
+	await page.getByRole("menuitem", { name: "Arrange" }).hover();
+	await page.getByRole("menuitem", { name: /Bring to front/ }).click();
+	await settle(page);
+	expect(await state<string[]>(page, "s.selection")).toEqual([
+		`0/${count - 1}`,
+	]);
+});
+
+test("right-click on a selected layer keeps the selection", async ({
+	page,
+}) => {
+	await openSample(page);
+	await run(page, `c.select(["0/2", "${NAME}"])`);
+	const r = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	const p = await artboardPoint(page, r.x + 40, r.y + 30);
+	await page.mouse.click(p.x, p.y, { button: "right" });
+	expect(await state<string[]>(page, "s.selection")).toEqual(["0/2", NAME]);
+	await page.getByRole("menuitem", { name: "Align" }).hover();
+	await page.getByRole("menuitem", { name: /Align top/ }).click();
+	await settle(page);
+	const a = await state<Rect>(page, 's.geometry.get("0/2").rect');
+	const b = await state<Rect>(page, `s.geometry.get("${NAME}").rect`);
+	expect(b.y).toBeCloseTo(a.y, 0);
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(1);
+});
+
+test("a multi-selection rotates about its bounding box centre", async ({
+	page,
+}) => {
+	await openSample(page);
+	await run(page, `c.select(["0/2", "${NAME}"])`);
+	const centre = async () => {
+		const [a, b] = await Promise.all([
+			state<Rect>(page, 's.geometry.get("0/2").rect'),
+			state<Rect>(page, `s.geometry.get("${NAME}").rect`),
+		]);
+		return {
+			a: { x: a.x + a.width / 2, y: a.y + a.height / 2 },
+			b: { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+		};
+	};
+	const before = await centre();
+	const ne = await page.getByTestId("handle-ne").boundingBox();
+	if (!ne) throw new Error("no handle");
+	const start = { x: ne.x + ne.width / 2 + 9, y: ne.y + ne.height / 2 - 9 };
+	await page.mouse.move(start.x, start.y);
+	await page.mouse.down();
+	for (let i = 1; i <= 8; i++)
+		await page.mouse.move(start.x + i * 6, start.y + i * 12);
+	await page.mouse.up();
+	await settle(page);
+	const after = await centre();
+	const [ra, rb] = await Promise.all([
+		state<number>(page, 's.geometry.get("0/2").rect.rotation'),
+		state<number>(page, `s.geometry.get("${NAME}").rect.rotation`),
+	]);
+	expect(ra).not.toBe(0);
+	expect(rb).toBeCloseTo(ra, 1);
+	const gap = (p: typeof before) => Math.hypot(p.a.x - p.b.x, p.a.y - p.b.y);
+	expect(gap(after)).toBeCloseTo(gap(before), 0);
+	expect(after.a.x).not.toBeCloseTo(before.a.x, 0);
+	expect(await state<number>(page, "s.doc.history.past.length")).toBe(1);
+});

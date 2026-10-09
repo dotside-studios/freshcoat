@@ -4,6 +4,7 @@ import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
+import { ProgressBar } from "@freshcoat-js/ui/progress";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
@@ -18,16 +19,28 @@ import {
 	guessMapping,
 	headersOf,
 	type ImportPlan,
+	INFER_SAMPLE,
+	inferType,
 	isValidKey,
 	previewMapping,
 } from "@freshcoat-js/workspace";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { KEY_RULE, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
+import { Badge } from "~/panels/content/shared";
 import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
+import { recallMapping, rememberMapping } from "./import-memory";
 import { emptyDataset, replaceDataset, TYPE_LABELS, uniqueName } from "./model";
 import { importTable, tableImporter } from "./table-import";
 import { dataRowCount, type OpenedTable } from "./table-store";
@@ -71,7 +84,12 @@ export function ImportWizard({
 }: {
 	target: ImportTarget;
 	onClose: () => void;
-	onImported: (datasetId: string, summary: string) => void;
+	onImported: (
+		datasetId: string,
+		summary: string,
+		isNew: boolean,
+		issues: string[],
+	) => void;
 }) {
 	const controller = useController();
 	const existing = useEditor((s) =>
@@ -84,6 +102,10 @@ export function ImportWizard({
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [importing, setImporting] = useState(false);
+	const [progress, setProgress] = useState<{
+		done: number;
+		total: number;
+	} | null>(null);
 	const [sheetIndex, setSheetIndex] = useState(0);
 	const [headerRow, setHeaderRow] = useState(0);
 	const [mode, setMode] = useState<"append" | "replace">("append");
@@ -93,6 +115,8 @@ export function ImportWizard({
 		null,
 	);
 	const [dragging, setDragging] = useState(false);
+	const [reviewing, setReviewing] = useState(false);
+	const [onlyIssues, setOnlyIssues] = useState(false);
 
 	const base = useMemo<Dataset | undefined>(() => {
 		if (existing) return existing;
@@ -112,13 +136,20 @@ export function ImportWizard({
 	const samples = useMemo(() => dataRowsOf(rows, headerRow), [rows, headerRow]);
 	const recordCount = sheet ? dataRowCount(sheet, headerRow) : 0;
 	const columns = base?.columns;
+	const baseId = base?.id;
+	const recalled = useMemo(
+		() => (baseId && columns ? recallMapping(baseId, headers, columns) : []),
+		[baseId, headers, columns],
+	);
 
 	// A new file, sheet or header row starts the mapping over.
 	useEffect(() => {
 		if (!columns) return;
-		setMapping(guessMapping(headers, columns, samples.slice(0, 200)));
+		const guess = guessMapping(headers, columns, samples.slice(0, 200));
+		setMapping(guess.map((m, i) => recalled[i] ?? m));
 		setMatch(null);
-	}, [headers, samples, columns]);
+		setReviewing(false);
+	}, [headers, samples, columns, recalled]);
 
 	const open = useRef<number | null>(null);
 	const closed = useRef(false);
@@ -218,6 +249,14 @@ export function ImportWizard({
 		(p) => !p.startsWith("Also"),
 	);
 	const nothingMapped = mapping.every((m) => m.kind === "skip");
+	const known =
+		headerRow >= 0 &&
+		headers.length > 0 &&
+		new Set(headers).size === headers.length &&
+		headers.every(
+			(h, i) => recalled[i] !== undefined || columns?.some((c) => c.key === h),
+		);
+	const skipMapping = known && !reviewing && !blocking && !nothingMapped;
 
 	// Totals over the held rows; Import maps the whole file in the worker.
 	const result = useMemo(
@@ -225,20 +264,41 @@ export function ImportWizard({
 		[step, base, rows, plan],
 	);
 	const partial = samples.length < recordCount;
-	const preview = useMemo(
-		() =>
-			step === 3 && base ? previewMapping(rows, plan, base.columns, 20) : [],
-		[step, base, rows, plan],
+	const issueRows = useMemo(
+		() => new Set(result?.issues.map((i) => i.row)),
+		[result],
 	);
+	const columnIssues = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const i of result?.issues ?? [])
+			counts.set(i.column, (counts.get(i.column) ?? 0) + 1);
+		return counts;
+	}, [result]);
+	const showIssues = onlyIssues && issueRows.size > 0;
+	const preview = useMemo(() => {
+		if (step !== 3 || !base) return [];
+		if (!showIssues) return previewMapping(rows, plan, base.columns, 20);
+		return previewMapping(rows, plan, base.columns, rows.length)
+			.filter((r) => issueRows.has(r.row) || r.cells.some((c) => !c.ok))
+			.slice(0, 20);
+	}, [step, base, rows, plan, showIssues, issueRows]);
 
 	const runImport = async (close: () => void) => {
 		if (!file || !base) return;
 		setImporting(true);
+		setProgress(null);
 		setError(null);
 		try {
-			const result = await importTable(file.table.id, sheetIndex, base, plan);
+			const result = await importTable(
+				file.table.id,
+				sheetIndex,
+				base,
+				plan,
+				(done, total) => setProgress({ done, total }),
+			);
 			if (closed.current) return;
 			commit(result);
+			rememberMapping(result.dataset.id, headers, plan.mapping);
 			close();
 		} catch (err) {
 			setError(
@@ -246,6 +306,7 @@ export function ImportWizard({
 			);
 		} finally {
 			setImporting(false);
+			setProgress(null);
 		}
 	};
 
@@ -261,9 +322,12 @@ export function ImportWizard({
 			activeId: result.dataset.id,
 		});
 		const rowsWithIssues = new Set(result.issues.map((i) => i.row)).size;
+		const records = [...new Set(result.issues.map((i) => i.record))];
 		onImported(
 			result.dataset.id,
 			`Imported ${plural(result.added, "record")}${result.updated ? `, updated ${formatNumber(result.updated)}` : ""} into ${result.dataset.name}${rowsWithIssues ? ` · ${formatNumber(rowsWithIssues)} with issues` : ""}`,
+			isNew,
+			records,
 		);
 	};
 
@@ -295,7 +359,25 @@ export function ImportWizard({
 				bodyClassName="max-h-[min(70vh,640px)] p-0"
 				footer={({ close }) => (
 					<>
-						{file ? (
+						{importing ? (
+							<span
+								className="mr-auto flex min-w-0 flex-1 items-center gap-2 text-fc-muted text-fc-sm tabular-nums"
+								data-testid="import-progress"
+							>
+								<ProgressBar
+									aria-label="Import progress"
+									className="max-w-40 flex-1"
+									value={progress?.done ?? 0}
+									maxValue={Math.max(1, progress?.total ?? 1)}
+									isIndeterminate={!progress}
+								/>
+								<span className="whitespace-nowrap">
+									{progress
+										? `${formatNumber(progress.done)} of ${plural(progress.total, "record")}`
+										: "Importing…"}
+								</span>
+							</span>
+						) : file ? (
 							<span className="mr-auto min-w-0 truncate text-fc-muted text-fc-sm">
 								{file.name} · {plural(recordCount, "record")}
 							</span>
@@ -304,7 +386,11 @@ export function ImportWizard({
 							Cancel
 						</Button>
 						{step > 1 ? (
-							<Button onPress={() => setStep((s) => (s - 1) as 1 | 2)}>
+							<Button
+								onPress={() =>
+									setStep((s) => (s === 3 && skipMapping ? 1 : s - 1) as 1 | 2)
+								}
+							>
 								Back
 							</Button>
 						) : null}
@@ -316,7 +402,9 @@ export function ImportWizard({
 									recordCount === 0 ||
 									(step === 2 && (blocking || nothingMapped))
 								}
-								onPress={() => setStep((s) => (s + 1) as 2 | 3)}
+								onPress={() =>
+									setStep((s) => (s === 1 && skipMapping ? 3 : s + 1) as 2 | 3)
+								}
 							>
 								Next
 							</Button>
@@ -451,27 +539,54 @@ export function ImportWizard({
 					/>
 				) : step === 3 && result ? (
 					<div className="flex flex-col gap-2 p-3">
-						<p data-testid="import-totals" className="tabular-nums">
-							{partial
-								? `In the first ${formatNumber(samples.length)} records: `
-								: null}
-							<strong>{formatNumber(result.added)}</strong> to add ·{" "}
-							<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
-							<strong
-								className={result.issues.length ? "text-fc-danger" : undefined}
+						<div className="flex flex-wrap items-center gap-2">
+							<p data-testid="import-totals" className="tabular-nums">
+								{partial
+									? `In the first ${formatNumber(samples.length)} records: `
+									: null}
+								<strong>{formatNumber(result.added)}</strong> to add ·{" "}
+								<strong>{formatNumber(result.updated)}</strong> to update ·{" "}
+								<strong
+									className={
+										result.issues.length ? "text-fc-danger" : undefined
+									}
+								>
+									{formatNumber(issueRows.size)}
+								</strong>{" "}
+								with issues
+								{skipMapping ? (
+									<>
+										{" · "}
+										<LinkButton
+											onPress={() => {
+												setReviewing(true);
+												setStep(2);
+											}}
+										>
+											Review mapping
+										</LinkButton>
+									</>
+								) : null}
+							</p>
+							<Checkbox
+								className="ml-auto"
+								isSelected={showIssues}
+								isDisabled={issueRows.size === 0}
+								onChange={setOnlyIssues}
 							>
-								{formatNumber(new Set(result.issues.map((i) => i.row)).size)}
-							</strong>{" "}
-							with issues
-						</p>
+								Only rows with issues
+							</Checkbox>
+						</div>
 						<PreviewTable
 							preview={preview}
 							mapping={mapping}
 							headers={headers}
+							columnIssues={columnIssues}
 						/>
-						{recordCount > preview.length ? (
+						{(showIssues ? issueRows.size : recordCount) > preview.length ? (
 							<p className="text-fc-faint text-fc-sm">
-								Showing {preview.length} of {formatNumber(recordCount)}
+								Showing {preview.length} of{" "}
+								{formatNumber(showIssues ? issueRows.size : recordCount)}
 							</p>
 						) : null}
 						{error ? (
@@ -483,6 +598,23 @@ export function ImportWizard({
 				) : null}
 			</Dialog>
 		</Modal>
+	);
+}
+
+function LinkButton({
+	onPress,
+	children,
+}: {
+	onPress: () => void;
+	children: ReactNode;
+}) {
+	return (
+		<RACButton
+			onPress={onPress}
+			className="cursor-default rounded-[2px] text-fc-accent-hover underline decoration-fc-accent/50 underline-offset-2 outline-none data-hovered:text-fc-text data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
+		>
+			{children}
+		</RACButton>
 	);
 }
 
@@ -562,9 +694,53 @@ function MappingStep({
 			.map((r) => r[i] ?? "")
 			.filter((v) => v.trim() !== "")
 			.slice(0, 3);
+	const inferred = useMemo(
+		() =>
+			headers.map((_, i) => {
+				const values = samples.map((r) => r[i] ?? "");
+				const filled = values.filter((v) => v.trim() !== "").length;
+				return {
+					type: inferType(values),
+					from: Math.min(filled, INFER_SAMPLE),
+				};
+			}),
+		[headers, samples],
+	);
+	const skipUnmatched = () =>
+		onMapping(mapping.map((m) => (m.kind === "column" ? m : { kind: "skip" })));
+	const allNew = () => {
+		const next = [...mapping];
+		headers.forEach((header, i) => {
+			if (next[i]?.kind !== "skip") return;
+			next[i] = {
+				kind: "new",
+				key: freshKey(header, i, dataset, next),
+				type: inferred[i]?.type ?? "text",
+			};
+		});
+		onMapping(next);
+	};
 
 	return (
 		<div className="flex flex-col">
+			<div className="flex gap-1 border-fc-border border-b px-2 py-1.5">
+				<Button
+					size="sm"
+					variant="ghost"
+					isDisabled={!mapping.some((m) => m.kind === "new")}
+					onPress={skipUnmatched}
+				>
+					Skip all unmatched
+				</Button>
+				<Button
+					size="sm"
+					variant="ghost"
+					isDisabled={!mapping.some((m) => m.kind === "skip")}
+					onPress={allNew}
+				>
+					All as new columns
+				</Button>
+			</div>
 			<table className="w-full border-collapse" data-testid="import-mapping">
 				<thead className="sticky top-0 z-10 bg-fc-raised text-fc-muted text-fc-sm">
 					<tr>
@@ -580,6 +756,7 @@ function MappingStep({
 						const m = mapping[i] ?? { kind: "skip" };
 						const newKey = m.kind === "new" ? m.key : "";
 						const problem = problems.get(i);
+						const guess = inferred[i];
 						return (
 							<tr
 								// biome-ignore lint/suspicious/noArrayIndexKey: source columns are positional
@@ -596,6 +773,12 @@ function MappingStep({
 									<div className="truncate text-fc-faint text-fc-sm sm:hidden">
 										{sampleOf(i).join(" · ")}
 									</div>
+									{guess?.from ? (
+										<Badge className="mt-1" testId={`inferred-${i}`}>
+											{TYPE_LABELS[guess.type]} · inferred from{" "}
+											{plural(guess.from, "row")}
+										</Badge>
+									) : null}
 								</td>
 								<td className="hidden max-w-56 px-2 py-1.5 text-fc-muted text-fc-sm sm:table-cell">
 									{sampleOf(i).map((s, k) => (
@@ -620,7 +803,7 @@ function MappingStep({
 														: {
 																kind: "new",
 																key: freshKey(header, i, dataset, mapping),
-																type: "text",
+																type: inferred[i]?.type ?? "text",
 															},
 												);
 											else set(i, { kind: "column", column: key.slice(4) });
@@ -634,7 +817,7 @@ function MappingStep({
 											)),
 											<SelectItem key="new" id="new">
 												{m.kind === "new"
-													? `New column: ${m.key} (${TYPE_LABELS[m.type].toLowerCase()})`
+													? `New column: ${m.key}`
 													: "New column"}
 											</SelectItem>,
 											<SelectItem key="skip" id="skip">
@@ -783,11 +966,14 @@ function PreviewTable({
 	preview,
 	mapping,
 	headers,
+	columnIssues,
 }: {
 	preview: ReturnType<typeof previewMapping>;
 	mapping: ColumnMapping[];
 	headers: string[];
+	columnIssues: ReadonlyMap<string, number>;
 }) {
+	const [focused, setFocused] = useState<string | null>(null);
 	const keys = mapping.flatMap((m, i) =>
 		m.kind === "skip"
 			? []
@@ -810,6 +996,15 @@ function PreviewTable({
 								title={k.header}
 							>
 								{k.key}
+								{columnIssues.get(k.key) ? (
+									<Badge
+										tone="danger"
+										className="ml-1 font-sans tabular-nums"
+										testId={`column-issues-${k.key}`}
+									>
+										{formatNumber(columnIssues.get(k.key) ?? 0)}
+									</Badge>
+								) : null}
 							</th>
 						))}
 					</tr>
@@ -820,26 +1015,47 @@ function PreviewTable({
 							<td className="px-1.5 py-0.5 text-right text-fc-faint tabular-nums">
 								{row.row + 1}
 							</td>
-							{row.cells.map((cell, i) => (
-								<td
-									// biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
-									key={i}
-									title={cell.message}
-									data-bad={cell.ok ? undefined : ""}
-									className={cn(
-										"relative max-w-48 truncate border-fc-border border-l px-1.5 py-0.5",
-										!cell.ok && "bg-fc-danger/15 text-fc-danger-text",
-									)}
-								>
-									{cell.value === null
-										? ""
-										: typeof cell.value === "boolean"
-											? cell.value
-												? "true"
-												: "false"
-											: String(cell.value)}
-								</td>
-							))}
+							{row.cells.map((cell, i) => {
+								const id = `${row.row}:${i}`;
+								const open = !cell.ok && focused === id;
+								return (
+									<td
+										// biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
+										key={i}
+										title={cell.message}
+										data-bad={cell.ok ? undefined : ""}
+										tabIndex={cell.ok ? undefined : 0}
+										onFocus={cell.ok ? undefined : () => setFocused(id)}
+										onBlur={
+											cell.ok
+												? undefined
+												: () => setFocused((f) => (f === id ? null : f))
+										}
+										className={cn(
+											"relative max-w-48 border-fc-border border-l px-1.5 py-0.5",
+											!open && "truncate",
+											!cell.ok &&
+												"bg-fc-danger/15 text-fc-danger-text outline-none focus-visible:outline-1 focus-visible:outline-fc-danger focus-visible:outline-solid",
+										)}
+									>
+										{cell.value === null
+											? ""
+											: typeof cell.value === "boolean"
+												? cell.value
+													? "true"
+													: "false"
+												: String(cell.value)}
+										{open ? (
+											<span
+												data-testid="cell-issue"
+												className="block whitespace-normal text-[10px]"
+											>
+												{cell.message}
+											</span>
+										) : null}
+									</td>
+								);
+							})}
 						</tr>
 					))}
 				</tbody>

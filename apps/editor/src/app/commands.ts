@@ -1,10 +1,11 @@
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
+import { openFindReplace } from "~/data/find-replace";
 import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
 import { loadBarcodeEncoder } from "~/render/barcode";
 import type { EditorState, Tool } from "~/state/store";
-import type { Section } from "~/state/workspace";
+import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
 import { toggleRenderStats } from "./render-stats";
@@ -43,6 +44,14 @@ export type Command = {
 const hasDoc = (s: EditorState) => s.doc !== null;
 const hasSelection = (s: EditorState) =>
 	s.selection.some((k) => !k.endsWith("/bg"));
+const hasSides = (s: EditorState) =>
+	(s.doc?.history.present.template_data.length ?? 0) > 1;
+const hasVariants = (s: EditorState) =>
+	(s.doc?.history.present.variants?.length ?? 0) > 0;
+const hasRecords = (s: EditorState) => {
+	const id = activeSlot(s)?.binding?.datasetId;
+	return !!s.workspace?.datasets.find((d) => d.id === id)?.records.length;
+};
 const tool = (t: Tool, label: string, key: string): Command => ({
 	id: `tool.${t}`,
 	label,
@@ -199,6 +208,30 @@ export const COMMANDS: Command[] = [
 		},
 	},
 	{
+		id: "data.find",
+		label: "Find",
+		keys: ["Mod+F"],
+		group: "Data",
+		global: true,
+		sections: ["data"],
+		enabled: hasDoc,
+		run: () => {
+			openFindReplace("find");
+		},
+	},
+	{
+		id: "data.replace",
+		label: "Find and replace",
+		keys: ["Mod+H"],
+		group: "Data",
+		global: true,
+		sections: ["data"],
+		enabled: hasDoc,
+		run: () => {
+			openFindReplace("replace");
+		},
+	},
+	{
 		id: "edit.undo",
 		label: "Undo",
 		keys: ["Mod+Z"],
@@ -253,6 +286,30 @@ export const COMMANDS: Command[] = [
 		group: "Edit",
 		enabled: hasDoc,
 		run: ({ controller }) => controller.paste(),
+	},
+	{
+		id: "edit.pasteInPlace",
+		label: "Paste in place",
+		keys: ["Mod+Shift+V"],
+		group: "Edit",
+		enabled: hasDoc,
+		run: ({ controller }) => controller.paste({ inPlace: true }),
+	},
+	{
+		id: "edit.copyStyle",
+		label: "Copy style",
+		keys: ["Mod+Alt+C"],
+		group: "Edit",
+		enabled: (s) => s.selection.length > 0,
+		run: ({ controller }) => controller.copyStyle(),
+	},
+	{
+		id: "edit.pasteStyle",
+		label: "Paste style",
+		keys: ["Mod+Alt+V"],
+		group: "Edit",
+		enabled: (s) => s.selection.length > 0,
+		run: ({ controller }) => controller.pasteStyle(),
 	},
 	{
 		id: "edit.duplicate",
@@ -384,8 +441,8 @@ export const COMMANDS: Command[] = [
 	alignCommand("top", "Align top", "Alt+W"),
 	alignCommand("vcenter", "Align vertical centers", "Alt+V"),
 	alignCommand("bottom", "Align bottom", "Alt+S"),
-	alignCommand("hdistribute", "Distribute horizontally"),
-	alignCommand("vdistribute", "Distribute vertically"),
+	alignCommand("hdistribute", "Distribute horizontally", "Alt+Shift+H"),
+	alignCommand("vdistribute", "Distribute vertically", "Alt+Shift+V"),
 	tool("move", "Move", "V"),
 	tool("hand", "Hand", "H"),
 	tool("frame", "Frame", "F"),
@@ -415,7 +472,7 @@ export const COMMANDS: Command[] = [
 	{
 		id: "view.zoom100",
 		label: "Zoom to 100%",
-		keys: ["Shift+0"],
+		keys: ["Mod+0", "Shift+0"],
 		group: "View",
 		enabled: hasDoc,
 		run: ({ controller }) => controller.zoomTo(1),
@@ -435,6 +492,54 @@ export const COMMANDS: Command[] = [
 		group: "View",
 		enabled: hasSelection,
 		run: ({ controller }) => controller.zoomToSelection(),
+	},
+	{
+		id: "view.previousSide",
+		label: "Previous side",
+		keys: ["Alt+,"],
+		group: "View",
+		enabled: hasSides,
+		run: ({ controller }) => controller.stepSide(-1),
+	},
+	{
+		id: "view.nextSide",
+		label: "Next side",
+		keys: ["Alt+."],
+		group: "View",
+		enabled: hasSides,
+		run: ({ controller }) => controller.stepSide(1),
+	},
+	{
+		id: "view.previousVariant",
+		label: "Previous variant",
+		keys: ["Alt+Shift+,"],
+		group: "View",
+		enabled: hasVariants,
+		run: ({ controller }) => controller.stepVariant(-1),
+	},
+	{
+		id: "view.nextVariant",
+		label: "Next variant",
+		keys: ["Alt+Shift+."],
+		group: "View",
+		enabled: hasVariants,
+		run: ({ controller }) => controller.stepVariant(1),
+	},
+	{
+		id: "view.previousRecord",
+		label: "Previous record",
+		keys: ["Alt+["],
+		group: "View",
+		enabled: hasRecords,
+		run: ({ controller }) => controller.stepRecord(-1),
+	},
+	{
+		id: "view.nextRecord",
+		label: "Next record",
+		keys: ["Alt+]"],
+		group: "View",
+		enabled: hasRecords,
+		run: ({ controller }) => controller.stepRecord(1),
 	},
 	{
 		id: "view.panels",
@@ -556,6 +661,7 @@ export function matchesChord(e: KeyLike, spec: string, mac: boolean): boolean {
 		return e.code === (key === "[" ? "BracketLeft" : "BracketRight");
 	if (key === "\\") return e.code === "Backslash";
 	if (key === ",") return e.code === "Comma";
+	if (key === ".") return e.code === "Period";
 	if (key === "=" || key === "-")
 		return e.code === (key === "=" ? "Equal" : "Minus") && !e.shiftKey;
 	return e.key === key;

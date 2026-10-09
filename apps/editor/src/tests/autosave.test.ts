@@ -104,6 +104,19 @@ describe("autosave", () => {
 		expect(read?.missingAssets).toBeUndefined();
 	});
 
+	it("keeps the recent entry it was written for, and writes again when it changes", async () => {
+		const store = createAutosaveStore(freshDb());
+		const ws = workspace([]);
+		await store.write({ workspace: ws, fileName: "a.coatworkspace" });
+		expect((await store.read())?.recentId).toBeUndefined();
+		await store.write({
+			workspace: ws,
+			fileName: "a.coatworkspace",
+			recentId: "recent_1",
+		});
+		expect((await store.read())?.recentId).toBe("recent_1");
+	});
+
 	it("hands back one stored photo by its sha", async () => {
 		const db = freshDb();
 		const store = createAutosaveStore(db);
