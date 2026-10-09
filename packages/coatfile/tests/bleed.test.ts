@@ -2,7 +2,9 @@ import { createRenderer, decodePixels, type GroupNode, type Node } from "@freshc
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import {
+	bleedMm,
 	bleedSize,
+	cardSizeMm,
 	extendIntoBleed,
 	templateBleed,
 	templateSafeArea,
@@ -280,5 +282,17 @@ describe("render with bleed", () => {
 		// The dot ran to the top-left edge, so it fills that corner of the bleed.
 		expect(at(1, 1)).toEqual([0, 0, 255]);
 		expect(at(215, 135)).toEqual([255, 0, 0]);
+	});
+});
+
+describe("print size in millimetres", () => {
+	test("is the pixels at the DPI in millimetres", () => {
+		const card = cardSizeMm(1200, 900, 300);
+		expect(card.widthMm).toBeCloseTo(101.6, 9);
+		expect(card.heightMm).toBeCloseTo(76.2, 9);
+		const bleed = bleedMm({ top: 30, right: 60, bottom: 30, left: 0 }, 300);
+		expect(bleed.top).toBeCloseTo(2.54, 9);
+		expect(bleed.right).toBeCloseTo(5.08, 9);
+		expect(bleed.left).toBe(0);
 	});
 });

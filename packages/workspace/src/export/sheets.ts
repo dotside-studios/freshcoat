@@ -1,18 +1,14 @@
 import {
+	bleedMm,
+	cardSizeMm,
 	hasInsets,
+	NO_BLEED,
 	type Sides,
 	type Template,
 	templateBleed,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import {
-	bleedMm,
-	cardSizeMm,
-	type Imposition,
-	imposeSheets,
-	NO_BLEED,
-	SheetLayoutError,
-} from "../impose";
+import { type Imposition, imposeSheets, SheetLayoutError } from "../impose";
 import { exportSize, pdfLayout } from "../plan";
 import type { ExportItem, ExportPreset, SheetLayout } from "../types";
 

@@ -104,7 +104,7 @@ backs. The designs inside the PDF are raster images at the chosen density.
 
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`
-(`bleedMm(pixels, dpi)` converts it). On sheets, each card is placed by its
+(coatfile's `bleedMm(pixels, dpi)` converts it). On sheets, each card is placed by its
 trim with the bleed outside the slot. The gap between cards is widened to
 `minGapMm(bleed)`, twice the bleed, when the layout's is narrower, and crop
 marks sit on the trim and start outside the bleed. One card per page, each

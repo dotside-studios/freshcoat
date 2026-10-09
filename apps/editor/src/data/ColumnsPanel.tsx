@@ -1,4 +1,5 @@
 import { compiledPattern } from "@freshcoat-js/coatfile";
+import { templateStem } from "@freshcoat-js/coatfile/coat";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { inputBase } from "@freshcoat-js/ui/field";
@@ -13,7 +14,6 @@ import {
 	type ColumnType,
 	coerce,
 	type Dataset,
-	templateStem,
 } from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";

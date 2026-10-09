@@ -59,6 +59,12 @@ export function isCoatFileName(name: string): boolean {
 	);
 }
 
+/** A template's file name without its extension: `.coat`, `.coat.json`, the
+ *  legacy `.tkit` and `.tkit.json`, or plain `.json`. */
+export function templateStem(fileName: string): string {
+	return fileName.replace(/\.(coat\.json|coat|tkit\.json|tkit|json)$/i, "");
+}
+
 const MIMETYPE_ENTRY = "mimetype";
 const TEMPLATE_ENTRY = "template.json";
 const ASSET_DIR = "assets/";

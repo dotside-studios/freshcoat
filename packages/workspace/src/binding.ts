@@ -1,7 +1,8 @@
 import {
+	closestVariant,
+	hasShapedVariants,
+	isEmptyVariant,
 	type Template,
-	type Variant,
-	variantSize,
 } from "@freshcoat-js/coatfile";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
@@ -77,16 +78,6 @@ export function autoBinding(template: Template, dataset: Dataset): Binding {
 			? { variant: { kind: "image" as const, field: photo } }
 			: {}),
 	};
-}
-
-/** Whether a variant's size differs in aspect from the template's. */
-export function hasShapedVariants(template: Template): boolean {
-	const aspect = template.width / template.height;
-	return (template.variants ?? []).some(
-		(v) =>
-			v.size !== undefined &&
-			Math.abs(v.size.width / v.size.height - aspect) > 1e-6,
-	);
 }
 
 export function serialValue(
@@ -178,28 +169,6 @@ export function variantFor(
 	)?.id;
 }
 
-/** The variant, or undefined for Default, whose size is closest to
- *  `aspect`. Default wins a tie, then the first in list order. */
-export function closestVariant(
-	template: Template,
-	aspect: number,
-): string | undefined {
-	const distance = (id?: string) => {
-		const size = variantSize(template, id);
-		return Math.abs(Math.log(size.width / size.height / aspect));
-	};
-	let best: string | undefined;
-	let bestDistance = distance(undefined);
-	for (const v of template.variants ?? []) {
-		const d = distance(v.id);
-		if (d < bestDistance - 1e-9) {
-			best = v.id;
-			bestDistance = d;
-		}
-	}
-	return best;
-}
-
 /**
  * Every variant a record renders in, in export order; undefined is Default.
  * Under `all` that is Default, then each variant in list order that changes
@@ -217,27 +186,6 @@ export function variantsFor(
 	}
 	const changed = (template.variants ?? []).filter((v) => !isEmptyVariant(v));
 	return [undefined, ...changed.map((v) => v.id)];
-}
-
-/** Whether a variant renders exactly as Default: no override replaces a
- *  background, and no element delta carries anything beyond its id and an
- *  empty `properties`. */
-export function isEmptyVariant(variant: Variant): boolean {
-	return variant.overrides.every(
-		(override) =>
-			override.background === undefined &&
-			(override.elements ?? []).every((delta) =>
-				Object.entries(delta).every(
-					([key, value]) =>
-						key === "id" ||
-						value === undefined ||
-						(key === "properties" &&
-							Object.values(value as Record<string, unknown>).every(
-								(v) => v === undefined,
-							)),
-				),
-			),
-	);
 }
 
 /** `ws:<sha>` to the Blob of every dataset photo. A renderer reads the bytes

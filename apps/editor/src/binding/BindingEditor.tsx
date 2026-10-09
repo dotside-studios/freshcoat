@@ -1,14 +1,13 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { isEmptyVariant, type Template } from "@freshcoat-js/coatfile";
 import { TextField } from "@freshcoat-js/ui/field";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import {
-	type Binding,
-	type Dataset,
-	type FieldSource,
-	isEmptyVariant,
-	type VariantSource,
+import type {
+	Binding,
+	Dataset,
+	FieldSource,
+	VariantSource,
 } from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import { useController } from "~/app/context";

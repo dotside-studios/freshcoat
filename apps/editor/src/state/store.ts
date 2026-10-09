@@ -1,6 +1,6 @@
 import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
-import { COAT_EXTENSION } from "@freshcoat-js/coatfile/coat";
+import { COAT_EXTENSION, templateStem } from "@freshcoat-js/coatfile/coat";
 import type {
 	Binding,
 	Dataset,
@@ -8,7 +8,6 @@ import type {
 	RecordStatus,
 	Workspace,
 } from "@freshcoat-js/workspace";
-import { templateStem } from "@freshcoat-js/workspace";
 import { type DataViewState, DEFAULT_DATA_VIEW } from "~/data/data-view";
 import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
 import { guidesForSides, type TemplateGuides } from "~/doc/guides";

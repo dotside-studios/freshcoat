@@ -1,3 +1,9 @@
+import {
+	type BleedMm,
+	type CardSizeMm,
+	NO_BLEED,
+	resolveBleedMm,
+} from "@freshcoat-js/coatfile";
 import type { PaperName, SheetLayout } from "./types";
 
 /** Paper sizes in millimetres, portrait: the short edge is the width. */
@@ -22,7 +28,6 @@ export const DEFAULT_SHEET_LAYOUT: SheetLayout = {
 	duplex: "none",
 };
 
-export const MM_PER_INCH = 25.4;
 /** Crop marks start this far outside the card's edge... */
 export const CROP_MARK_OFFSET_MM = 1;
 /** ...and run this far. */
@@ -30,54 +35,9 @@ export const CROP_MARK_LENGTH_MM = 4;
 /** A gap this wide holds a mark from each card on either side of it. */
 export const CROP_MARK_GAP_MM = 2 * (CROP_MARK_OFFSET_MM + CROP_MARK_LENGTH_MM);
 
-export type CardSizeMm = { widthMm: number; heightMm: number };
-
-/** Artwork past each edge of the trim, in millimetres. */
-export type BleedMm = {
-	top: number;
-	right: number;
-	bottom: number;
-	left: number;
-};
-
-export const NO_BLEED: BleedMm = { top: 0, right: 0, bottom: 0, left: 0 };
-
-export function resolveBleedMm(bleed: number | BleedMm | undefined): BleedMm {
-	if (bleed === undefined) return NO_BLEED;
-	if (typeof bleed === "number")
-		return { top: bleed, right: bleed, bottom: bleed, left: bleed };
-	return bleed;
-}
-
-/** The bleed a template of this many pixels of bleed prints at at this DPI. */
-export function bleedMm(
-	bleedPx: { top: number; right: number; bottom: number; left: number },
-	dpi: number,
-): BleedMm {
-	const mm = (px: number) => (px / dpi) * MM_PER_INCH;
-	return {
-		top: mm(bleedPx.top),
-		right: mm(bleedPx.right),
-		bottom: mm(bleedPx.bottom),
-		left: mm(bleedPx.left),
-	};
-}
-
 /** The narrowest gap that keeps neighbouring cards' bleed apart. */
 export function minGapMm(bleed: BleedMm): number {
 	return Math.max(bleed.left + bleed.right, bleed.top + bleed.bottom);
-}
-
-/** The card size a template of this many pixels prints at at this DPI. */
-export function cardSizeMm(
-	widthPx: number,
-	heightPx: number,
-	dpi: number,
-): CardSizeMm {
-	return {
-		widthMm: (widthPx / dpi) * MM_PER_INCH,
-		heightMm: (heightPx / dpi) * MM_PER_INCH,
-	};
 }
 
 /** What `imposeSheets` needs of an item: which record it shows, in which

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { cardSizeMm } from "@freshcoat-js/coatfile";
 import {
-	cardSizeMm,
 	DEFAULT_SHEET_LAYOUT,
 	imposeSheets,
 	type SheetLayout,

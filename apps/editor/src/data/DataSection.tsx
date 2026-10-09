@@ -1,3 +1,4 @@
+import { templateStem } from "@freshcoat-js/coatfile/coat";
 import { Button } from "@freshcoat-js/ui/button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
@@ -7,7 +8,6 @@ import {
 	jsonSchemaToColumns,
 	type RecordStatus,
 	type TableFormat,
-	templateStem,
 } from "@freshcoat-js/workspace";
 import {
 	type DragEvent,
