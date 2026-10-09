@@ -25,6 +25,7 @@ import {
 import { createRenderer, encodePng, type Node } from "@freshcoat-js/engine";
 import { createAnalysisCache } from "@freshcoat-js/for-print";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
+import { IMAGE_CACHE_PIXELS } from "@freshcoat-js/workspace/export";
 import { plugin } from "bun";
 import type { CanvasKit } from "canvaskit-wasm";
 
@@ -201,7 +202,7 @@ async function renderRecords(
 	const renderer = await createRenderer({
 		ck,
 		fonts,
-		cache: { maxImagePixels: 48_000_000 },
+		cache: { maxImagePixels: IMAGE_CACHE_PIXELS },
 	});
 	const analysisCache = createAnalysisCache(256);
 	try {
@@ -320,7 +321,7 @@ async function batchExport() {
 	const renderer = await createRenderer({
 		ck,
 		fonts,
-		cache: { maxImagePixels: 48_000_000 },
+		cache: { maxImagePixels: IMAGE_CACHE_PIXELS },
 	});
 	const exports = [
 		{ constraint: { kind: "width" as const, value: BATCH_WIDTH } },
