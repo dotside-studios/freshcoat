@@ -119,10 +119,31 @@ describe("shortcut matching", () => {
 
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
+		const normal = (k: string) => {
+			const parts = k.split("+");
+			const key = k.endsWith("++") ? "+" : (parts.at(-1) as string);
+			const mods = parts.slice(0, k.endsWith("++") ? -2 : -1).sort();
+			return [...mods, key].join("+");
+		};
 		for (const c of COMMANDS)
 			for (const k of c.keys ?? []) {
-				expect(seen.get(k), `${k} on ${c.id}`).toBeUndefined();
-				seen.set(k, c.id);
+				expect(seen.get(normal(k)), `${k} on ${c.id}`).toBeUndefined();
+				seen.set(normal(k), c.id);
 			}
+	});
+
+	test("Alt+Shift+H and Alt+Shift+V distribute", () => {
+		const key = (code: string) => ({
+			key: "x",
+			code,
+			altKey: true,
+			shiftKey: true,
+			metaKey: false,
+			ctrlKey: false,
+		});
+		expect(findCommand(key("KeyH"), false, false)?.id).toBe(
+			"align.hdistribute",
+		);
+		expect(findCommand(key("KeyV"), true, false)?.id).toBe("align.vdistribute");
 	});
 });

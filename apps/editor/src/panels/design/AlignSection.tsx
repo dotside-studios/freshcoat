@@ -1,4 +1,6 @@
 import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
+import { COMMAND_BY_ID } from "~/app/commands";
 import type { Icon } from "~/app/icons";
 import type { AlignMode } from "~/doc/geometry";
 import { useEditor } from "~/state/hooks";
@@ -34,20 +36,23 @@ export function AlignSection({ ins }: { ins: Inspect }) {
 			aria-label="Align"
 			className="flex items-center justify-between border-fc-border border-b px-1.5 py-1"
 		>
-			{ALIGN.map(([mode, label, Glyph]) => (
-				<IconButton
-					key={mode}
-					aria-label={label}
-					tooltip={label}
-					isDisabled={
-						movable === 0 || (mode.endsWith("distribute") && movable < 3)
-					}
-					className="pointer-coarse:size-7"
-					onPress={() => ins.controller.alignSelection(mode)}
-				>
-					<Glyph />
-				</IconButton>
-			))}
+			{ALIGN.map(([mode, label, Glyph]) => {
+				const key = COMMAND_BY_ID.get(`align.${mode}`)?.keys?.[0];
+				return (
+					<IconButton
+						key={mode}
+						aria-label={label}
+						tooltip={`${label}${key ? `  ${formatShortcut(key)}` : ""}`}
+						isDisabled={
+							movable === 0 || (mode.endsWith("distribute") && movable < 3)
+						}
+						className="pointer-coarse:size-7"
+						onPress={() => ins.controller.alignSelection(mode)}
+					>
+						<Glyph />
+					</IconButton>
+				);
+			})}
 		</div>
 	);
 }

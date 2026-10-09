@@ -1,6 +1,6 @@
 import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 /** The left panel's sections, in the order they stack. */
 export type LeftSection = "templates" | "sides" | "variants" | "layers";
@@ -14,41 +14,48 @@ const SECTIONS: readonly LeftSection[] = [
 	"layers",
 ];
 
-function readCollapsed(): Set<LeftSection> {
+/** What the person chose for each section they have toggled: true when
+ *  collapsed. Older storage kept a list of the collapsed sections. */
+type Choices = Partial<Record<LeftSection, boolean>>;
+
+function readChoices(): Choices {
 	try {
 		const raw: unknown = JSON.parse(
-			localStorage.getItem(COLLAPSED_KEY) ?? "[]",
+			localStorage.getItem(COLLAPSED_KEY) ?? "{}",
 		);
-		if (!Array.isArray(raw)) return new Set();
-		return new Set(SECTIONS.filter((s) => raw.includes(s)));
+		const out: Choices = {};
+		if (Array.isArray(raw)) {
+			for (const s of SECTIONS) if (raw.includes(s)) out[s] = true;
+		} else if (raw && typeof raw === "object") {
+			for (const s of SECTIONS) {
+				const v = (raw as Record<string, unknown>)[s];
+				if (typeof v === "boolean") out[s] = v;
+			}
+		}
+		return out;
 	} catch {
-		return new Set();
+		return {};
 	}
 }
 
 /**
- * Which left panel sections are collapsed, remembered in localStorage.
- * Every section starts expanded when nothing is stored or storage is off.
+ * Which left panel sections are collapsed. A section the person has not
+ * toggled is collapsed when `single` says it holds one entry; once toggled,
+ * their choice is remembered in localStorage.
  */
-export function useCollapsedSections() {
-	const [collapsed, setCollapsed] = useState(readCollapsed);
-	const toggle = useCallback((id: LeftSection) => {
-		setCollapsed((prev) => {
-			const next = new Set(prev);
-			if (next.has(id)) next.delete(id);
-			else next.add(id);
-			try {
-				localStorage.setItem(
-					COLLAPSED_KEY,
-					JSON.stringify(SECTIONS.filter((s) => next.has(s))),
-				);
-			} catch {
-				// Storage is off: the section still toggles for this session.
-			}
-			return next;
-		});
-	}, []);
-	return { collapsed, toggle };
+export function useCollapsedSections(single: (id: LeftSection) => boolean) {
+	const [choices, setChoices] = useState(readChoices);
+	const isCollapsed = (id: LeftSection) => choices[id] ?? single(id);
+	const toggle = (id: LeftSection) => {
+		const next = { ...choices, [id]: !isCollapsed(id) };
+		setChoices(next);
+		try {
+			localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+		} catch {
+			// Storage is off: the section still toggles for this session.
+		}
+	};
+	return { isCollapsed, toggle };
 }
 
 /**

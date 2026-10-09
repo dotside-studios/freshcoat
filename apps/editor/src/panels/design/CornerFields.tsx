@@ -1,14 +1,18 @@
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import RadiusIcon from "~icons/mingcute/border-radius-line";
 import SplitIcon from "~icons/mingcute/fullscreen-line";
-import { Pair, sectionActions } from "./controls";
+import { Pair, Row } from "./controls";
 import { commonValue, type Inspect, propsOf } from "./field-helpers";
 
 type Radius = number | [number, number, number, number];
 
 const CORNERS = ["TL", "TR", "BR", "BL"] as const;
+
+const CORNERED = new Set(["rect", "frame", "image"]);
+
+export const takesCorners = (ins: Inspect) =>
+	ins.layers.every((l) => CORNERED.has(l.type));
 
 const radiusOf = (el: Inspect["layers"][number]) =>
 	(propsOf(el).cornerRadius as Radius | undefined) ?? 0;
@@ -19,7 +23,9 @@ function uniform(r: Radius): number | null {
 	return r.every((v) => v === r[0]) ? r[0] : null;
 }
 
-export function CornersSection({ ins }: { ins: Inspect }) {
+/** Corner radius, smoothing and independent corners, shown in the Layer
+ *  section for rectangles, frames and images. */
+export function CornerFields({ ins }: { ins: Inspect }) {
 	const rectOnly = ins.layers.every((l) => l.type === "rect");
 	const splittable = ins.layers.every(
 		(l) => l.type === "rect" || l.type === "frame",
@@ -51,11 +57,8 @@ export function CornersSection({ ins }: { ins: Inspect }) {
 		});
 
 	return (
-		<PanelSection
-			title="Corners"
-			actions={sectionActions(["cornerRadius", "cornerSmoothing"])}
-		>
-			<div className="flex min-w-0 items-center gap-1.5">
+		<>
+			<Row label="Corners" keys={["cornerRadius", "cornerSmoothing"]}>
 				<NumberField
 					label={<RadiusIcon />}
 					aria-label="Corner radius"
@@ -91,7 +94,7 @@ export function CornersSection({ ins }: { ins: Inspect }) {
 						<SplitIcon />
 					</ToggleButton>
 				)}
-			</div>
+			</Row>
 			{split && (
 				<Pair cols={4}>
 					{CORNERS.map((name, i) => (
@@ -115,6 +118,6 @@ export function CornersSection({ ins }: { ins: Inspect }) {
 					))}
 				</Pair>
 			)}
-		</PanelSection>
+		</>
 	);
 }

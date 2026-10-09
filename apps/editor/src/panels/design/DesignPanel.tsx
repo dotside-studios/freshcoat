@@ -12,7 +12,6 @@ import { AlignSection } from "./AlignSection";
 import { BarcodeSection } from "./BarcodeSection";
 import { BooleanSection } from "./BooleanSection";
 import { ConstraintsSection, takesConstraints } from "./ConstraintsSection";
-import { CornersSection } from "./CornersSection";
 import { type Overrides, OverridesContext } from "./controls";
 import { EffectsSection } from "./EffectsSection";
 import { FillSection } from "./FillSection";
@@ -26,6 +25,10 @@ import {
 } from "./field-helpers";
 import { hasFills } from "./fills";
 import { ImageSection } from "./ImageSection";
+import {
+	InspectorCollapsedProvider,
+	useInspectorCollapsed,
+} from "./InspectorSection";
 import { LayerSection } from "./LayerSection";
 import { MaskSection } from "./MaskSection";
 import { QrSection } from "./QrSection";
@@ -36,7 +39,6 @@ import { VectorSection } from "./VectorSection";
 import { VisibilitySection } from "./VisibilitySection";
 
 const STROKED = new Set(["rect", "vector", "frame", "image"]);
-const CORNERED = new Set(["rect", "frame", "image"]);
 
 /** Keeps the previous array while its entries are the same objects, so the
  *  sections see a stable list across unrelated document changes. */
@@ -127,14 +129,17 @@ export function DesignPanel() {
 
 	const body = useMemo(() => (ins ? sections(ins) : null), [ins]);
 	const overrides = useOverrides(template, keys);
+	const collapsed = useInspectorCollapsed();
 
 	if (!template) return null;
 	if (!ins)
 		return <p className="p-3 text-fc-muted text-fc-sm">Nothing selected</p>;
 	return (
-		<OverridesContext.Provider value={overrides}>
-			{body}
-		</OverridesContext.Provider>
+		<InspectorCollapsedProvider value={collapsed}>
+			<OverridesContext.Provider value={overrides}>
+				{body}
+			</OverridesContext.Provider>
+		</InspectorCollapsedProvider>
 	);
 }
 
@@ -249,7 +254,6 @@ function sections(ins: Inspect) {
 				<BooleanSection ins={ins} />
 			)}
 			<LayerSection ins={ins} />
-			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			{every((t) => t === "text") && <TextSection ins={ins} />}
 			{every((t) => t === "image") && <ImageSection ins={ins} />}
 			{every((t) => t === "qr_code") && <QrSection ins={ins} />}
@@ -259,8 +263,8 @@ function sections(ins: Inspect) {
 			{every((t) => t === "mask") && <MaskSection ins={ins} />}
 			{layers.every(hasFills) && <FillSection ins={ins} />}
 			{every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
-			{every((t) => CORNERED.has(t)) && <CornersSection ins={ins} />}
 			<EffectsSection ins={ins} />
+			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			<AdjustSection ins={ins} />
 			<VisibilitySection ins={ins} />
 		</div>

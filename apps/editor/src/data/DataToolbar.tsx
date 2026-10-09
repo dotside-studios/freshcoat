@@ -379,7 +379,7 @@ export function DataToolbar({
 						<MenuTrigger>
 							<ToolButton
 								icon={<ExportIcon />}
-								label="Download"
+								label="Download data"
 								testId="download-menu"
 								menu
 							/>
@@ -446,7 +446,7 @@ export function DataToolbar({
 							</MenuItem>
 							<SubmenuTrigger>
 								<MenuItem id="download" icon={<ExportIcon />}>
-									Download
+									Download data
 								</MenuItem>
 								<Popover placement="end top">
 									<ExportMenu actions={actions} />
