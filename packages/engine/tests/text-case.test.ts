@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { applyCase } from "../src/text-case";
+import { applyCase, applySpanCase } from "../src/text-case";
 
 describe("applyCase", () => {
 	test("title-cases non-ASCII words once per word", () => {
@@ -25,5 +25,21 @@ describe("applyCase", () => {
 	test("other modes leave the text alone", () => {
 		expect(applyCase("élan", "original")).toBe("élan");
 		expect(applyCase("élan", undefined)).toBe("élan");
+	});
+});
+
+describe("applySpanCase", () => {
+	test("keeps one capital for a word split across spans", () => {
+		const spans = [{ text: "hel" }, { text: "lo wor" }, { text: "ld" }];
+		expect(applySpanCase(spans, "title").map((s) => s.text)).toEqual([
+			"Hel",
+			"lo Wor",
+			"ld",
+		]);
+	});
+
+	test("returns the spans as they are without a case", () => {
+		const spans = [{ text: "abc" }];
+		expect(applySpanCase(spans, "original")).toBe(spans);
 	});
 });

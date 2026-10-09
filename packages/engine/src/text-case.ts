@@ -52,3 +52,18 @@ export function applyCase(
 	}
 	return out;
 }
+
+/** Applies a text case across spans, so a word split between two spans keeps
+ *  one capital. */
+export function applySpanCase<T extends { text: string }>(
+	spans: T[],
+	mode: unknown,
+): T[] {
+	if (!isTextCase(mode)) return spans;
+	let prev = "";
+	return spans.map((s) => {
+		const text = applyCase(s.text, mode, prev);
+		prev = lastChar(s.text) || prev;
+		return { ...s, text };
+	});
+}

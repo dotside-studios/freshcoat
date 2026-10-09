@@ -185,6 +185,12 @@ export {
 	type SurfaceCanvas,
 } from "./renderer";
 export { squircleSvg } from "./squircle";
+export {
+	type ApplyCaseOptions,
+	applyCase,
+	applySpanCase,
+	type TextCase,
+} from "./text-case";
 export type { TextEngineCacheStats } from "./text-cache";
 export {
 	type FontWeightName,

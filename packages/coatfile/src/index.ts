@@ -160,7 +160,7 @@ export {
 	type ApplyCaseOptions,
 	applyCase,
 	type TextCase,
-} from "./text-case";
+} from "@freshcoat-js/engine";
 export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,

@@ -1,5 +1,6 @@
 import {
 	type Adjust,
+	applySpanCase,
 	type BitmapNode,
 	buildAdjust,
 	type ChildLayout,
@@ -44,7 +45,6 @@ import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
-import { applyCase, isTextCase, lastChar } from "./text-case";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -498,7 +498,7 @@ function compileText(
 	// Normalize: `value` is sugar for a single span. Figma "Case" applies to the
 	// already-substituted text (dynamic {{values}} are cased). A single span with
 	// no per-span override lowers as single-style text; anything richer as spans.
-	const spans = applyTextCase(normalizeTextSpans(props), props.case);
+	const spans = applySpanCase(normalizeTextSpans(props), props.case);
 	const single = spans.length === 1 && !hasOverrides(spans[0]);
 
 	const node: TextNode = {
@@ -1207,17 +1207,6 @@ function normalizeTextSpans(props: Record<string, unknown>): TextSpanInput[] {
 	const spans = props.spans as TextSpanInput[] | undefined;
 	if (spans && spans.length > 0) return spans;
 	return [{ text: String(props.value ?? "") }];
-}
-
-// Figma "Case": upper/lower/title on the resolved text.
-function applyTextCase(spans: TextSpanInput[], mode: unknown): TextSpanInput[] {
-	if (!isTextCase(mode)) return spans;
-	let prev = "";
-	return spans.map((s) => {
-		const text = applyCase(s.text, mode, prev);
-		prev = lastChar(s.text) || prev;
-		return { ...s, text };
-	});
 }
 
 function hasOverrides(span: TextSpanInput): boolean {
