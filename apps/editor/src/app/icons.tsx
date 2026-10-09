@@ -9,6 +9,7 @@ import MoveIcon from "~icons/mingcute/cursor-2-line";
 import FrameIcon from "~icons/mingcute/frame-line";
 import HandIcon from "~icons/mingcute/hand-line";
 import PenIcon from "~icons/mingcute/pen-line";
+import PlaceholderIcon from "~icons/mingcute/photo-album-line";
 import ImageIcon from "~icons/mingcute/pic-line";
 import QrIcon from "~icons/mingcute/qrcode-line";
 import EllipseIcon from "~icons/mingcute/round-line";
@@ -28,6 +29,7 @@ export const TOOL_ICONS: Record<Tool, Icon> = {
 	text: TextIcon,
 	pen: PenIcon,
 	image: ImageIcon,
+	placeholder: PlaceholderIcon,
 	qr: QrIcon,
 	barcode: BarcodeIcon,
 };
