@@ -258,7 +258,7 @@ async function cached(
 	const pending = load();
 	cache.set(key, pending);
 	const bytes = await pending;
-	if (bytes.length === 0) cache.delete(key);
+	if (bytes.length === 0 && cache.get(key) === pending) cache.delete(key);
 	return bytes;
 }
 

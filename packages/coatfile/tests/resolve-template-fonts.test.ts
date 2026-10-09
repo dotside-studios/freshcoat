@@ -155,6 +155,33 @@ describe("resolveTemplateFonts", () => {
 		expect(third.fonts.get("Inter")).toBe(second.fonts.get("Inter"));
 		expect(urls.length).toBe(fetched);
 	});
+
+	test("an empty result does not delete a newer entry for the same key", async () => {
+		const down = fakeFetch(() => ({ ok: false }));
+		const { fetch, urls } = fakeFetch((url) =>
+			url.startsWith("https://fonts.googleapis.com/")
+				? css("https://f/inter.ttf")
+				: { ok: true, body: [5] },
+		);
+		const stale = Promise.reject(new Error("stale"));
+		stale.catch(() => {});
+		const cache = new Map<string, Promise<Uint8Array[]>>();
+		const t = template([text("Inter")]);
+		cache.set("g:Inter:400", stale);
+
+		const [first, second] = await Promise.all([
+			resolveTemplateFonts(t, { fetch: down.fetch, cache }),
+			resolveTemplateFonts(t, { fetch, cache }),
+		]);
+		expect(first.missing).toEqual(["Inter"]);
+		expect(second.guessed).toEqual(["Inter"]);
+		expect(cache.size).toBe(1);
+
+		const fetched = urls.length;
+		const third = await resolveTemplateFonts(t, { fetch, cache });
+		expect(third.fonts.get("Inter")).toBe(second.fonts.get("Inter"));
+		expect(urls.length).toBe(fetched);
+	});
 });
 
 describe("weightsByFamily", () => {
