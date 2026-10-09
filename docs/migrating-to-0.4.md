@@ -18,6 +18,8 @@ depends on the `canvaskit-wasm` version its conformance goldens use.
 | `createParagraphEngine`, `deriveFontMetrics`, `memoizeTextEngine`, `createPaintCache` passed in a runtime | owned by the renderer; `renderer.prepare` and `renderer.compile` use them |
 | `env.loadImageBytes` | `load` on the renderer, `images` per render |
 | `setBarcodeEncoder(bwipBarcodeEncoder)` before `render` | not needed with `renderTemplate`, which loads the encoder when a template draws a barcode |
+| `setBarcodeEncoder(bwipBarcodeEncoder)` before `compile` | `compile(template, values, { ..., barcodeEncoder: bwipBarcodeEncoder })` |
+| `getBarcodeEncoder()` | keep the encoder you pass, or `await loadBarcodeEncoder()` from `@freshcoat-js/coatfile/render` |
 | `"bytes" in result`, `as EncodedPaintedFrame[]` | not needed: the result's type follows `output` |
 | `EncodedPaintedFrame`, `KeptPaintedFrame`, `RenderRuntime`, `ExportOptions` | `TemplateFrame<Output>`, `RenderTemplateOptions`, `RenderCompiledOptions` |
 

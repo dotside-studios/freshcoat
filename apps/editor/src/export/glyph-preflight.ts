@@ -2,6 +2,7 @@ import { compile, type Template, variantSize } from "@freshcoat-js/coatfile";
 import { findMissingGlyphs } from "@freshcoat-js/coatfile/render";
 import type { Renderer } from "@freshcoat-js/engine";
 import type { ExportItem } from "@freshcoat-js/workspace";
+import { barcodeEncoder } from "~/render/barcode";
 
 export type GlyphCheckItem = Pick<
 	ExportItem,
@@ -26,9 +27,11 @@ export function checkGlyphs(
 		item.variantId && template.variants?.some((v) => v.id === item.variantId)
 			? item.variantId
 			: undefined;
+	const encoder = barcodeEncoder();
 	const compiled = compile(template, item.values, {
 		...variantSize(template, variantId),
 		...(variantId ? { variantId } : {}),
+		...(encoder ? { barcodeEncoder: encoder } : {}),
 		frameNames: [item.side],
 	});
 	return findMissingGlyphs(renderer, compiled, {

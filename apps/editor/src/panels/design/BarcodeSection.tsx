@@ -1,10 +1,10 @@
 import {
 	type BarcodeElement,
+	type BarcodeEncoder,
 	type BarcodeProperties,
 	type BearerBars,
 	defaultQuietZone,
 	errorCorrectionRange,
-	getBarcodeEncoder,
 	isLinearSymbology,
 	SYMBOLOGIES,
 	type Symbology,
@@ -20,7 +20,7 @@ import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
 import { Header, ListBoxSection } from "react-aria-components";
 import { barcodeBoxFor } from "~/doc/factories";
-import { useBarcodeEncoder } from "~/render/barcode";
+import { barcodeEncoder, useBarcodeEncoder } from "~/render/barcode";
 import { useEditor } from "~/state/hooks";
 import { AddButton, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
@@ -50,8 +50,8 @@ export function barcodeMessages(
 	template: Template,
 	values: Record<string, unknown>,
 	layers: readonly BarcodeElement[],
+	encoder: BarcodeEncoder | null,
 ): string[] {
-	const encoder = getBarcodeEncoder();
 	if (!encoder) return [];
 	const ctx: Record<string, unknown> = {};
 	for (const [k, def] of Object.entries(template.fields.properties))
@@ -83,7 +83,9 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 	const values = useEditor((s) => s.values);
 	const messages = useMemo(
 		() =>
-			encoder === "ready" ? barcodeMessages(ins.template, values, codes) : [],
+			encoder === "ready"
+				? barcodeMessages(ins.template, values, codes, barcodeEncoder())
+				: [],
 		[encoder, ins.template, values, codes],
 	);
 

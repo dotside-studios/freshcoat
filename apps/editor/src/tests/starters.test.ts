@@ -5,7 +5,6 @@ import {
 	checkVariants,
 	compile,
 	isElementVisible,
-	setBarcodeEncoder,
 	validate,
 	variantSize,
 } from "@freshcoat-js/coatfile";
@@ -27,7 +26,6 @@ let fonts: Map<string, Uint8Array[]>;
 let renderer: Renderer;
 
 beforeAll(async () => {
-	setBarcodeEncoder(bwipBarcodeEncoder);
 	ck = await loadCanvasKit();
 	const src = VEND_SANS.kind === "local" ? VEND_SANS.files[0].src : "";
 	const bytes = new Uint8Array(
@@ -89,6 +87,7 @@ describe("starters", () => {
 				const out = compile(t, sampleValues(t), {
 					...size,
 					variantId,
+					barcodeEncoder: bwipBarcodeEncoder,
 				});
 				expect(out.frames.map((f) => f.name)).toEqual(
 					t.template_data.map((f) => f.name),
@@ -248,12 +247,14 @@ describe("the Event badge", () => {
 			width: t.width,
 			height: t.height,
 			variantId: "staff",
+			barcodeEncoder: bwipBarcodeEncoder,
 		});
 		expect(JSON.stringify(staff.frames[0]?.root)).not.toContain("TKT-2026");
 		const speaker = compile(t, sampleValues(t), {
 			width: t.width,
 			height: t.height,
 			variantId: "speaker",
+			barcodeEncoder: bwipBarcodeEncoder,
 		});
 		expect(JSON.stringify(speaker.frames[0]?.root)).toContain("TKT-2026");
 	});
@@ -320,7 +321,11 @@ type CK = {
 
 /** Left and right ink edges of the light text in rows `top`..`bottom`. */
 async function inkEdges(t: Template, top: number, bottom: number) {
-	const out = compile(t, sampleValues(t), { width: t.width, height: t.height });
+	const out = compile(t, sampleValues(t), {
+		width: t.width,
+		height: t.height,
+		barcodeEncoder: bwipBarcodeEncoder,
+	});
 	const png = await renderer.render(out.frames[0]?.root as Node, {
 		width: t.width,
 		height: t.height,

@@ -1,6 +1,6 @@
-// `@freshcoat-js/coatfile/barcode`: the bwip-js encoder behind `setBarcodeEncoder`.
+// `@freshcoat-js/coatfile/barcode`: the bwip-js encoder `compile` takes as `barcodeEncoder`.
 // A subpath of its own so that bwip-js stays out of every bundle that only
-// imports the main entry; the caller that needs barcodes registers it.
+// imports the main entry; the caller that needs barcodes passes it in.
 import {
 	azteccode,
 	code39,

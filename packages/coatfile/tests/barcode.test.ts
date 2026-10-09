@@ -18,9 +18,9 @@ import {
 	RGBLuminanceSource,
 } from "@zxing/library";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 import { bwipBarcodeEncoder } from "../src/barcode";
-import { getBarcodeEncoder, setBarcodeEncoder } from "../src/barcode-encoder";
+import type { BarcodeEncoder } from "../src/barcode-encoder";
 import { compile } from "../src/compile";
 import { resizeTemplate } from "../src/constraints";
 import { collectFontRequests } from "../src/fonts";
@@ -37,10 +37,6 @@ import { validate } from "../src/validate";
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
-});
-
-afterEach(() => {
-	setBarcodeEncoder(null);
 });
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -84,10 +80,15 @@ function barcodeTemplate(
 }
 
 // The barcode element's group, as compile emits it.
-function compiledGroup(tpl: Template, values: Record<string, unknown>) {
+function compiledGroup(
+	tpl: Template,
+	values: Record<string, unknown>,
+	barcodeEncoder: BarcodeEncoder | null = bwipBarcodeEncoder,
+) {
 	const compiled = compile(tpl, values, {
 		width: tpl.width,
 		height: tpl.height,
+		...(barcodeEncoder ? { barcodeEncoder } : {}),
 	});
 	const [frame] = compiled.frames;
 	const group = frame.root.children[1];
@@ -324,7 +325,6 @@ describe("decode round trip", () => {
 	];
 	for (const { symbology, value, decoded, box, card } of cases) {
 		test(`${symbology}: ${value.length > 30 ? `${value.length} characters` : value}`, async () => {
-			setBarcodeEncoder(bwipBarcodeEncoder);
 			const tpl = barcodeTemplate(
 				{ symbology, showText: false },
 				box,
@@ -338,7 +338,6 @@ describe("decode round trip", () => {
 
 	for (const bearerBars of ["frame", "horizontal"] as const) {
 		test(`itf14 with ${bearerBars} bearer bars`, async () => {
-			setBarcodeEncoder(bwipBarcodeEncoder);
 			const tpl = barcodeTemplate({ symbology: "itf14", bearerBars });
 			const { frame, pixels } = await paint(tpl, { code: "1234567890123" }, 3);
 			expect(frame.warnings).toEqual([]);
@@ -347,7 +346,6 @@ describe("decode round trip", () => {
 	}
 
 	test("a 1D code still scans with its text line under it", async () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate({ symbology: "ean13" });
 		const { pixels } = await paint(tpl, { code: "590123412345" }, 3);
 		expect(scan(pixels, "ean13")).toBe("5901234123457");
@@ -356,7 +354,6 @@ describe("decode round trip", () => {
 
 describe("compile", () => {
 	test("keeps the quiet zone inside the box", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		// LC 0001 is 101 modules; 10 each side makes 121 across 363 px, so 3 px a
 		// module and 30 px of quiet zone.
 		const tpl = barcodeTemplate(
@@ -381,7 +378,6 @@ describe("compile", () => {
 	});
 
 	test("1D bars fill the height the text line leaves", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate(
 			{ symbology: "code128", textSize: 20 },
 			{ x: 0, y: 0, width: 360, height: 120 },
@@ -401,7 +397,6 @@ describe("compile", () => {
 	});
 
 	test("2D codes keep square modules, centred in the box", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		// A 12x12 Data Matrix with its 1-module quiet zone is 14 modules: 10 px
 		// each in a 140 px square, centred in a 300 px wide box.
 		const tpl = barcodeTemplate(
@@ -414,7 +409,6 @@ describe("compile", () => {
 	});
 
 	test("ITF-14's bearer frame sits outside the quiet zone, 5 modules thick", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		// 135 modules, 10 of quiet zone and 5 of bearer each side: 165 modules
 		// across 330 px, so 2 px a module and a 10 px bar.
 		const tpl = barcodeTemplate(
@@ -437,7 +431,6 @@ describe("compile", () => {
 	});
 
 	test("horizontal bearer bars span the quiet zone above and below", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate(
 			{ symbology: "itf14", showText: false, bearerBars: "horizontal" },
 			{ x: 0, y: 0, width: 310, height: 100 },
@@ -456,7 +449,6 @@ describe("compile", () => {
 	});
 
 	test("bearer bars apply to ITF-14 only", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate(
 			{ symbology: "code128", showText: false, bearerBars: "frame" },
 			{ x: 0, y: 0, width: 363, height: 100 },
@@ -467,7 +459,6 @@ describe("compile", () => {
 	});
 
 	test("draws the background behind the quiet zone", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate({
 			symbology: "code128",
 			background: "#fafafa",
@@ -487,7 +478,6 @@ describe("compile", () => {
 	});
 
 	test("the text line uses the template's first font, and requests it", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = {
 			...barcodeTemplate({ symbology: "code128" }),
 			fonts: [
@@ -516,7 +506,11 @@ describe("placeholders", () => {
 
 	test("with no encoder: a labelled hatch, and barcode_unavailable", async () => {
 		const tpl = barcodeTemplate({ symbology: "ean13" });
-		const { frame, group } = compiledGroup(tpl, { code: "590123412345" });
+		const { frame, group } = compiledGroup(
+			tpl,
+			{ code: "590123412345" },
+			null,
+		);
 		expect(findBitmap(group)).toBeUndefined();
 		expect(hasHatch(group)).toBe(true);
 		expect(JSON.stringify(group)).toContain('"text":"EAN-13"');
@@ -536,15 +530,42 @@ describe("placeholders", () => {
 	});
 
 	test("renderTemplate() loads the encoder when the template draws a barcode", async () => {
-		expect(getBarcodeEncoder()).toBeNull();
 		const tpl = barcodeTemplate({ symbology: "ean13" });
 		const { frame } = await paint(tpl, { code: "590123412345" });
 		expect(frame.warnings).toEqual([]);
-		expect(getBarcodeEncoder()).toBe(bwipBarcodeEncoder);
+	});
+
+	test("renderTemplate() draws placeholders when the encoder is null", async () => {
+		const tpl = barcodeTemplate({ symbology: "ean13" });
+		const [frame] = await renderTemplate(
+			await createRenderer({ ck, cache: false }),
+			tpl,
+			{ code: "590123412345" },
+			{ barcodeEncoder: null },
+		);
+		expect(frame?.warnings).toContainEqual({
+			kind: "barcode_unavailable",
+			symbology: "ean13",
+			layer: "code",
+		});
+	});
+
+	test("renderTemplate() encodes with the encoder it is given", async () => {
+		const seen: string[] = [];
+		const spy: BarcodeEncoder = (symbology, value, opts) => {
+			seen.push(value);
+			return bwipBarcodeEncoder(symbology, value, opts);
+		};
+		await renderTemplate(
+			await createRenderer({ ck, cache: false }),
+			barcodeTemplate({ symbology: "ean13" }),
+			{ code: "590123412345" },
+			{ barcodeEncoder: spy },
+		);
+		expect(seen).toEqual(["590123412345"]);
 	});
 
 	test("with an invalid value: a placeholder, and the encoder's message", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate({ symbology: "ean13" });
 		const { frame, group } = compiledGroup(tpl, { code: "5901234123458" });
 		expect(findBitmap(group)).toBeUndefined();
@@ -565,6 +586,7 @@ describe("placeholders", () => {
 			const { group } = compiledGroup(
 				barcodeTemplate({ symbology }, box, { width: 800, height: 400 }),
 				{ code: "x" },
+				null,
 			);
 			const find = (node: Node): Node | undefined =>
 				node.kind === "text"
@@ -588,8 +610,11 @@ describe("placeholders", () => {
 
 	test("with an empty value: the code's shape, faint, and no warning", () => {
 		for (const encoder of [null, bwipBarcodeEncoder]) {
-			setBarcodeEncoder(encoder);
-			const oneD = compiledGroup(barcodeTemplate({ symbology: "code128" }), {});
+			const oneD = compiledGroup(
+				barcodeTemplate({ symbology: "code128" }),
+				{},
+				encoder,
+			);
 			expect(oneD.frame.warnings).toBeUndefined();
 			expect(findBitmap(oneD.group)).toBeUndefined();
 			expect(hasHatch(oneD.group)).toBe(false);
@@ -603,6 +628,7 @@ describe("placeholders", () => {
 					{ x: 0, y: 0, width: 200, height: 100 },
 				),
 				{},
+				encoder,
 			);
 			expect(square.group.children).toEqual([
 				expect.objectContaining({
@@ -655,7 +681,6 @@ describe("crisp at export", () => {
 		{ scale: 1, supersample: 2 },
 	]) {
 		test(`Code 128 at ${scale}x${supersample > 1 ? `, supersampled ${supersample}x` : ""} lands on whole pixels`, async () => {
-			setBarcodeEncoder(bwipBarcodeEncoder);
 			// A fractional position and a width that is no whole number of
 			// modules, so nothing lines up unless the painter snaps it.
 			const tpl = barcodeTemplate(
@@ -714,7 +739,6 @@ describe("constraints", () => {
 
 describe("print-kit", () => {
 	test("a barcode is code, and planning leaves it alone", () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		const tpl = barcodeTemplate({ symbology: "code128" });
 		const { frame } = compiledGroup(tpl, { code: "ABC" });
 		const planned = planScene(frame.root);
@@ -738,7 +762,7 @@ describe("main entry", () => {
 		expect(result.success).toBe(true);
 		const code = await result.outputs[0].text();
 		// Make sure the bundle really holds the kit, so an empty build can't pass.
-		expect(code).toContain("setBarcodeEncoder");
+		expect(code).toContain("isLinearSymbology");
 		expect(code).not.toMatch(/bwipp|bwip-js|BWIPP_VERSION/);
 	}, 30_000);
 });

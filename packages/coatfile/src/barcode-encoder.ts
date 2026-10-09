@@ -19,21 +19,6 @@ export type BarcodeEncoder = (
 	opts: { errorCorrection?: number },
 ) => BarcodeEncodeResult;
 
-// The encoder lives behind a registry so the main entry never imports one. The
-// only implementation, `bwipBarcodeEncoder` from `@freshcoat-js/coatfile/barcode`,
-// weighs ~87 KB gzipped, and most consumers compile templates without barcodes.
-let registered: BarcodeEncoder | null = null;
-
-/** Install the encoder compile uses for `barcode` elements. `null` removes it,
- *  and barcodes then draw as placeholders with a `barcode_unavailable` warning. */
-export function setBarcodeEncoder(encoder: BarcodeEncoder | null): void {
-	registered = encoder;
-}
-
-export function getBarcodeEncoder(): BarcodeEncoder | null {
-	return registered;
-}
-
 export const SYMBOLOGIES: readonly Symbology[] = [
 	"code128",
 	"ean13",

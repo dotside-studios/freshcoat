@@ -21,10 +21,10 @@ import {
 	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
 import {
+	type BarcodeEncoder,
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
 	defaultQuietZone,
-	getBarcodeEncoder,
 	isLinearSymbology,
 	isSquareSymbology,
 	symbologyLabel,
@@ -172,6 +172,7 @@ export function compile(
 			ratio,
 			width,
 			height,
+			opts.barcodeEncoder,
 		);
 	});
 
@@ -198,6 +199,7 @@ function compileFrame(
 	ratio: number,
 	targetWidth: number,
 	targetHeight: number,
+	barcodeEncoder: BarcodeEncoder | undefined,
 ): CompiledFrame {
 	const declaredFontByFamily = new Map(
 		(template.fonts ?? []).map((f) => [f.family, f] as const),
@@ -229,6 +231,7 @@ function compileFrame(
 
 	const scope: CompileScope = {
 		fontFamily: fallbackFamily ?? "sans-serif",
+		barcodeEncoder,
 		warnings: [],
 	};
 	const children: Node[] = [
@@ -251,9 +254,11 @@ function compileFrame(
 }
 
 // What compiling one frame's elements shares: the family a barcode's text falls
-// back to, and the problems found along the way, which the frame carries out.
+// back to, the encoder barcodes draw with, and the problems found along the
+// way, which the frame carries out.
 type CompileScope = {
 	fontFamily: string;
+	barcodeEncoder: BarcodeEncoder | undefined;
 	warnings: PaintWarning[];
 };
 
@@ -879,7 +884,7 @@ function compileBarcode(
 		return group();
 	}
 
-	const encoder = getBarcodeEncoder();
+	const encoder = scope.barcodeEncoder;
 	const result = encoder
 		? encoder(symbology, value, {
 				errorCorrection:

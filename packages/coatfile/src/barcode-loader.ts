@@ -1,25 +1,14 @@
-import {
-	type BarcodeEncoder,
-	getBarcodeEncoder,
-	setBarcodeEncoder,
-} from "./barcode-encoder";
+import type { BarcodeEncoder } from "./barcode-encoder";
 
+// bwip-js weighs ~87 KB gzipped and most templates have no barcode, so its
+// chunk is only fetched when something needs it.
 let loading: Promise<BarcodeEncoder> | null = null;
 
-/**
- * The registered encoder, or `bwipBarcodeEncoder` loaded and registered on
- * first use. Its chunk is only fetched when something needs it. A failed load
- * is retried by the next call.
- */
+/** `bwipBarcodeEncoder`, loaded on first use. A failed load is retried by the
+ *  next call. */
 export function loadBarcodeEncoder(): Promise<BarcodeEncoder> {
-	const have = getBarcodeEncoder();
-	if (have) return Promise.resolve(have);
 	loading ??= import("./barcode").then(
-		({ bwipBarcodeEncoder }) => {
-			setBarcodeEncoder(bwipBarcodeEncoder);
-			loading = null;
-			return bwipBarcodeEncoder;
-		},
+		({ bwipBarcodeEncoder }) => bwipBarcodeEncoder,
 		(err: unknown) => {
 			loading = null;
 			throw err;

@@ -3,16 +3,15 @@ import {
 	type BarcodeEncoder,
 	childElements,
 	type Element,
-	getBarcodeEncoder,
-	setBarcodeEncoder,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import { useEffect, useSyncExternalStore } from "react";
 
 // bwip-js is ~87 KB gzipped and most templates have no barcode, so the encoder
 // is a chunk of its own, fetched the first time something needs it: a template
-// with a barcode opens, or the Barcode tool is chosen. Once it resolves it is
-// registered for every `compile` on the main thread.
+// with a barcode opens, or the Barcode tool is chosen. Once it resolves, every
+// `compile` on the main thread passes it on.
+let encoder: BarcodeEncoder | null = null;
 let loading: Promise<BarcodeEncoder> | null = null;
 let failed = false;
 const listeners = new Set<() => void>();
@@ -23,22 +22,26 @@ function notify() {
 
 export type BarcodeEncoderState = "missing" | "loading" | "ready" | "failed";
 
+/** The encoder, once its chunk has loaded. */
+export function barcodeEncoder(): BarcodeEncoder | null {
+	return encoder;
+}
+
 export function barcodeEncoderState(): BarcodeEncoderState {
-	if (getBarcodeEncoder()) return "ready";
+	if (encoder) return "ready";
 	if (loading) return "loading";
 	return failed ? "failed" : "missing";
 }
 
-/** Registers `bwipBarcodeEncoder`, loading its chunk once. A failed load is
- *  retried by the next call. */
+/** Loads `bwipBarcodeEncoder`'s chunk once. A failed load is retried by the
+ *  next call. */
 export function loadBarcodeEncoder(): Promise<BarcodeEncoder> {
-	const have = getBarcodeEncoder();
-	if (have) return Promise.resolve(have);
+	if (encoder) return Promise.resolve(encoder);
 	if (!loading) {
 		failed = false;
 		loading = import("@freshcoat-js/coatfile/barcode").then(
 			({ bwipBarcodeEncoder }) => {
-				setBarcodeEncoder(bwipBarcodeEncoder);
+				encoder = bwipBarcodeEncoder;
 				loading = null;
 				notify();
 				return bwipBarcodeEncoder;

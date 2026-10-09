@@ -1,10 +1,9 @@
 // Every committed fixture, and a template that reaches every element kind,
 // compiles to exactly the render tree recorded in __snapshots__. Options a
 // template does not use must not move a single number of what it draws.
-import { afterEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import { bwipBarcodeEncoder } from "../src/barcode";
-import { setBarcodeEncoder } from "../src/barcode-encoder";
 import { compile } from "../src/compile";
 import type { CompiledTemplate, Template } from "../src/types";
 
@@ -182,7 +181,7 @@ const kitchenSink: Template = {
 	],
 };
 
-// Barcodes compile through the registered encoder, so their case registers it.
+// Barcodes compile through the encoder compile is given, so their case passes it.
 const barcodes: Template = {
 	format_version: "1.3",
 	id: "barcodes",
@@ -264,15 +263,10 @@ const cases: [string, Template, { variantId?: string }][] = [
 	["barcodes", barcodes, {}],
 ];
 
-afterEach(() => {
-	setBarcodeEncoder(null);
-});
-
 describe("compile output is stable", () => {
 	for (const [name, template, extra] of cases) {
 		for (const scale of [1, 0.5]) {
 			test(`${name} at ${scale}x`, () => {
-				if (template === barcodes) setBarcodeEncoder(bwipBarcodeEncoder);
 				const compiled = compile(
 					template,
 					{},
@@ -280,6 +274,9 @@ describe("compile output is stable", () => {
 						width: template.width * scale,
 						height: template.height * scale,
 						...extra,
+						...(template === barcodes
+							? { barcodeEncoder: bwipBarcodeEncoder }
+							: {}),
 					},
 				);
 				expect(plain(compiled)).toMatchSnapshot();

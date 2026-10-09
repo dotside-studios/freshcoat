@@ -554,24 +554,27 @@ A GS1 number (EAN-13, UPC-A, ITF-14) may leave its check digit off, and gets it
 added, in the bars and the text. One with the wrong check digit is refused with
 the digit it should be.
 
-**The encoder is registered, not imported.** The main entry does not carry
+**The encoder is passed in, not imported.** The main entry does not carry
 bwip-js, which is ~87 KB gzipped. `renderTemplate()` loads it on first use when
-a template draws a barcode. A consumer that compiles directly registers it
-once, before compiling:
+a template draws a barcode, or uses the `barcodeEncoder` it is given (`null`
+draws placeholders). A consumer that compiles directly passes it to `compile()`:
 
 ```ts
-import { setBarcodeEncoder } from "@freshcoat-js/coatfile";
+import { compile } from "@freshcoat-js/coatfile";
 import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 
-setBarcodeEncoder(bwipBarcodeEncoder);
+compile(template, values, { width, height, barcodeEncoder: bwipBarcodeEncoder });
 ```
+
+`loadBarcodeEncoder()` from `@freshcoat-js/coatfile/render` fetches the same
+encoder as its own chunk, once.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:
 
 | Case | Draws | Warning |
 |---|---|---|
-| No encoder registered | a hatched box naming the symbology | `barcode_unavailable` |
+| No encoder given | a hatched box naming the symbology | `barcode_unavailable` |
 | The encoder refuses the value | the same box | `barcode_invalid`, with its `message` |
 | An empty value (an unfilled field) | the code's shape, faint | none |
 

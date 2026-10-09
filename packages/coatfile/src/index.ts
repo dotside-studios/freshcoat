@@ -48,11 +48,9 @@ export {
 	bearerBarsOf,
 	defaultQuietZone,
 	errorCorrectionRange,
-	getBarcodeEncoder,
 	isLinearSymbology,
 	isSquareSymbology,
 	SYMBOLOGIES,
-	setBarcodeEncoder,
 	symbologyLabel,
 } from "./barcode-encoder";
 export { hasBarcode } from "./has-barcode";
