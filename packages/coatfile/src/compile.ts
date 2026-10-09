@@ -44,7 +44,7 @@ import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
-import { childElements } from "./tree";
+import { walkElements } from "./tree";
 import type {
 	Background,
 	BearerBars,
@@ -217,10 +217,9 @@ function compileFrame(
 			const src = String(substitute(el.properties.src, ctx) ?? "");
 			if (src) images.add(src);
 		}
-		for (const child of childElements(el)) collectAssets(child);
 	};
 	collectAssets(frame.background);
-	for (const el of frame.elements) collectAssets(el);
+	walkElements(frame.elements, collectAssets);
 
 	// collectFontRequests in fonts.ts mirrors this resolution — keep in step.
 	const fonts: FontRequest[] = [...usedFamilies].map((family) => {

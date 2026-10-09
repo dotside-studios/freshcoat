@@ -22,6 +22,7 @@ import {
 	resolveInsets,
 	subtleSha256,
 	type VariantElementDelta,
+	walkElements,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -1417,8 +1418,9 @@ function usedIds(t: Template, side: number): Set<string> {
 }
 
 function subtreeIds(el: Element, out: Set<string>): void {
-	out.add(el.id);
-	for (const [, c] of childEntries(el)) subtreeIds(c, out);
+	walkElements([el], (c) => {
+		out.add(c.id);
+	});
 }
 
 /** Maps each id in `from` to the id at the same place in `to`, its copy. */

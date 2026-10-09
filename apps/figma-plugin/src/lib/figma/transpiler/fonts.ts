@@ -1,4 +1,4 @@
-import { childElements, type Element } from "@freshcoat-js/coatfile";
+import { type Element, walkElements } from "@freshcoat-js/coatfile";
 import { SYSTEM_SAFE } from "./font-catalog";
 
 export type GoogleFontDescriptor = {
@@ -38,17 +38,14 @@ function addFont(map: Map<string, Used>, font: FontLike | undefined): void {
 }
 
 function walk(elements: Element[] | undefined, map: Map<string, Used>): void {
-	for (const el of elements ?? []) {
-		if (el.type === "text") {
-			const base = el.properties.font;
-			addFont(map, base);
-			// A span inherits whatever of the base font it does not override.
-			for (const s of el.properties.spans ?? [])
-				if (s.font) addFont(map, { ...base, ...s.font });
-		} else {
-			walk(childElements(el), map);
-		}
-	}
+	walkElements(elements ?? [], (el) => {
+		if (el.type !== "text") return;
+		const base = el.properties.font;
+		addFont(map, base);
+		// A span inherits whatever of the base font it does not override.
+		for (const s of el.properties.spans ?? [])
+			if (s.font) addFont(map, { ...base, ...s.font });
+	});
 }
 
 // Figma's font catalog is Google Fonts, so every non-system family is declared as

@@ -4,9 +4,8 @@ import {
 	fontBytes,
 	resolveFontRequest,
 } from "@freshcoat-js/engine";
-import { childElements } from "./tree";
+import { walkElements } from "./tree";
 import type {
-	Background,
 	BarcodeElement,
 	Element,
 	FontRequest,
@@ -23,18 +22,11 @@ export function defaultFontFamily(template: Template): string | undefined {
 	const declared = template.fonts?.[0]?.family;
 	if (declared) return declared;
 	let found: string | undefined;
-	const walk = (el: Element | Background) => {
-		if (found) return;
-		if (el.type === "text") {
-			found = el.properties.font.family;
-			return;
-		}
-		for (const child of childElements(el)) walk(child);
-	};
-	for (const frame of template.template_data) {
-		walk(frame.background);
-		for (const el of frame.elements) walk(el);
-	}
+	for (const frame of template.template_data)
+		walkElements(frame.elements, (el) => {
+			if (found) return false;
+			if (el.type === "text") found = el.properties.font.family;
+		});
 	return found;
 }
 
@@ -68,18 +60,14 @@ export function collectFontRequests(template: Template): FontRequest[] {
 	const usedFamilies = new Set<string>();
 	for (const t of withVariants(template)) {
 		const fallbackFamily = defaultFontFamily(t);
-		const walk = (el: Element | Background) => {
-			if (el.type === "text") usedFamilies.add(el.properties.font.family);
-			if (el.type === "barcode") {
-				const family = barcodeFontFamily(el, fallbackFamily);
-				if (family) usedFamilies.add(family);
-			}
-			for (const child of childElements(el)) walk(child);
-		};
-		for (const frame of t.template_data) {
-			walk(frame.background);
-			for (const el of frame.elements) walk(el);
-		}
+		for (const frame of t.template_data)
+			walkElements(frame.elements, (el) => {
+				if (el.type === "text") usedFamilies.add(el.properties.font.family);
+				if (el.type === "barcode") {
+					const family = barcodeFontFamily(el, fallbackFamily);
+					if (family) usedFamilies.add(family);
+				}
+			});
 	}
 
 	return [...usedFamilies].map((family) => {
@@ -213,7 +201,7 @@ export function weightsByFamily(template: Template): Map<string, Set<number>> {
 	};
 	for (const t of withVariants(template)) {
 		const fallbackFamily = defaultFontFamily(t);
-		const walk = (el: Element | Background) => {
+		const visit = (el: Element) => {
 			if (el.type === "text") {
 				const { font, spans } = el.properties;
 				add(font.family, font.weight ?? 400);
@@ -229,12 +217,8 @@ export function weightsByFamily(template: Template): Map<string, Set<number>> {
 				const family = barcodeFontFamily(el, fallbackFamily);
 				if (family) add(family, 400);
 			}
-			for (const child of childElements(el)) walk(child);
 		};
-		for (const frame of t.template_data) {
-			walk(frame.background);
-			for (const el of frame.elements) walk(el);
-		}
+		for (const frame of t.template_data) walkElements(frame.elements, visit);
 	}
 	return out;
 }

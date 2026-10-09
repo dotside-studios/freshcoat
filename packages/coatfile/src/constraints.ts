@@ -5,6 +5,7 @@
 // the new size, so compile, the editor and anything else read it unchanged.
 
 import { resizeBackground, resizeFrames, sameSize } from "./relayout";
+import { walkElements } from "./tree";
 import type { Element, Size, Template, Variant } from "./types";
 import { applyVariant, type VariantElementDelta } from "./variants";
 
@@ -113,15 +114,9 @@ function vectorPathChanged(
 // reaches them.
 function elementsById(elements: Element[]): Map<string, Element> {
 	const out = new Map<string, Element>();
-	const walk = (el: Element) => {
+	walkElements(elements, (el) => {
 		if (!out.has(el.id)) out.set(el.id, el);
-		if (el.type === "frame") el.properties.children.forEach(walk);
-		if (el.type === "mask") {
-			walk(el.properties.mask);
-			el.properties.children.forEach(walk);
-		}
-	};
-	elements.forEach(walk);
+	});
 	return out;
 }
 

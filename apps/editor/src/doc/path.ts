@@ -1,4 +1,9 @@
-import type { Background, Element, Template } from "@freshcoat-js/coatfile";
+import {
+	type Background,
+	childElements,
+	type Element,
+	type Template,
+} from "@freshcoat-js/coatfile";
 
 export type LayerPath =
 	| { side: number; path: number[] }
@@ -49,14 +54,8 @@ export function toPath(p: LayerPath | string): LayerPath | null {
 /** The layers directly inside an element, as `[index, element]` pairs: a
  *  mask's source at -1 first, then children. */
 export function childEntries(el: Layer): [number, Element][] {
-	if (el.type === "frame")
-		return el.properties.children.map((c, i) => [i, c] as [number, Element]);
-	if (el.type === "mask")
-		return [
-			[MASK_SOURCE, el.properties.mask],
-			...el.properties.children.map((c, i) => [i, c] as [number, Element]),
-		];
-	return [];
+	const first = el.type === "mask" ? MASK_SOURCE : 0;
+	return childElements(el).map((c, i) => [first + i, c]);
 }
 
 export function isContainer(

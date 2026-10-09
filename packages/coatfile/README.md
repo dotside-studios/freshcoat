@@ -1053,6 +1053,14 @@ stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
 
+## Walking elements
+
+`childElements(el)` is what one element holds: a frame's children, or a mask's
+shape followed by the content it masks. `walkElements(elements, visit)` visits
+every element and everything nested in it, each before what it holds; a visit
+that returns `false` skips that element's contents. `allElements(elements)` is
+the same walk as a list.
+
 ## Spec
 
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is

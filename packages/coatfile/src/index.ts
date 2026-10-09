@@ -120,7 +120,7 @@ export {
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
-export { childElements } from "./tree";
+export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,
 	BakedTextLayout,

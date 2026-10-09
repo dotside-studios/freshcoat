@@ -1,4 +1,5 @@
 import { resizeFrames } from "./relayout";
+import { allElements } from "./tree";
 import type { Element, Size, Template, TemplateFrame, Variant } from "./types";
 
 /** One element delta in a variant override. */
@@ -199,17 +200,7 @@ function isEmptyDelta(d: VariantElementDelta): boolean {
 }
 
 function elementIds(elements: Element[]): Set<string> {
-	const ids = new Set<string>();
-	const walk = (el: Element) => {
-		ids.add(el.id);
-		if (el.type === "frame") el.properties.children.forEach(walk);
-		if (el.type === "mask") {
-			walk(el.properties.mask);
-			el.properties.children.forEach(walk);
-		}
-	};
-	elements.forEach(walk);
-	return ids;
+	return new Set(allElements(elements).map((el) => el.id));
 }
 
 /** Whether a variant's size differs in aspect from the template's. */
