@@ -60,7 +60,6 @@
         "@create-figma-plugin/utilities": "^4.0.3",
         "@freshcoat-js/coatfile": "workspace:*",
         "@freshcoat-js/engine": "workspace:*",
-        "fflate": "^0.8.3",
         "js-sha256": "^0.11.0",
         "preact": "^10.29.2",
       },

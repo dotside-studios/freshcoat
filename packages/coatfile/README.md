@@ -299,6 +299,32 @@ keys without changing anything.
 Hashing defaults to `crypto.subtle`, which exists only in a secure context. A
 Figma plugin's iframe is not one, so the plugin passes its own `sha256`.
 
+## Hand-off links
+
+`./handoff` is the format the Figma plugin uses to open a template in Studio
+without a server: `<address>/edit#coat=<data>`, where `data` is the template
+JSON, raw-deflated at level 9 and base64url-encoded without padding. The
+fragment never reaches a server.
+
+```ts
+import {
+	decodeHandoff,
+	encodeHandoff,
+	HANDOFF_MAX_CHARS,
+	isHandoffOrigin,
+} from "@freshcoat-js/coatfile/handoff";
+
+const data = encodeHandoff(JSON.stringify(template));
+if (data.length <= HANDOFF_MAX_CHARS) open(`${base}/edit#coat=${data}`);
+
+const read = decodeHandoff(data); // { ok: true, json } or { ok: false, reason }
+```
+
+`decodeHandoff` refuses data that inflates past `HANDOFF_MAX_JSON_BYTES`
+(64 MB). `isHandoffOrigin(url)` accepts https anywhere, or http on `localhost`
+and `127.0.0.1`, with no sign-in in the address. Its only dependency is
+`fflate`.
+
 ## Format versions
 
 `FORMAT_VERSION` is what a writer stamps; `formatVersionStatus(v)` says whether
