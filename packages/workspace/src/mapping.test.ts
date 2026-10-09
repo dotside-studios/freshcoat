@@ -6,6 +6,7 @@ import {
 	guessMapping,
 	headersOf,
 	inferType,
+	PROGRESS_ROWS,
 	previewMapping,
 } from "./mapping";
 import { deepFreeze, photoSha } from "./test-fixtures";
@@ -153,6 +154,29 @@ const plan: ImportPlan = {
 };
 
 describe("applyMapping", () => {
+	it("reports progress every PROGRESS_ROWS data rows and at the end", () => {
+		const many = [
+			rows[0] as string[],
+			...Array.from({ length: PROGRESS_ROWS * 2 + 5 }, (_, i) => [
+				`P${i}`,
+				"",
+				"",
+				"",
+				"",
+			]),
+		];
+		const seen: [number, number][] = [];
+		applyMapping(base, many, plan, {
+			onProgress: (done, total) => seen.push([done, total]),
+		});
+		const total = PROGRESS_ROWS * 2 + 5;
+		expect(seen).toEqual([
+			[PROGRESS_ROWS, total],
+			[PROGRESS_ROWS * 2, total],
+			[total, total],
+		]);
+	});
+
 	it("appends coerced records and new columns, reporting issues", () => {
 		const result = applyMapping(base, deepFreeze(rows), plan);
 		expect(result.added).toBe(3);

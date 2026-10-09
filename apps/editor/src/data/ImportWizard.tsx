@@ -4,6 +4,7 @@ import { Dialog, Modal } from "@freshcoat-js/ui/dialog";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
+import { ProgressBar } from "@freshcoat-js/ui/progress";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
@@ -101,6 +102,10 @@ export function ImportWizard({
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [importing, setImporting] = useState(false);
+	const [progress, setProgress] = useState<{
+		done: number;
+		total: number;
+	} | null>(null);
 	const [sheetIndex, setSheetIndex] = useState(0);
 	const [headerRow, setHeaderRow] = useState(0);
 	const [mode, setMode] = useState<"append" | "replace">("append");
@@ -281,9 +286,16 @@ export function ImportWizard({
 	const runImport = async (close: () => void) => {
 		if (!file || !base) return;
 		setImporting(true);
+		setProgress(null);
 		setError(null);
 		try {
-			const result = await importTable(file.table.id, sheetIndex, base, plan);
+			const result = await importTable(
+				file.table.id,
+				sheetIndex,
+				base,
+				plan,
+				(done, total) => setProgress({ done, total }),
+			);
 			if (closed.current) return;
 			commit(result);
 			rememberMapping(result.dataset.id, headers, plan.mapping);
@@ -294,6 +306,7 @@ export function ImportWizard({
 			);
 		} finally {
 			setImporting(false);
+			setProgress(null);
 		}
 	};
 
@@ -346,7 +359,25 @@ export function ImportWizard({
 				bodyClassName="max-h-[min(70vh,640px)] p-0"
 				footer={({ close }) => (
 					<>
-						{file ? (
+						{importing ? (
+							<span
+								className="mr-auto flex min-w-0 flex-1 items-center gap-2 text-fc-muted text-fc-sm tabular-nums"
+								data-testid="import-progress"
+							>
+								<ProgressBar
+									aria-label="Import progress"
+									className="max-w-40 flex-1"
+									value={progress?.done ?? 0}
+									maxValue={Math.max(1, progress?.total ?? 1)}
+									isIndeterminate={!progress}
+								/>
+								<span className="whitespace-nowrap">
+									{progress
+										? `${formatNumber(progress.done)} of ${plural(progress.total, "record")}`
+										: "Importing…"}
+								</span>
+							</span>
+						) : file ? (
 							<span className="mr-auto min-w-0 truncate text-fc-muted text-fc-sm">
 								{file.name} · {plural(recordCount, "record")}
 							</span>

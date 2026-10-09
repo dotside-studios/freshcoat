@@ -14,6 +14,7 @@ import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { type ReactNode, useMemo } from "react";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
+import { JobIndicator } from "~/export/JobIndicator";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
 import { isDirty, present } from "~/state/store";
@@ -308,6 +309,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 			<div className="flex min-w-0 flex-1 items-center justify-end gap-2 pr-1.5 pl-3 text-fc-muted">
 				{name ? (
 					<>
+						<JobIndicator />
 						<span className="hidden truncate text-fc-text lg:inline">
 							{name}
 						</span>

@@ -26,6 +26,7 @@ export type TableImportRequest = TableImportBody & { id: number };
 
 export type TableImportReply =
 	| { id: number; part: { records: DataRecord[]; issues: ImportIssue[] } }
+	| { id: number; progress: { done: number; total: number } }
 	| { id: number; ok: true; value: OpenedTable | ApplyMappingResult | null }
 	| { id: number; ok: false; error: string; code?: string };
 
@@ -60,7 +61,14 @@ async function handle(req: TableImportRequest) {
 		case "apply":
 			return sendInParts(
 				req.id,
-				store.apply(req.table, req.sheet, req.dataset, req.plan),
+				store.apply(
+					req.table,
+					req.sheet,
+					req.dataset,
+					req.plan,
+					(done, total) =>
+						scope.postMessage({ id: req.id, progress: { done, total } }),
+				),
 			);
 		case "close":
 			store.close(req.table);

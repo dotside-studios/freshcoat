@@ -57,6 +57,18 @@ async function addDataset(
 	);
 }
 
+/** Whether leaving the page would warn, with the work counted as saved. */
+async function unloadWarns(page: Page): Promise<boolean> {
+	return page.evaluate(() => {
+		const c = (window as unknown as { __freshcoat: { controller: object } })
+			.__freshcoat.controller;
+		Object.defineProperty(c, "dirty", { configurable: true, get: () => false });
+		const event = new Event("beforeunload", { cancelable: true });
+		window.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+}
+
 async function chooseDataset(page: Page, name: string) {
 	await settingsTab(page, "Content");
 	const editor = page.getByTestId("binding-editor");
@@ -267,6 +279,11 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	await expect(page.getByTestId("export-progress")).toHaveText(/^\d+ \/ 80/, {
 		timeout: 30_000,
 	});
+	// Outside Export, the menu bar shows the job, and leaving the page warns.
+	await page.getByTestId("section-switcher").getByText("Edit").click();
+	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	expect(await unloadWarns(page)).toBe(true);
+	await page.getByTestId("job-indicator").click();
 	await page
 		.getByTestId("export-job")
 		.getByRole("button", { name: "Cancel" })
@@ -276,6 +293,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		"cancelled",
 	);
 	await expect(page.getByTestId("export-summary")).toHaveText(/^Canceled/);
+	expect(await unloadWarns(page)).toBe(false);
 	await page.waitForTimeout(1500);
 	expect(downloads).toBe(0);
 	expect(await statuses(page, "d_many")).toEqual(

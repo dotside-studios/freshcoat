@@ -243,6 +243,7 @@ export type PhotoImportProgress = {
 	label: string;
 	done: number;
 	total: number;
+	cancel(): void;
 };
 
 let progress: PhotoImportProgress | null = null;
@@ -287,12 +288,14 @@ export type CollectedPhotos = {
 /** The images among picked or dropped files, zips opened. */
 export async function photoFiles(
 	files: readonly (File | PickedFile)[],
+	signal?: AbortSignal,
 ): Promise<CollectedPhotos> {
 	const out: AssetFile[] = [];
 	let skipped = 0;
 	const pause = yielder();
 	for (const item of files) {
 		await pause();
+		signal?.throwIfAborted();
 		const { file, path } = picked(item);
 		if (isHiddenPath(path)) {
 			skipped += 1;
@@ -337,9 +340,17 @@ const collator = new Intl.Collator(undefined, {
 async function preparePhotos(
 	source: readonly (File | PickedFile)[],
 ): Promise<{ prepared: PreparedAsset[]; skipped: number } | null> {
-	setProgress({ label: "Reading photos", done: 0, total: source.length });
+	const aborter = new AbortController();
+	const report = (done: number, total: number) =>
+		setProgress({
+			label: "Reading photos",
+			done,
+			total,
+			cancel: () => aborter.abort(),
+		});
+	report(0, source.length);
 	try {
-		const { files, skipped } = await photoFiles(source);
+		const { files, skipped } = await photoFiles(source, aborter.signal);
 		if (files.length === 0) {
 			toast(
 				skipped
@@ -350,12 +361,16 @@ async function preparePhotos(
 			return null;
 		}
 		files.sort((a, b) => collator.compare(a.name, b.name));
-		setProgress({ label: "Reading photos", done: 0, total: files.length });
+		report(0, files.length);
 		const prepared = await prepareAssets(files, {
-			onProgress: (done, total) =>
-				setProgress({ label: "Reading photos", done, total }),
+			onProgress: report,
+			signal: aborter.signal,
 		});
 		return { prepared, skipped };
+	} catch (e) {
+		if (!aborter.signal.aborted) throw e;
+		toast("Photo import canceled");
+		return null;
 	} finally {
 		setProgress(null);
 	}

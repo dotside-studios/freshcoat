@@ -99,6 +99,7 @@ export {
 	jsonSchemaToColumns,
 } from "./json-schema";
 export {
+	type ApplyMappingOptions,
 	applyMapping,
 	columnLetter,
 	detectHeaderRow,

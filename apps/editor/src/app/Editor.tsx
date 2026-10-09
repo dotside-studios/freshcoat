@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import { isTyping } from "~/canvas/Viewport";
+import { exportJobsFor } from "~/export/export-jobs";
 import { useEditor } from "~/state/hooks";
 import { ConfirmDiscard } from "./ConfirmDiscard";
 import { type CommandContext, findCommand } from "./commands";
@@ -136,7 +137,11 @@ function EditorRoot({
 
 	useEffect(() => {
 		const onBeforeUnload = (e: BeforeUnloadEvent) => {
-			if (controller.dirty) e.preventDefault();
+			if (
+				controller.dirty ||
+				exportJobsFor(controller).getSnapshot().runner.state === "running"
+			)
+				e.preventDefault();
 		};
 		window.addEventListener("beforeunload", onBeforeUnload);
 		return () => window.removeEventListener("beforeunload", onBeforeUnload);

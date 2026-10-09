@@ -250,17 +250,25 @@ function matchKey(value: CellValue | undefined): string | null {
 	return typeof value === "string" ? value.trim() : String(value);
 }
 
+export const PROGRESS_ROWS = 1000;
+
+export type ApplyMappingOptions = {
+	onProgress?: (done: number, total: number) => void;
+};
+
 /**
  * The dataset with the rows imported: new columns added, every cell coerced,
  * new records `pending`. `replace` drops the existing records and keeps the
  * columns. With `match`, a row whose cell equals an existing record's value in
  * that column updates it in place; its empty cells leave the record's values
  * alone. An empty cell in a new record takes the column's default. Issue rows are indexes into `rows`.
+ * `onProgress` hears the data rows done every `PROGRESS_ROWS` and at the end.
  */
 export function applyMapping(
 	dataset: Dataset,
 	rows: readonly (readonly string[])[],
 	plan: ImportPlan,
+	{ onProgress }: ApplyMappingOptions = {},
 ): ApplyMappingResult {
 	const headers = headersOf(rows, plan.headerRow);
 	const { columns, targets } = targetsFor(plan, dataset.columns, headers);
@@ -287,7 +295,11 @@ export function applyMapping(
 	const ids = new Set(records.map((r) => r.id));
 	const addedIds = new Set<string>();
 	const updatedIds = new Set<string>();
-	for (const { index: rowIndex, cells } of dataRows(rows, plan)) {
+	const data = dataRows(rows, plan);
+	let done = 0;
+	for (const { index: rowIndex, cells } of data) {
+		if (done > 0 && done % PROGRESS_ROWS === 0) onProgress?.(done, data.length);
+		done += 1;
 		const values: Record<string, CellValue> = {};
 		const failed: CellIssue[] = [];
 		for (const { source, column } of targets) {
@@ -353,6 +365,7 @@ export function applyMapping(
 		}
 	}
 
+	onProgress?.(data.length, data.length);
 	return {
 		dataset: { ...dataset, columns, records },
 		added: addedIds.size,
