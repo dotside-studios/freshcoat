@@ -6,17 +6,34 @@ import {
 	parseImageFocus,
 	type Template,
 } from "@freshcoat-js/coatfile";
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
+import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
+import {
+	Menu,
+	MenuItem,
+	MenuSeparator,
+	SubmenuTrigger,
+} from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
-import { useEffect, useState } from "react";
-import { FileTrigger } from "react-aria-components";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MenuTrigger, Dialog as RACDialog } from "react-aria-components";
+import { useController } from "~/app/context";
+import { CONTENT } from "~/app/copy";
 import { formatBytes } from "~/app/format";
 import { attachImageAsset } from "~/doc/ops";
 import { getElement } from "~/doc/path";
+import { listFields } from "~/doc/values";
+import { createField } from "~/panels/content/field-def";
+import AddIcon from "~icons/mingcute/add-line";
+import BracesIcon from "~icons/mingcute/braces-line";
+import FileIcon from "~icons/mingcute/file-line";
+import LinkIcon from "~icons/mingcute/link-line";
 import UploadIcon from "~icons/mingcute/upload-2-line";
 import { Pair, Row, sectionActions } from "./controls";
 import {
@@ -25,7 +42,13 @@ import {
 	type Inspect,
 	patchLayers,
 } from "./field-helpers";
-import { InsertFieldMenu } from "./InsertFieldMenu";
+import {
+	fieldLabel,
+	InsertFieldMenu,
+	NEW_FIELD,
+	NewFieldPopover,
+	orderFields,
+} from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
 
 type Mask = NonNullable<ImageProperties["mask"]>;
@@ -122,6 +145,13 @@ export function assetSummary(t: Template, src: string): string | null {
 	return `Embedded · ${type ?? "image"} · ${formatBytes(bytes)}`;
 }
 
+export function fieldSummary(t: Template, src: string): string | null {
+	const id = wholeToken(src);
+	if (!id) return null;
+	const field = t.fields.properties[id];
+	return field ? `Field · ${field.title ?? id}` : `Field · ${id} (missing)`;
+}
+
 export function ImageSection({
 	ins,
 	background = false,
@@ -135,14 +165,15 @@ export function ImageSection({
 	const masks = props.map((p) => p.mask);
 	const kind = commonValue(masks.map(maskKind));
 	const mask = commonValue(masks);
-	const summary = src === null ? null : assetSummary(ins.template, src);
+	const summary =
+		src === null
+			? null
+			: (assetSummary(ins.template, src) ?? fieldSummary(ins.template, src));
 
 	const setImage = (field: string, patch: Partial<ImageProperties>) =>
 		ins.setProps(field, () => patch as Record<string, unknown>);
 
-	const replace = async (files: FileList | null) => {
-		const file = files?.[0];
-		if (!file) return;
+	const replace = async (file: File) => {
 		const bytes = new Uint8Array(await file.arrayBuffer());
 		const current = ins.controller.template;
 		if (!current) return;
@@ -190,20 +221,12 @@ export function ImageSection({
 				)}
 			</Row>
 			<Row label="">
-				<FileTrigger
-					acceptedFileTypes={[
-						"image/png",
-						"image/jpeg",
-						"image/webp",
-						"image/gif",
-					]}
-					onSelect={(files) => void replace(files)}
-				>
-					<Button size="md" className="flex-1">
-						<UploadIcon />
-						Replace…
-					</Button>
-				</FileTrigger>
+				<ReplaceMenu
+					template={ins.template}
+					src={src}
+					onFile={(file) => void replace(file)}
+					onSource={(v) => setImage("src", { src: v })}
+				/>
 			</Row>
 			<Row label="Fit" keys={["fit"]}>
 				<Select
@@ -422,6 +445,150 @@ function MaskParams({
 }
 
 const IMAGE_FORMATS = ["image", "url"] as const;
+const IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/gif";
+
+function ReplaceMenu({
+	template,
+	src,
+	onFile,
+	onSource,
+}: {
+	template: Template;
+	src: string | null;
+	onFile: (file: File) => void;
+	onSource: (src: string) => void;
+}) {
+	const controller = useController();
+	const anchor = useRef<HTMLDivElement>(null);
+	const fileInput = useRef<HTMLInputElement>(null);
+	const [open, setOpen] = useState<"url" | "field" | null>(null);
+	const fields = useMemo(
+		() => orderFields(listFields(template), IMAGE_FORMATS),
+		[template],
+	);
+	const bound = src === null ? undefined : wholeToken(src);
+	const currentUrl = src !== null && !parseAssetUri(src) && !bound ? src : "";
+	const create = (key: string) => {
+		if (!createField(controller, key, "image")) return false;
+		setOpen(null);
+		onSource(`{{${key}}}`);
+		return true;
+	};
+	return (
+		<div ref={anchor} className="flex min-w-0 flex-1">
+			<MenuTrigger>
+				<Button size="md" className="flex-1">
+					<UploadIcon />
+					Replace…
+					<ChevronDownIcon className="ml-auto size-3.5" />
+				</Button>
+				<Popover placement="bottom start">
+					<Menu
+						onAction={(k) => {
+							if (k === "file") fileInput.current?.click();
+							else if (k === "url") setOpen("url");
+						}}
+					>
+						<MenuItem id="file" icon={<FileIcon />}>
+							From file…
+						</MenuItem>
+						<MenuItem id="url" icon={<LinkIcon />}>
+							From URL…
+						</MenuItem>
+						<SubmenuTrigger>
+							<MenuItem id="field" icon={<BracesIcon />}>
+								From variable
+							</MenuItem>
+							<Popover>
+								<Menu
+									onAction={(k) => {
+										if (k === NEW_FIELD) setOpen("field");
+										else onSource(`{{${String(k)}}}`);
+									}}
+								>
+									{fields.map((f) => (
+										<MenuItem key={f.id} id={f.id} textValue={f.id}>
+											{fieldLabel(f)}
+										</MenuItem>
+									))}
+									{fields.length > 0 ? <MenuSeparator /> : null}
+									<MenuItem id={NEW_FIELD} icon={<AddIcon />}>
+										{CONTENT.newField}
+									</MenuItem>
+								</Menu>
+							</Popover>
+						</SubmenuTrigger>
+					</Menu>
+				</Popover>
+			</MenuTrigger>
+			<input
+				ref={fileInput}
+				type="file"
+				accept={IMAGE_TYPES}
+				className="hidden"
+				data-testid="image-replace-file"
+				onChange={(e) => {
+					const file = e.target.files?.[0];
+					e.target.value = "";
+					if (file) onFile(file);
+				}}
+			/>
+			<Popover
+				triggerRef={anchor}
+				isOpen={open === "url"}
+				onOpenChange={(v) => setOpen(v ? "url" : null)}
+				placement="bottom end"
+				className="w-64 p-1.5"
+			>
+				<RACDialog aria-label="Image URL" className="outline-none">
+					<UrlInput
+						initial={currentUrl}
+						onCommit={(v) => {
+							setOpen(null);
+							onSource(v);
+						}}
+						onCancel={() => setOpen(null)}
+					/>
+				</RACDialog>
+			</Popover>
+			<NewFieldPopover
+				template={template}
+				anchor={anchor}
+				isOpen={open === "field"}
+				onOpenChange={(v) => setOpen(v ? "field" : null)}
+				onCreate={create}
+			/>
+		</div>
+	);
+}
+
+function UrlInput({
+	initial,
+	onCommit,
+	onCancel,
+}: {
+	initial: string;
+	onCommit: (url: string) => void;
+	onCancel: () => void;
+}) {
+	const [url, setUrl] = useState(initial);
+	return (
+		<TextField
+			aria-label="Image URL"
+			placeholder="https://…"
+			autoFocus
+			value={url}
+			onChange={setUrl}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					const v = url.trim();
+					if (v) onCommit(v);
+				} else if (e.key === "Escape") onCancel();
+			}}
+		/>
+	);
+}
 
 function SrcField({
 	template,

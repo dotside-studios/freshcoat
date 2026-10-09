@@ -123,3 +123,56 @@ describe("Insert field", () => {
 		expect(props(c).value).toBe("{{code}}");
 	});
 });
+
+describe("Replace image", () => {
+	const ASSET = `asset:sha256-${"a".repeat(64)}`;
+
+	it("binds an embedded image to a field", async () => {
+		const user = fastUser();
+		const c = setup(withLayer("image", { src: ASSET }));
+		await user.click(screen.getByRole("button", { name: /Replace/ }));
+		const menu = await screen.findByRole("menu");
+		await user.click(
+			within(menu).getByRole("menuitem", { name: "From variable" }),
+		);
+		await user.click(await screen.findByRole("menuitem", { name: "photo" }));
+		expect(props(c).src).toBe("{{photo}}");
+		expect(screen.getByTestId("image-asset-summary").textContent).toBe(
+			"Field · photo",
+		);
+	});
+
+	it("creates an image field from the menu", async () => {
+		const user = fastUser();
+		const c = setup(withLayer("image", { src: ASSET }));
+		await user.click(screen.getByRole("button", { name: /Replace/ }));
+		const menu = await screen.findByRole("menu");
+		await user.click(
+			within(menu).getByRole("menuitem", { name: "From variable" }),
+		);
+		await user.click(
+			await screen.findByRole("menuitem", { name: CONTENT.newField }),
+		);
+		await user.type(
+			await screen.findByRole("textbox", { name: CONTENT.newKey }),
+			"hero{Enter}",
+		);
+		expect((c.template as Template).fields.properties.hero?.format).toBe(
+			"image",
+		);
+		expect(props(c).src).toBe("{{hero}}");
+	});
+
+	it("sets a URL", async () => {
+		const user = fastUser();
+		const c = setup(withLayer("image", { src: ASSET }));
+		await user.click(screen.getByRole("button", { name: /Replace/ }));
+		const menu = await screen.findByRole("menu");
+		await user.click(within(menu).getByRole("menuitem", { name: "From URL…" }));
+		await user.type(
+			await screen.findByRole("textbox", { name: "Image URL" }),
+			"https://example.com/b.png{Enter}",
+		);
+		expect(props(c).src).toBe("https://example.com/b.png");
+	});
+});

@@ -3,7 +3,7 @@ import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
-import { useMemo, useRef, useState } from "react";
+import { type RefObject, useMemo, useRef, useState } from "react";
 import { MenuTrigger, Dialog as RACDialog } from "react-aria-components";
 import { useController } from "~/app/context";
 import { CONTENT } from "~/app/copy";
@@ -48,7 +48,7 @@ export function spliceToken(
 	});
 }
 
-const NEW_FIELD = "\0new";
+export const NEW_FIELD = "\0new";
 
 export function InsertFieldMenu({
 	template,
@@ -109,21 +109,45 @@ export function InsertFieldMenu({
 					</Menu>
 				</Popover>
 			</MenuTrigger>
-			<Popover
-				triggerRef={anchor}
+			<NewFieldPopover
+				template={template}
+				anchor={anchor}
 				isOpen={naming}
 				onOpenChange={setNaming}
-				placement="bottom end"
-				className="w-56 p-1.5"
-			>
-				<RACDialog aria-label={CONTENT.newField} className="outline-none">
-					<NewFieldKey
-						taken={(k) => k in template.fields.properties}
-						onCreate={create}
-						onCancel={() => setNaming(false)}
-					/>
-				</RACDialog>
-			</Popover>
+				onCreate={create}
+			/>
 		</span>
+	);
+}
+
+export function NewFieldPopover({
+	template,
+	anchor,
+	isOpen,
+	onOpenChange,
+	onCreate,
+}: {
+	template: Template;
+	anchor: RefObject<Element | null>;
+	isOpen: boolean;
+	onOpenChange: (open: boolean) => void;
+	onCreate: (key: string) => boolean;
+}) {
+	return (
+		<Popover
+			triggerRef={anchor}
+			isOpen={isOpen}
+			onOpenChange={onOpenChange}
+			placement="bottom end"
+			className="w-56 p-1.5"
+		>
+			<RACDialog aria-label={CONTENT.newField} className="outline-none">
+				<NewFieldKey
+					taken={(k) => k in template.fields.properties}
+					onCreate={onCreate}
+					onCancel={() => onOpenChange(false)}
+				/>
+			</RACDialog>
+		</Popover>
 	);
 }
