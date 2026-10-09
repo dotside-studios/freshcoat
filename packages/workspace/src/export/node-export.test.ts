@@ -1,9 +1,8 @@
-import { openAsBlob } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
 import {
 	createRenderer,
 	decodePixels,
@@ -14,12 +13,12 @@ import { testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { packWorkspace, unpackWorkspace } from "../archive";
+import { packWorkspace } from "../archive";
+import { fileOutput, readWorkspaceFile } from "../node";
 import { planExport } from "../plan";
 import { makePng, sha256 } from "../test-fixtures";
 import type { ExportPreset, Workspace } from "../types";
 import { exportWorkspace, REPORT_FILE_NAME } from "./index";
-import { fileOutput } from "./node";
 
 const FONT_CSS = "https://fonts.example/css2?family=Inter";
 const FONT_FILE = "https://fonts.example/inter.ttf";
@@ -189,15 +188,7 @@ afterAll(async () => {
 });
 
 async function exportFrom(file: string, job: ExportPreset, out: string) {
-	const unpacked = await unpackWorkspace(await openAsBlob(file));
-	if (!unpacked.ok) throw new Error(unpacked.message);
-	const { workspace } = unpacked;
-	const entry = workspace.templates.find((t) => t.id === job.templateId);
-	if (!entry) throw new Error("no template");
-	const { fonts, missing } = await resolveTemplateFonts(entry.template, {
-		fetch: fontFetch,
-	});
-	expect(missing).toEqual([]);
+	const { workspace } = await readWorkspaceFile(file);
 	const renderer = await createRenderer({
 		ck: await loadCanvasKit("full"),
 		load: fileLoader({ root: dir }),
@@ -205,9 +196,10 @@ async function exportFrom(file: string, job: ExportPreset, out: string) {
 	try {
 		const result = await exportWorkspace(workspace, job, {
 			renderer,
-			fonts,
+			fontOptions: { fetch: fontFetch },
 			output: fileOutput(out),
 		});
+		expect(result.fonts?.missing).toEqual([]);
 		return { workspace, result };
 	} finally {
 		renderer.dispose();

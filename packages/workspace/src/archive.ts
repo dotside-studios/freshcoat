@@ -659,6 +659,27 @@ export async function unpackWorkspace(
 	}
 }
 
+/** Why `readWorkspace` could not read a file, with `unpackWorkspace`'s code. */
+export class WorkspaceReadError extends Error {
+	override readonly name = "WorkspaceReadError";
+	constructor(
+		readonly code: UnpackErrorCode,
+		message: string,
+	) {
+		super(message);
+	}
+}
+
+/** `unpackWorkspace` for a caller that wants an exception: the workspace and
+ *  its warnings, or a `WorkspaceReadError`. */
+export async function readWorkspace(
+	file: Blob | Uint8Array,
+): Promise<{ workspace: Workspace; warnings: string[] }> {
+	const out = await unpackWorkspace(file);
+	if (!out.ok) throw new WorkspaceReadError(out.code, out.message);
+	return { workspace: out.workspace, warnings: out.warnings };
+}
+
 /** A file name safe inside a zip, with any template extension removed. */
 function templateFileStem(fileName: string): string {
 	const stem = templateStem(fileName)

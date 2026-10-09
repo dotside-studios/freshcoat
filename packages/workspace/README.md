@@ -31,11 +31,15 @@ scheduling and file destinations.
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by |
+| `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Reading and writing files on disk differs by platform, so it lives at
+`@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
+`node` subpath.
 
 ## The shape of a workspace
 
@@ -84,7 +88,7 @@ share one size.
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
 import { exportWorkspace } from "@freshcoat-js/workspace/export";
-import { fileOutput } from "@freshcoat-js/workspace/export/node";
+import { fileOutput } from "@freshcoat-js/workspace/node";
 
 // The full build carries the JPEG and WebP encoders.
 const renderer = await createRenderer({ ck: await loadCanvasKit("full") });
@@ -95,9 +99,11 @@ const result = await exportWorkspace(workspace, preset, {
 // result.items says how each item went.
 ```
 
-`exportWorkspace` takes a preset or its id, resolves the template's fonts
-with `resolveTemplateFonts` unless `fonts` is given, and renders one item at
-a time on the calling thread. The renderer is the host's, so its `load`
+`exportWorkspace` takes a preset, its id or a name no other preset has
+(`findPreset` does that lookup). Unless `fonts` is given, it resolves the
+template's fonts with `resolveTemplateFonts`, passing it `fontOptions`, and
+reports the families it found no bytes for as `result.fonts.missing`. It
+renders one item at a time on the calling thread. The renderer is the host's, so its `load`
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
@@ -116,34 +122,29 @@ archive; other image sources, such as relative paths and `file:` URLs, go
 through the renderer's `load`.
 
 ```ts
-import { openAsBlob } from "node:fs";
-import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 import { createRenderer } from "@freshcoat-js/engine";
 import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
-import { unpackWorkspace } from "@freshcoat-js/workspace/archive";
 import { exportWorkspace } from "@freshcoat-js/workspace/export";
-import { fileOutput } from "@freshcoat-js/workspace/export/node";
+import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
 
-const unpacked = await unpackWorkspace(await openAsBlob("club.coatworkspace"));
-if (!unpacked.ok) throw new Error(unpacked.message);
-const { workspace } = unpacked;
-const preset = workspace.presets[0];
-const entry = workspace.templates.find((t) => t.id === preset.templateId);
-
-// `fetch` serves fonts from a cache or a mirror instead of the network.
-const { fonts, missing } = await resolveTemplateFonts(entry.template, { fetch });
-
+const { workspace, warnings } = await readWorkspaceFile("club.coatworkspace");
 const renderer = await createRenderer({
   ck: await loadCanvasKit("full"),
   load: fileLoader({ root: "." }),
 });
-const result = await exportWorkspace(workspace, preset, {
+const result = await exportWorkspace(workspace, "All cards", {
   renderer,
-  fonts,
-  output: fileOutput(preset.format === "pdf" ? "club.pdf" : "club.zip"),
+  output: fileOutput("club.zip"),
 });
 renderer.dispose();
+// result.fonts.missing, result.items
 ```
+
+`readWorkspaceFile` reads the archive without loading it into memory first
+and throws a `WorkspaceReadError`, whose `code` is `unpackWorkspace`'s, when
+it cannot. `readWorkspace` on `archive` does the same for a Blob or bytes.
+Pass `fontOptions: { fetch }` to serve fonts from a cache or a mirror instead
+of the network.
 
 `src/export/node-export.test.ts` runs this path end to end.
 

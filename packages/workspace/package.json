@@ -17,7 +17,7 @@
 		"./pdf": "./src/pdf.ts",
 		"./crc": "./src/crc.ts",
 		"./export": "./src/export/index.ts",
-		"./export/node": "./src/export/node.ts"
+		"./node": "./src/node.ts"
 	},
 	"scripts": {
 		"test": "vitest run",
