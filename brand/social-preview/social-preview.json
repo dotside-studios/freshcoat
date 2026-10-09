@@ -1,0 +1,378 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "freshcoat-social-preview",
+	"name": "Freshcoat social preview",
+	"description": "The GitHub social preview for the Freshcoat repository, rendered with the freshcoat CLI.",
+	"width": 1280,
+	"height": 640,
+	"fonts": [
+		{
+			"kind": "google",
+			"family": "Inter",
+			"url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+		}
+	],
+	"fields": {
+		"type": "object",
+		"properties": {
+			"tagline": {
+				"type": "string",
+				"title": "Tagline",
+				"default": "Create designs that scale."
+			},
+			"summary": {
+				"type": "string",
+				"title": "Summary",
+				"default": "An open-source template format, Skia renderer and batch export for cards, badges, labels and certificates."
+			},
+			"repo": {
+				"type": "string",
+				"title": "Repository",
+				"default": "github.com/dotside-studios/freshcoat"
+			},
+			"url": {
+				"type": "string",
+				"title": "QR link",
+				"default": "https://github.com/dotside-studios/freshcoat"
+			},
+			"name": {
+				"type": "string",
+				"title": "Card name",
+				"default": "Alex Rivera"
+			},
+			"role": {
+				"type": "string",
+				"title": "Card role",
+				"default": "Template designer"
+			}
+		},
+		"required": [
+			"tagline",
+			"summary",
+			"repo",
+			"url",
+			"name",
+			"role"
+		]
+	},
+	"template_data": [
+		{
+			"name": "social-preview",
+			"background": {
+				"id": "bg",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1280,
+					"height": 640
+				},
+				"properties": {
+					"fill": {
+						"kind": "linear",
+						"angle": 160,
+						"stops": [
+							{
+								"offset": 0,
+								"color": "#f8fbfd"
+							},
+							{
+								"offset": 1,
+								"color": "#e6f2f9"
+							}
+						]
+					}
+				}
+			},
+			"elements": [
+				{
+					"id": "card_back",
+					"type": "frame",
+					"pos": {
+						"x": 700,
+						"y": 150
+					},
+					"size": {
+						"width": 400,
+						"height": 252
+					},
+					"rotation": -14,
+					"properties": {
+						"fill": {
+							"kind": "linear",
+							"angle": 135,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#fbbf24"
+								},
+								{
+									"offset": 1,
+									"color": "#fb7185"
+								}
+							]
+						},
+						"cornerRadius": 20,
+						"clipsContent": true,
+						"children": []
+					},
+					"shadow": [
+						{
+							"color": "#0f172a33",
+							"dx": 0,
+							"dy": 18,
+							"blur": 40
+						}
+					]
+				},
+				{
+					"id": "card_mid",
+					"type": "frame",
+					"pos": {
+						"x": 748,
+						"y": 200
+					},
+					"size": {
+						"width": 400,
+						"height": 252
+					},
+					"rotation": -5,
+					"properties": {
+						"fill": {
+							"kind": "linear",
+							"angle": 135,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#34d399"
+								},
+								{
+									"offset": 1,
+									"color": "#0ea5e9"
+								}
+							]
+						},
+						"cornerRadius": 20,
+						"clipsContent": true,
+						"children": []
+					},
+					"shadow": [
+						{
+							"color": "#0f172a33",
+							"dx": 0,
+							"dy": 18,
+							"blur": 40
+						}
+					]
+				},
+				{
+					"id": "card_front",
+					"type": "frame",
+					"pos": {
+						"x": 780,
+						"y": 250
+					},
+					"size": {
+						"width": 400,
+						"height": 252
+					},
+					"rotation": 4,
+					"properties": {
+						"fill": {
+							"kind": "linear",
+							"angle": 135,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#0b1e33"
+								},
+								{
+									"offset": 1,
+									"color": "#123a5c"
+								}
+							]
+						},
+						"cornerRadius": 20,
+						"clipsContent": true,
+						"children": [
+							{
+								"id": "card_mark",
+								"type": "image",
+								"pos": {
+									"x": 28,
+									"y": 26
+								},
+								"size": {
+									"width": 44,
+									"height": 44
+								},
+								"properties": {
+									"src": "../freshcoat-mark.svg",
+									"fit": "contain"
+								}
+							},
+							{
+								"id": "card_name",
+								"type": "text",
+								"pos": {
+									"x": 28,
+									"y": 150
+								},
+								"size": {
+									"width": 240,
+									"height": 40
+								},
+								"properties": {
+									"value": "{{name}}",
+									"font": {
+										"family": "Inter",
+										"size": 28,
+										"weight": 700
+									},
+									"foreground": "#ffffff",
+									"align": "left"
+								}
+							},
+							{
+								"id": "card_role",
+								"type": "text",
+								"pos": {
+									"x": 28,
+									"y": 192
+								},
+								"size": {
+									"width": 240,
+									"height": 30
+								},
+								"properties": {
+									"value": "{{role}}",
+									"font": {
+										"family": "Inter",
+										"size": 18,
+										"weight": 500
+									},
+									"color": "#9fd3ef",
+									"align": "left"
+								}
+							},
+							{
+								"id": "card_qr",
+								"type": "qr_code",
+								"pos": {
+									"x": 284,
+									"y": 136
+								},
+								"size": {
+									"width": 92,
+									"height": 92
+								},
+								"properties": {
+									"value": "{{url}}",
+									"errorCorrection": "M",
+									"foreground": "#ffffff",
+									"background": "#00000000",
+								"margin": 0
+								}
+							}
+						]
+					},
+					"shadow": [
+						{
+							"color": "#0f172a33",
+							"dx": 0,
+							"dy": 18,
+							"blur": 40
+						}
+					]
+				},
+				{
+					"id": "logo",
+					"type": "image",
+					"pos": {
+						"x": 96,
+						"y": 150
+					},
+					"size": {
+						"width": 445,
+						"height": 80
+					},
+					"properties": {
+						"src": "../freshcoat-logo.svg",
+						"fit": "contain"
+					}
+				},
+				{
+					"id": "tagline",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 270
+					},
+					"size": {
+						"width": 600,
+						"height": 64
+					},
+					"properties": {
+						"value": "{{tagline}}",
+						"font": {
+							"family": "Inter",
+							"size": 46,
+							"weight": 700,
+							"letterSpacing": -0.5
+						},
+						"color": "#0b1e33",
+						"align": "left"
+					}
+				},
+				{
+					"id": "summary",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 346
+					},
+					"size": {
+						"width": 560,
+						"height": 110
+					},
+					"properties": {
+						"value": "{{summary}}",
+						"font": {
+							"family": "Inter",
+							"size": 24,
+							"weight": 400,
+							"lineHeight": 1.4
+						},
+						"color": "#3b4a5a",
+						"align": "left"
+					}
+				},
+				{
+					"id": "repo",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 520
+					},
+					"size": {
+						"width": 600,
+						"height": 32
+					},
+					"properties": {
+						"value": "{{repo}}",
+						"font": {
+							"family": "Inter",
+							"size": 20,
+							"weight": 500
+						},
+						"color": "#0b6f9f",
+						"align": "left"
+					}
+				}
+			]
+		}
+	]
+}
