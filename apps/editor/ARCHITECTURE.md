@@ -103,6 +103,11 @@ records as `ws:<sha256>`; thumbnails are made in a worker
 (`thumbnail-worker.ts`) and kept in a bounded LRU, so no grid decodes a whole
 photo.
 
+The section unmounts when another is shown, so how it shows each dataset (the
+search, filters, sort and selection) lives in the store's `dataViews`, by
+dataset id, outside the undo history and the saved workspace. Export reads a
+dataset's selection from there to offer it.
+
 ## Export
 
 ```

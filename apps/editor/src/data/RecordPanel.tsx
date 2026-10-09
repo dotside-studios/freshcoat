@@ -35,6 +35,7 @@ import LeftIcon from "~icons/mingcute/left-line";
 import PhotoIcon from "~icons/mingcute/pic-line";
 import RightIcon from "~icons/mingcute/right-line";
 import { editDataset } from "./actions";
+import { BulkPanel } from "./BulkPanel";
 import { ImagePicker, inputModeFor, STATUSES } from "./cells";
 import { type GridUiStore, useGridUi } from "./grid-state";
 import {
@@ -83,17 +84,20 @@ function useFramingTemplate(
 /**
  * The focused record: a large view of each of its photos, then a form of
  * every field with the editors the grid uses. Arrows step through the
- * records in the order they are shown.
+ * records in the order they are shown. With several records selected, a
+ * form that sets a value in all of them instead.
  */
 export function RecordPanel({
 	dataset,
 	rows,
+	selectedIds,
 	ui,
 	onImportPhotos,
 	onFocusRecord,
 }: {
 	dataset: Dataset;
 	rows: readonly DataRecord[];
+	selectedIds: readonly string[];
 	ui: GridUiStore;
 	onImportPhotos: () => void;
 	/** Moves the focus to another record, as the arrows do. */
@@ -107,6 +111,9 @@ export function RecordPanel({
 	const assets = useMemo(() => assetMap(dataset.assets), [dataset.assets]);
 	const controller = useController();
 	const framing = useFramingTemplate(dataset.id);
+
+	if (selectedIds.length > 1)
+		return <BulkPanel dataset={dataset} ids={selectedIds} />;
 
 	if (!record) {
 		return (

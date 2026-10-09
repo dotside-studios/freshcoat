@@ -9,6 +9,7 @@ import type {
 	Workspace,
 } from "@freshcoat-js/workspace";
 import { templateStem } from "@freshcoat-js/workspace";
+import { type DataViewState, DEFAULT_DATA_VIEW } from "~/data/data-view";
 import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
 import { guidesForSides, type TemplateGuides } from "~/doc/guides";
 import {
@@ -161,6 +162,8 @@ export type EditorState = {
 	 *  record and Export's preview; each shows it when its dataset has it. */
 	recordId: string | null;
 	exportView: ExportView;
+	/** Data's search, filters, sort and selection, by dataset id. */
+	dataViews: Readonly<Record<string, DataViewState>>;
 	/** The gradient fill last opened in the inspector, which the canvas
 	 *  handles edit while its layer is the one selected. */
 	activeFill: { key: string; index: number } | null;
@@ -281,6 +284,7 @@ export type Action =
 	| { type: "setPreviewRecord"; id: string | null }
 	| { type: "setRecord"; id: string | null }
 	| { type: "setExportView"; view: Partial<ExportView> }
+	| { type: "setDataView"; datasetId: string; patch: Partial<DataViewState> }
 	| {
 			type: "previewRecord";
 			id: string;
@@ -313,6 +317,7 @@ export function initialState(
 		previewRecordId: null,
 		recordId: null,
 		exportView: EXPORT_VIEW,
+		dataViews: {},
 		activeFill: null,
 		textEdit: null,
 	};
@@ -823,6 +828,24 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 			return state.recordId === action.id
 				? state
 				: { ...state, recordId: action.id };
+		case "setDataView": {
+			const current = state.dataViews[action.datasetId];
+			const base = current ?? DEFAULT_DATA_VIEW;
+			const patch = action.patch as Record<string, unknown>;
+			if (
+				Object.keys(patch).every(
+					(k) => patch[k] === (base as Record<string, unknown>)[k],
+				)
+			)
+				return state;
+			return {
+				...state,
+				dataViews: {
+					...state.dataViews,
+					[action.datasetId]: { ...base, ...action.patch },
+				},
+			};
+		}
 		case "previewRecord":
 			return withKnownVariant({
 				...state,
