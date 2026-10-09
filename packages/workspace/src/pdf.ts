@@ -15,6 +15,10 @@ type PdfLib = typeof import("pdf-lib");
 type PDFDocument = import("pdf-lib").PDFDocument;
 type PDFPage = import("pdf-lib").PDFPage;
 type PDFRef = import("pdf-lib").PDFRef;
+type PDFEmbeddedPage = import("pdf-lib").PDFEmbeddedPage;
+
+/** An embedded page image, or a vector page drawn as a form. */
+type Embedded = PDFRef | PDFEmbeddedPage;
 
 export type AssemblePdfOptions = {
 	/** pixels per inch: a page is `widthPx / dpi` inches wide */
@@ -56,7 +60,8 @@ export function pageSizePt(
  *  image, so pages of different sizes can share a document. With a sheet
  *  layout, the images are imposed on sheets of paper instead, each drawn at
  *  the card's size, with crop marks at the trim on the pages that aren't
- *  backs. */
+ *  backs. A page given as a one-page PDF is drawn as its vectors, sized as an
+ *  image of `widthPx` by `heightPx` would be. */
 export async function assemblePdf(
 	pages: readonly PdfPage[],
 	options: AssemblePdfOptions,
@@ -75,20 +80,26 @@ export async function assemblePdf(
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);
 	let embedded = 0;
-	const embed = async (page: PdfPage): Promise<PDFRef> => {
+	const embed = async (page: PdfPage): Promise<Embedded> => {
 		const ref =
-			page.format === "jpeg"
-				? (await doc.embedJpg(page.bytes)).ref
-				: (embedRgbPng(lib, doc, page.bytes) ??
-					(await doc.embedPng(page.bytes)).ref);
+			page.format === "pdf"
+				? ((await doc.embedPdf(page.bytes))[0] as PDFEmbeddedPage)
+				: page.format === "jpeg"
+					? (await doc.embedJpg(page.bytes)).ref
+					: (embedRgbPng(lib, doc, page.bytes) ??
+						(await doc.embedPng(page.bytes)).ref);
 		options.onProgress?.(++embedded, pages.length);
 		return ref;
 	};
 	const draw = (
 		out: PDFPage,
-		ref: PDFRef,
+		ref: Embedded,
 		rect: { x: number; y: number; width: number; height: number },
 	) => {
+		if (!(ref instanceof lib.PDFRef)) {
+			out.drawPage(ref, rect);
+			return;
+		}
 		const name = out.node.newXObject("Image", ref);
 		out.pushOperators(
 			...lib.drawImage(name, {

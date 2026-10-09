@@ -11,7 +11,7 @@ import {
 import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
 import { testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
-import { PDFDocument } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { packWorkspace } from "../archive";
 import { fileOutput, folderOutput, readWorkspaceFile } from "../node";
@@ -286,6 +286,57 @@ describe("export from a workspace file in Node", () => {
 		expect(result.items.map((i) => i.ok)).toEqual([true, true]);
 		const pdf = await PDFDocument.load(await readFile(out));
 		expect(pdf.getPageCount()).toBe(2);
+	});
+
+	it("draws vector PDF pages, as pixels where a PDF falls short", async () => {
+		const out = join(dir, "badges-vector.pdf");
+		const vector: ExportPreset = {
+			...preset,
+			format: "pdf",
+			pdfPageImage: "vector",
+		};
+		const { result } = await exportFrom(
+			await packTo("logo.png"),
+			vector,
+			fileOutput(out),
+		);
+		expect(result.items.map((i) => [i.ok, i.vector])).toEqual([
+			[true, "on"],
+			[true, "on"],
+		]);
+		const pdf = await PDFDocument.load(await readFile(out));
+		expect(pdf.getPageCount()).toBe(2);
+		const page = pdf.getPage(0);
+		expect(page.getWidth()).toBeCloseTo((400 / 300) * 72, 3);
+		expect(page.getHeight()).toBeCloseTo((250 / 300) * 72, 3);
+		const xobjects = page.node.Resources()?.lookup(PDFName.of("XObject"));
+		const [form] =
+			xobjects instanceof PDFDict
+				? xobjects.values().map((ref) => pdf.context.lookup(ref))
+				: [];
+		expect(
+			form instanceof PDFRawStream &&
+				form.dict.get(PDFName.of("Subtype"))?.toString(),
+		).toBe("/Form");
+
+		const shadowed = fixture("logo.png");
+		const logoElement = shadowed.templates[0]?.template.template_data[0]
+			?.elements[2] as { shadow?: unknown };
+		logoElement.shadow = { color: "#0008", dx: 0, dy: 2, blur: 4 };
+		const file = join(dir, "shadowed.coatworkspace");
+		await writeFile(file, await (await packWorkspace(shadowed)).bytes());
+		const fallback = await exportFrom(
+			file,
+			vector,
+			fileOutput(join(dir, "shadowed.pdf")),
+		);
+		expect(fallback.result.items.map((i) => [i.ok, i.vector])).toEqual([
+			[true, "fallback"],
+			[true, "fallback"],
+		]);
+		expect(fallback.result.items[0]?.warnings).toContain(
+			"Drawn as pixels: PDF has no vector equivalent for shadow: logo",
+		);
 	});
 
 	it("lists the characters the fonts can't draw when asked", async () => {

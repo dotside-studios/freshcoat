@@ -163,7 +163,7 @@ const PresetSchema = z.object({
 		])
 		.optional(),
 	quality: z.number().min(0).max(100).optional(),
-	pdfPageImage: z.enum(["png", "jpeg"]).optional(),
+	pdfPageImage: z.enum(["png", "jpeg", "vector"]).optional(),
 	destination: z.enum(["download", "zip-file", "folder"]).optional(),
 	scale: z.number().min(1).max(4),
 	dpi: z.number().positive(),

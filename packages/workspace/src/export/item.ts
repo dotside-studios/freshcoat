@@ -14,11 +14,15 @@ import {
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import { describeWarning, renderCompiled } from "@freshcoat-js/coatfile/render";
+import {
+	describeWarning,
+	renderCompiled,
+	renderCompiledPdf,
+} from "@freshcoat-js/coatfile/render";
 import { orientedSize } from "@freshcoat-js/engine/image";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
-import { DEFAULT_QUALITY, exportSize, imageFormat } from "../plan";
+import { DEFAULT_QUALITY, exportSize, imageFormat, vectorPages } from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
 import { createJobCaches } from "./caches";
 import {
@@ -50,12 +54,15 @@ export type RenderRequest = {
 	quality?: number;
 	/** render through for-print's card-printer path */
 	print?: RenderPrint;
+	/** draw a one-page PDF of vectors, `dpi` design units to the inch, and
+	 *  `format` instead when the design uses what a PDF cannot draw */
+	vector?: { dpi: number };
 };
 
 export type RenderOutput = {
 	bytes: Uint8Array;
 	/** what the bytes are; a CanvasKit without an encoder answers in PNG */
-	format: OutputFormat;
+	format: OutputFormat | "pdf";
 	width: number;
 	height: number;
 	/** CRC-32 of `bytes` */
@@ -70,6 +77,9 @@ export type RenderOutput = {
 	gamut?: GamutNote[];
 	/** the render's other warnings, described, each once */
 	warnings?: string[];
+	/** set when the request asked for vectors: "fallback" when the bytes are
+	 *  pixels because the design uses what a PDF cannot draw */
+	vector?: "on" | "fallback";
 };
 
 /** The warnings an item reports but still renders with: all but a refused
@@ -190,6 +200,7 @@ export function itemRequest(
 	if ("error" in size) return size;
 	const format = imageFormat(preset);
 	const print = printRequest(preset.print);
+	const vector = vectorPages(preset) && !print;
 	return {
 		size,
 		request: {
@@ -206,6 +217,13 @@ export function itemRequest(
 				? { quality: preset.quality ?? DEFAULT_QUALITY }
 				: {}),
 			...(print ? { print } : {}),
+			// A PDF page is sized as the design at `dpi`, or as the photo's
+			// pixels when the size follows one.
+			...(vector
+				? {
+						vector: { dpi: size.resize ? preset.dpi / size.scale : preset.dpi },
+					}
+				: {}),
 		},
 	};
 }
@@ -317,6 +335,32 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(req.bleed ? { bleed: true } : {}),
 				frameNames: [req.side],
 			});
+			let drawnAsPixels: string[] = [];
+			if (req.vector) {
+				const [page] = await renderCompiledPdf(renderer, compiled, {
+					frameNames: [req.side],
+					images,
+					dpi: req.vector.dpi,
+				});
+				if (!page) throw new Error("nothing was rendered");
+				for (const w of page.warnings)
+					if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
+				drawnAsPixels = page.warnings
+					.filter((w) => w.kind === "vector_unsupported")
+					.map((w) => `Drawn as pixels: ${describeWarning(w)}`);
+				if (drawnAsPixels.length === 0) {
+					const warnings = noted(page.warnings);
+					return {
+						bytes: page.bytes,
+						crc: crc32(page.bytes),
+						format: "pdf",
+						...exportPixelSize(compiled, req.scale),
+						ms: performance.now() - started,
+						vector: "on",
+						...(warnings.length > 0 ? { warnings } : {}),
+					};
+				}
+			}
 			const painted = await withPrintFallback(req.print, async (print) => {
 				const [result] = await renderCompiled(renderer, compiled, {
 					frameNames: [req.side],
@@ -345,7 +389,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			for (const w of result.warnings)
 				if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
-			const warnings = noted(result.warnings);
+			const warnings = [...drawnAsPixels, ...noted(result.warnings)];
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),
@@ -357,6 +401,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(painted.error ? { printError: painted.error } : {}),
 				...(gamut.length > 0 ? { gamut } : {}),
 				...(warnings.length > 0 ? { warnings } : {}),
+				...(req.vector ? { vector: "fallback" as const } : {}),
 			};
 		},
 		setFonts(next) {
