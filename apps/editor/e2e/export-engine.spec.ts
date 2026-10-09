@@ -65,8 +65,10 @@ test("a 20-record png-zip renders every side through the worker pool", async ({
 	}
 	const report = out.report.trim().split("\r\n");
 	expect(report).toHaveLength(41);
-	expect(report[0]).toBe("file,record,side,status,error,print,gamut,unfilled");
-	expect(report[1]).toBe("LC-0001-0000-front.png,r_0001,front,ok,,off,,");
+	expect(report[0]).toBe(
+		"file,record,side,status,error,print,gamut,unfilled,warnings",
+	);
+	expect(report[1]).toBe("LC-0001-0000-front.png,r_0001,front,ok,,off,,,");
 	expect(out.progressEvents).toBe(40);
 	expect(out.lastProgress).toMatchObject({
 		done: 40,
