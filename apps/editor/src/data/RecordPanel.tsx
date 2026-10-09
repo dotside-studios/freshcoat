@@ -20,6 +20,15 @@ import {
 	type RecordStatus,
 } from "@freshcoat-js/workspace";
 import {
+	assetMap,
+	cellIssue,
+	displayText,
+	editText,
+	NUMERIC_TYPES,
+	setCell,
+	valueFromText,
+} from "@freshcoat-js/workspace/dataset";
+import {
 	type KeyboardEvent,
 	type PointerEvent,
 	type ReactNode,
@@ -45,15 +54,6 @@ import {
 } from "./column-options";
 import { keepFocusInColumn } from "./focus-column";
 import { type GridUiStore, useGridUi } from "./grid-state";
-import {
-	assetMap,
-	cellIssue,
-	displayText,
-	editText,
-	NUMERIC_TYPES,
-	setCell,
-	valueFromText,
-} from "./model";
 import {
 	cellFocus,
 	movedFocus,

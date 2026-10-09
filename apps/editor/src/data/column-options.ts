@@ -5,6 +5,7 @@ import {
 	type Column,
 	type ColumnOptions,
 	DEFAULT_VARIANT,
+	matchVariant,
 	type VariantFallback,
 } from "@freshcoat-js/workspace";
 import { useMemo, useRef } from "react";
@@ -78,11 +79,7 @@ export function choiceOf(
 	value: CellValue | undefined,
 ): Choice | undefined {
 	if (value === null || value === undefined || value === "") return undefined;
-	const wanted = String(value).trim().toLowerCase();
-	return (
-		choices.options.find((o) => o.value.toLowerCase() === wanted) ??
-		choices.options.find((o) => o.label.trim().toLowerCase() === wanted)
-	);
+	return matchVariant(choices.options, String(value), (o) => o.value);
 }
 
 export function columnChoices(

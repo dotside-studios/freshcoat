@@ -29,6 +29,7 @@ export {
 	DEFAULT_VARIANT,
 	imageFields,
 	imagesFor,
+	matchVariant,
 	NO_DATASET,
 	readsDataset,
 	rebindDataset,

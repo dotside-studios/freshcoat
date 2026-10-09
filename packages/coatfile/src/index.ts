@@ -69,6 +69,9 @@ export {
 	NO_BLEED,
 	resolveBleedMm,
 	resolveInsets,
+	type SafeAreaEdge,
+	type SafeAreaIssue,
+	safeAreaIssues,
 	templateBleed,
 	templateSafeArea,
 } from "./bleed";

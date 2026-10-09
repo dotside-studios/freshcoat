@@ -17,18 +17,6 @@ import {
 	variantColumnSource,
 	withVariantSource,
 } from "@freshcoat-js/workspace";
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
-import { ListBox, ListBoxItem } from "react-aria-components";
-import { useController } from "~/app/context";
-import { EMPTY, KEY_RULE, plural } from "~/app/copy";
-import { useEditor } from "~/state/hooks";
-import AddIcon from "~icons/mingcute/add-line";
-import DownIcon from "~icons/mingcute/arrow-down-line";
-import UpIcon from "~icons/mingcute/arrow-up-line";
-import DeleteIcon from "~icons/mingcute/delete-2-line";
-import { editDataset, renameColumnEverywhere } from "./actions";
-import type { Confirm } from "./ConfirmDialog";
-import { useTemplateSlots } from "./column-options";
 import {
 	addColumn,
 	changeColumnType,
@@ -42,9 +30,21 @@ import {
 	newColumn,
 	replaceDataset,
 	TEXTUAL_TYPES,
-	TYPE_LABELS,
 	updateColumn,
-} from "./model";
+} from "@freshcoat-js/workspace/dataset";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { ListBox, ListBoxItem } from "react-aria-components";
+import { useController } from "~/app/context";
+import { EMPTY, KEY_RULE, plural } from "~/app/copy";
+import { useEditor } from "~/state/hooks";
+import AddIcon from "~icons/mingcute/add-line";
+import DownIcon from "~icons/mingcute/arrow-down-line";
+import UpIcon from "~icons/mingcute/arrow-up-line";
+import DeleteIcon from "~icons/mingcute/delete-2-line";
+import { editDataset, renameColumnEverywhere } from "./actions";
+import type { Confirm } from "./ConfirmDialog";
+import { useTemplateSlots } from "./column-options";
+import { TYPE_LABELS } from "./model";
 
 const FREE_TEXT = "free";
 

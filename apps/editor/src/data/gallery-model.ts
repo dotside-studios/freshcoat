@@ -5,16 +5,16 @@ import {
 	isEmptyValue,
 	type RecordStatus,
 } from "@freshcoat-js/workspace";
-import { STATUS_LABEL } from "~/app/copy";
-import type { DataViewState } from "./data-view";
 import {
 	assetMap,
 	displayText,
 	filterRecords,
 	recordIndexMap,
 	recordIssues,
-	sortRecords,
-} from "./model";
+} from "@freshcoat-js/workspace/dataset";
+import { STATUS_LABEL } from "~/app/copy";
+import type { DataViewState } from "./data-view";
+import { sortGridRecords } from "./model";
 import type { ThumbWidth } from "./thumbnails";
 
 // ── Views ─────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ export function shownRecords(
 		view.columnFilters,
 	);
 	const indexMap = recordIndexMap(dataset.records);
-	return sortRecords(
+	return sortGridRecords(
 		filtered,
 		dataset.columns,
 		view.sort,

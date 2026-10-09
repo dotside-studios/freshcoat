@@ -10,10 +10,14 @@ import {
 	uniqueKey,
 	withFieldSource,
 } from "@freshcoat-js/workspace";
+import {
+	addColumn,
+	replaceDataset,
+	setCell,
+} from "@freshcoat-js/workspace/dataset";
 import type { EditorController } from "~/app/controller";
 import { addField } from "~/doc/ops";
 import { produce } from "~/state/immer";
-import { addColumn, replaceDataset, setCell } from "./model";
 import type { PhotoFraming } from "./photo-framing";
 
 function setFocus(elements: Element[], id: string, focus: string): boolean {

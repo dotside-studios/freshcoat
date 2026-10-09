@@ -14,6 +14,21 @@ import type {
 	RecordStatus,
 } from "@freshcoat-js/workspace";
 import {
+	assetMap,
+	copyCells,
+	fillDown,
+	NUMERIC_TYPES,
+	type PasteResult,
+	parseTsv,
+	pasteBlock,
+	pasteInto,
+	recordByIdMap,
+	recordIndexMap,
+	type SortSpec,
+	setCell,
+	valueFromText,
+} from "@freshcoat-js/workspace/dataset";
+import {
 	type KeyboardEvent,
 	memo,
 	type ReactNode,
@@ -36,28 +51,10 @@ import {
 	STATUSES,
 	StatusCell,
 } from "./cells";
-import {
-	copyCells,
-	type PasteResult,
-	parseTsv,
-	pasteBlock,
-	pasteInto,
-} from "./clipboard";
 import { useColumnChoices } from "./column-options";
 import { GridContext, type GridContextValue } from "./grid-context";
 import type { CellRef, GridUiStore } from "./grid-state";
-import {
-	assetMap,
-	fillDown,
-	INDEX_COLUMN,
-	NUMERIC_TYPES,
-	recordByIdMap,
-	recordIndexMap,
-	type SortSpec,
-	STATUS_COLUMN,
-	setCell,
-	valueFromText,
-} from "./model";
+import { INDEX_COLUMN, STATUS_COLUMN } from "./model";
 
 export type GridHandle = {
 	/** Scrolls a record into view and focuses one of its cells. */

@@ -46,6 +46,7 @@ describe("release packaging", () => {
 		const data = manifest("packages/workspace");
 		expect(Object.keys(data.exports)).toEqual([
 			".",
+			"./dataset",
 			"./archive",
 			"./tabular",
 			"./pdf",

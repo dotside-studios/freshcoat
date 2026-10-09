@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	autoBinding,
 	imagesFor,
+	matchVariant,
 	resolveValues,
 	serialValue,
 	variantFor,
@@ -402,5 +403,19 @@ describe("imagesFor", () => {
 		const images = imagesFor(dataset);
 		expect([...images.keys()]).toEqual([`ws:${photoSha}`]);
 		expect(images.get(`ws:${photoSha}`)).toBe(dataset.assets[0]?.blob);
+	});
+});
+
+describe("matchVariant", () => {
+	const options = [
+		{ id: "dark", label: "Night" },
+		{ id: "portrait", label: " Tall " },
+	];
+	const id = (o: { id: string }) => o.id;
+
+	it("matches by id, then label, ignoring case and surrounding space", () => {
+		expect(matchVariant(options, "DARK", id)?.id).toBe("dark");
+		expect(matchVariant(options, " tall ", id)?.id).toBe("portrait");
+		expect(matchVariant(options, "nope", id)).toBeUndefined();
 	});
 });
