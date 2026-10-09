@@ -40,7 +40,8 @@
 		"pdf-lib": "^1.17.1",
 		"react": "^19.2.0",
 		"react-aria-components": "^1.19.0",
-		"react-dom": "^19.2.0"
+		"react-dom": "^19.2.0",
+		"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",

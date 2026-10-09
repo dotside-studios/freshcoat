@@ -243,8 +243,18 @@ function readNdjson(text: string): string[][] {
 type XlsxModule = typeof import("xlsx");
 type WorkSheet = import("xlsx").WorkSheet;
 
+const XLSX_TARBALL = "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz";
+
 async function loadXlsx(): Promise<XlsxModule> {
-	const mod = (await import("xlsx")) as XlsxModule & { default?: XlsxModule };
+	let mod: XlsxModule & { default?: XlsxModule };
+	try {
+		mod = (await import("xlsx")) as XlsxModule & { default?: XlsxModule };
+	} catch (cause) {
+		throw new Error(
+			`Spreadsheets need the optional xlsx package: npm install ${XLSX_TARBALL}`,
+			{ cause },
+		);
+	}
 	return mod.utils ? mod : (mod.default as XlsxModule);
 }
 

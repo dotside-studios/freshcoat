@@ -17,6 +17,7 @@ be published separately. They are not listed below.
 - `@freshcoat-js/coatfile`: compiles templates, QR codes and barcodes
 - `@freshcoat-js/engine`: the coat engine, which lays out and paints with CanvasKit
 - `@freshcoat-js/for-print`: the card printer path: photo analysis and the finish
+- `@freshcoat-js/workspace`: workspaces, datasets, spreadsheet import and batch export
 
 ## Bundled fonts and runtime
 

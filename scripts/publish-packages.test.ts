@@ -37,7 +37,12 @@ beforeEach(() => {
 		join(import.meta.dir, "publish-packages.mjs"),
 		join(directory, "scripts", "publish-packages.mjs"),
 	);
-	artifacts = ["@freshcoat-js/engine", "@freshcoat-js/for-print", "@freshcoat-js/coatfile"].map(
+	artifacts = [
+		"@freshcoat-js/engine",
+		"@freshcoat-js/for-print",
+		"@freshcoat-js/coatfile",
+		"@freshcoat-js/workspace",
+	].map(
 		(name) => {
 			const filename = `${name.replace(/^@/, "").replace("/", "-")}-0.1.0.tgz`;
 			const bytes = Buffer.from(name);
@@ -116,8 +121,17 @@ describe("release publisher", () => {
 
 	test("checks all tarball hashes before publishing the first package", () => {
 		writeFileSync(
-			join(directory, "dist", "releases", artifacts[2]!.filename),
+			join(directory, "dist", "releases", artifacts[3]!.filename),
 			"modified",
+		);
+		expect(publish().exitCode).not.toBe(0);
+		expect(calls()).toEqual([]);
+	});
+
+	test("rejects a release without every package", () => {
+		writeFileSync(
+			join(directory, "dist", "releases", "packages.json"),
+			JSON.stringify(artifacts.slice(0, 3)),
 		);
 		expect(publish().exitCode).not.toBe(0);
 		expect(calls()).toEqual([]);

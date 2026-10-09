@@ -37,6 +37,20 @@ lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
 
+## Spreadsheets
+
+CSV, TSV, JSON and NDJSON need nothing more. Excel, `.ods` and Numbers files
+go through SheetJS, an optional peer dependency. SheetJS publishes current
+releases from its own CDN rather than the npm registry, so install it from
+there:
+
+```sh
+npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+```
+
+Without it, `readTable()` and `writeTable()` reject for those formats with an
+error that names the package.
+
 ## The shape of a workspace
 
 A `.coatworkspace` is a zip, so a workspace is one file and its images travel
@@ -113,5 +127,5 @@ Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License
 
-Apache-2.0; see the repository's [`LICENSE`](../../LICENSE) and
-[`NOTICE`](../../NOTICE). Part of [Freshcoat](../../README.md).
+Apache-2.0, see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE). Part of
+[Freshcoat](../../README.md).
