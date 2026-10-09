@@ -1,5 +1,5 @@
+import { parseImageInfo } from "@freshcoat-js/engine/image";
 import type { NodeTrace } from "~/lib/figma/transpiler";
-import { pngSize } from "~/lib/png";
 import type { ReadDocumentMessage } from "~/shared/protocol";
 
 /** What one pre-exported bitmap came out as. The bytes themselves are megabytes
@@ -61,11 +61,11 @@ export function buildDiagnostics(input: {
 		})),
 		decisions: trace,
 		rasters: msg.rasters.map((r) => {
-			const size = pngSize(r.bytes);
+			const info = parseImageInfo(r.bytes);
 			return {
 				nodeId: r.nodeId,
 				bytes: r.bytes.length,
-				...(size ?? {}),
+				...(info ? { width: info.width, height: info.height } : {}),
 			};
 		}),
 	};

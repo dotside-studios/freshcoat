@@ -13,9 +13,9 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
+import { orientedSize } from "@freshcoat-js/engine/image";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
-import { orientedSize } from "../image-info";
 import { DEFAULT_QUALITY, exportSize, imageFormat } from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
 import { createJobCaches } from "./caches";

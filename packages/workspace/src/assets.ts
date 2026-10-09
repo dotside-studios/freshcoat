@@ -1,7 +1,11 @@
 import { subtleSha256 } from "@freshcoat-js/coatfile";
+import {
+	orientedSize,
+	readImageInfo,
+	sniffImageType,
+} from "@freshcoat-js/engine/image";
 import { newRecord } from "./columns";
 import { newId } from "./ids";
-import { orientedSize, readImageInfo, sniffImageType } from "./image-info";
 import type { CellValue, Column, Dataset, DatasetAsset } from "./types";
 import { readZip } from "./zip-stream";
 
@@ -85,17 +89,10 @@ export function assetExtension(contentType: string): string {
 /** The media type of an image, from its leading bytes, then its name. */
 export function imageContentType(name: string, bytes?: Uint8Array): string {
 	if (bytes !== undefined) {
-		const sniffed = sniffImage(bytes);
+		const sniffed = sniffImageType(bytes);
 		if (sniffed !== null) return sniffed;
 	}
 	return TYPE_BY_EXTENSION[extensionOf(name)] ?? "application/octet-stream";
-}
-
-function sniffImage(b: Uint8Array): string | null {
-	const type = sniffImageType(b);
-	if (type !== null) return type;
-	const avif = [0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66];
-	return avif.every((v, j) => b[4 + j] === v) ? "image/avif" : null;
 }
 
 function extensionOf(name: string): string {

@@ -5,7 +5,7 @@ import {
 	MM_PER_INCH,
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
-import { parseImageInfo } from "./image-info";
+import { parseImageInfo } from "@freshcoat-js/engine/image";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 

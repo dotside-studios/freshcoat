@@ -5,9 +5,9 @@ import {
 	isEmptyVariant,
 	type Template,
 } from "@freshcoat-js/coatfile";
+import { orientedSize } from "@freshcoat-js/engine/image";
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
-import { orientedSize } from "./image-info";
 import { normalizeName } from "./mapping";
 import type {
 	Binding,

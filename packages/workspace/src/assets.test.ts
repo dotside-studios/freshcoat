@@ -1,3 +1,4 @@
+import { jpegHeader } from "@freshcoat-js/test-utils";
 import { zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import type { AssetFile } from "./assets";
@@ -17,7 +18,6 @@ import {
 	prepareAssets,
 	sha256Hex,
 } from "./assets";
-import { jpegHeader } from "./image-fixtures";
 import {
 	backPng,
 	backSha,

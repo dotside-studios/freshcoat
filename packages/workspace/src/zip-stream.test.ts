@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32 } from "node:zlib";
+import { jpegHeader } from "@freshcoat-js/test-utils";
 import {
 	deflateSync,
 	strFromU8,
@@ -14,7 +15,6 @@ import {
 } from "fflate";
 import { describe, expect, it } from "vitest";
 import { crc32 as ourCrc32 } from "./crc";
-import { jpegHeader } from "./image-fixtures";
 import {
 	blobOutput,
 	createZipWriter,

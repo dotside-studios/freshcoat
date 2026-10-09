@@ -3,6 +3,7 @@ import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	unpackTemplate,
 } from "@freshcoat-js/coatfile/coat";
+import { jpegHeader } from "@freshcoat-js/test-utils";
 import {
 	strFromU8,
 	strToU8,
@@ -18,7 +19,6 @@ import {
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
-import { jpegHeader } from "./image-fixtures";
 import { exportSize, pdfLayout } from "./plan";
 import {
 	backSha,

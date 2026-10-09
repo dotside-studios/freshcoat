@@ -1,4 +1,10 @@
 export {
+	type ImageInfo,
+	orientedSize,
+	parseImageInfo,
+	readImageInfo,
+} from "@freshcoat-js/engine/image";
+export {
 	type AddAssetsOptions,
 	type AddAssetsResult,
 	ASSET_REF_PREFIX,
@@ -85,12 +91,6 @@ export {
 	uniqueKey,
 	uniqueName,
 } from "./ids";
-export {
-	type ImageInfo,
-	orientedSize,
-	parseImageInfo,
-	readImageInfo,
-} from "./image-info";
 export {
 	CROP_MARK_GAP_MM,
 	CROP_MARK_LENGTH_MM,

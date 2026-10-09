@@ -13,6 +13,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./browser": "./src/platform/browser.ts",
+		"./image": "./src/image-info.ts",
 		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
 		"./svg": "./src/svg/index.ts",
