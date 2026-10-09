@@ -9,58 +9,34 @@
 	"fonts": [
 		{
 			"kind": "google",
-			"family": "Inter",
-			"url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap"
+			"family": "Ubuntu Sans",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans:wght@400;500;700&display=swap"
 		}
 	],
 	"fields": {
 		"type": "object",
 		"properties": {
-			"tagline": {
-				"type": "string",
-				"title": "Tagline",
-				"default": "Create designs that scale."
-			},
 			"summary": {
 				"type": "string",
 				"title": "Summary",
-				"default": "An open-source template format, Skia renderer and batch export for cards, badges, labels and certificates."
+				"default": "An open-source editor, template format, and rendering engine for cards, badges, certificates, and more."
 			},
 			"repo": {
 				"type": "string",
 				"title": "Repository",
 				"default": "github.com/dotside-studios/freshcoat"
-			},
-			"url": {
-				"type": "string",
-				"title": "QR link",
-				"default": "https://github.com/dotside-studios/freshcoat"
-			},
-			"name": {
-				"type": "string",
-				"title": "Card name",
-				"default": "Alex Rivera"
-			},
-			"role": {
-				"type": "string",
-				"title": "Card role",
-				"default": "Template designer"
 			}
 		},
 		"required": [
-			"tagline",
 			"summary",
-			"repo",
-			"url",
-			"name",
-			"role"
+			"repo"
 		]
 	},
 	"template_data": [
 		{
 			"name": "social-preview",
 			"background": {
-				"id": "bg",
+				"id": "background",
 				"type": "rect",
 				"pos": {
 					"x": 0,
@@ -71,229 +47,86 @@
 					"height": 640
 				},
 				"properties": {
-					"fill": {
-						"kind": "linear",
-						"angle": 160,
-						"stops": [
-							{
-								"offset": 0,
-								"color": "#f8fbfd"
-							},
-							{
-								"offset": 1,
-								"color": "#e6f2f9"
-							}
-						]
-					}
+					"fill": "#ffffff"
 				}
 			},
 			"elements": [
 				{
-					"id": "card_back",
-					"type": "rect",
+					"id": "ring",
+					"type": "vector",
 					"pos": {
-						"x": 700,
-						"y": 150
+						"x": 840,
+						"y": -60
 					},
 					"size": {
-						"width": 400,
-						"height": 252
+						"width": 760,
+						"height": 760
 					},
-					"rotation": -14,
-					"shadow": [
-						{
-							"color": "#0f172a33",
-							"dx": 0,
-							"dy": 18,
-							"blur": 40
-						}
-					],
 					"properties": {
+						"d": "M0 380.0A380.0 380.0 0 1 0 760 380.0A380.0 380.0 0 1 0 0 380.0ZM220.0 380.0A160.0 160.0 0 1 0 540.0 380.0A160.0 160.0 0 1 0 220.0 380.0Z",
 						"fill": {
-							"kind": "linear",
-							"angle": 135,
+							"kind": "angular",
+							"rotation": -90,
 							"stops": [
 								{
-									"offset": 0,
-									"color": "#fbbf24"
+									"offset": 0.0,
+									"color": "#019dda"
 								},
 								{
-									"offset": 1,
-									"color": "#fb7185"
+									"offset": 0.1,
+									"color": "#2eaa8f"
+								},
+								{
+									"offset": 0.2,
+									"color": "#7bb353"
+								},
+								{
+									"offset": 0.3,
+									"color": "#f1b82b"
+								},
+								{
+									"offset": 0.4,
+									"color": "#f78e21"
+								},
+								{
+									"offset": 0.5,
+									"color": "#e75234"
+								},
+								{
+									"offset": 0.6,
+									"color": "#cc3b56"
+								},
+								{
+									"offset": 0.7,
+									"color": "#9f3d8c"
+								},
+								{
+									"offset": 0.8,
+									"color": "#5368b6"
+								},
+								{
+									"offset": 0.9,
+									"color": "#2883c9"
+								},
+								{
+									"offset": 1.0,
+									"color": "#019dda"
 								}
 							]
 						},
-						"cornerRadius": 20
+						"fillRule": "evenodd"
 					}
-				},
-				{
-					"id": "card_mid",
-					"type": "rect",
-					"pos": {
-						"x": 748,
-						"y": 200
-					},
-					"size": {
-						"width": 400,
-						"height": 252
-					},
-					"rotation": -5,
-					"shadow": [
-						{
-							"color": "#0f172a33",
-							"dx": 0,
-							"dy": 18,
-							"blur": 40
-						}
-					],
-					"properties": {
-						"fill": {
-							"kind": "linear",
-							"angle": 135,
-							"stops": [
-								{
-									"offset": 0,
-									"color": "#34d399"
-								},
-								{
-									"offset": 1,
-									"color": "#0ea5e9"
-								}
-							]
-						},
-						"cornerRadius": 20
-					}
-				},
-				{
-					"id": "card_front",
-					"type": "frame",
-					"pos": {
-						"x": 780,
-						"y": 250
-					},
-					"size": {
-						"width": 400,
-						"height": 252
-					},
-					"rotation": 4,
-					"properties": {
-						"fill": {
-							"kind": "linear",
-							"angle": 135,
-							"stops": [
-								{
-									"offset": 0,
-									"color": "#0b1e33"
-								},
-								{
-									"offset": 1,
-									"color": "#123a5c"
-								}
-							]
-						},
-						"cornerRadius": 20,
-						"clipsContent": true,
-						"children": [
-							{
-								"id": "card_mark",
-								"type": "image",
-								"pos": {
-									"x": 28,
-									"y": 26
-								},
-								"size": {
-									"width": 44,
-									"height": 44
-								},
-								"properties": {
-									"src": "freshcoat-mark.svg",
-									"fit": "contain"
-								}
-							},
-							{
-								"id": "card_name",
-								"type": "text",
-								"pos": {
-									"x": 28,
-									"y": 150
-								},
-								"size": {
-									"width": 240,
-									"height": 40
-								},
-								"properties": {
-									"value": "{{name}}",
-									"font": {
-										"family": "Inter",
-										"size": 28,
-										"weight": 700
-									},
-									"align": "left",
-									"color": "#ffffff"
-								}
-							},
-							{
-								"id": "card_role",
-								"type": "text",
-								"pos": {
-									"x": 28,
-									"y": 192
-								},
-								"size": {
-									"width": 240,
-									"height": 30
-								},
-								"properties": {
-									"value": "{{role}}",
-									"font": {
-										"family": "Inter",
-										"size": 18,
-										"weight": 500
-									},
-									"color": "#9fd3ef",
-									"align": "left"
-								}
-							},
-							{
-								"id": "card_qr",
-								"type": "qr_code",
-								"pos": {
-									"x": 276,
-									"y": 128
-								},
-								"size": {
-									"width": 100,
-									"height": 100
-								},
-								"properties": {
-									"value": "{{url}}",
-									"errorCorrection": "M",
-									"foreground": "#0b1e33",
-									"background": "#ffffff",
-									"margin": 8
-								}
-							}
-						]
-					},
-					"shadow": [
-						{
-							"color": "#0f172a33",
-							"dx": 0,
-							"dy": 18,
-							"blur": 40
-						}
-					]
 				},
 				{
 					"id": "logo",
 					"type": "image",
 					"pos": {
 						"x": 96,
-						"y": 140
+						"y": 96
 					},
 					"size": {
-						"width": 445,
-						"height": 80
+						"width": 278,
+						"height": 50
 					},
 					"properties": {
 						"src": "freshcoat-logo.svg",
@@ -305,19 +138,20 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 258
+						"y": 200
 					},
 					"size": {
-						"width": 600,
-						"height": 64
+						"width": 760,
+						"height": 180
 					},
 					"properties": {
-						"value": "{{tagline}}",
+						"value": "Create designs\nthat scale.",
 						"font": {
-							"family": "Inter",
-							"size": 46,
+							"family": "Ubuntu Sans",
+							"size": 84,
 							"weight": 700,
-							"letterSpacing": -0.5
+							"letterSpacing": -2.5,
+							"lineHeight": 1.05
 						},
 						"color": "#0b1e33",
 						"align": "left"
@@ -328,21 +162,21 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 332
+						"y": 400
 					},
 					"size": {
-						"width": 560,
-						"height": 110
+						"width": 620,
+						"height": 80
 					},
 					"properties": {
 						"value": "{{summary}}",
 						"font": {
-							"family": "Inter",
+							"family": "Ubuntu Sans",
 							"size": 24,
 							"weight": 400,
-							"lineHeight": 1.4
+							"lineHeight": 1.45
 						},
-						"color": "#3b4a5a",
+						"color": "#4a5868",
 						"align": "left"
 					}
 				},
@@ -351,16 +185,16 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 470
+						"y": 520
 					},
 					"size": {
 						"width": 600,
-						"height": 32
+						"height": 30
 					},
 					"properties": {
 						"value": "{{repo}}",
 						"font": {
-							"family": "Inter",
+							"family": "Ubuntu Sans",
 							"size": 20,
 							"weight": 500
 						},
