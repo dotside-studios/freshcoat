@@ -6,6 +6,7 @@ import {
 	addPreparedAssets,
 	assetForRef,
 	assetRef,
+	collectPhotoFiles,
 	filesFromZip,
 	findAssetByName,
 	hasAssetSha,
@@ -181,6 +182,55 @@ describe("addAssets", () => {
 			["ben.png", "image/png", "image/png"],
 		]);
 		expect(await bytesOf(files[0]?.blob as Blob)).toEqual(photoPng);
+	});
+
+	it("collects the images among files and zips, listing what it skipped", async () => {
+		const zip = zipSync({
+			"trip/ben.png": photoPng,
+			"trip/": new Uint8Array(),
+			"__MACOSX/trip/._ben.png": photoPng,
+			"trip/.hidden/x.png": photoPng,
+			".DS_Store": new Uint8Array([0]),
+			"trip/notes.txt": new TextEncoder().encode("hi"),
+			"trip/photo.dat": photoPng,
+		});
+		const named = (name: string, bytes: Uint8Array, type = "") =>
+			new File([bytes as BlobPart], name, { type });
+		const { files, skipped } = await collectPhotoFiles([
+			named("ana.png", photoPng, "image/png"),
+			named("cy.jpg", new Uint8Array([0xff, 0xd8, 0xff])),
+			named("scan", photoPng),
+			named("readme.txt", new TextEncoder().encode("hi")),
+			{ file: named("x.png", photoPng), path: "album/.cache/x.png" },
+			named("trip.zip", zip),
+			named("broken.zip", new Uint8Array([1, 2, 3])),
+		]);
+		expect(files.map((f) => [f.name, f.contentType])).toEqual([
+			["ana.png", "image/png"],
+			["cy.jpg", undefined],
+			["scan", "image/png"],
+			["ben.png", "image/png"],
+			["photo.dat", "image/png"],
+		]);
+		expect(skipped).toEqual([
+			{ path: "readme.txt", reason: "not-image" },
+			{ path: "album/.cache/x.png", reason: "hidden" },
+			{ path: "trip.zip/__MACOSX/trip/._ben.png", reason: "hidden" },
+			{ path: "trip.zip/trip/.hidden/x.png", reason: "hidden" },
+			{ path: "trip.zip/.DS_Store", reason: "hidden" },
+			{ path: "trip.zip/trip/notes.txt", reason: "not-image" },
+			{ path: "broken.zip", reason: "unreadable" },
+		]);
+	});
+
+	it("stops collecting photos when aborted", async () => {
+		const aborter = new AbortController();
+		aborter.abort();
+		await expect(
+			collectPhotoFiles([new File([photoPng as BlobPart], "a.png")], {
+				signal: aborter.signal,
+			}),
+		).rejects.toThrow();
 	});
 
 	it("knows hidden paths", () => {

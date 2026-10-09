@@ -30,7 +30,7 @@ scheduling and file destinations.
 | `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
-| `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
+| `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
 | `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
