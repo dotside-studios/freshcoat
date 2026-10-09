@@ -192,13 +192,23 @@ export type ZipPhotos = {
  *  and the metadata macOS and Windows add beside them. The zip is read as a
  *  stream, so it is never in memory whole. */
 export async function filesFromZip(zip: Blob | Uint8Array): Promise<ZipPhotos> {
-	const files: AssetFile[] = [];
 	let skipped = 0;
+	const files = await readZipPhotos(zip, () => {
+		skipped += 1;
+	});
+	return { files, skipped };
+}
+
+async function readZipPhotos(
+	zip: Blob | Uint8Array,
+	onSkip: (path: string, reason: SkipReason) => void,
+): Promise<AssetFile[]> {
+	const files: AssetFile[] = [];
 	await readZip(zip instanceof Blob ? zip : new Blob([zip as BlobPart]), {
 		filter(path) {
 			if (path.endsWith("/")) return false;
 			if (isHiddenPath(path)) {
-				skipped += 1;
+				onSkip(path, "hidden");
 				return false;
 			}
 			return true;
@@ -207,7 +217,7 @@ export async function filesFromZip(zip: Blob | Uint8Array): Promise<ZipPhotos> {
 			const base = baseName(path);
 			const contentType = imageContentType(base, chunks[0]);
 			if (!contentType.startsWith("image/")) {
-				skipped += 1;
+				onSkip(path, "not-image");
 				return;
 			}
 			files.push({
@@ -217,7 +227,98 @@ export async function filesFromZip(zip: Blob | Uint8Array): Promise<ZipPhotos> {
 			});
 		},
 	});
-	return { files, skipped };
+	return files;
+}
+
+/** A `File`, or any Blob with a name, as picked or dropped. */
+export type NamedBlob = Blob & {
+	readonly name: string;
+	readonly webkitRelativePath?: string;
+};
+
+/** A file with the path it had under the folder it was picked or dropped
+ *  in, which is what says whether it sits in a hidden folder. */
+export type PhotoInput = NamedBlob | { file: NamedBlob; path: string };
+
+export type SkipReason = "hidden" | "not-image" | "unreadable";
+
+export type SkippedPhoto = {
+	/** the file's path; a zip entry's is `<zip path>/<entry path>` */
+	path: string;
+	reason: SkipReason;
+};
+
+export type CollectedPhotos = {
+	files: AssetFile[];
+	skipped: SkippedPhoto[];
+};
+
+export type CollectPhotoOptions = {
+	signal?: AbortSignal;
+};
+
+const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+
+/** The images among picked or dropped files, zips opened, with each file
+ *  left out and why: hidden, not an image, or a zip that could not be read. */
+export async function collectPhotoFiles(
+	files: Iterable<PhotoInput>,
+	opts: CollectPhotoOptions = {},
+): Promise<CollectedPhotos> {
+	const out: AssetFile[] = [];
+	const skipped: SkippedPhoto[] = [];
+	const pause = yielder();
+	for (const item of files) {
+		await pause();
+		opts.signal?.throwIfAborted();
+		const { file, path } =
+			item instanceof Blob
+				? { file: item, path: item.webkitRelativePath || item.name }
+				: item;
+		if (isHiddenPath(path)) {
+			skipped.push({ path, reason: "hidden" });
+			continue;
+		}
+		if (/\.zip$/i.test(file.name)) {
+			try {
+				out.push(
+					...(await readZipPhotos(file, (entry, reason) =>
+						skipped.push({ path: `${path}/${entry}`, reason }),
+					)),
+				);
+			} catch {
+				skipped.push({ path, reason: "unreadable" });
+			}
+			continue;
+		}
+		let contentType = file.type.startsWith("image/") ? file.type : undefined;
+		if (contentType === undefined && !IMAGE_EXTENSION.test(file.name)) {
+			const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+			const sniffed = imageContentType(file.name, head);
+			if (!sniffed.startsWith("image/")) {
+				skipped.push({ path, reason: "not-image" });
+				continue;
+			}
+			contentType = sniffed;
+		}
+		out.push({
+			name: file.name,
+			blob: file,
+			...(contentType ? { contentType } : {}),
+		});
+	}
+	return { files: out, skipped };
+}
+
+/** Resolves on a fresh task once 16 ms of work have run since the last one,
+ *  so a long loop leaves a page able to paint and take input. */
+function yielder(): () => Promise<void> {
+	let since = performance.now();
+	return async () => {
+		if (performance.now() - since < 16) return;
+		await new Promise<void>((resolve) => setTimeout(resolve, 0));
+		since = performance.now();
+	};
 }
 
 /** One file as an asset: hashed, typed and measured from its header. */

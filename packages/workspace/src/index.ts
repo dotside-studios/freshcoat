@@ -8,17 +8,24 @@ export {
 	assetExtension,
 	assetForRef,
 	assetRef,
+	type CollectedPhotos,
+	type CollectPhotoOptions,
+	collectPhotoFiles,
 	filesFromZip,
 	findAssetByName,
 	imageContentType,
 	isHiddenPath,
+	type NamedBlob,
 	PHOTO_COLUMNS,
+	type PhotoInput,
 	type PreparedAsset,
 	type PrepareOptions,
 	parseAssetRef,
 	photoDataset,
 	prepareAsset,
 	prepareAssets,
+	type SkippedPhoto,
+	type SkipReason,
 	sha256Hex,
 	type ZipPhotos,
 } from "./assets";
@@ -137,6 +144,7 @@ export {
 	pdfRenderScale,
 	planExport,
 } from "./plan";
+export { duplicatePreset, newPreset } from "./presets";
 export {
 	mapDatasetRecords,
 	type RecordStatusExtra,

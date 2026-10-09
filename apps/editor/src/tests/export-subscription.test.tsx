@@ -1,10 +1,10 @@
 import * as ws from "@freshcoat-js/workspace";
+import { newPreset } from "@freshcoat-js/workspace";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { ExportSection } from "~/export/ExportSection";
-import { newPreset } from "~/export/preset";
 import { doc } from "./doc-fixture";
 
 vi.mock("@freshcoat-js/workspace", async (original) => {

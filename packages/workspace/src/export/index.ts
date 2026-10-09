@@ -1,5 +1,10 @@
 export { createJobCaches, IMAGE_CACHE_PIXELS, type JobCaches } from "./caches";
 export {
+	createFolderSink,
+	type FolderHandle,
+	type WritableFile,
+} from "./folder-sink";
+export {
 	checkAllGlyphs,
 	checkGlyphs,
 	codepointLabel,
@@ -28,6 +33,7 @@ export {
 	type AssemblePdf,
 	boundDatasetOf,
 	type ExportJobOptions,
+	exportPoolSize,
 	inlinePool,
 	type JobItemResult,
 	type JobPool,
@@ -36,8 +42,10 @@ export {
 	type JobStats,
 	jobFileName,
 	jobStem,
+	LARGE_IMAGE_PIXELS,
 	largestImagePixels,
 	PDF_CONFIRM_BYTES,
+	type PoolSizeInput,
 	REPORT_FILE_NAME,
 	reportCsv,
 	runExportJob,

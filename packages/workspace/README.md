@@ -25,14 +25,15 @@ scheduling and file destinations.
 | `mapping` | the import wizard's mapping of source columns to schema columns |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
+| `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
 | `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
-| `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
+| `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
-| `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
+| `node` | Bun and Node only: `readWorkspaceFile`, `fileOutput` and `folderOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Dataset editing
 lives at `@freshcoat-js/workspace/dataset`; its functions take a `Dataset`
@@ -150,7 +151,8 @@ the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
-stream.
+stream. `exportPoolSize` picks how many workers from the
+cores, memory and `largestImagePixels` of the job.
 
 `itemRequest` builds the render request `runExportJob` sends for one item,
 with the size `itemSize` gives it, and `imagesOf` lists the photos that item
@@ -183,6 +185,60 @@ const result = await exportWorkspace(workspace, "All cards", {
 });
 renderer.dispose();
 // result.fonts.missing, result.items
+```
+
+`folderOutput(dir)` writes one file per item into a folder instead, with the
+report beside them, and a PDF as one file in it. Like a folder in Studio, a
+cancelled job keeps the files already written. Studio writes to a folder the
+user picks through `createFolderSink` on `export`, which takes any
+`FolderHandle`; `folderOutput` hands it one over `node:fs`.
+
+A script can also start from a folder of photos and a template, making the
+dataset and preset as Studio does:
+
+```ts
+import { openAsBlob } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  autoBinding,
+  collectPhotoFiles,
+  newPreset,
+  photoDataset,
+  prepareAssets,
+  type Workspace,
+} from "@freshcoat-js/workspace";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { folderOutput } from "@freshcoat-js/workspace/node";
+
+const picked = await Promise.all(
+  (await readdir("photos", { recursive: true })).map(async (path) => ({
+    file: new File([await openAsBlob(join("photos", path))], path),
+    path,
+  })),
+);
+// skipped names each hidden file, non-image and unreadable zip, and why
+const { files, skipped } = await collectPhotoFiles(picked);
+const dataset = photoDataset("Photos", await prepareAssets(files));
+const workspace: Workspace = {
+  formatVersion: "1.0",
+  name: "Photos",
+  templates: [
+    {
+      id: "t_card",
+      fileName: "card.coat",
+      template,
+      binding: autoBinding(template, dataset),
+    },
+  ],
+  datasets: [dataset],
+  presets: [],
+};
+const preset = { ...newPreset("t_card", []), format: "jpeg-zip" as const };
+await exportWorkspace(workspace, preset, {
+  renderer,
+  output: folderOutput("out"),
+});
 ```
 
 `readWorkspaceFile` reads the archive without loading it into memory first

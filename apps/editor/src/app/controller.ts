@@ -13,6 +13,7 @@ import {
 import { toast } from "@freshcoat-js/ui/toast";
 import {
 	newId,
+	newPreset,
 	rebindDataset,
 	resolveValues,
 	variantFor,
@@ -88,7 +89,6 @@ import {
 	isHiddenInVariant,
 	isStructuralEdit,
 } from "~/doc/variant-edit";
-import { newPreset } from "~/export/preset";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
 import { findStarter, type Starter } from "~/samples/starters";
