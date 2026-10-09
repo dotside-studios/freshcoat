@@ -40,22 +40,19 @@ export {
 	subtleSha256,
 	verifyAssets,
 } from "./assets";
+export { encodeBarcode } from "./barcode";
 export {
 	type BarcodeEncodeResult,
-	type BarcodeEncoder,
 	type BarcodeEncoding,
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
 	defaultQuietZone,
 	errorCorrectionRange,
-	getBarcodeEncoder,
 	isLinearSymbology,
 	isSquareSymbology,
 	SYMBOLOGIES,
-	setBarcodeEncoder,
 	symbologyLabel,
 } from "./barcode-encoder";
-export { hasBarcode } from "./has-barcode";
 export {
 	type BleedMm,
 	bleedMm,
@@ -132,6 +129,7 @@ export type {
 	Command,
 	CompiledFrame,
 	CompiledTemplate,
+	CompileWarning,
 	CompileOptions,
 	Constraint,
 	Constraints,
@@ -164,6 +162,7 @@ export type {
 	FrameFlexLayout,
 	FrameGridLayout,
 	FrameProperties,
+	FrameWarning,
 	Gradient,
 	GradientStop,
 	GridTrack,
@@ -178,6 +177,7 @@ export type {
 	MaskElement,
 	MaskProperties,
 	PaintWarning,
+	PrintWarning,
 	QrCodeElement,
 	QrCodeProperties,
 	RectElement,

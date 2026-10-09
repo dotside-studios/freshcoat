@@ -9,7 +9,6 @@ import {
 	type ImageNode,
 	type MaskNode,
 	type Node,
-	type PaintWarning,
 	type PathNode,
 	patternFill,
 	roundCorners,
@@ -20,11 +19,11 @@ import {
 	type TrackSize,
 	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
+import { encodeBarcode } from "./barcode";
 import {
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
 	defaultQuietZone,
-	getBarcodeEncoder,
 	isLinearSymbology,
 	isSquareSymbology,
 	symbologyLabel,
@@ -51,6 +50,7 @@ import type {
 	CompiledFrame,
 	CompiledTemplate,
 	CompileOptions,
+	CompileWarning,
 	CornerRadius,
 	Element,
 	ElementAdjust,
@@ -254,7 +254,7 @@ function compileFrame(
 // back to, and the problems found along the way, which the frame carries out.
 type CompileScope = {
 	fontFamily: string;
-	warnings: PaintWarning[];
+	warnings: CompileWarning[];
 };
 
 function compileBackground(
@@ -879,31 +879,20 @@ function compileBarcode(
 		return group();
 	}
 
-	const encoder = getBarcodeEncoder();
-	const result = encoder
-		? encoder(symbology, value, {
-				errorCorrection:
-					typeof props.errorCorrection === "number"
-						? props.errorCorrection
-						: undefined,
-			})
-		: null;
-	if (!result || !result.ok) {
-		scope.warnings.push(
-			result
-				? {
-						kind: "barcode_invalid",
-						symbology,
-						value,
-						message: result.message,
-						...(base.id ? { layer: base.id } : {}),
-					}
-				: {
-						kind: "barcode_unavailable",
-						symbology,
-						...(base.id ? { layer: base.id } : {}),
-					},
-		);
+	const result = encodeBarcode(symbology, value, {
+		errorCorrection:
+			typeof props.errorCorrection === "number"
+				? props.errorCorrection
+				: undefined,
+	});
+	if (!result.ok) {
+		scope.warnings.push({
+			kind: "barcode_invalid",
+			symbology,
+			value,
+			message: result.message,
+			...(base.id ? { layer: base.id } : {}),
+		});
 		children.push(
 			barcodePlaceholder(symbologyLabel(symbology), size, foreground, {
 				family: scope.fontFamily,

@@ -227,12 +227,9 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			const { result } = painted;
 			// A placeholder in place of a code would print as if it scanned; the
 			// item fails instead, with the encoder's reason.
-			for (const w of result.warnings) {
+			for (const w of result.warnings)
 				if (w.kind === "barcode_invalid")
 					throw new Error(`Barcode: ${w.message}`);
-				if (w.kind === "barcode_unavailable")
-					throw new Error("Barcode: the encoder isn't loaded");
-			}
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
 			return {
 				bytes: result.bytes,

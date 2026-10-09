@@ -5,11 +5,9 @@ import {
 	checkVariants,
 	compile,
 	isElementVisible,
-	setBarcodeEncoder,
 	validate,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createRenderer, type Node, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -27,7 +25,6 @@ let fonts: Map<string, Uint8Array[]>;
 let renderer: Renderer;
 
 beforeAll(async () => {
-	setBarcodeEncoder(bwipBarcodeEncoder);
 	ck = await loadCanvasKit();
 	const src = VEND_SANS.kind === "local" ? VEND_SANS.files[0].src : "";
 	const bytes = new Uint8Array(

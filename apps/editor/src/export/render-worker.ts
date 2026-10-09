@@ -1,5 +1,4 @@
-import { setBarcodeEncoder, type Template } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import type { Template } from "@freshcoat-js/coatfile";
 import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/engine/browser";
 import {
 	createItemRenderer,
@@ -65,7 +64,6 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		case "init": {
 			fonts = new Map(msg.fonts);
 			items?.setFonts(fonts);
-			setBarcodeEncoder(bwipBarcodeEncoder);
 			const started = performance.now();
 			try {
 				await itemRenderer();

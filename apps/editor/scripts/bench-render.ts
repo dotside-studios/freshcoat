@@ -17,13 +17,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import {
-	compile,
-	type Element,
-	setBarcodeEncoder,
-	type Template,
-} from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import { compile, type Element, type Template } from "@freshcoat-js/coatfile";
 import {
 	type RenderCompiledOptions,
 	renderCompiled,
@@ -175,7 +169,6 @@ const RECORDS = [
 ] as const;
 
 const ck = await loadCanvasKit("full");
-setBarcodeEncoder(bwipBarcodeEncoder);
 const fonts = { "Vend Sans": [testFontBytes("VendSans-Variable-latin.woff2")] };
 const compiler = await createRenderer({ ck, fonts, cache: false });
 

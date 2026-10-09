@@ -183,10 +183,35 @@ export type CompiledFrame = {
 	// lives on group nodes' `layout`; positions are parent-relative; text is
 	// not yet baked. resolveLayout / compileScene finish it.
 	root: GroupNode;
-	// What compile found wrong while building the scene (a barcode it could not
-	// encode). render() passes these on with the painter's own.
-	warnings?: PaintWarning[];
+	// What compile found wrong while building the scene. render() passes these
+	// on with the painter's own.
+	warnings?: CompileWarning[];
 };
+
+// The encoder refused a barcode's value; `message` says why, in its words.
+// `layer` is the element id.
+export type CompileWarning = {
+	kind: "barcode_invalid";
+	symbology: Symbology;
+	value: string;
+	message: string;
+	layer?: string;
+};
+
+// Part of a layer went past the output range and chroma was given back to hold
+// the hue (see the engine's Adjust.gamut). Not a failure, the render is correct,
+// but that area ends up less saturated than the source art. `clipped` and
+// `pullback` are 0 to 1 shares; `layer` names the src when known.
+export type PrintWarning = {
+	kind: "gamut_compressed";
+	layer?: string;
+	clipped: number;
+	pullback: number;
+};
+
+/** What a rendered frame reports: the painter's warnings, then compile's and
+ *  the print planner's. */
+export type FrameWarning = PaintWarning | CompileWarning | PrintWarning;
 
 export type FrameAssets = {
 	fonts: FontRequest[];
