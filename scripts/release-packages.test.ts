@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+	entryPoints,
 	manifest,
+	packages,
 	publishedManifest,
 	releaseVersion,
 	rewriteModuleSpecifiers,
@@ -25,6 +27,44 @@ describe("release packaging", () => {
 					expect([...names.values()]).toContain(dependency);
 			}
 		}
+	});
+
+	test("publishes workspace after the packages it depends on", () => {
+		const names = packages.map((directory) => manifest(`packages/${directory}`).name);
+		for (const [index, directory] of packages.entries()) {
+			for (const dependency of Object.keys(
+				manifest(`packages/${directory}`).dependencies ?? {},
+			)) {
+				if (dependency.startsWith("@freshcoat-js/"))
+					expect(names.indexOf(dependency)).toBeLessThan(index);
+			}
+		}
+		expect(packages.at(-1)).toBe("workspace");
+	});
+
+	test("keeps workspace's public surface to its entry points", () => {
+		const data = manifest("packages/workspace");
+		expect(Object.keys(data.exports)).toEqual([
+			".",
+			"./archive",
+			"./tabular",
+			"./pdf",
+			"./export",
+			"./node",
+		]);
+		expect(entryPoints(data.exports).some((path) => /test|fixture/.test(path))).toBe(false);
+		for (const version of Object.values(data.dependencies ?? {}))
+			expect(version).not.toMatch(/^https?:/);
+	});
+
+	test("compiles only what the exports reach", () => {
+		expect(
+			entryPoints({
+				".": "./src/index.ts",
+				"./schema/*": "./schema/*",
+				"./fixtures": "./fixtures/index.ts",
+			}),
+		).toEqual(["./src/index.ts", "./fixtures/index.ts"]);
 	});
 
 	test("requires the release tag to match the committed versions", () => {

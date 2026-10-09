@@ -117,11 +117,36 @@ const barcode = { format_version: "1.3", version: "1.0.0", id: "barcode", name: 
 assert.ok(validate(barcode).ok);
 const [coded] = await renderTemplate(renderer, barcode, {}, { output: { pixels: true } });
 assert.equal(coded.warnings.length, 0);
+const { packWorkspace, unpackWorkspace } = loaded.get("@freshcoat-js/workspace/archive");
+const { readTable, writeTable } = loaded.get("@freshcoat-js/workspace/tabular");
+const { assemblePdf } = loaded.get("@freshcoat-js/workspace/pdf");
+const { createItemRenderer, inlinePool, runExportJob, REPORT_FILE_NAME } = loaded.get("@freshcoat-js/workspace/export");
+const { unzipSync } = await import(require.resolve("fflate"));
+const dataset = { id: "d_1", name: "Members", columns: [{ key: "displayName", type: "text" }], records: [{ id: "r_00000001", values: { displayName: "Ana" }, status: "pending" }, { id: "r_00000002", values: { displayName: "Ben" }, status: "pending" }], assets: [] };
+const preset = { id: "p_1", name: "All", templateId: "t_1", records: "all", sides: "all", format: "png-zip", scale: 0.25, dpi: 300, fileName: "{{index}}-{{side}}", markExported: false };
+const workspace = { formatVersion: "1.0", name: "Release check", templates: [{ id: "t_1", fileName: "card.coat", template, binding: { datasetId: "d_1", fields: { displayName: { kind: "column", column: "displayName" } } } }], datasets: [dataset], presets: [preset] };
+const items = createItemRenderer({ renderer });
+const job = await runExportJob(workspace, preset, { pool: inlinePool(items) });
+items.dispose();
 renderer.dispose();
+assert.equal(job.cancelled, false);
+assert.deepEqual(job.items.filter((item) => !item.ok), []);
+const files = unzipSync(new Uint8Array(await job.file.blob.arrayBuffer()));
+assert.deepEqual(Object.keys(files).sort(), ["1-front@0.25x.png", "2-front@0.25x.png", REPORT_FILE_NAME].sort());
+assert.equal(decodePixels(ck, files["1-front@0.25x.png"]).width, 253);
+const unpacked = await unpackWorkspace(await packWorkspace({ ...workspace, presets: [] }));
+assert.ok(unpacked.ok, unpacked.message);
+assert.equal(unpacked.workspace.datasets[0].records.length, 2);
+const csv = await writeTable(dataset, "csv");
+assert.deepEqual((await readTable(csv.bytes, "members.csv")).sheets[0].rows, [["displayName"], ["Ana"], ["Ben"]]);
+const xlsx = await writeTable(dataset, "xlsx");
+assert.deepEqual((await readTable(xlsx.bytes, "members.xlsx")).sheets[0].rows, [["displayName"], ["Ana"], ["Ben"]]);
+const pdf = await assemblePdf([{ bytes: files["1-front@0.25x.png"], format: "png", widthPx: 253, heightPx: 160 }], { dpi: 75 });
+assert.equal(new TextDecoder().decode(pdf.slice(0, 5)), "%PDF-");
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat-js/coatfile/schema/coatfile.v1.schema.json"), "utf8"));
 assert.ok(schema.$id);
 assert.equal(schema.$id, "https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@${manifest("packages/coatfile").version}/schema/coatfile.v1.schema.json");
-console.log("All public imports, scene, text and barcode rendering, print analysis, archives, fixtures and schema passed in Node");
+console.log("All public imports, scene, text and barcode rendering, print analysis, archives, fixtures, schema and a workspace export job passed in Node");
 `;
 	console.log(
 		run(["node", "--input-type=module", "--eval", smoke], consumer).trim(),

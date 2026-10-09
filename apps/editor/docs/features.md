@@ -105,7 +105,7 @@ the records, and **Export** turns templates and records into files.
     template bound to the dataset also has it read its variant from the
     column, keeping a Photo shape or fixed choice as what empty cells use.
     It is kept in the dataset's `schema.json` as `x-freshcoat-options`.
-  - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, `.numbers`, JSON or
+  - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, JSON or
     NDJSON through a wizard that maps each source column to a schema column
     or a new one, and can match existing records by a key column instead of
     appending. When every header names a column, or the dataset's last

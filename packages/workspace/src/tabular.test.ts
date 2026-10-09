@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { readXlsx } from "hucre/xlsx";
 import { describe, expect, it } from "vitest";
-import * as XLSX from "xlsx";
+import oracle from "./fixtures/delimited-sheetjs.json" with { type: "json" };
 import { readTable, TabularError, writeTable } from "./tabular";
 import { deepFreeze, members } from "./test-fixtures";
 import type { Dataset } from "./types";
@@ -61,60 +64,16 @@ describe("readTable: delimited text", () => {
 	});
 });
 
-/** What readTable gave for delimited text when SheetJS read it. */
-function sheetJsRows(text: string, ext: string): string[][] {
-	if (text.trim() === "") return [];
-	const wb = XLSX.read(text, {
-		type: "string",
-		raw: true,
-		...(ext === "tsv" ? { FS: "\t" } : {}),
-	});
-	const sheet = wb.Sheets[wb.SheetNames[0] as string] as XLSX.WorkSheet;
-	const rows = XLSX.utils.sheet_to_json<string[]>(sheet, {
-		header: 1,
-		raw: false,
-		defval: "",
-		blankrows: true,
-	});
-	const filled = (c: string | undefined) => c !== undefined && c.trim() !== "";
-	let height = rows.length;
-	while (height > 0 && !(rows[height - 1] ?? []).some(filled)) height -= 1;
-	let width = 0;
-	for (const row of rows.slice(0, height)) {
-		for (let c = row.length - 1; c >= width; c--) {
-			if (filled(row[c])) width = c + 1;
-		}
-	}
-	return rows
-		.slice(0, height)
-		.map((row) => Array.from({ length: width }, (_, c) => row[c] ?? ""));
-}
-
 const rowsOf = async (text: string, name: string) =>
 	(await readTable(text, name).catch(() => null))?.sheets[0]?.rows ?? [];
 
+// What SheetJS read from the same text, recorded when it was the reader.
 describe("readTable: delimited text matches SheetJS", () => {
-	const fixtures = [
-		'id,name,note\r\n007,"Cruz, Ana","Café ☕ 日本"\r\n008,Ben,"say ""hi"""\r\n',
-		"a,b,,\n1,,,\n,,,\n\n",
-		"a\tb\n1,2\t3\n",
-		'a,"multi\r\nline",c\r\n1,2,3',
-		'a,"open quote\nnever closed',
-		'a,b"c,"d"e"\n"x""y",z',
-		"a;b;c\n1;2;3",
-		"a|b\n1|2",
-		"sep=;\r\na;b,c\n",
-		"sep=|\na|b",
-		"a\rb\rc",
-		"a,b\n\n\nc,d\n",
-		'" spaced ", x ,\n',
-		'"",""\n"a"',
-	];
 	it("on the edge-case fixtures", async () => {
-		for (const text of fixtures) {
-			for (const ext of ["csv", "tsv", "txt"]) {
+		for (const { text, rows } of oracle.fixed) {
+			for (const ext of ["csv", "tsv", "txt"] as const) {
 				expect(await rowsOf(text, `x.${ext}`), `${ext}: ${text}`).toEqual(
-					sheetJsRows(text, ext),
+					rows[ext],
 				);
 			}
 		}
@@ -142,6 +101,7 @@ describe("readTable: delimited text matches SheetJS", () => {
 			"é",
 		];
 		const starts = ["x", "sep=;\n", "sep=|\r\n", '"q', ",", "\n"];
+		const hash = createHash("sha256");
 		for (let i = 0; i < 1500; i++) {
 			let text = starts[Math.floor(random() * starts.length)] as string;
 			const n = 1 + Math.floor(random() * 30);
@@ -149,12 +109,10 @@ describe("readTable: delimited text matches SheetJS", () => {
 				text += parts[Math.floor(random() * parts.length)];
 			}
 			for (const ext of ["csv", "tsv", "txt"]) {
-				expect(
-					await rowsOf(text, `x.${ext}`),
-					`${ext}: ${JSON.stringify(text)}`,
-				).toEqual(sheetJsRows(text, ext));
+				hash.update(JSON.stringify(await rowsOf(text, `x.${ext}`)));
 			}
 		}
+		expect(hash.digest("hex")).toBe(oracle.random);
 	});
 });
 
@@ -226,31 +184,36 @@ describe("readTable: errors", () => {
 });
 
 describe("readTable: workbooks", () => {
-	it("reads every sheet, dates as ISO text and other cells formatted", async () => {
-		const wb = XLSX.utils.book_new();
-		XLSX.utils.book_append_sheet(
-			wb,
-			XLSX.utils.aoa_to_sheet([
-				["name", "joined", "points", "ok"],
-				["Ana", { t: "n", v: 45000, z: "d/m/yy" }, 12, true],
-				["007", { t: "n", v: 45000.75, z: "d/m/yy" }, 1.5, false],
-			]),
-			"Members",
+	const fixture = (ext: string) =>
+		new Uint8Array(
+			readFileSync(new URL(`./fixtures/members.${ext}`, import.meta.url)),
 		);
-		XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([]), "Empty");
-		XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["x"]]), "Other");
-		for (const bookType of ["xlsx", "ods", "xls"] as const) {
-			const bytes = new Uint8Array(
-				XLSX.write(wb, { type: "array", bookType }) as ArrayBuffer,
-			);
-			const { sheets } = await readTable(bytes, `book.${bookType}`);
-			expect(sheets.map((s) => s.name)).toEqual(["Members", "Other"]);
-			expect(sheets[0]?.rows).toEqual([
-				["name", "joined", "points", "ok"],
-				["Ana", "2023-03-15", "12", "TRUE"],
-				["007", "2023-03-15", "1.5", "FALSE"],
+
+	it("reads every sheet, dates as ISO text and other cells formatted", async () => {
+		const formats = {
+			xlsx: ["12.5%", "1,234.50"],
+			xlsm: ["12.5%", "1,234.50"],
+			ods: ["12.50%", "1,234.50"],
+			xls: ["0.125", "1234.5"],
+		};
+		for (const [ext, [share, fee]] of Object.entries(formats)) {
+			const { sheets } = await readTable(fixture(ext), `book.${ext}`);
+			expect(
+				sheets.map((s) => s.name),
+				ext,
+			).toEqual(["Members", "Other"]);
+			expect(sheets[0]?.rows, ext).toEqual([
+				["name", "joined", "points", "ok", "share", "fee"],
+				["Ana", "2023-03-15", "12", "TRUE", share, fee],
+				["007", "2023-03-15", "1.5", "FALSE", "0.3", "0.333333333333333"],
 			]);
 		}
+	});
+
+	it("rejects a .numbers file as a format it does not read", async () => {
+		expect(
+			await rejection(readTable(new Uint8Array([0x50, 0x4b]), "x.numbers")),
+		).toBe("unsupported_format");
 	});
 
 	it("rejects bytes that are not a workbook", async () => {
@@ -319,13 +282,20 @@ describe("writeTable", () => {
 			"xlsx",
 		);
 		expect(out.extension).toBe("xlsx");
-		const wb = XLSX.read(out.bytes, { type: "array" });
-		expect(wb.SheetNames).toEqual(["A very long dataset name  with"]);
-		const sheet = wb.Sheets[wb.SheetNames[0] as string] as XLSX.WorkSheet;
-		expect(sheet.B2).toMatchObject({ t: "s", v: "007" });
-		expect(sheet.E2).toMatchObject({ t: "b", v: true });
-		expect(sheet.F2).toMatchObject({ t: "n", v: 45351 });
-		expect(sheet.G2).toMatchObject({ t: "n", v: 1200 });
+		const book = await readXlsx(out.bytes, { readStyles: true });
+		expect(book.sheets.map((s) => s.name)).toEqual([
+			"A very long dataset name  with",
+		]);
+		const sheet = book.sheets[0];
+		expect(sheet?.rows[1]?.slice(1)).toEqual([
+			"007",
+			"gold",
+			"ana.png",
+			true,
+			new Date("2024-02-29T00:00:00Z"),
+			1200,
+		]);
+		expect(sheet?.cells?.get("1,5")?.style?.numFmt).toBe("yyyy-mm-dd");
 
 		const { sheets } = await readTable(out.bytes, "back.xlsx");
 		expect(sheets[0]?.rows[0]).toEqual([

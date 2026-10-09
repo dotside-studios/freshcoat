@@ -1,11 +1,12 @@
 // @vitest-environment node
+
+import { crc32 } from "node:zlib";
 import type {
 	Dataset,
 	ExportPreset,
 	PdfPage,
 	Workspace,
 } from "@freshcoat-js/workspace";
-import { crc32 } from "@freshcoat-js/workspace/crc";
 import {
 	type AssemblePdf,
 	createPartZipSink,

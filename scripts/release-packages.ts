@@ -3,8 +3,8 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
-	readdirSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -12,7 +12,12 @@ import ts from "typescript";
 
 export const root = resolve(import.meta.dir, "..");
 // Dependency order also determines publication order.
-export const packages = ["engine", "for-print", "coatfile"] as const;
+export const packages = [
+	"engine",
+	"for-print",
+	"coatfile",
+	"workspace",
+] as const;
 export const stagingRoot = join(root, "dist", "npm");
 export const artifactRoot = join(root, "dist", "releases");
 
@@ -64,15 +69,10 @@ export function run(command: string[], cwd = root): string {
 	return result.stdout.toString();
 }
 
-function sourceFiles(directory: string): string[] {
-	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-		const path = join(directory, entry.name);
-		return entry.isDirectory()
-			? sourceFiles(path)
-			: path.endsWith(".ts")
-				? [path]
-				: [];
-	});
+// Tests and their fixtures sit next to the sources they cover, so compile only
+// what the published entry points reach.
+export function entryPoints(exports: Record<string, string>): string[] {
+	return Object.values(exports).filter((path) => path.endsWith(".ts"));
 }
 
 // TypeScript's bundler resolution accepts extensionless imports; Node ESM
@@ -190,9 +190,9 @@ export async function buildPackages(tag?: string): Promise<void> {
 				ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
 			);
 		const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
-		const files = sourceFiles(join(packageRoot, "src"));
-		if (existsSync(join(packageRoot, "fixtures")))
-			files.push(...sourceFiles(join(packageRoot, "fixtures")));
+		const files = entryPoints(data.exports).map((path) =>
+			join(packageRoot, path),
+		);
 		const program = ts.createProgram(files, {
 			...parsed.options,
 			noEmit: false,
@@ -248,8 +248,13 @@ export async function buildPackages(tag?: string): Promise<void> {
 					join(output, path.replace(/\.ts$/, ".d.ts")),
 				];
 		}
+		// Later packages read these declarations, whose imports resolve through
+		// the package's own isolated dependencies.
+		symlinkSync(join(packageRoot, "node_modules"), join(output, "node_modules"));
 		console.log(`Built ${data.name}@${data.version}`);
 	}
+	for (const directory of packages)
+		rmSync(join(stagingRoot, directory, "node_modules"));
 }
 
 export function packPackages(): string[] {

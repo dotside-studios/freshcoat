@@ -41,6 +41,17 @@ Reading and writing files on disk differs by platform, so it lives at
 `@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
 `node` subpath.
 
+## Spreadsheets
+
+`readTable()` reads `.xlsx`, `.xlsm`, `.xls` and `.ods`, and `writeTable()`
+writes `.xlsx`, through [hucre](https://github.com/productdevbook/hucre),
+loaded on first use. Workbook libraries sit behind the `WorkbookCodec`
+interface in `src/workbook/`: `WORKBOOK_READERS` and `WORKBOOK_WRITERS` name
+the codec for each extension, so a format can move to another library, or a
+new library can add a format, without touching `tabular`. Codecs turn cells
+into text with the shared `cellText()`, so every library reads dates, booleans
+and numbers alike.
+
 ## The shape of a workspace
 
 A `.coatworkspace` is a zip, so a workspace is one file and its images travel
@@ -163,5 +174,5 @@ Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License
 
-Apache-2.0; see the repository's [`LICENSE`](../../LICENSE) and
-[`NOTICE`](../../NOTICE). Part of [Freshcoat](../../README.md).
+Apache-2.0, see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE). Part of
+[Freshcoat](../../README.md).

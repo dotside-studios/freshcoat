@@ -38,10 +38,11 @@ and print workflows. If that sounds like your kind of work, see the
 | Fill a template with data and render it | [`@freshcoat-js/coatfile`](packages/coatfile/) |
 | Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/) |
 | Analyze images and plan corrections for card printers | [`@freshcoat-js/for-print`](packages/for-print/) |
+| Bind datasets to templates and batch-export them to ZIPs or PDFs | [`@freshcoat-js/workspace`](packages/workspace/) |
 | Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
 | Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
 
-Release builds for the three core SDK packages include compiled ESM,
+Release builds for the four core SDK packages include compiled ESM,
 TypeScript declarations and assets. Their source manifests are private and
 intended for workspace development; use the generated tarballs for publication.
 See the [release guide](docs/releases.md) for npm setup, release checks and
@@ -60,9 +61,8 @@ Figma plugin bundles.
   authoring. The workspace package adds datasets, bindings, export plans,
   PDF assembly and sheet imposition for applications that need batch output.
 
-The [workspace](packages/workspace/), [UI](packages/ui/) and
-[test-utils](packages/test-utils/) packages are internal packages and are
-not currently included in npm releases.
+The [UI](packages/ui/) and [test-utils](packages/test-utils/) packages are
+internal packages and are not currently included in npm releases.
 The workspace model is independent of React; the UI kit supplies Studio's
 React controls and themes.
 

@@ -37,6 +37,8 @@ const KITS: Record<string, string> = {
 	"@freshcoat-js/engine": "the coat engine, which lays out and paints with CanvasKit",
 	"@freshcoat-js/for-print":
 		"the card printer path: photo analysis and the finish",
+	"@freshcoat-js/workspace":
+		"workspaces, datasets, spreadsheet import and batch export",
 };
 const OWN_SCOPE = "@freshcoat-js/";
 
