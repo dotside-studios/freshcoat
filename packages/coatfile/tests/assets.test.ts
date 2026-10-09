@@ -3,7 +3,6 @@ import {
 	assetDataUri,
 	assetUri,
 	attachAssets,
-	base64ToBytes,
 	bytesToBase64,
 	collectAssetRefs,
 	detachAssets,
@@ -102,21 +101,6 @@ describe("asset URIs", () => {
 		]) {
 			expect(parseAssetUri(src)).toBeNull();
 		}
-	});
-});
-
-describe("base64 round-trip", () => {
-	test("survives high bytes and zeroes", () => {
-		expect([...base64ToBytes(bytesToBase64(new Uint8Array(BYTES)))]).toEqual(
-			BYTES,
-		);
-	});
-
-	test("handles a payload longer than one encode chunk", () => {
-		const bytes = new Uint8Array(0x8000 * 2 + 17).map((_, i) => i % 256);
-		const round = base64ToBytes(bytesToBase64(bytes));
-		expect(round.length).toBe(bytes.length);
-		expect(round[round.length - 1]).toBe(bytes[bytes.length - 1]);
 	});
 });
 

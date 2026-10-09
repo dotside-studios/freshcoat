@@ -2,7 +2,13 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
 import { createHeadlessEnv, renderSceneToPng } from "./helpers/headless";
-import { dataUrlToBytes, fetchLoader, mapLoader } from "../src/loader";
+import {
+	base64ToBytes,
+	bytesToBase64,
+	dataUrlToBytes,
+	fetchLoader,
+	mapLoader,
+} from "../src/loader";
 import { createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { Command, FontResolution } from "../src/types";
@@ -126,5 +132,19 @@ describe("createHeadlessEnv({ load })", () => {
 		const result = (await env.paint(commands, ck)) as EncodedPaintResult;
 		expect(result.warnings).toEqual([]);
 		expect(requested.sort()).toEqual(["fonts/geist.ttf", "logo.png"]);
+	});
+});
+
+describe("base64 round-trip", () => {
+	test("survives high bytes and zeroes", () => {
+		const bytes = [1, 2, 3, 250, 0, 255];
+		expect([...base64ToBytes(bytesToBase64(new Uint8Array(bytes)))]).toEqual(bytes);
+	});
+
+	test("handles a payload longer than one encode chunk", () => {
+		const bytes = new Uint8Array(0x8000 * 2 + 17).map((_, i) => i % 256);
+		const round = base64ToBytes(bytesToBase64(bytes));
+		expect(round.length).toBe(bytes.length);
+		expect(round[round.length - 1]).toBe(bytes[bytes.length - 1]);
 	});
 });

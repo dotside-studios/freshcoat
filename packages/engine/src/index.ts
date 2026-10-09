@@ -68,7 +68,9 @@ export {
 	resolveFontRequest,
 } from "./font-bytes";
 export {
+	base64ToBytes,
 	type ByteLoader,
+	bytesToBase64,
 	dataUrlToBytes,
 	fetchLoader,
 	mapLoader,
