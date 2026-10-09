@@ -242,7 +242,13 @@ export type ImportPlan = {
 	match?: { source: number; column: string };
 };
 
-export type ImportIssue = { row: number; column: string; message: string };
+export type ImportIssue = {
+	row: number;
+	/** the record the row added or updated */
+	record: string;
+	column: string;
+	message: string;
+};
 
 export type ApplyMappingResult = {
 	dataset: Dataset;

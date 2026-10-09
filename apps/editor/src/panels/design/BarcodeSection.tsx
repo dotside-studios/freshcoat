@@ -18,7 +18,6 @@ import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
@@ -30,6 +29,7 @@ import { useEditor } from "~/state/hooks";
 import BracesIcon from "~icons/mingcute/braces-line";
 import { AddButton, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 const GROUPS: [string, Symbology[]][] = [
 	["1D", SYMBOLOGIES.filter(isLinearSymbology)],
@@ -125,7 +125,7 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 		});
 
 	return (
-		<PanelSection title="Barcode">
+		<InspectorSection title="Barcode">
 			<Row label="Type">
 				<Select
 					aria-label="Barcode type"
@@ -290,7 +290,7 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 					</p>
 				</>
 			) : null}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

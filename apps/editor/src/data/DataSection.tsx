@@ -45,13 +45,18 @@ import {
 	photosIntoEmptyDataset,
 	pickFiles,
 } from "./actions";
+import { ColumnFilters } from "./ColumnFilters";
 import { ColumnsPanel } from "./ColumnsPanel";
 import { type Confirm, useConfirm } from "./ConfirmDialog";
 import { type DatasetCreators, DatasetsList } from "./DatasetsList";
 import { DataToolbar, FOLD_DATA_BELOW } from "./DataToolbar";
+import { type DataViewState, DEFAULT_DATA_VIEW } from "./data-view";
 import { DataJobBar, ExportSelected } from "./ExportSelected";
+import { FindReplace } from "./FindReplace";
 import {
 	type CardSize,
+	type ColumnFilter,
+	filterByColumns,
 	filterByStatus,
 	photoBytes,
 	type RecordsView,
@@ -61,6 +66,7 @@ import {
 } from "./gallery-model";
 import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
+import { announceImport } from "./imported";
 import {
 	addRecords,
 	applySchema,
@@ -293,8 +299,33 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary) => {
-						toast(summary, { tone: "success", timeout: 6000 });
+					onImported={(id, summary, isNew, issues) => {
+						controller.dispatch({
+							type: "setDataView",
+							datasetId: id,
+							patch: { imported: issues.length ? new Set(issues) : undefined },
+						});
+						announceImport(
+							controller,
+							id,
+							summary,
+							isNew,
+							issues.length
+								? () => {
+										controller.dispatch({ type: "setActiveDataset", id });
+										controller.dispatch({
+											type: "setDataView",
+											datasetId: id,
+											patch: {
+												query: "",
+												statusFilter: "imported",
+												columnFilters: [],
+												selection: new Set(),
+											},
+										});
+									}
+								: undefined,
+						);
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document
@@ -490,14 +521,61 @@ function RecordsPane({
 	importNonce: number;
 }) {
 	const controller = useController();
-	const [query, setQuery] = useState("");
+	const dataView =
+		useEditor((s) => s.dataViews[dataset.id]) ?? DEFAULT_DATA_VIEW;
+	const { query, columnFilters, sort } = dataView;
+	const statusFilter =
+		dataView.statusFilter === "imported" && !dataView.imported
+			? "all"
+			: dataView.statusFilter;
+	const selection = dataView.selection as Selection;
 	const deferredQuery = useDeferredValue(query);
-	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-	const [sort, setSort] = useState<SortSpec | undefined>();
-	const [selection, setSelection] = useState<Selection>(() => new Set());
+	const patchView = useCallback(
+		(patch: Partial<DataViewState>) =>
+			controller.dispatch({
+				type: "setDataView",
+				datasetId: dataset.id,
+				patch,
+			}),
+		[controller, dataset.id],
+	);
+	const setQuery = useCallback(
+		(next: string) => patchView({ query: next }),
+		[patchView],
+	);
+	const setStatusFilter = useCallback(
+		(next: StatusFilter) => patchView({ statusFilter: next }),
+		[patchView],
+	);
+	const setColumnFilters = useCallback(
+		(next: ColumnFilter[]) => patchView({ columnFilters: next }),
+		[patchView],
+	);
+	const setSort = useCallback(
+		(next: SortSpec | undefined) => patchView({ sort: next }),
+		[patchView],
+	);
+	const setSelection = useCallback(
+		(next: Selection) =>
+			patchView({
+				selection: next === "all" ? "all" : new Set([...next].map(String)),
+			}),
+		[patchView],
+	);
 	const [view, setViewState] = useState<RecordsView>(() => viewFor(dataset));
 	const [cardSize, setCardSizeState] = useState<CardSize>(savedCardSize);
-	const ui = useMemo(() => new GridUiStore(), []);
+	const [startRecord] = useState(() => {
+		const id = controller.state.recordId;
+		return dataset.records.some((r) => r.id === id) ? id : null;
+	});
+	const [ui] = useState(
+		() =>
+			new GridUiStore(
+				startRecord
+					? { row: startRecord, col: dataset.columns[0]?.key ?? "" }
+					: null,
+			),
+	);
 	const grid = useRef<GridHandle>(null);
 	const datasetId = dataset.id;
 
@@ -521,8 +599,13 @@ function RecordsPane({
 		[dataset, deferredQuery],
 	);
 	const filtered = useMemo(
-		() => filterByStatus(searched, dataset, statusFilter),
-		[searched, dataset, statusFilter],
+		() =>
+			filterByColumns(
+				filterByStatus(searched, dataset, statusFilter, dataView.imported),
+				dataset,
+				columnFilters,
+			),
+		[searched, dataset, statusFilter, columnFilters, dataView.imported],
 	);
 	const rows = useMemo(
 		() =>
@@ -548,20 +631,34 @@ function RecordsPane({
 			const row = ui.get().active?.row ?? null;
 			if (row === last) return;
 			last = row;
-			if (row) recordFocused();
+			if (!row) return;
+			recordFocused();
+			controller.dispatch({ type: "setRecord", id: row });
 		});
-	}, [ui, recordFocused]);
+	}, [ui, recordFocused, controller]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the current record is revealed once, on opening
 	useEffect(() => {
-		if (importNonce === 0) return;
-		setQuery("");
-		setStatusFilter("all");
-		setSelection(new Set());
+		if (startRecord && view === "table")
+			requestAnimationFrame(() => grid.current?.reveal(startRecord));
+	}, []);
+
+	// An import clears the view; a view kept from an earlier visit stays.
+	const seenImport = useRef(importNonce);
+	useEffect(() => {
+		if (importNonce === seenImport.current) return;
+		seenImport.current = importNonce;
+		patchView({
+			query: "",
+			statusFilter: "all",
+			columnFilters: [],
+			selection: new Set(),
+		});
 		const scroller = document.querySelector<HTMLElement>(
 			"[data-testid=records-grid] [role=grid], [data-testid=records-gallery] [role=grid]",
 		);
 		if (scroller) scroller.scrollTop = 0;
-	}, [importNonce]);
+	}, [importNonce, patchView]);
 
 	const deleteRows = useCallback(
 		async (ids: string[]) => {
@@ -580,7 +677,7 @@ function RecordsPane({
 			const active = ui.get().active;
 			if (active && ids.includes(active.row)) ui.set({ active: null });
 		},
-		[confirm, controller, datasetId, ui],
+		[confirm, controller, datasetId, ui, setSelection],
 	);
 
 	const onImportPhotos = useCallback(
@@ -611,8 +708,7 @@ function RecordsPane({
 
 	const actions = {
 		addRow: () => {
-			setQuery("");
-			setStatusFilter("all");
+			patchView({ query: "", statusFilter: "all", columnFilters: [] });
 			let added: string[] = [];
 			editDataset(controller, datasetId, (d) => {
 				const out = addRecords(d);
@@ -740,6 +836,7 @@ function RecordsPane({
 					onCardSize={setCardSize}
 					statusFilter={statusFilter}
 					onStatusFilter={setStatusFilter}
+					importIssues={dataView.imported !== undefined}
 					query={query}
 					onQuery={setQuery}
 					selected={selectedIds.length}
@@ -748,6 +845,24 @@ function RecordsPane({
 					panels={panels}
 					onPanels={onPanels}
 					foldData={foldData}
+					columnFilters={
+						dataset.columns.length > 0 ? (
+							<ColumnFilters
+								columns={dataset.columns}
+								filters={columnFilters}
+								onChange={setColumnFilters}
+							/>
+						) : null
+					}
+					findReplace={
+						dataset.columns.length > 0 && !empty ? (
+							<FindReplace
+								dataset={dataset}
+								rows={rows}
+								filtered={rows.length !== dataset.records.length}
+							/>
+						) : null
+					}
 					exportSelected={
 						selectedIds.length > 0 ? (
 							<ExportSelected datasetId={datasetId} ids={selectedIds} />
@@ -847,6 +962,7 @@ function RecordsPane({
 						<RecordPanel
 							dataset={dataset}
 							rows={rows}
+							selectedIds={selectedIds}
 							ui={ui}
 							onImportPhotos={onImportPhotos}
 							onFocusRecord={(id) => {

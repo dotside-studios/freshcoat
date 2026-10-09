@@ -274,3 +274,29 @@ describe("workspace slice", () => {
 		expect(s(store).selection).toEqual([]);
 	});
 });
+
+describe("Data views", () => {
+	test("keep each dataset's view until the workspace closes", () => {
+		const store = opened();
+		store.dispatch({
+			type: "setDataView",
+			datasetId: "d1",
+			patch: { query: "ada", selection: new Set(["r_1"]) },
+		});
+		const once = store.getState();
+		expect(once.dataViews.d1).toMatchObject({
+			query: "ada",
+			statusFilter: "all",
+		});
+		store.dispatch({
+			type: "setDataView",
+			datasetId: "d1",
+			patch: { query: "ada" },
+		});
+		expect(store.getState()).toBe(once);
+		store.dispatch({ type: "setSection", section: "edit" });
+		expect(store.getState().dataViews.d1?.query).toBe("ada");
+		store.dispatch({ type: "close" });
+		expect(store.getState().dataViews).toEqual({});
+	});
+});

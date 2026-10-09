@@ -2,7 +2,6 @@ import type { Fill } from "@freshcoat-js/coatfile";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo } from "react";
 import { useEditor } from "~/state/hooks";
@@ -38,6 +37,7 @@ import {
 	withStops,
 } from "./fills";
 import { GradientSwatch } from "./GradientSwatch";
+import { InspectorSection } from "./InspectorSection";
 import { PatternSwatch } from "./PatternSwatch";
 import { GradientStops } from "./StopBar";
 
@@ -92,7 +92,7 @@ export function FillSection({
 	const box = useBox(ins.keys[0] ?? "");
 
 	return (
-		<PanelSection
+		<InspectorSection
 			title={title}
 			actions={sectionActions(
 				["fill", "color"],
@@ -135,7 +135,7 @@ export function FillSection({
 					/>
 				</ItemGroup>
 			))}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

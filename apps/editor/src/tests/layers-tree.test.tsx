@@ -144,6 +144,35 @@ describe("Layers tree", () => {
 	});
 });
 
+describe("Layers filter", () => {
+	it("narrows the tree to matching layers, expanding their ancestors", async () => {
+		const user = setup();
+		await user.type(
+			screen.getByRole("searchbox", { name: "Filter layers" }),
+			"deep",
+		);
+		const tree = screen.getByRole("treegrid", { name: "Layers" });
+		expect(
+			within(tree)
+				.getAllByRole("row")
+				.map((r) => r.getAttribute("data-layer-key")),
+		).toEqual(["0/1", "0/1/2", "0/1/2/0"]);
+		await user.keyboard("{Escape}");
+		expect(within(tree).getAllByRole("row")).toHaveLength(8);
+	});
+
+	it("says when nothing matches", async () => {
+		const user = setup();
+		await user.type(
+			screen.getByRole("searchbox", { name: "Filter layers" }),
+			"zzz",
+		);
+		expect(screen.getByText("No matching layers")).toBeTruthy();
+		await user.click(screen.getByRole("button", { name: "Clear filter" }));
+		expect(screen.queryByText("No matching layers")).toBeNull();
+	});
+});
+
 describe("Sides list", () => {
 	it("clicking a side switches to it and the tree follows", async () => {
 		const user = setup();

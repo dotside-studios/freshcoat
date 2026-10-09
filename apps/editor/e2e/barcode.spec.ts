@@ -95,18 +95,18 @@ test("draw a barcode, bind it to a field, and step records", async ({
 	await page.getByRole("tab", { name: "Content" }).click();
 	const stepper = page.getByTestId("record-stepper");
 	await expect(stepper).toBeVisible();
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await state<string>(page, "s.values.display_name")).toBe("ALPHA-1");
 	const first = await stripe();
 	// Bars: both black and white columns along the stripe.
 	expect(first.some((v) => v < 60)).toBe(true);
 	expect(first.some((v) => v > 200)).toBe(true);
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	const second = await stripe();
 	expect(second).not.toEqual(first);
-	await page.getByRole("button", { name: "Next record" }).click();
+	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await stripe()).not.toEqual(second);
 	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);

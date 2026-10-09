@@ -6,6 +6,7 @@ import {
 import { assetRef } from "./assets";
 import { isEmptyValue, toTemplateValue } from "./columns";
 import { orientedSize } from "./image-info";
+import { normalizeName } from "./mapping";
 import type {
 	Binding,
 	Column,
@@ -35,16 +36,36 @@ function columnOf(
 }
 
 /** Each template field bound to the column with the same key, exactly or
- *  ignoring case. Fields with no such column are left to their default. When
- *  the template's variants differ in shape, the variant follows the first
- *  bound photo field. */
+ *  ignoring case, then to a column whose key or title matches the field's
+ *  key or title ignoring case and punctuation. Fields with no such column are
+ *  left to their default. When the template's variants differ in shape, the
+ *  variant follows the first bound photo field. */
 export function autoBinding(template: Template, dataset: Dataset): Binding {
 	const fields: Record<string, FieldSource> = {};
-	for (const key of Object.keys(template.fields.properties)) {
+	const entries = Object.entries(template.fields.properties);
+	for (const [key] of entries) {
 		const column =
 			dataset.columns.find((c) => c.key === key) ??
 			dataset.columns.find((c) => c.key.toLowerCase() === key.toLowerCase());
 		if (column) fields[key] = { kind: "column", column: column.key };
+	}
+	const claimed = new Set(
+		Object.values(fields).map((s) => (s.kind === "column" ? s.column : "")),
+	);
+	for (const [key, field] of entries) {
+		if (fields[key] !== undefined) continue;
+		const wanted = new Set(
+			[key, field.title ?? ""].map(normalizeName).filter((n) => n !== ""),
+		);
+		const column = dataset.columns.find(
+			(c) =>
+				!claimed.has(c.key) &&
+				[c.key, c.title ?? ""].some((n) => wanted.has(normalizeName(n))),
+		);
+		if (column) {
+			claimed.add(column.key);
+			fields[key] = { kind: "column", column: column.key };
+		}
 	}
 	const photo = Object.entries(template.fields.properties).find(
 		([key, field]) => field.format === "image" && fields[key] !== undefined,

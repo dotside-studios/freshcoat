@@ -105,6 +105,7 @@ export {
 	detectHeaderRow,
 	guessMapping,
 	headersOf,
+	INFER_SAMPLE,
 	inferType,
 	type PreviewCell,
 	type PreviewRow,

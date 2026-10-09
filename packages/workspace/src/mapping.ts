@@ -1,6 +1,7 @@
 import {
 	coerce,
 	EMAIL_PATTERN,
+	HEX_COLOR,
 	isEmptyValue,
 	isUrl,
 	parseDateText,
@@ -9,6 +10,7 @@ import {
 import { freshId, slug, uniqueKey } from "./ids";
 import type {
 	ApplyMappingResult,
+	CellIssue,
 	CellValue,
 	Column,
 	ColumnMapping,
@@ -19,13 +21,15 @@ import type {
 	ImportPlan,
 } from "./types";
 
-const INFER_SAMPLE = 200;
+export const INFER_SAMPLE = 200;
 const LONG_TEXT = 120;
 
 const INTEGER_TEXT = /^[-+]?(0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)$/;
 const NUMBER_TEXT =
 	/^[-+]?((0|[1-9]\d{0,2}(,\d{3})+|[1-9]\d*)(\.\d+)?|\.\d+)(e[-+]?\d+)?$/i;
 const BOOLEAN_WORDS = new Set(["true", "false", "yes", "no", "✓"]);
+const IMAGE_FILE =
+	/^[^:?#\r\n]+\.(jpe?g|jfif|png|webp|gif|avif|heic|heif|tiff?|bmp|svg)$/i;
 
 /** `A`, `B`, … `Z`, `AA`: what a column is called when the file has no
  *  header row. */
@@ -76,7 +80,8 @@ export function detectHeaderRow(
 	return -1;
 }
 
-function normalize(text: string): string {
+/** A name compared ignoring case, spaces and punctuation. */
+export function normalizeName(text: string): string {
 	return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
@@ -98,6 +103,8 @@ export function inferType(values: readonly string[]): ColumnType {
 	}
 	if (all((v) => /^https?:\/\//i.test(v) && isUrl(v))) return "url";
 	if (all((v) => EMAIL_PATTERN.test(v))) return "email";
+	if (all((v) => IMAGE_FILE.test(v))) return "image";
+	if (all((v) => HEX_COLOR.test(v))) return "color";
 	const long = values.some((v) => v.length > LONG_TEXT || /[\r\n]/.test(v));
 	return long ? "longText" : "text";
 }
@@ -124,13 +131,13 @@ export function guessMapping(
 	});
 	headers.forEach((header, i) => {
 		if (out[i] !== undefined) return;
-		const wanted = normalize(header);
+		const wanted = normalizeName(header);
 		if (wanted === "") return;
 		const loose = columns.find(
 			(c) =>
 				!claimed.has(c.key) &&
-				(normalize(c.key) === wanted ||
-					(c.title !== undefined && normalize(c.title) === wanted)),
+				(normalizeName(c.key) === wanted ||
+					(c.title !== undefined && normalizeName(c.title) === wanted)),
 		);
 		if (loose) {
 			claimed.add(loose.key);
@@ -294,13 +301,11 @@ export function applyMapping(
 		if (done > 0 && done % PROGRESS_ROWS === 0) onProgress?.(done, data.length);
 		done += 1;
 		const values: Record<string, CellValue> = {};
-		const failed = new Set<string>();
+		const failed: CellIssue[] = [];
 		for (const { source, column } of targets) {
 			const result = coerce(column, cells[source] ?? "", options);
 			if (!result.ok) {
-				failed.add(column.key);
-				issues.push({
-					row: rowIndex,
+				failed.push({
 					column: column.key,
 					message: result.message ?? "Invalid",
 				});
@@ -346,13 +351,16 @@ export function applyMapping(
 			}
 		}
 
+		for (const issue of failed) {
+			issues.push({ row: rowIndex, record: record.id, ...issue });
+		}
 		for (const issue of validateRecord(
 			columns,
 			record.values,
 			dataset.assets,
 		)) {
-			if (!failed.has(issue.column)) {
-				issues.push({ row: rowIndex, ...issue });
+			if (!failed.some((f) => f.column === issue.column)) {
+				issues.push({ row: rowIndex, record: record.id, ...issue });
 			}
 		}
 	}

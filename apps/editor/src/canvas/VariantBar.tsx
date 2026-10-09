@@ -6,6 +6,7 @@ import { activeVariantId, changedLayerCount } from "~/doc/variant-edit";
 import { useEditor } from "~/state/hooks";
 import { present } from "~/state/store";
 import BackIcon from "~icons/mingcute/back-line";
+import { VariantMenu } from "./SideVariantMenus";
 
 /** Across the top of the canvas while a variant is active, so every edit is
  *  plainly an edit of that variant. */
@@ -41,9 +42,9 @@ export function VariantBar() {
 				swatch={swatch}
 				className="shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-white)_70%,transparent)] [--swatch-mark:currentColor]"
 			/>
-			<span className="min-w-0 truncate font-semibold">
+			<VariantMenu className="h-6 px-1 font-semibold data-hovered:bg-white/15 data-pressed:bg-white/25 pointer-coarse:h-8">
 				{VARIANT_UI.editing(label)}
-			</span>
+			</VariantMenu>
 			<span className="shrink-0 text-white/80 tabular-nums">
 				{VARIANT_UI.changed(changed)}
 			</span>

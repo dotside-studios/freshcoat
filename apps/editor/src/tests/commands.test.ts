@@ -93,12 +93,57 @@ describe("shortcut matching", () => {
 		).toBe("edit.redo");
 	});
 
+	test("Alt+[ and Alt+] step the previewed record", () => {
+		const at = (code: string) =>
+			findCommand(key({ key: "“", code, altKey: true }), true, false)?.id;
+		expect(at("BracketLeft")).toBe("view.previousRecord");
+		expect(at("BracketRight")).toBe("view.nextRecord");
+	});
+
+	test("Alt+, and Alt+. step sides, and with Shift variants", () => {
+		const at = (code: string, shiftKey = false) =>
+			findCommand(key({ key: "≤", code, altKey: true, shiftKey }), true, false)
+				?.id;
+		expect(at("Comma")).toBe("view.previousSide");
+		expect(at("Period")).toBe("view.nextSide");
+		expect(at("Comma", true)).toBe("view.previousVariant");
+		expect(at("Period", true)).toBe("view.nextVariant");
+	});
+
+	test("Mod+0 zooms to 100%", () => {
+		expect(
+			findCommand(key({ key: "0", code: "Digit0", metaKey: true }), true, false)
+				?.id,
+		).toBe("view.zoom100");
+	});
+
 	test("no two commands claim the same chord", () => {
 		const seen = new Map<string, string>();
+		const normal = (k: string) => {
+			const parts = k.split("+");
+			const key = k.endsWith("++") ? "+" : (parts.at(-1) as string);
+			const mods = parts.slice(0, k.endsWith("++") ? -2 : -1).sort();
+			return [...mods, key].join("+");
+		};
 		for (const c of COMMANDS)
 			for (const k of c.keys ?? []) {
-				expect(seen.get(k), `${k} on ${c.id}`).toBeUndefined();
-				seen.set(k, c.id);
+				expect(seen.get(normal(k)), `${k} on ${c.id}`).toBeUndefined();
+				seen.set(normal(k), c.id);
 			}
+	});
+
+	test("Alt+Shift+H and Alt+Shift+V distribute", () => {
+		const key = (code: string) => ({
+			key: "x",
+			code,
+			altKey: true,
+			shiftKey: true,
+			metaKey: false,
+			ctrlKey: false,
+		});
+		expect(findCommand(key("KeyH"), false, false)?.id).toBe(
+			"align.hdistribute",
+		);
+		expect(findCommand(key("KeyV"), true, false)?.id).toBe("align.vdistribute");
 	});
 });

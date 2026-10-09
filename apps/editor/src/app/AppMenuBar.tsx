@@ -1,4 +1,6 @@
 import { Button } from "@freshcoat-js/ui/button";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { formatShortcut } from "@freshcoat-js/ui/kbd";
 import {
 	Menu,
 	MenuBar,
@@ -10,14 +12,16 @@ import {
 import { Popover } from "@freshcoat-js/ui/popover";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
 import { JobIndicator } from "~/export/JobIndicator";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
 import { isDirty, present } from "~/state/store";
 import type { Section } from "~/state/workspace";
+import UndoIcon from "~icons/mingcute/back-2-line";
 import CheckIcon from "~icons/mingcute/check-line";
+import RedoIcon from "~icons/mingcute/forward-2-line";
 import LeftPanelIcon from "~icons/mingcute/layout-leftbar-open-line";
 import RightPanelIcon from "~icons/mingcute/layout-rightbar-open-line";
 import SendIconFill from "~icons/mingcute/send-fill";
@@ -28,7 +32,10 @@ import { useRenderStats } from "./render-stats";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
 import { useThemePreference } from "./theme";
 
-const MENUS: { label: string; items: (string | "-")[] }[] = [
+type Submenu = { label: string; items: (string | "-")[] };
+type Entry = string | "-" | Submenu;
+
+const MENUS: { label: string; items: Entry[] }[] = [
 	{
 		label: "File",
 		items: [
@@ -74,24 +81,39 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 			"object.ungroup",
 			"object.textOnPath",
 			"-",
-			"object.union",
-			"object.subtract",
-			"object.intersect",
-			"object.exclude",
-			"-",
-			"object.front",
-			"object.forward",
-			"object.backward",
-			"object.back",
-			"-",
-			"align.left",
-			"align.hcenter",
-			"align.right",
-			"align.top",
-			"align.vcenter",
-			"align.bottom",
-			"align.hdistribute",
-			"align.vdistribute",
+			{
+				label: "Boolean",
+				items: [
+					"object.union",
+					"object.subtract",
+					"object.intersect",
+					"object.exclude",
+				],
+			},
+			{
+				label: "Arrange",
+				items: [
+					"object.front",
+					"object.forward",
+					"object.backward",
+					"object.back",
+				],
+			},
+			{
+				label: "Align and distribute",
+				items: [
+					"align.left",
+					"align.hcenter",
+					"align.right",
+					"-",
+					"align.top",
+					"align.vcenter",
+					"align.bottom",
+					"-",
+					"align.hdistribute",
+					"align.vdistribute",
+				],
+			},
 			"-",
 			"object.hide",
 			"object.lock",
@@ -120,7 +142,11 @@ const MENUS: { label: string; items: (string | "-")[] }[] = [
 	{ label: "Help", items: ["help.shortcuts"] },
 ];
 
-const MENU_IDS = MENUS.flatMap((m) => m.items);
+const idsOf = (items: Entry[]): string[] =>
+	items.flatMap((e) =>
+		typeof e === "string" ? (e === "-" ? [] : [e]) : idsOf(e.items),
+	);
+const MENU_IDS = MENUS.flatMap((m) => idsOf(m.items));
 const THEME_IDS = ["view.theme.light", "view.theme.dark", "view.theme.system"];
 
 export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
@@ -147,6 +173,31 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const sendTarget = useSendBackTarget(
 		useEditor((s) => s.workspace?.activeTemplateId),
 	);
+	const runCommand = (id: string) => {
+		const command = COMMAND_BY_ID.get(id);
+		if (command) void command.run(ctx);
+	};
+	const commandItem = (id: string) => {
+		const c = COMMAND_BY_ID.get(id);
+		if (!c) return null;
+		return (
+			<MenuItem
+				key={id}
+				id={id}
+				shortcut={c.keys?.[0]}
+				destructive={id === "edit.delete"}
+				icon={
+					(id === "view.rulers" && rulers) ||
+					(id === "view.printGuides" && guides) ||
+					(id === "view.renderStats" && renderStats) ? (
+						<CheckIcon />
+					) : undefined
+				}
+			>
+				{c.label}
+			</MenuItem>
+		);
+	};
 	const togglePanel = (side: "left" | "right") =>
 		ctx.controller.dispatch({
 			type: "setPanels",
@@ -165,17 +216,40 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 							key={menu.label}
 							label={menu.label}
 							menuProps={{
-								onAction: (id) => {
-									const command = COMMAND_BY_ID.get(String(id));
-									if (command) void command.run(ctx);
-								},
-								disabledKeys: menu.items.filter((id) => disabled.includes(id)),
+								onAction: (id) => runCommand(String(id)),
+								disabledKeys: idsOf(menu.items).filter((id) =>
+									disabled.includes(id),
+								),
 							}}
 						>
 							{menu.items.map((id, i) => {
 								if (id === "-")
 									// biome-ignore lint/suspicious/noArrayIndexKey: separators are positional
 									return <MenuSeparator key={`sep-${i}`} />;
+								if (typeof id !== "string")
+									return (
+										<SubmenuTrigger key={id.label}>
+											<MenuItem id={id.label}>{id.label}</MenuItem>
+											<Popover>
+												<Menu
+													aria-label={id.label}
+													onAction={(item) => runCommand(String(item))}
+													disabledKeys={idsOf(id.items).filter((item) =>
+														disabled.includes(item),
+													)}
+												>
+													{id.items.map((item, j) =>
+														item === "-" ? (
+															// biome-ignore lint/suspicious/noArrayIndexKey: separators are positional
+															<MenuSeparator key={`sep-${j}`} />
+														) : (
+															commandItem(item)
+														),
+													)}
+												</Menu>
+											</Popover>
+										</SubmenuTrigger>
+									);
 								if (id === "samples")
 									return (
 										<SubmenuTrigger key="samples">
@@ -225,25 +299,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 											</Popover>
 										</SubmenuTrigger>
 									);
-								const c = COMMAND_BY_ID.get(id);
-								if (!c) return null;
-								return (
-									<MenuItem
-										key={id}
-										id={id}
-										shortcut={c.keys?.[0]}
-										destructive={id === "edit.delete"}
-										icon={
-											(id === "view.rulers" && rulers) ||
-											(id === "view.printGuides" && guides) ||
-											(id === "view.renderStats" && renderStats) ? (
-												<CheckIcon />
-											) : undefined
-										}
-									>
-										{c.label}
-									</MenuItem>
-								);
+								return commandItem(id);
 							})}
 						</MenuBarMenu>
 					))}
@@ -275,6 +331,14 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 							</Button>
 						) : null}
 						<span className="ml-1 flex items-center gap-0.5">
+							<HistoryButton id="edit.undo" ctx={ctx}>
+								<UndoIcon />
+							</HistoryButton>
+							<HistoryButton id="edit.redo" ctx={ctx}>
+								<RedoIcon />
+							</HistoryButton>
+						</span>
+						<span className="flex items-center gap-0.5">
 							<ToggleButton
 								aria-label="Layers panel"
 								tooltip="Layers panel"
@@ -296,6 +360,32 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 				) : null}
 			</div>
 		</header>
+	);
+}
+
+function HistoryButton({
+	id,
+	ctx,
+	children,
+}: {
+	id: "edit.undo" | "edit.redo";
+	ctx: CommandContext;
+	children: ReactNode;
+}) {
+	const command = COMMAND_BY_ID.get(id);
+	const enabled = useEditor((s) => command?.enabled?.(s) ?? false);
+	if (!command) return null;
+	const key = command.keys?.[0];
+	return (
+		<IconButton
+			aria-label={command.label}
+			tooltip={`${command.label}${key ? `  ${formatShortcut(key)}` : ""}`}
+			isDisabled={!enabled}
+			onPress={() => void command.run(ctx)}
+			className="pointer-coarse:size-7"
+		>
+			{children}
+		</IconButton>
 	);
 }
 

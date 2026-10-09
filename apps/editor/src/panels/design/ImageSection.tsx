@@ -10,7 +10,6 @@ import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
 import { useEffect, useState } from "react";
@@ -26,6 +25,7 @@ import {
 	type Inspect,
 	patchLayers,
 } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 type Mask = NonNullable<ImageProperties["mask"]>;
 type MaskKind =
@@ -168,7 +168,7 @@ export function ImageSection({
 	};
 
 	return (
-		<PanelSection
+		<InspectorSection
 			title={background ? "Background image" : "Image"}
 			actions={background ? sectionActions(["src"]) : undefined}
 		>
@@ -246,7 +246,7 @@ export function ImageSection({
 					)}
 				</>
 			)}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

@@ -97,13 +97,16 @@ export function Badge({
 	tone = "muted",
 	children,
 	className,
+	testId,
 }: {
 	tone?: "muted" | "success" | "warning" | "danger" | "accent";
 	children: ReactNode;
 	className?: string;
+	testId?: string;
 }) {
 	return (
 		<span
+			data-testid={testId}
 			className={cn(
 				"inline-flex h-4 shrink-0 items-center rounded-[3px] px-1 font-medium text-[10px] leading-none",
 				tone === "muted" && "bg-fc-hover text-fc-muted",

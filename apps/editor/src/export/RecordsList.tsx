@@ -16,6 +16,7 @@ import { useCallback, useMemo } from "react";
 import { MenuTrigger, type Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY } from "~/app/copy";
+import { formatNumber } from "~/app/format";
 import ChevronIcon from "~icons/mingcute/down-line";
 import {
 	bulkStatusAction,
@@ -77,6 +78,7 @@ export function RecordsList({
 	previewId,
 	onPreview,
 	selectionIsPreset,
+	dataSelection = [],
 }: {
 	dataset: Dataset;
 	filter: StatusFilter;
@@ -87,6 +89,8 @@ export function RecordsList({
 	onPreview: (id: string) => void;
 	/** the selection is the preset's "selected" records */
 	selectionIsPreset: boolean;
+	/** the records selected in Data, in dataset order */
+	dataSelection?: readonly string[];
 }) {
 	const controller = useController();
 	const label = labelColumn(dataset);
@@ -161,6 +165,16 @@ export function RecordsList({
 						</SegmentedItem>
 					))}
 				</SegmentedControl>
+				{dataSelection.length > 0 && !sameIds(dataSelection, selection) ? (
+					<Button
+						size="sm"
+						variant="ghost"
+						data-testid="use-data-selection"
+						onPress={() => onSelectionChange([...dataSelection])}
+					>
+						{`Use ${formatNumber(dataSelection.length)} selected`}
+					</Button>
+				) : null}
 				<span
 					className="ml-auto text-fc-muted text-fc-sm tabular-nums @max-[36rem]:hidden"
 					data-testid="export-records-selection"
@@ -222,6 +236,12 @@ export function RecordsList({
 			/>
 		</div>
 	);
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+	if (a.length !== b.length) return false;
+	const set = new Set(b);
+	return a.every((id) => set.has(id));
 }
 
 function cellContent(

@@ -141,6 +141,7 @@ export function JobBar({
 	count,
 	blocked,
 	blockedDetail,
+	warning,
 	onShowFailed,
 	recordIds,
 	hideRun,
@@ -155,6 +156,8 @@ export function JobBar({
 	blocked: string | null;
 	/** the whole of a `blocked` reason that is a short form, for its hover */
 	blockedDetail?: string;
+	/** what the export will miss though it can run */
+	warning?: string | null;
 	/** narrows the section to the records the last job failed */
 	onShowFailed?: () => void;
 	/** chosen records: the button exports only these, and says so */
@@ -232,6 +235,15 @@ export function JobBar({
 				>
 					<WarningIcon className="size-3.5 shrink-0" />
 					<span className="truncate">{reason}</span>
+				</span>
+			) : warning && !running && !hideRun ? (
+				<span
+					className="inline-flex min-w-0 items-center gap-1 text-fc-sm text-fc-warning"
+					title={warning}
+					data-testid="export-warning"
+				>
+					<WarningIcon className="size-3.5 shrink-0" />
+					<span className="truncate">{warning}</span>
 				</span>
 			) : null}
 

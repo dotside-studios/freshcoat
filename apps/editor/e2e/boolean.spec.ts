@@ -66,6 +66,7 @@ test("the inspector and the Object menu run the others", async ({ page }) => {
 		`const n = c.template.template_data[0].elements.length; c.select(["0/" + (n - 2), "0/" + (n - 1)]);`,
 	);
 	await page.getByRole("button", { name: "Object", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Boolean" }).click();
 	await page.getByRole("menuitem", { name: "Subtract selection" }).click();
 	await expect
 		.poll(async () => (await selectedLayer(page)).type)
