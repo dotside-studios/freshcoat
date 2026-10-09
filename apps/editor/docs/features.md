@@ -98,6 +98,13 @@ the records, and **Export** turns templates and records into files.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.
+  - A text column's **Values** is **Free text** or the variants of one of
+    the workspace's templates. With variants, the Record tab edits the
+    column with a dropdown and a grid cell opens a list to pick from, and a
+    value that is no variant stays shown so it can be replaced. Picking a
+    template bound to the dataset also has it read its variant from the
+    column, keeping a Photo shape or fixed choice as what empty cells use.
+    It is kept in the dataset's `schema.json` as `x-freshcoat-options`.
   - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, JSON or
     NDJSON through a wizard that maps each source column to a schema column
     or a new one, and can match existing records by a key column instead of
@@ -431,10 +438,13 @@ to fill cards with records.
 - **Record tab:** opening a record shows each of its photos large, with its
   size, file size and format, and a form for every field with the grid's
   editors. It steps through the shown records and sets their status. When
-  the template bound to the dataset crops a photo with Cover and its focus
-  is bound to a column, the photo shows what the record's variant keeps:
-  drag it, or use the arrow keys, to move the photo in its box, and the
-  point is written to that column.
+  the template bound to the dataset crops a photo with Cover, the photo
+  shows what the record's variant keeps: drag it, or use the arrow keys, to
+  move the photo in its box, and the point is written to the focus column.
+  When the open template's focus is not kept in a column yet, the first move
+  makes one: a `<photo>_focus` text column beside the photo, a focus field
+  on the image whose default is the point it had, and the binding between
+  them, so other records keep their framing until moved.
 - **Size from the photo:** an export preset can take each item's size from a
   bound photo, capped by "Limit long edge" if set. The design is laid out at
   the photo's aspect by its constraints, with its shorter side kept, so a
@@ -620,7 +630,9 @@ reaches every variant at once.
 - **Exporting:** a binding picks the variant each record gets: Default, a
   fixed variant, a column naming the variant id, **Photo shape** (the
   variant, or Default, whose size is closest to the shape of the record's
-  photo, as seen), or **All variants**. Binding a dataset to a template
+  photo, as seen), or **All variants**. A column source's **When empty**
+  picks what a record whose cell names no variant gets: Default, Photo
+  shape or a fixed variant; a cell holding `default` always gets Default. Binding a dataset to a template
   whose variants differ in shape picks Photo shape for its first photo
   field. Each item exports at its variant's size; sheets need one card
   size. All

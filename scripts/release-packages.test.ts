@@ -50,6 +50,7 @@ describe("release packaging", () => {
 			"./tabular",
 			"./pdf",
 			"./export",
+			"./node",
 		]);
 		expect(entryPoints(data.exports).some((path) => /test|fixture/.test(path))).toBe(false);
 		for (const version of Object.values(data.dependencies ?? {}))

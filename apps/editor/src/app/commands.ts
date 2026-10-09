@@ -3,7 +3,6 @@ import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
 import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
-import { loadBarcodeEncoder } from "~/render/barcode";
 import type { EditorState, Tool } from "~/state/store";
 import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
@@ -61,8 +60,6 @@ const tool = (t: Tool, label: string, key: string): Command => ({
 	run: ({ controller, pickImage }) => {
 		if (t === "image") pickImage();
 		else controller.dispatch({ type: "setTool", tool: t });
-		// Fetched now so the first code drawn is not a placeholder.
-		if (t === "barcode") void loadBarcodeEncoder().catch(() => {});
 	},
 });
 const booleanCommand = (op: BooleanOp, key: string): Command => ({

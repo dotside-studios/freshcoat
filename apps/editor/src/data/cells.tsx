@@ -3,9 +3,11 @@ import { ColorInput } from "@freshcoat-js/ui/color";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { formatShortcut } from "@freshcoat-js/ui/kbd";
 import { cn } from "@freshcoat-js/ui/lib/cn";
+import { listBox, listItem } from "@freshcoat-js/ui/lib/styles";
 import { Popover } from "@freshcoat-js/ui/popover";
 import {
 	assetRef,
+	type CellValue,
 	type Column,
 	type DataRecord,
 	type Dataset,
@@ -22,11 +24,17 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { Dialog, Button as RACButton } from "react-aria-components";
+import {
+	Dialog,
+	ListBox,
+	ListBoxItem,
+	Button as RACButton,
+} from "react-aria-components";
 import { STATUS_LABEL } from "~/app/copy";
 import CheckIcon from "~icons/mingcute/check-line";
 import ImportIcon from "~icons/mingcute/file-import-line";
 import { AssetThumb } from "./AssetThumb";
+import { type ColumnChoices, choiceOf } from "./column-options";
 import { useGrid } from "./grid-context";
 import { useGridUi } from "./grid-state";
 import { cellIssue, displayText, editText, NUMERIC_TYPES } from "./model";
@@ -56,10 +64,12 @@ export const STATUSES: { id: RecordStatus; label: string; tone: string }[] = [
 
 const STATUS_BY_ID = new Map(STATUSES.map((s) => [s.id, s]));
 
-/** Types edited in place with a plain input; the rest open a popover or
- *  toggle. */
-export function editsInline(column: Column): boolean {
-	return !["boolean", "longText", "color", "image"].includes(column.type);
+/** Types edited in place with a plain input; the rest, and a column with
+ *  choices, open a popover or toggle. */
+export function editsInline(column: Column, choices = false): boolean {
+	return (
+		!choices && !["boolean", "longText", "color", "image"].includes(column.type)
+	);
 }
 
 export function IndexCell({ id }: { id: string }) {
@@ -122,6 +132,7 @@ export function RecordCell({ id, column }: { id: string; column: Column }) {
 	const issue = cellIssue(grid.dataset, record, column.key);
 	const value = record.values[column.key];
 	const cell = { row: id, col: column.key };
+	const inline = editsInline(column, grid.columnChoices.has(column.key));
 
 	const toggle = () => grid.setValue(record.id, column.key, value !== true);
 
@@ -175,7 +186,7 @@ export function RecordCell({ id, column }: { id: string; column: Column }) {
 				grid.startEdit(cell);
 			}}
 		>
-			{editing !== null && editsInline(column) ? (
+			{editing !== null && inline ? (
 				<InlineEditor
 					column={column}
 					initial={editText(column, value)}
@@ -185,7 +196,7 @@ export function RecordCell({ id, column }: { id: string; column: Column }) {
 			) : (
 				<CellValueView column={column} record={record} />
 			)}
-			{editing !== null && !editsInline(column) ? (
+			{editing !== null && !inline ? (
 				<PopoverEditor column={column} record={record} anchor={anchor} />
 			) : null}
 			{issue ? (
@@ -207,8 +218,18 @@ function CellValueView({
 	column: Column;
 	record: DataRecord;
 }) {
-	const { assets } = useGrid();
+	const { assets, columnChoices } = useGrid();
 	const value = record.values[column.key];
+	const choices = columnChoices.get(column.key);
+	if (choices) {
+		const picked = choiceOf(choices, value);
+		if (picked || value === null || value === undefined || value === "")
+			return (
+				<span className={cn("min-w-0 truncate", !picked && "text-fc-faint")}>
+					{picked?.label ?? choices.empty}
+				</span>
+			);
+	}
 	switch (column.type) {
 		case "boolean":
 			return (
@@ -358,6 +379,7 @@ function PopoverEditor({
 }) {
 	const grid = useGrid();
 	const value = record.values[column.key];
+	const choices = grid.columnChoices.get(column.key);
 	const cancelled = useRef(false);
 	const [text, setText] = useState(() => {
 		const start = editText(column, value);
@@ -378,7 +400,9 @@ function PopoverEditor({
 			onOpenChange={(open) => {
 				if (!open) close(cancelled.current ? "cancel" : "commit");
 			}}
-			className={column.type === "longText" ? "w-80" : "w-64"}
+			className={
+				choices ? "w-48" : column.type === "longText" ? "w-80" : "w-64"
+			}
 		>
 			<Dialog
 				aria-label={`Edit ${column.title ?? column.key}`}
@@ -394,6 +418,7 @@ function PopoverEditor({
 							close("cancel");
 						} else if (
 							e.key === "Enter" &&
+							!choices &&
 							(e.metaKey || e.ctrlKey || column.type !== "longText")
 						) {
 							e.preventDefault();
@@ -402,7 +427,16 @@ function PopoverEditor({
 						stopKeys(e);
 					}}
 				>
-					{column.type === "longText" ? (
+					{choices ? (
+						<ChoicePicker
+							choices={choices}
+							value={value}
+							onPick={(next) => {
+								grid.draft.current = next;
+								close("commit");
+							}}
+						/>
+					) : column.type === "longText" ? (
 						<>
 							<textarea
 								autoFocus
@@ -450,6 +484,46 @@ function PopoverEditor({
 				</div>
 			</Dialog>
 		</Popover>
+	);
+}
+
+const EMPTY_CHOICE = "\u0000empty";
+
+/** A column's choices as a list: picking one commits it, and the first item
+ *  empties the cell. */
+function ChoicePicker({
+	choices,
+	value,
+	onPick,
+}: {
+	choices: ColumnChoices;
+	value: CellValue | undefined;
+	onPick: (value: string) => void;
+}) {
+	const current = choiceOf(choices, value)?.value ?? EMPTY_CHOICE;
+	const items = [
+		{ value: EMPTY_CHOICE, label: choices.empty },
+		...choices.options,
+	];
+	return (
+		<ListBox
+			autoFocus
+			aria-label="Choices"
+			onAction={(key) => onPick(key === EMPTY_CHOICE ? "" : String(key))}
+			className={cn(listBox, "-m-1 max-h-64")}
+		>
+			{items.map((o) => (
+				<ListBoxItem
+					key={o.value}
+					id={o.value}
+					textValue={o.label}
+					className={cn(listItem, o.value === EMPTY_CHOICE && "text-fc-muted")}
+				>
+					<span className="min-w-0 flex-1 truncate">{o.label}</span>
+					{o.value === current ? <CheckIcon className="size-3.5" /> : null}
+				</ListBoxItem>
+			))}
+		</ListBox>
 	);
 }
 

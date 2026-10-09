@@ -31,11 +31,15 @@ scheduling and file destinations.
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by |
+| `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Reading and writing files on disk differs by platform, so it lives at
+`@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
+`node` subpath.
 
 ## Spreadsheets
 
@@ -81,33 +85,79 @@ A binding's `variant` picks the variant each record renders in: a fixed one,
 the one a column names, every one, or `{ kind: "image", field }`, the one
 whose size is closest in aspect to the record's photo, so a template with
 landscape, portrait and square variants follows each photo's orientation.
+A column source's `fallback`, a fixed or image source, is what a record
+whose cell names no variant gets. A workspace that uses one is written at
+format 1.1, which a 1.0 reader opens without the fallback.
+
+A text column's `options` names where its cells pick their value from, kept
+in `schema.json` as `x-freshcoat-options`. `{ kind: "variants", templateId }`
+is the variants of one of the workspace's templates.
 Each item renders at its variant's size; sheets need every card in a plan to
 share one size.
 
 ```ts
+import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
-import {
-  createItemRenderer,
-  inlinePool,
-  runExportJob,
-} from "@freshcoat-js/workspace/export";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { fileOutput } from "@freshcoat-js/workspace/node";
 
 // The full build carries the JPEG and WebP encoders.
-const items = createItemRenderer({
-  ck: await loadCanvasKit("full"),
-  fonts: new Map([["Inter", [interBytes]]]),
+const renderer = await createRenderer({ ck: await loadCanvasKit("full") });
+const result = await exportWorkspace(workspace, preset, {
+  renderer,
+  output: fileOutput("club.zip"),
 });
-const result = await runExportJob(workspace, preset, {
-  pool: inlinePool(items),
-});
-// result.file is the zip or PDF; result.items says how each item went.
+// result.items says how each item went.
 ```
 
-The pool is the host's: `inlinePool` renders one item at a time on the
-calling thread, and Studio passes a pool of workers, each holding its own
-`createItemRenderer`. So is the destination: the default keeps the zip in
-memory, and a host can pass any `OutputSink`, such as `createStreamZipSink`
-over a writable stream.
+`exportWorkspace` takes a preset, its id or a name no other preset has
+(`findPreset` does that lookup). Unless `fonts` is given, it resolves the
+template's fonts with `resolveTemplateFonts`, passing it `fontOptions`, and
+reports the families it found no bytes for as `result.fonts.missing`. It
+renders one item at a time on the calling thread. The renderer is the host's, so its `load`
+decides where image sources that are not dataset photos come from. Without
+an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
+it to a path, the zip as it renders, and deletes the partial file when the
+job is cancelled or fails.
+
+`runExportJob` is the layer below, for a host with its own pool: Studio
+passes a pool of workers, each holding a `createItemRenderer` over its own
+renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
+stream.
+
+### Export from Node
+
+The same job runs in Bun or Node without a DOM, starting from a
+`.coatworkspace` on disk. Dataset photos (`ws:<sha256>`) come from the
+archive; other image sources, such as relative paths and `file:` URLs, go
+through the renderer's `load`.
+
+```ts
+import { createRenderer } from "@freshcoat-js/engine";
+import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
+
+const { workspace, warnings } = await readWorkspaceFile("club.coatworkspace");
+const renderer = await createRenderer({
+  ck: await loadCanvasKit("full"),
+  load: fileLoader({ root: "." }),
+});
+const result = await exportWorkspace(workspace, "All cards", {
+  renderer,
+  output: fileOutput("club.zip"),
+});
+renderer.dispose();
+// result.fonts.missing, result.items
+```
+
+`readWorkspaceFile` reads the archive without loading it into memory first
+and throws a `WorkspaceReadError`, whose `code` is `unpackWorkspace`'s, when
+it cannot. `readWorkspace` on `archive` does the same for a Blob or bytes.
+Pass `fontOptions: { fetch }` to serve fonts from a cache or a mirror instead
+of the network.
+
+`src/export/node-export.test.ts` runs this path end to end.
 
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex

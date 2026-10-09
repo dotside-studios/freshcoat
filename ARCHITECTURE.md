@@ -43,11 +43,13 @@ files differ by platform, so they live on the engine's `node` and `browser`
 subpaths.
 
 For batch work, `workspace` turns templates, datasets, bindings and presets
-into export plans, and `workspace/export` runs them: `createItemRenderer`
-renders one item, and `runExportJob` renders a whole preset through a pool and
-writes a zip or a PDF. The pool and the destination are the host's. Studio
-runs items in a pool of workers and writes to a folder or file it asks the
-user for; a script can use `inlinePool` and write the zip itself. Print
+into export plans, and `workspace/export` runs them through coatfile with a
+renderer the host creates: `createItemRenderer` renders one item, and
+`runExportJob` renders a whole preset through a pool and writes a zip or a
+PDF. The pool and the destination are the host's. Studio runs items in a pool
+of workers and writes to a folder or file it asks the user for; a script calls
+`exportWorkspace`, which renders on its own thread, and can write to disk with
+`fileOutput` from `workspace/node`. Print
 correction uses `for-print` when requested.
 
 ## Dependency boundaries

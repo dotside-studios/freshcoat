@@ -1,6 +1,5 @@
 import type { BarcodeElement, Template } from "@freshcoat-js/coatfile";
-import { setBarcodeEncoder, validate } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import { validate } from "@freshcoat-js/coatfile";
 import {
 	act,
 	cleanup,
@@ -9,7 +8,7 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { IssuesList } from "~/app/IssuesPopover";
@@ -71,13 +70,11 @@ const code = (c: EditorController, key = KEY) =>
 	getElement(c.template as Template, key) as BarcodeElement;
 
 beforeAll(() => {
-	setBarcodeEncoder(bwipBarcodeEncoder);
 	// jsdom has no CSS.escape, which react-aria uses to find items by key.
 	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
 	g.CSS ??= {};
 	g.CSS.escape ??= (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 });
-afterAll(() => setBarcodeEncoder(null));
 afterEach(cleanup);
 
 describe("BarcodeSection", () => {
@@ -269,18 +266,6 @@ describe("barcodeMessages", () => {
 		expect(barcodeMessages(t, {}, layers)).toEqual([]);
 		expect(barcodeMessages(t, { title: "x" }, layers)).toHaveLength(1);
 		expect(barcodeMessages(t, { title: "5901234123457" }, layers)).toEqual([]);
-	});
-
-	it("says nothing without an encoder", () => {
-		const t = withBarcode({ symbology: "ean13", value: "x" });
-		setBarcodeEncoder(null);
-		try {
-			expect(
-				barcodeMessages(t, {}, [getElement(t, KEY) as BarcodeElement]),
-			).toEqual([]);
-		} finally {
-			setBarcodeEncoder(bwipBarcodeEncoder);
-		}
 	});
 });
 

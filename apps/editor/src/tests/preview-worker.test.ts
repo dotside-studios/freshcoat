@@ -1,6 +1,4 @@
 // @vitest-environment node
-import { setBarcodeEncoder } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import { sampleValues } from "~/doc/values";
@@ -303,7 +301,6 @@ describe("main-thread fallback", () => {
 	let fonts: Map<string, Uint8Array[]>;
 
 	beforeAll(async () => {
-		setBarcodeEncoder(bwipBarcodeEncoder);
 		ck = await loadCanvasKit();
 		const src = VEND_SANS.kind === "local" ? VEND_SANS.files[0].src : "";
 		fonts = new Map([

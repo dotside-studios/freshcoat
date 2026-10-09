@@ -1,6 +1,3 @@
-// `@freshcoat-js/coatfile/barcode`: the bwip-js encoder behind `setBarcodeEncoder`.
-// A subpath of its own so that bwip-js stays out of every bundle that only
-// imports the main entry; the caller that needs barcodes registers it.
 import {
 	azteccode,
 	code39,
@@ -13,7 +10,6 @@ import {
 } from "bwip-js/generic";
 import {
 	type BarcodeEncodeResult,
-	type BarcodeEncoder,
 	type BarcodeEncoding,
 	isLinearSymbology,
 } from "./barcode-encoder";
@@ -267,11 +263,12 @@ function encode(
 const CACHE_LIMIT = 256;
 const cache = new Map<string, BarcodeEncodeResult>();
 
-export const bwipBarcodeEncoder: BarcodeEncoder = (
-	symbology,
-	value,
-	opts,
-) => {
+/** A barcode's modules, encoded with bwip-js, or why the value can't be one. */
+export function encodeBarcode(
+	symbology: Symbology,
+	value: string,
+	opts: { errorCorrection?: number } = {},
+): BarcodeEncodeResult {
 	const key = `${symbology}\u0000${opts.errorCorrection ?? ""}\u0000${value}`;
 	const hit = cache.get(key);
 	if (hit) return hit;
@@ -282,4 +279,4 @@ export const bwipBarcodeEncoder: BarcodeEncoder = (
 	}
 	cache.set(key, result);
 	return result;
-};
+}

@@ -7,6 +7,7 @@ import type {
 	RecordStatus,
 } from "@freshcoat-js/workspace";
 import { createContext, useContext } from "react";
+import type { ColumnChoices } from "./column-options";
 import type { CellRef, GridUiStore } from "./grid-state";
 
 export type GridContextValue = {
@@ -28,6 +29,8 @@ export type GridContextValue = {
 	importPhotos: () => void;
 	openStatusMenu: (recordId: string, anchor: HTMLElement) => void;
 	columnByKey: (key: string) => Column | undefined;
+	/** What the cells of a column with options pick from, by key. */
+	columnChoices: ReadonlyMap<string, ColumnChoices>;
 };
 
 export const GridContext = createContext<GridContextValue | null>(null);

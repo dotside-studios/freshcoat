@@ -42,6 +42,13 @@ export {
 	withPrintFallback,
 } from "./print";
 export {
+	type ExportOutput,
+	type ExportWorkspaceOptions,
+	type ExportWorkspaceResult,
+	exportWorkspace,
+	findPreset,
+} from "./run";
+export {
 	BLEED_NEEDS_TEMPLATE_SIZE,
 	pagesPerSheet,
 	planSheets,

@@ -17,7 +17,11 @@ depends on the `canvaskit-wasm` version its conformance goldens use.
 | `renderCompiled(compiled, opts, runtime)` | `renderCompiled(renderer, compiled, opts)` |
 | `createParagraphEngine`, `deriveFontMetrics`, `memoizeTextEngine`, `createPaintCache` passed in a runtime | owned by the renderer; `renderer.prepare` and `renderer.compile` use them |
 | `env.loadImageBytes` | `load` on the renderer, `images` per render |
-| `setBarcodeEncoder(bwipBarcodeEncoder)` before `render` | not needed with `renderTemplate`, which loads the encoder when a template draws a barcode |
+| `setBarcodeEncoder(bwipBarcodeEncoder)` | not needed: `compile` encodes barcodes itself |
+| `bwipBarcodeEncoder` from `@freshcoat-js/coatfile/barcode`, `getBarcodeEncoder()` | `encodeBarcode` from `@freshcoat-js/coatfile` |
+| `hasBarcode`, the `barcode_unavailable` warning | removed |
+| `PaintWarning` kinds `barcode_invalid` and `gamut_compressed` | coatfile's `CompileWarning` and `PrintWarning`; a template frame's `warnings` are `FrameWarning[]` from `@freshcoat-js/coatfile` |
+| the `qr_generate_failed` warning | removed; nothing emitted it |
 | `"bytes" in result`, `as EncodedPaintedFrame[]` | not needed: the result's type follows `output` |
 | `EncodedPaintedFrame`, `KeptPaintedFrame`, `RenderRuntime`, `ExportOptions` | `TemplateFrame<Output>`, `RenderTemplateOptions`, `RenderCompiledOptions` |
 
