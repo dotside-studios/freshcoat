@@ -121,11 +121,15 @@ describe("worker pool", () => {
 			print: "fallback",
 			printError: "no SkSL",
 			gamut: [{ clipped: 0.1, pullback: 1 }],
+			warnings: ["Drawn as pixels: PDF has no vector equivalent for shadow"],
+			vector: "fallback",
 		});
 		expect(await out).toMatchObject({
 			print: "fallback",
 			printError: "no SkSL",
 			gamut: [{ clipped: 0.1, pullback: 1 }],
+			warnings: ["Drawn as pixels: PDF has no vector equivalent for shadow"],
+			vector: "fallback",
 		});
 	});
 

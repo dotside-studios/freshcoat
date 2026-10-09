@@ -501,7 +501,10 @@ export function ExportSettings({
 									className={segmentedFull}
 									selectedKey={preset.pdfPageImage ?? "png"}
 									onSelectionChange={(key) =>
-										set({ pdfPageImage: key === "jpeg" ? "jpeg" : "png" })
+										set({
+											pdfPageImage:
+												key === "jpeg" || key === "vector" ? key : "png",
+										})
 									}
 								>
 									<SegmentedItem id="png" className={segmentedItemFull}>
@@ -509,6 +512,9 @@ export function ExportSettings({
 									</SegmentedItem>
 									<SegmentedItem id="jpeg" className={segmentedItemFull}>
 										JPEG
+									</SegmentedItem>
+									<SegmentedItem id="vector" className={segmentedItemFull}>
+										Vector
 									</SegmentedItem>
 								</SegmentedControl>
 							</Row>
