@@ -149,7 +149,7 @@ export async function transpile(
 		}
 		// The first slot that resolves sets the canvas; the rest must match it.
 		// This subsumes orientation — a portrait side against a landscape canvas
-		// reads as "638×1013, resize to 1013×638", which is what the author does
+		// reads as "638×1012, resize to 1012×638", which is what the author does
 		// about it anyway.
 		if (canvas === null) canvas = size;
 		else if (!sizesAgree(size, canvas)) issue(canvas.width, canvas.height);

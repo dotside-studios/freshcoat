@@ -10,7 +10,7 @@ import { readBaseFields } from "~/main/read-base";
 const PRODUCT: ProductRegistryEntry = {
 	sku: "card_cr80",
 	displayName: "CR80 Card",
-	width: 1013,
+	width: 1012,
 	height: 638,
 	frames: [{ name: "front", label: "Front", required: true }],
 };
@@ -58,7 +58,7 @@ async function run(children: FigmaNode[]) {
 		id: "front",
 		name: "front",
 		type: "FRAME",
-		absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+		absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 		fills: [],
 		children,
 	};
@@ -69,7 +69,7 @@ async function run(children: FigmaNode[]) {
 				fileKey: "FK",
 				nodeId: "front",
 				nodeName: "Front",
-				width: 1013,
+				width: 1012,
 				height: 638,
 			},
 		},

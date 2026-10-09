@@ -22,7 +22,7 @@ import { collectRasterTargets } from "~/main/raster-targets";
 const CR80: ProductRegistryEntry = {
 	sku: "card_cr80",
 	displayName: "CR80 Card",
-	width: 1013,
+	width: 1012,
 	height: 638,
 	frames: [
 		{ name: "front", label: "Front", required: true },
@@ -62,7 +62,7 @@ function rect(
 function slotFrame(
 	id: string,
 	children: FigmaNode[],
-	box = { x: 0, y: 0, width: 1013, height: 638 },
+	box = { x: 0, y: 0, width: 1012, height: 638 },
 ): FigmaContainerNode {
 	return {
 		id,
@@ -82,11 +82,11 @@ const bleedGuide = (id: string, extra: Partial<FigmaNode> = {}) =>
 	rect(
 		id,
 		"guide:bleed",
-		{ x: -35, y: -35, width: 1083, height: 708 },
+		{ x: -35, y: -35, width: 1082, height: 708 },
 		{ fills: [], ...extra },
 	);
 const safeGuide = (id: string) =>
-	rect(id, "guide:safe-area", { x: 35, y: 35, width: 943, height: 568 });
+	rect(id, "guide:safe-area", { x: 35, y: 35, width: 942, height: 568 });
 
 function input(front: FigmaContainerNode, back: FigmaContainerNode) {
 	const trees: Record<string, FigmaContainerNode> = { front, back };
@@ -99,7 +99,7 @@ function input(front: FigmaContainerNode, back: FigmaContainerNode) {
 					fileKey: "FK",
 					nodeId: name,
 					nodeName: name,
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			]),
@@ -158,7 +158,7 @@ describe("readSlotGuides", () => {
 
 	it("warns about a guide that measures nothing, and a second guide", () => {
 		const frame = slotFrame("front", [
-			rect("g1", "guide:bleed", { x: 0, y: 0, width: 1013, height: 638 }),
+			rect("g1", "guide:bleed", { x: 0, y: 0, width: 1012, height: 638 }),
 			bleedGuide("g2"),
 			bleedGuide("g3"),
 		]);
@@ -254,10 +254,10 @@ describe("transpile with print guides", () => {
 		const compiled = compile(
 			v.value,
 			{},
-			{ width: 1013, height: 638, bleed: true },
+			{ width: 1012, height: 638, bleed: true },
 		);
-		expect([compiled.width, compiled.height]).toEqual([1083, 708]);
-		expect(compiled.trim).toEqual({ x: 35, y: 35, width: 1013, height: 638 });
+		expect([compiled.width, compiled.height]).toEqual([1082, 708]);
+		expect(compiled.trim).toEqual({ x: 35, y: 35, width: 1012, height: 638 });
 	});
 
 	it("reads a hidden guide", async () => {

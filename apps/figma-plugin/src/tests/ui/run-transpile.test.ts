@@ -11,7 +11,7 @@ const base = {
 	blendMode: "NORMAL" as const,
 	effects: [],
 };
-const bbox = { x: 0, y: 0, width: 1013, height: 638 };
+const bbox = { x: 0, y: 0, width: 1012, height: 638 };
 
 function hexToRgba(hex: string): {
 	r: number;
@@ -47,7 +47,7 @@ const msg: ReadDocumentMessage = {
 	product: {
 		sku: "card_cr80",
 		displayName: "CR80 Card",
-		width: 1013,
+		width: 1012,
 		height: 638,
 		frames: [
 			{ name: "front", label: "Front", required: true },
@@ -62,7 +62,7 @@ const msg: ReadDocumentMessage = {
 			slot: "front",
 			nodeId: "1:0",
 			nodeName: "Front",
-			width: 1013,
+			width: 1012,
 			height: 638,
 			tree: {
 				...base,
@@ -86,7 +86,7 @@ const msg: ReadDocumentMessage = {
 			slot: "back",
 			nodeId: "1:9",
 			nodeName: "Back",
-			width: 1013,
+			width: 1012,
 			height: 638,
 			tree: {
 				...base,
@@ -150,7 +150,7 @@ describe("runTranspileToTemplate", () => {
 				`asset ${sha} is carried`,
 			).toBe(true);
 		}
-		const compiled = compile(template, {}, { width: 1013, height: 638 });
+		const compiled = compile(template, {}, { width: 1012, height: 638 });
 		for (const frame of compiled.frames) {
 			for (const src of frame.assets.images) {
 				expect(src.startsWith("asset:")).toBe(false);
@@ -219,7 +219,7 @@ describe("runTranspileToTemplate", () => {
 			variants?: Array<{ id: string }>;
 			width: number;
 		};
-		expect(t.width).toBe(1013);
+		expect(t.width).toBe(1012);
 		expect(t.variants?.map((v) => v.id)).toEqual(["default", "amber"]);
 	});
 

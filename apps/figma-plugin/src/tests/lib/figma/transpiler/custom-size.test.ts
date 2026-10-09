@@ -69,7 +69,7 @@ describe("transpile (custom sizing)", () => {
 	it("emits the design's own dims, not the product's", async () => {
 		// Seed dims deliberately wrong — from-design mode must ignore them.
 		const out = await transpile(
-			makeInput({ certificate: A4_PORTRAIT }, [1013, 638]),
+			makeInput({ certificate: A4_PORTRAIT }, [1012, 638]),
 		);
 		const t = out.template as { width: number; height: number };
 		expect(t.width).toBe(2480);
