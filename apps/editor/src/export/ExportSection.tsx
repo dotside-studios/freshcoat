@@ -18,6 +18,7 @@ import {
 	variantsFor,
 } from "@freshcoat-js/workspace";
 import {
+	boundDatasetOf,
 	itemSize,
 	pagesPerSheet,
 	planSheets,
@@ -45,7 +46,6 @@ import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
 import { ExportSettings, type SettingsTab } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
-	boundDataset,
 	labelColumn,
 	photoSizedTemplate,
 	recordLabel,
@@ -214,7 +214,8 @@ export function ExportSection() {
 	const template = entry?.template;
 	const binding = entry?.binding;
 	const everyVariant = binding?.variant?.kind === "all";
-	const dataset = boundDataset(workspace, preset);
+	const dataset =
+		workspace && preset ? boundDatasetOf(workspace, preset) : undefined;
 	const unbound = !!preset && !!template && !dataset;
 
 	const typingFileName = useTypingFileName(preset);

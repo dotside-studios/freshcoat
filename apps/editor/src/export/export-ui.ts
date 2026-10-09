@@ -266,17 +266,6 @@ export function presetsForDataset(
 	return presets.filter((p) => bound.has(p.templateId));
 }
 
-/** The dataset a preset's template reads from, if it is bound to one that exists. */
-export function boundDataset(
-	workspace: Workspace | null,
-	preset: ExportPreset | undefined,
-): Dataset | undefined {
-	if (!workspace || !preset) return undefined;
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	const id = entry?.binding?.datasetId;
-	return id ? workspace.datasets.find((d) => d.id === id) : undefined;
-}
-
 export type RecordOutcome = {
 	ok: string[];
 	failed: string[];
