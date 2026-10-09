@@ -10,7 +10,7 @@
 		{
 			"kind": "google",
 			"family": "Inter",
-			"url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+			"url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap"
 		}
 	],
 	"fields": {
@@ -90,7 +90,7 @@
 			"elements": [
 				{
 					"id": "card_back",
-					"type": "frame",
+					"type": "rect",
 					"pos": {
 						"x": 700,
 						"y": 150
@@ -100,6 +100,14 @@
 						"height": 252
 					},
 					"rotation": -14,
+					"shadow": [
+						{
+							"color": "#0f172a33",
+							"dx": 0,
+							"dy": 18,
+							"blur": 40
+						}
+					],
 					"properties": {
 						"fill": {
 							"kind": "linear",
@@ -115,22 +123,12 @@
 								}
 							]
 						},
-						"cornerRadius": 20,
-						"clipsContent": true,
-						"children": []
-					},
-					"shadow": [
-						{
-							"color": "#0f172a33",
-							"dx": 0,
-							"dy": 18,
-							"blur": 40
-						}
-					]
+						"cornerRadius": 20
+					}
 				},
 				{
 					"id": "card_mid",
-					"type": "frame",
+					"type": "rect",
 					"pos": {
 						"x": 748,
 						"y": 200
@@ -140,6 +138,14 @@
 						"height": 252
 					},
 					"rotation": -5,
+					"shadow": [
+						{
+							"color": "#0f172a33",
+							"dx": 0,
+							"dy": 18,
+							"blur": 40
+						}
+					],
 					"properties": {
 						"fill": {
 							"kind": "linear",
@@ -155,18 +161,8 @@
 								}
 							]
 						},
-						"cornerRadius": 20,
-						"clipsContent": true,
-						"children": []
-					},
-					"shadow": [
-						{
-							"color": "#0f172a33",
-							"dx": 0,
-							"dy": 18,
-							"blur": 40
-						}
-					]
+						"cornerRadius": 20
+					}
 				},
 				{
 					"id": "card_front",
@@ -210,7 +206,7 @@
 									"height": 44
 								},
 								"properties": {
-									"src": "../freshcoat-mark.svg",
+									"src": "freshcoat-mark.svg",
 									"fit": "contain"
 								}
 							},
@@ -232,8 +228,8 @@
 										"size": 28,
 										"weight": 700
 									},
-									"foreground": "#ffffff",
-									"align": "left"
+									"align": "left",
+									"color": "#ffffff"
 								}
 							},
 							{
@@ -262,19 +258,19 @@
 								"id": "card_qr",
 								"type": "qr_code",
 								"pos": {
-									"x": 284,
-									"y": 136
+									"x": 276,
+									"y": 128
 								},
 								"size": {
-									"width": 92,
-									"height": 92
+									"width": 100,
+									"height": 100
 								},
 								"properties": {
 									"value": "{{url}}",
 									"errorCorrection": "M",
-									"foreground": "#ffffff",
-									"background": "#00000000",
-								"margin": 0
+									"foreground": "#0b1e33",
+									"background": "#ffffff",
+									"margin": 8
 								}
 							}
 						]
@@ -293,14 +289,14 @@
 					"type": "image",
 					"pos": {
 						"x": 96,
-						"y": 150
+						"y": 140
 					},
 					"size": {
 						"width": 445,
 						"height": 80
 					},
 					"properties": {
-						"src": "../freshcoat-logo.svg",
+						"src": "freshcoat-logo.svg",
 						"fit": "contain"
 					}
 				},
@@ -309,7 +305,7 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 270
+						"y": 258
 					},
 					"size": {
 						"width": 600,
@@ -332,7 +328,7 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 346
+						"y": 332
 					},
 					"size": {
 						"width": 560,
@@ -355,7 +351,7 @@
 					"type": "text",
 					"pos": {
 						"x": 96,
-						"y": 520
+						"y": 470
 					},
 					"size": {
 						"width": 600,

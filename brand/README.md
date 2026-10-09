@@ -7,13 +7,20 @@
 | `freshcoat-logo.svg` | The Freshcoat logo and wordmark, without the Studio qualifier |
 | `freshcoat-studio-logo.svg`, `freshcoat-studio-logo-dark.svg` | The Freshcoat Studio logo, for light and dark backgrounds |
 | `freshcoat-studio-wordmark.svg` | The wordmark alone, `currentColor`, with "studio" at reduced opacity |
-| `png/` | Raster exports, including a 512 px square icon |
+| `social-preview.json` | The GitHub social preview template, 1280 × 640 |
+| `png/` | Raster exports, including a 512 px square icon and `social-preview.png` |
 
 `source/` holds the Figma exports. Everything else is generated from them:
 
 ```sh
 bun brand/build.ts          # also writes the files in apps/editor/public/
 bun brand/build.ts --check  # diffs the rebuilt gradient against Figma's
+```
+
+The social preview is rendered from its template with the CLI:
+
+```sh
+bun packages/cli/src/bin.ts render brand/social-preview.json --out brand/png
 ```
 
 Figma writes the mark's angular gradient as a CSS `conic-gradient` inside a
