@@ -359,9 +359,12 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			alive();
 			const failed: FontLoadReport["failed"] = [];
 			const loaded: Array<readonly [string, Uint8Array[]]> = [];
+			const byFamily = new Map<string, Extract<FontRequest, { descriptor: unknown }>>();
+			for (const req of requests)
+				if ("descriptor" in req && !byFamily.has(req.family))
+					byFamily.set(req.family, req);
 			await Promise.all(
-				requests.map(async (req) => {
-					if (!("descriptor" in req)) return;
+				[...byFamily.values()].map(async (req) => {
 					const key = JSON.stringify(req.descriptor);
 					// Bytes given directly win over a descriptor, as they do when painting.
 					if (fonts.has(req.family) && (fontKeys.get(req.family) ?? key) === key)

@@ -9,7 +9,7 @@
 // upscaling a 1× PNG — glyphs re-rasterize and images resample from their source
 // at the exported resolution, while line breaks, hinting-free layout and every
 // baked text layout stay identical across scales.
-import type { Size } from "./types";
+import type { Command, Size } from "./types";
 
 // How an export decides its scale. `scale` is the multiplier itself; `width` /
 // `height` are target pixels on that axis, which the design's own size turns into
@@ -122,4 +122,25 @@ export function exportPixelSize(size: Size, scale: number): Size {
 		width: Math.max(1, Math.round(size.width * scale)),
 		height: Math.max(1, Math.round(size.height * scale)),
 	};
+}
+
+// Retarget compiled commands at an export density and sample rate. Both live on
+// the scene's own `createCanvas`, so a re-export swaps that one command rather
+// than compiling again. A field is set only when it is not 1x, keeping the
+// stream identical to one compiled without export settings.
+export function withExportScale(
+	commands: Command[],
+	scale: number,
+	supersample: number,
+): Command[] {
+	if (scale === 1 && supersample === 1) return commands;
+	return commands.map((c) =>
+		c.op === "createCanvas"
+			? {
+					...c,
+					...(scale !== 1 ? { scale } : {}),
+					...(supersample !== 1 ? { supersample } : {}),
+				}
+			: c,
+	);
 }

@@ -56,6 +56,7 @@ export {
 	MAX_SUPERSAMPLE,
 	resolveExportScale,
 	resolveSupersample,
+	withExportScale,
 } from "./export-scale";
 export {
 	clearFontBytesCache,
