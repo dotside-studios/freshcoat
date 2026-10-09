@@ -14,8 +14,6 @@
 
 import type {
 	CanvasKit,
-	FontWeight,
-	FontWeightEnumValues,
 	Paragraph,
 	ParagraphBuilder,
 	ParagraphStyle,
@@ -26,7 +24,6 @@ import {
 	makeParagraphBuilder,
 	type SharedFontProvider,
 } from "./font-collection";
-import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type {
 	ClusterAdvance,
 	InlineShapedLine,
@@ -34,26 +31,13 @@ import type {
 	SpanFont,
 	TextEngine,
 } from "./text-engine";
+import { spanTextStyle } from "./text-style";
 import {
 	paragraphGaps,
 	type TextLayout,
 	type TextLayoutInput,
 } from "./text-types";
 import type { FontVMetrics } from "./types";
-
-type WeightName = Exclude<keyof FontWeightEnumValues, "values">;
-
-const WEIGHTS: Record<number, WeightName> = {
-	100: "Thin",
-	200: "ExtraLight",
-	300: "Light",
-	400: "Normal",
-	500: "Medium",
-	600: "SemiBold",
-	700: "Bold",
-	800: "ExtraBold",
-	900: "Black",
-};
 
 const SHRINK_FLOOR_PX = 8;
 const NATURAL_WIDTH = 1e7; // effectively unbounded — single-line advance
@@ -109,46 +93,12 @@ export function createParagraphEngine(
 	// registered. Callers order the map so broader fallbacks come after the primary.
 	const fallbackFamilies = [...fonts.keys()];
 
-	function ckWeight(weight: number | undefined): FontWeight {
-		return ck.FontWeight[
-			WEIGHTS[Math.round((weight || 400) / 100) * 100] ?? "Normal"
-		];
-	}
-
-	// The CanvasKit TextStyle for a span — the same shape canvaskit.ts paints
-	// with. CanvasKit adds letterSpacing after each glyph, so measuring/breaking
-	// with it here matches the render exactly.
-	function spanTextStyle(font: SpanFont): TextStyle {
-		return {
-			fontFamilies: [
-				font.family,
-				...fallbackFamilies.filter((f) => f !== font.family),
-			],
-			fontSize: font.size,
-			fontStyle: {
-				weight: ckWeight(font.weight),
-				slant:
-					font.style === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright,
-			},
-			// The same weight again as a variation axis, plus any other axes the
-			// span sets. A family delivered as one variable file (what Google Fonts
-			// serves a browser, one woff2 per subset reused across every weight row)
-			// would otherwise shape a 700 span as the 400 instance under synthetic
-			// bold: lighter strokes and 400's advances, so thin and mis-wrapped.
-			fontVariations: fontVariationList(font.weight, font.variations),
-			...(font.features
-				? { fontFeatures: fontFeatureList(font.features) }
-				: {}),
-			...(font.letterSpacing ? { letterSpacing: font.letterSpacing } : {}),
-		};
-	}
-
 	function paragraphStyle(
 		font: SpanFont,
 		direction?: "ltr" | "rtl",
 	): ParagraphStyle {
 		return new ck.ParagraphStyle({
-			textStyle: spanTextStyle(font),
+			textStyle: spanTextStyle(ck, font, fallbackFamilies),
 			...(direction === "rtl"
 				? {
 						textDirection: ck.TextDirection.RTL,
@@ -189,7 +139,7 @@ export function createParagraphEngine(
 			// Typed as constructor only; CanvasKit also allows the plain call.
 			builder.pushStyle(
 				(ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
-					spanTextStyle(s.font),
+					spanTextStyle(ck, s.font, fallbackFamilies),
 				),
 			);
 			const text = normalizeNewlines(s.text);

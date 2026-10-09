@@ -266,6 +266,57 @@ test("double-click edits a text layer on the canvas as one undo step", async ({
 	).toBe(before);
 });
 
+test("the canvas editor places the caret where the text is clicked", async ({
+	page,
+}) => {
+	await openSample(page);
+	await page.getByTestId("artboard").hover();
+	await page.keyboard.press("t");
+	const p = await artboardPoint(page, 300, 200);
+	await page.mouse.click(p.x, p.y);
+	const editor = page.getByLabel("Edit text on canvas");
+	await expect(editor).toBeFocused();
+	await page.keyboard.type("Hello {{ name }}");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("world");
+	const surface = page.locator("canvas.cursor-text");
+	await expect(surface).toBeVisible();
+	const box = await surface.boundingBox();
+	if (!box) throw new Error("no editing surface");
+	const caret = () =>
+		editor.evaluate((el: HTMLTextAreaElement) => [
+			el.selectionStart,
+			el.selectionEnd,
+		]);
+
+	await page.mouse.click(box.x + 1, box.y + 4);
+	await expect.poll(caret).toEqual([0, 0]);
+	await page.keyboard.press("ArrowDown");
+	await expect.poll(caret).toEqual([17, 17]);
+	await page.keyboard.press("End");
+	await expect.poll(caret).toEqual([22, 22]);
+	await page.keyboard.press("Shift+ArrowUp");
+	await expect.poll(caret).toEqual([6, 22]);
+
+	await page.mouse.move(box.x + 1, box.y + 4);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width - 1, box.y + 4, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(caret).toEqual([0, 16]);
+	await expect(editor).toBeFocused();
+
+	await page.keyboard.type("Hi");
+	await page.keyboard.press("Escape");
+	await expect
+		.poll(() =>
+			state<string>(
+				page,
+				"t.template_data[0].elements.at(-1).properties.value",
+			),
+		)
+		.toBe("Hi\nworld");
+});
+
 test("images dropped on the canvas land where they are dropped", async ({
 	page,
 }) => {

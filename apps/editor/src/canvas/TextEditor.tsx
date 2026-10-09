@@ -1,15 +1,22 @@
 import type { TextElement } from "@freshcoat-js/coatfile";
+import { cn } from "@freshcoat-js/ui/lib/cn";
+import type { CanvasKit } from "canvaskit-wasm";
 import {
 	type CSSProperties,
 	type KeyboardEvent,
+	type PointerEvent,
+	useEffect,
 	useLayoutEffect,
 	useRef,
+	useState,
 } from "react";
 import { useController } from "~/app/context";
 import { ancestorRects, worldCorners } from "~/doc/geometry";
 import { getElement } from "~/doc/path";
 import { useFieldCompletion } from "~/panels/design/field-completion";
+import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { useEditor } from "~/state/hooks";
+import { TextSurface } from "./text-surface";
 
 const faces = new Map<string, string>();
 
@@ -42,6 +49,38 @@ function fitHeight(el: HTMLTextAreaElement) {
 	el.style.height = `${el.scrollHeight}px`;
 }
 
+function useCanvasKit(): CanvasKit | undefined {
+	const [ck, setCk] = useState(loadedCanvasKit);
+	useEffect(() => {
+		if (ck) return;
+		let live = true;
+		getCanvasKit()
+			.then((instance) => {
+				if (live) setCk(() => instance);
+			})
+			.catch(() => {});
+		return () => {
+			live = false;
+		};
+	}, [ck]);
+	return ck;
+}
+
+function select(el: HTMLTextAreaElement, anchor: number, focus: number) {
+	if (focus < anchor) el.setSelectionRange(focus, anchor, "backward");
+	else el.setSelectionRange(anchor, focus, "forward");
+}
+
+function ends(el: HTMLTextAreaElement): { anchor: number; focus: number } {
+	return el.selectionDirection === "backward"
+		? { anchor: el.selectionEnd, focus: el.selectionStart }
+		: { anchor: el.selectionStart, focus: el.selectionEnd };
+}
+
+const MAC =
+	typeof navigator !== "undefined" &&
+	/Mac|iP(hone|ad)/.test(navigator.platform);
+
 const JUSTIFY: Record<string, CSSProperties["justifyContent"]> = {
 	top: "flex-start",
 	middle: "center",
@@ -54,8 +93,10 @@ const CASE: Record<string, CSSProperties["textTransform"]> = {
 	title: "capitalize",
 };
 
-/** The layer being edited on the canvas: a textarea over its box, in its
- *  font, holding the raw template text with its `{{tokens}}`. The render
+/** The layer being edited on the canvas, holding the raw template text with
+ *  its `{{tokens}}`. A textarea over the layer's box takes the typing; once
+ *  CanvasKit is loaded it hides, and a canvas shows the text as the render
+ *  shapes and wraps it, with the caret, selection and fields. The render
  *  leaves the layer out meanwhile. Blur, Escape or Mod+Enter end the edit. */
 export function TextEditor() {
 	const key = useEditor((s) => s.textEdit);
@@ -68,6 +109,14 @@ function EditingText({ layer }: { layer: string }) {
 	const geometry = useEditor((s) => s.geometry);
 	const area = useRef<HTMLTextAreaElement>(null);
 	const wrap = useRef<HTMLDivElement>(null);
+	const canvas = useRef<HTMLCanvasElement>(null);
+	const surface = useRef<TextSurface | null>(null);
+	const goal = useRef<{ at: number; x: number } | null>(null);
+	const drag = useRef<{ from: [number, number]; by: "char" | "word" } | null>(
+		null,
+	);
+	const [painted, setPainted] = useState(false);
+	const ck = useCanvasKit();
 	const placed = geometry.has(layer);
 	const template = useEditor((s) => s.doc?.history.present ?? null);
 	const completion = useFieldCompletion(wrap, template, (next, caret) => {
@@ -88,6 +137,20 @@ function EditingText({ layer }: { layer: string }) {
 		el.select();
 	}, [layer, placed]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new surface for each layer, once its canvas is mounted
+	useLayoutEffect(() => {
+		const c = canvas.current;
+		const a = area.current;
+		if (!ck || !c || !a) return;
+		const s = new TextSurface(ck, c, a, () => setPainted(true));
+		surface.current = s;
+		return () => {
+			surface.current = null;
+			s.dispose();
+			setPainted(false);
+		};
+	}, [ck, layer, placed]);
+
 	const t = controller.template;
 	const el = t ? getElement(t, layer) : undefined;
 	const box = geometry.get(layer);
@@ -107,6 +170,94 @@ function EditingText({ layer }: { layer: string }) {
 	const width = Math.hypot(ne.x - nw.x, ne.y - nw.y);
 	const height = Math.hypot(sw.x - nw.x, sw.y - nw.y);
 	const angle = (Math.atan2(ne.y - nw.y, ne.x - nw.x) * 180) / Math.PI;
+	if (surface.current)
+		surface.current.input = {
+			props,
+			fonts: controller.fonts,
+			box: { width: box.rect.width, height: box.rect.height },
+			zoom: view.zoom,
+		};
+
+	const laidOut = () => {
+		const s = surface.current;
+		return painted && s?.sync() ? s.text : null;
+	};
+	const move = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+		const text = laidOut();
+		const el = area.current;
+		if (!text || !el || e.altKey || e.ctrlKey) return false;
+		const { anchor, focus } = ends(el);
+		let to: number | null = null;
+		if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.metaKey) {
+			const x =
+				goal.current?.at === focus ? goal.current.x : text.caret(focus).x;
+			to = text.vertical(focus, e.key === "ArrowUp" ? -1 : 1, x);
+			goal.current = { at: to, x };
+		} else if (
+			e.key === "Home" ||
+			e.key === "End" ||
+			(MAC && e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight"))
+		) {
+			const back = e.key === "Home" || e.key === "ArrowLeft";
+			if (e.metaKey && !MAC) return false;
+			to = text.lineEdge(focus, back ? "start" : "end");
+		}
+		if (to === null) return false;
+		if (e.shiftKey) select(el, anchor, to);
+		else el.setSelectionRange(to, to);
+		return true;
+	};
+
+	const pick = (e: PointerEvent<HTMLCanvasElement>) => {
+		const text = laidOut();
+		if (!text) return null;
+		const at = text.indexAt(
+			e.nativeEvent.offsetX / view.zoom,
+			e.nativeEvent.offsetY / view.zoom,
+		);
+		return { text, at };
+	};
+	const onCanvasDown = (e: PointerEvent<HTMLCanvasElement>) => {
+		e.stopPropagation();
+		e.preventDefault();
+		const el = area.current;
+		const hit = pick(e);
+		if (!el || !hit || e.button !== 0) return;
+		el.focus();
+		const { text, at } = hit;
+		goal.current = null;
+		if (e.detail >= 3) {
+			const [a, b] = text.paragraph(at);
+			select(el, a, b);
+			drag.current = null;
+			return;
+		}
+		if (e.detail === 2) {
+			const [a, b] = text.word(at);
+			select(el, a, b);
+			drag.current = { from: [a, b], by: "word" };
+		} else if (e.shiftKey) {
+			const { anchor } = ends(el);
+			select(el, anchor, at);
+			drag.current = { from: [anchor, anchor], by: "char" };
+		} else {
+			el.setSelectionRange(at, at);
+			drag.current = { from: [at, at], by: "char" };
+		}
+		e.currentTarget.setPointerCapture(e.pointerId);
+	};
+	const onCanvasMove = (e: PointerEvent<HTMLCanvasElement>) => {
+		const d = drag.current;
+		const el = area.current;
+		const hit = d && pick(e);
+		if (!d || !el || !hit) return;
+		const [a, b] = d.by === "word" ? hit.text.word(hit.at) : [hit.at, hit.at];
+		if (a < d.from[0]) select(el, d.from[1], a);
+		else select(el, d.from[0], Math.max(b, d.from[1]));
+	};
+	const onCanvasUp = () => {
+		drag.current = null;
+	};
 
 	const end = () => {
 		if (controller.state.textEdit === layer) controller.endTextEdit();
@@ -117,7 +268,10 @@ function EditingText({ layer }: { layer: string }) {
 		if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
 			e.preventDefault();
 			area.current?.blur();
+			return;
 		}
+		if (e.key !== "ArrowUp" && e.key !== "ArrowDown") goal.current = null;
+		if (move(e)) e.preventDefault();
 	};
 	const align = props.align ?? (props.direction ? "start" : "left");
 
@@ -135,6 +289,20 @@ function EditingText({ layer }: { layer: string }) {
 				justifyContent: JUSTIFY[props.verticalAlign ?? "top"],
 			}}
 		>
+			<canvas
+				ref={canvas}
+				aria-hidden
+				className={cn(
+					"block cursor-text outline outline-1 outline-fc-accent",
+					!painted && "hidden",
+				)}
+				onPointerDown={onCanvasDown}
+				onPointerMove={onCanvasMove}
+				onPointerUp={onCanvasUp}
+				onPointerCancel={onCanvasUp}
+				onMouseDown={(e) => e.preventDefault()}
+				onDoubleClick={(e) => e.stopPropagation()}
+			/>
 			<textarea
 				ref={area}
 				aria-label="Edit text on canvas"
@@ -142,7 +310,12 @@ function EditingText({ layer }: { layer: string }) {
 				dir={props.direction ?? "ltr"}
 				spellCheck={false}
 				rows={1}
-				className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline outline-1 outline-fc-accent"
+				className={cn(
+					"block w-full resize-none overflow-hidden border-0 bg-transparent p-0",
+					painted
+						? "pointer-events-none absolute inset-0 h-full text-transparent caret-transparent selection:bg-transparent"
+						: "outline outline-1 outline-fc-accent",
+				)}
 				style={{
 					fontFamily: `"${editingFamily(font.family, controller.fonts)}", "${font.family}", sans-serif`,
 					fontSize: font.size * view.zoom,
