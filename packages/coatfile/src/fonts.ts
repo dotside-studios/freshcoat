@@ -2,14 +2,14 @@ import {
 	type ByteLoader,
 	type FontFetch,
 	fontBytes,
+	fontRequestKey,
+	googleCss2Url,
 	resolveFontRequest,
 } from "@freshcoat-js/engine";
 import {
 	barcodeFontFamily,
 	defaultFontFamily,
-	fontRequestKey,
 	fontUsage,
-	googleCss2Url,
 	withVariants,
 } from "./font-usage";
 import { walkElements } from "./tree";

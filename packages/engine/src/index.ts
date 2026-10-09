@@ -62,6 +62,9 @@ export {
 	clearFontBytesCache,
 	type FontFetch,
 	fontBytes,
+	fontRequestKey,
+	googleCss2Url,
+	googleFamilyParam,
 	resolveFontRequest,
 } from "./font-bytes";
 export {
