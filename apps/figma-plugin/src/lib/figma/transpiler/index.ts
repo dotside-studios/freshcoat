@@ -1,6 +1,8 @@
-import type {
-	TemplateWarning,
-	VariantElementDelta,
+import {
+	DEFAULT_VARIANT_ID,
+	type TemplateWarning,
+	type VariantElementDelta,
+	variantIdFor,
 } from "@freshcoat-js/coatfile";
 import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
 import {
@@ -40,7 +42,7 @@ import {
 	hiddenElements,
 	traceElementsByNode,
 } from "./variant-deltas";
-import { alignInstanceVisibility, uniqueVariantId } from "./variants";
+import { alignInstanceVisibility } from "./variants";
 import { makeThrowawaySink } from "./walk";
 
 export type {
@@ -393,18 +395,19 @@ export async function transpile(
 		// The base card itself, so a picker has something to switch back to. It is
 		// not a colorway instance, so it gets no variantPicks entry.
 		variants.push({
-			id: "default",
+			id: DEFAULT_VARIANT_ID,
 			label: "Default",
 			...(defaultSwatch ? { swatch: defaultSwatch } : {}),
 			overrides: [],
 		});
-		const takenIds = new Set(["default"]);
+		const takenIds = new Set<string>();
 		for (const cw of colorways) {
 			const { overrides, swatch, assets } = await buildVariantOverrides(cw);
 			// Embed the recolored rasters this variant introduced; assembleBundle
 			// de-dupes by sha256, so any that coincide with base rasters collapse.
 			for (const a of assets) allAssets.push(a);
-			const id = uniqueVariantId(cw.label, takenIds);
+			const id = variantIdFor(cw.label, takenIds);
+			takenIds.add(id);
 			variants.push({
 				id,
 				label: cw.label,

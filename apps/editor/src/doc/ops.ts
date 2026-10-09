@@ -14,6 +14,7 @@ import {
 	bytesToBase64,
 	checkVariants,
 	collectAssetRefs,
+	DEFAULT_VARIANT_ID,
 	FORMAT_MINOR,
 	FORMAT_VERSION,
 	formatVersionStatus,
@@ -22,6 +23,7 @@ import {
 	resolveInsets,
 	subtleSha256,
 	type VariantElementDelta,
+	variantIdFor,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -1025,8 +1027,6 @@ export function pruneUnusedAssets(t: Template): Template {
 // ── Variants ─────────────────────────────────────────────────────────────────
 
 const VARIANT_ID = /^[a-z0-9-]+$/;
-/** Export file names and bindings say `default` for Default. */
-const RESERVED_VARIANT_ID = "default";
 
 export type AddVariantResult =
 	| (OpOk & { variantId: string })
@@ -1046,24 +1046,6 @@ function withVariant(t: Template, id: string, next: Variant): Template {
 		...t,
 		variants: (t.variants ?? []).map((v) => (v.id === id ? next : v)),
 	};
-}
-
-/** A variant id from a label: lowercase, `-` between words, `variant` when
- *  nothing is left, and `-2`, `-3` until no other variant has it. */
-export function variantIdFor(t: Template, label: string): string {
-	const slug =
-		label
-			.normalize("NFKD")
-			.replace(/[\u0300-\u036f]/g, "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "") || "variant";
-	const used = new Set((t.variants ?? []).map((v) => v.id));
-	used.add(RESERVED_VARIANT_ID);
-	if (!used.has(slug)) return slug;
-	let n = 2;
-	while (used.has(`${slug}-${n}`)) n++;
-	return `${slug}-${n}`;
 }
 
 /**
@@ -1099,7 +1081,10 @@ export function addVariant(
 	const source =
 		opts.from === undefined ? undefined : findVariant(t, opts.from);
 	if (opts.from !== undefined && !source) return unknownVariant();
-	const id = variantIdFor(t, label);
+	const id = variantIdFor(
+		label,
+		(t.variants ?? []).map((v) => v.id),
+	);
 	const swatch = source ? source.swatch : suggestSwatch(t);
 	const variant: Variant = {
 		id,
@@ -1213,7 +1198,7 @@ export function changeVariantId(
 	if (clean === id) return ok(t, []);
 	if (!VARIANT_ID.test(clean))
 		return refuse("invalid_variant_id", VARIANT_COPY.idRule);
-	if (clean === RESERVED_VARIANT_ID)
+	if (clean === DEFAULT_VARIANT_ID)
 		return refuse("invalid_variant_id", VARIANT_COPY.reservedId);
 	if (findVariant(t, clean))
 		return refuse("duplicate_variant_id", VARIANT_COPY.idTaken(clean));

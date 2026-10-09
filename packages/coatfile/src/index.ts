@@ -221,11 +221,13 @@ export {
 	applyVariant,
 	checkVariants,
 	closestVariant,
+	DEFAULT_VARIANT_ID,
 	hasShapedVariants,
 	isEmptyVariant,
 	type VariantElementDelta,
 	type VariantIssue,
 	variantBase,
+	variantIdFor,
 	variantSize,
 } from "./variants";
 export {

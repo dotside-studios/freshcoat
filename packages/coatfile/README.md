@@ -783,6 +783,12 @@ which is what `renderTemplate` compiles at by default; `compile` needs a
 laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
 sized variant as it is.
 
+`DEFAULT_VARIANT_ID` (`"default"`) is how export file names, bindings and
+pickers name Default, so no variant may take it. `variantIdFor(label, taken)`
+makes an id from a label: accents stripped, lowercased, `-` between words,
+`variant` when nothing is left, then `-2`, `-3` until it is neither in `taken`
+nor `DEFAULT_VARIANT_ID`. It does not add the id to `taken`.
+
 `closestVariant(t, aspect)` is the variant whose size is closest in aspect,
 or undefined for Default, which wins a tie. `hasShapedVariants(t)` says
 whether any variant's size changes the aspect. `isEmptyVariant(variant)` says

@@ -34,7 +34,6 @@ import {
 	unwrap,
 	updateElement,
 	updateField,
-	variantIdFor,
 } from "~/doc/ops";
 import { getElement, keyOf, walkLayers } from "~/doc/path";
 import { resizeWithConstraints } from "~/doc/resize";
@@ -506,9 +505,6 @@ describe("variant management", () => {
 		const t = doc();
 		const r = addVariant(t, { label: "Dark" });
 		expect(r.ok && r.variantId).toBe("dark-2");
-		expect(variantIdFor(t, "  ")).toBe("variant");
-		expect(variantIdFor(t, "Crème Brûlée!")).toBe("creme-brulee");
-		expect(variantIdFor(t, "Default")).toBe("default-2");
 		expect(addVariant(t, { label: " " }).ok).toBe(false);
 	});
 

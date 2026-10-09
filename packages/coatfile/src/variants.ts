@@ -1,6 +1,29 @@
 import { resizeFrames } from "./relayout";
 import type { Element, Size, Template, TemplateFrame, Variant } from "./types";
 
+/** The id export file names, bindings and pickers use for Default. No
+ *  variant may take it. */
+export const DEFAULT_VARIANT_ID = "default";
+
+/** A variant id from a label: accents stripped, lowercase, `-` between words,
+ *  `variant` when nothing is left, then `-2`, `-3` until it is neither in
+ *  `taken` nor `DEFAULT_VARIANT_ID`. */
+export function variantIdFor(label: string, taken: Iterable<string>): string {
+	const slug =
+		label
+			.normalize("NFKD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "") || "variant";
+	const used = new Set(taken);
+	used.add(DEFAULT_VARIANT_ID);
+	if (!used.has(slug)) return slug;
+	let n = 2;
+	while (used.has(`${slug}-${n}`)) n++;
+	return `${slug}-${n}`;
+}
+
 /** One element delta in a variant override. */
 export type VariantElementDelta = NonNullable<
 	Variant["overrides"][number]["elements"]

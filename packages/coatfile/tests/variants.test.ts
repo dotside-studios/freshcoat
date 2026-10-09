@@ -18,8 +18,10 @@ import {
 	applyVariant,
 	checkVariants,
 	closestVariant,
+	DEFAULT_VARIANT_ID,
 	hasShapedVariants,
 	isEmptyVariant,
+	variantIdFor,
 	variantSize,
 } from "../src/variants";
 
@@ -720,5 +722,29 @@ describe("isEmptyVariant", () => {
 		expect(isEmptyVariant(shell({ pos: { x: 1, y: 2 } }))).toBe(false);
 		expect(isEmptyVariant(shell({ hidden: true }))).toBe(false);
 		expect(isEmptyVariant(shell({ opacity: undefined }))).toBe(true);
+	});
+});
+
+describe("variantIdFor", () => {
+	test("slugs the label and strips accents", () => {
+		expect(variantIdFor("Crème Brûlée!", [])).toBe("creme-brulee");
+		expect(variantIdFor("  Dark  Mode ", [])).toBe("dark-mode");
+	});
+
+	test("falls back to `variant` when nothing is left", () => {
+		expect(variantIdFor("  ", [])).toBe("variant");
+		expect(variantIdFor("!!", ["variant"])).toBe("variant-2");
+	});
+
+	test("suffixes from -2 past every taken id and the default id", () => {
+		expect(DEFAULT_VARIANT_ID).toBe("default");
+		expect(variantIdFor("Default", [])).toBe("default-2");
+		expect(variantIdFor("Sky", ["sky", "sky-2"])).toBe("sky-3");
+	});
+
+	test("does not change `taken`", () => {
+		const taken = new Set(["sky"]);
+		expect(variantIdFor("Sky", taken)).toBe("sky-2");
+		expect([...taken]).toEqual(["sky"]);
 	});
 });
