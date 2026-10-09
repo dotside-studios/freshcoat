@@ -142,6 +142,10 @@ dataset's selection from there to offer it.
   runs it over Studio's worker pool. On sheets,
   `../../packages/workspace/src/export/sheets.ts` and
   `../../packages/workspace/src/impose.ts` place each card on paper.
+- **Statuses** (`../../packages/workspace/src/export/status.ts`): a finished
+  job's `recordOutcome` marks records exported or failed when the preset has
+  `markExported`. `statusActions` in `src/export/export-ui.ts` turns it into
+  store actions, which write it outside the undo history.
 - **Sinks** (`src/export/sinks.ts`): where files go. Download zips in
   memory and hands over 512 MB parts; Zip file and Folder write through the
   File System Access API as items finish.

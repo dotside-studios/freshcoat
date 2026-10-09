@@ -23,8 +23,6 @@ import {
 	labelColumn,
 	photoSizedTemplate,
 	recordLabel,
-	recordOutcome,
-	retryPreset,
 	selectedIds,
 	settingsSummary,
 	statusActions,
@@ -94,18 +92,6 @@ describe("presets", () => {
 		expect(duplicatePreset(first, [first, copy]).name).toBe(
 			"New preset copy 2",
 		);
-	});
-
-	test("retrying failed items reruns failed records", () => {
-		const r = result([item("r1", "front", true), item("r3", "front", false)]);
-		expect(retryPreset(preset({ selected: ["x"] }), r)).toEqual({
-			...preset(),
-			records: "failed",
-		});
-		expect(retryPreset(preset({ markExported: false }), r)).toMatchObject({
-			records: "selected",
-			selected: ["r3"],
-		});
 	});
 });
 
@@ -230,11 +216,6 @@ describe("record statuses", () => {
 			item("r2", "back", false, "font"),
 			item("r3", "front", false),
 		]);
-		expect(recordOutcome(r)).toEqual({
-			ok: ["r1"],
-			failed: ["r2", "r3"],
-			errors: { r2: "font", r3: "Failed" },
-		});
 		expect(statusActions(r, "d", now)).toEqual([
 			{
 				type: "setRecordStatus",

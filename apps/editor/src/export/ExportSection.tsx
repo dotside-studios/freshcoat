@@ -22,6 +22,7 @@ import {
 	itemSize,
 	pagesPerSheet,
 	planSheets,
+	recordOutcome,
 	sheetOf,
 	withRecordIds,
 } from "@freshcoat-js/workspace/export";
@@ -49,7 +50,6 @@ import {
 	labelColumn,
 	photoSizedTemplate,
 	recordLabel,
-	recordOutcome,
 	type StatusFilter,
 	selectedIds,
 } from "./export-ui";

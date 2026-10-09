@@ -56,6 +56,7 @@ export {
 	type ExportWorkspaceResult,
 	exportWorkspace,
 	findPreset,
+	markExported,
 } from "./run";
 export {
 	BLEED_NEEDS_TEMPLATE_SIZE,
@@ -83,3 +84,10 @@ export {
 	type PartZipSinkOptions,
 	type SinkResult,
 } from "./sink";
+export {
+	applyJobResult,
+	type RecordOutcome,
+	recordOutcome,
+	retryPreset,
+	unwrittenRecordIds,
+} from "./status";

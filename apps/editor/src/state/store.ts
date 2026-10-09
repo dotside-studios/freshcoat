@@ -8,6 +8,7 @@ import {
 	newId,
 	type RecordStatus,
 	type Workspace,
+	withRecordStatus,
 } from "@freshcoat-js/workspace";
 import { type DataViewState, DEFAULT_DATA_VIEW } from "~/data/data-view";
 import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
@@ -48,7 +49,6 @@ import {
 	undoDatasets,
 	type WorkspaceState,
 	withJobStatus,
-	withRecordStatus,
 	workspaceDirty,
 	workspaceState,
 } from "./workspace";

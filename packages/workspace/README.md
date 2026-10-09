@@ -122,6 +122,15 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
 job is cancelled or fails.
 
+When the preset has `markExported`, `result.workspace` is the workspace with
+the job's record statuses written: `exported` with the time for records whose
+every item rendered, `failed` with the first error for the rest. The workspace
+passed in is not changed, and nothing is written for a cancelled job. Save
+`result.workspace` with `packWorkspace` to keep them. `applyJobResult` does
+the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
+`retryPreset` gives the preset that reruns a job's failed records, and
+`unwrittenRecordIds` lists the records a cancelled job left unwritten.
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
