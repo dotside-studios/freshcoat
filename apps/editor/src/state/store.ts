@@ -1,12 +1,13 @@
 import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
 import { COAT_EXTENSION, templateStem } from "@freshcoat-js/coatfile/coat";
-import type {
-	Binding,
-	Dataset,
-	ExportPreset,
-	RecordStatus,
-	Workspace,
+import {
+	type Binding,
+	type Dataset,
+	type ExportPreset,
+	newId,
+	type RecordStatus,
+	type Workspace,
 } from "@freshcoat-js/workspace";
 import { type DataViewState, DEFAULT_DATA_VIEW } from "~/data/data-view";
 import { type LayerGeometry, sameGeometry } from "~/doc/geometry";
@@ -37,7 +38,6 @@ import {
 	activeSlot,
 	type BindingPatch,
 	commitDatasets,
-	newId,
 	type ParkedEditor,
 	patchBindings,
 	redoDatasets,

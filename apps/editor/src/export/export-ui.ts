@@ -1,5 +1,6 @@
 import {
 	applyVariant,
+	cardSizeMm,
 	fitDesignSize,
 	resizeTemplate,
 	type Template,
@@ -159,22 +160,17 @@ export function imageFieldKeys(template: Template | undefined): string[] {
 }
 
 /** A PDF page's physical size: template pixels are dots at the DPI. */
-export function pageSize(
-	template: { width: number; height: number },
-	dpi: number,
-): { inches: [number, number]; mm: [number, number] } {
-	const w = template.width / dpi;
-	const h = template.height / dpi;
-	return { inches: [w, h], mm: [w * 25.4, h * 25.4] };
-}
-
 export function formatPageSize(
 	template: { width: number; height: number },
 	dpi: number,
 ): string {
 	if (!(dpi > 0)) return "";
-	const { inches, mm } = pageSize(template, dpi);
-	return `${inches[0].toFixed(2)} × ${inches[1].toFixed(2)} in · ${mm[0].toFixed(1)} × ${mm[1].toFixed(1)} mm`;
+	const { widthMm, heightMm } = cardSizeMm(
+		template.width,
+		template.height,
+		dpi,
+	);
+	return `${(template.width / dpi).toFixed(2)} × ${(template.height / dpi).toFixed(2)} in · ${widthMm.toFixed(1)} × ${heightMm.toFixed(1)} mm`;
 }
 
 export function formatDuration(ms: number): string {
@@ -264,17 +260,6 @@ export function presetsForDataset(
 			.map((t) => t.id),
 	);
 	return presets.filter((p) => bound.has(p.templateId));
-}
-
-/** The dataset a preset's template reads from, if it is bound to one that exists. */
-export function boundDataset(
-	workspace: Workspace | null,
-	preset: ExportPreset | undefined,
-): Dataset | undefined {
-	if (!workspace || !preset) return undefined;
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	const id = entry?.binding?.datasetId;
-	return id ? workspace.datasets.find((d) => d.id === id) : undefined;
 }
 
 export type RecordOutcome = {

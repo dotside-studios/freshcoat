@@ -23,6 +23,7 @@ import {
 	inferType,
 	isValidKey,
 	previewMapping,
+	uniqueName,
 } from "@freshcoat-js/workspace";
 import {
 	type DragEvent,
@@ -41,7 +42,7 @@ import { useEditor } from "~/state/hooks";
 import FileIcon from "~icons/mingcute/file-import-line";
 import { pickFiles, TABLE_ACCEPT } from "./actions";
 import { recallMapping, rememberMapping } from "./import-memory";
-import { emptyDataset, replaceDataset, TYPE_LABELS, uniqueName } from "./model";
+import { emptyDataset, replaceDataset, TYPE_LABELS } from "./model";
 import { importTable, tableImporter } from "./table-import";
 import { dataRowCount, type OpenedTable } from "./table-store";
 

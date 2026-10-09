@@ -12,6 +12,7 @@ import {
 } from "@freshcoat-js/coatfile/coat";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
+	newId,
 	resolveValues,
 	variantFor,
 	type Workspace,
@@ -105,7 +106,6 @@ import {
 } from "~/state/store";
 import {
 	activeSlot,
-	newId,
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";

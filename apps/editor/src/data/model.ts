@@ -270,15 +270,6 @@ export function replaceDataset(
 	return datasets.map((d) => (d.id === next.id ? next : d));
 }
 
-export function uniqueName(base: string, taken: Iterable<string>): string {
-	const used = new Set(taken);
-	if (!used.has(base)) return base;
-	for (let n = 2; ; n++) {
-		const name = `${base} ${n}`;
-		if (!used.has(name)) return name;
-	}
-}
-
 export function emptyDataset(
 	name: string,
 	columns: Column[] = [],

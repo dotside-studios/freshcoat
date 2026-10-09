@@ -27,6 +27,7 @@ import {
 	DEFAULT_QUALITY,
 	exportSize,
 	imageFormat,
+	paperSize,
 	pdfLayout,
 	sheetSummary,
 } from "@freshcoat-js/workspace";
@@ -66,7 +67,6 @@ import {
 	PAPER_LABEL,
 	type PaperChoice,
 	paperChoice,
-	paperSizeMm,
 	sheetsFor,
 } from "./sheets";
 import { destinationSupport } from "./sinks";
@@ -871,7 +871,7 @@ function LayoutGroup({
 								const next = key as PaperChoice;
 								if (next === paper) return;
 								patch({
-									paper: next === "custom" ? { ...paperSizeMm(sheet) } : next,
+									paper: next === "custom" ? paperSize(sheet) : next,
 								});
 							}}
 						>

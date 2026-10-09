@@ -8,6 +8,7 @@ import {
 	jsonSchemaToColumns,
 	type RecordStatus,
 	type TableFormat,
+	uniqueName,
 } from "@freshcoat-js/workspace";
 import {
 	type DragEvent,
@@ -81,7 +82,6 @@ import {
 	type SortSpec,
 	schemaChanges,
 	sortRecords,
-	uniqueName,
 } from "./model";
 import { PhotoImportBar } from "./PhotoImportBar";
 import { RecordPanel } from "./RecordPanel";

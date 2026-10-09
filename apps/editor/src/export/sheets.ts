@@ -3,7 +3,7 @@ import type {
 	PaperName,
 	SheetLayout,
 } from "@freshcoat-js/workspace";
-import { DEFAULT_SHEET_LAYOUT, PAPER_SIZES_MM } from "@freshcoat-js/workspace";
+import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
 
 export type PaperChoice = PaperName | "custom";
 
@@ -27,16 +27,6 @@ export const PAPER_CHOICES: PaperChoice[] = [
 
 export function paperChoice(layout: SheetLayout): PaperChoice {
 	return typeof layout.paper === "string" ? layout.paper : "custom";
-}
-
-/** The paper's size in millimetres, portrait. */
-export function paperSizeMm(layout: SheetLayout): {
-	widthMm: number;
-	heightMm: number;
-} {
-	return typeof layout.paper === "string"
-		? PAPER_SIZES_MM[layout.paper]
-		: layout.paper;
 }
 
 /** The layout a preset switches to for Sheets: its last one, else the

@@ -1,12 +1,13 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import type {
-	Binding,
-	DataRecord,
-	Dataset,
-	ExportPreset,
-	RecordStatus,
-	TemplateEntry,
-	Workspace,
+import {
+	type Binding,
+	type DataRecord,
+	type Dataset,
+	type ExportPreset,
+	newId,
+	type RecordStatus,
+	type TemplateEntry,
+	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { LayerGeometry } from "~/doc/geometry";
 import { hasGuides, type TemplateGuides } from "~/doc/guides";
@@ -63,17 +64,6 @@ export type WorkspaceState = {
 
 export const DATASET_HISTORY_CAP = 100;
 const MERGE_WINDOW_MS = 1000;
-
-export function newId(prefix: string): string {
-	const hex =
-		typeof crypto !== "undefined" && "randomUUID" in crypto
-			? crypto.randomUUID().replace(/-/g, "")
-			: (
-					Math.random().toString(16).slice(2) +
-					Math.random().toString(16).slice(2)
-				).padEnd(16, "0");
-	return `${prefix}_${hex.slice(0, 16)}`;
-}
 
 export function workspaceState(
 	ws: Workspace,

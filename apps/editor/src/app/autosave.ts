@@ -2,10 +2,11 @@ import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type Dataset,
 	type DatasetAsset,
+	newId,
 	parseImageInfo,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { newId, sameGuides, singleTemplateWorkspace } from "~/state/workspace";
+import { sameGuides, singleTemplateWorkspace } from "~/state/workspace";
 import { plural } from "./copy";
 import { isNotReadable } from "./source-assets";
 

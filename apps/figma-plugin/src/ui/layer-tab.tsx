@@ -19,7 +19,7 @@ import {
 	type Symbology,
 	symbologyLabel,
 } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/mustache";
+import { renameToken, tokenIds } from "@freshcoat-js/coatfile/mustache";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
@@ -70,13 +70,6 @@ import {
 import { useMainMessage } from "~/ui/messages";
 import { postToMain } from "~/ui/post";
 import { useAnnounce } from "~/ui/status";
-
-function substituteToken(template: string, from: string, to: string): string {
-	return template.replace(
-		new RegExp(`\\{\\{\\s*${from}\\s*\\}\\}`, "g"),
-		`{{${to}}}`,
-	);
-}
 
 const SOURCE_OPTIONS = [
 	{ value: "user", children: "User" },
@@ -353,7 +346,7 @@ export function LayerTab(): JSX.Element {
 			if (newId !== f.id) {
 				renames.push({ from: f.id, to: newId });
 				for (const key of Object.keys(bind)) {
-					bind[key] = substituteToken(bind[key], f.id, newId);
+					bind[key] = renameToken(bind[key], f.id, newId);
 				}
 			}
 			fields.push({ ...draft, id: newId });

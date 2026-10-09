@@ -3,16 +3,8 @@ import {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
 	newId,
+	uniqueName,
 } from "@freshcoat-js/workspace";
-
-function uniqueName(base: string, taken: readonly string[]): string {
-	const used = new Set(taken.map((n) => n.toLowerCase()));
-	if (!used.has(base.toLowerCase())) return base;
-	for (let n = 2; ; n++) {
-		const name = `${base} ${n}`;
-		if (!used.has(name.toLowerCase())) return name;
-	}
-}
 
 /** A preset for a template with the spec's defaults: every record but the
  *  skipped ones, every side, a PNG zip at 1×, 300 dpi, the default file name,
@@ -27,6 +19,7 @@ export function newPreset(
 		name: uniqueName(
 			"New preset",
 			existing.map((p) => p.name),
+			{ caseInsensitive: true },
 		),
 		templateId,
 		records: "all",
@@ -50,6 +43,7 @@ export function duplicatePreset(
 		name: uniqueName(
 			`${preset.name} copy`,
 			existing.map((p) => p.name),
+			{ caseInsensitive: true },
 		),
 		...(preset.selected ? { selected: [...preset.selected] } : {}),
 	};

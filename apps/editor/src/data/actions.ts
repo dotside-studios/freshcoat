@@ -12,19 +12,16 @@ import {
 	photoDataset,
 	prepareAssets,
 	type TableFormat,
+	uniqueName,
 } from "@freshcoat-js/workspace";
+import { TABLE_EXTENSIONS } from "@freshcoat-js/workspace/tabular";
 import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
 import type { BindingPatch } from "~/state/workspace";
-import {
-	rebindColumn,
-	renameColumn,
-	replaceDataset,
-	uniqueName,
-} from "./model";
+import { rebindColumn, renameColumn, replaceDataset } from "./model";
 
 export function currentDataset(
 	controller: EditorController,
@@ -112,8 +109,7 @@ export function pickFiles(opts: {
 	});
 }
 
-export const TABLE_ACCEPT =
-	".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.ods,.json,.ndjson,.jsonl";
+export const TABLE_ACCEPT = TABLE_EXTENSIONS.map((e) => `.${e}`).join(",");
 
 export const PHOTO_ACCEPT = "image/*,.zip";
 

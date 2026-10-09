@@ -5,6 +5,7 @@ import {
 	type Template,
 	type Vec2,
 } from "@freshcoat-js/coatfile";
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import {
 	type Binding,
 	type DataRecord,
@@ -26,11 +27,9 @@ export type PhotoFraming = {
 /** A part of a photo, as fractions of it. */
 export type Crop = { x: number; y: number; width: number; height: number };
 
-const WHOLE_TOKEN = /^\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}$/;
-
 function boundColumn(binding: Binding, value: unknown): string | undefined {
 	if (typeof value !== "string") return undefined;
-	const field = WHOLE_TOKEN.exec(value)?.[1];
+	const field = wholeToken(value);
 	const source = field === undefined ? undefined : binding.fields[field];
 	return source?.kind === "column" ? source.column : undefined;
 }
@@ -45,7 +44,7 @@ function* images(elements: Element[]): Generator<Element> {
 
 function fieldOf(value: unknown): string | undefined {
 	if (typeof value !== "string") return undefined;
-	return WHOLE_TOKEN.exec(value)?.[1];
+	return wholeToken(value);
 }
 
 /**

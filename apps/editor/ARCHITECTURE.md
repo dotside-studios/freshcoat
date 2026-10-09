@@ -135,9 +135,12 @@ dataset's selection from there to offer it.
   JPEG and WebP encoders), renders through coatfile and, when asked,
   for-print, and keeps decoded photos in an LRU. The pool is at most 4
   workers, 2 when photos pass 24 megapixels.
-- **Job** (`src/export/job.ts`): dispatches items, at most twice the
-  pool's size in flight, writes them in order, records failures and goes on,
-  and writes `export-report.csv`. On sheets, `sheets.ts` and
+- **Job** (`runExportJob` in `../../packages/workspace/src/export/job.ts`):
+  renders at most the pool's size at once and dispatches at most twice that
+  ahead of what is written, writes items in plan order, records failures and
+  goes on, and writes `export-report.csv`. `src/export/use-export-runner.ts`
+  runs it over Studio's worker pool. On sheets,
+  `../../packages/workspace/src/export/sheets.ts` and
   `../../packages/workspace/src/impose.ts` place each card on paper.
 - **Sinks** (`src/export/sinks.ts`): where files go. Download zips in
   memory and hands over 512 MB parts; Zip file and Folder write through the
