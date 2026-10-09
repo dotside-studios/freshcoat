@@ -261,6 +261,7 @@ export {
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,
+	activeVariantId,
 	applyVariant,
 	backgroundSwatch,
 	checkVariants,

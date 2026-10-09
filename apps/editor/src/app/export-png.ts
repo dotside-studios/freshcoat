@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { activeVariantId, type Template } from "@freshcoat-js/coatfile";
 import { renderTemplate } from "@freshcoat-js/coatfile/render";
 import { createRenderer } from "@freshcoat-js/engine";
 import { exportFileName } from "~/doc/io";
@@ -23,10 +23,7 @@ export async function renderSidePng(
 		...(opts.fonts ? { fonts: Object.fromEntries(opts.fonts) } : {}),
 		cache: false,
 	});
-	const variantId =
-		opts.variantId && t.variants?.some((v) => v.id === opts.variantId)
-			? opts.variantId
-			: undefined;
+	const variantId = activeVariantId(t, opts.variantId);
 	const [result] = await renderTemplate(renderer, t, opts.values, {
 		variantId,
 		frameNames: [frame.name],

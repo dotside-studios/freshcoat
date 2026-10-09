@@ -1,4 +1,5 @@
 import {
+	activeVariantId,
 	applyVariant,
 	compile,
 	exportPixelSize,
@@ -287,10 +288,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			const { template } = req;
 			if (!template.template_data.some((f) => f.name === req.side))
 				throw new Error(`no side named "${req.side}"`);
-			const variantId =
-				req.variantId && template.variants?.some((v) => v.id === req.variantId)
-					? req.variantId
-					: undefined;
+			const variantId = activeVariantId(template, req.variantId);
 			const images = await photosFor(req.images);
 			const design = req.resize ?? variantSize(template, variantId);
 			const compiled = compile(template, req.values, {

@@ -1,4 +1,5 @@
 import {
+	activeVariantId,
 	compile,
 	type Renderer,
 	type Template,
@@ -26,10 +27,7 @@ export function checkGlyphs(
 	item: GlyphCheckItem,
 	renderer: Renderer,
 ): GlyphIssue[] {
-	const variantId =
-		item.variantId && template.variants?.some((v) => v.id === item.variantId)
-			? item.variantId
-			: undefined;
+	const variantId = activeVariantId(template, item.variantId);
 	const compiled = compile(template, item.values, {
 		...variantSize(template, variantId),
 		...(variantId ? { variantId } : {}),
