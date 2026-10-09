@@ -1,0 +1,208 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "freshcoat-social-preview",
+	"name": "Freshcoat social preview",
+	"description": "The GitHub social preview for the Freshcoat repository, rendered with the freshcoat CLI.",
+	"width": 1280,
+	"height": 640,
+	"fonts": [
+		{
+			"kind": "google",
+			"family": "Ubuntu Sans",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans:wght@400;500;700&display=swap"
+		}
+	],
+	"fields": {
+		"type": "object",
+		"properties": {
+			"summary": {
+				"type": "string",
+				"title": "Summary",
+				"default": "An open-source editor, template format, and rendering engine for cards, badges, certificates, and more."
+			},
+			"repo": {
+				"type": "string",
+				"title": "Repository",
+				"default": "github.com/dotside-studios/freshcoat"
+			}
+		},
+		"required": [
+			"summary",
+			"repo"
+		]
+	},
+	"template_data": [
+		{
+			"name": "social-preview",
+			"background": {
+				"id": "background",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1280,
+					"height": 640
+				},
+				"properties": {
+					"fill": "#ffffff"
+				}
+			},
+			"elements": [
+				{
+					"id": "ring",
+					"type": "vector",
+					"pos": {
+						"x": 840,
+						"y": -60
+					},
+					"size": {
+						"width": 760,
+						"height": 760
+					},
+					"properties": {
+						"d": "M0 380.0A380.0 380.0 0 1 0 760 380.0A380.0 380.0 0 1 0 0 380.0ZM220.0 380.0A160.0 160.0 0 1 0 540.0 380.0A160.0 160.0 0 1 0 220.0 380.0Z",
+						"fill": {
+							"kind": "angular",
+							"rotation": -90,
+							"stops": [
+								{
+									"offset": 0.0,
+									"color": "#019dda"
+								},
+								{
+									"offset": 0.1,
+									"color": "#2eaa8f"
+								},
+								{
+									"offset": 0.2,
+									"color": "#7bb353"
+								},
+								{
+									"offset": 0.3,
+									"color": "#f1b82b"
+								},
+								{
+									"offset": 0.4,
+									"color": "#f78e21"
+								},
+								{
+									"offset": 0.5,
+									"color": "#e75234"
+								},
+								{
+									"offset": 0.6,
+									"color": "#cc3b56"
+								},
+								{
+									"offset": 0.7,
+									"color": "#9f3d8c"
+								},
+								{
+									"offset": 0.8,
+									"color": "#5368b6"
+								},
+								{
+									"offset": 0.9,
+									"color": "#2883c9"
+								},
+								{
+									"offset": 1.0,
+									"color": "#019dda"
+								}
+							]
+						},
+						"fillRule": "evenodd"
+					}
+				},
+				{
+					"id": "logo",
+					"type": "image",
+					"pos": {
+						"x": 96,
+						"y": 96
+					},
+					"size": {
+						"width": 278,
+						"height": 50
+					},
+					"properties": {
+						"src": "freshcoat-logo.svg",
+						"fit": "contain"
+					}
+				},
+				{
+					"id": "tagline",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 200
+					},
+					"size": {
+						"width": 760,
+						"height": 180
+					},
+					"properties": {
+						"value": "Create designs\nthat scale.",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 84,
+							"weight": 700,
+							"letterSpacing": -2.5,
+							"lineHeight": 1.05
+						},
+						"color": "#0b1e33",
+						"align": "left"
+					}
+				},
+				{
+					"id": "summary",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 400
+					},
+					"size": {
+						"width": 620,
+						"height": 80
+					},
+					"properties": {
+						"value": "{{summary}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 24,
+							"weight": 400,
+							"lineHeight": 1.45
+						},
+						"color": "#4a5868",
+						"align": "left"
+					}
+				},
+				{
+					"id": "repo",
+					"type": "text",
+					"pos": {
+						"x": 96,
+						"y": 520
+					},
+					"size": {
+						"width": 600,
+						"height": 30
+					},
+					"properties": {
+						"value": "{{repo}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 20,
+							"weight": 500
+						},
+						"color": "#0b6f9f",
+						"align": "left"
+					}
+				}
+			]
+		}
+	]
+}

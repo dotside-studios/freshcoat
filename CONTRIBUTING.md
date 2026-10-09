@@ -25,6 +25,7 @@ the Figma bundle command also uses `zip`.
 | Scene layout and CanvasKit painting | [engine](packages/engine/README.md) |
 | Print analysis and correction | [for-print](packages/for-print/README.md) |
 | Dataset and export planning | [workspace](packages/workspace/README.md) |
+| The `freshcoat` command line | [cli](packages/cli/README.md) |
 | Shared React controls and themes | [UI kit](packages/ui/README.md#contributing) |
 | CanvasKit and font fixtures for tests | [test-utils](packages/test-utils/README.md) |
 | Browser editor | [Studio contribution guide](apps/editor/CONTRIBUTING.md) |
@@ -42,7 +43,7 @@ Run these commands from the repository root:
 | `bun run check:boundaries` | Checks declared dependencies and repository boundaries |
 | `bun run check:links` | Checks relative Markdown links and heading anchors |
 | `bun run check:notices` | Verifies third-party notices against installed dependencies |
-| `bun run release:pack` | Compiles and packs the three SDK packages |
+| `bun run release:pack` | Compiles and packs the SDK packages and the CLI |
 | `bun run release:check` | Checks those tarballs in an isolated npm consumer |
 
 Not every package defines every script. Inspect its `package.json` or README

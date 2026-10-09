@@ -1,0 +1,575 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "freshcoat-figma-cover",
+	"name": "Freshcoat for Figma cover",
+	"description": "The Figma Community thumbnail for Freshcoat for Figma, rendered with the freshcoat CLI.",
+	"width": 1920,
+	"height": 1080,
+	"fonts": [
+		{
+			"kind": "google",
+			"family": "Ubuntu Sans",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans:wght@400;500;700&display=swap"
+		},
+		{
+			"kind": "google",
+			"family": "Ubuntu Sans Mono",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans+Mono:wght@500;700&display=swap"
+		}
+	],
+	"fields": {
+		"type": "object",
+		"properties": {
+			"tagline": {
+				"type": "string",
+				"title": "Tagline",
+				"default": "Turn Figma designs\ninto Freshcoat templates."
+			},
+			"summary": {
+				"type": "string",
+				"title": "Summary",
+				"default": "Mark layers as fields, then export a .coat file."
+			},
+			"marker": {
+				"type": "string",
+				"title": "Marker",
+				"default": "text:{{name}}"
+			}
+		},
+		"required": [
+			"tagline",
+			"summary",
+			"marker"
+		]
+	},
+	"template_data": [
+		{
+			"name": "figma-cover",
+			"background": {
+				"id": "background",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1920,
+					"height": 1080
+				},
+				"properties": {
+					"fill": "#ffffff"
+				}
+			},
+			"elements": [
+				{
+					"id": "ring",
+					"type": "vector",
+					"pos": {
+						"x": 1290,
+						"y": -50.0
+					},
+					"size": {
+						"width": 1180,
+						"height": 1180
+					},
+					"properties": {
+						"d": "M0 590.0A590.0 590.0 0 1 0 1180 590.0A590.0 590.0 0 1 0 0 590.0ZM340.0 590.0A250.0 250.0 0 1 0 840.0 590.0A250.0 250.0 0 1 0 340.0 590.0Z",
+						"fillRule": "evenodd",
+						"fill": {
+							"kind": "angular",
+							"rotation": -90,
+							"stops": [
+								{
+									"offset": 0.0,
+									"color": "#019dda"
+								},
+								{
+									"offset": 0.1,
+									"color": "#2eaa8f"
+								},
+								{
+									"offset": 0.2,
+									"color": "#7bb353"
+								},
+								{
+									"offset": 0.3,
+									"color": "#f1b82b"
+								},
+								{
+									"offset": 0.4,
+									"color": "#f78e21"
+								},
+								{
+									"offset": 0.5,
+									"color": "#e75234"
+								},
+								{
+									"offset": 0.6,
+									"color": "#cc3b56"
+								},
+								{
+									"offset": 0.7,
+									"color": "#9f3d8c"
+								},
+								{
+									"offset": 0.8,
+									"color": "#5368b6"
+								},
+								{
+									"offset": 0.9,
+									"color": "#2883c9"
+								},
+								{
+									"offset": 1.0,
+									"color": "#019dda"
+								}
+							]
+						}
+					}
+				},
+				{
+					"id": "card",
+					"type": "frame",
+					"pos": {
+						"x": 1200,
+						"y": 210
+					},
+					"size": {
+						"width": 560,
+						"height": 352
+					},
+					"shadow": [
+						{
+							"color": "#0b1e3326",
+							"dx": 0,
+							"dy": 24,
+							"blur": 60
+						}
+					],
+					"properties": {
+						"fill": {
+							"kind": "linear",
+							"angle": 135,
+							"stops": [
+								{
+									"offset": 0,
+									"color": "#0b1e33"
+								},
+								{
+									"offset": 1,
+									"color": "#143f63"
+								}
+							]
+						},
+						"cornerRadius": 24,
+						"clipsContent": true,
+						"children": [
+							{
+								"id": "card_mark",
+								"type": "image",
+								"pos": {
+									"x": 36,
+									"y": 34
+								},
+								"size": {
+									"width": 56,
+									"height": 52
+								},
+								"properties": {
+									"src": "freshcoat-mark.svg",
+									"fit": "contain"
+								}
+							},
+							{
+								"id": "card_name",
+								"type": "text",
+								"pos": {
+									"x": 36,
+									"y": 214
+								},
+								"size": {
+									"width": 360,
+									"height": 48
+								},
+								"properties": {
+									"value": "Alex Rivera",
+									"font": {
+										"family": "Ubuntu Sans",
+										"size": 40,
+										"weight": 700
+									},
+									"color": "#ffffff",
+									"align": "left"
+								}
+							},
+							{
+								"id": "card_role",
+								"type": "text",
+								"pos": {
+									"x": 36,
+									"y": 268
+								},
+								"size": {
+									"width": 360,
+									"height": 36
+								},
+								"properties": {
+									"value": "Member since 2026",
+									"font": {
+										"family": "Ubuntu Sans",
+										"size": 26,
+										"weight": 400
+									},
+									"color": "#9fd3ef",
+									"align": "left"
+								}
+							},
+							{
+								"id": "card_qr",
+								"type": "qr_code",
+								"pos": {
+									"x": 412,
+									"y": 200
+								},
+								"size": {
+									"width": 112,
+									"height": 112
+								},
+								"properties": {
+									"value": "https://github.com/dotside-studios/freshcoat",
+									"foreground": "#0b1e33",
+									"background": "#ffffff",
+									"margin": 8
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "sel_box",
+					"type": "rect",
+					"pos": {
+						"x": 1230,
+						"y": 418
+					},
+					"size": {
+						"width": 312,
+						"height": 58
+					},
+					"properties": {
+						"stroke": {
+							"color": "#0d99ff",
+							"width": 3,
+							"align": "outside"
+						}
+					}
+				},
+				{
+					"id": "sel_handle_0",
+					"type": "rect",
+					"pos": {
+						"x": 1223,
+						"y": 411
+					},
+					"size": {
+						"width": 14,
+						"height": 14
+					},
+					"properties": {
+						"fill": "#ffffff",
+						"stroke": {
+							"color": "#0d99ff",
+							"width": 3,
+							"align": "inside"
+						}
+					}
+				},
+				{
+					"id": "sel_handle_1",
+					"type": "rect",
+					"pos": {
+						"x": 1535,
+						"y": 411
+					},
+					"size": {
+						"width": 14,
+						"height": 14
+					},
+					"properties": {
+						"fill": "#ffffff",
+						"stroke": {
+							"color": "#0d99ff",
+							"width": 3,
+							"align": "inside"
+						}
+					}
+				},
+				{
+					"id": "sel_handle_2",
+					"type": "rect",
+					"pos": {
+						"x": 1223,
+						"y": 469
+					},
+					"size": {
+						"width": 14,
+						"height": 14
+					},
+					"properties": {
+						"fill": "#ffffff",
+						"stroke": {
+							"color": "#0d99ff",
+							"width": 3,
+							"align": "inside"
+						}
+					}
+				},
+				{
+					"id": "sel_handle_3",
+					"type": "rect",
+					"pos": {
+						"x": 1535,
+						"y": 469
+					},
+					"size": {
+						"width": 14,
+						"height": 14
+					},
+					"properties": {
+						"fill": "#ffffff",
+						"stroke": {
+							"color": "#0d99ff",
+							"width": 3,
+							"align": "inside"
+						}
+					}
+				},
+				{
+					"id": "sel_tag",
+					"type": "frame",
+					"pos": {
+						"x": 1230,
+						"y": 338
+					},
+					"size": {
+						"width": 250,
+						"height": 56
+					},
+					"properties": {
+						"fill": "#0d99ff",
+						"cornerRadius": 10,
+						"children": [
+							{
+								"id": "sel_tag_text",
+								"type": "text",
+								"pos": {
+									"x": 18,
+									"y": 10
+								},
+								"size": {
+									"width": 220,
+									"height": 38
+								},
+								"properties": {
+									"value": "{{marker}}",
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 28,
+										"weight": 700
+									},
+									"color": "#ffffff",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "arrow_line",
+					"type": "rect",
+					"pos": {
+						"x": 1478.0,
+						"y": 602
+					},
+					"size": {
+						"width": 4,
+						"height": 110
+					},
+					"properties": {
+						"fill": "#0b6f9f"
+					}
+				},
+				{
+					"id": "arrow_head",
+					"type": "vector",
+					"pos": {
+						"x": 1466.0,
+						"y": 708
+					},
+					"size": {
+						"width": 28,
+						"height": 22
+					},
+					"properties": {
+						"d": "M0 0L28 0L14 22Z",
+						"fill": "#0b6f9f"
+					}
+				},
+				{
+					"id": "coat",
+					"type": "frame",
+					"pos": {
+						"x": 1290.0,
+						"y": 762
+					},
+					"size": {
+						"width": 380,
+						"height": 110
+					},
+					"shadow": [
+						{
+							"color": "#0b1e3326",
+							"dx": 0,
+							"dy": 24,
+							"blur": 60
+						}
+					],
+					"properties": {
+						"fill": "#ffffff",
+						"cornerRadius": 24,
+						"stroke": {
+							"color": "#dbe3ea",
+							"width": 2,
+							"align": "inside"
+						},
+						"children": [
+							{
+								"id": "coat_icon",
+								"type": "image",
+								"pos": {
+									"x": 34,
+									"y": 31
+								},
+								"size": {
+									"width": 52,
+									"height": 48
+								},
+								"properties": {
+									"src": "freshcoat-mark.svg",
+									"fit": "contain"
+								}
+							},
+							{
+								"id": "coat_label",
+								"type": "text",
+								"pos": {
+									"x": 108,
+									"y": 33
+								},
+								"size": {
+									"width": 260,
+									"height": 46
+								},
+								"properties": {
+									"value": "member.coat",
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 36,
+										"weight": 500
+									},
+									"color": "#0b1e33",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "logo",
+					"type": "image",
+					"pos": {
+						"x": 144,
+						"y": 290
+					},
+					"size": {
+						"width": 417,
+						"height": 75
+					},
+					"properties": {
+						"src": "freshcoat-logo.svg",
+						"fit": "contain"
+					}
+				},
+				{
+					"id": "product",
+					"type": "text",
+					"pos": {
+						"x": 580,
+						"y": 306
+					},
+					"size": {
+						"width": 400,
+						"height": 60
+					},
+					"properties": {
+						"value": "for Figma",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 50,
+							"weight": 500
+						},
+						"color": "#4a5868",
+						"align": "left"
+					}
+				},
+				{
+					"id": "tagline",
+					"type": "text",
+					"pos": {
+						"x": 144,
+						"y": 430
+					},
+					"size": {
+						"width": 1040,
+						"height": 200
+					},
+					"properties": {
+						"value": "{{tagline}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 86,
+							"weight": 700,
+							"letterSpacing": -2.5,
+							"lineHeight": 1.05
+						},
+						"color": "#0b1e33",
+						"align": "left"
+					}
+				},
+				{
+					"id": "summary",
+					"type": "text",
+					"pos": {
+						"x": 144,
+						"y": 660
+					},
+					"size": {
+						"width": 880,
+						"height": 60
+					},
+					"properties": {
+						"value": "{{summary}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 38,
+							"weight": 400
+						},
+						"color": "#4a5868",
+						"align": "left"
+					}
+				}
+			]
+		}
+	]
+}
