@@ -1,6 +1,10 @@
-import { collectFontRequests, type Template } from "@freshcoat-js/coatfile";
+import {
+	collectFontRequests,
+	resolveTemplateFonts,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { resolveTemplateFonts } from "./fonts";
+import { fontCache } from "./font-cache";
 
 export type DocumentFonts = {
 	fonts: Map<string, Uint8Array[]> | undefined;
@@ -51,7 +55,7 @@ export function useDocumentFonts(template: Template | null): DocumentFonts {
 			return;
 		}
 		let cancelled = false;
-		resolveTemplateFonts(current)
+		resolveTemplateFonts(current, { cache: fontCache })
 			.then((report) => {
 				if (!cancelled) setState({ key, report });
 			})

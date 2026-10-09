@@ -23,31 +23,49 @@ const TTF_UA =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.30 (KHTML, like Gecko)";
 const FONT_FETCH_TIMEOUT_MS = 8000;
 
+export type FontFetch = (
+	url: string,
+	init: { headers: Record<string, string>; signal: AbortSignal },
+) => Promise<Pick<Response, "ok" | "status" | "text" | "arrayBuffer">>;
+
 // Turn a resolution into raw font-file bytes. data: and http(s) sources are
-// handled here; any other local file src goes through `load`.
+// handled here; any other local file src goes through `load`. http(s) requests
+// go through `fetcher`, the global fetch when it is omitted.
 export async function fontBytes(
 	res: FontResolution,
 	load: ByteLoader = fetchLoader,
+	fetcher?: FontFetch,
 ): Promise<Uint8Array[]> {
 	if (res.kind === "bytes") return res.bytes;
 	if (res.kind === "none") return [];
-	return descriptorBytes(res.descriptor, load);
+	return descriptorBytes(res.descriptor, load, httpFor(fetcher));
 }
+
+type Http = {
+	fetch: FontFetch;
+	file: Map<string, Promise<Uint8Array>>;
+	stylesheet: Map<string, Promise<Uint8Array[]>>;
+};
 
 async function descriptorBytes(
 	d: FontDescriptor,
 	load: ByteLoader,
+	http: Http,
 ): Promise<Uint8Array[]> {
 	if (d.kind === "local") {
-		return Promise.all(d.files.map((f) => fileBytes(f.src, load)));
+		return Promise.all(d.files.map((f) => fileBytes(f.src, load, http)));
 	}
 	// google / fontsource carry a CSS stylesheet, not a font file.
-	return stylesheetFontBytes(d.url);
+	return stylesheetFontBytes(d.url, http);
 }
 
-async function fileBytes(src: string, load: ByteLoader): Promise<Uint8Array> {
+async function fileBytes(
+	src: string,
+	load: ByteLoader,
+	http: Http,
+): Promise<Uint8Array> {
 	if (src.startsWith("data:")) return dataFontBytes(src);
-	if (/^https?:/i.test(src)) return fetchBytes(src);
+	if (/^https?:/i.test(src)) return fetchBytes(src, http);
 	return memoize(loaderMemo(load), src, load);
 }
 
@@ -69,12 +87,20 @@ async function fileBytes(src: string, load: ByteLoader): Promise<Uint8Array> {
  * the wrong cap height — and load them all, which also picks up the accented
  * ranges and the other weights the single-face fetch was dropping.
  */
-function stylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
-	return memoize(stylesheetMemo, cssUrl, loadStylesheetFontBytes);
+function stylesheetFontBytes(
+	cssUrl: string,
+	http: Http,
+): Promise<Uint8Array[]> {
+	return memoize(http.stylesheet, cssUrl, (url) =>
+		loadStylesheetFontBytes(url, http),
+	);
 }
 
-async function loadStylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
-	const css = await fetchText(cssUrl);
+async function loadStylesheetFontBytes(
+	cssUrl: string,
+	http: Http,
+): Promise<Uint8Array[]> {
+	const css = await fetchText(cssUrl, http.fetch);
 	const faces = parseStylesheetFaces(css);
 	if (faces.length === 0) {
 		throw new Error(`no font file found in stylesheet: ${cssUrl}`);
@@ -96,7 +122,7 @@ async function loadStylesheetFontBytes(cssUrl: string): Promise<Uint8Array[]> {
 		seen.add(face.url);
 		unique.push(face);
 	}
-	return Promise.all(unique.map((f) => fetchBytes(f.url)));
+	return Promise.all(unique.map((f) => fetchBytes(f.url, http)));
 }
 
 type StylesheetFace = { url: string; coversLatin: boolean };
@@ -153,8 +179,8 @@ function rangeCovers(spec: string, code: number): boolean {
 	return false;
 }
 
-async function fetchText(url: string): Promise<string> {
-	const res = await fetch(url, {
+async function fetchText(url: string, fetcher: FontFetch): Promise<string> {
+	const res = await fetcher(url, {
 		headers: { "user-agent": TTF_UA },
 		signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT_MS),
 	});
@@ -162,12 +188,12 @@ async function fetchText(url: string): Promise<string> {
 	return res.text();
 }
 
-function fetchBytes(url: string): Promise<Uint8Array> {
-	return memoize(fileMemo, url, loadBytes);
+function fetchBytes(url: string, http: Http): Promise<Uint8Array> {
+	return memoize(http.file, url, (u) => loadBytes(u, http.fetch));
 }
 
-async function loadBytes(url: string): Promise<Uint8Array> {
-	const res = await fetch(url, {
+async function loadBytes(url: string, fetcher: FontFetch): Promise<Uint8Array> {
+	const res = await fetcher(url, {
 		headers: { "user-agent": TTF_UA },
 		signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT_MS),
 	});
@@ -182,6 +208,7 @@ const fileMemo = new Map<string, Promise<Uint8Array>>();
 const stylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
 const dataMemo = new Map<string, Uint8Array>();
 let loaderMemos = new WeakMap<ByteLoader, Map<string, Promise<Uint8Array>>>();
+let fetchMemos = new WeakMap<FontFetch, Http>();
 export const FONT_MEMO_MAX = 64;
 const DATA_MEMO_MAX = 16;
 
@@ -198,6 +225,23 @@ function memoize<T>(
 		if (memo.get(key) === p) memo.delete(key);
 	});
 	return p;
+}
+
+// The global fetch is read per call so a host or test can replace it; a fetcher
+// given explicitly gets memos of its own, so its answers never leak to another.
+function httpFor(fetcher: FontFetch | undefined): Http {
+	if (!fetcher)
+		return {
+			fetch: (url, init) => fetch(url, init),
+			file: fileMemo,
+			stylesheet: stylesheetMemo,
+		};
+	let http = fetchMemos.get(fetcher);
+	if (!http) {
+		http = { fetch: fetcher, file: new Map(), stylesheet: new Map() };
+		fetchMemos.set(fetcher, http);
+	}
+	return http;
 }
 
 function loaderMemo(load: ByteLoader): Map<string, Promise<Uint8Array>> {
@@ -241,6 +285,7 @@ export function clearFontBytesCache(): void {
 	stylesheetMemo.clear();
 	dataMemo.clear();
 	loaderMemos = new WeakMap();
+	fetchMemos = new WeakMap();
 }
 
 // The ArrayBuffer CanvasKit registers a font from, copied only when the view
