@@ -148,6 +148,15 @@ the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
 `retryPreset` gives the preset that reruns a job's failed records, and
 `unwrittenRecordIds` lists the records a cancelled job left unwritten.
 
+Each item in `result.items` says how it went, and `export-report.csv` in a
+zip has a row per item with the same columns: `file`, `record`, `side`,
+`status`, `error`, `print`, `gamut`, `unfilled` and `warnings`. A barcode
+the encoder refuses fails its item, since a placeholder would print as if it
+scanned. Other render warnings, such as an image or font that failed to
+load, leave the item rendered and are listed in its `warnings`, described by
+coatfile's `describeWarning` and joined with `; ` in the report. An image
+field left empty is not reported.
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable

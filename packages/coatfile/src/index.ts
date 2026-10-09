@@ -197,6 +197,7 @@ export type {
 	ExportSetting,
 	FieldDefinition,
 	FieldFormat,
+	FieldReferenceRole,
 	FieldsSchema,
 	Fill,
 	FontDescriptor,

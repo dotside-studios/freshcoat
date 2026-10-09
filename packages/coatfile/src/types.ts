@@ -238,7 +238,14 @@ export type ValidationError = {
 	path: string;
 	code: string;
 	message: string;
+	/** The field id an `unknown_field_reference` names. */
+	field?: string;
+	/** Where that reference sits: an image's `src`, a `visibleWhen` condition,
+	 *  or a `{{token}}` in any other string. */
+	role?: FieldReferenceRole;
 };
+
+export type FieldReferenceRole = "text" | "src" | "condition";
 
 export type ValidationResult<T> =
 	| { ok: true; value: T }
