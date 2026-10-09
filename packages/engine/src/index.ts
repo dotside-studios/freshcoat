@@ -69,6 +69,11 @@ export {
 	mapLoader,
 } from "./loader";
 export {
+	createSharedFontProvider,
+	makeParagraphBuilder,
+	type SharedFontProvider,
+} from "./font-collection";
+export {
 	getFontMetrics,
 	readFontMetrics,
 	registerFontMetrics,
@@ -126,6 +131,8 @@ export {
 	decorationLine,
 	type FitOptions,
 	fitRect,
+	fontFeatureList,
+	fontVariationList,
 	insetCorner,
 	skipInkSegments,
 	strokeInset,
