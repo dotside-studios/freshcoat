@@ -15,6 +15,7 @@ import {
 	exportPixelSize,
 	MAX_EXPORT_DIMENSION,
 	resolveExportScale,
+	withExportScale,
 } from "../src/export-scale";
 import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect, createText } from "../src/node";
@@ -116,6 +117,20 @@ const swatch = (fill: string, adjust?: ReturnType<typeof buildAdjust>) =>
 			}),
 		],
 	});
+
+describe("withExportScale", () => {
+	test("matches a scene compiled at that density", () => {
+		const base = compileScene(swatch("#000000"), { width: 20, height: 20 });
+		const compiled = compileScene(swatch("#000000"), {
+			width: 20,
+			height: 20,
+			scale: 3,
+			supersample: 2,
+		});
+		expect(withExportScale(base, 3, 2)).toEqual(compiled);
+		expect(withExportScale(base, 1, 1)).toBe(base);
+	});
+});
 
 describe("compileScene scale", () => {
 	test("1× leaves the density off the command entirely", () => {

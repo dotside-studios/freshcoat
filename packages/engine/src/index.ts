@@ -25,7 +25,7 @@ export {
 	resolveLeadingTrim,
 	textClipOutset,
 } from "./bake-text";
-export { hslToRgb, parseColor, type Rgba, toHex } from "./color";
+export { hslToRgb, mixColor, parseColor, type Rgba, toHex } from "./color";
 export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {
 	type CompileSceneOptions,
@@ -56,15 +56,21 @@ export {
 	MAX_SUPERSAMPLE,
 	resolveExportScale,
 	resolveSupersample,
+	withExportScale,
 } from "./export-scale";
 export {
 	clearFontBytesCache,
 	type FontFetch,
 	fontBytes,
+	fontRequestKey,
+	googleCss2Url,
+	googleFamilyParam,
 	resolveFontRequest,
 } from "./font-bytes";
 export {
+	base64ToBytes,
 	type ByteLoader,
+	bytesToBase64,
 	dataUrlToBytes,
 	fetchLoader,
 	mapLoader,
@@ -121,6 +127,7 @@ export {
 	createText,
 	gridLayout,
 } from "./node";
+export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export {
 	createPaintCache,
 	type PaintCache,
@@ -137,6 +144,7 @@ export {
 	strokeInset,
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
+export { modulePixels } from "./module-pixels";
 export { scalePathData } from "./path-data";
 export { roundCorners } from "./round-corners";
 export { flattenOverWhite } from "./jpeg";
@@ -156,8 +164,13 @@ export {
 	type PatternFill,
 	patternFill,
 } from "./pattern";
-export { resolveLayout } from "./resolve-layout";
-export { outlinePath, rectShape } from "./outline";
+export { resolveLayout, rotatedFootprint } from "./resolve-layout";
+export {
+	ellipsePath,
+	isEllipsePath,
+	outlinePath,
+	rectShape,
+} from "./outline";
 export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {
 	type CanvasFrame,
@@ -180,6 +193,12 @@ export {
 	type SurfaceCanvas,
 } from "./renderer";
 export { squircleSvg } from "./squircle";
+export {
+	type ApplyCaseOptions,
+	applyCase,
+	applySpanCase,
+	type TextCase,
+} from "./text-case";
 export type { TextEngineCacheStats } from "./text-cache";
 export {
 	type FontWeightName,

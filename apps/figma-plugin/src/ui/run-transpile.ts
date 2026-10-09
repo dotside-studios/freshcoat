@@ -7,6 +7,7 @@ import {
 	validate,
 } from "@freshcoat-js/coatfile";
 import { attachAssets } from "@freshcoat-js/coatfile/assets";
+import { parseImageInfo } from "@freshcoat-js/engine/image";
 import type { FigmaPick, NodeTrace } from "~/lib/figma/transpiler";
 import { transpile } from "~/lib/figma/transpiler";
 import {
@@ -14,7 +15,6 @@ import {
 	BARCODE_UNKNOWN_SYMBOLOGY,
 } from "~/lib/figma/transpiler/barcode";
 import type { RenderImageFn } from "~/lib/figma/transpiler/rasterize";
-import { pngSize } from "~/lib/png";
 import { slug } from "~/lib/slug";
 import type { ReadDocumentMessage } from "~/shared/protocol";
 import { type FigmaSource, figmaSource } from "~/shared/source";
@@ -236,13 +236,13 @@ async function build(
 		// Read off the PNG header we already hold, so the transpiler can tell an
 		// export with content from Figma's 1×1 answer for a node that renders
 		// nothing — without decoding the image.
-		const size = pngSize(bytes);
+		const info = parseImageInfo(bytes);
 		const hash = await sha256(bytes);
 		assetHashes.add(hash);
 		return {
 			blob: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }),
 			sha256: hash,
-			...(size ?? {}),
+			...(info ? { width: info.width, height: info.height } : {}),
 		};
 	};
 

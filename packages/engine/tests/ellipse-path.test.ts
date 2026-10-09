@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { ellipsePath, isEllipsePath } from "../src/ellipse-path";
+import { compileScene } from "../src/compile-scene";
+import { createEllipse } from "../src/node";
+import { ellipsePath, isEllipsePath } from "../src/outline";
 
 describe("ellipsePath", () => {
 	test("is two arcs spanning the box", () => {
@@ -17,5 +19,12 @@ describe("ellipsePath", () => {
 		expect(
 			isEllipsePath("M 0,20 A 40,20 0 1 0 80,20 A 40 20 0 1 0 0 20 z", 80, 40),
 		).toBe(true);
+	});
+
+	test("matches the path an ellipse node draws", () => {
+		const size = { width: 80, height: 40 };
+		const commands = compileScene(createEllipse({ pos: { x: 0, y: 0 }, size }), size);
+		const draw = commands.find((c) => c.op === "drawPath");
+		expect(draw && isEllipsePath(draw.d, 80, 40)).toBe(true);
 	});
 });

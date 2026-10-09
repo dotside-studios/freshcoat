@@ -9,11 +9,9 @@ import {
 	planForPrint,
 } from "@freshcoat-js/for-print";
 import {
-	type Command,
 	type DefaultOutput,
 	type ExportSetting,
 	exportPixelSize,
-	type FontRequest,
 	type FrameFinish,
 	type FrameFor,
 	type ImageNode,
@@ -24,6 +22,7 @@ import {
 	resolveExportScale,
 	resolveSupersample,
 	sampleImageNode,
+	withExportScale,
 } from "@freshcoat-js/engine";
 import { compile } from "./compile";
 import type {
@@ -171,28 +170,6 @@ function gamutWarnings(
 	return out;
 }
 
-// Retarget a compiled scene at an export setting. Both the density and the
-// sample rate live on the scene's own `createCanvas` (freshcoat's paint-time
-// contract), so a re-export is this one-command swap rather than a second
-// compileScene. A field is set only when it is not 1×, keeping the stream
-// identical to a scene compiled without export settings at all.
-function atExport(
-	commands: Command[],
-	scale: number,
-	supersample: number,
-): Command[] {
-	if (scale === 1 && supersample === 1) return commands;
-	return commands.map((c) =>
-		c.op === "createCanvas"
-			? {
-					...c,
-					...(scale !== 1 ? { scale } : {}),
-					...(supersample !== 1 ? { supersample } : {}),
-				}
-			: c,
-	);
-}
-
 function scaleBox(
 	box: NonNullable<CompiledTemplate["trim"]>,
 	scale: number,
@@ -238,7 +215,7 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 	const frames = compiled.frames.filter(
 		(f) => !options.frameNames || options.frameNames.includes(f.name),
 	);
-	await renderer.loadFonts(fontRequests(frames.flatMap((f) => f.assets.fonts)));
+	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
 	const print = resolvePrint(options.print);
 	// Analyze the layer AS RENDERED: draw the image into its own box honoring `fit`
 	// (a cover crop shows only part of the source), bounded to a small buffer, then
@@ -295,7 +272,7 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 		for (const setting of settings) {
 			const scale = resolveExportScale(setting.constraint, design);
 			const supersample = resolveSupersample(setting.supersample, design, scale);
-			const result = await renderer.paint(atExport(commands, scale, supersample), {
+			const result = await renderer.paint(withExportScale(commands, scale, supersample), {
 				...(options.images ? { images: options.images } : {}),
 				...(options.output ? { output: options.output } : {}),
 			});
@@ -314,17 +291,6 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 		}
 	}
 	return results;
-}
-
-// One request per family, keeping the first that carries a descriptor.
-function fontRequests(requests: FontRequest[]): FontRequest[] {
-	const byFamily = new Map<string, FontRequest>();
-	for (const req of requests) {
-		const held = byFamily.get(req.family);
-		if (!held || (!("descriptor" in held) && "descriptor" in req))
-			byFamily.set(req.family, req);
-	}
-	return [...byFamily.values()];
 }
 
 export type FrameMissingGlyphs = {

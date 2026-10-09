@@ -1,5 +1,6 @@
 import {
 	type Adjust,
+	applySpanCase,
 	type BitmapNode,
 	buildAdjust,
 	type ChildLayout,
@@ -7,7 +8,9 @@ import {
 	FALLBACK_LINE_HEIGHT,
 	type GroupNode,
 	type ImageNode,
+	isEllipsePath,
 	type MaskNode,
+	modulePixels,
 	type Node,
 	type PathNode,
 	parseColor,
@@ -38,13 +41,11 @@ import {
 } from "./bleed";
 import { linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
-import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
-import { applyCase, isTextCase, lastChar } from "./text-case";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -498,7 +499,7 @@ function compileText(
 	// Normalize: `value` is sugar for a single span. Figma "Case" applies to the
 	// already-substituted text (dynamic {{values}} are cased). A single span with
 	// no per-span override lowers as single-style text; anything richer as spans.
-	const spans = applyTextCase(normalizeTextSpans(props), props.case);
+	const spans = applySpanCase(normalizeTextSpans(props), props.case);
 	const single = spans.length === 1 && !hasOverrides(spans[0]);
 
 	const node: TextNode = {
@@ -903,13 +904,7 @@ function compileBarcode(
 		return group();
 	}
 
-	const [r, g, b] = foregroundRgb(foreground);
-	const paint = (pixels: Uint8Array, i: number) => {
-		pixels[i * 4] = r;
-		pixels[i * 4 + 1] = g;
-		pixels[i * 4 + 2] = b;
-		pixels[i * 4 + 3] = 255;
-	};
+	const rgb = foregroundRgb(foreground);
 	const { encoding } = result;
 	if (encoding.kind === "linear") {
 		const n = encoding.modules.length;
@@ -920,10 +915,7 @@ function compileBarcode(
 		const sideBearers = bearers === "frame" ? BEARER_BAR_MODULES : 0;
 		const module = size.width / (n + 2 * quietZone + 2 * sideBearers);
 		const bearer = bearers === "none" ? 0 : BEARER_BAR_MODULES * module;
-		const pixels = new Uint8Array(n * 4);
-		encoding.modules.forEach((set, i) => {
-			if (set) paint(pixels, i);
-		});
+		const pixels = modulePixels(encoding.modules, rgb);
 		children.push({
 			kind: "bitmap",
 			pos: { x: (sideBearers + quietZone) * module, y: bearer },
@@ -947,12 +939,7 @@ function compileBarcode(
 		size.width / (cols + 2 * quietZone),
 		size.height / (rows + 2 * quietZone),
 	);
-	const pixels = new Uint8Array(rows * cols * 4);
-	encoding.rows.forEach((row, y) => {
-		row.forEach((set, x) => {
-			if (set) paint(pixels, y * cols + x);
-		});
-	});
+	const pixels = modulePixels(encoding.rows.flat(), rgb);
 	children.push({
 		kind: "bitmap",
 		pos: {
@@ -1207,17 +1194,6 @@ function normalizeTextSpans(props: Record<string, unknown>): TextSpanInput[] {
 	const spans = props.spans as TextSpanInput[] | undefined;
 	if (spans && spans.length > 0) return spans;
 	return [{ text: String(props.value ?? "") }];
-}
-
-// Figma "Case": upper/lower/title on the resolved text.
-function applyTextCase(spans: TextSpanInput[], mode: unknown): TextSpanInput[] {
-	if (!isTextCase(mode)) return spans;
-	let prev = "";
-	return spans.map((s) => {
-		const text = applyCase(s.text, mode, prev);
-		prev = lastChar(s.text) || prev;
-		return { ...s, text };
-	});
 }
 
 function hasOverrides(span: TextSpanInput): boolean {

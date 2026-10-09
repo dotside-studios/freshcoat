@@ -18,7 +18,7 @@ import {
 	transformPath,
 	viewBoxMatrix,
 } from "@freshcoat-js/engine/svg";
-import { linearGradientAngle } from "./gradient";
+import { linearGradientAngle } from "@freshcoat-js/engine";
 import type {
 	Element,
 	Fill,

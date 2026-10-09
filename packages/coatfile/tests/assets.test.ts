@@ -3,11 +3,13 @@ import {
 	assetDataUri,
 	assetUri,
 	attachAssets,
-	base64ToBytes,
 	bytesToBase64,
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,
+	inlinedAssetUri,
+	mediaExtension,
+	mediaType,
 	type PendingAsset,
 	parseAssetUri,
 	readAssets,
@@ -105,21 +107,6 @@ describe("asset URIs", () => {
 	});
 });
 
-describe("base64 round-trip", () => {
-	test("survives high bytes and zeroes", () => {
-		expect([...base64ToBytes(bytesToBase64(new Uint8Array(BYTES)))]).toEqual(
-			BYTES,
-		);
-	});
-
-	test("handles a payload longer than one encode chunk", () => {
-		const bytes = new Uint8Array(0x8000 * 2 + 17).map((_, i) => i % 256);
-		const round = base64ToBytes(bytesToBase64(bytes));
-		expect(round.length).toBe(bytes.length);
-		expect(round[round.length - 1]).toBe(bytes[bytes.length - 1]);
-	});
-});
-
 describe("attachAssets", () => {
 	test("a template carrying its rasters is still a valid template", async () => {
 		const t = await attachAssets(template(), [pending("bg"), pending("logo")]);
@@ -178,6 +165,26 @@ describe("inline asset URLs", () => {
 	test("inlineAssetUrls maps every carried hash", async () => {
 		const t = await attachAssets(template(), [pending("bg"), pending("logo")]);
 		expect([...inlineAssetUrls(t).keys()]).toEqual(["bg", "logo"]);
+	});
+
+	test("inlinedAssetUri maps each inlined data URL back to its asset", async () => {
+		const logo = { ...pending("logo"), blob: new Blob([new Uint8Array([9])]) };
+		const t = await attachAssets(template(), [pending("bg"), logo]);
+		const uri = inlinedAssetUri(t);
+		for (const [sha, url] of inlineAssetUrls(t))
+			expect(uri(url)).toBe(`asset:${sha}`);
+		expect(uri("data:image/png;base64,AAAA")).toBeUndefined();
+	});
+});
+
+describe("media types", () => {
+	test("map between extensions and types both ways", () => {
+		expect(mediaExtension("image/jpeg")).toBe("jpg");
+		expect(mediaExtension("font/woff2")).toBe("woff2");
+		expect(mediaExtension("text/plain")).toBeUndefined();
+		expect(mediaType("JPEG")).toBe("image/jpeg");
+		expect(mediaType("ttf")).toBe("font/ttf");
+		expect(mediaType("txt")).toBeUndefined();
 	});
 });
 

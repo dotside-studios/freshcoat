@@ -161,10 +161,12 @@ describe("createRenderer", () => {
 		renderer.dispose();
 	});
 
-	test("loads described fonts once, reloads a re-pointed family, keeps given bytes and reports failures", async () => {
+	test("loads described fonts once per family, reloads a re-pointed family, keeps given bytes and reports failures", async () => {
 		const files: Record<string, Uint8Array> = {
 			"a.ttf": testFontBytes("Geist-Regular.ttf"),
 			"b.ttf": testFontBytes("VendSans-Variable-latin.woff2"),
+			"d.ttf": testFontBytes("Geist-Regular.ttf"),
+			"e.ttf": testFontBytes("Geist-Regular.ttf"),
 		};
 		const reads: string[] = [];
 		const renderer = await createRenderer({
@@ -199,6 +201,13 @@ describe("createRenderer", () => {
 		const report = await renderer.loadFonts([local("Missing", "c.ttf")]);
 		expect(report.failed.map((f) => f.family)).toEqual(["Missing"]);
 		expect(renderer.fonts.has("Missing")).toBe(false);
+		reads.length = 0;
+		await renderer.loadFonts([
+			{ family: "Twice" },
+			local("Twice", "d.ttf"),
+			local("Twice", "e.ttf"),
+		]);
+		expect(reads).toEqual(["d.ttf"]);
 		renderer.dispose();
 	});
 

@@ -4,6 +4,7 @@
 // works in a variant without knowing about variants.
 
 import {
+	activeVariantId,
 	applyVariant,
 	type Background,
 	diffElement,
@@ -21,21 +22,13 @@ import {
 import type { LayerGeometry } from "./geometry";
 import { childEntries, walkLayers } from "./path";
 
+export { activeVariantId };
+
 export type VariantOverride = Variant["overrides"][number];
 
 // ── The working template ─────────────────────────────────────────────────────
 
 const workingCache = new WeakMap<Template, Map<string, Template>>();
-
-/** `variantId` when the template has that variant, else undefined (Default). */
-export function activeVariantId(
-	t: Template,
-	variantId: string | undefined,
-): string | undefined {
-	return variantId !== undefined && t.variants?.some((v) => v.id === variantId)
-		? variantId
-		: undefined;
-}
 
 /**
  * The base with the variant applied for editing: hidden layers stay, ids,

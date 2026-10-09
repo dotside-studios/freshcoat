@@ -31,7 +31,10 @@ export {
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,
+	inlinedAssetUri,
 	mapAssetSrcs,
+	mediaExtension,
+	mediaType,
 	type PendingAsset,
 	parseAssetUri,
 	readAssets,
@@ -120,8 +123,8 @@ export {
 	variantFieldRefs,
 	visibilityFieldRefs,
 } from "./fields";
-export { linearGradientAngle, linearGradientPoints } from "./gradient";
-export { ellipsePath, isEllipsePath } from "./ellipse-path";
+export { linearGradientAngle, linearGradientPoints } from "@freshcoat-js/engine";
+export { ellipsePath, isEllipsePath } from "@freshcoat-js/engine";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
@@ -160,7 +163,7 @@ export {
 	type ApplyCaseOptions,
 	applyCase,
 	type TextCase,
-} from "./text-case";
+} from "@freshcoat-js/engine";
 export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,
@@ -262,6 +265,7 @@ export {
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,
+	activeVariantId,
 	applyVariant,
 	backgroundSwatch,
 	checkVariants,

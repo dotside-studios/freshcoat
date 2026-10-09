@@ -1,5 +1,5 @@
-// Image headers built byte by byte for the image-info tests: enough of each
-// format for a header reader, not decodable images.
+// Image headers built byte by byte: enough of each format for a header
+// reader, not decodable images.
 
 function concat(parts: (Uint8Array | number[])[]): Uint8Array {
 	const arrays = parts.map((p) =>

@@ -1,3 +1,4 @@
+import { jpegHeader } from "@freshcoat-js/test-utils";
 import {
 	decodePDFRawStream,
 	PDFArray,
@@ -8,7 +9,6 @@ import {
 	PDFRawStream,
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { jpegHeader } from "./image-fixtures";
 import { imposeSheets } from "./impose";
 import { assemblePdf, pageSizePt, rgbIdat } from "./pdf";
 import { makePng, makeRgbaPng } from "./test-fixtures";

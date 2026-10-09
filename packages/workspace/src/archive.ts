@@ -23,11 +23,11 @@ import {
 	pruneUnusedAssets,
 	templateStem,
 } from "@freshcoat-js/coatfile/coat";
+import { readImageInfo } from "@freshcoat-js/engine/image";
 import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
-import { readImageInfo } from "./image-info";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import type {
 	Dataset,

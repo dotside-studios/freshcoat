@@ -1,3 +1,4 @@
+import { modulePixels } from "@freshcoat-js/engine";
 import { correction, generate, mode } from "lean-qr";
 import type { ECLevel } from "./types";
 
@@ -78,15 +79,7 @@ export function generatePixels(
 	const key = `${ec}:${r},${g},${b}:${value}`;
 	const hit = pixelBuffers.get(key);
 	if (hit) return { size, pixels: hit };
-	const pixels = new Uint8Array(size * size * 4);
-	for (let i = 0; i < bits.length; i++) {
-		if (bits[i]) {
-			pixels[i * 4] = r;
-			pixels[i * 4 + 1] = g;
-			pixels[i * 4 + 2] = b;
-			pixels[i * 4 + 3] = 255;
-		}
-	}
+	const pixels = modulePixels(bits, [r, g, b]);
 	pixelBuffers.set(key, pixels);
 	return { size, pixels };
 }

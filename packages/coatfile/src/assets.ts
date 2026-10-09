@@ -12,7 +12,10 @@
 // `detachAssets` is the step that ends that state: it swaps each `asset:` src
 // for its uploaded URL and drops `assets`.
 
+import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine";
 import type { InlineAsset, Template } from "./types";
+
+export { base64ToBytes, bytesToBase64 };
 
 export const ASSET_URI_PREFIX = "asset:";
 
@@ -38,29 +41,39 @@ export type PendingAsset = {
 
 // ── Encoding ─────────────────────────────────────────────────────────────────
 
-// String.fromCharCode is applied to a spread, so the argument count — not the
-// byte count — is what has a ceiling. 32K per call stays well under every
-// engine's limit while keeping the loop short for multi-megabyte rasters.
-const CHUNK = 0x8000;
+const EXTENSION_BY_TYPE: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/webp": "webp",
+	"image/gif": "gif",
+	"image/avif": "avif",
+	"image/svg+xml": "svg",
+	"font/woff2": "woff2",
+	"font/woff": "woff",
+	"font/ttf": "ttf",
+	"font/otf": "otf",
+};
 
-export function bytesToBase64(bytes: Uint8Array): string {
-	let binary = "";
-	for (let i = 0; i < bytes.length; i += CHUNK) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-	}
-	return btoa(binary);
+const TYPE_BY_EXTENSION: Record<string, string> = {
+	...Object.fromEntries(
+		Object.entries(EXTENSION_BY_TYPE).map(([type, ext]) => [ext, type]),
+	),
+	jpeg: "image/jpeg",
+};
+
+/** The file extension, without its dot, for an image or font media type. */
+export function mediaExtension(contentType: string): string | undefined {
+	return EXTENSION_BY_TYPE[contentType];
 }
 
-export function base64ToBytes(b64: string): Uint8Array {
-	const binary = atob(b64);
-	const out = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-	return out;
+/** The image or font media type a file extension names, in any case. */
+export function mediaType(extension: string): string | undefined {
+	return TYPE_BY_EXTENSION[extension.toLowerCase()];
 }
 
 /** The `data:` URL for an inline asset. */
 export function assetDataUri(asset: InlineAsset): string {
-	return `data:${asset.contentType};base64,${asset.base64}`;
+	return `${dataPrefix(asset)}${asset.base64}`;
 }
 
 // ── Producer / consumer sides ────────────────────────────────────────────────
@@ -123,6 +136,52 @@ export function inlineAssetUrls(template: Template): Map<string, string> {
 		out.set(asset.sha256, assetDataUri(asset));
 	}
 	return out;
+}
+
+/** The inverse of `inlineAssetUrls`: the `asset:` URI for a `data:` URL
+ *  `compile()` gave one of the template's assets, else undefined. */
+export function inlinedAssetUri(
+	template: Template,
+): (src: string) => string | undefined {
+	const keys = new Map<string, InlineAsset[]>();
+	for (const asset of template.assets ?? []) {
+		const prefix = dataPrefix(asset);
+		const length = prefix.length + asset.base64.length;
+		const key = sampleKey(length, (i) =>
+			i < prefix.length
+				? prefix.charCodeAt(i)
+				: asset.base64.charCodeAt(i - prefix.length),
+		);
+		keys.set(key, [...(keys.get(key) ?? []), asset]);
+	}
+	return (src) => {
+		const key = sampleKey(src.length, (i) => src.charCodeAt(i));
+		const asset = keys
+			.get(key)
+			?.find(
+				(a) =>
+					src.length === dataPrefix(a).length + a.base64.length &&
+					src.startsWith(dataPrefix(a)) &&
+					src.endsWith(a.base64),
+			);
+		return asset ? assetUri(asset.sha256) : undefined;
+	};
+}
+
+const dataPrefix = (asset: InlineAsset) => `data:${asset.contentType};base64,`;
+
+const SAMPLES = 32;
+
+// A short key for a long string: its length and a spread of its characters.
+// Lookups confirm the match, so equal keys only cost a comparison.
+function sampleKey(length: number, charAt: (i: number) => number): string {
+	let key = `${length}:`;
+	if (length === 0) return key;
+	for (let i = 0; i < SAMPLES; i++)
+		key += String.fromCharCode(
+			charAt(Math.floor((i * (length - 1)) / (SAMPLES - 1))),
+		);
+	return key;
 }
 
 /** Every sha256 the template still references through `asset:`. The set an

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
 	gifHeader,
 	jpegHeader,
@@ -6,9 +5,16 @@ import {
 	webpVp8,
 	webpVp8l,
 	webpVp8x,
-} from "./image-fixtures";
-import { orientedSize, parseImageInfo, readImageInfo } from "./image-info";
-import { photoPng } from "./test-fixtures";
+} from "@freshcoat-js/test-utils";
+import { describe, expect, it } from "vitest";
+import {
+	orientedSize,
+	parseImageInfo,
+	readImageInfo,
+	rgbIdat,
+	sniffImageType,
+} from "../src/image-info";
+import { encodePng } from "../src/png";
 
 const blob = (bytes: Uint8Array) => new Blob([bytes as BlobPart]);
 
@@ -19,7 +25,7 @@ describe("image-info", () => {
 			width: 4000,
 			height: 3000,
 		});
-		expect(await readImageInfo(blob(photoPng))).toMatchObject({
+		expect(await readImageInfo(blob(pngHeader(2, 2)))).toMatchObject({
 			contentType: "image/png",
 		});
 		expect(parseImageInfo(gifHeader(320, 200))).toEqual({
@@ -132,5 +138,30 @@ describe("image-info", () => {
 				Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0, 2, 0xff, 0xd9]),
 			),
 		).toBeNull();
+	});
+});
+
+describe("sniffImageType", () => {
+	it("knows AVIF by its ftyp brand", () => {
+		const avif = Uint8Array.from([
+			0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66,
+		]);
+		expect(sniffImageType(avif)).toBe("image/avif");
+		expect(parseImageInfo(avif)).toBeNull();
+	});
+});
+
+describe("rgbIdat", () => {
+	it("passes through what encodePng writes for an opaque image", async () => {
+		const pixels = new Uint8Array(3 * 2 * 4).fill(255);
+		const idat = rgbIdat(await encodePng(pixels, 3, 2));
+		expect(idat).toMatchObject({ width: 3, height: 2 });
+		expect(idat?.data.length).toBeGreaterThan(0);
+	});
+
+	it("refuses a translucent image or another format", async () => {
+		const pixels = new Uint8Array(3 * 2 * 4).fill(128);
+		expect(rgbIdat(await encodePng(pixels, 3, 2))).toBeUndefined();
+		expect(rgbIdat(gifHeader(3, 2))).toBeUndefined();
 	});
 });

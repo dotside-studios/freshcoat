@@ -20,6 +20,7 @@ import {
 	base64ToBytes,
 	bytesToBase64,
 	collectAssetRefs,
+	mediaExtension,
 	parseAssetUri,
 	rehashAssets,
 	type Sha256,
@@ -79,19 +80,6 @@ const MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
 // The earliest time a zip can record. Every entry carries it, so packing the
 // same template twice produces the same bytes.
 const ZIP_EPOCH = new Date(1980, 0, 1);
-
-const EXTENSION_BY_TYPE: Record<string, string> = {
-	"image/png": "png",
-	"image/jpeg": "jpg",
-	"image/webp": "webp",
-	"image/gif": "gif",
-	"image/avif": "avif",
-	"image/svg+xml": "svg",
-	"font/woff2": "woff2",
-	"font/woff": "woff",
-	"font/ttf": "ttf",
-	"font/otf": "otf",
-};
 
 // Already compressed; deflating them again spends time to gain nothing.
 const STORED_TYPES = new Set([
@@ -370,7 +358,7 @@ export function pruneUnusedAssets(template: Template): Template {
 }
 
 function assetEntryName(asset: InlineAsset): string {
-	const ext = EXTENSION_BY_TYPE[asset.contentType];
+	const ext = mediaExtension(asset.contentType);
 	return `${ASSET_DIR}${asset.sha256}${ext ? `.${ext}` : ""}`;
 }
 

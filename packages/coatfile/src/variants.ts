@@ -164,6 +164,16 @@ export type ApplyVariantOptions = {
 	hidden?: "drop" | "keep";
 };
 
+/** `variantId` when the template has that variant, else undefined (Default). */
+export function activeVariantId(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+): string | undefined {
+	return variantId !== undefined && t.variants?.some((v) => v.id === variantId)
+		? variantId
+		: undefined;
+}
+
 /** The size a variant is drawn at: its own `size`, else the template's. An
  *  absent or unknown id is the template's size. */
 export function variantSize(

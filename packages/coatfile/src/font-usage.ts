@@ -1,11 +1,12 @@
 import { walkElements } from "./tree";
-import type {
-	BarcodeElement,
-	Element,
-	FontRequest,
-	Template,
-} from "./types";
+import type { BarcodeElement, Element, Template } from "./types";
 import { applyVariant } from "./variants";
+
+export {
+	fontRequestKey,
+	googleCss2Url,
+	googleFamilyParam,
+} from "@freshcoat-js/engine";
 
 export type FontUsage = { weights: number[]; italic: boolean };
 
@@ -83,39 +84,4 @@ export function fontUsage(template: Template): Map<string, FontUsage> {
 			italic: u.italic,
 		});
 	return out;
-}
-
-const CSS2 = "https://fonts.googleapis.com/css2";
-
-// The css2 `family` parameter: each word URI-encoded, joined by `+`.
-export function googleFamilyParam(family: string): string {
-	return family.trim().split(/\s+/).map(encodeURIComponent).join("+");
-}
-
-// A Google Fonts css2 stylesheet URL. Without `weights` it asks for the
-// family's default face; an empty list asks for 400. `italic` adds the italic
-// of every weight.
-export function googleCss2Url(
-	family: string,
-	weights?: Iterable<number>,
-	italic = false,
-): string {
-	const name = googleFamilyParam(family);
-	if (weights === undefined) return `${CSS2}?family=${name}&display=swap`;
-	const ws = [...new Set(weights)].sort((a, b) => a - b);
-	if (ws.length === 0) ws.push(400);
-	const axes = italic
-		? `ital,wght@${[...ws.map((w) => `0,${w}`), ...ws.map((w) => `1,${w}`)].join(";")}`
-		: `wght@${ws.join(";")}`;
-	return `${CSS2}?family=${name}:${axes}&display=swap`;
-}
-
-// Identifies the bytes a request resolves to, for caching. A data: src can be
-// large; its length and tail identify it well enough.
-export function fontRequestKey(request: FontRequest): string {
-	if (!("descriptor" in request)) return `${request.family}:none`;
-	const d = request.descriptor;
-	return d.kind === "local"
-		? `${request.family}:local:${d.files.map((f) => `${f.weight}/${f.style ?? ""}/${f.src.length}/${f.src.slice(-48)}`).join(",")}`
-		: `${request.family}:${d.kind}:${d.url}`;
 }

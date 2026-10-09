@@ -15,6 +15,7 @@ import { validate } from "../src/validate";
 import { resizeTemplate } from "../src/constraints";
 import { minimumFormatVersion } from "../src/format";
 import {
+	activeVariantId,
 	applyVariant,
 	backgroundSwatch,
 	checkVariants,
@@ -654,6 +655,12 @@ describe("sized variants", () => {
 		expect(variantSize(pinned, "portrait")).toEqual({ width: 60, height: 100 });
 		expect(variantSize(pinned, undefined)).toEqual({ width: 100, height: 60 });
 		expect(variantSize(pinned, "nope")).toEqual({ width: 100, height: 60 });
+	});
+
+	test("activeVariantId keeps a known id and drops any other", () => {
+		expect(activeVariantId(pinned, "portrait")).toBe("portrait");
+		expect(activeVariantId(pinned, "nope")).toBeUndefined();
+		expect(activeVariantId(pinned, undefined)).toBeUndefined();
 	});
 
 	test("lays the base out at the variant's size before its deltas", () => {

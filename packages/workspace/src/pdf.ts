@@ -5,9 +5,11 @@ import {
 	MM_PER_INCH,
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
-import { parseImageInfo } from "./image-info";
+import { rgbIdat } from "@freshcoat-js/engine/image";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
+
+export { rgbIdat };
 
 type PdfLib = typeof import("pdf-lib");
 type PDFDocument = import("pdf-lib").PDFDocument;
@@ -192,55 +194,4 @@ export function embedRgbPng(
 		},
 	});
 	return context.register(lib.PDFRawStream.of(dict, idat.data));
-}
-
-/** The concatenated IDAT data of a PNG `embedRgbPng` can pass through. */
-export function rgbIdat(
-	bytes: Uint8Array,
-): { width: number; height: number; data: Uint8Array } | undefined {
-	const info = parseImageInfo(bytes);
-	if (info?.contentType !== "image/png") return undefined;
-	const { width, height } = info;
-	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-	const parts: Uint8Array[] = [];
-	let size = 0;
-	for (let at = 8; at + 8 <= bytes.length; ) {
-		const length = view.getUint32(at);
-		const type = String.fromCharCode(...bytes.subarray(at + 4, at + 8));
-		const start = at + 8;
-		const end = start + length;
-		if (end + 4 > bytes.length) return undefined;
-		if (type === "IHDR") {
-			if (length < 13) return undefined;
-			const [depth, colour, compression, filter, interlace] = bytes.subarray(
-				start + 8,
-				start + 13,
-			);
-			if (
-				depth !== 8 ||
-				colour !== 2 ||
-				compression !== 0 ||
-				filter !== 0 ||
-				interlace !== 0
-			)
-				return undefined;
-		} else if (type === "IDAT") {
-			parts.push(bytes.subarray(start, end));
-			size += length;
-		} else if (type === "tRNS" || type === "acTL") {
-			return undefined;
-		} else if (type === "IEND") {
-			break;
-		}
-		at = end + 4;
-	}
-	if (!(width > 0 && height > 0) || parts.length === 0) return undefined;
-	if (parts.length === 1) return { width, height, data: parts[0] };
-	const data = new Uint8Array(size);
-	let at = 0;
-	for (const part of parts) {
-		data.set(part, at);
-		at += part.length;
-	}
-	return { width, height, data };
 }

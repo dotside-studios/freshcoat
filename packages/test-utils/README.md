@@ -35,6 +35,13 @@ const geist = testFontBytes("Geist-Regular.ttf");
 const path = testFontPath("VendSans-Variable-latin.woff2");
 ```
 
+## Image headers
+
+`pngHeader`, `jpegHeader`, `gifHeader`, `webpVp8`, `webpVp8l` and `webpVp8x`
+build the start of an image file byte by byte: enough for a header reader such
+as the engine's `parseImageInfo`, not a decodable image. `jpegHeader` can carry
+an EXIF orientation and capture time.
+
 ## Checks
 
 ```sh
