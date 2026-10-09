@@ -1,4 +1,9 @@
-import { type Renderer, resolveTemplateFonts } from "@freshcoat-js/coatfile";
+import {
+	type Renderer,
+	type ResolvedTemplateFonts,
+	type ResolveTemplateFontsOptions,
+	resolveTemplateFonts,
+} from "@freshcoat-js/coatfile";
 import type { ExportPreset, Workspace } from "../types";
 import { createItemRenderer } from "./item";
 import {
@@ -24,36 +29,62 @@ export type ExportWorkspaceOptions = {
 	renderer: Renderer;
 	/** Default: the template's fonts, through `resolveTemplateFonts`. */
 	fonts?: Map<string, Uint8Array[]>;
+	/** How `resolveTemplateFonts` loads them when `fonts` is not given. */
+	fontOptions?: ResolveTemplateFontsOptions;
 	output?: ExportOutput;
 	signal?: AbortSignal;
 	onProgress?: (progress: JobProgress) => void;
 };
 
-/** Runs a preset on this thread with the host's renderer. */
+export type ExportWorkspaceResult = JobResult & {
+	/** set when `exportWorkspace` resolved the fonts itself */
+	fonts?: Omit<ResolvedTemplateFonts, "fonts">;
+};
+
+/** A preset by its id, else by a name no other preset has. */
+export function findPreset(
+	workspace: Workspace,
+	idOrName: string,
+): ExportPreset | undefined {
+	const byId = workspace.presets.find((p) => p.id === idOrName);
+	if (byId) return byId;
+	const named = workspace.presets.filter((p) => p.name === idOrName);
+	return named.length === 1 ? named[0] : undefined;
+}
+
+/** Runs a preset, given as itself, its id or its name, on this thread with
+ *  the host's renderer. */
 export async function exportWorkspace(
 	workspace: Workspace,
-	presetOrId: ExportPreset | string,
+	preset: ExportPreset | string,
 	options: ExportWorkspaceOptions,
-): Promise<JobResult> {
-	const preset =
-		typeof presetOrId === "string"
-			? workspace.presets.find((p) => p.id === presetOrId)
-			: presetOrId;
-	if (!preset) throw new Error(`no preset "${presetOrId}"`);
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	if (!entry) throw new Error(`no template "${preset.templateId}"`);
-	const fonts =
-		options.fonts ?? (await resolveTemplateFonts(entry.template)).fonts;
+): Promise<ExportWorkspaceResult> {
+	const found =
+		typeof preset === "string" ? findPreset(workspace, preset) : preset;
+	if (!found) throw new Error(`no preset "${preset}"`);
+	const entry = workspace.templates.find((t) => t.id === found.templateId);
+	if (!entry) throw new Error(`no template "${found.templateId}"`);
+	let report: ExportWorkspaceResult["fonts"];
+	let fonts = options.fonts;
+	if (!fonts) {
+		const { fonts: resolved, ...rest } = await resolveTemplateFonts(
+			entry.template,
+			options.fontOptions,
+		);
+		fonts = resolved;
+		report = rest;
+	}
 	const { output, signal, onProgress } = options;
 	const items = createItemRenderer({ renderer: options.renderer, fonts });
 	try {
-		const sink = preset.format === "pdf" ? undefined : output?.sink?.();
-		const result = await runExportJob(workspace, preset, {
+		const sink = found.format === "pdf" ? undefined : output?.sink?.();
+		const result: ExportWorkspaceResult = await runExportJob(workspace, found, {
 			pool: inlinePool(items),
 			...(sink ? { sink } : {}),
 			...(signal ? { signal } : {}),
 			...(onProgress ? { onProgress } : {}),
 		});
+		if (report) result.fonts = report;
 		if (result.cancelled) {
 			await output?.discard?.();
 			return result;

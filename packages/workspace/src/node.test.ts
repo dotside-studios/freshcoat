@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Renderer } from "@freshcoat-js/coatfile";
@@ -7,11 +7,12 @@ import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { planExport } from "../plan";
-import { preset, workspace } from "../test-fixtures";
-import type { ExportPreset } from "../types";
-import { exportWorkspace, REPORT_FILE_NAME } from "./index";
-import { fileOutput } from "./node";
+import { packWorkspace, WorkspaceReadError } from "./archive";
+import { exportWorkspace, findPreset, REPORT_FILE_NAME } from "./export";
+import { fileOutput, readWorkspaceFile } from "./node";
+import { planExport } from "./plan";
+import { preset, workspace } from "./test-fixtures";
+import type { ExportPreset, Workspace } from "./types";
 
 const fonts = new Map([["Inter", [testFontBytes("Geist-Regular.ttf")]]]);
 const small: ExportPreset = { ...preset, scale: 0.25 };
@@ -87,5 +88,37 @@ describe("exportWorkspace with fileOutput", () => {
 		await expect(
 			exportWorkspace(workspace, "p_missing", { renderer, fonts }),
 		).rejects.toThrow(/no preset "p_missing"/);
+	});
+
+	it("finds a preset by a name no other preset has", async () => {
+		const named: Workspace = {
+			...workspace,
+			presets: [
+				{ ...small, id: "p_a", name: "Cards" },
+				{ ...small, id: "p_b", name: "Twice" },
+				{ ...small, id: "p_c", name: "Twice" },
+			],
+		};
+		expect(findPreset(named, "Cards")?.id).toBe("p_a");
+		expect(findPreset(named, "p_b")?.id).toBe("p_b");
+		expect(findPreset(named, "Twice")).toBeUndefined();
+	});
+});
+
+describe("readWorkspaceFile", () => {
+	it("reads a workspace from a path", async () => {
+		const file = join(dir, "club.coatworkspace");
+		await writeFile(file, await (await packWorkspace(workspace)).bytes());
+		const read = await readWorkspaceFile(file);
+		expect(read.workspace.name).toBe(workspace.name);
+		expect(read.workspace.datasets[0]?.assets).toHaveLength(1);
+	});
+
+	it("throws the unpack code for a file it cannot read", async () => {
+		const file = join(dir, "not.coatworkspace");
+		await writeFile(file, "not a zip");
+		const err = await readWorkspaceFile(file).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(WorkspaceReadError);
+		expect((err as WorkspaceReadError).code).toBe("not_a_zip");
 	});
 });
