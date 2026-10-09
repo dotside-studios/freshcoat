@@ -1,13 +1,18 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
+	compile,
 	DEFAULT_VARIANT_ID,
 	type FrameWarning,
 	resolveTemplateFonts,
 	type Template,
 	validateValues,
+	variantSize,
 } from "@freshcoat-js/coatfile";
-import { renderTemplate } from "@freshcoat-js/coatfile/render";
+import {
+	renderCompiledPdf,
+	renderTemplate,
+} from "@freshcoat-js/coatfile/render";
 import { exactlyOne, parse, parseScale, parseSettings } from "../args";
 import { warnAboutFonts } from "../fonts";
 import { CliError, createLog, type Io, UsageError } from "../io";
@@ -18,7 +23,8 @@ export const renderHelp = `Usage: freshcoat render <template> [options]
 
 Render each frame of a template to an image. <template> is a .coat file or
 template JSON. Files are named after the frame, with the scale as a suffix
-for anything but 1x: front.png, front@2x.png.
+for anything but 1x: front.png, front@2x.png. The pdf format writes each
+frame as one page of vectors, front.pdf.
 
 Options:
   --values <file>    JSON file of field values
@@ -26,7 +32,8 @@ Options:
   --variant <id>     render a variant of the template
   --frame <name>     render only this frame; repeatable
   --scale <n>        pixel density, default 1; repeatable
-  --format <format>  png (default), jpeg or webp
+  --format <format>  png (default), jpeg, webp or pdf
+  --dpi <n>          design units per inch of a pdf page, default 300
   --out <dir>        directory to write to, default the current directory
   -q, --quiet        hide warnings and progress
   -h, --help         show this help
@@ -40,6 +47,7 @@ const FORMATS = {
 	jpeg: { format: "jpeg", extension: "jpg" },
 	jpg: { format: "jpeg", extension: "jpg" },
 	webp: { format: "webp", extension: "webp" },
+	pdf: { format: "pdf", extension: "pdf" },
 } as const;
 
 export async function render(args: string[], io: Io): Promise<void> {
@@ -50,14 +58,24 @@ export async function render(args: string[], io: Io): Promise<void> {
 		frame: { type: "string", multiple: true },
 		scale: { type: "string", multiple: true },
 		format: { type: "string" },
+		dpi: { type: "string" },
 		out: { type: "string" },
 	});
 	const file = exactlyOne(positionals, "template file");
 	const log = createLog(io, flags.quiet === true);
 	const choice = flags.format ?? "png";
 	if (!Object.hasOwn(FORMATS, choice))
-		throw new UsageError(`--format must be png, jpeg or webp, got "${choice}"`);
+		throw new UsageError(
+			`--format must be png, jpeg, webp or pdf, got "${choice}"`,
+		);
 	const output = FORMATS[choice as keyof typeof FORMATS];
+	if (output.format === "pdf" && flags.scale)
+		throw new UsageError("--scale does not apply to pdf; use --dpi");
+	if (output.format !== "pdf" && flags.dpi !== undefined)
+		throw new UsageError("--dpi applies to pdf only");
+	const dpi = Number(flags.dpi ?? 300);
+	if (!Number.isFinite(dpi) || dpi <= 0)
+		throw new UsageError(`--dpi must be a positive number, got "${flags.dpi}"`);
 	const scales = parseScale(flags.scale);
 	const settings = parseSettings(flags.set);
 
@@ -78,20 +96,32 @@ export async function render(args: string[], io: Io): Promise<void> {
 		fonts,
 	});
 	try {
-		const frames = await renderTemplate(renderer, template, values, {
-			...(variantId ? { variantId } : {}),
-			...(frameNames ? { frameNames } : {}),
-			exports: scales.map((value) => ({
-				constraint: { kind: "scale", value },
-				suffix: value === 1 ? "" : `@${value}x`,
-			})),
-			output: { encode: { format: output.format } },
-		});
+		const frames =
+			output.format === "pdf"
+				? await renderCompiledPdf(
+						renderer,
+						compile(template, values, {
+							...variantSize(template, variantId),
+							variantId,
+							...(frameNames ? { frameNames } : {}),
+						}),
+						{ dpi, ...(frameNames ? { frameNames } : {}) },
+					)
+				: await renderTemplate(renderer, template, values, {
+						...(variantId ? { variantId } : {}),
+						...(frameNames ? { frameNames } : {}),
+						exports: scales.map((value) => ({
+							constraint: { kind: "scale", value },
+							suffix: value === 1 ? "" : `@${value}x`,
+						})),
+						output: { encode: { format: output.format } },
+					});
 		const directoryOut = flags.out ?? ".";
 		await mkdir(resolve(io.cwd, directoryOut), { recursive: true });
 		const written = new Set<string>();
 		for (const frame of frames) {
-			const name = `${safeName(frame.name)}${frame.suffix ?? ""}.${output.extension}`;
+			const suffix = "suffix" in frame ? (frame.suffix ?? "") : "";
+			const name = `${safeName(frame.name)}${suffix}.${output.extension}`;
 			if (written.has(name))
 				throw new CliError(`two frames would both be written as ${name}`);
 			written.add(name);

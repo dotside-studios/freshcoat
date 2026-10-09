@@ -92,6 +92,31 @@ describe("render", () => {
 		}
 	});
 
+	test("writes a vector PDF page per frame", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--format",
+			"pdf",
+			"--dpi",
+			"72",
+			"--out",
+			"pdf",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe("");
+		expect((await readdir(box.path("pdf"))).sort()).toEqual([
+			"back.pdf",
+			"front.pdf",
+		]);
+		const text = new TextDecoder("latin1").decode(
+			await readFile(box.path("pdf", "front.pdf")),
+		);
+		expect(text.startsWith("%PDF-")).toBe(true);
+		expect(text).toContain("/MediaBox [0 0 200 100]");
+		expect(text).toContain("/Subtype /Form");
+	});
+
 	test("renders a variant at its own size", async () => {
 		const run = await box.run(
 			"render",
@@ -179,6 +204,9 @@ describe("render", () => {
 			[["render", "a.json", "b.json"], 2, "expected one template file"],
 			[["render", "badge.json", "--format", "gif"], 2, "--format must be"],
 			[["render", "badge.json", "--scale", "0"], 2, "--scale must be"],
+			[["render", "badge.json", "--format", "pdf", "--scale", "2"], 2, "--scale does not apply to pdf"],
+			[["render", "badge.json", "--dpi", "300"], 2, "--dpi applies to pdf only"],
+			[["render", "badge.json", "--format", "pdf", "--dpi", "0"], 2, "--dpi must be"],
 			[["render", "badge.json", "--set", "name"], 2, "--set expects key=value"],
 			[["render", "badge.json", "--bogus"], 2, "unknown option --bogus"],
 			[["render", "badge.json", "--out"], 2, "option --out needs a value"],
@@ -326,6 +354,35 @@ describe("export", () => {
 		expect(run.stderr).toBe("");
 		const bytes = await readFile(box.path("proof.pdf"));
 		expect(new TextDecoder().decode(bytes.subarray(0, 5))).toBe("%PDF-");
+	});
+
+	test("draws a PDF preset as vectors when asked", async () => {
+		const run = await box.run(
+			"export",
+			"badges.coatworkspace",
+			"--preset",
+			"p_pdf",
+			"--out",
+			"vector.pdf",
+			"--vector",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stderr).not.toContain("drawn as pixels");
+		const text = new TextDecoder("latin1").decode(
+			await readFile(box.path("vector.pdf")),
+		);
+		expect(text).toContain("/Subtype /Form");
+		const zip = await box.run(
+			"export",
+			"badges.coatworkspace",
+			"--preset",
+			"p_png",
+			"--out",
+			"x.zip",
+			"--vector",
+		);
+		expect(zip.code).toBe(2);
+		expect(zip.stderr).toContain("--vector needs a pdf preset");
 	});
 
 	test("warns about characters the fonts cannot draw", async () => {
