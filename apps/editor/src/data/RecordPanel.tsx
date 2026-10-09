@@ -43,6 +43,7 @@ import {
 	choiceOf,
 	useColumnChoices,
 } from "./column-options";
+import { keepFocusInColumn } from "./focus-column";
 import { type GridUiStore, useGridUi } from "./grid-state";
 import {
 	assetMap,
@@ -69,7 +70,7 @@ const STATUS_BY_ID = new Map(STATUSES.map((s) => [s.id, s]));
  *  bound to `datasetId`, else the first that is. */
 function useFramingTemplate(
 	datasetId: string,
-): { template: Template; binding: Binding } | undefined {
+): { template: Template; binding: Binding; active: boolean } | undefined {
 	const ws = useEditor((s) => s.workspace);
 	const live = useEditor((s) => s.doc?.history.present);
 	return useMemo(() => {
@@ -83,7 +84,11 @@ function useFramingTemplate(
 			slot.id === ws?.activeTemplateId && live
 				? live
 				: (slot.parked?.doc.history.present ?? slot.template);
-		return { template, binding: slot.binding };
+		return {
+			template,
+			binding: slot.binding,
+			active: slot.id === ws?.activeTemplateId,
+		};
 	}, [ws, live, datasetId]);
 }
 
@@ -208,7 +213,7 @@ export function RecordPanel({
 				{images.length ? (
 					<div className="flex flex-col gap-3 border-fc-border border-b p-2.5">
 						{images.map((c) => {
-							const frame = framing
+							const found = framing
 								? photoFraming(
 										framing.template,
 										framing.binding,
@@ -217,6 +222,11 @@ export function RecordPanel({
 										c.key,
 									)
 								: undefined;
+							const frame =
+								found?.focusColumn !== undefined || framing?.active
+									? found
+									: undefined;
+							const focusColumn = frame?.focusColumn;
 							return (
 								<RecordPhoto
 									key={c.key}
@@ -227,14 +237,26 @@ export function RecordPanel({
 									framing={
 										frame && {
 											...frame,
-											focus: record.values[frame.focusColumn],
+											focus:
+												focusColumn === undefined
+													? undefined
+													: record.values[focusColumn],
 											onFocus: (text) =>
-												editDataset(
-													controller,
-													dataset.id,
-													(d) => setCell(d, record.id, frame.focusColumn, text),
-													`cell:${dataset.id}:${record.id}:${frame.focusColumn}`,
-												),
+												focusColumn === undefined
+													? keepFocusInColumn(
+															controller,
+															dataset,
+															record.id,
+															c.key,
+															frame,
+															text,
+														)
+													: editDataset(
+															controller,
+															dataset.id,
+															(d) => setCell(d, record.id, focusColumn, text),
+															`cell:${dataset.id}:${record.id}:${focusColumn}`,
+														),
 										}
 									}
 								/>
@@ -435,7 +457,7 @@ function FramingOverlay({
 	framing: Framing;
 	photoAspect: number;
 }) {
-	const saved = cellFocus(framing.focus);
+	const saved = cellFocus(framing.focus, framing.fallback);
 	const [draft, setDraft] = useState<typeof saved | null>(null);
 	const drag = useRef<{ x: number; y: number; w: number; h: number } | null>(
 		null,
@@ -460,6 +482,7 @@ function FramingOverlay({
 			role="slider"
 			tabIndex={0}
 			aria-label="Photo framing"
+			title="Drag to choose what stays in view"
 			aria-valuetext={`${Math.round(focus.x * 100)}%, ${Math.round(focus.y * 100)}%`}
 			aria-valuenow={Math.round(focus.x * 100)}
 			data-testid="photo-framing"

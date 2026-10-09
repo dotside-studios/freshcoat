@@ -438,10 +438,13 @@ to fill cards with records.
 - **Record tab:** opening a record shows each of its photos large, with its
   size, file size and format, and a form for every field with the grid's
   editors. It steps through the shown records and sets their status. When
-  the template bound to the dataset crops a photo with Cover and its focus
-  is bound to a column, the photo shows what the record's variant keeps:
-  drag it, or use the arrow keys, to move the photo in its box, and the
-  point is written to that column.
+  the template bound to the dataset crops a photo with Cover, the photo
+  shows what the record's variant keeps: drag it, or use the arrow keys, to
+  move the photo in its box, and the point is written to the focus column.
+  When the open template's focus is not kept in a column yet, the first move
+  makes one: a `<photo>_focus` text column beside the photo, a focus field
+  on the image whose default is the point it had, and the binding between
+  them, so other records keep their framing until moved.
 - **Size from the photo:** an export preset can take each item's size from a
   bound photo, capped by "Limit long edge" if set. The design is laid out at
   the photo's aspect by its constraints, with its shorter side kept, so a

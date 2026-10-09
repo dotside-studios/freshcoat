@@ -19,6 +19,7 @@ import {
 	it,
 	vi,
 } from "vitest";
+import { produce } from "~/state/immer";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
 import { DataSection } from "../data/DataSection";
@@ -428,6 +429,57 @@ describe("Data section with a photo dataset", () => {
 		});
 		const record = controller.state.workspace?.datasets[0]?.records[0];
 		expect(record?.values.photo_focus).toBe("0.51,0.5");
+	});
+
+	it("keeps a photo's point in a new column the first time it is moved", async () => {
+		const d = photos();
+		const fixed = produce(photoWatermark(), (t) => {
+			delete t.fields.properties.photo_focus;
+			const photo = t.template_data[0]?.elements[0];
+			if (photo?.type === "image") photo.properties.focus = "0.2,0.5";
+		});
+		controller = new EditorController();
+		controller.dispatch({
+			type: "open",
+			template: fixed,
+			fileName: "watermark.coat",
+		});
+		controller.dispatch({ type: "datasetEdit", datasets: [d] });
+		const templateId = controller.state.workspace?.activeTemplateId ?? "";
+		controller.dispatch({
+			type: "setBinding",
+			id: templateId,
+			binding: {
+				datasetId: d.id,
+				fields: { photo: { kind: "column", column: "photo" } },
+				variant: { kind: "image", field: "photo" },
+			},
+		});
+		render(
+			<ControllerProvider controller={controller}>
+				<DataSection />
+			</ControllerProvider>,
+		);
+		doubleClick(card("r_1"));
+		const handle = await screen.findByTestId("photo-framing");
+		expect(handle.style.left).toBe("0%");
+		act(() => {
+			fireEvent.keyDown(handle, { key: "ArrowRight" });
+		});
+		const ws = controller.state.workspace;
+		const dataset = ws?.datasets[0];
+		expect(dataset?.columns.map((c) => c.key)).toContain("photo_focus");
+		expect(dataset?.records[0]?.values.photo_focus).toBe("0.385,0.5");
+		expect(
+			ws?.templates.find((t) => t.id === templateId)?.binding?.fields
+				.photo_focus,
+		).toEqual({ kind: "column", column: "photo_focus" });
+		const t = controller.base;
+		expect(t?.fields.properties.photo_focus?.default).toBe("0.2,0.5");
+		const photo = t?.template_data[0]?.elements[0];
+		expect(photo?.type === "image" && photo.properties.focus).toBe(
+			"{{photo_focus}}",
+		);
 	});
 
 	it("opens a record in the Record tab and edits a field there", async () => {
