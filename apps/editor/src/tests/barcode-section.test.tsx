@@ -1,6 +1,5 @@
 import type { BarcodeElement, Template } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import {
 	act,
 	cleanup,
@@ -18,7 +17,6 @@ import { insertElements, unwrap } from "~/doc/ops";
 import { getElement } from "~/doc/path";
 import { barcodeMessages } from "~/panels/design/BarcodeSection";
 import { DesignPanel } from "~/panels/design/DesignPanel";
-import { loadBarcodeEncoder } from "~/render/barcode";
 import { chooseOption, fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
@@ -71,8 +69,7 @@ function setup(t: Template, selection = [KEY]) {
 const code = (c: EditorController, key = KEY) =>
 	getElement(c.template as Template, key) as BarcodeElement;
 
-beforeAll(async () => {
-	await loadBarcodeEncoder();
+beforeAll(() => {
 	// jsdom has no CSS.escape, which react-aria uses to find items by key.
 	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
 	g.CSS ??= {};
@@ -266,25 +263,9 @@ describe("barcodeMessages", () => {
 		const layers = [0, 1].map(
 			(i) => getElement(t, `0/${7 + i}`) as BarcodeElement,
 		);
-		expect(barcodeMessages(t, {}, layers, bwipBarcodeEncoder)).toEqual([]);
-		expect(
-			barcodeMessages(t, { title: "x" }, layers, bwipBarcodeEncoder),
-		).toHaveLength(1);
-		expect(
-			barcodeMessages(
-				t,
-				{ title: "5901234123457" },
-				layers,
-				bwipBarcodeEncoder,
-			),
-		).toEqual([]);
-	});
-
-	it("says nothing without an encoder", () => {
-		const t = withBarcode({ symbology: "ean13", value: "x" });
-		expect(
-			barcodeMessages(t, {}, [getElement(t, KEY) as BarcodeElement], null),
-		).toEqual([]);
+		expect(barcodeMessages(t, {}, layers)).toEqual([]);
+		expect(barcodeMessages(t, { title: "x" }, layers)).toHaveLength(1);
+		expect(barcodeMessages(t, { title: "5901234123457" }, layers)).toEqual([]);
 	});
 });
 

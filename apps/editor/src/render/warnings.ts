@@ -33,8 +33,6 @@ function describeWarning(w: PaintWarning): string {
 			return `Couldn't load font: ${w.family}`;
 		case "qr_generate_failed":
 			return `Couldn't generate QR code: ${w.value}`;
-		case "barcode_unavailable":
-			return "Couldn't load the barcode encoder, so barcodes draw as placeholders";
 		case "unhandled_op":
 			return `Unhandled draw op: ${w.op}`;
 		case "adjust_unsupported":

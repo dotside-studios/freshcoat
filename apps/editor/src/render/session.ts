@@ -9,7 +9,6 @@ import {
 	type SurfaceCanvas,
 } from "@freshcoat-js/engine";
 import type { CanvasKit } from "canvaskit-wasm";
-import { barcodeEncoder, hasBarcode, loadBarcodeEncoder } from "./barcode";
 
 export type RenderInput<G> = {
 	/** A single-side template, ready to compile (see doc/preview). */
@@ -81,13 +80,6 @@ export function createRenderSession(
 			if (disposed) throw new Error("render session is disposed");
 			const r = await ready;
 			const { template } = input;
-			// Without the encoder a barcode draws as a placeholder; a failed load
-			// still renders, and the placeholder's warning says why.
-			const encoder =
-				barcodeEncoder() ??
-				(hasBarcode(template)
-					? await loadBarcodeEncoder().catch(() => null)
-					: null);
 			if (fonts !== input.fonts) {
 				await r.addFonts(Object.fromEntries(input.fonts));
 				fonts = input.fonts;
@@ -96,7 +88,6 @@ export function createRenderSession(
 			const compiled = compile(template, input.values, {
 				width: template.width,
 				height: template.height,
-				...(encoder ? { barcodeEncoder: encoder } : {}),
 			});
 			const frame = compiled.frames[0];
 			if (!frame) throw new Error("template has no side to render");

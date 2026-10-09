@@ -1,5 +1,4 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/engine/browser";
 import {
 	createItemRenderer,
@@ -31,7 +30,6 @@ async function itemRenderer(): Promise<ItemRenderer> {
 	items ??= createItemRenderer({
 		ck: await loadCanvasKitAt(CANVASKIT_BASE),
 		fonts,
-		barcodeEncoder: bwipBarcodeEncoder,
 	});
 	return items;
 }

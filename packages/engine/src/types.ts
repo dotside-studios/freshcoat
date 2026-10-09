@@ -521,10 +521,8 @@ export type PaintWarning =
 	| { kind: "svg_unsupported"; src: string; feature: string }
 	| { kind: "font_load_failed"; family: string; error: string }
 	| { kind: "qr_generate_failed"; value: string; error: string }
-	// A barcode element compiled with no encoder registered, so it drew as a
-	// placeholder. `layer` is the element id.
-	| { kind: "barcode_unavailable"; symbology: string; layer?: string }
-	// The encoder refused the value; `message` says why, in its words.
+	// The encoder refused a barcode's value; `message` says why, in its words.
+	// `layer` is the element id.
 	| {
 			kind: "barcode_invalid";
 			symbology: string;

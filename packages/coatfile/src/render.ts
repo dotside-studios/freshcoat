@@ -26,14 +26,9 @@ import {
 	resolveSupersample,
 	sampleImageNode,
 } from "@freshcoat-js/engine";
-import type { BarcodeEncoder } from "./barcode-encoder";
-import { loadBarcodeEncoder } from "./barcode-loader";
-import { hasBarcode } from "./has-barcode";
 import { compile } from "./compile";
 import type { CompiledTemplate, Template } from "./types";
 import { variantSize } from "./variants";
-
-export { loadBarcodeEncoder };
 
 // A painted side: what the renderer returned, tagged with the frame it was
 // rendered from and the export setting it was rendered at. `width`/`height`,
@@ -107,9 +102,6 @@ export type RenderTemplateOptions<O extends Output = DefaultOutput> =
 		/** Include the template's bleed around the trim. Off by default, so the
 		 *  output is the trim alone. */
 		bleed?: boolean;
-		/** Encodes `barcode` elements. Omit to load `bwipBarcodeEncoder` on first
-		 *  use when the template draws a barcode; `null` draws placeholders. */
-		barcodeEncoder?: BarcodeEncoder | null;
 	};
 
 type ResolvedPrint = {
@@ -206,8 +198,7 @@ function scaleBox(
 }
 
 // Compile a template and paint each of its sides. The template's fonts load
-// through the renderer, and the barcode encoder, unless one is given, loads on
-// first use when the template draws a barcode.
+// through the renderer.
 export async function renderTemplate<O extends Output = DefaultOutput>(
 	renderer: Renderer,
 	template: Template,
@@ -216,10 +207,6 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 ): Promise<Array<TemplateFrame<O>>> {
 	// Without an encoder a barcode draws as a placeholder; a failed load still
 	// renders, and the placeholder's warning says why.
-	const barcodeEncoder =
-		options.barcodeEncoder === undefined && hasBarcode(template)
-			? await loadBarcodeEncoder().catch(() => undefined)
-			: (options.barcodeEncoder ?? undefined);
 	const size = variantSize(template, options.variantId);
 	const compiled = compile(template, values, {
 		width: options.width ?? size.width,
@@ -227,7 +214,6 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 		variantId: options.variantId,
 		...(options.frameNames ? { frameNames: options.frameNames } : {}),
 		...(options.bleed ? { bleed: true } : {}),
-		...(barcodeEncoder ? { barcodeEncoder } : {}),
 	});
 	return renderCompiled(renderer, compiled, options);
 }

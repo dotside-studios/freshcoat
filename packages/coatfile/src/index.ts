@@ -40,9 +40,9 @@ export {
 	subtleSha256,
 	verifyAssets,
 } from "./assets";
+export { encodeBarcode } from "./barcode";
 export {
 	type BarcodeEncodeResult,
-	type BarcodeEncoder,
 	type BarcodeEncoding,
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
@@ -53,7 +53,6 @@ export {
 	SYMBOLOGIES,
 	symbologyLabel,
 } from "./barcode-encoder";
-export { hasBarcode } from "./has-barcode";
 export {
 	type BleedMm,
 	bleedMm,

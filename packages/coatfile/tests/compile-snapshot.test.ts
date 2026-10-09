@@ -3,7 +3,6 @@
 // template does not use must not move a single number of what it draws.
 import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
-import { bwipBarcodeEncoder } from "../src/barcode";
 import { compile } from "../src/compile";
 import type { CompiledTemplate, Template } from "../src/types";
 
@@ -181,7 +180,6 @@ const kitchenSink: Template = {
 	],
 };
 
-// Barcodes compile through the encoder compile is given, so their case passes it.
 const barcodes: Template = {
 	format_version: "1.3",
 	id: "barcodes",
@@ -274,9 +272,6 @@ describe("compile output is stable", () => {
 						width: template.width * scale,
 						height: template.height * scale,
 						...extra,
-						...(template === barcodes
-							? { barcodeEncoder: bwipBarcodeEncoder }
-							: {}),
 					},
 				);
 				expect(plain(compiled)).toMatchSnapshot();

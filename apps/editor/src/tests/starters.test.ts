@@ -8,7 +8,6 @@ import {
 	validate,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import { createRenderer, type Node, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -87,7 +86,6 @@ describe("starters", () => {
 				const out = compile(t, sampleValues(t), {
 					...size,
 					variantId,
-					barcodeEncoder: bwipBarcodeEncoder,
 				});
 				expect(out.frames.map((f) => f.name)).toEqual(
 					t.template_data.map((f) => f.name),
@@ -247,14 +245,12 @@ describe("the Event badge", () => {
 			width: t.width,
 			height: t.height,
 			variantId: "staff",
-			barcodeEncoder: bwipBarcodeEncoder,
 		});
 		expect(JSON.stringify(staff.frames[0]?.root)).not.toContain("TKT-2026");
 		const speaker = compile(t, sampleValues(t), {
 			width: t.width,
 			height: t.height,
 			variantId: "speaker",
-			barcodeEncoder: bwipBarcodeEncoder,
 		});
 		expect(JSON.stringify(speaker.frames[0]?.root)).toContain("TKT-2026");
 	});
@@ -321,11 +317,7 @@ type CK = {
 
 /** Left and right ink edges of the light text in rows `top`..`bottom`. */
 async function inkEdges(t: Template, top: number, bottom: number) {
-	const out = compile(t, sampleValues(t), {
-		width: t.width,
-		height: t.height,
-		barcodeEncoder: bwipBarcodeEncoder,
-	});
+	const out = compile(t, sampleValues(t), { width: t.width, height: t.height });
 	const png = await renderer.render(out.frames[0]?.root as Node, {
 		width: t.width,
 		height: t.height,

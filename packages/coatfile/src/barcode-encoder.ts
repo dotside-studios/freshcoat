@@ -13,12 +13,6 @@ export type BarcodeEncodeResult =
 	| { ok: true; encoding: BarcodeEncoding }
 	| { ok: false; message: string };
 
-export type BarcodeEncoder = (
-	symbology: Symbology,
-	value: string,
-	opts: { errorCorrection?: number },
-) => BarcodeEncodeResult;
-
 export const SYMBOLOGIES: readonly Symbology[] = [
 	"code128",
 	"ean13",

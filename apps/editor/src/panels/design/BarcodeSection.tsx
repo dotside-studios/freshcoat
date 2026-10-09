@@ -1,9 +1,9 @@
 import {
 	type BarcodeElement,
-	type BarcodeEncoder,
 	type BarcodeProperties,
 	type BearerBars,
 	defaultQuietZone,
+	encodeBarcode,
 	errorCorrectionRange,
 	isLinearSymbology,
 	SYMBOLOGIES,
@@ -20,7 +20,6 @@ import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
 import { Header, ListBoxSection } from "react-aria-components";
 import { barcodeBoxFor } from "~/doc/factories";
-import { barcodeEncoder, useBarcodeEncoder } from "~/render/barcode";
 import { useEditor } from "~/state/hooks";
 import { AddButton, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
@@ -50,9 +49,7 @@ export function barcodeMessages(
 	template: Template,
 	values: Record<string, unknown>,
 	layers: readonly BarcodeElement[],
-	encoder: BarcodeEncoder | null,
 ): string[] {
-	if (!encoder) return [];
 	const ctx: Record<string, unknown> = {};
 	for (const [k, def] of Object.entries(template.fields.properties))
 		if (def.default !== undefined) ctx[k] = def.default;
@@ -63,7 +60,7 @@ export function barcodeMessages(
 		const p = el.properties;
 		const value = String(substitute(p.value, ctx) ?? "");
 		if (value === "") continue;
-		const r = encoder(p.symbology, value, {
+		const r = encodeBarcode(p.symbology, value, {
 			errorCorrection: p.errorCorrection,
 		});
 		if (!r.ok) out.add(r.message);
@@ -79,14 +76,10 @@ export function BarcodeSection({ ins }: { ins: Inspect }) {
 	const set = (field: string, patch: Partial<BarcodeProperties>) =>
 		ins.setProps(field, () => patch as Record<string, unknown>);
 
-	const encoder = useBarcodeEncoder(ins.template);
 	const values = useEditor((s) => s.values);
 	const messages = useMemo(
-		() =>
-			encoder === "ready"
-				? barcodeMessages(ins.template, values, codes, barcodeEncoder())
-				: [],
-		[encoder, ins.template, values, codes],
+		() => barcodeMessages(ins.template, values, codes),
+		[ins.template, values, codes],
 	);
 
 	const symbology = pick((p) => p.symbology);

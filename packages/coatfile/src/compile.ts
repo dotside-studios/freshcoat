@@ -20,8 +20,8 @@ import {
 	type TrackSize,
 	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
+import { encodeBarcode } from "./barcode";
 import {
-	type BarcodeEncoder,
 	BEARER_BAR_MODULES,
 	bearerBarsOf,
 	defaultQuietZone,
@@ -172,7 +172,6 @@ export function compile(
 			ratio,
 			width,
 			height,
-			opts.barcodeEncoder,
 		);
 	});
 
@@ -199,7 +198,6 @@ function compileFrame(
 	ratio: number,
 	targetWidth: number,
 	targetHeight: number,
-	barcodeEncoder: BarcodeEncoder | undefined,
 ): CompiledFrame {
 	const declaredFontByFamily = new Map(
 		(template.fonts ?? []).map((f) => [f.family, f] as const),
@@ -231,7 +229,6 @@ function compileFrame(
 
 	const scope: CompileScope = {
 		fontFamily: fallbackFamily ?? "sans-serif",
-		barcodeEncoder,
 		warnings: [],
 	};
 	const children: Node[] = [
@@ -254,11 +251,9 @@ function compileFrame(
 }
 
 // What compiling one frame's elements shares: the family a barcode's text falls
-// back to, the encoder barcodes draw with, and the problems found along the
-// way, which the frame carries out.
+// back to, and the problems found along the way, which the frame carries out.
 type CompileScope = {
 	fontFamily: string;
-	barcodeEncoder: BarcodeEncoder | undefined;
 	warnings: PaintWarning[];
 };
 
@@ -884,31 +879,20 @@ function compileBarcode(
 		return group();
 	}
 
-	const encoder = scope.barcodeEncoder;
-	const result = encoder
-		? encoder(symbology, value, {
-				errorCorrection:
-					typeof props.errorCorrection === "number"
-						? props.errorCorrection
-						: undefined,
-			})
-		: null;
-	if (!result || !result.ok) {
-		scope.warnings.push(
-			result
-				? {
-						kind: "barcode_invalid",
-						symbology,
-						value,
-						message: result.message,
-						...(base.id ? { layer: base.id } : {}),
-					}
-				: {
-						kind: "barcode_unavailable",
-						symbology,
-						...(base.id ? { layer: base.id } : {}),
-					},
-		);
+	const result = encodeBarcode(symbology, value, {
+		errorCorrection:
+			typeof props.errorCorrection === "number"
+				? props.errorCorrection
+				: undefined,
+	});
+	if (!result.ok) {
+		scope.warnings.push({
+			kind: "barcode_invalid",
+			symbology,
+			value,
+			message: result.message,
+			...(base.id ? { layer: base.id } : {}),
+		});
 		children.push(
 			barcodePlaceholder(symbologyLabel(symbology), size, foreground, {
 				family: scope.fontFamily,

@@ -18,7 +18,6 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { compile, type Element, type Template } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
 import {
 	type RenderCompiledOptions,
 	renderCompiled,
@@ -176,12 +175,11 @@ const compiler = await createRenderer({ ck, fonts, cache: false });
 const card = membershipCard();
 const synthetic = repeatedFront(card, 12);
 const size = { width: card.width, height: card.height };
-const compileOptions = { ...size, barcodeEncoder: bwipBarcodeEncoder };
 
 // Per compile of every side, as the preview recompiles an unchanged scene.
 // Timed 100 at a time, as one is too quick to time alone.
 async function compileRepeat(template: Template): Promise<number> {
-	const compiled = compile(template, sampleValues(template), compileOptions);
+	const compiled = compile(template, sampleValues(template), size);
 	const batch = 100;
 	const ms = await time(() => {
 		for (let i = 0; i < batch; i++)
@@ -213,7 +211,7 @@ async function renderRecords(
 					i % RECORDS.length
 				] as (typeof RECORDS)[number];
 				const values = { ...sampleValues(card), display_name, tier, member_id };
-				const compiled = compile(card, values, compileOptions);
+				const compiled = compile(card, values, size);
 				const frames = await renderCompiled(renderer, compiled, {
 					...(print ? { print } : {}),
 					analysisCache,
@@ -338,7 +336,7 @@ async function batchExport() {
 			const values = { ...sampleValues(card), display_name, tier, member_id };
 			const frames = await renderCompiled(
 				renderer,
-				compile(card, values, compileOptions),
+				compile(card, values, size),
 				{ exports },
 			);
 			for (const frame of frames) sink += frame.bytes.length;

@@ -8,7 +8,6 @@ import type {
 	Vec2,
 } from "@freshcoat-js/engine";
 import type { z } from "zod";
-import type { BarcodeEncoder } from "./barcode-encoder";
 import type {
 	AdjustSchema,
 	BackgroundSchema,
@@ -208,10 +207,6 @@ export type CompileOptions = {
 	bleed?: boolean;
 	/** Compile only the frames with these names. */
 	frameNames?: string[];
-	/** Encodes `barcode` elements. Without one they draw as placeholders with a
-	 *  `barcode_unavailable` warning. `bwipBarcodeEncoder` from
-	 *  `@freshcoat-js/coatfile/barcode` is the implementation. */
-	barcodeEncoder?: BarcodeEncoder;
 };
 
 export type ValidationError = {

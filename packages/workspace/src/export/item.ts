@@ -1,17 +1,12 @@
 import {
-	type BarcodeEncoder,
 	compile,
 	fitDesignSize,
-	hasBarcode,
 	hasInsets,
 	type Sides,
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import {
-	loadBarcodeEncoder,
-	renderCompiled,
-} from "@freshcoat-js/coatfile/render";
+import { renderCompiled } from "@freshcoat-js/coatfile/render";
 import {
 	type ByteLoader,
 	createRenderer,
@@ -144,8 +139,6 @@ export type ItemRendererOptions = {
 	load?: ByteLoader;
 	/** Decoded pixels kept across items. */
 	maxImagePixels?: number;
-	/** Encodes barcodes. Default: `bwipBarcodeEncoder`, loaded on first use. */
-	barcodeEncoder?: BarcodeEncoder;
 };
 
 /** Renders export items one at a time, keeping decoded images, analyses and
@@ -202,18 +195,12 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					: undefined;
 			own = new Map(req.images);
 			const design = req.resize ?? variantSize(template, variantId);
-			const barcodeEncoder =
-				options.barcodeEncoder ??
-				(hasBarcode(template)
-					? await loadBarcodeEncoder().catch(() => undefined)
-					: undefined);
 			const compiled = compile(template, req.values, {
 				width: design.width,
 				height: design.height,
 				variantId,
 				...(req.resize ? { resize: req.resize } : {}),
 				...(req.bleed ? { bleed: true } : {}),
-				...(barcodeEncoder ? { barcodeEncoder } : {}),
 				frameNames: [req.side],
 			});
 			const painted = await withPrintFallback(req.print, async (print) => {
@@ -240,12 +227,9 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			const { result } = painted;
 			// A placeholder in place of a code would print as if it scanned; the
 			// item fails instead, with the encoder's reason.
-			for (const w of result.warnings) {
+			for (const w of result.warnings)
 				if (w.kind === "barcode_invalid")
 					throw new Error(`Barcode: ${w.message}`);
-				if (w.kind === "barcode_unavailable")
-					throw new Error("Barcode: the encoder isn't loaded");
-			}
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
 			return {
 				bytes: result.bytes,
