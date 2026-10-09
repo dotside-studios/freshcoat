@@ -37,6 +37,8 @@ Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Image header reading lives at `@freshcoat-js/workspace/image-info` too, which
+imports nothing, for hosts that need only that.
 Reading and writing files on disk differs by platform, so it lives at
 `@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
 `node` subpath.
