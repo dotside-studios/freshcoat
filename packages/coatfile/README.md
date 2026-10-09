@@ -818,6 +818,20 @@ or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
 fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
 nothing beyond its id.
 
+`diffElement(base, next, { epsilon })` is the delta that turns one version of
+an element into another, or undefined when they draw the same. `properties`
+holds each key `next` sets to a different value; a key it removes is left out,
+since a delta cannot remove one. A frame's `children` and a mask's `mask` and
+`children` are never diffed, because each element inside gets its own delta.
+A shell field is kept where `next` sets it and it differs from `base`'s, an
+omitted one read as compile draws it: `pos` `{ x: 0, y: 0 }`, `rotation` 0,
+`opacity` 1. It never sets `hidden`. Values compare with `sameJson(a, b, {
+epsilon })`, which ignores key order, reads a missing key as `undefined` and
+treats numbers less than `epsilon` apart as equal (exact by default).
+`backgroundSwatch(background)` is the colour a background suggests for a
+variant's swatch: a rect's fill, its first gradient stop or pattern colour,
+undefined for an image or a `{{field}}` colour.
+
 `validate` checks `{{field}}` references in variant backgrounds and deltas as it
 does in the design, with paths under `/variants/<i>/overrides/<j>/`.
 `checkVariants(template)` is a separate lint that never fails validation; it

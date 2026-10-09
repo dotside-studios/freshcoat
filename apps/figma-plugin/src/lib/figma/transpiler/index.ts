@@ -1,5 +1,11 @@
 import {
+	type Background,
+	backgroundSwatch,
+	collectAssetRefs,
 	DEFAULT_VARIANT_ID,
+	diffElement,
+	type Element,
+	type Template,
 	type TemplateWarning,
 	type VariantElementDelta,
 	variantIdFor,
@@ -34,10 +40,6 @@ import type {
 } from "./types";
 import {
 	backgroundsDiffer,
-	collectAssetRefsDeep,
-	diffElementProperties,
-	diffElementShell,
-	fillOf,
 	flattenElementsById,
 	hiddenElements,
 	traceElementsByNode,
@@ -245,7 +247,9 @@ export async function transpile(
 
 	const primarySlotName = input.product.frames[0]?.name;
 	const defaultSwatch = primarySlotName
-		? fillOf(baseSlotOf(primarySlotName).background)
+		? backgroundSwatch(
+				baseSlotOf(primarySlotName).background as Background | undefined,
+			)
 		: undefined;
 
 	// Diffs a colorway instance's sides against the base BY ELEMENT ID (see
@@ -320,7 +324,8 @@ export async function transpile(
 			);
 			for (const a of sideSink.assets) producedAssets.push(a);
 
-			if (slot.name === primarySlotName) swatch = fillOf(vBg) ?? swatch;
+			if (slot.name === primarySlotName)
+				swatch = backgroundSwatch(vBg as Background | undefined) ?? swatch;
 
 			const base = baseSlotOf(slot.name);
 			const bgDiffers = backgroundsDiffer(vBg, base.background);
@@ -361,14 +366,11 @@ export async function transpile(
 				if (hidden.within.has(id)) continue;
 				const varEl = varById.get(id);
 				if (!varEl) continue;
-				const properties = diffElementProperties(baseEl, varEl);
-				const shell = diffElementShell(baseEl, varEl);
-				if (
-					Object.keys(properties).length > 0 ||
-					Object.keys(shell).length > 0
-				) {
-					elementDeltas.push({ id, properties, ...shell });
-				}
+				// Two walks of one layer can differ in the last bits of a float.
+				const d = diffElement(baseEl as Element, varEl as Element, {
+					epsilon: 1e-6,
+				});
+				if (d) elementDeltas.push(d);
 			}
 
 			if (bgDiffers || elementDeltas.length > 0) {
@@ -383,8 +385,10 @@ export async function transpile(
 		// Only assets an emitted override actually points at need embedding.
 		// Rasters whose bytes matched the base (same sha256, no delta emitted)
 		// are already carried by the base and would just be de-duped anyway.
-		const referenced = new Set<string>();
-		for (const ov of overrides) collectAssetRefsDeep(ov, referenced);
+		const referenced = collectAssetRefs({
+			template_data: [],
+			variants: [{ id: "", label: "", overrides }],
+		} as unknown as Template);
 		const assets = producedAssets.filter((a) => referenced.has(a.sha256));
 
 		return { overrides, swatch, assets };

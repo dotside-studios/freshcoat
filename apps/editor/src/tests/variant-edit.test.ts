@@ -47,7 +47,6 @@ import {
 	isStructuralEdit,
 	mergedDelta,
 	overriddenKeys,
-	sameJson,
 	workingTemplate,
 } from "~/doc/variant-edit";
 import {
@@ -772,16 +771,6 @@ describe("view state", () => {
 			variantId: "nope",
 		});
 		expect(s.variantId).toBeUndefined();
-	});
-});
-
-describe("sameJson", () => {
-	test("ignores key order and treats undefined as missing", () => {
-		expect(sameJson({ a: 1, b: { c: 2 } }, { b: { c: 2 }, a: 1 })).toBe(true);
-		expect(sameJson({ a: 1, b: undefined }, { a: 1 })).toBe(true);
-		expect(sameJson({ a: 1 }, { a: 1, b: undefined })).toBe(true);
-		expect(sameJson([1, 2], [2, 1])).toBe(false);
-		expect(sameJson({ a: 1 }, { a: 2 })).toBe(false);
 	});
 });
 

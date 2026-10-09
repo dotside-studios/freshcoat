@@ -6,15 +6,16 @@
 import {
 	applyVariant,
 	type Background,
+	diffElement,
 	type Element,
 	variantDeltas as readVariantDeltas,
 	type SideDeltas,
+	sameJson,
 	type Template,
 	type TemplateFrame,
 	VARIANT_SHELL_KEYS,
 	type Variant,
 	type VariantElementDelta,
-	type VariantShellKey,
 	variantBase,
 } from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
@@ -58,26 +59,6 @@ export function workingTemplate(
 		byId.set(id, out);
 	}
 	return out;
-}
-
-// ── Equality ─────────────────────────────────────────────────────────────────
-
-/** Deep equality for template JSON: key order is ignored and a missing key
- *  equals one set to `undefined`. */
-export function sameJson(a: unknown, b: unknown): boolean {
-	if (Object.is(a, b)) return true;
-	if (typeof a !== "object" || typeof b !== "object" || !a || !b) return false;
-	if (Array.isArray(a) !== Array.isArray(b)) return false;
-	if (Array.isArray(a)) {
-		const bb = b as unknown[];
-		return a.length === bb.length && a.every((v, i) => sameJson(v, bb[i]));
-	}
-	const ra = a as Record<string, unknown>;
-	const rb = b as Record<string, unknown>;
-	for (const k of Object.keys(ra)) if (!sameJson(ra[k], rb[k])) return false;
-	for (const k of Object.keys(rb))
-		if (!(k in ra) && rb[k] !== undefined) return false;
-	return true;
 }
 
 // ── Reading a variant's overrides ────────────────────────────────────────────
@@ -314,13 +295,6 @@ function shallowSame(a: Template, b: Template): boolean {
 	return true;
 }
 
-/** Container keys: structure, never a delta. */
-function structuralProps(type: Element["type"]): readonly string[] {
-	if (type === "frame") return ["children"];
-	if (type === "mask") return ["mask", "children"];
-	return [];
-}
-
 function recomputeOverrides(
 	base: Template,
 	laid: Template,
@@ -402,42 +376,14 @@ function sideOverride(
 	};
 }
 
-const SHELL_DEFAULT: Record<VariantShellKey, unknown> = {
-	pos: { x: 0, y: 0 },
-	size: undefined,
-	rotation: 0,
-	opacity: 1,
-};
-
 function elementDelta(
 	b: Element,
 	n: Element,
 	hidden: boolean | undefined,
-): VariantElementDelta | null {
-	const skip = structuralProps(b.type);
-	const bp = b.properties as Record<string, unknown>;
-	const np = n.properties as Record<string, unknown>;
-	const properties: Record<string, unknown> = {};
-	for (const k of Object.keys(np)) {
-		if (skip.includes(k) || np[k] === undefined) continue;
-		// A key the variant removes cannot be written as a delta, so only
-		// values it sets are kept.
-		if (!sameJson(np[k], bp[k])) properties[k] = np[k];
-	}
-	const d: VariantElementDelta = { id: b.id, properties };
-	let changed = Object.keys(properties).length > 0;
-	for (const k of VARIANT_SHELL_KEYS) {
-		const nv = n[k] ?? SHELL_DEFAULT[k];
-		const bv = b[k] ?? SHELL_DEFAULT[k];
-		if (nv === undefined || sameJson(nv, bv)) continue;
-		(d as Record<string, unknown>)[k] = nv;
-		changed = true;
-	}
-	if (hidden === true) {
-		d.hidden = true;
-		changed = true;
-	}
-	return changed ? d : null;
+): VariantElementDelta | undefined {
+	const d = diffElement(b, n);
+	if (hidden !== true) return d;
+	return { ...(d ?? { id: b.id, properties: {} }), hidden: true };
 }
 
 function foldStructural(

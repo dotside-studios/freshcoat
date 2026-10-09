@@ -11,6 +11,7 @@ import type {
 import {
 	applyVariant,
 	assetUri,
+	backgroundSwatch,
 	bytesToBase64,
 	checkVariants,
 	collectAssetRefs,
@@ -22,6 +23,7 @@ import {
 	isEmptyDelta,
 	parseAssetUri,
 	resolveInsets,
+	sameJson,
 	subtleSha256,
 	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
@@ -64,7 +66,6 @@ import {
 	updateList,
 	updateSide,
 } from "./tree";
-import { sameJson } from "./variant-edit";
 
 export type { OpOk, OpRefused, OpResult, RefusalCode } from "./result";
 export { ok, refuse, unwrap } from "./result";
@@ -1059,17 +1060,7 @@ function withVariant(t: Template, id: string, next: Variant): Template {
 export function suggestSwatch(t: Template, id?: string): string | undefined {
 	const applied =
 		id !== undefined && findVariant(t, id) ? applyVariant(t, id) : t;
-	const bg = applied.template_data[0]?.background;
-	if (bg?.type !== "rect") return undefined;
-	const fills = bg.properties.fill;
-	const fill = Array.isArray(fills) ? fills[0] : fills;
-	const colour =
-		typeof fill === "string"
-			? fill
-			: fill?.kind === "pattern"
-				? fill.colors?.[0]
-				: fill?.stops[0]?.color;
-	return colour && !colour.includes("{{") ? colour : undefined;
+	return backgroundSwatch(applied.template_data[0]?.background);
 }
 
 /** Appends a variant labelled `label`. With `from`, it starts as a copy of

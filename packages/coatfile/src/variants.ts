@@ -273,6 +273,108 @@ function applyDelta(el: Element, d: VariantElementDelta): Element {
 	} as Element;
 }
 
+export type SameJsonOptions = {
+	/** Numbers this close are equal. Default 0, exact. */
+	epsilon?: number;
+};
+
+/** Deep equality for template JSON: key order is ignored, a missing key
+ *  equals one set to `undefined`, and numbers within `epsilon` are equal. */
+export function sameJson(
+	a: unknown,
+	b: unknown,
+	opts: SameJsonOptions = {},
+): boolean {
+	const epsilon = opts.epsilon ?? 0;
+	const same = (a: unknown, b: unknown): boolean => {
+		if (Object.is(a, b)) return true;
+		if (typeof a === "number" && typeof b === "number")
+			return Math.abs(a - b) < epsilon;
+		if (typeof a !== "object" || typeof b !== "object" || !a || !b)
+			return false;
+		if (Array.isArray(a) !== Array.isArray(b)) return false;
+		if (Array.isArray(a)) {
+			const bb = b as unknown[];
+			return a.length === bb.length && a.every((v, i) => same(v, bb[i]));
+		}
+		const ra = a as Record<string, unknown>;
+		const rb = b as Record<string, unknown>;
+		for (const k of Object.keys(ra)) if (!same(ra[k], rb[k])) return false;
+		for (const k of Object.keys(rb))
+			if (!(k in ra) && rb[k] !== undefined) return false;
+		return true;
+	};
+	return same(a, b);
+}
+
+export type DiffElementOptions = SameJsonOptions;
+
+/** The value an element that omits a shell field draws with. */
+const SHELL_DEFAULT: Record<VariantShellKey, unknown> = {
+	pos: { x: 0, y: 0 },
+	size: undefined,
+	rotation: 0,
+	opacity: 1,
+};
+
+/**
+ * The delta that turns `base` into `next`, two versions of one element, or
+ * undefined when they draw the same. `properties` holds each key `next` sets
+ * to a different value; a key it removes cannot be written as a delta, so it
+ * is left out. A frame's `children` and a mask's `mask` and `children` are
+ * structure, never a delta: each element inside gets its own. A shell field
+ * `next` sets is kept where it differs from `base`'s, an omitted one read as
+ * what compile draws (`pos` `{x:0,y:0}`, `rotation` 0, `opacity` 1). Values
+ * compare as `sameJson` does, within `epsilon`. `hidden` is never set.
+ */
+export function diffElement(
+	base: Element,
+	next: Element,
+	opts: DiffElementOptions = {},
+): VariantElementDelta | undefined {
+	const skip = new Set<string>();
+	if (base.type === "frame" || next.type === "frame") skip.add("children");
+	if (base.type === "mask" || next.type === "mask") {
+		skip.add("children");
+		skip.add("mask");
+	}
+	const bp = (base.properties ?? {}) as Record<string, unknown>;
+	const np = (next.properties ?? {}) as Record<string, unknown>;
+	const properties: Record<string, unknown> = {};
+	for (const k of Object.keys(np)) {
+		if (skip.has(k) || np[k] === undefined) continue;
+		if (!sameJson(np[k], bp[k], opts)) properties[k] = np[k];
+	}
+	const d: VariantElementDelta = { id: base.id, properties };
+	let changed = Object.keys(properties).length > 0;
+	for (const k of VARIANT_SHELL_KEYS) {
+		const nv = next[k] ?? SHELL_DEFAULT[k];
+		const bv = base[k] ?? SHELL_DEFAULT[k];
+		if (nv === undefined || sameJson(nv, bv, opts)) continue;
+		(d as Record<string, unknown>)[k] = nv;
+		changed = true;
+	}
+	return changed ? d : undefined;
+}
+
+/** The colour a background suggests as a variant's swatch: a rect's fill, its
+ *  first gradient stop or pattern colour. Undefined for an image background,
+ *  a missing fill, or a colour read from a field. */
+export function backgroundSwatch(
+	bg: Background | undefined,
+): string | undefined {
+	if (bg?.type !== "rect") return undefined;
+	const fills = bg.properties.fill;
+	const fill = Array.isArray(fills) ? fills[0] : fills;
+	const colour =
+		typeof fill === "string"
+			? fill
+			: fill?.kind === "pattern"
+				? fill.colors?.[0]
+				: fill?.stops?.[0]?.color;
+	return colour && !colour.includes("{{") ? colour : undefined;
+}
+
 /** What `checkVariants` reports. */
 export type VariantIssue = {
 	code: "variant_orphan_override" | "variant_empty_override";
