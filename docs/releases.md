@@ -8,6 +8,7 @@ Freshcoat releases use one version for the core SDK and the Figma plugin.
 | `@freshcoat-js/for-print` | npm: print analysis and correction planning |
 | `@freshcoat-js/coatfile` | npm: template files, validation, compilation and rendering helpers |
 | `@freshcoat-js/workspace` | npm: datasets, bindings, archives, tabular I/O and batch export |
+| `@freshcoat-js/cli` | npm: the `freshcoat` command for rendering, validating and exporting from a terminal |
 | Freshcoat for Figma | GitHub release ZIP; Community updates are published separately in Figma |
 
 Studio is deployed separately. The UI package remains internal.
@@ -16,12 +17,13 @@ Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md).
 
 ## Prepare and check a release
 
-Update the version in these five manifests together:
+Update the version in these six manifests together:
 
 - `packages/engine/package.json`
 - `packages/for-print/package.json`
 - `packages/coatfile/package.json`
 - `packages/workspace/package.json`
+- `packages/cli/package.json`
 - `apps/figma-plugin/package.json`
 
 Then regenerate the lockfile and schema, and build the release artifacts:
@@ -53,7 +55,8 @@ public import and declaration, renders a scene and text in Node, and exercises
 print analysis, template archives, fixtures and schema access. It imports every
 workspace subpath and runs a small export job that writes a ZIP in Node. It
 also checks that the tarballs include license files and exclude TypeScript
-source.
+source, and runs the installed `freshcoat` bin: its version, then `validate`,
+`inspect` and `render` on a fixture template.
 
 Every release dependency installs from the npm registry. The workspace check
 also writes and reads back an `.xlsx` file.
@@ -78,6 +81,7 @@ npm publish dist/releases/freshcoat-js-engine-0.1.0.tgz --access public
 npm publish dist/releases/freshcoat-js-for-print-0.1.0.tgz --access public
 npm publish dist/releases/freshcoat-js-coatfile-0.1.0.tgz --access public
 npm publish dist/releases/freshcoat-js-workspace-0.1.0.tgz --access public
+npm publish dist/releases/freshcoat-js-cli-0.1.0.tgz --access public
 ```
 
 Those commands publish publicly. The first manual publication does not receive
@@ -95,7 +99,7 @@ Configure a GitHub Actions trusted publisher in each package's npm settings:
 | Allowed action | Direct publishing with `npm publish` |
 
 Explicitly enable direct publishing: new trusted-publisher connections default
-to staged publishing, which this workflow does not use. Configure all four
+to staged publishing, which this workflow does not use. Configure all five
 scoped packages separately; settings on the old unscoped `freshcoat` package do
 not carry over.
 
@@ -122,8 +126,8 @@ GitHub release for that tag. Publishing the GitHub release starts
 The workflow runs the existing CI checks, including browser smoke tests, plus
 package and plugin artifact checks. Once validation passes, two jobs run:
 
-- npm publishes the tested tarballs in engine, for-print, coatfile, workspace
-  order.
+- npm publishes the tested tarballs in engine, for-print, coatfile, workspace,
+  cli order.
 - GitHub attaches those tarballs and the plugin ZIP to the release.
 
 The tag must match the package versions. Stable versions use npm's `latest`

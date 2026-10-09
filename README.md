@@ -39,10 +39,11 @@ and print workflows. If that sounds like your kind of work, see the
 | Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/) |
 | Analyze images and plan corrections for card printers | [`@freshcoat-js/for-print`](packages/for-print/) |
 | Bind datasets to templates and batch-export them to ZIPs or PDFs | [`@freshcoat-js/workspace`](packages/workspace/) |
+| Render, validate and batch-export from a terminal or CI | [`@freshcoat-js/cli`](packages/cli/) |
 | Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
 | Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
 
-Release builds for the four core SDK packages include compiled ESM,
+Release builds for the SDK packages and the command line include compiled ESM,
 TypeScript declarations and assets. Their source manifests are private and
 intended for workspace development; use the generated tarballs for publication.
 See the [release guide](docs/releases.md) for npm setup, release checks and
