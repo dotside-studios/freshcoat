@@ -1030,6 +1030,15 @@ stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
 
+### Text case
+
+`case` is `upper`, `lower`, `title` or `original`. Title case capitalises a
+letter whose preceding character is not a Unicode letter, number or underscore,
+looking across span boundaries, so `élan émile` becomes `Élan Émile` and a word
+split over two spans keeps one capital. `applyCase(text, mode, prevChar?)`
+applies the same rule; pass `{ preserveLength: true }` to keep a character whose
+cased form changes length (`ß` in upper case), so string indices stay stable.
+
 ## Spec
 
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is

@@ -1,4 +1,4 @@
-import type { TextElement } from "@freshcoat-js/coatfile";
+import { applyCase, type TextElement } from "@freshcoat-js/coatfile";
 import { parseMustache } from "@freshcoat-js/coatfile/mustache";
 import {
 	createSharedFontProvider,
@@ -52,22 +52,12 @@ export function casedText(text: string, mode: TextProps["case"]): string {
 	if (mode !== "upper" && mode !== "lower" && mode !== "title") return text;
 	let out = "";
 	for (const seg of parseMustache(text)) {
-		if (seg.kind === "ref") {
-			out += seg.raw;
-			continue;
-		}
-		let prev = text[seg.start - 1] ?? "";
-		for (const ch of seg.value) {
-			const word = mode === "title" && !/[\p{L}\p{N}_]/u.test(prev);
-			const next =
-				mode === "upper" || word
-					? ch.toUpperCase()
-					: mode === "lower"
-						? ch.toLowerCase()
-						: ch;
-			out += next.length === ch.length ? next : ch;
-			prev = ch;
-		}
+		out +=
+			seg.kind === "ref"
+				? seg.raw
+				: applyCase(seg.value, mode, text[seg.start - 1] ?? "", {
+						preserveLength: true,
+					});
 	}
 	return out;
 }

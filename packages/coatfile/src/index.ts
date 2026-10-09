@@ -118,6 +118,11 @@ export {
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
+export {
+	type ApplyCaseOptions,
+	applyCase,
+	type TextCase,
+} from "./text-case";
 export { childElements } from "./tree";
 export type {
 	Background,

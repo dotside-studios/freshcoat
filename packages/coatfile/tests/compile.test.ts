@@ -1117,6 +1117,20 @@ describe("compile (mixed text spans)", () => {
 		);
 	});
 
+	test("title case carries a word across span boundaries", () => {
+		const tpl = withSpans([
+			{ text: "élan fresh" },
+			{ text: "coat émile", color: "#f59e0b" },
+		]);
+		const text = tpl.template_data[0].elements[0] as TextElement;
+		(text.properties as Record<string, unknown>).case = "title";
+		const cmds = getCommands(tpl, {}, { width: 300, height: 180 });
+		const spans = findDraw(cmds, "drawText")!.layout.lines.flatMap(
+			(l) => l.spans,
+		);
+		expect(spans.map((s) => s.text).join("")).toBe("Élan Freshcoat Émile");
+	});
+
 	test("span without overrides inherits the element default font + color", () => {
 		const cmds = getCommands(
 			withSpans([{ text: "Hello" }]),
