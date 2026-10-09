@@ -156,7 +156,7 @@ export {
 	type PatternFill,
 	patternFill,
 } from "./pattern";
-export { resolveLayout } from "./resolve-layout";
+export { resolveLayout, rotatedFootprint } from "./resolve-layout";
 export {
 	ellipsePath,
 	isEllipsePath,

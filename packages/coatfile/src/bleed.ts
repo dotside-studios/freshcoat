@@ -1,3 +1,4 @@
+import { rotatedFootprint } from "@freshcoat-js/engine";
 import type { Element, Insets, Sides, Template } from "./types";
 
 export const NO_INSETS: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -181,17 +182,10 @@ const SAFE_EDGES: SafeAreaEdge[] = ["left", "top", "right", "bottom"];
 
 function rotatedBox(el: Element): [number, number, number, number] | null {
 	if (!el.size) return null;
-	const x = el.pos?.x ?? 0;
-	const y = el.pos?.y ?? 0;
-	const { width, height } = el.size;
-	const rad = ((el.rotation ?? 0) * Math.PI) / 180;
-	const hw =
-		(Math.abs(Math.cos(rad)) * width + Math.abs(Math.sin(rad)) * height) / 2;
-	const hh =
-		(Math.abs(Math.sin(rad)) * width + Math.abs(Math.cos(rad)) * height) / 2;
-	const cx = x + width / 2;
-	const cy = y + height / 2;
-	return [cx - hw, cy - hh, cx + hw, cy + hh];
+	const { width, height } = rotatedFootprint(el.size, el.rotation);
+	const cx = (el.pos?.x ?? 0) + el.size.width / 2;
+	const cy = (el.pos?.y ?? 0) + el.size.height / 2;
+	return [cx - width / 2, cy - height / 2, cx + width / 2, cy + height / 2];
 }
 
 /**
