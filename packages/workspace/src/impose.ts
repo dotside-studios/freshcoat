@@ -108,7 +108,8 @@ type Grid = {
 	rows: number;
 };
 
-function portraitPaper(layout: SheetLayout): CardSizeMm {
+/** The paper's size in millimetres, portrait. */
+export function paperSize(layout: SheetLayout): CardSizeMm {
 	const size =
 		typeof layout.paper === "string"
 			? PAPER_SIZES_MM[layout.paper]
@@ -255,7 +256,7 @@ export function imposeSheets<T extends ImposeItem>(
 		...sheetLayout,
 		gapMm: Math.max(sheetLayout.gapMm, minGapMm(bleed)),
 	};
-	const paper = portraitPaper(layout);
+	const paper = paperSize(layout);
 	const portrait = grid(paper, "portrait", card, layout);
 	let g: Grid;
 	if (layout.orientation === "auto") {

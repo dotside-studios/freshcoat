@@ -76,6 +76,7 @@ export {
 	imposeSheets,
 	minGapMm,
 	PAPER_SIZES_MM,
+	paperSize,
 	type SheetLayoutAxis,
 	SheetLayoutError,
 	type SheetPage,
