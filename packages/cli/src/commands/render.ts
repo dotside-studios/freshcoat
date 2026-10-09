@@ -8,32 +8,10 @@ import {
 	validateValues,
 } from "@freshcoat-js/coatfile";
 import { renderTemplate } from "@freshcoat-js/coatfile/render";
-import { exactlyOne, parse, parseScale, parseSettings } from "../args";
 import { warnAboutFonts } from "../fonts";
-import { CliError, createLog, type Io, UsageError } from "../io";
+import { CliError, createLog, type Io } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readBytes, readTemplate } from "../template-file";
-
-export const renderHelp = `Usage: freshcoat render <template> [options]
-
-Render each frame of a template to an image. <template> is a .coat file or
-template JSON. Files are named after the frame, with the scale as a suffix
-for anything but 1x: front.png, front@2x.png.
-
-Options:
-  --values <file>    JSON file of field values
-  --set <key=value>  one field value; repeatable, overrides --values
-  --variant <id>     render a variant of the template
-  --frame <name>     render only this frame; repeatable
-  --scale <n>        pixel density, default 1; repeatable
-  --format <format>  png (default), jpeg or webp
-  --out <dir>        directory to write to, default the current directory
-  -q, --quiet        hide warnings and progress
-  -h, --help         show this help
-
-Fonts the template declares are loaded from their sources; others are looked
-up on Google Fonts by name. Relative image paths resolve against the
-template's directory. Written paths are printed on stdout.`;
 
 const FORMATS = {
 	png: { format: "png", extension: "png" },
@@ -42,29 +20,30 @@ const FORMATS = {
 	webp: { format: "webp", extension: "webp" },
 } as const;
 
-export async function render(args: string[], io: Io): Promise<void> {
-	const { values: flags, positionals } = parse(args, {
-		values: { type: "string" },
-		set: { type: "string", multiple: true },
-		variant: { type: "string" },
-		frame: { type: "string", multiple: true },
-		scale: { type: "string", multiple: true },
-		format: { type: "string" },
-		out: { type: "string" },
-	});
-	const file = exactlyOne(positionals, "template file");
-	const log = createLog(io, flags.quiet === true);
-	const choice = flags.format ?? "png";
-	if (!Object.hasOwn(FORMATS, choice))
-		throw new UsageError(`--format must be png, jpeg or webp, got "${choice}"`);
-	const output = FORMATS[choice as keyof typeof FORMATS];
-	const scales = parseScale(flags.scale);
-	const settings = parseSettings(flags.set);
+export type RenderOptions = {
+	values?: string;
+	set?: Record<string, string>;
+	variant?: string;
+	frame?: string[];
+	scale?: number[];
+	format: keyof typeof FORMATS;
+	out?: string;
+	quiet: boolean;
+};
+
+export async function render(
+	file: string,
+	options: RenderOptions,
+	io: Io,
+): Promise<void> {
+	const log = createLog(io, options.quiet);
+	const output = FORMATS[options.format];
+	const scales = options.scale ?? [1];
 
 	const { template, directory } = await readTemplate(io, file);
-	const variantId = pickVariant(template, flags.variant);
-	const frameNames = pickFrames(template, flags.frame);
-	const values = await collectValues(io, template, flags.values, settings);
+	const variantId = pickVariant(template, options.variant);
+	const frameNames = pickFrames(template, options.frame);
+	const values = await collectValues(io, template, options.values, options.set ?? {});
 
 	const { fonts, ...report } = await resolveTemplateFonts(template, {
 		...(io.fetch ? { fetch: io.fetch } : {}),
@@ -87,7 +66,7 @@ export async function render(args: string[], io: Io): Promise<void> {
 			})),
 			output: { encode: { format: output.format } },
 		});
-		const directoryOut = flags.out ?? ".";
+		const directoryOut = options.out ?? ".";
 		await mkdir(resolve(io.cwd, directoryOut), { recursive: true });
 		const written = new Set<string>();
 		for (const frame of frames) {

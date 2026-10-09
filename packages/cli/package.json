@@ -21,9 +21,11 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@commander-js/extra-typings": "^14.0.0",
 		"@freshcoat-js/coatfile": "workspace:*",
 		"@freshcoat-js/engine": "workspace:*",
-		"@freshcoat-js/workspace": "workspace:*"
+		"@freshcoat-js/workspace": "workspace:*",
+		"commander": "^14.0.3"
 	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",

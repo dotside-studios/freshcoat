@@ -27,14 +27,6 @@ export class CliError extends Error {
 	}
 }
 
-export class UsageError extends CliError {
-	command?: string;
-	constructor(message: string) {
-		super(message, 2);
-		this.name = "UsageError";
-	}
-}
-
 export type Log = {
 	out(line: string): void;
 	warn(line: string): void;
