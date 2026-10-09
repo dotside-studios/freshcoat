@@ -554,7 +554,11 @@ the digit it should be.
 
 Barcodes are encoded with bwip-js as part of compile, as QR codes are with
 lean-qr. `encodeBarcode()` is the same encoder on its own, for checking a value
-before it reaches a template.
+before it reaches a template. `symbologyLabel("ean13")` is a symbology's usual
+name ("EAN-13"), and `parseSymbology` reads one back from what a person typed:
+an id, a label or a common alias (`upc`, `ean`, `itf`, `aztec code`), with
+case, spaces, hyphens and underscores ignored. Both also come from
+`@freshcoat-js/coatfile/barcode-encoder`, which has no runtime imports.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:

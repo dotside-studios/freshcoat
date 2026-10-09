@@ -51,6 +51,7 @@ export {
 	errorCorrectionRange,
 	isLinearSymbology,
 	isSquareSymbology,
+	parseSymbology,
 	SYMBOLOGIES,
 	symbologyLabel,
 } from "./barcode-encoder";
