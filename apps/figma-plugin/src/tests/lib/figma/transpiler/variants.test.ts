@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	colorwayLabel,
-	uniqueVariantId,
-} from "~/lib/figma/transpiler/variants";
+import { colorwayLabel } from "~/lib/figma/transpiler/variants";
 
 describe("colorwayLabel", () => {
 	it("extracts the label after `<Card> / `", () => {
@@ -24,22 +21,5 @@ describe("colorwayLabel", () => {
 		expect(colorwayLabel("Aurora Card / Amber / L", "Aurora Card")).toBe(
 			"Amber / L",
 		);
-	});
-});
-
-describe("uniqueVariantId", () => {
-	it("suffixes a slug already taken, starting at -2", () => {
-		const taken = new Set(["default"]);
-		expect(uniqueVariantId("Sky", taken)).toBe("sky");
-		expect(uniqueVariantId("Sky!", taken)).toBe("sky-2");
-		expect(uniqueVariantId("sky", taken)).toBe("sky-3");
-		expect(uniqueVariantId("Default", taken)).toBe("default-2");
-		expect([...taken]).toEqual([
-			"default",
-			"sky",
-			"sky-2",
-			"sky-3",
-			"default-2",
-		]);
 	});
 });

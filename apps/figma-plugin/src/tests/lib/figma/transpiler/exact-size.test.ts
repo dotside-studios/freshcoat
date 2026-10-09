@@ -6,33 +6,33 @@ import {
 	sizesAgree,
 } from "~/lib/figma/transpiler/exact-size";
 
-const PRODUCT = { width: 1013, height: 638 };
+const PRODUCT = { width: 1012, height: 638 };
 
 describe("exactSizeCheck", () => {
 	it("accepts an exact landscape frame and returns canonical landscape dims", () => {
-		const r = exactSizeCheck(1013, 638, PRODUCT);
+		const r = exactSizeCheck(1012, 638, PRODUCT);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(r.orientation).toBe("landscape");
-			expect(r.width).toBe(1013);
+			expect(r.width).toBe(1012);
 			expect(r.height).toBe(638);
 		}
 	});
 
 	it("accepts an exact portrait frame and returns transposed canonical dims", () => {
-		const r = exactSizeCheck(638, 1013, PRODUCT);
+		const r = exactSizeCheck(638, 1012, PRODUCT);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(r.orientation).toBe("portrait");
 			expect(r.width).toBe(638);
-			expect(r.height).toBe(1013);
+			expect(r.height).toBe(1012);
 		}
 	});
 
 	it("accepts sub-pixel measurements within ±1px", () => {
 		const r = exactSizeCheck(1012.6, 638.4, PRODUCT);
 		expect(r.ok).toBe(true);
-		if (r.ok) expect(r.width).toBe(1013);
+		if (r.ok) expect(r.width).toBe(1012);
 	});
 
 	it("rejects an off-size frame and suggests the nearest orientation's dims", () => {
@@ -40,7 +40,7 @@ describe("exactSizeCheck", () => {
 		expect(r.ok).toBe(false);
 		if (!r.ok) {
 			// wider than tall → suggest landscape canonical
-			expect(r.suggestedWidth).toBe(1013);
+			expect(r.suggestedWidth).toBe(1012);
 			expect(r.suggestedHeight).toBe(638);
 		}
 	});
@@ -50,7 +50,7 @@ describe("exactSizeCheck", () => {
 		expect(r.ok).toBe(false);
 		if (!r.ok) {
 			expect(r.suggestedWidth).toBe(638);
-			expect(r.suggestedHeight).toBe(1013);
+			expect(r.suggestedHeight).toBe(1012);
 		}
 	});
 });
@@ -82,17 +82,17 @@ describe("SizeMismatchError", () => {
 		nodeName: slot,
 		width,
 		height,
-		expectedWidth: 1013,
+		expectedWidth: 1012,
 		expectedHeight: 638,
 	});
 
 	it("names every offending frame and its target size", () => {
 		const err = new SizeMismatchError("exact_size", [
 			issue("front", 1000, 630),
-			issue("back", 638, 1013),
+			issue("back", 638, 1012),
 		]);
 		expect(err.message).toBe(
-			"exact_size: 'front' is 1000×630 — resize to 1013×638; 'back' is 638×1013 — resize to 1013×638.",
+			"exact_size: 'front' is 1000×630 — resize to 1012×638; 'back' is 638×1012 — resize to 1012×638.",
 		);
 		expect(err.issues).toHaveLength(2);
 	});

@@ -1,48 +1,43 @@
-import type { Template, TextElement } from "@freshcoat-js/coatfile";
+import {
+	type Template,
+	type TextElement,
+	fontUsage as templateFontUsage,
+} from "@freshcoat-js/coatfile";
 import { addFont, type OpResult } from "~/doc/ops";
 import { getElement, walkLayers } from "~/doc/path";
 import { patchLayers } from "~/panels/design/field-helpers";
 import { type GoogleFontRow, googleDescriptor } from "./catalogue";
 
-/** The families a template declares, then the ones its text uses. */
+/** The families a template declares, then the ones its text, barcodes and
+ *  variants use. */
 export function templateFamilies(t: Template): string[] {
 	const out = new Set<string>();
 	for (const f of t.fonts ?? []) out.add(f.family);
-	t.template_data.forEach((_, side) => {
-		for (const { element } of walkLayers(t, side)) {
-			if (element.type !== "text") continue;
-			out.add(element.properties.font.family);
-			for (const s of element.properties.spans ?? [])
-				if (s.font?.family) out.add(s.font.family);
-		}
-	});
+	for (const family of templateFontUsage(t).keys()) out.add(family);
 	return [...out].filter(Boolean);
 }
 
 /**
  * The weights and italics a family is wanted at: the selected layers' (which
- * are about to take the family) and those of any text already set in it.
+ * are about to take the family) and wherever the template already uses it.
  */
 export function fontUsage(
 	t: Template,
 	family: string,
 	keys: readonly string[] = [],
 ): { weights: number[]; italic: boolean } {
-	const weights = new Set<number>();
-	let italic = false;
+	const used = templateFontUsage(t).get(family);
+	const weights = new Set<number>(used?.weights);
+	let italic = used?.italic ?? false;
 	const selected = new Set(keys);
 	t.template_data.forEach((_, side) => {
 		for (const { key, element } of walkLayers(t, side)) {
-			if (element.type !== "text") continue;
+			if (element.type !== "text" || !selected.has(key)) continue;
 			const { font, spans } = element.properties;
-			const taking = selected.has(key);
-			if (taking || font.family === family) {
-				weights.add(font.weight ?? 400);
-				if (font.style === "italic") italic = true;
-			}
+			weights.add(font.weight ?? 400);
+			if (font.style === "italic") italic = true;
 			for (const s of spans ?? []) {
-				const spanFamily = s.font?.family ?? font.family;
-				if (!(spanFamily === family || (taking && !s.font?.family))) continue;
+				if (s.font?.family) continue;
 				weights.add(s.font?.weight ?? font.weight ?? 400);
 				if ((s.font?.style ?? font.style) === "italic") italic = true;
 			}

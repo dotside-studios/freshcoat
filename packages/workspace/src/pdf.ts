@@ -5,6 +5,7 @@ import {
 	MM_PER_INCH,
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
+import { parseImageInfo } from "./image-info";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
@@ -164,8 +165,6 @@ function trimOf(
 	};
 }
 
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
 /** Embeds an 8-bit RGB, non-interlaced PNG by passing its zlib stream through
  *  with the PNG predictor, skipping the decode and re-deflate `embedPng` does.
  *  Returns undefined for any other PNG, which `embedPng` handles instead. */
@@ -199,11 +198,10 @@ export function embedRgbPng(
 export function rgbIdat(
 	bytes: Uint8Array,
 ): { width: number; height: number; data: Uint8Array } | undefined {
-	if (bytes.length < 8 || PNG_SIGNATURE.some((b, i) => bytes[i] !== b))
-		return undefined;
+	const info = parseImageInfo(bytes);
+	if (info?.contentType !== "image/png") return undefined;
+	const { width, height } = info;
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-	let width = 0;
-	let height = 0;
 	const parts: Uint8Array[] = [];
 	let size = 0;
 	for (let at = 8; at + 8 <= bytes.length; ) {
@@ -214,8 +212,6 @@ export function rgbIdat(
 		if (end + 4 > bytes.length) return undefined;
 		if (type === "IHDR") {
 			if (length < 13) return undefined;
-			width = view.getUint32(start);
-			height = view.getUint32(start + 4);
 			const [depth, colour, compression, filter, interlace] = bytes.subarray(
 				start + 8,
 				start + 13,

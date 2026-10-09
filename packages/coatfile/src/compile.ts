@@ -37,13 +37,14 @@ import {
 	templateBleed,
 } from "./bleed";
 import { linearPoints } from "./fills";
-import { barcodeFontFamily, defaultFontFamily } from "./fonts";
+import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
+import { applyCase, isTextCase, lastChar } from "./text-case";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -1210,14 +1211,13 @@ function normalizeTextSpans(props: Record<string, unknown>): TextSpanInput[] {
 
 // Figma "Case": upper/lower/title on the resolved text.
 function applyTextCase(spans: TextSpanInput[], mode: unknown): TextSpanInput[] {
-	if (mode !== "upper" && mode !== "lower" && mode !== "title") return spans;
-	const transform = (t: string): string =>
-		mode === "upper"
-			? t.toUpperCase()
-			: mode === "lower"
-				? t.toLowerCase()
-				: t.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
-	return spans.map((s) => ({ ...s, text: transform(s.text) }));
+	if (!isTextCase(mode)) return spans;
+	let prev = "";
+	return spans.map((s) => {
+		const text = applyCase(s.text, mode, prev);
+		prev = lastChar(s.text) || prev;
+		return { ...s, text };
+	});
 }
 
 function hasOverrides(span: TextSpanInput): boolean {

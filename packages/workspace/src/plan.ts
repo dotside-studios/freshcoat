@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { DEFAULT_VARIANT_ID, type Template } from "@freshcoat-js/coatfile";
 import { columnsByKey, resolveValues, variantsFor } from "./binding";
 import { toTemplateValue } from "./columns";
 import type {
@@ -141,7 +141,7 @@ function compileFileName(
 			case "record":
 				return ctx.record;
 			case "variant":
-				return ctx.variant ?? "default";
+				return ctx.variant ?? DEFAULT_VARIANT_ID;
 			default:
 				return (ctx.cells?.[token] ?? ctx.values?.[token] ?? "").replace(
 					SOURCE_EXTENSION,
@@ -269,7 +269,7 @@ export function planExport(
 				});
 				items.push({
 					key: everyVariant
-						? `${recordId}:${side}:${variantId ?? "default"}`
+						? `${recordId}:${side}:${variantId ?? DEFAULT_VARIANT_ID}`
 						: `${recordId}:${side}`,
 					recordId,
 					recordIndex,

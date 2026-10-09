@@ -1,6 +1,9 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import type {
+	GlyphCheckItem,
+	GlyphIssue,
+} from "@freshcoat-js/workspace/export";
 import { useEffect, useRef, useState } from "react";
-import type { GlyphCheckItem, GlyphIssue } from "./glyph-preflight";
 import type { GlyphWorkerReply, GlyphWorkerRequest } from "./protocol";
 
 /** The part of `Worker` the client uses, so tests can hand it fakes. */

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { collectFontRequests, defaultFontFamily } from "../src/fonts";
+import { defaultFontFamily } from "../src/font-usage";
+import { collectFontRequests } from "../src/fonts";
 import type { Template } from "../src/types";
 
 // A template whose text uses three families: one declared (google), one nested

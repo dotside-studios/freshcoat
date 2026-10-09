@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { DEFAULT_VARIANT_ID, type Template } from "@freshcoat-js/coatfile";
 import type { DataRecord, Dataset } from "@freshcoat-js/workspace";
 import { VARIANT_EXPORT } from "~/app/copy";
 
@@ -27,7 +27,7 @@ export type PreviewVariant = {
 
 /** How plan keys and file names name a variant: its id, or `default`. */
 export function variantToken(variantId: string | undefined): string {
-	return variantId ?? "default";
+	return variantId ?? DEFAULT_VARIANT_ID;
 }
 
 /** The variant an id names, with its label and swatch from the template:

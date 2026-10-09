@@ -16,10 +16,21 @@ import { resizeTemplate } from "../src/constraints";
 import { minimumFormatVersion } from "../src/format";
 import {
 	applyVariant,
+	backgroundSwatch,
 	checkVariants,
 	closestVariant,
+	DEFAULT_VARIANT_ID,
+	diffElement,
 	hasShapedVariants,
+	hiddenElementIds,
+	isEmptyDelta,
 	isEmptyVariant,
+	mergedElementDelta,
+	sameJson,
+	sideBackground,
+	sideDeltas,
+	variantDeltas,
+	variantIdFor,
 	variantSize,
 } from "../src/variants";
 
@@ -405,6 +416,83 @@ describe("applyVariant hidden", () => {
 	});
 });
 
+describe("reading variant deltas", () => {
+	const blueBg = { ...rect("bg", "#0000ff"), size: { width: 100, height: 60 } };
+	const redBg = { ...rect("bg", "#ff0000"), size: { width: 100, height: 60 } };
+	const t = withVariant([
+		{
+			name: "front",
+			background: blueBg,
+			elements: [
+				{ id: "title", properties: { color: "#111111" }, pos: { x: 1, y: 1 } },
+				{ id: "wrapper", properties: {}, hidden: true },
+			],
+		},
+		{
+			name: "back",
+			elements: [{ id: "back_rect", properties: {}, opacity: 0.5 }],
+		},
+		{
+			name: "front",
+			background: redBg,
+			elements: [
+				{ id: "title", properties: { value: "Hey" }, rotation: 10 },
+				{ id: "wrapper", properties: {}, hidden: false },
+				{ id: "masked", properties: {}, hidden: false },
+			],
+		},
+	]);
+
+	test("merges every override for a side in order", () => {
+		expect(mergedElementDelta(t, "v", "front", "title")).toEqual({
+			id: "title",
+			properties: { color: "#111111", value: "Hey" },
+			pos: { x: 1, y: 1 },
+			rotation: 10,
+		});
+		expect(sideBackground(t, "v", "front")).toBe(redBg);
+		expect(sideBackground(t, "v", "back")).toBeUndefined();
+		expect([...variantDeltas(t, "v").keys()]).toEqual(["front", "back"]);
+		expect([...sideDeltas(t, "v", "back").elements.keys()]).toEqual([
+			"back_rect",
+		]);
+	});
+
+	test("a later shell field left undefined keeps the earlier one", () => {
+		const u = front([
+			{ id: "title", properties: {}, pos: { x: 3, y: 4 } },
+			{ id: "title", properties: {}, pos: undefined },
+		]);
+		expect(mergedElementDelta(u, "v", "front", "title")?.pos).toEqual({
+			x: 3,
+			y: 4,
+		});
+	});
+
+	test("any hidden: true hides; a later hidden: false does not show it", () => {
+		expect(mergedElementDelta(t, "v", "front", "wrapper")?.hidden).toBe(true);
+		expect(hiddenElementIds(t, "v", "front")).toEqual(new Set(["wrapper"]));
+		const drawn = frame(applyVariant(t, "v"), "front").elements;
+		expect(byId(drawn, "wrapper")).toBeUndefined();
+		expect(byId(drawn, "masked")).toBeDefined();
+	});
+
+	test("an absent or unknown variant reads as empty", () => {
+		expect(hiddenElementIds(t, undefined, "front").size).toBe(0);
+		expect(mergedElementDelta(t, "nope", "front", "title")).toBeUndefined();
+		expect(variantDeltas(t, "nope").size).toBe(0);
+	});
+
+	test("isEmptyDelta", () => {
+		expect(isEmptyDelta({ id: "a", properties: {} })).toBe(true);
+		expect(isEmptyDelta({ id: "a", properties: { fill: "#fff" } })).toBe(false);
+		expect(isEmptyDelta({ id: "a", properties: {}, rotation: 0 })).toBe(false);
+		expect(isEmptyDelta({ id: "a", properties: {}, hidden: false })).toBe(
+			false,
+		);
+	});
+});
+
 describe("format 1.4", () => {
 	const t = front([
 		{ id: "title", properties: {}, pos: { x: 3, y: 4 }, hidden: true },
@@ -720,5 +808,170 @@ describe("isEmptyVariant", () => {
 		expect(isEmptyVariant(shell({ pos: { x: 1, y: 2 } }))).toBe(false);
 		expect(isEmptyVariant(shell({ hidden: true }))).toBe(false);
 		expect(isEmptyVariant(shell({ opacity: undefined }))).toBe(true);
+	});
+});
+
+describe("variantIdFor", () => {
+	test("slugs the label and strips accents", () => {
+		expect(variantIdFor("Crème Brûlée!", [])).toBe("creme-brulee");
+		expect(variantIdFor("  Dark  Mode ", [])).toBe("dark-mode");
+	});
+
+	test("falls back to `variant` when nothing is left", () => {
+		expect(variantIdFor("  ", [])).toBe("variant");
+		expect(variantIdFor("!!", ["variant"])).toBe("variant-2");
+	});
+
+	test("suffixes from -2 past every taken id and the default id", () => {
+		expect(DEFAULT_VARIANT_ID).toBe("default");
+		expect(variantIdFor("Default", [])).toBe("default-2");
+		expect(variantIdFor("Sky", ["sky", "sky-2"])).toBe("sky-3");
+	});
+
+	test("does not change `taken`", () => {
+		const taken = new Set(["sky"]);
+		expect(variantIdFor("Sky", taken)).toBe("sky-2");
+		expect([...taken]).toEqual(["sky"]);
+	});
+});
+
+describe("sameJson", () => {
+	test("ignores key order and treats undefined as missing", () => {
+		expect(sameJson({ a: 1, b: { c: 2 } }, { b: { c: 2 }, a: 1 })).toBe(true);
+		expect(sameJson({ a: 1, b: undefined }, { a: 1 })).toBe(true);
+		expect(sameJson({ a: 1 }, { a: 1, b: undefined })).toBe(true);
+		expect(sameJson([1, 2], [2, 1])).toBe(false);
+		expect(sameJson({ a: 1 }, { a: 2 })).toBe(false);
+		expect(sameJson([], {})).toBe(false);
+	});
+
+	test("compares numbers exactly unless given an epsilon", () => {
+		expect(sameJson({ x: 1 }, { x: 1 + 1e-9 })).toBe(false);
+		expect(sameJson({ x: 1 }, { x: 1 + 1e-9 }, { epsilon: 1e-6 })).toBe(true);
+		expect(sameJson({ x: 1 }, { x: 1.1 }, { epsilon: 1e-6 })).toBe(false);
+	});
+});
+
+describe("diffElement", () => {
+	test("is undefined when nothing changes", () => {
+		expect(diffElement(rect("r", "#000"), rect("r", "#000"))).toBeUndefined();
+	});
+
+	test("keeps changed properties and shell fields", () => {
+		const base = rect("r", "#000");
+		const next: RectElement = {
+			...base,
+			pos: { x: 3, y: 0 },
+			rotation: 15,
+			properties: { ...base.properties, fill: "#fff" },
+		};
+		expect(diffElement(base, next)).toEqual({
+			id: "r",
+			properties: { fill: "#fff" },
+			pos: { x: 3, y: 0 },
+			rotation: 15,
+		});
+	});
+
+	test("reads a missing pos as 0,0, rotation as 0 and opacity as 1", () => {
+		const { pos: _p, ...noPos } = rect("r", "#000");
+		const base = noPos as RectElement;
+		const next: RectElement = {
+			...base,
+			pos: { x: 0, y: 0 },
+			rotation: 0,
+			opacity: 1,
+		};
+		expect(diffElement(base, next)).toBeUndefined();
+		expect(diffElement(next, base)).toBeUndefined();
+		expect(diffElement(base, { ...base, pos: { x: 1, y: 0 } })?.pos).toEqual({
+			x: 1,
+			y: 0,
+		});
+	});
+
+	test("leaves out a removed key or shell field", () => {
+		const base: RectElement = { ...rect("r", "#000"), opacity: 0.5 };
+		const { opacity: _o, ...next } = base;
+		const props = {
+			...base.properties,
+			radius: 4,
+		} as RectElement["properties"];
+		expect(diffElement({ ...base, properties: props }, base)).toBeUndefined();
+		expect(diffElement(base, next as RectElement)?.opacity).toBe(1);
+	});
+
+	test("an epsilon ignores float noise", () => {
+		const base = rect("r", "#000");
+		const next: RectElement = { ...base, pos: { x: 1e-9, y: 0 } };
+		expect(diffElement(base, next)?.pos).toEqual({ x: 1e-9, y: 0 });
+		expect(diffElement(base, next, { epsilon: 1e-6 })).toBeUndefined();
+	});
+
+	test("skips a frame's children and a mask's shape and children", () => {
+		const nextWrapper: FrameElement = {
+			...wrapper,
+			properties: { ...wrapper.properties, children: [] },
+		};
+		expect(diffElement(wrapper, nextWrapper)).toBeUndefined();
+		const nextMasked: MaskElement = {
+			...masked,
+			properties: { mask: rect("other", "#000"), children: [] },
+		};
+		expect(diffElement(masked, nextMasked)).toBeUndefined();
+	});
+
+	test("the delta applies back to the next element", () => {
+		const base = text("title", "#1a1a1a");
+		const next: TextElement = {
+			...base,
+			size: { width: 10, height: 10 },
+			properties: { ...base.properties, color: "#ff0000" },
+		};
+		const d = diffElement(base, next)!;
+		const t: Template = {
+			...template,
+			template_data: [{ ...template.template_data[0], elements: [base] }],
+			variants: [
+				{ id: "v", label: "V", overrides: [{ name: "front", elements: [d] }] },
+			],
+		};
+		expect(frame(applyVariant(t, "v"), "front").elements[0]).toEqual(next);
+	});
+});
+
+describe("backgroundSwatch", () => {
+	const bg = (fill: unknown) =>
+		({ ...rect("bg", "#000"), properties: { fill } }) as RectElement;
+
+	test("reads a solid, a list, a gradient or a pattern", () => {
+		expect(backgroundSwatch(bg("#123456"))).toBe("#123456");
+		expect(backgroundSwatch(bg(["#abcdef", "#000000"]))).toBe("#abcdef");
+		expect(
+			backgroundSwatch(
+				bg({
+					kind: "linear",
+					stops: [
+						{ offset: 0, color: "#ff0000" },
+						{ offset: 1, color: "#0000ff" },
+					],
+				}),
+			),
+		).toBe("#ff0000");
+		expect(backgroundSwatch(bg({ kind: "pattern", colors: ["#00ff00"] }))).toBe(
+			"#00ff00",
+		);
+	});
+
+	test("is undefined for a field colour, an image or nothing", () => {
+		expect(backgroundSwatch(bg("{{brand}}"))).toBeUndefined();
+		expect(backgroundSwatch(undefined)).toBeUndefined();
+		expect(
+			backgroundSwatch({
+				id: "bg",
+				type: "image",
+				properties: { src: "x.png", fit: "cover" },
+			}),
+		).toBeUndefined();
 	});
 });

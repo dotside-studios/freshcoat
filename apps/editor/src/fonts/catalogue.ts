@@ -1,4 +1,8 @@
-import type { FontDescriptor } from "@freshcoat-js/coatfile";
+import {
+	type FontDescriptor,
+	googleCss2Url,
+	googleFamilyParam,
+} from "@freshcoat-js/coatfile";
 
 export type FontCategory =
 	| "sans"
@@ -124,13 +128,6 @@ export function nearestWeight(available: readonly number[], wanted: number) {
 	return best;
 }
 
-const CSS2 = "https://fonts.googleapis.com/css2";
-
-/** The css2 family parameter, spaces as `+`. */
-export function familyParam(family: string): string {
-	return family.trim().split(/\s+/).map(encodeURIComponent).join("+");
-}
-
 /**
  * A `google` descriptor for a catalogue family with the weights a template
  * uses, each moved to the nearest one the family has, and its italics when
@@ -141,21 +138,16 @@ export function googleDescriptor(
 	weights: Iterable<number>,
 	italic = false,
 ): Extract<FontDescriptor, { kind: "google" }> {
-	const ws = [...new Set([...weights].map((w) => nearestWeight(row.w, w)))];
+	const ws = [...weights].map((w) => nearestWeight(row.w, w));
 	if (ws.length === 0) ws.push(nearestWeight(row.w, 400));
-	ws.sort((a, b) => a - b);
-	const axes =
-		italic && row.i
-			? `ital,wght@${[...ws.map((w) => `0,${w}`), ...ws.map((w) => `1,${w}`)].join(";")}`
-			: `wght@${ws.join(";")}`;
 	return {
 		kind: "google",
 		family: row.f,
-		url: `${CSS2}?family=${familyParam(row.f)}:${axes}&display=swap`,
+		url: googleCss2Url(row.f, ws, italic && row.i),
 	};
 }
 
 /** The stylesheet for a preview of a family: just the glyphs of its name. */
 export function previewCssUrl(family: string): string {
-	return `${CSS2}?family=${familyParam(family)}&text=${encodeURIComponent(family)}`;
+	return `https://fonts.googleapis.com/css2?family=${googleFamilyParam(family)}&text=${encodeURIComponent(family)}`;
 }
