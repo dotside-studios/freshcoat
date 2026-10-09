@@ -3,11 +3,13 @@ import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { openSample, probePath, run, settle, state } from "./helpers";
 
+const fixtures = join(
+	import.meta.dirname,
+	"../../../packages/coatfile/tests/fixtures",
+);
+
 // Written by the Figma plugin's encoder; see src/app/handoff.ts.
-const coat = readFileSync(
-	join(import.meta.dirname, "../src/tests/fixtures/handoff-fflate.txt"),
-	"utf8",
-).trim();
+const coat = readFileSync(join(fixtures, "handoff-fflate.txt"), "utf8").trim();
 
 const url = (page: Page) =>
 	page.evaluate(() => `${location.pathname}${location.search}${location.hash}`);
@@ -76,9 +78,7 @@ for (const hash of ["#open=1", "#drop=1"]) {
 
 		const chooser = page.waitForEvent("filechooser");
 		await open.click();
-		await (await chooser).setFiles(
-			join(import.meta.dirname, "../src/tests/fixtures/handoff-template.json"),
-		);
+		await (await chooser).setFiles(join(fixtures, "handoff-template.json"));
 		await expect(page.getByTestId("artboard-canvas")).toBeAttached();
 		await settle(page);
 		expect(await state<string>(page, "t.name")).toBe("Café card from Figma");
