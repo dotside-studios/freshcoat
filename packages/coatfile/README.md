@@ -719,6 +719,15 @@ across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
 
+## Field keys
+
+A field's key, and the id in a `{{id}}` token, matches `FIELD_ID`: a letter or
+`_`, then letters, digits and `_`. `fieldKeyFrom(text)` makes one from any
+text, such as a layer or column name: `First Name` and `firstName` give
+`first_name`, `Año` gives `ano`, and `2nd` gives `_2nd`. Text with nothing
+usable in it gives `field`, or the fallback passed as the second argument. Both
+come from `@freshcoat-js/coatfile/mustache`, which has no runtime imports.
+
 ## Field patterns
 
 A field's `pattern` is a JavaScript regular expression that `validateValues`

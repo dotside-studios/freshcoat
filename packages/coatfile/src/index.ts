@@ -115,6 +115,7 @@ export {
 } from "./stroke-trim";
 export {
 	FIELD_ID,
+	fieldKeyFrom,
 	hasToken,
 	type MustacheRef,
 	type MustacheSegment,

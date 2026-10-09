@@ -30,7 +30,7 @@ scheduling and file destinations.
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
-| `ids` | the stable ids, keys and slugs the workspace is addressed by |
+| `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
 | `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O

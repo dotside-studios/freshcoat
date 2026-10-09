@@ -1,4 +1,4 @@
-const KEY_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+import { FIELD_ID, fieldKeyFrom } from "@freshcoat-js/coatfile/mustache";
 
 /** `<prefix>_` and 16 hex digits, e.g. `r_1a2b3c4d5e6f7a8b`. */
 export function newId(prefix: string): string {
@@ -13,21 +13,13 @@ export function freshId(prefix: string, taken: ReadonlySet<string>): string {
 }
 
 export function isValidKey(key: string): boolean {
-	return KEY_PATTERN.test(key);
+	return FIELD_ID.test(key);
 }
 
 /** A valid column key made from any header or property name:
  *  `First Name` gives `first_name`, `2nd` gives `_2nd`. */
 export function slug(text: string): string {
-	const ascii = text
-		.normalize("NFKD")
-		.replace(/[̀-ͯ]/g, "")
-		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "_")
-		.replace(/^_+|_+$/g, "");
-	if (ascii === "") return "column";
-	return /^[0-9]/.test(ascii) ? `_${ascii}` : ascii;
+	return fieldKeyFrom(text, "column");
 }
 
 /** `base`, or `base_2`, `base_3`… whichever is not taken. */
