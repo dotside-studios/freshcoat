@@ -115,7 +115,9 @@ preserved); a density large enough to exceed the coat engine's `MAX_EXPORT_DIMEN
 is lowered to fit, and the `scale` on the result is the one actually used.
 
 `@freshcoat-js/coatfile/render` holds `renderTemplate` and `renderCompiled`,
-so the main entry stays free of the painter.
+so the main entry stays free of the painter. `describeWarning(w)` there turns
+one of a result's `warnings` into a line of readable text, such as
+`Couldn't load image: logo.png`.
 
 ### PNG size
 
@@ -1229,6 +1231,11 @@ cased form changes length (`ß` in upper case), so string indices stay stable.
 
 The format is defined by the zod schemas in `src/schemas.ts`; `validate()` is
 the reference check, including the cross-field rules zod alone does not express.
+
+Each error is `{ path, code, message }`, with `path` a JSON pointer. The
+message is for people and may be reworded. An `unknown_field_reference` also
+carries `field`, the id it names, and `role`: `"src"` for an image source,
+`"condition"` for a `visibleWhen`, and `"text"` for a `{{token}}` anywhere else.
 
 ## Fixtures
 

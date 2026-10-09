@@ -236,8 +236,8 @@ describe("export from a workspace file in Node", () => {
 		expect(
 			new TextDecoder().decode(zip[REPORT_FILE_NAME]).trim().split("\r\n"),
 		).toEqual([
-			"file,record,side,status,error,print,gamut,unfilled",
-			...plan.map((i) => `${i.fileName},${i.recordId},${i.side},ok,,off,,`),
+			"file,record,side,status,error,print,gamut,unfilled,warnings",
+			...plan.map((i) => `${i.fileName},${i.recordId},${i.side},ok,,off,,,`),
 		]);
 
 		const ck = await loadCanvasKit("full");

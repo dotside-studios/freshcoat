@@ -141,9 +141,9 @@ test("a printing PNG export carries the finish, and the report says so", async (
 
 	const plain = await exportZip(page);
 	expect(plain.report[0]).toBe(
-		"file,record,side,status,error,print,gamut,unfilled",
+		"file,record,side,status,error,print,gamut,unfilled,warnings",
 	);
-	expect(plain.report.slice(1).every((l) => l.endsWith(",ok,,off,,"))).toBe(
+	expect(plain.report.slice(1).every((l) => l.endsWith(",ok,,off,,,"))).toBe(
 		true,
 	);
 
@@ -170,7 +170,7 @@ test("a printing PNG export carries the finish, and the report says so", async (
 	const printed = await exportZip(page);
 	expect(Object.keys(printed.pngs)).toEqual(Object.keys(plain.pngs));
 	for (const line of printed.report.slice(1))
-		expect(line).toMatch(/,ok,,on,(\d+%)?$/);
+		expect(line).toMatch(/,ok,,on,(\d+%)?,,$/);
 	for (const name of Object.keys(plain.pngs)) {
 		const a = plain.pngs[name] as Uint8Array;
 		const b = printed.pngs[name] as Uint8Array;
@@ -256,7 +256,7 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 
 	const profiled = await exportZip(page);
 	for (const line of profiled.report.slice(1))
-		expect(line).toMatch(/,ok,,on,(\d+%)?$/);
+		expect(line).toMatch(/,ok,,on,(\d+%)?,,$/);
 	for (const name of Object.keys(noProfile.pngs))
 		expect(
 			await differingPixels(
@@ -349,7 +349,7 @@ test("a photo pulled into printer range says how much, in the preview and the re
 
 	const out = await exportZip(page);
 	expect(out.report).toHaveLength(2);
-	expect(out.report[1]).toMatch(/,ok,,on,\d+%$/);
+	expect(out.report[1]).toMatch(/,ok,,on,\d+%,,$/);
 });
 
 /** The PNG with every color channel scaled, as a photo exposed below the

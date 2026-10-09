@@ -65,6 +65,31 @@ describe("createItemRenderer", () => {
 		expect([...pixels.data.slice(at, at + 3)]).toEqual([200, 40, 40]);
 	});
 
+	it("reports a photo it could not load and still renders", async () => {
+		const ref = "ws:missing";
+		const out = await items.render({
+			template,
+			values: { name: "Ana", photo: ref },
+			side: "front",
+			scale: 0.25,
+			images: [],
+			format: "png",
+		});
+		expect(out.warnings).toEqual([`Couldn't load image: ${ref}`]);
+	});
+
+	it("leaves warnings unset on a clean render", async () => {
+		const out = await items.render({
+			template,
+			values: { name: "Ana" },
+			side: "front",
+			scale: 0.25,
+			images: [],
+			format: "png",
+		});
+		expect(out.warnings).toBeUndefined();
+	});
+
 	it("refuses a side the template does not have", async () => {
 		await expect(
 			items.render({
@@ -97,6 +122,42 @@ describe("runExportJob on this thread", () => {
 		const first = files[plan[0]?.fileName ?? ""];
 		if (!first) throw new Error("no first file");
 		expect(decodePixels(ck, first)?.width).toBe(253);
+		items.endJob();
+	});
+
+	it("puts each item's warnings in the result and the report", async () => {
+		const small: ExportPreset = {
+			...preset,
+			scale: 0.25,
+			records: "selected",
+			selected: ["r_00000004"],
+		};
+		const missing = `ws:${"0".repeat(64)}`;
+		const broken = {
+			...workspace,
+			datasets: workspace.datasets.map((d) => ({
+				...d,
+				records: d.records.map((r) => ({
+					...r,
+					values: { ...r.values, photo: missing },
+				})),
+			})),
+		};
+		const result = await runExportJob(broken, small, {
+			pool: inlinePool(items),
+		});
+		const front = result.items.find((i) => i.side === "front");
+		expect(front?.ok).toBe(true);
+		expect(front?.warnings).toEqual([`Couldn't load image: ${missing}`]);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no zip");
+		const report = new TextDecoder().decode(
+			unzipSync(new Uint8Array(await blob.arrayBuffer()))[REPORT_FILE_NAME],
+		);
+		expect(report.split("\r\n")[0]).toBe(
+			"file,record,side,status,error,print,gamut,unfilled,warnings",
+		);
+		expect(report).toContain(`,ok,,off,,,Couldn't load image: ${missing}\r\n`);
 		items.endJob();
 	});
 
