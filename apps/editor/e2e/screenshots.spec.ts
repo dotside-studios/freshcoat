@@ -324,8 +324,18 @@ for (const size of SIZES) {
 
 			test("welcome", async ({ page }) => {
 				await page.goto(`/?theme=${theme}`);
-				await page.getByTestId("starter-davi-card").waitFor();
-				await page.getByTestId("sample-membership-card").waitFor();
+				for (const id of [
+					"starter-davi-card",
+					"starter-photo-watermark",
+					"starter-event-badge",
+					"sample-membership-card",
+					"sample-certificate",
+					"sample-minimal",
+				])
+					await page
+						.getByTestId(id)
+						.getByTestId("thumbnail")
+						.waitFor({ timeout: 30_000 });
 				await shot(page, "welcome");
 			});
 

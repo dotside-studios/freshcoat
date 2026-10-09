@@ -29,8 +29,16 @@ the records, and **Export** turns templates and records into files.
   - Unsaved work is autosaved to IndexedDB, and the welcome screen offers to
     restore it. Photos are stored apart from the templates and data, each once, so an
     edit does not rewrite them.
+  - The welcome screen's **Recent** group lists the last workspaces opened
+    that can still be opened again: the one autosave holds, restored as it
+    was, and the samples and starters opened, with a thumbnail of each. A
+    workspace opened from a file shows there while autosave holds it; file
+    handles are not kept, so nothing asks for permission again. The list is
+    kept in IndexedDB, and each entry can be removed from it.
 - **Starters:** the welcome screen's **Start from** group lists designs meant
-  to be made your own, ahead of the samples:
+  to be made your own, ahead of the samples. Each starter and sample shows its
+  front side in the default variant, drawn in the browser the first time and
+  kept in IndexedDB until its template changes:
   - **Davi card**, CR80: name, position and organization, a QR of the card
     link on the back, the Davi wordmark, and cobalt, sage and plum variants,
     each also in portrait at 638 × 1012 (`cobalt-portrait`, and so on);

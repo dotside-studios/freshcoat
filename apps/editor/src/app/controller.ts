@@ -82,7 +82,7 @@ import {
 import { newPreset } from "~/export/preset";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
-import { findStarter } from "~/samples/starters";
+import { findStarter, type Starter } from "~/samples/starters";
 import { loadVendSans } from "~/samples/vend-sans-file";
 import {
 	type Action,
@@ -97,10 +97,12 @@ import {
 } from "~/state/store";
 import {
 	activeSlot,
+	newId,
 	singleTemplateWorkspace,
 	workspaceSnapshot,
 } from "~/state/workspace";
 import {
+	type Autosave,
 	clearAutosave,
 	configureAutosave,
 	keepAutosaveAsset,
@@ -110,6 +112,7 @@ import { readClipboard, writeClipboard } from "./clipboard";
 import { BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
+import { type RecentSource, recentStore } from "./recent";
 import {
 	reportSourceChanged,
 	SourceChangedError,
@@ -194,6 +197,8 @@ export class EditorController {
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
+	private recentId: string | undefined;
+	private openingFrom: { source: RecentSource; id?: string } | null = null;
 
 	constructor(store: EditorStore = createEditorStore()) {
 		this.store = store;
@@ -1037,7 +1042,27 @@ export class EditorController {
 	}
 
 	private emitOpened(): void {
+		const from = this.openingFrom ?? { source: { kind: "workspace" } };
+		this.recentId = from.id ?? newId("recent");
+		const name = this.state.workspace?.name;
+		if (name)
+			void recentStore().record({
+				id: this.recentId,
+				name,
+				openedAt: Date.now(),
+				source: from.source,
+			});
 		for (const fn of this.openedListeners) fn();
+	}
+
+	/** Runs `open` with what a workspace it starts is recorded as. */
+	private openingAs<T>(source: RecentSource, open: () => T, id?: string): T {
+		this.openingFrom = { source, ...(id ? { id } : {}) };
+		try {
+			return open();
+		} finally {
+			this.openingFrom = null;
+		}
 	}
 
 	/** Calls `fn` when the issues list should be shown, as when a save fails
@@ -1131,7 +1156,10 @@ export class EditorController {
 		const sample = findSample(id);
 		if (!sample) return;
 		const t = await this.loadSample(sample, () => this.openSample(id));
-		if (t) this.open(t, `${sample.id}${COAT_EXTENSION}`);
+		if (t)
+			this.openingAs({ kind: "sample", id: sample.id }, () =>
+				this.open(t, `${sample.id}${COAT_EXTENSION}`),
+			);
 	}
 
 	private loadSample(
@@ -1157,6 +1185,12 @@ export class EditorController {
 		if (!starter) return;
 		const template = await this.loadSample(starter, () => this.openStarter(id));
 		if (!template) return;
+		this.openingAs({ kind: "starter", id: starter.id }, () =>
+			this.openStarterTemplate(starter, template),
+		);
+	}
+
+	private openStarterTemplate(starter: Starter, template: Template): void {
 		const fileName = `${starter.id}${COAT_EXTENSION}`;
 		if (!starter.preset) {
 			this.open(template, fileName);
@@ -1259,6 +1293,15 @@ export class EditorController {
 				failed: "Couldn't load the workspace archive",
 			},
 			retry,
+		);
+	}
+
+	/** Opens the autosaved workspace as the workspace it was written for. */
+	restore(saved: Autosave, notices: string[] = []): void {
+		this.openingAs(
+			{ kind: "workspace" },
+			() => this.openWorkspace(saved.workspace, saved.fileName, notices),
+			saved.recentId,
 		);
 	}
 
@@ -1532,7 +1575,11 @@ export class EditorController {
 			const ws = workspaceSnapshot(this.state);
 			const fileName = this.state.workspace?.fileName;
 			if (ws && fileName && isDirty(this.state))
-				void writeAutosave({ workspace: ws, fileName });
+				void writeAutosave({
+					workspace: ws,
+					fileName,
+					...(this.recentId ? { recentId: this.recentId } : {}),
+				});
 		}, 1000);
 	}
 
