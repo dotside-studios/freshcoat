@@ -1,4 +1,4 @@
-import { decodePixels } from "@freshcoat-js/engine";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { photoSha, preset, workspace } from "../test-fixtures";
 import type { ExportPreset } from "../types";
 import {
 	createItemRenderer,
+	IMAGE_CACHE_PIXELS,
 	type ItemRenderer,
 	inlinePool,
 	REPORT_FILE_NAME,
@@ -20,7 +21,10 @@ let items: ItemRenderer;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
 	items = createItemRenderer({
-		ck,
+		renderer: await createRenderer({
+			ck,
+			cache: { maxImagePixels: IMAGE_CACHE_PIXELS },
+		}),
 		fonts: new Map([["Inter", [testFontBytes("Geist-Regular.ttf")]]]),
 	});
 });

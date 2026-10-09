@@ -351,7 +351,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		async addFonts(sources) {
 			alive();
-			setFonts(await resolveSources(sources));
+			const entries = await resolveSources(sources);
+			for (const [family] of entries) fontKeys.delete(family);
+			setFonts(entries);
 		},
 		async loadFonts(requests) {
 			alive();
