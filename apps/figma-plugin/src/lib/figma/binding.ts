@@ -2,7 +2,11 @@
 // run at harvest time (write pluginData) and at export time (live fallback), so
 // the marker grammar lives in exactly one place.
 
-import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
+import type {
+	FieldFormat as CoatFieldFormat,
+	Symbology,
+	VisibilityCondition,
+} from "@freshcoat-js/coatfile";
 import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { titleCase } from "./transpiler/fields";
@@ -10,13 +14,7 @@ import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
 /** Schema format a field lowers to (coatfile). */
-export type FieldFormat =
-	| "text"
-	| "longText"
-	| "image"
-	| "color"
-	| "url"
-	| "boolean";
+export type FieldFormat = "text" | CoatFieldFormat;
 
 /** What on a node a template drives. The layer-name marker seeds one; the
  * plugin may add extras (e.g. `textColor` alongside `text`). */

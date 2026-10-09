@@ -10,7 +10,10 @@ import {
 	bleedMm,
 	bleedSize,
 	cardSizeMm,
+	compactInsets,
 	extendIntoBleed,
+	maxInsets,
+	resolveInsets,
 	safeAreaIssues,
 	templateBleed,
 	templateSafeArea,
@@ -332,5 +335,34 @@ describe("safe area issues", () => {
 		expect(safeAreaIssues(card({ safeArea: 6 }, els()), { safe })).toEqual([
 			{ side: 0, index: 0, id: "near", edges: ["left"] },
 		]);
+	});
+});
+
+describe("compactInsets", () => {
+	const even = { top: 3, right: 3, bottom: 3, left: 3 };
+
+	test("writes one number when every side agrees", () => {
+		expect(compactInsets(even)).toBe(3);
+		expect(compactInsets({ ...even, left: 4 })).toEqual({ ...even, left: 4 });
+	});
+
+	test("is the inverse of resolveInsets", () => {
+		expect(resolveInsets(compactInsets(even))).toEqual(even);
+		expect(compactInsets(resolveInsets(7))).toBe(7);
+	});
+});
+
+describe("maxInsets", () => {
+	test("takes the largest inset on each side", () => {
+		expect(
+			maxInsets([
+				{ top: 1, right: 5, bottom: 2, left: 0 },
+				{ top: 4, right: 2, bottom: 2, left: 3 },
+			]),
+		).toEqual({ top: 4, right: 5, bottom: 2, left: 3 });
+	});
+
+	test("is no insets for an empty list", () => {
+		expect(maxInsets([])).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
 });

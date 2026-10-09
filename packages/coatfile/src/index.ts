@@ -51,6 +51,7 @@ export {
 	errorCorrectionRange,
 	isLinearSymbology,
 	isSquareSymbology,
+	parseSymbology,
 	SYMBOLOGIES,
 	symbologyLabel,
 } from "./barcode-encoder";
@@ -60,9 +61,11 @@ export {
 	bleedSize,
 	type CardSizeMm,
 	cardSizeMm,
+	compactInsets,
 	extendIntoBleed,
 	hasInsets,
 	MM_PER_INCH,
+	maxInsets,
 	NO_BLEED,
 	resolveBleedMm,
 	resolveInsets,
@@ -114,7 +117,9 @@ export {
 	type StrokeTrimInput,
 } from "./stroke-trim";
 export {
+	FIELD_FORMATS,
 	FIELD_ID,
+	fieldKeyFrom,
 	hasToken,
 	type MustacheRef,
 	type MustacheSegment,
