@@ -5,7 +5,7 @@ import {
 	displayText,
 	valueFromText,
 	writeCells,
-} from "./model";
+} from "@freshcoat-js/workspace/dataset";
 
 export type FindSpec = {
 	text: string;

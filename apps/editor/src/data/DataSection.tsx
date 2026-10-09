@@ -11,6 +11,20 @@ import {
 	uniqueName,
 } from "@freshcoat-js/workspace";
 import {
+	addRecords,
+	applySchema,
+	cellIssue,
+	columnsFromTemplate,
+	deleteRecords,
+	duplicateRecords,
+	emptyDataset,
+	filterRecords,
+	issueCount,
+	recordIndexMap,
+	type SortSpec,
+	schemaChanges,
+} from "@freshcoat-js/workspace/dataset";
+import {
 	type DragEvent,
 	type ReactNode,
 	useCallback,
@@ -68,21 +82,7 @@ import {
 import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
 import { announceImport } from "./imported";
-import {
-	addRecords,
-	applySchema,
-	cellIssue,
-	columnsFromTemplate,
-	deleteRecords,
-	duplicateRecords,
-	emptyDataset,
-	filterRecords,
-	issueCount,
-	recordIndexMap,
-	type SortSpec,
-	schemaChanges,
-	sortRecords,
-} from "./model";
+import { sortGridRecords } from "./model";
 import { PhotoImportBar } from "./PhotoImportBar";
 import { RecordPanel } from "./RecordPanel";
 import { RecordsGallery } from "./RecordsGallery";
@@ -609,7 +609,7 @@ function RecordsPane({
 	);
 	const rows = useMemo(
 		() =>
-			sortRecords(
+			sortGridRecords(
 				filtered,
 				dataset.columns,
 				sort,

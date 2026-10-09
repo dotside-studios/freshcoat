@@ -12,7 +12,7 @@ import {
 	recordByIdMap,
 	valueFromText,
 	writeCells,
-} from "./model";
+} from "@freshcoat-js/workspace/dataset";
 
 /**
  * Tab-separated text as spreadsheets put it on the clipboard: a cell with a

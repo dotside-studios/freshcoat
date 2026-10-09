@@ -3,6 +3,13 @@ import { inputBase } from "@freshcoat-js/ui/field";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { toast } from "@freshcoat-js/ui/toast";
 import type { CellValue, Column, Dataset } from "@freshcoat-js/workspace";
+import {
+	assetMap,
+	displayText,
+	NUMERIC_TYPES,
+	sharedValues,
+	writeCells,
+} from "@freshcoat-js/workspace/dataset";
 import { type FormEvent, useMemo, useState } from "react";
 import { useController } from "~/app/context";
 import { plural } from "~/app/copy";
@@ -10,13 +17,6 @@ import { formatNumber } from "~/app/format";
 import { editDataset } from "./actions";
 import { inputModeFor } from "./cells";
 import { misfitCount, pastedValue } from "./clipboard";
-import {
-	assetMap,
-	displayText,
-	NUMERIC_TYPES,
-	sharedValues,
-	writeCells,
-} from "./model";
 
 /**
  * The Record tab while several records are selected: one form per column

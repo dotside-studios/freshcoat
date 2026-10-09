@@ -1,4 +1,9 @@
 import type { Dataset } from "@freshcoat-js/workspace";
+import {
+	fillDown,
+	sharedValues,
+	writeCells,
+} from "@freshcoat-js/workspace/dataset";
 import { describe, expect, it } from "vitest";
 import {
 	copyCells,
@@ -7,7 +12,6 @@ import {
 	pasteInto,
 	toTsv,
 } from "~/data/clipboard";
-import { fillDown, sharedValues, writeCells } from "~/data/model";
 
 function people(): Dataset {
 	return {

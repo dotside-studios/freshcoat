@@ -21,6 +21,7 @@ scheduling and file destinations.
 | `columns` | the column types (text, number, date, color, URL, email, image, …), coercion and validation |
 | `json-schema` | a dataset's schema as JSON Schema 2020-12, in and out |
 | `tabular` | CSV, TSV, Excel, `.ods`, JSON and NDJSON in and out |
+| `dataset` | editing a dataset the way Studio does: cells, records and columns, renames that keep bindings in step, retyping, schema import, search, sort and per-record issues |
 | `mapping` | the import wizard's mapping of source columns to schema columns |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
@@ -33,7 +34,10 @@ scheduling and file destinations.
 | `ids` | the stable ids, keys and slugs the workspace is addressed by |
 | `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
-Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
+Most utilities are exported from `@freshcoat-js/workspace`. Dataset editing
+lives at `@freshcoat-js/workspace/dataset`; its functions take a `Dataset`
+and return a new one, so a script or `node` host edits a dataset as Studio
+does. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.

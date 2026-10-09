@@ -5,12 +5,16 @@ import {
 	type Vec2,
 } from "@freshcoat-js/coatfile";
 import { type Dataset, uniqueKey } from "@freshcoat-js/workspace";
+import {
+	addColumn,
+	replaceDataset,
+	setCell,
+} from "@freshcoat-js/workspace/dataset";
 import type { EditorController } from "~/app/controller";
 import { withFieldSource } from "~/binding/binding";
 import { addField } from "~/doc/ops";
 import { humanize } from "~/doc/values";
 import { produce } from "~/state/immer";
-import { addColumn, replaceDataset, setCell } from "./model";
 import type { PhotoFraming } from "./photo-framing";
 
 function setFocus(elements: Element[], id: string, focus: string): boolean {
