@@ -735,13 +735,18 @@ for (const size of SIZES) {
 				await shot(page, "event-badge");
 
 				await page.keyboard.press(`${mod}+3`);
+				const sheetRadio = page.getByRole("radio", {
+					name: "Sheet",
+					exact: true,
+				});
+				await expect(sheetRadio).toBeVisible();
 				await reveal(page, "export-settings", "Settings");
 				await settingsTab(page, "Print");
 				await expect(page.getByTestId("export-sheet-summary")).toHaveText(
 					"4 per sheet · 3 sheets",
 				);
 				await closeSettingsSheet(page);
-				await page.getByRole("radio", { name: "Sheet", exact: true }).click();
+				await sheetRadio.click();
 				await sheetReady(page);
 				await page.mouse.move(0, 0);
 				await shot(page, "event-badge-sheet");
