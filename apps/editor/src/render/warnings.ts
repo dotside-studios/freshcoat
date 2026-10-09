@@ -1,4 +1,4 @@
-import type { PaintWarning } from "@freshcoat-js/engine";
+import type { FrameWarning } from "@freshcoat-js/coatfile";
 import type { BarcodeIssue } from "~/state/store";
 
 const NO_WARNINGS = Object.freeze([]) as unknown as string[];
@@ -6,7 +6,7 @@ const NO_WARNINGS = Object.freeze([]) as unknown as string[];
 /** Barcode values the encoder refused go to the Issues list as hints, with
  *  their layer; everything else is a line under "Last render". */
 export function splitWarnings(
-	warnings: PaintWarning[],
+	warnings: FrameWarning[],
 	pathIds: Map<string, string> | undefined,
 ): { warnings: string[]; barcodes: BarcodeIssue[] } {
 	const out = { warnings: [] as string[], barcodes: [] as BarcodeIssue[] };
@@ -25,14 +25,12 @@ export function splitWarnings(
 	return out;
 }
 
-function describeWarning(w: PaintWarning): string {
+function describeWarning(w: FrameWarning): string {
 	switch (w.kind) {
 		case "image_load_failed":
 			return `Couldn't load image: ${w.src.startsWith("data:") ? "inline data" : w.src}`;
 		case "font_load_failed":
 			return `Couldn't load font: ${w.family}`;
-		case "qr_generate_failed":
-			return `Couldn't generate QR code: ${w.value}`;
 		case "unhandled_op":
 			return `Unhandled draw op: ${w.op}`;
 		case "adjust_unsupported":

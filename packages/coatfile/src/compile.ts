@@ -9,7 +9,6 @@ import {
 	type ImageNode,
 	type MaskNode,
 	type Node,
-	type PaintWarning,
 	type PathNode,
 	patternFill,
 	roundCorners,
@@ -51,6 +50,7 @@ import type {
 	CompiledFrame,
 	CompiledTemplate,
 	CompileOptions,
+	CompileWarning,
 	CornerRadius,
 	Element,
 	ElementAdjust,
@@ -254,7 +254,7 @@ function compileFrame(
 // back to, and the problems found along the way, which the frame carries out.
 type CompileScope = {
 	fontFamily: string;
-	warnings: PaintWarning[];
+	warnings: CompileWarning[];
 };
 
 function compileBackground(

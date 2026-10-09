@@ -1,9 +1,12 @@
-import { compile, type Template } from "@freshcoat-js/coatfile";
+import {
+	compile,
+	type FrameWarning,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import {
 	createRenderer,
 	type Node,
 	type PaintCacheStats,
-	type PaintWarning,
 	type Renderer,
 	resolveExportScale,
 	type SurfaceCanvas,
@@ -33,7 +36,7 @@ export type RenderTimings = {
 export type RenderOutput<G> = {
 	canvas: HTMLCanvasElement;
 	geometry: G;
-	warnings: PaintWarning[];
+	warnings: FrameWarning[];
 	timings: RenderTimings;
 	/** The density actually painted at, after the export clamp. */
 	scale: number;

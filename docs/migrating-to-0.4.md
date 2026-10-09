@@ -20,6 +20,8 @@ depends on the `canvaskit-wasm` version its conformance goldens use.
 | `setBarcodeEncoder(bwipBarcodeEncoder)` | not needed: `compile` encodes barcodes itself |
 | `bwipBarcodeEncoder` from `@freshcoat-js/coatfile/barcode`, `getBarcodeEncoder()` | `encodeBarcode` from `@freshcoat-js/coatfile` |
 | `hasBarcode`, the `barcode_unavailable` warning | removed |
+| `PaintWarning` kinds `barcode_invalid` and `gamut_compressed` | coatfile's `CompileWarning` and `PrintWarning`; a template frame's `warnings` are `FrameWarning[]` from `@freshcoat-js/coatfile` |
+| the `qr_generate_failed` warning | removed; nothing emitted it |
 | `"bytes" in result`, `as EncodedPaintedFrame[]` | not needed: the result's type follows `output` |
 | `EncodedPaintedFrame`, `KeptPaintedFrame`, `RenderRuntime`, `ExportOptions` | `TemplateFrame<Output>`, `RenderTemplateOptions`, `RenderCompiledOptions` |
 
