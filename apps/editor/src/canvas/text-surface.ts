@@ -1,5 +1,6 @@
+import { toColor } from "@freshcoat-js/engine";
 import type { CanvasKit, Surface } from "canvaskit-wasm";
-import { cssColor, EditableText, type TextProps } from "./text-layout";
+import { EditableText, type TextProps } from "./text-layout";
 
 const BLINK_MS = 530;
 
@@ -121,7 +122,7 @@ export class TextSurface {
 		sk.save();
 		sk.scale(zoom * dpr, zoom * dpr);
 		const fill = (alpha: number, rects: ReturnType<EditableText["rects"]>) => {
-			const c = cssColor(ck, accent);
+			const c = toColor(ck, accent);
 			c[3] = alpha;
 			paint.setColor(c);
 			for (const r of rects)
@@ -142,7 +143,7 @@ export class TextSurface {
 		if (caret) {
 			const c = text.caret(start);
 			const w = 1.5 / zoom;
-			paint.setColor(cssColor(ck, accent));
+			paint.setColor(toColor(ck, accent));
 			sk.drawRect(ck.XYWHRect(c.x - w / 2, c.y, w, c.height), paint);
 		}
 		sk.restore();

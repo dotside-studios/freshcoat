@@ -2,21 +2,13 @@ import type { TextElement } from "@freshcoat-js/coatfile";
 import { parseMustache } from "@freshcoat-js/coatfile/mustache";
 import {
 	createSharedFontProvider,
-	fontFeatureList,
-	fontVariationList,
 	makeParagraphBuilder,
-	parseCssColor,
 	resolveDirection,
 	type SharedFontProvider,
+	spanTextStyle,
+	toColor,
 } from "@freshcoat-js/engine";
-import type {
-	Canvas,
-	CanvasKit,
-	Color,
-	FontWeight,
-	Paragraph,
-	TextAlign,
-} from "canvaskit-wasm";
+import type { Canvas, CanvasKit, Paragraph, TextAlign } from "canvaskit-wasm";
 
 export type TextProps = TextElement["properties"];
 export type Box = { x: number; y: number; width: number; height: number };
@@ -78,35 +70,6 @@ export function casedText(text: string, mode: TextProps["case"]): string {
 		}
 	}
 	return out;
-}
-
-const WEIGHTS = [
-	"Thin",
-	"ExtraLight",
-	"Light",
-	"Normal",
-	"Medium",
-	"SemiBold",
-	"Bold",
-	"ExtraBold",
-	"Black",
-] as const;
-
-function weight(ck: CanvasKit, value: number | undefined): FontWeight {
-	const i = Math.round((value || 400) / 100) - 1;
-	return ck.FontWeight[WEIGHTS[Math.max(0, Math.min(8, i))]];
-}
-
-/** A CSS color as a CanvasKit color. */
-export function cssColor(ck: CanvasKit, css: string): Color {
-	const hex = parseCssColor(css).slice(1);
-	const byte = (i: number) => Number.parseInt(hex.slice(i, i + 2), 16);
-	return ck.Color(
-		byte(0),
-		byte(2),
-		byte(4),
-		hex.length > 6 ? byte(6) / 255 : 1,
-	);
 }
 
 /**
@@ -202,24 +165,8 @@ export class EditableText {
 			textAlign: textAlign[align] ?? ck.TextAlign.Left,
 			textDirection: rtl ? ck.TextDirection.RTL : ck.TextDirection.LTR,
 			textStyle: {
-				color: cssColor(ck, props.color ?? ""),
-				fontFamilies: [
-					font.family,
-					...families.filter((f) => f !== font.family),
-				],
-				fontSize: size,
-				fontStyle: {
-					weight: weight(ck, font.weight),
-					slant:
-						font.style === "italic"
-							? ck.FontSlant.Italic
-							: ck.FontSlant.Upright,
-				},
-				fontVariations: fontVariationList(font.weight, font.variations),
-				...(font.features
-					? { fontFeatures: fontFeatureList(font.features) }
-					: {}),
-				...(font.letterSpacing ? { letterSpacing: font.letterSpacing } : {}),
+				...spanTextStyle(ck, { ...font, size }, families),
+				color: toColor(ck, props.color ?? ""),
 				...(lineHeight
 					? { heightMultiplier: lineHeight, halfLeading: true }
 					: {}),

@@ -132,8 +132,6 @@ export {
 	decorationLine,
 	type FitOptions,
 	fitRect,
-	fontFeatureList,
-	fontVariationList,
 	insetCorner,
 	skipInkSegments,
 	strokeInset,
@@ -183,6 +181,13 @@ export {
 } from "./renderer";
 export { squircleSvg } from "./squircle";
 export type { TextEngineCacheStats } from "./text-cache";
+export {
+	type FontWeightName,
+	fontWeight,
+	fontWeightName,
+	spanTextStyle,
+	toColor,
+} from "./text-style";
 export type {
 	ClusterAdvance,
 	SpanFont,
