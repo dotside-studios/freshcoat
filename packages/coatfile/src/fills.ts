@@ -2,8 +2,13 @@
 // solid `color` or its gradient `fill`; shapes, frames and backgrounds paint
 // `fill` as one value or a list, bottom first.
 
-import { PATTERN_DEFAULTS, parseColor, toHex } from "@freshcoat-js/engine";
-import { linearGradientAngle, linearGradientPoints } from "./gradient";
+import {
+	linearGradientAngle,
+	linearGradientPoints,
+	PATTERN_DEFAULTS,
+	parseColor,
+	toHex,
+} from "@freshcoat-js/engine";
 import type {
 	Background,
 	Element,

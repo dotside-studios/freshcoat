@@ -121,6 +121,7 @@ export {
 	createText,
 	gridLayout,
 } from "./node";
+export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export {
 	createPaintCache,
 	type PaintCache,

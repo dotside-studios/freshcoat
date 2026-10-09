@@ -4,6 +4,7 @@
 // CSS-ish strings, and CanvasKit can't parse `oklch()`. App-specific resolution
 // (e.g. `var(--token)`) stays with the caller via the ColorResolver hook.
 import { oklchToRgb, parseColor, toHex } from "./color";
+import { linearGradientPoints } from "./gradient";
 import type { ResolvedFill } from "./types";
 
 // Resolve one CSS color token to `#rrggbb`. Callers pass this to handle values
@@ -57,13 +58,8 @@ function angleToEndpoints(angle: number): {
 	from: { x: number; y: number };
 	to: { x: number; y: number };
 } {
-	const rad = (angle * Math.PI) / 180;
-	const dx = Math.sin(rad) / 2;
-	const dy = -Math.cos(rad) / 2;
-	return {
-		from: { x: 0.5 - dx, y: 0.5 - dy },
-		to: { x: 0.5 + dx, y: 0.5 + dy },
-	};
+	const { from, to } = linearGradientPoints(angle - 90);
+	return { from: { x: from[0], y: from[1] }, to: { x: to[0], y: to[1] } };
 }
 
 // Parse a CSS `linear-gradient(...)` into a freshcoat linear fill. Angles (`Ndeg`

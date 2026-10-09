@@ -120,7 +120,7 @@ export {
 	variantFieldRefs,
 	visibilityFieldRefs,
 } from "./fields";
-export { linearGradientAngle, linearGradientPoints } from "./gradient";
+export { linearGradientAngle, linearGradientPoints } from "@freshcoat-js/engine";
 export { ellipsePath, isEllipsePath } from "@freshcoat-js/engine";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
