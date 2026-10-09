@@ -1,12 +1,13 @@
-import { variantSize } from "@freshcoat-js/coatfile";
-import { assetRef } from "../assets";
-import { slug, templateStem } from "../ids";
 import {
 	type BleedMm,
 	type CardSizeMm,
 	cardSizeMm,
-	SheetLayoutError,
-} from "../impose";
+	variantSize,
+} from "@freshcoat-js/coatfile";
+import { templateStem } from "@freshcoat-js/coatfile/coat";
+import { assetRef } from "../assets";
+import { slug } from "../ids";
+import { SheetLayoutError } from "../impose";
 import { DEFAULT_QUALITY, imageFormat, planExport } from "../plan";
 import type {
 	Dataset,

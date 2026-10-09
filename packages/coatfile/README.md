@@ -182,6 +182,9 @@ With bleed:
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
 insets; `extendIntoBleed` is the edge rule on its own.
 
+For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
+millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
+
 ## Inline assets
 
 A template normally points at its rasters by URL. An authoring tool has none —
@@ -366,6 +369,9 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
+
+`templateStem(fileName)` is a file name without its template extension
+(`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
 
 ## Gradients
 
@@ -790,6 +796,11 @@ which is what `renderTemplate` compiles at by default; `compile` needs a
 `width` and `height` with that aspect. `variantBase(t, variantId)` is the base
 laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
 sized variant as it is.
+
+`closestVariant(t, aspect)` is the variant whose size is closest in aspect,
+or undefined for Default, which wins a tie. `hasShapedVariants(t)` says
+whether any variant's size changes the aspect. `isEmptyVariant(variant)` says
+whether a variant draws exactly as Default.
 
 `applyVariant(template, variantId, { hidden })` returns the template with one
 variant applied, which is what `compile` draws for `variantId`. A hidden element

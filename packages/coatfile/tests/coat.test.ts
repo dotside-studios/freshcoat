@@ -20,6 +20,7 @@ import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	packTemplate,
 	serializeTemplate,
+	templateStem,
 	unpackTemplate,
 } from "../src/coat";
 import { FORMAT_VERSION, formatVersionStatus } from "../src/format";
@@ -328,5 +329,16 @@ describe("JSON Schema", () => {
 		expect(
 			readFileSync(join(root, "schema/coatfile.v1.schema.json"), "utf8"),
 		).toBe(expected);
+	});
+});
+
+describe("templateStem", () => {
+	test("drops a current, legacy or plain JSON template extension", () => {
+		expect(templateStem("Card.coat")).toBe("Card");
+		expect(templateStem("Card.coat.json")).toBe("Card");
+		expect(templateStem("Card.TKIT")).toBe("Card");
+		expect(templateStem("Card.tkit.json")).toBe("Card");
+		expect(templateStem("Card.json")).toBe("Card");
+		expect(templateStem("Card.png")).toBe("Card.png");
 	});
 });

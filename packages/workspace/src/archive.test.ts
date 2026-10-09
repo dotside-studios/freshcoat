@@ -18,7 +18,6 @@ import {
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
-import { templateStem } from "./ids";
 import { jpegHeader } from "./image-fixtures";
 import { exportSize, pdfLayout } from "./plan";
 import {
@@ -833,16 +832,5 @@ describe("format_version", () => {
 			};
 			expect(template.format_version).toBe("1.1");
 		}
-	});
-});
-
-describe("templateStem", () => {
-	it("drops a current, legacy or plain JSON template extension", () => {
-		expect(templateStem("Card.coat")).toBe("Card");
-		expect(templateStem("Card.coat.json")).toBe("Card");
-		expect(templateStem("Card.TKIT")).toBe("Card");
-		expect(templateStem("Card.tkit.json")).toBe("Card");
-		expect(templateStem("Card.json")).toBe("Card");
-		expect(templateStem("Card.png")).toBe("Card.png");
 	});
 });

@@ -2,11 +2,10 @@ import {
 	type BleedMm,
 	type CardSizeMm,
 	cardSizeMm,
-	cropMarks,
-	imposeSheets,
 	MM_PER_INCH,
 	resolveBleedMm,
-} from "./impose";
+} from "@freshcoat-js/coatfile";
+import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
 type PdfLib = typeof import("pdf-lib");

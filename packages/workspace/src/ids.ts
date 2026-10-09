@@ -39,9 +39,3 @@ export function uniqueKey(base: string, taken: Iterable<string>): string {
 		if (!used.has(candidate)) return candidate;
 	}
 }
-
-/** A template's file name without its extension: `.coat`, `.coat.json`, the
- *  legacy `.tkit` and `.tkit.json`, or plain `.json`. */
-export function templateStem(fileName: string): string {
-	return fileName.replace(/\.(coat\.json|coat|tkit\.json|tkit|json)$/i, "");
-}

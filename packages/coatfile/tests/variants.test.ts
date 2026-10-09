@@ -9,11 +9,19 @@ import type {
 	RectElement,
 	Template,
 	TextElement,
+	Variant,
 } from "../src/types";
 import { validate } from "../src/validate";
 import { resizeTemplate } from "../src/constraints";
 import { minimumFormatVersion } from "../src/format";
-import { applyVariant, checkVariants, variantSize } from "../src/variants";
+import {
+	applyVariant,
+	checkVariants,
+	closestVariant,
+	hasShapedVariants,
+	isEmptyVariant,
+	variantSize,
+} from "../src/variants";
 
 const rect = (id: string, fill: string): RectElement => ({
 	id,
@@ -609,5 +617,108 @@ describe("sized variants", () => {
 				"/variants/0/size/width",
 				"/variants/0/size/height",
 			]);
+	});
+});
+
+describe("closestVariant", () => {
+	const shaped: Template = {
+		...template,
+		variants: [
+			{ id: "gold", label: "Gold", overrides: [] },
+			{
+				id: "portrait",
+				label: "Portrait",
+				size: { width: 60, height: 100 },
+				overrides: [],
+			},
+			{
+				id: "square",
+				label: "Square",
+				size: { width: 80, height: 80 },
+				overrides: [],
+			},
+		],
+	};
+
+	test("picks the closest aspect, Default on a tie", () => {
+		expect(closestVariant(shaped, 1.6)).toBeUndefined();
+		expect(closestVariant(shaped, 0.6)).toBe("portrait");
+		expect(closestVariant(shaped, 1.1)).toBe("square");
+	});
+
+	test("has shaped variants only when a size changes the aspect", () => {
+		expect(hasShapedVariants(shaped)).toBe(true);
+		expect(
+			hasShapedVariants({
+				...template,
+				variants: [
+					{
+						id: "big",
+						label: "Big",
+						size: { width: 200, height: 120 },
+						overrides: [],
+					},
+				],
+			}),
+		).toBe(false);
+		expect(hasShapedVariants(template)).toBe(false);
+	});
+});
+
+describe("isEmptyVariant", () => {
+	const variant = (overrides: Variant["overrides"]): Variant => ({
+		id: "v",
+		label: "V",
+		overrides,
+	});
+
+	test("is empty with no overrides, or only empty deltas", () => {
+		expect(isEmptyVariant(variant([]))).toBe(true);
+		expect(isEmptyVariant(variant([{ name: "front" }]))).toBe(true);
+		expect(
+			isEmptyVariant(
+				variant([
+					{ name: "front", elements: [] },
+					{ name: "back", elements: [{ id: "name", properties: {} }] },
+				]),
+			),
+		).toBe(true);
+	});
+
+	test("is not empty with a background, a property or a shell field", () => {
+		expect(
+			isEmptyVariant(
+				variant([
+					{
+						name: "front",
+						background: {
+							id: "bg",
+							type: "rect",
+							pos: { x: 0, y: 0 },
+							size: { width: 1, height: 1 },
+							properties: { fill: "#000" },
+						},
+					},
+				]),
+			),
+		).toBe(false);
+		expect(
+			isEmptyVariant(
+				variant([
+					{ name: "front", elements: [{ id: "name", properties: { a: 1 } }] },
+				]),
+			),
+		).toBe(false);
+		// format 1.4 deltas: a shell field or hidden alone is a change
+		const shell = (extra: Record<string, unknown>) =>
+			variant([
+				{
+					name: "front",
+					elements: [{ id: "name", properties: {}, ...extra }],
+				},
+			] as Variant["overrides"]);
+		expect(isEmptyVariant(shell({ pos: { x: 1, y: 2 } }))).toBe(false);
+		expect(isEmptyVariant(shell({ hidden: true }))).toBe(false);
+		expect(isEmptyVariant(shell({ opacity: undefined }))).toBe(true);
 	});
 });

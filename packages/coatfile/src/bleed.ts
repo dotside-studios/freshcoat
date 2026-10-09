@@ -35,6 +35,45 @@ export function bleedSize(t: Pick<Template, "width" | "height" | "bleed">): {
 	};
 }
 
+export const MM_PER_INCH = 25.4;
+
+export type CardSizeMm = { widthMm: number; heightMm: number };
+
+/** Artwork past each edge of the trim, in millimetres. */
+export type BleedMm = Sides;
+
+export const NO_BLEED: BleedMm = NO_INSETS;
+
+export function resolveBleedMm(bleed: number | BleedMm | undefined): BleedMm {
+	return resolveInsets(bleed);
+}
+
+/** The bleed a template of this many pixels of bleed prints at at this DPI. */
+export function bleedMm(
+	bleedPx: Sides,
+	dpi: number,
+): BleedMm {
+	const mm = (px: number) => (px / dpi) * MM_PER_INCH;
+	return {
+		top: mm(bleedPx.top),
+		right: mm(bleedPx.right),
+		bottom: mm(bleedPx.bottom),
+		left: mm(bleedPx.left),
+	};
+}
+
+/** The card size a template of this many pixels prints at at this DPI. */
+export function cardSizeMm(
+	widthPx: number,
+	heightPx: number,
+	dpi: number,
+): CardSizeMm {
+	return {
+		widthMm: (widthPx / dpi) * MM_PER_INCH,
+		heightMm: (heightPx / dpi) * MM_PER_INCH,
+	};
+}
+
 // Within this of a trim edge, a layer counts as running to it.
 const EDGE_EPSILON = 0.5;
 

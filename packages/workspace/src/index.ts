@@ -24,10 +24,7 @@ export {
 } from "./assets";
 export {
 	autoBinding,
-	closestVariant,
-	hasShapedVariants,
 	imagesFor,
-	isEmptyVariant,
 	resolveValues,
 	serialValue,
 	variantFor,
@@ -57,7 +54,6 @@ export {
 	isValidKey,
 	newId,
 	slug,
-	templateStem,
 	uniqueKey,
 } from "./ids";
 export {
@@ -67,24 +63,17 @@ export {
 	readImageInfo,
 } from "./image-info";
 export {
-	type BleedMm,
-	bleedMm,
-	type CardSizeMm,
 	CROP_MARK_GAP_MM,
 	CROP_MARK_LENGTH_MM,
 	CROP_MARK_OFFSET_MM,
 	type CropMark,
-	cardSizeMm,
 	cropMarks,
 	DEFAULT_SHEET_LAYOUT,
 	type ImposeItem,
 	type Imposition,
 	imposeSheets,
-	MM_PER_INCH,
 	minGapMm,
-	NO_BLEED,
 	PAPER_SIZES_MM,
-	resolveBleedMm,
 	type SheetLayoutAxis,
 	SheetLayoutError,
 	type SheetPage,
