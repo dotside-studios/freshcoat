@@ -1,6 +1,6 @@
-import type { Dataset } from "@freshcoat-js/workspace";
 import { describe, expect, it } from "vitest";
-import { countMatches, replaceAll } from "~/data/find";
+import { countMatches, replaceAll } from "./dataset";
+import type { Dataset } from "./types";
 
 function people(): Dataset {
 	return {

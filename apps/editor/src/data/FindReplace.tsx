@@ -5,6 +5,11 @@ import { DialogTrigger, Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
 import type { DataRecord, Dataset } from "@freshcoat-js/workspace";
+import {
+	countMatches,
+	type FindSpec,
+	replaceAll,
+} from "@freshcoat-js/workspace/dataset";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Dialog as RACDialog } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -13,7 +18,6 @@ import FindIcon from "~icons/mingcute/list-search-line";
 import { editDataset } from "./actions";
 import { misfitCount } from "./clipboard";
 import { ToolButton } from "./DataToolbar";
-import { countMatches, type FindSpec, replaceAll } from "./find";
 import { type FindField, registerFindReplace } from "./find-replace";
 
 const ALL = "@all";
