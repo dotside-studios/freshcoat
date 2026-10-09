@@ -1,6 +1,12 @@
 import { COLUMN_TYPES, coerce } from "./columns";
 import { isValidKey, slug, uniqueKey } from "./ids";
-import type { CellValue, Column, ColumnType, Dataset } from "./types";
+import type {
+	CellValue,
+	Column,
+	ColumnOptions,
+	ColumnType,
+	Dataset,
+} from "./types";
 
 export const JSON_SCHEMA_DIALECT =
 	"https://json-schema.org/draft/2020-12/schema";
@@ -13,6 +19,7 @@ export type JsonSchemaProperty = {
 	description?: string;
 	default?: CellValue;
 	enum?: string[];
+	"x-freshcoat-options"?: ColumnOptions;
 	minimum?: number;
 	maximum?: number;
 	minLength?: number;
@@ -93,6 +100,7 @@ const PROPERTY_KEYWORDS = new Set([
 	"description",
 	"default",
 	"enum",
+	"x-freshcoat-options",
 	"minimum",
 	"maximum",
 	"minLength",
@@ -123,6 +131,9 @@ export function columnsToJsonSchema(
 		}
 		if (column.default !== undefined) property.default = column.default;
 		if (column.enum !== undefined) property.enum = [...column.enum];
+		if (column.options !== undefined) {
+			property["x-freshcoat-options"] = { ...column.options };
+		}
 		for (const key of [
 			"minimum",
 			"maximum",
@@ -238,6 +249,12 @@ function readProperty(
 			column.enum = [...p.enum];
 		} else warn("ignored enum");
 	}
+	const options = p["x-freshcoat-options"];
+	if (options !== undefined) {
+		const read = type === "text" ? readOptions(options) : undefined;
+		if (read) column.options = read;
+		else warn("ignored x-freshcoat-options");
+	}
 	for (const bound of ["minimum", "maximum"] as const) {
 		if (p[bound] === undefined) continue;
 		if (NUMERIC.has(type) && typeof p[bound] === "number") {
@@ -261,6 +278,14 @@ function readProperty(
 		else column.default = value;
 	}
 	return column;
+}
+
+function readOptions(raw: unknown): ColumnOptions | undefined {
+	if (!isObject(raw)) return undefined;
+	if (raw.kind === "variants" && typeof raw.templateId === "string") {
+		return { kind: "variants", templateId: raw.templateId };
+	}
+	return undefined;
 }
 
 function readType(

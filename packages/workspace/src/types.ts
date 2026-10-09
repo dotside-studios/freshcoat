@@ -25,12 +25,18 @@ export type Column = {
 	default?: CellValue;
 	/** text only */
 	enum?: string[];
+	/** text only: where the cells pick their value from */
+	options?: ColumnOptions;
 	minimum?: number;
 	maximum?: number;
 	minLength?: number;
 	maxLength?: number;
 	pattern?: string;
 };
+
+/** A set of values a column's cells pick from, held elsewhere in the
+ *  workspace: `variants` is the variants of the template `templateId`. */
+export type ColumnOptions = { kind: "variants"; templateId: string };
 
 export type RecordStatus = "pending" | "exported" | "failed" | "skipped";
 
@@ -87,12 +93,21 @@ export type FieldSource =
  *  variant the template lacks, is Default. `all` renders each record in
  *  Default and then every variant that changes something. `image` picks,
  *  from Default and every variant, the one whose size is closest in aspect
- *  to the photo in `field`, as seen. */
+ *  to the photo in `field`, as seen. `column` reads a variant's id or label,
+ *  or `default`, from the record, and uses `fallback` when the cell is empty
+ *  or names no variant. */
 export type VariantSource =
 	| { kind: "fixed"; id?: string }
-	| { kind: "column"; column: string }
+	| { kind: "column"; column: string; fallback?: VariantFallback }
 	| { kind: "all" }
 	| { kind: "image"; field: string };
+
+/** What a `column` variant source uses for a record whose cell picks no
+ *  variant. */
+export type VariantFallback = Extract<
+	VariantSource,
+	{ kind: "fixed" } | { kind: "image" }
+>;
 
 export type Binding = {
 	datasetId: string;

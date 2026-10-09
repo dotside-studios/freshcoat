@@ -12,11 +12,15 @@ import {
 	variantFor,
 } from "@freshcoat-js/workspace";
 
-/** How a template crops one of a record's photos: the box's aspect, and the
- *  column the focal point is kept in. */
+/** How a template crops one of a record's photos: the box's aspect, the
+ *  column the focal point is kept in, when there is one, and the point a
+ *  record without its own is cropped around. `image` is the layer and the
+ *  fields it draws from, to keep the point in a column once there is none. */
 export type PhotoFraming = {
 	aspect: number;
-	focusColumn: string;
+	focusColumn?: string;
+	fallback: Vec2;
+	image: { id: string; srcField: string; focusField?: string };
 };
 
 /** A part of a photo, as fractions of it. */
@@ -39,10 +43,15 @@ function* images(elements: Element[]): Generator<Element> {
 	}
 }
 
+function fieldOf(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	return WHOLE_TOKEN.exec(value)?.[1];
+}
+
 /**
  * How `template`, in the variant `record` renders in, crops the photo in
  * `photoColumn`: the first `cover` image drawing it whose focus is bound to a
- * column. Undefined when none does.
+ * column, else the first drawing it at all. Undefined when none does.
  */
 export function photoFraming(
 	template: Template,
@@ -54,27 +63,52 @@ export function photoFraming(
 	const variantId = variantFor(template, binding, dataset, record);
 	const t =
 		variantId === undefined ? template : applyVariant(template, variantId);
+	let unbound: PhotoFraming | undefined;
 	for (const frame of t.template_data) {
 		for (const el of images(frame.elements)) {
 			if (el.type !== "image" || el.properties.fit !== "cover") continue;
 			if (el.properties.crop || !el.size) continue;
+			const srcField = fieldOf(el.properties.src);
+			if (srcField === undefined) continue;
 			if (boundColumn(binding, el.properties.src) !== photoColumn) continue;
-			const focusColumn = boundColumn(binding, el.properties.focus);
-			if (
-				focusColumn === undefined ||
-				!dataset.columns.some((c) => c.key === focusColumn)
-			)
-				continue;
 			if (!(el.size.width > 0 && el.size.height > 0)) continue;
-			return { aspect: el.size.width / el.size.height, focusColumn };
+			const aspect = el.size.width / el.size.height;
+			const focusField = fieldOf(el.properties.focus);
+			const focusColumn = boundColumn(binding, el.properties.focus);
+			const image = {
+				id: el.id,
+				srcField,
+				...(focusField !== undefined ? { focusField } : {}),
+			};
+			if (
+				focusColumn !== undefined &&
+				dataset.columns.some((c) => c.key === focusColumn)
+			) {
+				const fallback = cellFocus(
+					focusField && t.fields.properties[focusField]?.default,
+				);
+				return { aspect, focusColumn, fallback, image };
+			}
+			unbound ??= {
+				aspect,
+				fallback: cellFocus(
+					focusField === undefined
+						? el.properties.focus
+						: t.fields.properties[focusField]?.default,
+				),
+				image,
+			};
 		}
 	}
-	return undefined;
+	return unbound;
 }
 
-/** The focal point a cell holds, or the centre. */
-export function cellFocus(value: unknown): Vec2 {
-	return parseImageFocus(value) ?? { x: 0.5, y: 0.5 };
+/** The focal point a cell holds, or `fallback`. */
+export function cellFocus(
+	value: unknown,
+	fallback: Vec2 = { x: 0.5, y: 0.5 },
+): Vec2 {
+	return parseImageFocus(value) ?? fallback;
 }
 
 /** What `cover` shows of a photo of `photoAspect` in a box of `boxAspect`,

@@ -24,6 +24,7 @@ export {
 } from "./assets";
 export {
 	autoBinding,
+	DEFAULT_VARIANT,
 	imagesFor,
 	resolveValues,
 	serialValue,

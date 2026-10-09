@@ -51,6 +51,10 @@ export const WORKSPACE_EXTENSION = ".coatworkspace";
 export const WORKSPACE_MEDIA_TYPE = "application/vnd.freshcoat.workspace+zip";
 export const WORKSPACE_FORMAT = "freshcoat.workspace";
 export const WORKSPACE_FORMAT_VERSION = "1.0";
+/** The version a workspace is written at when it uses a variant fallback,
+ *  which a reader of 1.0 drops. */
+const FALLBACK_FORMAT_VERSION = "1.1";
+const READ_MINOR = 1;
 
 const MIMETYPE_ENTRY = "mimetype";
 const MANIFEST_ENTRY = "workspace.json";
@@ -91,15 +95,30 @@ const FieldSourceSchema = z.discriminatedUnion("kind", [
 	}),
 ]);
 
+const FixedVariantSchema = z.object({
+	kind: z.literal("fixed"),
+	id: z.string().optional(),
+});
+const ImageVariantSchema = z.object({
+	kind: z.literal("image"),
+	field: z.string(),
+});
+
 const BindingSchema = z.object({
 	datasetId: z.string(),
 	fields: z.record(z.string(), FieldSourceSchema),
 	variant: z
 		.discriminatedUnion("kind", [
-			z.object({ kind: z.literal("fixed"), id: z.string().optional() }),
-			z.object({ kind: z.literal("column"), column: z.string() }),
+			FixedVariantSchema,
+			z.object({
+				kind: z.literal("column"),
+				column: z.string(),
+				fallback: z
+					.discriminatedUnion("kind", [FixedVariantSchema, ImageVariantSchema])
+					.optional(),
+			}),
 			z.object({ kind: z.literal("all") }),
-			z.object({ kind: z.literal("image"), field: z.string() }),
+			ImageVariantSchema,
 		])
 		.optional(),
 });
@@ -248,7 +267,12 @@ function templatePath(entry: TemplateEntry): string {
 function manifestOf(ws: Workspace): WorkspaceManifest {
 	return {
 		format: WORKSPACE_FORMAT,
-		formatVersion: WORKSPACE_FORMAT_VERSION,
+		formatVersion: ws.templates.some(
+			(t) =>
+				t.binding?.variant?.kind === "column" && t.binding.variant.fallback,
+		)
+			? FALLBACK_FORMAT_VERSION
+			: WORKSPACE_FORMAT_VERSION,
 		name: ws.name,
 		templates: ws.templates.map((entry) => ({
 			id: entry.id,
@@ -434,7 +458,7 @@ function readManifest(read: ReadEntries): {
 				`format ${version} is newer than this version of Freshcoat reads`,
 			);
 		}
-		if (minor !== undefined && minor > 0) {
+		if (minor !== undefined && minor > READ_MINOR) {
 			warnings.push(
 				`Saved by a newer Freshcoat (format ${version}); anything it added was dropped`,
 			);

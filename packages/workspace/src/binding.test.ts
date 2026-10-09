@@ -225,6 +225,30 @@ describe("variantFor", () => {
 		expect(variantFor(template, fixed("bronze"), dataset, ana)).toBeUndefined();
 		expect(variantFor(template, fixed(), dataset, ana)).toBeUndefined();
 	});
+
+	it("falls back when the cell names no variant, unless it says default", () => {
+		const withFallback: Binding = {
+			...byTier,
+			variant: {
+				kind: "column",
+				column: "tier",
+				fallback: { kind: "fixed", id: "silver" },
+			},
+		};
+		const tier = (value: string | null) => ({
+			id: "r",
+			status: "pending" as const,
+			values: { tier: value },
+		});
+		expect(variantFor(template, withFallback, dataset, ana)).toBe("gold");
+		expect(variantFor(template, withFallback, dataset, cy)).toBe("silver");
+		expect(variantFor(template, withFallback, dataset, tier(null))).toBe(
+			"silver",
+		);
+		expect(
+			variantFor(template, withFallback, dataset, tier(" Default ")),
+		).toBeUndefined();
+	});
 });
 
 describe("variant from the photo's shape", () => {
@@ -266,6 +290,25 @@ describe("variant from the photo's shape", () => {
 			],
 		};
 	};
+
+	it("reads the photo's shape for a variant column's empty cells", () => {
+		const byColumn: Binding = {
+			...byPhoto,
+			variant: {
+				kind: "column",
+				column: "tier",
+				fallback: { kind: "image", field: "photo" },
+			},
+		};
+		const tall = withPhoto(2000, 3000);
+		expect(variantFor(shaped, byColumn, tall, ana)).toBe("gold");
+		expect(
+			variantFor(shaped, byColumn, tall, {
+				...ana,
+				values: { ...ana.values, tier: null },
+			}),
+		).toBe("portrait");
+	});
 
 	it("reads the bound photo as seen", () => {
 		expect(variantFor(shaped, byPhoto, withPhoto(3000, 2000), ana)).toBe(

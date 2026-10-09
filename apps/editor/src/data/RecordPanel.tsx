@@ -7,6 +7,7 @@ import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import {
 	type Binding,
 	type CellValue,
@@ -37,6 +38,12 @@ import RightIcon from "~icons/mingcute/right-line";
 import { editDataset } from "./actions";
 import { BulkPanel } from "./BulkPanel";
 import { ImagePicker, inputModeFor, STATUSES } from "./cells";
+import {
+	type ColumnChoices,
+	choiceOf,
+	useColumnChoices,
+} from "./column-options";
+import { keepFocusInColumn } from "./focus-column";
 import { type GridUiStore, useGridUi } from "./grid-state";
 import {
 	assetMap,
@@ -63,7 +70,7 @@ const STATUS_BY_ID = new Map(STATUSES.map((s) => [s.id, s]));
  *  bound to `datasetId`, else the first that is. */
 function useFramingTemplate(
 	datasetId: string,
-): { template: Template; binding: Binding } | undefined {
+): { template: Template; binding: Binding; active: boolean } | undefined {
 	const ws = useEditor((s) => s.workspace);
 	const live = useEditor((s) => s.doc?.history.present);
 	return useMemo(() => {
@@ -77,7 +84,11 @@ function useFramingTemplate(
 			slot.id === ws?.activeTemplateId && live
 				? live
 				: (slot.parked?.doc.history.present ?? slot.template);
-		return { template, binding: slot.binding };
+		return {
+			template,
+			binding: slot.binding,
+			active: slot.id === ws?.activeTemplateId,
+		};
 	}, [ws, live, datasetId]);
 }
 
@@ -111,6 +122,7 @@ export function RecordPanel({
 	const assets = useMemo(() => assetMap(dataset.assets), [dataset.assets]);
 	const controller = useController();
 	const framing = useFramingTemplate(dataset.id);
+	const columnChoices = useColumnChoices(dataset.columns, dataset.id);
 
 	if (selectedIds.length > 1)
 		return <BulkPanel dataset={dataset} ids={selectedIds} />;
@@ -201,7 +213,7 @@ export function RecordPanel({
 				{images.length ? (
 					<div className="flex flex-col gap-3 border-fc-border border-b p-2.5">
 						{images.map((c) => {
-							const frame = framing
+							const found = framing
 								? photoFraming(
 										framing.template,
 										framing.binding,
@@ -210,6 +222,11 @@ export function RecordPanel({
 										c.key,
 									)
 								: undefined;
+							const frame =
+								found?.focusColumn !== undefined || framing?.active
+									? found
+									: undefined;
+							const focusColumn = frame?.focusColumn;
 							return (
 								<RecordPhoto
 									key={c.key}
@@ -220,14 +237,26 @@ export function RecordPanel({
 									framing={
 										frame && {
 											...frame,
-											focus: record.values[frame.focusColumn],
+											focus:
+												focusColumn === undefined
+													? undefined
+													: record.values[focusColumn],
 											onFocus: (text) =>
-												editDataset(
-													controller,
-													dataset.id,
-													(d) => setCell(d, record.id, frame.focusColumn, text),
-													`cell:${dataset.id}:${record.id}:${frame.focusColumn}`,
-												),
+												focusColumn === undefined
+													? keepFocusInColumn(
+															controller,
+															dataset,
+															record.id,
+															c.key,
+															frame,
+															text,
+														)
+													: editDataset(
+															controller,
+															dataset.id,
+															(d) => setCell(d, record.id, focusColumn, text),
+															`cell:${dataset.id}:${record.id}:${focusColumn}`,
+														),
 										}
 									}
 								/>
@@ -245,6 +274,7 @@ export function RecordPanel({
 							dataset={dataset}
 							record={record}
 							column={c}
+							choices={columnChoices.get(c.key)}
 							onImportPhotos={onImportPhotos}
 						/>
 					))}
@@ -308,6 +338,8 @@ function StatusMenu({
 	);
 }
 
+const PHOTO_BOX_ASPECT = 4 / 3;
+
 /** One image field, large, with what the photo is. */
 type Framing = PhotoFraming & {
 	focus: CellValue | undefined;
@@ -348,10 +380,12 @@ function RecordPhoto({
 							!url && "bg-fc-hover",
 						)}
 						style={
-							!url && seen
+							seen
 								? {
 										aspectRatio: `${seen.width} / ${seen.height}`,
-										[seen.width >= seen.height ? "width" : "height"]: "100%",
+										[seen.width / seen.height >= PHOTO_BOX_ASPECT
+											? "width"
+											: "height"]: "100%",
 									}
 								: undefined
 						}
@@ -362,7 +396,8 @@ function RecordPhoto({
 								alt={asset.name}
 								draggable={false}
 								className={cn(
-									"block max-h-full max-w-full",
+									"block",
+									seen ? "size-full" : "max-h-full max-w-full",
 									mayBeTransparent(asset) && "fc-checkerboard",
 								)}
 							/>
@@ -422,7 +457,7 @@ function FramingOverlay({
 	framing: Framing;
 	photoAspect: number;
 }) {
-	const saved = cellFocus(framing.focus);
+	const saved = cellFocus(framing.focus, framing.fallback);
 	const [draft, setDraft] = useState<typeof saved | null>(null);
 	const drag = useRef<{ x: number; y: number; w: number; h: number } | null>(
 		null,
@@ -447,6 +482,7 @@ function FramingOverlay({
 			role="slider"
 			tabIndex={0}
 			aria-label="Photo framing"
+			title="Drag to choose what stays in view"
 			aria-valuetext={`${Math.round(focus.x * 100)}%, ${Math.round(focus.y * 100)}%`}
 			aria-valuenow={Math.round(focus.x * 100)}
 			data-testid="photo-framing"
@@ -503,11 +539,13 @@ function Field({
 	dataset,
 	record,
 	column,
+	choices,
 	onImportPhotos,
 }: {
 	dataset: Dataset;
 	record: DataRecord;
 	column: Column;
+	choices: ColumnChoices | undefined;
 	onImportPhotos: () => void;
 }) {
 	const controller = useController();
@@ -524,57 +562,73 @@ function Field({
 	const label = column.title ?? column.key;
 
 	let editor: ReactNode;
-	switch (column.type) {
-		case "boolean":
-			editor = (
-				<Checkbox
-					aria-label={label}
-					isSelected={value === true}
-					isInvalid={!!issue}
-					onChange={(on) => set(on)}
-					className="h-fc-control"
-				/>
-			);
-			break;
-		case "color":
-			editor = (
-				<ColorInput
-					aria-label={label}
-					value={typeof value === "string" ? value : ""}
-					onChange={(next) => set(next === "" ? null : next)}
-				/>
-			);
-			break;
-		case "image":
-			editor = (
-				<ImageField
-					dataset={dataset}
-					column={column}
-					value={value}
-					onPick={(text) =>
-						set(
-							text === "" ? null : valueFromText(column, text, dataset.assets),
-						)
-					}
-					onImportPhotos={onImportPhotos}
-				/>
-			);
-			break;
-		default:
-			editor = (
-				<TextValue
-					id={id}
-					column={column}
-					value={value}
-					invalid={!!issue}
-					onCommit={(text) =>
-						set(
-							text === "" ? null : valueFromText(column, text, dataset.assets),
-						)
-					}
-				/>
-			);
-	}
+	if (choices) {
+		editor = (
+			<ChoiceValue
+				id={id}
+				label={label}
+				choices={choices}
+				value={value}
+				invalid={!!issue}
+				onPick={(next) => set(next === "" ? null : next)}
+			/>
+		);
+	} else
+		switch (column.type) {
+			case "boolean":
+				editor = (
+					<Checkbox
+						aria-label={label}
+						isSelected={value === true}
+						isInvalid={!!issue}
+						onChange={(on) => set(on)}
+						className="h-fc-control"
+					/>
+				);
+				break;
+			case "color":
+				editor = (
+					<ColorInput
+						aria-label={label}
+						value={typeof value === "string" ? value : ""}
+						onChange={(next) => set(next === "" ? null : next)}
+					/>
+				);
+				break;
+			case "image":
+				editor = (
+					<ImageField
+						dataset={dataset}
+						column={column}
+						value={value}
+						onPick={(text) =>
+							set(
+								text === ""
+									? null
+									: valueFromText(column, text, dataset.assets),
+							)
+						}
+						onImportPhotos={onImportPhotos}
+					/>
+				);
+				break;
+			default:
+				editor = (
+					<TextValue
+						id={id}
+						column={column}
+						value={value}
+						invalid={!!issue}
+						onCommit={(text) =>
+							set(
+								text === ""
+									? null
+									: valueFromText(column, text, dataset.assets),
+							)
+						}
+					/>
+				);
+		}
 
 	return (
 		<>
@@ -602,6 +656,53 @@ function Field({
 				) : null}
 			</div>
 		</>
+	);
+}
+
+const EMPTY_CHOICE = "\u0000empty";
+
+/** A value picked from a column's choices. A value that is none of them
+ *  stays listed so it can be seen and replaced. */
+function ChoiceValue({
+	id,
+	label,
+	choices,
+	value,
+	invalid,
+	onPick,
+}: {
+	id: string;
+	label: string;
+	choices: ColumnChoices;
+	value: CellValue | undefined;
+	invalid: boolean;
+	onPick: (value: string) => void;
+}) {
+	const picked = choiceOf(choices, value);
+	const raw = value === null || value === undefined ? "" : String(value);
+	const unknown = !picked && raw !== "" ? raw : undefined;
+	return (
+		<Select
+			id={id}
+			aria-label={label}
+			isInvalid={invalid}
+			value={picked?.value ?? unknown ?? EMPTY_CHOICE}
+			onChange={(key) => onPick(key === EMPTY_CHOICE ? "" : String(key ?? ""))}
+		>
+			<SelectItem id={EMPTY_CHOICE} textValue={choices.empty}>
+				<span className="text-fc-muted">{choices.empty}</span>
+			</SelectItem>
+			{choices.options.map((o) => (
+				<SelectItem key={o.value} id={o.value} textValue={o.label}>
+					{o.label}
+				</SelectItem>
+			))}
+			{unknown !== undefined ? (
+				<SelectItem id={unknown} textValue={unknown}>
+					<span className="text-fc-danger-text">{unknown}</span>
+				</SelectItem>
+			) : null}
+		</Select>
 	);
 }
 
