@@ -1,5 +1,7 @@
 import {
+	copyFileSync,
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -47,6 +49,15 @@ try {
 		const staged = JSON.parse(
 			readFileSync(join(stagingRoot, directory, "package.json"), "utf8"),
 		);
+		for (const path of Object.values(
+			(staged.bin ?? {}) as Record<string, string>,
+		)) {
+			const listing = run(["tar", "-tvf", tarball])
+				.split("\n")
+				.find((line) => line.endsWith(` package/${path.replace(/^\.\//, "")}`));
+			if (!listing?.startsWith("-rwx"))
+				throw new Error(`${filename}: ${path} is missing or not executable`);
+		}
 		for (const [key, value] of Object.entries(staged.exports)) {
 			if (key.includes("*")) continue;
 			imports.push(key === "." ? data.name : `${data.name}/${key.slice(2)}`);
@@ -151,6 +162,7 @@ console.log("All public imports, scene, text and barcode rendering, print analys
 	console.log(
 		run(["node", "--input-type=module", "--eval", smoke], consumer).trim(),
 	);
+	checkCli(consumer, font);
 	writeFileSync(
 		join(consumer, "check.ts"),
 		imports
@@ -189,4 +201,57 @@ console.log("All public imports, scene, text and barcode rendering, print analys
 	);
 } finally {
 	rmSync(consumer, { recursive: true, force: true });
+}
+
+function checkCli(consumer: string, font: string): void {
+	const bin = join(consumer, "node_modules", ".bin", "freshcoat");
+	const version = run([bin, "--version"], consumer).trim();
+	if (version !== manifest("packages/cli").version)
+		throw new Error(`freshcoat --version printed "${version}"`);
+	const fixture = JSON.parse(
+		readFileSync(
+			join(root, "packages", "coatfile", "fixtures", "minimal-card.json"),
+			"utf8",
+		),
+	);
+	const text = fixture.template_data[0].elements[0].properties.font;
+	text.family = "Geist";
+	text.weight = 400;
+	fixture.fonts = [
+		{
+			kind: "local",
+			family: "Geist",
+			files: [{ weight: 400, src: "Geist-Regular.ttf" }],
+		},
+	];
+	mkdirSync(join(consumer, "templates"));
+	copyFileSync(font, join(consumer, "templates", "Geist-Regular.ttf"));
+	writeFileSync(
+		join(consumer, "templates", "card.json"),
+		JSON.stringify(fixture),
+	);
+	run([bin, "validate", "templates/card.json"], consumer);
+	const info = JSON.parse(
+		run([bin, "inspect", "templates/card.json", "--json"], consumer),
+	);
+	if (info.frames[0].name !== "front" || info.fonts[0].declared !== true)
+		throw new Error("freshcoat inspect --json did not describe the fixture");
+	const written = run(
+		[
+			bin,
+			"render",
+			"templates/card.json",
+			"--set",
+			"displayName=Release check",
+			"--out",
+			"rendered",
+		],
+		consumer,
+	).trim();
+	if (written !== join("rendered", "front.png"))
+		throw new Error(`freshcoat render printed "${written}"`);
+	const png = readFileSync(join(consumer, "rendered", "front.png"));
+	if (png.readUInt32BE(16) !== 1012 || png.readUInt32BE(20) !== 638)
+		throw new Error("freshcoat render wrote an image of the wrong size");
+	console.log("The installed freshcoat command validated, inspected and rendered");
 }

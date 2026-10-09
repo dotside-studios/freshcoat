@@ -1,4 +1,5 @@
 import {
+	chmodSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -17,6 +18,7 @@ export const packages = [
 	"for-print",
 	"coatfile",
 	"workspace",
+	"cli",
 ] as const;
 export const stagingRoot = join(root, "dist", "npm");
 export const artifactRoot = join(root, "dist", "releases");
@@ -26,6 +28,7 @@ type Manifest = {
 	version: string;
 	private?: boolean;
 	exports: Record<string, string>;
+	bin?: Record<string, string>;
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 	scripts?: Record<string, string>;
@@ -71,8 +74,13 @@ export function run(command: string[], cwd = root): string {
 
 // Tests and their fixtures sit next to the sources they cover, so compile only
 // what the published entry points reach.
-export function entryPoints(exports: Record<string, string>): string[] {
-	return Object.values(exports).filter((path) => path.endsWith(".ts"));
+export function entryPoints(
+	exports: Record<string, string>,
+	bin: Record<string, string> = {},
+): string[] {
+	return [...Object.values(exports), ...Object.values(bin)].filter((path) =>
+		path.endsWith(".ts"),
+	);
 }
 
 // TypeScript's bundler resolution accepts extensionless imports; Node ESM
@@ -131,6 +139,7 @@ export function publishedManifest(
 		scripts: _scripts,
 		devDependencies: _devDependencies,
 		exports,
+		bin,
 		...metadata
 	} = source;
 	const dependencies = Object.fromEntries(
@@ -149,6 +158,16 @@ export function publishedManifest(
 		types: "./src/index.d.ts",
 		files: ["src", "fixtures", "schema", "LICENSE", "NOTICE", "README.md"],
 		publishConfig: { access: "public" },
+		...(bin
+			? {
+					bin: Object.fromEntries(
+						Object.entries(bin).map(([name, path]) => [
+							name,
+							path.replace(/\.ts$/, ".js"),
+						]),
+					),
+				}
+			: {}),
 		exports: Object.fromEntries(
 			Object.entries(exports).map(([key, path]) => [
 				key,
@@ -190,7 +209,7 @@ export async function buildPackages(tag?: string): Promise<void> {
 				ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
 			);
 		const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
-		const files = entryPoints(data.exports).map((path) =>
+		const files = entryPoints(data.exports, data.bin).map((path) =>
 			join(packageRoot, path),
 		);
 		const program = ts.createProgram(files, {
@@ -230,6 +249,12 @@ export async function buildPackages(tag?: string): Promise<void> {
 		});
 		if (emitted.emitSkipped || emitted.diagnostics.length)
 			throw new Error(`Declaration emit failed: ${data.name}`);
+		for (const path of Object.values(data.bin ?? {})) {
+			const built = join(output, path.replace(/\.ts$/, ".js"));
+			if (!readFileSync(built, "utf8").startsWith("#!/usr/bin/env node\n"))
+				throw new Error(`${data.name}: ${path} lost its shebang`);
+			chmodSync(built, 0o755);
+		}
 		for (const asset of ["LICENSE", "NOTICE", "README.md", "schema"]) {
 			if (existsSync(join(packageRoot, asset)))
 				cpSync(join(packageRoot, asset), join(output, asset), {

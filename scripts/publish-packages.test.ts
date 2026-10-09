@@ -42,6 +42,7 @@ beforeEach(() => {
 		"@freshcoat-js/for-print",
 		"@freshcoat-js/coatfile",
 		"@freshcoat-js/workspace",
+		"@freshcoat-js/cli",
 	].map(
 		(name) => {
 			const filename = `${name.replace(/^@/, "").replace("/", "-")}-0.1.0.tgz`;

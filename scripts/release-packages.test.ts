@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	entryPoints,
 	manifest,
 	packages,
 	publishedManifest,
 	releaseVersion,
+	root,
 	rewriteModuleSpecifiers,
 } from "./release-packages";
 
@@ -15,6 +18,7 @@ describe("release packaging", () => {
 			["packages/coatfile", "@freshcoat-js/coatfile"],
 			["packages/for-print", "@freshcoat-js/for-print"],
 			["packages/workspace", "@freshcoat-js/workspace"],
+			["packages/cli", "@freshcoat-js/cli"],
 			["packages/ui", "@freshcoat-js/ui"],
 			["apps/editor", "@freshcoat-js/editor"],
 			["apps/figma-plugin", "@freshcoat-js/figma-plugin"],
@@ -39,7 +43,7 @@ describe("release packaging", () => {
 					expect(names.indexOf(dependency)).toBeLessThan(index);
 			}
 		}
-		expect(packages.at(-1)).toBe("workspace");
+		expect(packages.slice(-2)).toEqual(["workspace", "cli"]);
 	});
 
 	test("keeps workspace's public surface to its entry points", () => {
@@ -55,6 +59,22 @@ describe("release packaging", () => {
 		expect(entryPoints(data.exports).some((path) => /test|fixture/.test(path))).toBe(false);
 		for (const version of Object.values(data.dependencies ?? {}))
 			expect(version).not.toMatch(/^https?:/);
+	});
+
+	test("ships the cli's bin as compiled JavaScript", () => {
+		const data = manifest("packages/cli");
+		expect(data.bin).toEqual({ freshcoat: "./src/bin.ts" });
+		expect(entryPoints(data.exports, data.bin)).toEqual([
+			"./src/index.ts",
+			"./src/bin.ts",
+		]);
+		const published = publishedManifest(data, new Map(
+			packages.map((name) => [manifest(`packages/${name}`).name, data.version]),
+		));
+		expect(published.bin).toEqual({ freshcoat: "./src/bin.js" });
+		expect(readFileSync(join(root, "packages/cli/src/bin.ts"), "utf8")).toStartWith(
+			"#!/usr/bin/env node\n",
+		);
 	});
 
 	test("compiles only what the exports reach", () => {

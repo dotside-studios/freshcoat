@@ -6,6 +6,7 @@ FROM base AS deps
 COPY package.json bun.lock ./
 COPY apps/editor/package.json ./apps/editor/
 COPY apps/figma-plugin/package.json ./apps/figma-plugin/
+COPY packages/cli/package.json ./packages/cli/
 COPY packages/coatfile/package.json ./packages/coatfile/
 COPY packages/engine/package.json ./packages/engine/
 COPY packages/for-print/package.json ./packages/for-print/

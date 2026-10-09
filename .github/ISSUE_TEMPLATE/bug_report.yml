@@ -15,6 +15,7 @@ body:
         - Template format (@freshcoat-js/coatfile)
         - Print utilities (@freshcoat-js/for-print)
         - Workspace model and export (@freshcoat-js/workspace)
+        - Command line (@freshcoat-js/cli)
         - Shared UI kit
         - Freshcoat Studio
         - Figma plugin
