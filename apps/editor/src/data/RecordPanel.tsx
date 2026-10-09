@@ -308,6 +308,8 @@ function StatusMenu({
 	);
 }
 
+const PHOTO_BOX_ASPECT = 4 / 3;
+
 /** One image field, large, with what the photo is. */
 type Framing = PhotoFraming & {
 	focus: CellValue | undefined;
@@ -348,10 +350,12 @@ function RecordPhoto({
 							!url && "bg-fc-hover",
 						)}
 						style={
-							!url && seen
+							seen
 								? {
 										aspectRatio: `${seen.width} / ${seen.height}`,
-										[seen.width >= seen.height ? "width" : "height"]: "100%",
+										[seen.width / seen.height >= PHOTO_BOX_ASPECT
+											? "width"
+											: "height"]: "100%",
 									}
 								: undefined
 						}
@@ -362,7 +366,8 @@ function RecordPhoto({
 								alt={asset.name}
 								draggable={false}
 								className={cn(
-									"block max-h-full max-w-full",
+									"block",
+									seen ? "size-full" : "max-h-full max-w-full",
 									mayBeTransparent(asset) && "fc-checkerboard",
 								)}
 							/>
