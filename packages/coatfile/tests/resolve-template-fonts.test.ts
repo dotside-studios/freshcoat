@@ -1,6 +1,11 @@
 import { clearFontBytesCache, type FontFetch } from "@freshcoat-js/engine";
 import { afterEach, describe, expect, test } from "vitest";
-import { resolveTemplateFonts, weightsByFamily } from "../src/fonts";
+import {
+	fontRequestKey,
+	fontUsage,
+	googleCss2Url,
+} from "../src/font-usage";
+import { resolveTemplateFonts } from "../src/fonts";
 import type { Template } from "../src/types";
 
 afterEach(() => clearFontBytesCache());
@@ -184,7 +189,20 @@ describe("resolveTemplateFonts", () => {
 	});
 });
 
-describe("weightsByFamily", () => {
+describe("fontUsage", () => {
+	const bold = (font: Record<string, unknown>) =>
+		({
+			variants: [
+				{
+					id: "bold",
+					label: "Bold",
+					overrides: [
+						{ name: "front", elements: [{ id: "a", properties: { font } }] },
+					],
+				},
+			],
+		}) as unknown as Partial<Template>;
+
 	test("collects weights from spans, variants and barcodes", () => {
 		const t = template(
 			[
@@ -192,39 +210,94 @@ describe("weightsByFamily", () => {
 				text("Roboto", undefined, [{ font: { family: "Lora", weight: 500 } }]),
 				{ type: "barcode", properties: { fontFamily: "Mono" } },
 			],
-			{
-				variants: [
-					{
-						id: "bold",
-						label: "Bold",
-						overrides: [
-							{
-								name: "front",
-								elements: [
-									{
-										id: "a",
-										properties: { font: { family: "Inter", weight: 800 } },
-									},
-								],
-							},
-						],
-					},
-				],
-			} as unknown as Partial<Template>,
+			bold({ family: "Inter", weight: 800 }),
 		);
-		const weights = weightsByFamily(t);
-		expect(
-			Object.fromEntries(
-				[...weights].map(([family, set]) => [
-					family,
-					[...set].sort((a, b) => a - b),
-				]),
-			),
-		).toEqual({
-			Inter: [300, 600, 800],
-			Roboto: [400],
-			Lora: [500],
-			Mono: [400],
+		expect(Object.fromEntries(fontUsage(t))).toEqual({
+			Inter: { weights: [300, 600, 800], italic: false },
+			Roboto: { weights: [400], italic: false },
+			Lora: { weights: [500], italic: false },
+			Mono: { weights: [400], italic: false },
 		});
+	});
+
+	test("includes a family only a variant uses", () => {
+		const t = template(
+			[{ ...text("Inter"), id: "a" }],
+			bold({ family: "Playfair Display", weight: 700 }),
+		);
+		expect(fontUsage(t).get("Playfair Display")).toEqual({
+			weights: [700],
+			italic: false,
+		});
+	});
+
+	test("gives a barcode without a font the default family", () => {
+		const t = template([
+			text("Inter", 600),
+			{ type: "barcode", properties: {} },
+		]);
+		expect(fontUsage(t).get("Inter")).toEqual({
+			weights: [400, 600],
+			italic: false,
+		});
+	});
+
+	test("reports italics, inherited by spans", () => {
+		const t = template([
+			{
+				type: "text",
+				properties: {
+					font: { family: "Inter", style: "italic" },
+					text: "hi",
+					spans: [{ font: { family: "Lora" } }],
+				},
+			},
+			text("Roboto", 700, [{ font: { style: "italic" } }]),
+			text("Mono"),
+		]);
+		const usage = fontUsage(t);
+		expect(usage.get("Inter")?.italic).toBe(true);
+		expect(usage.get("Lora")?.italic).toBe(true);
+		expect(usage.get("Roboto")).toEqual({ weights: [700], italic: true });
+		expect(usage.get("Mono")?.italic).toBe(false);
+	});
+});
+
+describe("googleCss2Url", () => {
+	test("joins the words of a family with +", () => {
+		expect(googleCss2Url(" Open  Sans ", [700, 400, 700])).toBe(
+			"https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap",
+		);
+	});
+
+	test("lists every upright weight before the italics", () => {
+		expect(googleCss2Url("Playfair Display", [700, 400], true)).toBe(
+			"https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap",
+		);
+	});
+
+	test("asks for 400 with no weights, and the default face without a list", () => {
+		expect(googleCss2Url("Inter", [])).toBe(
+			"https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap",
+		);
+		expect(googleCss2Url("Bebas Neue")).toBe(
+			"https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap",
+		);
+	});
+});
+
+describe("fontRequestKey", () => {
+	test("tells local faces apart by style", () => {
+		const local = (style?: "italic") =>
+			fontRequestKey({
+				family: "Inter",
+				descriptor: {
+					kind: "local",
+					family: "Inter",
+					files: [{ weight: 400, ...(style ? { style } : {}), src: "a.ttf" }],
+				},
+			});
+		expect(local()).not.toBe(local("italic"));
+		expect(fontRequestKey({ family: "Inter" })).toBe("Inter:none");
 	});
 });

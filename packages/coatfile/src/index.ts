@@ -79,12 +79,19 @@ export {
 export {
 	collectFontBytes,
 	collectFontRequests,
-	defaultFontFamily,
 	type FontCache,
 	type ResolvedTemplateFonts,
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "./fonts";
+export {
+	defaultFontFamily,
+	type FontUsage,
+	fontRequestKey,
+	fontUsage,
+	googleCss2Url,
+	googleFamilyParam,
+} from "./font-usage";
 export {
 	FORMAT_MAJOR,
 	FORMAT_MINOR,

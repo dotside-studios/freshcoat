@@ -821,6 +821,20 @@ template hands them the font. Embed only a font whose license allows that.
 `collectFontRequests` lists the families a template needs and where each is
 declared, including the families a variant's deltas and barcodes bring in.
 
+`fontUsage(template)` maps each family to the weights it is used at and
+whether any of it is italic, across text, spans, barcodes and variants.
+`googleCss2Url(family, weights?, italic?)` builds the Google Fonts css2
+stylesheet URL for those, and `fontRequestKey(request)` names the bytes a
+request resolves to, for a cache. All three, with `defaultFontFamily`, also
+come from `@freshcoat-js/coatfile/fonts`, which leaves out the font loaders:
+
+```ts
+import { fontUsage, googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+
+for (const [family, { weights, italic }] of fontUsage(template))
+	console.log(googleCss2Url(family, weights, italic));
+```
+
 ### Resolving fonts
 
 `resolveTemplateFonts(template, options)` loads every font a template needs and

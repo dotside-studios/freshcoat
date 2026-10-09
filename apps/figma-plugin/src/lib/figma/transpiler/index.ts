@@ -422,7 +422,10 @@ export async function transpile(
 		.filter((t) => t.decision === "flatten" || t.decision === "skip")
 		.map(({ slot: _slot, ...rest }) => rest);
 
-	const fonts = collectFontDescriptors(templateData);
+	const fonts = collectFontDescriptors({
+		template_data: templateData,
+		variants,
+	});
 
 	// A field only an `if:` layer names is a toggle. One a layer also renders
 	// keeps that layer's format, and its `if:` layers hide while it is blank.

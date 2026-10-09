@@ -35,7 +35,7 @@ import {
 	offsetElements,
 	templateBleed,
 } from "./bleed";
-import { barcodeFontFamily, defaultFontFamily } from "./fonts";
+import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { linearGradientPoints } from "./gradient";
 import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
