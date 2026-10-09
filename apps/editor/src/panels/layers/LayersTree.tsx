@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { hiddenElementIds, type Template } from "@freshcoat-js/coatfile";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -32,7 +32,6 @@ import { moveElements, renameElement } from "~/doc/ops";
 import { parentKeyOf, remapKeys, walkLayers } from "~/doc/path";
 import {
 	activeVariantId,
-	hiddenInVariant,
 	overriddenKeys,
 	overrideBackground,
 	workingTemplate,
@@ -76,7 +75,7 @@ function variantMarks(
 	const frame = t?.template_data[side];
 	const variant = t?.variants?.find((v) => v.id === id);
 	if (!t || !frame || !variant) return null;
-	const hiddenIds = hiddenInVariant(t, variant.id, frame.name);
+	const hiddenIds = hiddenElementIds(t, variant.id, frame.name);
 	const changed = new Set<string>();
 	const hidden = new Set<string>();
 	for (const e of walkLayers(t, side)) {

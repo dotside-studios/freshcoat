@@ -4,55 +4,16 @@ import {
 	fontBytes,
 	resolveFontRequest,
 } from "@freshcoat-js/engine";
+import {
+	barcodeFontFamily,
+	defaultFontFamily,
+	fontRequestKey,
+	fontUsage,
+	googleCss2Url,
+	withVariants,
+} from "./font-usage";
 import { childElements } from "./tree";
-import type {
-	Background,
-	BarcodeElement,
-	Element,
-	FontRequest,
-	Template,
-} from "./types";
-import { applyVariant } from "./variants";
-
-// The family a barcode's text and placeholder label use when the element names
-// none: the template's first declared font, else the first family a text
-// element uses. Undefined when the template has neither, and the painter's own
-// fallback draws it. A variant can change that family, so it is asked of the
-// template with the variant applied, which is what `compile` draws.
-export function defaultFontFamily(template: Template): string | undefined {
-	const declared = template.fonts?.[0]?.family;
-	if (declared) return declared;
-	let found: string | undefined;
-	const walk = (el: Element | Background) => {
-		if (found) return;
-		if (el.type === "text") {
-			found = el.properties.font.family;
-			return;
-		}
-		for (const child of childElements(el)) walk(child);
-	};
-	for (const frame of template.template_data) {
-		walk(frame.background);
-		for (const el of frame.elements) walk(el);
-	}
-	return found;
-}
-
-// The base design followed by each variant applied to it, which is every
-// template `compile` can be asked to draw.
-function withVariants(template: Template): Template[] {
-	return [
-		template,
-		...(template.variants ?? []).map((v) => applyVariant(template, v.id)),
-	];
-}
-
-export function barcodeFontFamily(
-	el: BarcodeElement,
-	fallback: string | undefined,
-): string | undefined {
-	return el.properties.fontFamily || fallback;
-}
+import type { Background, Element, FontRequest, Template } from "./types";
 
 // The FontRequests a template needs, gathered exactly as compileFrame does: every
 // family referenced by a text element (walking nested frames and backgrounds,
@@ -127,21 +88,19 @@ export async function resolveTemplateFonts(
 	options: ResolveTemplateFontsOptions = {},
 ): Promise<ResolvedTemplateFonts> {
 	const { fetch, load, cache, guessGoogle = true } = options;
-	const weights = weightsByFamily(template);
+	const usage = fontUsage(template);
 
 	const results = await Promise.all(
 		collectFontRequests(template).map(async (request) => {
 			if ("descriptor" in request) {
-				const bytes = await cached(cache, `d:${requestKey(request)}`, () =>
+				const bytes = await cached(cache, `d:${fontRequestKey(request)}`, () =>
 					fontBytes(resolveFontRequest(request), load, fetch),
 				);
 				return { family: request.family, bytes, guessed: false };
 			}
 			if (!guessGoogle)
 				return { family: request.family, bytes: [], guessed: true };
-			const wanted = [...(weights.get(request.family) ?? [400])].sort(
-				(a, b) => a - b,
-			);
+			const wanted = usage.get(request.family)?.weights ?? [400];
 			const bytes = await cached(
 				cache,
 				`g:${request.family}:${wanted.join(",")}`,
@@ -152,7 +111,7 @@ export async function resolveTemplateFonts(
 							descriptor: {
 								kind: "google",
 								family: request.family,
-								url: googleStylesheetUrl(request.family, wanted),
+								url: googleCss2Url(request.family, wanted),
 							},
 						},
 						load,
@@ -195,50 +154,6 @@ export async function collectFontBytes(
 	).fonts;
 }
 
-// One stylesheet for every weight, the URL shape a declared `google` font has.
-function googleStylesheetUrl(family: string, weights: number[]): string {
-	return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
-		family,
-	)}:wght@${weights.join(";")}&display=swap`;
-}
-
-// The weights each family is used at, across text, spans and barcodes in the
-// base design and each variant, so no face is fetched needlessly.
-export function weightsByFamily(template: Template): Map<string, Set<number>> {
-	const out = new Map<string, Set<number>>();
-	const add = (family: string, weight: number) => {
-		const set = out.get(family);
-		if (set) set.add(weight);
-		else out.set(family, new Set([weight]));
-	};
-	for (const t of withVariants(template)) {
-		const fallbackFamily = defaultFontFamily(t);
-		const walk = (el: Element | Background) => {
-			if (el.type === "text") {
-				const { font, spans } = el.properties;
-				add(font.family, font.weight ?? 400);
-				for (const span of spans ?? []) {
-					if (!span.font) continue;
-					add(
-						span.font.family ?? font.family,
-						span.font.weight ?? font.weight ?? 400,
-					);
-				}
-			}
-			if (el.type === "barcode") {
-				const family = barcodeFontFamily(el, fallbackFamily);
-				if (family) add(family, 400);
-			}
-			for (const child of childElements(el)) walk(child);
-		};
-		for (const frame of t.template_data) {
-			walk(frame.background);
-			for (const el of frame.elements) walk(el);
-		}
-	}
-	return out;
-}
-
 async function cached(
 	cache: FontCache | undefined,
 	key: string,
@@ -260,13 +175,4 @@ async function cached(
 	const bytes = await pending;
 	if (bytes.length === 0 && cache.get(key) === pending) cache.delete(key);
 	return bytes;
-}
-
-function requestKey(
-	request: Extract<FontRequest, { descriptor: unknown }>,
-): string {
-	const d = request.descriptor;
-	return d.kind === "local"
-		? `${request.family}:local:${d.files.map((f) => `${f.weight}/${f.style ?? ""}/${f.src.length}/${f.src.slice(-48)}`).join(",")}`
-		: `${request.family}:${d.kind}:${d.url}`;
 }

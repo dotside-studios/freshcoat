@@ -79,12 +79,19 @@ export {
 export {
 	collectFontBytes,
 	collectFontRequests,
-	defaultFontFamily,
 	type FontCache,
 	type ResolvedTemplateFonts,
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "./fonts";
+export {
+	defaultFontFamily,
+	type FontUsage,
+	fontRequestKey,
+	fontUsage,
+	googleCss2Url,
+	googleFamilyParam,
+} from "./font-usage";
 export {
 	FORMAT_MAJOR,
 	FORMAT_MINOR,
@@ -118,6 +125,11 @@ export {
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
+export {
+	type ApplyCaseOptions,
+	applyCase,
+	type TextCase,
+} from "./text-case";
 export { childElements } from "./tree";
 export type {
 	Background,
@@ -219,13 +231,29 @@ export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,
 	applyVariant,
+	backgroundSwatch,
 	checkVariants,
 	closestVariant,
+	DEFAULT_VARIANT_ID,
+	type DiffElementOptions,
+	diffElement,
 	hasShapedVariants,
+	hiddenElementIds,
+	isEmptyDelta,
 	isEmptyVariant,
+	mergedElementDelta,
+	type SameJsonOptions,
+	type SideDeltas,
+	sameJson,
+	sideBackground,
+	sideDeltas,
+	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
 	type VariantIssue,
+	type VariantShellKey,
 	variantBase,
+	variantDeltas,
+	variantIdFor,
 	variantSize,
 } from "./variants";
 export {

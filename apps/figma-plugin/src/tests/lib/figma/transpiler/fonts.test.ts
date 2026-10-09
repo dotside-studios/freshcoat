@@ -1,8 +1,6 @@
+import { googleCss2Url } from "@freshcoat-js/coatfile/fonts";
 import { describe, expect, it } from "vitest";
-import {
-	collectFontDescriptors,
-	googleCss2Url,
-} from "~/lib/figma/transpiler/fonts";
+import { collectFontDescriptors } from "~/lib/figma/transpiler/fonts";
 
 // Minimal template_data shapes (only the fields collectFontDescriptors reads).
 const textEl = (family: string, weight = 400, style?: "italic") => ({
@@ -19,19 +17,6 @@ const frame = (name: string, elements: unknown[]) => ({
 	elements,
 });
 
-describe("googleCss2Url", () => {
-	it("builds a css2 url with sorted weights", () => {
-		expect(googleCss2Url("Open Sans", [700, 400], false)).toBe(
-			"https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap",
-		);
-	});
-	it("adds the ital axis when italic is used", () => {
-		expect(googleCss2Url("Inter", [400], true)).toBe(
-			"https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;1,400&display=swap",
-		);
-	});
-});
-
 describe("collectFontDescriptors", () => {
 	it("emits google descriptors for all non-system families", () => {
 		const td = [
@@ -40,7 +25,7 @@ describe("collectFontDescriptors", () => {
 				textEl("Inter", 400, "italic"),
 			]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Inter"]);
 		expect(
 			fonts.every(
@@ -55,7 +40,7 @@ describe("collectFontDescriptors", () => {
 		const td = [
 			frame("front", [textEl("Comfortaa", 700), textEl("Arial", 400)]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		// Arial is a system font — filtered out. Comfortaa is declared as Google.
 		expect(fonts.map((f) => f.family)).toEqual(["Comfortaa"]);
 		expect(fonts[0]).toMatchObject({ kind: "google", family: "Comfortaa" });
@@ -65,7 +50,7 @@ describe("collectFontDescriptors", () => {
 		const td = [
 			frame("front", [textEl("Comfortaa", 700), textEl("Proxima Nova", 400)]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		// Both declared as Google; no warnings, no special handling.
 		expect(fonts.map((f) => f.family).sort()).toEqual([
 			"Comfortaa",
@@ -89,7 +74,7 @@ describe("collectFontDescriptors", () => {
 				{ id: "g", type: "frame", properties: { children: [spanEl] } },
 			]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Poppins"]);
 	});
 
@@ -110,7 +95,7 @@ describe("collectFontDescriptors", () => {
 				},
 			]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		expect(fonts).toEqual([
 			{
 				kind: "google",
@@ -141,7 +126,49 @@ describe("collectFontDescriptors", () => {
 				},
 			]),
 		];
-		const fonts = collectFontDescriptors(td);
+		const fonts = collectFontDescriptors({ template_data: td });
 		expect(fonts.map((f) => f.family).sort()).toEqual(["Comfortaa", "Lobster"]);
+	});
+
+	it("declares a family only a variant uses", () => {
+		const td = [frame("front", [{ ...textEl("Comfortaa"), id: "a" }])];
+		const variants = [
+			{
+				id: "alt",
+				label: "Alt",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{
+								id: "a",
+								properties: {
+									font: { family: "Playfair Display", weight: 700 },
+								},
+							},
+						],
+					},
+				],
+			},
+		];
+		const fonts = collectFontDescriptors({ template_data: td, variants });
+		expect(fonts).toContainEqual({
+			kind: "google",
+			family: "Playfair Display",
+			url: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap",
+		});
+	});
+
+	it("declares a barcode's font", () => {
+		const td = [
+			frame("front", [
+				textEl("Comfortaa", 700),
+				{ id: "b", type: "barcode", properties: { fontFamily: "Vend Sans" } },
+			]),
+		];
+		const fonts = collectFontDescriptors({ template_data: td });
+		expect(fonts.find((f) => f.family === "Vend Sans")?.url).toBe(
+			googleCss2Url("Vend Sans", [400]),
+		);
 	});
 });

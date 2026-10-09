@@ -17,7 +17,7 @@ describe("getProductSpec", () => {
 	it("returns card_cr80 with exact print dimensions", () => {
 		const p = getProductSpec("card_cr80");
 		expect(p).not.toBeNull();
-		expect(p?.width).toBe(1013);
+		expect(p?.width).toBe(1012);
 		expect(p?.height).toBe(638);
 		expect(p?.frames.map((f) => f.name)).toEqual(["front", "back"]);
 	});
@@ -105,7 +105,7 @@ describe("applyRemoteProducts", () => {
 		// Remote-added sku resolves…
 		expect(getProductSpec("card_square")?.width).toBe(800);
 		// …and the shipped fallback sku still resolves.
-		expect(getProductSpec("card_cr80")?.width).toBe(1013);
+		expect(getProductSpec("card_cr80")?.width).toBe(1012);
 		expect(
 			listProductSpecs()
 				.map((p) => p.sku)
@@ -118,7 +118,7 @@ describe("applyRemoteProducts", () => {
 			{
 				sku: "card_cr80",
 				displayName: "CR80 (remote)",
-				width: 1013,
+				width: 1012,
 				height: 700,
 				frames: [{ name: "front", label: "Front", required: true }],
 			},

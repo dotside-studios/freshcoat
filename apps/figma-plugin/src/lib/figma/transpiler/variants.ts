@@ -1,4 +1,3 @@
-import { slug } from "../../slug";
 import type { FigmaContainerNode, FigmaNode } from "../types";
 import { isContainerNode } from "../types";
 
@@ -18,17 +17,6 @@ export function colorwayLabel(
 	if (!instanceName.startsWith(prefix)) return null;
 	const label = instanceName.slice(prefix.length).trim();
 	return label.length > 0 ? label : null;
-}
-
-// A variant's id is its label's slug, made unique against every id already
-// taken. `default` is taken from the start: it names the base card, so a
-// colorway labelled "Default" becomes `default-2` rather than shadowing it.
-export function uniqueVariantId(label: string, taken: Set<string>): string {
-	const base = slug(label, { fallback: "variant" });
-	let id = base;
-	for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
-	taken.add(id);
-	return id;
 }
 
 // Whether a layer paints anything. The walk skips one that doesn't, so the

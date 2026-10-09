@@ -1,4 +1,8 @@
-import type { FontDescriptor, Template } from "@freshcoat-js/coatfile";
+import {
+	type FontDescriptor,
+	googleCss2Url,
+	type Template,
+} from "@freshcoat-js/coatfile";
 
 export const WEIGHTS: [number, string][] = [
 	[100, "Thin"],
@@ -12,14 +16,8 @@ export const WEIGHTS: [number, string][] = [
 	[900, "Black"],
 ];
 
-const CSS2 = "https://fonts.googleapis.com/css2?family=";
-
 export function googleFontUrls(family: string): [string, string] {
-	const name = family.trim().replace(/\s+/g, "+");
-	return [
-		`${CSS2}${name}:wght@400;700&display=swap`,
-		`${CSS2}${name}&display=swap`,
-	];
+	return [googleCss2Url(family, [400, 700]), googleCss2Url(family)];
 }
 
 export function isDeclared(t: Template, family: string): boolean {

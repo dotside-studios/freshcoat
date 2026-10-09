@@ -4,7 +4,9 @@ import {
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "@freshcoat-js/coatfile";
+import { planExport } from "../plan";
 import type { ExportPreset, Workspace } from "../types";
+import { checkAllGlyphs, type GlyphIssue } from "./glyph-preflight";
 import { createItemRenderer } from "./item";
 import {
 	inlinePool,
@@ -34,11 +36,15 @@ export type ExportWorkspaceOptions = {
 	output?: ExportOutput;
 	signal?: AbortSignal;
 	onProgress?: (progress: JobProgress) => void;
+	/** Also lists the text each item's fonts have no glyphs for, as `glyphs`. */
+	checkGlyphs?: boolean;
 };
 
 export type ExportWorkspaceResult = JobResult & {
 	/** set when `exportWorkspace` resolved the fonts itself */
 	fonts?: Omit<ResolvedTemplateFonts, "fonts">;
+	/** set when `checkGlyphs` was asked for and the job was not cancelled */
+	glyphs?: GlyphIssue[];
 };
 
 /** A preset by its id, else by a name no other preset has. */
@@ -88,6 +94,15 @@ export async function exportWorkspace(
 		if (result.cancelled) {
 			await output?.discard?.();
 			return result;
+		}
+		if (options.checkGlyphs) {
+			const glyphs = await checkAllGlyphs(
+				entry.template,
+				planExport(workspace, found),
+				options.renderer,
+				() => signal?.aborted ?? false,
+			);
+			if (glyphs) result.glyphs = glyphs;
 		}
 		if (result.file) await output?.save?.(result.file);
 		return result;

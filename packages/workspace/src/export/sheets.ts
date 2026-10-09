@@ -1,6 +1,7 @@
 import {
 	bleedMm,
 	cardSizeMm,
+	DEFAULT_VARIANT_ID,
 	hasInsets,
 	NO_BLEED,
 	type Sides,
@@ -160,7 +161,8 @@ export function showsRecord(
 ): boolean {
 	return (
 		item.recordId === recordId &&
-		(variant === undefined || (item.variantId ?? "default") === variant)
+		(variant === undefined ||
+			(item.variantId ?? DEFAULT_VARIANT_ID) === variant)
 	);
 }
 

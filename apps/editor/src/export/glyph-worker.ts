@@ -1,7 +1,7 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { createRenderer, type Renderer } from "@freshcoat-js/engine";
+import { checkAllGlyphs } from "@freshcoat-js/workspace/export";
 import { getCanvasKit } from "~/render/canvaskit";
-import { checkAllGlyphs } from "./glyph-preflight";
 import type { GlyphWorkerReply, GlyphWorkerRequest } from "./protocol";
 
 type Scope = {

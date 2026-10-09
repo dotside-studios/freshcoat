@@ -262,7 +262,7 @@ test.describe("export steps", () => {
 		await frames.getByRole("button", { name: "Resize" }).first().click();
 		await expect(status(ui)).toHaveText(/^Resized/);
 		const [resize] = await sentOfType(page, "resize-node");
-		expect(resize.width).toBe(1013);
+		expect(resize.width).toBe(1012);
 	});
 
 	test("a barcode placeholder stops the export until accepted", async ({

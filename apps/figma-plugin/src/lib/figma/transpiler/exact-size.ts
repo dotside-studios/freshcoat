@@ -1,7 +1,7 @@
 // Canvas sizing for the transpiler, in two modes.
 //
 // EXACT (product export): a product declares an EXACT print size (e.g. CR80 at
-// ~300 DPI = 1013×638). A card side frame must measure that size in either
+// ~300 DPI = 1012×638). A card side frame must measure that size in either
 // orientation, within ±1px (sub-pixel rounding). Order-site prints at the
 // template's native width/height, so the emitted dims must equal the product's
 // exact pixels — no ratio math, no resolution flexibility, no scaling.
