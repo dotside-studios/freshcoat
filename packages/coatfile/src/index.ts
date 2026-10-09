@@ -126,7 +126,15 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
-export { healElementIds, uniquifyElementIds } from "./normalize";
+export {
+	type HealOptions,
+	healElementIds,
+	type IdSeparator,
+	nextFreeId,
+	type UniquifyOptions,
+	uniquifyElementIds,
+	uniquifyElementIdsDeep,
+} from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
 export { childElements } from "./tree";

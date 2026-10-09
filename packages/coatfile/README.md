@@ -386,7 +386,16 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 
 - `healElementIds` suffixes ids that repeat within a frame. `validate` rejects
   those, and a design with three layers named "Vector" produces three elements
-  called `Vector` — so this is the common case, not the exotic one.
+  called `Vector` — so this is the common case, not the exotic one. It renames
+  only the top-level repeats `validate` refuses; `{ deep: true }` also renames
+  repeats anywhere in a side's tree.
+- `uniquifyElementIdsDeep(elements, options)` is the walk behind it: the first
+  occurrence keeps its id and later ones get the next free suffix, depth
+  first with a mask's shape before its content, so the same tree always gets
+  the same ids. `separator` is `_` (`Vector_2`, the default) or `-`
+  (`title-2`), `fromStem` counts on from a numbered id (`title-2` to
+  `title-3`), `used` seeds and collects the ids taken, and `inPlace` renames
+  the elements themselves. `nextFreeId(base, isTaken, options)` picks one id.
 
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
