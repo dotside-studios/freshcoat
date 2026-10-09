@@ -1,5 +1,14 @@
 export const FIELD_ID = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+/** The values a field's `format` may take. A field without one is plain text. */
+export const FIELD_FORMATS = [
+	"longText",
+	"color",
+	"url",
+	"image",
+	"boolean",
+] as const;
+
 /** A key `FIELD_ID` accepts, made from any text: `First Name` and `firstName`
  *  give `first_name`, `Año` gives `ano`, `2nd` gives `_2nd`. `fallback` when
  *  nothing is left. */

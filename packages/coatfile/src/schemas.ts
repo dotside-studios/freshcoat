@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
-import { tokenIds } from "./mustache";
+import { FIELD_FORMATS, tokenIds } from "./mustache";
 import type {
 	Element,
 	FrameElement,
@@ -102,7 +102,7 @@ export const FieldDefinitionSchema = z.object({
 	description: z.string().optional(),
 	default: z.string().optional(),
 	// "boolean" is a toggle whose value is the string "true" or "false".
-	format: z.enum(["color", "url", "image", "longText", "boolean"]).optional(),
+	format: z.enum(FIELD_FORMATS).optional(),
 	maxLength: z.number().optional(),
 	minLength: z.number().optional(),
 	pattern: z

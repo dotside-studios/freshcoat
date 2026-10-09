@@ -725,8 +725,13 @@ A field's key, and the id in a `{{id}}` token, matches `FIELD_ID`: a letter or
 `_`, then letters, digits and `_`. `fieldKeyFrom(text)` makes one from any
 text, such as a layer or column name: `First Name` and `firstName` give
 `first_name`, `Año` gives `ano`, and `2nd` gives `_2nd`. Text with nothing
-usable in it gives `field`, or the fallback passed as the second argument. Both
-come from `@freshcoat-js/coatfile/mustache`, which has no runtime imports.
+usable in it gives `field`, or the fallback passed as the second argument.
+
+`FIELD_FORMATS` lists the values a field's `format` may take: `longText`,
+`color`, `url`, `image` and `boolean`. A field without one is plain text.
+
+All three come from `@freshcoat-js/coatfile/mustache`, which has no runtime
+imports.
 
 ## Field patterns
 
