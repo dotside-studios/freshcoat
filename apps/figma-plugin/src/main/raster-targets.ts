@@ -1,5 +1,5 @@
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { classify } from "~/lib/figma/transpiler/classify";
-import { isWholeMustacheToken } from "~/lib/figma/transpiler/fields";
 import { withoutGuides } from "~/lib/figma/transpiler/guides";
 import type { FigmaContainerNode, FigmaNode } from "~/lib/figma/types";
 import { isContainerNode } from "~/lib/figma/types";
@@ -15,7 +15,7 @@ export function collectRasterTargets(frame: FigmaContainerNode): string[] {
 		}
 		if (c.kind === "native-image") {
 			// Static image fills are rasterized; dynamic {{token}} images are not.
-			if (!isWholeMustacheToken(n.name).ok) ids.push(n.id);
+			if (wholeToken(n.name.trim()) === undefined) ids.push(n.id);
 			return;
 		}
 		if (

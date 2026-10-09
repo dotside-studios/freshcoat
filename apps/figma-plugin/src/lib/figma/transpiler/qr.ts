@@ -1,7 +1,7 @@
+import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import type { FigmaBoundingBox, FigmaNode } from "../types";
 import { singleSolidFillHex } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
-import { isWholeMustacheToken } from "./fields";
 
 export type ParsedQrName = { value: string; options: Record<string, string> };
 
@@ -37,7 +37,7 @@ export function transpileQr(node: FigmaNode, ctx: TranspileQrContext) {
 
 	// Fields are registered centrally from the node binding; here the whole-token
 	// value only determines the element id.
-	const tokenMatch = isWholeMustacheToken(parsed.value);
+	const token = wholeToken(parsed.value.trim());
 
 	const placed = ctx.worldAnchor
 		? placeWorld(node, ctx.worldAnchor, ctx.scale)
@@ -66,7 +66,7 @@ export function transpileQr(node: FigmaNode, ctx: TranspileQrContext) {
 	}
 
 	return {
-		id: tokenMatch.ok ? tokenMatch.id : node.id.replace(":", "_"),
+		id: token ?? node.id.replace(":", "_"),
 		type: "qr_code" as const,
 		pos: placed.pos,
 		size: placed.size,

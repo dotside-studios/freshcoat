@@ -3,9 +3,9 @@
 // the marker grammar lives in exactly one place.
 
 import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/mustache";
+import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
-import { isWholeMustacheToken, titleCase } from "./transpiler/fields";
+import { titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
@@ -112,8 +112,8 @@ export function parseValue(raw: string): ParsedValue | null {
 		if (ids.length === 0) return null;
 		return { mode: "template", template: inner, ids: dedupe(ids) };
 	}
-	const m = isWholeMustacheToken(s);
-	if (m.ok) return { mode: "token", id: m.id };
+	const id = wholeToken(s);
+	if (id !== undefined) return { mode: "token", id };
 	return null;
 }
 
