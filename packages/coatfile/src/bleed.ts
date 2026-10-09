@@ -9,6 +9,28 @@ export function resolveInsets(insets: Insets | undefined): Sides {
 	return insets;
 }
 
+/** The inverse of `resolveInsets`: one number when every side is the same. */
+export function compactInsets(sides: Sides): Insets {
+	return sides.top === sides.right &&
+		sides.top === sides.bottom &&
+		sides.top === sides.left
+		? sides.top
+		: { ...sides };
+}
+
+/** The largest inset on each side. */
+export function maxInsets(all: readonly Sides[]): Sides {
+	return all.reduce(
+		(m, s) => ({
+			top: Math.max(m.top, s.top),
+			right: Math.max(m.right, s.right),
+			bottom: Math.max(m.bottom, s.bottom),
+			left: Math.max(m.left, s.left),
+		}),
+		all[0] ?? NO_INSETS,
+	);
+}
+
 export function hasInsets(sides: Sides): boolean {
 	return sides.top > 0 || sides.right > 0 || sides.bottom > 0 || sides.left > 0;
 }

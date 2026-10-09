@@ -175,7 +175,10 @@ With bleed:
   the trim by hand.
 
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
-insets; `extendIntoBleed` is the edge rule on its own.
+insets; `extendIntoBleed` is the edge rule on its own. `resolveInsets` turns
+either form into four sides, `compactInsets` turns four sides back into one
+number when they agree, and `maxInsets` takes the largest on each side. These
+also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.

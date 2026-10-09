@@ -1,5 +1,9 @@
 import type { Insets, Sides, TemplateWarning } from "@freshcoat-js/coatfile";
-import { hasInsets } from "@freshcoat-js/coatfile/bleed";
+import {
+	compactInsets,
+	hasInsets,
+	maxInsets,
+} from "@freshcoat-js/coatfile/bleed";
 import type { FigmaContainerNode, FigmaNode } from "../types";
 import { roundHalfPx } from "./coordinates";
 
@@ -83,12 +87,6 @@ export function readSlotGuides(
 	return out;
 }
 
-export function toInsets(s: Sides): Insets {
-	return s.top === s.right && s.top === s.bottom && s.top === s.left
-		? s.top
-		: { ...s };
-}
-
 // Slots that disagree take the larger inset on each side: extra bleed is
 // always printable, and a larger safe area is the cautious guide.
 export function combineGuides(
@@ -103,12 +101,7 @@ export function combineGuides(
 		const found = slots.filter((s) => s.guides[key] !== undefined);
 		if (found.length === 0) return undefined;
 		const all = found.map((s) => s.guides[key] as Sides);
-		const merged: Sides = {
-			top: Math.max(...all.map((s) => s.top)),
-			right: Math.max(...all.map((s) => s.right)),
-			bottom: Math.max(...all.map((s) => s.bottom)),
-			left: Math.max(...all.map((s) => s.left)),
-		};
+		const merged = maxInsets(all);
 		const differs =
 			found.length < slots.length || all.some((s) => !sidesEqual(s, merged));
 		if (differs && slots.length > 1) {
@@ -136,7 +129,7 @@ export function combineGuides(
 		safeArea = undefined;
 	}
 	return {
-		...(bleed ? { bleed: toInsets(bleed) } : {}),
-		...(safeArea ? { safeArea: toInsets(safeArea) } : {}),
+		...(bleed ? { bleed: compactInsets(bleed) } : {}),
+		...(safeArea ? { safeArea: compactInsets(safeArea) } : {}),
 	};
 }
