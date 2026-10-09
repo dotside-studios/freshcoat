@@ -7,6 +7,7 @@ import {
 	FALLBACK_LINE_HEIGHT,
 	type GroupNode,
 	type ImageNode,
+	isEllipsePath,
 	type MaskNode,
 	type Node,
 	type PathNode,
@@ -38,7 +39,6 @@ import {
 } from "./bleed";
 import { linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
-import { isEllipsePath } from "./ellipse-path";
 import { parseImageFocus } from "./image-focus";
 import { prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";

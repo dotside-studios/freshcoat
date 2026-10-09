@@ -157,7 +157,12 @@ export {
 	patternFill,
 } from "./pattern";
 export { resolveLayout } from "./resolve-layout";
-export { outlinePath, rectShape } from "./outline";
+export {
+	ellipsePath,
+	isEllipsePath,
+	outlinePath,
+	rectShape,
+} from "./outline";
 export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {
 	type CanvasFrame,

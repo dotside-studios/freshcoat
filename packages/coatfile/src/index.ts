@@ -121,7 +121,7 @@ export {
 	visibilityFieldRefs,
 } from "./fields";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
-export { ellipsePath, isEllipsePath } from "./ellipse-path";
+export { ellipsePath, isEllipsePath } from "@freshcoat-js/engine";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
