@@ -55,7 +55,7 @@ plugin({
 	},
 });
 const { membershipCard } = await import("../src/samples/membership-card");
-const { sampleValues } = await import("../src/doc/values");
+const { sampleValues } = await import("@freshcoat-js/coatfile");
 
 type Case = { ms: number; relative: number };
 type Baseline = { calibrationMs: number; cases: Record<string, Case> };

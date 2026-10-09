@@ -109,6 +109,17 @@ export {
 	minimumFormatVersion,
 	raiseFormatVersion,
 } from "./format";
+export {
+	defaultFieldValues,
+	elementFieldRefs,
+	fieldTitle,
+	isSystemField,
+	PLACEHOLDER_IMAGE,
+	sampleValues,
+	templateFieldRefs,
+	variantFieldRefs,
+	visibilityFieldRefs,
+} from "./fields";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { ellipsePath, isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
@@ -134,7 +145,15 @@ export {
 	wholeToken,
 } from "./mustache";
 export { pruneUnusedAssets } from "./coat";
-export { healElementIds, uniquifyElementIds } from "./normalize";
+export {
+	type HealOptions,
+	healElementIds,
+	type IdSeparator,
+	nextFreeId,
+	type UniquifyOptions,
+	uniquifyElementIds,
+	uniquifyElementIdsDeep,
+} from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
 export {

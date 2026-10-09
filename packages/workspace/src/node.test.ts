@@ -49,6 +49,35 @@ describe("exportWorkspace with fileOutput", () => {
 		);
 	});
 
+	it("reports records rendered without a required field", async () => {
+		const [entry] = workspace.templates;
+		if (!entry?.binding) throw new Error("fixture has no binding");
+		const { name: _, ...fields } = entry.binding.fields;
+		const unbound: Workspace = {
+			...workspace,
+			templates: [{ ...entry, binding: { ...entry.binding, fields } }],
+		};
+		const one: ExportPreset = {
+			...small,
+			records: "selected",
+			selected: ["r_00000001"],
+		};
+		const result = await exportWorkspace(unbound, one, { renderer, fonts });
+		expect(result.items.map((i) => [i.ok, i.unfilled])).toEqual([
+			[true, ["name"]],
+			[true, ["name"]],
+		]);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no zip");
+		const zip = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+		const report = new TextDecoder()
+			.decode(zip[REPORT_FILE_NAME])
+			.trim()
+			.split("\r\n");
+		expect(report[0]?.endsWith(",unfilled")).toBe(true);
+		expect(report.slice(1).every((row) => row.endsWith(",name"))).toBe(true);
+	});
+
 	it("writes a PDF to the same kind of path", async () => {
 		const out = join(dir, "club.pdf");
 		const pdf: ExportPreset = {

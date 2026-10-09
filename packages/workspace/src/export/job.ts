@@ -65,6 +65,8 @@ export type JobItemResult = {
 	printError?: string;
 	/** the most photo color, in whole percent, pulled into printer range */
 	gamut?: number;
+	/** required fields rendered with their defaults, as `ExportItem` says */
+	unfilled?: string[];
 };
 
 export type JobStats = {
@@ -180,7 +182,7 @@ function csvCell(value: string): string {
 
 export function reportCsv(items: JobItemResult[]): string {
 	const rows = [
-		["file", "record", "side", "status", "error", "print", "gamut"],
+		["file", "record", "side", "status", "error", "print", "gamut", "unfilled"],
 	];
 	for (const item of items)
 		rows.push([
@@ -191,6 +193,7 @@ export function reportCsv(items: JobItemResult[]): string {
 			item.error ?? item.printError ?? "",
 			item.print ?? "",
 			item.gamut ? `${item.gamut}%` : "",
+			item.unfilled?.join(" ") ?? "",
 		]);
 	return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }
@@ -520,6 +523,7 @@ export function runExportJob(
 				fileName: item.fileName,
 				ok,
 				...(ok ? printResult(out) : { error: errorText(error) }),
+				...(item.unfilled ? { unfilled: item.unfilled } : {}),
 			};
 			outputs[index] = out;
 			done++;

@@ -89,6 +89,15 @@ and writes the outputs in plan order to a zip, or into one PDF, with a report
 of what succeeded or failed. Rendering goes through
 [`@freshcoat-js/coatfile`](../coatfile) and [`@freshcoat-js/engine`](../engine).
 
+A binding fills each field from a column, a fixed value or a serial.
+`autoBinding()` matches fields to columns by key, then by title, and
+`unfilledRequired()` names the template's required fields that a binding
+reading a dataset leaves without a source, or bound to a missing column. A
+binding whose `datasetId` is `NO_DATASET` holds only a variant choice. Those
+fields still render with their defaults, so an export is a warning rather
+than a failure: every planned item lists them in `unfilled`, as does each
+job result and the report's `unfilled` column.
+
 A binding's `variant` picks the variant each record renders in: a fixed one,
 the one a column names, every one, or `{ kind: "image", field }`, the one
 whose size is closest in aspect to the record's photo, so a template with
@@ -115,7 +124,8 @@ const result = await exportWorkspace(workspace, preset, {
   renderer,
   output: fileOutput("club.zip"),
 });
-// result.items says how each item went.
+// result.items says how each item went, and which required fields it left
+// to their defaults.
 ```
 
 `exportWorkspace` takes a preset, its id or a name no other preset has

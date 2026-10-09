@@ -14,6 +14,8 @@ import {
 	type ColumnType,
 	coerce,
 	type Dataset,
+	variantColumnSource,
+	withVariantSource,
 } from "@freshcoat-js/workspace";
 import {
 	addColumn,
@@ -34,7 +36,6 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, KEY_RULE, plural } from "~/app/copy";
-import { variantColumnSource, withVariantSource } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
 import DownIcon from "~icons/mingcute/arrow-down-line";

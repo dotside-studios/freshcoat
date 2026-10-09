@@ -241,9 +241,9 @@ describe("a printing export", () => {
 		if (!blob) throw new Error("no file");
 		const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
 		expect(strFromU8(files[REPORT_FILE_NAME]).split("\r\n")).toEqual([
-			"file,record,side,status,error,print,gamut",
-			"1.png,r_1,front,ok,,on,5%",
-			"2.png,r_2,front,ok,finish failed,fallback,",
+			"file,record,side,status,error,print,gamut,unfilled",
+			"1.png,r_1,front,ok,,on,5%,",
+			"2.png,r_2,front,ok,finish failed,fallback,,",
 			"",
 		]);
 	});

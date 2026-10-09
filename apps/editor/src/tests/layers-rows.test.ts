@@ -4,7 +4,6 @@ import {
 	buildLayerRows,
 	filterRows,
 	flattenRows,
-	isBound,
 	type LayerRow,
 } from "../panels/layers/rows";
 import { frozenDoc } from "./doc-fixture";
@@ -75,41 +74,6 @@ describe("buildLayerRows", () => {
 		expect(find(rows, "t1")?.fields).toEqual(["name"]);
 		expect(find(rows, "title")?.fields).toEqual(["title", "show"]);
 		expect(find(rows, "f")?.fields).toEqual([]);
-	});
-
-	it("isBound sees visibleWhen alone, and tokens anywhere in properties", () => {
-		expect(
-			isBound({
-				id: "x",
-				type: "rect",
-				visibleWhen: { field: "show" },
-				properties: {},
-			}),
-		).toBe(true);
-		expect(
-			isBound({
-				id: "x",
-				type: "rect",
-				properties: { fill: "{{brand}}" },
-			}),
-		).toBe(true);
-		expect(
-			isBound({
-				id: "x",
-				type: "image",
-				properties: { src: "{{ photo }}", fit: "cover" },
-			}),
-		).toBe(true);
-		expect(
-			isBound({
-				id: "x",
-				type: "text",
-				properties: {
-					value: "{{ not a token }}",
-					font: { family: "Inter", size: 12 },
-				},
-			}),
-		).toBe(false);
 	});
 
 	it("lists another side on its own", () => {

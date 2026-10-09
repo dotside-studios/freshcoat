@@ -1,4 +1,5 @@
 import type { VisibilityCondition } from "@freshcoat-js/coatfile";
+import { uniquifyElementIdsDeep as uniquifyIdsDeep } from "@freshcoat-js/coatfile/normalize";
 import type { FigmaNode } from "../types";
 
 // Figma masks the layers ABOVE a mask layer in the same parent, up to the next
@@ -96,53 +97,16 @@ export function dropUnfilledSlots(elements: unknown[]): unknown[] {
 	return elements;
 }
 
-// coatfile's uniquifyElementIds (@freshcoat-js/coatfile/normalize) only
-// dedupes the TOP-LEVEL array — it never recurses into a frame element's
-// `properties.children`. Figma auto-names layers ("Text", "Rectangle", …),
-// so a nested element commonly slugs to the same id as a top-level (or
-// sibling-subtree) element, e.g. two "Text" layers both → "text". That
-// collision survives past uniquifyElementIds and later breaks
-// flattenElementsById: its flat id→element map is last-write-wins, so one
-// of the colliding elements silently disappears from the diff, and
-// coatfile's `compile.applyElementOverrides` (which itself recurses
-// into frame children) applies the resulting delta to BOTH elements that
-// share the id — the wrong element gets recolored on the printed card, with
-// no warning (the id SETS still compare equal, so variant_structure_mismatch
-// never fires).
-//
-// Fix: assign ids that are unique across the WHOLE side element tree (top-
-// level AND every nested frame.properties.children), depth-first in
-// traversal order — same collision-suffix scheme as uniquifyElementIds
-// (`_2`, `_3`, … skipping ids already taken), just tracked in one Set that
-// spans the whole tree instead of one per array. Deliberately kept local to
-// the plugin (not folded into coatfile's uniquifyElementIds) since only
-// the transpiler's by-id variant diff needs global-per-side uniqueness;
-// coatfile's own `validate` only enforces per-frame (top-level)
-// uniqueness, so this is strictly more unique and stays valid there.
-//
-// Because an instance mirrors the base's structure/order, running this SAME
-// deterministic walk over the base side and every variant side yields
-// identical id sequences, so flattenElementsById becomes collision-free and
-// the diff aligns element-for-element.
+// Element ids unique across the whole side tree, not only per array as
+// `validate` asks: the variant diff flattens a side by id, so a nested repeat
+// would drop an element from the diff and apply its delta to both. An
+// instance mirrors its base's structure and order, so this deterministic walk
+// gives the base side and every variant side the same ids and the diff aligns
+// element for element. In place, since trace entries hold the elements.
 export function uniquifyElementIdsDeep(elements: unknown[]): unknown[] {
-	const seen = new Set<string>();
-	const nextSuffix = new Map<string, number>();
-	const walk = (els: unknown[]): void => {
-		for (const raw of els) {
-			const el = raw as Record<string, unknown>;
-			const originalId = typeof el.id === "string" ? el.id : "";
-			let id = originalId;
-			if (seen.has(id)) {
-				let n = nextSuffix.get(originalId) ?? 2;
-				while (seen.has(`${originalId}_${n}`)) n += 1;
-				id = `${originalId}_${n}`;
-				nextSuffix.set(originalId, n + 1);
-			}
-			seen.add(id);
-			el.id = id;
-			for (const nested of nestedElementArrays(el)) walk(nested);
-		}
-	};
-	walk(elements);
-	return elements;
+	return uniquifyIdsDeep(elements as { id: string }[], {
+		inPlace: true,
+		nested: (el) =>
+			nestedElementArrays(el as Record<string, unknown>) as { id: string }[][],
+	});
 }

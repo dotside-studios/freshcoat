@@ -23,7 +23,7 @@ describe("reconcileFields", () => {
 		expect(out.display_name).toEqual({
 			id: "display_name",
 			format: "text",
-			title: "Display Name",
+			title: "Display name",
 			required: true,
 			source: "user",
 			default: "Aurora",

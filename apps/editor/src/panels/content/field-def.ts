@@ -1,4 +1,9 @@
-import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
+import {
+	type FieldDefinition,
+	fieldTitle,
+	sampleValues,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import {
 	FIELD_ID,
 	FIELD_FORMATS as FORMAT_IDS,
@@ -6,7 +11,6 @@ import {
 import type { EditorController } from "~/app/controller";
 import { KEY_RULE } from "~/app/copy";
 import { addField } from "~/doc/ops";
-import { humanize, sampleValues } from "~/doc/values";
 
 type FormatId = "text" | (typeof FORMAT_IDS)[number];
 
@@ -72,7 +76,7 @@ export function createField(
 	key: string,
 	format?: FieldDefinition["format"],
 ): boolean {
-	const def: FieldDefinition = { type: "string", title: humanize(key) };
+	const def: FieldDefinition = { type: "string", title: fieldTitle(key) };
 	if (format) def.format = format;
 	const result = controller.edit((t) => addField(t, key, def), {
 		scope: "base",

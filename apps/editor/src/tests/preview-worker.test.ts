@@ -1,7 +1,8 @@
 // @vitest-environment node
+
+import { sampleValues } from "@freshcoat-js/coatfile";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import { sampleValues } from "~/doc/values";
 import { type LiveRequest, renderLiveFrame } from "~/render/live-frame";
 import {
 	createWorkerBackend,

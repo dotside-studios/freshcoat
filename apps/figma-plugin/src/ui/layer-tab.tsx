@@ -19,6 +19,7 @@ import {
 	type Symbology,
 	symbologyLabel,
 } from "@freshcoat-js/coatfile";
+import { fieldTitle } from "@freshcoat-js/coatfile/fields";
 import {
 	fieldKeyFrom,
 	renameToken,
@@ -41,7 +42,6 @@ import {
 	DEFAULT_SYMBOLOGY,
 	parseBarcodeLayerName,
 } from "~/lib/figma/transpiler/barcode-name";
-import { titleCase } from "~/lib/figma/transpiler/fields";
 import type { SelectionDetail } from "~/shared/protocol";
 import {
 	byPropertyOrder,
@@ -200,7 +200,7 @@ export function LayerTab(): JSX.Element {
 
 	const header = (
 		<SectionTitle
-			action={<Badge>{titleCase(detail.nodeType.toLowerCase())}</Badge>}
+			action={<Badge>{fieldTitle(detail.nodeType.toLowerCase())}</Badge>}
 		>
 			{detail.name}
 		</SectionTitle>
@@ -264,7 +264,7 @@ export function LayerTab(): JSX.Element {
 				nodeId: detail.nodeId,
 				bind: { [property]: `{{${id}}}` },
 				fields: [
-					{ id, format, title: titleCase(id), required: true, source: "user" },
+					{ id, format, title: fieldTitle(id), required: true, source: "user" },
 				],
 				renames: [],
 				removedIds: [],
@@ -414,7 +414,7 @@ export function LayerTab(): JSX.Element {
 			bind: { ...detail.bind, [property]: `{{${id}}}` },
 			fields: [
 				...detail.fields.map((f) => f.meta),
-				{ id, format, title: titleCase(id), required: true, source: "user" },
+				{ id, format, title: fieldTitle(id), required: true, source: "user" },
 			],
 			renames: [],
 			removedIds: [],

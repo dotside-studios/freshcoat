@@ -306,7 +306,7 @@ describe("buildFieldMeta", () => {
 		expect(buildFieldMeta({ id: "display_name", format: "text" })).toEqual({
 			id: "display_name",
 			format: "text",
-			title: "Display Name",
+			title: "Display name",
 			required: true,
 			source: "user",
 		});

@@ -9,12 +9,12 @@ import {
 } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { treeRow } from "@freshcoat-js/ui/tree";
+import { readsDataset } from "@freshcoat-js/workspace";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
 import { COMMAND_BY_ID } from "~/app/commands";
 import { useController } from "~/app/context";
 import { TEMPLATE_SETUP } from "~/app/copy";
-import { readsDataset } from "~/binding/binding";
 import { PRESETS } from "~/doc/new-document";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";

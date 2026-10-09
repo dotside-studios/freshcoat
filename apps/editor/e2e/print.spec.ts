@@ -140,8 +140,10 @@ test("a printing PNG export carries the finish, and the report says so", async (
 	await openExportWithPreset(page);
 
 	const plain = await exportZip(page);
-	expect(plain.report[0]).toBe("file,record,side,status,error,print,gamut");
-	expect(plain.report.slice(1).every((l) => l.endsWith(",ok,,off,"))).toBe(
+	expect(plain.report[0]).toBe(
+		"file,record,side,status,error,print,gamut,unfilled",
+	);
+	expect(plain.report.slice(1).every((l) => l.endsWith(",ok,,off,,"))).toBe(
 		true,
 	);
 

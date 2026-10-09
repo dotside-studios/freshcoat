@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 import type { Template } from "@freshcoat-js/coatfile";
-import { approxEngine, bytesToBase64, compile } from "@freshcoat-js/coatfile";
+import {
+	approxEngine,
+	bytesToBase64,
+	compile,
+	sampleValues,
+} from "@freshcoat-js/coatfile";
 import { resolveLayout } from "@freshcoat-js/engine";
 import { collectGeometry, type LayerGeometry } from "../doc/geometry";
 import { buildPreview } from "../doc/preview";
-import { sampleValues } from "../doc/values";
 
 export const PNG_BYTES = new Uint8Array([
 	137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,

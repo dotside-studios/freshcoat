@@ -5,18 +5,17 @@
 // too large for a link is downloaded as a `.coat` instead, and Freshcoat opens
 // on `#open=1`, pointing at its "Open file…" button for that file.
 //
-// The editor decodes this format with its own copy of the inverse (Freshcoat
-// cannot import from here); the two are held together by checked-in fixtures
-// each side decodes.
+// The link format itself lives in `@freshcoat-js/coatfile/handoff`.
 
 import type { Template } from "@freshcoat-js/coatfile";
-import {
-	base64ToBytes,
-	bytesToBase64,
-	subtleSha256,
-} from "@freshcoat-js/coatfile/assets";
+import { subtleSha256 } from "@freshcoat-js/coatfile/assets";
 import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat-js/coatfile/coat";
-import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
+import {
+	encodeHandoff,
+	HANDOFF_MAX_CHARS,
+	isHandoffOrigin,
+	isLoopbackHost,
+} from "@freshcoat-js/coatfile/handoff";
 // js-sha256 where crypto.subtle is unavailable, as in the plugin iframe (non-secure context).
 import { sha256 } from "js-sha256";
 import type { UiToMain } from "~/shared/protocol";
@@ -42,36 +41,12 @@ export function coatBlob(bytes: Uint8Array): Blob {
 	});
 }
 
-/** The longest `coat` value sent as a link. Chromium accepts URLs up to 2 MB;
- *  this leaves room for the address and for browsers that allow less. */
-export const HANDOFF_MAX_CHARS = 1_500_000;
-
 export const TOO_LARGE_MESSAGE =
 	"Too large for a link. Open the downloaded file in Freshcoat";
-
-/** Template JSON as the `coat` fragment value: raw deflate at level 9, then
- *  base64url without padding. */
-export function encodeHandoff(json: string): string {
-	const deflated = deflateSync(strToU8(json), { level: 9 });
-	return bytesToBase64(deflated)
-		.replace(/\+/g, "-")
-		.replace(/\//g, "_")
-		.replace(/=+$/, "");
-}
-
-/** The inverse of `encodeHandoff`. The editor has its own; this one exists so
- *  the plugin's tests can prove the encoder alone. */
-export function decodeHandoff(data: string): string {
-	const b64 = data.replace(/-/g, "+").replace(/_/g, "/");
-	const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-	return strFromU8(inflateSync(base64ToBytes(padded)));
-}
 
 export type AddressCheck =
 	| { ok: true; base: string }
 	| { ok: false; reason: string };
-
-const LOOPBACK = new Set(["localhost", "127.0.0.1"]);
 
 /**
  * Checks a Freshcoat address and returns it as the base the editor paths hang
@@ -88,15 +63,18 @@ export function checkFreshcoatAddress(address: string): AddressCheck {
 	} catch {
 		return { ok: false, reason: "Not a web address" };
 	}
-	const local = LOOPBACK.has(url.hostname);
-	if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) {
+	if (!isHandoffOrigin(url)) {
+		const bare = new URL(url.href);
+		bare.username = "";
+		bare.password = "";
+		if (isHandoffOrigin(bare))
+			return { ok: false, reason: "Leave the sign-in out of the address" };
 		return {
 			ok: false,
-			reason: local ? "Use an http or https address" : "Use an https address",
+			reason: isLoopbackHost(url.hostname)
+				? "Use an http or https address"
+				: "Use an https address",
 		};
-	}
-	if (url.username || url.password) {
-		return { ok: false, reason: "Leave the sign-in out of the address" };
 	}
 	const path = url.pathname.replace(/\/+$/, "").replace(/\/edit$/, "");
 	return { ok: true, base: `${url.origin}${path}` };

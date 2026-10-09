@@ -308,6 +308,32 @@ keys without changing anything.
 Hashing defaults to `crypto.subtle`, which exists only in a secure context. A
 Figma plugin's iframe is not one, so the plugin passes its own `sha256`.
 
+## Hand-off links
+
+`./handoff` is the format the Figma plugin uses to open a template in Studio
+without a server: `<address>/edit#coat=<data>`, where `data` is the template
+JSON, raw-deflated at level 9 and base64url-encoded without padding. The
+fragment never reaches a server.
+
+```ts
+import {
+	decodeHandoff,
+	encodeHandoff,
+	HANDOFF_MAX_CHARS,
+	isHandoffOrigin,
+} from "@freshcoat-js/coatfile/handoff";
+
+const data = encodeHandoff(JSON.stringify(template));
+if (data.length <= HANDOFF_MAX_CHARS) open(`${base}/edit#coat=${data}`);
+
+const read = decodeHandoff(data); // { ok: true, json } or { ok: false, reason }
+```
+
+`decodeHandoff` refuses data that inflates past `HANDOFF_MAX_JSON_BYTES`
+(64 MB). `isHandoffOrigin(url)` accepts https anywhere, or http on `localhost`
+and `127.0.0.1`, with no sign-in in the address. Its only dependency is
+`fflate`.
+
 ## Format versions
 
 `FORMAT_VERSION` is what a writer stamps; `formatVersionStatus(v)` says whether
@@ -369,7 +395,16 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 
 - `healElementIds` suffixes ids that repeat within a frame. `validate` rejects
   those, and a design with three layers named "Vector" produces three elements
-  called `Vector` — so this is the common case, not the exotic one.
+  called `Vector` — so this is the common case, not the exotic one. It renames
+  only the top-level repeats `validate` refuses; `{ deep: true }` also renames
+  repeats anywhere in a side's tree.
+- `uniquifyElementIdsDeep(elements, options)` is the walk behind it: the first
+  occurrence keeps its id and later ones get the next free suffix, depth
+  first with a mask's shape before its content, so the same tree always gets
+  the same ids. `separator` is `_` (`Vector_2`, the default) or `-`
+  (`title-2`), `fromStem` counts on from a numbered id (`title-2` to
+  `title-3`), `used` seeds and collects the ids taken, and `inPlace` renames
+  the elements themselves. `nextFreeId(base, isTaken, options)` picks one id.
 
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
@@ -794,6 +829,26 @@ and workspace column checks enforce. It compiles with the `u` flag, so
 `u`, such as `^\#\d+$` or `^[\w-.]+$`, compiles without flags instead. A
 pattern invalid in both modes imposes no constraint, and the editor flags it as
 not a valid regular expression.
+
+## Fields a template reads
+
+`./fields` (also on the main entry) answers which fields a design uses, with
+no runtime dependency beyond the mustache parser.
+
+- `elementFieldRefs(element)` lists the fields one element reads itself:
+  `{{tokens}}` in its own properties (text, image, QR and barcode sources,
+  colors) and the fields its `visibleWhen` tests. What it holds is left out.
+- `templateFieldRefs(template)` lists every field the template reads: each
+  side's background and elements, nested frame and mask children, and each
+  variant's overrides (`variantFieldRefs`). `visibilityFieldRefs` lists only
+  the fields a `visibleWhen` tests.
+- `sampleValues(template)` is the declared defaults plus a stand-in for every
+  blank field (`PLACEHOLDER_IMAGE` for a photo), so a template renders
+  complete. A visibility field whose default is empty stays empty.
+- `fieldTitle(id)` names a field in sentence case: `first_name` and
+  `firstName` read "First name".
+- `isSystemField(id, field)` is true for a field a pipeline fills rather
+  than a person: `readOnly`, `x-source: "system"` or an id starting `$$`.
 
 ## Conditional visibility
 

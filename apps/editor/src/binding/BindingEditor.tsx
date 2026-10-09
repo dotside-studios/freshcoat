@@ -9,16 +9,10 @@ import type {
 	FieldSource,
 	VariantSource,
 } from "@freshcoat-js/workspace";
-import { useMemo } from "react";
-import { useController } from "~/app/context";
-import { EMPTY, VARIANT_EXPORT } from "~/app/copy";
-import { useEditor } from "~/state/hooks";
-import WarningIcon from "~icons/mingcute/warning-line";
 import {
 	imageFields,
 	readsDataset,
 	rebindDataset,
-	SOURCE_KINDS,
 	type SourceKind,
 	sourceOfKind,
 	sourceProblem,
@@ -29,7 +23,13 @@ import {
 	variantSourceOfKind,
 	withFieldSource,
 	withVariantSource,
-} from "./binding";
+} from "@freshcoat-js/workspace";
+import { useMemo } from "react";
+import { useController } from "~/app/context";
+import { EMPTY, VARIANT_EXPORT } from "~/app/copy";
+import { useEditor } from "~/state/hooks";
+import WarningIcon from "~icons/mingcute/warning-line";
+import { SOURCE_KINDS } from "./binding";
 
 const NONE = "__none__";
 

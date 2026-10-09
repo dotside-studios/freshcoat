@@ -1,5 +1,8 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
-import { hasToken, tokenIds } from "@freshcoat-js/coatfile/mustache";
+import {
+	type Element,
+	elementFieldRefs,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";
@@ -20,37 +23,6 @@ export type LayerRow = {
 	children: LayerRow[];
 };
 
-/** Whether the layer itself (not what it holds) depends on a field. */
-export function isBound(layer: Layer): boolean {
-	if ("visibleWhen" in layer && layer.visibleWhen) return true;
-	const {
-		children: _c,
-		mask: _m,
-		...own
-	} = (layer.properties ?? {}) as Record<string, unknown>;
-	return hasToken(own);
-}
-
-/** The fields the layer itself reads, through tokens or `visibleWhen`. */
-export function layerFields(layer: Layer): string[] {
-	const found = new Set<string>();
-	const scan = (value: unknown) => {
-		if (typeof value === "string")
-			for (const id of tokenIds(value)) found.add(id);
-		else if (value && typeof value === "object")
-			for (const item of Object.values(value)) scan(item);
-	};
-	const {
-		children: _c,
-		mask: _m,
-		...own
-	} = (layer.properties ?? {}) as Record<string, unknown>;
-	scan(own);
-	if ("visibleWhen" in layer && layer.visibleWhen)
-		for (const cond of [layer.visibleWhen].flat()) found.add(cond.field);
-	return [...found];
-}
-
 // Rows are reused while their element object and key are unchanged, since
 // operations share untouched subtrees.
 const cache = new WeakMap<object, LayerRow>();
@@ -65,13 +37,14 @@ function rowFor(
 	if (hit && hit.key === key && hit.kind === kind) return hit;
 	const container =
 		kind === "layer" && (element.type === "frame" || element.type === "mask");
+	const fields = elementFieldRefs(element);
 	const row: LayerRow = {
 		key,
 		id: element.id,
 		kind,
 		element,
-		bound: isBound(element),
-		fields: layerFields(element),
+		bound: fields.length > 0,
+		fields,
 		container,
 		children: children(),
 	};

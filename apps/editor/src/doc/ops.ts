@@ -15,6 +15,7 @@ import {
 	bytesToBase64,
 	checkVariants,
 	DEFAULT_VARIANT_ID,
+	elementFieldRefs,
 	FORMAT_MINOR,
 	FORMAT_VERSION,
 	formatVersionStatus,
@@ -26,6 +27,7 @@ import {
 	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
 	type VariantShellKey,
+	variantFieldRefs,
 	variantIdFor,
 	walkElements,
 } from "@freshcoat-js/coatfile";
@@ -905,28 +907,13 @@ export function removeField(t: Template, key: string): OpResult {
 /** Layer keys that read a field through a token or `visibleWhen`, plus
  *  `variant:<id>` for variant overrides that do. */
 export function fieldReferences(t: Template, field: string): string[] {
-	const token = new RegExp(`\\{\\{\\s*${field}\\s*\\}\\}`);
-	const mentions = (v: unknown): boolean => {
-		if (typeof v === "string") return token.test(v);
-		if (Array.isArray(v)) return v.some(mentions);
-		if (v && typeof v === "object") return Object.values(v).some(mentions);
-		return false;
-	};
 	const out: string[] = [];
 	t.template_data.forEach((_, side) => {
-		for (const { key, element } of walkLayers(t, side)) {
-			const {
-				children: _c,
-				mask: _m,
-				...own
-			} = element.properties as Record<string, unknown>;
-			const when = (element as Element).visibleWhen;
-			const conds = when ? (Array.isArray(when) ? when : [when]) : [];
-			if (mentions(own) || conds.some((c) => c.field === field)) out.push(key);
-		}
+		for (const { key, element } of walkLayers(t, side))
+			if (elementFieldRefs(element).includes(field)) out.push(key);
 	});
 	for (const v of t.variants ?? [])
-		if (v.overrides.some(mentions)) out.push(`variant:${v.id}`);
+		if (variantFieldRefs(v).includes(field)) out.push(`variant:${v.id}`);
 	return out;
 }
 
