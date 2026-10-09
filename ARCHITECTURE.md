@@ -94,8 +94,8 @@ for reusable APIs.
 
 ## Releases
 
-The engine, coatfile and for-print are prepared for npm publication. Generated
-manifests expose compiled ESM and declarations with concrete dependency
-versions; checked-in manifests export source for workspace development.
-UI and workspace remain internal. Figma is distributed as a plugin bundle,
+The engine, for-print, coatfile and workspace are prepared for npm
+publication. Generated manifests expose compiled ESM and declarations with
+concrete dependency versions; checked-in manifests export source for workspace
+development. UI remains internal. Figma is distributed as a plugin bundle,
 and Studio is deployed separately. See [releases](docs/releases.md).
