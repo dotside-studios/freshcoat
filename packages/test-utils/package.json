@@ -2,7 +2,7 @@
 	"name": "@freshcoat-js/test-utils",
 	"private": true,
 	"version": "0.0.0",
-	"description": "Shared test fixtures for Freshcoat packages: CanvasKit loading and vendored fonts",
+	"description": "Shared test fixtures for Freshcoat packages: CanvasKit loading, vendored fonts and image headers",
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
