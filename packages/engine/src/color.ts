@@ -165,3 +165,13 @@ const hex = (n: number) =>
 export function toHex(c: Rgba, opacity = 1): string {
 	return `#${hex(c[0])}${hex(c[1])}${hex(c[2])}${hex(clamp(c[3] * opacity, 0, 1) * 255)}`;
 }
+
+/** The colour `t` of the way from `a` to `b`, blended in sRGB. */
+export function mixColor(a: Rgba, b: Rgba, t: number): Rgba {
+	return [
+		a[0] + (b[0] - a[0]) * t,
+		a[1] + (b[1] - a[1]) * t,
+		a[2] + (b[2] - a[2]) * t,
+		a[3] + (b[3] - a[3]) * t,
+	];
+}

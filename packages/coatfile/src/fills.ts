@@ -5,6 +5,7 @@
 import {
 	linearGradientAngle,
 	linearGradientPoints,
+	mixColor,
 	PATTERN_DEFAULTS,
 	parseColor,
 	toHex,
@@ -193,12 +194,7 @@ export function colorAt(stops: readonly GradientStop[], offset: number): string 
 	const cb = parseColor(b.color);
 	if (!ca || !cb || ca === "none" || cb === "none")
 		return t < 0.5 ? a.color : b.color;
-	const hex = toHex([
-		ca[0] + (cb[0] - ca[0]) * t,
-		ca[1] + (cb[1] - ca[1]) * t,
-		ca[2] + (cb[2] - ca[2]) * t,
-		ca[3] + (cb[3] - ca[3]) * t,
-	]);
+	const hex = toHex(mixColor(ca, cb, t));
 	return hex.endsWith("ff") ? hex.slice(0, 7) : hex;
 }
 
