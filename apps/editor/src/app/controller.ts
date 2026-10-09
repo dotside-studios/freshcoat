@@ -247,7 +247,20 @@ export class EditorController {
 	}
 
 	dispatch(action: Action): void {
+		const before = this.store.getState();
 		this.store.dispatch(action);
+		if (action.type === "setSection" || action.type === "setRecord")
+			this.followRecord(before);
+	}
+
+	/** Brings Edit's preview to the current record when Edit comes into view
+	 *  or the record moves while it shows, and its dataset has the record. */
+	private followRecord(before: EditorState): void {
+		const s = this.state;
+		if (s.section !== "edit" || !s.recordId) return;
+		if (s.recordId === s.previewRecordId) return;
+		if (before.section === "edit" && before.recordId === s.recordId) return;
+		this.previewRecord(s.recordId);
 	}
 
 	// ── Editing ──────────────────────────────────────────────────────────────
@@ -772,6 +785,25 @@ export class EditorController {
 	/** Shows and edits `id`, or Default with undefined. */
 	setVariant(id: string | undefined): void {
 		this.refitAfter(() => this.dispatch({ type: "setVariant", variantId: id }));
+	}
+
+	/** Shows the side `by` sides on, wrapping round. */
+	stepSide(by: number): void {
+		const count = this.base?.template_data.length ?? 0;
+		if (count < 2) return;
+		const side = (((this.state.side + by) % count) + count) % count;
+		this.dispatch({ type: "setSide", side });
+	}
+
+	/** Shows the variant `by` on from the active one, Default first,
+	 *  wrapping round. */
+	stepVariant(by: number): void {
+		const t = this.base;
+		const ids = [undefined, ...(t?.variants ?? []).map((v) => v.id)];
+		if (!t || ids.length < 2) return;
+		const at = ids.indexOf(activeVariantId(t, this.state.variantId));
+		const next = (((at + by) % ids.length) + ids.length) % ids.length;
+		this.setVariant(ids[next]);
 	}
 
 	/** Runs `change` and fits the view when it changed the canvas's size. */
@@ -1398,6 +1430,28 @@ export class EditorController {
 				variantId: variantFor(t, binding, dataset, record),
 			}),
 		);
+	}
+
+	/** The records the Edit preview steps through: the bound dataset's. */
+	previewRecords(): readonly { id: string }[] {
+		const id = activeSlot(this.state)?.binding?.datasetId;
+		return (
+			this.state.workspace?.datasets.find((d) => d.id === id)?.records ?? []
+		);
+	}
+
+	/** Steps the Edit preview `by` records, from the current record when
+	 *  nothing is previewed yet. */
+	stepRecord(by: number): void {
+		const records = this.previewRecords();
+		if (records.length === 0) return;
+		const s = this.state;
+		const from = records.findIndex(
+			(r) => r.id === (s.previewRecordId ?? s.recordId),
+		);
+		const at = from < 0 ? 0 : s.previewRecordId === null ? from : from + by;
+		const next = records[Math.max(0, Math.min(records.length - 1, at))];
+		if (next) this.previewRecord(next.id);
 	}
 
 	switchTemplate(id: string): void {

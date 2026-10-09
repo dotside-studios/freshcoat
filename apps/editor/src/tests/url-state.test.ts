@@ -392,7 +392,7 @@ describe("the view of a workspace", () => {
 		store.dispatch({ type: "setSection", section: "data" });
 		expect(urlOf(store.getState())).toBe("/data?side=back");
 		store.dispatch({ type: "setSection", section: "export" });
-		store.dispatch({ type: "setExportRecord", id: "r_a2" });
+		store.dispatch({ type: "setRecord", id: "r_a2" });
 		expect(urlOf(store.getState())).toBe("/export?side=back&record=r_a2");
 		store.dispatch({ type: "switchTemplate", id: second });
 		store.dispatch({ type: "setActiveDataset", id: "b" });

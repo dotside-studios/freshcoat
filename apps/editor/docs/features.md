@@ -66,6 +66,27 @@ the records, and **Export** turns templates and records into files.
     yes/no, date, color, URL, email, image) and the records that follow it.
   - A virtualized grid edits cells in place, with an editor per type, and
     marks every value the schema rejects.
+  - Mod+C copies the focused cell, or every column of the selected records,
+    as tab-separated text. Mod+V pastes a block copied from a spreadsheet
+    from the focused cell down the shown records, adding records past the
+    last one; each value is parsed by its column's type. One value pasted
+    into a selected record fills every selected record. A paste is one undo
+    step.
+  - Mod+D fills down: the first selected record's value in the focused
+    column goes into the other selected records, or with fewer than two
+    selected, the value above goes into the focused cell.
+  - With several records selected, the Record tab reads "Set value for N
+    selected": one form per column, showing the value they share or Mixed,
+    that sets a value in all of them as one undo step.
+  - Find and replace (Mod+F, or Mod+H to start at Replace) works on the
+    records shown, in every column or one, optionally matching case. It
+    counts the matches and the records holding them; Replace all parses
+    each changed value by its column's type and is one undo step.
+  - Beside the status filter, column filters narrow the records by one
+    column containing a value, equaling it or being empty, ignoring case.
+    Each is a chip that opens to change it; every filter must match.
+  - Each dataset keeps its search, filters, sort and selection while the
+    workspace is open, through switching datasets and sections.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.
@@ -80,7 +101,7 @@ the records, and **Export** turns templates and records into files.
     records to those it flagged.
   - Photos: see [Photos](#photos).
   - Import and export the schema as JSON Schema 2020-12, and the records as
-    CSV, Excel or JSON.
+    CSV, Excel or JSON (Download data in the toolbar).
 - **Export:**
   - Presets name a template, which records (all, pending, failed or
     selected), which sides, the size (the template's, or each record's
@@ -94,6 +115,9 @@ the records, and **Export** turns templates and records into files.
   - A Records tab beside the filmstrip lists each record's status (pending,
     exported, failed, skipped), which can be set by hand; an export marks
     what it made.
+  - The filmstrip or Records tab, the status filter, what the filmstrip
+    shows, the list's selection and the settings tab stay as they were while
+    another section shows.
   - Rendering runs in a pool of module workers, each with its own CanvasKit.
     The job bar shows progress, items per second, the time left, bytes
     written and where they go, and after a job "Show failed", "Retry
@@ -111,6 +135,9 @@ the records, and **Export** turns templates and records into files.
   the import toast. Required fields left unfilled are counted on the binding,
   under the record stepper and beside the Export button. In Edit, the record
   stepper previews real records on the canvas.
+- **Current record:** Edit's preview, Data's focused record and Export's
+  preview share one current record. Moving to a record in one section moves
+  the others to it when their dataset has it.
 - **Canvas:**
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
@@ -122,7 +149,12 @@ the records, and **Export** turns templates and records into files.
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector.
-  - Pan and zoom with the wheel, pinch, Space-drag or the keyboard.
+  - Pan and zoom with the wheel, pinch, Space-drag or the keyboard. The
+    status bar's zoom takes a typed percentage, and its menu zooms to fit, to
+    the selection or to a set level; Mod+0 is 100%.
+  - The side's name above the artboard and in the status bar is a menu of
+    the sides, so they switch with the panels closed; Alt+, and Alt+. step
+    through them.
   - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
     They follow the pan and zoom, and mark the selection's extent with its
     edges' positions.
@@ -143,7 +175,7 @@ the records, and **Export** turns templates and records into files.
     and filled when closed, whose path data the inspector edits.
   - Boolean operations: select two or more sibling rectangles, ellipses or
     vectors and choose Union, Subtract, Intersect or Exclude selection from
-    the Object menu, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
+    Object > Boolean, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
     X. The shapes become one vector layer in the bottom-most one's place,
     with its fill, stroke and effects, as in Figma: Subtract takes the upper
     shapes away from the bottom-most. Each is one undo step. Rotation and
@@ -153,16 +185,25 @@ the records, and **Export** turns templates and records into files.
     and a dot per stop. Shift snaps directions to 15 degrees, and a click on
     the line adds a stop.
 - **Left panel:** Templates, Sides, Variants and Layers, top to bottom. Each
-  section's header collapses it, and the panel remembers which are collapsed;
-  collapsing one above Layers gives Layers the room.
+  section's header collapses it; collapsing one above Layers gives Layers the
+  room. Templates, Sides and Variants start collapsed while they hold one
+  entry, and once a header is toggled the panel remembers that choice.
 - **Layers:**
   - One side is shown at a time; the Sides list switches between them.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer.
+  - The filter in the Layers header narrows the tree to layers whose name or
+    type matches, with the frames that hold them expanded.
 - **Inspector:**
-  - Geometry, blend mode (every Figma layer mode, linear burn included) and
-    alignment.
+  - Align and boolean toolbars at the top. Align left, horizontal centers
+    and right are Alt+A, H and D; top, vertical centers and bottom are
+    Alt+W, V and S; Alt+Shift+H and Alt+Shift+V distribute. The Object menu
+    holds the same commands under Boolean, Arrange and Align and distribute.
+  - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
+    linear burn included, and corner radius), the layer type's own section,
+    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
@@ -172,7 +213,7 @@ the records, and **Export** turns templates and records into files.
     gradient fill. The canvas gradient handles follow fills only.
   - Rectangles and frames can set each corner's radius on its own. A frame
     applies its corners to its fill, its stroke and its clip.
-  - Corners, text, image, QR, barcode, vector path, frame and auto layout, mask,
+  - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to
@@ -205,6 +246,8 @@ the records, and **Export** turns templates and records into files.
   - "Try with <dataset>" steps the canvas through the bound dataset's records,
     with the binding folded below it. An unbound template picks a dataset
     there.
+    The status bar's "◀ 7/120 ▶" and Alt+[ and Alt+] step them from either
+    tab.
   - One list of fields: each row has the key, a required mark, the type and
     its sample value, typed in place. Sample values drive the render without
     touching history, and "Reset to samples" puts them back.
@@ -212,9 +255,10 @@ the records, and **Export** turns templates and records into files.
     (every `{{token}}` is rewritten) and deleted. A field that is still in use
     cannot be deleted, and the editor lists what uses it.
   - Fields a pipeline fills in are listed under "From the system".
-- **Template setup:** File > Template setup… (`Mod+Alt+,`) holds the
-  template's name, id, description, version, product, size and fonts (with
-  whether each one loaded). Saving a template that has never been named opens
+- **Template setup:** File > Template setup… (`Mod+Alt+,`), or the same
+  item in a template's context menu, holds the template's name, id,
+  description, version, product, size and fonts (with whether each one
+  loaded). Saving a template that has never been named opens
   it first as "Name this template", once for each unnamed template in a
   workspace.
 - **Issues:** the status bar's Issues button counts validation, variant,
@@ -222,7 +266,8 @@ the records, and **Export** turns templates and records into files.
   layer or variant it is about, and print and preview hints are listed without
   being counted. A save that fails validation opens it.
 - **Undo and redo:** every command has one undo step. A drag, a burst of typing
-  or a run of nudges is a single step.
+  or a run of nudges is a single step. Undo and redo are also buttons at the
+  right of the menu bar, for touch screens.
 - **SVG paste:** pasted SVG markup can become layers, an image or text.
   As layers, paths and shapes become vectors, groups frames, and clips and
   masks mask layers; embedded images become image layers, `<text>` and
@@ -230,7 +275,9 @@ the records, and **Export** turns templates and records into files.
   becomes a mask of its tiles. Anything skipped (filters, `foreignObject`,
   video, audio, external images) raises one "Some SVG features were
   skipped" toast.
-- **Keyboard:** everything has a shortcut; press `?` to list them.
+- **Keyboard:** everything has a shortcut; press `?` to list them. The list
+  has a filter, and its Canvas group covers the modifier keys for dragging
+  and clicking on the canvas.
 - **Themes:** light (the default), dark, or following the system, from
   View > Theme and remembered per browser under `freshcoat.theme`. The
   theme is set before first paint, so a dark user never sees a light flash,
@@ -505,6 +552,8 @@ reaches every variant at once.
 - **Editing in a variant:** selecting a variant makes it the one you edit.
   A bar across the top of the canvas says "Editing Speaker", with how many
   layers it changes and **Back to Default**, and the status bar names it.
+  The name in the bar and in the status bar is a menu of the variants;
+  Alt+Shift+, and Alt+Shift+. step through them, Default first.
   Changes on the canvas and in the inspector become that variant's own and
   leave Default as it was; setting a value back to Default's removes the
   change. One edit is one undo step, as anywhere else.
@@ -596,6 +645,8 @@ refreshes it.
 - **Export:** the filmstrip selects with Shift-click, Mod-click and Mod+A
   (a plain click still only previews), and the Records tab's checkboxes
   share the selection. The button reads "Export N selected".
+- With records selected in Data, Export's Records tab offers "Use N
+  selected" to make them its selection.
 - The preset is never changed: the run replaces its record filter with
   exactly the chosen ids, in dataset order. The summary and history name
 

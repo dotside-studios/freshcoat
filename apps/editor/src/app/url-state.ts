@@ -261,7 +261,7 @@ export function viewOf(state: EditorState): ViewState {
 		state.section === "edit"
 			? state.previewRecordId
 			: state.section === "export"
-				? state.exportRecordId
+				? state.recordId
 				: null;
 	return {
 		section: state.section,

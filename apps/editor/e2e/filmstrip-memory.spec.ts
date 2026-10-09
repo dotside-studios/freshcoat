@@ -137,7 +137,7 @@ async function stepFilmstrip(page: Page, dir: string) {
 	console.log(
 		`filmstrip: ${COUNT} photos stepped in ${Math.round(ms / 1000)} s (${Math.round(ms / COUNT)} ms a step), heap ${mb(baseline)} MB, after gc at most ${mb(most)} MB (+${mb(most - baseline)}), ${mb(settled)} MB at the end, ${mb(raw)} MB before gc at most`,
 	);
-	expect(await state<string>(page, "s.exportRecordId")).toBe(ids.at(-1));
+	expect(await state<string>(page, "s.recordId")).toBe(ids.at(-1));
 	await expect(page.getByTestId("export-stepper-position")).toHaveText(
 		`${COUNT} / ${COUNT}`,
 	);

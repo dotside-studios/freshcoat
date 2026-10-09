@@ -1,7 +1,6 @@
 import type { Element, LayoutChild, Template } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
 import { type ReactNode, useMemo } from "react";
@@ -17,6 +16,7 @@ import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import RotateIcon from "~icons/mingcute/anticlockwise-line";
+import { CornerFields, takesCorners } from "./CornerFields";
 import { CommitField, Marked, Pair, Row } from "./controls";
 import { isGridLayout } from "./FrameSection";
 import {
@@ -26,6 +26,7 @@ import {
 	mergeKeyOf,
 	parseGridLine,
 } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 export const BLEND_MODES = [
 	"normal",
@@ -164,7 +165,7 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 	const inGrid = inLayout && parentLayouts.every(isGridLayout);
 
 	return (
-		<PanelSection title="Layer">
+		<InspectorSection title="Layer">
 			<Pair>
 				<GeometryFields ins={ins} autoAll={autoAll} />
 				<Marked keys={["opacity"]}>
@@ -206,8 +207,9 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 					))}
 				</Select>
 			</Row>
+			{takesCorners(ins) && <CornerFields ins={ins} />}
 			{inLayout && <ResizingRows ins={ins} grid={inGrid} />}
-		</PanelSection>
+		</InspectorSection>
 	);
 }
 

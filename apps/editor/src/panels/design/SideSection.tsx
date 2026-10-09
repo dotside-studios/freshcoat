@@ -1,4 +1,3 @@
-import { PanelSection } from "@freshcoat-js/ui/panel";
 import { INSETS, TEMPLATE_SETUP } from "~/app/copy";
 import {
 	TemplateInsetField,
@@ -7,6 +6,7 @@ import {
 } from "../setup/SizeSection";
 import { Row } from "./controls";
 import type { Inspect } from "./field-helpers";
+import { InspectorSection } from "./InspectorSection";
 
 /** What Design shows with nothing selected: the side itself, and the
  *  template's size, which every side shares. */
@@ -15,7 +15,7 @@ export function SideSection({ ins }: { ins: Inspect }) {
 	const name = t.template_data[ins.side]?.name ?? "";
 	const sized = useSizedVariant() !== undefined;
 	return (
-		<PanelSection title="Side">
+		<InspectorSection title="Side">
 			<Row label="Name">
 				<span className="truncate text-fc-text">{name}</span>
 			</Row>
@@ -39,6 +39,6 @@ export function SideSection({ ins }: { ins: Inspect }) {
 					/>
 				</Row>
 			))}
-		</PanelSection>
+		</InspectorSection>
 	);
 }

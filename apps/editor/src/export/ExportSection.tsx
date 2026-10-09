@@ -30,8 +30,10 @@ import { BINDING, EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { unfilledRequired } from "~/binding/binding";
+import { selectedInView } from "~/data/gallery-model";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
+import type { ExportView } from "~/state/store";
 import { workspaceOf } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
 import CloseIcon from "~icons/mingcute/close-line";
@@ -179,16 +181,25 @@ export function ExportSection() {
 	const narrow = useNarrow();
 	const [rail, setRail] = useRail();
 	const [overlay, setOverlay] = useState<"presets" | "settings" | null>(null);
-	const [filter, setFilter] = useState<StatusFilter>("all");
-	const [scope, setScope] = useState<FilmstripScope>("export");
-	const [tab, setTab] = useState<"filmstrip" | "records">("filmstrip");
-	const [settingsTab, setSettingsTab] = useState<SettingsTab>("content");
+	const {
+		filter,
+		scope,
+		tab,
+		settingsTab,
+		selection: listSelection,
+	} = useEditor((s) => s.exportView);
+	const setView = (view: Partial<ExportView>) =>
+		controller.dispatch({ type: "setExportView", view });
+	const setFilter = (filter: StatusFilter) => setView({ filter });
+	const setScope = (scope: FilmstripScope) => setView({ scope });
+	const setTab = (tab: ExportView["tab"]) => setView({ tab });
+	const setSettingsTab = (settingsTab: SettingsTab) => setView({ settingsTab });
+	const setListSelection = (selection: string[]) => setView({ selection });
 	const [chosenMode, setChosenMode] = useState<PreviewMode>("output");
 	const [split, setSplit] = useState(0.5);
-	const [listSelection, setListSelection] = useState<string[]>([]);
-	const previewId = useEditor((s) => s.exportRecordId);
+	const previewId = useEditor((s) => s.recordId);
 	const setPreviewId = (id: string | null) =>
-		controller.dispatch({ type: "setExportRecord", id });
+		controller.dispatch({ type: "setRecord", id });
 	const [previewSide, setPreviewSide] = useState<string | null>(null);
 	// The variant the preview shows under All variants, as a token; null
 	// is the record's first.
@@ -226,6 +237,13 @@ export function ExportSection() {
 		const known = new Set(dataset.records.map((r) => r.id));
 		return ids.filter((id) => known.has(id));
 	}, [preset, listSelection, dataset]);
+	const dataView = useEditor((s) =>
+		dataset ? s.dataViews[dataset.id] : undefined,
+	);
+	const dataSelection = useMemo(
+		() => (dataset ? selectedInView(dataset, dataView) : NONE),
+		[dataset, dataView],
+	);
 	const onSelectionChange = (ids: string[]) => {
 		if (preset?.records === "selected")
 			controller.dispatch({
@@ -822,6 +840,7 @@ export function ExportSection() {
 						previewId={currentId ?? null}
 						onPreview={pickRecord}
 						selectionIsPreset={preset.records === "selected"}
+						dataSelection={dataSelection}
 					/>
 				) : (
 					<UnboundHint onBind={showBinding} />

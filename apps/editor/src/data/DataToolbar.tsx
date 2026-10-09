@@ -164,6 +164,8 @@ export function DataToolbar({
 	onPanels,
 	foldData,
 	exportSelected,
+	findReplace,
+	columnFilters,
 }: {
 	view: RecordsView;
 	onView: (view: RecordsView) => void;
@@ -183,6 +185,8 @@ export function DataToolbar({
 	foldData: boolean;
 	/** "Export selected", shown while records are selected */
 	exportSelected?: ReactNode;
+	findReplace?: ReactNode;
+	columnFilters?: ReactNode;
 }) {
 	const filters = importIssues
 		? [...STATUS_FILTERS, IMPORT_ISSUES_FILTER]
@@ -281,6 +285,8 @@ export function DataToolbar({
 						</Menu>
 					</Popover>
 				</MenuTrigger>
+				{columnFilters}
+				{findReplace}
 			</Group>
 			<Divider />
 			<Group label="Records">
@@ -386,7 +392,7 @@ export function DataToolbar({
 						<MenuTrigger>
 							<ToolButton
 								icon={<ExportIcon />}
-								label="Download"
+								label="Download data"
 								testId="download-menu"
 								menu
 							/>
@@ -453,7 +459,7 @@ export function DataToolbar({
 							</MenuItem>
 							<SubmenuTrigger>
 								<MenuItem id="download" icon={<ExportIcon />}>
-									Download
+									Download data
 								</MenuItem>
 								<Popover placement="end top">
 									<ExportMenu actions={actions} />

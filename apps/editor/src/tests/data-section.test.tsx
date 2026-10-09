@@ -93,6 +93,29 @@ describe("Data section", { timeout: 15_000 }, () => {
 		).toBeTruthy();
 	});
 
+	it("opens on the current record and moves it with the focus", async () => {
+		controller = new EditorController();
+		controller.dispatch({
+			type: "open",
+			template: doc(),
+			fileName: "doc.coat",
+		});
+		controller.dispatch({ type: "datasetEdit", datasets: [dataset()] });
+		controller.dispatch({ type: "setRecord", id: "r_2" });
+		const user = fastUser();
+		render(
+			<ControllerProvider controller={controller}>
+				<DataSection />
+			</ControllerProvider>,
+		);
+		const panel = screen.getByTestId("record-panel");
+		expect(panel.dataset.record).toBe("r_2");
+		await user.click(
+			within(panel).getByRole("button", { name: "Next record" }),
+		);
+		expect(controller.state.recordId).toBe("r_3");
+	});
+
 	it("offers the ways to start when there are no datasets", async () => {
 		const user = setup(false);
 		expect(screen.getByTestId("data-empty")).toBeTruthy();

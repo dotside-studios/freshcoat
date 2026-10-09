@@ -5,6 +5,7 @@ import {
 import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
+import { toast } from "@freshcoat-js/ui/toast";
 import type {
 	Column,
 	ColumnType,
@@ -18,6 +19,7 @@ import {
 	type ReactNode,
 	type Ref,
 	useCallback,
+	useEffect,
 	useImperativeHandle,
 	useMemo,
 	useRef,
@@ -25,6 +27,7 @@ import {
 } from "react";
 import type { Selection, SortDescriptor } from "react-aria-components";
 import { useController } from "~/app/context";
+import { plural } from "~/app/copy";
 import { currentDataset, editDataset } from "./actions";
 import {
 	editsInline,
@@ -33,10 +36,18 @@ import {
 	STATUSES,
 	StatusCell,
 } from "./cells";
+import {
+	copyCells,
+	type PasteResult,
+	parseTsv,
+	pasteBlock,
+	pasteInto,
+} from "./clipboard";
 import { GridContext, type GridContextValue } from "./grid-context";
 import type { CellRef, GridUiStore } from "./grid-state";
 import {
 	assetMap,
+	fillDown,
 	INDEX_COLUMN,
 	NUMERIC_TYPES,
 	recordByIdMap,
@@ -290,6 +301,22 @@ export const RecordsGrid = memo(function RecordsGrid({
 		[controller, datasetId],
 	);
 
+	/** Mod+D: the first selected record's value into the other selected
+	 *  ones, or with fewer selected, the value above into the focused cell. */
+	const fillDownTo = useCallback(
+		(row: string, col: string) => {
+			const { rows, selectedIds } = latest.current;
+			let ids: readonly string[] = selectedIds;
+			if (ids.length < 2) {
+				const above = rows[rows.findIndex((r) => r.id === row) - 1];
+				if (!above) return;
+				ids = [above.id, row];
+			}
+			editDataset(controller, datasetId, (d) => fillDown(d, ids, col).dataset);
+		},
+		[controller, datasetId],
+	);
+
 	const ctx = useMemo<GridContextValue>(
 		() => ({
 			dataset,
@@ -371,6 +398,64 @@ export const RecordsGrid = memo(function RecordsGrid({
 		[coarse, focusCell, startEdit],
 	);
 
+	// Clipboard events reach the document even when the focused cell is not
+	// editable, so the grid listens there while it holds the focus.
+	useEffect(() => {
+		const inGrid = () => {
+			const el = document.activeElement;
+			return (
+				!!el &&
+				!!wrapper.current?.contains(el) &&
+				!ui.get().editing &&
+				!el.matches("input:not([type=checkbox]),textarea")
+			);
+		};
+		const onCopy = (e: ClipboardEvent) => {
+			if (!inGrid() || !e.clipboardData) return;
+			const { dataset, selectedIds } = latest.current;
+			const active = ui.get().active;
+			const ids = selectedIds.length ? selectedIds : active ? [active.row] : [];
+			const keys = selectedIds.length
+				? dataset.columns.map((c) => c.key)
+				: active
+					? [active.col]
+					: [];
+			if (ids.length === 0 || keys.length === 0) return;
+			e.preventDefault();
+			e.clipboardData.setData("text/plain", copyCells(dataset, ids, keys));
+		};
+		const onPaste = (e: ClipboardEvent) => {
+			if (!inGrid()) return;
+			const active = ui.get().active;
+			const text = e.clipboardData?.getData("text/plain") ?? "";
+			if (!active || text === "") return;
+			e.preventDefault();
+			const block = parseTsv(text);
+			const { rows, selectedIds } = latest.current;
+			const one = block.length === 1 && block[0]?.length === 1;
+			let result: PasteResult | undefined;
+			editDataset(controller, datasetId, (d) => {
+				result =
+					one && selectedIds.length > 1 && selectedIds.includes(active.row)
+						? pasteInto(d, selectedIds, active.col, block[0]?.[0] ?? "")
+						: pasteBlock(
+								d,
+								rows.map((r) => r.id),
+								active,
+								block,
+							);
+				return result.dataset;
+			});
+			if (result) pasteToast(result);
+		};
+		document.addEventListener("copy", onCopy);
+		document.addEventListener("paste", onPaste);
+		return () => {
+			document.removeEventListener("copy", onCopy);
+			document.removeEventListener("paste", onPaste);
+		};
+	}, [controller, datasetId, ui]);
+
 	const onKeyDownCapture = (e: KeyboardEvent<HTMLDivElement>) => {
 		const target = e.target as HTMLElement;
 		// Keys from popovers bubble through React but are not in the grid.
@@ -420,6 +505,12 @@ export const RecordsGrid = memo(function RecordsGrid({
 				e.stopPropagation();
 				onDeleteRows([row]);
 			}
+			return;
+		}
+		if (mod && e.code === "KeyD") {
+			e.preventDefault();
+			e.stopPropagation();
+			if (row && col) fillDownTo(row, col);
 			return;
 		}
 		if (!cellEl?.dataset.row || !cellEl.dataset.col) return;
@@ -587,3 +678,14 @@ export const RecordsGrid = memo(function RecordsGrid({
 		</GridContext.Provider>
 	);
 });
+
+function pasteToast({ cells, added, misfits, clipped }: PasteResult) {
+	if (cells <= 1 && misfits === 0 && clipped === 0) return;
+	const parts = [`Pasted ${plural(cells, "cell")}`];
+	if (added) parts.push(`${plural(added, "new record")}`);
+	if (misfits) parts.push(`${plural(misfits, "issue")}`);
+	if (clipped) parts.push(`${plural(clipped, "column")} left out`);
+	toast(parts.join(" · "), {
+		tone: misfits || clipped ? "warning" : "success",
+	});
+}

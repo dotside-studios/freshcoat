@@ -103,7 +103,7 @@ export function Row({
 	return (
 		<div
 			className={cn(
-				"grid min-h-fc-control grid-cols-[52px_minmax(0,1fr)] items-center gap-2",
+				"grid min-h-fc-control grid-cols-[56px_minmax(0,1fr)] items-center gap-2",
 				className,
 			)}
 		>

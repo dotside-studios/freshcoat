@@ -520,7 +520,31 @@ test("a failed record shows its error and opens in Export", async ({
 	await expect(error).toContainText("Font missing");
 	await error.getByRole("button", { name: "Show in Export" }).click();
 	await expect(page.getByTestId("section-export")).toBeVisible();
-	expect(await state<string>(page, "s.exportRecordId")).toBe(id);
+	expect(await state<string>(page, "s.recordId")).toBe(id);
+});
+
+test("the record focused in Data is the one Edit and Export show", async ({
+	page,
+}) => {
+	await openDataFromTemplate(page);
+	await importCsv(page);
+	await run(
+		page,
+		`const s = c.state.workspace; c.dispatch({ type: "setBinding", id: s.activeTemplateId, binding: { datasetId: s.datasets[0].id, fields: { display_name: { kind: "column", column: "display_name" } } } })`,
+	);
+	const id = (await records(page))[2]?.id as string;
+	await cell(page, id, "tier").click();
+	expect(await state<string>(page, "s.recordId")).toBe(id);
+	await page.keyboard.press(`${mod}+1`);
+	await expect.poll(() => state<string>(page, "s.previewRecordId")).toBe(id);
+	await page.keyboard.press("Alt+BracketLeft");
+	const before = (await records(page))[1]?.id as string;
+	expect(await state<string>(page, "s.recordId")).toBe(before);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(page.getByTestId("record-panel")).toHaveAttribute(
+		"data-record",
+		before,
+	);
 });
 
 /** A real JPEG of this size from the page's own encoder, with an EXIF
@@ -760,4 +784,279 @@ test("autosave keeps photos apart from the document and restores them", async ({
 	expect(
 		await state<number>(page, "s.workspace.datasets[0].assets[0].blob.size"),
 	).toBe(PNG.length);
+});
+
+const PEOPLE = `{
+	id: "d_people",
+	name: "People",
+	columns: [
+		{ key: "name", type: "text", required: true },
+		{ key: "tier", type: "text" },
+		{ key: "points", type: "integer" },
+	],
+	records: [
+		{ id: "r1", values: { name: "Ada", tier: "Gold", points: 120 }, status: "pending" },
+		{ id: "r2", values: { name: "Grace", tier: "Silver", points: 95 }, status: "pending" },
+		{ id: "r3", values: { name: "Alan", tier: "Gold" }, status: "pending" },
+	],
+	assets: [],
+}`;
+
+async function openPeople(page: Page) {
+	await openSample(page);
+	await run(page, `c.dispatch({ type: "datasetEdit", datasets: [${PEOPLE}] })`);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(cell(page, "r1", "name")).toBeVisible();
+}
+
+const values = (page: Page, key: string) =>
+	state<unknown[]>(
+		page,
+		`s.workspace.datasets[0].records.map((r) => r.values[${JSON.stringify(key)}] ?? null)`,
+	);
+
+/** Fires a clipboard event at the focused element and returns what a copy
+ *  put on the clipboard. */
+function clipboard(page: Page, type: "copy" | "paste", text = "") {
+	return page.evaluate(
+		({ type, text }) => {
+			const data = new DataTransfer();
+			if (text) data.setData("text/plain", text);
+			const target = document.activeElement ?? document.body;
+			target.dispatchEvent(
+				new ClipboardEvent(type, {
+					clipboardData: data,
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+			return data.getData("text/plain");
+		},
+		{ type, text },
+	);
+}
+
+test("cells copy and paste as tab-separated blocks, in one undo step", async ({
+	page,
+}) => {
+	await openPeople(page);
+
+	await cell(page, "r2", "tier").click();
+	expect(await clipboard(page, "copy")).toBe("Silver");
+
+	await page
+		.locator('[role=row][data-row="r1"]')
+		.getByRole("checkbox")
+		.check({ force: true });
+	await page
+		.locator('[role=row][data-row="r2"]')
+		.getByRole("checkbox")
+		.check({ force: true });
+	await cell(page, "r1", "name").click();
+	expect(await clipboard(page, "copy")).toBe(
+		"Ada\tGold\t120\nGrace\tSilver\t95",
+	);
+	await page.keyboard.press("Escape");
+
+	// A block from a spreadsheet goes in from the focused cell, adding a
+	// record past the last one; a value that does not parse is flagged.
+	await cell(page, "r2", "tier").click();
+	await clipboard(page, "paste", "Bronze\t7\r\nPlatinum\tlots\r\nNew\t3\r\n");
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Bronze", "Platinum", "New"]);
+	expect(await values(page, "points")).toEqual([120, 7, "lots", 3]);
+	await expect(page.getByTestId("data-status")).toContainText("4 records");
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+	expect(await values(page, "points")).toEqual([120, 95, null]);
+});
+
+test("Mod+D fills down from the first selected record", async ({ page }) => {
+	await openPeople(page);
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	await cell(page, "r3", "points").click();
+	await page.keyboard.press(`${mod}+d`);
+	await expect.poll(() => values(page, "points")).toEqual([120, 95, 120]);
+
+	// With one record or none selected, the value above fills the cell.
+	await page.keyboard.press("Escape");
+	await cell(page, "r2", "name").click();
+	await page.keyboard.press(`${mod}+d`);
+	await expect.poll(() => values(page, "name")).toEqual(["Ada", "Ada", "Alan"]);
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "name"))
+		.toEqual(["Ada", "Grace", "Alan"]);
+	expect(await values(page, "points")).toEqual([120, 95, 120]);
+});
+
+test("with several records selected the Record tab sets a value in all of them", async ({
+	page,
+}) => {
+	await openPeople(page);
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	const bulk = page.getByTestId("bulk-panel");
+	await expect(bulk).toContainText("Set value for 2 selected");
+	await expect(bulk.getByLabel("tier", { exact: true })).toHaveValue("Gold");
+	await expect(bulk.getByLabel("points", { exact: true })).toHaveAttribute(
+		"placeholder",
+		"Mixed",
+	);
+	await bulk.getByLabel("points", { exact: true }).fill("10");
+	await page.keyboard.press("Enter");
+	await expect.poll(() => values(page, "points")).toEqual([10, 95, 10]);
+	await bulk.getByLabel("tier", { exact: true }).fill("");
+	await bulk.getByRole("button", { name: "Set tier" }).click();
+	await expect.poll(() => values(page, "tier")).toEqual([null, "Silver", null]);
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+	expect(await values(page, "points")).toEqual([10, 95, 10]);
+});
+
+test("find and replace counts matches and replaces them in one undo step", async ({
+	page,
+}) => {
+	await openPeople(page);
+	await cell(page, "r1", "name").click();
+	await page.keyboard.press(`${mod}+f`);
+	const popover = page.getByTestId("find-replace-popover");
+	const find = popover.getByRole("textbox", { name: "Find" });
+	await expect(find).toBeFocused();
+	await find.fill("gold");
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"2 matches in 2 records",
+	);
+	await popover.getByRole("checkbox", { name: "Match case" }).click({
+		force: true,
+	});
+	await expect(page.getByTestId("find-replace-count")).toHaveText("No matches");
+	await popover.getByRole("checkbox", { name: "Match case" }).click({
+		force: true,
+	});
+
+	await page.keyboard.press(`${mod}+h`);
+	const replace = popover.getByRole("textbox", { name: "Replace" });
+	await expect(replace).toBeFocused();
+	await replace.fill("Platinum");
+	await popover.getByRole("button", { name: "Replace all" }).click();
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Platinum", "Silver", "Platinum"]);
+	await expect(page.getByTestId("find-replace-count")).toHaveText("No matches");
+
+	// Limited to one column.
+	await find.fill("a");
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"7 matches in 3 records",
+	);
+	await popover.getByRole("button", { name: /All columns/ }).click();
+	await page.getByRole("option", { name: "name" }).click();
+	await expect(page.getByTestId("find-replace-count")).toHaveText(
+		"5 matches in 3 records",
+	);
+	await page.keyboard.press("Escape");
+	await expect(popover).toBeHidden();
+	await page.keyboard.press(`${mod}+z`);
+	await expect
+		.poll(() => values(page, "tier"))
+		.toEqual(["Gold", "Silver", "Gold"]);
+});
+
+test("column filter chips narrow the records beside the status filter", async ({
+	page,
+}) => {
+	await openPeople(page);
+	await page.getByTestId("add-column-filter").click();
+	const popover = page.getByTestId("column-filter-popover");
+	await popover.getByRole("button", { name: /Column/ }).click();
+	await page.getByRole("option", { name: "tier" }).click();
+	await popover.getByRole("textbox", { name: "Value" }).fill("gold");
+	await page.keyboard.press("Enter");
+	await expect(popover).toBeHidden();
+	await expect(page.getByTestId("column-filter")).toHaveText(
+		"tier contains gold",
+	);
+	await expect.poll(() => columnTexts(page, "name")).toEqual(["Ada", "Alan"]);
+	await expect(page.getByTestId("data-status-records")).toHaveText(
+		"2 of 3 records",
+	);
+
+	await page.getByTestId("add-column-filter").click();
+	await popover.getByRole("button", { name: /Column/ }).click();
+	await page.getByRole("option", { name: "points" }).click();
+	await popover.getByRole("button", { name: /Test/ }).click();
+	await page.getByRole("option", { name: "is empty" }).click();
+	await page.keyboard.press("Escape");
+	await expect.poll(() => columnTexts(page, "name")).toEqual(["Alan"]);
+
+	await page
+		.getByRole("button", { name: "Remove filter tier contains gold" })
+		.click();
+	await page
+		.getByRole("button", { name: "Remove filter points is empty" })
+		.click();
+	await expect.poll(() => columnTexts(page, "name")).toHaveLength(3);
+});
+
+test("Data keeps its search, filters, sort and selection per dataset, and Export can use the selection", async ({
+	page,
+}) => {
+	await openPeople(page);
+	const search = page.getByRole("searchbox", { name: "Search records" });
+	await search.fill("a");
+	await page.getByRole("columnheader", { name: /^name/ }).click();
+	for (const id of ["r1", "r3"])
+		await page
+			.locator(`[role=row][data-row="${id}"]`)
+			.getByRole("checkbox")
+			.check({ force: true });
+	await expect(page.getByTestId("data-status-selected")).toHaveText(
+		"2 selected",
+	);
+
+	await page.keyboard.press(`${mod}+1`);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(search).toHaveValue("a");
+	await expect(page.getByTestId("data-status-selected")).toHaveText(
+		"2 selected",
+	);
+	await expect
+		.poll(() => columnTexts(page, "name"))
+		.toEqual(["Ada", "Alan", "Grace"]);
+
+	await page.keyboard.press(`${mod}+3`);
+	await page
+		.getByTestId("export-presets")
+		.getByRole("button", { name: "New preset" })
+		.click();
+	await page
+		.getByTestId("binding-editor")
+		.getByRole("button", { name: /Dataset/ })
+		.click();
+	await page.getByRole("option", { name: "People" }).click();
+	await page.getByRole("tab", { name: "Records" }).click();
+	const use = page.getByTestId("use-data-selection");
+	await expect(use).toHaveText("Use 2 selected");
+	await use.click();
+	await expect(use).toBeHidden();
+	await expect(page.getByTestId("export-selection")).toHaveText("2 selected");
+	await expect(
+		page
+			.getByTestId("export-records")
+			.locator('[role=row][data-row="r3"]')
+			.getByRole("checkbox"),
+	).toBeChecked();
 });
