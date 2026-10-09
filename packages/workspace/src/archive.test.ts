@@ -1,4 +1,4 @@
-import { validate } from "@freshcoat-js/coatfile";
+import { bytesToBase64, validate } from "@freshcoat-js/coatfile";
 import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	unpackTemplate,
@@ -21,7 +21,9 @@ import {
 import { jpegHeader } from "./image-fixtures";
 import { exportSize, pdfLayout } from "./plan";
 import {
+	backSha,
 	deepFreeze,
+	makePng,
 	memberCard,
 	photoPng,
 	photoSha,
@@ -826,6 +828,72 @@ describe("packTemplates", () => {
 			await unpackTemplate(zip["templates/Member card.coat"] as Uint8Array),
 		).toEqual(memberCard);
 		expect(await packTemplates(twins)).toEqual(await packTemplates(twins));
+	});
+});
+
+describe("unused assets", () => {
+	const variantPng = makePng(3, 3, [0, 128, 0]);
+	const unusedPng = makePng(5, 5, [0, 0, 255]);
+	const png = (bytes: Uint8Array) => ({
+		sha256: sha256(bytes),
+		base64: bytesToBase64(bytes),
+		contentType: "image/png" as const,
+	});
+	const carried: Workspace = {
+		...ws,
+		templates: ws.templates.map((entry, i) =>
+			i === 0
+				? {
+						...entry,
+						template: {
+							...memberCard,
+							variants: [
+								{
+									id: "gold",
+									label: "Gold Tier",
+									overrides: [
+										{
+											name: "front",
+											elements: [
+												{
+													id: "photo",
+													properties: {
+														src: `asset:${sha256(variantPng)}`,
+													},
+												},
+											],
+										},
+									],
+								},
+							],
+							assets: [
+								...(memberCard.assets ?? []),
+								png(variantPng),
+								png(unusedPng),
+							],
+						},
+					}
+				: entry,
+		),
+	};
+	const kept = [backSha, sha256(variantPng)];
+
+	it("packWorkspace drops the ones nothing references", async () => {
+		const result = await unpackWorkspace(await packed(carried));
+		if (!result.ok) throw new Error(JSON.stringify(result));
+		expect(
+			result.workspace.templates[0]?.template.assets?.map((a) => a.sha256),
+		).toEqual(kept);
+	});
+
+	it("packTemplates drops them too", async () => {
+		const zip = unzipSync(await packTemplates(carried));
+		const bytes = zip["templates/Member card.coat"];
+		if (!bytes) throw new Error(Object.keys(zip).join());
+		const template = (await unpackTemplate(bytes)) as {
+			assets: { sha256: string }[];
+		};
+		expect(template.assets.map((a) => a.sha256)).toEqual(kept);
 	});
 });
 

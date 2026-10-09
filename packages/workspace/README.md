@@ -70,7 +70,9 @@ data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
 
 Templates inside are ordinary `.coat` files: a template opened on its own
 becomes a one-template workspace, and a workspace's template can be exported
-on its own again. Editor state that is not part of the design, such as a
+on its own again. Templates are read through coatfile's `loadTemplate`,
+and written without the assets nothing in them references
+(`pruneUnusedAssets`). Editor state that is not part of the design, such as a
 template's ruler guides, stays in the manifest's template entry, so the
 template format and its renders are unchanged.
 
@@ -122,10 +124,26 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
 job is cancelled or fails.
 
+When the preset has `markExported`, `result.workspace` is the workspace with
+the job's record statuses written: `exported` with the time for records whose
+every item rendered, `failed` with the first error for the rest. The workspace
+passed in is not changed, and nothing is written for a cancelled job. Save
+`result.workspace` with `packWorkspace` to keep them. `applyJobResult` does
+the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
+`retryPreset` gives the preset that reruns a job's failed records, and
+`unwrittenRecordIds` lists the records a cancelled job left unwritten.
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
 stream.
+
+`itemRequest` builds the render request `runExportJob` sends for one item,
+with the size `itemSize` gives it, and `imagesOf` lists the photos that item
+references. `itemTemplate` returns the template laid out at the size
+`itemSize` gives an item whose size follows a photo, with `maxEdge` applied,
+so a preview shows what the export will render. Studio builds its export
+preview and printer file from these.
 
 ### Export from Node
 

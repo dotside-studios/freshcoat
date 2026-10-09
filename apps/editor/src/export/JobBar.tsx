@@ -9,6 +9,7 @@ import {
 	printFallbacks,
 	REPORT_FILE_NAME,
 	reportCsv,
+	retryPreset,
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { DialogTrigger, Dialog as RACDialog } from "react-aria-components";
@@ -32,7 +33,6 @@ import {
 	formatEta,
 	formatRate,
 	formatTime,
-	retryPreset,
 } from "./export-ui";
 
 const HISTORY_STATE = { cancelled: "Canceled", error: "Failed" } as const;

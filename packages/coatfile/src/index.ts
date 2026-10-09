@@ -107,6 +107,7 @@ export {
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
+export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
 	parseTrimValue,
 	type ResolvedStrokeTrim,
@@ -127,6 +128,7 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
+export { pruneUnusedAssets } from "./coat";
 export { healElementIds, uniquifyElementIds } from "./normalize";
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";

@@ -9,14 +9,19 @@ export {
 	summarizeGlyphs,
 } from "./glyph-preflight";
 export {
+	assetsByRef,
 	createItemRenderer,
 	type ItemRenderer,
 	type ItemRendererOptions,
 	type ItemSize,
+	imagesOf,
+	itemRequest,
 	itemSize,
+	itemTemplate,
 	type OutputFormat,
 	type RenderOutput,
 	type RenderRequest,
+	referencedAssets,
 } from "./item";
 export {
 	type AssembleExtras,
@@ -56,6 +61,7 @@ export {
 	type ExportWorkspaceResult,
 	exportWorkspace,
 	findPreset,
+	markExported,
 } from "./run";
 export {
 	BLEED_NEEDS_TEMPLATE_SIZE,
@@ -83,3 +89,10 @@ export {
 	type PartZipSinkOptions,
 	type SinkResult,
 } from "./sink";
+export {
+	applyJobResult,
+	type RecordOutcome,
+	recordOutcome,
+	retryPreset,
+	unwrittenRecordIds,
+} from "./status";

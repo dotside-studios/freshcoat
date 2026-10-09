@@ -49,7 +49,8 @@ renderer the host creates: `createItemRenderer` renders one item, and
 PDF. The pool and the destination are the host's. Studio runs items in a pool
 of workers and writes to a folder or file it asks the user for; a script calls
 `exportWorkspace`, which renders on its own thread, and can write to disk with
-`fileOutput` from `workspace/node`. Print
+`fileOutput` from `workspace/node`. Both write a job's record statuses back
+through the same `applyJobResult`, when the preset has `markExported`. Print
 correction uses `for-print` when requested.
 
 ## Dependency boundaries

@@ -14,14 +14,12 @@ import {
 	backgroundSwatch,
 	bytesToBase64,
 	checkVariants,
-	collectAssetRefs,
 	DEFAULT_VARIANT_ID,
 	FORMAT_MINOR,
 	FORMAT_VERSION,
 	formatVersionStatus,
 	hasInsets,
 	isEmptyDelta,
-	parseAssetUri,
 	resolveInsets,
 	sameJson,
 	subtleSha256,
@@ -1009,23 +1007,6 @@ export async function attachImageAsset(
 		},
 		src,
 	};
-}
-
-/** Drops carried assets nothing references, local font files included. */
-export function pruneUnusedAssets(t: Template): Template {
-	if (!t.assets) return t;
-	const used = collectAssetRefs(t);
-	for (const f of t.fonts ?? [])
-		if (f.kind === "local")
-			for (const file of f.files) {
-				const sha = parseAssetUri(file.src);
-				if (sha) used.add(sha);
-			}
-	const assets = t.assets.filter((a) => used.has(a.sha256));
-	if (assets.length === t.assets.length) return t;
-	if (assets.length > 0) return { ...t, assets };
-	const { assets: _dropped, ...rest } = t;
-	return rest as Template;
 }
 
 // ── Variants ─────────────────────────────────────────────────────────────────
