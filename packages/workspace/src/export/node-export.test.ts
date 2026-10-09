@@ -283,4 +283,32 @@ describe("export from a workspace file in Node", () => {
 		const pdf = await PDFDocument.load(await readFile(out));
 		expect(pdf.getPageCount()).toBe(2);
 	});
+
+	it("lists the characters the fonts can't draw when asked", async () => {
+		const workspace = fixture("logo.png");
+		const ben = workspace.datasets[0]?.records[1];
+		if (ben) ben.values.name = "김민준";
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		try {
+			const result = await exportWorkspace(workspace, preset, {
+				renderer,
+				fontOptions: { fetch: fontFetch },
+				checkGlyphs: true,
+			});
+			expect(result.glyphs).toEqual([
+				{
+					recordId: "r_00000002",
+					side: "front",
+					elementId: "name",
+					text: "김민준",
+					codepoints: [0xae40, 0xbbfc, 0xc900],
+				},
+			]);
+		} finally {
+			renderer.dispose();
+		}
+	});
 });

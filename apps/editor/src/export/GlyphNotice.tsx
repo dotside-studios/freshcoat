@@ -1,13 +1,13 @@
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { useState } from "react";
-import { Button as RACButton } from "react-aria-components";
-import { plural } from "~/app/copy";
-import ChevronIcon from "~icons/mingcute/right-line";
 import {
 	codepointLabel,
 	type GlyphIssue,
 	summarizeGlyphs,
-} from "./glyph-preflight";
+} from "@freshcoat-js/workspace/export";
+import { useState } from "react";
+import { Button as RACButton } from "react-aria-components";
+import { plural } from "~/app/copy";
+import ChevronIcon from "~icons/mingcute/right-line";
 
 const SHOWN_CHARS = 12;
 

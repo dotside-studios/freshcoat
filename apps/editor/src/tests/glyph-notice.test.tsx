@@ -1,4 +1,8 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import type {
+	GlyphCheckItem,
+	GlyphIssue,
+} from "@freshcoat-js/workspace/export";
 import {
 	act,
 	cleanup,
@@ -10,7 +14,6 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { GlyphNotice } from "~/export/GlyphNotice";
 import { type GlyphWorker, useGlyphPreflight } from "~/export/glyph-client";
-import type { GlyphCheckItem, GlyphIssue } from "~/export/glyph-preflight";
 import type { GlyphWorkerRequest } from "~/export/protocol";
 
 const template = { id: "badge" } as unknown as Template;

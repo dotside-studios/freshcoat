@@ -1,11 +1,12 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { PdfPage } from "@freshcoat-js/workspace";
 import type {
+	GlyphCheckItem,
+	GlyphIssue,
 	RenderOutput,
 	RenderRequest,
 } from "@freshcoat-js/workspace/export";
 import type { AssemblePdfOptions } from "@freshcoat-js/workspace/pdf";
-import type { GlyphCheckItem, GlyphIssue } from "./glyph-preflight";
 
 /** `template` is left out when it is the one the worker rendered last. */
 export type WorkerRenderRequest = Omit<RenderRequest, "template"> & {

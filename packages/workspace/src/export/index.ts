@@ -1,5 +1,14 @@
 export { createJobCaches, IMAGE_CACHE_PIXELS, type JobCaches } from "./caches";
 export {
+	checkAllGlyphs,
+	checkGlyphs,
+	codepointLabel,
+	type GlyphCheckItem,
+	type GlyphIssue,
+	type GlyphSummary,
+	summarizeGlyphs,
+} from "./glyph-preflight";
+export {
 	createItemRenderer,
 	type ItemRenderer,
 	type ItemRendererOptions,
