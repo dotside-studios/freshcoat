@@ -1,0 +1,35 @@
+{
+	"name": "@freshcoat-js/cli",
+	"private": true,
+	"version": "0.3.0",
+	"description": "The freshcoat command line: render, validate, inspect and batch-export Freshcoat templates",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dotside-studios/freshcoat.git",
+		"directory": "packages/cli"
+	},
+	"type": "module",
+	"bin": {
+		"freshcoat": "./src/bin.ts"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@freshcoat-js/coatfile": "workspace:*",
+		"@freshcoat-js/engine": "workspace:*",
+		"@freshcoat-js/workspace": "workspace:*"
+	},
+	"devDependencies": {
+		"@freshcoat-js/test-utils": "workspace:*",
+		"@types/bun": "^1.3.12",
+		"@types/node": "^26.6.3",
+		"fflate": "^0.8.3",
+		"typescript": "^5.7.2"
+	}
+}
