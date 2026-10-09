@@ -93,6 +93,11 @@ describe("shortcut matching", () => {
 		).toBe("edit.redo");
 	});
 
+	test("paste in place has its own chord", () => {
+		const e = key({ key: "V", code: "KeyV", metaKey: true, shiftKey: true });
+		expect(findCommand(e, true, false)?.id).toBe("edit.pasteInPlace");
+	});
+
 	test("Alt+[ and Alt+] step the previewed record", () => {
 		const at = (code: string) =>
 			findCommand(key({ key: "“", code, altKey: true }), true, false)?.id;

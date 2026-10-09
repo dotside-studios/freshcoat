@@ -2,10 +2,23 @@ import type { Element, InlineAsset, Template } from "@freshcoat-js/coatfile";
 import { parseAssetUri } from "@freshcoat-js/coatfile";
 import { looksLikeSvg } from "./svg";
 
-type Payload = { freshcoat: 1; elements: Element[]; assets: InlineAsset[] };
+type Origin = { x: number; y: number };
+
+/** `origins` holds each element's parent's absolute origin when copied. */
+type Payload = {
+	freshcoat: 1;
+	elements: Element[];
+	assets: InlineAsset[];
+	origins?: Origin[];
+};
 
 export type Clip =
-	| { kind: "layers"; elements: Element[]; assets: InlineAsset[] }
+	| {
+			kind: "layers";
+			elements: Element[];
+			assets: InlineAsset[];
+			origins?: Origin[];
+	  }
 	| { kind: "svg"; svg: string }
 	| { kind: "text"; text: string };
 
@@ -16,6 +29,7 @@ let memory: Payload | null = null;
 export async function writeClipboard(
 	t: Template,
 	elements: Element[],
+	origins?: Origin[],
 ): Promise<void> {
 	const shas = new Set<string>();
 	const walk = (v: unknown) => {
@@ -30,6 +44,7 @@ export async function writeClipboard(
 		freshcoat: 1,
 		elements,
 		assets: (t.assets ?? []).filter((a) => shas.has(a.sha256)),
+		...(origins ? { origins } : {}),
 	};
 	memory = payload;
 	try {
@@ -49,6 +64,7 @@ export async function readClipboard(): Promise<Clip | null> {
 				kind: "layers",
 				elements: parsed.elements,
 				assets: parsed.assets,
+				origins: parsed.origins,
 			};
 		if (memory && text === JSON.stringify(memory))
 			return { kind: "layers", ...memory };
@@ -67,6 +83,10 @@ export function parsePayload(text: string): Payload | null {
 			freshcoat: 1,
 			elements: v.elements,
 			assets: Array.isArray(v.assets) ? v.assets : [],
+			origins:
+				Array.isArray(v.origins) && v.origins.length === v.elements.length
+					? v.origins
+					: undefined,
 		};
 	} catch {
 		return null;

@@ -150,8 +150,18 @@ the records, and **Export** turns templates and records into files.
   - Selection: click, Shift-click, marquee, and double-click to drill into a
     group.
   - Move, resize and rotate, with snapping to the artboard, to other layers
-    and to guides.
+    and to guides. Several selected layers rotate together about their
+    bounding box's centre.
   - Arrow keys nudge a layer, and Esc cancels a drag.
+  - Several layers align to their combined box; one layer aligns to its
+    parent frame, or to the artboard at the top level.
+  - Paste puts the copy beside the selected layer, or inside the selected
+    frame when one frame is selected, centred in it if it would land outside.
+    Paste in place (Mod+Shift+V) keeps the copy where it was on the
+    artboard. Each paste is one undo step.
+  - Copy style (Mod+Alt+C) and Paste style (Mod+Alt+V) carry fills, stroke,
+    shadows and blurs, corner radius and, between text layers, the text
+    style, without the content. Pasting a style is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
     `{{field}}` tokens, even while a record preview fills the fields in. Esc,
@@ -200,7 +210,9 @@ the records, and **Export** turns templates and records into files.
   - One side is shown at a time; the Sides list switches between them.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
   - Hide and lock layers; neither is written to the file.
-  - A context menu on every layer.
+  - A context menu on every layer, with Arrange, Align and Boolean
+    submenus. Right-clicking a layer on the canvas selects it, unless it is
+    already selected, and opens the same menu.
   - The filter in the Layers header narrows the tree to layers whose name or
     type matches, with the frames that hold them expanded.
 - **Inspector:**

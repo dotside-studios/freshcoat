@@ -183,6 +183,22 @@ test("the context menu acts on the row it opened on", async ({ page }) => {
 	expect(await state<string[]>(page, "s.selection")).toEqual(["0/3"]);
 });
 
+test("the context menu arranges and offers booleans", async ({ page }) => {
+	await openSample(page);
+	await row(page, "0/2").click({ button: "right" });
+	await expect(
+		page.getByRole("menuitem", { name: "Attach text to path" }),
+	).toBeDisabled();
+	await page.getByRole("menuitem", { name: "Boolean" }).hover();
+	await expect(
+		page.getByRole("menuitem", { name: /Union selection/ }),
+	).toBeDisabled();
+	await page.getByRole("menuitem", { name: "Arrange" }).hover();
+	await page.getByRole("menuitem", { name: /Send to back/ }).click();
+	await settle(page);
+	expect((await ids(page))[0]).toBe("logo");
+});
+
 test("dragging a row onto a frame reparents it", async ({ page }) => {
 	await openSample(page);
 	const before = await state<{ x: number; y: number }>(

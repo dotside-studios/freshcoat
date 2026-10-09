@@ -2,7 +2,7 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { ContextMenu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { ContextMenu } from "@freshcoat-js/ui/menu";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { Tree, TreeItem } from "@freshcoat-js/ui/tree";
 import {
@@ -23,11 +23,10 @@ import {
 	type Selection,
 	useDragAndDrop,
 } from "react-aria-components";
-import { COMMAND_BY_ID, type CommandContext } from "~/app/commands";
 import { useController } from "~/app/context";
-import type { EditorController } from "~/app/controller";
 import { VARIANT_UI } from "~/app/copy";
 import { layerIcon } from "~/app/icons";
+import { LayerMenuItems } from "~/app/LayerMenu";
 import { moveElements, renameElement } from "~/doc/ops";
 import { parentKeyOf, remapKeys, walkLayers } from "~/doc/path";
 import {
@@ -151,37 +150,6 @@ function useHiddenInTree(key: string): boolean {
 
 function rowSelector(key: string) {
 	return `[data-layer-key="${key}"]`;
-}
-
-// Commands whose implementation only needs the controller.
-function runCommand(controller: EditorController, id: string) {
-	const ctx: CommandContext = {
-		controller,
-		pickFile() {},
-		pickTemplate() {},
-		pickImage() {},
-		showShortcuts() {},
-		showTemplateSetup() {},
-		confirmDiscard: (then) => then(),
-	};
-	void COMMAND_BY_ID.get(id)?.run(ctx);
-}
-
-function shortcut(id: string, which = 0): string | undefined {
-	return COMMAND_BY_ID.get(id)?.keys?.[which];
-}
-
-/** Sets every key to the same state: on if any of them is off. */
-function setAll(
-	controller: EditorController,
-	which: "hidden" | "locked",
-	keys: string[],
-) {
-	const set = controller.state[which];
-	const turnOn = keys.some((k) => !set.has(k));
-	const flip = keys.filter((k) => set.has(k) !== turnOn);
-	if (which === "hidden") controller.toggleHidden(flip);
-	else controller.toggleLocked(flip);
 }
 
 export function LayersTree({ filter = "" }: { filter?: string }) {
@@ -416,128 +384,10 @@ export function LayersTree({ filter = "" }: { filter?: string }) {
 	);
 
 	const menuTarget = menuKey ?? selection[0] ?? null;
-	const layers = controller.selectedLayers();
-	const hasLayers = layers.length > 0;
-	const allHidden =
-		selection.length > 0 &&
-		selection.every((k) => controller.state.hidden.has(k));
-	const allLocked =
-		selection.length > 0 &&
-		selection.every((k) => controller.state.locked.has(k));
-	const inVariant = marks ? controller.variantVisibility(layers) : [];
-	const allHiddenInVariant =
-		inVariant.length > 0 && inVariant.every((l) => l.hidden);
-
 	const menu = (
-		<>
-			<MenuItem
-				id="rename"
-				shortcut="F2"
-				isDisabled={!menuTarget}
-				onAction={() => menuTarget && renameCtx.start(menuTarget)}
-			>
-				Rename
-			</MenuItem>
-			<MenuItem
-				id="duplicate"
-				shortcut={shortcut("edit.duplicate")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "edit.duplicate")}
-			>
-				Duplicate
-			</MenuItem>
-			<MenuItem
-				id="delete"
-				shortcut={shortcut("edit.delete", 1)}
-				isDisabled={!hasLayers}
-				destructive
-				onAction={() => runCommand(controller, "edit.delete")}
-			>
-				Delete
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="group"
-				shortcut={shortcut("object.group")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.group")}
-			>
-				Group
-			</MenuItem>
-			<MenuItem
-				id="ungroup"
-				shortcut={shortcut("object.ungroup")}
-				isDisabled={
-					!layers.some((k) => rowIndex.get(k)?.element.type === "frame")
-				}
-				onAction={() => runCommand(controller, "object.ungroup")}
-			>
-				Ungroup
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="forward"
-				shortcut={shortcut("object.forward")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.forward")}
-			>
-				Bring forward
-			</MenuItem>
-			<MenuItem
-				id="backward"
-				shortcut={shortcut("object.backward")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "object.backward")}
-			>
-				Send backward
-			</MenuItem>
-			<MenuSeparator />
-			<MenuItem
-				id="hide"
-				shortcut={shortcut("object.hide")}
-				isDisabled={selection.length === 0}
-				onAction={() => setAll(controller, "hidden", selection)}
-			>
-				{allHidden ? "Show" : "Hide"}
-			</MenuItem>
-			<MenuItem
-				id="lock"
-				shortcut={shortcut("object.lock")}
-				isDisabled={selection.length === 0}
-				onAction={() => setAll(controller, "locked", selection)}
-			>
-				{allLocked ? "Unlock" : "Lock"}
-			</MenuItem>
-			{marks ? (
-				<MenuItem
-					id="hide-in-variant"
-					isDisabled={inVariant.length === 0}
-					onAction={() =>
-						controller.setHiddenInVariant(layers, !allHiddenInVariant)
-					}
-				>
-					{allHiddenInVariant
-						? VARIANT_UI.showIn(marks.label)
-						: VARIANT_UI.hideIn(marks.label)}
-				</MenuItem>
-			) : null}
-			<MenuSeparator />
-			<MenuItem
-				id="copy"
-				shortcut={shortcut("edit.copy")}
-				isDisabled={!hasLayers}
-				onAction={() => runCommand(controller, "edit.copy")}
-			>
-				Copy
-			</MenuItem>
-			<MenuItem
-				id="paste"
-				shortcut={shortcut("edit.paste")}
-				onAction={() => runCommand(controller, "edit.paste")}
-			>
-				Paste
-			</MenuItem>
-		</>
+		<LayerMenuItems
+			onRename={() => menuTarget && renameCtx.start(menuTarget)}
+		/>
 	);
 
 	return (
