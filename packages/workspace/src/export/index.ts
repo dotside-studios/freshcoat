@@ -1,5 +1,10 @@
 export { createJobCaches, IMAGE_CACHE_PIXELS, type JobCaches } from "./caches";
 export {
+	createFolderSink,
+	type FolderHandle,
+	type WritableFile,
+} from "./folder-sink";
+export {
 	checkAllGlyphs,
 	checkGlyphs,
 	codepointLabel,
