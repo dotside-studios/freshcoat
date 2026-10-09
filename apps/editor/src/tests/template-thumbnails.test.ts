@@ -11,7 +11,8 @@ const renderSidePng = vi.fn(async () => ({
 }));
 
 vi.mock("~/app/export-png", () => ({ renderSidePng }));
-vi.mock("~/render/fonts", () => ({
+vi.mock("@freshcoat-js/coatfile", async (load) => ({
+	...(await load<typeof import("@freshcoat-js/coatfile")>()),
 	resolveTemplateFonts: async () => ({ fonts: new Map() }),
 }));
 

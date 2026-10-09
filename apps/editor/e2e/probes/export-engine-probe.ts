@@ -1,3 +1,4 @@
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import {
 	type JobFile,
@@ -7,7 +8,7 @@ import {
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import { createWorkerPool } from "~/export/worker-pool";
-import { resolveTemplateFonts } from "~/render/fonts";
+import { fontCache } from "~/render/font-cache";
 import { membershipCard } from "~/samples/membership-card";
 
 const TIERS = ["Gold", "Silver", "Bronze"];
@@ -84,7 +85,9 @@ function pngSize(bytes: Uint8Array) {
 async function setup(ws: Workspace) {
 	const pool = createWorkerPool();
 	const t0 = performance.now();
-	const { fonts } = await resolveTemplateFonts(ws.templates[0].template);
+	const { fonts } = await resolveTemplateFonts(ws.templates[0].template, {
+		cache: fontCache,
+	});
 	await pool.init(fonts);
 	return { pool, initMs: performance.now() - t0 };
 }
