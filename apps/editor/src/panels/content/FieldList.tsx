@@ -13,11 +13,11 @@ import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import type { FieldSource } from "@freshcoat-js/workspace";
+import { readsDataset } from "@freshcoat-js/workspace";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { CONTENT } from "~/app/copy";
-import { readsDataset } from "~/binding/binding";
 import {
 	fieldReferences,
 	refuse,

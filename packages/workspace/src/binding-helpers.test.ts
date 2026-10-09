@@ -1,5 +1,4 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import type { Binding, Dataset } from "@freshcoat-js/workspace";
 import { describe, expect, test } from "vitest";
 import {
 	bindingForDataset,
@@ -16,8 +15,34 @@ import {
 	variantSourceOfKind,
 	withFieldSource,
 	withVariantSource,
-} from "~/binding/binding";
-import { doc } from "./doc-fixture";
+} from "./binding";
+import type { Binding, Dataset } from "./types";
+
+function doc(): Template {
+	return {
+		format_version: "1.1",
+		id: "doc",
+		name: "Doc",
+		width: 1000,
+		height: 600,
+		fields: {
+			type: "object",
+			properties: {
+				name: { type: "string", title: "Name", default: "Ada" },
+				title: { type: "string" },
+				show: { type: "string", format: "boolean", default: "true" },
+			},
+			required: ["name", "title"],
+		},
+		template_data: [
+			{
+				name: "front",
+				background: { id: "bg", type: "rect", properties: { fill: "#fff" } },
+				elements: [],
+			},
+		],
+	} as Template;
+}
 
 function dataset(): Dataset {
 	return {

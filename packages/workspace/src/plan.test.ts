@@ -166,6 +166,25 @@ describe("planExport", () => {
 		expect(items[0]?.values.number).toBe("0000");
 	});
 
+	it("lists the required fields a dataset binding leaves unfilled", () => {
+		expect(plan({}).every((i) => i.unfilled === undefined)).toBe(true);
+		const [entry] = ws.templates;
+		if (!entry?.binding) throw new Error("fixture has no binding");
+		const { name: _, ...fields } = entry.binding.fields;
+		const unbound: Workspace = {
+			...ws,
+			templates: [{ ...entry, binding: { ...entry.binding, fields } }],
+		};
+		const items = planExport(unbound, preset);
+		expect(items.length).toBeGreaterThan(0);
+		expect(items.every((i) => i.unfilled?.join() === "name")).toBe(true);
+		const gone = planExport({ ...ws, datasets: [] }, preset);
+		expect(gone.map((i) => i.unfilled)).toEqual([["name"], ["name"]]);
+		expect(
+			plan({ templateId: "t_plain" }).some((i) => i.unfilled !== undefined),
+		).toBe(false);
+	});
+
 	it("plans nothing for an unknown template", () => {
 		expect(plan({ templateId: "nope" })).toEqual([]);
 	});

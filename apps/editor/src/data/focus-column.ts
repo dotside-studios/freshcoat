@@ -4,9 +4,12 @@ import {
 	type Template,
 	type Vec2,
 } from "@freshcoat-js/coatfile";
-import { type Dataset, uniqueKey } from "@freshcoat-js/workspace";
+import {
+	type Dataset,
+	uniqueKey,
+	withFieldSource,
+} from "@freshcoat-js/workspace";
 import type { EditorController } from "~/app/controller";
-import { withFieldSource } from "~/binding/binding";
 import { addField } from "~/doc/ops";
 import { humanize } from "~/doc/values";
 import { produce } from "~/state/immer";

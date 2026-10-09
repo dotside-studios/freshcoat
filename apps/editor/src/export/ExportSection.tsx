@@ -14,6 +14,7 @@ import {
 	planExport,
 	resolveValues,
 	sheetSummary,
+	unfilledRequired,
 	variantFor,
 	variantsFor,
 } from "@freshcoat-js/workspace";
@@ -30,7 +31,6 @@ import { useController } from "~/app/context";
 import { BINDING, EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
-import { unfilledRequired } from "~/binding/binding";
 import { selectedInView } from "~/data/gallery-model";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
