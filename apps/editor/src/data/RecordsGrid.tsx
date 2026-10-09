@@ -15,8 +15,13 @@ import type {
 } from "@freshcoat-js/workspace";
 import {
 	assetMap,
+	copyCells,
 	fillDown,
 	NUMERIC_TYPES,
+	type PasteResult,
+	parseTsv,
+	pasteBlock,
+	pasteInto,
 	recordByIdMap,
 	recordIndexMap,
 	type SortSpec,
@@ -46,13 +51,6 @@ import {
 	STATUSES,
 	StatusCell,
 } from "./cells";
-import {
-	copyCells,
-	type PasteResult,
-	parseTsv,
-	pasteBlock,
-	pasteInto,
-} from "./clipboard";
 import { useColumnChoices } from "./column-options";
 import { GridContext, type GridContextValue } from "./grid-context";
 import type { CellRef, GridUiStore } from "./grid-state";

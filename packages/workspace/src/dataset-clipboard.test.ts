@@ -1,17 +1,15 @@
-import type { Dataset } from "@freshcoat-js/workspace";
-import {
-	fillDown,
-	sharedValues,
-	writeCells,
-} from "@freshcoat-js/workspace/dataset";
 import { describe, expect, it } from "vitest";
 import {
 	copyCells,
+	fillDown,
 	parseTsv,
 	pasteBlock,
 	pasteInto,
+	sharedValues,
 	toTsv,
-} from "~/data/clipboard";
+	writeCells,
+} from "./dataset";
+import type { Dataset } from "./types";
 
 function people(): Dataset {
 	return {

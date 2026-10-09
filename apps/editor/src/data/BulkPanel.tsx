@@ -6,7 +6,9 @@ import type { CellValue, Column, Dataset } from "@freshcoat-js/workspace";
 import {
 	assetMap,
 	displayText,
+	misfitCount,
 	NUMERIC_TYPES,
+	pastedValue,
 	sharedValues,
 	writeCells,
 } from "@freshcoat-js/workspace/dataset";
@@ -16,7 +18,6 @@ import { plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { editDataset } from "./actions";
 import { inputModeFor } from "./cells";
-import { misfitCount, pastedValue } from "./clipboard";
 
 /**
  * The Record tab while several records are selected: one form per column
