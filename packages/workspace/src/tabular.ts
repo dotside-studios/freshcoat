@@ -1,5 +1,5 @@
 import { assetForRef } from "./assets";
-import { dateToIso, isIsoDate, isoToSerial } from "./columns";
+import { isIsoDate } from "./columns";
 import type {
 	CellValue,
 	Column,
@@ -8,6 +8,11 @@ import type {
 	TableSheet,
 	WrittenTable,
 } from "./types";
+import {
+	WORKBOOK_READERS,
+	WORKBOOK_WRITERS,
+	type WorkbookCell,
+} from "./workbook/index";
 
 export type TabularErrorCode =
 	| "empty_file"
@@ -27,8 +32,7 @@ export class TabularError extends Error {
 type Sheets = { sheets: TableSheet[] };
 
 const TEXT_FORMATS = new Set(["csv", "tsv", "txt"]);
-const ZIP_FORMATS = new Set(["xlsx", "xlsm", "ods", "numbers"]);
-const WORKBOOK_FORMATS = new Set(["xlsx", "xlsm", "xls", "ods", "numbers"]);
+const ZIP_FORMATS = new Set(["xlsx", "xlsm", "ods"]);
 
 export const TABLE_EXTENSIONS: readonly string[] = [
 	"csv",
@@ -37,7 +41,7 @@ export const TABLE_EXTENSIONS: readonly string[] = [
 	"json",
 	"ndjson",
 	"jsonl",
-	...WORKBOOK_FORMATS,
+	...Object.keys(WORKBOOK_READERS),
 ];
 
 const MEDIA_TYPES: Record<TableFormat, string> = {
@@ -240,49 +244,6 @@ function readNdjson(text: string): string[][] {
 	return items.length === 0 ? [] : objectsToRows(items);
 }
 
-type XlsxModule = typeof import("xlsx");
-type WorkSheet = import("xlsx").WorkSheet;
-
-const XLSX_TARBALL = "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz";
-
-async function loadXlsx(): Promise<XlsxModule> {
-	let mod: XlsxModule & { default?: XlsxModule };
-	try {
-		mod = (await import("xlsx")) as XlsxModule & { default?: XlsxModule };
-	} catch (cause) {
-		throw new Error(
-			`Spreadsheets need the optional xlsx package: npm install ${XLSX_TARBALL}`,
-			{ cause },
-		);
-	}
-	return mod.utils ? mod : (mod.default as XlsxModule);
-}
-
-function sheetRows(XLSX: XlsxModule, sheet: WorkSheet): string[][] {
-	const ref = sheet["!ref"];
-	const data = sheet["!data"];
-	if (ref === undefined || data === undefined) return [];
-	const range = XLSX.utils.decode_range(ref);
-	const rows: string[][] = [];
-	for (let r = range.s.r; r <= range.e.r; r++) {
-		const cells = data[r];
-		const row: string[] = [];
-		for (let c = range.s.c; c <= range.e.c; c++) {
-			const cell = cells?.[c] as
-				| { t: string; v?: unknown; w?: string }
-				| undefined;
-			if (cell === undefined || cell.t === "z") row.push("");
-			else if (cell.t === "d" && cell.v instanceof Date) {
-				row.push(dateToIso(cell.v) ?? cell.w ?? "");
-			} else if (cell.t === "d" && typeof cell.v === "string") {
-				row.push(cell.v.slice(0, 10));
-			} else row.push(cell.w ?? cellText(cell.v));
-		}
-		rows.push(row);
-	}
-	return rows;
-}
-
 /**
  * The sheets of a table file, each as a matrix of strings. The extension picks
  * the reader. Rejects with a `TabularError`: `empty_file` when there are no
@@ -311,29 +272,22 @@ export async function readTable(
 							rows: splitDelimited(text, ext === "tsv" ? "\t" : undefined),
 						},
 					];
-	} else if (WORKBOOK_FORMATS.has(ext)) {
+	} else if (WORKBOOK_READERS[ext]) {
 		if (typeof input === "string") {
 			throw new TabularError("invalid_file", `A .${ext} file is binary`);
 		}
-		// SheetJS reads nearly any bytes as some kind of sheet, so a file that
-		// names a zip-based format has to be one.
 		if (ZIP_FORMATS.has(ext) && !(input[0] === 0x50 && input[1] === 0x4b)) {
 			throw new TabularError("invalid_file", `Not a .${ext} file`);
 		}
-		const XLSX = await loadXlsx();
-		let wb: import("xlsx").WorkBook;
+		const codec = await WORKBOOK_READERS[ext]();
 		try {
-			wb = XLSX.read(input, { type: "array", cellDates: true, dense: true });
+			sheets = await codec.read(input, ext);
 		} catch (err) {
 			throw new TabularError(
 				"invalid_file",
 				err instanceof Error ? err.message : String(err),
 			);
 		}
-		sheets = wb.SheetNames.map((name) => ({
-			name,
-			rows: sheetRows(XLSX, wb.Sheets[name] as WorkSheet),
-		}));
 	} else {
 		throw new TabularError(
 			"unsupported_format",
@@ -413,29 +367,31 @@ export function sheetName(name: string): string {
 	return clean === "" ? "Sheet1" : clean;
 }
 
-async function xlsxBytes(dataset: Dataset): Promise<Uint8Array> {
-	const XLSX = await loadXlsx();
+async function workbookBytes(
+	dataset: Dataset,
+	format: TableFormat,
+): Promise<Uint8Array> {
+	const load = WORKBOOK_WRITERS[format];
+	const codec = load && (await load());
+	if (!codec?.write) throw new Error(`No workbook writer for ${format}`);
 	const header = dataset.columns.map((c) => c.key);
 	const body = dataset.records.map((record) =>
-		dataset.columns.map((column) => {
+		dataset.columns.map((column): WorkbookCell => {
 			const value = record.values[column.key];
 			if (value === null || value === undefined) return null;
-			if (column.type === "date" && typeof value === "string") {
-				const serial = isIsoDate(value) ? isoToSerial(value) : null;
-				if (serial !== null) return { t: "n", v: serial, z: "yyyy-mm-dd" };
-			}
+			if (
+				column.type === "date" &&
+				typeof value === "string" &&
+				isIsoDate(value)
+			)
+				return new Date(`${value}T00:00:00Z`);
 			return exportValue(dataset, column, value);
 		}),
 	);
-	const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
-	const wb = XLSX.utils.book_new();
-	XLSX.utils.book_append_sheet(wb, sheet, sheetName(dataset.name));
-	const out = XLSX.write(wb, {
-		type: "array",
-		bookType: "xlsx",
-		compression: true,
-	}) as ArrayBuffer;
-	return new Uint8Array(out);
+	return codec.write(
+		{ name: sheetName(dataset.name), rows: [header, ...body] },
+		format,
+	);
 }
 
 /** The dataset as a file. The header row is the column keys. */
@@ -463,7 +419,7 @@ export async function writeTable(
 			);
 			break;
 		case "xlsx":
-			bytes = await xlsxBytes(dataset);
+			bytes = await workbookBytes(dataset, format);
 			break;
 	}
 	return { bytes, mediaType: MEDIA_TYPES[format], extension: format };

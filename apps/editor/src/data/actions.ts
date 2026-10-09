@@ -113,7 +113,7 @@ export function pickFiles(opts: {
 }
 
 export const TABLE_ACCEPT =
-	".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.ods,.numbers,.json,.ndjson,.jsonl";
+	".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.ods,.json,.ndjson,.jsonl";
 
 export const PHOTO_ACCEPT = "image/*,.zip";
 

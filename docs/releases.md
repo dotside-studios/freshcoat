@@ -55,11 +55,8 @@ workspace subpath and runs a small export job that writes a ZIP in Node. It
 also checks that the tarballs include license files and exclude TypeScript
 source.
 
-Workspace declares `xlsx` as an optional peer dependency. SheetJS publishes
-current releases only from its own CDN, and the npm registry's `xlsx` is an
-older release with known vulnerabilities, so the release check runs without it
-and confirms that `./tabular` reports the missing package for spreadsheet
-formats.
+Every release dependency installs from the npm registry. The workspace check
+also writes and reads back an `.xlsx` file.
 
 The schema URL includes the npm package version, independently of the template
 format version. Regenerate it whenever the package version changes.

@@ -83,7 +83,7 @@ covers shared checks and pull requests.
   an export can produce every record in every variant.
 - **Fields and data:** a template's fields bind to a dataset's columns, a
   fixed value or a pattern. Datasets have typed columns and import from CSV,
-  TSV, Excel, `.ods`, `.numbers`, JSON and NDJSON through a mapping wizard.
+  TSV, Excel, `.ods`, JSON and NDJSON through a mapping wizard.
   Step through real records on the canvas while you design.
 - **Photos:** import hundreds of camera photos from files, zips or folders,
   browse them in a gallery, export each one watermarked in the variant that

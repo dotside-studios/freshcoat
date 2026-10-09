@@ -30,7 +30,7 @@ be published separately. They are not listed below.
 
 ## Packages
 
-51 packages: 34 MIT, 9 Apache-2.0, 2 0BSD, 2 BSD-3-Clause, 2 OFL-1.1, 1 MIT AND Zlib, 1 Unlicense.
+51 packages: 35 MIT, 8 Apache-2.0, 2 0BSD, 2 BSD-3-Clause, 2 OFL-1.1, 1 MIT AND Zlib, 1 Unlicense.
 
 | Package | Version | License | Repository |
 |---|---|---|---|
@@ -61,6 +61,7 @@ be published separately. They are not listed below.
 | cookie-es | 3.1.1 | MIT | https://github.com/unjs/cookie-es |
 | fflate | 0.8.3 | MIT | https://github.com/101arrowz/fflate |
 | hex-rgb | 5.0.0 | MIT | https://github.com/sindresorhus/hex-rgb |
+| hucre | 1.2.0 | MIT | https://github.com/productdevbook/hucre |
 | immer | 10.2.0 | MIT | https://github.com/immerjs/immer |
 | isbot | 5.2.2 | Unlicense | https://github.com/omrilotan/isbot |
 | js-sha256 | 0.11.1 | MIT | https://github.com/emn178/js-sha256 |
@@ -83,7 +84,6 @@ be published separately. They are not listed below.
 | tslib | 1.14.1 | 0BSD | https://github.com/Microsoft/tslib |
 | tslib | 2.8.1 | 0BSD | https://github.com/Microsoft/tslib |
 | use-sync-external-store | 1.7.0 | MIT | https://github.com/react/react |
-| xlsx | 0.20.3 | Apache-2.0 | https://git.sheetjs.com/SheetJS/sheetjs |
 | zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |
 
 ## License texts
@@ -949,6 +949,34 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### hucre 1.2.0
+
+License: MIT
+
+```text
+MIT License
+
+Copyright (c) 2026 productdevbook
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### immer 10.2.0

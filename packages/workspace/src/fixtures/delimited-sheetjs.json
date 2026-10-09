@@ -1,0 +1,129 @@
+{
+	"fixed": [
+		{
+			"text": "id,name,note\r\n007,\"Cruz, Ana\",\"Café ☕ 日本\"\r\n008,Ben,\"say \"\"hi\"\"\"\r\n",
+			"rows": {
+				"csv": [
+					["id", "name", "note"],
+					["007", "Cruz, Ana", "Café ☕ 日本"],
+					["008", "Ben", "say \"hi\""]
+				],
+				"tsv": [
+					["id,name,note"],
+					["007,\"Cruz, Ana\",\"Café ☕ 日本\""],
+					["008,Ben,\"say \"\"hi\"\"\""]
+				],
+				"txt": [
+					["id", "name", "note"],
+					["007", "Cruz, Ana", "Café ☕ 日本"],
+					["008", "Ben", "say \"hi\""]
+				]
+			}
+		},
+		{
+			"text": "a,b,,\n1,,,\n,,,\n\n",
+			"rows": {
+				"csv": [["a", "b"], ["1", ""]],
+				"tsv": [["a,b,,"], ["1,,,"], [",,,"]],
+				"txt": [["a", "b"], ["1", ""]]
+			}
+		},
+		{
+			"text": "a\tb\n1,2\t3\n",
+			"rows": {
+				"csv": [["a", "b"], ["1,2", "3"]],
+				"tsv": [["a", "b"], ["1,2", "3"]],
+				"txt": [["a", "b"], ["1,2", "3"]]
+			}
+		},
+		{
+			"text": "a,\"multi\r\nline\",c\r\n1,2,3",
+			"rows": {
+				"csv": [["a", "multi\r\nline", "c"], ["1", "2", "3"]],
+				"tsv": [["a,\"multi"], ["line\",c"], ["1,2,3"]],
+				"txt": [["a", "multi\r\nline", "c"], ["1", "2", "3"]]
+			}
+		},
+		{
+			"text": "a,\"open quote\nnever closed",
+			"rows": {
+				"csv": [["a", "\"open quote\nnever closed"]],
+				"tsv": [["a,\"open quote"], ["never closed"]],
+				"txt": [["a", "\"open quote\nnever closed"]]
+			}
+		},
+		{
+			"text": "a,b\"c,\"d\"e\"\n\"x\"\"y\",z",
+			"rows": {
+				"csv": [["a", "b\"c", "\"d\"e\"\n\"x\"\"y\",z"]],
+				"tsv": [["a,b\"c,\"d\"e\""], ["\"x\"\"y\",z"]],
+				"txt": [["a", "b\"c", "\"d\"e\"\n\"x\"\"y\",z"]]
+			}
+		},
+		{
+			"text": "a;b;c\n1;2;3",
+			"rows": {
+				"csv": [["a", "b", "c"], ["1", "2", "3"]],
+				"tsv": [["a;b;c"], ["1;2;3"]],
+				"txt": [["a", "b", "c"], ["1", "2", "3"]]
+			}
+		},
+		{
+			"text": "a|b\n1|2",
+			"rows": {
+				"csv": [["a", "b"], ["1", "2"]],
+				"tsv": [["a|b"], ["1|2"]],
+				"txt": [["a", "b"], ["1", "2"]]
+			}
+		},
+		{
+			"text": "sep=;\r\na;b,c\n",
+			"rows": {
+				"csv": [["a", "b,c"]],
+				"tsv": [["a", "b,c"]],
+				"txt": [["a", "b,c"]]
+			}
+		},
+		{
+			"text": "sep=|\na|b",
+			"rows": {
+				"csv": [["a", "b"]],
+				"tsv": [["a", "b"]],
+				"txt": [["a", "b"]]
+			}
+		},
+		{
+			"text": "a\rb\rc",
+			"rows": {
+				"csv": [["a"], ["b"], ["c"]],
+				"tsv": [["a"], ["b"], ["c"]],
+				"txt": [["a"], ["b"], ["c"]]
+			}
+		},
+		{
+			"text": "a,b\n\n\nc,d\n",
+			"rows": {
+				"csv": [["a", "b"], ["", ""], ["", ""], ["c", "d"]],
+				"tsv": [["a,b"], [""], [""], ["c,d"]],
+				"txt": [["a", "b"], ["", ""], ["", ""], ["c", "d"]]
+			}
+		},
+		{
+			"text": "\" spaced \", x ,\n",
+			"rows": {
+				"csv": [[" spaced ", " x "]],
+				"tsv": [["\" spaced \", x ,"]],
+				"txt": [[" spaced ", " x "]]
+			}
+		},
+		{
+			"text": "\"\",\"\"\n\"a\"",
+			"rows": {
+				"csv": [[""], ["a"]],
+				"tsv": [["\",\""], ["a"]],
+				"txt": [[""], ["a"]]
+			}
+		}
+	],
+	"random": "a7ef0688fa9fc5369b304fa2f0f6d748a48cc6ac210041a56f9bf77be855a421"
+}

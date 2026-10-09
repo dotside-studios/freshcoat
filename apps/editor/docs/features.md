@@ -98,7 +98,7 @@ the records, and **Export** turns templates and records into files.
   - The Columns panel sets a column's type, title, default and constraints.
     Changing a type says how many values would not convert. Renaming a column
     repoints the bindings that read it, in the same undo step.
-  - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, `.numbers`, JSON or
+  - Import CSV, TSV, Excel (`.xlsx`, `.xls`), `.ods`, JSON or
     NDJSON through a wizard that maps each source column to a schema column
     or a new one, and can match existing records by a key column instead of
     appending. When every header names a column, or the dataset's last

@@ -39,17 +39,14 @@ The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
 
 ## Spreadsheets
 
-CSV, TSV, JSON and NDJSON need nothing more. Excel, `.ods` and Numbers files
-go through SheetJS, an optional peer dependency. SheetJS publishes current
-releases from its own CDN rather than the npm registry, so install it from
-there:
-
-```sh
-npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
-```
-
-Without it, `readTable()` and `writeTable()` reject for those formats with an
-error that names the package.
+`readTable()` reads `.xlsx`, `.xlsm`, `.xls` and `.ods`, and `writeTable()`
+writes `.xlsx`, through [hucre](https://github.com/productdevbook/hucre),
+loaded on first use. Workbook libraries sit behind the `WorkbookCodec`
+interface in `src/workbook/`: `WORKBOOK_READERS` and `WORKBOOK_WRITERS` name
+the codec for each extension, so a format can move to another library, or a
+new library can add a format, without touching `tabular`. Codecs turn cells
+into text with the shared `cellText()`, so every library reads dates, booleans
+and numbers alike.
 
 ## The shape of a workspace
 

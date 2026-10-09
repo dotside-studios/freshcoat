@@ -52,9 +52,8 @@ describe("release packaging", () => {
 			"./export",
 		]);
 		expect(entryPoints(data.exports).some((path) => /test|fixture/.test(path))).toBe(false);
-		expect(data.dependencies).not.toHaveProperty("xlsx");
-		expect(data.peerDependencies).toEqual({ xlsx: "^0.20.2" });
-		expect(data.peerDependenciesMeta).toEqual({ xlsx: { optional: true } });
+		for (const version of Object.values(data.dependencies ?? {}))
+			expect(version).not.toMatch(/^https?:/);
 	});
 
 	test("compiles only what the exports reach", () => {

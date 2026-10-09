@@ -1,16 +1,21 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import { mod, openSample, run, state } from "./helpers";
 
-// SheetJS comes from the workspace package, which owns the dependency.
-type Workbook = { SheetNames: string[]; Sheets: Record<string, unknown> };
-const XLSX = createRequire(
-	new URL("../../../packages/workspace/package.json", import.meta.url),
-)("xlsx") as {
-	read(data: Buffer, opts: { type: "buffer" }): Workbook;
-	utils: { sheet_to_json<T>(sheet: unknown): T[] };
-};
+// hucre comes from the workspace package, which owns the dependency.
+async function xlsxRows(bytes: Buffer): Promise<Record<string, unknown>[]> {
+	const path = createRequire(
+		new URL("../../../packages/workspace/package.json", import.meta.url),
+	).resolve("hucre/xlsx");
+	const { readXlsxObjects } = (await import(pathToFileURL(path).href)) as {
+		readXlsxObjects(
+			data: Uint8Array,
+		): Promise<{ data: Record<string, unknown>[] }>;
+	};
+	return (await readXlsxObjects(new Uint8Array(bytes))).data;
+}
 
 type Rec = { id: string; status: string; values: Record<string, unknown> };
 type Col = { key: string; type: string; required?: boolean };
@@ -314,9 +319,7 @@ test("records export to CSV and XLSX, and the schema round-trips through JSON Sc
 
 	const xlsx = await download(page, "download-menu", /Excel/);
 	expect(xlsx.name).toBe("membership-card.xlsx");
-	const wb = XLSX.read(xlsx.bytes, { type: "buffer" });
-	const sheet = wb.Sheets[wb.SheetNames[0] as string];
-	const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+	const rows = await xlsxRows(xlsx.bytes);
 	expect(rows).toHaveLength(3);
 	expect(rows[0]).toMatchObject({
 		display_name: "Ada Lovelace",
