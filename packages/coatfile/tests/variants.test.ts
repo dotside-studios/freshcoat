@@ -20,7 +20,13 @@ import {
 	closestVariant,
 	DEFAULT_VARIANT_ID,
 	hasShapedVariants,
+	hiddenElementIds,
+	isEmptyDelta,
 	isEmptyVariant,
+	mergedElementDelta,
+	sideBackground,
+	sideDeltas,
+	variantDeltas,
 	variantIdFor,
 	variantSize,
 } from "../src/variants";
@@ -404,6 +410,83 @@ describe("applyVariant hidden", () => {
 			);
 		expect(names()).toContain("title");
 		expect(names("v")).not.toContain("title");
+	});
+});
+
+describe("reading variant deltas", () => {
+	const blueBg = { ...rect("bg", "#0000ff"), size: { width: 100, height: 60 } };
+	const redBg = { ...rect("bg", "#ff0000"), size: { width: 100, height: 60 } };
+	const t = withVariant([
+		{
+			name: "front",
+			background: blueBg,
+			elements: [
+				{ id: "title", properties: { color: "#111111" }, pos: { x: 1, y: 1 } },
+				{ id: "wrapper", properties: {}, hidden: true },
+			],
+		},
+		{
+			name: "back",
+			elements: [{ id: "back_rect", properties: {}, opacity: 0.5 }],
+		},
+		{
+			name: "front",
+			background: redBg,
+			elements: [
+				{ id: "title", properties: { value: "Hey" }, rotation: 10 },
+				{ id: "wrapper", properties: {}, hidden: false },
+				{ id: "masked", properties: {}, hidden: false },
+			],
+		},
+	]);
+
+	test("merges every override for a side in order", () => {
+		expect(mergedElementDelta(t, "v", "front", "title")).toEqual({
+			id: "title",
+			properties: { color: "#111111", value: "Hey" },
+			pos: { x: 1, y: 1 },
+			rotation: 10,
+		});
+		expect(sideBackground(t, "v", "front")).toBe(redBg);
+		expect(sideBackground(t, "v", "back")).toBeUndefined();
+		expect([...variantDeltas(t, "v").keys()]).toEqual(["front", "back"]);
+		expect([...sideDeltas(t, "v", "back").elements.keys()]).toEqual([
+			"back_rect",
+		]);
+	});
+
+	test("a later shell field left undefined keeps the earlier one", () => {
+		const u = front([
+			{ id: "title", properties: {}, pos: { x: 3, y: 4 } },
+			{ id: "title", properties: {}, pos: undefined },
+		]);
+		expect(mergedElementDelta(u, "v", "front", "title")?.pos).toEqual({
+			x: 3,
+			y: 4,
+		});
+	});
+
+	test("any hidden: true hides; a later hidden: false does not show it", () => {
+		expect(mergedElementDelta(t, "v", "front", "wrapper")?.hidden).toBe(true);
+		expect(hiddenElementIds(t, "v", "front")).toEqual(new Set(["wrapper"]));
+		const drawn = frame(applyVariant(t, "v"), "front").elements;
+		expect(byId(drawn, "wrapper")).toBeUndefined();
+		expect(byId(drawn, "masked")).toBeDefined();
+	});
+
+	test("an absent or unknown variant reads as empty", () => {
+		expect(hiddenElementIds(t, undefined, "front").size).toBe(0);
+		expect(mergedElementDelta(t, "nope", "front", "title")).toBeUndefined();
+		expect(variantDeltas(t, "nope").size).toBe(0);
+	});
+
+	test("isEmptyDelta", () => {
+		expect(isEmptyDelta({ id: "a", properties: {} })).toBe(true);
+		expect(isEmptyDelta({ id: "a", properties: { fill: "#fff" } })).toBe(false);
+		expect(isEmptyDelta({ id: "a", properties: {}, rotation: 0 })).toBe(false);
+		expect(isEmptyDelta({ id: "a", properties: {}, hidden: false })).toBe(
+			false,
+		);
 	});
 });
 

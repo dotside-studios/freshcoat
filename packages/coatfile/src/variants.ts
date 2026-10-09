@@ -1,5 +1,12 @@
 import { resizeFrames } from "./relayout";
-import type { Element, Size, Template, TemplateFrame, Variant } from "./types";
+import type {
+	Background,
+	Element,
+	Size,
+	Template,
+	TemplateFrame,
+	Variant,
+} from "./types";
 
 /** The id export file names, bindings and pickers use for Default. No
  *  variant may take it. */
@@ -28,6 +35,123 @@ export function variantIdFor(label: string, taken: Iterable<string>): string {
 export type VariantElementDelta = NonNullable<
 	Variant["overrides"][number]["elements"]
 >[number];
+
+/** The shell fields a delta can carry. Each replaces the element's own. */
+export const VARIANT_SHELL_KEYS = [
+	"pos",
+	"size",
+	"rotation",
+	"opacity",
+] as const;
+export type VariantShellKey = (typeof VARIANT_SHELL_KEYS)[number];
+
+/** What a variant sets on one side, every override naming it merged in
+ *  order: the last background, and one delta per element id. */
+export type SideDeltas = {
+	background: Background | undefined;
+	elements: Map<string, VariantElementDelta>;
+};
+
+/**
+ * Two deltas for one element as one, `b` applied after `a`: its `properties`
+ * merge over `a`'s, a shell field it sets replaces `a`'s, and the element is
+ * hidden when either hides it. A later `hidden: false` does not show an
+ * element an earlier delta hides.
+ */
+function mergeDelta(
+	a: VariantElementDelta,
+	b: VariantElementDelta,
+): VariantElementDelta {
+	const out: VariantElementDelta = {
+		...a,
+		properties: { ...a.properties, ...b.properties },
+	};
+	for (const k of VARIANT_SHELL_KEYS)
+		if (b[k] !== undefined) (out as Record<string, unknown>)[k] = b[k];
+	if (b.hidden !== undefined && a.hidden !== true) out.hidden = b.hidden;
+	return out;
+}
+
+/** Every side a variant overrides, by frame name, with its overrides merged
+ *  as `applyVariant` applies them. Empty for an absent or unknown id. */
+export function variantDeltas(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+): Map<string, SideDeltas> {
+	return collectDeltas(t, variantId);
+}
+
+function collectDeltas(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+	sideName?: string,
+): Map<string, SideDeltas> {
+	const out = new Map<string, SideDeltas>();
+	const variant =
+		variantId === undefined
+			? undefined
+			: t.variants?.find((v) => v.id === variantId);
+	for (const ov of variant?.overrides ?? []) {
+		if (sideName !== undefined && ov.name !== sideName) continue;
+		let side = out.get(ov.name);
+		if (!side) {
+			side = { background: undefined, elements: new Map() };
+			out.set(ov.name, side);
+		}
+		if (ov.background) side.background = ov.background;
+		for (const d of ov.elements ?? []) {
+			const prev = side.elements.get(d.id);
+			side.elements.set(d.id, prev ? mergeDelta(prev, d) : d);
+		}
+	}
+	return out;
+}
+
+/** What a variant sets on the side called `sideName`. */
+export function sideDeltas(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+	sideName: string,
+): SideDeltas {
+	return (
+		collectDeltas(t, variantId, sideName).get(sideName) ?? {
+			background: undefined,
+			elements: new Map(),
+		}
+	);
+}
+
+/** Every delta a variant has for one element on one side, merged. */
+export function mergedElementDelta(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+	sideName: string,
+	elementId: string,
+): VariantElementDelta | undefined {
+	return sideDeltas(t, variantId, sideName).elements.get(elementId);
+}
+
+/** Ids of the elements on a side a variant hides: any of its deltas for the
+ *  element says `hidden: true`. */
+export function hiddenElementIds(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+	sideName: string,
+): Set<string> {
+	const out = new Set<string>();
+	for (const [id, d] of sideDeltas(t, variantId, sideName).elements)
+		if (d.hidden === true) out.add(id);
+	return out;
+}
+
+/** The background a variant sets on a side, when it sets one. */
+export function sideBackground(
+	t: Pick<Template, "variants">,
+	variantId: string | undefined,
+	sideName: string,
+): Background | undefined {
+	return sideDeltas(t, variantId, sideName).background;
+}
 
 export type ApplyVariantOptions = {
 	/**
@@ -65,7 +189,7 @@ export function variantBase(t: Template, variantId: string): Template {
 // Returns `t` with one variant's overrides applied: each override replaces the
 // background of the first frame with its name and applies its element deltas by
 // id. Overrides naming no frame are skipped, and several naming the same frame
-// apply in order. A variant with a `size` starts from the base laid out at that
+// apply in order, merged as `variantDeltas` merges them. A variant with a `size` starts from the base laid out at that
 // size (`variantBase`), and its deltas are in that size's units. The input is
 // not mutated; frames and elements an override does not reach are shared with
 // it. `variants` is kept.
@@ -80,18 +204,18 @@ export function applyVariant(
 	const base = variantBase(t, variantId);
 
 	const frames = [...base.template_data];
-	for (const ov of variant.overrides) {
-		const target = frames.find((f) => f.name === ov.name);
-		if (!target) continue;
-		let next: TemplateFrame = target;
-		if (ov.background) next = { ...next, background: ov.background };
-		if (ov.elements && ov.elements.length > 0) {
+	for (const [name, side] of variantDeltas(t, variantId)) {
+		const at = frames.findIndex((f) => f.name === name);
+		if (at < 0) continue;
+		let next = frames[at] as TemplateFrame;
+		if (side.background) next = { ...next, background: side.background };
+		if (side.elements.size > 0) {
 			next = {
 				...next,
-				elements: applyElementDeltas(next.elements, ov.elements, dropHidden),
+				elements: applyElementDeltas(next.elements, side.elements, dropHidden),
 			};
 		}
-		frames[frames.indexOf(target)] = next;
+		frames[at] = next;
 	}
 	return { ...base, template_data: frames };
 }
@@ -105,20 +229,13 @@ export function applyVariant(
 // never written to.
 function applyElementDeltas(
 	elements: Element[],
-	deltas: VariantElementDelta[],
+	byId: Map<string, VariantElementDelta>,
 	dropHidden: boolean,
 ): Element[] {
-	const byId = new Map<string, VariantElementDelta[]>();
-	for (const d of deltas) {
-		const list = byId.get(d.id);
-		if (list) list.push(d);
-		else byId.set(d.id, [d]);
-	}
-	const isHidden = (el: Element) =>
-		byId.get(el.id)?.some((d) => d.hidden === true) ?? false;
+	const isHidden = (el: Element) => byId.get(el.id)?.hidden === true;
 	const one = (el: Element): Element => {
-		let next = el;
-		for (const d of byId.get(el.id) ?? []) next = applyDelta(next, d);
+		const d = byId.get(el.id);
+		let next = d ? applyDelta(el, d) : el;
 		if (next.type === "frame") {
 			next = {
 				...next,
@@ -210,13 +327,12 @@ export function checkVariants(t: Template): VariantIssue[] {
 	return issues;
 }
 
-function isEmptyDelta(d: VariantElementDelta): boolean {
+/** Whether a delta carries nothing beyond its id: no `properties` key, no
+ *  shell field and no `hidden`. */
+export function isEmptyDelta(d: VariantElementDelta): boolean {
 	return (
 		Object.keys(d.properties ?? {}).length === 0 &&
-		d.pos === undefined &&
-		d.size === undefined &&
-		d.rotation === undefined &&
-		d.opacity === undefined &&
+		VARIANT_SHELL_KEYS.every((k) => d[k] === undefined) &&
 		d.hidden === undefined
 	);
 }

@@ -803,6 +803,21 @@ kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
 everything else.
 
+Several overrides may name the same side; they apply in order. Reading them
+back follows the same rule `applyVariant` draws by: `variantDeltas(t,
+variantId)` maps each side's name to its `SideDeltas`, `{ background,
+elements }`, with the last background and one merged delta per element id;
+`sideDeltas(t, variantId, sideName)` is one side's. `mergedElementDelta(t,
+variantId, sideName, elementId)` is one element's merged delta: later
+`properties` merge over earlier ones, and a later shell field replaces an
+earlier one only when it is set. An element is hidden when any of its deltas
+says `hidden: true`, so a later `hidden: false` does not show it again.
+`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, and
+`sideBackground(t, variantId, sideName)` is the background it sets. An absent
+or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
+fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
+nothing beyond its id.
+
 `validate` checks `{{field}}` references in variant backgrounds and deltas as it
 does in the design, with paths under `/variants/<i>/overrides/<j>/`.
 `checkVariants(template)` is a separate lint that never fails validation; it

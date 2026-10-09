@@ -1,7 +1,8 @@
-import type {
-	Element,
-	Template,
-	VariantElementDelta,
+import {
+	type Element,
+	hiddenElementIds,
+	type Template,
+	type VariantElementDelta,
 } from "@freshcoat-js/coatfile";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { EditorController } from "~/app/controller";
@@ -42,7 +43,6 @@ import {
 	changedLayerKeys,
 	foldVariantEdit,
 	geometryForBase,
-	hiddenInVariant,
 	isHiddenInVariant,
 	isStructuralEdit,
 	mergedDelta,
@@ -649,8 +649,17 @@ describe("variant management", () => {
 		const back = unwrap(
 			setHiddenInVariant(t, "dark", "back", "a", true),
 		).template;
-		expect(hiddenInVariant(back, "dark", "back")).toEqual(new Set(["a"]));
+		expect(hiddenElementIds(back, "dark", "back")).toEqual(new Set(["a"]));
 		expect(setHiddenInVariant(t, "dark", "front", "zzz", true).ok).toBe(false);
+	});
+
+	test("a later hidden: false does not show a layer, as on the canvas", () => {
+		const t = withDelta(
+			withDelta(doc(), { id: "rot", properties: {}, hidden: true }),
+			{ id: "rot", properties: {}, hidden: false },
+		);
+		expect(isHiddenInVariant(t, "dark", "front", "rot")).toBe(true);
+		expect(hiddenElementIds(t, "dark", "front")).toEqual(new Set(["rot"]));
 	});
 
 	test("overridden keys and changed layers", () => {
@@ -880,7 +889,7 @@ describe("variant change counts", () => {
 		const t = manyVariants();
 		for (const v of t.variants ?? [])
 			expect(changedLayerCount(t, v.id)).toBe(countBefore(t, v.id));
-		expect(changedLayerCount(t, "nested")).toBe(3);
+		expect(changedLayerCount(t, "nested")).toBe(4);
 		expect(changedLayerCount(t, "nope")).toBe(0);
 	});
 

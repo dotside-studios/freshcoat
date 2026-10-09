@@ -7,20 +7,20 @@ import {
 	applyVariant,
 	type Background,
 	type Element,
+	variantDeltas as readVariantDeltas,
+	type SideDeltas,
 	type Template,
 	type TemplateFrame,
+	VARIANT_SHELL_KEYS,
 	type Variant,
 	type VariantElementDelta,
+	type VariantShellKey,
 	variantBase,
 } from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
 import { childEntries, walkLayers } from "./path";
 
 export type VariantOverride = Variant["overrides"][number];
-
-/** The shell fields a delta can carry. */
-export const DELTA_SHELL = ["pos", "size", "rotation", "opacity"] as const;
-export type DeltaShellKey = (typeof DELTA_SHELL)[number];
 
 // ── The working template ─────────────────────────────────────────────────────
 
@@ -82,42 +82,23 @@ export function sameJson(a: unknown, b: unknown): boolean {
 
 // ── Reading a variant's overrides ────────────────────────────────────────────
 
-/** A delta with every entry for one element on one side merged, in the order
- *  `applyVariant` applies them. */
+/** `mergedElementDelta`, read through the per-template cache. */
 export function mergedDelta(
 	t: Template,
 	variantId: string,
 	sideName: string,
 	elementId: string,
 ): VariantElementDelta | undefined {
-	const variant = t.variants?.find((v) => v.id === variantId);
-	let out: VariantElementDelta | undefined;
-	for (const ov of variant?.overrides ?? []) {
-		if (ov.name !== sideName) continue;
-		for (const d of ov.elements ?? [])
-			if (d.id === elementId)
-				out = out
-					? {
-							...out,
-							...d,
-							properties: { ...out.properties, ...d.properties },
-						}
-					: d;
-	}
-	return out;
+	return variantDeltas(t, variantId).get(sideName)?.elements.get(elementId);
 }
 
-/** The background a variant sets on a side, when it sets one. */
+/** `sideBackground`, read through the per-template cache. */
 export function overrideBackground(
 	t: Template,
 	variantId: string,
 	sideName: string,
 ): Background | undefined {
-	const variant = t.variants?.find((v) => v.id === variantId);
-	let out: Background | undefined;
-	for (const ov of variant?.overrides ?? [])
-		if (ov.name === sideName && ov.background) out = ov.background;
-	return out;
+	return variantDeltas(t, variantId).get(sideName)?.background;
 }
 
 /**
@@ -139,7 +120,7 @@ export function overriddenKeys(
 	if (!d) return [];
 	return [
 		...Object.keys(d.properties).filter((k) => d.properties[k] !== undefined),
-		...DELTA_SHELL.filter((k) => d[k] !== undefined),
+		...VARIANT_SHELL_KEYS.filter((k) => d[k] !== undefined),
 	];
 }
 
@@ -151,28 +132,6 @@ export function isHiddenInVariant(
 ): boolean {
 	return mergedDelta(t, variantId, sideName, elementId)?.hidden === true;
 }
-
-/** Ids of the layers on a side the variant hides. */
-export function hiddenInVariant(
-	t: Template,
-	variantId: string,
-	sideName: string,
-): Set<string> {
-	const variant = t.variants?.find((v) => v.id === variantId);
-	const out = new Set<string>();
-	for (const ov of variant?.overrides ?? [])
-		if (ov.name === sideName)
-			for (const d of ov.elements ?? []) {
-				if (d.hidden === true) out.add(d.id);
-				else if (d.hidden === false) out.delete(d.id);
-			}
-	return out;
-}
-
-type SideDeltas = {
-	elements: Map<string, VariantElementDelta>;
-	background: Background | undefined;
-};
 
 const deltasCache = new WeakMap<
 	Template,
@@ -189,31 +148,10 @@ function variantDeltas(
 		deltasCache.set(t, byId);
 	}
 	let out = byId.get(variantId);
-	if (out) return out;
-	out = new Map();
-	const variant = t.variants?.find((v) => v.id === variantId);
-	for (const ov of variant?.overrides ?? []) {
-		let side = out.get(ov.name);
-		if (!side) {
-			side = { elements: new Map(), background: undefined };
-			out.set(ov.name, side);
-		}
-		if (ov.background) side.background = ov.background;
-		for (const d of ov.elements ?? []) {
-			const prev = side.elements.get(d.id);
-			side.elements.set(
-				d.id,
-				prev
-					? {
-							...prev,
-							...d,
-							properties: { ...prev.properties, ...d.properties },
-						}
-					: d,
-			);
-		}
+	if (!out) {
+		out = readVariantDeltas(t, variantId);
+		byId.set(variantId, out);
 	}
-	byId.set(variantId, out);
 	return out;
 }
 
@@ -221,7 +159,7 @@ function deltaChanges(d: VariantElementDelta | undefined): boolean {
 	if (!d) return false;
 	if (d.hidden === true) return true;
 	for (const k in d.properties) if (d.properties[k] !== undefined) return true;
-	return DELTA_SHELL.some((k) => d[k] !== undefined);
+	return VARIANT_SHELL_KEYS.some((k) => d[k] !== undefined);
 }
 
 function sideChangedKeys(
@@ -464,7 +402,7 @@ function sideOverride(
 	};
 }
 
-const SHELL_DEFAULT: Record<DeltaShellKey, unknown> = {
+const SHELL_DEFAULT: Record<VariantShellKey, unknown> = {
 	pos: { x: 0, y: 0 },
 	size: undefined,
 	rotation: 0,
@@ -488,7 +426,7 @@ function elementDelta(
 	}
 	const d: VariantElementDelta = { id: b.id, properties };
 	let changed = Object.keys(properties).length > 0;
-	for (const k of DELTA_SHELL) {
+	for (const k of VARIANT_SHELL_KEYS) {
 		const nv = n[k] ?? SHELL_DEFAULT[k];
 		const bv = b[k] ?? SHELL_DEFAULT[k];
 		if (nv === undefined || sameJson(nv, bv)) continue;
@@ -589,7 +527,8 @@ export function geometryForBase(
 		for (const e of walkLayers(base, side)) {
 			if ("background" in e.path) continue;
 			const d = elements.get(e.element.id);
-			if (d && DELTA_SHELL.some((k) => d[k] !== undefined)) moved.add(e.key);
+			if (d && VARIANT_SHELL_KEYS.some((k) => d[k] !== undefined))
+				moved.add(e.key);
 		}
 	});
 	if (moved.size === 0) return geometry;

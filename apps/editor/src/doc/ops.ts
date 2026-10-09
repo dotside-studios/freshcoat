@@ -19,10 +19,13 @@ import {
 	FORMAT_VERSION,
 	formatVersionStatus,
 	hasInsets,
+	isEmptyDelta,
 	parseAssetUri,
 	resolveInsets,
 	subtleSha256,
+	VARIANT_SHELL_KEYS,
 	type VariantElementDelta,
+	type VariantShellKey,
 	variantIdFor,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
@@ -61,7 +64,7 @@ import {
 	updateList,
 	updateSide,
 } from "./tree";
-import { DELTA_SHELL, type DeltaShellKey, sameJson } from "./variant-edit";
+import { sameJson } from "./variant-edit";
 
 export type { OpOk, OpRefused, OpResult, RefusalCode } from "./result";
 export { ok, refuse, unwrap } from "./result";
@@ -1235,8 +1238,11 @@ export function resetOverride(
 			const properties = { ...d.properties };
 			const next: Record<string, unknown> = { ...d };
 			for (const k of keys) {
-				if ((DELTA_SHELL as readonly string[]).includes(k) || k === "hidden")
-					delete next[k as DeltaShellKey | "hidden"];
+				if (
+					(VARIANT_SHELL_KEYS as readonly string[]).includes(k) ||
+					k === "hidden"
+				)
+					delete next[k as VariantShellKey | "hidden"];
 				else delete properties[k];
 			}
 			const out = { ...next, properties } as Delta;
@@ -1302,14 +1308,6 @@ export function removeUnusedChanges(t: Template): OpResult {
 		next = r.template;
 	}
 	return ok(next, []);
-}
-
-function isEmptyDelta(d: Delta): boolean {
-	return (
-		Object.keys(d.properties).length === 0 &&
-		DELTA_SHELL.every((k) => d[k] === undefined) &&
-		d.hidden === undefined
-	);
 }
 
 function sameOverrides(a: Override[], b: Override[]): boolean {
