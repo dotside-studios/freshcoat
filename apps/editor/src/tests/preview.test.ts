@@ -1,10 +1,9 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { compile } from "@freshcoat-js/coatfile";
+import { compile, sampleValues } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { unwrap, updateElement } from "../doc/ops";
 import { getElement, walkLayers } from "../doc/path";
 import { buildPreview } from "../doc/preview";
-import { sampleValues } from "../doc/values";
 import { frozenDoc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
 
 const el = (t: Template, key: string) => getElement(t, key) as Element;

@@ -747,6 +747,26 @@ and workspace column checks enforce. It compiles with the `u` flag, so
 pattern invalid in both modes imposes no constraint, and the editor flags it as
 not a valid regular expression.
 
+## Fields a template reads
+
+`./fields` (also on the main entry) answers which fields a design uses, with
+no runtime dependency beyond the mustache parser.
+
+- `elementFieldRefs(element)` lists the fields one element reads itself:
+  `{{tokens}}` in its own properties (text, image, QR and barcode sources,
+  colors) and the fields its `visibleWhen` tests. What it holds is left out.
+- `templateFieldRefs(template)` lists every field the template reads: each
+  side's background and elements, nested frame and mask children, and each
+  variant's overrides (`variantFieldRefs`). `visibilityFieldRefs` lists only
+  the fields a `visibleWhen` tests.
+- `sampleValues(template)` is the declared defaults plus a stand-in for every
+  blank field (`PLACEHOLDER_IMAGE` for a photo), so a template renders
+  complete. A visibility field whose default is empty stays empty.
+- `fieldTitle(id)` names a field in sentence case: `first_name` and
+  `firstName` read "First name".
+- `isSystemField(id, field)` is true for a field a pipeline fills rather
+  than a person: `readOnly`, `x-source: "system"` or an id starting `$$`.
+
 ## Conditional visibility
 
 `visibleWhen` on any element shows it only while a field is set, and drops it

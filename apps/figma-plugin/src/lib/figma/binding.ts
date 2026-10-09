@@ -3,9 +3,9 @@
 // the marker grammar lives in exactly one place.
 
 import type { Symbology, VisibilityCondition } from "@freshcoat-js/coatfile";
+import { fieldTitle } from "@freshcoat-js/coatfile/fields";
 import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
-import { titleCase } from "./transpiler/fields";
 import { canHoldImage } from "./transpiler/image-shape";
 import type { FigmaNode } from "./types";
 
@@ -387,7 +387,7 @@ export function buildFieldMeta(
 	return {
 		id: draft.id,
 		format: draft.format,
-		title: titleCase(draft.id),
+		title: fieldTitle(draft.id),
 		// A toggle always has an answer (unset is its default), so it is never
 		// the thing a buyer forgot to fill in.
 		required: draft.format !== "boolean",

@@ -1064,7 +1064,7 @@ describe("transpile (minimal card fixture)", () => {
 			renderImage: vi.fn(),
 		});
 		expect(result.fieldsInferred).toEqual([
-			{ id: "display_name", field: { type: "string", title: "Display Name" } },
+			{ id: "display_name", field: { type: "string", title: "Display name" } },
 		]);
 	});
 });

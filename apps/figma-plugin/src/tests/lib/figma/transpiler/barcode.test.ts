@@ -252,7 +252,7 @@ describe("transpile (barcode)", () => {
 		// Inferred as text, entered as a barcode.
 		expect(fields.properties.member_id).toEqual({
 			type: "string",
-			title: "Member Id",
+			title: "Member id",
 			"x-widget": "barcode",
 		});
 		expect(fields.required).toEqual(["member_id"]);

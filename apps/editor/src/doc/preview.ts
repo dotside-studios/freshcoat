@@ -4,8 +4,11 @@ import type {
 	InlineAsset,
 	Template,
 } from "@freshcoat-js/coatfile";
-import { applyVariant, base64ToBytes } from "@freshcoat-js/coatfile";
-import { tokenIds } from "@freshcoat-js/coatfile/mustache";
+import {
+	applyVariant,
+	base64ToBytes,
+	templateFieldRefs,
+} from "@freshcoat-js/coatfile";
 import { childEntries, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {
@@ -142,24 +145,11 @@ function build(
  * The document itself is untouched, and its issues are still reported.
  */
 function tolerate(t: Template): Template {
-	const known = new Set(Object.keys(t.fields.properties));
-	const missing = new Set<string>();
-	const walk = (v: unknown) => {
-		if (typeof v === "string") {
-			for (const id of tokenIds(v)) if (!known.has(id)) missing.add(id);
-		} else if (Array.isArray(v)) v.forEach(walk);
-		else if (v && typeof v === "object") {
-			for (const [k, x] of Object.entries(v)) {
-				if (k === "visibleWhen") {
-					for (const c of Array.isArray(x) ? x : [x])
-						if (c && !known.has(c.field)) missing.add(c.field);
-				} else walk(x);
-			}
-		}
-	};
-	walk(t.template_data);
+	const missing = templateFieldRefs(t).filter(
+		(id) => !(id in t.fields.properties),
+	);
 	const needsName = !t.name || !t.id;
-	if (missing.size === 0 && !needsName) return t;
+	if (missing.length === 0 && !needsName) return t;
 	return {
 		...t,
 		id: t.id || "preview",
@@ -169,7 +159,7 @@ function tolerate(t: Template): Template {
 			properties: {
 				...t.fields.properties,
 				...Object.fromEntries(
-					[...missing].map((f) => [f, { type: "string" as const }]),
+					missing.map((f) => [f, { type: "string" as const }]),
 				),
 			},
 		},

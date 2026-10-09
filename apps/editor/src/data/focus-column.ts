@@ -1,5 +1,6 @@
 import {
 	type Element,
+	fieldTitle,
 	formatImageFocus,
 	type Template,
 	type Vec2,
@@ -11,7 +12,6 @@ import {
 } from "@freshcoat-js/workspace";
 import type { EditorController } from "~/app/controller";
 import { addField } from "~/doc/ops";
-import { humanize } from "~/doc/values";
 import { produce } from "~/state/immer";
 import { addColumn, replaceDataset, setCell } from "./model";
 import type { PhotoFraming } from "./photo-framing";
@@ -41,7 +41,7 @@ export function withFocusField(
 ): Template | undefined {
 	const added = addField(t, field, {
 		type: "string",
-		title: humanize(field),
+		title: fieldTitle(field),
 		description: "The point kept in view when the photo is cropped",
 		default:
 			fallback.x === 0.5 && fallback.y === 0.5
@@ -112,7 +112,7 @@ export function keepFocusInColumn(
 		? current
 		: addColumn(
 				current,
-				{ key: column, type: "text", title: humanize(column) },
+				{ key: column, type: "text", title: fieldTitle(column) },
 				current.columns.findIndex((c) => c.key === photoColumn) + 1,
 			);
 	controller.dispatch({

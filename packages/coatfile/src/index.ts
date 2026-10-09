@@ -94,6 +94,17 @@ export {
 	minimumFormatVersion,
 	raiseFormatVersion,
 } from "./format";
+export {
+	defaultFieldValues,
+	elementFieldRefs,
+	fieldTitle,
+	isSystemField,
+	PLACEHOLDER_IMAGE,
+	sampleValues,
+	templateFieldRefs,
+	variantFieldRefs,
+	visibilityFieldRefs,
+} from "./fields";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
 export { isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";

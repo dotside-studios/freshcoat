@@ -1,7 +1,11 @@
 import {
 	compiledPattern,
 	type FieldDefinition,
+	fieldTitle,
+	isSystemField,
+	sampleValues,
 	type Template,
+	templateFieldRefs,
 } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
@@ -25,14 +29,7 @@ import {
 	renameField,
 	updateField,
 } from "~/doc/ops";
-import {
-	type FieldEntry,
-	humanize,
-	isSystemField,
-	listFields,
-	referencedFields,
-	sampleValues,
-} from "~/doc/values";
+import { type FieldEntry, listFields } from "~/doc/values";
 import { useEditor } from "~/state/hooks";
 import { activeSlot } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
@@ -67,7 +64,7 @@ export function FieldList({ template }: { template: Template }) {
 		null,
 	);
 	const fields = useMemo(() => listFields(template), [template]);
-	const used = useMemo(() => referencedFields(template), [template]);
+	const used = useMemo(() => new Set(templateFieldRefs(template)), [template]);
 	const shown = useEditor((s) => s.shownFields);
 	const binding = useEditor((s) => activeSlot(s)?.binding);
 	const sources = readsDataset(binding) ? binding.fields : null;
@@ -281,7 +278,7 @@ function FieldRow({
 }) {
 	const format = FIELD_FORMATS.find((f) => f.id === (field.format ?? "text"));
 	const type = format?.name ?? field.format;
-	const title = field.title ?? humanize(id);
+	const title = field.title ?? fieldTitle(id);
 	const ownLine = OWN_LINE.has(field.format);
 	const input = (
 		<div
@@ -561,7 +558,7 @@ function FieldEditor({
 				label="Title"
 				labelPosition="side"
 				value={field.title ?? ""}
-				placeholder={humanize(id)}
+				placeholder={fieldTitle(id)}
 				onCommit={(v) => patch({ title: v || undefined }, "title")}
 			/>
 			<DraftTextField

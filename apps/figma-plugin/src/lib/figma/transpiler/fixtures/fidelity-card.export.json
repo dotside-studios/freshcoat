@@ -12,7 +12,7 @@
 		"properties": {
 			"user_avatar": {
 				"type": "string",
-				"title": "User Avatar",
+				"title": "User avatar",
 				"format": "image",
 				"x-image-aspect": [
 					1,
@@ -21,7 +21,7 @@
 			},
 			"display_name": {
 				"type": "string",
-				"title": "Display Name"
+				"title": "Display name"
 			},
 			"sku": {
 				"type": "string",

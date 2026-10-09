@@ -5,6 +5,7 @@ import {
 	checkVariants,
 	compile,
 	isElementVisible,
+	sampleValues,
 	validate,
 	variantSize,
 } from "@freshcoat-js/coatfile";
@@ -12,7 +13,6 @@ import { createRenderer, type Node, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { walkLayers } from "../doc/path";
-import { sampleValues } from "../doc/values";
 import { SAMPLES } from "../samples";
 import { DAVI_WORDMARK_HEIGHT, daviWordmark } from "../samples/davi-wordmark";
 import { findStarter, STARTERS } from "../samples/starters";
