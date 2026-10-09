@@ -1,4 +1,5 @@
 import {
+	compactInsets,
 	resolveInsets,
 	type Template,
 	variantSize,
@@ -85,16 +86,12 @@ export function TemplateInsetField({
 	className?: string;
 }) {
 	const controller = useController();
-	const sides = resolveInsets(template[inset]);
-	const uniform =
-		sides.top === sides.right &&
-		sides.top === sides.bottom &&
-		sides.top === sides.left;
+	const compact = compactInsets(resolveInsets(template[inset]));
 	return (
 		<NumberField
 			aria-label={inset === "bleed" ? INSETS.bleedLabel : INSETS.safeAreaLabel}
 			className={className}
-			value={uniform ? sides.top : null}
+			value={typeof compact === "number" ? compact : null}
 			placeholder={INSETS.mixed}
 			min={0}
 			max={MAX_SIDE}

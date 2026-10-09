@@ -146,6 +146,8 @@ const xlsx = await writeTable(dataset, "xlsx");
 assert.deepEqual((await readTable(xlsx.bytes, "members.xlsx")).sheets[0].rows, [["displayName"], ["Ana"], ["Ben"]]);
 const pdf = await assemblePdf([{ bytes: files["1-front@0.25x.png"], format: "png", widthPx: 253, heightPx: 160 }], { dpi: 75 });
 assert.equal(new TextDecoder().decode(pdf.slice(0, 5)), "%PDF-");
+const { parseImageInfo } = loaded.get("@freshcoat-js/workspace/image-info");
+assert.equal(parseImageInfo(files["1-front@0.25x.png"]).width, 253);
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat-js/coatfile/schema/coatfile.v1.schema.json"), "utf8"));
 assert.ok(schema.$id);
 assert.equal(schema.$id, "https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@${manifest("packages/coatfile").version}/schema/coatfile.v1.schema.json");

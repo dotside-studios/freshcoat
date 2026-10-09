@@ -5,13 +5,11 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { templateStem } from "@freshcoat-js/coatfile/coat";
-import { assetRef } from "../assets";
 import { slug } from "../ids";
 import { SheetLayoutError } from "../impose";
-import { DEFAULT_QUALITY, imageFormat, planExport } from "../plan";
+import { planExport } from "../plan";
 import type {
 	Dataset,
-	DatasetAsset,
 	ExportItem,
 	ExportPreset,
 	PdfPage,
@@ -19,14 +17,15 @@ import type {
 	Workspace,
 } from "../types";
 import {
+	assetsByRef,
 	type ItemRenderer,
 	type ItemSize,
-	itemSize,
+	itemRequest,
 	type RenderOutput,
 	type RenderRequest,
 	withBleed,
 } from "./item";
-import { gamutPercent, type PrintOutcome, printRequest } from "./print";
+import { gamutPercent, type PrintOutcome } from "./print";
 import {
 	planSheets,
 	presetBleed,
@@ -224,12 +223,6 @@ export function boundDatasetOf(
 	return id ? workspace.datasets.find((d) => d.id === id) : undefined;
 }
 
-function assetsByRef(dataset: Dataset | undefined): Map<string, DatasetAsset> {
-	return new Map(
-		(dataset?.assets ?? []).map((a) => [assetRef(a.sha256), a] as const),
-	);
-}
-
 /** The pixel count of the largest photo the preset's items use, as stored,
  *  which is what a worker decodes whatever size it renders at. */
 export function largestImagePixels(
@@ -237,7 +230,7 @@ export function largestImagePixels(
 	preset: ExportPreset,
 	plan: readonly ExportItem[] = planExport(workspace, preset),
 ): number {
-	const assets = assetsByRef(boundDatasetOf(workspace, preset));
+	const assets = assetsByRef(boundDatasetOf(workspace, preset)?.assets);
 	if (assets.size === 0) return 0;
 	let largest = 0;
 	const seen = new Set<string>();
@@ -250,19 +243,6 @@ export function largestImagePixels(
 				largest = Math.max(largest, asset.width * asset.height);
 		}
 	return largest;
-}
-
-/** The photos an item's values name, so a worker gets only those. */
-function imagesOf(
-	item: ExportItem,
-	assets: ReadonlyMap<string, DatasetAsset>,
-): [string, Blob][] {
-	const out: [string, Blob][] = [];
-	for (const value of new Set(Object.values(item.values))) {
-		const asset = assets.get(value);
-		if (asset) out.push([value, asset.blob]);
-	}
-	return out;
 }
 
 /** A PDF's pages, kept in memory until the document is assembled. */
@@ -303,10 +283,6 @@ export function runExportJob(
 	const plan: ExportItem[] = entry ? planExport(workspace, preset) : [];
 	const total = plan.length;
 	const pdf = preset.format === "pdf";
-	const format = imageFormat(preset);
-	const quality =
-		format === "png" ? undefined : (preset.quality ?? DEFAULT_QUALITY);
-	const print = printRequest(preset.print);
 	const concurrency = Math.max(1, pool.size);
 	const windowSize = 2 * concurrency;
 	const stats: JobStats = {
@@ -324,7 +300,7 @@ export function runExportJob(
 		});
 
 	const template = entry.template;
-	const assets = assetsByRef(boundDatasetOf(workspace, preset));
+	const assets = assetsByRef(boundDatasetOf(workspace, preset)?.assets);
 	const sink: OutputSink | null = pdf
 		? null
 		: (options.sink ??
@@ -571,25 +547,13 @@ export function runExportJob(
 
 		const start = (index: number) => {
 			const item = plan[index];
-			const size = itemSize(template, preset, item, assets);
-			if ("error" in size) {
-				settle(index, -1, undefined, new Error(size.error));
+			const built = itemRequest(template, preset, item, assets);
+			if ("error" in built) {
+				settle(index, -1, undefined, new Error(built.error));
 				return;
 			}
-			sizes[index] = size;
-			const request: RenderRequest = {
-				template,
-				values: item.values,
-				...(item.variantId !== undefined ? { variantId: item.variantId } : {}),
-				side: item.side,
-				scale: size.scale,
-				images: imagesOf(item, assets),
-				...(size.resize ? { resize: size.resize } : {}),
-				...(size.bleed ? { bleed: true } : {}),
-				format,
-				...(quality !== undefined ? { quality } : {}),
-				...(print ? { print } : {}),
-			};
+			sizes[index] = built.size;
+			const request = built.request;
 			const startedAt = now();
 			inFlight++;
 			pool.render(request).then(

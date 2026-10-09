@@ -1,10 +1,4 @@
-import {
-	applyVariant,
-	cardSizeMm,
-	fitDesignSize,
-	resizeTemplate,
-	type Template,
-} from "@freshcoat-js/coatfile";
+import { cardSizeMm, type Template } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
 	Dataset,
@@ -12,18 +6,14 @@ import type {
 	ExportItem,
 	ExportPreset,
 	RecordStatus,
-	Workspace,
 } from "@freshcoat-js/workspace";
 import {
 	exportSize,
 	fileExtension,
 	fileNameFor,
-	orientedSize,
-	parseAssetRef,
 	pdfLayout,
-	planExport,
 } from "@freshcoat-js/workspace";
-import type { JobResult } from "@freshcoat-js/workspace/export";
+import { type JobResult, recordOutcome } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
 import { formatDate } from "~/app/format";
 import type { Action } from "~/state/store";
@@ -109,47 +99,6 @@ export function fileNameExample(
 			? ""
 			: `@${preset.scale}x`;
 	return `${base}${suffix}.${fileExtension(preset.format)}`;
-}
-
-/** The template laid out at the aspect of the photo a size-from-image preset
- *  follows for this item, as the export will render it; the template itself
- *  otherwise. An item in a variant with its own size gets that variant laid
- *  out, without its variants. */
-export function photoSizedTemplate(
-	template: Template,
-	preset: ExportPreset,
-	item: { values: Record<string, string>; variantId?: string } | null,
-	dataset: Dataset | undefined,
-): Template {
-	const size = exportSize(preset);
-	if (size.kind !== "image" || !item || !dataset) return template;
-	const sha = parseAssetRef(item.values[size.field]);
-	const asset = sha ? dataset.assets.find((a) => a.sha256 === sha) : undefined;
-	if (!asset?.width || !asset.height) return template;
-	const seen = orientedSize({
-		width: asset.width,
-		height: asset.height,
-		orientation: asset.orientation,
-	});
-	const sized = item.variantId
-		? template.variants?.find((v) => v.id === item.variantId && v.size)
-		: undefined;
-	const { variants: _v, ...applied } = sized
-		? applyVariant(template, sized.id)
-		: template;
-	const base = sized ? applied : template;
-	const design = fitDesignSize(base, seen.width, seen.height);
-	if (
-		Math.abs(design.width - base.width) < 0.5 &&
-		Math.abs(design.height - base.height) < 0.5
-	)
-		return base;
-	// A template's size is whole design units, and most photo aspects are not.
-	return resizeTemplate(
-		base,
-		Math.max(1, Math.round(design.width)),
-		Math.max(1, Math.round(design.height)),
-	);
 }
 
 /** The template's image fields, which a size can follow. */
@@ -262,33 +211,6 @@ export function presetsForDataset(
 	return presets.filter((p) => bound.has(p.templateId));
 }
 
-export type RecordOutcome = {
-	ok: string[];
-	failed: string[];
-	errors: Record<string, string>;
-};
-
-/** Per record: exported when every side rendered, failed with the first
- *  error otherwise. Items with no record (an unbound template) are ignored. */
-export function recordOutcome(result: JobResult): RecordOutcome {
-	const errors: Record<string, string> = {};
-	const seen: string[] = [];
-	const bad = new Set<string>();
-	for (const item of result.items) {
-		if (!item.recordId) continue;
-		if (!seen.includes(item.recordId)) seen.push(item.recordId);
-		if (!item.ok) {
-			bad.add(item.recordId);
-			errors[item.recordId] ??= item.error ?? "Failed";
-		}
-	}
-	return {
-		ok: seen.filter((id) => !bad.has(id)),
-		failed: seen.filter((id) => bad.has(id)),
-		errors,
-	};
-}
-
 /** What a finished job writes back to the dataset when the preset marks
  *  exports: `exported` with the time for records that rendered, `failed`
  *  with the error for the rest. Nothing for a cancelled job. */
@@ -319,42 +241,6 @@ export function statusActions(
 			fromJob: true,
 		});
 	return actions;
-}
-
-/** The preset a "Retry failed" runs. Failed records are found by status when
- *  the preset writes statuses, and by the last result's ids when it does not
- *  or when the run was over chosen records, so a retry stays inside them. */
-export function retryPreset(
-	preset: ExportPreset,
-	result: JobResult,
-): ExportPreset {
-	if (preset.markExported && preset.records !== "selected") {
-		const { selected: _s, ...rest } = preset;
-		return { ...rest, records: "failed" };
-	}
-	return {
-		...preset,
-		records: "selected",
-		selected: recordOutcome(result).failed,
-	};
-}
-
-/** The records a job left unwritten, in plan order: all of them for a PDF,
- *  which is written only once whole. */
-export function unwrittenRecordIds(
-	workspace: Workspace,
-	preset: ExportPreset,
-	result: JobResult,
-): string[] {
-	const written = new Set(
-		preset.format === "pdf"
-			? []
-			: result.items.filter((i) => i.ok).map((i) => i.key),
-	);
-	const out = new Set<string>();
-	for (const item of planExport(workspace, preset))
-		if (item.recordId && !written.has(item.key)) out.add(item.recordId);
-	return [...out];
 }
 
 export function formatTime(iso: string | number | undefined): string {

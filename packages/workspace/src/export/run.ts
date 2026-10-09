@@ -4,15 +4,19 @@ import {
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "@freshcoat-js/coatfile";
+import { planExport } from "../plan";
 import type { ExportPreset, Workspace } from "../types";
+import { checkAllGlyphs, type GlyphIssue } from "./glyph-preflight";
 import { createItemRenderer } from "./item";
 import {
+	boundDatasetOf,
 	inlinePool,
 	type JobProgress,
 	type JobResult,
 	runExportJob,
 } from "./job";
 import type { JobFile, OutputSink } from "./sink";
+import { applyJobResult } from "./status";
 
 /** Where `exportWorkspace` writes. Without one, a zip or PDF comes back as
  *  the result's `file`. */
@@ -34,12 +38,38 @@ export type ExportWorkspaceOptions = {
 	output?: ExportOutput;
 	signal?: AbortSignal;
 	onProgress?: (progress: JobProgress) => void;
+	/** Also lists the text each item's fonts have no glyphs for, as `glyphs`. */
+	checkGlyphs?: boolean;
+	/** the time written to exported records; default now */
+	now?: Date;
 };
 
 export type ExportWorkspaceResult = JobResult & {
 	/** set when `exportWorkspace` resolved the fonts itself */
 	fonts?: Omit<ResolvedTemplateFonts, "fonts">;
+	/** set when `checkGlyphs` was asked for and the job was not cancelled */
+	glyphs?: GlyphIssue[];
+	/** The workspace with the job's record statuses written when the preset
+	 *  has `markExported`; the one given otherwise. Save it to keep them. */
+	workspace: Workspace;
 };
+
+/** The workspace with a finished job's record statuses written, when the
+ *  preset marks exports and its template is bound. */
+export function markExported(
+	workspace: Workspace,
+	preset: ExportPreset,
+	result: JobResult,
+	now: Date = new Date(),
+): Workspace {
+	if (!preset.markExported) return workspace;
+	const dataset = boundDatasetOf(workspace, preset);
+	if (!dataset) return workspace;
+	const datasets = applyJobResult(workspace.datasets, dataset.id, result, now);
+	return datasets === workspace.datasets
+		? workspace
+		: { ...workspace, datasets };
+}
 
 /** A preset by its id, else by a name no other preset has. */
 export function findPreset(
@@ -78,16 +108,29 @@ export async function exportWorkspace(
 	const items = createItemRenderer({ renderer: options.renderer, fonts });
 	try {
 		const sink = found.format === "pdf" ? undefined : output?.sink?.();
-		const result: ExportWorkspaceResult = await runExportJob(workspace, found, {
+		const job = await runExportJob(workspace, found, {
 			pool: inlinePool(items),
 			...(sink ? { sink } : {}),
 			...(signal ? { signal } : {}),
 			...(onProgress ? { onProgress } : {}),
 		});
+		const result: ExportWorkspaceResult = {
+			...job,
+			workspace: markExported(workspace, found, job, options.now),
+		};
 		if (report) result.fonts = report;
 		if (result.cancelled) {
 			await output?.discard?.();
 			return result;
+		}
+		if (options.checkGlyphs) {
+			const glyphs = await checkAllGlyphs(
+				entry.template,
+				planExport(workspace, found),
+				options.renderer,
+				() => signal?.aborted ?? false,
+			);
+			if (glyphs) result.glyphs = glyphs;
 		}
 		if (result.file) await output?.save?.(result.file);
 		return result;

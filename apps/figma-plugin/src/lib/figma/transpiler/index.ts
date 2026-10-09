@@ -1,6 +1,14 @@
-import type {
-	TemplateWarning,
-	VariantElementDelta,
+import {
+	type Background,
+	backgroundSwatch,
+	collectAssetRefs,
+	DEFAULT_VARIANT_ID,
+	diffElement,
+	type Element,
+	type Template,
+	type TemplateWarning,
+	type VariantElementDelta,
+	variantIdFor,
 } from "@freshcoat-js/coatfile";
 import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
 import {
@@ -32,15 +40,11 @@ import type {
 } from "./types";
 import {
 	backgroundsDiffer,
-	collectAssetRefsDeep,
-	diffElementProperties,
-	diffElementShell,
-	fillOf,
 	flattenElementsById,
 	hiddenElements,
 	traceElementsByNode,
 } from "./variant-deltas";
-import { alignInstanceVisibility, uniqueVariantId } from "./variants";
+import { alignInstanceVisibility } from "./variants";
 import { makeThrowawaySink } from "./walk";
 
 export type {
@@ -145,7 +149,7 @@ export async function transpile(
 		}
 		// The first slot that resolves sets the canvas; the rest must match it.
 		// This subsumes orientation — a portrait side against a landscape canvas
-		// reads as "638×1013, resize to 1013×638", which is what the author does
+		// reads as "638×1012, resize to 1012×638", which is what the author does
 		// about it anyway.
 		if (canvas === null) canvas = size;
 		else if (!sizesAgree(size, canvas)) issue(canvas.width, canvas.height);
@@ -243,7 +247,9 @@ export async function transpile(
 
 	const primarySlotName = input.product.frames[0]?.name;
 	const defaultSwatch = primarySlotName
-		? fillOf(baseSlotOf(primarySlotName).background)
+		? backgroundSwatch(
+				baseSlotOf(primarySlotName).background as Background | undefined,
+			)
 		: undefined;
 
 	// Diffs a colorway instance's sides against the base BY ELEMENT ID (see
@@ -318,7 +324,8 @@ export async function transpile(
 			);
 			for (const a of sideSink.assets) producedAssets.push(a);
 
-			if (slot.name === primarySlotName) swatch = fillOf(vBg) ?? swatch;
+			if (slot.name === primarySlotName)
+				swatch = backgroundSwatch(vBg as Background | undefined) ?? swatch;
 
 			const base = baseSlotOf(slot.name);
 			const bgDiffers = backgroundsDiffer(vBg, base.background);
@@ -359,14 +366,11 @@ export async function transpile(
 				if (hidden.within.has(id)) continue;
 				const varEl = varById.get(id);
 				if (!varEl) continue;
-				const properties = diffElementProperties(baseEl, varEl);
-				const shell = diffElementShell(baseEl, varEl);
-				if (
-					Object.keys(properties).length > 0 ||
-					Object.keys(shell).length > 0
-				) {
-					elementDeltas.push({ id, properties, ...shell });
-				}
+				// Two walks of one layer can differ in the last bits of a float.
+				const d = diffElement(baseEl as Element, varEl as Element, {
+					epsilon: 1e-6,
+				});
+				if (d) elementDeltas.push(d);
 			}
 
 			if (bgDiffers || elementDeltas.length > 0) {
@@ -381,8 +385,10 @@ export async function transpile(
 		// Only assets an emitted override actually points at need embedding.
 		// Rasters whose bytes matched the base (same sha256, no delta emitted)
 		// are already carried by the base and would just be de-duped anyway.
-		const referenced = new Set<string>();
-		for (const ov of overrides) collectAssetRefsDeep(ov, referenced);
+		const referenced = collectAssetRefs({
+			template_data: [],
+			variants: [{ id: "", label: "", overrides }],
+		} as unknown as Template);
 		const assets = producedAssets.filter((a) => referenced.has(a.sha256));
 
 		return { overrides, swatch, assets };
@@ -393,18 +399,19 @@ export async function transpile(
 		// The base card itself, so a picker has something to switch back to. It is
 		// not a colorway instance, so it gets no variantPicks entry.
 		variants.push({
-			id: "default",
+			id: DEFAULT_VARIANT_ID,
 			label: "Default",
 			...(defaultSwatch ? { swatch: defaultSwatch } : {}),
 			overrides: [],
 		});
-		const takenIds = new Set(["default"]);
+		const takenIds = new Set<string>();
 		for (const cw of colorways) {
 			const { overrides, swatch, assets } = await buildVariantOverrides(cw);
 			// Embed the recolored rasters this variant introduced; assembleBundle
 			// de-dupes by sha256, so any that coincide with base rasters collapse.
 			for (const a of assets) allAssets.push(a);
-			const id = uniqueVariantId(cw.label, takenIds);
+			const id = variantIdFor(cw.label, takenIds);
+			takenIds.add(id);
 			variants.push({
 				id,
 				label: cw.label,
@@ -422,7 +429,10 @@ export async function transpile(
 		.filter((t) => t.decision === "flatten" || t.decision === "skip")
 		.map(({ slot: _slot, ...rest }) => rest);
 
-	const fonts = collectFontDescriptors(templateData);
+	const fonts = collectFontDescriptors({
+		template_data: templateData,
+		variants,
+	});
 
 	// A field only an `if:` layer names is a toggle. One a layer also renders
 	// keeps that layer's format, and its `if:` layers hide while it is blank.

@@ -1,6 +1,7 @@
-import { validate } from "@freshcoat-js/coatfile";
+import { type Template, validate } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
+	Dataset,
 	ExportItem,
 	ExportPreset,
 } from "@freshcoat-js/workspace";
@@ -10,7 +11,11 @@ import {
 	DEFAULT_SHEET_LAYOUT,
 	planExport,
 } from "@freshcoat-js/workspace";
-import type { JobResult } from "@freshcoat-js/workspace/export";
+import {
+	assetsByRef,
+	itemTemplate,
+	type JobResult,
+} from "@freshcoat-js/workspace/export";
 import { describe, expect, test } from "vitest";
 import {
 	bulkStatusAction,
@@ -21,10 +26,7 @@ import {
 	formatPageSize,
 	imageFieldKeys,
 	labelColumn,
-	photoSizedTemplate,
 	recordLabel,
-	recordOutcome,
-	retryPreset,
 	selectedIds,
 	settingsSummary,
 	statusActions,
@@ -94,18 +96,6 @@ describe("presets", () => {
 		expect(duplicatePreset(first, [first, copy]).name).toBe(
 			"New preset copy 2",
 		);
-	});
-
-	test("retrying failed items reruns failed records", () => {
-		const r = result([item("r1", "front", true), item("r3", "front", false)]);
-		expect(retryPreset(preset({ selected: ["x"] }), r)).toEqual({
-			...preset(),
-			records: "failed",
-		});
-		expect(retryPreset(preset({ markExported: false }), r)).toMatchObject({
-			records: "selected",
-			selected: ["r3"],
-		});
 	});
 });
 
@@ -230,11 +220,6 @@ describe("record statuses", () => {
 			item("r2", "back", false, "font"),
 			item("r3", "front", false),
 		]);
-		expect(recordOutcome(r)).toEqual({
-			ok: ["r1"],
-			failed: ["r2", "r3"],
-			errors: { r2: "font", r3: "Failed" },
-		});
 		expect(statusActions(r, "d", now)).toEqual([
 			{
 				type: "setRecordStatus",
@@ -281,6 +266,12 @@ describe("photo export helpers", () => {
 		records: [],
 		assets: [photo],
 	};
+	const photoSizedTemplate = (
+		template: Template,
+		p: ExportPreset,
+		it: { values: Record<string, string>; variantId?: string },
+		d: Dataset,
+	) => itemTemplate(template, p, it, assetsByRef(d.assets));
 
 	test("the example file name follows the format and the size", () => {
 		expect(

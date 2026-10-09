@@ -258,8 +258,8 @@ direct children of the slot frame:
 | `guide:bleed` | A box larger than the frame. How far it reaches past each edge is the template's `bleed` on that side |
 | `guide:safe-area` | A box inside the frame. How far in it sits from each edge is the template's `safeArea` on that side |
 
-A CR80 side at 1013×638 with a 35-unit bleed has a `guide:bleed` rectangle at
-−35, −35, sized 1083×708. Use any layer type. Guides are measured by their
+A CR80 side at 1012×638 with a 35-unit bleed has a `guide:bleed` rectangle at
+−35, −35, sized 1082×708. Use any layer type. Guides are measured by their
 bounding box, read whether visible or hidden, and never exported as
 artwork. The measurement is scaled to design units like everything else, and
 written as one number when every side is the same. Without a guide, the

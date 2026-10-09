@@ -30,13 +30,15 @@ scheduling and file destinations.
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
-| `ids` | the stable ids, keys and slugs the workspace is addressed by |
+| `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
 | `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Image header reading lives at `@freshcoat-js/workspace/image-info` too, which
+imports nothing, for hosts that need only that.
 Reading and writing files on disk differs by platform, so it lives at
 `@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
 `node` subpath.
@@ -68,7 +70,9 @@ data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
 
 Templates inside are ordinary `.coat` files: a template opened on its own
 becomes a one-template workspace, and a workspace's template can be exported
-on its own again. Editor state that is not part of the design, such as a
+on its own again. Templates are read through coatfile's `loadTemplate`,
+and written without the assets nothing in them references
+(`pruneUnusedAssets`). Editor state that is not part of the design, such as a
 template's ruler guides, stays in the manifest's template entry, so the
 template format and its renders are unchanged.
 
@@ -130,10 +134,26 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
 job is cancelled or fails.
 
+When the preset has `markExported`, `result.workspace` is the workspace with
+the job's record statuses written: `exported` with the time for records whose
+every item rendered, `failed` with the first error for the rest. The workspace
+passed in is not changed, and nothing is written for a cancelled job. Save
+`result.workspace` with `packWorkspace` to keep them. `applyJobResult` does
+the same for a dataset list, `recordOutcome` sorts a `JobResult` by record,
+`retryPreset` gives the preset that reruns a job's failed records, and
+`unwrittenRecordIds` lists the records a cancelled job left unwritten.
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
 stream.
+
+`itemRequest` builds the render request `runExportJob` sends for one item,
+with the size `itemSize` gives it, and `imagesOf` lists the photos that item
+references. `itemTemplate` returns the template laid out at the size
+`itemSize` gives an item whose size follows a photo, with `maxEdge` applied,
+so a preview shows what the export will render. Studio builds its export
+preview and printer file from these.
 
 ### Export from Node
 
@@ -166,6 +186,12 @@ and throws a `WorkspaceReadError`, whose `code` is `unpackWorkspace`'s, when
 it cannot. `readWorkspace` on `archive` does the same for a Blob or bytes.
 Pass `fontOptions: { fetch }` to serve fonts from a cache or a mirror instead
 of the network.
+
+Pass `checkGlyphs: true` to also get `result.glyphs`: each item's text that
+the template's fonts have no glyphs for, by record, side and element, so a CLI
+can warn before the cards print with boxes. `checkGlyphs` and
+`checkAllGlyphs` run the same check on given items with a renderer that holds
+the fonts, and `summarizeGlyphs` and `codepointLabel` shape it for display.
 
 `src/export/node-export.test.ts` runs this path end to end.
 

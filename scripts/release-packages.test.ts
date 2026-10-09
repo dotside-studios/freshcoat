@@ -49,6 +49,7 @@ describe("release packaging", () => {
 			"./archive",
 			"./tabular",
 			"./pdf",
+			"./image-info",
 			"./export",
 			"./node",
 		]);

@@ -175,7 +175,10 @@ With bleed:
   the trim by hand.
 
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
-insets; `extendIntoBleed` is the edge rule on its own.
+insets; `extendIntoBleed` is the edge rule on its own. `resolveInsets` turns
+either form into four sides, `compactInsets` turns four sides back into one
+number when they agree, and `maxInsets` takes the largest on each side. These
+also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
@@ -400,6 +403,30 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 `healElementIds` renames layers, so a consumer that shows the file to a person
 should say what changed rather than heal silently.
 
+`loadTemplate` runs those steps in order: it decodes the input, validates
+it, heals element ids only when the file does not validate as written, and
+validates again. Studio and the workspace archive both read templates
+through it.
+
+```ts
+import { loadTemplate } from "@freshcoat-js/coatfile";
+
+const loaded = await loadTemplate(fileBytes);
+if (loaded.ok) {
+  loaded.template; // valid
+  loaded.healed; // ids were renamed; loaded.renamedIds says which
+} else if (loaded.reason === "unreadable") {
+  loaded.code; // a CoatErrorCode, with loaded.message
+} else {
+  loaded.errors; // the file's validation errors as written
+}
+```
+
+`pruneUnusedAssets` (on `./coat` and the root) drops carried assets nothing
+references. Image srcs in frames and variant overrides, and local font files,
+count as references. Studio prunes before it saves, and the workspace archive
+prunes each template it packs.
+
 `templateStem(fileName)` is a file name without its template extension
 (`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
 
@@ -586,7 +613,11 @@ the digit it should be.
 
 Barcodes are encoded with bwip-js as part of compile, as QR codes are with
 lean-qr. `encodeBarcode()` is the same encoder on its own, for checking a value
-before it reaches a template.
+before it reaches a template. `symbologyLabel("ean13")` is a symbology's usual
+name ("EAN-13"), and `parseSymbology` reads one back from what a person typed:
+an id, a label or a common alias (`upc`, `ean`, `itf`, `aztec code`), with
+case, spaces, hyphens and underscores ignored. Both also come from
+`@freshcoat-js/coatfile/barcode-encoder`, which has no runtime imports.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:
@@ -747,6 +778,20 @@ across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
 
+## Field keys
+
+A field's key, and the id in a `{{id}}` token, matches `FIELD_ID`: a letter or
+`_`, then letters, digits and `_`. `fieldKeyFrom(text)` makes one from any
+text, such as a layer or column name: `First Name` and `firstName` give
+`first_name`, `Año` gives `ano`, and `2nd` gives `_2nd`. Text with nothing
+usable in it gives `field`, or the fallback passed as the second argument.
+
+`FIELD_FORMATS` lists the values a field's `format` may take: `longText`,
+`color`, `url`, `image` and `boolean`. A field without one is plain text.
+
+All three come from `@freshcoat-js/coatfile/mustache`, which has no runtime
+imports.
+
 ## Field patterns
 
 A field's `pattern` is a JavaScript regular expression that `validateValues`
@@ -838,6 +883,12 @@ which is what `renderTemplate` compiles at by default; `compile` needs a
 laid out at the variant's size, before its deltas. `resizeTemplate` leaves a
 sized variant as it is.
 
+`DEFAULT_VARIANT_ID` (`"default"`) is how export file names, bindings and
+pickers name Default, so no variant may take it. `variantIdFor(label, taken)`
+makes an id from a label: accents stripped, lowercased, `-` between words,
+`variant` when nothing is left, then `-2`, `-3` until it is neither in `taken`
+nor `DEFAULT_VARIANT_ID`. It does not add the id to `taken`.
+
 `closestVariant(t, aspect)` is the variant whose size is closest in aspect,
 or undefined for Default, which wins a tie. `hasShapedVariants(t)` says
 whether any variant's size changes the aspect. `isEmptyVariant(variant)` says
@@ -851,6 +902,35 @@ itself, so hiding it has no effect. The input is not mutated, `variants` is
 kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
 everything else.
+
+Several overrides may name the same side; they apply in order. Reading them
+back follows the same rule `applyVariant` draws by: `variantDeltas(t,
+variantId)` maps each side's name to its `SideDeltas`, `{ background,
+elements }`, with the last background and one merged delta per element id;
+`sideDeltas(t, variantId, sideName)` is one side's. `mergedElementDelta(t,
+variantId, sideName, elementId)` is one element's merged delta: later
+`properties` merge over earlier ones, and a later shell field replaces an
+earlier one only when it is set. An element is hidden when any of its deltas
+says `hidden: true`, so a later `hidden: false` does not show it again.
+`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, and
+`sideBackground(t, variantId, sideName)` is the background it sets. An absent
+or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
+fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
+nothing beyond its id.
+
+`diffElement(base, next, { epsilon })` is the delta that turns one version of
+an element into another, or undefined when they draw the same. `properties`
+holds each key `next` sets to a different value; a key it removes is left out,
+since a delta cannot remove one. A frame's `children` and a mask's `mask` and
+`children` are never diffed, because each element inside gets its own delta.
+A shell field is kept where `next` sets it and it differs from `base`'s, an
+omitted one read as compile draws it: `pos` `{ x: 0, y: 0 }`, `rotation` 0,
+`opacity` 1. It never sets `hidden`. Values compare with `sameJson(a, b, {
+epsilon })`, which ignores key order, reads a missing key as `undefined` and
+treats numbers less than `epsilon` apart as equal (exact by default).
+`backgroundSwatch(background)` is the colour a background suggests for a
+variant's swatch: a rect's fill, its first gradient stop or pattern colour,
+undefined for an image or a `{{field}}` colour.
 
 `validate` checks `{{field}}` references in variant backgrounds and deltas as it
 does in the design, with paths under `/variants/<i>/overrides/<j>/`.
@@ -875,6 +955,20 @@ template hands them the font. Embed only a font whose license allows that.
 
 `collectFontRequests` lists the families a template needs and where each is
 declared, including the families a variant's deltas and barcodes bring in.
+
+`fontUsage(template)` maps each family to the weights it is used at and
+whether any of it is italic, across text, spans, barcodes and variants.
+`googleCss2Url(family, weights?, italic?)` builds the Google Fonts css2
+stylesheet URL for those, and `fontRequestKey(request)` names the bytes a
+request resolves to, for a cache. All three, with `defaultFontFamily`, also
+come from `@freshcoat-js/coatfile/fonts`, which leaves out the font loaders:
+
+```ts
+import { fontUsage, googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+
+for (const [family, { weights, italic }] of fontUsage(template))
+	console.log(googleCss2Url(family, weights, italic));
+```
 
 ### Resolving fonts
 
@@ -1084,6 +1178,15 @@ sets to `left`, or to `start` when a `direction` is given. A justified paragraph
 stretches the spaces of every line but its last, which `alignLast` sets
 (`start` by default, or any other `align` value). A line with no space to
 stretch stays at its natural width.
+
+### Text case
+
+`case` is `upper`, `lower`, `title` or `original`. Title case capitalises a
+letter whose preceding character is not a Unicode letter, number or underscore,
+looking across span boundaries, so `élan émile` becomes `Élan Émile` and a word
+split over two spans keeps one capital. `applyCase(text, mode, prevChar?)`
+applies the same rule; pass `{ preserveLength: true }` to keep a character whose
+cased form changes length (`ß` in upper case), so string indices stay stable.
 
 ## Spec
 

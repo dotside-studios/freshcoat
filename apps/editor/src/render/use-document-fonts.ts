@@ -1,5 +1,6 @@
 import {
 	collectFontRequests,
+	fontRequestKey,
 	resolveTemplateFonts,
 	type Template,
 } from "@freshcoat-js/coatfile";
@@ -100,21 +101,7 @@ export function fontKey(template: Template | null): FontKey {
 function computeFontKey(template: Template): FontKey {
 	const requests = collectFontRequests(template);
 	return {
-		key: requests
-			.map((r) => `${r.family}|${descriptorKey(r)}`)
-			.sort()
-			.join("\n"),
+		key: requests.map(fontRequestKey).sort().join("\n"),
 		families: requests.map((r) => r.family).sort(),
 	};
-}
-
-function descriptorKey(
-	request: ReturnType<typeof collectFontRequests>[number],
-): string {
-	if (!("descriptor" in request)) return "none";
-	const d = request.descriptor;
-	// A data: src can be large; its length and tail identify it well enough.
-	return d.kind === "local"
-		? `local:${d.files.map((f) => `${f.weight}:${f.src.length}:${f.src.slice(-32)}`).join(",")}`
-		: `${d.kind}:${d.url}`;
 }

@@ -8,7 +8,7 @@ export type FrameSlot = { name: string; label: string; required: true };
 export type ProductRegistryEntry = {
 	sku: string;
 	displayName: string;
-	/** Exact print size in pixels (CR80 at ~300 DPI = 1013×638). Under
+	/** Exact print size in pixels (CR80 at ~300 DPI = 1012×638). Under
 	 *  sizeMode "exact" frames must measure exactly this (either orientation)
 	 *  and template dims are emitted as these ints; under "from-design" it is
 	 *  only a seed — the design's own measurement wins. */

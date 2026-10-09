@@ -7,6 +7,7 @@ import type {
 import {
 	applyVariant,
 	base64ToBytes,
+	hiddenElementIds,
 	templateFieldRefs,
 } from "@freshcoat-js/coatfile";
 import { childEntries, keyOf, MASK_SOURCE } from "./path";
@@ -88,11 +89,7 @@ function build(
 			? undefined
 			: variants?.find((v) => v.id === variantId);
 	if (variant) one = applyVariant(one, variant.id, { hidden: "keep" });
-	const dropped = new Set(
-		variant?.overrides.flatMap((ov) =>
-			(ov.elements ?? []).filter((d) => d.hidden).map((d) => d.id),
-		),
-	);
+	const dropped = hiddenElementIds(one, variant?.id, frame.name);
 	const resolved = one.template_data[0];
 
 	const pathIds = new Map<string, string>();

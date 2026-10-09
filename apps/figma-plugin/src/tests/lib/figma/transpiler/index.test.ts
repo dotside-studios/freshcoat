@@ -44,7 +44,7 @@ const META = { id: "t", name: "T", version: "1.0.0", formatVersion: "1.0" };
 const EXACT_PRODUCT: ProductRegistryEntry = {
 	sku: "card_cr80",
 	displayName: "CR80 Card",
-	width: 1013,
+	width: 1012,
 	height: 638,
 	frames: [
 		{ name: "front", label: "Front", required: true },
@@ -129,10 +129,10 @@ function makeInput(opts: {
 describe("transpile (exact sizing)", () => {
 	it("emits the exact canonical dims for an exactly-sized landscape card", async () => {
 		const out = await transpile(
-			makeInput({ frontSize: [1013, 638], backSize: [1013, 638] }),
+			makeInput({ frontSize: [1012, 638], backSize: [1012, 638] }),
 		);
 		const t = out.template as { width: number; height: number };
-		expect(t.width).toBe(1013);
+		expect(t.width).toBe(1012);
 		expect(t.height).toBe(638);
 	});
 
@@ -141,14 +141,14 @@ describe("transpile (exact sizing)", () => {
 			makeInput({ frontSize: [1012, 638], backSize: [1012, 638] }),
 		);
 		const t = out.template as { width: number; height: number };
-		expect(t.width).toBe(1013);
+		expect(t.width).toBe(1012);
 		expect(t.height).toBe(638);
 	});
 
 	it("throws with a suggested size when a side is off-size", async () => {
 		await expect(
-			transpile(makeInput({ frontSize: [1000, 630], backSize: [1013, 638] })),
-		).rejects.toThrow(/exact_size|resize .* 1013.638/i);
+			transpile(makeInput({ frontSize: [1000, 630], backSize: [1012, 638] })),
+		).rejects.toThrow(/exact_size|resize .* 1012.638/i);
 	});
 
 	it("rejects a side whose orientation disagrees with the first, in the canvas's terms", async () => {
@@ -156,8 +156,8 @@ describe("transpile (exact sizing)", () => {
 		// because the front already settled the canvas as landscape. The author
 		// gets the target dims rather than the word "orientation".
 		await expect(
-			transpile(makeInput({ frontSize: [1013, 638], backSize: [638, 1013] })),
-		).rejects.toThrow(/'back' is 638×1013 — resize to 1013×638/);
+			transpile(makeInput({ frontSize: [1012, 638], backSize: [638, 1012] })),
+		).rejects.toThrow(/'back' is 638×1012 — resize to 1012×638/);
 	});
 
 	it("reports every off-size side at once, not just the first", async () => {
@@ -173,7 +173,7 @@ describe("transpile (exact sizing)", () => {
 			nodeName: "Front",
 			width: 1000,
 			height: 630,
-			expectedWidth: 1013,
+			expectedWidth: 1012,
 			expectedHeight: 638,
 		});
 	});
@@ -181,7 +181,7 @@ describe("transpile (exact sizing)", () => {
 	it("does not build elements when a side is off-size", async () => {
 		// The size gate runs as a pre-pass, so an off-size export costs one tree
 		// fetch per slot and no rasterization.
-		const input = makeInput({ frontSize: [1000, 630], backSize: [1013, 638] });
+		const input = makeInput({ frontSize: [1000, 630], backSize: [1012, 638] });
 		await expect(transpile(input)).rejects.toThrow(SizeMismatchError);
 		expect(input.renderImage).not.toHaveBeenCalled();
 	});
@@ -191,8 +191,8 @@ describe("transpile (variants from instances)", () => {
 	it("emits Default + one variant per colorway instance", async () => {
 		const out = await transpile(
 			makeInput({
-				frontSize: [1013, 638],
-				backSize: [1013, 638],
+				frontSize: [1012, 638],
+				backSize: [1012, 638],
 				variants: [
 					{ label: "Amber", frontFill: "#ffbf00", backFill: "#ffbf00" },
 					{ label: "Sky", frontFill: "#00aaff", backFill: "#00aaff" },
@@ -213,8 +213,8 @@ describe("transpile (variants from instances)", () => {
 	it("omits variants entirely when there are no colorway instances", async () => {
 		const out = await transpile(
 			makeInput({
-				frontSize: [1013, 638],
-				backSize: [1013, 638],
+				frontSize: [1012, 638],
+				backSize: [1012, 638],
 				variants: [],
 			}),
 		);
@@ -225,8 +225,8 @@ describe("transpile (variants from instances)", () => {
 
 	it("does not throw when a colorway's perSide omits a side, and only overrides the present side", async () => {
 		const input = makeInput({
-			frontSize: [1013, 638],
-			backSize: [1013, 638],
+			frontSize: [1012, 638],
+			backSize: [1012, 638],
 		});
 		input.variants = [
 			{
@@ -246,8 +246,8 @@ describe("transpile (variants from instances)", () => {
 	it("does not invoke renderImage for a pure-paint variant (no flatten/static-image content)", async () => {
 		const renderImage = vi.fn();
 		const input = makeInput({
-			frontSize: [1013, 638],
-			backSize: [1013, 638],
+			frontSize: [1012, 638],
+			backSize: [1012, 638],
 			variants: [{ label: "Amber", frontFill: "#ffbf00", backFill: "#ffbf00" }],
 		});
 		input.renderImage = renderImage;
@@ -263,7 +263,7 @@ describe("transpile (variant element deltas)", () => {
 	const singleSlotProduct: ProductRegistryEntry = {
 		sku: "card_cr80",
 		displayName: "CR80 Card",
-		width: 1013,
+		width: 1012,
 		height: 638,
 		frames: [{ name: "front", label: "Front", required: true }],
 	};
@@ -310,7 +310,7 @@ describe("transpile (variant element deltas)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: bgFill ? [{ type: "SOLID", color: hexToRgba(bgFill) }] : [],
 			children,
 		} as unknown as FigmaContainerNode;
@@ -324,7 +324,7 @@ describe("transpile (variant element deltas)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
@@ -426,7 +426,7 @@ describe("transpile (variant raster assets are embedded)", () => {
 	const singleSlotProduct: ProductRegistryEntry = {
 		sku: "card_cr80",
 		displayName: "CR80 Card",
-		width: 1013,
+		width: 1012,
 		height: 638,
 		frames: [{ name: "front", label: "Front", required: true }],
 	};
@@ -466,7 +466,7 @@ describe("transpile (variant raster assets are embedded)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
 			children: [photoRect(photoNodeId)],
 		} as unknown as FigmaContainerNode;
@@ -492,7 +492,7 @@ describe("transpile (variant raster assets are embedded)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
@@ -539,7 +539,7 @@ describe("transpile (deep id uniqueness across nested frames)", () => {
 	const singleSlotProduct: ProductRegistryEntry = {
 		sku: "card_cr80",
 		displayName: "CR80 Card",
-		width: 1013,
+		width: 1012,
 		height: 638,
 		frames: [{ name: "front", label: "Front", required: true }],
 	};
@@ -607,7 +607,7 @@ describe("transpile (deep id uniqueness across nested frames)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: [],
 			children: [
 				textNode("1:2", "name", topColor, {
@@ -636,7 +636,7 @@ describe("transpile (deep id uniqueness across nested frames)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
@@ -2469,7 +2469,7 @@ describe("transpile (blend modes)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: [],
 			children: [
 				{
@@ -2494,20 +2494,20 @@ describe("transpile (blend modes)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 				back: {
 					fileKey: "FK",
 					nodeId: "back",
 					nodeName: "Back",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
 			metadata: META,
 			fetchNodeTree: async (_k, id) =>
-				id === "front" ? cardWith(blendMode) : frameNode("back", 1013, 638),
+				id === "front" ? cardWith(blendMode) : frameNode("back", 1012, 638),
 			renderImage: async () => ({
 				blob: new Blob([new Uint8Array([1])]),
 				sha256: "abc",
@@ -2551,7 +2551,7 @@ describe("transpile (blend modes)", () => {
 describe("transpile (shape warnings)", () => {
 	async function warningsFor(rect: Record<string, unknown>) {
 		const card = {
-			...frameNode("front", 1013, 638),
+			...frameNode("front", 1012, 638),
 			children: [
 				{
 					id: "1:2",
@@ -2570,7 +2570,7 @@ describe("transpile (shape warnings)", () => {
 			fileKey: "FK",
 			nodeId,
 			nodeName: nodeId,
-			width: 1013,
+			width: 1012,
 			height: 638,
 		});
 		const out = await transpile({
@@ -2578,7 +2578,7 @@ describe("transpile (shape warnings)", () => {
 			picks: { front: pick("front"), back: pick("back") },
 			metadata: META,
 			fetchNodeTree: async (_k, id) =>
-				id === "front" ? card : frameNode("back", 1013, 638),
+				id === "front" ? card : frameNode("back", 1012, 638),
 			renderImage: vi.fn(),
 		});
 		return out.warnings.map((w) => w.code);
@@ -2614,7 +2614,7 @@ describe("transpile (bound text names its element)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: [],
 			children: [
 				{
@@ -2654,14 +2654,14 @@ describe("transpile (bound text names its element)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 				back: {
 					fileKey: "FK",
 					nodeId: "back",
 					nodeName: "Back",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
@@ -2692,7 +2692,7 @@ describe("transpile (bound text names its element)", () => {
 			fileKey: "FK",
 			nodeId,
 			nodeName: nodeId,
-			width: 1013,
+			width: 1012,
 			height: 638,
 		});
 		const out = await transpile({
@@ -2721,7 +2721,7 @@ describe("transpile (rotated child of a live auto-layout)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			fills: [],
 			children: [
 				{
@@ -2778,20 +2778,20 @@ describe("transpile (rotated child of a live auto-layout)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 				back: {
 					fileKey: "FK",
 					nodeId: "back",
 					nodeName: "Back",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
 			metadata: META,
 			fetchNodeTree: async (_k, id) =>
-				id === "front" ? tree() : frameNode("back", 1013, 638),
+				id === "front" ? tree() : frameNode("back", 1012, 638),
 			renderImage: vi.fn(),
 		});
 		const t = out.template as {
@@ -2844,7 +2844,7 @@ describe("transpile (a group that carries an effect)", () => {
 			visible: true,
 			opacity: 1,
 			blendMode: "NORMAL",
-			absoluteBoundingBox: { x: 0, y: 0, width: 1013, height: 638 },
+			absoluteBoundingBox: { x: 0, y: 0, width: 1012, height: 638 },
 			absoluteTransform: [
 				[1, 0, 0],
 				[0, 1, 0],
@@ -2911,20 +2911,20 @@ describe("transpile (a group that carries an effect)", () => {
 					fileKey: "FK",
 					nodeId: "front",
 					nodeName: "Front",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 				back: {
 					fileKey: "FK",
 					nodeId: "back",
 					nodeName: "Back",
-					width: 1013,
+					width: 1012,
 					height: 638,
 				},
 			},
 			metadata: META,
 			fetchNodeTree: async (_k, id) =>
-				id === "front" ? tree() : frameNode("back", 1013, 638),
+				id === "front" ? tree() : frameNode("back", 1012, 638),
 			renderImage: vi.fn(),
 		});
 		const t = out.template as {

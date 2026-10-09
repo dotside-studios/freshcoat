@@ -24,7 +24,6 @@ import {
 import {
 	patchBindings,
 	undoDatasets,
-	withRecordStatus,
 	workspaceSnapshot,
 } from "~/state/workspace";
 import { deepFreeze, doc, frozenDoc } from "./doc-fixture";
@@ -207,10 +206,7 @@ describe("recipes that change nothing return their base", () => {
 		).toBe(s);
 	});
 
-	test("withRecordStatus and patchBindings", () => {
-		const datasets = [dataset("a", 3)];
-		expect(withRecordStatus(datasets, "a", ["r_a1"], "pending")).toBe(datasets);
-		expect(withRecordStatus(datasets, "b", ["r_a1"], "failed")).toBe(datasets);
+	test("patchBindings", () => {
 		const templates = workspace().workspace?.templates ?? [];
 		const bound = templates.find((t) => t.binding);
 		expect(

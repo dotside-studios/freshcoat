@@ -1,7 +1,12 @@
 // Throughput of the state layer, comparing Immer with manual updates. Run with
 // `bunx vitest bench --run src/tests/perf`; `bun run test` leaves it out.
 import type { Template } from "@freshcoat-js/coatfile";
-import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import {
+	type Dataset,
+	type ExportPreset,
+	type Workspace,
+	withRecordStatus,
+} from "@freshcoat-js/workspace";
 import { bench, describe } from "vitest";
 import { translateLayers } from "~/doc/geometry";
 import {
@@ -14,11 +19,7 @@ import {
 } from "~/doc/ops";
 import { membershipCard } from "~/samples/membership-card";
 import { type Action, initialState, reduce } from "~/state/store";
-import {
-	commitDatasets,
-	withRecordStatus,
-	workspaceState,
-} from "~/state/workspace";
+import { commitDatasets, workspaceState } from "~/state/workspace";
 import { geometryOf } from "../doc-fixture";
 
 function dataset(id: string, rows: number): Dataset {

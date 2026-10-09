@@ -96,6 +96,38 @@ describe("exportWorkspace with fileOutput", () => {
 		expect(head).toBe("%PDF-");
 	});
 
+	it("writes record statuses back when the preset marks exports", async () => {
+		const now = new Date("2026-10-01T09:00:00Z");
+		const selected: ExportPreset = {
+			...small,
+			records: "selected",
+			selected: ["r_00000001", "r_00000005"],
+		};
+		const result = await exportWorkspace(workspace, selected, {
+			renderer,
+			fonts,
+			output: fileOutput(join(dir, "marked.zip")),
+			now,
+		});
+		const records = result.workspace.datasets[0]?.records ?? [];
+		expect(
+			records
+				.filter((r) => selected.selected?.includes(r.id))
+				.map((r) => [r.status, r.exportedAt]),
+		).toEqual([
+			["exported", now.toISOString()],
+			["exported", now.toISOString()],
+		]);
+		expect(workspace.datasets[0]?.records[0]?.status).toBe("pending");
+
+		const unmarked = await exportWorkspace(
+			workspace,
+			{ ...selected, markExported: false },
+			{ renderer, fonts, output: fileOutput(join(dir, "unmarked.zip")) },
+		);
+		expect(unmarked.workspace).toBe(workspace);
+	});
+
 	it("removes the partial zip when cancelled", async () => {
 		const out = join(dir, "cancelled.zip");
 		const controller = new AbortController();

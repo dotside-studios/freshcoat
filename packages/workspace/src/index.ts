@@ -136,6 +136,12 @@ export {
 	pdfRenderScale,
 	planExport,
 } from "./plan";
+export {
+	mapDatasetRecords,
+	type RecordStatusExtra,
+	recordStatusSetter,
+	withRecordStatus,
+} from "./status";
 export type * from "./types";
 export {
 	blobOutput,

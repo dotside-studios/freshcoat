@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Template } from "@freshcoat-js/coatfile";
 import { createRenderer, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
@@ -8,7 +7,7 @@ import {
 	codepointLabel,
 	type GlyphCheckItem,
 	summarizeGlyphs,
-} from "~/export/glyph-preflight";
+} from "./glyph-preflight";
 
 const template = {
 	format_version: "1.0",
