@@ -1,7 +1,10 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
+import {
+	type Element,
+	resizeVectorPath,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import type { Node } from "@freshcoat-js/engine";
-import { scalePathData } from "@freshcoat-js/engine";
-import { ellipsePath, isEllipseVector, round2 } from "./factories";
+import { round2 } from "./factories";
 import {
 	getElement,
 	isAncestor,
@@ -475,7 +478,7 @@ export function applyRect(
 			...next,
 			properties: {
 				...next.properties,
-				d: resizedPath(el, width, height),
+				d: resizeVectorPath(el, { width, height }),
 			},
 		};
 	}
@@ -497,25 +500,6 @@ export function applyRect(
 		updateAt(t, p.side, p.path, () => next),
 		[key],
 	);
-}
-
-function resizedPath(
-	el: Extract<Element, { type: "vector" }>,
-	width: number,
-	height: number,
-): string {
-	const d = el.properties.d;
-	if (isEllipseVector(el)) return ellipsePath(width, height);
-	const old = el.size;
-	if (!old || !old.width || !old.height) return d;
-	const sx = width / old.width;
-	const sy = height / old.height;
-	if (sx === 1 && sy === 1) return d;
-	try {
-		return scalePathData(d, sx, sy);
-	} catch {
-		return d;
-	}
 }
 
 /** Moves layers by an absolute delta. A layer under a rotated ancestor moves

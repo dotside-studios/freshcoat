@@ -461,6 +461,11 @@ leaves the path different from the resized base's.
 - A vector's `d` scales with its box on each axis, arcs included. Path data
   that does not parse keeps its authored coordinates.
 
+`resizeVectorPath(vector, size)` is that path for one vector at a new size, and
+`barcodeBox(elementOrSymbology, box)` is the box a code takes in `box`: the
+square of its shorter side, centred, for a code that only reads square, and
+`box` itself for any other.
+
 ## Vectors and blend modes
 
 A `vector` element's `d` is SVG path data with any number of subpaths, arcs
@@ -711,6 +716,9 @@ There is no ellipse element. An ellipse is a `vector` whose `d` is two arcs
 across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
+
+`ellipsePath(width, height)` writes that path, and `isEllipsePath(d, width,
+height)` tells whether a path is one.
 
 ## Field patterns
 

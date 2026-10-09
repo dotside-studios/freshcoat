@@ -71,10 +71,12 @@ export {
 } from "./bleed";
 export { compile } from "./compile";
 export {
+	barcodeBox,
 	constrainBox,
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorPath,
 } from "./constraints";
 export {
 	collectFontBytes,
@@ -95,7 +97,7 @@ export {
 	raiseFormatVersion,
 } from "./format";
 export { linearGradientAngle, linearGradientPoints } from "./gradient";
-export { isEllipsePath } from "./ellipse-path";
+export { ellipsePath, isEllipsePath } from "./ellipse-path";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export {
 	parseTrimValue,

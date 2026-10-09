@@ -8,7 +8,12 @@ import { resizeBackground, resizeFrames, sameSize } from "./relayout";
 import type { Element, Size, Template, Variant } from "./types";
 import { applyVariant, type VariantElementDelta } from "./variants";
 
-export { constrainBox, resizeElements } from "./relayout";
+export {
+	barcodeBox,
+	constrainBox,
+	resizeElements,
+	resizeVectorPath,
+} from "./relayout";
 
 /**
  * The template laid out at `width` x `height` design units: every frame's
