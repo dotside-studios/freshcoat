@@ -16,6 +16,7 @@
 		"./image": "./src/image-info.ts",
 		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
+		"./pdf": "./src/pdf/index.ts",
 		"./svg": "./src/svg/index.ts",
 		"./svg/sniff": "./src/svg/sniff.ts"
 	},
@@ -26,7 +27,8 @@
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
 	"dependencies": {
-		"canvaskit-wasm": "0.41.1"
+		"canvaskit-wasm": "0.41.1",
+		"fontkit": "2.0.4"
 	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",

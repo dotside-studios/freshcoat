@@ -21,6 +21,7 @@ import type {
 	Image,
 	ImageFilter,
 	ImageInfo,
+	Paragraph,
 	InputMatrix,
 	Paint,
 	Path,
@@ -179,7 +180,7 @@ const LAYER_BLUR_SIGMA = (blur: number) => blur / 2.2727;
 
 // A per-frame bin of CanvasKit handles to free after the snapshot is taken —
 // shaders, filters, paths, images, etc. leak native memory otherwise.
-type Bin = {
+export type Bin = {
 	track: <T>(o: T) => T;
 	free: () => void;
 	// Reusing an equal table keeps a photo-heavy scene from allocating and
@@ -193,7 +194,7 @@ type Bin = {
 	// one. Callers must not mutate the result.
 	path: (ck: CanvasKit, d: string, evenOdd?: boolean) => Path | null;
 };
-function makeBin(cache?: PaintCacheState | null): Bin {
+export function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
 	const luts = cache?.luts ?? createLutImages();
 	const track = <T>(o: T): T => {
@@ -393,7 +394,7 @@ function tileMode(ck: CanvasKit, spread: GradientSpread | undefined) {
 
 // The focus in the circle's own space, before the ellipse's local matrix, or
 // null when the gradient starts from a point at its centre.
-function focalPoint(
+export function focalPoint(
 	fill: Extract<ResolvedFill, { kind: "radial" }>,
 	cx: number,
 	cy: number,
@@ -747,43 +748,145 @@ function drawText(
 		canvas.drawParagraph(para, left, (line.baseline ?? line.y) - ascent);
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
-		const baseline = line.baseline ?? line.y;
-		let runs: GlyphRun[] | undefined;
-		for (const span of line.spans) {
-			if (!span.font.decoration) continue;
-			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
+		const decorations = lineDecorations(
+			ck,
+			provider,
+			bin,
+			line,
+			para,
+			ascent,
+			left,
+		);
+		for (const d of decorations) {
 			const p = bin.track(new ck.Paint());
 			p.setAntiAlias(true);
 			if (fillShader) p.setShader(fillShader);
-			else p.setColor(toColor(ck, span.color));
-			let segments: [number, number][] = [[span.x, span.x + span.width]];
-			if (span.font.decoration === "underline" && span.font.skipInk !== false) {
-				if (!runs) {
-					runs = para.getShapedLines()[0]?.runs ?? [];
-					for (const run of runs) bin.track(run.typeface);
-				}
-				const y0 = baseline - ascent;
-				const gaps: number[] = [];
-				for (const run of runs) {
-					const hits = runFont(ck, bin, run).getGlyphIntercepts(
-						run.glyphs,
-						run.positions,
-						top - y0,
-						top + thickness - y0,
-					);
-					for (const x of hits) gaps.push(left + x);
-				}
-				segments = skipInkSegments(
-					span.x,
-					span.x + span.width,
-					gaps,
-					Math.max(thickness, span.font.size * 0.05),
-				);
-			}
-			for (const [x0, x1] of segments)
-				canvas.drawRect(ck.LTRBRect(x0, top, x1, top + thickness), p);
+			else p.setColor(toColor(ck, d.color));
+			canvas.drawRect(
+				ck.LTRBRect(d.x0, d.top, d.x1, d.top + d.thickness),
+				p,
+			);
 		}
 	}
+}
+
+export type DecorationRect = {
+	x0: number;
+	x1: number;
+	top: number;
+	thickness: number;
+	color: string;
+};
+
+// Each decorated span's underline or strikethrough on a shaped line, as rects,
+// with an underline broken where glyphs cross it.
+function lineDecorations(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	line: TextLine,
+	para: Paragraph,
+	ascent: number,
+	left: number,
+): DecorationRect[] {
+	const out: DecorationRect[] = [];
+	const baseline = line.baseline ?? line.y;
+	let runs: GlyphRun[] | undefined;
+	for (const span of line.spans) {
+		if (!span.font.decoration) continue;
+		const { top, thickness } = spanDecoration(ck, provider, span, baseline);
+		let segments: [number, number][] = [[span.x, span.x + span.width]];
+		if (span.font.decoration === "underline" && span.font.skipInk !== false) {
+			if (!runs) {
+				runs = para.getShapedLines()[0]?.runs ?? [];
+				for (const run of runs) bin.track(run.typeface);
+			}
+			const y0 = baseline - ascent;
+			const gaps: number[] = [];
+			for (const run of runs) {
+				const hits = runFont(ck, bin, run).getGlyphIntercepts(
+					run.glyphs,
+					run.positions,
+					top - y0,
+					top + thickness - y0,
+				);
+				for (const x of hits) gaps.push(left + x);
+			}
+			segments = skipInkSegments(
+				span.x,
+				span.x + span.width,
+				gaps,
+				Math.max(thickness, span.font.size * 0.05),
+			);
+		}
+		for (const [x0, x1] of segments)
+			out.push({ x0, x1, top, thickness, color: span.color });
+	}
+	return out;
+}
+
+export type ShapedTextLine = {
+	line: TextLine;
+	// Where the line's run positions are measured from.
+	x: number;
+	y: number;
+	runs: GlyphRun[];
+	// The span each code unit of the line's text belongs to.
+	spanAt: number[];
+	decorations: DecorationRect[];
+};
+
+// A straight text command's lines shaped as drawText shapes them, for a
+// backend that places the glyphs itself. The caller frees what `bin` holds.
+export function shapeTextLines(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+): ShapedTextLine[] {
+	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	const out: ShapedTextLine[] = [];
+	for (const line of cmd.layout.lines) {
+		const first = line.spans[0];
+		if (!first) continue;
+		const { para, ascent } = shapeLine(
+			ck,
+			provider,
+			cmd,
+			line,
+			fallback,
+			null,
+			null,
+		);
+		bin.track(para);
+		const left =
+			line.direction === "rtl"
+				? Math.min(...line.spans.map((s) => s.x))
+				: first.x;
+		const runs = para.getShapedLines().flatMap((l) => l.runs);
+		for (const run of runs) bin.track(run.typeface);
+		const spanAt: number[] = [];
+		line.spans.forEach((span, i) => {
+			for (let k = 0; k < span.text.length; k++) spanAt.push(i);
+		});
+		out.push({
+			line,
+			x: left,
+			y: (line.baseline ?? line.y) - ascent,
+			runs,
+			spanAt,
+			decorations: lineDecorations(
+				ck,
+				provider,
+				bin,
+				line,
+				para,
+				ascent,
+				left,
+			),
+		});
+	}
+	return out;
 }
 
 const decorationMetrics = new WeakMap<
@@ -4432,7 +4535,7 @@ function writeBackground(
 }
 
 // Collect the unique font requests + image srcs a scene's commands declare.
-function collectAssets(commands: Command[]): {
+export function collectAssets(commands: Command[]): {
 	fonts: FontRequest[];
 	images: string[];
 } {

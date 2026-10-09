@@ -224,7 +224,7 @@ function paeth(a: number, b: number, c: number): number {
 // implement, and this needs nothing but the compression stream itself. The write
 // is deliberately not awaited before reading starts — a large frame fills the
 // stream's queue, and waiting for the write to settle first would deadlock.
-async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
+export async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 	const cs = new CompressionStream("deflate");
 	const writer = cs.writable.getWriter();
 	const written = writer

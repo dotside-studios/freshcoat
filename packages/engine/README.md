@@ -222,6 +222,26 @@ that can shape them, such as coatfile's `svgToElements`. A pattern's tiles are
 not clipped to the tile, and a pattern of more than 1,000 tiles uses its
 fallback color.
 
+## PDF output
+
+`renderer.renderPdf(scene, { width, height, dpi })` lays the scene out as
+`render` does and writes one PDF page of vectors, `dpi` design units to the
+inch. `renderer.paintPdf(commands)` does the same for a compiled scene.
+Shapes, linear and radial gradients, strokes (alignment, dashes, caps, joins
+and trims), clips, alpha and luminance masks, opacity, isolated groups and
+the blend modes PDF defines are drawn natively. Text is shaped by CanvasKit
+exactly as it renders and drawn as glyph outlines read with fontkit, variable
+fonts and WOFF2 included, so it is not selectable. Images are embedded at
+their source resolution, a JPEG as it is; an SVG image is drawn as vectors
+and a bitmap of a few flat colours, as a code is, as rectangles.
+
+Shadows, blurs, `adjust`, angular and pattern fills, reflected and repeated
+gradients, tiled images, text on a curve, the `plus` and `linear-burn` blend
+modes, the frame finish and text or filters inside an SVG image have no PDF
+equivalent. Each is left out and reported once per layer as a
+`vector_unsupported` warning, so a caller can render that scene as pixels
+instead.
+
 ## Subpaths
 
 The barrel stays free of DOM and Node APIs; platform code lives on its own
@@ -233,6 +253,7 @@ subpath.
 | `@freshcoat-js/engine/node` | `loadCanvasKit`, `initCanvasKit`, `fileLoader`, `canvasKitBinDir` for Node and Bun |
 | `@freshcoat-js/engine/browser` | `loadCanvasKit(baseUrl)` for a page or a worker |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
+| `@freshcoat-js/engine/pdf` | `paintPdf`, the PDF painter `renderPdf` and `paintPdf` call, for a runtime of your own |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 | `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, and `rgbIdat` for passing an RGB PNG's data through as is |

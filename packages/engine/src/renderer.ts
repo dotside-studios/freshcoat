@@ -112,6 +112,30 @@ export type RenderOptions<O extends Output = DefaultOutput> = PaintOptions<O> & 
 	precision?: Precision;
 };
 
+export type PaintPdfOptions = {
+	/** Bytes for this paint only, by src. */
+	images?: Map<string, Uint8Array>;
+	/** Design units per inch, which sets the page size. Default 72. */
+	dpi?: number;
+	title?: string;
+	date?: Date;
+};
+
+export type RenderPdfOptions = PaintPdfOptions & {
+	/** The design size: layout and text shaping happen here. */
+	width: number;
+	height: number;
+	leadingTrim?: boolean;
+};
+
+export type PdfFrame = {
+	bytes: Uint8Array;
+	warnings: PaintWarning[];
+	/** Page size in points. */
+	width: number;
+	height: number;
+};
+
 export type RendererCompileOptions = Omit<
 	CompileSceneOptions,
 	"textEngine" | "measure" | "fontMetrics"
@@ -135,6 +159,14 @@ export type Renderer = {
 		scene: Node,
 		options: RenderOptions<O>,
 	): Promise<FrameFor<O>>;
+	/**
+	 * Lays the scene out as `render` does and paints it as one PDF page of
+	 * vectors. What a PDF cannot draw is left out and reported as a
+	 * `vector_unsupported` warning.
+	 */
+	renderPdf(scene: Node, options: RenderPdfOptions): Promise<PdfFrame>;
+	/** Paints a compiled scene as one PDF page of vectors, as `renderPdf`. */
+	paintPdf(commands: Command[], options?: PaintPdfOptions): Promise<PdfFrame>;
 	/** Resolves layout and line heights, as compile does first. */
 	prepare(scene: Node): Node;
 	compile(scene: Node, options: RendererCompileOptions): Command[];
@@ -302,6 +334,23 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		}
 	};
 
+	const doPaintPdf = async (
+		commands: Command[],
+		{ images, dpi, title, date }: PaintPdfOptions,
+	): Promise<PdfFrame> => {
+		const { paintPdf } = await import("./pdf/paint");
+		return paintPdf(
+			ck,
+			commands,
+			{
+				resolveFont: (req) => resolveFontRequest(req, fonts),
+				fonts,
+				loadBytes: mapLoader(images, load),
+			},
+			{ dpi, title, date },
+		);
+	};
+
 	const renderer: Renderer = {
 		ck,
 		get fonts() {
@@ -327,6 +376,23 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				});
 				return doPaint(commands, renderOptions);
 			});
+		},
+		renderPdf(scene, pdfOptions) {
+			alive();
+			return serial(() =>
+				doPaintPdf(
+					renderer.compile(scene, {
+						width: pdfOptions.width,
+						height: pdfOptions.height,
+						leadingTrim: pdfOptions.leadingTrim,
+					}),
+					pdfOptions,
+				),
+			);
+		},
+		paintPdf(commands, pdfOptions = {}) {
+			alive();
+			return serial(() => doPaintPdf(commands, pdfOptions));
 		},
 		prepare(scene) {
 			alive();

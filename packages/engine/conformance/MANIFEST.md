@@ -41,9 +41,11 @@ const report = await runConformance({
 });
 ```
 
-There is no second backend today and no plan for one. The seam exists because
-it is how the reference backend is graded, and because the alternative was
-leaving these semantics undocumented.
+The PDF painter in `src/pdf` reads the same `Command[]` but writes a document
+rather than pixels, so it is not graded here; `tests/pdf.test.ts` compares its
+pages with the reference render instead. The seam exists because it is how the
+reference backend is graded, and because the alternative was leaving these
+semantics undocumented.
 
 **Profiles**, not a forty-entry matrix, because a backend needs to answer "am I
 done" with something better than a percentage:
