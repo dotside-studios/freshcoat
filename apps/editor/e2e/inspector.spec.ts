@@ -124,16 +124,34 @@ test("editing text content repaints, and undo reverts", async ({ page }) => {
 	expect(await regionSum(page, box)).toBe(before);
 });
 
-test("double-clicking a selected text layer focuses its content", async ({
+test("double-clicking a selected mixed-style text layer shows its content in the inspector", async ({
 	page,
 }) => {
 	await openSample(page);
-	await run(page, `c.select(["${NAME}"])`);
+	await run(
+		page,
+		`c.edit((t) => {
+			const side = t.template_data[0];
+			const elements = side.elements.map((e, i) =>
+				i === 6 ? { ...e, properties: { ...e.properties, spans: [{ text: "Ada " }, { text: "Lovelace" }] } } : e,
+			);
+			return { ...t, template_data: [{ ...side, elements }, ...t.template_data.slice(1)] };
+		});
+		c.dispatch({ type: "setRightTab", tab: "content" });
+		c.dispatch({ type: "setPanels", panels: { right: false } });
+		c.select(["${NAME}"])`,
+	);
+	await settle(page);
 	const p = await artboardPoint(page, 64 + 120, 396 + 40);
 	await page.mouse.dblclick(p.x, p.y);
 	await expect(
-		inspector(page).getByRole("textbox", { name: "Text content" }),
-	).toBeFocused();
+		inspector(page).getByText("Mixed styles (2 spans)"),
+	).toBeVisible();
+	await expect(
+		inspector(page).getByRole("button", { name: "Flatten to plain text" }),
+	).toBeVisible();
+	await expect(page.getByLabel("Edit text on canvas")).toHaveCount(0);
+	expect(await state<string | null>(page, "s.textEdit")).toBeNull();
 });
 
 test("the Object menu groups align and distribute, which have shortcuts", async ({

@@ -59,6 +59,7 @@ export {
 } from "./export-scale";
 export {
 	clearFontBytesCache,
+	type FontFetch,
 	fontBytes,
 	resolveFontRequest,
 } from "./font-bytes";

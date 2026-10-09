@@ -75,6 +75,10 @@ export {
 	collectFontBytes,
 	collectFontRequests,
 	defaultFontFamily,
+	type FontCache,
+	type ResolvedTemplateFonts,
+	type ResolveTemplateFontsOptions,
+	resolveTemplateFonts,
 } from "./fonts";
 export {
 	FORMAT_MAJOR,

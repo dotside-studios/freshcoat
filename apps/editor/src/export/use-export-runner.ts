@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import { resolveTemplateFonts, type Template } from "@freshcoat-js/coatfile";
 import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import {
 	boundDatasetOf,
@@ -10,7 +10,7 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { settleAssets } from "~/app/source-assets";
-import { resolveTemplateFonts } from "~/render/fonts";
+import { fontCache } from "~/render/font-cache";
 import { assemblePdf } from "./pdf-client";
 import {
 	createWorkerPool,
@@ -88,7 +88,7 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 	const resolveFonts =
 		deps.resolveFonts ??
 		(async (template: Template) =>
-			(await resolveTemplateFonts(template)).fonts);
+			(await resolveTemplateFonts(template, { cache: fontCache })).fonts);
 	let pool: ReturnType<typeof createPool> | null = null;
 	let poolFonts: Map<string, Uint8Array[]> | null = null;
 	let controller: AbortController | null = null;

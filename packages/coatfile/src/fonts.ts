@@ -1,4 +1,9 @@
-import { fontBytes, resolveFontRequest } from "@freshcoat-js/engine";
+import {
+	type ByteLoader,
+	type FontFetch,
+	fontBytes,
+	resolveFontRequest,
+} from "@freshcoat-js/engine";
 import { childElements } from "./tree";
 import type {
 	Background,
@@ -83,26 +88,185 @@ export function collectFontRequests(template: Template): FontRequest[] {
 	});
 }
 
-// Fetch every font a template uses as bytes, keyed by family: what the
-// CanvasKit painter and the Paragraph text engine shape with.
-//
-// Resolution is per-family: a descriptor that doesn't fetch (a family declared
-// against a stylesheet URL that 404s, a CDN that's down, a timeout) leaves that
-// family out of the map and out of the painter's fallback chain, where it falls
-// back by name. It must not take the other families with it — the map is the
-// painter's ENTIRE font supply, so one dead URL propagating out of here renders
-// every glyph in the template, in every family, as tofu.
+export type FontCache = {
+	get(key: string): Promise<Uint8Array[] | undefined> | undefined;
+	set(key: string, bytes: Promise<Uint8Array[]>): unknown;
+	delete(key: string): unknown;
+};
+
+export type ResolveTemplateFontsOptions = {
+	// Every http(s) request goes through it; the global fetch when omitted.
+	fetch?: FontFetch;
+	// Reads a `local` font file src that is neither data: nor http(s).
+	load?: ByteLoader;
+	// Look an undeclared family up on Google Fonts by name. Defaults to true.
+	guessGoogle?: boolean;
+	// Holds fetched bytes across calls. An empty result is deleted again, so a
+	// family that failed is retried on the next call.
+	cache?: FontCache;
+};
+
+export type ResolvedTemplateFonts = {
+	// Font bytes per family, in the order the template uses them.
+	fonts: Map<string, Uint8Array[]>;
+	// Families the template declares in its `fonts` block.
+	declared: string[];
+	// Undeclared families Google Fonts had under that name.
+	guessed: string[];
+	// Families nothing produced bytes for. Their text paints with a fallback face.
+	missing: string[];
+};
+
+// Load every font a template's text and barcodes need, in the base design and
+// each variant. A declared family loads from its descriptor. A family the
+// `fonts` block does not describe is looked up on Google Fonts by name, at the
+// weights the template uses it at, unless `guessGoogle` is false. One family
+// that fails never takes the others with it: it is reported as missing.
+export async function resolveTemplateFonts(
+	template: Template,
+	options: ResolveTemplateFontsOptions = {},
+): Promise<ResolvedTemplateFonts> {
+	const { fetch, load, cache, guessGoogle = true } = options;
+	const weights = weightsByFamily(template);
+
+	const results = await Promise.all(
+		collectFontRequests(template).map(async (request) => {
+			if ("descriptor" in request) {
+				const bytes = await cached(cache, `d:${requestKey(request)}`, () =>
+					fontBytes(resolveFontRequest(request), load, fetch),
+				);
+				return { family: request.family, bytes, guessed: false };
+			}
+			if (!guessGoogle)
+				return { family: request.family, bytes: [], guessed: true };
+			const wanted = [...(weights.get(request.family) ?? [400])].sort(
+				(a, b) => a - b,
+			);
+			const bytes = await cached(
+				cache,
+				`g:${request.family}:${wanted.join(",")}`,
+				() =>
+					fontBytes(
+						{
+							kind: "descriptor",
+							descriptor: {
+								kind: "google",
+								family: request.family,
+								url: googleStylesheetUrl(request.family, wanted),
+							},
+						},
+						load,
+						fetch,
+					),
+			);
+			return { family: request.family, bytes, guessed: true };
+		}),
+	);
+
+	const fonts = new Map<string, Uint8Array[]>();
+	const declared: string[] = [];
+	const guessed: string[] = [];
+	const missing: string[] = [];
+	for (const { family, bytes, guessed: isGuess } of results) {
+		if (!isGuess) declared.push(family);
+		if (bytes.length === 0) {
+			missing.push(family);
+			continue;
+		}
+		fonts.set(family, bytes);
+		if (isGuess) guessed.push(family);
+	}
+	return {
+		fonts,
+		declared: declared.sort(),
+		guessed: guessed.sort(),
+		missing: missing.sort(),
+	};
+}
+
+// The declared-only resolution: the bytes of every family the `fonts` block
+// describes, with no Google guess and no report.
 export async function collectFontBytes(
 	template: Template,
+	options: Omit<ResolveTemplateFontsOptions, "guessGoogle"> = {},
 ): Promise<Map<string, Uint8Array[]>> {
-	const out = new Map<string, Uint8Array[]>();
-	for (const req of collectFontRequests(template)) {
-		try {
-			const bytes = await fontBytes(resolveFontRequest(req));
-			if (bytes.length) out.set(req.family, bytes);
-		} catch {
-			// Unresolvable family — see above.
+	return (
+		await resolveTemplateFonts(template, { ...options, guessGoogle: false })
+	).fonts;
+}
+
+// One stylesheet for every weight, the URL shape a declared `google` font has.
+function googleStylesheetUrl(family: string, weights: number[]): string {
+	return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+		family,
+	)}:wght@${weights.join(";")}&display=swap`;
+}
+
+// The weights each family is used at, across text, spans and barcodes in the
+// base design and each variant, so no face is fetched needlessly.
+export function weightsByFamily(template: Template): Map<string, Set<number>> {
+	const out = new Map<string, Set<number>>();
+	const add = (family: string, weight: number) => {
+		const set = out.get(family);
+		if (set) set.add(weight);
+		else out.set(family, new Set([weight]));
+	};
+	for (const t of withVariants(template)) {
+		const fallbackFamily = defaultFontFamily(t);
+		const walk = (el: Element | Background) => {
+			if (el.type === "text") {
+				const { font, spans } = el.properties;
+				add(font.family, font.weight ?? 400);
+				for (const span of spans ?? []) {
+					if (!span.font) continue;
+					add(
+						span.font.family ?? font.family,
+						span.font.weight ?? font.weight ?? 400,
+					);
+				}
+			}
+			if (el.type === "barcode") {
+				const family = barcodeFontFamily(el, fallbackFamily);
+				if (family) add(family, 400);
+			}
+			for (const child of childElements(el)) walk(child);
+		};
+		for (const frame of t.template_data) {
+			walk(frame.background);
+			for (const el of frame.elements) walk(el);
 		}
 	}
 	return out;
+}
+
+async function cached(
+	cache: FontCache | undefined,
+	key: string,
+	fetchBytes: () => Promise<Uint8Array[]>,
+): Promise<Uint8Array[]> {
+	const load = () =>
+		fetchBytes().then(
+			(bytes) => bytes.filter((b) => b.length > 0),
+			() => [] as Uint8Array[],
+		);
+	if (!cache) return load();
+	const hit = cache.get(key);
+	if (hit) {
+		const bytes = await hit.catch(() => undefined);
+		if (bytes?.length) return bytes;
+	}
+	const pending = load();
+	cache.set(key, pending);
+	const bytes = await pending;
+	if (bytes.length === 0) cache.delete(key);
+	return bytes;
+}
+
+function requestKey(
+	request: Extract<FontRequest, { descriptor: unknown }>,
+): string {
+	const d = request.descriptor;
+	return d.kind === "local"
+		? `${request.family}:local:${d.files.map((f) => `${f.weight}/${f.style ?? ""}/${f.src.length}/${f.src.slice(-48)}`).join(",")}`
+		: `${request.family}:${d.kind}:${d.url}`;
 }
