@@ -245,6 +245,30 @@ describe("packWorkspace", () => {
 		}
 	});
 
+	it("writes 1.1 for a variant fallback and reads it back without a warning", async () => {
+		const [member, plain] = ws.templates;
+		const variant = {
+			kind: "column",
+			column: "tier",
+			fallback: { kind: "image", field: "photo" },
+		} as const;
+		const w: Workspace = {
+			...ws,
+			templates: [
+				{ ...member, binding: { datasetId: "d_members", fields: {}, variant } },
+				plain,
+			],
+		};
+		const packed = await packWorkspace(w);
+		const files = unzipSync(new Uint8Array(await packed.arrayBuffer()));
+		expect(manifestOf(files).formatVersion).toBe("1.1");
+		const result = await unpackWorkspace(packed);
+		expect(result.ok && result.warnings).toEqual([]);
+		expect(result.ok && result.workspace.templates[0].binding?.variant).toEqual(
+			variant,
+		);
+	});
+
 	it("keeps guides in the manifest and leaves the template alone", async () => {
 		const [member, plain] = ws.templates;
 		const guides = {
@@ -637,6 +661,8 @@ describe("unpackWorkspace rejections", () => {
 		const minor = await withVersion("1.3");
 		expect(minor.ok).toBe(true);
 		expect(minor.ok && minor.warnings).toHaveLength(1);
+		const read = await withVersion("1.1");
+		expect(read.ok && read.warnings).toEqual([]);
 	});
 
 	it("missing_entry, for a template, a data file or an asset", async () => {

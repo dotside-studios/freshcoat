@@ -520,18 +520,6 @@ export type PaintWarning =
 	// An SVG source drew without a feature it uses (text, filters, patterns).
 	| { kind: "svg_unsupported"; src: string; feature: string }
 	| { kind: "font_load_failed"; family: string; error: string }
-	| { kind: "qr_generate_failed"; value: string; error: string }
-	// A barcode element compiled with no encoder registered, so it drew as a
-	// placeholder. `layer` is the element id.
-	| { kind: "barcode_unavailable"; symbology: string; layer?: string }
-	// The encoder refused the value; `message` says why, in its words.
-	| {
-			kind: "barcode_invalid";
-			symbology: string;
-			value: string;
-			message: string;
-			layer?: string;
-	  }
 	| { kind: "unhandled_op"; op: string }
 	// Text on a path ran past the path's end; the glyphs that did not fit are
 	// hidden.
@@ -566,16 +554,6 @@ export type PaintWarning =
 			component: "lut" | "lut3d" | "sharpen" | "gamut";
 			// The source node id when supplied; image src is used as a useful fallback.
 			layer?: string;
-	  }
-	// Part of a layer went past the output range and chroma was given back to hold
-	// the hue (see Adjust.gamut). Not a failure — the render is correct — but that
-	// area ends up less saturated than the source art. `clipped` and `pullback` are
-	// 0–1 shares; `layer` names the src when known.
-	| {
-			kind: "gamut_compressed";
-			layer?: string;
-			clipped: number;
-			pullback: number;
 	  };
 
 // What a runtime knows about a font request without fetching: pre-supplied bytes

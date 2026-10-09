@@ -1,8 +1,9 @@
-import { setBarcodeEncoder, type Template } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import type { Template } from "@freshcoat-js/coatfile";
+import { createRenderer, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit as loadCanvasKitAt } from "@freshcoat-js/engine/browser";
 import {
 	createItemRenderer,
+	IMAGE_CACHE_PIXELS,
 	type ItemRenderer,
 } from "@freshcoat-js/workspace/export";
 import type {
@@ -22,16 +23,18 @@ const scope = self as unknown as WorkerScope;
 // JPEG nor the WebP encoder, and would answer every photo export in PNG.
 const CANVASKIT_BASE = `${__CANVASKIT_BASE__}/full`;
 
+let renderer: Renderer | undefined;
 let items: ItemRenderer | undefined;
 let fonts = new Map<string, Uint8Array[]>();
 /** the template of the last render; the pool sends it only when it changes */
 let current: Template | undefined;
 
 async function itemRenderer(): Promise<ItemRenderer> {
-	items ??= createItemRenderer({
+	renderer ??= await createRenderer({
 		ck: await loadCanvasKitAt(CANVASKIT_BASE),
-		fonts,
+		cache: { maxImagePixels: IMAGE_CACHE_PIXELS },
 	});
+	items ??= createItemRenderer({ renderer, fonts });
 	return items;
 }
 
@@ -65,7 +68,6 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		case "init": {
 			fonts = new Map(msg.fonts);
 			items?.setFonts(fonts);
-			setBarcodeEncoder(bwipBarcodeEncoder);
 			const started = performance.now();
 			try {
 				await itemRenderer();
@@ -91,6 +93,8 @@ async function handle(msg: WorkerRequest): Promise<void> {
 		case "dispose":
 			items?.dispose();
 			items = undefined;
+			renderer?.dispose();
+			renderer = undefined;
 			current = undefined;
 			scope.close();
 			return;

@@ -1,19 +1,17 @@
 import {
 	compile,
-	getBarcodeEncoder,
+	type FrameWarning,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import {
 	createRenderer,
 	type Node,
 	type PaintCacheStats,
-	type PaintWarning,
 	type Renderer,
 	resolveExportScale,
 	type SurfaceCanvas,
 } from "@freshcoat-js/engine";
 import type { CanvasKit } from "canvaskit-wasm";
-import { hasBarcode, loadBarcodeEncoder } from "./barcode";
 
 export type RenderInput<G> = {
 	/** A single-side template, ready to compile (see doc/preview). */
@@ -38,7 +36,7 @@ export type RenderTimings = {
 export type RenderOutput<G> = {
 	canvas: HTMLCanvasElement;
 	geometry: G;
-	warnings: PaintWarning[];
+	warnings: FrameWarning[];
 	timings: RenderTimings;
 	/** The density actually painted at, after the export clamp. */
 	scale: number;
@@ -85,10 +83,6 @@ export function createRenderSession(
 			if (disposed) throw new Error("render session is disposed");
 			const r = await ready;
 			const { template } = input;
-			// Without the encoder a barcode draws as a placeholder; a failed load
-			// still renders, and the placeholder's warning says why.
-			if (!getBarcodeEncoder() && hasBarcode(template))
-				await loadBarcodeEncoder().catch(() => {});
 			if (fonts !== input.fonts) {
 				await r.addFonts(Object.fromEntries(input.fonts));
 				fonts = input.fonts;

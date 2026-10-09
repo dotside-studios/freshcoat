@@ -1,5 +1,5 @@
+import type { FrameWarning } from "@freshcoat-js/coatfile";
 import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
-import type { PaintWarning } from "@freshcoat-js/engine";
 import type { ChannelBalance } from "@freshcoat-js/for-print";
 import type { ExportPreset, PresetPrint } from "../types";
 
@@ -72,7 +72,7 @@ export async function withPrintFallback<T>(
 }
 
 /** The gamut warnings among a render's warnings. */
-export function gamutNotes(warnings: readonly PaintWarning[]): GamutNote[] {
+export function gamutNotes(warnings: readonly FrameWarning[]): GamutNote[] {
 	const out: GamutNote[] = [];
 	for (const w of warnings)
 		if (w.kind === "gamut_compressed")

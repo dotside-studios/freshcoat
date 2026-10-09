@@ -88,7 +88,7 @@ const loaded = new Map();
 for (const name of ${JSON.stringify(imports)}) loaded.set(name, await import(name));
 const { compileScene, createRenderer, decodePixels } = loaded.get("@freshcoat-js/engine");
 const { planScene, analyzePixels } = loaded.get("@freshcoat-js/for-print");
-const { validate, compile, getBarcodeEncoder } = loaded.get("@freshcoat-js/coatfile");
+const { validate, compile } = loaded.get("@freshcoat-js/coatfile");
 const { fixtures } = loaded.get("@freshcoat-js/coatfile/fixtures");
 const { packTemplate, decodeTemplate } = loaded.get("@freshcoat-js/coatfile/coat");
 const { renderTemplate } = loaded.get("@freshcoat-js/coatfile/render");
@@ -117,7 +117,6 @@ const barcode = { format_version: "1.3", version: "1.0.0", id: "barcode", name: 
 assert.ok(validate(barcode).ok);
 const [coded] = await renderTemplate(renderer, barcode, {}, { output: { pixels: true } });
 assert.equal(coded.warnings.length, 0);
-assert.ok(getBarcodeEncoder());
 renderer.dispose();
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat-js/coatfile/schema/coatfile.v1.schema.json"), "utf8"));
 assert.ok(schema.$id);

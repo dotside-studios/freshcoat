@@ -21,6 +21,11 @@ const everyType: Dataset = deepFreeze({
 			default: "Anon",
 		},
 		{ key: "tier", type: "text", enum: ["gold", "silver"] },
+		{
+			key: "variant",
+			type: "text",
+			options: { kind: "variants", templateId: "t_card" },
+		},
 		{ key: "bio", type: "longText" },
 		{ key: "score", type: "number", minimum: 0, maximum: 1.5, default: 0.5 },
 		{ key: "age", type: "integer", minimum: 18, required: true },
@@ -80,6 +85,24 @@ describe("columnsToJsonSchema", () => {
 });
 
 describe("jsonSchemaToColumns", () => {
+	it("ignores options it does not know, or on a column that is not text", () => {
+		const { columns, warnings } = jsonSchemaToColumns({
+			type: "object",
+			properties: {
+				a: { type: "string", "x-freshcoat-options": { kind: "rows" } },
+				b: {
+					type: "number",
+					"x-freshcoat-options": { kind: "variants", templateId: "t" },
+				},
+			},
+		});
+		expect(columns.map((c) => c.options)).toEqual([undefined, undefined]);
+		expect(warnings).toEqual([
+			"a: ignored x-freshcoat-options",
+			"b: ignored x-freshcoat-options",
+		]);
+	});
+
 	it("reads a foreign schema, warning about what it drops", () => {
 		const { columns, warnings } = jsonSchemaToColumns({
 			$schema: "http://json-schema.org/draft-07/schema#",

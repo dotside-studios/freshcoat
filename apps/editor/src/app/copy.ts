@@ -191,6 +191,8 @@ export const VARIANT_EXPORT = {
 	},
 	noPhoto: "Choose a photo",
 	default: "Default",
+	/** beside what a variant column's empty cells use */
+	fallback: "When empty",
 	defaultHint: "The template's default look",
 	noVariants: "No variants",
 	/** what All variants exports, beside the choice */

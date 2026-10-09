@@ -18,9 +18,8 @@ the rendering helpers live on the `render` subpath.
 ## Quick start
 
 For template-to-image output, use `renderTemplate()` with a renderer from the
-coat engine. It loads the fonts the template describes through the renderer,
-loads the barcode encoder when the template draws a barcode, and paints each
-side at the template's own size unless you give another.
+coat engine. It loads the fonts the template describes through the renderer
+and paints each side at the template's own size unless you give another.
 
 ```ts
 import { createRenderer } from "@freshcoat-js/engine";
@@ -52,10 +51,6 @@ const compiled = compile(template, { displayName: "Alex" }, { width: 1012, heigh
 // compiled.frames[i].assets.images: the srcs it draws
 const [result] = await renderCompiled(renderer, compiled, { frameNames: ["front"] });
 ```
-
-`renderCompiled()` does not load the barcode encoder, since the barcodes were
-drawn when the template compiled; register it before compiling (see
-[Barcodes](#barcodes)).
 
 ### Rendering many records
 
@@ -554,25 +549,16 @@ A GS1 number (EAN-13, UPC-A, ITF-14) may leave its check digit off, and gets it
 added, in the bars and the text. One with the wrong check digit is refused with
 the digit it should be.
 
-**The encoder is registered, not imported.** The main entry does not carry
-bwip-js, which is ~87 KB gzipped. `renderTemplate()` loads it on first use when
-a template draws a barcode. A consumer that compiles directly registers it
-once, before compiling:
-
-```ts
-import { setBarcodeEncoder } from "@freshcoat-js/coatfile";
-import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
-
-setBarcodeEncoder(bwipBarcodeEncoder);
-```
+Barcodes are encoded with bwip-js as part of compile, as QR codes are with
+lean-qr. `encodeBarcode()` is the same encoder on its own, for checking a value
+before it reaches a template.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:
 
 | Case | Draws | Warning |
 |---|---|---|
-| No encoder registered | a hatched box naming the symbology | `barcode_unavailable` |
-| The encoder refuses the value | the same box | `barcode_invalid`, with its `message` |
+| The encoder refuses the value | a hatched box naming the symbology | `barcode_invalid`, with its `message` |
 | An empty value (an unfilled field) | the code's shape, faint | none |
 
 The quiet zone is kept inside the element's box. 1D bars fill the height the

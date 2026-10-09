@@ -1,19 +1,11 @@
 import {
+	encodeBarcode,
 	errorCorrectionRange,
 	type Symbology,
 	type TemplateWarning,
 } from "@freshcoat-js/coatfile";
-import type { BarcodeEncoder } from "@freshcoat-js/coatfile/barcode-encoder";
-import {
-	type FigmaBoundingBox,
-	type FigmaNode,
-	isContainerNode,
-} from "../types";
-import {
-	DEFAULT_SYMBOLOGY,
-	isBarcodeLayerName,
-	parseBarcodeLayerName,
-} from "./barcode-name";
+import type { FigmaBoundingBox, FigmaNode } from "../types";
+import { DEFAULT_SYMBOLOGY, parseBarcodeLayerName } from "./barcode-name";
 import { singleSolidFillHex } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
@@ -27,20 +19,6 @@ export type TranspileBarcodeContext = {
  *  export stands in a placeholder for it, which the author must agree to. */
 export const BARCODE_UNKNOWN_SYMBOLOGY = "barcode_unknown_symbology";
 export const BARCODE_INVALID_VALUE = "barcode_invalid_value";
-
-let encoder: BarcodeEncoder | undefined;
-
-/** Loads the bwip-js encoder, which is large and only needed by designs that
- *  carry a `barcode:` layer. Must resolve before such a layer is transpiled. */
-export async function loadBarcodeEncoder(): Promise<void> {
-	encoder ??= (await import("@freshcoat-js/coatfile/barcode"))
-		.bwipBarcodeEncoder;
-}
-
-export function hasBarcodeLayer(node: FigmaNode): boolean {
-	if (isBarcodeLayerName(node.name)) return true;
-	return isContainerNode(node) && node.children.some(hasBarcodeLayer);
-}
 
 /** A `barcode:` layer as a coatfile barcode element. Like a QR placeholder,
  *  only the layer's name, box and single solid fill are read, so any node type
@@ -91,8 +69,7 @@ export function transpileBarcode(
 	} else if (parsed.mode === "literal") {
 		// A field's value is only known at render time, but a literal can be
 		// checked now, with the encoder coatfile draws it with.
-		if (!encoder) throw new Error("loadBarcodeEncoder has not resolved");
-		const encoded = encoder(symbology, value, {
+		const encoded = encodeBarcode(symbology, value, {
 			...(ec !== undefined ? { errorCorrection: ec } : {}),
 		});
 		if (!encoded.ok) warn(BARCODE_INVALID_VALUE, encoded.message);

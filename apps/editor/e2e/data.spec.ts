@@ -1060,3 +1060,61 @@ test("Data keeps its search, filters, sort and selection per dataset, and Export
 			.getByRole("checkbox"),
 	).toBeChecked();
 });
+
+test("a column picks its values from a template's variants in the Columns, Record and grid editors", async ({
+	page,
+}) => {
+	await openDataFromTemplate(page);
+	await importCsv(page);
+	await run(
+		page,
+		`const s = c.state.workspace; c.dispatch({ type: "setBinding", id: s.activeTemplateId, binding: { datasetId: s.datasets[0].id, fields: {}, variant: { kind: "image", field: "photo" } } })`,
+	);
+	await page.getByRole("tab", { name: "Columns" }).click();
+	await page
+		.getByTestId("columns-list")
+		.getByRole("option", { name: /^tier/ })
+		.click();
+	await page.getByTestId("column-options").getByRole("button").click();
+	await page
+		.getByRole("option", { name: "Variants of membership-card" })
+		.click();
+	const tier = async () =>
+		(await columns(page)).find((c) => c.key === "tier") as Col & {
+			options?: unknown;
+		};
+	await expect
+		.poll(async () => (await tier()).options)
+		.toEqual({
+			kind: "variants",
+			templateId: await state<string>(page, "s.workspace.activeTemplateId"),
+		});
+	expect(
+		await state<unknown>(page, "s.workspace.templates[0].binding.variant"),
+	).toEqual({
+		kind: "column",
+		column: "tier",
+		fallback: { kind: "image", field: "photo" },
+	});
+
+	const [first, second] = await records(page);
+	if (!first || !second) throw new Error("no records");
+	await cell(page, first.id, "tier").click();
+	await page.getByRole("tab", { name: "Record" }).click();
+	const field = page.locator('[data-field="tier"]').getByRole("button");
+	await expect(field).toContainText("Gold");
+	await field.click();
+	await page.getByRole("option", { name: "Midnight" }).click();
+	await expect
+		.poll(async () => (await records(page))[0]?.values.tier)
+		.toBe("midnight");
+
+	await cell(page, second.id, "tier").dblclick();
+	await expect(page.getByRole("listbox", { name: "Choices" })).toBeVisible();
+	await page.getByRole("option", { name: "Auto: Photo shape" }).click();
+	await expect
+		.poll(async () => (await records(page))[1]?.values.tier ?? null)
+		.toBe(null);
+	await expect(cell(page, second.id, "tier")).toHaveText("Auto: Photo shape");
+	await expect(cell(page, first.id, "tier")).toHaveText("Midnight");
+});

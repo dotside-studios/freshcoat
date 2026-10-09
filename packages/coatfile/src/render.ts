@@ -20,23 +20,28 @@ import {
 	missingGlyphs,
 	type Node,
 	type Output,
-	type PaintWarning,
 	type Renderer,
 	resolveExportScale,
 	resolveSupersample,
 	sampleImageNode,
 } from "@freshcoat-js/engine";
-import { getBarcodeEncoder } from "./barcode-encoder";
-import { loadBarcodeEncoder } from "./barcode-loader";
-import { hasBarcode } from "./has-barcode";
 import { compile } from "./compile";
-import type { CompiledTemplate, Template } from "./types";
+import type {
+	CompiledTemplate,
+	FrameWarning,
+	PrintWarning,
+	Template,
+} from "./types";
 import { variantSize } from "./variants";
 
 // A painted side: what the renderer returned, tagged with the frame it was
 // rendered from and the export setting it was rendered at. `width`/`height`,
 // `scale` and `supersample` are the result's real values, after any clamp.
-export type TemplateFrame<O extends Output = DefaultOutput> = FrameFor<O> & {
+export type TemplateFrame<O extends Output = DefaultOutput> = Omit<
+	FrameFor<O>,
+	"warnings"
+> & {
+	warnings: FrameWarning[];
 	name: string;
 	// The export setting's suffix, carried through untouched.
 	suffix?: string;
@@ -156,8 +161,8 @@ const GAMUT_REPORT_FLOOR = 0.02;
 // against the preview rather than inferred from it.
 function gamutWarnings(
 	analyses: Array<{ analysis: ImageAnalysis; node: ImageNode }>,
-): PaintWarning[] {
-	const out: PaintWarning[] = [];
+): PrintWarning[] {
+	const out: PrintWarning[] = [];
 	for (const { analysis, node } of analyses) {
 		const { clipped, pullback } = analysis.gamut;
 		if (clipped < GAMUT_REPORT_FLOOR) continue;
@@ -201,8 +206,7 @@ function scaleBox(
 }
 
 // Compile a template and paint each of its sides. The template's fonts load
-// through the renderer, and the barcode encoder loads on first use when the
-// template draws a barcode.
+// through the renderer.
 export async function renderTemplate<O extends Output = DefaultOutput>(
 	renderer: Renderer,
 	template: Template,
@@ -211,8 +215,6 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 ): Promise<Array<TemplateFrame<O>>> {
 	// Without an encoder a barcode draws as a placeholder; a failed load still
 	// renders, and the placeholder's warning says why.
-	if (!getBarcodeEncoder() && hasBarcode(template))
-		await loadBarcodeEncoder().catch(() => {});
 	const size = variantSize(template, options.variantId);
 	const compiled = compile(template, values, {
 		width: options.width ?? size.width,

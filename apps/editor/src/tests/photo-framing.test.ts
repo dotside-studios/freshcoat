@@ -8,6 +8,7 @@ import {
 	visibleCrop,
 } from "~/data/photo-framing";
 import { photoWatermark } from "~/samples/photo-watermark";
+import { produce } from "~/state/immer";
 
 const dataset = (width: number, height: number): Dataset => ({
 	id: "d_photos",
@@ -58,14 +59,32 @@ describe("photoFraming", () => {
 		expect(port && port.aspect < 1).toBe(true);
 	});
 
-	test("is undefined when the focus is not bound to a column", () => {
+	test("frames an unbound focus around the field's default or the fixed point", () => {
 		const t = photoWatermark();
 		const data = dataset(3000, 2000);
 		const record = data.records[0] as Dataset["records"][number];
 		const { photo_focus: _f, ...fields } = binding.fields;
-		expect(
-			photoFraming(t, { ...binding, fields }, data, record, "photo"),
-		).toBeUndefined();
+		const unbound = photoFraming(
+			t,
+			{ ...binding, fields },
+			data,
+			record,
+			"photo",
+		);
+		expect(unbound?.focusColumn).toBeUndefined();
+		expect(unbound?.image).toEqual({
+			id: "photo",
+			srcField: "photo",
+			focusField: "photo_focus",
+		});
+		expect(unbound?.fallback).toEqual({ x: 0.5, y: 0.5 });
+		const fixed = produce(t, (d) => {
+			const photo = d.template_data[0]?.elements[0];
+			if (photo?.type === "image") photo.properties.focus = "0.2,0.4";
+		});
+		const framed = photoFraming(fixed, binding, data, record, "photo");
+		expect(framed?.image.focusField).toBeUndefined();
+		expect(framed?.fallback).toEqual({ x: 0.2, y: 0.4 });
 		expect(photoFraming(t, binding, data, record, "logo")).toBeUndefined();
 	});
 });

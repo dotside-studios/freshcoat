@@ -12,6 +12,7 @@ import {
 	unboundBinding,
 	unfilledRequired,
 	unmatchedRequired,
+	variantColumnSource,
 	variantSourceOfKind,
 	withFieldSource,
 	withVariantSource,
@@ -144,6 +145,35 @@ describe("binding helpers", () => {
 		expect(
 			variantSourceOfKind("all", withVariants(), dataset(), fixed),
 		).toEqual({ kind: "all" });
+	});
+
+	test("a variant column keeps a photo-shape or fixed choice as its fallback", () => {
+		const t = withVariants();
+		const ds = dataset();
+		const photo = { kind: "image" as const, field: "photo" };
+		const column = variantSourceOfKind("column", t, ds, photo);
+		expect(column).toEqual({
+			kind: "column",
+			column: "variant",
+			fallback: photo,
+		});
+		expect(variantSourceOfKind("image", t, ds, column)).toEqual(photo);
+		expect(variantColumnSource("role", { kind: "fixed" })).toEqual({
+			kind: "column",
+			column: "role",
+		});
+		expect(variantColumnSource("role", column)).toEqual({
+			kind: "column",
+			column: "role",
+			fallback: photo,
+		});
+		expect(
+			rebindDataset(t, undefined, {
+				datasetId: ds.id,
+				fields: {},
+				variant: column,
+			}),
+		).toEqual(unboundBinding(photo));
 	});
 
 	test("a template with no dataset keeps its variant choice alone", () => {

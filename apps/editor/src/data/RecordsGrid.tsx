@@ -43,6 +43,7 @@ import {
 	pasteBlock,
 	pasteInto,
 } from "./clipboard";
+import { useColumnChoices } from "./column-options";
 import { GridContext, type GridContextValue } from "./grid-context";
 import type { CellRef, GridUiStore } from "./grid-state";
 import {
@@ -157,8 +158,15 @@ export const RecordsGrid = memo(function RecordsGrid({
 	const draft = useRef("");
 	const pendingEdit = useRef<string | null>(null);
 	const anchor = useRef<string | null>(null);
-	const latest = useRef({ dataset, rows, selectedIds, selection });
-	latest.current = { dataset, rows, selectedIds, selection };
+	const columnChoices = useColumnChoices(dataset.columns, dataset.id);
+	const latest = useRef({
+		dataset,
+		rows,
+		selectedIds,
+		selection,
+		columnChoices,
+	});
+	latest.current = { dataset, rows, selectedIds, selection, columnChoices };
 	const datasetId = dataset.id;
 	const statusAnchor = useRef<HTMLElement | null>(null);
 	const [statusMenu, setStatusMenu] = useState<string | null>(null);
@@ -243,7 +251,8 @@ export const RecordsGrid = memo(function RecordsGrid({
 			ui.set({
 				active: cell,
 				editing:
-					seed && editsInline(column)
+					seed &&
+					editsInline(column, latest.current.columnChoices.has(column.key))
 						? { ...cell, seed }
 						: select
 							? { ...cell, select }
@@ -332,6 +341,7 @@ export const RecordsGrid = memo(function RecordsGrid({
 			importPhotos: onImportPhotos,
 			openStatusMenu,
 			columnByKey: (key) => dataset.columns.find((c) => c.key === key),
+			columnChoices,
 		}),
 		[
 			dataset,
@@ -345,6 +355,7 @@ export const RecordsGrid = memo(function RecordsGrid({
 			finishEdit,
 			onImportPhotos,
 			openStatusMenu,
+			columnChoices,
 		],
 	);
 
@@ -542,7 +553,7 @@ export const RecordsGrid = memo(function RecordsGrid({
 			plain &&
 			e.key.length === 1 &&
 			e.key !== " " &&
-			editsInline(column)
+			editsInline(column, ctx.columnChoices.has(column.key))
 		) {
 			e.preventDefault();
 			e.stopPropagation();

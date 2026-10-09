@@ -461,7 +461,7 @@ function VariantRow({
 							label="Variant column"
 							dataset={dataset}
 							value={source.column}
-							onChange={(column) => onChange({ kind: "column", column })}
+							onChange={(column) => onChange({ ...source, column })}
 						/>
 					) : (
 						<VariantHint
@@ -476,6 +476,79 @@ function VariantRow({
 					)}
 				</div>
 			</div>
+			{source?.kind === "column" ? (
+				<FallbackRow template={template} source={source} onChange={onChange} />
+			) : null}
+		</div>
+	);
+}
+
+const PHOTO_SHAPE = "\u0000photo";
+
+/** What a variant column's empty cells, and cells that name no variant,
+ *  render in. */
+function FallbackRow({
+	template,
+	source,
+	onChange,
+}: {
+	template: Template;
+	source: Extract<VariantSource, { kind: "column" }>;
+	onChange: (source: VariantSource) => void;
+}) {
+	const photos = imageFields(template);
+	const fallback = source.fallback;
+	const value =
+		fallback?.kind === "image"
+			? `${PHOTO_SHAPE}${fallback.field}`
+			: (fallback?.id ?? NONE);
+	const { fallback: _f, ...bare } = source;
+	return (
+		<div className="flex min-w-0 items-center gap-1">
+			<span className="w-28 shrink-0 truncate pl-1.5 text-fc-faint text-fc-sm">
+				{VARIANT_EXPORT.fallback}
+			</span>
+			<Select
+				aria-label="Variant fallback"
+				className="min-w-0 flex-1"
+				value={value}
+				onChange={(key) => {
+					const k = String(key);
+					onChange(
+						k === NONE
+							? bare
+							: k.startsWith(PHOTO_SHAPE)
+								? {
+										...bare,
+										fallback: {
+											kind: "image",
+											field: k.slice(PHOTO_SHAPE.length),
+										},
+									}
+								: { ...bare, fallback: { kind: "fixed", id: k } },
+					);
+				}}
+			>
+				<SelectItem id={NONE} textValue={VARIANT_EXPORT.default}>
+					{VARIANT_EXPORT.default}
+				</SelectItem>
+				{photos.map((f) => (
+					<SelectItem
+						key={f.key}
+						id={`${PHOTO_SHAPE}${f.key}`}
+						textValue={`${VARIANT_EXPORT.kinds.image}: ${f.title}`}
+					>
+						{photos.length > 1
+							? `${VARIANT_EXPORT.kinds.image}: ${f.title}`
+							: VARIANT_EXPORT.kinds.image}
+					</SelectItem>
+				))}
+				{(template.variants ?? []).map((v) => (
+					<SelectItem key={v.id} id={v.id} textValue={v.label}>
+						{v.label}
+					</SelectItem>
+				))}
+			</Select>
 		</div>
 	);
 }

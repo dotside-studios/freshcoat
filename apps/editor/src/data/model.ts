@@ -577,7 +577,7 @@ export function rebindColumn(
 	}
 	let variant = binding.variant;
 	if (variant?.kind === "column" && variant.column === from) {
-		variant = { kind: "column", column: to };
+		variant = { ...variant, column: to };
 		changed = true;
 	}
 	if (!changed) return null;
@@ -587,7 +587,10 @@ export function rebindColumn(
 /** Drops the constraints a type does not use. */
 export function constraintsFor(column: Column): Column {
 	const next: Column = { ...column };
-	if (next.type !== "text") delete next.enum;
+	if (next.type !== "text") {
+		delete next.enum;
+		delete next.options;
+	}
 	if (!NUMERIC_TYPES.has(next.type)) {
 		delete next.minimum;
 		delete next.maximum;
