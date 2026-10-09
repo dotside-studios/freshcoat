@@ -1,6 +1,9 @@
 import type { FieldDefinition, Template } from "@freshcoat-js/coatfile";
 import { FIELD_ID } from "@freshcoat-js/coatfile/mustache";
+import type { EditorController } from "~/app/controller";
 import { KEY_RULE } from "~/app/copy";
+import { addField } from "~/doc/ops";
+import { humanize, sampleValues } from "~/doc/values";
 
 export const FIELD_FORMATS = [
 	{ id: "text", name: "Text" },
@@ -52,4 +55,24 @@ export function setRequired(t: Template, key: string, on: boolean): Template {
 		...t,
 		fields: required.length ? { ...rest, required } : rest,
 	};
+}
+
+/** Adds a field titled from its key, previewing its sample value. */
+export function createField(
+	controller: EditorController,
+	key: string,
+	format?: FieldDefinition["format"],
+): boolean {
+	const def: FieldDefinition = { type: "string", title: humanize(key) };
+	if (format) def.format = format;
+	const result = controller.edit((t) => addField(t, key, def), {
+		scope: "base",
+	});
+	if (!result?.ok) return false;
+	controller.dispatch({
+		type: "setValue",
+		field: key,
+		value: sampleValues(result.template)[key] ?? "",
+	});
+	return true;
 }

@@ -134,10 +134,26 @@ export const CONTENT = {
 	fields: "Fields",
 	addField: "Add field",
 	newKey: "New field key",
+	newField: "New field…",
+	createField: "Create field",
 	resetSamples: "Reset to samples",
 	/** Fields a pipeline fills in rather than a person. */
 	system: "From the system",
 	unused: "unused",
+	usedBy: "Used by",
+	noLayers: "No layers",
+	boundTo: "Bound to",
+	/** What fills a field when the template is bound, by source kind. */
+	sources: {
+		column: (column: string) => column || "No column chosen",
+		constant: (value: string) => (value ? `Fixed: ${value}` : "Fixed"),
+		serial: "Serial number",
+		default: "Its default",
+	},
+	usesFields: (ids: readonly string[]) =>
+		ids.length
+			? `Uses ${ids.map((id) => `{{${id}}}`).join(", ")}`
+			: "Uses a field",
 	empty: "No fields yet. Add one with +, then type {{key}} in a text layer.",
 } as const;
 

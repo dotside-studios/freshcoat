@@ -20,14 +20,20 @@ import { Button as RACButton } from "react-aria-components";
 import { type SafeAreaHint, safeAreaHints } from "~/canvas/print-guides";
 import { removeUnusedChanges } from "~/doc/ops";
 import { walkLayers } from "~/doc/path";
+import { createField } from "~/panels/content/field-def";
 import { Badge, goToReference, referenceLabel } from "~/panels/content/shared";
 import { useEditor } from "~/state/hooks";
 import type { BarcodeIssue } from "~/state/store";
 import CheckIcon from "~icons/mingcute/check-circle-line";
 import WarnIcon from "~icons/mingcute/warning-line";
 import { useController } from "./context";
-import { plural, VARIANT_UI } from "./copy";
-import { issueMessage, issuePathToKey } from "./issue-path";
+import { CONTENT, plural, VARIANT_UI } from "./copy";
+import {
+	canCreateField,
+	issueMessage,
+	issuePathToKey,
+	missingField,
+} from "./issue-path";
 
 const EMPTY: ValidationError[] = [];
 const NONE: string[] = [];
@@ -317,20 +323,41 @@ function ValidationRow({
 	const controller = useController();
 	const key = issuePathToKey(issue.path, template);
 	const layer = key ? referenceLabel(template, key) : null;
+	const missing = missingField(issue);
+	const fix =
+		missing && canCreateField(missing.id, template) ? (
+			<Button
+				size="sm"
+				data-testid="create-field"
+				aria-label={`${CONTENT.createField} ${missing.id}`}
+				onPress={() => createField(controller, missing.id, missing.format)}
+			>
+				{CONTENT.createField}
+			</Button>
+		) : null;
+	const link =
+		key && layer ? (
+			<EntryLink
+				testId="issue-path"
+				label={`Select ${layer}`}
+				onPress={() => goToReference(controller, key)}
+			>
+				{layer}
+			</EntryLink>
+		) : null;
 	return (
 		<Entry
 			tone="danger"
 			code={[issue.code, issue.path || "/", issue.message].join("\n")}
 			link={
-				key && layer ? (
-					<EntryLink
-						testId="issue-path"
-						label={`Select ${layer}`}
-						onPress={() => goToReference(controller, key)}
-					>
-						{layer}
-					</EntryLink>
-				) : undefined
+				fix ? (
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+						{link}
+						{fix}
+					</div>
+				) : (
+					(link ?? undefined)
+				)
 			}
 		>
 			{issueMessage(issue, template)}

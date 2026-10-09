@@ -55,6 +55,15 @@ describe("Layers tree", () => {
 		expect(within(row("0/0")).queryByText("{}")).toBeNull();
 	});
 
+	it("the field badge names the fields and shows them in Content", async () => {
+		const user = setup();
+		const badge = within(row("0/4")).getByTestId("layer-fields");
+		expect(badge.getAttribute("aria-label")).toBe("Uses {{title}}, {{show}}");
+		await user.click(badge);
+		expect(controller.state.rightTab).toBe("content");
+		expect(controller.state.shownFields).toEqual(["title", "show"]);
+	});
+
 	it("clicking a row selects it in the store, modifiers extend", async () => {
 		const user = setup();
 		await user.click(within(row("0/0")).getByText("a"));

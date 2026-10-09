@@ -20,6 +20,7 @@ import { button, chooseOption, fastUser } from "./aria";
 import { doc } from "./doc-fixture";
 
 beforeAll(() => {
+	Element.prototype.scrollIntoView ??= () => {};
 	// jsdom has no CSS.escape, which react-aria's tab list uses to find tabs.
 	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
 	g.CSS ??= {};
@@ -223,6 +224,65 @@ describe("the Content tab", () => {
 		await user.click(toggle);
 		expect(toggle.getAttribute("aria-expanded")).toBe("true");
 		expect(screen.getByTestId("binding-editor")).toBeTruthy();
+	});
+});
+
+describe("field usage", () => {
+	test("an expanded field lists the layers using it, which select them", async () => {
+		const { controller, user } = setup();
+		await user.click(screen.getByRole("button", { name: "name field" }));
+		const used = screen.getByTestId("used-by-name");
+		const chip = within(used).getByTestId("reference-chip");
+		expect(chip.textContent).toBe("front · t1");
+		await user.click(chip);
+		expect(controller.state.selection).toEqual(["0/1/1"]);
+		expect(screen.queryByTestId("bound-name")).toBeNull();
+	});
+
+	test("a bound template shows what fills each field", async () => {
+		const { controller, user } = setup();
+		const dataset = {
+			id: "d_m",
+			name: "Members",
+			columns: [{ key: "name", type: "text" as const }],
+			records: [],
+			assets: [],
+		};
+		const id = controller.state.workspace?.activeTemplateId as string;
+		act(() => {
+			controller.dispatch({ type: "datasetEdit", datasets: [dataset] });
+			controller.dispatch({
+				type: "setBinding",
+				id,
+				binding: autoBinding(controller.template as Template, dataset),
+			});
+		});
+		await user.click(screen.getByRole("button", { name: "name field" }));
+		await user.click(screen.getByRole("button", { name: "title field" }));
+		expect(screen.getByTestId("bound-name").textContent).toBe("Bound toname");
+		expect(screen.getByTestId("bound-title").textContent).toBe(
+			"Bound toIts default",
+		);
+	});
+
+	test("showing fields opens Content with them expanded", () => {
+		const { controller } = setup(doc(), <RightPanel />);
+		act(() =>
+			controller.dispatch({ type: "showFields", fields: ["title", "show"] }),
+		);
+		expect(controller.state.rightTab).toBe("content");
+		expect(controller.state.shownFields).toBeNull();
+		for (const id of ["title", "show"])
+			expect(
+				screen
+					.getByRole("button", { name: `${id} field` })
+					.getAttribute("aria-expanded"),
+			).toBe("true");
+		expect(
+			screen
+				.getByRole("button", { name: "name field" })
+				.getAttribute("aria-expanded"),
+		).toBe("false");
 	});
 });
 

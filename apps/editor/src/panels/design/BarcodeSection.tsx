@@ -15,20 +15,16 @@ import {
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
-import { IconButton } from "@freshcoat-js/ui/icon-button";
-import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo, useRef } from "react";
-import { Header, ListBoxSection, MenuTrigger } from "react-aria-components";
+import { Header, ListBoxSection } from "react-aria-components";
 import { barcodeBoxFor } from "~/doc/factories";
-import { listFields } from "~/doc/values";
 import { useBarcodeEncoder } from "~/render/barcode";
 import { useEditor } from "~/state/hooks";
-import BracesIcon from "~icons/mingcute/braces-line";
 import { AddButton, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InsertFieldMenu, spliceToken } from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
 
 const GROUPS: [string, Symbology[]][] = [
@@ -305,22 +301,11 @@ function ValueField({
 }) {
 	const wrap = useRef<HTMLDivElement>(null);
 	const value = commonValue(codes.map((e) => e.properties.value));
-	const fields = useMemo(() => listFields(ins.template), [ins.template]);
 	const write = (v: string) =>
 		ins.setProps("barcode-value", () => ({ value: v }));
 
-	const insertToken = (id: string) => {
-		const input = wrap.current?.querySelector("input");
-		const current = value ?? "";
-		const token = `{{${id}}}`;
-		const start = input?.selectionStart ?? current.length;
-		const end = input?.selectionEnd ?? current.length;
-		write(current.slice(0, start) + token + current.slice(end));
-		requestAnimationFrame(() => {
-			input?.focus();
-			input?.setSelectionRange(start + token.length, start + token.length);
-		});
-	};
+	const insertToken = (id: string) =>
+		spliceToken(wrap.current?.querySelector("input"), value ?? "", id, write);
 
 	return (
 		<Row label="Value">
@@ -333,25 +318,11 @@ function ValueField({
 					value={value ?? ""}
 					onChange={write}
 				/>
-				<MenuTrigger>
-					<IconButton
-						aria-label="Insert field"
-						tooltip="Insert field"
-						className="size-5 shrink-0 pointer-coarse:size-8"
-						isDisabled={fields.length === 0 || value === null}
-					>
-						<BracesIcon />
-					</IconButton>
-					<Popover placement="bottom end">
-						<Menu onAction={(k) => insertToken(String(k))}>
-							{fields.map((f) => (
-								<MenuItem key={f.id} id={f.id} textValue={f.id}>
-									{f.field.title ? `${f.field.title} · ${f.id}` : f.id}
-								</MenuItem>
-							))}
-						</Menu>
-					</Popover>
-				</MenuTrigger>
+				<InsertFieldMenu
+					template={ins.template}
+					onInsert={insertToken}
+					isDisabled={value === null}
+				/>
 			</div>
 		</Row>
 	);

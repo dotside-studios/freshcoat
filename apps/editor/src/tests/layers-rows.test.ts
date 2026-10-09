@@ -70,6 +70,13 @@ describe("buildLayerRows", () => {
 		expect(bound("bg")).toBe(false);
 	});
 
+	it("lists the fields a layer reads, tokens then conditions", () => {
+		const rows = buildLayerRows(frozenDoc(), 0);
+		expect(find(rows, "t1")?.fields).toEqual(["name"]);
+		expect(find(rows, "title")?.fields).toEqual(["title", "show"]);
+		expect(find(rows, "f")?.fields).toEqual([]);
+	});
+
 	it("isBound sees visibleWhen alone, and tokens anywhere in properties", () => {
 		expect(
 			isBound({

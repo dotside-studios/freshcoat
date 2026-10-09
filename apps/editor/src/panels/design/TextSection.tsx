@@ -2,12 +2,9 @@ import type { TextElement, TextProperties } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { TextArea, TextField } from "@freshcoat-js/ui/field";
-import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { ChevronDownIcon } from "@freshcoat-js/ui/icons";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem, triggerButton } from "@freshcoat-js/ui/select";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
@@ -16,11 +13,10 @@ import {
 	ToggleGroupItem,
 } from "@freshcoat-js/ui/toggle";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button as AriaButton, MenuTrigger } from "react-aria-components";
+import { Button as AriaButton } from "react-aria-components";
 import { plural } from "~/app/copy";
 import { addFont } from "~/doc/ops";
 import { getElement } from "~/doc/path";
-import { listFields } from "~/doc/values";
 import { applyFontPick, templateFamilies } from "~/fonts/apply";
 import { type FontPick, FontPicker } from "~/fonts/FontPicker";
 import AlignBottomIcon from "~icons/mingcute/align-bottom-line";
@@ -30,7 +26,6 @@ import AlignLeftIcon from "~icons/mingcute/align-left-line";
 import AlignRightIcon from "~icons/mingcute/align-right-line";
 import AlignTopIcon from "~icons/mingcute/align-top-line";
 import AlignMiddleIcon from "~icons/mingcute/align-vertical-center-line";
-import BracesIcon from "~icons/mingcute/braces-line";
 import FlipIcon from "~icons/mingcute/flip-vertical-line";
 import ItalicIcon from "~icons/mingcute/italic-line";
 import LetterSpacingIcon from "~icons/mingcute/letter-spacing-line";
@@ -38,6 +33,7 @@ import LineHeightIcon from "~icons/mingcute/line-height-line";
 import StrikeIcon from "~icons/mingcute/strikethrough-line";
 import UnderlineIcon from "~icons/mingcute/underline-line";
 import { OverrideMarker, Row } from "./controls";
+import { useFieldCompletion } from "./field-completion";
 import {
 	commonValue,
 	formatFeatures,
@@ -46,6 +42,7 @@ import {
 	patchLayers,
 } from "./field-helpers";
 import { isDeclared, verifyGoogleFamily, WEIGHTS } from "./fonts";
+import { InsertFieldMenu, spliceToken } from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
 
 type Font = TextProperties["font"];
@@ -619,7 +616,6 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 		0,
 	);
 	const value = commonValue(texts.map((e) => e.properties.value ?? ""));
-	const fields = useMemo(() => listFields(ins.template), [ins.template]);
 
 	useEffect(() => {
 		const focus = () => {
@@ -633,18 +629,22 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 
 	const write = (v: string) => ins.setProps("text-value", () => ({ value: v }));
 
-	const insertToken = (id: string) => {
-		const area = wrap.current?.querySelector("textarea");
-		const current = value ?? "";
-		const token = `{{${id}}}`;
-		const start = area?.selectionStart ?? current.length;
-		const end = area?.selectionEnd ?? current.length;
-		write(current.slice(0, start) + token + current.slice(end));
+	const completion = useFieldCompletion(wrap, ins.template, (next, caret) => {
+		write(next);
 		requestAnimationFrame(() => {
+			const area = wrap.current?.querySelector("textarea");
 			area?.focus();
-			area?.setSelectionRange(start + token.length, start + token.length);
+			area?.setSelectionRange(caret, caret);
 		});
-	};
+	});
+
+	const insertToken = (id: string) =>
+		spliceToken(
+			wrap.current?.querySelector("textarea"),
+			value ?? "",
+			id,
+			write,
+		);
 
 	const flatten = () =>
 		ins.controller.edit((t) =>
@@ -666,31 +666,17 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 		);
 
 	return (
-		<div ref={wrap} className="flex flex-col gap-1.5">
+		<div ref={wrap} className="relative flex flex-col gap-1.5">
 			<div className="flex h-5 items-center justify-between pointer-coarse:h-8">
 				<span className="flex items-center gap-1 text-fc-muted text-fc-sm">
 					<OverrideMarker keys={["value", "spans"]} className="-ml-1" />
 					Content
 				</span>
-				<MenuTrigger>
-					<IconButton
-						aria-label="Insert field"
-						tooltip="Insert field"
-						className="size-5 pointer-coarse:size-8"
-						isDisabled={spans > 0 || fields.length === 0 || value === null}
-					>
-						<BracesIcon />
-					</IconButton>
-					<Popover placement="bottom end">
-						<Menu onAction={(k) => insertToken(String(k))}>
-							{fields.map((f) => (
-								<MenuItem key={f.id} id={f.id} textValue={f.id}>
-									{f.field.title ? `${f.field.title} · ${f.id}` : f.id}
-								</MenuItem>
-							))}
-						</Menu>
-					</Popover>
-				</MenuTrigger>
+				<InsertFieldMenu
+					template={ins.template}
+					onInsert={insertToken}
+					isDisabled={spans > 0 || value === null}
+				/>
 			</div>
 			{spans > 0 ? (
 				<div className="flex items-center justify-between gap-2 rounded-[3px] bg-fc-raised px-1.5 py-1">
@@ -710,6 +696,7 @@ function ContentField({ ins, texts }: { ins: Inspect; texts: TextElement[] }) {
 					onChange={write}
 				/>
 			)}
+			{completion}
 		</div>
 	);
 }

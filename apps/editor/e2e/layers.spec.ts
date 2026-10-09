@@ -138,8 +138,10 @@ test("reorder with the keyboard shortcut", async ({ page }) => {
 
 test("group and ungroup two layers", async ({ page }) => {
 	await openSample(page);
-	await row(page, "0/7").click();
-	await row(page, "0/8").click({ modifiers: ["Shift"] });
+	await row(page, "0/7").locator("[data-layer-name]").click();
+	await row(page, "0/8")
+		.locator("[data-layer-name]")
+		.click({ modifiers: ["Shift"] });
 	expect(new Set(await state<string[]>(page, "s.selection"))).toEqual(
 		new Set(["0/7", "0/8"]),
 	);

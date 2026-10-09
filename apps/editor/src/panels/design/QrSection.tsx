@@ -3,8 +3,10 @@ import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
+import { useRef } from "react";
 import { Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
+import { InsertFieldMenu, spliceToken } from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
 
 const LEVELS = [
@@ -22,17 +24,33 @@ export function QrSection({ ins }: { ins: Inspect }) {
 		ins.setProps(field, () => patch as Record<string, unknown>);
 	const level = pick((p) => p.errorCorrection ?? "M");
 	const value = pick((p) => p.value);
+	const wrap = useRef<HTMLDivElement>(null);
+	const write = (v: string) => set("qr-value", { value: v });
 
 	return (
 		<InspectorSection title="QR code">
 			<Row label="Value" keys={["value"]}>
-				<TextField
-					aria-label="QR value"
-					className="min-w-0 flex-1"
-					placeholder={value === null ? "Mixed" : "https://… or {{field}}"}
-					value={value ?? ""}
-					onChange={(v) => set("qr-value", { value: v })}
-				/>
+				<div ref={wrap} className="flex min-w-0 flex-1 items-center gap-1">
+					<TextField
+						aria-label="QR value"
+						className="min-w-0 flex-1"
+						placeholder={value === null ? "Mixed" : "https://… or {{field}}"}
+						value={value ?? ""}
+						onChange={write}
+					/>
+					<InsertFieldMenu
+						template={ins.template}
+						isDisabled={value === null}
+						onInsert={(id) =>
+							spliceToken(
+								wrap.current?.querySelector("input"),
+								value ?? "",
+								id,
+								write,
+							)
+						}
+					/>
+				</div>
 			</Row>
 			<Row label="Recovery" keys={["errorCorrection"]}>
 				<ToggleGroup

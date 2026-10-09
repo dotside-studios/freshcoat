@@ -25,6 +25,7 @@ import {
 	type Inspect,
 	patchLayers,
 } from "./field-helpers";
+import { InsertFieldMenu } from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
 
 type Mask = NonNullable<ImageProperties["mask"]>;
@@ -181,7 +182,11 @@ export function ImageSection({
 						{summary}
 					</span>
 				) : (
-					<SrcField value={src} onCommit={(v) => setImage("src", { src: v })} />
+					<SrcField
+						template={ins.template}
+						value={src}
+						onCommit={(v) => setImage("src", { src: v })}
+					/>
 				)}
 			</Row>
 			<Row label="">
@@ -416,10 +421,14 @@ function MaskParams({
 	);
 }
 
+const IMAGE_FORMATS = ["image", "url"] as const;
+
 function SrcField({
+	template,
 	value,
 	onCommit,
 }: {
+	template: Template;
 	value: string | null;
 	onCommit: (v: string) => void;
 }) {
@@ -432,17 +441,25 @@ function SrcField({
 		else setDraft(shown);
 	};
 	return (
-		<TextField
-			aria-label="Image source"
-			className="min-w-0 flex-1"
-			placeholder={value === null ? "Mixed" : "https://… or {{field}}"}
-			value={draft}
-			onChange={setDraft}
-			onBlur={commit}
-			onKeyDown={(e) => {
-				if (e.key === "Enter") commit();
-				if (e.key === "Escape") setDraft(shown);
-			}}
-		/>
+		<div className="flex min-w-0 flex-1 items-center gap-1">
+			<TextField
+				aria-label="Image source"
+				className="min-w-0 flex-1"
+				placeholder={value === null ? "Mixed" : "https://… or {{field}}"}
+				value={draft}
+				onChange={setDraft}
+				onBlur={commit}
+				onKeyDown={(e) => {
+					if (e.key === "Enter") commit();
+					if (e.key === "Escape") setDraft(shown);
+				}}
+			/>
+			<InsertFieldMenu
+				template={template}
+				prefer={IMAGE_FORMATS}
+				newFormat="image"
+				onInsert={(id) => onCommit(`{{${id}}}`)}
+			/>
+		</div>
 	);
 }

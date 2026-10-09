@@ -12,12 +12,13 @@ import { cn } from "@freshcoat-js/ui/lib/cn";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { type ReactNode, useMemo, useState } from "react";
+import type { FieldSource } from "@freshcoat-js/workspace";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { CONTENT } from "~/app/copy";
+import { readsDataset } from "~/binding/binding";
 import {
-	addField,
 	fieldReferences,
 	refuse,
 	removeField,
@@ -33,18 +34,27 @@ import {
 	sampleValues,
 } from "~/doc/values";
 import { useEditor } from "~/state/hooks";
+import { activeSlot } from "~/state/workspace";
 import AddIcon from "~icons/mingcute/add-line";
 import DeleteIcon from "~icons/mingcute/delete-2-line";
 import ResetIcon from "~icons/mingcute/refresh-2-line";
 import ChevronIcon from "~icons/mingcute/right-line";
 import {
+	createField,
 	FIELD_FORMATS,
 	FIELD_SOURCES,
 	fieldKeyError,
 	setRequired,
 	withPatch,
 } from "./field-def";
-import { Badge, DraftTextField, RefusalNotice, Subheading } from "./shared";
+import {
+	Badge,
+	DraftTextField,
+	NewFieldKey,
+	ReferenceChips,
+	RefusalNotice,
+	Subheading,
+} from "./shared";
 
 /** Every field in one list: its key, type and sample value on one line, and
  *  its definition when expanded. Fields a pipeline fills come last. */
@@ -58,6 +68,22 @@ export function FieldList({ template }: { template: Template }) {
 	);
 	const fields = useMemo(() => listFields(template), [template]);
 	const used = useMemo(() => referencedFields(template), [template]);
+	const shown = useEditor((s) => s.shownFields);
+	const binding = useEditor((s) => activeSlot(s)?.binding);
+	const sources = readsDataset(binding) ? binding.fields : null;
+
+	useEffect(() => {
+		if (!shown) return;
+		setExpanded((prev) => new Set([...prev, ...shown]));
+		controller.dispatch({ type: "showFields", fields: null });
+		const first = shown[0];
+		if (first)
+			requestAnimationFrame(() =>
+				document
+					.querySelector(`[data-testid="field-${first}"]`)
+					?.scrollIntoView({ block: "nearest" }),
+			);
+	}, [shown, controller]);
 	const own = fields.filter((f) => !isSystemField(f.id, f.field));
 	const system = fields.filter((f) => isSystemField(f.id, f.field));
 
@@ -70,16 +96,7 @@ export function FieldList({ template }: { template: Template }) {
 		});
 
 	const create = (key: string): boolean => {
-		const result = controller.edit(
-			(t) => addField(t, key, { type: "string", title: humanize(key) }),
-			{ scope: "base" },
-		);
-		if (!result?.ok) return false;
-		controller.dispatch({
-			type: "setValue",
-			field: key,
-			value: sampleValues(result.template)[key] ?? "",
-		});
+		if (!createField(controller, key)) return false;
 		setAdding(false);
 		toggle(key, true);
 		return true;
@@ -142,6 +159,11 @@ export function FieldList({ template }: { template: Template }) {
 					) : null
 				}
 			>
+				<FieldUsage
+					template={template}
+					id={id}
+					source={sources ? (sources[id] ?? null) : undefined}
+				/>
 				<FieldEditor
 					id={id}
 					field={field}
@@ -219,45 +241,6 @@ function EmptyFields() {
 			<code className="font-fc-mono">{"{{key}}"}</code>
 			{after}
 		</p>
-	);
-}
-
-function NewFieldKey({
-	taken,
-	onCreate,
-	onCancel,
-}: {
-	taken: (key: string) => boolean;
-	onCreate: (key: string) => boolean;
-	onCancel: () => void;
-}) {
-	const [key, setKey] = useState("");
-	const [touched, setTouched] = useState(false);
-	const error = touched ? fieldKeyError(key, taken) : null;
-	return (
-		<TextField
-			aria-label={CONTENT.newKey}
-			placeholder="Key, e.g. first_name"
-			autoFocus
-			value={key}
-			onChange={(v) => {
-				setKey(v);
-				setTouched(v !== "");
-			}}
-			isInvalid={!!error}
-			errorMessage={error ?? undefined}
-			inputClassName="font-fc-mono"
-			onKeyDown={(e) => {
-				if (e.key === "Enter") {
-					e.preventDefault();
-					setTouched(true);
-					if (!fieldKeyError(key, taken)) onCreate(key);
-				} else if (e.key === "Escape") onCancel();
-			}}
-			onBlur={() => {
-				if (key === "") onCancel();
-			}}
-		/>
 	);
 }
 
@@ -386,6 +369,68 @@ function FieldRow({
 			) : null}
 		</div>
 	);
+}
+
+/** The layers that read a field, and what fills it when the template is
+ *  bound: `source` is null for a field left to its default, and undefined
+ *  while unbound. */
+function FieldUsage({
+	template,
+	id,
+	source,
+}: {
+	template: Template;
+	id: string;
+	source: FieldSource | null | undefined;
+}) {
+	const references = useMemo(
+		() => fieldReferences(template, id),
+		[template, id],
+	);
+	return (
+		<>
+			<div className="flex items-start gap-2" data-testid={`used-by-${id}`}>
+				<span className="flex h-5 w-16 shrink-0 items-center truncate text-fc-muted text-fc-sm pointer-coarse:h-7">
+					{CONTENT.usedBy}
+				</span>
+				{references.length > 0 ? (
+					<ReferenceChips template={template} references={references} />
+				) : (
+					<span className="flex h-5 items-center text-fc-faint text-fc-sm">
+						{CONTENT.noLayers}
+					</span>
+				)}
+			</div>
+			{source !== undefined ? (
+				<div className="flex items-center gap-2" data-testid={`bound-${id}`}>
+					<span className="w-16 shrink-0 truncate text-fc-muted text-fc-sm">
+						{CONTENT.boundTo}
+					</span>
+					<span
+						className={cn(
+							"min-w-0 truncate text-fc-sm",
+							source?.kind === "column" && "font-fc-mono text-[11px]",
+						)}
+					>
+						{sourceLabel(source)}
+					</span>
+				</div>
+			) : null}
+		</>
+	);
+}
+
+function sourceLabel(source: FieldSource | null): string {
+	switch (source?.kind) {
+		case "column":
+			return CONTENT.sources.column(source.column);
+		case "constant":
+			return CONTENT.sources.constant(source.value);
+		case "serial":
+			return CONTENT.sources.serial;
+		default:
+			return CONTENT.sources.default;
+	}
 }
 
 /** The sample value's input, by the field's format. */

@@ -77,6 +77,31 @@ describe("the issues list", () => {
 		expect(controller.state.selection).toEqual(["0/1/1"]);
 	});
 
+	test("an unknown field offers to create it, which clears the issue", async () => {
+		const { controller, user } = mount(<List />);
+		breakText(controller);
+		await user.click(screen.getByRole("button", { name: "Create field nope" }));
+		expect(controller.template?.fields.properties.nope).toEqual({
+			type: "string",
+			title: "Nope",
+		});
+		expect(controller.state.values.nope).toBe("Nope");
+		expect(screen.getByTestId("no-issues")).toBeTruthy();
+	});
+
+	test("a field made for an image source is an image", async () => {
+		const { controller, user } = mount(<List />);
+		act(() => {
+			controller.edit((t) =>
+				updateElement(t, "0/2/0", { properties: { src: "{{photo}}" } }),
+			);
+		});
+		await user.click(
+			screen.getByRole("button", { name: "Create field photo" }),
+		);
+		expect(controller.template?.fields.properties.photo?.format).toBe("image");
+	});
+
 	test("with one side, the layer link is the layer's name alone", () => {
 		const one = doc();
 		one.template_data = one.template_data.slice(0, 1);

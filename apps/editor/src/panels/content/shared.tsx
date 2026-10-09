@@ -9,8 +9,10 @@ import { type ReactNode, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import { CONTENT } from "~/app/copy";
 import { getElement, parseKey } from "~/doc/path";
 import CloseIcon from "~icons/mingcute/close-line";
+import { fieldKeyError } from "./field-def";
 
 type DraftFieldProps = Omit<
 	TextFieldProps,
@@ -218,5 +220,44 @@ export function Subheading({ children }: { children: ReactNode }) {
 			{children}
 			<span className="h-px flex-1 bg-fc-border" />
 		</div>
+	);
+}
+
+export function NewFieldKey({
+	taken,
+	onCreate,
+	onCancel,
+}: {
+	taken: (key: string) => boolean;
+	onCreate: (key: string) => boolean;
+	onCancel: () => void;
+}) {
+	const [key, setKey] = useState("");
+	const [touched, setTouched] = useState(false);
+	const error = touched ? fieldKeyError(key, taken) : null;
+	return (
+		<TextField
+			aria-label={CONTENT.newKey}
+			placeholder="Key, e.g. first_name"
+			autoFocus
+			value={key}
+			onChange={(v) => {
+				setKey(v);
+				setTouched(v !== "");
+			}}
+			isInvalid={!!error}
+			errorMessage={error ?? undefined}
+			inputClassName="font-fc-mono"
+			onKeyDown={(e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					setTouched(true);
+					if (!fieldKeyError(key, taken)) onCreate(key);
+				} else if (e.key === "Escape") onCancel();
+			}}
+			onBlur={() => {
+				if (key === "") onCancel();
+			}}
+		/>
 	);
 }
