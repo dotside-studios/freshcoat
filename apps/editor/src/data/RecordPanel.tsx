@@ -182,7 +182,7 @@ export function RecordPanel({
 						variant="ghost"
 						size="sm"
 						onPress={() => {
-							controller.dispatch({ type: "setExportRecord", id: record.id });
+							controller.dispatch({ type: "setRecord", id: record.id });
 							controller.dispatch({ type: "setSection", section: "export" });
 						}}
 					>

@@ -112,23 +112,7 @@ to find one.
   - a new `apps/editor/src/tests/shortcuts-dialog.test.tsx` covers a match, no
     match and clearing the field.
 
-## 8. Step through preview records from the keyboard
-
-In Edit, the record stepper in the Content tab previews the previous or next
-record with its buttons only.
-
-- **Files:** `apps/editor/src/app/commands.ts` (two commands with
-  `sections: ["edit"]`), `apps/editor/src/panels/content/RecordStepper.tsx` for
-  how it moves, and `previewRecord` in `apps/editor/src/app/controller.ts`.
-- **Done when:**
-  - two commands, "Previous record" and "Next record", step the preview on a
-    free chord, disabled at either end or when the template is not bound.
-    Arrow keys in Edit always nudge (see `app/Editor.tsx`), so pick something
-    like `Alt+[` and `Alt+]`, and check `COMMANDS` for clashes;
-  - they appear in the shortcuts sheet;
-  - `apps/editor/src/tests/commands.test.ts` covers both, and the ends.
-
-## 9. Width and height in the export report
+## 8. Width and height in the export report
 
 Every image export writes `export-report.csv` with `file`, `record`, `side`,
 `status`, `error`, `print` and `gamut`. With sizes taken from each photo, the
@@ -143,7 +127,7 @@ output size varies per file and is worth recording.
   - `apps/editor/src/tests/export-job.test.ts` checks the header and one row of
     each kind.
 
-## 10. Guard more British spellings in the copy
+## 9. Guard more British spellings in the copy
 
 The copy guard keeps "colour", "centre" and "optimis" out of the interface.
 The style guide asks for American spelling throughout.

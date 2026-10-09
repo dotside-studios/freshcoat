@@ -507,7 +507,31 @@ test("a failed record shows its error and opens in Export", async ({
 	await expect(error).toContainText("Font missing");
 	await error.getByRole("button", { name: "Show in Export" }).click();
 	await expect(page.getByTestId("section-export")).toBeVisible();
-	expect(await state<string>(page, "s.exportRecordId")).toBe(id);
+	expect(await state<string>(page, "s.recordId")).toBe(id);
+});
+
+test("the record focused in Data is the one Edit and Export show", async ({
+	page,
+}) => {
+	await openDataFromTemplate(page);
+	await importCsv(page);
+	await run(
+		page,
+		`const s = c.state.workspace; c.dispatch({ type: "setBinding", id: s.activeTemplateId, binding: { datasetId: s.datasets[0].id, fields: { display_name: { kind: "column", column: "display_name" } } } })`,
+	);
+	const id = (await records(page))[2]?.id as string;
+	await cell(page, id, "tier").click();
+	expect(await state<string>(page, "s.recordId")).toBe(id);
+	await page.keyboard.press(`${mod}+1`);
+	await expect.poll(() => state<string>(page, "s.previewRecordId")).toBe(id);
+	await page.keyboard.press("Alt+BracketLeft");
+	const before = (await records(page))[1]?.id as string;
+	expect(await state<string>(page, "s.recordId")).toBe(before);
+	await page.keyboard.press(`${mod}+2`);
+	await expect(page.getByTestId("record-panel")).toHaveAttribute(
+		"data-record",
+		before,
+	);
 });
 
 /** A real JPEG of this size from the page's own encoder, with an EXIF

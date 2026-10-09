@@ -283,7 +283,7 @@ class RouteSync {
 				if (s.previewRecordId !== step.id) c.previewRecord(step.id);
 				return;
 			case "exportRecord":
-				c.dispatch({ type: "setExportRecord", id: step.id });
+				c.dispatch({ type: "setRecord", id: step.id });
 				return;
 		}
 	}
