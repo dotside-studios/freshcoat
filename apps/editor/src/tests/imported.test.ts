@@ -64,4 +64,13 @@ describe("announceImport", () => {
 			{ tone: "success", timeout: 6000 },
 		]);
 	});
+
+	it("offers to show the issues an import left", () => {
+		const show = vi.fn();
+		announceImport(controller, "d_a", "Imported", false, show);
+		const action = vi.mocked(toast).mock.calls[0]?.[1]?.action;
+		expect(action?.label).toBe("Show issues");
+		action?.onAction();
+		expect(show).toHaveBeenCalled();
+	});
 });

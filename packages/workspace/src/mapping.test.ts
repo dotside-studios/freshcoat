@@ -79,6 +79,17 @@ describe("inferType", () => {
 		expect(inferType(["", " "])).toBe("text");
 	});
 
+	it("infers image file names and hex colors", () => {
+		expect(inferType(["ada.png", "Grace Hopper.JPG", "photos/cy.webp"])).toBe(
+			"image",
+		);
+		expect(inferType(["ada.png", "notes.txt"])).toBe("text");
+		expect(inferType(["https://a.co/ada.png"])).toBe("url");
+		expect(inferType(["#fff", "#00FF7f", "#11223344"])).toBe("color");
+		expect(inferType(["#fff", "red"])).toBe("text");
+		expect(inferType(["#12345"])).toBe("text");
+	});
+
 	it("reads only the first 200 values", () => {
 		expect(inferType([...Array(200).fill("1"), "x"])).toBe("integer");
 	});
@@ -179,10 +190,21 @@ describe("applyMapping", () => {
 			tier: "silver",
 		});
 		expect(added[2]?.values).toEqual({ email: "e@x.co", points: 3 });
+		const [, dee, empty] = added;
 		expect(result.issues).toEqual([
-			{ row: 3, column: "points", message: "Not a whole number" },
-			{ row: 3, column: "email", message: "Not an email address" },
-			{ row: 4, column: "first_name", message: "Required" },
+			{
+				row: 3,
+				record: dee?.id,
+				column: "points",
+				message: "Not a whole number",
+			},
+			{
+				row: 3,
+				record: dee?.id,
+				column: "email",
+				message: "Not an email address",
+			},
+			{ row: 4, record: empty?.id, column: "first_name", message: "Required" },
 		]);
 		expect(result.dataset.records[0]).toBe(base.records[0]);
 	});
@@ -261,7 +283,7 @@ describe("applyMapping", () => {
 		});
 		expect(result.dataset.records).toHaveLength(4);
 		expect(result.issues).toEqual([
-			{ row: 2, column: "points", message: "Not a number" },
+			{ row: 2, record: lower?.id, column: "points", message: "Not a number" },
 		]);
 		expect(base.records[0]?.values.points).toBe(5);
 	});

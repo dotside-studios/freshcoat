@@ -9,6 +9,8 @@ export type DataViewState = {
 	columnFilters: readonly ColumnFilter[];
 	sort?: SortSpec;
 	selection: "all" | ReadonlySet<string>;
+	/** the records the last import left with issues */
+	imported?: ReadonlySet<string>;
 };
 
 export const DEFAULT_DATA_VIEW: DataViewState = {

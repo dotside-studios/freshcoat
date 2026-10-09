@@ -156,6 +156,12 @@ describe("gallery model", () => {
 		expect(filterByStatus(d.records, d, "issues").map((r) => r.id)).toEqual([
 			"r_3",
 		]);
+		expect(
+			filterByStatus(d.records, d, "imported", new Set(["r_1", "r_4"])).map(
+				(r) => r.id,
+			),
+		).toEqual(["r_1", "r_4"]);
+		expect(filterByStatus(d.records, d, "imported")).toEqual([]);
 		expect(photoBytes(d)).toBe(10_000);
 	});
 

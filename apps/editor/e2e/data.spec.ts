@@ -142,6 +142,17 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 	expect(cols.find((c) => c.key === "profile_url")?.type).toBe("url");
 
 	await importCsv(page);
+	await page.getByRole("button", { name: "Show issues" }).click();
+	await expect(page.getByTestId("status-filter")).toHaveAccessibleName(
+		"Show: Import issues",
+	);
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(1);
+	const flagged = await page
+		.locator("[role=row][data-row]")
+		.getAttribute("data-row");
+	await page.getByTestId("status-filter").click();
+	await page.getByRole("menuitemradio", { name: "All records" }).click();
+	await expect(page.locator("[role=row][data-row]")).toHaveCount(3);
 	const recs = await records(page);
 	expect(recs).toHaveLength(3);
 	expect(recs.map((r) => r.values.display_name)).toEqual([
@@ -165,6 +176,8 @@ test("a dataset from template fields takes a CSV through the wizard, then edits,
 	await expect(page.getByTestId("data-status")).toContainText("1 issue");
 
 	const [ada, grace, alan] = recs.map((r) => r.id) as [string, string, string];
+
+	expect(flagged).toBe(alan);
 
 	// With the side panels closed every column fits without scrolling.
 	await page.getByRole("button", { name: "Datasets panel" }).click();

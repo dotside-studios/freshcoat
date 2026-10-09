@@ -44,6 +44,7 @@ import { STATUSES } from "./cells";
 import {
 	CARD_SIZES,
 	type CardSize,
+	IMPORT_ISSUES_FILTER,
 	type RecordsView,
 	STATUS_FILTERS,
 	type StatusFilter,
@@ -153,6 +154,7 @@ export function DataToolbar({
 	onCardSize,
 	statusFilter,
 	onStatusFilter,
+	importIssues,
 	query,
 	onQuery,
 	selected,
@@ -171,6 +173,8 @@ export function DataToolbar({
 	onCardSize: (size: CardSize) => void;
 	statusFilter: StatusFilter;
 	onStatusFilter: (filter: StatusFilter) => void;
+	/** offers the last import's records with issues as a filter */
+	importIssues: boolean;
 	query: string;
 	onQuery: (q: string) => void;
 	selected: number;
@@ -184,9 +188,12 @@ export function DataToolbar({
 	findReplace?: ReactNode;
 	columnFilters?: ReactNode;
 }) {
+	const filters = importIssues
+		? [...STATUS_FILTERS, IMPORT_ISSUES_FILTER]
+		: STATUS_FILTERS;
 	const filtering = statusFilter !== "all";
 	const filterLabel =
-		STATUS_FILTERS.find((f) => f.id === statusFilter)?.label ?? "All records";
+		filters.find((f) => f.id === statusFilter)?.label ?? "All records";
 	return (
 		<div
 			className="@container flex h-9 shrink-0 items-center gap-0.5 border-fc-border border-b bg-fc-panel px-1.5 pointer-coarse:h-11"
@@ -270,7 +277,7 @@ export function DataToolbar({
 							selectedKeys={[statusFilter]}
 							onAction={(k) => onStatusFilter(k as StatusFilter)}
 						>
-							{STATUS_FILTERS.map((f) => (
+							{filters.map((f) => (
 								<MenuItem key={f.id} id={f.id}>
 									{f.label}
 								</MenuItem>

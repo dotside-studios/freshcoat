@@ -122,7 +122,7 @@ export function titleColumn(columns: readonly Column[]): Column | undefined {
 
 // ── Filters and totals ───────────────────────────────────────────────────
 
-export type StatusFilter = "all" | RecordStatus | "issues";
+export type StatusFilter = "all" | RecordStatus | "issues" | "imported";
 
 export const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 	{ id: "all", label: "All records" },
@@ -133,12 +133,20 @@ export const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 	{ id: "issues", label: "With issues" },
 ];
 
+export const IMPORT_ISSUES_FILTER: { id: StatusFilter; label: string } = {
+	id: "imported",
+	label: "Import issues",
+};
+
 export function filterByStatus(
 	records: readonly DataRecord[],
 	dataset: Pick<Dataset, "columns" | "assets">,
 	filter: StatusFilter,
+	imported?: ReadonlySet<string>,
 ): readonly DataRecord[] {
 	if (filter === "all") return records;
+	if (filter === "imported")
+		return records.filter((r) => imported?.has(r.id) ?? false);
 	if (filter === "issues")
 		return records.filter((r) => recordIssues(dataset, r).length > 0);
 	return records.filter((r) => r.status === filter);
@@ -205,6 +213,7 @@ export function shownRecords(
 			filterRecords(dataset.records, dataset, query),
 			dataset,
 			view.statusFilter,
+			view.imported,
 		),
 		dataset,
 		view.columnFilters,

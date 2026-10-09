@@ -92,4 +92,15 @@ describe("selection in a view", () => {
 		).toEqual(["r_1", "r_2"]);
 		expect(selectedInView(d, undefined)).toEqual([]);
 	});
+
+	it("selects all of the last import's records with issues", () => {
+		expect(
+			selectedInView(people(), {
+				...DEFAULT_DATA_VIEW,
+				statusFilter: "imported",
+				imported: new Set(["r_3", "r_1"]),
+				selection: "all",
+			}),
+		).toEqual(["r_1", "r_3"]);
+	});
 });

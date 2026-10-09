@@ -299,8 +299,33 @@ export function DataSection() {
 				<ImportWizard
 					target={wizard}
 					onClose={() => setWizard(null)}
-					onImported={(id, summary, isNew) => {
-						announceImport(controller, id, summary, isNew);
+					onImported={(id, summary, isNew, issues) => {
+						controller.dispatch({
+							type: "setDataView",
+							datasetId: id,
+							patch: { imported: issues.length ? new Set(issues) : undefined },
+						});
+						announceImport(
+							controller,
+							id,
+							summary,
+							isNew,
+							issues.length
+								? () => {
+										controller.dispatch({ type: "setActiveDataset", id });
+										controller.dispatch({
+											type: "setDataView",
+											datasetId: id,
+											patch: {
+												query: "",
+												statusFilter: "imported",
+												columnFilters: [],
+												selection: new Set(),
+											},
+										});
+									}
+								: undefined,
+						);
 						setImportNonce((n) => n + 1);
 						requestAnimationFrame(() =>
 							document
@@ -498,7 +523,11 @@ function RecordsPane({
 	const controller = useController();
 	const dataView =
 		useEditor((s) => s.dataViews[dataset.id]) ?? DEFAULT_DATA_VIEW;
-	const { query, statusFilter, columnFilters, sort } = dataView;
+	const { query, columnFilters, sort } = dataView;
+	const statusFilter =
+		dataView.statusFilter === "imported" && !dataView.imported
+			? "all"
+			: dataView.statusFilter;
 	const selection = dataView.selection as Selection;
 	const deferredQuery = useDeferredValue(query);
 	const patchView = useCallback(
@@ -572,11 +601,11 @@ function RecordsPane({
 	const filtered = useMemo(
 		() =>
 			filterByColumns(
-				filterByStatus(searched, dataset, statusFilter),
+				filterByStatus(searched, dataset, statusFilter, dataView.imported),
 				dataset,
 				columnFilters,
 			),
-		[searched, dataset, statusFilter, columnFilters],
+		[searched, dataset, statusFilter, columnFilters, dataView.imported],
 	);
 	const rows = useMemo(
 		() =>
@@ -807,6 +836,7 @@ function RecordsPane({
 					onCardSize={setCardSize}
 					statusFilter={statusFilter}
 					onStatusFilter={setStatusFilter}
+					importIssues={dataView.imported !== undefined}
 					query={query}
 					onQuery={setQuery}
 					selected={selectedIds.length}

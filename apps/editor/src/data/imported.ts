@@ -4,12 +4,14 @@ import { readsDataset } from "~/binding/binding";
 import { activeSlot } from "~/state/workspace";
 
 /** Reports an import. A new dataset is bound to the active template when it
- *  has none, and otherwise offered to it from the toast. */
+ *  has none, and otherwise offered to it from the toast. Without that offer,
+ *  an import that left issues offers to show them. */
 export function announceImport(
 	controller: EditorController,
 	datasetId: string,
 	summary: string,
 	isNew: boolean,
+	showIssues?: () => void,
 ): void {
 	const slot = activeSlot(controller.state);
 	const offer = isNew && slot !== undefined;
@@ -25,6 +27,8 @@ export function announceImport(
 						onAction: () => controller.bindTemplate(slot.id, datasetId),
 					},
 				}
-			: {}),
+			: showIssues
+				? { action: { label: "Show issues", onAction: showIssues } }
+				: {}),
 	});
 }
