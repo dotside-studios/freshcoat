@@ -1,0 +1,617 @@
+{
+	"format_version": "1.0",
+	"version": "1.0.0",
+	"id": "freshcoat-figma-cover",
+	"name": "Freshcoat for Figma cover",
+	"description": "The Figma Community thumbnail for Freshcoat for Figma, rendered with the freshcoat CLI.",
+	"width": 1920,
+	"height": 1080,
+	"fonts": [
+		{
+			"kind": "google",
+			"family": "Ubuntu Sans",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans:wght@400;500;700&display=swap"
+		},
+		{
+			"kind": "google",
+			"family": "Ubuntu Sans Mono",
+			"url": "https://fonts.googleapis.com/css2?family=Ubuntu+Sans+Mono:wght@500;700&display=swap"
+		}
+	],
+	"fields": {
+		"type": "object",
+		"properties": {
+			"tagline": {
+				"type": "string",
+				"title": "Tagline",
+				"default": "Figma frames,\nready for data."
+			},
+			"summary": {
+				"type": "string",
+				"title": "Summary",
+				"default": "Mark layers with {{fields}}, export a .coat template, then fill it from a spreadsheet in Freshcoat Studio or your own code."
+			},
+			"footer": {
+				"type": "string",
+				"title": "Footer",
+				"default": "Free and open source"
+			},
+			"layer_0_field": {
+				"type": "string",
+				"title": "Layer 0 field",
+				"default": "{{name}}"
+			},
+			"layer_1_field": {
+				"type": "string",
+				"title": "Layer 1 field",
+				"default": "{{avatar}}"
+			},
+			"layer_2_field": {
+				"type": "string",
+				"title": "Layer 2 field",
+				"default": "{{brand}}"
+			},
+			"layer_3_field": {
+				"type": "string",
+				"title": "Layer 3 field",
+				"default": "{{url}}"
+			}
+		},
+		"required": [
+			"tagline",
+			"summary",
+			"footer",
+			"layer_0_field",
+			"layer_1_field",
+			"layer_2_field",
+			"layer_3_field"
+		]
+	},
+	"template_data": [
+		{
+			"name": "figma-cover",
+			"background": {
+				"id": "background",
+				"type": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 1920,
+					"height": 1080
+				},
+				"properties": {
+					"fill": "#ffffff"
+				}
+			},
+			"elements": [
+				{
+					"id": "ring",
+					"type": "vector",
+					"pos": {
+						"x": 1290,
+						"y": -50.0
+					},
+					"size": {
+						"width": 1180,
+						"height": 1180
+					},
+					"properties": {
+						"d": "M0 590.0A590.0 590.0 0 1 0 1180 590.0A590.0 590.0 0 1 0 0 590.0ZM340.0 590.0A250.0 250.0 0 1 0 840.0 590.0A250.0 250.0 0 1 0 340.0 590.0Z",
+						"fillRule": "evenodd",
+						"fill": {
+							"kind": "angular",
+							"rotation": -90,
+							"stops": [
+								{
+									"offset": 0.0,
+									"color": "#019dda"
+								},
+								{
+									"offset": 0.1,
+									"color": "#2eaa8f"
+								},
+								{
+									"offset": 0.2,
+									"color": "#7bb353"
+								},
+								{
+									"offset": 0.3,
+									"color": "#f1b82b"
+								},
+								{
+									"offset": 0.4,
+									"color": "#f78e21"
+								},
+								{
+									"offset": 0.5,
+									"color": "#e75234"
+								},
+								{
+									"offset": 0.6,
+									"color": "#cc3b56"
+								},
+								{
+									"offset": 0.7,
+									"color": "#9f3d8c"
+								},
+								{
+									"offset": 0.8,
+									"color": "#5368b6"
+								},
+								{
+									"offset": 0.9,
+									"color": "#2883c9"
+								},
+								{
+									"offset": 1.0,
+									"color": "#019dda"
+								}
+							]
+						}
+					}
+				},
+				{
+					"id": "layer_0",
+					"type": "frame",
+					"pos": {
+						"x": 1150,
+						"y": 300
+					},
+					"size": {
+						"width": 380,
+						"height": 84
+					},
+					"shadow": [
+						{
+							"color": "#0b1e331f",
+							"dx": 0,
+							"dy": 14,
+							"blur": 36
+						}
+					],
+					"properties": {
+						"fill": "#ffffff",
+						"cornerRadius": 20,
+						"stroke": {
+							"color": "#dbe3ea",
+							"width": 2,
+							"align": "inside"
+						},
+						"children": [
+							{
+								"id": "layer_0_dot",
+								"type": "rect",
+								"pos": {
+									"x": 28,
+									"y": 30
+								},
+								"size": {
+									"width": 24,
+									"height": 24
+								},
+								"properties": {
+									"fill": "#019dda",
+									"cornerRadius": 7
+								}
+							},
+							{
+								"id": "layer_0_marker",
+								"type": "text",
+								"pos": {
+									"x": 72,
+									"y": 23
+								},
+								"size": {
+									"width": 300,
+									"height": 40
+								},
+								"properties": {
+									"spans": [
+										{
+											"text": "text:",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 500
+											},
+											"color": "#4a5868"
+										},
+										{
+											"text": "{{layer_0_field}}",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 700
+											},
+											"color": "#0b1e33"
+										}
+									],
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 30,
+										"weight": 500
+									},
+									"color": "#0b1e33",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "layer_1",
+					"type": "frame",
+					"pos": {
+						"x": 1210,
+						"y": 428
+					},
+					"size": {
+						"width": 380,
+						"height": 84
+					},
+					"shadow": [
+						{
+							"color": "#0b1e331f",
+							"dx": 0,
+							"dy": 14,
+							"blur": 36
+						}
+					],
+					"properties": {
+						"fill": "#ffffff",
+						"cornerRadius": 20,
+						"stroke": {
+							"color": "#dbe3ea",
+							"width": 2,
+							"align": "inside"
+						},
+						"children": [
+							{
+								"id": "layer_1_dot",
+								"type": "rect",
+								"pos": {
+									"x": 28,
+									"y": 30
+								},
+								"size": {
+									"width": 24,
+									"height": 24
+								},
+								"properties": {
+									"fill": "#f1b82b",
+									"cornerRadius": 7
+								}
+							},
+							{
+								"id": "layer_1_marker",
+								"type": "text",
+								"pos": {
+									"x": 72,
+									"y": 23
+								},
+								"size": {
+									"width": 300,
+									"height": 40
+								},
+								"properties": {
+									"spans": [
+										{
+											"text": "image:",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 500
+											},
+											"color": "#4a5868"
+										},
+										{
+											"text": "{{layer_1_field}}",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 700
+											},
+											"color": "#0b1e33"
+										}
+									],
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 30,
+										"weight": 500
+									},
+									"color": "#0b1e33",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "layer_2",
+					"type": "frame",
+					"pos": {
+						"x": 1170,
+						"y": 556
+					},
+					"size": {
+						"width": 380,
+						"height": 84
+					},
+					"shadow": [
+						{
+							"color": "#0b1e331f",
+							"dx": 0,
+							"dy": 14,
+							"blur": 36
+						}
+					],
+					"properties": {
+						"fill": "#ffffff",
+						"cornerRadius": 20,
+						"stroke": {
+							"color": "#dbe3ea",
+							"width": 2,
+							"align": "inside"
+						},
+						"children": [
+							{
+								"id": "layer_2_dot",
+								"type": "rect",
+								"pos": {
+									"x": 28,
+									"y": 30
+								},
+								"size": {
+									"width": 24,
+									"height": 24
+								},
+								"properties": {
+									"fill": "#e75234",
+									"cornerRadius": 7
+								}
+							},
+							{
+								"id": "layer_2_marker",
+								"type": "text",
+								"pos": {
+									"x": 72,
+									"y": 23
+								},
+								"size": {
+									"width": 300,
+									"height": 40
+								},
+								"properties": {
+									"spans": [
+										{
+											"text": "color:",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 500
+											},
+											"color": "#4a5868"
+										},
+										{
+											"text": "{{layer_2_field}}",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 700
+											},
+											"color": "#0b1e33"
+										}
+									],
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 30,
+										"weight": 500
+									},
+									"color": "#0b1e33",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "layer_3",
+					"type": "frame",
+					"pos": {
+						"x": 1230,
+						"y": 684
+					},
+					"size": {
+						"width": 380,
+						"height": 84
+					},
+					"shadow": [
+						{
+							"color": "#0b1e331f",
+							"dx": 0,
+							"dy": 14,
+							"blur": 36
+						}
+					],
+					"properties": {
+						"fill": "#ffffff",
+						"cornerRadius": 20,
+						"stroke": {
+							"color": "#dbe3ea",
+							"width": 2,
+							"align": "inside"
+						},
+						"children": [
+							{
+								"id": "layer_3_dot",
+								"type": "rect",
+								"pos": {
+									"x": 28,
+									"y": 30
+								},
+								"size": {
+									"width": 24,
+									"height": 24
+								},
+								"properties": {
+									"fill": "#9f3d8c",
+									"cornerRadius": 7
+								}
+							},
+							{
+								"id": "layer_3_marker",
+								"type": "text",
+								"pos": {
+									"x": 72,
+									"y": 23
+								},
+								"size": {
+									"width": 300,
+									"height": 40
+								},
+								"properties": {
+									"spans": [
+										{
+											"text": "qr:",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 500
+											},
+											"color": "#4a5868"
+										},
+										{
+											"text": "{{layer_3_field}}",
+											"font": {
+												"family": "Ubuntu Sans Mono",
+												"size": 30,
+												"weight": 700
+											},
+											"color": "#0b1e33"
+										}
+									],
+									"font": {
+										"family": "Ubuntu Sans Mono",
+										"size": 30,
+										"weight": 500
+									},
+									"color": "#0b1e33",
+									"align": "left"
+								}
+							}
+						]
+					}
+				},
+				{
+					"id": "logo",
+					"type": "image",
+					"pos": {
+						"x": 144,
+						"y": 200
+					},
+					"size": {
+						"width": 417,
+						"height": 75
+					},
+					"properties": {
+						"src": "freshcoat-logo.svg",
+						"fit": "contain"
+					}
+				},
+				{
+					"id": "product",
+					"type": "text",
+					"pos": {
+						"x": 580,
+						"y": 216
+					},
+					"size": {
+						"width": 400,
+						"height": 60
+					},
+					"properties": {
+						"value": "for Figma",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 50,
+							"weight": 500
+						},
+						"color": "#4a5868",
+						"align": "left"
+					}
+				},
+				{
+					"id": "tagline",
+					"type": "text",
+					"pos": {
+						"x": 144,
+						"y": 370
+					},
+					"size": {
+						"width": 960,
+						"height": 280
+					},
+					"properties": {
+						"value": "{{tagline}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 112,
+							"weight": 700,
+							"letterSpacing": -3,
+							"lineHeight": 1.05
+						},
+						"color": "#0b1e33",
+						"align": "left"
+					}
+				},
+				{
+					"id": "summary",
+					"type": "text",
+					"pos": {
+						"x": 144,
+						"y": 650
+					},
+					"size": {
+						"width": 880,
+						"height": 140
+					},
+					"properties": {
+						"value": "{{summary}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 36,
+							"weight": 400,
+							"lineHeight": 1.45
+						},
+						"color": "#4a5868",
+						"align": "left"
+					}
+				},
+				{
+					"id": "footer",
+					"type": "text",
+					"pos": {
+						"x": 144,
+						"y": 850
+					},
+					"size": {
+						"width": 900,
+						"height": 44
+					},
+					"properties": {
+						"value": "{{footer}}",
+						"font": {
+							"family": "Ubuntu Sans",
+							"size": 30,
+							"weight": 500
+						},
+						"color": "#0b6f9f",
+						"align": "left"
+					}
+				}
+			]
+		}
+	]
+}
