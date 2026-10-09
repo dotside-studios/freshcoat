@@ -34,7 +34,8 @@ export interface OutputSink {
 	add(name: string, bytes: Uint8Array, crc?: number): Promise<void>;
 	finish(): Promise<SinkResult>;
 	/** Stops, keeping what the destination keeps: a folder its files, a
-	 *  download the parts already handed over, a zip file nothing. */
+	 *  download the parts already handed over, a zip file what its writable
+	 *  keeps on abort. */
 	abort(): Promise<void>;
 	/** files added so far */
 	readonly files: number;
@@ -52,9 +53,11 @@ function levelFor(name: string): 0 | 6 {
 
 // ── Zip file ───────────────────────────────────────────────────────────────
 
-/** A zip streamed into a writable, such as a file from `showSaveFilePicker`.
- *  Each write is awaited, so a slow disk holds the job back. Cancelling
- *  aborts the writable, which discards the file. */
+/** A zip streamed into a writable, such as a file from `showSaveFilePicker`
+ *  or `Writable.toWeb(createWriteStream(path))` in Node. Each write is
+ *  awaited, so a slow disk holds the job back. Cancelling aborts the
+ *  writable: a file from `showSaveFilePicker` is discarded, while a Node
+ *  file stream leaves a partial zip for the host to remove. */
 export function createStreamZipSink(
 	writable: WritableStream<Uint8Array>,
 ): OutputSink {

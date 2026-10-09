@@ -98,6 +98,63 @@ calling thread, and Studio passes a pool of workers, each holding its own
 memory, and a host can pass any `OutputSink`, such as `createStreamZipSink`
 over a writable stream.
 
+### Export from Node
+
+The same job runs in Bun or Node without a DOM. The host does what Studio's
+workers do: it resolves the template's fonts, registers the barcode encoder,
+and gives the renderer a loader for image sources that are file paths.
+Dataset photos (`ws:<sha256>`) come from the archive and need no loader.
+
+```ts
+import { createWriteStream, openAsBlob } from "node:fs";
+import { unlink, writeFile } from "node:fs/promises";
+import { Writable } from "node:stream";
+import { resolveTemplateFonts, setBarcodeEncoder } from "@freshcoat-js/coatfile";
+import { bwipBarcodeEncoder } from "@freshcoat-js/coatfile/barcode";
+import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
+import { unpackWorkspace } from "@freshcoat-js/workspace/archive";
+import {
+  createItemRenderer,
+  createStreamZipSink,
+  inlinePool,
+  runExportJob,
+} from "@freshcoat-js/workspace/export";
+
+const unpacked = await unpackWorkspace(await openAsBlob("club.coatworkspace"));
+if (!unpacked.ok) throw new Error(unpacked.message);
+const { workspace } = unpacked;
+const preset = workspace.presets[0];
+const entry = workspace.templates.find((t) => t.id === preset.templateId);
+
+// Pass `fetch` to serve fonts from a cache or a mirror instead of the network.
+const { fonts, missing } = await resolveTemplateFonts(entry.template);
+setBarcodeEncoder(bwipBarcodeEncoder);
+
+const items = createItemRenderer({
+  ck: await loadCanvasKit("full"),
+  fonts,
+  // relative paths and file: URLs in the template, read under this directory
+  load: fileLoader({ root: "." }),
+});
+
+const out = preset.format === "pdf" ? "club.pdf" : "club.zip";
+const result = await runExportJob(workspace, preset, {
+  pool: inlinePool(items),
+  sink:
+    preset.format === "pdf"
+      ? undefined
+      : createStreamZipSink(Writable.toWeb(createWriteStream(out))),
+});
+items.dispose();
+
+// A PDF is assembled in memory and comes back as `file`.
+if (result.file) await writeFile(out, await result.file.blob.bytes());
+// A cancelled zip leaves a partial file behind.
+if (result.cancelled) await unlink(out).catch(() => {});
+```
+
+`src/export/node-export.test.ts` runs this path end to end.
+
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex
 backs. The designs inside the PDF are raster images at the chosen density.
