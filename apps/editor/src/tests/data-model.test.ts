@@ -31,7 +31,6 @@ import {
 	setCell,
 	sortRecords,
 	templatesUsing,
-	uniqueName,
 	updateColumn,
 	valueFromText,
 } from "~/data/model";
@@ -410,11 +409,6 @@ describe("JSON Schema import", () => {
 });
 
 describe("helpers", () => {
-	it("numbers a name that is taken", () => {
-		expect(uniqueName("Dataset", [])).toBe("Dataset");
-		expect(uniqueName("Dataset", ["Dataset", "Dataset 2"])).toBe("Dataset 3");
-	});
-
 	it("lists the templates bound to a dataset", () => {
 		const templates = [
 			{

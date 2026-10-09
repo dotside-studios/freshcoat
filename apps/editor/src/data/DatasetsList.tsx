@@ -10,6 +10,7 @@ import {
 import { Popover } from "@freshcoat-js/ui/popover";
 import { toast } from "@freshcoat-js/ui/toast";
 import { treeRow } from "@freshcoat-js/ui/tree";
+import { uniqueName } from "@freshcoat-js/workspace";
 import { useMemo, useState } from "react";
 import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -18,7 +19,7 @@ import { RenameInput } from "~/panels/layers/RenameInput";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
 import TableIcon from "~icons/mingcute/table-2-line";
-import { duplicateDataset, templatesUsing, uniqueName } from "./model";
+import { duplicateDataset, templatesUsing } from "./model";
 
 /** New dataset actions, shared by the list header and the empty state. */
 export type DatasetCreators = {

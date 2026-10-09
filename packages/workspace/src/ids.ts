@@ -32,10 +32,29 @@ export function slug(text: string): string {
 
 /** `base`, or `base_2`, `base_3`… whichever is not taken. */
 export function uniqueKey(base: string, taken: Iterable<string>): string {
-	const used = new Set(taken);
-	if (!used.has(base)) return base;
+	return firstFree(base, taken, "_", false);
+}
+
+/** `name`, or `name 2`, `name 3`… whichever is not taken. */
+export function uniqueName(
+	name: string,
+	taken: Iterable<string>,
+	options: { caseInsensitive?: boolean } = {},
+): string {
+	return firstFree(name, taken, " ", options.caseInsensitive ?? false);
+}
+
+function firstFree(
+	base: string,
+	taken: Iterable<string>,
+	separator: string,
+	caseInsensitive: boolean,
+): string {
+	const fold = (s: string) => (caseInsensitive ? s.toLowerCase() : s);
+	const used = new Set(Array.from(taken, fold));
+	if (!used.has(fold(base))) return base;
 	for (let n = 2; ; n++) {
-		const candidate = `${base}_${n}`;
-		if (!used.has(candidate)) return candidate;
+		const candidate = `${base}${separator}${n}`;
+		if (!used.has(fold(candidate))) return candidate;
 	}
 }

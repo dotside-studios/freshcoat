@@ -56,6 +56,7 @@ export {
 	newId,
 	slug,
 	uniqueKey,
+	uniqueName,
 } from "./ids";
 export {
 	type ImageInfo,

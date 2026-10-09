@@ -12,6 +12,7 @@ import {
 	photoDataset,
 	prepareAssets,
 	type TableFormat,
+	uniqueName,
 } from "@freshcoat-js/workspace";
 import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
@@ -19,12 +20,7 @@ import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
 import type { BindingPatch } from "~/state/workspace";
-import {
-	rebindColumn,
-	renameColumn,
-	replaceDataset,
-	uniqueName,
-} from "./model";
+import { rebindColumn, renameColumn, replaceDataset } from "./model";
 
 export function currentDataset(
 	controller: EditorController,
