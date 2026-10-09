@@ -2,23 +2,17 @@ import {
 	compile,
 	fitDesignSize,
 	hasInsets,
+	type Renderer,
 	type Sides,
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { renderCompiled } from "@freshcoat-js/coatfile/render";
-import {
-	type ByteLoader,
-	createRenderer,
-	fetchLoader,
-	type Renderer,
-	type RendererOptions,
-} from "@freshcoat-js/engine";
 import { crc32 } from "../crc";
 import { orientedSize } from "../image-info";
 import { exportSize } from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
-import { createJobCaches, IMAGE_CACHE_PIXELS } from "./caches";
+import { createJobCaches } from "./caches";
 import {
 	type GamutNote,
 	gamutNotes,
@@ -132,20 +126,16 @@ export function withBleed(
 }
 
 export type ItemRendererOptions = {
-	ck: RendererOptions["ck"];
+	/** The host owns it: dispose leaves it alive. */
+	renderer: Renderer;
 	fonts?: Map<string, Uint8Array[]>;
-	/** Where bytes the request's `images` do not hold come from. Default:
-	 *  data: URLs and fetch. */
-	load?: ByteLoader;
-	/** Decoded pixels kept across items. */
-	maxImagePixels?: number;
 };
 
-/** Renders export items one at a time, keeping decoded images, analyses and
- *  the surface across the items of a job. */
+/** Renders export items one at a time, keeping analyses and the renderer's
+ *  decoded images and surface across the items of a job. */
 export type ItemRenderer = {
 	render(request: RenderRequest): Promise<RenderOutput>;
-	/** Replaces the fonts. What was kept is freed with the renderer. */
+	/** Adds these fonts to the renderer, replacing families it already has. */
 	setFonts(fonts: Map<string, Uint8Array[]>): void;
 	/** Frees what was kept across the job's items. */
 	endJob(): void;
@@ -153,38 +143,34 @@ export type ItemRenderer = {
 };
 
 export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
-	const { ck } = options;
-	const fallback = options.load ?? fetchLoader;
-	let fonts = options.fonts ?? new Map<string, Uint8Array[]>();
-	let renderer: Promise<Renderer> | undefined;
-	let own = new Map<string, Blob>();
+	const { renderer } = options;
 	const caches = createJobCaches();
+	let fonts: Promise<void> = options.fonts
+		? renderer.addFonts(Object.fromEntries(options.fonts))
+		: Promise.resolve();
+	// The renderer keeps a decoded photo while it is handed the same bytes, and
+	// a `ws:` ref names its content, so the last item's bytes are passed again.
+	let photos = new Map<string, Uint8Array>();
 
-	const load: ByteLoader = async (src) => {
-		const blob = own.get(src);
-		if (blob) return new Uint8Array(await blob.arrayBuffer());
-		return fallback(src);
-	};
-
-	const rendererFor = () => {
-		renderer ??= createRenderer({
-			ck,
-			fonts: Object.fromEntries(fonts),
-			load,
-			cache: { maxImagePixels: options.maxImagePixels ?? IMAGE_CACHE_PIXELS },
-		});
-		return renderer;
-	};
-
-	const dropRenderer = () => {
-		caches.clear();
-		void renderer?.then((r) => r.dispose());
-		renderer = undefined;
+	const photosFor = async (images: RenderRequest["images"]) => {
+		const next = new Map(
+			await Promise.all(
+				images.map(
+					async ([ref, blob]) =>
+						[
+							ref,
+							photos.get(ref) ?? new Uint8Array(await blob.arrayBuffer()),
+						] as const,
+				),
+			),
+		);
+		photos = next;
+		return next;
 	};
 
 	return {
 		async render(req) {
-			const r = await rendererFor();
+			await fonts;
 			const started = performance.now();
 			const { template } = req;
 			if (!template.template_data.some((f) => f.name === req.side))
@@ -193,7 +179,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				req.variantId && template.variants?.some((v) => v.id === req.variantId)
 					? req.variantId
 					: undefined;
-			own = new Map(req.images);
+			const images = await photosFor(req.images);
 			const design = req.resize ?? variantSize(template, variantId);
 			const compiled = compile(template, req.values, {
 				width: design.width,
@@ -204,8 +190,9 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				frameNames: [req.side],
 			});
 			const painted = await withPrintFallback(req.print, async (print) => {
-				const [result] = await renderCompiled(r, compiled, {
+				const [result] = await renderCompiled(renderer, compiled, {
 					frameNames: [req.side],
+					images,
 					...(print ? { print } : {}),
 					exports: [
 						req.scale === 1
@@ -244,16 +231,17 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			};
 		},
 		setFonts(next) {
-			dropRenderer();
-			fonts = next;
+			const add = () => renderer.addFonts(Object.fromEntries(next));
+			fonts = fonts.then(add, add);
 		},
 		endJob() {
 			caches.clear();
-			void renderer?.then((r) => r.clear());
+			photos = new Map();
+			renderer.clear();
 		},
 		dispose() {
-			dropRenderer();
-			own = new Map();
+			caches.clear();
+			photos = new Map();
 		},
 	};
 }

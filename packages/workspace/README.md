@@ -74,29 +74,32 @@ Each item renders at its variant's size; sheets need every card in a plan to
 share one size.
 
 ```ts
+import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
-import {
-  createItemRenderer,
-  inlinePool,
-  runExportJob,
-} from "@freshcoat-js/workspace/export";
+import { exportWorkspace } from "@freshcoat-js/workspace/export";
+import { fileOutput } from "@freshcoat-js/workspace/export/node";
 
 // The full build carries the JPEG and WebP encoders.
-const items = createItemRenderer({
-  ck: await loadCanvasKit("full"),
-  fonts: new Map([["Inter", [interBytes]]]),
+const renderer = await createRenderer({ ck: await loadCanvasKit("full") });
+const result = await exportWorkspace(workspace, preset, {
+  renderer,
+  output: fileOutput("club.zip"),
 });
-const result = await runExportJob(workspace, preset, {
-  pool: inlinePool(items),
-});
-// result.file is the zip or PDF; result.items says how each item went.
+// result.items says how each item went.
 ```
 
-The pool is the host's: `inlinePool` renders one item at a time on the
-calling thread, and Studio passes a pool of workers, each holding its own
-`createItemRenderer`. So is the destination: the default keeps the zip in
-memory, and a host can pass any `OutputSink`, such as `createStreamZipSink`
-over a writable stream.
+`exportWorkspace` takes a preset or its id, resolves the template's fonts
+with `resolveTemplateFonts` unless `fonts` is given, and renders one item at
+a time on the calling thread. The renderer is the host's, so its `load`
+decides where image sources that are not dataset photos come from. Without
+an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
+it to a path, the zip as it renders, and deletes the partial file when the
+job is cancelled or fails.
+
+`runExportJob` is the layer below, for a host with its own pool: Studio
+passes a pool of workers, each holding a `createItemRenderer` over its own
+renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
+stream.
 
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
 one image per page or impose cards on sheets with crop marks and duplex

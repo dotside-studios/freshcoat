@@ -12,6 +12,7 @@ export {
 	type PaintCacheOptions,
 	type PaintCacheStats,
 	readFontMetrics,
+	type Renderer,
 	registerFontMetrics,
 	resolveExportScale,
 	resolveSupersample,
