@@ -10,6 +10,7 @@ import {
 	type ImageNode,
 	isEllipsePath,
 	type MaskNode,
+	modulePixels,
 	type Node,
 	type PathNode,
 	parseColor,
@@ -903,13 +904,7 @@ function compileBarcode(
 		return group();
 	}
 
-	const [r, g, b] = foregroundRgb(foreground);
-	const paint = (pixels: Uint8Array, i: number) => {
-		pixels[i * 4] = r;
-		pixels[i * 4 + 1] = g;
-		pixels[i * 4 + 2] = b;
-		pixels[i * 4 + 3] = 255;
-	};
+	const rgb = foregroundRgb(foreground);
 	const { encoding } = result;
 	if (encoding.kind === "linear") {
 		const n = encoding.modules.length;
@@ -920,10 +915,7 @@ function compileBarcode(
 		const sideBearers = bearers === "frame" ? BEARER_BAR_MODULES : 0;
 		const module = size.width / (n + 2 * quietZone + 2 * sideBearers);
 		const bearer = bearers === "none" ? 0 : BEARER_BAR_MODULES * module;
-		const pixels = new Uint8Array(n * 4);
-		encoding.modules.forEach((set, i) => {
-			if (set) paint(pixels, i);
-		});
+		const pixels = modulePixels(encoding.modules, rgb);
 		children.push({
 			kind: "bitmap",
 			pos: { x: (sideBearers + quietZone) * module, y: bearer },
@@ -947,12 +939,7 @@ function compileBarcode(
 		size.width / (cols + 2 * quietZone),
 		size.height / (rows + 2 * quietZone),
 	);
-	const pixels = new Uint8Array(rows * cols * 4);
-	encoding.rows.forEach((row, y) => {
-		row.forEach((set, x) => {
-			if (set) paint(pixels, y * cols + x);
-		});
-	});
+	const pixels = modulePixels(encoding.rows.flat(), rgb);
 	children.push({
 		kind: "bitmap",
 		pos: {

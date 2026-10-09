@@ -144,6 +144,7 @@ export {
 	strokeInset,
 } from "./paint-helpers";
 export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
+export { modulePixels } from "./module-pixels";
 export { scalePathData } from "./path-data";
 export { roundCorners } from "./round-corners";
 export { flattenOverWhite } from "./jpeg";
