@@ -1,10 +1,6 @@
-import type { ExportPreset } from "@freshcoat-js/workspace";
-import {
-	DEFAULT_DPI,
-	DEFAULT_FILE_NAME_PATTERN,
-	newId,
-	uniqueName,
-} from "@freshcoat-js/workspace";
+import { newId, uniqueName } from "./ids";
+import { DEFAULT_DPI, DEFAULT_FILE_NAME_PATTERN } from "./plan";
+import type { ExportPreset } from "./types";
 
 /** A preset for a template with the spec's defaults: every record but the
  *  skipped ones, every side, a PNG zip at 1×, 300 dpi, the default file name,
@@ -16,11 +12,7 @@ export function newPreset(
 ): ExportPreset {
 	return {
 		id,
-		name: uniqueName(
-			"New preset",
-			existing.map((p) => p.name),
-			{ caseInsensitive: true },
-		),
+		name: presetName("New preset", existing),
 		templateId,
 		records: "all",
 		sides: "all",
@@ -32,6 +24,7 @@ export function newPreset(
 	};
 }
 
+/** A copy of `preset` under a fresh id and a `<name> copy` name. */
 export function duplicatePreset(
 	preset: ExportPreset,
 	existing: readonly ExportPreset[],
@@ -40,11 +33,15 @@ export function duplicatePreset(
 	return {
 		...preset,
 		id,
-		name: uniqueName(
-			`${preset.name} copy`,
-			existing.map((p) => p.name),
-			{ caseInsensitive: true },
-		),
+		name: presetName(`${preset.name} copy`, existing),
 		...(preset.selected ? { selected: [...preset.selected] } : {}),
 	};
+}
+
+function presetName(name: string, existing: readonly ExportPreset[]): string {
+	return uniqueName(
+		name,
+		existing.map((p) => p.name),
+		{ caseInsensitive: true },
+	);
 }

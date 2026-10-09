@@ -137,6 +137,7 @@ export {
 	pdfRenderScale,
 	planExport,
 } from "./plan";
+export { duplicatePreset, newPreset } from "./presets";
 export {
 	mapDatasetRecords,
 	type RecordStatusExtra,

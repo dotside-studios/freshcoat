@@ -8,6 +8,7 @@ import {
 	type DataRecord,
 	type ExportItem,
 	type ExportPreset,
+	newPreset,
 	parseAssetRef,
 	planExport,
 	resolveValues,
@@ -65,7 +66,6 @@ import { GlyphNotice } from "./GlyphNotice";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
 import { PresetList } from "./PresetList";
-import { newPreset } from "./preset";
 import {
 	effectiveMode,
 	PREVIEW_MODE_LABEL,

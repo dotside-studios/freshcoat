@@ -4,6 +4,7 @@ import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type { ExportPreset } from "@freshcoat-js/workspace";
+import { duplicatePreset, newPreset } from "@freshcoat-js/workspace";
 import { useState } from "react";
 import { Button, Input, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -17,7 +18,6 @@ import EditIcon from "~icons/mingcute/edit-2-line";
 import CollapseIcon from "~icons/mingcute/layout-left-line";
 import MoreIcon from "~icons/mingcute/more-2-line";
 import { FORMAT_LABEL } from "./export-ui";
-import { duplicatePreset, newPreset } from "./preset";
 
 const RECORDS_LABEL = {
 	all: "all records",

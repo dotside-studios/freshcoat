@@ -25,6 +25,7 @@ scheduling and file destinations.
 | `mapping` | the import wizard's mapping of source columns to schema columns |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
+| `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
 | `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |

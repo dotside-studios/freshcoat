@@ -1,7 +1,6 @@
-import type { ExportPreset } from "@freshcoat-js/workspace";
+import { type ExportPreset, newPreset } from "@freshcoat-js/workspace";
 import { itemRequest } from "@freshcoat-js/workspace/export";
 import { describe, expect, it } from "vitest";
-import { newPreset } from "~/export/preset";
 import {
 	PRINTER_FILE_MAX_EDGE,
 	printerFileRequest,

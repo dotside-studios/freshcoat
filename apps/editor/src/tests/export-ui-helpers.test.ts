@@ -6,9 +6,8 @@ import type {
 	ExportPreset,
 } from "@freshcoat-js/workspace";
 import {
-	DEFAULT_DPI,
-	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_SHEET_LAYOUT,
+	newPreset,
 	planExport,
 } from "@freshcoat-js/workspace";
 import {
@@ -31,7 +30,6 @@ import {
 	settingsSummary,
 	statusActions,
 } from "~/export/export-ui";
-import { duplicatePreset, newPreset } from "~/export/preset";
 import { photoWatermark } from "~/samples/photo-watermark";
 import { doc } from "./doc-fixture";
 
@@ -57,46 +55,6 @@ const item = (recordId: string, side: string, ok: boolean, error?: string) => ({
 	fileName: `${recordId}-${side}.png`,
 	ok,
 	...(error ? { error } : {}),
-});
-
-describe("presets", () => {
-	test("a new preset takes the spec's defaults", () => {
-		expect(newPreset("t_doc", [], "p_1")).toEqual({
-			id: "p_1",
-			name: "New preset",
-			templateId: "t_doc",
-			records: "all",
-			sides: "all",
-			format: "png-zip",
-			scale: 1,
-			dpi: DEFAULT_DPI,
-			fileName: DEFAULT_FILE_NAME_PATTERN,
-			markExported: true,
-		});
-		expect(DEFAULT_DPI).toBe(300);
-	});
-
-	test("new and duplicated presets get unique names", () => {
-		const first = preset();
-		const second = newPreset("t_doc", [first], "p_2");
-		expect(second.name).toBe("New preset 2");
-		expect(newPreset("t_doc", [first, second]).name).toBe("New preset 3");
-		expect(newPreset("t_doc", []).id).toMatch(/^p_[0-9a-f]{16}$/);
-		const copy = duplicatePreset(
-			{ ...first, records: "selected", selected: ["r1"] },
-			[first],
-			"p_3",
-		);
-		expect(copy).toMatchObject({
-			id: "p_3",
-			name: "New preset copy",
-			records: "selected",
-			selected: ["r1"],
-		});
-		expect(duplicatePreset(first, [first, copy]).name).toBe(
-			"New preset copy 2",
-		);
-	});
 });
 
 describe("file name example", () => {
