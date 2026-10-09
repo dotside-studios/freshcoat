@@ -19,6 +19,7 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, KEY_RULE, plural } from "~/app/copy";
+import { variantColumnSource, withVariantSource } from "~/binding/binding";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
 import DownIcon from "~icons/mingcute/arrow-down-line";
@@ -26,6 +27,7 @@ import UpIcon from "~icons/mingcute/arrow-up-line";
 import DeleteIcon from "~icons/mingcute/delete-2-line";
 import { editDataset, renameColumnEverywhere } from "./actions";
 import type { Confirm } from "./ConfirmDialog";
+import { useTemplateSlots } from "./column-options";
 import {
 	addColumn,
 	changeColumnType,
@@ -37,10 +39,92 @@ import {
 	moveColumn,
 	NUMERIC_TYPES,
 	newColumn,
+	replaceDataset,
 	TEXTUAL_TYPES,
 	TYPE_LABELS,
 	updateColumn,
 } from "./model";
+
+const FREE_TEXT = "free";
+
+/** Where a text column's cells pick their value from: typed freely, or the
+ *  variants of a template. Picking a template bound to this dataset also
+ *  has it read its variant from the column, in the same undo step. */
+function OptionsField({
+	dataset,
+	column,
+}: {
+	dataset: Dataset;
+	column: Column;
+}) {
+	const controller = useController();
+	const slots = useTemplateSlots().filter(
+		(s) => s.template.variants?.length || s.id === column.options?.templateId,
+	);
+	const current = column.options?.templateId;
+	const slot = slots.find((s) => s.id === current);
+	const reads =
+		slot?.binding?.datasetId === dataset.id &&
+		slot.binding.variant?.kind === "column" &&
+		slot.binding.variant.column === column.key;
+
+	const choose = (key: string) => {
+		const ws = controller.state.workspace;
+		const d = ws?.datasets.find((x) => x.id === dataset.id);
+		if (!ws || !d) return;
+		const target = slots.find((s) => s.id === key);
+		const next = updateColumn(
+			d,
+			column.key,
+			target
+				? {
+						options: { kind: "variants", templateId: target.id },
+						enum: undefined,
+					}
+				: { options: undefined },
+		);
+		const binding = target?.binding;
+		controller.dispatch({
+			type: "datasetEdit",
+			datasets: replaceDataset(ws.datasets, next),
+			...(target && binding?.datasetId === dataset.id
+				? {
+						bindings: {
+							[target.id]: withVariantSource(
+								binding,
+								variantColumnSource(column.key, binding.variant),
+							),
+						},
+					}
+				: {}),
+		});
+	};
+
+	return (
+		<div className="flex flex-col gap-1">
+			<Select
+				label="Values"
+				aria-label="Values"
+				data-testid="column-options"
+				selectedKey={slot ? slot.id : FREE_TEXT}
+				onSelectionChange={(key) => choose(String(key))}
+			>
+				<SelectItem id={FREE_TEXT}>Free text</SelectItem>
+				{slots.map((s) => (
+					<SelectItem key={s.id} id={s.id}>
+						{`Variants of ${templateStem(s.fileName)}`}
+					</SelectItem>
+				))}
+			</Select>
+			{slot && !reads ? (
+				<p className="text-fc-faint text-fc-sm">
+					{templateStem(slot.fileName)} does not read its variant from this
+					column.
+				</p>
+			) : null}
+		</div>
+	);
+}
 
 export function ColumnsPanel({
 	dataset,
@@ -347,6 +431,9 @@ function ColumnEditor({
 				column={column}
 				onChange={(value) => patch({ default: value })}
 			/>
+			{column.type === "text" ? (
+				<OptionsField dataset={dataset} column={column} />
+			) : null}
 			<Constraints column={column} patch={patch} />
 		</div>
 	);
@@ -442,7 +529,7 @@ function Constraints({
 					/>
 				</div>
 			) : null}
-			{column.type === "text" ? (
+			{column.type === "text" && !column.options ? (
 				<CommitField
 					label="Allowed values"
 					value={column.enum?.join(", ") ?? ""}

@@ -161,13 +161,29 @@ export function variantFor(
 	}
 	const column = columnOf(dataset, source.column, columns);
 	const cell = record?.values[source.column] ?? null;
-	if (column === undefined || isEmptyValue(cell)) return undefined;
-	const wanted = toTemplateValue(column, cell).trim().toLowerCase();
-	return (
-		variants.find((v) => v.id.toLowerCase() === wanted) ??
-		variants.find((v) => v.label.trim().toLowerCase() === wanted)
-	)?.id;
+	const wanted =
+		column === undefined || isEmptyValue(cell)
+			? ""
+			: toTemplateValue(column, cell).trim().toLowerCase();
+	const picked = wanted
+		? (
+				variants.find((v) => v.id.toLowerCase() === wanted) ??
+				variants.find((v) => v.label.trim().toLowerCase() === wanted)
+			)?.id
+		: undefined;
+	if (picked !== undefined || wanted === DEFAULT_VARIANT) return picked;
+	if (!binding || source.fallback === undefined) return undefined;
+	return variantFor(
+		template,
+		{ ...binding, variant: source.fallback },
+		dataset,
+		record,
+		columns,
+	);
 }
+
+/** What a variant column holds to pick Default. */
+export const DEFAULT_VARIANT = "default";
 
 /**
  * Every variant a record renders in, in export order; undefined is Default.

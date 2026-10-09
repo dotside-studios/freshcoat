@@ -70,6 +70,13 @@ A binding's `variant` picks the variant each record renders in: a fixed one,
 the one a column names, every one, or `{ kind: "image", field }`, the one
 whose size is closest in aspect to the record's photo, so a template with
 landscape, portrait and square variants follows each photo's orientation.
+A column source's `fallback`, a fixed or image source, is what a record
+whose cell names no variant gets. A workspace that uses one is written at
+format 1.1, which a 1.0 reader opens without the fallback.
+
+A text column's `options` names where its cells pick their value from, kept
+in `schema.json` as `x-freshcoat-options`. `{ kind: "variants", templateId }`
+is the variants of one of the workspace's templates.
 Each item renders at its variant's size; sheets need every card in a plan to
 share one size.
 

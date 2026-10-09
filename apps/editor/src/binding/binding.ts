@@ -52,7 +52,7 @@ export function rebindDataset(
 	previous: Binding | undefined,
 ): Binding | undefined {
 	const variant = previous?.variant;
-	const keep = variant && variant.kind !== "column" ? variant : undefined;
+	const keep = variant?.kind === "column" ? variant.fallback : variant;
 	const next = bindingForDataset(template, dataset);
 	if (next) return keep ? { ...next, variant: keep } : next;
 	return unboundBinding(keep);
@@ -145,6 +145,8 @@ export function variantSourceOfKind(
 ): VariantSource | undefined {
 	if (kind === "none") return undefined;
 	if (previous?.kind === kind) return previous;
+	if (previous?.kind === "column" && previous.fallback?.kind === kind)
+		return previous.fallback;
 	if (kind === "all") return { kind: "all" };
 	if (kind === "image")
 		return { kind: "image", field: imageFields(template)[0]?.key ?? "" };
@@ -155,7 +157,23 @@ export function variantSourceOfKind(
 		columns.find((c) => /^variant$/i.test(c.key)) ??
 		columns.find((c) => c.type === "text") ??
 		columns[0];
-	return { kind: "column", column: column?.key ?? "" };
+	return variantColumnSource(column?.key ?? "", previous);
+}
+
+/** A column variant source, keeping a photo-shape or fixed `previous` as
+ *  what it falls back to. */
+export function variantColumnSource(
+	column: string,
+	previous: VariantSource | undefined,
+): VariantSource {
+	const fallback =
+		previous?.kind === "column"
+			? previous.fallback
+			: previous?.kind === "image" ||
+					(previous?.kind === "fixed" && previous.id !== undefined)
+				? previous
+				: undefined;
+	return { kind: "column", column, ...(fallback ? { fallback } : {}) };
 }
 
 /** Why a field's source cannot produce a value, if it cannot. */
