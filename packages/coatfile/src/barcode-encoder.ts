@@ -40,6 +40,29 @@ export function symbologyLabel(symbology: Symbology): string {
 	return LABELS[symbology];
 }
 
+// Other names a symbology commonly goes by.
+const ALIASES: Record<string, Symbology> = {
+	azteccode: "aztec",
+	upc: "upca",
+	ean: "ean13",
+	itf: "itf14",
+};
+
+const nameKey = (name: string): string =>
+	name.toLowerCase().replace(/[\s_-]+/g, "");
+
+/** The inverse of `symbologyLabel`: the symbology a typed name means, with
+ *  case, spaces, hyphens and underscores ignored, or undefined for none. Ids,
+ *  labels and common aliases all read, so `Code-128`, `EAN_13`, `data matrix`
+ *  and `upc` do. */
+export function parseSymbology(name: string): Symbology | undefined {
+	const key = nameKey(name);
+	return (
+		SYMBOLOGIES.find((s) => s === key || nameKey(LABELS[s]) === key) ??
+		ALIASES[key]
+	);
+}
+
 /** Linear codes are one row of bars; the rest are 2D. */
 export function isLinearSymbology(symbology: Symbology): boolean {
 	return (

@@ -175,7 +175,10 @@ With bleed:
   the trim by hand.
 
 `bleedSize(t)`, `templateBleed(t)` and `templateSafeArea(t)` resolve the
-insets; `extendIntoBleed` is the edge rule on its own.
+insets; `extendIntoBleed` is the edge rule on its own. `resolveInsets` turns
+either form into four sides, `compactInsets` turns four sides back into one
+number when they agree, and `maxInsets` takes the largest on each side. These
+also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
@@ -551,7 +554,11 @@ the digit it should be.
 
 Barcodes are encoded with bwip-js as part of compile, as QR codes are with
 lean-qr. `encodeBarcode()` is the same encoder on its own, for checking a value
-before it reaches a template.
+before it reaches a template. `symbologyLabel("ean13")` is a symbology's usual
+name ("EAN-13"), and `parseSymbology` reads one back from what a person typed:
+an id, a label or a common alias (`upc`, `ean`, `itf`, `aztec code`), with
+case, spaces, hyphens and underscores ignored. Both also come from
+`@freshcoat-js/coatfile/barcode-encoder`, which has no runtime imports.
 
 A code that can't be drawn still compiles, and says why in the frame's
 `warnings`, which `renderTemplate()` passes on with the painter's own:
@@ -711,6 +718,20 @@ There is no ellipse element. An ellipse is a `vector` whose `d` is two arcs
 across its box, which the engine draws exactly as it would an ellipse node, and
 which every 1.x reader already renders. A separate element would add nothing
 to the picture and would make those files unreadable to older kits.
+
+## Field keys
+
+A field's key, and the id in a `{{id}}` token, matches `FIELD_ID`: a letter or
+`_`, then letters, digits and `_`. `fieldKeyFrom(text)` makes one from any
+text, such as a layer or column name: `First Name` and `firstName` give
+`first_name`, `Año` gives `ano`, and `2nd` gives `_2nd`. Text with nothing
+usable in it gives `field`, or the fallback passed as the second argument.
+
+`FIELD_FORMATS` lists the values a field's `format` may take: `longText`,
+`color`, `url`, `image` and `boolean`. A field without one is plain text.
+
+All three come from `@freshcoat-js/coatfile/mustache`, which has no runtime
+imports.
 
 ## Field patterns
 

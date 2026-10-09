@@ -140,10 +140,10 @@
 							"format": {
 								"type": "string",
 								"enum": [
+									"longText",
 									"color",
 									"url",
 									"image",
-									"longText",
 									"boolean"
 								]
 							},

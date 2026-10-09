@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	FIELD_ID,
+	fieldKeyFrom,
 	hasToken,
 	parseMustache,
 	renameToken,
@@ -233,5 +234,38 @@ describe("parser matches the reference regex", () => {
 				s.replace(TOKEN, (m, id: string) => (id === "a" ? m.replace(id, "b") : m)),
 			);
 		}
+	});
+});
+
+describe("fieldKeyFrom", () => {
+	test("joins words with underscores", () => {
+		expect(fieldKeyFrom("First Name")).toBe("first_name");
+		expect(fieldKeyFrom("  E-mail address ")).toBe("e_mail_address");
+	});
+
+	test("splits camelCase", () => {
+		expect(fieldKeyFrom("firstName")).toBe("first_name");
+		expect(fieldKeyFrom("line2Text")).toBe("line2_text");
+	});
+
+	test("prefixes a leading digit", () => {
+		expect(fieldKeyFrom("2nd")).toBe("_2nd");
+		expect(fieldKeyFrom("2nd line")).toBe("_2nd_line");
+	});
+
+	test("drops accents", () => {
+		expect(fieldKeyFrom("Año")).toBe("ano");
+		expect(fieldKeyFrom("Café crème")).toBe("cafe_creme");
+	});
+
+	test("falls back when nothing is left", () => {
+		expect(fieldKeyFrom("")).toBe("field");
+		expect(fieldKeyFrom("%%%")).toBe("field");
+		expect(fieldKeyFrom("  ", "name")).toBe("name");
+	});
+
+	test("always gives a key FIELD_ID accepts", () => {
+		for (const s of ["", "2nd", "firstName", "Año", "日本", "_x_", "a.b", "9"])
+			expect(FIELD_ID.test(fieldKeyFrom(s))).toBe(true);
 	});
 });

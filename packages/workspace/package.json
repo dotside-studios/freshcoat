@@ -16,6 +16,7 @@
 		"./archive": "./src/archive.ts",
 		"./tabular": "./src/tabular.ts",
 		"./pdf": "./src/pdf.ts",
+		"./image-info": "./src/image-info.ts",
 		"./export": "./src/export/index.ts",
 		"./node": "./src/node.ts"
 	},

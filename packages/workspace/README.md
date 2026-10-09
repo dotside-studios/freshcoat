@@ -31,7 +31,7 @@ scheduling and file destinations.
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it |
-| `ids` | the stable ids, keys and slugs the workspace is addressed by |
+| `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
 | `node` | Bun and Node only: `readWorkspaceFile` and `fileOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Dataset editing
@@ -41,6 +41,8 @@ does. Tabular file I/O
 lives at `@freshcoat-js/workspace/tabular`, and PDF assembly at
 `@freshcoat-js/workspace/pdf`, keeping those dependencies off the main entry.
 The `.coatworkspace` archive lives at `@freshcoat-js/workspace/archive`.
+Image header reading lives at `@freshcoat-js/workspace/image-info` too, which
+imports nothing, for hosts that need only that.
 Reading and writing files on disk differs by platform, so it lives at
 `@freshcoat-js/workspace/node`, as CanvasKit loading does on the engine's
 `node` subpath.

@@ -7,10 +7,6 @@ describe("slug", () => {
 		expect(slug("Sky / L")).toBe("sky-l");
 		expect(slug("  --Hi there--  ")).toBe("hi-there");
 	});
-	it("joins with `_` when asked", () => {
-		expect(slug("Display Name!", { sep: "_" })).toBe("display_name");
-		expect(slug("__a-b__", { sep: "_" })).toBe("a_b");
-	});
 	it("falls back when empty", () => {
 		expect(slug("  ")).toBe("");
 		expect(slug("  ", { fallback: "variant" })).toBe("variant");

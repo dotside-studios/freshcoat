@@ -9,7 +9,6 @@ import {
 	combineGuides,
 	guideKind,
 	readSlotGuides,
-	toInsets,
 } from "~/lib/figma/transpiler/guides";
 import {
 	type ProductRegistryEntry,
@@ -176,11 +175,6 @@ describe("readSlotGuides", () => {
 describe("combineGuides", () => {
 	const canvas = { width: 100, height: 60 };
 	const even = { top: 3, right: 3, bottom: 3, left: 3 };
-
-	it("writes one number when every side agrees", () => {
-		expect(toInsets(even)).toBe(3);
-		expect(toInsets({ ...even, left: 4 })).toEqual({ ...even, left: 4 });
-	});
 
 	it("takes the larger inset on each side when slots differ", () => {
 		const warnings: TemplateWarning[] = [];
