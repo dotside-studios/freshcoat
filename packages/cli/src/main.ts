@@ -1,35 +1,15 @@
 import { readFileSync } from "node:fs";
-import { exportCommand, exportHelp } from "./commands/export";
-import { inspect, inspectHelp } from "./commands/inspect";
-import { render, renderHelp } from "./commands/render";
-import { validateCommand, validateHelp } from "./commands/validate";
-import { CliError, type Io, processIo, UsageError } from "./io";
-
-const COMMANDS: Record<
-	string,
-	{ summary: string; help: string; run(args: string[], io: Io): Promise<void> }
-> = {
-	render: {
-		summary: "render a template's frames to images",
-		help: renderHelp,
-		run: render,
-	},
-	validate: {
-		summary: "check a template against the format",
-		help: validateHelp,
-		run: validateCommand,
-	},
-	inspect: {
-		summary: "list a template's frames, fields, variants and fonts",
-		help: inspectHelp,
-		run: inspect,
-	},
-	export: {
-		summary: "run an export preset from a .coatworkspace",
-		help: exportHelp,
-		run: exportCommand,
-	},
-};
+import {
+	Command,
+	CommanderError,
+	InvalidArgumentError,
+	Option,
+} from "@commander-js/extra-typings";
+import { exportCommand } from "./commands/export";
+import { inspect } from "./commands/inspect";
+import { render } from "./commands/render";
+import { validateCommand } from "./commands/validate";
+import { CliError, type Io, processIo } from "./io";
 
 export function version(): string {
 	const manifest = JSON.parse(
@@ -38,84 +18,130 @@ export function version(): string {
 	return manifest.version;
 }
 
-function overview(): string {
-	const width = Math.max(...Object.keys(COMMANDS).map((name) => name.length));
-	return `Usage: freshcoat <command> [options]
-
-Render, check and export Freshcoat templates.
-
-Commands:
-${Object.entries(COMMANDS)
-	.map(([name, { summary }]) => `  ${name.padEnd(width)}  ${summary}`)
-	.join("\n")}
-
-Options:
-  -q, --quiet    hide warnings and progress
-  -v, --version  print the version
-  -h, --help     show help; after a command, that command's help
-
-Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
-0 done, 1 the work failed, 2 the command line was wrong.`;
-}
-
 export async function main(
 	argv: string[],
 	io: Io = processIo(),
 ): Promise<number> {
 	try {
-		return await dispatch(argv, io);
+		await program(io).parseAsync(argv, { from: "user" });
+		return 0;
 	} catch (error) {
-		if (error instanceof CliError) {
-			io.stderr(`freshcoat: ${error.message}\n`);
-			if (error instanceof UsageError)
-				io.stderr(
-					`Run freshcoat ${error.command ? `${error.command} ` : ""}--help for usage.\n`,
-				);
-			return error.exitCode;
-		}
-		io.stderr(
-			`freshcoat: ${error instanceof Error ? error.message : String(error)}\n`,
+		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
+		const message = error instanceof Error ? error.message : String(error);
+		io.stderr(`freshcoat: ${message}\n`);
+		return error instanceof CliError ? error.exitCode : 1;
+	}
+}
+
+function program(io: Io) {
+	const root = new Command("freshcoat")
+		.usage("<command> [options]")
+		.description("Render, check and export Freshcoat templates.")
+		.version(version(), "-v, --version", "print the version")
+		.helpOption("-h, --help", "show help")
+		.helpCommand("help [command]", "show help for a command")
+		.option("-q, --quiet", "hide warnings and progress")
+		.configureHelp({ showGlobalOptions: true })
+		.configureOutput({
+			writeOut: io.stdout,
+			writeErr: io.stderr,
+			outputError: (text, write) => write(text.replace(/^error: /, "freshcoat: ")),
+		})
+		.exitOverride()
+		.addHelpText(
+			"after",
+			"\nResults go to stdout; progress, warnings and errors go to stderr. Exit codes:\n0 done, 1 the work failed, 2 the command line was wrong.",
 		);
-		return 1;
-	}
+
+	const command = (name: string) =>
+		root
+			.command(name)
+			.helpOption("-h, --help", "show help")
+			.showHelpAfterError(`Run freshcoat ${name} --help for usage.`);
+	const quiet = (cmd: { optsWithGlobals(): { quiet?: true } }) =>
+		cmd.optsWithGlobals().quiet === true;
+
+	command("render")
+		.summary("render a template's frames to images")
+		.description(
+			"Render each frame of a template to an image. <template> is a .coat file or\ntemplate JSON. Files are named after the frame, with the scale as a suffix\nfor anything but 1x: front.png, front@2x.png.",
+		)
+		.argument("<template>", "a .coat file or template JSON")
+		.option("--values <file>", "JSON file of field values")
+		.option(
+			"--set <key=value>",
+			"one field value; repeatable, overrides --values",
+			collectSetting,
+		)
+		.option("--variant <id>", "render a variant of the template")
+		.option("--frame <name>", "render only this frame; repeatable", collect)
+		.option("--scale <n>", "pixel density, default 1; repeatable", collectScale)
+		.addOption(
+			new Option("--format <format>", "image format")
+				.choices(["png", "jpeg", "jpg", "webp"] as const)
+				.default("png" as const),
+		)
+		.option("--out <dir>", "directory to write to, default the current directory")
+		.addHelpText(
+			"after",
+			"\nFonts the template declares are loaded from their sources; others are looked\nup on Google Fonts by name. Relative image paths resolve against the\ntemplate's directory. Written paths are printed on stdout.",
+		)
+		.action((file, options, cmd) =>
+			render(file, { ...options, quiet: quiet(cmd) }, io),
+		);
+
+	command("validate")
+		.summary("check a template against the format")
+		.description(
+			"Check a template against the format. Exits 0 when it is valid and 1 when it\nis not, listing each issue. --quiet prints nothing when it is valid.",
+		)
+		.argument("<template>", "a .coat file or template JSON")
+		.action((file, _options, cmd) =>
+			validateCommand(file, { quiet: quiet(cmd) }, io),
+		);
+
+	command("inspect")
+		.summary("list a template's frames, fields, variants and fonts")
+		.description("List a template's frames, fields, variants and fonts.")
+		.argument("<template>", "a .coat file or template JSON")
+		.option("--json", "print the inspection as JSON")
+		.action((file, options) => inspect(file, options, io));
+
+	command("export")
+		.summary("run an export preset from a .coatworkspace")
+		.description(
+			"Run an export preset from a .coatworkspace file. A zip format writes a zip of\nimages and a report; the pdf format writes a PDF. Dataset photos come from\nthe workspace; other relative image paths resolve against its directory.",
+		)
+		.argument("<workspace>", "a .coatworkspace file")
+		.requiredOption("--preset <name|id>", "the preset to run, by id or by a name only it has")
+		.requiredOption("--out <path>", "file to write, such as cards.zip or cards.pdf")
+		.addHelpText(
+			"after",
+			"\nProgress and warnings go to stderr and a summary to stdout. Exits 1 when the\nexport is cancelled or any item fails.",
+		)
+		.action((file, options, cmd) =>
+			exportCommand(file, { ...options, quiet: quiet(cmd) }, io),
+		);
+
+	return root;
 }
 
-async function dispatch(argv: string[], io: Io): Promise<number> {
-	const [first, ...rest] = argv;
-	if (first === undefined) {
-		io.stderr(`${overview()}\n`);
-		return 2;
-	}
-	if (first === "--help" || first === "-h") {
-		io.stdout(`${overview()}\n`);
-		return 0;
-	}
-	if (first === "--version" || first === "-v") {
-		io.stdout(`${version()}\n`);
-		return 0;
-	}
-	if (first === "help") {
-		const topic = rest[0];
-		if (topic === undefined) io.stdout(`${overview()}\n`);
-		else io.stdout(`${commandOf(topic).help}\n`);
-		return 0;
-	}
-	const command = commandOf(first);
-	if (rest.includes("--help") || rest.includes("-h")) {
-		io.stdout(`${command.help}\n`);
-		return 0;
-	}
-	try {
-		await command.run(rest, io);
-	} catch (error) {
-		if (error instanceof UsageError) error.command = first;
-		throw error;
-	}
-	return 0;
+function collect(value: string, previous: string[] = []): string[] {
+	return [...previous, value];
 }
 
-function commandOf(name: string) {
-	const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
-	if (!command) throw new UsageError(`unknown command "${name}"`);
-	return command;
+function collectSetting(
+	entry: string,
+	previous: Record<string, string> = {},
+): Record<string, string> {
+	const at = entry.indexOf("=");
+	if (at <= 0) throw new InvalidArgumentError("Expected key=value.");
+	return { ...previous, [entry.slice(0, at)]: entry.slice(at + 1) };
+}
+
+function collectScale(entry: string, previous: number[] = []): number[] {
+	const value = Number(entry);
+	if (!Number.isFinite(value) || value <= 0)
+		throw new InvalidArgumentError("Expected a positive number.");
+	return [...previous, value];
 }

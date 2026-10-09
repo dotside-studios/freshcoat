@@ -175,13 +175,13 @@ describe("render", () => {
 
 	test("refuses bad input", async () => {
 		const cases: [string[], number, string][] = [
-			[["render"], 2, "missing template file"],
-			[["render", "a.json", "b.json"], 2, "expected one template file"],
-			[["render", "badge.json", "--format", "gif"], 2, "--format must be"],
-			[["render", "badge.json", "--scale", "0"], 2, "--scale must be"],
-			[["render", "badge.json", "--set", "name"], 2, "--set expects key=value"],
-			[["render", "badge.json", "--bogus"], 2, "unknown option --bogus"],
-			[["render", "badge.json", "--out"], 2, "option --out needs a value"],
+			[["render"], 2, "missing required argument 'template'"],
+			[["render", "a.json", "b.json"], 2, "too many arguments for 'render'"],
+			[["render", "badge.json", "--format", "gif"], 2, "Allowed choices are png, jpeg, jpg, webp"],
+			[["render", "badge.json", "--scale", "0"], 2, "Expected a positive number"],
+			[["render", "badge.json", "--set", "name"], 2, "Expected key=value"],
+			[["render", "badge.json", "--bogus"], 2, "unknown option '--bogus'"],
+			[["render", "badge.json", "--out"], 2, "option '--out <dir>' argument missing"],
 			[["render", "nope.json"], 1, "cannot read nope.json: no such file"],
 			[["render", "badge.json", "--variant", "tall"], 1, 'no variant "tall"; the template has wide'],
 			[["render", "badge.json", "--frame", "side"], 1, 'no frame "side"; the template has front, back'],
@@ -375,10 +375,10 @@ describe("export", () => {
 	test("requires a preset and an output", async () => {
 		const noPreset = await box.run("export", "badges.coatworkspace", "--out", "x.zip");
 		expect(noPreset.code).toBe(2);
-		expect(noPreset.stderr).toContain("missing --preset");
+		expect(noPreset.stderr).toContain("required option '--preset <name|id>' not specified");
 		const noOut = await box.run("export", "badges.coatworkspace", "--preset", "p_png");
 		expect(noOut.code).toBe(2);
-		expect(noOut.stderr).toContain("missing --out");
+		expect(noOut.stderr).toContain("required option '--out <path>' not specified");
 	});
 });
 
@@ -409,7 +409,7 @@ describe("the command line", () => {
 		expect(none.stderr).toContain("Usage: freshcoat <command>");
 		const unknown = await box.run("paint");
 		expect(unknown.code).toBe(2);
-		expect(unknown.stderr).toContain('unknown command "paint"');
+		expect(unknown.stderr).toContain("unknown command 'paint'");
 		const topic = await box.run("help", "paint");
 		expect(topic.code).toBe(2);
 	});
@@ -417,7 +417,7 @@ describe("the command line", () => {
 	test("points a usage error at the command's help", async () => {
 		const run = await box.run("inspect");
 		expect(run.code).toBe(2);
-		expect(run.stderr).toContain("freshcoat: missing template file");
+		expect(run.stderr).toContain("freshcoat: missing required argument 'template'");
 		expect(run.stderr).toContain("Run freshcoat inspect --help for usage.");
 	});
 });

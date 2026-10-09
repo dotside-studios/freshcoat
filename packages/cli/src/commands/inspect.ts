@@ -4,19 +4,9 @@ import {
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
-import { exactlyOne, parse } from "../args";
 import { type FontSummary, summarizeFonts } from "../fonts";
 import type { Io } from "../io";
 import { readTemplate } from "../template-file";
-
-export const inspectHelp = `Usage: freshcoat inspect <template> [options]
-
-List what a template holds: its frames and their sizes, fields, variants and
-the font families it uses, and which of those it declares.
-
-Options:
-  --json      print one JSON object instead of text
-  -h, --help  show this help`;
 
 export type Inspection = {
 	file: string;
@@ -76,15 +66,15 @@ function countElements(element: Element): number {
 	return 1 + childElements(element).reduce((n, c) => n + countElements(c), 0);
 }
 
-export async function inspect(args: string[], io: Io): Promise<void> {
-	const { values: flags, positionals } = parse(args, {
-		json: { type: "boolean" },
-	});
-	const file = exactlyOne(positionals, "template file");
+export async function inspect(
+	file: string,
+	options: { json?: true },
+	io: Io,
+): Promise<void> {
 	const { template } = await readTemplate(io, file);
 	const info = inspectTemplate(file, template);
 	io.stdout(
-		flags.json ? `${JSON.stringify(info, null, 2)}\n` : `${describe(info)}\n`,
+		options.json ? `${JSON.stringify(info, null, 2)}\n` : `${describe(info)}\n`,
 	);
 }
 

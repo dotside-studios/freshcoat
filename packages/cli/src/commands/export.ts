@@ -10,44 +10,27 @@ import {
 	summarizeGlyphs,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
-import { exactlyOne, parse } from "../args";
 import { warnAboutFonts } from "../fonts";
-import { CliError, createLog, type Io, type Log, UsageError } from "../io";
+import { CliError, createLog, type Io, type Log } from "../io";
 import { openRenderer } from "../renderer";
 
-export const exportHelp = `Usage: freshcoat export <workspace> --preset <name|id> --out <path> [options]
+export type ExportOptions = { preset: string; out: string; quiet: boolean };
 
-Run an export preset from a .coatworkspace file. A zip format writes a zip of
-images and a report; the pdf format writes a PDF. Dataset photos come from
-the workspace; other relative image paths resolve against its directory.
-
-Options:
-  --preset <name|id>  the preset to run, by id or by a name only it has
-  --out <path>        file to write, such as cards.zip or cards.pdf
-  -q, --quiet         hide warnings and progress
-  -h, --help          show this help
-
-Progress and warnings go to stderr and a summary to stdout. Exits 1 when the
-export is cancelled or any item fails.`;
-
-export async function exportCommand(args: string[], io: Io): Promise<void> {
-	const { values: flags, positionals } = parse(args, {
-		preset: { type: "string" },
-		out: { type: "string" },
-	});
-	const file = exactlyOne(positionals, "workspace file");
-	if (!flags.preset) throw new UsageError("missing --preset");
-	if (!flags.out) throw new UsageError("missing --out");
-	const log = createLog(io, flags.quiet === true);
+export async function exportCommand(
+	file: string,
+	options: ExportOptions,
+	io: Io,
+): Promise<void> {
+	const log = createLog(io, options.quiet);
 
 	const path = resolve(io.cwd, file);
 	const { workspace, warnings } = await readWorkspace(path, file);
 	for (const warning of warnings) log.warn(`${file}: ${warning}`);
 
-	const preset = findPreset(workspace, flags.preset);
-	if (!preset) throw new CliError(presetMessage(workspace.presets, flags.preset));
+	const preset = findPreset(workspace, options.preset);
+	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
 
-	const out = resolve(io.cwd, flags.out);
+	const out = resolve(io.cwd, options.out);
 	await mkdir(dirname(out), { recursive: true });
 	const renderer = await openRenderer(io, {
 		root: dirname(path),
@@ -76,7 +59,7 @@ export async function exportCommand(args: string[], io: Io): Promise<void> {
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);
 		const size = (await stat(out)).size;
 		log.out(
-			`${result.items.length - failed.length} of ${result.items.length} items exported to ${flags.out} (${formatBytes(size)}, ${(result.ms / 1000).toFixed(1)}s)`,
+			`${result.items.length - failed.length} of ${result.items.length} items exported to ${options.out} (${formatBytes(size)}, ${(result.ms / 1000).toFixed(1)}s)`,
 		);
 		if (failed.length > 0)
 			throw new CliError(
