@@ -908,6 +908,41 @@ describe("validate warnings", () => {
 	});
 });
 
+describe("validate warnings for a CR80 card", () => {
+	function printed(safeArea?: number): Template {
+		const base = card({ product: "card_cr80", ...(safeArea ? { safeArea } : {}) } as never);
+		const front = base.template_data[0]!;
+		front.elements = [
+			...front.elements,
+			{
+				id: "tight",
+				type: "rect",
+				pos: { x: 4, y: 40 },
+				size: { width: 20, height: 20 },
+				properties: { fill: "#000000" },
+			},
+		];
+		return base;
+	}
+
+	test("checks the printer's 3 mm safe area when the template sets none", async () => {
+		await box.write("cr80.json", JSON.stringify(printed()));
+		const run = await box.run("validate", "cr80.json");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe(
+			'warning: front: "tight" has its left edge inside the safe area\n',
+		);
+		expect(run.stdout).toBe("cr80.json is valid, with 1 warning\n");
+	});
+
+	test("uses the template's own safe area over the printer's", async () => {
+		await box.write("cr80-own.json", JSON.stringify(printed(2)));
+		const run = await box.run("validate", "cr80-own.json");
+		expect(run.stderr).toBe("");
+		expect(run.stdout).toBe("cr80-own.json is valid\n");
+	});
+});
+
 describe("workspaces in inspect and validate", () => {
 	beforeAll(async () => {
 		await box.write("club.coatworkspace", await workspaceBytes(workspaceOf(card())));
