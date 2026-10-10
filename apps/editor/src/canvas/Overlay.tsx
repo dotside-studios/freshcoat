@@ -1,5 +1,7 @@
 import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import type { ReactNode } from "react";
+import { useController } from "~/app/context";
+import { DEFAULT_FILL } from "~/doc/factories";
 import {
 	ancestorRects,
 	canTransform,
@@ -13,7 +15,7 @@ import {
 	unionRects,
 	worldCorners,
 } from "~/doc/geometry";
-import { type PenPath, penPathData } from "~/doc/pen";
+import { type PenPath, penCloseRadius, penPaint, penPathData } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { View } from "~/state/store";
 import { type DraftStore, useDrafts } from "./draft-store";
@@ -147,7 +149,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 					/>
 				</>
 			) : null}
-			{pen ? <PenOverlay pen={pen} view={view} /> : null}
+			{pen ? <PenOverlay pen={pen} view={view} coarse={coarse} /> : null}
 			{draft.angle ? (
 				<Label
 					at={{
@@ -161,7 +163,16 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 	);
 }
 
-function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
+function PenOverlay({
+	pen,
+	view,
+	coarse,
+}: {
+	pen: PenDraft;
+	view: View;
+	coarse: boolean;
+}) {
+	const controller = useController();
 	const toScreen = (p: Point) => ({
 		x: view.x + p.x * view.zoom,
 		y: view.y + p.y * view.zoom,
@@ -181,9 +192,23 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 		!!first &&
 		!!cursor &&
 		screen.points.length >= 2 &&
-		Math.hypot(cursor.x - first.x, cursor.y - first.y) <= 8;
+		Math.hypot(cursor.x - first.x, cursor.y - first.y) <=
+			penCloseRadius(coarse);
+	const willClose = screen.closed || closing;
+	const paint = penPaint(willClose, controller.penLook);
+	const anchor = coarse ? 10 : 7;
+	const handle = coarse ? 5 : 3;
 	return (
 		<g data-testid="pen-draft" data-points={pen.path.points.length}>
+			<path
+				data-testid="pen-preview"
+				d={penPathData({ ...screen, closed: willClose })}
+				fill={paint.fill ? solid(paint.fill) : "none"}
+				stroke={paint.stroke ? solid(paint.stroke.color) : "none"}
+				strokeWidth={paint.stroke ? paint.stroke.width * view.zoom : 0}
+				strokeLinecap={paint.stroke?.cap}
+				strokeLinejoin={paint.stroke?.join}
+			/>
 			<path
 				d={penPathData(screen)}
 				className="fill-none stroke-fc-accent"
@@ -223,7 +248,7 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 							<circle
 								cx={h.x}
 								cy={h.y}
-								r={3}
+								r={handle}
 								className="fill-white stroke-fc-accent"
 								strokeWidth={1}
 							/>
@@ -232,7 +257,7 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 				),
 			)}
 			{screen.points.map((p, i) => {
-				const size = i === 0 && closing ? 10 : 7;
+				const size = i === 0 && closing ? anchor + 3 : anchor;
 				return (
 					<rect
 						// biome-ignore lint/suspicious/noArrayIndexKey: anchors are ordered points
@@ -252,6 +277,10 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 			})}
 		</g>
 	);
+}
+
+function solid(paint: unknown): string {
+	return typeof paint === "string" ? paint : DEFAULT_FILL;
 }
 
 function SelectionBox({

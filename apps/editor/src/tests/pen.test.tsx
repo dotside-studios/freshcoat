@@ -13,7 +13,10 @@ import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { ShortcutsDialog } from "~/app/ShortcutsDialog";
 import { Viewport } from "~/canvas/Viewport";
-import { getElement } from "~/doc/path";
+import { DEFAULT_FILL } from "~/doc/factories";
+import { applyRect } from "~/doc/geometry";
+import { updateElement } from "~/doc/ops";
+import { getElement, parentKeyOf } from "~/doc/path";
 import {
 	closePoint,
 	constrain45,
@@ -28,6 +31,13 @@ import {
 } from "~/doc/pen";
 import { doc, geometryOf } from "./doc-fixture";
 
+const pointer = vi.hoisted(() => ({ coarse: false }));
+
+vi.mock("@freshcoat-js/ui/data-table", async (orig) => ({
+	...(await orig<object>()),
+	useCoarsePointer: () => pointer.coarse,
+}));
+
 vi.mock("~/canvas/use-live-render", () => ({
 	useLiveRender: () => ({ canvas: null, scale: 1, fontsLoading: false }),
 }));
@@ -40,7 +50,10 @@ vi.stubGlobal(
 	},
 );
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	pointer.coarse = false;
+});
 
 const corners: PenPath = {
 	closed: false,
@@ -208,6 +221,46 @@ describe("pen paths", () => {
 		);
 		expect(line?.size).toEqual({ width: 50, height: 1 });
 	});
+
+	test("uses the given style instead of the defaults", () => {
+		const stroke = { color: "#ff0000", width: 6 };
+		const open = penElement(corners, doc(), 0, { stroke, fill: "#00ff00" });
+		expect((open as VectorElement).properties).toMatchObject({ stroke });
+		expect((open as VectorElement).properties.fill).toBeUndefined();
+		const closed = penElement({ ...corners, closed: true }, doc(), 0, {
+			stroke,
+			fill: "#00ff00",
+		}) as VectorElement;
+		expect(closed.properties.fill).toBe("#00ff00");
+		expect(closed.properties.stroke).toBeUndefined();
+	});
+
+	test("a barely spanned axis is flat, so a later resize keeps the slope", () => {
+		const t = doc();
+		const el = penElement(
+			{
+				closed: false,
+				points: [
+					{ x: 0, y: 5 },
+					{ x: 50, y: 5.3 },
+				],
+			},
+			t,
+			0,
+		) as VectorElement;
+		expect(el.properties.d).toBe("M0 0L50 0");
+		const at = {
+			...t,
+			template_data: [{ ...t.template_data[0], elements: [el] }],
+		};
+		const key = "0/0";
+		const rect = { x: 0, y: 5, width: 100, height: 40, rotation: 0 };
+		const g = geometryOf(at as Template);
+		const out = applyRect(at as Template, key, rect, g);
+		if (!out.ok) throw new Error(out.reason);
+		const next = getElement(out.template, key) as VectorElement;
+		expect(next.properties.d).toBe("M0 0L100 0");
+	});
 });
 
 describe("pen tool", () => {
@@ -360,5 +413,110 @@ describe("pen gestures", () => {
 		click(200, 300, { metaKey: true });
 		click(101, 100, { metaKey: true });
 		expect(created(c).properties.d).toMatch(/^M[^C]*Z$/);
+	});
+
+	test("the draft previews the stroke an open path will get, scaled by zoom", () => {
+		const c = mount();
+		c.setView({ x: 0, y: 0, zoom: 2 });
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		const preview = screen.getByTestId("pen-preview");
+		expect(preview.getAttribute("stroke")).toBe(PEN_STROKE.color);
+		expect(preview.getAttribute("stroke-width")).toBe(
+			String(PEN_STROKE.width * 2),
+		);
+		expect(preview.getAttribute("fill")).toBe("none");
+	});
+
+	test("the draft previews the fill once the path will close", () => {
+		mount();
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		click(200, 300, { metaKey: true });
+		expect(screen.getByTestId("pen-preview").getAttribute("fill")).toBe("none");
+		fireEvent.pointerMove(viewport(), at(103, 100, { metaKey: true }));
+		const preview = screen.getByTestId("pen-preview");
+		expect(preview.getAttribute("fill")).toBe(DEFAULT_FILL);
+		expect(preview.getAttribute("stroke")).toBe("none");
+	});
+
+	test("a path drawn in a selected frame goes into it, in its space", () => {
+		const c = mount();
+		c.select(["0/1"]);
+		click(250, 150, { metaKey: true });
+		click(400, 250, { metaKey: true });
+		fireEvent.keyDown(window, { key: "Enter" });
+		const key = c.state.selection[0] as string;
+		expect(parentKeyOf(key)).toBe("0/1");
+		expect(created(c).pos).toEqual({ x: 50, y: 50 });
+	});
+
+	test("a path starting outside the selected frame goes on the side", () => {
+		const c = mount();
+		c.select(["0/1"]);
+		click(600, 500, { metaKey: true });
+		click(700, 550, { metaKey: true });
+		fireEvent.keyDown(window, { key: "Enter" });
+		expect(parentKeyOf(c.state.selection[0] as string)).toBeNull();
+	});
+
+	test("a coarse pointer closes from further away and gets bigger anchors", () => {
+		const first = mount();
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		click(200, 300, { metaKey: true });
+		click(112, 100, { metaKey: true });
+		expect(points()).toBe("4");
+		expect(first.state.tool).toBe("pen");
+		const small = screen
+			.getByTestId("pen-draft")
+			.querySelector("rect")
+			?.getAttribute("width");
+		cleanup();
+
+		pointer.coarse = true;
+		const c = mount();
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		click(200, 300, { metaKey: true });
+		fireEvent.pointerMove(viewport(), at(112, 100, { metaKey: true }));
+		const big = screen
+			.getByTestId("pen-draft")
+			.querySelector("rect")
+			?.getAttribute("width");
+		expect(Number(big)).toBeGreaterThan(Number(small));
+		click(112, 100, { metaKey: true });
+		expect(created(c).properties.fill).toBeDefined();
+	});
+
+	test("new paths reuse the stroke and fill last set on a pen layer", () => {
+		const c = mount();
+		const open = c.createPath(corners) as string;
+		c.edit(
+			(t) =>
+				updateElement(t, open, {
+					properties: { stroke: { color: "#ff0000", width: 9 } },
+				}),
+			{ scope: "base" },
+		);
+		const closed = c.createPath({ ...corners, closed: true }) as string;
+		c.edit(
+			(t) => updateElement(t, closed, { properties: { fill: "#0000ff" } }),
+			{
+				scope: "base",
+			},
+		);
+		const next = c.createPath(corners) as string;
+		const after = c.base as Template;
+		expect(
+			(getElement(after, next) as VectorElement).properties.stroke,
+		).toEqual({
+			color: "#ff0000",
+			width: 9,
+		});
+		const filled = c.createPath({ ...corners, closed: true }) as string;
+		expect(
+			(getElement(c.base as Template, filled) as VectorElement).properties.fill,
+		).toBe("#0000ff");
 	});
 });
