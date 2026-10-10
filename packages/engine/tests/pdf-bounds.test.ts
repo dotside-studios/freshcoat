@@ -4,7 +4,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { drawableBounds, makeBin, paintScene } from "../src/canvaskit";
+import {
+	drawableBounds,
+	makeBin,
+	paintScene,
+	shapeTextLines,
+} from "../src/canvaskit";
 import { createSharedFontProvider } from "../src/font-collection";
 import {
 	createFrame,
@@ -17,7 +22,7 @@ import {
 	type Node,
 } from "../src/node";
 import { createRenderer, type Renderer } from "../src/renderer";
-import type { Command, DrawCommand } from "../src/types";
+import type { Command, DrawCommand, DrawTextCommand } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 
 const W = 240;
@@ -209,6 +214,52 @@ async function pixels(
 		out.dispose();
 	}
 }
+
+describe("shapeTextLines", () => {
+	test("frees each paragraph and keeps the runs it returns", () => {
+		const shared = createSharedFontProvider(ck, geist);
+		(shared.provider as { __families?: string[] }).__families = ["Geist"];
+		const bin = makeBin();
+		const made = ck.ParagraphBuilder.MakeFromFontCollection;
+		const built: Array<{ deleted: boolean }> = [];
+		ck.ParagraphBuilder.MakeFromFontCollection = (...args: unknown[]) => {
+			const builder = made.apply(ck.ParagraphBuilder, args);
+			const build = builder.build.bind(builder);
+			builder.build = () => {
+				const para = build();
+				const del = para.delete.bind(para);
+				const entry = { deleted: false };
+				para.delete = () => {
+					entry.deleted = true;
+					del();
+				};
+				built.push(entry);
+				return para;
+			};
+			return builder;
+		};
+		try {
+			const commands = renderer.compile(
+				createFrame({
+					...box(0, 0, W, H),
+					children: [text("Hello there", 20, 10, 10)],
+				}),
+				{ width: W, height: H },
+			);
+			const cmd = flatten(commands).find(
+				(c) => c.op === "drawText",
+			) as DrawTextCommand;
+			const lines = shapeTextLines(ck, shared.provider, bin, cmd);
+			expect(lines[0]?.runs[0]?.glyphs.length).toBeGreaterThan(0);
+			expect(built.length).toBeGreaterThan(0);
+			expect(built.every((p) => p.deleted)).toBe(true);
+		} finally {
+			ck.ParagraphBuilder.MakeFromFontCollection = made;
+			bin.free();
+			shared.release();
+		}
+	});
+});
 
 describe("drawableBounds", () => {
 	test("text is unbounded while a variable font is in the fallback chain", () => {

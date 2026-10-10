@@ -843,7 +843,8 @@ export type ShapedTextLine = {
 };
 
 // A straight text command's lines shaped as drawText shapes them, for a
-// backend that places the glyphs itself. The caller frees what `bin` holds.
+// backend that places the glyphs itself. The paragraphs are freed here, the
+// typefaces `bin` holds by the caller.
 export function shapeTextLines(
 	ck: CanvasKit,
 	provider: TypefaceFontProvider,
@@ -864,33 +865,36 @@ export function shapeTextLines(
 			null,
 			null,
 		);
-		bin.track(para);
-		const left =
-			line.direction === "rtl"
-				? Math.min(...line.spans.map((s) => s.x))
-				: first.x;
-		const runs = para.getShapedLines().flatMap((l) => l.runs);
-		for (const run of runs) bin.track(run.typeface);
-		const spanAt: number[] = [];
-		line.spans.forEach((span, i) => {
-			for (let k = 0; k < span.text.length; k++) spanAt.push(i);
-		});
-		out.push({
-			line,
-			x: left,
-			y: (line.baseline ?? line.y) - ascent,
-			runs,
-			spanAt,
-			decorations: lineDecorations(
-				ck,
-				provider,
-				bin,
+		try {
+			const left =
+				line.direction === "rtl"
+					? Math.min(...line.spans.map((s) => s.x))
+					: first.x;
+			const runs = para.getShapedLines().flatMap((l) => l.runs);
+			for (const run of runs) bin.track(run.typeface);
+			const spanAt: number[] = [];
+			line.spans.forEach((span, i) => {
+				for (let k = 0; k < span.text.length; k++) spanAt.push(i);
+			});
+			out.push({
 				line,
-				para,
-				ascent,
-				left,
-			),
-		});
+				x: left,
+				y: (line.baseline ?? line.y) - ascent,
+				runs,
+				spanAt,
+				decorations: lineDecorations(
+					ck,
+					provider,
+					bin,
+					line,
+					para,
+					ascent,
+					left,
+				),
+			});
+		} finally {
+			para.delete();
+		}
 	}
 	return out;
 }
