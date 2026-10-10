@@ -104,3 +104,16 @@ export {
 	retryPreset,
 	unwrittenRecordIds,
 } from "./status";
+export { serveRenders, type WorkerScope } from "./render-worker";
+export {
+	createWorkerPool,
+	type PoolWorker,
+	RenderCancelledError,
+	type WorkerFactory,
+	type WorkerPool,
+} from "./worker-pool";
+export type {
+	RenderWorkerReply,
+	RenderWorkerRequest,
+	WorkerRenderRequest,
+} from "./worker-protocol";

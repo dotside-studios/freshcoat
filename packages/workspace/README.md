@@ -162,8 +162,19 @@ field left empty is not reported.
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
-stream. `exportPoolSize` picks how many workers from the
-cores, memory and `largestImagePixels` of the job.
+stream.
+
+`createWorkerPool(size, factory)` is that pool. `factory` makes a worker:
+anything with `postMessage`, `terminate`, `onmessage` and `onerror`, such as a
+web `Worker` or an adapter over a Node `worker_threads` one. Each worker calls
+`serveRenders(scope, createRenderer)` with its own scope and a function that
+makes its renderer, with the CanvasKit and image loader of its platform.
+`init(fonts)` hands every worker the fonts and waits for each, workers start
+when first needed and a failed one is replaced, and a template is sent to a
+worker only when it changes. Studio runs it over module workers and the CLI
+over threads, and either pool can be passed to `exportWorkspace` as `pool`.
+`exportPoolSize` picks how many workers from the cores, memory and
+`largestImagePixels` of the job.
 
 `itemRequest` builds the render request `runExportJob` sends for one item,
 with the size `itemSize` gives it, and `imagesOf` lists the photos that item

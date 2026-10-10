@@ -21,7 +21,7 @@ import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readWorkspace } from "../workspace-file";
-import { createWorkerPool, poolSize } from "../worker-pool";
+import { poolSize, startWorkerPool } from "../worker-pool";
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
 export type WorkspaceOptions = {
@@ -120,7 +120,7 @@ export async function runPreset(
 	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
 	const pool =
 		threads > 1
-			? await createWorkerPool(threads, { root: options.root, fonts: [...fonts] })
+			? await startWorkerPool(threads, options.root, fonts)
 			: undefined;
 	const renderer = await openRenderer(io, { root: options.root, build: "full" });
 	const progress = progressReporter(log);
@@ -154,7 +154,7 @@ export async function runPreset(
 			);
 	} finally {
 		log.endProgress();
-		await pool?.dispose();
+		pool?.dispose();
 		renderer.dispose();
 	}
 }

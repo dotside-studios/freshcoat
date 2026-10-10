@@ -131,10 +131,14 @@ dataset's selection from there to offer it.
   of items, one per record and side, with its file name and size.
 - **Runner and pool** (`src/export/use-export-runner.ts`,
   `worker-pool.ts`): one job at a time over a pool of module workers
-  (`render-worker.ts`). Each worker loads CanvasKit's full build (it has the
-  JPEG and WebP encoders), renders through coatfile and, when asked,
-  for-print, and keeps decoded photos in an LRU. The pool is at most 4
-  workers, 2 when photos pass 24 megapixels.
+  (`render-worker.ts`). The pool and the loop each worker runs are
+  `createWorkerPool` and `serveRenders` in
+  `../../packages/workspace/src/export/`, shared with the CLI's
+  `worker_threads`; Studio's files make the module worker and load
+  CanvasKit's full build (it has the JPEG and WebP encoders) from its URL.
+  Each worker renders through coatfile and, when asked, for-print, and keeps
+  decoded photos in an LRU. The pool is at most 4 workers, 2 when photos
+  pass 24 megapixels.
 - **Job** (`runExportJob` in `../../packages/workspace/src/export/job.ts`):
   renders at most the pool's size at once and dispatches at most twice that
   ahead of what is written, writes items in plan order, records failures and
