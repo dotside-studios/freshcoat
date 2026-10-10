@@ -7,14 +7,10 @@ import { CliError, type Io } from "./io";
 
 const MODULE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
 
-/** A template written as a script, which a runtime evaluates to JSON. */
 export function isTemplateModule(path: string): boolean {
 	return MODULE_EXTENSIONS.includes(extname(path).toLowerCase());
 }
 
-// Runs in the child: imports the module, takes its default export, or a
-// `template` export, calls it when it is a function and writes the awaited
-// result as JSON. The file keeps the script's own console output off it.
 const BOOTSTRAP = `
 import { writeFileSync } from "node:fs";
 const env = process.env;
@@ -30,8 +26,6 @@ writeFileSync(env.FRESHCOAT_MODULE_OUT, JSON.stringify(value));
 
 type Runtime = { command: string; args: string[] };
 
-/** The runtime that evaluates a module: `FRESHCOAT_RUNTIME` when set, a
- *  `node`, `bun` or `deno` command or path, otherwise the one running freshcoat. */
 export function moduleRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
 	const command = env.FRESHCOAT_RUNTIME || process.execPath;
 	const name = basename(command).toLowerCase().replace(/\.exe$/, "");
@@ -40,8 +34,6 @@ export function moduleRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
 	return { command, args: ["--input-type=module", "-e", BOOTSTRAP] };
 }
 
-/** Evaluates the module at `path` and returns the JSON its export resolves
- *  to. What the script prints goes to stderr. */
 export async function evaluateTemplateModule(io: Io, path: string): Promise<string> {
 	const runtime = moduleRuntime(io.env);
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-module-"));

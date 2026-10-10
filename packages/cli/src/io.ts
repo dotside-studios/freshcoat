@@ -8,7 +8,6 @@ export type Io = {
 	fetch?: FontFetch;
 	tty?: boolean;
 	cacheDir?: string;
-	/** The environment a template module is evaluated in, default process.env. */
 	env?: NodeJS.ProcessEnv;
 };
 

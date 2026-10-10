@@ -55,7 +55,7 @@ export function newerFormatWarning(version: string): string {
 }
 
 /** Reads a template as Studio opens it: duplicate element ids are healed
- *  rather than refused. A script is evaluated first, and its JSON read. */
+ *  rather than refused. */
 export async function readTemplate(io: Io, path: string): Promise<TemplateFile> {
 	const input = isTemplateModule(path)
 		? await evaluateTemplateModule(io, path)
