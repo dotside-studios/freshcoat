@@ -193,6 +193,8 @@ export type Bin = {
 	// Path.MakeFromSVGString(d), shared through the PaintCache when there is
 	// one. Callers must not mutate the result.
 	path: (ck: CanvasKit, d: string, evenOdd?: boolean) => Path | null;
+	// The PaintCache this paint draws through, if any; shaped lines live in it.
+	cache: PaintCacheState | null;
 };
 export function makeBin(cache?: PaintCacheState | null): Bin {
 	const items: { delete(): void }[] = [];
@@ -213,6 +215,7 @@ export function makeBin(cache?: PaintCacheState | null): Bin {
 			if (!cache) freeLutImages(luts);
 		},
 		luts,
+		cache: cache ?? null,
 		mipmaps: (src, img) => {
 			const build = () => img.makeCopyWithDefaultMipmaps();
 			return (
@@ -658,8 +661,6 @@ function textStyleOf(
 // Render each baked line with a ParagraphBuilder — HarfBuzz shaping applies the
 // kerning Figma uses — aligning the paragraph's baseline to the baked
 // baseline via getLineMetrics.
-const shapedLines = new WeakMap<TypefaceFontProvider, PaintCacheState>();
-
 function drawText(
 	ck: CanvasKit,
 	canvas: Canvas,
@@ -720,7 +721,7 @@ function drawText(
 		return;
 	}
 	// Gradient paints depend on position, so those lines are not cached.
-	const cache = fgPaint ? undefined : shapedLines.get(provider);
+	const cache = fgPaint ? null : bin.cache;
 	const rows = visibleRows(canvas);
 	for (const line of cmd.layout.lines) {
 		const first = line.spans[0];
@@ -959,7 +960,7 @@ function arcLines(
 	cmd: DrawTextCommand,
 	fallback: string[],
 ): { line: TextLine; arc: ArcLine }[] {
-	const cache = shapedLines.get(provider);
+	const cache = bin.cache;
 	const first = cmd.layout.lines[0];
 	const base0 = first ? (first.baseline ?? first.y) : 0;
 	const out: { line: TextLine; arc: ArcLine }[] = [];
@@ -1787,8 +1788,8 @@ function recordSvg(
 			const { filter: own, ...group } = item;
 			if (group.mask) group.mask = lift(group.mask);
 			if (!own) return { ...group, children: lift(item.children) };
-			const key = `svg-filter:${images.size}`;
 			const picture = recordSvg(ck, provider, svg, drawing, item.children, images, bin, own);
+			const key = `svg-filter:${images.size}`;
 			images.set(key, {
 				svgPicture: picture,
 				width,
@@ -2798,7 +2799,7 @@ function textBounds(
 					bottom: (Math.ceil(device.height) - ctm[5]) / ctm[4],
 				}
 			: null;
-	const cache = shapedLines.get(provider);
+	const cache = bin.cache;
 	const out: Bounds[] = [];
 	for (const line of cmd.layout.lines) {
 		const first = line.spans[0];
@@ -3364,6 +3365,11 @@ function paintAdjustedOffscreen(
 		return;
 	}
 
+	// The snapshot below is copy-on-write off this surface, and the shader samples
+	// it when the MAIN surface flushes (later, on the GPU path), so keep the
+	// offscreen alive until bin.free() runs (after that flush), disposing (not
+	// delete()ing, which would leak the pixel buffer) it then.
+	bin.track({ delete: () => surface.dispose() });
 	const off = surface.getCanvas();
 	off.clear(ck.TRANSPARENT);
 	// The main canvas may already carry an export scale and arbitrary ancestor
@@ -3373,12 +3379,7 @@ function paintAdjustedOffscreen(
 	off.translate(-rect.x, -rect.y);
 	off.concat(matrix);
 	paintDrawable(ck, off, provider, images, bin, inner, issues, frame);
-	// The snapshot is copy-on-write off this surface, and the shader samples it when
-	// the MAIN surface flushes (later, on the GPU path) — so keep the offscreen alive
-	// until bin.free() runs (after that flush), disposing (not delete()ing, which
-	// would leak the pixel buffer) it then.
 	const img = bin.track(surface.makeImageSnapshot());
-	bin.track({ delete: () => surface.dispose() });
 
 	const srcSh = bin.track(
 		img.makeShaderOptions(
@@ -3531,7 +3532,6 @@ function reduceSupersampled(
 
 	let level = src;
 	let levelSize = exportPixelSize(design, exportScale * supersample);
-	retire(src);
 
 	if (supersample === 1) {
 		const canvas = out.getCanvas();
@@ -3723,6 +3723,8 @@ function applyFrameFinish(
 		finishOnCpu(ck, surface, bin, u, cache)
 	)
 		return;
+	const curve = u.curve ? lutImage(ck, bin, u.curve) : null;
+	if (u.curve && !curve) return; // the table couldn't be uploaded; leave the frame as-is.
 	const snap = bin.track(surface.makeImageSnapshot());
 	const canvas = surface.getCanvas();
 	canvas.clear(ck.TRANSPARENT);
@@ -3735,9 +3737,7 @@ function applyFrameFinish(
 		),
 	);
 	const children = [srcSh];
-	if (u.curve) {
-		const curve = lutImage(ck, bin, u.curve);
-		if (!curve) return; // the table couldn't be uploaded; leave the frame as-is.
+	if (curve) {
 		children.push(
 			bin.track(
 				curve.makeShaderOptions(
@@ -4578,6 +4578,43 @@ export async function paintScene(
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
 	if (cache) cache.stats.paints++;
+	const bin = makeBin(cache);
+	// Undone only when the paint throws: on success the caller owns the surface.
+	const rollback: (() => void)[] = [];
+	try {
+		return await paintSceneIn(ck, commands, rt, opts, cache, bin, rollback);
+	} catch (e) {
+		for (const undo of rollback) {
+			try {
+				undo();
+			} catch {}
+		}
+		throw e;
+	} finally {
+		bin.free();
+	}
+}
+
+async function paintSceneIn(
+	ck: CanvasKit,
+	commands: Command[],
+	rt: PaintTarget,
+	opts: { fontProvider?: SharedFontProvider } | undefined,
+	cache: PaintCacheState | null,
+	bin: Bin,
+	rollback: (() => void)[],
+): Promise<PaintOutput> {
+	const create = commands.find((c) => c.op === "createCanvas") as
+		| {
+				op: "createCanvas";
+				width: number;
+				height: number;
+				scale?: number;
+				supersample?: number;
+				precision?: Precision;
+		  }
+		| undefined;
+	if (!create) throw new Error("canvaskit: scene has no createCanvas command");
 	const { fonts, images } = collectAssets(commands);
 	const requested = new Set(images);
 	const warnings: PaintWarning[] = [];
@@ -4607,6 +4644,8 @@ export async function paintScene(
 	if (!cache) {
 		sharedFonts?.retain();
 		owned = sharedFonts ?? createSharedFontProvider(ck, loaded);
+		const own = owned;
+		bin.track({ delete: () => own.release() });
 	}
 	const provider = cache
 		? cachedFontProvider(
@@ -4619,18 +4658,15 @@ export async function paintScene(
 						},
 			)
 		: (owned as SharedFontProvider).provider;
-	if (cache) shapedLines.set(provider, cache);
 
 	const imageMap = new Map<string, Image | SvgPicture>();
-	// Images the runtime lent through loadImage: painted, never freed here.
-	const borrowed = new Set<string>();
+	// Images the runtime lends through loadImage are painted, never freed here.
 	for (const src of images) {
 		if (rt.loadImage) {
 			try {
 				const img = await rt.loadImage(src, ck);
 				if (img) {
 					imageMap.set(src, img as Image);
-					borrowed.add(src);
 				} else
 					warnings.push({
 						kind: "image_load_failed",
@@ -4656,7 +4692,8 @@ export async function paintScene(
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
-				cache?.images.set(src, { image: img, mipped: null });
+				if (cache) cache.images.set(src, { image: img, mipped: null });
+				else bin.track(img);
 				warnSvgFeatures(warnings, src, img);
 			} else
 				warnings.push({
@@ -4673,18 +4710,6 @@ export async function paintScene(
 		}
 	}
 
-	const bin = makeBin(cache);
-	const create = commands.find((c) => c.op === "createCanvas") as
-		| {
-				op: "createCanvas";
-				width: number;
-				height: number;
-				scale?: number;
-				supersample?: number;
-				precision?: Precision;
-		  }
-		| undefined;
-	if (!create) throw new Error("canvaskit: scene has no createCanvas command");
 	const design = { width: create.width, height: create.height };
 	const exportScale = create.scale ?? 1;
 	// The size the caller asked for. Everything the outside world sees — the
@@ -4697,6 +4722,11 @@ export async function paintScene(
 				() => makeSurface(ck, rt, device.width, device.height),
 			)
 		: makeSurface(ck, rt, device.width, device.height);
+	if (!cache)
+		rollback.push(() => {
+			surface.dispose();
+			loseContext();
+		});
 
 	// Supersampling renders denser than the export and reduces (see
 	// ./export-scale). Only the RENDER density belongs on `frame`: every pass that
@@ -4732,7 +4762,8 @@ export async function paintScene(
 					precision,
 				)
 			: null;
-	if (!superSurface) {
+	if (superSurface) bin.track({ delete: () => superSurface.dispose() });
+	else {
 		frame.scale = exportScale;
 		frame.grid = 1;
 		frame.precision = "u8";
@@ -4880,7 +4911,7 @@ export async function paintScene(
 			| undefined;
 		if (finishCmd)
 			applyFrameFinish(ck, surface, bin, finishCmd.finish, device, cache);
-		// Flush before freeing the provider/images below: on the WebGL path the GPU
+		// Flush before the bin frees the provider/images: on the WebGL path the GPU
 		// still references the decoded images until the surface is flushed.
 		surface.flush();
 	} finally {
@@ -4889,13 +4920,8 @@ export async function paintScene(
 			evictUnusedLines(cache);
 			evictUnusedPaths(cache);
 			evictUnusedLutImages(cache.luts);
-		} else {
-			owned?.release();
-			for (const [src, img] of imageMap)
-				if (!borrowed.has(src)) img.delete();
 		}
 	}
-	bin.free();
 
 	return {
 		canvas,

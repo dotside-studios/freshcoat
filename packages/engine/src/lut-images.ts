@@ -53,11 +53,13 @@ export function cachedLutImage(
 		luts.byArray.set(parts[0], hit);
 		return hit.image;
 	}
+	const image = build();
+	if (!image) return null;
 	const entry: Entry = {
 		size,
 		source: parts,
 		bytes: parts.map((p) => p.slice()),
-		image: build(),
+		image,
 		used: true,
 	};
 	luts.builds++;

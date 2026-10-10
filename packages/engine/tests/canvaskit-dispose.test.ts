@@ -11,7 +11,7 @@ const commands: Command[] = [
 
 // A fake CanvasKit whose surface factories are individually controllable so we can
 // assert the dispose() closure only loses a context on the WebGL-backed path.
-function fakeCk(surface: { dispose: () => void }): {
+function fakeCk(surface: { dispose: () => void; flush?: () => void }): {
 	ck: unknown;
 	getWebGL: ReturnType<typeof vi.fn>;
 	makeSW: ReturnType<typeof vi.fn>;
@@ -102,5 +102,52 @@ describe("paintScene dispose() releases the WebGL context", () => {
 		out.dispose();
 		expect(disposeSurface).toHaveBeenCalledTimes(1);
 		expect(loseContext).not.toHaveBeenCalled();
+	});
+});
+
+describe("paintScene frees what it made when the paint throws", () => {
+	test("the uncached surface, provider and images are freed", async () => {
+		const disposeSurface = vi.fn();
+		const { ck } = fakeCk({
+			dispose: disposeSurface,
+			flush: () => {
+				throw new Error("flush failed");
+			},
+		});
+		const providerDelete = vi.fn();
+		(ck as { TypefaceFontProvider: { Make: unknown } }).TypefaceFontProvider.Make =
+			() => ({ registerFont: vi.fn(), delete: providerDelete });
+		const imageDelete = vi.fn();
+		(ck as { MakeImageFromEncoded: unknown }).MakeImageFromEncoded = () => ({
+			delete: imageDelete,
+		});
+		const rt = {
+			resolveFont: () => ({ kind: "none" }),
+			loadBytes: async () => new Uint8Array(),
+		} as unknown as PaintRuntime;
+		const scene = [
+			...commands,
+			{ op: "loadImages", srcs: ["a.png"] },
+		] as unknown as Command[];
+
+		await expect(paintScene(ck, scene, rt)).rejects.toThrow("flush failed");
+		expect(disposeSurface).toHaveBeenCalledTimes(1);
+		expect(providerDelete).toHaveBeenCalledTimes(1);
+		expect(imageDelete).toHaveBeenCalledTimes(1);
+	});
+
+	test("a scene without createCanvas loads nothing", async () => {
+		const { ck } = fakeCk({ dispose: vi.fn() });
+		const loadBytes = vi.fn(async () => new Uint8Array());
+		const resolveFont = vi.fn(() => ({ kind: "none" }));
+		const rt = { resolveFont, loadBytes } as unknown as PaintRuntime;
+		const scene = [
+			{ op: "loadImages", srcs: ["a.png"] },
+			{ op: "loadFonts", requests: [{ family: "X" }] },
+		] as unknown as Command[];
+
+		await expect(paintScene(ck, scene, rt)).rejects.toThrow("createCanvas");
+		expect(loadBytes).not.toHaveBeenCalled();
+		expect(resolveFont).not.toHaveBeenCalled();
 	});
 });

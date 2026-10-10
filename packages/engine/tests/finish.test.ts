@@ -2,6 +2,7 @@
 // black-extract, and dither — run through an SkSL pass on the final surface.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
+import { setCpuFinish } from "../src/canvaskit";
 import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
@@ -120,5 +121,28 @@ describe("FrameFinish", () => {
 		expect(pixelAt(ck, noop.bytes, 30, 10)).toEqual(
 			pixelAt(ck, control.bytes, 30, 10),
 		);
+	});
+
+	test("a curve whose table can't be uploaded leaves the frame as it was", async () => {
+		const ck = await loadCanvasKit();
+		setCpuFinish(false);
+		try {
+			const control = await render(ck);
+			const noTable = Object.create(ck);
+			noTable.MakeImage = (info: any, pixels: Uint8Array, rowBytes: number) =>
+				info.width === 256 && info.height === 1
+					? null
+					: ck.MakeImage(info, pixels, rowBytes);
+			const invert = Uint8Array.from({ length: 256 }, (_, i) => 255 - i);
+			const finished = await render(noTable, {
+				curve: { r: invert, g: invert, b: invert },
+			});
+			for (const x of [10, 30, 50])
+				expect(pixelAt(ck, finished.bytes, x, 10)).toEqual(
+					pixelAt(ck, control.bytes, x, 10),
+				);
+		} finally {
+			setCpuFinish(true);
+		}
 	});
 });

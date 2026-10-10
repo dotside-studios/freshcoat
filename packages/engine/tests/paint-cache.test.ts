@@ -689,6 +689,15 @@ describe("LUT images", () => {
 		);
 	});
 
+	test("a failed build is not kept", () => {
+		const luts = createLutImages();
+		const a = new Uint8Array([1, 2, 3]);
+		expect(cachedLutImage(luts, 1, [a], () => null)).toBeNull();
+		const img = fake();
+		expect(cachedLutImage(luts, 1, [a], () => img)).toBe(img);
+		expect(cachedLutImage(luts, 1, [a], fake)).toBe(img);
+	});
+
 	test("eviction and freeing delete the images", () => {
 		const luts = createLutImages();
 		const kept = cachedLutImage(luts, 1, [new Uint8Array([1])], fake);
