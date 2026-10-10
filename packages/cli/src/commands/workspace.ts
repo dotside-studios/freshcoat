@@ -2,7 +2,6 @@ import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
 	type ExportPreset,
-	planExport,
 	SheetLayoutError,
 	sheetSummary,
 	type Workspace,
@@ -13,7 +12,7 @@ import {
 	findPreset,
 	type JobProgress,
 	largestImagePixels,
-	planSheets,
+	presetReadiness,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
@@ -106,7 +105,8 @@ export async function runPreset(
 	io: Io,
 ): Promise<void> {
 	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
+	const readiness = presetReadiness(workspace, preset);
+	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
@@ -116,7 +116,6 @@ export async function runPreset(
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
-	const plan = planExport(workspace, preset);
 	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
 	const pool =
 		threads > 1
@@ -165,9 +164,7 @@ function planPreset(
 	out: string,
 	log: Log,
 ): void {
-	const plan = planExport(workspace, preset);
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	const sheets = entry ? planSheets(plan, entry.template, preset) : null;
+	const { plan, sheets } = presetReadiness(workspace, preset);
 	if (sheets?.error !== undefined)
 		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);

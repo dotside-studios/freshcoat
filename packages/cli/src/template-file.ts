@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
+	formatVersionStatus,
+	loadTemplate,
 	type Template,
 	type ValidationError,
-	validate,
+	verifyAssets,
 } from "@freshcoat-js/coatfile";
-import { decodeTemplate } from "@freshcoat-js/coatfile/coat";
-import { CliError, type Io } from "./io";
+import { CliError, type Io, type Log } from "./io";
 
 export async function readBytes(
 	io: Io,
@@ -27,24 +28,6 @@ function reason(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-export type TemplateDocument = {
-	directory: string;
-	document: unknown;
-};
-
-export async function readDocument(
-	io: Io,
-	path: string,
-): Promise<TemplateDocument> {
-	const bytes = await readBytes(io, path);
-	const decoded = await decodeTemplate(bytes);
-	if (!decoded.ok) throw new CliError(`${path}: ${decoded.message}`);
-	return {
-		directory: dirname(resolve(io.cwd, path)),
-		document: decoded.document,
-	};
-}
-
 export function formatIssue(issue: ValidationError): string {
 	const where = issue.path === "" ? "" : `${issue.path}: `;
 	return `${where}${issue.message} (${issue.code})`;
@@ -57,12 +40,56 @@ export function issueSummary(path: string, errors: ValidationError[]): string {
 	].join("\n");
 }
 
-export async function readTemplate(
-	io: Io,
+export type TemplateFile = {
+	directory: string;
+	template: Template;
+	/** What reading healed or found off, as sentences about the file. */
+	notes: string[];
+	/** Written by a newer 1.x kit, so fields it added were dropped. */
+	newerFormat: boolean;
+};
+
+export function newerFormatWarning(version: string): string {
+	return `format_version ${version} is newer than this freshcoat reads; fields it adds are ignored`;
+}
+
+/** Reads a template as Studio opens it: duplicate element ids are healed
+ *  rather than refused. */
+export async function readTemplate(io: Io, path: string): Promise<TemplateFile> {
+	const bytes = await readBytes(io, path);
+	const loaded = await loadTemplate(bytes);
+	if (!loaded.ok) {
+		if (loaded.reason === "unreadable") throw new CliError(`${path}: ${loaded.message}`);
+		throw new CliError(issueSummary(path, loaded.errors));
+	}
+	const { template } = loaded;
+	const notes: string[] = [];
+	if (loaded.renamedIds.length > 0)
+		notes.push(
+			`renamed duplicate element ${loaded.renamedIds.length === 1 ? "id" : "ids"} ${loaded.renamedIds.join(", ")}`,
+		);
+	const misKeyed = await verifyAssets(template);
+	if (misKeyed.length > 0)
+		notes.push(
+			`${misKeyed.length === 1 ? "asset" : "assets"} ${misKeyed.map((m) => m.declared).join(", ")} ${misKeyed.length === 1 ? "is" : "are"} not keyed by the hash of ${misKeyed.length === 1 ? "its" : "their"} bytes`,
+		);
+	return {
+		directory: dirname(resolve(io.cwd, path)),
+		template,
+		notes,
+		newerFormat: formatVersionStatus(template.format_version) === "newer",
+	};
+}
+
+/** The warnings reading the file raised, named by file. `format` leaves out the
+ *  newer-format one, for a caller that lints the format itself. */
+export function warnLoad(
+	log: Log,
 	path: string,
-): Promise<TemplateDocument & { template: Template }> {
-	const read = await readDocument(io, path);
-	const result = validate(read.document);
-	if (!result.ok) throw new CliError(issueSummary(path, result.errors));
-	return { ...read, template: result.value };
+	file: TemplateFile,
+	options: { format?: boolean } = {},
+): void {
+	for (const note of file.notes) log.warn(`${path}: ${note}`);
+	if (file.newerFormat && options.format !== false)
+		log.warn(`${path}: ${newerFormatWarning(file.template.format_version)}`);
 }

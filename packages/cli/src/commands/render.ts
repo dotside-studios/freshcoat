@@ -19,7 +19,7 @@ import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io } from "../io";
 import { createLoader, openRenderer } from "../renderer";
-import { readBytes, readTemplate } from "../template-file";
+import { readBytes, readTemplate, warnLoad } from "../template-file";
 
 const FORMATS = {
 	png: { format: "png", extension: "png" },
@@ -49,7 +49,9 @@ export async function render(
 	const output = FORMATS[options.format ?? "png"];
 	const scales = options.scale ?? [1];
 
-	const { template, directory } = await readTemplate(io, file);
+	const loaded = await readTemplate(io, file);
+	warnLoad(log, file, loaded);
+	const { template, directory } = loaded;
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
 	const read = await readValues(io, template, options.values, options.set ?? {});

@@ -1,4 +1,3 @@
-import { validate } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -13,7 +12,6 @@ import {
 	planExport,
 	resolveValues,
 	sheetSummary,
-	unfilledRequired,
 	variantFor,
 	variantsFor,
 } from "@freshcoat-js/workspace";
@@ -22,7 +20,7 @@ import {
 	itemSize,
 	itemTemplate,
 	pagesPerSheet,
-	planSheets,
+	presetReadiness,
 	recordOutcome,
 	sheetOf,
 	assetsByRef as toAssetsByRef,
@@ -30,7 +28,7 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { BINDING, EMPTY, plural } from "~/app/copy";
+import { BINDING, EMPTY } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { selectedInView } from "~/data/gallery-model";
@@ -225,11 +223,6 @@ export function ExportSection() {
 				workspace && preset ? planExport(workspace, preset) : [];
 		return lastPlan.current;
 	}, [workspace, preset, typingFileName]);
-	const issues = useMemo(() => {
-		if (!template) return 0;
-		const result = validate(template);
-		return result.ok ? 0 : result.errors.length;
-	}, [template]);
 	const selection = useMemo(() => {
 		const ids =
 			preset?.records === "selected" ? (preset.selected ?? []) : listSelection;
@@ -268,27 +261,17 @@ export function ExportSection() {
 	const runCount = runPlan.length;
 	const { fonts } = useDocumentFonts(template ?? null);
 	const glyphIssues = useGlyphPreflight(template, fonts, runPlan);
-	// What the export button would put on sheets, when the preset uses them.
-	const sheets = useMemo(
-		() => (preset ? planSheets(runPlan, template, preset) : null),
-		[runPlan, template, preset],
-	);
-	const imposition = sheets?.imposition;
-	const blocked =
-		issues > 0
-			? `Template has ${plural(issues, "issue")}`
-			: sheets?.error
-				? sheets.shortError
-				: runCount === 0
-					? "Nothing to export"
-					: null;
-	const unfilled = useMemo(
+	// Whether the export button can run, and what it would put on sheets, when
+	// the preset uses them.
+	const readiness = useMemo(
 		() =>
-			template && workspace
-				? unfilledRequired(template, binding, workspace.datasets).length
-				: 0,
-		[template, binding, workspace],
+			workspace && preset ? presetReadiness(workspace, preset, runPlan) : null,
+		[workspace, preset, runPlan],
 	);
+	const sheets = readiness?.sheets ?? null;
+	const imposition = sheets?.imposition;
+	const blocked = readiness?.blocked ?? null;
+	const unfilled = readiness?.unfilled.length ?? 0;
 	const onStripSelection = (ids: string[]) =>
 		onSelectionChange(
 			dataset ? selectedIds(new Set(ids), [], dataset.records) : ids,
@@ -971,12 +954,8 @@ export function ExportSection() {
 				snapshot={jobs.snapshot}
 				preset={preset}
 				count={runCount}
-				blocked={blocked}
-				blockedDetail={
-					sheets?.error && blocked === sheets.shortError
-						? sheets.error
-						: undefined
-				}
+				blocked={blocked?.message ?? null}
+				blockedDetail={blocked?.detail}
 				warning={unfilled > 0 ? BINDING.unfilled(unfilled) : null}
 				onShowFailed={dataset ? showFailed : undefined}
 				recordIds={chosen}

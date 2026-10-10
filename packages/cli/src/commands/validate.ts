@@ -1,8 +1,7 @@
-import { validate } from "@freshcoat-js/coatfile";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
-import { CliError, createLog, type Io } from "../io";
+import { CliError, createLog, type Io, type Log } from "../io";
 import { type Findings, templateWarnings, workspaceFindings } from "../lint";
-import { issueSummary, readDocument } from "../template-file";
+import { readTemplate, warnLoad } from "../template-file";
 import { readWorkspace } from "../workspace-file";
 
 export async function validateCommand(
@@ -13,7 +12,7 @@ export async function validateCommand(
 	const log = createLog(io, options.quiet);
 	const findings = file.toLowerCase().endsWith(WORKSPACE_EXTENSION)
 		? await checkWorkspace(io, file)
-		: await checkTemplate(io, file);
+		: await checkTemplate(io, log, file);
 	const { errors, warnings } = findings;
 	if (errors.length > 0)
 		throw new CliError(
@@ -33,11 +32,10 @@ export async function validateCommand(
 		);
 }
 
-async function checkTemplate(io: Io, file: string): Promise<Findings> {
-	const { document } = await readDocument(io, file);
-	const result = validate(document);
-	if (!result.ok) throw new CliError(issueSummary(file, result.errors));
-	return { errors: [], warnings: templateWarnings(result.value) };
+async function checkTemplate(io: Io, log: Log, file: string): Promise<Findings> {
+	const loaded = await readTemplate(io, file);
+	warnLoad(log, file, loaded, { format: false });
+	return { errors: [], warnings: templateWarnings(loaded.template) };
 }
 
 async function checkWorkspace(io: Io, file: string): Promise<Findings> {

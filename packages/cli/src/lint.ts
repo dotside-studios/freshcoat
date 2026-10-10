@@ -1,53 +1,35 @@
+import { type Template, templateHints, validate } from "@freshcoat-js/coatfile";
 import {
-	checkVariants,
-	formatVersionStatus,
-	minimumFormatVersion,
-	safeAreaIssues,
-	type Template,
-	validate,
-} from "@freshcoat-js/coatfile";
-import {
-	planExport,
 	readsDataset,
 	unfilledRequired,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { planSheets } from "@freshcoat-js/workspace/export";
-import { formatIssue } from "./template-file";
+import { presetReadiness } from "@freshcoat-js/workspace/export";
+import { formatIssue, newerFormatWarning } from "./template-file";
 
 export type Findings = { errors: string[]; warnings: string[] };
 
 export function templateWarnings(template: Template): string[] {
-	const warnings = checkVariants(template).map(
-		(issue) => `${issue.message} (${issue.code})`,
-	);
-	for (const { side, id, edges } of safeAreaIssues(template)) {
-		const frame = template.template_data[side]?.name ?? String(side);
-		warnings.push(
-			`${frame}: "${id}" has its ${andList(edges)} ${edges.length === 1 ? "edge" : "edges"} inside the safe area`,
-		);
-	}
-	const declared = template.format_version;
-	if (formatVersionStatus(declared) === "newer")
-		warnings.push(
-			`format_version ${declared} is newer than this freshcoat reads; fields it adds are ignored`,
-		);
-	const needed = minimumFormatVersion(template);
-	if (minor(needed) > minor(declared))
-		warnings.push(
-			`uses fields from format ${needed} but declares ${declared}; older readers drop them`,
-		);
-	return warnings;
+	return templateHints(template).map((hint) => {
+		switch (hint.kind) {
+			case "variant":
+				return `${hint.issue.message} (${hint.issue.code})`;
+			case "safe_area": {
+				const { sideName, id, edges } = hint;
+				return `${sideName}: "${id}" has its ${andList(edges)} ${edges.length === 1 ? "edge" : "edges"} inside the safe area`;
+			}
+			case "format_newer":
+				return newerFormatWarning(hint.declared);
+			case "format_low":
+				return `uses fields from format ${hint.needed} but declares ${hint.declared}; older readers drop them`;
+		}
+	});
 }
 
 function andList(items: readonly string[]): string {
 	return items.length < 2
 		? items.join("")
 		: `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
-}
-
-function minor(version: string): number {
-	return Number(/^\d+\.(\d+)/.exec(version)?.[1] ?? 0);
 }
 
 export function workspaceFindings(workspace: Workspace): Findings {
@@ -71,12 +53,11 @@ export function workspaceFindings(workspace: Workspace): Findings {
 			);
 	}
 	for (const preset of workspace.presets) {
-		const entry = workspace.templates.find((t) => t.id === preset.templateId);
-		if (!entry) {
+		const { blocked, sheets } = presetReadiness(workspace, preset);
+		if (blocked?.reason === "missing_template") {
 			errors.push(`preset "${preset.name}": its template is not in the workspace`);
 			continue;
 		}
-		const sheets = planSheets(planExport(workspace, preset), entry.template, preset);
 		if (sheets?.error !== undefined)
 			errors.push(`preset "${preset.name}": ${sheets.error}`);
 	}

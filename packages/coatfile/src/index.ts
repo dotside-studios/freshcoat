@@ -64,12 +64,20 @@ export {
 	bleedSize,
 	type CardSizeMm,
 	cardSizeMm,
+	CR80_CORNER_MM,
+	CR80_LONG_MM,
+	CR80_SAFE_MM,
 	compactInsets,
 	extendIntoBleed,
 	hasInsets,
+	isPrintedCard,
 	MM_PER_INCH,
 	maxInsets,
 	NO_BLEED,
+	type PrintGuideMetrics,
+	type PrintGuideSet,
+	printGuideMetrics,
+	printGuidesFor,
 	resolveBleedMm,
 	resolveInsets,
 	type SafeAreaEdge,
@@ -125,6 +133,12 @@ export {
 } from "./fields";
 export { linearGradientAngle, linearGradientPoints } from "@freshcoat-js/engine";
 export { ellipsePath, isEllipsePath } from "@freshcoat-js/engine";
+export {
+	type SafeAreaHint,
+	type TemplateHint,
+	safeAreaHints,
+	templateHints,
+} from "./hints";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
@@ -147,7 +161,12 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
-export { pruneUnusedAssets } from "./coat";
+export {
+	type SaveResult,
+	pruneUnusedAssets,
+	saveTemplate,
+	writableTemplate,
+} from "./coat";
 export {
 	type HealOptions,
 	healElementIds,

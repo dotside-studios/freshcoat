@@ -188,8 +188,16 @@ also come from `@freshcoat-js/coatfile/bleed`, which has no runtime imports.
 `safeAreaIssues(t, { safe })` lists the top-level layers with an edge between
 the trim and the safe line, with the edges that cross it. A layer that runs to
 the trim or past it counts as bleed and is not listed. `safe` defaults to the
-template's `safeArea`; a consumer with its own product rules, such as Studio's
-3 mm for a CR80 card, passes them in.
+template's `safeArea`.
+
+`printGuidesFor(t)` is what a print preview draws: the template's own bleed and
+safe area, and for a `card_cr80` product the trim corner radius and, unless the
+template sets its own, the printer's 3 mm safe area, scaled from the template's
+long side (`printGuideMetrics`). `templateHints(t)` is the advice a valid
+template earns, as typed data for the caller to word: `variant` (from
+`checkVariants`), `safe_area` (layers inside `printGuidesFor(t).safe`, with side,
+layer id and edges), `format_newer` (a format newer than this kit reads) and
+`format_low` (fields used from a later minor than the declared version).
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
@@ -303,6 +311,13 @@ const bytes = await packTemplate(template);        // Uint8Array, deterministic
 const read = await decodeTemplate(bytes);          // or JSON text, or JSON bytes
 if (read.ok) validate(healElementIds(read.document));
 ```
+
+`saveTemplate(template, "coat" | "json")` is the rule for writing a template out:
+`writableTemplate` (unused assets pruned, `format_version` raised to cover the
+fields used), `validate`, then `packTemplate` or `serializeTemplate`. It returns
+`{ ok: true, data }` or `{ ok: false, errors }`, a refused write (a newer minor)
+reported as an error on `/format_version`. `loadTemplate` is its counterpart for
+reading a file in.
 
 `packTemplate` re-keys every asset by the real hash of its bytes first
 (`rehashAssets`), because that hash becomes its entry name and `unpackTemplate`
