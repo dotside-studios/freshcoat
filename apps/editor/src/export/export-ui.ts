@@ -101,13 +101,6 @@ export function fileNameExample(
 	return `${base}${suffix}.${fileExtension(preset.format)}`;
 }
 
-/** The template's image fields, which a size can follow. */
-export function imageFieldKeys(template: Template | undefined): string[] {
-	return Object.entries(template?.fields.properties ?? {})
-		.filter(([, field]) => field.format === "image")
-		.map(([key]) => key);
-}
-
 /** A PDF page's physical size: template pixels are dots at the DPI. */
 export function formatPageSize(
 	template: { width: number; height: number },

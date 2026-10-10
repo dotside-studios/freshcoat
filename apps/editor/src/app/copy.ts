@@ -203,6 +203,13 @@ export const VARIANT_EXPORT = {
 	unbound: "Not bound. Fields use their defaults.",
 	fileNameTokens:
 		"Tokens: {{template}} {{side}} {{index}} {{record}} {{variant}} and any column key",
+	/** under the file name pattern, for tokens that export as empty text */
+	unknownTokens: (tokens: readonly string[]) => {
+		const list = tokens.map((t) => `{{${t}}}`).join(", ");
+		return tokens.length === 1
+			? `${list} isn't a field or column`
+			: `${list} aren't fields or columns`;
+	},
 } as const;
 
 /** What a validation issue says in the Issues list, by its code. The code

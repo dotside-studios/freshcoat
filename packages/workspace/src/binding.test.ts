@@ -2,6 +2,7 @@ import type { Template, Variant } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import {
 	autoBinding,
+	imageFields,
 	imagesFor,
 	matchVariant,
 	resolveValues,
@@ -395,6 +396,14 @@ describe("variantsFor", () => {
 		expect(
 			variantsFor(t, bind({ kind: "column", column: "tier" }), dataset, ana),
 		).toEqual(["gold"]);
+	});
+});
+
+describe("imageFields", () => {
+	it("lists the fields with format image", () => {
+		expect(imageFields(template).map((f) => f.key)).toEqual(["photo"]);
+		const none = { ...template, fields: { type: "object", properties: {} } };
+		expect(imageFields(none as Template)).toEqual([]);
 	});
 });
 

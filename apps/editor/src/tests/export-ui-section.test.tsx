@@ -435,6 +435,48 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 
+	test("warns under the file name pattern about tokens that name nothing", async () => {
+		const { controller, user, templateId } = setup();
+		const preset = (fileName: string): ExportPreset => ({
+			id: "p_1",
+			name: "Names",
+			templateId,
+			records: "all",
+			sides: "all",
+			format: "png-zip",
+			scale: 1,
+			dpi: 300,
+			fileName,
+			markExported: true,
+		});
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: preset("{{name}}-{{side}}"),
+			}),
+		);
+		await user.click(screen.getByRole("tab", { name: "Files" }));
+		expect(screen.queryByTestId("export-file-name-unknown")).toBeNull();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: preset("{{nam}}-{{side}}-{{team}}"),
+			}),
+		);
+		expect(screen.getByTestId("export-file-name-unknown").textContent).toBe(
+			"{{nam}}, {{team}} aren't fields or columns",
+		);
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: preset("{{nam}}"),
+			}),
+		);
+		expect(screen.getByTestId("export-file-name-unknown").textContent).toBe(
+			"{{nam}} isn't a field or column",
+		);
+	});
+
 	/** Runs the All preset and finishes it with two files ok and one failed. */
 	async function finishedJob() {
 		const ctx = setup();
