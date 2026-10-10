@@ -311,3 +311,29 @@ export function serializePath(segs: Segment[]): string {
 		})
 		.join("");
 }
+
+const round4 = (n: number) => {
+	const r = Math.round(n * 1e4) / 1e4;
+	return Object.is(r, -0) ? 0 : r;
+};
+
+/** The segments as `serializePath` and `normalizePath` would return them. */
+export function roundPath(segs: Segment[]): Segment[] {
+	const out = segs.map((s): Segment => {
+		if (s.op === "Z") return s;
+		if (s.op === "C")
+			return {
+				op: "C",
+				x1: round4(s.x1),
+				y1: round4(s.y1),
+				x2: round4(s.x2),
+				y2: round4(s.y2),
+				x: round4(s.x),
+				y: round4(s.y),
+			};
+		return { op: s.op, x: round4(s.x), y: round4(s.y) };
+	});
+	return out.every((s) => s.op === "Z" || Object.values(s).every((v) => typeof v === "string" || Number.isFinite(v)))
+		? out
+		: normalizePath(serializePath(segs));
+}

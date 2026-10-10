@@ -75,6 +75,17 @@ describe("svgToNode", () => {
 		expect(path.d).toBe("M0 0L10 0L10 5Z");
 	});
 
+	test("a shape rebuilt from its serialised d lowers the same", () => {
+		const drawing = parseSvg(
+			'<svg width="20" height="10"><circle cx="5.123456" cy="5" r="3"/></svg>',
+		);
+		const copy = {
+			...drawing,
+			children: drawing.children.map((c) => ({ ...c })),
+		};
+		expect(svgToNode(copy)).toEqual(svgToNode(drawing));
+	});
+
 	test("preserveAspectRatio meet widens the viewBox around the content", () => {
 		const node = svgToNode(
 			parseSvg('<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z"/></svg>'),
