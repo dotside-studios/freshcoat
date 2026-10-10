@@ -208,4 +208,33 @@ describe("SVG filters", () => {
 		expect(created).toBeGreaterThan(10);
 		expect(live.size).toBe(0);
 	});
+
+	test("a filtered group inside a filtered group keeps its own picture", async () => {
+		const live = new Set<object>();
+		const proto = ck.PictureRecorder.prototype;
+		const finish = proto.finishRecordingAsPicture;
+		proto.finishRecordingAsPicture = function (this: unknown, ...args: unknown[]) {
+			const picture = finish.apply(this, args);
+			live.add(picture);
+			const del = picture.delete.bind(picture);
+			picture.delete = () => {
+				live.delete(picture);
+				del();
+			};
+			return picture;
+		};
+		try {
+			const { at } = await paint(
+				svg(
+					'<filter id="a" x="0" y="0" width="40" height="40" filterUnits="userSpaceOnUse"><feOffset dx="8"/></filter><filter id="b" x="0" y="0" width="40" height="40" filterUnits="userSpaceOnUse"><feOffset dx="8"/></filter><g filter="url(#a)"><g filter="url(#b)"><rect x="2" y="10" width="6" height="10" fill="red"/></g></g>',
+				),
+				40,
+			);
+			close(at(20, 15), [255, 0, 0, 255]);
+			expect(at(5, 15)[3]).toBe(0);
+		} finally {
+			proto.finishRecordingAsPicture = finish;
+		}
+		expect(live.size).toBe(0);
+	});
 });
