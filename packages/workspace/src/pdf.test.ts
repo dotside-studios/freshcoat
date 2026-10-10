@@ -1,8 +1,4 @@
-import {
-	createFrame,
-	createRenderer,
-	createText,
-} from "@freshcoat-js/engine";
+import { createFrame, createRenderer, createText } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
 import { jpegHeader, testFontBytes } from "@freshcoat-js/test-utils";
 import {
@@ -478,10 +474,9 @@ describe("assemblePdf with font subsets", () => {
 				for (const key of ["FontName", "BaseFont"])
 					if (obj.has(PDFName.of(key))) obj.set(PDFName.of(key), clash);
 		const renamed = await doc.save();
-		const out = await assemblePdf(
-			[page(fresh), page(coat), page(renamed)],
-			{ dpi: 300 },
-		);
+		const out = await assemblePdf([page(fresh), page(coat), page(renamed)], {
+			dpi: 300,
+		});
 		const separate = await assemblePdf([page(fresh), page(renamed)], {
 			dpi: 300,
 		});
