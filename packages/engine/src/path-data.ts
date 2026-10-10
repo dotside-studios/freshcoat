@@ -32,7 +32,7 @@ const AXIS: Record<string, ("x" | "y" | null)[]> = {
 	Z: [],
 };
 
-const NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/;
+const NUMBER = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/y;
 
 /** Scale path data by `sx` horizontally and `sy` vertically (default: `sx`).
  *  Exact for a uniform scale; with `sx !== sy` a rotated arc's radii are scaled
@@ -43,17 +43,29 @@ export function scalePathData(d: string, sx: number, sy: number = sx): string {
 	// Everything that is not a length is copied through verbatim, so the output
 	// keeps the input's separators and number formatting.
 	let out = "";
+	let last = 0;
 	let i = 0;
 	let cmd = "";
 	let argIndex = 0;
 	const copySeparators = () => {
-		while (i < d.length && /[\s,]/.test(d[i])) out += d[i++];
+		const start = i;
+		while (i < d.length && /[\s,]/.test(d[i])) i++;
+		if (i > start) {
+			out += d.slice(start, i);
+			last = d.charCodeAt(i - 1);
+		}
 	};
 	// A rewritten number can lose the boundary its original had ("1.5.5" →
 	// "3" + "1"), so one that would run into the previous digits gets a space.
 	const emitScaled = (token: string) => {
-		if (/[\d.]$/.test(out) && !/^[-+]/.test(token)) out += " ";
+		if (
+			((last >= 48 && last <= 57) || last === 46) &&
+			token[0] !== "-" &&
+			token[0] !== "+"
+		)
+			out += " ";
 		out += token;
+		last = token.charCodeAt(token.length - 1);
 	};
 	copySeparators();
 	while (i < d.length) {
@@ -64,6 +76,7 @@ export function scalePathData(d: string, sx: number, sy: number = sx): string {
 			cmd = ch;
 			argIndex = 0;
 			out += ch;
+			last = ch.charCodeAt(0);
 			i++;
 			copySeparators();
 			continue;
@@ -82,7 +95,8 @@ export function scalePathData(d: string, sx: number, sy: number = sx): string {
 				throw new Error(`path: bad arc flag "${token}" at ${i}`);
 			i++;
 		} else {
-			const m = NUMBER.exec(d.slice(i));
+			NUMBER.lastIndex = i;
+			const m = NUMBER.exec(d);
 			if (!m) throw new Error(`path: unreadable number at ${i}`);
 			token = m[0];
 			i += token.length;
@@ -90,7 +104,10 @@ export function scalePathData(d: string, sx: number, sy: number = sx): string {
 		const axis = AXIS[upper][slot];
 		if (axis)
 			emitScaled(String(Number.parseFloat(token) * (axis === "x" ? sx : sy)));
-		else out += token;
+		else {
+			out += token;
+			last = token.charCodeAt(token.length - 1);
+		}
 		argIndex++;
 		copySeparators();
 	}
