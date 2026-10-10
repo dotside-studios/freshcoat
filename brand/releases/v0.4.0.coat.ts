@@ -5,10 +5,23 @@
 
 import type { Element } from "../../packages/coatfile/src/types";
 import { defineTemplate } from "../../packages/coatfile/src/define";
-import { banner, ellipse, HEIGHT, hue, random, rect, WIDTH } from "./art";
+import { banner, ellipse, HEIGHT, random, rect, WIDTH } from "./art";
 
 const VERSION = "0.4.0";
 const rng = random(`freshcoat v${VERSION}`);
+
+// The mark's colours, on a near-black ground.
+const GROUND = "#0a0f1c";
+const COLOURS = ["#019dda", "#2eaa8f", "#7bb353", "#f1b82b", "#f78e21", "#e75234", "#cc3b56", "#9f3d8c", "#5368b6", "#2883c9"];
+
+const hue = (t: number) => {
+	const at = (((t % 1) + 1) % 1) * COLOURS.length;
+	const i = Math.floor(at);
+	const [a, b] = [COLOURS[i], COLOURS[(i + 1) % COLOURS.length]].map((hex) =>
+		[1, 3, 5].map((k) => Number.parseInt(hex.slice(k, k + 2), 16)),
+	);
+	return `#${a.map((v, n) => Math.round(v + (b[n] - v) * (at - i)).toString(16).padStart(2, "0")).join("")}`;
+};
 
 const STEP = 34;
 const REACH = 820;
@@ -79,6 +92,8 @@ export default defineTemplate(
 	banner({
 		version: VERSION,
 		description: "The v0.4.0 release banner: interference rings from one live exclude operation.",
+		background: GROUND,
+		tone: "dark",
 		art,
 	}),
 );

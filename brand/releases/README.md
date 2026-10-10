@@ -11,8 +11,10 @@ banner can look like nothing before it.
 
 These belong to `art.ts` and keep the banners recognisable as a series:
 
-- the 1600 × 320 strip and its dark ground;
-- the lockup: the logo, a divider and the version, centred over a soft shade;
+- the 1600 × 320 strip;
+- the lockup: the logo, a divider and the version, centred over a soft shade.
+  `tone` says whether the art behind it is dark or light, and the lockup is
+  drawn to stand out from it;
 - a random source seeded by the version, so a banner renders the same every
   time;
 - the banner is a template module, `v<version>.coat.ts`, rendered by the CLI
@@ -23,8 +25,9 @@ earlier banners when you do.
 
 ## What is open
 
-Everything behind the lockup: the subject, composition, technique, colour,
-density, mood. There is no house style for the art. The previous banner is a
+Everything behind the lockup: the background, colour, subject, composition,
+technique, density and mood. Each module sets its own `background` and colours;
+`art.ts` gives none. There is no house style for the art. The previous banner is a
 reference for quality, not a template to follow.
 
 ## Choosing the idea
@@ -63,8 +66,6 @@ Questions that help:
   fine detail that turns to noise.
 - **No words in the art.** The lockup is the only text. A glyph or a line of
   code can be material, as long as nobody needs to read it.
-- **Colour is free.** The mark's palette, `PALETTE` and `hue()`, is a
-  starting point, not a rule. Keep the art in tune with the mark beside it.
 - **It renders quickly.** Aim for under 30 seconds. If a boolean or a pattern
   is slow, reduce the shapes rather than wait.
 - **It is reproducible.** Draw randomness only from `random()`, never from

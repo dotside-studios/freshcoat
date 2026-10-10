@@ -34,8 +34,8 @@ art does not list the release's features; it is one idea drawn with some of
 what the release made possible. Each banner is a template module,
 `releases/v<version>.coat.ts`, rendered by the CLI of the release it
 announces. `releases/art.ts` holds what every banner shares: the strip, the
-lockup, the palette of the mark and a random source seeded by the version, so
-a banner renders the same each time.
+lockup and a random source seeded by the version, so a banner renders the same
+each time. The background and colours belong to each release.
 
 ```sh
 bun packages/cli/src/bin.ts render brand/releases/v0.4.0.coat.ts --out brand/releases

@@ -1,6 +1,6 @@
-// Shared pieces for the release banners: a seeded random source, the brand
-// palette, shapes and the strip every banner is drawn in, with the logo and
-// version centred over the release's own art. A banner is a template module,
+// Shared pieces for the release banners: a seeded random source, shapes and
+// the strip every banner is drawn in, with the logo and version centred over
+// the release's own art. A banner is a template module,
 // so the CLI of the release it announces renders it.
 
 import { readFileSync } from "node:fs";
@@ -10,10 +10,8 @@ import { scalePathData } from "../../packages/engine/src/path-data";
 // A 5:1 strip, wide and thin like a film frame.
 export const WIDTH = 1600;
 export const HEIGHT = 320;
-export const INK = "#0a0f1c";
-
 // The stops of the mark's angular gradient.
-export const PALETTE = [
+const MARK = [
 	"#019dda",
 	"#2eaa8f",
 	"#7bb353",
@@ -25,18 +23,6 @@ export const PALETTE = [
 	"#5368b6",
 	"#2883c9",
 ];
-
-/** The palette colour at `t`, wrapping, blended between neighbouring stops. */
-export function hue(t: number): string {
-	const at = (((t % 1) + 1) % 1) * PALETTE.length;
-	const i = Math.floor(at);
-	const a = rgb(PALETTE[i]);
-	const b = rgb(PALETTE[(i + 1) % PALETTE.length]);
-	const k = at - i;
-	return `#${a.map((v, n) => Math.round(v + (b[n] - v) * k).toString(16).padStart(2, "0")).join("")}`;
-}
-
-const rgb = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
 
 export type Random = {
 	(): number;
@@ -94,11 +80,11 @@ export function rect(x: number, y: number, w: number, h: number, extra: Partial<
 	} as Element;
 }
 
-export const angular = (rotation = -90): Fill => ({
+const markFill: Fill = {
 	kind: "angular",
-	rotation,
-	stops: [...PALETTE, PALETTE[0]].map((color, i) => ({ offset: i / PALETTE.length, color })),
-});
+	rotation: 0,
+	stops: [...MARK, MARK[0]].map((color, i) => ({ offset: i / MARK.length, color })),
+};
 
 const logoSvg = readFileSync(new URL("../freshcoat-logo.svg", import.meta.url), "utf8");
 const pick = (re: RegExp) => {
@@ -124,7 +110,7 @@ export function logo(height: number, color: string): Element {
 					type: "vector",
 					pos: { x: 0, y: 0 },
 					size: { width: round(138 * s), height },
-					properties: { d: scalePathData(markPath, s), fill: angular(0) },
+					properties: { d: scalePathData(markPath, s), fill: markFill },
 				},
 				{
 					id: "logo-wordmark",
@@ -151,9 +137,16 @@ const ROBOTO_FLEX = {
 	],
 } as const;
 
+/** Whether the art behind the lockup is mostly dark or light. The lockup is
+ *  drawn in white over a dark shade on dark art, and in black over a light
+ *  shade on light art. */
+export type Tone = "dark" | "light";
+
 /** The logo and the version, centred, over a shade that keeps them readable
- *  on any art. The same in every banner. */
-function lockup(version: string): Element[] {
+ *  on any art. The same in every banner but for its tone. */
+function lockup(version: string, tone: Tone): Element[] {
+	const ink = tone === "dark" ? "#ffffff" : "#000000";
+	const shade = tone === "dark" ? "#000000" : "#ffffff";
 	return [
 		rect(0, 0, WIDTH, HEIGHT, {
 			id: "shade",
@@ -164,9 +157,9 @@ function lockup(version: string): Element[] {
 					radius: 0.26,
 					radiusY: 0.12,
 					stops: [
-						{ offset: 0, color: `${INK}e6` },
-						{ offset: 0.55, color: `${INK}b3` },
-						{ offset: 1, color: `${INK}00` },
+						{ offset: 0, color: `${shade}b3` },
+						{ offset: 0.55, color: `${shade}80` },
+						{ offset: 1, color: `${shade}00` },
 					],
 				},
 			},
@@ -179,8 +172,8 @@ function lockup(version: string): Element[] {
 			properties: {
 				layout: { direction: "row", gap: 28, primaryAlign: "center", crossAlign: "center" },
 				children: [
-					logo(58, "#ffffff"),
-					rect(0, 0, 2, 52, { id: "divider", properties: { fill: "#ffffff59" } } as Partial<Element>),
+					logo(58, ink),
+					rect(0, 0, 2, 52, { id: "divider", properties: { fill: `${ink}59` } } as Partial<Element>),
 					{
 						id: "version",
 						type: "text",
@@ -189,7 +182,7 @@ function lockup(version: string): Element[] {
 						properties: {
 							value: version,
 							font: { family: "Roboto Flex", size: 54, lineHeight: 1, variations: { wght: 300, wdth: 100, opsz: 72 } },
-							color: "#ffffff",
+							color: ink,
 							verticalAlign: "middle",
 						},
 					},
@@ -204,8 +197,10 @@ export type BannerOptions = {
 	description: string;
 	/** The release's own art, drawn behind the lockup. */
 	art: Element[];
+	/** The ground under the art. */
+	background: Fill | Fill[];
+	tone: Tone;
 	fonts?: Template["fonts"];
-	background?: Fill | Fill[];
 };
 
 /** The template for a release banner: a strip with the release's art behind
@@ -229,9 +224,9 @@ export function banner(o: BannerOptions): Template {
 					type: "rect",
 					pos: { x: 0, y: 0 },
 					size: { width: WIDTH, height: HEIGHT },
-					properties: { fill: o.background ?? INK },
+					properties: { fill: o.background },
 				},
-				elements: [...o.art, ...lockup(o.version)],
+				elements: [...o.art, ...lockup(o.version, o.tone)],
 			},
 		],
 	} as Template;
