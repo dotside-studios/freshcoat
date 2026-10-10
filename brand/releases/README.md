@@ -45,8 +45,8 @@ The art starts from a word, not from a feature.
    command, so its word is *converge*.
 3. **Draw the word, not the release.** No cards, screens, UI or pictures of
    the features. Ask what the word looks like as form, motion or material:
-   what converges in the world, and how would someone draw it with paper,
-   ink, thread or a ruler?
+   what converges, and what would only show up if it happened a thousand
+   times, exactly?
 4. **Choose how to draw it.** This is where the engine comes in. A technique
    the release added, or that earlier banners did not use, is a good choice,
    but the word comes first: never bend the idea to show off a feature.
@@ -56,22 +56,33 @@ The art starts from a word, not from a feature.
 
 Write the word and a line on the idea at the top of the module.
 
-## Avoid the generic
+## Made by the engine, shaped by a person
 
-Generated art drifts towards the same look: glowing light streaks, floating
-particles, neon on dark purple, soft blurred blobs, lens flares, everything
-symmetric and shining. It reads as stock imagery and says nothing about us.
-Instead:
+The art should be impossible to make by hand: too many marks, too exact, too
+tightly related to each other for anyone to draw or place one by one. That is
+what a renderer is for, and it is what makes the banner ours. Reach for:
 
-- **Draw like a designer would.** Look to things people make: print, cut
-  paper, weaving, drafting, signage, typography, supergraphics. Choose a
-  craft and follow its rules.
-- **Limit the means.** A few colours, flat fills, one kind of mark. A
-  constraint gives the art a voice; adding effects takes it away.
-- **Make decisions visible.** Deliberate spacing, alignment and rhythm, and
-  randomness that serves a structure rather than replacing it.
-- **Keep some texture.** Grain, misregistration and uneven ink are fine when
-  they belong to the craft, not as a filter over everything.
+- scale: thousands of shapes, lines or glyphs, each one placed by a rule;
+- precision: geometry computed exactly, such as booleans, interference,
+  tilings, offsets and paths that follow other paths;
+- variation: one rule repeated with small seeded differences, so no two
+  marks are the same and none was chosen by hand.
+
+Generation alone is not enough. Left to itself it drifts towards the same
+look: glowing streaks, floating particles, blurred blobs and neon on dark
+purple. Keep the balance with decisions a person makes:
+
+- **One rule, followed through.** A clear system the eye can sense, rather
+  than many effects stacked up.
+- **Deliberate means.** A chosen palette, a kind of mark, a structure and a
+  composition that serve the word.
+- **Randomness inside structure.** The seed varies the details; the
+  composition stays intended.
+- **Effects only when they belong.** Blur, glow and grain should be part of
+  the idea, not a finish over everything.
+
+If a person could draw it in an afternoon, push the system further. If it
+could have come from any generator, make more of the decisions yourself.
 
 ## Constraints
 
