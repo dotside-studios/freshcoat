@@ -11,17 +11,12 @@
 // A template is read from the path its manifest entry names, so a workspace
 // written with `templates/<entryId>.tkit` entries opens unchanged.
 
-import {
-	loadTemplate,
-	raiseFormatVersion,
-	subtleSha256,
-	type Template,
-} from "@freshcoat-js/coatfile";
+import { loadTemplate, subtleSha256 } from "@freshcoat-js/coatfile";
 import {
 	COAT_EXTENSION,
 	packTemplate,
-	pruneUnusedAssets,
 	templateStem,
+	writableTemplate,
 } from "@freshcoat-js/coatfile/coat";
 import { readImageInfo } from "@freshcoat-js/engine/image";
 import { parsePrintProfile } from "@freshcoat-js/for-print";
@@ -681,12 +676,6 @@ function templateFileStem(fileName: string): string {
 		.replace(/[\\/:*?"<>|\p{Cc}]/gu, "-")
 		.trim();
 	return stem === "" || /^\.+$/.test(stem) ? "template" : stem;
-}
-
-/** A template as it is written: unused assets pruned, `format_version`
- *  raised to cover the fields used. */
-function writableTemplate(template: Template): Template {
-	return raiseFormatVersion(pruneUnusedAssets(template));
 }
 
 /** Every template as `templates/<fileName>.coat`, in one zip. */
