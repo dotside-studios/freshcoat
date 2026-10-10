@@ -238,6 +238,41 @@ describe("createRenderer", () => {
 		renderer.dispose();
 	});
 
+	test("clear during a paint waits for it", async () => {
+		const renderer = await createRenderer({ ck });
+		const pending = renderer.render(rect("#ff0000"), {
+			width: 8,
+			height: 8,
+			output: { pixels: true },
+		});
+		renderer.clear();
+		expect(firstPixel((await pending).pixels.data)).toEqual([255, 0, 0, 255]);
+		const next = await renderer.render(rect("#00ff00"), {
+			width: 8,
+			height: 8,
+			output: { pixels: true },
+		});
+		expect(firstPixel(next.pixels.data)).toEqual([0, 255, 0, 255]);
+		expect(renderer.stats().paintCache?.surfaceCreates).toBe(2);
+		renderer.dispose();
+	});
+
+	test("dispose during a paint lets it finish, then frees", async () => {
+		const renderer = await createRenderer({ ck });
+		const pending = renderer.render(rect("#ff0000"), {
+			width: 8,
+			height: 8,
+			output: { pixels: true },
+		});
+		renderer.dispose();
+		expect(() => renderer.stats()).not.toThrow();
+		expect(firstPixel((await pending).pixels.data)).toEqual([255, 0, 0, 255]);
+		expect(() => renderer.render(rect("#000000"), { width: 8, height: 8 })).toThrow(
+			/disposed/,
+		);
+		renderer.dispose();
+	});
+
 	test("refuses work after dispose", async () => {
 		const renderer = await createRenderer({ ck });
 		renderer.dispose();

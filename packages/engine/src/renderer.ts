@@ -183,8 +183,9 @@ export type Renderer = {
 	loadFonts(requests: readonly FontRequest[]): Promise<FontLoadReport>;
 	stats(): RendererStats;
 	/** Frees the cached surface and images; the next paint rebuilds them, as
-	 *  after a lost GPU context. */
+	 *  after a lost GPU context. Runs after any paint in flight. */
 	clear(): void;
+	/** Fails new calls at once and frees everything after any paint in flight. */
 	dispose(): void;
 };
 
@@ -265,17 +266,27 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		fonts = new Map([...fonts, ...entries]);
 	};
 
+	let pending = 0;
 	const serial = <T>(task: () => Promise<T>): Promise<T> => {
+		pending++;
 		const run = queue.then(task, task);
-		queue = run.catch(() => {});
+		const done = () => {
+			pending--;
+		};
+		queue = run.then(done, done);
 		return run;
+	};
+
+	// Runs now when no paint is queued or in flight, else behind the last one.
+	const afterPaints = (task: () => void) => {
+		if (pending === 0) task();
+		else void serial(async () => task());
 	};
 
 	const doPaint = async <O extends Output>(
 		commands: Command[],
 		paintOptions: PaintOptions<O> | undefined,
 	): Promise<FrameFor<O>> => {
-		alive();
 		const output = (paintOptions?.output ?? { encode: {} }) as Output;
 		if ("canvas" in output && !factory)
 			throw new Error('the "canvas" output needs a surface factory');
@@ -353,6 +364,16 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		);
 	};
 
+	// What a queued paint compiles with: it was accepted before any dispose.
+	const compileNow = (scene: Node, compileOptions: RendererCompileOptions) => {
+		const { engine, metrics } = textFor();
+		return compileScene(scene, {
+			...compileOptions,
+			textEngine: engine,
+			fontMetrics: metrics,
+		});
+	};
+
 	const renderer: Renderer = {
 		ck,
 		get fonts() {
@@ -368,7 +389,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			const scale = resolveExportScale(setting.constraint, design);
 			const supersample = resolveSupersample(setting.supersample, design, scale);
 			return serial(() => {
-				const commands = renderer.compile(scene, {
+				const commands = compileNow(scene, {
 					...design,
 					finish: renderOptions.finish,
 					leadingTrim: renderOptions.leadingTrim,
@@ -383,7 +404,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			alive();
 			const { width, height, leadingTrim, ...paint } = pdfOptions;
 			return serial(() =>
-				doPaintPdf(renderer.compile(scene, { width, height, leadingTrim }), paint),
+				doPaintPdf(compileNow(scene, { width, height, leadingTrim }), paint),
 			);
 		},
 		paintPdf(commands, pdfOptions = {}) {
@@ -397,12 +418,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		compile(scene, compileOptions) {
 			alive();
-			const { engine, metrics } = textFor();
-			return compileScene(scene, {
-				...compileOptions,
-				textEngine: engine,
-				fontMetrics: metrics,
-			});
+			return compileNow(scene, compileOptions);
 		},
 		paint(commands, paintOptions) {
 			alive();
@@ -458,17 +474,22 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		clear() {
 			alive();
-			cache?.clear();
-			perCall.clear();
+			afterPaints(() => {
+				cache?.clear();
+				perCall.clear();
+			});
 		},
 		dispose() {
 			if (disposed) return;
 			disposed = true;
-			text?.engine.dispose();
-			text = null;
-			cache?.dispose();
-			fontSet?.provider.release();
-			fontSet = null;
+			// A paint in flight still reads all of this.
+			afterPaints(() => {
+				text?.engine.dispose();
+				text = null;
+				cache?.dispose();
+				fontSet?.provider.release();
+				fontSet = null;
+			});
 		},
 	};
 
