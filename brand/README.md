@@ -42,8 +42,8 @@ bun packages/cli/src/bin.ts render brand/releases/v0.4.0.coat.ts --out brand/rel
 ```
 
 The frame is named after the release, so this writes `releases/v0.4.0.png`.
-For a new release, copy the last module, change `VERSION` and replace its art.
-See [the release guide](../docs/releases.md#release-banner) for adding the
+For a new release, follow [the banner brief](releases/README.md), which covers
+how to choose the art and what stays the same. See [the release guide](../docs/releases.md#release-banner) for adding the
 banner to the release notes.
 
 Figma writes the mark's angular gradient as a CSS `conic-gradient` inside a
