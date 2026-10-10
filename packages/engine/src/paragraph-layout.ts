@@ -33,6 +33,7 @@ import type {
 } from "./text-engine";
 import { spanTextStyle } from "./text-style";
 import {
+	largestFitting,
 	paragraphGaps,
 	type TextLayout,
 	type TextLayoutInput,
@@ -356,22 +357,16 @@ export function createParagraphEngine(
 		if (full.totalHeight <= input.maxHeight)
 			return { ...full, shrinkApplied: false };
 
-		let lo = SHRINK_FLOOR_PX;
-		// The full size was just shown not to fit, so search below it.
-		let hi = Math.ceil(input.font.size) - 1;
-		let best: ReturnType<typeof once> | null = null;
-		while (lo <= hi) {
-			const mid = Math.floor((lo + hi) / 2);
-			const trial = once(mid);
-			if (trial.totalHeight <= input.maxHeight) {
-				best = trial;
-				lo = mid + 1;
-			} else {
-				hi = mid - 1;
-			}
-		}
-		if (best) return { ...best, shrinkApplied: true };
-		return { ...once(SHRINK_FLOOR_PX), shrinkApplied: true };
+		// The full size was just shown not to fit, so search below it, starting
+		// from the size at which the height would fit if it scaled with the size.
+		const chosen = largestFitting(
+			SHRINK_FLOOR_PX,
+			Math.ceil(input.font.size) - 1,
+			input.font.size * Math.sqrt(input.maxHeight / full.totalHeight),
+			once,
+			(trial) => trial.totalHeight <= input.maxHeight,
+		);
+		return { ...chosen, shrinkApplied: true };
 	};
 
 	// A family's vertical metrics as Skia reads them from the decoded face, for

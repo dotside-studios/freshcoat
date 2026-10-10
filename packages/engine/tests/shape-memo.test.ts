@@ -13,6 +13,8 @@ const font = {
 	lineHeight: 1.2,
 };
 
+const fonts = () => new Map([["Geist", [new Uint8Array(readFileSync(FONT))]]]);
+
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let shapes = 0;
@@ -77,5 +79,53 @@ describe("shaping memo", () => {
 		const big = engine.measureText(text, { ...font, size: 30 }, 100);
 		expect(narrow.height).toBeGreaterThan(wide.height);
 		expect(big.height).toBeGreaterThan(narrow.height);
+	});
+});
+
+// The bisection the shrink search replaced, over the same trial function.
+function bisect(
+	lo: number,
+	hi: number,
+	fits: (size: number) => boolean,
+): { size: number; shapes: number } {
+	let shapes = 0;
+	let best = lo;
+	while (lo <= hi) {
+		const mid = Math.floor((lo + hi) / 2);
+		shapes++;
+		if (fits(mid)) {
+			best = mid;
+			lo = mid + 1;
+		} else hi = mid - 1;
+	}
+	return { size: best, shapes };
+}
+
+describe("shrink search", () => {
+	test("lands where bisecting the range does, in fewer shapes", () => {
+		const other = createParagraphEngine(ck, fonts());
+		let seeded = 0;
+		let bisected = 0;
+		for (const size of [14, 24, 40, 72, 72.5, 120])
+			for (const maxHeight of [20, 45, 80, 140, 300]) {
+				const base = input(size, maxHeight);
+				if (other.layoutText(base).totalHeight <= maxHeight) continue;
+				const ref = bisect(
+					8,
+					Math.ceil(size) - 1,
+					(s) =>
+						other.layoutText({ ...base, font: { ...font, size: s } })
+							.totalHeight <= maxHeight,
+				);
+				shapes = 0;
+				const mine = createParagraphEngine(ck, fonts());
+				const fitted = mine.layoutText({ ...base, fit: "shrink" });
+				mine.dispose();
+				seeded += shapes;
+				bisected += ref.shapes + 1;
+				expect(fitted.effectiveFontSize).toBe(ref.size);
+			}
+		other.dispose();
+		expect(seeded).toBeLessThan(bisected);
 	});
 });
