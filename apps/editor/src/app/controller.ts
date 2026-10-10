@@ -30,10 +30,12 @@ import {
 import {
 	type AlignMode,
 	align,
+	canTransform,
 	type LayerGeometry,
 	parentOrigin,
 	type Rect,
 	rectOf,
+	rotatePoint,
 	translateLayers,
 	unionRects,
 } from "~/doc/geometry";
@@ -89,6 +91,17 @@ import {
 	isHiddenInVariant,
 	isStructuralEdit,
 } from "~/doc/variant-edit";
+import {
+	movePoints,
+	type PointRef,
+	parseVectorPath,
+	removePoints,
+	type SegmentHit,
+	setVectorPaths,
+	splitSegment,
+	toggleSmooth,
+	vectorFrame,
+} from "~/doc/vector-edit";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
 import { findStarter, type Starter } from "~/samples/starters";
@@ -613,6 +626,105 @@ export class EditorController {
 		if ((value ?? "") === this.textEditFrom) this.cancelTx();
 		else this.endTx();
 		this.textEditFrom = undefined;
+	}
+
+	// ── Vector points on the canvas ──────────────────────────────────────────
+
+	/** Starts editing the points of a vector layer on the canvas. False, with
+	 *  the reason shown, for a layer that cannot be: not a vector, in auto
+	 *  layout, under a rotated parent or without a path. */
+	beginPathEdit(key: string | undefined = this.state.selection[0]): boolean {
+		const t = this.template;
+		const el = t && key ? getElement(t, key) : undefined;
+		if (!t || !key || !el || !("type" in el) || el.type !== "vector")
+			return false;
+		if (!canTransform(key, this.state.geometry)) {
+			toast("Can't edit points in auto layout or under a rotated parent", {
+				tone: "warning",
+			});
+			return false;
+		}
+		if (parseVectorPath(el.properties.d).length === 0) {
+			toast("This path has no points to edit", { tone: "warning" });
+			return false;
+		}
+		this.dispatch({ type: "setTool", tool: "move" });
+		this.select([key]);
+		this.dispatch({ type: "pathEdit", edit: { key, selected: [] } });
+		return true;
+	}
+
+	endPathEdit(): void {
+		this.dispatch({ type: "pathEdit", edit: null });
+	}
+
+	/** The vector being edited, its path in its own space and its box. */
+	pathTarget() {
+		const key = this.state.pathEdit?.key;
+		return key ? this.vectorTarget(key) : null;
+	}
+
+	selectPathPoints(selected: PointRef[]): void {
+		const edit = this.state.pathEdit;
+		if (edit) this.dispatch({ type: "pathEdit", edit: { ...edit, selected } });
+	}
+
+	/** Redraws the edited vector as `paths`, as one undo step. */
+	editPath(paths: PenPath[], selected?: PointRef[]): void {
+		const key = this.state.pathEdit?.key;
+		if (!key) return;
+		this.edit((t) => setVectorPaths(t, key, paths));
+		if (selected) this.selectPathPoints(selected);
+	}
+
+	/** Removes the picked points. A layer left with no path is deleted. */
+	removePathPoints(): void {
+		const target = this.pathTarget();
+		const picked = this.state.pathEdit?.selected;
+		if (!target || !picked?.length) return;
+		const paths = removePoints(target.paths, picked);
+		if (paths.length > 0) {
+			this.editPath(paths, []);
+			return;
+		}
+		this.endPathEdit();
+		this.edit((t) => removeElements(t, [target.key]), {
+			select: [],
+			scope: "base",
+		});
+	}
+
+	/** Moves the picked points by a step along the canvas's axes. */
+	nudgePathPoints(dx: number, dy: number): void {
+		const target = this.pathTarget();
+		const picked = this.state.pathEdit?.selected;
+		if (!target || !picked?.length) return;
+		const d = rotatePoint({ x: dx, y: dy }, -target.frame.rotation);
+		this.editPath(movePoints(target.paths, picked, d.x, d.y));
+	}
+
+	/** Turns a point into a corner, or a corner into a smooth point. */
+	togglePathPoint(ref: PointRef): void {
+		const target = this.pathTarget();
+		if (target) this.editPath(toggleSmooth(target.paths, ref), [ref]);
+	}
+
+	/** Adds a point where `hit` is, leaving the shape as it was. */
+	insertPathPoint(hit: SegmentHit): void {
+		const target = this.pathTarget();
+		const split =
+			target && splitSegment(target.paths, hit.path, hit.segment, hit.t);
+		if (split) this.editPath(split.paths, [split.ref]);
+	}
+
+	private vectorTarget(key: string) {
+		const t = this.template;
+		const el = t ? getElement(t, key) : undefined;
+		if (!t || !el || !("type" in el) || el.type !== "vector") return null;
+		const frame = vectorFrame(t, key, this.state.geometry);
+		return frame
+			? { key, frame, paths: parseVectorPath(el.properties.d) }
+			: null;
 	}
 
 	/** Inserts a new layer, at the top of `parent` (the side when omitted). */

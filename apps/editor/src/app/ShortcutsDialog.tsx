@@ -11,6 +11,7 @@ const GROUPS = [
 	"Object",
 	"Arrange",
 	"Tools",
+	"Path",
 	"Canvas",
 	"View",
 	"Help",
@@ -19,9 +20,10 @@ const GROUPS = [
 type Entry = {
 	id: string;
 	label: string;
-	shortcut: string;
+	/** Absent for a gesture made with no key held. */
+	shortcut?: string;
 	/** A pointer gesture made while holding `shortcut`. */
-	gesture?: "drag" | "click";
+	gesture?: "drag" | "click" | "double-click";
 };
 
 /** Keys and gestures the editor handles outside its commands. */
@@ -41,6 +43,34 @@ const EXTRAS: Record<string, Entry[]> = {
 			id: "pen-angle",
 			label: "Constrain to 45°",
 			shortcut: "Shift",
+			gesture: "drag",
+		},
+	],
+	Path: [
+		{ id: "edit-path", label: "Edit path points", shortcut: "Enter" },
+		{
+			id: "edit-path-double",
+			label: "Edit path points",
+			gesture: "double-click",
+		},
+		{ id: "end-path-edit", label: "Finish editing points", shortcut: "Escape" },
+		{ id: "add-point", label: "Add a point", gesture: "click" },
+		{ id: "remove-point-edit", label: "Remove points", shortcut: "Delete" },
+		{
+			id: "toggle-point",
+			label: "Toggle corner and smooth",
+			gesture: "double-click",
+		},
+		{
+			id: "pick-points",
+			label: "Pick several points",
+			shortcut: "Shift",
+			gesture: "click",
+		},
+		{
+			id: "break-pair",
+			label: "Move one handle only",
+			shortcut: "Alt",
 			gesture: "drag",
 		},
 	],
@@ -104,8 +134,8 @@ function matches(group: string, e: Entry, query: string): boolean {
 	return [
 		group,
 		e.label,
-		e.shortcut,
-		formatShortcut(e.shortcut),
+		e.shortcut ?? "",
+		e.shortcut ? formatShortcut(e.shortcut) : "",
 		e.gesture ?? "",
 	].some((s) => s.toLowerCase().includes(q));
 }
@@ -158,7 +188,7 @@ export function ShortcutsDialog({
 									>
 										<span className="truncate">{e.label}</span>
 										<span className="flex shrink-0 items-center gap-1">
-											<Kbd shortcut={e.shortcut} />
+											{e.shortcut ? <Kbd shortcut={e.shortcut} /> : null}
 											{e.gesture ? (
 												<span className="text-fc-muted text-fc-xs">
 													{e.gesture}

@@ -334,13 +334,16 @@ export const COMMANDS: Command[] = [
 	},
 	{
 		id: "edit.selectChildren",
-		label: "Select children or edit text",
+		label: "Select children, edit text or points",
 		keys: ["Enter"],
 		group: "Edit",
 		enabled: hasSelection,
 		run: ({ controller }) => {
 			const [only, ...rest] = controller.state.selection;
-			if (only && rest.length === 0 && controller.beginTextEdit(only)) return;
+			if (only && rest.length === 0) {
+				if (controller.beginTextEdit(only) || controller.beginPathEdit(only))
+					return;
+			}
 			controller.selectChildren();
 		},
 	},

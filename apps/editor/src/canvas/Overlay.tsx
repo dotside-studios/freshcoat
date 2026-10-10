@@ -18,6 +18,7 @@ import { useEditor } from "~/state/hooks";
 import type { View } from "~/state/store";
 import { type DraftStore, useDrafts } from "./draft-store";
 import { GradientHandles } from "./gradient-handles";
+import { PathEditOverlay } from "./PathEditOverlay";
 import { PrintGuides } from "./PrintGuides";
 
 export type OverlayDraft = {
@@ -27,6 +28,8 @@ export type OverlayDraft = {
 	angle?: { at: Point; value: number };
 	/** A gradient handle is being dragged, so its handles stay up. */
 	gradient?: boolean;
+	/** Where a click on the edited path would add a point. */
+	pathHover?: Point;
 };
 
 /** The path the pen tool is drawing, and where the pointer is. */
@@ -49,6 +52,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 	const geometry = useEditor((s) => s.geometry);
 	const selection = useEditor((s) => s.selection);
 	const hover = useEditor((s) => s.hover);
+	const editingPath = useEditor((s) => s.pathEdit !== null);
 	const tool = useEditor((s) => s.tool);
 	const inTx = useEditor((s) => s.doc?.history.tx !== undefined);
 	const coarse = useCoarsePointer();
@@ -63,7 +67,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 		return worldCorners(box.rect, ancestorRects(key, geometry)).map(toScreen);
 	};
 
-	const selected = selection.filter((k) => geometry.has(k));
+	const selected = editingPath ? [] : selection.filter((k) => geometry.has(k));
 	const gradient =
 		(!inTx || draft.gradient) && !draft.marquee && !draft.create ? (
 			<GradientHandles view={view} coarse={coarse} />
@@ -95,7 +99,9 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 					width={1}
 				/>
 			))}
-			{selected.length > 0 ? (
+			{editingPath ? (
+				<PathEditOverlay hover={draft.pathHover} />
+			) : selected.length > 0 ? (
 				<SelectionBox
 					keys={selected}
 					geometry={geometry}

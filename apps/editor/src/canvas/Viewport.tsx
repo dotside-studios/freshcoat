@@ -57,6 +57,15 @@ import {
 } from "./gradient-handles";
 import { Overlay } from "./Overlay";
 import {
+	dragPath,
+	isPathGesture,
+	type PathGesture,
+	pressPath,
+	releasePath,
+	segmentUnder,
+	togglePointAt,
+} from "./path-edit";
+import {
 	printGuidesFor,
 	printGuidesOn,
 	usePrintGuidesVersion,
@@ -144,7 +153,8 @@ type Gesture =
 			close: boolean;
 			pointerType: string;
 	  }
-	| { kind: "create"; tool: ElementKind; startWorld: Point; parent?: string };
+	| { kind: "create"; tool: ElementKind; startWorld: Point; parent?: string }
+	| PathGesture;
 
 export function Viewport() {
 	const controller = useController();
@@ -154,6 +164,7 @@ export function Viewport() {
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
 	const textEditing = useEditor((s) => s.textEdit !== null);
+	const pathEditing = useEditor((s) => s.pathEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
 	const { canvas, fontsLoading } = useLiveRender();
 	usePrintGuidesVersion();
@@ -207,6 +218,36 @@ export function Viewport() {
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, [tool, finishPen, setPen, penPath]);
+
+	// Enter or Esc leaves path editing; Backspace removes the picked points and
+	// the arrows nudge them, as one undo step each.
+	useEffect(() => {
+		if (!pathEditing) return;
+		const step = (e: KeyboardEvent): [number, number] | null => {
+			const n = e.shiftKey ? 10 : 1;
+			const arrow: Record<string, [number, number]> = {
+				ArrowLeft: [-n, 0],
+				ArrowRight: [n, 0],
+				ArrowUp: [0, -n],
+				ArrowDown: [0, n],
+			};
+			return arrow[e.key] ?? null;
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (gesture.current || isTyping(e.target)) return;
+			const picked = controller.state.pathEdit?.selected.length;
+			const nudge = step(e);
+			if (e.key === "Enter" || e.key === "Escape") controller.endPathEdit();
+			else if ((e.key === "Backspace" || e.key === "Delete") && picked)
+				controller.removePathPoints();
+			else if (nudge && picked) controller.nudgePathPoints(...nudge);
+			else return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, [pathEditing, controller]);
 
 	// Mount the session's canvas; it is replaced when the painted size changes.
 	useLayoutEffect(() => {
@@ -356,6 +397,15 @@ export function Viewport() {
 				startGradient(name, p, world, e.pointerType);
 			else startTransform(name, world);
 			return;
+		}
+
+		if (state.pathEdit && state.tool === "move") {
+			const held = pressPath(controller, p, world, e.pointerType, e);
+			if (held) {
+				gesture.current = held;
+				return;
+			}
+			controller.endPathEdit();
 		}
 
 		if (state.tool === "pen") {
@@ -513,12 +563,23 @@ export function Viewport() {
 				if (path) setPen({ path, cursor: point });
 				return;
 			}
+			if (state.pathEdit) {
+				const at =
+					e.pointerType === "mouse" ? segmentUnder(controller, p) : null;
+				setDraft(at ? { pathHover: at } : {});
+				return;
+			}
 			if (e.pointerType === "mouse" && state.tool === "move" && template) {
 				const onHandle = (e.target as Element).closest?.("[data-handle]");
 				const hit = onHandle ? null : controller.hitTest(world);
 				if (hit !== state.hover)
 					controller.dispatch({ type: "hover", key: hit });
 			}
+			return;
+		}
+
+		if (isPathGesture(g)) {
+			setDraft({ guides: dragPath(controller, g, p, world, e) });
 			return;
 		}
 
@@ -768,6 +829,11 @@ export function Viewport() {
 		}
 		gesture.current = null;
 		setCursor(undefined);
+		if (isPathGesture(g)) {
+			releasePath(controller, g);
+			setDraft({});
+			return;
+		}
 		const world = toWorld(local(e));
 		switch (g.kind) {
 			case "press":
@@ -813,11 +879,19 @@ export function Viewport() {
 		if (onControl(e)) return;
 		const t = controller.template;
 		if (!t || controller.state.tool !== "move") return;
+		if (controller.state.pathEdit) {
+			togglePointAt(controller, local(e), "mouse");
+			return;
+		}
 		const world = toWorld(local(e));
 		const deep = controller.hitTest(world, { deep: true });
 		if (!deep) return;
 		const selected = controller.state.selection;
 		const el = getElement(t, deep);
+		if (selected.includes(deep) && el && "type" in el && el.type === "vector") {
+			controller.beginPathEdit(deep);
+			return;
+		}
 		if (selected.includes(deep) && el && "type" in el && el.type === "text") {
 			if (controller.beginTextEdit(deep)) return;
 			controller.dispatch({ type: "setRightTab", tab: "design" });
@@ -965,6 +1039,7 @@ function onControl(e: { target: EventTarget }): boolean {
 function inTransaction(g: Gesture | null): boolean {
 	if (!g) return false;
 	if (g.kind === "gradient") return g.handle.part !== "line";
+	if (isPathGesture(g)) return g.tx;
 	return g.kind === "move" || g.kind === "resize" || g.kind === "rotate";
 }
 
