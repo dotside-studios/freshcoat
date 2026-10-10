@@ -34,7 +34,8 @@ and `--no-cache` fetches them again without reading or writing it.
 
 A template can also be a script: a `.ts`, `.mts`, `.cts`, `.js`, `.mjs` or
 `.cjs` file whose default export, or `template` export, is a template object,
-a promise of one, or a function that returns either. Each command that reads
+a promise of one, or a function that returns either.
+[`defineTemplate`](../coatfile/README.md#template-modules) types it. Each command that reads
 a template runs the script in a separate runtime, takes the JSON its export
 resolves to and reads that as it would a template JSON file, so the result is
 validated the same way and relative image paths resolve against the script's
@@ -42,11 +43,11 @@ directory.
 
 ```ts
 // card.coat.ts
-import base from "./base.json" with { type: "json" };
+import { defineTemplate } from "@freshcoat-js/coatfile/define";
 
-export default async () => ({
-	...base,
-	name: `Badge ${new Date().getFullYear()}`,
+export default defineTemplate(async () => {
+	const response = await fetch("https://example.com/badge.json");
+	return { ...(await response.json()), name: `Badge ${new Date().getFullYear()}` };
 });
 ```
 

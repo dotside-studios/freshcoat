@@ -249,10 +249,10 @@ describe("validate", () => {
 });
 
 describe("a template module", () => {
-	const source = `import type { Template } from "@freshcoat-js/coatfile";
-const base: Template = ${JSON.stringify(card())};
+	const source = `import { defineTemplate } from "${import.meta.resolve("@freshcoat-js/coatfile/define")}";
+const base = ${JSON.stringify(card())};
 console.log("building");
-export default async (): Promise<Template> => ({ ...base, name: "Scripted" });
+export default defineTemplate(async () => ({ ...base, name: "Scripted" }));
 `;
 
 	test("renders what its default export resolves to", async () => {
