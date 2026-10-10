@@ -4002,6 +4002,43 @@ function layerBounds(
 	return ck.LTRBRect(l, t, r, btm);
 }
 
+// Whether `cmd` or anything it holds takes the adjust shader's offscreen pass,
+// whose reach predictedBounds does not model.
+function hasShaderAdjust(cmd: DrawCommand): boolean {
+	if (needsShaderAdjust(cmd)) return true;
+	if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
+		return cmd.children.some(hasShaderAdjust);
+	return false;
+}
+
+// The device pixels, at `scale`, that painting `cmd` can touch: shadows, blur,
+// strokes, glyphs and rotation counted as the painter's layers count them, and
+// not cut to any surface. Null where that is not modelled or the drawable
+// reaches the whole surface (an adjustment, a mask, text on a curve in a font
+// of unknown box). `provider` must hold the fonts `cmd` draws.
+export function drawableBounds(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawCommand,
+	scale: number,
+): [number, number, number, number] | null {
+	if (hasShaderAdjust(cmd)) return null;
+	const frame = { width: 0, height: 0, scale, grid: 1 };
+	const b = predictedBounds(
+		ck,
+		provider,
+		bin,
+		new Map(),
+		cmd,
+		frame,
+		frame,
+		[scale, 0, 0, 0, scale, 0, 0, 0, 1],
+		true,
+	);
+	return b?.every(Number.isFinite) ? b : null;
+}
+
 function isolates(cmd: DrawCommand): boolean {
 	return cmd.op === "drawGroup" && cmd.isolate === true;
 }
@@ -4605,11 +4642,15 @@ function warnSvgFeatures(
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
 // `fontProvider` holds every face in rt.fonts; a paint whose fonts all come
 // from there uses it rather than registering its own.
+// Where on the device the painted surface begins: the drawables are drawn
+// shifted back by it, so a surface smaller than the scene shows that part.
+export type PaintOrigin = { x: number; y: number };
+
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintTarget,
-	opts?: { fontProvider?: SharedFontProvider },
+	opts?: { fontProvider?: SharedFontProvider; origin?: PaintOrigin },
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -4635,7 +4676,7 @@ async function paintSceneIn(
 	ck: CanvasKit,
 	commands: Command[],
 	rt: PaintTarget,
-	opts: { fontProvider?: SharedFontProvider } | undefined,
+	opts: { fontProvider?: SharedFontProvider; origin?: PaintOrigin } | undefined,
 	cache: PaintCacheState | null,
 	bin: Bin,
 	rollback: (() => void)[],
@@ -4820,7 +4861,7 @@ async function paintSceneIn(
 	const pixelInfo =
 		cache && !rt.canvas && frame.precision === "u8" ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
-		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
+		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}/${opts?.origin?.x ?? 0},${opts?.origin?.y ?? 0}`
 		: "";
 	const lead = pixelInfo ? backgroundKeys(drawables).keys : [];
 	const closest =
@@ -4857,8 +4898,10 @@ async function paintSceneIn(
 	try {
 		// Scoped to the drawable loop: the finishing pass below reads back the
 		// composited pixels and belongs in device space.
-		if (frame.scale !== 1) {
+		const origin = opts?.origin;
+		if (frame.scale !== 1 || origin) {
 			skCanvas.save();
+			if (origin) skCanvas.translate(-origin.x, -origin.y);
 			skCanvas.scale(frame.scale, frame.scale);
 		}
 		// The families this scene loaded, in order, are the per-glyph fallback
@@ -4924,7 +4967,7 @@ async function paintSceneIn(
 		// Whole-frame finishing runs on the composited result, so after every
 		// drawable and before the flush — and in device pixels, off the scaled
 		// matrix the drawables used.
-		if (frame.scale !== 1) skCanvas.restore();
+		if (frame.scale !== 1 || origin) skCanvas.restore();
 		// The reduction comes BEFORE the finish: dither, black-extract and
 		// white-clamp are output-resolution ops (see applyFrameFinish), and running
 		// them on the dense render would average the dither back out and re-admit

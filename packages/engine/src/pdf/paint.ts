@@ -9,6 +9,7 @@ import type { CanvasKit, GlyphRun, TypefaceFontProvider } from "canvaskit-wasm";
 import {
 	type Bin,
 	collectAssets,
+	drawableBounds,
 	makeBin,
 	paintScene,
 	type ShapedTextLine,
@@ -42,7 +43,6 @@ import type {
 	ShapeMask,
 	Stroke,
 } from "../types";
-import { drawableExtent, shiftDrawable } from "./bounds";
 import { FontEmbedder, type FontFile } from "./fonts";
 import { cm, type Matrix, outlineOps, pathOps, rotateAbout } from "./geometry";
 import {
@@ -279,15 +279,12 @@ export async function paintPdf(
 					: null;
 			for (const cmd of page.plan(rest)) {
 				const layer = { ...cmd, blendMode: undefined };
-				const area = layerArea(ck, layer, create, scale);
+				const area = layerArea(ck, shared.provider, bin, layer, create, scale);
 				if (area && !(area.width > 0 && area.height > 0)) {
 					page.patches.set(cmd, null);
 					continue;
 				}
-				const moved = area
-					? shiftDrawable(layer, -area.x / scale, -area.y / scale)
-					: layer;
-				page.patches.set(cmd, page.patch(await paint([moved], area)));
+				page.patches.set(cmd, page.patch(await paint([layer], area)));
 			}
 		} finally {
 			cache?.dispose();
@@ -320,20 +317,19 @@ export async function paintPdf(
 // is painted over the whole page.
 function layerArea(
 	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
 	cmd: DrawCommand,
 	create: Extract<Command, { op: "createCanvas" }>,
 	scale: number,
 ): Area | undefined {
-	const extent = drawableExtent(ck, cmd);
-	if (!extent) return;
+	const box = drawableBounds(ck, provider, bin, cmd, scale);
+	if (!box) return;
 	const device = exportPixelSize(create, scale);
-	const x = Math.max(Math.floor(extent[0] * scale) - RASTER_PAD, 0);
-	const y = Math.max(Math.floor(extent[1] * scale) - RASTER_PAD, 0);
-	const right = Math.min(Math.ceil(extent[2] * scale) + RASTER_PAD, device.width);
-	const bottom = Math.min(
-		Math.ceil(extent[3] * scale) + RASTER_PAD,
-		device.height,
-	);
+	const x = Math.max(Math.floor(box[0]) - RASTER_PAD, 0);
+	const y = Math.max(Math.floor(box[1]) - RASTER_PAD, 0);
+	const right = Math.min(Math.ceil(box[2]) + RASTER_PAD, device.width);
+	const bottom = Math.min(Math.ceil(box[3]) + RASTER_PAD, device.height);
 	return { x, y, width: right - x, height: bottom - y };
 }
 
@@ -383,7 +379,7 @@ async function rasterize(
 			...layers,
 		],
 		rt,
-		{ fontProvider: shared },
+		{ fontProvider: shared, origin: area },
 	);
 	try {
 		const pixels = out.readPixels?.() ?? null;
