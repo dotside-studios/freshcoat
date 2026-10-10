@@ -8,10 +8,21 @@ import {
 	fileLoader,
 	loadCanvasKit,
 } from "@freshcoat-js/engine/node";
+import { assetRef, type DatasetAsset } from "@freshcoat-js/workspace";
 import type { Io } from "./io";
 
-export function createLoader(io: Io, root: string): ByteLoader {
-	return fileLoader({ root, ...(io.fetch ? { next: remoteLoader(io) } : {}) });
+export function createLoader(
+	io: Io,
+	root: string,
+	assets: readonly DatasetAsset[] = [],
+): ByteLoader {
+	const files = fileLoader({ root, ...(io.fetch ? { next: remoteLoader(io) } : {}) });
+	if (assets.length === 0) return files;
+	const refs = new Map(assets.map((asset) => [assetRef(asset.sha256), asset.blob]));
+	return async (src) => {
+		const blob = refs.get(src);
+		return blob ? new Uint8Array(await blob.arrayBuffer()) : files(src);
+	};
 }
 
 export async function openRenderer(
@@ -20,11 +31,12 @@ export async function openRenderer(
 		root: string;
 		build: CanvasKitBuild;
 		fonts?: Map<string, Uint8Array[]>;
+		assets?: readonly DatasetAsset[];
 	},
 ): Promise<Renderer> {
 	return createRenderer({
 		ck: await loadCanvasKit(options.build),
-		load: createLoader(io, options.root),
+		load: createLoader(io, options.root, options.assets),
 		...(options.fonts ? { fonts: Object.fromEntries(options.fonts) } : {}),
 	});
 }

@@ -6,7 +6,7 @@ import {
 	Option,
 } from "@commander-js/extra-typings";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
-import { renderData } from "./commands/data";
+import { renderBatch } from "./commands/batch";
 import { inspect } from "./commands/inspect";
 import { render } from "./commands/render";
 import { validateCommand } from "./commands/validate";
@@ -66,7 +66,7 @@ function program(io: Io) {
 	command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
 		.description(
-			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. With --data, a template renders once\nper row of a spreadsheet into a zip of images and a report, or a PDF; a\nworkspace preset writes the same.",
+			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into one of those; a workspace\npreset writes the same.",
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option(
@@ -81,7 +81,7 @@ function program(io: Io) {
 		)
 		.option("--variant <id>", "template: render a variant of the template")
 		.option("--frame <name>", "template: render only this frame; repeatable", collect)
-		.option("--scale <n>", "template: pixel density, default 1; repeatable without --data", collectScale)
+		.option("--scale <n>", "template: pixel density, default 1; repeatable into a directory", collectScale)
 		.addOption(
 			new Option("--format <format>", "template: image format, default png").choices([
 				"png",
@@ -96,7 +96,7 @@ function program(io: Io) {
 		)
 		.option(
 			"--out <path>",
-			"template: directory, default the current one; with --data or a workspace: a .zip or .pdf file",
+			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need a file",
 		)
 		.addHelpText(
 			"after",
@@ -112,23 +112,30 @@ function program(io: Io) {
 					return cmd.error(
 						`error: ${misplaced.join(", ")} ${misplaced.length === 1 ? "applies" : "apply"} only to templates`,
 					);
-				if (preset === undefined)
-					return cmd.error("error: a .coatworkspace needs --preset <name|id>");
 				if (out === undefined)
 					return cmd.error("error: a .coatworkspace needs --out <path>");
-				return renderWorkspace(file, { preset, out, quiet: quiet(cmd) }, io);
+				return renderWorkspace(
+					file,
+					{ ...(preset ? { preset } : {}), out, quiet: quiet(cmd) },
+					io,
+				);
 			}
 			if (preset !== undefined)
 				return cmd.error("error: --preset needs a .coatworkspace file");
-			if (data === undefined)
+			const archive = out !== undefined && /\.(zip|pdf)$/i.test(out);
+			if (data === undefined && !archive)
 				return render(file, { ...templateOptions, ...(out ? { out } : {}), quiet: quiet(cmd) }, io);
-			if (out === undefined || !/\.(zip|pdf)$/i.test(out))
+			if (out === undefined || !archive)
 				return cmd.error("error: --data needs --out <file.zip|file.pdf>");
 			if ((templateOptions.scale?.length ?? 0) > 1)
-				return cmd.error("error: --data takes one --scale");
+				return cmd.error("error: a .zip or .pdf takes one --scale");
 			if (templateOptions.format !== undefined && /\.pdf$/i.test(out))
 				return cmd.error("error: --format applies only to a zip");
-			return renderData(file, { ...templateOptions, data, out, quiet: quiet(cmd) }, io);
+			return renderBatch(
+				file,
+				{ ...templateOptions, ...(data ? { data } : {}), out, quiet: quiet(cmd) },
+				io,
+			);
 		});
 
 	command("validate")

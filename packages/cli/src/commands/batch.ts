@@ -23,7 +23,13 @@ import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/datas
 import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { readBytes, readTemplate } from "../template-file";
-import { pickFrames, pickVariant, readValues } from "./render";
+import {
+	checkValues,
+	isLocalImage,
+	pickFrames,
+	pickVariant,
+	readValues,
+} from "./render";
 import { runPreset } from "./workspace";
 
 const ZIP_FORMATS = {
@@ -35,8 +41,8 @@ const ZIP_FORMATS = {
 
 const MAX_ISSUES = 10;
 
-export type DataOptions = {
-	data: string;
+export type BatchOptions = {
+	data?: string;
 	out: string;
 	values?: string;
 	set?: Record<string, string>;
@@ -47,9 +53,9 @@ export type DataOptions = {
 	quiet: boolean;
 };
 
-export async function renderData(
+export async function renderBatch(
 	file: string,
-	options: DataOptions,
+	options: BatchOptions,
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
@@ -57,10 +63,18 @@ export async function renderData(
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
 	const constants = await readValues(io, template, options.values, options.set ?? {});
-	const dataset = await readDataset(io, log, template, options.data);
+	const read =
+		options.data === undefined
+			? {
+					...emptyDataset("values", []),
+					records: [{ id: "r_00000001", values: {}, status: "pending" as const }],
+				}
+			: await readDataset(io, log, template, options.data);
+	if (options.data === undefined) checkValues(template, constants.values);
+	const dataset = { ...read, assets: [...read.assets, ...constants.assets] };
 
 	let binding = autoBinding(template, dataset);
-	for (const [key, value] of Object.entries(constants))
+	for (const [key, value] of Object.entries(constants.values))
 		binding = withFieldSource(binding, key, {
 			kind: "constant",
 			value: typeof value === "string" ? value : JSON.stringify(value),
@@ -75,7 +89,10 @@ export async function renderData(
 		datasets: [dataset],
 		presets: [],
 	};
-	const missing = unfilledRequired(template, binding, workspace.datasets);
+	const missing =
+		options.data === undefined
+			? []
+			: unfilledRequired(template, binding, workspace.datasets);
 	if (missing.length > 0)
 		log.warn(
 			`no column or --set fills the required ${missing.length === 1 ? "field" : "fields"} ${missing.join(", ")}; ${missing.length === 1 ? "it uses its" : "they use their"} default`,
@@ -88,6 +105,7 @@ export async function renderData(
 			: ZIP_FORMATS[options.format ?? "png"],
 		scale: options.scale?.[0] ?? 1,
 		markExported: false,
+		...(options.data === undefined ? { fileName: "{{side}}" } : {}),
 		...(frameNames ? { sides: frameNames } : {}),
 	};
 	await runPreset(workspace, preset, { root: directory, out: options.out }, log, io);
@@ -162,7 +180,7 @@ async function readPhotos(
 		if (entry.kind !== "column" || !images.has(entry.column)) return;
 		for (const row of rows.slice(1)) {
 			const name = (row[i] ?? "").trim();
-			if (name !== "" && !/^(https?|data|ws):/i.test(name)) names.add(name);
+			if (isLocalImage(name)) names.add(name);
 		}
 	});
 	const files: AssetFile[] = [];
