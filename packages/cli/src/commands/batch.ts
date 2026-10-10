@@ -12,8 +12,8 @@ import {
 	type Dataset,
 	type DatasetAsset,
 	type ExportPreset,
-	guessMapping,
 	headersOf,
+	importDefaults,
 	newPreset,
 	type PaperName,
 	prepareAssets,
@@ -185,12 +185,18 @@ async function readDataset(
 		if (error instanceof TabularError) throw new CliError(`${file}: ${error.message}`);
 		throw error;
 	}
-	const [sheet] = sheets;
+	const wanted = columnsFromTemplate(template);
+	const start = importDefaults(sheets, wanted);
+	const sheet = sheets[start.sheetIndex];
 	if (!sheet) throw new CliError(`${file} has no rows`);
-	if (sheets.length > 1) log.warn(`${file}: reading only the first sheet, ${sheet.name}`);
+	if (sheets.length > 1)
+		log.warn(
+			`${file}: reading only the ${start.sheetIndex === 0 ? "first sheet" : "first sheet with rows"}, ${sheet.name}`,
+		);
 
-	const headers = headersOf(sheet.rows, 0);
-	const mapping = guessMapping(headers, columnsFromTemplate(template)).map(
+	const { headerRow } = start;
+	const headers = headersOf(sheet.rows, headerRow);
+	const mapping = start.mapping.map(
 		(entry): ColumnMapping => (entry.kind === "new" ? { kind: "skip" } : entry),
 	);
 	const unused = headers.filter(
@@ -203,20 +209,18 @@ async function readDataset(
 	const used = new Set(
 		mapping.flatMap((entry) => (entry.kind === "column" ? [entry.column] : [])),
 	);
-	const columns = columnsFromTemplate(template).filter((column) =>
-		used.has(column.key),
-	);
+	const columns = wanted.filter((column) => used.has(column.key));
 
 	const directory = dirname(resolve(io.cwd, file));
 	const empty = {
 		...emptyDataset(basename(file), columns),
-		assets: await readPhotos(directory, sheet.rows, mapping, columns),
+		assets: await readPhotos(directory, sheet.rows.slice(headerRow + 1), mapping, columns),
 	};
 	const { dataset, issues } = applyMapping(empty, sheet.rows, {
-		headerRow: 0,
+		headerRow,
 		mapping,
 		mode: "replace",
-		dateOrder: "mdy",
+		dateOrder: start.dateOrder,
 	});
 	for (const issue of issues.slice(0, MAX_ISSUES))
 		log.warn(`${file}: row ${issue.row + 1}, ${issue.column}: ${issue.message}`);
@@ -238,7 +242,7 @@ async function readPhotos(
 	const names = new Set<string>();
 	mapping.forEach((entry, i) => {
 		if (entry.kind !== "column" || !images.has(entry.column)) return;
-		for (const row of rows.slice(1)) {
+		for (const row of rows) {
 			const name = (row[i] ?? "").trim();
 			if (isLocalImage(name)) names.add(name);
 		}

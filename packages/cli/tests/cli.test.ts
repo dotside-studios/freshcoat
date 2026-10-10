@@ -562,6 +562,24 @@ describe("render a template with --data", () => {
 		);
 	});
 
+	describe("starts where Studio's import does", () => {
+		async function csvNames(path: string): Promise<string[]> {
+			const zip = unzipSync(new Uint8Array(await readFile(box.path(path))));
+			return Object.keys(zip).filter((name) => name.endsWith(".png")).sort();
+		}
+
+		test("finds a header that is not on the first row", async () => {
+			await box.write("report.csv", "Staff badges,,\n,,\nname,motto,team\nAna,Hi,Red\nBen,Yo,Blue\n");
+			const run = await box.run(
+				"render", "badge.json", "--data", "report.csv", "--frame", "front",
+				"--name", "{{name}}", "--out", "report.zip",
+			);
+			expect(run.code).toBe(0);
+			expect(run.stderr).toContain("warning: report.csv: no field matches the column team");
+			expect(await csvNames("report.zip")).toEqual(["Ana.png", "Ben.png"]);
+		});
+	});
+
 	test("refuses bad data and options", async () => {
 		await box.write("empty.csv", "name\n");
 		await box.write("people.dat", "name\nAna\n");
