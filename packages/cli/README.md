@@ -31,8 +31,9 @@ freshcoat render card.coat --format pdf --dpi 300 --out out
 Renders each frame and prints the path of every file it writes. Files are named
 after the frame, with the scale as a suffix for anything but 1x: `front.png`,
 `front@2x.png`. JPEG files use `.jpg`. `--format pdf` writes each frame as one
-page of vectors, `front.pdf`, sized at `--dpi` design units to the inch; what
-a PDF cannot draw, such as a shadow, is left out with a warning.
+page of vectors, `front.pdf`, sized at `--dpi` design units to the inch. Text
+is set in its embedded font, and a layer a PDF cannot express, such as a
+shadow, is drawn as a 600 dpi image with a note on stderr.
 
 | Flag | |
 |---|---|
@@ -82,9 +83,7 @@ Runs an export preset from a `.coatworkspace`, chosen by id or by a name no
 other preset has, and writes the zip or PDF to `--out`. Progress goes to
 stderr and a one-line summary to stdout. The command also warns about text the
 fonts have no glyphs for, and exits 1 when an item fails. `--vector` draws a
-PDF preset's cards as vectors, as its `pdfPageImage: "vector"` does; a card
-that uses what a PDF cannot draw is drawn as pixels, and the command says how
-many and why.
+PDF preset's cards as vectors, as its `pdfPageImage: "vector"` does.
 
 ## From code
 

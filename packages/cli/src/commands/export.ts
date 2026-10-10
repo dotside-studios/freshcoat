@@ -77,18 +77,6 @@ export async function exportCommand(args: string[], io: Io): Promise<void> {
 				`the fonts have no glyphs for ${codepoints.map(codepointLabel).join(" ")} in ${records} ${records === 1 ? "record" : "records"}; they print as boxes`,
 			);
 		}
-		const pixels = result.items.filter((item) => item.vector === "fallback");
-		if (pixels.length > 0) {
-			const reasons = new Set(
-				pixels.flatMap((item) =>
-					(item.warnings ?? []).filter((w) => w.startsWith("Drawn as pixels: ")),
-				),
-			);
-			log.warn(
-				`${pixels.length} of ${result.items.length} cards drawn as pixels, not vectors`,
-			);
-			for (const reason of reasons) log.info(`  ${reason}`);
-		}
 		if (result.cancelled) throw new CliError("the export was cancelled");
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)

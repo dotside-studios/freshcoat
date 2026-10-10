@@ -114,7 +114,7 @@ describe("render", () => {
 		);
 		expect(text.startsWith("%PDF-")).toBe(true);
 		expect(text).toContain("/MediaBox [0 0 200 100]");
-		expect(text).toContain("/Subtype /Form");
+		expect(text).toContain("/Subtype /Type0");
 	});
 
 	test("renders a variant at its own size", async () => {
@@ -367,11 +367,10 @@ describe("export", () => {
 			"--vector",
 		);
 		expect(run.code).toBe(0);
-		expect(run.stderr).not.toContain("drawn as pixels");
 		const text = new TextDecoder("latin1").decode(
 			await readFile(box.path("vector.pdf")),
 		);
-		expect(text).toContain("/Subtype /Form");
+		expect(text).toContain("/Length1");
 		const zip = await box.run(
 			"export",
 			"badges.coatworkspace",
