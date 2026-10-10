@@ -17,7 +17,9 @@ import {
 	createText,
 	type Node,
 } from "../src/node";
+import { FontEmbedder } from "../src/pdf/fonts";
 import { paintPdf } from "../src/pdf/paint";
+import { PdfWriter } from "../src/pdf/writer";
 import { createRenderer, type Renderer } from "../src/renderer";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
@@ -444,6 +446,42 @@ describe("renderPdf", () => {
 			]);
 			expect(at).toEqual([0, 0, 0]);
 		}
+	});
+
+	test("makes typefaces only for the families a run names, and frees them", async () => {
+		const made: Array<{ delete: () => void }> = [];
+		let deleted = 0;
+		const spy = {
+			Typeface: {
+				MakeTypefaceFromData: (data: ArrayBuffer) => {
+					const typeface = ck.Typeface.MakeTypefaceFromData(data);
+					const free = typeface.delete.bind(typeface);
+					typeface.delete = () => {
+						deleted++;
+						free();
+					};
+					made.push(typeface);
+					return typeface;
+				},
+			},
+		};
+		const geist = testFontBytes("Geist-Regular.ttf");
+		const embedder = new FontEmbedder(
+			spy as never,
+			new Map([
+				["Geist", [geist]],
+				["Vend", [testFontBytes("VendSans-Variable-latin.woff2")]],
+			]),
+			new PdfWriter(),
+		);
+		const probe = ck.Typeface.MakeTypefaceFromData(geist.buffer.slice(geist.byteOffset, geist.byteOffset + geist.byteLength));
+		const run = { typeface: probe, glyphs: [], offsets: [] };
+		const file = embedder.file(run as never, { weight: 400, italic: false }, "");
+		probe.delete();
+		expect("reason" in file).toBe(false);
+		expect(made).toHaveLength(1);
+		embedder.dispose();
+		expect(deleted).toBe(1);
 	});
 
 	describe("layers drawn as images", () => {
