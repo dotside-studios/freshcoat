@@ -23,7 +23,6 @@ import {
 	formatDuration,
 	formatEta,
 	formatPageSize,
-	imageFieldKeys,
 	labelColumn,
 	recordLabel,
 	selectedIds,
@@ -308,10 +307,5 @@ describe("photo export helpers", () => {
 		expect(Number.isInteger(sized.width)).toBe(true);
 		expect(Number.isInteger(sized.height)).toBe(true);
 		expect(validate(sized).ok).toBe(true);
-	});
-
-	test("image fields", () => {
-		expect(imageFieldKeys(photoWatermark())).toEqual(["photo", "logo"]);
-		expect(imageFieldKeys(undefined)).toEqual([]);
 	});
 });

@@ -6,9 +6,11 @@ import {
 	fileExtension,
 	fileNameFor,
 	fileNamePattern,
+	fileNameTokens,
 	imageFormat,
 	pdfRenderScale,
 	planExport,
+	unknownFileNameTokens,
 	vectorPages,
 } from "./plan";
 import {
@@ -719,5 +721,53 @@ describe("preset helpers", () => {
 		);
 		expect(fileExtension("jpeg-zip")).toBe("jpg");
 		expect(fileExtension("pdf")).toBe("png");
+	});
+});
+
+describe("unknownFileNameTokens", () => {
+	const template = ws.templates[0]?.template as typeof memberCard;
+
+	it("lists the built-ins, the template's fields and the dataset's columns", () => {
+		expect(fileNameTokens(template)).toEqual([
+			"template",
+			"side",
+			"index",
+			"record",
+			"variant",
+			"name",
+			"number",
+			"photo",
+			"vip",
+		]);
+		expect(fileNameTokens(template, members)).toContain("tier");
+	});
+
+	it("is empty when every token is known", () => {
+		expect(
+			unknownFileNameTokens(
+				"{{template}}-{{ index }}-{{side}}-{{name}}",
+				template,
+			),
+		).toEqual([]);
+		expect(unknownFileNameTokens("plain", template)).toEqual([]);
+		expect(unknownFileNameTokens("", template)).toEqual([]);
+	});
+
+	it("names each unknown token once, in order", () => {
+		expect(
+			unknownFileNameTokens("{{nam}}-{{side}}-{{team}}-{{ nam }}", template),
+		).toEqual(["nam", "team"]);
+	});
+
+	it("knows a dataset's columns only when given the dataset", () => {
+		expect(unknownFileNameTokens("{{tier}}", template)).toEqual(["tier"]);
+		expect(unknownFileNameTokens("{{tier}}", template, members)).toEqual([]);
+	});
+
+	it("reads tokens the way a file name does", () => {
+		expect(unknownFileNameTokens("{{a b}}-{{}}", template)).toEqual([
+			"a b",
+			"",
+		]);
 	});
 });

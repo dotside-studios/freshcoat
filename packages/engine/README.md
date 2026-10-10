@@ -45,7 +45,7 @@ instance in Node or Bun; from `@freshcoat-js/engine/browser` it loads
 A renderer owns its CanvasKit instance, its fonts, the Paragraph text engine
 and metrics built from them, and a paint cache that keeps the surface, font
 provider and decoded images between renders. Create one per process or worker
-and keep it; `dispose()` frees everything.
+and keep it; `dispose()` frees everything once any paint in flight finishes.
 
 ```ts
 const renderer = await createRenderer({
@@ -78,7 +78,7 @@ only; a src whose bytes change between renders is decoded again, so a
 per-request logo is never served from an earlier request. Fonts can be added
 later with `addFonts`, and `loadFonts` loads the families that font requests
 describe, once per descriptor. `clear()` frees the cache, as after a lost GPU
-context.
+context, once any paint in flight finishes.
 
 `prepare`, `compile` and `paint` are the steps `render` runs, for callers that
 read the laid-out scene or the command list in between.

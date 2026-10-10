@@ -121,14 +121,19 @@ export {
 	type ApplyMappingOptions,
 	applyMapping,
 	columnLetter,
+	defaultHeaderRow,
 	detectHeaderRow,
+	guessDateOrder,
 	guessMapping,
 	headersOf,
+	type ImportDefaults,
 	INFER_SAMPLE,
+	importDefaults,
 	inferType,
 	type PreviewCell,
 	type PreviewRow,
 	previewMapping,
+	sampleRows,
 } from "./mapping";
 export {
 	DEFAULT_DPI,
@@ -139,10 +144,12 @@ export {
 	fileExtension,
 	fileNameFor,
 	fileNamePattern,
+	fileNameTokens,
 	imageFormat,
 	pdfLayout,
 	pdfRenderScale,
 	planExport,
+	unknownFileNameTokens,
 } from "./plan";
 export { duplicatePreset, newPreset } from "./presets";
 export {

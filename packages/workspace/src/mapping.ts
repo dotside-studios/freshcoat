@@ -17,6 +17,7 @@ import type {
 	ColumnType,
 	DataRecord,
 	Dataset,
+	DateOrder,
 	ImportIssue,
 	ImportPlan,
 } from "./types";
@@ -78,6 +79,70 @@ export function detectHeaderRow(
 		if (full) return r;
 	}
 	return -1;
+}
+
+/** The header row an import starts at: `detectHeaderRow`'s, or the first row
+ *  when none is full; -1 when there are no rows. */
+export function defaultHeaderRow(rows: readonly (readonly string[])[]): number {
+	const detected = detectHeaderRow(rows);
+	return detected < 0 && rows.length > 0 ? 0 : detected;
+}
+
+/** The rows below the header row that have a filled cell, for inferring
+ *  types from. */
+export function sampleRows<Row extends readonly string[]>(
+	rows: readonly Row[],
+	headerRow: number,
+): Row[] {
+	return rows
+		.slice(Math.max(headerRow + 1, 0))
+		.filter((row) => row.some((cell) => cell.trim() !== ""));
+}
+
+const SLASH_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
+
+/** `dmy` when some date can only be read day first, else `mdy`. */
+export function guessDateOrder(
+	rows: readonly (readonly string[])[],
+): DateOrder {
+	for (const row of rows.slice(0, 500)) {
+		for (const cell of row) {
+			const m = SLASH_DATE.exec(cell.trim());
+			if (!m) continue;
+			if (Number(m[1]) > 12) return "dmy";
+			if (Number(m[2]) > 12) return "mdy";
+		}
+	}
+	return "mdy";
+}
+
+export type ImportDefaults = {
+	/** The first sheet with rows, or the first. */
+	sheetIndex: number;
+	headerRow: number;
+	dateOrder: DateOrder;
+	/** One per source column of the sheet, as `guessMapping` finds them. */
+	mapping: ColumnMapping[];
+};
+
+/** Where an import of a file starts: the sheet, header row, date order and
+ *  column mapping it guesses, which a person can then change. */
+export function importDefaults(
+	sheets: readonly { rows: readonly (readonly string[])[] }[],
+	columns: readonly Column[],
+): ImportDefaults {
+	const sheetIndex = Math.max(
+		sheets.findIndex((sheet) => sheet.rows.length > 0),
+		0,
+	);
+	const rows = sheets[sheetIndex]?.rows ?? [];
+	const headerRow = defaultHeaderRow(rows);
+	const mapping = guessMapping(
+		headersOf(rows, headerRow),
+		columns,
+		sampleRows(rows, headerRow).slice(0, INFER_SAMPLE),
+	);
+	return { sheetIndex, headerRow, dateOrder: guessDateOrder(rows), mapping };
 }
 
 /** A name compared ignoring case, spaces and punctuation. */

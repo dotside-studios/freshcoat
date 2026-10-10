@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
-import { guessDateOrder, ImportWizard } from "../data/ImportWizard";
+import { ImportWizard } from "../data/ImportWizard";
 import {
 	inPageImporter,
 	setTableImporter,
@@ -360,13 +360,5 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		).toHaveProperty("ariaValueNow", "1000");
 		finish();
 		await waitFor(() => expect(onImported).toHaveBeenCalled());
-	});
-});
-
-describe("guessDateOrder", () => {
-	it("guesses the date order from a date only one order can read", () => {
-		expect(guessDateOrder([["a"], ["31/03/2025"]])).toBe("dmy");
-		expect(guessDateOrder([["03/31/2025"]])).toBe("mdy");
-		expect(guessDateOrder([["03/04/2025"]])).toBe("mdy");
 	});
 });

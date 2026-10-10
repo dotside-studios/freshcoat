@@ -557,6 +557,16 @@ describe("unsupported content and limits", () => {
 		expect(shapes(d.children).length).toBeLessThanOrEqual(20000);
 		expect(d.warnings.map((w) => w.feature)).toContain("item-limit");
 	});
+	test("use expansion of empty content stops at the walk limit", () => {
+		let body = '<g id="l0"/>';
+		const uses = (id: string) => `<use href="#${id}"/>`.repeat(10);
+		for (let i = 1; i <= 10; i++) body += `<g id="l${i}">${uses(`l${i - 1}`)}</g>`;
+		const start = performance.now();
+		const d = parseSvg(svg(`<defs>${body}</defs><use href="#l10"/>`));
+		expect(performance.now() - start).toBeLessThan(5000);
+		expect(shapes(d.children)).toHaveLength(0);
+		expect(d.warnings.map((w) => w.feature)).toContain("walk-limit");
+	});
 });
 
 describe("filters", () => {

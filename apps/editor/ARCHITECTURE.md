@@ -100,7 +100,8 @@ lists only what it can still open.
 The Data section (`src/data`) edits datasets: typed columns (the
 schema) and records. The table and the gallery run on react-aria's
 `Virtualizer`. Import goes through `@freshcoat-js/workspace`'s tabular readers
-and a mapping wizard. Photos stay as the browser's `Blob`s, referenced from
+and a mapping wizard, which starts from `importDefaults` (the sheet, header row,
+date order and mapping it guesses) as the CLI's `--data` does. Photos stay as the browser's `Blob`s, referenced from
 records as `ws:<sha256>`; thumbnails are made in a worker
 (`thumbnail-worker.ts`) and kept in a bounded LRU, so no grid decodes a whole
 photo.
@@ -129,6 +130,9 @@ dataset's selection from there to offer it.
 
 - **Plan** (`../../packages/workspace/src/plan.ts`): a preset and a workspace become a list
   of items, one per record and side, with its file name and size.
+  `presetReadiness` (`../../packages/workspace/src/export/readiness.ts`) decides
+  whether the Export button is blocked and why, and counts the unfilled required
+  fields; `unknownFileNameTokens` drives the warning under the file name field.
 - **Runner and pool** (`src/export/use-export-runner.ts`,
   `worker-pool.ts`): one job at a time over a pool of module workers
   (`render-worker.ts`). The pool and the loop each worker runs are

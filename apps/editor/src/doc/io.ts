@@ -2,17 +2,15 @@ import type { Template, ValidationError } from "@freshcoat-js/coatfile";
 import {
 	formatVersionStatus,
 	loadTemplate,
-	raiseFormatVersion,
 	validate,
 	verifyAssets,
 } from "@freshcoat-js/coatfile";
 import {
 	type COAT_EXTENSION,
 	type COAT_JSON_EXTENSION,
-	CoatError,
-	packTemplate,
-	pruneUnusedAssets,
-	serializeTemplate,
+	type SaveResult,
+	saveTemplate,
+	writableTemplate,
 } from "@freshcoat-js/coatfile/coat";
 
 export type LoadOutcome =
@@ -58,52 +56,21 @@ export async function openFile(
 	}
 }
 
-export type SaveResult<T> =
-	| { ok: true; data: T }
-	| { ok: false; errors: ValidationError[] };
-
-/** Unused assets pruned, `format_version` raised to cover the fields used. */
-function writable(t: Template): Template {
-	return raiseFormatVersion(pruneUnusedAssets(t));
-}
-
 /** The `.coat` package bytes. */
-export async function saveCoat(t: Template): Promise<SaveResult<Uint8Array>> {
-	const pruned = writable(t);
-	const v = validate(pruned);
-	if (!v.ok) return { ok: false, errors: v.errors };
-	try {
-		return { ok: true, data: await packTemplate(pruned) };
-	} catch (err) {
-		return { ok: false, errors: [writeError(err)] };
-	}
+export function saveCoat(t: Template): Promise<SaveResult<Uint8Array>> {
+	return saveTemplate(t, "coat");
 }
 
 /** The template as it would be saved. */
 export function sendableTemplate(t: Template): SaveResult<Template> {
-	const pruned = writable(t);
-	const v = validate(pruned);
-	return v.ok ? { ok: true, data: pruned } : { ok: false, errors: v.errors };
+	const written = writableTemplate(t);
+	const v = validate(written);
+	return v.ok ? { ok: true, data: written } : { ok: false, errors: v.errors };
 }
 
 /** The `.coat.json` text. */
 export function saveJson(t: Template): SaveResult<string> {
-	const pruned = writable(t);
-	const v = validate(pruned);
-	if (!v.ok) return { ok: false, errors: v.errors };
-	try {
-		return { ok: true, data: serializeTemplate(pruned) };
-	} catch (err) {
-		return { ok: false, errors: [writeError(err)] };
-	}
-}
-
-function writeError(err: unknown): ValidationError {
-	return {
-		path: "/format_version",
-		code: err instanceof CoatError ? err.code : "write_failed",
-		message: err instanceof Error ? err.message : String(err),
-	};
+	return saveTemplate(t, "json");
 }
 
 /** `<id>-<side>[-<variant>][@<n>x].png`. */

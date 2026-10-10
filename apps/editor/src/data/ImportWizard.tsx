@@ -15,14 +15,16 @@ import {
 	type ColumnType,
 	type Dataset,
 	type DateOrder,
-	detectHeaderRow,
+	defaultHeaderRow,
 	guessMapping,
 	headersOf,
 	type ImportPlan,
 	INFER_SAMPLE,
+	importDefaults,
 	inferType,
 	isValidKey,
 	previewMapping,
+	sampleRows,
 	uniqueName,
 } from "@freshcoat-js/workspace";
 import { emptyDataset, replaceDataset } from "@freshcoat-js/workspace/dataset";
@@ -55,29 +57,6 @@ export type ImportTarget = ({ datasetId: string } | { newDataset: true }) & {
 type Loaded = { name: string; table: OpenedTable };
 
 const NO_ROWS: string[][] = [];
-
-const SLASH_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
-
-/** `dmy` when some date can only be read day first, else `mdy`. */
-export function guessDateOrder(
-	rows: readonly (readonly string[])[],
-): DateOrder {
-	for (const row of rows.slice(0, 500)) {
-		for (const cell of row) {
-			const m = SLASH_DATE.exec(cell.trim());
-			if (!m) continue;
-			if (Number(m[1]) > 12) return "dmy";
-			if (Number(m[2]) > 12) return "mdy";
-		}
-	}
-	return "mdy";
-}
-
-function dataRowsOf(rows: readonly string[][], headerRow: number) {
-	return rows
-		.slice(Math.max(headerRow + 1, 0))
-		.filter((r) => r.some((c) => c.trim() !== ""));
-}
 
 export function ImportWizard({
 	target,
@@ -135,7 +114,7 @@ export function ImportWizard({
 	const sheet = file?.table.sheets[sheetIndex];
 	const rows = sheet?.rows ?? NO_ROWS;
 	const headers = useMemo(() => headersOf(rows, headerRow), [rows, headerRow]);
-	const samples = useMemo(() => dataRowsOf(rows, headerRow), [rows, headerRow]);
+	const samples = useMemo(() => sampleRows(rows, headerRow), [rows, headerRow]);
 	const recordCount = sheet ? dataRowCount(sheet, headerRow) : 0;
 	const columns = base?.columns;
 	const baseId = base?.id;
@@ -175,14 +154,11 @@ export function ImportWizard({
 			}
 			if (open.current !== null) tableImporter().close(open.current);
 			open.current = table.id;
-			const first = table.sheets.findIndex((s) => s.rows.length > 0);
-			const index = Math.max(first, 0);
-			const sheetRows = table.sheets[index]?.rows ?? [];
-			const detected = detectHeaderRow(sheetRows);
+			const start = importDefaults(table.sheets, existing?.columns ?? []);
 			setFile({ name: chosen.name, table });
-			setSheetIndex(index);
-			setHeaderRow(detected < 0 && sheetRows.length > 0 ? 0 : detected);
-			setDateOrder(guessDateOrder(sheetRows));
+			setSheetIndex(start.sheetIndex);
+			setHeaderRow(start.headerRow);
+			setDateOrder(start.dateOrder);
 		} catch (err) {
 			const code = (err as { code?: string }).code;
 			setError(
@@ -468,8 +444,7 @@ export function ImportWizard({
 												const i = Number(k);
 												setSheetIndex(i);
 												const r = file.table.sheets[i]?.rows ?? [];
-												const h = detectHeaderRow(r);
-												setHeaderRow(h < 0 && r.length ? 0 : h);
+												setHeaderRow(defaultHeaderRow(r));
 											}}
 										>
 											{file.table.sheets.map((s, i) => (

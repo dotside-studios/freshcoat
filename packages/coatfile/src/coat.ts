@@ -26,9 +26,10 @@ import {
 	type Sha256,
 	subtleSha256,
 } from "./assets";
-import { formatVersionStatus } from "./format";
+import { formatVersionStatus, raiseFormatVersion } from "./format";
 import { unwrapLegacyBundle } from "./normalize";
-import type { InlineAsset, Template } from "./types";
+import type { InlineAsset, Template, ValidationError } from "./types";
+import { validate } from "./validate";
 
 export const COAT_EXTENSION = ".coat";
 /** The name a tool writes template JSON under. Plain `.json` still reads; the
@@ -355,6 +356,61 @@ export function pruneUnusedAssets(template: Template): Template {
 	if (assets.length > 0) return { ...template, assets };
 	const { assets: _dropped, ...rest } = template;
 	return rest as Template;
+}
+
+/** A template as it is written: unused assets pruned, `format_version`
+ *  raised to cover the fields used. */
+export function writableTemplate(template: Template): Template {
+	return raiseFormatVersion(pruneUnusedAssets(template));
+}
+
+export type SaveResult<T> =
+	| { ok: true; data: T }
+	| { ok: false; errors: ValidationError[] };
+
+/**
+ * A template as it is saved: `writableTemplate`, validated, then the `.coat`
+ * bytes or the `.coat.json` text. A template that does not validate, or that
+ * cannot be written, comes back as errors. The text is ready at once; the
+ * package is a promise.
+ */
+export function saveTemplate(
+	template: Template,
+	as: "coat",
+): Promise<SaveResult<Uint8Array>>;
+export function saveTemplate(
+	template: Template,
+	as: "json",
+): SaveResult<string>;
+export function saveTemplate(
+	template: Template,
+	as: "coat" | "json",
+): Promise<SaveResult<Uint8Array>> | SaveResult<string> {
+	const writable = writableTemplate(template);
+	const checked = validate(writable);
+	if (!checked.ok) {
+		const failed = { ok: false as const, errors: checked.errors };
+		return as === "coat" ? Promise.resolve(failed) : failed;
+	}
+	if (as === "json") {
+		try {
+			return { ok: true, data: serializeTemplate(writable) };
+		} catch (err) {
+			return { ok: false, errors: [writeError(err)] };
+		}
+	}
+	return packTemplate(writable).then(
+		(data) => ({ ok: true as const, data }),
+		(err) => ({ ok: false as const, errors: [writeError(err)] }),
+	);
+}
+
+function writeError(err: unknown): ValidationError {
+	return {
+		path: "/format_version",
+		code: err instanceof CoatError ? err.code : "write_failed",
+		message: err instanceof Error ? err.message : String(err),
+	};
 }
 
 function assetEntryName(asset: InlineAsset): string {

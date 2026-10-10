@@ -26,11 +26,13 @@ import {
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
 	exportSize,
+	imageFields,
 	imageFormat,
 	paperSize,
 	pdfLayout,
 	sheetSummary,
 	unfilledRequired,
+	unknownFileNameTokens,
 } from "@freshcoat-js/workspace";
 import {
 	BLEED_NEEDS_TEMPLATE_SIZE,
@@ -57,7 +59,6 @@ import {
 	DESTINATION_LABEL,
 	fileNameExample,
 	formatPageSize,
-	imageFieldKeys,
 	RECORD_FILTERS,
 	settingsSummary,
 } from "./export-ui";
@@ -197,16 +198,20 @@ export function ExportSettings({
 	};
 	const example = fileNameExample(plan, preset, template);
 	const size = exportSize(preset);
-	const photoFields = imageFieldKeys(template);
+	const photoFields = template ? imageFields(template) : [];
 	const destination = preset.destination ?? "download";
 	const support = destinationSupport();
 	const pdf = preset.format === "pdf";
 	const lossy = imageFormat(preset) !== "png";
 	const datasets = useEditor((s) => s.workspace?.datasets);
 	const bindingOf = templates?.find((t) => t.id === preset.templateId)?.binding;
-	const boundTo = bindingOf
-		? datasets?.find((d) => d.id === bindingOf.datasetId)?.name
+	const boundDataset = bindingOf
+		? datasets?.find((d) => d.id === bindingOf.datasetId)
 		: undefined;
+	const boundTo = boundDataset?.name;
+	const unknownTokens = template
+		? unknownFileNameTokens(preset.fileName, template, boundDataset)
+		: [];
 	const sharedBy =
 		useEditor((s) => s.workspace?.presets)?.filter(
 			(p) => p.templateId === preset.templateId,
@@ -362,7 +367,9 @@ export function ExportSettings({
 							onSelectionChange={(key) => {
 								if (key === size.kind) return;
 								if (key === "image" && photoFields[0])
-									set({ size: { kind: "image", field: photoFields[0] } });
+									set({
+										size: { kind: "image", field: photoFields[0].key },
+									});
 								else if (key === "template")
 									set({ size: { kind: "template" } });
 							}}
@@ -397,7 +404,7 @@ export function ExportSettings({
 											set({ size: { ...size, field: key } });
 									}}
 								>
-									{photoFields.map((key) => (
+									{photoFields.map(({ key }) => (
 										<SelectItem key={key} id={key} textValue={key}>
 											{key}
 										</SelectItem>
@@ -639,6 +646,14 @@ export function ExportSettings({
 							<span className="text-fc-faint">e.g. </span>
 							<span className="font-fc-mono">{example}</span>
 						</p>
+						{unknownTokens.length > 0 ? (
+							<p
+								className="m-0 text-fc-sm text-fc-warning"
+								data-testid="export-file-name-unknown"
+							>
+								{VARIANT_EXPORT.unknownTokens(unknownTokens)}
+							</p>
+						) : null}
 						<p className="m-0 text-fc-faint text-fc-sm">
 							{VARIANT_EXPORT.fileNameTokens}
 						</p>

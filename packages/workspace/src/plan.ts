@@ -119,6 +119,41 @@ export function fileNameFor(pattern: string, ctx: FileNameContext): string {
 
 type FileNamePart = { literal: string } | { token: string };
 
+/** A `{{token}}` of a file name pattern; the group is the token's name. */
+const FILE_NAME_TOKEN = "\\{\\{\\s*([^{}]*?)\\s*\\}\\}";
+
+/** What every pattern may name, besides fields and columns. */
+const BUILT_IN_TOKENS = ["template", "side", "index", "record", "variant"];
+
+/** The tokens a pattern may name: the built-ins, the template's field keys and
+ *  the dataset's column keys. */
+export function fileNameTokens(
+	template: Pick<Template, "fields">,
+	dataset?: Pick<Dataset, "columns">,
+): string[] {
+	return [
+		...new Set([
+			...BUILT_IN_TOKENS,
+			...Object.keys(template.fields.properties),
+			...(dataset?.columns.map((column) => column.key) ?? []),
+		]),
+	];
+}
+
+/** The tokens in a pattern that name nothing `fileNameTokens` lists, once
+ *  each, in the order they appear. Such a token exports as empty text. */
+export function unknownFileNameTokens(
+	pattern: string,
+	template: Pick<Template, "fields">,
+	dataset?: Pick<Dataset, "columns">,
+): string[] {
+	const known = new Set(fileNameTokens(template, dataset));
+	const unknown = new Set<string>();
+	for (const match of pattern.matchAll(new RegExp(FILE_NAME_TOKEN, "g")))
+		if (!known.has(match[1] as string)) unknown.add(match[1] as string);
+	return [...unknown];
+}
+
 function cleanFileName(text: string): string {
 	return text.replace(/[^\w.-]/g, "-");
 }
@@ -131,7 +166,7 @@ function compileFileName(
 ): (ctx: FileNameContext) => string {
 	const width = String(Math.max(count, 1)).length;
 	const parts: FileNamePart[] = [];
-	const tokens = /\{\{\s*([^{}]*?)\s*\}\}/g;
+	const tokens = new RegExp(FILE_NAME_TOKEN, "g");
 	let at = 0;
 	for (let match = tokens.exec(source); match; match = tokens.exec(source)) {
 		if (match.index > at)

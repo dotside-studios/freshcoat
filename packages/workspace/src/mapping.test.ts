@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
 	applyMapping,
 	columnLetter,
+	defaultHeaderRow,
 	detectHeaderRow,
+	guessDateOrder,
 	guessMapping,
 	headersOf,
+	importDefaults,
 	inferType,
 	PROGRESS_ROWS,
 	previewMapping,
@@ -61,6 +64,104 @@ describe("headers", () => {
 			]),
 		).toBe(2);
 		expect(detectHeaderRow([])).toBe(-1);
+	});
+});
+
+describe("defaultHeaderRow", () => {
+	it("is the first full row, else the first row", () => {
+		expect(
+			defaultHeaderRow([["", ""], ["Title"], ["a", "b", "c"], ["1", "2", "3"]]),
+		).toBe(2);
+		expect(
+			defaultHeaderRow([
+				["a", ""],
+				["", "b"],
+			]),
+		).toBe(0);
+		expect(defaultHeaderRow([])).toBe(-1);
+	});
+});
+
+describe("guessDateOrder", () => {
+	it("guesses the date order from a date only one order can read", () => {
+		expect(guessDateOrder([["a"], ["31/03/2025"]])).toBe("dmy");
+		expect(guessDateOrder([["03/31/2025"]])).toBe("mdy");
+		expect(guessDateOrder([["03/04/2025"]])).toBe("mdy");
+	});
+});
+
+describe("importDefaults", () => {
+	it("starts at the first sheet with rows, its header row and a guessed mapping", () => {
+		const sheets = [
+			{ rows: [] as string[][] },
+			{
+				rows: [
+					["Report"],
+					["Email", "Given name", "Joined"],
+					["ana@x.co", "Ana", "31/03/2025"],
+				],
+			},
+		];
+		const start = importDefaults(sheets, columns);
+		expect(start.sheetIndex).toBe(1);
+		expect(start.headerRow).toBe(1);
+		expect(start.dateOrder).toBe("dmy");
+		expect(start.mapping).toEqual([
+			{ kind: "column", column: "email" },
+			{ kind: "column", column: "first_name" },
+			{ kind: "new", key: "joined", type: "date" },
+		]);
+	});
+
+	it("carries the date order into applyMapping", () => {
+		const rows = [
+			["name", "joined"],
+			["Ana", "13/04/2026"],
+			["Ben", "02/05/2026"],
+		];
+		const joined: Column[] = [
+			{ key: "name", type: "text" },
+			{ key: "joined", type: "date" },
+		];
+		const start = importDefaults([{ rows }], joined);
+		const { dataset, issues } = applyMapping(
+			{ id: "d", name: "D", columns: joined, records: [], assets: [] },
+			rows,
+			{ ...start, mode: "replace" },
+		);
+		expect(issues).toEqual([]);
+		expect(dataset.records.map((r) => r.values.joined)).toEqual([
+			"2026-04-13",
+			"2026-05-02",
+		]);
+	});
+
+	it("reads a file with no full row from its first row", () => {
+		const start = importDefaults(
+			[
+				{
+					rows: [
+						["a", ""],
+						["", "b"],
+					],
+				},
+			],
+			columns,
+		);
+		expect(start).toMatchObject({
+			sheetIndex: 0,
+			headerRow: 0,
+			dateOrder: "mdy",
+		});
+	});
+
+	it("starts empty when no sheet has rows", () => {
+		expect(importDefaults([{ rows: [] }], columns)).toEqual({
+			sheetIndex: 0,
+			headerRow: -1,
+			dateOrder: "mdy",
+			mapping: [],
+		});
 	});
 });
 

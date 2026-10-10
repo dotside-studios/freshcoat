@@ -76,7 +76,7 @@ function trackProviders(on: any = ck) {
 	return { made, collections };
 }
 
-function textScene(family: string): Node {
+function textScene(family: string, label = "Membership"): Node {
 	return createFrame({
 		pos: { x: 0, y: 0 },
 		size: SIZE,
@@ -84,7 +84,7 @@ function textScene(family: string): Node {
 			createText({
 				pos: { x: 4, y: 4 },
 				size: { width: SIZE.width - 8, height: 24 },
-				text: "Membership",
+				text: label,
 				font: { family, weight: 400, style: "normal", size: 16, lineHeight: 1.2 },
 				color: "#101828",
 			}),
@@ -265,6 +265,39 @@ describe("shared provider disposal", () => {
 		expect(made[0]!.deleted).toBe(0);
 		expect(layout(createParagraphEngine(ck, fonts, shared)).width).toBeGreaterThan(0);
 		shared.release();
+	});
+});
+
+describe("shaped lines and the paint cache", () => {
+	test("an uncached paint on a shared provider does not shape into a cache", async () => {
+		const fonts = new Map([["Geist", [GEIST]]]);
+		const shared = createSharedFontProvider(ck, fonts);
+		const engine = createParagraphEngine(ck, fonts, shared);
+		const cache = createPaintCache();
+		const compile = (label: string) =>
+			compileScene(textScene("Geist", label), {
+				...SIZE,
+				textEngine: engine,
+				fontMetrics: deriveFontMetrics(fonts),
+			});
+		try {
+			await (
+				await paintScene(ck, compile("Cached"), createHeadlessEnv({ fonts, cache }), {
+					fontProvider: shared,
+				})
+			).dispose();
+			const built = cache.stats().paragraphBuilds;
+			await (
+				await paintScene(ck, compile("Uncached"), createHeadlessEnv({ fonts }), {
+					fontProvider: shared,
+				})
+			).dispose();
+			expect(cache.stats().paragraphBuilds).toBe(built);
+		} finally {
+			engine.dispose();
+			cache.dispose();
+			shared.release();
+		}
 	});
 });
 
