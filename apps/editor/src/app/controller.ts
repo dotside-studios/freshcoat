@@ -92,15 +92,18 @@ import {
 	isStructuralEdit,
 } from "~/doc/variant-edit";
 import {
+	mapPath,
 	movePoints,
 	type PointRef,
 	parseVectorPath,
 	removePoints,
+	reversePath,
 	type SegmentHit,
 	setVectorPaths,
 	splitSegment,
 	toggleSmooth,
 	vectorFrame,
+	worldToFrame,
 } from "~/doc/vector-edit";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
@@ -717,7 +720,27 @@ export class EditorController {
 		if (split) this.editPath(split.paths, [split.ref]);
 	}
 
-	private vectorTarget(key: string) {
+	/** Puts `path`, drawn with the pen in template space from the end of
+	 *  subpath `subpath` of a vector, in place of that subpath, as one undo
+	 *  step. `reversed` when it was drawn from the subpath's start. */
+	continuePath(
+		key: string,
+		subpath: number,
+		reversed: boolean,
+		path: PenPath,
+	): void {
+		const target = this.vectorTarget(key);
+		if (!target) return;
+		const local = mapPath(path, (p) => worldToFrame(target.frame, p));
+		const paths = target.paths.slice();
+		paths[subpath] = reversed ? reversePath(local) : local;
+		this.edit((t) => setVectorPaths(t, key, paths));
+		if (this.state.tool === "pen")
+			this.dispatch({ type: "setTool", tool: "move" });
+	}
+
+	/** A vector's path in its own space and its box. */
+	vectorTarget(key: string) {
 		const t = this.template;
 		const el = t ? getElement(t, key) : undefined;
 		if (!t || !el || !("type" in el) || el.type !== "vector") return null;

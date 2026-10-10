@@ -16,10 +16,12 @@ import {
 import {
 	frameToWorld,
 	type HandleSide,
+	mapPath,
 	moveHandle,
 	movePoints,
 	nearestSegment,
 	type PointRef,
+	reversePath,
 	type SegmentHit,
 	sameRef,
 	setVectorPaths,
@@ -296,4 +298,47 @@ export function togglePointAt(
 	if (hit?.kind !== "point") return false;
 	controller.togglePathPoint(hit.ref);
 	return true;
+}
+
+/** An open subpath of the selected vector that the pen carries on from. */
+export type PenResume = {
+	key: string;
+	subpath: number;
+	/** The pen takes up the subpath's start, so it is drawn from backwards. */
+	reversed: boolean;
+	/** The subpath in template space, ending where the pen takes up. */
+	path: PenPath;
+};
+
+/** The open subpath of the selected vector with an end anchor within `reach`
+ *  pixels of `p`, if any. */
+export function penResumeAt(
+	controller: EditorController,
+	p: Point,
+	reach: number,
+): PenResume | null {
+	const [only, ...rest] = controller.state.selection;
+	const target =
+		only && rest.length === 0 ? controller.vectorTarget(only) : null;
+	if (!target) return null;
+	const { view } = controller.state;
+	const near = (q: Point) => {
+		const s = screenOf(target.frame, view, q);
+		return Math.hypot(s.x - p.x, s.y - p.y) <= reach;
+	};
+	for (const [subpath, path] of target.paths.entries()) {
+		const first = path.points[0];
+		const last = path.points[path.points.length - 1];
+		if (path.closed || !first || !last) continue;
+		const reversed = !near(last);
+		if (reversed && !near(first)) continue;
+		const drawn = reversed ? reversePath(path) : path;
+		return {
+			key: target.key,
+			subpath,
+			reversed,
+			path: mapPath(drawn, (q) => frameToWorld(target.frame, q)),
+		};
+	}
+	return null;
 }

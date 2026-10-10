@@ -467,6 +467,89 @@ describe("editing points", () => {
 	});
 });
 
+describe("continuing a path with the pen", () => {
+	const OPEN = "M0 0L100 50L200 0";
+	function pen(dd = OPEN) {
+		const m = mount(dd, {
+			size: { width: 200, height: 50 },
+			properties: { d: dd, stroke: { color: "#000000", width: 2 } },
+		});
+		act(() => {
+			m.c.select([m.key]);
+			m.c.dispatch({ type: "setTool", tool: "pen" });
+		});
+		return m;
+	}
+	const draftPoints = () =>
+		screen.getByTestId("pen-draft").getAttribute("data-points");
+
+	test("clicking the end anchor carries the path on, as one undo step", () => {
+		const { c, key: k } = pen();
+		const layers = c.base?.template_data[0]?.elements.length as number;
+		click(500, 330, NO_SNAP);
+		expect(draftPoints()).toBe("3");
+		click(550, 400, NO_SNAP);
+		expect(draftPoints()).toBe("4");
+		key("Enter");
+		expect(c.base?.template_data[0]?.elements).toHaveLength(layers);
+		expect(c.state.tool).toBe("move");
+		expect(c.state.selection).toEqual([k]);
+		const [pts] = painted(c, k);
+		expect(pts).toHaveLength(4);
+		near(pts?.[3]?.anchor, 550, 400);
+		near(pts?.[0]?.anchor, 300, 330);
+		near(pts?.[2]?.anchor, 500, 330);
+		c.undo();
+		expect(d(c, k)).toBe(OPEN);
+	});
+
+	test("the start anchor continues backwards and keeps the path's direction", () => {
+		const { c, key: k } = pen();
+		click(300, 330, NO_SNAP);
+		click(250, 300, NO_SNAP);
+		key("Enter");
+		const [pts] = painted(c, k);
+		expect(pts).toHaveLength(4);
+		near(pts?.[0]?.anchor, 250, 300);
+		near(pts?.[1]?.anchor, 300, 330);
+		near(pts?.[3]?.anchor, 500, 330);
+	});
+
+	test("clicking the other end closes the path", () => {
+		const { c, key: k } = pen();
+		click(500, 330, NO_SNAP);
+		click(400, 430, NO_SNAP);
+		click(300, 330, NO_SNAP);
+		expect(d(c, k)).toMatch(/Z$/);
+		expect(parseVectorPath(d(c, k))[0]?.points).toHaveLength(4);
+	});
+
+	test("a click elsewhere starts a new layer as before", () => {
+		const { c } = pen();
+		const layers = c.base?.template_data[0]?.elements.length as number;
+		click(100, 500, NO_SNAP);
+		click(200, 500, NO_SNAP);
+		key("Enter");
+		expect(c.base?.template_data[0]?.elements).toHaveLength(layers + 1);
+	});
+
+	test("a closed path is not continued", () => {
+		pen(TRIANGLE);
+		click(300, 330, NO_SNAP);
+		expect(screen.queryByTestId("pen-draft")).toBeTruthy();
+		expect(draftPoints()).toBe("1");
+	});
+
+	test("finishing without adding a point changes nothing", () => {
+		const { c, key: k } = pen();
+		const before = c.base;
+		click(500, 330, NO_SNAP);
+		key("Enter");
+		expect(c.base).toBe(before);
+		expect(d(c, k)).toBe(OPEN);
+	});
+});
+
 describe("path editing in the shortcuts sheet", () => {
 	test("lists the editing gestures", () => {
 		render(<ShortcutsDialog isOpen onOpenChange={() => {}} />);

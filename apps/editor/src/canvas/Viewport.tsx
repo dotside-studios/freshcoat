@@ -60,6 +60,8 @@ import {
 	dragPath,
 	isPathGesture,
 	type PathGesture,
+	type PenResume,
+	penResumeAt,
 	pressPath,
 	releasePath,
 	segmentUnder,
@@ -182,11 +184,23 @@ export function Viewport() {
 	const [drafts] = useState(createDraftStore);
 	const { setDraft, setPen } = drafts;
 	const penPath = useCallback(() => drafts.get().pen?.path ?? null, [drafts]);
+	// The vector subpath the pen is carrying on, and how many points it began with.
+	const resuming = useRef<(PenResume & { count: number }) | null>(null);
 	const finishPen = useCallback(
 		(path: PenPath | null) => {
+			const resume = resuming.current;
+			resuming.current = null;
 			setPen(null);
 			setDraft({});
-			if (path && path.points.length >= 2) controller.createPath(path);
+			if (resume && path) {
+				if (path.closed || path.points.length > resume.count)
+					controller.continuePath(
+						resume.key,
+						resume.subpath,
+						resume.reversed,
+						path,
+					);
+			} else if (path && path.points.length >= 2) controller.createPath(path);
 		},
 		[controller, setPen, setDraft],
 	);
@@ -409,6 +423,13 @@ export function Viewport() {
 		}
 
 		if (state.tool === "pen") {
+			const resume = penPath() ? null : penResumeAt(controller, p, CLOSE_PX);
+			if (resume) {
+				resuming.current = { ...resume, count: resume.path.points.length };
+				setPen({ path: resume.path });
+				return;
+			}
+			if (!penPath()) resuming.current = null;
 			const path = penPath() ?? { points: [], closed: false };
 			const first = path.points[0];
 			const v = state.view;
