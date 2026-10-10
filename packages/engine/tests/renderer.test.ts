@@ -211,6 +211,49 @@ describe("createRenderer", () => {
 		renderer.dispose();
 	});
 
+	test("paints with per-call images keep the provider for a scene font the renderer started without", async () => {
+		const geist = testFontBytes("Geist-Regular.ttf");
+		const reads: string[] = [];
+		const renderer = await createRenderer({
+			ck,
+			load: async (src) => {
+				reads.push(src);
+				return geist;
+			},
+		});
+		const family = "Body";
+		const request: FontRequest = {
+			family,
+			descriptor: {
+				kind: "local",
+				family,
+				files: [{ src: "a.ttf", weight: 400, style: "normal" }],
+			},
+		};
+		const commands = renderer.compile(text(family), {
+			width: 120,
+			height: 40,
+			fonts: [request],
+		});
+		const images = new Map([["img://unused", new Uint8Array(1)]]);
+		const first = await renderer.paint(commands, {
+			images,
+			output: { pixels: true },
+		});
+		expect(first.warnings).toEqual([]);
+		for (let i = 0; i < 2; i++)
+			await renderer.paint(commands, {
+				images: new Map(images),
+				output: { pixels: true },
+			});
+		expect(reads).toEqual(["a.ttf"]);
+		expect(renderer.fonts.has(family)).toBe(true);
+		expect(renderer.stats().paintCache).toMatchObject({
+			fontProviderBuilds: 1,
+		});
+		renderer.dispose();
+	});
+
 	test("prepare and compile share the renderer's text engine", async () => {
 		const renderer = await createRenderer({
 			ck,

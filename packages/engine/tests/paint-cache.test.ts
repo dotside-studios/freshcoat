@@ -8,6 +8,7 @@ import { clearFontBytesCache } from "../src/font-bytes";
 import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
+	createBitmap,
 	createFrame,
 	createGroup,
 	createImage,
@@ -178,7 +179,7 @@ function compile(
 	node: Node,
 	size: { width: number; height: number },
 	fonts: Map<string, Uint8Array[]>,
-	extra?: { supersample?: number },
+	extra?: { supersample?: number; precision?: "u8" | "f16" },
 ): Command[] {
 	const textEngine = createParagraphEngine(ck, fonts);
 	try {
@@ -434,6 +435,49 @@ describe("PaintCache", () => {
 		cache.dispose();
 	});
 
+	test("supersample and f16 working surfaces are kept across paints", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		for (const extra of [
+			{ supersample: 2 },
+			{ supersample: 4 },
+			{ precision: "f16" as const },
+		]) {
+			const cache = createPaintCache();
+			const { rt } = runtime(fonts, new Map(), cache);
+			const commands = compile(scene(SIZE, []), SIZE, fonts, extra);
+			const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			const work = [...(paintCacheState(cache).surface?.work.values() ?? [])];
+			expect(work.length).toBe(extra.supersample === 4 ? 2 : 1);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect([...(paintCacheState(cache).surface?.work.values() ?? [])]).toEqual(
+				work,
+			);
+			const disposed = work.map((w) => vi.spyOn(w, "dispose"));
+			cache.clear();
+			for (const spy of disposed) expect(spy).toHaveBeenCalledTimes(1);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			cache.dispose();
+		}
+	});
+
+	test("a changed supersample frees the working surfaces it no longer uses", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(scene(SIZE, []), SIZE, fonts, { supersample: 4 }), rt);
+		const state = paintCacheState(cache);
+		const [first] = [...(state.surface?.work.values() ?? [])];
+		const spy = vi.spyOn(first as object as { dispose(): void }, "dispose");
+		await pixels(compile(scene(SIZE, []), SIZE, fonts, { supersample: 2 }), rt);
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(state.surface?.work.size).toBe(1);
+		expect(cache.stats().surfaceCreates).toBe(1);
+		cache.dispose();
+	});
+
 	test("an image dropped from the scene is evicted", async () => {
 		await initCk();
 		const fonts = new Map([["Geist", [FONT]]]);
@@ -565,6 +609,68 @@ describe("PaintCache", () => {
 		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
 		expect(at(14)).toBe(255);
 		expect(at(38)).toBe(0);
+		cache.dispose();
+	});
+
+	function bitmapScene(modules: Uint8Array[]): Node {
+		return createFrame({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			children: modules.map((pixels, i) =>
+				createBitmap({
+					pos: { x: 4 + i * 30, y: 4 },
+					size: { width: 24, height: 24 },
+					pixels,
+					pixelWidth: 2,
+					pixelHeight: 2,
+					role: "barcode",
+				}),
+			),
+		});
+	}
+
+	test("a bitmap is uploaded once across paints", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const bits = new Uint8Array([
+			0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255,
+		]);
+		const commands = compile(bitmapScene([bits]), SIZE, fonts);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const spy = vi.spyOn(ck, "MakeImage");
+		try {
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(spy).toHaveBeenCalledTimes(1);
+		} finally {
+			spy.mockRestore();
+		}
+		expect(paintCacheState(cache).bitmaps.size).toBe(1);
+		cache.dispose();
+	});
+
+	test("a bitmap dropped from the scene is deleted and uploaded again", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const a = new Uint8Array(16).fill(255);
+		const b = new Uint8Array(16).fill(128);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(bitmapScene([a, b]), SIZE, fonts), rt);
+		const state = paintCacheState(cache);
+		expect([...state.bitmaps.keys()]).toEqual([a, b]);
+		const dropped = state.bitmaps.get(b)?.image as Image;
+		const del = vi.spyOn(dropped, "delete");
+		await pixels(compile(bitmapScene([a]), SIZE, fonts), rt);
+		expect([...state.bitmaps.keys()]).toEqual([a]);
+		expect(del).toHaveBeenCalledTimes(1);
+		const kept = state.bitmaps.get(a)?.image as Image;
+		const keptDel = vi.spyOn(kept, "delete");
+		cache.clear();
+		expect(keptDel).toHaveBeenCalledTimes(1);
+		expect(state.bitmaps.size).toBe(0);
 		cache.dispose();
 	});
 
@@ -909,7 +1015,12 @@ describe("PaintCache background", () => {
 		for (const extra of [{}, { supersample: 2 }]) {
 			const cache = createPaintCache();
 			await paintRecords(
-				[cardScene("Ada"), cardScene("Grace"), cardScene("Hedy")],
+				[
+					cardScene("Ada"),
+					cardScene("Ada"),
+					cardScene("Grace"),
+					cardScene("Hedy"),
+				],
 				cache,
 				extra,
 			);
@@ -935,8 +1046,10 @@ describe("PaintCache background", () => {
 		await paintRecords(
 			[
 				cardScene("Ada"),
+				cardScene("Ada"),
 				cardScene("Grace", { fills: other }),
 				cardScene("Hedy", { fills: other }),
+				cardScene("Margaret", { fills: other }),
 			],
 			cache,
 		);
@@ -955,12 +1068,13 @@ describe("PaintCache background", () => {
 				cardScene("Ada", { accent: "#ff0000" }),
 				cardScene("Grace", { accent: "#00ff00" }),
 				cardScene("Hedy", { accent: "#0000ff" }),
+				cardScene("Margaret", { accent: "#ffff00" }),
 			],
 			cache,
 		);
 		expect(cache.stats()).toMatchObject({
-			backgroundSnapshots: 2,
-			backgroundReuses: 1,
+			backgroundSnapshots: 1,
+			backgroundReuses: 2,
 		});
 		cache.dispose();
 	});
@@ -976,9 +1090,9 @@ describe("PaintCache background", () => {
 	test("clear() drops the background", async () => {
 		await initCk();
 		const cache = createPaintCache();
-		await paintRecords([cardScene("Ada")], cache);
+		await paintRecords([cardScene("Ada"), cardScene("Ada")], cache);
 		cache.clear();
-		await paintRecords([cardScene("Grace")], cache);
+		await paintRecords([cardScene("Grace"), cardScene("Grace")], cache);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 2,
 			backgroundReuses: 0,
@@ -1009,7 +1123,7 @@ describe("PaintCache background", () => {
 		for (const extra of [{}, { supersample: 2 }]) {
 			const cache = createPaintCache();
 			await paintRecords(
-				sides(["Ada", "Ada", "Grace", "Grace", "Hedy", "Hedy"]),
+				sides(["Ada", "Ada", "Grace", "Grace", "Hedy", "Hedy", "Ada", "Ada"]),
 				cache,
 				extra,
 			);
@@ -1027,12 +1141,12 @@ describe("PaintCache background", () => {
 			createHash("sha256").update(px.data).digest("hex");
 		const cache = createPaintCache();
 		const { rt } = runtime(fonts, images, cache);
-		for (const node of sides(["Ada", "Ada", "Grace", "Grace"])) {
+		for (const node of sides(Array(8).fill("Ada"))) {
 			const commands = compile(node, SIZE, fonts);
 			const plain = await pixels(commands, runtime(fonts, images).rt);
 			expect(hash(await pixels(commands, rt))).toBe(hash(plain));
 		}
-		expect(cache.stats().backgroundReuses).toBe(2);
+		expect(cache.stats().backgroundReuses).toBe(4);
 		cache.dispose();
 	});
 
@@ -1041,9 +1155,12 @@ describe("PaintCache background", () => {
 		const colors = ["#000000", "#111111", "#222222", "#333333", "#444444"];
 		const cache = createPaintCache();
 		await paintRecords(
-			[...colors, colors[1] as string, colors[0] as string].map((c) =>
-				cardScene("Ada", { fills: tinted(c) }),
-			),
+			[
+				...colors.flatMap((c) => [c, c]),
+				colors[1] as string,
+				colors[0] as string,
+				colors[0] as string,
+			].map((c) => cardScene("Ada", { fills: tinted(c) })),
 			cache,
 		);
 		expect(cache.stats()).toMatchObject({
@@ -1057,7 +1174,7 @@ describe("PaintCache background", () => {
 		await initCk();
 		const one = SIZE.width * SIZE.height;
 		const cache = createPaintCache({ maxImagePixels: one * 1.5 });
-		await paintRecords(sides(["Ada", "Ada", "Grace", "Grace"]), cache);
+		await paintRecords(sides(Array(6).fill("Ada")), cache);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 4,
 			backgroundReuses: 0,
@@ -1157,7 +1274,10 @@ describe("PaintCache background", () => {
 				],
 			});
 		const cache = createPaintCache();
-		await paintRecords([isolated("Alice"), isolated("Bob")], cache);
+		await paintRecords(
+			[isolated("Alice"), isolated("Bob"), isolated("Carol")],
+			cache,
+		);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 1,
 			backgroundReuses: 1,
@@ -1285,6 +1405,125 @@ describe("PaintCache background", () => {
 			backgroundSnapshots: 0,
 			backgroundReuses: 0,
 		});
+		cache.dispose();
+	});
+
+
+	// So the frame's group is entered, each leading rect keyed on its own.
+	const label = () =>
+		createText({
+			pos: { x: 4, y: 40 },
+			size: { width: 60, height: 14 },
+			text: "label",
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 10,
+				lineHeight: 1.2,
+			},
+			color: "#101828",
+		});
+
+	function dragged(x: number): Node {
+		return createFrame({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			children: [
+				createRect({
+					pos: { x, y: 4 },
+					size: { width: 20, height: 20 },
+					fills: [{ kind: "solid", color: "#ef4444" }],
+				}),
+				createRect({
+					pos: { x: 40, y: 20 },
+					size: { width: 30, height: 20 },
+					fills: [{ kind: "solid", color: "#3b82f6" }],
+				}),
+				label(),
+			],
+		});
+	}
+
+	test("a lead that changes every paint is never read back", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		let reads = 0;
+		for (let x = 0; x < 6; x++)
+			reads += await readbacks(compile(dragged(x), SIZE, fonts), rt);
+		expect(reads).toBe(0);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 0,
+			backgroundReuses: 0,
+		});
+		expect(paintCacheState(cache).backgrounds).toEqual([]);
+		cache.dispose();
+	});
+
+	test("a repeated lead is read back once and then reused", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const reads: number[] = [];
+		for (let i = 0; i < 4; i++)
+			reads.push(await readbacks(compile(dragged(3), SIZE, fonts), rt));
+		expect(reads).toEqual([0, 1, 0, 0]);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 1,
+			backgroundReuses: 2,
+		});
+		cache.dispose();
+	});
+
+	test("a stable lead survives a later drawable moving", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const move = (x: number) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: SIZE,
+				children: [
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: SIZE,
+						fills: [{ kind: "solid", color: "#f5f0e6" }],
+					}),
+					createRect({
+						pos: { x, y: 4 },
+						size: { width: 20, height: 20 },
+						fills: [{ kind: "solid", color: "#ef4444" }],
+					}),
+					label(),
+				],
+			});
+		for (let x = 0; x < 5; x++) {
+			const commands = compile(move(x), SIZE, fonts);
+			const plain = await pixels(commands, runtime(fonts, images).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+		}
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 1,
+			backgroundReuses: 3,
+		});
+		cache.dispose();
+	});
+
+	test("a command's key is stringified once across paints", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const commands = compile(dragged(3), SIZE, fonts);
+		const spy = vi.spyOn(JSON, "stringify");
+		try {
+			await readbacks(commands, rt);
+			const first = spy.mock.calls.length;
+			await readbacks(commands, rt);
+			expect(spy.mock.calls.length - first).toBeLessThan(first);
+		} finally {
+			spy.mockRestore();
+		}
 		cache.dispose();
 	});
 

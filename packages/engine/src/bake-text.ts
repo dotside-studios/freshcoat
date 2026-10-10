@@ -13,7 +13,7 @@
 import { getFontMetrics } from "./font-metrics";
 import type { TextNode } from "./node";
 import type { TextEngine } from "./text-engine";
-import { paragraphGaps } from "./text-types";
+import { largestFitting, paragraphGaps } from "./text-types";
 import type {
 	BakedTextLayout,
 	ClipOutset,
@@ -509,24 +509,16 @@ function layoutInline(
 					...r,
 					font: scaleFont(r.font, target / top),
 				}));
-			let lo = SHRINK_FLOOR_PX;
-			let hi = Math.floor(top) === top ? top - 1 : Math.floor(top);
-			let best: { rs: typeof authored; set: typeof shapedSet } | null = null;
-			while (lo <= hi) {
-				const mid = Math.floor((lo + hi) / 2);
-				const rs = scaled(mid);
-				const set = shape(rs);
-				if (set.totalHeight <= size.height) {
-					best = { rs, set };
-					lo = mid + 1;
-				} else {
-					hi = mid - 1;
-				}
-			}
-			const chosen = best ?? {
-				rs: scaled(SHRINK_FLOOR_PX),
-				set: shape(scaled(SHRINK_FLOOR_PX)),
-			};
+			const chosen = largestFitting(
+				SHRINK_FLOOR_PX,
+				Math.floor(top) === top ? top - 1 : Math.floor(top),
+				top * Math.sqrt(size.height / shapedSet.totalHeight),
+				(mid) => {
+					const rs = scaled(mid);
+					return { rs, set: shape(rs) };
+				},
+				(trial) => trial.set.totalHeight <= size.height,
+			);
 			resolved = chosen.rs;
 			shapedSet = chosen.set;
 			shrinkApplied = true;

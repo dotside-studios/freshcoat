@@ -33,6 +33,7 @@ import type {
 } from "./text-engine";
 import { spanTextStyle } from "./text-style";
 import {
+	largestFitting,
 	paragraphGaps,
 	type TextLayout,
 	type TextLayoutInput,
@@ -40,6 +41,7 @@ import {
 import type { FontVMetrics } from "./types";
 
 const SHRINK_FLOOR_PX = 8;
+const SHAPE_MEMO_MAX = 2000;
 const NATURAL_WIDTH = 1e7; // effectively unbounded — single-line advance
 // Font size the metrics probe shapes at: big enough that the reported line box
 // divides back to a per-em ratio without rounding noise.
@@ -61,6 +63,27 @@ function collapse(text: string): string {
 const hardLines = (text: string): number => text.split(/\r\n?|\n/).length;
 
 type Line = { text: string; width: number; hardBreak?: boolean };
+
+// A least-recently-used map from a JSON key to a shaping result.
+function memoShape<A extends unknown[], R>(
+	max: number,
+	fn: (...args: A) => R,
+): (...args: A) => R {
+	const cache = new Map<string, R>();
+	return (...args) => {
+		const key = JSON.stringify(args);
+		const hit = cache.get(key);
+		if (hit !== undefined) {
+			cache.delete(key);
+			cache.set(key, hit);
+			return hit;
+		}
+		const value = fn(...args);
+		cache.set(key, value);
+		if (cache.size > max) cache.delete(cache.keys().next().value as string);
+		return value;
+	};
+}
 
 // The paragraph's unresolved codepoints, in the order the text first uses them.
 function missingIn(para: Paragraph, text: string): number[] | undefined {
@@ -198,11 +221,11 @@ export function createParagraphEngine(
 		}
 	}
 
-	function breakLines(
+	function shapeLines(
 		text: string,
 		font: SpanFont,
 		maxWidth: number,
-		direction?: "ltr" | "rtl",
+		direction: "ltr" | "rtl" | undefined,
 	): { lines: Line[]; missing?: number[] } {
 		const norm = collapse(text);
 		const { para, builder } = build(norm, font, direction);
@@ -231,7 +254,7 @@ export function createParagraphEngine(
 		}
 	}
 
-	function naturalWidth(text: string, font: SpanFont): number {
+	function shapeNaturalWidth(text: string, font: SpanFont): number {
 		const { para, builder } = build(collapse(text), font);
 		try {
 			para.layout(NATURAL_WIDTH);
@@ -241,6 +264,13 @@ export function createParagraphEngine(
 			builder.delete();
 		}
 	}
+
+	// measureText and layoutText meet at the same (text, font, width): a hug box
+	// and the bake at its width shape once, and the shrink search reuses trials.
+	// Shaping is a pure function of these for the engine's fixed faces. Results
+	// are shared, so callers treat them as read-only (memoizeTextEngine freezes).
+	const breakLines = memoShape(SHAPE_MEMO_MAX, shapeLines);
+	const naturalWidth = memoShape(SHAPE_MEMO_MAX, shapeNaturalWidth);
 
 	const measureText: TextEngine["measureText"] = (text, font, maxWidth) => {
 		const lineHeightPx = font.size * font.lineHeight;
@@ -254,7 +284,7 @@ export function createParagraphEngine(
 				height: hardLines(text) * lineHeightPx,
 			};
 		}
-		const { lines } = breakLines(text, font, maxWidth);
+		const { lines } = breakLines(text, font, maxWidth, undefined);
 		const width = lines.reduce((max, l) => Math.max(max, l.width), 0);
 		const height = Math.max(1, lines.length) * lineHeightPx;
 		return { width, height };
@@ -327,22 +357,16 @@ export function createParagraphEngine(
 		if (full.totalHeight <= input.maxHeight)
 			return { ...full, shrinkApplied: false };
 
-		let lo = SHRINK_FLOOR_PX;
-		// The full size was just shown not to fit, so search below it.
-		let hi = Math.ceil(input.font.size) - 1;
-		let best: ReturnType<typeof once> | null = null;
-		while (lo <= hi) {
-			const mid = Math.floor((lo + hi) / 2);
-			const trial = once(mid);
-			if (trial.totalHeight <= input.maxHeight) {
-				best = trial;
-				lo = mid + 1;
-			} else {
-				hi = mid - 1;
-			}
-		}
-		if (best) return { ...best, shrinkApplied: true };
-		return { ...once(SHRINK_FLOOR_PX), shrinkApplied: true };
+		// The full size was just shown not to fit, so search below it, starting
+		// from the size at which the height would fit if it scaled with the size.
+		const chosen = largestFitting(
+			SHRINK_FLOOR_PX,
+			Math.ceil(input.font.size) - 1,
+			input.font.size * Math.sqrt(input.maxHeight / full.totalHeight),
+			once,
+			(trial) => trial.totalHeight <= input.maxHeight,
+		);
+		return { ...chosen, shrinkApplied: true };
 	};
 
 	// A family's vertical metrics as Skia reads them from the decoded face, for

@@ -9,6 +9,7 @@ import type { CanvasKit, GlyphRun, TypefaceFontProvider } from "canvaskit-wasm";
 import {
 	type Bin,
 	collectAssets,
+	drawableBounds,
 	makeBin,
 	paintScene,
 	type ShapedTextLine,
@@ -22,9 +23,11 @@ import {
 	createSharedFontProvider,
 	type SharedFontProvider,
 } from "../font-collection";
+import { exportPixelSize } from "../export-scale";
 import { parseImageInfo } from "../image-info";
 import { dataUrlToBytes } from "../loader";
 import { outlineGeometry, rectShape } from "../outline";
+import { createPaintCache } from "../paint-cache";
 import { fitRect, strokeInset } from "../paint-helpers";
 import type { PaintTarget } from "../runtime-types";
 import { isSvg } from "../svg/sniff";
@@ -95,6 +98,10 @@ const MITER_LIMIT = 4;
 // The longest edge, in pixels, a layer drawn as an image is painted at.
 const MAX_RASTER_EDGE = 8192;
 const MAX_SVG_NESTING = 4;
+// Device pixels kept around a layer's bounds for antialiasing.
+const RASTER_PAD = 2;
+// Decoded pixels the layers of one page share.
+const RASTER_CACHE_PIXELS = 1 << 26;
 
 type Box = { x: number; y: number; w: number; h: number };
 type Rgba = [number, number, number, number];
@@ -111,7 +118,17 @@ type SvgScene = {
 	height: number;
 	features: string[];
 };
-type Frame = { data: Uint8Array; width: number; height: number; scale: number };
+// `x` and `y` place the frame's top-left, in design units.
+type Frame = {
+	data: Uint8Array;
+	width: number;
+	height: number;
+	scale: number;
+	x: number;
+	y: number;
+};
+// A window of the page in device pixels.
+type Area = { x: number; y: number; width: number; height: number };
 // A layer painted as pixels, placed in design units.
 type Patch = { ref: PdfRef; x: number; y: number; w: number; h: number } | null;
 type TextRun = { run: GlyphRun; file: FontFile };
@@ -234,22 +251,44 @@ export async function paintPdf(
 			(options.rasterDpi ?? 600) / dpi,
 			MAX_RASTER_EDGE / Math.max(create.width, create.height),
 		);
-		const paint = (layers: Command[]) =>
-			rasterize(ck, create, scale, [...setup, ...layers], rt, shared);
-		const base =
-			under > 0
-				? page.patch(
-						await paint([
-							...drawables.slice(0, under),
-							...(finish ? [finish] : []),
-						]),
-					)
-				: null;
-		for (const cmd of page.plan(rest))
-			page.patches.set(
-				cmd,
-				page.patch(await paint([{ ...cmd, blendMode: undefined }])),
+		const cache = rt.cache
+			? null
+			: createPaintCache({ maxImagePixels: RASTER_CACHE_PIXELS });
+		// Fonts the shared provider holds need no loading by a layer without text.
+		const narrow = loaded.every((f) => rt.fonts?.has(f.family));
+		const paint = (layers: Command[], area?: Area) =>
+			rasterize(
+				ck,
+				create,
+				scale,
+				[...(area && narrow ? usedSetup(setup, layers) : setup), ...layers],
+				cache ? { ...rt, cache } : rt,
+				shared,
+				area,
 			);
+		let base: Patch = null;
+		try {
+			base =
+				under > 0
+					? page.patch(
+							await paint([
+								...drawables.slice(0, under),
+								...(finish ? [finish] : []),
+							]),
+						)
+					: null;
+			for (const cmd of page.plan(rest)) {
+				const layer = { ...cmd, blendMode: undefined };
+				const area = layerArea(ck, shared.provider, bin, layer, create, scale);
+				if (area && !(area.width > 0 && area.height > 0)) {
+					page.patches.set(cmd, null);
+					continue;
+				}
+				page.patches.set(cmd, page.patch(await paint([layer], area)));
+			}
+		} finally {
+			cache?.dispose();
+		}
 		const k = 72 / dpi;
 		let content = `q\n${cm([k, 0, 0, -k, 0, create.height * k])}`;
 		if (base) content += page.placePatch(base);
@@ -274,7 +313,51 @@ export async function paintPdf(
 	}
 }
 
-// The layers as the CanvasKit painter draws them, at `scale`.
+// The device pixels a layer can touch, or nothing where that is not known and it
+// is painted over the whole page.
+function layerArea(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawCommand,
+	create: Extract<Command, { op: "createCanvas" }>,
+	scale: number,
+): Area | undefined {
+	const box = drawableBounds(ck, provider, bin, cmd, scale);
+	if (!box) return;
+	const device = exportPixelSize(create, scale);
+	const x = Math.max(Math.floor(box[0]) - RASTER_PAD, 0);
+	const y = Math.max(Math.floor(box[1]) - RASTER_PAD, 0);
+	const right = Math.min(Math.ceil(box[2]) + RASTER_PAD, device.width);
+	const bottom = Math.min(Math.ceil(box[3]) + RASTER_PAD, device.height);
+	return { x, y, width: right - x, height: bottom - y };
+}
+
+// The fonts and images `layers` draw.
+function usedSetup(setup: Command[], layers: Command[]): Command[] {
+	const families = new Set<string>();
+	const srcs = new Set<string>();
+	const walk = (cmd: DrawCommand) => {
+		if (cmd.op === "drawText")
+			for (const line of cmd.layout.lines)
+				for (const span of line.spans) families.add(span.font.family);
+		if (cmd.op === "drawImage") srcs.add(cmd.src);
+		if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
+			for (const child of cmd.children) walk(child);
+		if (cmd.op === "drawMasked") walk(cmd.mask);
+	};
+	for (const cmd of layers) if (isDrawable(cmd)) walk(cmd);
+	return setup.map((cmd) =>
+		cmd.op === "loadFonts"
+			? { ...cmd, requests: cmd.requests.filter((r) => families.has(r.family)) }
+			: cmd.op === "loadImages"
+				? { ...cmd, srcs: cmd.srcs.filter((src) => srcs.has(src)) }
+				: cmd,
+	);
+}
+
+// The layers as the CanvasKit painter draws them, at `scale`, over `area` of
+// the page or all of it.
 async function rasterize(
 	ck: CanvasKit,
 	create: Extract<Command, { op: "createCanvas" }>,
@@ -282,24 +365,32 @@ async function rasterize(
 	layers: Command[],
 	rt: PaintTarget,
 	shared: SharedFontProvider,
+	area?: Area,
 ): Promise<Frame | null> {
 	const out = await paintScene(
 		ck,
 		[
 			{
 				op: "createCanvas",
-				width: create.width,
-				height: create.height,
+				width: area ? area.width / scale : create.width,
+				height: area ? area.height / scale : create.height,
 				scale,
 			},
 			...layers,
 		],
 		rt,
-		{ fontProvider: shared },
+		{ fontProvider: shared, origin: area },
 	);
 	try {
 		const pixels = out.readPixels?.() ?? null;
-		return pixels ? { ...pixels, scale } : null;
+		return pixels
+			? {
+					...pixels,
+					scale,
+					x: (area?.x ?? 0) / scale,
+					y: (area?.y ?? 0) / scale,
+				}
+			: null;
 	} finally {
 		out.dispose();
 	}
@@ -480,8 +571,8 @@ class PageBuilder {
 			);
 		return {
 			ref: this.rgbaImage(crop, w, h, true),
-			x: x0 / scale,
-			y: y0 / scale,
+			x: frame.x + x0 / scale,
+			y: frame.y + y0 / scale,
 			w: w / scale,
 			h: h / scale,
 		};
@@ -839,8 +930,11 @@ class PageBuilder {
 				const outline = cmd.strokeD
 					? ck.Path.MakeFromSVGString(cmd.strokeD)
 					: null;
-				out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
-				outline?.delete();
+				try {
+					out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
+				} finally {
+					outline?.delete();
+				}
 			}
 			return `${out}Q\n`;
 		} finally {

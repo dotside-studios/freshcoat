@@ -34,7 +34,7 @@ export type FaceRequest = {
 };
 
 export class FontEmbedder {
-	private files: FontFile[] | null = null;
+	private files = new Map<string, FontFile[]>();
 	private faces = new Map<FontFile, EmbeddedFace>();
 
 	constructor(
@@ -50,9 +50,10 @@ export class FontEmbedder {
 		text: string,
 	): FontFile | { reason: string } {
 		const family = run.typeface?.getFamilyName() ?? "";
-		const named = this.all().filter(
-			(f) => f.family === family || f.registered === family,
-		);
+		const named = [...this.open(family)];
+		if (named.length === 0)
+			for (const registered of this.byFamily.keys())
+				named.push(...this.open(registered).filter((f) => f.family === family));
 		if (named.length === 0) return { reason: `font ${family || "unknown"}` };
 		if (named.some((f) => !f.info))
 			return { reason: `font ${family} is not TrueType or OpenType` };
@@ -115,19 +116,22 @@ export class FontEmbedder {
 	}
 
 	dispose() {
-		for (const f of this.files ?? []) f.typeface?.delete();
-		this.files = null;
+		for (const list of this.files.values())
+			for (const f of list) f.typeface?.delete();
+		this.files.clear();
 	}
 
-	private all(): FontFile[] {
-		if (this.files) return this.files;
-		this.files = [];
-		for (const [registered, list] of this.byFamily)
-			for (const bytes of list) {
+	// The files registered under `registered`, made on first use.
+	private open(registered: string): FontFile[] {
+		let list = this.files.get(registered);
+		if (!list) {
+			list = [];
+			this.files.set(registered, list);
+			for (const bytes of this.byFamily.get(registered) ?? []) {
 				const typeface = this.ck.Typeface.MakeTypefaceFromData(
 					fontArrayBuffer(bytes),
 				);
-				this.files.push({
+				list.push({
 					registered,
 					bytes,
 					info: readSfnt(bytes),
@@ -135,7 +139,8 @@ export class FontEmbedder {
 					typeface,
 				});
 			}
-		return this.files;
+		}
+		return list;
 	}
 }
 

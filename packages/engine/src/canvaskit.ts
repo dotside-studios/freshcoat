@@ -87,15 +87,20 @@ import {
 	backgroundFits,
 	cacheBackground,
 	cacheFinishNoise,
+	cachedBitmap,
 	cachedFontProvider,
 	cachedLine,
 	cachedMipmaps,
 	cachedPath,
 	cachedSurface,
+	cachedWorkSurface,
 	closestBackground,
+	evictUnusedBitmaps,
 	evictUnusedImages,
 	evictUnusedLines,
 	evictUnusedPaths,
+	evictUnusedWork,
+	noteLead,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
@@ -1561,13 +1566,11 @@ function drawBitmap(
 ) {
 	const { pos, size, pixels, pixelWidth, pixelHeight } = cmd;
 	if (pixelWidth <= 0 || pixelHeight <= 0) return;
-	const img = makeImageFromPixels(
-		ck,
-		"pixels",
-		pixelWidth,
-		pixelHeight,
-		pixels,
-	);
+	const upload = () =>
+		makeImageFromPixels(ck, "pixels", pixelWidth, pixelHeight, pixels);
+	const img = bin.cache
+		? cachedBitmap(bin.cache, pixels, pixelWidth, pixelHeight, upload)
+		: bin.track(upload());
 	if (!img) return;
 	canvas.save();
 	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
@@ -1598,7 +1601,6 @@ function drawBitmap(
 			paint,
 		);
 	}
-	img.delete();
 	canvas.restore();
 }
 
@@ -3517,6 +3519,30 @@ function matrixStretch(m: number[]): number {
 // Every level is kept alive in `bin` until the OUTPUT surface flushes: on the GPU
 // path the draws only sample them then. Surfaces are disposed rather than
 // delete()d, which would strand their pixel buffers.
+//
+// A paint cache keeps the working surface and every level across paints, in
+// place of the bin, so a paint clears each before drawing.
+function workSurface(
+	ck: CanvasKit,
+	bin: Bin,
+	from: Surface,
+	width: number,
+	height: number,
+	precision: Precision,
+): Surface | null {
+	const make = () =>
+		makeLayerSurface(ck, from.getCanvas(), width, height, precision);
+	if (bin.cache)
+		return cachedWorkSurface(
+			bin.cache,
+			`${width}x${height}@${precision}`,
+			make,
+		);
+	const surface = make();
+	if (surface) bin.track({ delete: () => surface.dispose() });
+	return surface;
+}
+
 function reduceSupersampled(
 	ck: CanvasKit,
 	out: Surface,
@@ -3528,7 +3554,6 @@ function reduceSupersampled(
 	precision: Precision,
 ) {
 	const rect = (s: Size) => ck.XYWHRect(0, 0, s.width, s.height);
-	const retire = (s: Surface) => bin.track({ delete: () => s.dispose() });
 
 	let level = src;
 	let levelSize = exportPixelSize(design, exportScale * supersample);
@@ -3550,13 +3575,7 @@ function reduceSupersampled(
 		const last = factor === 2;
 		const dst = last
 			? out
-			: makeLayerSurface(
-					ck,
-					level.getCanvas(),
-					target.width,
-					target.height,
-					precision,
-				);
+			: workSurface(ck, bin, level, target.width, target.height, precision);
 		const img = bin.track(level.makeImageSnapshot());
 		const paint = bin.track(new ck.Paint());
 		if (!dst) {
@@ -3586,7 +3605,6 @@ function reduceSupersampled(
 			ck.MipmapMode.None,
 			paint,
 		);
-		if (!last) retire(dst);
 		level = dst;
 		levelSize = target;
 	}
@@ -3982,6 +4000,43 @@ function layerBounds(
 		b[3] + 1,
 	]);
 	return ck.LTRBRect(l, t, r, btm);
+}
+
+// Whether `cmd` or anything it holds takes the adjust shader's offscreen pass,
+// whose reach predictedBounds does not model.
+function hasShaderAdjust(cmd: DrawCommand): boolean {
+	if (needsShaderAdjust(cmd)) return true;
+	if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
+		return cmd.children.some(hasShaderAdjust);
+	return false;
+}
+
+// The device pixels, at `scale`, that painting `cmd` can touch: shadows, blur,
+// strokes, glyphs and rotation counted as the painter's layers count them, and
+// not cut to any surface. Null where that is not modelled or the drawable
+// reaches the whole surface (an adjustment, a mask, text on a curve in a font
+// of unknown box). `provider` must hold the fonts `cmd` draws.
+export function drawableBounds(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawCommand,
+	scale: number,
+): [number, number, number, number] | null {
+	if (hasShaderAdjust(cmd)) return null;
+	const frame = { width: 0, height: 0, scale, grid: 1 };
+	const b = predictedBounds(
+		ck,
+		provider,
+		bin,
+		new Map(),
+		cmd,
+		frame,
+		frame,
+		[scale, 0, 0, 0, scale, 0, 0, 0, 1],
+		true,
+	);
+	return b?.every(Number.isFinite) ? b : null;
 }
 
 function isolates(cmd: DrawCommand): boolean {
@@ -4431,6 +4486,24 @@ function paintDrawable(
 	canvas.restore();
 }
 
+// JSON of a command, and of a group apart from its children, kept per command
+// object so a scene that repaints the same commands stringifies them once.
+const commandJson = new WeakMap<object, string>();
+const groupJson = new WeakMap<object, string>();
+
+function memoJson(
+	memo: WeakMap<object, string>,
+	cmd: DrawCommand,
+	value: () => unknown,
+): string {
+	let json = memo.get(cmd);
+	if (json === undefined) {
+		json = JSON.stringify(value());
+		memo.set(cmd, json);
+	}
+	return json;
+}
+
 // The leading drawables whose pixels depend on nothing but the command and the
 // frame, each as a structural key. Text and images also depend on fonts and
 // decoded bytes the key would not cover, so the run stops at the first one. A
@@ -4443,15 +4516,15 @@ function backgroundKeys(
 	const keys: string[] = [];
 	for (const cmd of drawables) {
 		if (selfContained(cmd)) {
-			keys.push(outer + JSON.stringify(cmd));
+			keys.push(outer + memoJson(commandJson, cmd, () => cmd));
 			continue;
 		}
 		if (cmd.op === "drawGroup" && passThrough(cmd)) {
-			const { children, ...group } = cmd;
-			const inner = backgroundKeys(
-				children,
-				`${outer + JSON.stringify(group)}>`,
-			);
+			const group = memoJson(groupJson, cmd, () => {
+				const { children, ...rest } = cmd;
+				return rest;
+			});
+			const inner = backgroundKeys(cmd.children, `${outer + group}>`);
 			keys.push(...inner.keys);
 			if (inner.complete) continue;
 		}
@@ -4559,6 +4632,10 @@ function warnSvgFeatures(
 			warnings.push({ kind: "svg_unsupported", src, feature });
 }
 
+// Where on the device the painted surface begins: the drawables are drawn
+// shifted back by it, so a surface smaller than the scene shows that part.
+export type PaintOrigin = { x: number; y: number };
+
 // The CanvasKit paint routine env.paint runs (CanvasKit is the only backend, so
 // there is no painter-strategy indirection): one compiled scene -> a live surface
 // + a PaintOutput. freshcoat paints a single scene here — a card's multiple sides
@@ -4573,7 +4650,7 @@ export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintTarget,
-	opts?: { fontProvider?: SharedFontProvider },
+	opts?: { fontProvider?: SharedFontProvider; origin?: PaintOrigin },
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -4599,7 +4676,7 @@ async function paintSceneIn(
 	ck: CanvasKit,
 	commands: Command[],
 	rt: PaintTarget,
-	opts: { fontProvider?: SharedFontProvider } | undefined,
+	opts: { fontProvider?: SharedFontProvider; origin?: PaintOrigin } | undefined,
 	cache: PaintCacheState | null,
 	bin: Bin,
 	rollback: (() => void)[],
@@ -4754,16 +4831,9 @@ async function paintSceneIn(
 	// at the export size and 8 bits: softer than asked for, but a render.
 	const superSurface =
 		supersample > 1 || precision !== "u8"
-			? makeLayerSurface(
-					ck,
-					surface.getCanvas(),
-					render.width,
-					render.height,
-					precision,
-				)
+			? workSurface(ck, bin, surface, render.width, render.height, precision)
 			: null;
-	if (superSurface) bin.track({ delete: () => superSurface.dispose() });
-	else {
+	if (!superSurface) {
 		frame.scale = exportScale;
 		frame.grid = 1;
 		frame.precision = "u8";
@@ -4772,6 +4842,8 @@ async function paintSceneIn(
 	// one, else the output surface directly (the pre-supersampling path, untouched).
 	const target = superSurface ?? surface;
 	const skCanvas = target.getCanvas();
+	// A kept surface may come back from a paint that threw with saves open.
+	if (cache) skCanvas.restoreToCount(1);
 	skCanvas.clear(ck.TRANSPARENT);
 
 	const drawables = commands.filter(
@@ -4789,11 +4861,14 @@ async function paintSceneIn(
 	const pixelInfo =
 		cache && !rt.canvas && frame.precision === "u8" ? target.imageInfo() : null;
 	const bgFrame = pixelInfo
-		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}`
+		? `${pixelInfo.width}x${pixelInfo.height}@${frame.scale}/${frame.grid}/${opts?.origin?.x ?? 0},${opts?.origin?.y ?? 0}`
 		: "";
 	const lead = pixelInfo ? backgroundKeys(drawables).keys : [];
 	const closest =
 		cache && pixelInfo ? closestBackground(cache, bgFrame, lead) : null;
+	// A lead no earlier paint began with is not read back: when it changes every
+	// paint (a dragged shape) the snapshot would be evicted unused.
+	const seen = cache && pixelInfo ? noteLead(cache, lead) : 0;
 	const held = closest?.held ?? null;
 	const shared = closest?.shared ?? 0;
 	let skip = 0;
@@ -4814,7 +4889,7 @@ async function paintSceneIn(
 		!pixelInfo ||
 		!backgroundFits(cache, pixelInfo.width * pixelInfo.height)
 			? 0
-			: shared || lead.length;
+			: shared || seen;
 	const { head, tail } = splitBackground(drawables, skip || snapAt);
 	const run = skip ? tail : [...head, ...tail];
 	const snapAfter = snapAt ? head.length : 0;
@@ -4823,8 +4898,10 @@ async function paintSceneIn(
 	try {
 		// Scoped to the drawable loop: the finishing pass below reads back the
 		// composited pixels and belongs in device space.
-		if (frame.scale !== 1) {
+		const origin = opts?.origin;
+		if (frame.scale !== 1 || origin) {
 			skCanvas.save();
+			if (origin) skCanvas.translate(-origin.x, -origin.y);
 			skCanvas.scale(frame.scale, frame.scale);
 		}
 		// The families this scene loaded, in order, are the per-glyph fallback
@@ -4890,7 +4967,7 @@ async function paintSceneIn(
 		// Whole-frame finishing runs on the composited result, so after every
 		// drawable and before the flush — and in device pixels, off the scaled
 		// matrix the drawables used.
-		if (frame.scale !== 1) skCanvas.restore();
+		if (frame.scale !== 1 || origin) skCanvas.restore();
 		// The reduction comes BEFORE the finish: dither, black-extract and
 		// white-clamp are output-resolution ops (see applyFrameFinish), and running
 		// them on the dense render would average the dither back out and re-admit
@@ -4919,6 +4996,8 @@ async function paintSceneIn(
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
 			evictUnusedPaths(cache);
+			evictUnusedBitmaps(cache);
+			evictUnusedWork(cache);
 			evictUnusedLutImages(cache.luts);
 		}
 	}

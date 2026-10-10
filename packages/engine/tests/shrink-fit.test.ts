@@ -53,7 +53,7 @@ describe("shrink to fit", () => {
 		shaped.length = 0;
 		const fitted = engine.layoutText(input(20, height, "shrink"));
 		expect(fitted.shrinkApplied).toBe(true);
-		expect(shaped.filter((s) => s === 20)).toHaveLength(1);
+		expect(shaped.filter((s) => s === 20).length).toBeLessThanOrEqual(1);
 	});
 
 	test("lands on the largest size that fits", () => {

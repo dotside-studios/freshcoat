@@ -9,6 +9,7 @@ import {
 	createFrame,
 	createPaintCache,
 	createText,
+	encodePng,
 } from "../src/index";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
@@ -164,12 +165,19 @@ describe("one font provider per renderer", () => {
 		const blocked = new Promise<void>((resolve) => {
 			unblock = resolve;
 		});
+		let reached = () => {};
+		const loading = new Promise<void>((resolve) => {
+			reached = resolve;
+		});
+		const png = await encodePng(new Uint8Array(4 * 4 * 4).fill(255), 4, 4);
 		const renderer = await createRenderer({
 			ck,
 			fonts: { Geist: [GEIST] },
-			load: async () => {
+			load: async (src) => {
+				if (src !== "img://late") return VEND.slice();
+				reached();
 				await blocked;
-				return VEND.slice();
+				return png;
 			},
 		});
 		const [canvas, ...rest] = renderer.compile(textScene("Geist"), SIZE);
@@ -188,14 +196,15 @@ describe("one font provider per renderer", () => {
 					},
 				],
 			} as Command,
+			{ op: "loadImages", srcs: ["img://late"] },
 			...rest,
 		]);
+		await loading;
 		await renderer.addFonts({ Geist: [GEIST.slice()] });
 		renderer.compile(textScene("Geist"), SIZE);
 		expect(made[0]!.deleted).toBe(0);
 		unblock();
 		expect((await late).warnings).toEqual([]);
-		expect(made[0]!.deleted).toBe(1);
 		renderer.dispose();
 		expect(made.every((m) => m.deleted === 1)).toBe(true);
 	});
