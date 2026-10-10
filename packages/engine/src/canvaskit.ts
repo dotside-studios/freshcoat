@@ -98,6 +98,7 @@ import {
 	evictUnusedLines,
 	evictUnusedPaths,
 	evictUnusedWork,
+	noteLead,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
@@ -4449,6 +4450,24 @@ function paintDrawable(
 	canvas.restore();
 }
 
+// JSON of a command, and of a group apart from its children, kept per command
+// object so a scene that repaints the same commands stringifies them once.
+const commandJson = new WeakMap<object, string>();
+const groupJson = new WeakMap<object, string>();
+
+function memoJson(
+	memo: WeakMap<object, string>,
+	cmd: DrawCommand,
+	value: () => unknown,
+): string {
+	let json = memo.get(cmd);
+	if (json === undefined) {
+		json = JSON.stringify(value());
+		memo.set(cmd, json);
+	}
+	return json;
+}
+
 // The leading drawables whose pixels depend on nothing but the command and the
 // frame, each as a structural key. Text and images also depend on fonts and
 // decoded bytes the key would not cover, so the run stops at the first one. A
@@ -4461,15 +4480,15 @@ function backgroundKeys(
 	const keys: string[] = [];
 	for (const cmd of drawables) {
 		if (selfContained(cmd)) {
-			keys.push(outer + JSON.stringify(cmd));
+			keys.push(outer + memoJson(commandJson, cmd, () => cmd));
 			continue;
 		}
 		if (cmd.op === "drawGroup" && passThrough(cmd)) {
-			const { children, ...group } = cmd;
-			const inner = backgroundKeys(
-				children,
-				`${outer + JSON.stringify(group)}>`,
-			);
+			const group = memoJson(groupJson, cmd, () => {
+				const { children, ...rest } = cmd;
+				return rest;
+			});
+			const inner = backgroundKeys(cmd.children, `${outer + group}>`);
 			keys.push(...inner.keys);
 			if (inner.complete) continue;
 		}
@@ -4807,6 +4826,9 @@ async function paintSceneIn(
 	const lead = pixelInfo ? backgroundKeys(drawables).keys : [];
 	const closest =
 		cache && pixelInfo ? closestBackground(cache, bgFrame, lead) : null;
+	// A lead no earlier paint began with is not read back: when it changes every
+	// paint (a dragged shape) the snapshot would be evicted unused.
+	const seen = cache && pixelInfo ? noteLead(cache, lead) : 0;
 	const held = closest?.held ?? null;
 	const shared = closest?.shared ?? 0;
 	let skip = 0;
@@ -4827,7 +4849,7 @@ async function paintSceneIn(
 		!pixelInfo ||
 		!backgroundFits(cache, pixelInfo.width * pixelInfo.height)
 			? 0
-			: shared || lead.length;
+			: shared || seen;
 	const { head, tail } = splitBackground(drawables, skip || snapAt);
 	const run = skip ? tail : [...head, ...tail];
 	const snapAfter = snapAt ? head.length : 0;

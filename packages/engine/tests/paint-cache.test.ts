@@ -952,7 +952,12 @@ describe("PaintCache background", () => {
 		for (const extra of [{}, { supersample: 2 }]) {
 			const cache = createPaintCache();
 			await paintRecords(
-				[cardScene("Ada"), cardScene("Grace"), cardScene("Hedy")],
+				[
+					cardScene("Ada"),
+					cardScene("Ada"),
+					cardScene("Grace"),
+					cardScene("Hedy"),
+				],
 				cache,
 				extra,
 			);
@@ -978,8 +983,10 @@ describe("PaintCache background", () => {
 		await paintRecords(
 			[
 				cardScene("Ada"),
+				cardScene("Ada"),
 				cardScene("Grace", { fills: other }),
 				cardScene("Hedy", { fills: other }),
+				cardScene("Margaret", { fills: other }),
 			],
 			cache,
 		);
@@ -998,12 +1005,13 @@ describe("PaintCache background", () => {
 				cardScene("Ada", { accent: "#ff0000" }),
 				cardScene("Grace", { accent: "#00ff00" }),
 				cardScene("Hedy", { accent: "#0000ff" }),
+				cardScene("Margaret", { accent: "#ffff00" }),
 			],
 			cache,
 		);
 		expect(cache.stats()).toMatchObject({
-			backgroundSnapshots: 2,
-			backgroundReuses: 1,
+			backgroundSnapshots: 1,
+			backgroundReuses: 2,
 		});
 		cache.dispose();
 	});
@@ -1019,9 +1027,9 @@ describe("PaintCache background", () => {
 	test("clear() drops the background", async () => {
 		await initCk();
 		const cache = createPaintCache();
-		await paintRecords([cardScene("Ada")], cache);
+		await paintRecords([cardScene("Ada"), cardScene("Ada")], cache);
 		cache.clear();
-		await paintRecords([cardScene("Grace")], cache);
+		await paintRecords([cardScene("Grace"), cardScene("Grace")], cache);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 2,
 			backgroundReuses: 0,
@@ -1052,7 +1060,7 @@ describe("PaintCache background", () => {
 		for (const extra of [{}, { supersample: 2 }]) {
 			const cache = createPaintCache();
 			await paintRecords(
-				sides(["Ada", "Ada", "Grace", "Grace", "Hedy", "Hedy"]),
+				sides(["Ada", "Ada", "Grace", "Grace", "Hedy", "Hedy", "Ada", "Ada"]),
 				cache,
 				extra,
 			);
@@ -1070,12 +1078,12 @@ describe("PaintCache background", () => {
 			createHash("sha256").update(px.data).digest("hex");
 		const cache = createPaintCache();
 		const { rt } = runtime(fonts, images, cache);
-		for (const node of sides(["Ada", "Ada", "Grace", "Grace"])) {
+		for (const node of sides(Array(8).fill("Ada"))) {
 			const commands = compile(node, SIZE, fonts);
 			const plain = await pixels(commands, runtime(fonts, images).rt);
 			expect(hash(await pixels(commands, rt))).toBe(hash(plain));
 		}
-		expect(cache.stats().backgroundReuses).toBe(2);
+		expect(cache.stats().backgroundReuses).toBe(4);
 		cache.dispose();
 	});
 
@@ -1084,9 +1092,12 @@ describe("PaintCache background", () => {
 		const colors = ["#000000", "#111111", "#222222", "#333333", "#444444"];
 		const cache = createPaintCache();
 		await paintRecords(
-			[...colors, colors[1] as string, colors[0] as string].map((c) =>
-				cardScene("Ada", { fills: tinted(c) }),
-			),
+			[
+				...colors.flatMap((c) => [c, c]),
+				colors[1] as string,
+				colors[0] as string,
+				colors[0] as string,
+			].map((c) => cardScene("Ada", { fills: tinted(c) })),
 			cache,
 		);
 		expect(cache.stats()).toMatchObject({
@@ -1100,7 +1111,7 @@ describe("PaintCache background", () => {
 		await initCk();
 		const one = SIZE.width * SIZE.height;
 		const cache = createPaintCache({ maxImagePixels: one * 1.5 });
-		await paintRecords(sides(["Ada", "Ada", "Grace", "Grace"]), cache);
+		await paintRecords(sides(Array(6).fill("Ada")), cache);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 4,
 			backgroundReuses: 0,
@@ -1200,7 +1211,10 @@ describe("PaintCache background", () => {
 				],
 			});
 		const cache = createPaintCache();
-		await paintRecords([isolated("Alice"), isolated("Bob")], cache);
+		await paintRecords(
+			[isolated("Alice"), isolated("Bob"), isolated("Carol")],
+			cache,
+		);
 		expect(cache.stats()).toMatchObject({
 			backgroundSnapshots: 1,
 			backgroundReuses: 1,
@@ -1328,6 +1342,125 @@ describe("PaintCache background", () => {
 			backgroundSnapshots: 0,
 			backgroundReuses: 0,
 		});
+		cache.dispose();
+	});
+
+
+	// So the frame's group is entered, each leading rect keyed on its own.
+	const label = () =>
+		createText({
+			pos: { x: 4, y: 40 },
+			size: { width: 60, height: 14 },
+			text: "label",
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 10,
+				lineHeight: 1.2,
+			},
+			color: "#101828",
+		});
+
+	function dragged(x: number): Node {
+		return createFrame({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			children: [
+				createRect({
+					pos: { x, y: 4 },
+					size: { width: 20, height: 20 },
+					fills: [{ kind: "solid", color: "#ef4444" }],
+				}),
+				createRect({
+					pos: { x: 40, y: 20 },
+					size: { width: 30, height: 20 },
+					fills: [{ kind: "solid", color: "#3b82f6" }],
+				}),
+				label(),
+			],
+		});
+	}
+
+	test("a lead that changes every paint is never read back", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		let reads = 0;
+		for (let x = 0; x < 6; x++)
+			reads += await readbacks(compile(dragged(x), SIZE, fonts), rt);
+		expect(reads).toBe(0);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 0,
+			backgroundReuses: 0,
+		});
+		expect(paintCacheState(cache).backgrounds).toEqual([]);
+		cache.dispose();
+	});
+
+	test("a repeated lead is read back once and then reused", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const reads: number[] = [];
+		for (let i = 0; i < 4; i++)
+			reads.push(await readbacks(compile(dragged(3), SIZE, fonts), rt));
+		expect(reads).toEqual([0, 1, 0, 0]);
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 1,
+			backgroundReuses: 2,
+		});
+		cache.dispose();
+	});
+
+	test("a stable lead survives a later drawable moving", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const move = (x: number) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: SIZE,
+				children: [
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: SIZE,
+						fills: [{ kind: "solid", color: "#f5f0e6" }],
+					}),
+					createRect({
+						pos: { x, y: 4 },
+						size: { width: 20, height: 20 },
+						fills: [{ kind: "solid", color: "#ef4444" }],
+					}),
+					label(),
+				],
+			});
+		for (let x = 0; x < 5; x++) {
+			const commands = compile(move(x), SIZE, fonts);
+			const plain = await pixels(commands, runtime(fonts, images).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+		}
+		expect(cache.stats()).toMatchObject({
+			backgroundSnapshots: 1,
+			backgroundReuses: 3,
+		});
+		cache.dispose();
+	});
+
+	test("a command's key is stringified once across paints", async () => {
+		await initCk();
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, images, cache);
+		const commands = compile(dragged(3), SIZE, fonts);
+		const spy = vi.spyOn(JSON, "stringify");
+		try {
+			await readbacks(commands, rt);
+			const first = spy.mock.calls.length;
+			await readbacks(commands, rt);
+			expect(spy.mock.calls.length - first).toBeLessThan(first);
+		} finally {
+			spy.mockRestore();
+		}
 		cache.dispose();
 	});
 

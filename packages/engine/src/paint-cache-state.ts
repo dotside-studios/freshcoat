@@ -91,6 +91,8 @@ export type PaintCacheState = {
 	luts: LutImages;
 	surface: CachedSurface | null;
 	workUsed: Set<string>;
+	// The leading keys of the last few offscreen paints, most recent first.
+	leads: string[][];
 	// Most recently used first.
 	backgrounds: CachedBackground[];
 	finishNoise: CachedFinishNoise | null;
@@ -127,6 +129,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		luts: createLutImages(),
 		surface: null,
 		workUsed: new Set(),
+		leads: [],
 		backgrounds: [],
 		finishNoise: null,
 		disposed: false,
@@ -141,6 +144,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		state.images.clear();
 		freeLutImages(state.luts);
 		state.backgrounds = [];
+		state.leads = [];
 		state.finishNoise = null;
 		const surface = state.surface;
 		state.surface = null;
@@ -323,6 +327,18 @@ export function closestBackground(
 		if (!best || shared > best.shared) best = { held, shared };
 	}
 	return best;
+}
+
+// Records a paint's leading keys and returns how many of them an earlier
+// paint's began with, the part worth keeping a snapshot of.
+export function noteLead(state: PaintCacheState, keys: string[]): number {
+	let seen = 0;
+	for (const lead of state.leads) seen = Math.max(seen, sharedLength(lead, keys));
+	if (keys.length === 0) return 0;
+	state.leads = [keys, ...state.leads.filter((lead) => lead !== keys)];
+	if (state.leads.length > MAX_BACKGROUNDS)
+		state.leads.length = MAX_BACKGROUNDS;
+	return seen;
 }
 
 export function touchBackground(
