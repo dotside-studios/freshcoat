@@ -456,6 +456,28 @@ prunes each template it packs.
 `templateStem(fileName)` is a file name without its template extension
 (`.coat`, `.coat.json`, `.tkit`, `.tkit.json` or `.json`).
 
+## Template modules
+
+`defineTemplate` types a template written as a script, the module form the
+[`freshcoat` command line](../cli/README.md#template-modules) evaluates before
+it renders. It takes a template, a promise of one, or a function that returns
+either, and returns it unchanged. `./define` also exports it and nothing else,
+for a script that should load no more than it needs.
+
+```ts
+import { defineTemplate } from "@freshcoat-js/coatfile";
+
+export default defineTemplate(async () => ({
+  format_version: "1.6",
+  id: "badge",
+  name: "Badge",
+  width: 200,
+  height: 100,
+  fields: { type: "object", properties: {}, required: [] },
+  template_data: [],
+}));
+```
+
 ## Gradients
 
 A `fill` is a colour string or a gradient: `linear`, `radial` or `angular`,

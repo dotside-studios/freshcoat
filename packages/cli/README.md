@@ -30,6 +30,38 @@ Fonts fetched from the network, such as Google Fonts, are kept in a cache for
 `%LOCALAPPDATA%\freshcoat\Cache` on Windows. `FRESHCOAT_CACHE_DIR` moves it,
 and `--no-cache` fetches them again without reading or writing it.
 
+## Template modules
+
+A template can also be a script: a `.ts`, `.mts`, `.cts`, `.js`, `.mjs` or
+`.cjs` file whose default export, or `template` export, is a template object,
+a promise of one, or a function that returns either.
+[`defineTemplate`](../coatfile/README.md#template-modules) types it. Each command that reads
+a template runs the script in a separate runtime, takes the JSON its export
+resolves to and reads that as it would a template JSON file, so the result is
+validated the same way and relative image paths resolve against the script's
+directory.
+
+```ts
+// card.coat.ts
+import { defineTemplate } from "@freshcoat-js/coatfile";
+
+export default defineTemplate(async () => {
+	const response = await fetch("https://example.com/badge.json");
+	return { ...(await response.json()), name: `Badge ${new Date().getFullYear()}` };
+});
+```
+
+```sh
+freshcoat render card.coat.ts --set displayName="Alex" --out out
+freshcoat pack card.coat.ts --out card.coat
+```
+
+The script runs in the runtime running freshcoat, or the `node`, `bun` or
+`deno` command or path that `FRESHCOAT_RUNTIME` names, with the working
+directory and environment of freshcoat. TypeScript needs a runtime that runs
+it: Bun, Deno, or Node 22.18 or later. What the script prints goes to stderr.
+A script runs with your permissions, so render only scripts you trust.
+
 ## Commands
 
 ### render
