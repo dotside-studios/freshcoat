@@ -348,11 +348,12 @@ const SHELL_DEFAULT: Record<VariantShellKey, unknown> = {
  * The delta that turns `base` into `next`, two versions of one element, or
  * undefined when they draw the same. `properties` holds each key `next` sets
  * to a different value; a key it removes cannot be written as a delta, so it
- * is left out. A frame's `children` and a mask's `mask` and `children` are
- * structure, never a delta: each element inside gets its own. A shell field
- * `next` sets is kept where it differs from `base`'s, an omitted one read as
- * what compile draws (`pos` `{x:0,y:0}`, `rotation` 0, `opacity` 1). Values
- * compare as `sameJson` does, within `epsilon`. `hidden` is never set.
+ * is left out. A frame's `children`, a mask's `mask` and `children` and a
+ * vector's `boolean` operands are structure, never a delta: each element
+ * inside gets its own. A shell field `next` sets is kept where it differs
+ * from `base`'s, an omitted one read as what compile draws (`pos`
+ * `{x:0,y:0}`, `rotation` 0, `opacity` 1). Values compare as `sameJson` does,
+ * within `epsilon`. `hidden` is never set.
  */
 export function diffElement(
 	base: Element,
@@ -365,6 +366,7 @@ export function diffElement(
 		skip.add("children");
 		skip.add("mask");
 	}
+	if (base.type === "vector" || next.type === "vector") skip.add("boolean");
 	const bp = (base.properties ?? {}) as Record<string, unknown>;
 	const np = (next.properties ?? {}) as Record<string, unknown>;
 	const properties: Record<string, unknown> = {};

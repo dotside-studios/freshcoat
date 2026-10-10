@@ -20,7 +20,7 @@ import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
 import { chooseOption, fastUser, spinbutton } from "./aria";
-import { doc, geometryOf } from "./doc-fixture";
+import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
 function setup(selection: string[], t: Template = doc()) {
 	const c = new EditorController();
@@ -167,6 +167,17 @@ describe("DesignPanel", () => {
 			"Visibility",
 		]);
 		expect(spinbutton("Corner radius")).toBeTruthy();
+	});
+
+	it("gives a boolean layer its operation, and its operands only the shape", () => {
+		setup(["0/7"], booleanDoc());
+		const titles = () =>
+			screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+		expect(screen.getByRole("toolbar", { name: "Boolean" })).toBeTruthy();
+		expect(titles()).toContain("Fill");
+		cleanup();
+		setup(["0/7/0"], booleanDoc());
+		expect(titles()).toEqual(["Layer", "Visibility"]);
 	});
 
 	it("remembers a collapsed section across selections", async () => {

@@ -31,6 +31,7 @@ export type RefusalCode =
 	| "too_few"
 	| "not_a_shape"
 	| "empty_result"
+	| "last_operand"
 	| "unknown_variant"
 	| "empty_label"
 	| "invalid_variant_id"

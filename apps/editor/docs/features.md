@@ -207,10 +207,23 @@ the records, and **Export** turns templates and records into files.
   - Boolean operations: select two or more sibling rectangles, ellipses or
     vectors and choose Union, Subtract, Intersect or Exclude selection from
     Object > Boolean, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
-    X. The shapes become one vector layer in the bottom-most one's place,
+    X. The shapes become one boolean layer in the bottom-most one's place,
     with its fill, stroke and effects, as in Figma: Subtract takes the upper
-    shapes away from the bottom-most. Each is one undo step. Rotation and
-    corner radius are part of the result, and corner smoothing is not.
+    shapes away from the bottom-most. The shapes stay in it as operands, so
+    the result follows every edit to them, and a boolean selected with other
+    shapes becomes an operand of the new one. Each is one undo step.
+    Rotation and corner radius are part of the result, and corner smoothing
+    is not.
+  - A selected boolean layer shows its operation pressed in the Boolean
+    toolbar; the others switch it. Flatten, in the toolbar, Object > Flatten
+    and the layer menu, turns it into a plain vector that keeps the result,
+    after which the operands are gone. Its points can't be edited until then.
+  - Operands are layers: double-click a selected boolean, or Ctrl or Cmd
+    click it, to select the shape under the pointer (Enter selects them all),
+    then move, resize, rotate, restyle, hide or delete it. An operand paints
+    nothing of its own, and a hidden one leaves the result. Deleting the last operand
+    deletes the boolean. A boolean's file keeps its last result as the
+    layer's path, so a reader that doesn't combine shapes draws the same.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a
     radial one's center and two radii, an angular one's center and rotation,
     and a dot per stop. Shift snaps directions to 15 degrees, and a click on
@@ -222,6 +235,10 @@ the records, and **Export** turns templates and records into files.
 - **Layers:**
   - One side is shown at a time; the Sides list switches between them.
   - Rename in place, reorder or reparent by drag and drop, group and ungroup.
+  - A boolean layer expands to its operands, which rename, hide, reorder and
+    drag out to become ordinary layers like a mask's content. Only rectangles,
+    ellipses and vectors can be dragged in, and the last operand can't be
+    dragged out.
   - Hide and lock layers; neither is written to the file.
   - A context menu on every layer, with Arrange, Align and Boolean
     submenus. Right-clicking a layer on the canvas selects it, unless it is
@@ -231,7 +248,8 @@ the records, and **Export** turns templates and records into files.
   - A layer that reads a field shows `{}`, which names those fields and opens
     them in Content.
 - **Inspector:**
-  - Align and boolean toolbars at the top. Align left, horizontal centers
+  - Align and boolean toolbars at the top (the boolean one for two or more
+    shapes, or one boolean layer). Align left, horizontal centers
     and right are Alt+A, H and D; top, vertical centers and bottom are
     Alt+W, V and S; Alt+Shift+H and Alt+Shift+V distribute. The Object menu
     holds the same commands under Boolean, Arrange and Align and distribute.

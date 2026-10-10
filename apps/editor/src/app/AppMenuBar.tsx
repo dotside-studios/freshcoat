@@ -82,6 +82,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 		items: [
 			"object.group",
 			"object.ungroup",
+			"object.flatten",
 			"object.textOnPath",
 			"-",
 			{

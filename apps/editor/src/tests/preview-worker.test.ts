@@ -19,7 +19,7 @@ import {
 import { createRenderSession } from "~/render/session";
 import { SAMPLES } from "~/samples";
 import { VEND_SANS } from "~/samples/vend-sans";
-import { doc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
+import { booleanDoc, doc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
 
 function request(over: Partial<LiveRequest> = {}): LiveRequest {
 	const template = over.template ?? doc();
@@ -314,6 +314,22 @@ describe("main-thread fallback", () => {
 				],
 			],
 		]);
+	});
+
+	test("rebuilds a boolean's path from its operands", async () => {
+		const session = createRenderSession(
+			ck,
+			(width, height) => ({ width, height }) as OffscreenCanvas,
+		);
+		const combine = vi.spyOn(ck.Path, "MakeFromOp");
+		const out = await renderLiveFrame(
+			session,
+			request({ template: booleanDoc() }),
+		);
+		expect(combine).toHaveBeenCalled();
+		expect(out.geometry.get("0/7/1")?.parentKey).toBe("0/7");
+		combine.mockRestore();
+		session.dispose();
 	});
 
 	test("paints a sample and reads its layer boxes and warnings", async () => {

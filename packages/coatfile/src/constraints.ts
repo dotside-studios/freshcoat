@@ -13,6 +13,7 @@ export {
 	barcodeBox,
 	constrainBox,
 	resizeElements,
+	resizeVectorBoolean,
 	resizeVectorPath,
 } from "./relayout";
 

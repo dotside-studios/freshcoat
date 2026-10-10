@@ -4,7 +4,7 @@ import { rectOf } from "../doc/geometry";
 import { moveElements, unwrap } from "../doc/ops";
 import { getElement } from "../doc/path";
 import { dropToMove } from "../panels/layers/drop";
-import { doc, frozenDoc, geometryOf } from "./doc-fixture";
+import { booleanDoc, doc, frozenDoc, geometryOf } from "./doc-fixture";
 
 // front, paint order: 0 a · 1 f [f1, t1, inner [deep]] · 2 m (ms) [img] ·
 // 3 row [r1, r2, abs] · 4 title · 5 rot · 6 spin [spun]. The tree shows each
@@ -284,5 +284,60 @@ describe("dropToMove: several layers", () => {
 			parent: { side: 0 },
 			index: 5,
 		});
+	});
+});
+
+describe("dropToMove: a boolean", () => {
+	const t = booleanDoc();
+
+	it("takes a rect or vector dropped on it as its topmost operand", () => {
+		const move = dropToMove(t, ["0/0"], "0/7", "on");
+		expect(move).toEqual({ keys: ["0/0"], parent: "0/7", index: 2 });
+	});
+
+	it("takes a rect dropped between its operands", () => {
+		expect(dropToMove(t, ["0/0"], "0/7/0", "before")).toEqual({
+			keys: ["0/0"],
+			parent: "0/7",
+			index: 1,
+		});
+	});
+
+	it("refuses anything else, on it or among its operands", () => {
+		for (const dragged of ["0/1", "0/2", "0/3", "0/4"]) {
+			expect(dropToMove(t, [dragged], "0/7", "on")).toBeNull();
+			expect(dropToMove(t, [dragged], "0/7/1", "after")).toBeNull();
+		}
+		expect(dropToMove(t, ["0/0", "0/4"], "0/7", "on")).toBeNull();
+	});
+
+	it("lets an operand out to the stack, keeping its place", () => {
+		const move = dropToMove(t, ["0/7/1"], "0/0", "before");
+		expect(move).toEqual({ keys: ["0/7/1"], parent: { side: 0 }, index: 1 });
+		const r = unwrap(
+			moveElements(
+				t,
+				move?.keys as string[],
+				move?.parent as never,
+				move?.index as number,
+				geometryOf(t),
+			),
+		);
+		const out = r.template.template_data[0]?.elements[1];
+		expect(out?.id).toBe("dot");
+		expect(out?.pos).toEqual({ x: 140, y: 400 });
+	});
+
+	it("reorders operands within it", () => {
+		const move = dropToMove(t, ["0/7/0"], "0/7/1", "before");
+		expect(move).toEqual({ keys: ["0/7/0"], parent: "0/7", index: 2 });
+		const r = unwrap(moveElements(t, ["0/7/0"], "0/7", 2, geometryOf(t)));
+		const shape = getElement(r.template, "0/7") as never as {
+			properties: { boolean: { operands: Element[] } };
+		};
+		expect(shape.properties.boolean.operands.map((e) => e.id)).toEqual([
+			"dot",
+			"sq",
+		]);
 	});
 });

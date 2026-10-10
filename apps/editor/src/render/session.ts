@@ -1,4 +1,5 @@
 import {
+	canvasKitPathOp,
 	compile,
 	type FrameWarning,
 	type Template,
@@ -77,6 +78,7 @@ export function createRenderSession(
 	});
 	let fonts: Map<string, Uint8Array[]> | null = null;
 	let disposed = false;
+	const pathOp = canvasKitPathOp(ck);
 
 	return {
 		async render(input) {
@@ -91,6 +93,7 @@ export function createRenderSession(
 			const compiled = compile(template, input.values, {
 				width: template.width,
 				height: template.height,
+				pathOp,
 			});
 			const frame = compiled.frames[0];
 			if (!frame) throw new Error("template has no side to render");

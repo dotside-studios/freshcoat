@@ -6,7 +6,7 @@ import {
 	flattenRows,
 	type LayerRow,
 } from "../panels/layers/rows";
-import { frozenDoc } from "./doc-fixture";
+import { booleanDoc, frozenDoc } from "./doc-fixture";
 
 const find = (rows: LayerRow[], id: string): LayerRow | undefined => {
 	for (const r of rows) {
@@ -56,6 +56,27 @@ describe("buildLayerRows", () => {
 			(k) => byKey(rows, k)?.container,
 		);
 		expect(containers).toEqual(["0/6", "0/3", "0/2", "0/1", "0/1/2"]);
+	});
+
+	it("shows a boolean's operands as its rows, topmost first", () => {
+		const rows = buildLayerRows(booleanDoc(), 0);
+		const shape = find(rows, "shape") as LayerRow;
+		expect(shape.container).toBe(true);
+		expect(shape.children.map((r) => [r.id, r.key, r.kind])).toEqual([
+			["dot", "0/7/1", "layer"],
+			["sq", "0/7/0", "layer"],
+		]);
+		expect(shape.children.every((r) => !r.container)).toBe(true);
+		expect(flattenRows(rows).slice(0, 3)).toEqual(["0/7", "0/7/1", "0/7/0"]);
+	});
+
+	it("keeps a boolean's rows when its operand matches a filter", () => {
+		const { rows, ancestors } = filterRows(
+			buildLayerRows(booleanDoc(), 0),
+			"dot",
+		);
+		expect(ancestors).toEqual(["0/7"]);
+		expect(rows[0]?.children.map((r) => r.id)).toEqual(["dot"]);
 	});
 
 	it("badges layers that read a field themselves", () => {

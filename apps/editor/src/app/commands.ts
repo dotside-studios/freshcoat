@@ -3,7 +3,8 @@ import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
 import type { BooleanOp } from "~/doc/boolean";
 import type { AlignMode } from "~/doc/geometry";
-import type { EditorState, Tool } from "~/state/store";
+import { getElement, isBooleanVector } from "~/doc/path";
+import { type EditorState, type Tool, working } from "~/state/store";
 import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
@@ -387,6 +388,16 @@ export const COMMANDS: Command[] = [
 	booleanCommand("subtract", "Alt+Shift+S"),
 	booleanCommand("intersect", "Alt+Shift+I"),
 	booleanCommand("exclude", "Alt+Shift+X"),
+	{
+		id: "object.flatten",
+		label: BOOLEAN.flatten,
+		group: "Object",
+		enabled: (s) => {
+			const t = working(s);
+			return !!t && s.selection.some((k) => isBooleanVector(getElement(t, k)));
+		},
+		run: ({ controller }) => controller.flattenSelection(),
+	},
 	{
 		id: "object.forward",
 		label: "Bring forward",

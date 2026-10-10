@@ -4,6 +4,7 @@ import { TextArea } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useEffect, useState } from "react";
+import { BOOLEAN } from "~/app/copy";
 import RadiusIcon from "~icons/mingcute/border-radius-line";
 import { Notice, Row } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
@@ -27,24 +28,27 @@ export function VectorSection({ ins }: { ins: Inspect }) {
 	const props = (ins.layers as VectorElement[]).map((e) => e.properties);
 	const rule = commonValue(props.map((p) => p.fillRule ?? "nonzero"));
 	const radius = commonValue(props.map((p) => p.cornerRadius ?? 0));
+	const live = props.some((p) => p.boolean);
 	return (
 		<InspectorSection title="Vector">
-			<Row label="Fill rule">
-				<Select
-					aria-label="Fill rule"
-					className="min-w-0 flex-1"
-					placeholder="Mixed"
-					value={rule}
-					onChange={(v) =>
-						ins.setProps("fill-rule", () => ({
-							fillRule: v === "nonzero" ? undefined : v,
-						}))
-					}
-				>
-					<SelectItem id="nonzero">Non-zero</SelectItem>
-					<SelectItem id="evenodd">Even-odd</SelectItem>
-				</Select>
-			</Row>
+			{!live && (
+				<Row label="Fill rule">
+					<Select
+						aria-label="Fill rule"
+						className="min-w-0 flex-1"
+						placeholder="Mixed"
+						value={rule}
+						onChange={(v) =>
+							ins.setProps("fill-rule", () => ({
+								fillRule: v === "nonzero" ? undefined : v,
+							}))
+						}
+					>
+						<SelectItem id="nonzero">Non-zero</SelectItem>
+						<SelectItem id="evenodd">Even-odd</SelectItem>
+					</Select>
+				</Row>
+			)}
 			<NumberField
 				label={<RadiusIcon />}
 				aria-label="Corner radius"
@@ -56,7 +60,9 @@ export function VectorSection({ ins }: { ins: Inspect }) {
 					}))
 				}
 			/>
-			{props.length === 1 ? (
+			{live ? (
+				<Notice>{BOOLEAN.editPoints}</Notice>
+			) : props.length === 1 ? (
 				<PathField
 					value={props[0].d}
 					onCommit={(d) => ins.setProps("path", () => ({ d }))}

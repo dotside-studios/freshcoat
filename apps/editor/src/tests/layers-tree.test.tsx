@@ -5,7 +5,7 @@ import { EditorController } from "../app/controller";
 import { getElement } from "../doc/path";
 import { LeftPanel } from "../panels/LeftPanel";
 import { fastUser } from "./aria";
-import { doc } from "./doc-fixture";
+import { booleanDoc, doc } from "./doc-fixture";
 
 let controller: EditorController;
 
@@ -13,9 +13,9 @@ function row(key: string): HTMLElement {
 	return screen.getByTestId(`layer-row-${key}`);
 }
 
-function setup() {
+function setup(template = doc()) {
 	controller = new EditorController();
-	controller.dispatch({ type: "open", template: doc(), fileName: "doc.coat" });
+	controller.dispatch({ type: "open", template, fileName: "doc.coat" });
 	const user = fastUser();
 	render(
 		<ControllerProvider controller={controller}>
@@ -97,6 +97,20 @@ describe("Layers tree", () => {
 		act(() => controller.select(["0/2/0"]));
 		expect(within(row("0/2/-1")).getByText("mask ·")).toBeTruthy();
 		expect(within(row("0/2/-1")).getByText("ms")).toBeTruthy();
+	});
+
+	it("shows a boolean's operands as children that select and rename", async () => {
+		const user = setup(booleanDoc());
+		expect(row("0/7").getAttribute("aria-expanded")).toBe("false");
+		act(() => controller.select(["0/7/1"]));
+		expect(row("0/7").getAttribute("aria-expanded")).toBe("true");
+		expect(row("0/7/1").getAttribute("aria-selected")).toBe("true");
+		expect(row("0/7/0")).toBeTruthy();
+		expect(row("0/7/1").getAttribute("data-pinned")).toBeNull();
+		await user.click(
+			within(row("0/7/0")).getByRole("button", { name: "Hide" }),
+		);
+		expect(controller.state.hidden.has("0/7/0")).toBe(true);
 	});
 
 	it("hover goes both ways", async () => {

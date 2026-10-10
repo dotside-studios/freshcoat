@@ -170,6 +170,7 @@ test("the Object menu groups align and distribute, which have shortcuts", async 
 	await expect(menu.getByRole("menuitem")).toHaveText([
 		/Group into frame/,
 		/Ungroup/,
+		/Flatten/,
 		/Attach text to path/,
 		"Boolean",
 		"Arrange",

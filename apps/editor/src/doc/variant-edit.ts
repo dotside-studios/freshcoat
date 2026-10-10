@@ -20,7 +20,7 @@ import {
 	variantBase,
 } from "@freshcoat-js/coatfile";
 import type { LayerGeometry } from "./geometry";
-import { childEntries, walkLayers } from "./path";
+import { childEntries, isBooleanVector, walkLayers } from "./path";
 
 export { activeVariantId };
 
@@ -394,6 +394,21 @@ function foldStructural(
 		const restore = (el: Element): Element => {
 			const b = byId.get(el.id);
 			const own = b && b.type === el.type ? b : el;
+			if (isBooleanVector(el)) {
+				const operation = isBooleanVector(own)
+					? own.properties.boolean
+					: el.properties.boolean;
+				return {
+					...own,
+					properties: {
+						...own.properties,
+						boolean: {
+							...operation,
+							operands: el.properties.boolean.operands.map(restore),
+						},
+					},
+				} as Element;
+			}
 			if (el.type !== "frame" && el.type !== "mask") return own;
 			const properties: Record<string, unknown> = {
 				...own.properties,

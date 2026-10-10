@@ -1,4 +1,5 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
+import { isBooleanShape } from "~/doc/boolean";
 import type { ParentRef } from "~/doc/ops";
 import {
 	childEntries,
@@ -6,6 +7,7 @@ import {
 	getElement,
 	isAncestor,
 	isBackgroundPath,
+	isBooleanVector,
 	isContainer,
 	MASK_SOURCE,
 	parentKeyOf,
@@ -44,9 +46,10 @@ function childCount(t: Template, parent: string | null, side: number): number {
  *
  * The tree lists each stack topmost first, so a row shown above another is
  * painted over it: "before" a row is the paint index above it (i + 1) and
- * "after" is its own index. "On" a frame or mask makes the layers its topmost
- * children. The background row only takes a drop before it (the bottom of the
- * side), and a mask's source takes none.
+ * "after" is its own index. "On" a frame, mask or boolean vector makes the
+ * layers its topmost children. The background row only takes a drop before it
+ * (the bottom of the side), a mask's source takes none, and a boolean takes
+ * only rectangles and vectors.
  */
 export function dropToMove(
 	t: Template,
@@ -88,6 +91,14 @@ export function dropToMove(
 	if (
 		parentKey !== null &&
 		keys.some((k) => k === parentKey || isAncestor(k, parentKey as string))
+	)
+		return null;
+
+	if (
+		isBooleanVector(
+			parentKey === null ? undefined : getElement(t, parentKey),
+		) &&
+		!keys.every((k) => isBooleanShape(getElement(t, k) as Element))
 	)
 		return null;
 

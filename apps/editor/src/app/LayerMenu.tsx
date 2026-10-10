@@ -177,6 +177,7 @@ export function LayerMenuItems({ onRename }: { onRename?: () => void }) {
 				isDisabled={layers.length === 0}
 			/>
 			<CommandItem id="object.ungroup" state={state} isDisabled={!hasFrame} />
+			<CommandItem id="object.flatten" state={state} />
 			<CommandItem id="object.textOnPath" state={state} />
 			<MenuSeparator />
 			<CommandSubmenu
