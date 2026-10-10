@@ -43,7 +43,7 @@ directory.
 
 ```ts
 // card.coat.ts
-import { defineTemplate } from "@freshcoat-js/coatfile/define";
+import { defineTemplate } from "@freshcoat-js/coatfile";
 
 export default defineTemplate(async () => {
 	const response = await fetch("https://example.com/badge.json");

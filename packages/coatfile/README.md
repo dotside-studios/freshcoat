@@ -461,11 +461,11 @@ prunes each template it packs.
 `defineTemplate` types a template written as a script, the module form the
 [`freshcoat` command line](../cli/README.md#template-modules) evaluates before
 it renders. It takes a template, a promise of one, or a function that returns
-either, and returns it unchanged. `./define` holds only it, so the script loads
-nothing else.
+either, and returns it unchanged. `./define` also exports it and nothing else,
+for a script that should load no more than it needs.
 
 ```ts
-import { defineTemplate } from "@freshcoat-js/coatfile/define";
+import { defineTemplate } from "@freshcoat-js/coatfile";
 
 export default defineTemplate(async () => ({
   format_version: "1.6",
