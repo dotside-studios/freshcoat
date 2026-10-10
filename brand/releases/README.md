@@ -1,9 +1,11 @@
 # Release banner brief
 
 Every release opens with a banner: the logo and version in the middle of a
-1600 × 320 strip, over art made for that release. This brief is how we decide
-what that art is. It fixes the frame and leaves the art open, so each banner
-can look like nothing before it.
+1600 × 320 strip, over art made for that release. The banner is how we
+celebrate a release: it gives each one an identity of its own, something to
+remember it by, rather than a summary of its changes. This brief is how we
+decide what that art is. It fixes the frame and leaves the art open, so each
+banner can look like nothing before it.
 
 ## What stays the same
 
