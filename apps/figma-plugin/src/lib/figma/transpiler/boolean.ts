@@ -146,14 +146,17 @@ function operandOf(
 	const placed = place(parent, child, scale);
 	if (!placed) return `${label} is skewed, flipped or scaled`;
 	if (child.type === "RECTANGLE") {
-		if (child.cornerSmoothing && child.cornerRadius)
-			return `${label} has corner smoothing`;
 		const corners = scaleCorners(child.cornerRadius, scale);
 		return {
 			id: idOf(child),
 			type: "rect",
 			...placed,
-			properties: corners !== undefined ? { cornerRadius: corners } : {},
+			properties: {
+				...(corners !== undefined ? { cornerRadius: corners } : {}),
+				...(corners !== undefined && child.cornerSmoothing
+					? { cornerSmoothing: Math.min(1, child.cornerSmoothing) }
+					: {}),
+			},
 		};
 	}
 	const path = pathOf(child, scale);
