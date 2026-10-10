@@ -4,6 +4,7 @@ import { packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
+import { PDFDocument } from "pdf-lib";
 import { version } from "../src/main";
 import {
 	card,
@@ -510,10 +511,7 @@ describe("render a template with --data", () => {
 		await box.write("people.dat", "name\nAna\n");
 		const data = ["render", "badge.json", "--data"];
 		const cases: [string[], number, string][] = [
-			[[...data, "people.csv"], 2, "--data needs --out <file.zip|file.pdf>"],
-			[[...data, "people.csv", "--out", "dir"], 2, "--data needs --out <file.zip|file.pdf>"],
-			[[...data, "people.csv", "--out", "x.zip", "--scale", "1", "--scale", "2"], 2, "a .zip or .pdf takes one --scale"],
-			[[...data, "people.csv", "--out", "x.pdf", "--format", "jpeg"], 2, "--format applies only to a zip"],
+			[[...data, "people.csv"], 2, "--data needs --out <dir|file.zip|file.pdf>"],
 			[["render", "a.coatworkspace", "--data", "people.csv", "--preset", "p", "--out", "x.zip"], 2, "--data applies only to templates"],
 			[[...data, "none.csv", "--out", "x.zip"], 1, "cannot read none.csv: no such file"],
 			[[...data, "empty.csv", "--out", "x.zip"], 1, "empty.csv has no records"],
@@ -524,6 +522,176 @@ describe("render a template with --data", () => {
 			expect({ argv, code: run.code }).toEqual({ argv, code });
 			expect(run.stderr).toContain(message);
 			expect(run.stdout).toBe("");
+		}
+	});
+});
+
+describe("render export options", () => {
+	beforeAll(async () => {
+		await box.write("crew.csv", "name\nAna\nBen\n");
+		await box.write("bled.json", JSON.stringify(card({ bleed: 10 } as never)));
+	});
+
+	async function zipOf(path: string): Promise<Record<string, Uint8Array>> {
+		return unzipSync(new Uint8Array(await readFile(box.path(path))));
+	}
+
+	async function mediaBoxes(bytes: Uint8Array): Promise<string[]> {
+		const pdf = await PDFDocument.load(bytes);
+		return pdf.getPages().map((page) => {
+			const { width, height } = page.getMediaBox();
+			return `0 0 ${Math.round(width)} ${Math.round(height)}`;
+		});
+	}
+
+	test("writes images and the report into a directory", async () => {
+		const run = await box.run("render", "badge.json", "--data", "crew.csv", "--out", "crew-dir");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toMatch(/^4 of 4 items exported to crew-dir \(\d+\.\ds\)\n$/);
+		expect((await readdir(box.path("crew-dir"))).sort()).toEqual([
+			"badge-1-back.png",
+			"badge-1-front.png",
+			"badge-2-back.png",
+			"badge-2-front.png",
+			"export-report.csv",
+		]);
+	});
+
+	test("names files from a pattern", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"crew.csv",
+			"--name",
+			"{{name}}-{{side}}",
+			"--frame",
+			"front",
+			"--out",
+			"named.zip",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		expect(Object.keys(await zipOf("named.zip")).sort()).toEqual([
+			"Ana-front.png",
+			"Ben-front.png",
+			"export-report.csv",
+		]);
+	});
+
+	test("refuses a pattern token the template does not have", async () => {
+		const run = await box.run("render", "badge.json", "--name", "{{age}}", "--out", "x.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("--name has no {{age}}; it takes {{template}}");
+	});
+
+	test("sets the JPEG quality", async () => {
+		const sizes: number[] = [];
+		for (const quality of ["10", "100"]) {
+			const run = await box.run(
+				"render",
+				"badge.json",
+				"--frame",
+				"front",
+				"--format",
+				"jpeg",
+				"--quality",
+				quality,
+				"--out",
+				`q${quality}.zip`,
+				"-q",
+			);
+			expect(run.code).toBe(0);
+			sizes.push(((await zipOf(`q${quality}.zip`))["front.jpg"] as Uint8Array).length);
+		}
+		expect(sizes[0]).toBeLessThan(sizes[1] as number);
+	});
+
+	test("includes the bleed", async () => {
+		const run = await box.run("render", "bled.json", "--bleed", "--frame", "front", "--out", "bled.zip", "-q");
+		expect(run.code).toBe(0);
+		const zip = await zipOf("bled.zip");
+		const pixels = decodePixels(ck, zip["front.png"] as Uint8Array);
+		expect([pixels?.width, pixels?.height]).toEqual([220, 120]);
+	});
+
+	test("refuses --bleed for a template without one", async () => {
+		const run = await box.run("render", "badge.json", "--bleed", "--out", "x.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("--bleed needs a template with a bleed");
+	});
+
+	test("sizes PDF pages from the dpi", async () => {
+		const run = await box.run("render", "badge.json", "--frame", "front", "--dpi", "72", "--out", "dpi.pdf", "-q");
+		expect(run.code).toBe(0);
+		expect(await mediaBoxes(await readFile(box.path("dpi.pdf")))).toEqual(["0 0 200 100"]);
+	});
+
+	test("lays cards out on sheets", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"crew.csv",
+			"--sheets",
+			"a4",
+			"--duplex",
+			"long",
+			"--margin",
+			"5",
+			"--gap",
+			"2",
+			"--out",
+			"sheets.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const boxes = await mediaBoxes(await readFile(box.path("sheets.pdf")));
+		expect(boxes).toHaveLength(2);
+		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
+	});
+
+	test("takes a custom paper size and says when the cards do not fit", async () => {
+		const fits = await box.run("render", "badge.json", "--sheets", "100x50", "--no-crop-marks", "--out", "custom.pdf", "-q");
+		expect(fits.code).toBe(0);
+		expect((await mediaBoxes(await readFile(box.path("custom.pdf"))))[0]).toMatch(/^0 0 (283 142|142 283)$/);
+		const tight = await box.run("render", "badge.json", "--sheets", "20x20", "--out", "tight.pdf");
+		expect(tight.code).toBe(1);
+		expect(tight.stderr).toContain("cannot lay out the sheets:");
+	});
+
+	test("writes a workspace preset into a directory", async () => {
+		await box.write("crew.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		const run = await box.run("render", "crew.coatworkspace", "--preset", "p_png", "--out", "ws-dir", "-q");
+		expect(run.code).toBe(0);
+		expect((await readdir(box.path("ws-dir"))).sort()).toEqual([
+			"1-back.png",
+			"1-front.png",
+			"2-back.png",
+			"2-front.png",
+			"export-report.csv",
+		]);
+	});
+
+	test("refuses export options that do not fit", async () => {
+		const cases: [string[], string][] = [
+			[["badge.json", "--name", "x", "--out", "dir"], "--name needs --data or a .zip or .pdf --out"],
+			[["badge.json", "--bleed", "--quality", "50"], "--bleed, --quality need --data or a .zip or .pdf --out"],
+			[["badge.json", "--dpi", "72", "--out", "x.zip"], "--dpi applies only to a .pdf"],
+			[["badge.json", "--duplex", "long", "--out", "x.pdf"], "--duplex needs --sheets"],
+			[["badge.json", "--no-crop-marks", "--margin", "2", "--out", "x.pdf"], "--no-crop-marks, --margin need --sheets"],
+			[["badge.json", "--quality", "50", "--out", "x.zip"], "--quality needs --format jpeg or webp"],
+			[["badge.json", "--quality", "50", "--out", "x.pdf"], "--quality needs --pdf-pages jpeg"],
+			[["badge.json", "--format", "jpeg", "--out", "x.pdf"], "--format applies only to images; a PDF takes --pdf-pages"],
+			[["badge.json", "--scale", "1", "--scale", "2", "--out", "x.zip"], "an export takes one --scale"],
+			[["badge.json", "--quality", "101", "--out", "x.zip"], "Expected a whole number from 0 to 100"],
+			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
+			[["badges.coatworkspace", "--preset", "p_png", "--name", "x", "--out", "x.zip"], "--name applies only to templates"],
+		];
+		for (const [argv, message] of cases) {
+			const run = await box.run("render", ...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code: 2 });
+			expect(run.stderr).toContain(message);
 		}
 	});
 });

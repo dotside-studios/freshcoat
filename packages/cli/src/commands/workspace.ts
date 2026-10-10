@@ -1,14 +1,22 @@
 import { constants } from "node:fs";
 import { access, mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
+import {
+	type ExportPreset,
+	SheetLayoutError,
+	type Workspace,
+} from "@freshcoat-js/workspace";
 import { WorkspaceReadError } from "@freshcoat-js/workspace/archive";
 import {
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
 } from "@freshcoat-js/workspace/export";
-import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
+import {
+	fileOutput,
+	folderOutput,
+	readWorkspaceFile,
+} from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
@@ -37,6 +45,10 @@ export async function renderWorkspace(
 	await runPreset(workspace, preset, { root: dirname(path), out: options.out }, log, io);
 }
 
+export function writesFile(out: string): boolean {
+	return /\.(zip|pdf)$/i.test(out);
+}
+
 export async function runPreset(
 	workspace: Workspace,
 	preset: ExportPreset,
@@ -45,7 +57,8 @@ export async function runPreset(
 	io: Io,
 ): Promise<void> {
 	const out = resolve(io.cwd, options.out);
-	await mkdir(dirname(out), { recursive: true });
+	const file = writesFile(options.out);
+	await mkdir(file ? dirname(out) : out, { recursive: true });
 	const renderer = await openRenderer(io, { root: options.root, build: "full" });
 	const progress = progressReporter(log);
 	try {
@@ -55,9 +68,13 @@ export async function runPreset(
 				...(io.fetch ? { fetch: io.fetch } : {}),
 				load: createLoader(io, options.root),
 			},
-			output: fileOutput(out),
+			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
+		}).catch((error: unknown) => {
+			if (error instanceof SheetLayoutError)
+				throw new CliError(`cannot lay out the sheets: ${error.message}`);
+			throw error;
 		});
 		log.endProgress();
 		if (result.fonts) warnAboutFonts(log, result.fonts);
@@ -66,9 +83,9 @@ export async function runPreset(
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);
-		const size = (await stat(out)).size;
+		const size = file ? `${formatBytes((await stat(out)).size)}, ` : "";
 		log.out(
-			`${result.items.length - failed.length} of ${result.items.length} items exported to ${options.out} (${formatBytes(size)}, ${(result.ms / 1000).toFixed(1)}s)`,
+			`${result.items.length - failed.length} of ${result.items.length} items exported to ${options.out} (${size}${(result.ms / 1000).toFixed(1)}s)`,
 		);
 		if (failed.length > 0)
 			throw new CliError(
