@@ -87,6 +87,7 @@ export {
 	templateSafeArea,
 } from "./bleed";
 export { compile } from "./compile";
+export { defineTemplate, type TemplateModule } from "./define";
 export {
 	barcodeBox,
 	constrainBox,

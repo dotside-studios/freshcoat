@@ -21,6 +21,7 @@
 		"./svg": "./src/svg.ts",
 		"./normalize": "./src/normalize.ts",
 		"./coat": "./src/coat.ts",
+		"./define": "./src/define.ts",
 		"./fields": "./src/fields.ts",
 		"./handoff": "./src/handoff.ts",
 		"./mustache": "./src/mustache.ts",
