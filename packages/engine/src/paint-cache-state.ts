@@ -57,6 +57,8 @@ type CachedSurface = {
 	width: number;
 	height: number;
 	hosted: boolean;
+	// Working surfaces made from this one, freed before it.
+	work: Map<string, Surface>;
 };
 
 const DEFAULT_MAX_IMAGES = 256;
@@ -88,6 +90,7 @@ export type PaintCacheState = {
 	pathsUsed: Set<string>;
 	luts: LutImages;
 	surface: CachedSurface | null;
+	workUsed: Set<string>;
 	// Most recently used first.
 	backgrounds: CachedBackground[];
 	finishNoise: CachedFinishNoise | null;
@@ -123,6 +126,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		pathsUsed: new Set(),
 		luts: createLutImages(),
 		surface: null,
+		workUsed: new Set(),
 		backgrounds: [],
 		finishNoise: null,
 		disposed: false,
@@ -230,8 +234,37 @@ export function cachedSurface(
 	if (hit) releaseSurface(hit);
 	const made = make();
 	state.stats.surfaceCreates++;
-	state.surface = { ...made, ...want };
+	state.surface = { ...made, ...want, work: new Map() };
 	return state.surface;
+}
+
+// A working surface of the cached output surface's backend, kept under `key`
+// (its size and precision) while paints keep asking for it. null when there is
+// no output surface or the backend won't make one. The caller clears it.
+export function cachedWorkSurface(
+	state: PaintCacheState,
+	key: string,
+	make: () => Surface | null,
+): Surface | null {
+	const owner = state.surface;
+	if (!owner) return null;
+	state.workUsed.add(key);
+	const hit = owner.work.get(key);
+	if (hit) return hit;
+	const made = make();
+	if (made) owner.work.set(key, made);
+	return made;
+}
+
+export function evictUnusedWork(state: PaintCacheState): void {
+	const owner = state.surface;
+	if (owner)
+		for (const [key, surface] of owner.work) {
+			if (state.workUsed.has(key)) continue;
+			owner.work.delete(key);
+			tryFree(() => surface.dispose());
+		}
+	state.workUsed.clear();
 }
 
 // Deletes the cached images this paint's scene did not use, oldest first, until
@@ -476,6 +509,8 @@ function freeLines(state: PaintCacheState): void {
 }
 
 function releaseSurface(s: CachedSurface): void {
+	for (const work of s.work.values()) tryFree(() => work.dispose());
+	s.work.clear();
 	tryFree(() => s.surface.dispose());
 	tryFree(s.loseContext);
 }

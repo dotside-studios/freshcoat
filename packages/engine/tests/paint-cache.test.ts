@@ -178,7 +178,7 @@ function compile(
 	node: Node,
 	size: { width: number; height: number },
 	fonts: Map<string, Uint8Array[]>,
-	extra?: { supersample?: number },
+	extra?: { supersample?: number; precision?: "u8" | "f16" },
 ): Command[] {
 	const textEngine = createParagraphEngine(ck, fonts);
 	try {
@@ -431,6 +431,49 @@ describe("PaintCache", () => {
 		const px = await pixels(compile(scene(bigger, []), bigger, fonts), rt);
 		expect(cache.stats().surfaceCreates).toBe(2);
 		expect([px.width, px.height]).toEqual([120, 64]);
+		cache.dispose();
+	});
+
+	test("supersample and f16 working surfaces are kept across paints", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		for (const extra of [
+			{ supersample: 2 },
+			{ supersample: 4 },
+			{ precision: "f16" as const },
+		]) {
+			const cache = createPaintCache();
+			const { rt } = runtime(fonts, new Map(), cache);
+			const commands = compile(scene(SIZE, []), SIZE, fonts, extra);
+			const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			const work = [...(paintCacheState(cache).surface?.work.values() ?? [])];
+			expect(work.length).toBe(extra.supersample === 4 ? 2 : 1);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect([...(paintCacheState(cache).surface?.work.values() ?? [])]).toEqual(
+				work,
+			);
+			const disposed = work.map((w) => vi.spyOn(w, "dispose"));
+			cache.clear();
+			for (const spy of disposed) expect(spy).toHaveBeenCalledTimes(1);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			cache.dispose();
+		}
+	});
+
+	test("a changed supersample frees the working surfaces it no longer uses", async () => {
+		await initCk();
+		const fonts = new Map([["Geist", [FONT]]]);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(scene(SIZE, []), SIZE, fonts, { supersample: 4 }), rt);
+		const state = paintCacheState(cache);
+		const [first] = [...(state.surface?.work.values() ?? [])];
+		const spy = vi.spyOn(first as object as { dispose(): void }, "dispose");
+		await pixels(compile(scene(SIZE, []), SIZE, fonts, { supersample: 2 }), rt);
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(state.surface?.work.size).toBe(1);
+		expect(cache.stats().surfaceCreates).toBe(1);
 		cache.dispose();
 	});
 

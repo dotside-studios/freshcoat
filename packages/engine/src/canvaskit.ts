@@ -92,10 +92,12 @@ import {
 	cachedMipmaps,
 	cachedPath,
 	cachedSurface,
+	cachedWorkSurface,
 	closestBackground,
 	evictUnusedImages,
 	evictUnusedLines,
 	evictUnusedPaths,
+	evictUnusedWork,
 	type PaintCacheState,
 	paintCacheState,
 	type ShapedLine,
@@ -3517,6 +3519,30 @@ function matrixStretch(m: number[]): number {
 // Every level is kept alive in `bin` until the OUTPUT surface flushes: on the GPU
 // path the draws only sample them then. Surfaces are disposed rather than
 // delete()d, which would strand their pixel buffers.
+//
+// A paint cache keeps the working surface and every level across paints, in
+// place of the bin, so a paint clears each before drawing.
+function workSurface(
+	ck: CanvasKit,
+	bin: Bin,
+	from: Surface,
+	width: number,
+	height: number,
+	precision: Precision,
+): Surface | null {
+	const make = () =>
+		makeLayerSurface(ck, from.getCanvas(), width, height, precision);
+	if (bin.cache)
+		return cachedWorkSurface(
+			bin.cache,
+			`${width}x${height}@${precision}`,
+			make,
+		);
+	const surface = make();
+	if (surface) bin.track({ delete: () => surface.dispose() });
+	return surface;
+}
+
 function reduceSupersampled(
 	ck: CanvasKit,
 	out: Surface,
@@ -3528,7 +3554,6 @@ function reduceSupersampled(
 	precision: Precision,
 ) {
 	const rect = (s: Size) => ck.XYWHRect(0, 0, s.width, s.height);
-	const retire = (s: Surface) => bin.track({ delete: () => s.dispose() });
 
 	let level = src;
 	let levelSize = exportPixelSize(design, exportScale * supersample);
@@ -3550,13 +3575,7 @@ function reduceSupersampled(
 		const last = factor === 2;
 		const dst = last
 			? out
-			: makeLayerSurface(
-					ck,
-					level.getCanvas(),
-					target.width,
-					target.height,
-					precision,
-				);
+			: workSurface(ck, bin, level, target.width, target.height, precision);
 		const img = bin.track(level.makeImageSnapshot());
 		const paint = bin.track(new ck.Paint());
 		if (!dst) {
@@ -3586,7 +3605,6 @@ function reduceSupersampled(
 			ck.MipmapMode.None,
 			paint,
 		);
-		if (!last) retire(dst);
 		level = dst;
 		levelSize = target;
 	}
@@ -4754,16 +4772,9 @@ async function paintSceneIn(
 	// at the export size and 8 bits: softer than asked for, but a render.
 	const superSurface =
 		supersample > 1 || precision !== "u8"
-			? makeLayerSurface(
-					ck,
-					surface.getCanvas(),
-					render.width,
-					render.height,
-					precision,
-				)
+			? workSurface(ck, bin, surface, render.width, render.height, precision)
 			: null;
-	if (superSurface) bin.track({ delete: () => superSurface.dispose() });
-	else {
+	if (!superSurface) {
 		frame.scale = exportScale;
 		frame.grid = 1;
 		frame.precision = "u8";
@@ -4772,6 +4783,8 @@ async function paintSceneIn(
 	// one, else the output surface directly (the pre-supersampling path, untouched).
 	const target = superSurface ?? surface;
 	const skCanvas = target.getCanvas();
+	// A kept surface may come back from a paint that threw with saves open.
+	if (cache) skCanvas.restoreToCount(1);
 	skCanvas.clear(ck.TRANSPARENT);
 
 	const drawables = commands.filter(
@@ -4919,6 +4932,7 @@ async function paintSceneIn(
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
 			evictUnusedPaths(cache);
+			evictUnusedWork(cache);
 			evictUnusedLutImages(cache.luts);
 		}
 	}
