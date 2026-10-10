@@ -30,6 +30,14 @@ export class CliError extends Error {
 	}
 }
 
+/** The command line was wrong: exits 2 and points at the command's help. */
+export class UsageError extends CliError {
+	constructor(message: string) {
+		super(message, 2);
+		this.name = "UsageError";
+	}
+}
+
 export type Log = {
 	out(line: string): void;
 	warn(line: string): void;

@@ -12,7 +12,7 @@ import {
 import { saveTemplate } from "@freshcoat-js/coatfile/coat";
 import { fileLoader } from "@freshcoat-js/engine/node";
 import { packTemplates, WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
-import { CliError, createLog, type Io, type Log } from "../io";
+import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { formatIssue, readTemplate, warnLoad } from "../template-file";
 import { readWorkspace } from "../workspace-file";
 import { isLocalImage } from "./render";
@@ -27,7 +27,7 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 		const { workspace } = await readWorkspace(io, file);
 		if (options.template === undefined) {
 			if (!/\.zip$/i.test(out))
-				throw new CliError("a workspace packs into a .zip, or one template with --template", 2);
+				throw new UsageError("a workspace packs into a .zip, or one template with --template");
 			bytes = await packTemplates(workspace);
 		} else {
 			const wanted = options.template;
@@ -42,7 +42,7 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 		}
 	} else {
 		if (options.template !== undefined)
-			throw new CliError("--template needs a .coatworkspace file", 2);
+			throw new UsageError("--template needs a .coatworkspace file");
 		const loaded = await readTemplate(io, file);
 		warnLoad(log, file, loaded);
 		const { template, directory } = loaded;
@@ -57,7 +57,7 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 async function encode(template: Template, out: string): Promise<Uint8Array | string> {
 	const json = /\.json$/i.test(out);
 	if (!json && extname(out).toLowerCase() !== ".coat")
-		throw new CliError("--out names a .coat or .coat.json file", 2);
+		throw new UsageError("--out names a .coat or .coat.json file");
 	const saved = json ? saveTemplate(template, "json") : await saveTemplate(template, "coat");
 	if (saved.ok) return saved.data;
 	throw new CliError(

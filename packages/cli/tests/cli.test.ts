@@ -870,7 +870,7 @@ describe("render a workspace", () => {
 		const run = await box.run("render", "badges.coatworkspace", "--out", "x.zip");
 		expect(run.code).toBe(2);
 		expect(run.stderr).toBe(
-			"freshcoat: a .coatworkspace needs --preset <name|id>\nPresets:\n  All badges  (p_png)\n  Proof  (p_pdf)\n",
+			"freshcoat: a .coatworkspace needs --preset <name|id>\nPresets:\n  All badges  (p_png)\n  Proof  (p_pdf)\nRun freshcoat render --help for usage.\n",
 		);
 	});
 
@@ -1196,6 +1196,7 @@ describe("pack", () => {
 			const run = await box.run("pack", ...argv);
 			expect({ argv, code: run.code }).toEqual({ argv, code });
 			expect(run.stderr).toContain(message);
+			if (code === 2) expect(run.stderr).toContain("Run freshcoat pack --help for usage.");
 		}
 	});
 });
