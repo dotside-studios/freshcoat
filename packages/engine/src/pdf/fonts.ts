@@ -46,10 +46,11 @@ export class FontEmbedder {
 	) {}
 
 	// The embeddable file CanvasKit shaped `run` with, or why there is none.
+	// `clusters` holds the text of each cluster by its UTF-8 offset.
 	file(
 		run: GlyphRun,
 		req: FaceRequest,
-		text: string,
+		clusters: Map<number, string>,
 	): FontFile | { reason: string } {
 		const family = run.typeface?.getFamilyName() ?? "";
 		const named = [...this.open(family)];
@@ -65,7 +66,7 @@ export class FontEmbedder {
 			.map(({ f }) => f);
 		const probes: Array<[string, number]> = [];
 		for (let i = 0; i < run.glyphs.length && probes.length < 4; i++) {
-			const cp = text.codePointAt(run.offsets[i] ?? 0);
+			const cp = clusters.get(run.offsets[i] ?? 0)?.codePointAt(0);
 			if (cp === undefined || cp <= 0x20) continue;
 			const ch = String.fromCodePoint(cp);
 			const id = run.typeface?.getGlyphIDs(ch)[0];

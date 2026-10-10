@@ -133,9 +133,81 @@ type Area = { x: number; y: number; width: number; height: number };
 type Patch = { ref: PdfRef; x: number; y: number; w: number; h: number } | null;
 type TextRun = { run: GlyphRun; file: FontFile };
 type TextPlan = {
-	lines: Array<{ line: ShapedTextLine; text: string; runs: TextRun[] }>;
+	lines: Array<{
+		line: ShapedTextLine;
+		clusters: Map<number, string>;
+		runs: TextRun[];
+	}>;
 	reason?: string;
 };
+
+// The text each glyph stands for. A cluster drawn with one glyph gives it all
+// its text; one drawn with several gives each the characters the font maps to
+// it, then hands the rest out in order. Glyph 0 stands for nothing.
+export function glyphTexts(
+	runs: GlyphRun[],
+	clusters: Map<number, string>,
+): string[][] {
+	const out = runs.map((run) => Array.from(run.glyphs, () => ""));
+	const byCluster = new Map<number, Array<[number, number]>>();
+	runs.forEach((run, r) => {
+		for (let i = 0; i < run.glyphs.length; i++) {
+			if (run.glyphs[i] === 0) continue;
+			const start = run.offsets[i] ?? 0;
+			const list = byCluster.get(start) ?? [];
+			list.push([r, i]);
+			byCluster.set(start, list);
+		}
+	});
+	for (const [start, glyphs] of byCluster) {
+		const text = clusters.get(start) ?? "";
+		const first = glyphs[0];
+		if (!first) continue;
+		if (glyphs.length === 1) {
+			(out[first[0]] as string[])[first[1]] = text;
+			continue;
+		}
+		const chars = [...text];
+		const open: Array<[number, number]> = [];
+		for (const [r, i] of glyphs) {
+			const run = runs[r] as GlyphRun;
+			const k = chars.findIndex(
+				(ch) => run.typeface?.getGlyphIDs(ch)[0] === run.glyphs[i],
+			);
+			if (k < 0) open.push([r, i]);
+			else (out[r] as string[])[i] = chars.splice(k, 1)[0] as string;
+		}
+		open.forEach(([r, i], n) => {
+			(out[r] as string[])[i] =
+				n === open.length - 1 ? chars.join("") : (chars.shift() ?? "");
+		});
+		if (open.length === 0 && chars.length) {
+			const [r, i] = glyphs[glyphs.length - 1] as [number, number];
+			(out[r] as string[])[i] += chars.join("");
+		}
+	}
+	return out;
+}
+
+// The text of each glyph cluster on a line, by its UTF-8 offset: from one
+// cluster's start to the next one's, in either direction the runs read.
+export function lineClusters(
+	text: string,
+	runs: GlyphRun[],
+): Map<number, string> {
+	const bytes = new TextEncoder().encode(text);
+	const starts = [
+		...new Set(runs.flatMap((r) => [...r.offsets.subarray(0, r.glyphs.length)])),
+	].sort((a, b) => a - b);
+	const decoder = new TextDecoder();
+	const out = new Map<number, string>();
+	starts.forEach((start, i) => {
+		const end = starts[i + 1] ?? bytes.length;
+		out.set(start, decoder.decode(bytes.subarray(start, end)));
+	});
+	return out;
+}
+
 // Glyphs on one baseline in one colour, shown by one TJ.
 type Segment = {
 	color: string;
@@ -519,7 +591,10 @@ class PageBuilder {
 		if (hit) return hit;
 		const plan: TextPlan = { lines: [] };
 		for (const line of shapeTextLines(this.ck, this.provider, this.bin, cmd)) {
-			const text = line.line.spans.map((s) => s.text).join("");
+			const clusters = lineClusters(
+				line.line.spans.map((s) => s.text).join(""),
+				line.runs,
+			);
 			const runs: TextRun[] = [];
 			for (const run of line.runs) {
 				if (!run.glyphs.length) continue;
@@ -533,12 +608,12 @@ class PageBuilder {
 						italic: span.font.style === "italic",
 						variations: span.font.variations,
 					},
-					text,
+					clusters,
 				);
 				if ("reason" in file) plan.reason ??= file.reason;
 				else runs.push({ run, file });
 			}
-			plan.lines.push({ line, text, runs });
+			plan.lines.push({ line, clusters, runs });
 		}
 		this.texts.set(cmd, plan);
 		return plan;
@@ -948,9 +1023,10 @@ class PageBuilder {
 		const plan = this.textPlan(cmd);
 		const segments: Segment[] = [];
 		let decorations = "";
-		for (const { line, text, runs } of plan.lines) {
+		for (const { line, clusters, runs } of plan.lines) {
 			const spans = line.line.spans;
-			for (const { run, file } of runs) {
+			const texts = glyphTexts(runs.map((r) => r.run), clusters);
+			for (const [r, { run, file }] of runs.entries()) {
 				const face = this.fonts.embed(file);
 				const { info } = face;
 				const sx = (run as { scaleX?: number }).scaleX ?? 1;
@@ -962,8 +1038,7 @@ class PageBuilder {
 					const x = line.x + (run.positions[i * 2] as number);
 					const y = line.y + (run.positions[i * 2 + 1] as number);
 					const start = run.offsets[i] ?? 0;
-					if (!face.used.has(gid))
-						face.used.set(gid, text.slice(start, run.offsets[i + 1] ?? start));
+					if (!face.used.get(gid)) face.used.set(gid, texts[r]?.[i] ?? "");
 					const owner = spans[line.spanAt[start] ?? 0] ?? spans[0];
 					const c = rgba(owner?.color ?? cmd.color);
 					const color = `${this.alpha(c[3])}${rgb(c)} rg\n`;

@@ -18,7 +18,7 @@ import {
 	type Node,
 } from "../src/node";
 import { FontEmbedder } from "../src/pdf/fonts";
-import { paintPdf } from "../src/pdf/paint";
+import { glyphTexts, lineClusters, paintPdf } from "../src/pdf/paint";
 import { PdfWriter } from "../src/pdf/writer";
 import { createRenderer, type Renderer } from "../src/renderer";
 
@@ -476,7 +476,7 @@ describe("renderPdf", () => {
 		);
 		const probe = ck.Typeface.MakeTypefaceFromData(geist.buffer.slice(geist.byteOffset, geist.byteOffset + geist.byteLength));
 		const run = { typeface: probe, glyphs: [], offsets: [] };
-		const file = embedder.file(run as never, { weight: 400, italic: false }, "");
+		const file = embedder.file(run as never, { weight: 400, italic: false }, new Map());
 		probe.delete();
 		expect("reason" in file).toBe(false);
 		expect(made).toHaveLength(1);
@@ -562,6 +562,76 @@ describe("renderPdf", () => {
 			// Once to embed it, once to decode it for every layer that draws it.
 			expect(loads.filter((src) => src === "a.png")).toHaveLength(2);
 			expect(loads.filter((src) => src === "b.png")).toHaveLength(2);
+		});
+	});
+});
+
+describe("text a PDF reader can extract", () => {
+	// A run with glyphs at UTF-8 offsets, in the order CanvasKit placed them.
+	const run = (glyphs: number[], offsets: number[], ids: Record<string, number> = {}) =>
+		({
+			glyphs: Uint16Array.from(glyphs),
+			offsets: Uint32Array.from(offsets),
+			typeface: { getGlyphIDs: (ch: string) => [ids[ch] ?? 0] },
+		}) as never;
+
+	test("reads clusters by UTF-8 offset, in either direction", () => {
+		const text = "aש b";
+		const rtl = run([7, 5], [3, 1]);
+		const ltr = run([1, 2], [0, 4]);
+		const clusters = lineClusters(text, [ltr, rtl]);
+		expect([...clusters]).toEqual([
+			[0, "a"],
+			[1, "ש"],
+			[3, " "],
+			[4, "b"],
+		]);
+		expect(glyphTexts([rtl], clusters)).toEqual([[" ", "ש"]]);
+	});
+
+	test("splits a cluster drawn with several glyphs by the font's own map", () => {
+		const text = "שָׁ";
+		const clusters = lineClusters(text, [run([96, 79, 100], [0, 2, 2])]);
+		const marks = run([96, 100, 79], [0, 2, 2], { "\u05b8": 79, "\u05c1": 100 });
+		expect(glyphTexts([marks], clusters)).toEqual([["ש", "\u05c1", "\u05b8"]]);
+		const unmapped = run([96, 100, 79], [0, 2, 2]);
+		expect(glyphTexts([unmapped], clusters)).toEqual([["ש", "\u05b8", "\u05c1"]]);
+	});
+
+	test("gives glyph 0 no text", () => {
+		const clusters = lineClusters("ab", [run([0, 4], [0, 1])]);
+		expect(glyphTexts([run([0, 4], [0, 1])], clusters)).toEqual([["", "b"]]);
+	});
+
+	describe.skipIf(!pdftotext)("with poppler", () => {
+		let hebrew: Renderer;
+		beforeAll(async () => {
+			hebrew = await createRenderer({
+				ck,
+				fonts: {
+					Geist: [testFontBytes("Geist-Regular.ttf")],
+					Hebrew: [testFontBytes("NotoSansHebrew-Regular.ttf")],
+				},
+			});
+		});
+
+		// The page's text with poppler's direction marks taken out.
+		const extract = async (family: string, value: string) => {
+			const scene = frame([
+				label(family, 400, value, 8),
+				label(family === "Geist" ? "Hebrew" : "Geist", 400, "x", 60),
+			]);
+			const pdf = await hebrew.renderPdf(scene, { width: W, height: H });
+			return extractText(pdf.bytes).replace(/[\u200e\u200f\u202a-\u202e]/g, "");
+		};
+
+		test("reads Hebrew in logical order", async () => {
+			expect(await extract("Hebrew", "שלום עולם")).toContain("שלום עולם");
+		});
+
+		test("reads Hebrew set among Latin", async () => {
+			const text = await extract("Geist", "Hello שלום world");
+			for (const word of ["Hello", "שלום", "world"]) expect(text).toContain(word);
 		});
 	});
 });
