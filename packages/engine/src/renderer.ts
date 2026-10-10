@@ -320,6 +320,13 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		else serial(async () => task()).catch(() => {});
 	};
 
+	// Bytes of a src the cache no longer holds decoded have nothing stale to
+	// compare against, so they need not be kept.
+	const pruneCalls = (state: ReturnType<typeof paintCacheState>) => {
+		for (const src of perCall.keys())
+			if (!state.images.has(src)) perCall.delete(src);
+	};
+
 	const doPaint = async <O extends Output>(
 		commands: Command[],
 		paintOptions: PaintOptions<O> | undefined,
@@ -365,6 +372,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			);
 		} finally {
 			shared.release();
+			if (cache) pruneCalls(paintCacheState(cache));
 		}
 		const info = frameInfo(commands, result.warnings);
 		if ("canvas" in output) {
