@@ -167,7 +167,7 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 		y: view.y + p.y * view.zoom,
 	});
 	const screen: PenPath = {
-		closed: false,
+		closed: pen.path.closed,
 		points: pen.path.points.map((p) => ({
 			...toScreen(p),
 			...(p.in ? { in: toScreen(p.in) } : {}),
@@ -195,7 +195,9 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 						closed: false,
 						points: [
 							last,
-							closing && first ? { ...first, out: undefined } : cursor,
+							closing && first
+								? { x: first.x, y: first.y, in: first.in }
+								: cursor,
 						],
 					})}
 					className="fill-none stroke-fc-accent"
@@ -203,28 +205,32 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 					strokeDasharray="4 3"
 				/>
 			) : null}
-			{last?.in && last.out ? (
-				<>
-					<line
-						x1={last.in.x}
-						y1={last.in.y}
-						x2={last.out.x}
-						y2={last.out.y}
-						className="stroke-fc-accent"
-						strokeWidth={1}
-					/>
-					{[last.in, last.out].map((h) => (
-						<circle
-							key={`${h.x},${h.y}`}
-							cx={h.x}
-							cy={h.y}
-							r={3}
-							className="fill-white stroke-fc-accent"
-							strokeWidth={1}
-						/>
-					))}
-				</>
-			) : null}
+			{screen.points.map((p, i) =>
+				[p.in, p.out].map((h, j) =>
+					h ? (
+						<g
+							// biome-ignore lint/suspicious/noArrayIndexKey: handles are ordered per anchor
+							key={`${i}-${j}`}
+						>
+							<line
+								x1={p.x}
+								y1={p.y}
+								x2={h.x}
+								y2={h.y}
+								className="stroke-fc-accent"
+								strokeWidth={1}
+							/>
+							<circle
+								cx={h.x}
+								cy={h.y}
+								r={3}
+								className="fill-white stroke-fc-accent"
+								strokeWidth={1}
+							/>
+						</g>
+					) : null,
+				),
+			)}
 			{screen.points.map((p, i) => {
 				const size = i === 0 && closing ? 10 : 7;
 				return (

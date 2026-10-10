@@ -30,6 +30,19 @@ const EXTRAS: Record<string, Entry[]> = {
 	Tools: [
 		{ id: "finish-path", label: "Finish path", shortcut: "Enter" },
 		{ id: "remove-point", label: "Remove last point", shortcut: "Backspace" },
+		{ id: "undo-point", label: "Undo last point", shortcut: "Mod+Z" },
+		{
+			id: "break-handles",
+			label: "Break handles",
+			shortcut: "Alt",
+			gesture: "drag",
+		},
+		{
+			id: "pen-angle",
+			label: "Constrain to 45°",
+			shortcut: "Shift",
+			gesture: "drag",
+		},
 	],
 	Canvas: [
 		{ id: "pan", label: "Pan", shortcut: "Space", gesture: "drag" },

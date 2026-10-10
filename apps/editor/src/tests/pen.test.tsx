@@ -1,21 +1,43 @@
 import type { Template, VectorElement } from "@freshcoat-js/coatfile";
 import { validate } from "@freshcoat-js/coatfile";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, test } from "vitest";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { findCommand } from "~/app/commands";
+import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { ShortcutsDialog } from "~/app/ShortcutsDialog";
+import { Viewport } from "~/canvas/Viewport";
 import { getElement } from "~/doc/path";
 import {
 	constrain45,
+	dragPoint,
 	PEN_STROKE,
 	type PenPath,
 	penBounds,
 	penElement,
 	penPathData,
 	smoothPoint,
+	snapPenPoint,
 } from "~/doc/pen";
-import { doc } from "./doc-fixture";
+import { doc, geometryOf } from "./doc-fixture";
+
+vi.mock("~/canvas/use-live-render", () => ({
+	useLiveRender: () => ({ canvas: null, scale: 1, fontsLoading: false }),
+}));
+
+vi.stubGlobal(
+	"ResizeObserver",
+	class {
+		observe() {}
+		disconnect() {}
+	},
+);
 
 afterEach(cleanup);
 
@@ -84,6 +106,48 @@ describe("pen paths", () => {
 			],
 		};
 		expect(penPathData(path)).toBe("M0 0L100 0C100 0 -10 10 0 0Z");
+	});
+
+	test("Alt drags only the outgoing handle, keeping the incoming one", () => {
+		const anchor = { x: 50, y: 50 };
+		const drag = { x: 80, y: 40 };
+		expect(dragPoint(anchor, drag, undefined, false)).toEqual(
+			smoothPoint(anchor, drag),
+		);
+		expect(dragPoint(anchor, drag, { ...anchor }, true)).toEqual({
+			x: 50,
+			y: 50,
+			out: drag,
+		});
+		const smooth = smoothPoint(anchor, { x: 60, y: 50 });
+		expect(dragPoint(anchor, drag, smooth, true)).toEqual({
+			x: 50,
+			y: 50,
+			out: drag,
+			in: { x: 40, y: 50 },
+		});
+	});
+
+	test("anchors snap to candidates and to placed anchors", () => {
+		const candidates = {
+			x: [{ value: 100, from: 0, to: 200 }],
+			y: [{ value: 40, from: 0, to: 200 }],
+		};
+		const near = snapPenPoint({ x: 102, y: 90 }, candidates, [], 5);
+		expect(near.point).toEqual({ x: 100, y: 90 });
+		expect(near.guides).toHaveLength(1);
+		const anchored = snapPenPoint(
+			{ x: 31, y: 43 },
+			candidates,
+			[{ x: 30, y: 300 }],
+			5,
+		);
+		expect(anchored.point).toEqual({ x: 30, y: 40 });
+		expect(anchored.guides).toHaveLength(2);
+		expect(snapPenPoint({ x: 70, y: 90 }, candidates, [], 5).point).toEqual({
+			x: 70,
+			y: 90,
+		});
 	});
 
 	test("Shift keeps a segment on 45° lines", () => {
@@ -174,5 +238,110 @@ describe("pen tool", () => {
 			.parentElement as HTMLElement;
 		expect(within(tools).getByText("Pen")).toBeTruthy();
 		expect(within(tools).getByText("Finish path")).toBeTruthy();
+		expect(within(tools).getByText("Break handles")).toBeTruthy();
+		expect(within(tools).getByText("Undo last point")).toBeTruthy();
+	});
+});
+
+describe("pen gestures", () => {
+	function mount() {
+		const t = doc();
+		const c = new EditorController();
+		c.open(t, "doc.coat");
+		c.dispatch({
+			type: "rendered",
+			geometry: geometryOf(t),
+			timings: { compile: 0, layout: 0, lower: 0, paint: 0, total: 0 },
+			stats: {} as never,
+			warnings: [],
+		});
+		c.setViewportSize(1200, 800);
+		c.setView({ x: 0, y: 0, zoom: 1 });
+		c.dispatch({ type: "setTool", tool: "pen" });
+		render(
+			<ControllerProvider controller={c}>
+				<Viewport />
+			</ControllerProvider>,
+		);
+		return c;
+	}
+
+	const viewport = () => screen.getByTestId("viewport");
+	const at = (x: number, y: number, mods: object = {}) => ({
+		pointerId: 1,
+		button: 0,
+		pointerType: "mouse",
+		clientX: x,
+		clientY: y,
+		...mods,
+	});
+	const click = (x: number, y: number, mods: object = {}) => {
+		fireEvent.pointerDown(viewport(), at(x, y, mods));
+		fireEvent.pointerUp(viewport(), at(x, y, mods));
+	};
+	const points = () =>
+		screen.getByTestId("pen-draft").getAttribute("data-points");
+	const circles = () =>
+		screen.getByTestId("pen-draft").querySelectorAll("circle");
+	const created = (c: EditorController) =>
+		getElement(
+			c.base as Template,
+			c.state.selection[0] as string,
+		) as VectorElement;
+
+	test("anchors snap to the artboard edge unless Shift or Mod is held", () => {
+		const c = mount();
+		click(3, 200);
+		click(100, 100, { metaKey: true });
+		fireEvent.keyDown(window, { key: "Enter" });
+		expect(created(c).properties.d).toBe("M0 100L100 0");
+	});
+
+	test("Cmd+Z takes back the last point and never undoes the document", () => {
+		const c = mount();
+		const before = c.base;
+		click(100, 100, { metaKey: true });
+		click(200, 100, { metaKey: true });
+		expect(points()).toBe("2");
+		fireEvent.keyDown(window, { key: "z", metaKey: true });
+		expect(points()).toBe("1");
+		fireEvent.keyDown(window, { key: "z", metaKey: true, shiftKey: true });
+		expect(points()).toBe("1");
+		expect(c.base).toBe(before);
+	});
+
+	test("Alt-drag breaks the handles, so only the outgoing one shows", () => {
+		mount();
+		const mods = { metaKey: true };
+		fireEvent.pointerDown(viewport(), at(100, 100, mods));
+		fireEvent.pointerMove(viewport(), at(160, 100, { ...mods, altKey: true }));
+		expect(circles()).toHaveLength(1);
+		fireEvent.pointerMove(viewport(), at(160, 100, mods));
+		expect(circles()).toHaveLength(2);
+		fireEvent.pointerMove(viewport(), at(170, 100, { ...mods, altKey: true }));
+		expect(circles()).toHaveLength(2);
+	});
+
+	test("dragging from the first point closes the path with a curve", () => {
+		const c = mount();
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		click(200, 300, { metaKey: true });
+		fireEvent.pointerDown(viewport(), at(100, 100, { metaKey: true }));
+		fireEvent.pointerMove(viewport(), at(60, 60, { metaKey: true }));
+		fireEvent.pointerUp(viewport(), at(60, 60, { metaKey: true }));
+		const el = created(c);
+		expect(c.state.tool).toBe("move");
+		expect(el.properties.fill).toBeDefined();
+		expect(el.properties.d).toMatch(/^M.*C.*Z$/);
+	});
+
+	test("a plain click on the first point closes without curves", () => {
+		const c = mount();
+		click(100, 100, { metaKey: true });
+		click(300, 100, { metaKey: true });
+		click(200, 300, { metaKey: true });
+		click(101, 100, { metaKey: true });
+		expect(created(c).properties.d).toMatch(/^M[^C]*Z$/);
 	});
 });

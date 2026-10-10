@@ -1,6 +1,12 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
 import { DEFAULT_FILL, round2 } from "./factories";
-import type { Point, Rect } from "./geometry";
+import {
+	type Guide,
+	type Point,
+	type Rect,
+	type SnapCandidates,
+	snapMove,
+} from "./geometry";
 import { uniqueId } from "./ids";
 
 /** An anchor with its control handles, in template space. A corner point has
@@ -21,6 +27,54 @@ export function smoothPoint(anchor: Point, drag: Point): PenPoint {
 		out: { x: drag.x, y: drag.y },
 		in: { x: 2 * anchor.x - drag.x, y: 2 * anchor.y - drag.y },
 	};
+}
+
+/**
+ * `prev` dragged to `drag`. The handles stay mirrored, unless `breakHandles`
+ * is set: then only the outgoing one follows, and the incoming one stays
+ * where `prev` had it (at the anchor for a corner).
+ */
+export function dragPoint(
+	anchor: Point,
+	drag: Point,
+	prev: PenPoint | undefined,
+	breakHandles: boolean,
+): PenPoint {
+	if (!breakHandles) return smoothPoint(anchor, drag);
+	return {
+		x: anchor.x,
+		y: anchor.y,
+		out: { x: drag.x, y: drag.y },
+		...(prev?.in ? { in: prev.in } : {}),
+	};
+}
+
+/**
+ * `p` pulled onto the nearest candidate line within `threshold`, with the
+ * guides that show it. The anchors already placed are candidates too.
+ */
+export function snapPenPoint(
+	p: Point,
+	candidates: SnapCandidates,
+	anchors: readonly Point[],
+	threshold: number,
+): { point: Point; guides: Guide[] } {
+	const withAnchors: SnapCandidates = {
+		x: [
+			...candidates.x,
+			...anchors.map((a) => ({ value: a.x, from: a.y, to: a.y })),
+		],
+		y: [
+			...candidates.y,
+			...anchors.map((a) => ({ value: a.y, from: a.x, to: a.x })),
+		],
+	};
+	const snap = snapMove(
+		{ x: p.x, y: p.y, width: 0, height: 0, rotation: 0 },
+		withAnchors,
+		threshold,
+	);
+	return { point: { x: p.x + snap.dx, y: p.y + snap.dy }, guides: snap.guides };
 }
 
 /** `p` moved onto the nearest 45° line through `from`. */
