@@ -346,6 +346,16 @@ describe("live boolean operations", () => {
 			expect(warning?.message).toContain('"label" is a text');
 		});
 
+		it("for a rect with corner smoothing on different radii", async () => {
+			const smoothed = rect("1:2", RECT_BOX, {
+				cornerRadius: [8, 0, 8, 0],
+				cornerSmoothing: 0.6,
+			} as never);
+			const out = await flat(boolean("1:1", BOX, "UNION", [smoothed]));
+			const warning = out.warnings.find((w) => w.code === "boolean_flattened");
+			expect(warning?.message).toContain("corner smoothing on different radii");
+		});
+
 		it("for a group child", async () => {
 			const group = {
 				...base("1:3", "group", ELLIPSE_BOX),

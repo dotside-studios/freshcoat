@@ -155,7 +155,7 @@ layers were kept, flattened or skipped.
   boolean's box. A hidden child is left out, as Figma leaves it out of the
   result. The cached `d` is Figma's own result, and the fill, stroke and
   effects are the boolean's, not its children's. If any child cannot be an
-  operand (text, a group or frame, a mask, a line or open path, or a skewed, flipped or scaled child), the whole boolean
+  operand (text, a group or frame, a mask, a line or open path, a skewed, flipped or scaled child, or a rect with corner smoothing on different radii), the whole boolean
   is written as one flat `vector` and the export reports `boolean_flattened`
   as information. Nothing is rasterized.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
