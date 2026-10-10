@@ -294,7 +294,7 @@ describe("export from a workspace file in Node", () => {
 		expect(pdf.getPageCount()).toBe(2);
 	});
 
-	it("draws vector PDF pages with one copy of each font", async () => {
+	it("draws vector PDF pages with the glyphs of each font they use", async () => {
 		const out = join(dir, "badges-vector.pdf");
 		const vector: ExportPreset = {
 			...preset,
@@ -326,18 +326,21 @@ describe("export from a workspace file in Node", () => {
 			form instanceof PDFRawStream &&
 				form.dict.get(PDFName.of("Subtype"))?.toString(),
 		).toBe("/Form");
-		const fontFiles = pdf.context
+		const descriptors = pdf.context
 			.enumerateIndirectObjects()
+			.map(([, obj]) => obj)
 			.filter(
-				([, obj]) =>
+				(obj): obj is PDFDict =>
 					obj instanceof PDFDict &&
 					obj.get(PDFName.of("Type")) === PDFName.of("FontDescriptor"),
-			)
-			.map(([, obj]) =>
-				(obj as PDFDict).get(PDFName.of("FontFile2"))?.toString(),
 			);
-		expect(fontFiles).toHaveLength(2);
-		expect(new Set(fontFiles).size).toBe(1);
+		expect(descriptors).toHaveLength(2);
+		for (const d of descriptors) {
+			expect(d.get(PDFName.of("FontName"))?.toString()).toMatch(
+				/^\/[A-Z]{6}\+/,
+			);
+			expect(d.get(PDFName.of("FontFile2"))).toBeDefined();
+		}
 	});
 
 	it("lists the characters the fonts can't draw when asked", async () => {

@@ -168,8 +168,9 @@ export async function assemblePdf(
 	return doc.save();
 }
 
-/** Points every font descriptor at one copy of each embedded font file and
- *  drops the others: each vector page carries the whole files it uses. */
+/** Points every font descriptor at one copy of each identical embedded font
+ *  file and drops the others: each vector page carries the glyphs it uses, so
+ *  pages that draw the same ones share a file. */
 function shareFontFiles(lib: PdfLib, doc: PDFDocument) {
 	const { PDFDict, PDFName, PDFRawStream, PDFRef } = lib;
 	const type = PDFName.of("Type");
