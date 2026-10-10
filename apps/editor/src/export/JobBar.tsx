@@ -175,10 +175,6 @@ export function JobBar({
 	const okItems = lastResult ? lastResult.items.length - failedItems : 0;
 	// A print fallback wrote a plain file: a warning, not a failure.
 	const warnedItems = lastResult ? printFallbacks(lastResult.items) : 0;
-	// A vector page that uses what a PDF cannot draw is written as pixels.
-	const pixelItems =
-		lastResult?.items.filter((i) => i.ok && i.vector === "fallback").length ??
-		0;
 	const reason =
 		running || hideRun ? null : preset ? blocked : "Choose a preset";
 	const chosen = recordIds && recordIds.length > 0 ? recordIds : undefined;
@@ -336,7 +332,7 @@ export function JobBar({
 							className="inline-flex min-w-0 items-center gap-1.5 text-fc-sm tabular-nums"
 							data-testid="export-summary"
 						>
-							{failedItems > 0 || warnedItems > 0 || pixelItems > 0 ? (
+							{failedItems > 0 || warnedItems > 0 ? (
 								<WarningIcon className="size-3.5 shrink-0 text-fc-warning" />
 							) : (
 								<CheckIcon className="size-3.5 shrink-0 text-fc-success" />
@@ -358,7 +354,6 @@ export function JobBar({
 								{[
 									`${okItems} ok`,
 									warnedItems > 0 ? plural(warnedItems, "warning") : "",
-									pixelItems > 0 ? `${pixelItems} as pixels` : "",
 									failedItems > 0 ? `${failedItems} failed` : "",
 									formatDuration(lastResult.ms),
 								]

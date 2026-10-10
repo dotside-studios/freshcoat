@@ -142,9 +142,10 @@ the records, and **Export** turns templates and records into files.
     per record and side, sized as the design (or the photo) at the preset's
     DPI, with PNG or JPEG page images or as vectors, or lays the cards out
     on sheets of paper with crop marks (see [Sheets](#sheets)). Vector pages
-    keep shapes, text and SVG logos sharp at any size; a card with a shadow,
-    blur or another effect a PDF cannot draw is written as a PNG page, and the
-    job summary counts those as pixels.
+    keep shapes and SVG logos sharp at any size and set text in its embedded
+    font, selectable when the font is a TrueType or OpenType file; a layer a
+    PDF cannot express, such as a shadow, or text in a web font file, is drawn
+    as a 600 dpi image in place.
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
   value, or a pattern. One binding serves every preset that exports the
   template. Choosing a dataset matches fields to columns by key or title,
