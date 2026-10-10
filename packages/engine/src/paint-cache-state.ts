@@ -111,6 +111,10 @@ export type PaintCacheState = {
 	// Most recently used first.
 	backgrounds: CachedBackground[];
 	finishNoise: CachedFinishNoise | null;
+	// The frame size whose last finish found translucent pixels, which the CPU
+	// finish cannot take, and how many paints may skip reading it back before
+	// one looks again.
+	finishTranslucent: { size: string; skips: number } | null;
 	disposed: boolean;
 };
 
@@ -149,6 +153,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		leads: [],
 		backgrounds: [],
 		finishNoise: null,
+		finishTranslucent: null,
 		disposed: false,
 	};
 	const clear = () => {
@@ -164,6 +169,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		state.backgrounds = [];
 		state.leads = [];
 		state.finishNoise = null;
+		state.finishTranslucent = null;
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);

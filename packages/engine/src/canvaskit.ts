@@ -3855,6 +3855,10 @@ export function setCpuFinish(enabled: boolean): void {
 	cpuFinish = enabled;
 }
 
+// How many paints of a frame size that last had translucent pixels go
+// straight to the shader before one reads the frame back to look again.
+const FINISH_TRANSLUCENT_SKIPS = 8;
+
 // The finish shader in float32 on the surface's own pixels, byte for byte what the
 // shader writes in software, which runs runtime effects slowly. Exact only
 // where alpha is 255 (unpremultiplying rounds otherwise), so a frame with any
@@ -3871,10 +3875,22 @@ function finishOnCpu(
 	const info = surface.imageInfo();
 	if (info.colorType !== ck.ColorType.RGBA_8888) return false;
 	if (u.dither > 0 && !cache) return false;
+	const size = `${info.width}x${info.height}`;
+	const known = cache?.finishTranslucent;
+	if (known?.size === size && known.skips > 0) {
+		known.skips--;
+		return false;
+	}
 	const canvas = surface.getCanvas();
 	const px = canvas.readPixels(0, 0, info) as Uint8Array | null;
 	if (!px) return false;
-	for (let i = 3; i < px.length; i += 4) if (px[i] !== 255) return false;
+	for (let i = 3; i < px.length; i += 4)
+		if (px[i] !== 255) {
+			if (cache)
+				cache.finishTranslucent = { size, skips: FINISH_TRANSLUCENT_SKIPS };
+			return false;
+		}
+	if (cache) cache.finishTranslucent = null;
 	let noise: Float32Array | null = null;
 	if (u.dither > 0) {
 		noise = cache && finishNoise(ck, surface, bin, cache, u);

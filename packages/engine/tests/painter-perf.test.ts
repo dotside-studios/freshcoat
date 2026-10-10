@@ -7,10 +7,10 @@ import { compileScene } from "../src/compile-scene";
 import { deriveFontMetrics } from "../src/font-metrics";
 import { createSharedFontProvider } from "../src/font-collection";
 import { createPaintCache, type PaintCache } from "../src/index";
-import { createFrame, createText, type Node } from "../src/node";
+import { createFrame, createRect, createText, type Node } from "../src/node";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
-import type { Command, ResolvedFont } from "../src/types";
+import type { Command, FrameFinish, ResolvedFont } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 
 const geist = new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
@@ -30,7 +30,12 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function compile(node: Node, width: number, height: number): Command[] {
+function compile(
+	node: Node,
+	width: number,
+	height: number,
+	finish?: FrameFinish,
+): Command[] {
 	const textEngine = createParagraphEngine(ck, geist);
 	try {
 		return compileScene(node, {
@@ -38,6 +43,7 @@ function compile(node: Node, width: number, height: number): Command[] {
 			height,
 			textEngine,
 			fontMetrics: deriveFontMetrics(geist),
+			...(finish ? { finish } : {}),
 		});
 	} finally {
 		textEngine.dispose();
@@ -277,5 +283,74 @@ describe("shaping that throws", () => {
 		}
 		expect(matched.length).toBeGreaterThan(0);
 		expect(matched.every((t) => !t || t.isDeleted())).toBe(true);
+	});
+});
+
+describe("the CPU finish", () => {
+	const frame = (color: string) =>
+		createFrame({
+			pos: { x: 0, y: 0 },
+			size: { width: 64, height: 64 },
+			children: [
+				createRect({
+					pos: { x: 0, y: 0 },
+					size: { width: 32, height: 64 },
+					fills: [{ kind: "solid", color }],
+				}),
+			],
+		});
+
+	// Calls to `method` of ck.Canvas while `run` paints.
+	async function countCalls(
+		method: "readPixels" | "writePixels",
+		run: () => Promise<unknown>,
+	) {
+		const proto = ck.Canvas.prototype;
+		const real = proto[method];
+		let n = 0;
+		proto[method] = function (...args: unknown[]) {
+			n++;
+			return real.apply(this, args);
+		};
+		try {
+			await run();
+			return n;
+		} finally {
+			proto[method] = real;
+		}
+	}
+
+	test("stops reading back a frame that had translucent pixels", async () => {
+		const scene = frame("#2f6fed80");
+		const reads = async (finish?: FrameFinish) => {
+			const commands = compile(scene, 64, 64, finish);
+			const cache = createPaintCache();
+			try {
+				await paint(commands, cache);
+				return await countCalls("readPixels", async () => {
+					for (let i = 0; i < 10; i++) await paint(commands, cache);
+				});
+			} finally {
+				cache.dispose();
+			}
+		};
+		// Eight paints skip the read, the ninth looks again.
+		expect((await reads({ whiteClamp: 200 })) - (await reads())).toBe(1);
+	});
+
+	test("takes an opaque frame again once it looks", async () => {
+		const finish = { whiteClamp: 200 };
+		const translucent = compile(frame("#2f6fed80"), 64, 64, finish);
+		const opaque = compile(frame("#2f6fed"), 64, 64, finish);
+		const cache = createPaintCache();
+		try {
+			await paint(translucent, cache);
+			const writes = await countCalls("writePixels", async () => {
+				for (let i = 0; i < 12; i++) await paint(opaque, cache);
+			});
+			expect(writes).toBeGreaterThan(0);
+		} finally {
+			cache.dispose();
+		}
 	});
 });
