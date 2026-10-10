@@ -16,6 +16,7 @@ import type {
 	ColorFilter,
 	ColorSpace,
 	Font,
+	FontMetrics,
 	GlyphRun,
 	GrDirectContext,
 	Image,
@@ -34,6 +35,7 @@ import type {
 	StrokeJoinEnumValues,
 	Surface,
 	TextStyle,
+	Typeface,
 	TypefaceFontProvider,
 	WebGLContextHandle,
 } from "canvaskit-wasm";
@@ -93,6 +95,7 @@ import {
 	cachedMipmaps,
 	cachedPath,
 	cachedSurface,
+	cachedTile,
 	cachedWorkSurface,
 	closestBackground,
 	evictUnusedBitmaps,
@@ -100,6 +103,7 @@ import {
 	evictUnusedLines,
 	evictUnusedPaths,
 	evictUnusedWork,
+	keepLine,
 	noteLead,
 	type PaintCacheState,
 	paintCacheState,
@@ -728,14 +732,17 @@ function drawText(
 	// Gradient paints depend on position, so those lines are not cached.
 	const cache = fgPaint ? null : bin.cache;
 	const rows = visibleRows(canvas);
+	const decorationPaints = new Map<string, Paint>();
 	for (const line of cmd.layout.lines) {
 		const first = line.spans[0];
 		if (!first) continue;
 		if (rows) {
 			const baseline = line.baseline ?? line.y;
 			const reach = 2 * Math.max(...line.spans.map((s) => s.font.size));
-			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
+			if (baseline + reach < rows.top || baseline - reach > rows.bottom) {
+				if (cache) keepLine(cache, lineKey(line, cmd.color, fallback));
 				continue;
+			}
 		}
 		const shape = () =>
 			shapeLine(ck, provider, cmd, line, fallback, fgPaint, bgPaint);
@@ -754,20 +761,16 @@ function drawText(
 		canvas.drawParagraph(para, left, (line.baseline ?? line.y) - ascent);
 		// Decoration lines are drawn as rects
 		// rather than via Paragraph decoration, so both backends agree.
-		const decorations = lineDecorations(
-			ck,
-			provider,
-			bin,
-			line,
-			para,
-			ascent,
-			left,
-		);
-		for (const d of decorations) {
-			const p = bin.track(new ck.Paint());
-			p.setAntiAlias(true);
-			if (fillShader) p.setShader(fillShader);
-			else p.setColor(toColor(ck, d.color));
+		for (const d of lineDecorations(ck, provider, bin, line, shaped, left)) {
+			const color = fillShader ? "" : d.color;
+			let p = decorationPaints.get(color);
+			if (!p) {
+				p = bin.track(new ck.Paint());
+				p.setAntiAlias(true);
+				if (fillShader) p.setShader(fillShader);
+				else p.setColor(toColor(ck, d.color));
+				decorationPaints.set(color, p);
+			}
 			canvas.drawRect(
 				ck.LTRBRect(d.x0, d.top, d.x1, d.top + d.thickness),
 				p,
@@ -791,26 +794,25 @@ function lineDecorations(
 	provider: TypefaceFontProvider,
 	bin: Bin,
 	line: TextLine,
-	para: Paragraph,
-	ascent: number,
+	shaped: ShapedLine,
 	left: number,
 ): DecorationRect[] {
 	const out: DecorationRect[] = [];
 	const baseline = line.baseline ?? line.y;
-	let runs: GlyphRun[] | undefined;
+	let ink: { run: GlyphRun; font: Font }[] | undefined;
 	for (const span of line.spans) {
 		if (!span.font.decoration) continue;
 		const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 		let segments: [number, number][] = [[span.x, span.x + span.width]];
 		if (span.font.decoration === "underline" && span.font.skipInk !== false) {
-			if (!runs) {
-				runs = para.getShapedLines()[0]?.runs ?? [];
-				for (const run of runs) bin.track(run.typeface);
-			}
-			const y0 = baseline - ascent;
+			ink ??= (glyphLines(bin, shaped)[0]?.runs ?? []).map((run) => ({
+				run,
+				font: runFont(ck, bin, run),
+			}));
+			const y0 = baseline - shaped.ascent;
 			const gaps: number[] = [];
-			for (const run of runs) {
-				const hits = runFont(ck, bin, run).getGlyphIntercepts(
+			for (const { run, font } of ink) {
+				const hits = font.getGlyphIntercepts(
 					run.glyphs,
 					run.positions,
 					top - y0,
@@ -856,22 +858,14 @@ export function shapeTextLines(
 	for (const line of cmd.layout.lines) {
 		const first = line.spans[0];
 		if (!first) continue;
-		const { para, ascent } = shapeLine(
-			ck,
-			provider,
-			cmd,
-			line,
-			fallback,
-			null,
-			null,
-		);
+		const shaped = shapeLine(ck, provider, cmd, line, fallback, null, null);
+		const { para, ascent } = shaped;
 		try {
 			const left =
 				line.direction === "rtl"
 					? Math.min(...line.spans.map((s) => s.x))
 					: first.x;
-			const runs = para.getShapedLines().flatMap((l) => l.runs);
-			for (const run of runs) bin.track(run.typeface);
+			const runs = glyphLines(bin, shaped).flatMap((l) => l.runs);
 			const spanAt: number[] = [];
 			line.spans.forEach((span, i) => {
 				for (let k = 0; k < span.text.length; k++) spanAt.push(i);
@@ -882,15 +876,7 @@ export function shapeTextLines(
 				y: (line.baseline ?? line.y) - ascent,
 				runs,
 				spanAt,
-				decorations: lineDecorations(
-					ck,
-					provider,
-					bin,
-					line,
-					para,
-					ascent,
-					left,
-				),
+				decorations: lineDecorations(ck, provider, bin, line, shaped, left),
 			});
 		} finally {
 			para.delete();
@@ -929,10 +915,7 @@ function spanDecoration(
 		});
 		let em: DecorationMetrics | undefined;
 		if (typeface) {
-			const font = new ck.Font(typeface, FONT_BOX_SIZE);
-			const m = font.getMetrics();
-			font.delete();
-			typeface.delete();
+			const m = boxMetrics(ck, typeface);
 			const per = (v: number | undefined) =>
 				v === undefined ? undefined : v / FONT_BOX_SIZE;
 			em = {
@@ -984,16 +967,15 @@ function arcLines(
 			shaped = shape();
 			bin.track(shaped.para);
 		}
-		const sl = shaped.para.getShapedLines()[0];
+		const sl = glyphLines(bin, shaped)[0];
 		const runs = sl?.runs ?? [];
-		for (const run of runs) bin.track(run.typeface);
 		const starts = spanByteStarts(line.spans.map((s) => s.text));
-		const spacing = runs.map((run) =>
+		const spacing = (shaped.spacing ??= runs.map((run) =>
 			Float32Array.from(
 				run.offsets.subarray(0, run.glyphs.length),
 				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
 			),
-		);
+		));
 		out.push({
 			line,
 			arc: {
@@ -1023,6 +1005,19 @@ function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
 	if (run.fakeBold) font.setEmbolden(true);
 	if (run.fakeItalic) font.setSkewX(-FAKE_ITALIC_SKEW);
 	return font;
+}
+
+// A shaped line's glyph runs. A cached line keeps them, and frees their
+// typefaces with itself; otherwise `bin` frees the typefaces.
+function glyphLines(
+	bin: Bin,
+	shaped: ShapedLine,
+): ReturnType<Paragraph["getShapedLines"]> {
+	if (shaped.glyphLines) return shaped.glyphLines;
+	const lines = shaped.para.getShapedLines();
+	if (!shaped.cached)
+		for (const l of lines) for (const run of l.runs) bin.track(run.typeface);
+	return (shaped.glyphLines = lines);
 }
 
 type ArcDecoration = {
@@ -1213,22 +1208,33 @@ function drawArcText(
 		cy,
 	);
 	drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, fgPaint);
+	const decorationPaints = new Map<string, Paint>();
 	for (const d of arcDecorations(lines, rings, arc)) {
-		const p = bin.track(new ck.Paint());
-		p.setAntiAlias(true);
-		p.setStyle(ck.PaintStyle.Stroke);
-		p.setStrokeWidth(d.thickness);
-		if (fillShader) p.setShader(fillShader);
-		else p.setColor(toColor(ck, d.span.color ?? cmd.color ?? "#000000"));
+		const color = fillShader ? "" : (d.span.color ?? cmd.color ?? "#000000");
+		const key = `${d.thickness}|${color}`;
+		let p = decorationPaints.get(key);
+		if (!p) {
+			p = bin.track(new ck.Paint());
+			p.setAntiAlias(true);
+			p.setStyle(ck.PaintStyle.Stroke);
+			p.setStrokeWidth(d.thickness);
+			if (fillShader) p.setShader(fillShader);
+			else p.setColor(toColor(ck, color));
+			decorationPaints.set(key, p);
+		}
 		const builder = new ck.PathBuilder();
 		const deg = 180 / Math.PI;
-		builder.addArc(
-			ck.LTRBRect(cx - d.r, cy - d.r, cx + d.r, cy + d.r),
-			Math.min(d.a0, d.a1) * deg - 90,
-			Math.abs(d.a1 - d.a0) * deg,
-		);
-		const path = bin.track(builder.detach());
-		builder.delete();
+		let path: Path;
+		try {
+			builder.addArc(
+				ck.LTRBRect(cx - d.r, cy - d.r, cx + d.r, cy + d.r),
+				Math.min(d.a0, d.a1) * deg - 90,
+				Math.abs(d.a1 - d.a0) * deg,
+			);
+			path = bin.track(builder.detach());
+		} finally {
+			builder.delete();
+		}
 		canvas.drawPath(path, p);
 	}
 }
@@ -1313,21 +1319,30 @@ function shapeLine(
 			: {}),
 	});
 	const builder = makeParagraphBuilder(ck, style, provider);
-	for (const span of line.spans) {
-		// Typed as a constructor only; CanvasKit also allows the plain call.
-		const ts = (ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
-			textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
-		);
-		if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint as Paint);
-		else builder.pushStyle(ts);
-		builder.addText(span.text);
-		builder.pop();
+	let para: Paragraph;
+	try {
+		for (const span of line.spans) {
+			// Typed as a constructor only; CanvasKit also allows the plain call.
+			const ts = (ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
+				textStyleOf(ck, span, cmd, fallback, line.wordSpacing),
+			);
+			if (fgPaint) builder.pushPaintStyle(ts, fgPaint, bgPaint as Paint);
+			else builder.pushStyle(ts);
+			builder.addText(span.text);
+			builder.pop();
+		}
+		para = builder.build();
+	} finally {
+		builder.delete();
 	}
-	const para = builder.build();
-	builder.delete();
-	para.layout(1e6); // single pre-wrapped line; no re-wrapping
-	const lm = para.getLineMetrics();
-	return { para, ascent: lm.length ? lm[0].ascent : 0 };
+	try {
+		para.layout(1e6); // single pre-wrapped line; no re-wrapping
+		const lm = para.getLineMetrics();
+		return { para, ascent: lm.length ? lm[0].ascent : 0 };
+	} catch (e) {
+		para.delete();
+		throw e;
+	}
 }
 
 // Mitchell–Netravali cubic (B = C = 1/3): Skia's canonical "high quality"
@@ -1468,15 +1483,17 @@ function drawImage(
 	const paint = bin.track(new ck.Paint());
 	paint.setAntiAlias(true);
 	if (cmd.fit === "tile") {
-		const shader = bin.track(
+		const build = () =>
 			img.makeShaderOptions(
 				ck.TileMode.Repeat,
 				ck.TileMode.Repeat,
 				ck.FilterMode.Linear,
 				ck.MipmapMode.None,
-			),
+			);
+		paint.setShader(
+			(bin.cache && cachedTile(bin.cache, cmd.src, img, build)) ??
+				bin.track(build()),
 		);
-		paint.setShader(shader);
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), paint);
 	} else {
 		const r = fitRect(
@@ -1935,17 +1952,18 @@ function drawSvgPicture(
 	if (cmd.fit === "tile") {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
+		const build = () =>
+			img.svgPicture.makeShader(
+				ck.TileMode.Repeat,
+				ck.TileMode.Repeat,
+				ck.FilterMode.Linear,
+				// Typed as optional; CanvasKit also takes null.
+				null as unknown as InputMatrix,
+				ck.LTRBRect(0, 0, img.width, img.height),
+			);
 		paint.setShader(
-			bin.track(
-				img.svgPicture.makeShader(
-					ck.TileMode.Repeat,
-					ck.TileMode.Repeat,
-					ck.FilterMode.Linear,
-					// Typed as optional; CanvasKit also takes null.
-					null as unknown as InputMatrix,
-					ck.LTRBRect(0, 0, img.width, img.height),
-				),
-			),
+			(bin.cache && cachedTile(bin.cache, cmd.src, img, build)) ??
+				bin.track(build()),
 		);
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), paint);
 		return;
@@ -2823,8 +2841,11 @@ function textBounds(
 		const size = Math.max(...line.spans.map((s) => s.font.size));
 		if (rows) {
 			const reach = 2 * size;
-			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
+			if (baseline + reach < rows.top || baseline - reach > rows.bottom) {
+				if (cache && runBox)
+					keepLine(cache, lineKey(line, cmd.color, fallback));
 				continue;
+			}
 		}
 		for (const span of line.spans) {
 			if (!span.font.decoration) continue;
@@ -2851,8 +2872,7 @@ function textBounds(
 		let x1 = Number.NEGATIVE_INFINITY;
 		let top = 0;
 		let bottom = 0;
-		for (const run of shaped.para.getShapedLines()[0]?.runs ?? []) {
-			if (variable) bin.track(run.typeface);
+		for (const run of glyphLines(bin, shaped)[0]?.runs ?? []) {
 			const em = runBox(run);
 			const skew = italic
 				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * run.size
@@ -2925,10 +2945,7 @@ function familyBox(
 				slant,
 			});
 			if (!typeface) continue;
-			const font = new ck.Font(typeface, FONT_BOX_SIZE);
-			const b = font.getMetrics().bounds;
-			font.delete();
-			typeface.delete();
+			const b = boxMetrics(ck, typeface).bounds;
 			if (!b) {
 				box = null;
 				break;
@@ -2945,6 +2962,20 @@ function familyBox(
 	}
 	byFamily.set(family, box);
 	return box;
+}
+
+// The metrics of `typeface` at FONT_BOX_SIZE, which it is freed after.
+function boxMetrics(ck: CanvasKit, typeface: Typeface): FontMetrics {
+	try {
+		const font = new ck.Font(typeface, FONT_BOX_SIZE);
+		try {
+			return font.getMetrics();
+		} finally {
+			font.delete();
+		}
+	} finally {
+		typeface.delete();
+	}
 }
 
 // SkFont's synthetic oblique.
@@ -3828,6 +3859,10 @@ export function setCpuFinish(enabled: boolean): void {
 	cpuFinish = enabled;
 }
 
+// How many paints of a frame size that last had translucent pixels go
+// straight to the shader before one reads the frame back to look again.
+const FINISH_TRANSLUCENT_SKIPS = 8;
+
 // The finish shader in float32 on the surface's own pixels, byte for byte what the
 // shader writes in software, which runs runtime effects slowly. Exact only
 // where alpha is 255 (unpremultiplying rounds otherwise), so a frame with any
@@ -3844,10 +3879,22 @@ function finishOnCpu(
 	const info = surface.imageInfo();
 	if (info.colorType !== ck.ColorType.RGBA_8888) return false;
 	if (u.dither > 0 && !cache) return false;
+	const size = `${info.width}x${info.height}`;
+	const known = cache?.finishTranslucent;
+	if (known?.size === size && known.skips > 0) {
+		known.skips--;
+		return false;
+	}
 	const canvas = surface.getCanvas();
 	const px = canvas.readPixels(0, 0, info) as Uint8Array | null;
 	if (!px) return false;
-	for (let i = 3; i < px.length; i += 4) if (px[i] !== 255) return false;
+	for (let i = 3; i < px.length; i += 4)
+		if (px[i] !== 255) {
+			if (cache)
+				cache.finishTranslucent = { size, skips: FINISH_TRANSLUCENT_SKIPS };
+			return false;
+		}
+	if (cache) cache.finishTranslucent = null;
 	let noise: Float32Array | null = null;
 	if (u.dither > 0) {
 		noise = cache && finishNoise(ck, surface, bin, cache, u);
@@ -4823,7 +4870,7 @@ async function paintSceneIn(
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
-				if (cache) cache.images.set(src, { image: img, mipped: null });
+				if (cache) cache.images.set(src, { image: img, mipped: null, tile: null });
 				else bin.track(img);
 				warnSvgFeatures(warnings, src, img);
 			} else

@@ -38,8 +38,13 @@ export function decodeEntities(s: string): string {
 const NAME = /[A-Za-z_:][-A-Za-z0-9_:.]*/y;
 const SPACE = /\s*/y;
 
+// Reading recurses per element; this is well past any drawing and far short of
+// the stack.
+const MAX_XML_DEPTH = 512;
+
 export function parseXml(src: string): XmlElement {
 	let i = 0;
+	let depth = 0;
 	const fail = (msg: string): never => {
 		throw new SvgError(`svg: ${msg} at ${i}`);
 	};
@@ -96,6 +101,8 @@ export function parseXml(src: string): XmlElement {
 
 	const readElement = (): XmlElement => {
 		i++; // <
+		if (++depth > MAX_XML_DEPTH)
+			fail(`elements are nested deeper than ${MAX_XML_DEPTH}`);
 		const name = readName();
 		const attrs: Record<string, string> = {};
 		for (;;) {
@@ -103,6 +110,7 @@ export function parseXml(src: string): XmlElement {
 			skipSpace();
 			if (src.startsWith("/>", i)) {
 				i += 2;
+				depth--;
 				return { name, attrs, children: [] };
 			}
 			if (src[i] === ">") {
@@ -146,6 +154,7 @@ export function parseXml(src: string): XmlElement {
 				if (src[i] !== ">") fail("expected >");
 				i++;
 				flush();
+				depth--;
 				return { name, attrs, children };
 			}
 			if (src.startsWith("<![CDATA[", i)) {

@@ -138,8 +138,13 @@ export function createParagraphEngine(
 	): { para: Paragraph; builder: ParagraphBuilder } {
 		const style = paragraphStyle(font, direction);
 		const builder = makeParagraphBuilder(ck, style, provider);
-		builder.addText(text);
-		return { para: builder.build(), builder };
+		try {
+			builder.addText(text);
+			return { para: builder.build(), builder };
+		} catch (e) {
+			builder.delete();
+			throw e;
+		}
 	}
 
 	// Shape every styled span as ONE paragraph and wrap at maxWidth, so cross-span
@@ -155,27 +160,32 @@ export function createParagraphEngine(
 		if (spans.length === 0) return { lines: [] };
 		const pstyle = paragraphStyle(spans[0]!.font, direction);
 		const builder = makeParagraphBuilder(ck, pstyle, provider);
-		const ranges: { start: number; end: number; spanIndex: number }[] = [];
-		let cursor = 0;
-		let full = "";
-		spans.forEach((s, i) => {
-			// Typed as constructor only; CanvasKit also allows the plain call.
-			builder.pushStyle(
-				(ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
-					spanTextStyle(ck, s.font, fallbackFamilies),
-				),
-			);
-			const text = normalizeNewlines(s.text);
-			builder.addText(text);
-			builder.pop();
-			ranges.push({ start: cursor, end: cursor + text.length, spanIndex: i });
-			cursor += text.length;
-			full += text;
-		});
-		const para = builder.build();
+		let para: Paragraph | undefined;
 		try {
+			const ranges: { start: number; end: number; spanIndex: number }[] = [];
+			let cursor = 0;
+			let full = "";
+			spans.forEach((s, i) => {
+				// Typed as constructor only; CanvasKit also allows the plain call.
+				builder.pushStyle(
+					(ck.TextStyle as unknown as (ts: TextStyle) => TextStyle)(
+						spanTextStyle(ck, s.font, fallbackFamilies),
+					),
+				);
+				const text = normalizeNewlines(s.text);
+				builder.addText(text);
+				builder.pop();
+				ranges.push({ start: cursor, end: cursor + text.length, spanIndex: i });
+				cursor += text.length;
+				full += text;
+			});
+			para = builder.build();
 			para.layout(maxWidth);
-			const lines: InlineShapedLine[] = para
+			const shaped = para;
+			// Lines are ordered, so each line resumes at the first span that can
+			// still reach it.
+			let first = 0;
+			const lines: InlineShapedLine[] = shaped
 				.getLineMetrics()
 				.map(
 					(lm: {
@@ -185,12 +195,16 @@ export function createParagraphEngine(
 						left: number;
 						isHardBreak: boolean;
 					}) => {
+						while (first < ranges.length && ranges[first]!.end <= lm.startIndex)
+							first++;
 						const fragments = [];
-						for (const r of ranges) {
+						for (let k = first; k < ranges.length; k++) {
+							const r = ranges[k]!;
+							if (r.start >= lm.endExcludingWhitespaces) break;
 							const fs = Math.max(r.start, lm.startIndex);
 							const fe = Math.min(r.end, lm.endExcludingWhitespaces);
 							if (fe <= fs) continue; // span absent from this line (or only ws)
-							const rects = para.getRectsForRange(
+							const rects = shaped.getRectsForRange(
 								fs,
 								fe,
 								ck.RectHeightStyle.Tight,
@@ -213,10 +227,10 @@ export function createParagraphEngine(
 						return { fragments, width: lm.width, hardBreak: lm.isHardBreak };
 					},
 				);
-			const missing = missingIn(para, full);
+			const missing = missingIn(shaped, full);
 			return missing ? { lines, missing } : { lines };
 		} finally {
-			para.delete();
+			para?.delete();
 			builder.delete();
 		}
 	}

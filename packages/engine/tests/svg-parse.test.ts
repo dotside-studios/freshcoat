@@ -549,6 +549,10 @@ describe("unsupported content and limits", () => {
 		expect(shapes(d.children)).toHaveLength(0);
 		expect(d.warnings.map((w) => w.feature)).toContain("depth-limit");
 	});
+	test("20k nested groups are refused with an SvgError", () => {
+		const deep = `${"<g>".repeat(20000)}<path d="M0 0H1V1Z"/>${"</g>".repeat(20000)}`;
+		expect(() => parseSvg(svg(deep))).toThrow(SvgError);
+	});
 	test("exponential use expansion stops at the item limit", () => {
 		let body = '<path id="l0" d="M0 0H1V1Z"/>';
 		for (let i = 1; i <= 20; i++)

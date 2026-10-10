@@ -13,9 +13,10 @@ import {
 	type SvgItem,
 	type SvgPaint,
 	type SvgShape,
+	segmentsOf,
 	viewBoxMatrix,
 } from "./parse";
-import { normalizePath, serializePath, transformPath } from "./path";
+import { serializePath, transformPath } from "./path";
 
 /** Lowers a drawing to a scene subtree at the origin, sized to `size` (default
  *  the drawing's own). Content outside the box is clipped, as SVG's root is.
@@ -75,7 +76,7 @@ export function svgToNode(drawing: SvgDrawing, size?: Size): GroupNode {
 			pos: origin,
 			size: box,
 			viewBox,
-			d: serializePath(transformPath(normalizePath(s.d), shift)),
+			d: serializePath(transformPath(segmentsOf(s), shift)),
 			fills: s.fill ? [fill(s.fill)] : [],
 		};
 		if (s.id) node.id = s.id;

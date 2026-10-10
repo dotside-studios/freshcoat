@@ -5,6 +5,8 @@ import type {
 	Image,
 	Paragraph,
 	Path,
+	Shader,
+	ShapedLine as GlyphLine,
 	Surface,
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
@@ -25,13 +27,24 @@ import type { PaintWarning } from "./types";
 
 type FontKey = { family: string; bytes: Uint8Array }[];
 
-export type ShapedLine = { para: Paragraph; ascent: number };
+// What the cache holds for a line also carries, once a paint has asked for them,
+// the paragraph's glyph runs (their typefaces freed with the line) and the
+// per-glyph letter spacing arc text derives from them.
+export type ShapedLine = {
+	para: Paragraph;
+	ascent: number;
+	cached?: boolean;
+	glyphLines?: GlyphLine[];
+	spacing?: Float32Array[];
+};
 
 // A decoded image and, once a heavy downscale has asked for it, its mipmapped
-// copy, freed together.
+// copy and, once a tile fill has asked for it, its repeating shader, freed
+// together.
 export type CachedImage = {
 	image: Image | SvgPicture;
 	mipped: Image | null;
+	tile: Shader | null;
 };
 
 // The pixels a paint's leading run of drawables left on its render surface,
@@ -101,6 +114,10 @@ export type PaintCacheState = {
 	// Most recently used first.
 	backgrounds: CachedBackground[];
 	finishNoise: CachedFinishNoise | null;
+	// The frame size whose last finish found translucent pixels, which the CPU
+	// finish cannot take, and how many paints may skip reading it back before
+	// one looks again.
+	finishTranslucent: { size: string; skips: number } | null;
 	disposed: boolean;
 };
 
@@ -139,6 +156,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		leads: [],
 		backgrounds: [],
 		finishNoise: null,
+		finishTranslucent: null,
 		disposed: false,
 	};
 	const clear = () => {
@@ -154,6 +172,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		state.backgrounds = [];
 		state.leads = [];
 		state.finishNoise = null;
+		state.finishTranslucent = null;
 		const surface = state.surface;
 		state.surface = null;
 		if (surface) releaseSurface(surface);
@@ -467,8 +486,22 @@ export function forgetImage(state: PaintCacheState, src: string): void {
 	);
 }
 
+// The repeating shader of a cached image, built on first use. null when `image`
+// is not the one cached under `src`.
+export function cachedTile(
+	state: PaintCacheState,
+	src: string,
+	image: Image | SvgPicture,
+	build: () => Shader,
+): Shader | null {
+	const entry = state.images.get(src);
+	if (!entry || entry.image !== image) return null;
+	return (entry.tile ??= build());
+}
+
 function freeImage(entry: CachedImage): void {
-	const { image, mipped } = entry;
+	const { image, mipped, tile } = entry;
+	if (tile) tryFree(() => tile.delete());
 	if (mipped) tryFree(() => mipped.delete());
 	tryFree(() => image.delete());
 }
@@ -482,16 +515,22 @@ export function cachedLine(
 	const hit = state.lines.get(key);
 	if (hit) return hit;
 	const line = build();
+	line.cached = true;
 	state.stats.paragraphBuilds++;
 	state.lines.set(key, line);
 	return line;
+}
+
+// Keeps a cached line a paint skipped (culled off screen) from being evicted.
+export function keepLine(state: PaintCacheState, key: string): void {
+	if (state.lines.has(key)) state.linesUsed.add(key);
 }
 
 export function evictUnusedLines(state: PaintCacheState): void {
 	for (const [key, line] of state.lines) {
 		if (state.linesUsed.has(key)) continue;
 		state.lines.delete(key);
-		tryFree(() => line.para.delete());
+		freeLine(line);
 	}
 	state.linesUsed.clear();
 }
@@ -566,9 +605,15 @@ function freePaths(state: PaintCacheState): void {
 }
 
 function freeLines(state: PaintCacheState): void {
-	for (const line of state.lines.values()) tryFree(() => line.para.delete());
+	for (const line of state.lines.values()) freeLine(line);
 	state.lines.clear();
 	state.linesUsed.clear();
+}
+
+function freeLine(line: ShapedLine): void {
+	for (const glyphLine of line.glyphLines ?? [])
+		for (const run of glyphLine.runs) tryFree(() => run.typeface.delete());
+	tryFree(() => line.para.delete());
 }
 
 function releaseSurface(s: CachedSurface): void {

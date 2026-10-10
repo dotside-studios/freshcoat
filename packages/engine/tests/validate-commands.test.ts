@@ -216,6 +216,17 @@ describe("paths point at the offending field", () => {
 		expect(issues[0].path).toBe("commands[1].children[0].opacity");
 		expect(issues[0].id).toBe("inner");
 	});
+
+	test("names a field several groups deep in a deep tree", () => {
+		let node = rect({ opacity: 4 } as Partial<DrawRectCommand>);
+		for (let d = 0; d < 1000; d++)
+			node = { op: "drawGroup", ...box(0, 0, 5, 5), children: [node] } as Command;
+		const issues = validateCommands([canvas(), node]);
+		expect(issues).toHaveLength(1);
+		expect(issues[0].path).toBe(
+			`commands[1]${".children[0]".repeat(1000)}.opacity`,
+		);
+	});
 });
 
 // The half that keeps it honest: a real compile must produce no issues, or the

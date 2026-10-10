@@ -17,6 +17,7 @@ import {
 	type Box,
 	normalizePath,
 	pathBounds,
+	roundPath,
 	type Segment,
 	serializePath,
 	transformPath,
@@ -81,6 +82,41 @@ export type SvgShape = {
 	stroke?: SvgStroke;
 	opacity?: number;
 };
+
+type ShapeGeometry = { segs: Segment[]; box?: Box | null };
+
+// Parsed segments (already rounded as `d` would be) travel with each shape so
+// bounds and lowering never re-read its `d`.
+const geometries = new WeakMap<SvgShape, ShapeGeometry>();
+
+function makeShape(segs: Segment[], fields: Omit<SvgShape, "kind" | "d">): SvgShape {
+	let d: string | undefined;
+	const shape: SvgShape = {
+		kind: "shape",
+		get d() {
+			return (d ??= serializePath(segs));
+		},
+		...fields,
+	};
+	geometries.set(shape, { segs });
+	return shape;
+}
+
+function geometryOf(shape: SvgShape): ShapeGeometry {
+	let g = geometries.get(shape);
+	if (!g) geometries.set(shape, (g = { segs: normalizePath(shape.d) }));
+	return g;
+}
+
+export function segmentsOf(shape: SvgShape): Segment[] {
+	return geometryOf(shape).segs;
+}
+
+function shapeBounds(shape: SvgShape): Box | null {
+	const g = geometryOf(shape);
+	if (g.box === undefined) g.box = pathBounds(g.segs);
+	return g.box;
+}
 
 export type SvgGroup = {
 	kind: "group";
@@ -420,7 +456,7 @@ function boundsOf(items: SvgItem[]): Box | null {
 function itemBounds(item: SvgItem): Box | null {
 	switch (item.kind) {
 		case "shape":
-			return pathBounds(normalizePath(item.d));
+			return shapeBounds(item);
 		case "group":
 			return boundsOf(item.children);
 		case "image":
@@ -1061,12 +1097,10 @@ export function parseSvg(markup: string): SvgDrawing {
 					}),
 				);
 		if (children.length === 0) return null;
-		const clip: SvgShape = {
-			kind: "shape",
-			d: serializePath(transformPath(local, m)),
+		const clip = makeShape(roundPath(transformPath(local, m)), {
 			fillRule: style["fill-rule"] === "evenodd" ? "evenodd" : "nonzero",
 			fill: { kind: "solid", color: "#000000ff" },
-		};
+		});
 		const group: SvgGroup = { kind: "group", clip: [clip], children };
 		const opacity = opacityOf(style["fill-opacity"]);
 		if (opacity < 1) group.opacity = opacity;
@@ -1243,11 +1277,9 @@ export function parseSvg(markup: string): SvgDrawing {
 					);
 		const stroke = resolveStroke(style, m, localBox, ctx.viewport);
 		if (fill || stroke) {
-			const shape: SvgShape = {
-				kind: "shape",
-				d: serializePath(transformPath(local, m)),
+			const shape = makeShape(roundPath(transformPath(local, m)), {
 				fillRule: style["fill-rule"] === "evenodd" ? "evenodd" : "nonzero",
-			};
+			});
 			if (el.attrs.id) shape.id = el.attrs.id;
 			if (fill) shape.fill = fill;
 			if (stroke) shape.stroke = stroke;
@@ -1300,12 +1332,12 @@ export function parseSvg(markup: string): SvgDrawing {
 			}
 			const local = shapeSegments(el, name, ctx.viewport);
 			if (!local.some((s) => s.op !== "M")) return;
-			out.push({
-				kind: "shape",
-				d: serializePath(transformPath(local, em)),
-				fillRule: own["clip-rule"] === "evenodd" ? "evenodd" : "nonzero",
-				fill: { kind: "solid", color: "#000000ff" },
-			});
+			out.push(
+				makeShape(roundPath(transformPath(local, em)), {
+					fillRule: own["clip-rule"] === "evenodd" ? "evenodd" : "nonzero",
+					fill: { kind: "solid", color: "#000000ff" },
+				}),
+			);
 		};
 		for (const c of clip.children)
 			if (!("text" in c)) collect(c, clipStyle, cm, ctx.depth + 1);
@@ -1340,7 +1372,7 @@ export function parseSvg(markup: string): SvgDrawing {
 		const visit = (list: SvgItem[]) => {
 			for (const item of list) {
 				if (item.kind === "group") visit(item.children);
-				else if (item.kind === "shape") add(normalizePath(item.d));
+				else if (item.kind === "shape") add(segmentsOf(item));
 				else {
 					const b = itemBounds(item) as Box;
 					add(normalizePath(`M${b.x} ${b.y}h${b.width}v${b.height}h${-b.width}Z`));
@@ -1640,14 +1672,10 @@ export function parseSvg(markup: string): SvgDrawing {
 					viewport: own ?? { width: w, height: h },
 				});
 				if (children.length === 0) return [];
-				const clip: SvgShape = {
-					kind: "shape",
-					d: serializePath(
-						transformPath(normalizePath(`M0 0H${w}V${h}H0Z`), origin),
-					),
-					fillRule: "nonzero",
-					fill: { kind: "solid", color: "#000000ff" },
-				};
+				const clip = makeShape(
+					roundPath(transformPath(normalizePath(`M0 0H${w}V${h}H0Z`), origin)),
+					{ fillRule: "nonzero", fill: { kind: "solid", color: "#000000ff" } },
+				);
 				const g: SvgGroup = { kind: "group", clip: [clip], children };
 				if (el.attrs.id) g.id = el.attrs.id;
 				const opacity = opacityOf(style.opacity);

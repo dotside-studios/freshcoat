@@ -46,8 +46,10 @@ const finite = (v: unknown): v is number =>
 
 export function validateCommands(commands: Command[]): IrIssue[] {
 	const issues: IrIssue[] = [];
-	const add = (code: string, message: string, path: string, id?: string) =>
+	const add: Add = (code, message, p, id) => {
+		const path = `${p}`;
 		issues.push(id ? { code, message, path, id } : { code, message, path });
+	};
 
 	const setups = commands.filter((c) => c.op === "createCanvas");
 	if (setups.length === 0)
@@ -66,7 +68,7 @@ export function validateCommands(commands: Command[]): IrIssue[] {
 		);
 
 	commands.forEach((cmd, i) => {
-		const path = `commands[${i}]`;
+		const path = sub(undefined, `commands[${i}]`);
 		if (cmd.op === "createCanvas") {
 			if (!finite(cmd.width) || cmd.width <= 0)
 				add(
@@ -118,9 +120,34 @@ export function validateCommands(commands: Command[]): IrIssue[] {
 	return issues;
 }
 
-type Add = (code: string, message: string, path: string, id?: string) => void;
+// A chain of segments joined only when an issue is added (template literals
+// call toString), so a clean tree costs no string building and a deep one no
+// quadratic concatenation.
+class Path {
+	constructor(
+		readonly parent: Path | undefined,
+		readonly segment: string,
+	) {}
 
-function validateFinish(finish: FrameFinish, path: string, add: Add): void {
+	toString(): string {
+		const parts: string[] = [];
+		for (let p: Path | undefined = this; p; p = p.parent)
+			parts.push(p.segment);
+		return parts.reverse().join("");
+	}
+}
+
+const sub = (parent: Path | undefined, segment: string): Path =>
+	new Path(parent, segment);
+
+type Add = (
+	code: string,
+	message: string,
+	path: Path | string,
+	id?: string,
+) => void;
+
+function validateFinish(finish: FrameFinish, path: Path, add: Add): void {
 	const threshold = (v: number | undefined, name: string) => {
 		if (v === undefined) return;
 		if (!finite(v) || v < 0 || v > 255)
@@ -150,7 +177,7 @@ function validateFinish(finish: FrameFinish, path: string, add: Add): void {
 		);
 }
 
-function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
+function validateDrawable(cmd: DrawCommand, path: Path, add: Add): void {
 	const id = cmd.id;
 	if (!finite(cmd.pos?.x) || !finite(cmd.pos?.y))
 		add("bad_pos", "pos.x and pos.y must be finite", `${path}.pos`, id);
@@ -215,7 +242,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 		);
 
 	if (cmd.clip?.kind === "rounded-rect" && Array.isArray(cmd.clip.radius))
-		validateCornerRadius(cmd.clip.radius, `${path}.clip.radius`, add, id);
+		validateCornerRadius(cmd.clip.radius, sub(path, ".clip.radius"), add, id);
 	if (cmd.clip?.kind === "rounded-rect" && cmd.clip.smoothing !== undefined) {
 		const smoothing = cmd.clip.smoothing;
 		if (!finite(smoothing) || smoothing < 0)
@@ -243,7 +270,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 			add("bad_shadow", "shadow dx/dy must be finite", `${path}.shadow`, id);
 	}
 
-	if (cmd.adjust) validateAdjust(cmd.adjust, `${path}.adjust`, add, id);
+	if (cmd.adjust) validateAdjust(cmd.adjust, sub(path, ".adjust"), add, id);
 	if (cmd.op !== "drawGroup" && "isolate" in cmd)
 		add(
 			"isolate_not_group",
@@ -254,12 +281,12 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 
 	if ("fills" in cmd && cmd.fills)
 		cmd.fills.forEach((f, i) => {
-			validateFill(f, `${path}.fills[${i}]`, add, id);
+			validateFill(f, sub(path, `.fills[${i}]`), add, id);
 		});
 	if ("stroke" in cmd && cmd.stroke)
-		validateStroke(cmd.stroke, `${path}.stroke`, add, id);
+		validateStroke(cmd.stroke, sub(path, ".stroke"), add, id);
 	if ("cornerRadius" in cmd && cmd.cornerRadius !== undefined)
-		validateCornerRadius(cmd.cornerRadius, `${path}.cornerRadius`, add, id);
+		validateCornerRadius(cmd.cornerRadius, sub(path, ".cornerRadius"), add, id);
 
 	switch (cmd.op) {
 		case "drawBitmap": {
@@ -420,7 +447,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 					id,
 				);
 			cmd.children.forEach((c, i) => {
-				validateDrawable(c, `${path}.children[${i}]`, add);
+				validateDrawable(c, sub(path, `.children[${i}]`), add);
 			});
 			break;
 		case "drawMasked":
@@ -431,9 +458,9 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 					`${path}.channel`,
 					id,
 				);
-			validateDrawable(cmd.mask, `${path}.mask`, add);
+			validateDrawable(cmd.mask, sub(path, ".mask"), add);
 			cmd.children.forEach((c, i) => {
-				validateDrawable(c, `${path}.children[${i}]`, add);
+				validateDrawable(c, sub(path, `.children[${i}]`), add);
 			});
 			break;
 	}
@@ -441,7 +468,7 @@ function validateDrawable(cmd: DrawCommand, path: string, add: Add): void {
 
 function validateAdjust(
 	adjust: Adjust,
-	path: string,
+	path: Path,
 	add: Add,
 	id?: string,
 ): void {
@@ -504,7 +531,7 @@ function validateAdjust(
 
 function validatePattern(
 	fill: Extract<ResolvedFill, { kind: "pattern" }>,
-	path: string,
+	path: Path,
 	add: Add,
 	id?: string,
 ): void {
@@ -547,7 +574,7 @@ function validatePattern(
 
 function validateFill(
 	fill: ResolvedFill,
-	path: string,
+	path: Path,
 	add: Add,
 	id?: string,
 ): void {
@@ -592,7 +619,7 @@ function validateFill(
 
 function validateStroke(
 	stroke: Stroke,
-	path: string,
+	path: Path,
 	add: Add,
 	id?: string,
 ): void {
@@ -631,14 +658,14 @@ function validateStroke(
 			`${path}.gradient.kind`,
 			id,
 		);
-	else validateFill(gradient, `${path}.gradient`, add, id);
+	else validateFill(gradient, sub(path, ".gradient"), add, id);
 }
 
 const STROKE_GRADIENTS: readonly string[] = ["linear", "radial", "angular"];
 
 function validateCornerRadius(
 	radius: CornerRadius,
-	path: string,
+	path: Path,
 	add: Add,
 	id?: string,
 ): void {

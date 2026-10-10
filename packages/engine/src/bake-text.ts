@@ -252,12 +252,8 @@ function layoutWrappable(
 	if (maxLines !== undefined && mlines.length > maxLines) {
 		const kept = mlines.slice(0, maxLines);
 		const last = kept[maxLines - 1];
-		const truncated = ellipsize(last.text, effFont, size.width, engine);
-		kept[maxLines - 1] = {
-			...last,
-			text: truncated,
-			width: engine.measureText(truncated, effFont, null).width,
-		};
+		const truncated = ellipsizeMeasured(last.text, effFont, size.width, engine);
+		kept[maxLines - 1] = { ...last, ...truncated };
 		mlines = kept;
 	}
 
@@ -334,11 +330,30 @@ export function ellipsize(
 	maxWidth: number,
 	engine: TextEngine,
 ): string {
+	return ellipsizeMeasured(text, font, maxWidth, engine).text;
+}
+
+function ellipsizeMeasured(
+	text: string,
+	font: ResolvedFont,
+	maxWidth: number,
+	engine: TextEngine,
+): { text: string; width: number } {
 	const ell = "…";
-	const fits = (prefix: string) =>
-		engine.measureText(`${prefix}${ell}`, font, null).width <= maxWidth;
-	if (fits(text)) return `${text}${ell}`;
-	if (!engine.clusterAdvances) return bisectEllipsize(text, ell, fits);
+	const widths = new Map<string, number>();
+	const fits = (prefix: string) => {
+		const s = `${prefix}${ell}`;
+		const width = engine.measureText(s, font, null).width;
+		widths.set(s, width);
+		return width <= maxWidth;
+	};
+	const done = (s: string) => ({
+		text: s,
+		width: widths.get(s) ?? engine.measureText(s, font, null).width,
+	});
+	if (fits(text)) return done(`${text}${ell}`);
+	if (!engine.clusterAdvances)
+		return done(bisectEllipsize(text, ell, fits));
 
 	const xAt = new Map<number, number>([[0, 0]]);
 	const clusters = engine.clusterAdvances(text, font);
@@ -346,8 +361,11 @@ export function ellipsize(
 	// Distinct trimmed cut points, ascending. The untrimmed full text is
 	// already known not to fit.
 	const cuts: { end: number; x: number }[] = [{ end: 0, x: 0 }];
+	let end = 0;
+	let scanned = 0;
 	for (const c of clusters) {
-		const end = text.slice(0, c.end).trimEnd().length;
+		for (; scanned < c.end; scanned++)
+			if (text[scanned].trim() !== "") end = scanned + 1;
 		const x = xAt.get(end);
 		if (x === undefined || end === cuts[cuts.length - 1].end) continue;
 		if (end === text.length) continue;
@@ -364,7 +382,7 @@ export function ellipsize(
 	} else {
 		while (i + 1 < cuts.length && fits(cut(i + 1))) i++;
 	}
-	return `${cut(i)}${ell}`;
+	return done(`${cut(i)}${ell}`);
 }
 
 function bisectEllipsize(
