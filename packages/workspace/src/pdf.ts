@@ -6,6 +6,7 @@ import {
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
 import { rgbIdat } from "@freshcoat-js/engine/image";
+import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
 import { crc32 } from "./crc";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
@@ -16,6 +17,9 @@ type PdfLib = typeof import("pdf-lib");
 type PDFDocument = import("pdf-lib").PDFDocument;
 type PDFPage = import("pdf-lib").PDFPage;
 type PDFRef = import("pdf-lib").PDFRef;
+type PDFDict = import("pdf-lib").PDFDict;
+type PDFRawStream = import("pdf-lib").PDFRawStream;
+type PDFObject = import("pdf-lib").PDFObject;
 type PDFEmbeddedPage = import("pdf-lib").PDFEmbeddedPage;
 
 /** An embedded page image, or a vector page drawn as a form. */
@@ -169,7 +173,9 @@ export async function assemblePdf(
 }
 
 /** Points every font descriptor at one copy of each embedded font file and
- *  drops the others: each vector page carries the whole files it uses. */
+ *  drops the others. Each vector page carries the glyphs it uses, so pages
+ *  that draw the same ones share a file, and the subsets of one font that
+ *  differ are merged into one file with the glyphs of them all. */
 function shareFontFiles(lib: PdfLib, doc: PDFDocument) {
 	const { PDFDict, PDFName, PDFRawStream, PDFRef } = lib;
 	const type = PDFName.of("Type");
@@ -196,6 +202,112 @@ function shareFontFiles(lib: PdfLib, doc: PDFDocument) {
 			obj.set(key, first.ref);
 			doc.context.delete(ref);
 		}
+	}
+	mergeFontSubsetFiles(lib, doc);
+}
+
+/** Replaces the files of the subsets of one font by a file with all their
+ *  glyphs, renaming the fonts that name it. Subsets are of one font when
+ *  `mergeFontSubsets` takes them; a name alone does not say, as the engine
+ *  numbers a page's faces from `F0` and the order differs between pages. Each
+ *  page keeps its own widths and text map, which list that page's glyphs, and
+ *  glyph ids are the same in every subset. */
+function mergeFontSubsetFiles(lib: PdfLib, doc: PDFDocument) {
+	const { PDFArray, PDFDict, PDFName, PDFNumber, PDFRawStream, PDFRef } = lib;
+	const field = (dict: PDFDict, key: string) => dict.get(PDFName.of(key));
+	const parents = new Map<PDFRef, PDFDict>();
+	const cids = new Map<PDFRef, { ref: PDFRef; dict: PDFDict }>();
+	const descriptors: Array<{ ref: PDFRef; dict: PDFDict }> = [];
+	for (const [ref, obj] of doc.context.enumerateIndirectObjects()) {
+		if (!(obj instanceof PDFDict)) continue;
+		const kind = field(obj, "Type");
+		if (kind === PDFName.of("FontDescriptor"))
+			descriptors.push({ ref, dict: obj });
+		if (kind !== PDFName.of("Font")) continue;
+		const fonts = field(obj, "DescendantFonts");
+		if (fonts instanceof PDFArray)
+			for (const font of fonts.asArray())
+				if (font instanceof PDFRef) parents.set(font, obj);
+		const owned = field(obj, "FontDescriptor");
+		if (owned instanceof PDFRef) cids.set(owned, { ref, dict: obj });
+	}
+	type Group = {
+		key: string;
+		rest: string;
+		stream: PDFRawStream;
+		merged: Uint8Array;
+		files: Map<PDFRef, Array<{ ref: PDFRef; dict: PDFDict }>>;
+	};
+	const groups = new Map<string, Group[]>();
+	const decoded = new Map<PDFRef, Uint8Array | null>();
+	for (const entry of descriptors) {
+		const name = field(entry.dict, "FontName");
+		const rest =
+			name instanceof PDFName &&
+			/^[A-Z]{6}\+(.+)$/.exec(name.decodeText())?.[1];
+		if (!rest) continue;
+		for (const key of ["FontFile2", "FontFile3"]) {
+			const ref = field(entry.dict, key);
+			if (!(ref instanceof PDFRef)) continue;
+			const stream = doc.context.lookup(ref);
+			if (!(stream instanceof PDFRawStream)) continue;
+			let bytes = decoded.get(ref);
+			if (bytes === undefined) {
+				try {
+					bytes = lib.decodePDFRawStream(stream).decode();
+				} catch {
+					bytes = null;
+				}
+				decoded.set(ref, bytes);
+			}
+			if (!bytes) continue;
+			const family = `${key}:${rest.replace(/-F\d+$/, "")}`;
+			const list = groups.get(family) ?? [];
+			groups.set(family, list);
+			const owners = list.find((g) => g.files.has(ref));
+			if (owners) {
+				owners.files.get(ref)?.push(entry);
+				continue;
+			}
+			const files = new Map([[ref, [entry]]]);
+			let joined = false;
+			for (const group of list) {
+				const merged = mergeFontSubsets([group.merged, bytes]);
+				if (!merged) continue;
+				group.merged = merged;
+				group.files.set(ref, [entry]);
+				joined = true;
+				break;
+			}
+			if (!joined) list.push({ key, rest, stream, merged: bytes, files });
+		}
+	}
+	for (const group of [...groups.values()].flat()) {
+		if (group.files.size < 2) continue;
+		const extra: Record<string, PDFObject> = {};
+		for (const [k, v] of group.stream.dict.entries()) {
+			const entry = k.decodeText();
+			if (!["Length", "Filter", "DecodeParms"].includes(entry))
+				extra[entry] = v;
+		}
+		if (extra.Length1) extra.Length1 = PDFNumber.of(group.merged.length);
+		const file = doc.context.register(
+			doc.context.flateStream(group.merged, extra),
+		);
+		const base = PDFName.of(`${subsetTag(group.merged)}+${group.rest}`);
+		for (const [old, owners] of group.files) {
+			for (const { dict } of owners) {
+				dict.set(PDFName.of(group.key), file);
+				dict.set(PDFName.of("FontName"), base);
+			}
+			doc.context.delete(old);
+		}
+		for (const owners of group.files.values())
+			for (const { ref } of owners) {
+				const cid = cids.get(ref);
+				cid?.dict.set(PDFName.of("BaseFont"), base);
+				if (cid) parents.get(cid.ref)?.set(PDFName.of("BaseFont"), base);
+			}
 	}
 }
 

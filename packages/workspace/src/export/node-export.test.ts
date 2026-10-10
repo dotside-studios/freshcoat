@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -97,7 +98,7 @@ const card = (logoSrc: string): Template =>
 		],
 	}) as Template;
 
-function fixture(logoSrc: string): Workspace {
+function fixture(logoSrc: string, names = ["Ana", "Ben"]): Workspace {
 	return {
 		formatVersion: "1.0",
 		name: "Badges",
@@ -125,18 +126,15 @@ function fixture(logoSrc: string): Workspace {
 					{ key: "code", type: "text" },
 					{ key: "photo", type: "image" },
 				],
-				records: [
-					{
-						id: "r_00000001",
-						values: { name: "Ana", code: "A-001", photo: `ws:${photoSha}` },
-						status: "pending",
+				records: names.map((name, i) => ({
+					id: `r_${String(i + 1).padStart(8, "0")}`,
+					values: {
+						name,
+						code: `${name[0]}-00${i + 1}`,
+						...(i === 0 ? { photo: `ws:${photoSha}` } : {}),
 					},
-					{
-						id: "r_00000002",
-						values: { name: "Ben", code: "B-002" },
-						status: "pending",
-					},
-				],
+					status: "pending" as const,
+				})),
 				assets: [
 					{
 						sha256: photoSha,
@@ -326,18 +324,88 @@ describe("export from a workspace file in Node", () => {
 			form instanceof PDFRawStream &&
 				form.dict.get(PDFName.of("Subtype"))?.toString(),
 		).toBe("/Form");
-		const fontFiles = pdf.context
+		const descriptors = pdf.context
 			.enumerateIndirectObjects()
+			.map(([, obj]) => obj)
 			.filter(
-				([, obj]) =>
+				(obj): obj is PDFDict =>
 					obj instanceof PDFDict &&
 					obj.get(PDFName.of("Type")) === PDFName.of("FontDescriptor"),
-			)
-			.map(([, obj]) =>
-				(obj as PDFDict).get(PDFName.of("FontFile2"))?.toString(),
 			);
+		const fontFiles = descriptors.map((d) =>
+			d.get(PDFName.of("FontFile2"))?.toString(),
+		);
 		expect(fontFiles).toHaveLength(2);
 		expect(new Set(fontFiles).size).toBe(1);
+		expect(
+			new Set(descriptors.map((d) => d.get(PDFName.of("FontName"))?.toString()))
+				.size,
+		).toBe(1);
+		expect(descriptors[0]?.get(PDFName.of("FontName"))?.toString()).toMatch(
+			/^\/[A-Z]{6}\+/,
+		);
+	});
+
+	it("merges the glyphs each vector page uses into one font file", async () => {
+		const names = ["Quentin Zhou", "Lucy Vance", "Mara Okafor", "Jo Brandt"];
+		const vector: ExportPreset = {
+			...preset,
+			format: "pdf",
+			pdfPageImage: "vector",
+		};
+		const fonts = (pdf: PDFDocument) => {
+			const objects = pdf.context.enumerateIndirectObjects();
+			const descriptors = objects
+				.map(([, obj]) => obj)
+				.filter(
+					(obj): obj is PDFDict =>
+						obj instanceof PDFDict &&
+						obj.get(PDFName.of("Type")) === PDFName.of("FontDescriptor"),
+				);
+			const files = descriptors.map((d) => d.get(PDFName.of("FontFile2")));
+			const sizes = [...new Set(files)].map((ref) => {
+				const file = ref && pdf.context.lookup(ref);
+				return file instanceof PDFRawStream ? file.getContents().length : 0;
+			});
+			const baseFonts = objects
+				.map(([, obj]) => obj)
+				.filter((obj): obj is PDFDict => obj instanceof PDFDict)
+				.map((d) => d.get(PDFName.of("BaseFont"))?.toString())
+				.filter((n) => n !== undefined);
+			return { descriptors, files, sizes, baseFonts };
+		};
+		const exportNames = async (file: string, selected?: string[]) => {
+			const out = join(dir, `deck-${selected?.join("-") ?? "all"}.pdf`);
+			await exportFrom(
+				file,
+				selected ? { ...vector, records: "selected", selected } : vector,
+				fileOutput(out),
+			);
+			return out;
+		};
+		const file = join(dir, "deck.coatworkspace");
+		await writeFile(
+			file,
+			await (await packWorkspace(fixture("logo.png", names))).bytes(),
+		);
+		const out = await exportNames(file);
+		const pdf = await PDFDocument.load(await readFile(out));
+		expect(pdf.getPageCount()).toBe(names.length);
+		const merged = fonts(pdf);
+		expect(merged.descriptors).toHaveLength(names.length);
+		expect(new Set(merged.files.map(String)).size).toBe(1);
+		expect(new Set(merged.baseFonts).size).toBe(1);
+		let alone = 0;
+		for (let i = 1; i <= names.length; i++) {
+			const one = await exportNames(file, [`r_${String(i).padStart(8, "0")}`]);
+			const sizes = fonts(await PDFDocument.load(await readFile(one))).sizes;
+			alone += sizes[0] ?? 0;
+		}
+		expect(merged.sizes).toHaveLength(1);
+		expect(merged.sizes[0]).toBeLessThan(alone);
+		if (spawnSync("pdftotext", ["-v"]).status !== 0) return;
+		const text = spawnSync("pdftotext", [out, "-"]).stdout.toString("utf8");
+		for (const name of names) expect(text).toContain(name);
 	});
 
 	it("lists the characters the fonts can't draw when asked", async () => {
