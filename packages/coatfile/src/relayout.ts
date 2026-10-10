@@ -6,6 +6,7 @@
 import { scalePathData } from "@freshcoat-js/engine";
 import { isSquareSymbology } from "./barcode-encoder";
 import type {
+	BooleanOperandElement,
 	Constraint,
 	Element,
 	Size,
@@ -119,14 +120,59 @@ export function resizeVectorPath(el: VectorElement, size: Size): string {
 	return resizePath(el.properties.d, el.size, size);
 }
 
+function axisScale(before: number, after: number): number {
+	return before === 0 ? 1 : after / before;
+}
+
 function resizePath(d: string, before: Size, after: Size): string {
-	const sx = before.width === 0 ? 1 : after.width / before.width;
-	const sy = before.height === 0 ? 1 : after.height / before.height;
+	return scalePath(
+		d,
+		axisScale(before.width, after.width),
+		axisScale(before.height, after.height),
+	);
+}
+
+function scalePath(d: string, sx: number, sy: number): string {
 	try {
 		return scalePathData(d, sx, sy);
 	} catch {
 		return d;
 	}
+}
+
+// An operand lives in its vector's box, so it follows the box's change in
+// size: its position and size scale with it, and so does a vector's path.
+function scaleOperand(
+	el: BooleanOperandElement,
+	sx: number,
+	sy: number,
+): BooleanOperandElement {
+	const next = {
+		...el,
+		...(el.pos !== undefined
+			? { pos: { x: el.pos.x * sx, y: el.pos.y * sy } }
+			: {}),
+		...(el.size !== undefined
+			? { size: { width: el.size.width * sx, height: el.size.height * sy } }
+			: {}),
+	};
+	if (next.type !== "vector") return next;
+	const nested = next.properties.boolean;
+	return {
+		...next,
+		properties: {
+			...next.properties,
+			d: scalePath(next.properties.d, sx, sy),
+			...(nested
+				? {
+						boolean: {
+							...nested,
+							operands: nested.operands.map((o) => scaleOperand(o, sx, sy)),
+						},
+					}
+				: {}),
+		},
+	};
 }
 
 function resizeElement(
@@ -153,11 +199,24 @@ function resizeElement(
 
 	if (el.size === undefined || sameSize(box.size, before)) return next;
 	if (next.type === "vector" && el.type === "vector") {
+		const operation = next.properties.boolean;
+		const sx = axisScale(before.width, box.size.width);
+		const sy = axisScale(before.height, box.size.height);
 		return {
 			...next,
 			properties: {
 				...next.properties,
 				d: resizeVectorPath(el, box.size),
+				...(operation
+					? {
+							boolean: {
+								...operation,
+								operands: operation.operands.map((o) =>
+									scaleOperand(o, sx, sy),
+								),
+							},
+						}
+					: {}),
 			},
 		};
 	}

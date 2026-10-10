@@ -161,6 +161,7 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
+export { cachePathOp, canvasKitPathOp, type PathOp } from "./boolean";
 export {
 	type SaveResult,
 	pruneUnusedAssets,
@@ -192,6 +193,8 @@ export type {
 	BearerBars,
 	BitmapRole,
 	BlendMode,
+	BooleanOp,
+	BooleanOperandElement,
 	Command,
 	CompiledFrame,
 	CompiledTemplate,
@@ -270,6 +273,7 @@ export type {
 	ValidationResult,
 	Variant,
 	Vec2,
+	VectorBoolean,
 	VectorElement,
 	VectorProperties,
 	VisibilityCondition,

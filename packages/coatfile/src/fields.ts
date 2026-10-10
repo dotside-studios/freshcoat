@@ -63,6 +63,7 @@ function ownProperties(properties: object): Record<string, unknown> {
 	const {
 		children: _c,
 		mask: _m,
+		boolean: _b,
 		...own
 	} = properties as Record<string, unknown>;
 	return own;

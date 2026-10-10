@@ -9523,6 +9523,30 @@
 												"color",
 												"width"
 											]
+										},
+										"boolean": {
+											"type": "object",
+											"properties": {
+												"op": {
+													"type": "string",
+													"enum": [
+														"union",
+														"subtract",
+														"intersect",
+														"exclude"
+													]
+												},
+												"operands": {
+													"type": "array",
+													"items": {
+														"$ref": "#/$defs/__schema0"
+													}
+												}
+											},
+											"required": [
+												"op",
+												"operands"
+											]
 										}
 									},
 									"required": [

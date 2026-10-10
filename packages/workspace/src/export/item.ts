@@ -1,6 +1,7 @@
 import {
 	activeVariantId,
 	applyVariant,
+	canvasKitPathOp,
 	compile,
 	exportPixelSize,
 	type FrameWarning,
@@ -333,6 +334,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(req.resize ? { resize: req.resize } : {}),
 				...(req.bleed ? { bleed: true } : {}),
 				frameNames: [req.side],
+				pathOp: canvasKitPathOp(renderer.ck),
 			});
 			if (req.vector) {
 				const [page] = await renderCompiledPdf(renderer, compiled, {

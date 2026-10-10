@@ -20,7 +20,7 @@ import type { Template } from "./types";
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
-//        gradient stroke `color`; variant `size`
+//        gradient stroke `color`; variant `size`; vector `boolean`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 6;
@@ -83,6 +83,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 			if (o.type === "text" && usesArc(o.properties)) need(6);
 			if (o.type === "text" && usesTextPath(o.properties)) need(6);
+			if (o.type === "vector" && usesBoolean(o.properties)) need(6);
 			if (o.type === "frame") {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
@@ -115,6 +116,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
+				if (usesBoolean(delta.properties)) need(6);
 			}
 		}
 	}
@@ -137,6 +139,14 @@ function usesPerCornerRadius(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		Array.isArray((properties as Record<string, unknown>).cornerRadius)
+	);
+}
+
+function usesBoolean(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).boolean !== undefined
 	);
 }
 

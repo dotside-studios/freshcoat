@@ -69,8 +69,8 @@ type Node = { id: string; type?: unknown; properties?: unknown };
 export type UniquifyOptions = Omit<FreeIdOptions, "from"> & {
 	/** Ids already in use. Every id kept or picked is added to it. */
 	used?: Set<string>;
-	/** Whether frame children and a mask's shape and content count too.
-	 *  Default true. */
+	/** Whether frame children, a mask's shape and content and a vector's
+	 *  boolean operands count too. Default true. */
 	deep?: boolean;
 } & (
 		| { inPlace?: false }
@@ -80,16 +80,25 @@ export type UniquifyOptions = Omit<FreeIdOptions, "from"> & {
 				inPlace: true;
 				/** Where an element's nested elements are, for a tree not yet
 				 *  in the template's shape. Default: a frame's children, a
-				 *  mask's shape then its content. */
+				 *  mask's shape then its content, a vector's boolean
+				 *  operands. */
 				nested?: (el: Node) => readonly Node[][];
 		  }
 	);
 
-type Nested = { children?: unknown; mask?: unknown };
+type Nested = {
+	children?: unknown;
+	mask?: unknown;
+	boolean?: { operands?: unknown };
+};
 
 function nestedOf(el: Node): Node[][] {
-	if (el.type !== "frame" && el.type !== "mask") return [];
 	const props = el.properties as Nested | undefined;
+	if (el.type === "vector")
+		return Array.isArray(props?.boolean?.operands)
+			? [props.boolean.operands as Node[]]
+			: [];
+	if (el.type !== "frame" && el.type !== "mask") return [];
 	const out: Node[][] = [];
 	if (el.type === "mask" && props?.mask && typeof props.mask === "object")
 		out.push([props.mask as Node]);
@@ -143,6 +152,19 @@ export function uniquifyElementIdsDeep<T extends { id: string }>(
 		const id = pick(idOf(el));
 		const renamed: E = id === el.id ? el : { ...el, id };
 		const props = el.properties as Nested | undefined;
+		if (deep && props && el.type === "vector") {
+			const operation = props.boolean;
+			const before = Array.isArray(operation?.operands)
+				? (operation.operands as Node[])
+				: undefined;
+			const operands = before?.map(visit);
+			if (!operation || !operands || operands.every((o, i) => o === before?.[i]))
+				return renamed;
+			return {
+				...renamed,
+				properties: { ...props, boolean: { ...operation, operands } },
+			};
+		}
 		if (!deep || !props || (el.type !== "frame" && el.type !== "mask"))
 			return renamed;
 		const mask =

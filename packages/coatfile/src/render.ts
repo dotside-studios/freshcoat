@@ -25,6 +25,7 @@ import {
 	sampleImageNode,
 	withExportScale,
 } from "@freshcoat-js/engine";
+import { canvasKitPathOp } from "./boolean";
 import { compile } from "./compile";
 import type {
 	CompiledTemplate,
@@ -200,6 +201,7 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 		variantId: options.variantId,
 		...(options.frameNames ? { frameNames: options.frameNames } : {}),
 		...(options.bleed ? { bleed: true } : {}),
+		pathOp: canvasKitPathOp(renderer.ck),
 	});
 	return renderCompiled(renderer, compiled, options);
 }

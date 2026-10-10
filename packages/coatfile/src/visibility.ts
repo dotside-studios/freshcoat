@@ -2,7 +2,12 @@
 // scene before layout when its condition does not hold, so an auto-layout frame
 // closes the gap it leaves exactly as a hidden layer does in Figma.
 
-import type { Element, FieldDefinition, VisibilityCondition } from "./types";
+import type {
+	BooleanOperandElement,
+	Element,
+	FieldDefinition,
+	VisibilityCondition,
+} from "./types";
 
 /** Whether a field counts as set. A boolean field is set when it is "true"; any
  *  other field when it has a non-blank value. */
@@ -42,7 +47,7 @@ export function isElementVisible(
 	return conds.every((c) => conditionHolds(c, values, fields));
 }
 
-/** The elements shown for these values, recursing into frames and masks. */
+/** The elements shown for these values, recursing into frames, masks and boolean operands. */
 export function pruneHiddenElements(
 	elements: Element[],
 	values: Record<string, unknown>,
@@ -60,6 +65,21 @@ export function pruneHiddenElements(
 					children: pruneHiddenElements(el.properties.children, values, fields),
 				},
 			} as Element);
+		} else if (el.type === "vector" && el.properties.boolean) {
+			out.push({
+				...el,
+				properties: {
+					...el.properties,
+					boolean: {
+						...el.properties.boolean,
+						operands: pruneHiddenElements(
+							el.properties.boolean.operands,
+							values,
+							fields,
+						) as BooleanOperandElement[],
+					},
+				},
+			});
 		} else {
 			out.push(el);
 		}
