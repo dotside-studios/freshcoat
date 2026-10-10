@@ -280,7 +280,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 	// Runs now when no paint is queued or in flight, else behind the last one.
 	const afterPaints = (task: () => void) => {
 		if (pending === 0) task();
-		else void serial(async () => task());
+		else serial(async () => task()).catch(() => {});
 	};
 
 	const doPaint = async <O extends Output>(
