@@ -125,6 +125,18 @@ describe("ellipsize matches the binary search it replaced", () => {
 		}
 	}
 
+	test("a 5000 character line matches the binary search and is fast", () => {
+		const text = "lorem ipsum   dolor sit amet ".repeat(173).slice(0, 5000);
+		for (const engine of [stub, ck]) {
+			for (const w of [40, 333.3, 1200, 20000]) {
+				const start = performance.now();
+				const got = ellipsize(text, font, w, engine);
+				expect(performance.now() - start).toBeLessThan(500);
+				expect(got).toBe(bisect(text, w, engine));
+			}
+		}
+	});
+
 	test("widths below the ellipsis give the bare ellipsis", () => {
 		for (const engine of [stub, approxEngine, ck]) {
 			expect(ellipsize("Hello world", font, 0, engine)).toBe(ELL);
