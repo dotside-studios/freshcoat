@@ -26,7 +26,7 @@ writeFileSync(env.FRESHCOAT_MODULE_OUT, JSON.stringify(value));
 
 type Runtime = { command: string; args: string[] };
 
-export function moduleRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
+export function moduleRuntime(env: Record<string, string | undefined> = process.env): Runtime {
 	const command = env.FRESHCOAT_RUNTIME || process.execPath;
 	const name = basename(command).toLowerCase().replace(/\.exe$/, "");
 	if (name.startsWith("deno")) return { command, args: ["eval", BOOTSTRAP] };
@@ -60,7 +60,7 @@ export async function evaluateTemplateModule(io: Io, path: string): Promise<stri
 
 function run(
 	runtime: Runtime,
-	env: NodeJS.ProcessEnv,
+	env: Record<string, string | undefined>,
 	cwd: string,
 ): Promise<{ code: number | null; error?: Error; output: string }> {
 	return new Promise((done) => {

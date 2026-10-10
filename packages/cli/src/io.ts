@@ -8,7 +8,7 @@ export type Io = {
 	fetch?: FontFetch;
 	tty?: boolean;
 	cacheDir?: string;
-	env?: NodeJS.ProcessEnv;
+	env?: Record<string, string | undefined>;
 };
 
 export function processIo(): Io {
