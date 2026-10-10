@@ -71,31 +71,39 @@ export async function encodePng(
 	// "best" keeps it as a candidate.
 	const opaque = isOpaque(pixels, expected);
 	const adaptive = opts?.effort === "best";
-	const plans: { channels: 3 | 4; rows: Uint8Array }[] = [];
+	// Built and deflated one at a time, keeping only the smallest stream so far:
+	// at 8192x8192 every candidate's filtered rows alive at once is about a GB.
+	const plans: { channels: 3 | 4; rows: () => Uint8Array }[] = [];
 	if (!opaque || adaptive)
 		plans.push({
 			channels: 4,
-			rows: filterRows(pixels, width, height, 4, false),
+			rows: () => filterRows(pixels, width, height, 4, false),
 		});
 	if (adaptive)
 		plans.push({
 			channels: 4,
-			rows: filterRows(pixels, width, height, 4, true),
+			rows: () => filterRows(pixels, width, height, 4, true),
 		});
 	if (opaque) {
-		plans.push({ channels: 3, rows: rgbRows(pixels, width, height) });
-		if (adaptive) {
-			const rgb = rgbLayout(pixels, width, height);
-			plans.push({ channels: 3, rows: filterRows(rgb, width, height, 3, true) });
-		}
+		plans.push({ channels: 3, rows: () => rgbRows(pixels, width, height) });
+		if (adaptive)
+			plans.push({
+				channels: 3,
+				rows: () =>
+					filterRows(rgbLayout(pixels, width, height), width, height, 3, true),
+			});
 	}
 
-	const streams = await Promise.all(plans.map((p) => deflate(p.rows)));
-	let best = 0;
-	for (let i = 1; i < streams.length; i++) {
-		if (streams[i].length < streams[best].length) best = i;
+	let best = {
+		stream: await deflate(plans[0].rows()),
+		channels: plans[0].channels,
+	};
+	for (let i = 1; i < plans.length; i++) {
+		const stream = await deflate(plans[i].rows());
+		if (stream.length < best.stream.length)
+			best = { stream, channels: plans[i].channels };
 	}
-	return assemble(streams[best], width, height, plans[best].channels);
+	return assemble(best.stream, width, height, best.channels);
 }
 
 // Read a frame's pixels straight out of a decode and encode them. The pairing
