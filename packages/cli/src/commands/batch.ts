@@ -25,7 +25,7 @@ import {
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
 import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
 import { CliError, createLog, type Io, type Log } from "../io";
-import { readBytes, readTemplate } from "../template-file";
+import { readBytes, readTemplate, warnLoad } from "../template-file";
 import {
 	checkValues,
 	isLocalImage,
@@ -76,7 +76,9 @@ export async function renderBatch(
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
-	const { template, directory } = await readTemplate(io, file);
+	const loaded = await readTemplate(io, file);
+	warnLoad(log, file, loaded);
+	const { template, directory } = loaded;
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
 	if (options.name !== undefined) checkName(template, options.name);

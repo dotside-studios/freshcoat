@@ -248,6 +248,68 @@ describe("validate", () => {
 	});
 });
 
+describe("reading a template as Studio opens it", () => {
+	function duplicated(): Template {
+		const base = card();
+		return {
+			...base,
+			template_data: base.template_data.map((frame) => ({
+				...frame,
+				elements: frame.elements.map((el) => ({ ...el, id: "shared" })),
+			})),
+		} as Template;
+	}
+
+	test("heals duplicate element ids and warns", async () => {
+		await box.write("dupes.json", JSON.stringify(duplicated()));
+		for (const argv of [
+			["render", "dupes.json", "--out", "dupes"],
+			["inspect", "dupes.json"],
+			["validate", "dupes.json"],
+			["pack", "dupes.json", "--out", "dupes.coat"],
+		]) {
+			const run = await box.run(...argv);
+			expect(run.code).toBe(0);
+			expect(run.stderr).toMatch(/warning: dupes\.json: renamed duplicate element ids? /);
+			expect((await box.run(...argv, "-q")).stderr).toBe("");
+		}
+	});
+
+	test("still refuses a file that does not validate healed", async () => {
+		await box.write("worse.json", JSON.stringify({ ...duplicated(), width: -1 }));
+		const run = await box.run("render", "worse.json", "--out", "worse");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("worse.json is not a valid template (");
+	});
+
+	test("warns about a newer format on every command that reads a template", async () => {
+		await box.write("newer.json", JSON.stringify(card({ format_version: "1.99" } as never)));
+		for (const argv of [
+			["render", "newer.json", "--out", "newer"],
+			["inspect", "newer.json"],
+			["pack", "newer.json", "--out", "newer.coat"],
+		]) {
+			const run = await box.run(...argv);
+			expect(run.stderr).toContain(
+				"warning: newer.json: format_version 1.99 is newer than this freshcoat reads; fields it adds are ignored",
+			);
+		}
+		const checked = await box.run("validate", "newer.json");
+		expect(checked.stderr.match(/is newer than this freshcoat reads/g)).toHaveLength(1);
+	});
+
+	test("warns about assets not keyed by their bytes", async () => {
+		const mis = card({
+			assets: [{ sha256: "deadbeef", base64: "AAAA", contentType: "image/png" }],
+		} as never);
+		await box.write("miskeyed.json", JSON.stringify(mis));
+		const run = await box.run("inspect", "miskeyed.json");
+		expect(run.stderr).toContain(
+			"warning: miskeyed.json: asset deadbeef is not keyed by the hash of its bytes",
+		);
+	});
+});
+
 describe("inspect", () => {
 	test("prints a JSON summary", async () => {
 		const run = await box.run("inspect", "badge.json", "--json");

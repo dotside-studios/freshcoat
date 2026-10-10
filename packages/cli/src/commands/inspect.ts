@@ -15,8 +15,8 @@ import {
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { planSheets } from "@freshcoat-js/workspace/export";
 import { type FontSummary, summarizeFonts } from "../fonts";
-import type { Io } from "../io";
-import { readTemplate } from "../template-file";
+import { createLog, type Io } from "../io";
+import { readTemplate, warnLoad } from "../template-file";
 import { readWorkspace } from "../workspace-file";
 
 export type Inspection = {
@@ -152,7 +152,7 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 
 export async function inspect(
 	file: string,
-	options: { json?: true },
+	options: { json?: true; quiet?: boolean },
 	io: Io,
 ): Promise<void> {
 	let info: Inspection | WorkspaceInspection;
@@ -162,7 +162,9 @@ export async function inspect(
 		const read = inspectWorkspace(file, workspace);
 		[info, text] = [read, describeWorkspace(read)];
 	} else {
-		const { template } = await readTemplate(io, file);
+		const loaded = await readTemplate(io, file);
+		warnLoad(createLog(io, options.quiet === true), file, loaded);
+		const { template } = loaded;
 		const read = inspectTemplate(file, template);
 		[info, text] = [read, describe(read)];
 	}

@@ -220,7 +220,9 @@ function program(io: Io) {
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option("--json", "print the inspection as JSON")
-		.action((file, options) => inspect(file, options, io));
+		.action((file, options, cmd) =>
+			inspect(file, { ...options, quiet: quiet(cmd) }, io),
+		);
 
 	command("pack")
 		.summary("package a template as .coat or .coat.json")

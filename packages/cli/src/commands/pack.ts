@@ -6,20 +6,14 @@ import {
 	mapAssetSrcs,
 	mediaType,
 	type PendingAsset,
-	raiseFormatVersion,
 	subtleSha256,
 	type Template,
 } from "@freshcoat-js/coatfile";
-import {
-	CoatError,
-	packTemplate,
-	pruneUnusedAssets,
-	serializeTemplate,
-} from "@freshcoat-js/coatfile/coat";
+import { saveTemplate } from "@freshcoat-js/coatfile/coat";
 import { fileLoader } from "@freshcoat-js/engine/node";
 import { packTemplates, WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { CliError, createLog, type Io, type Log } from "../io";
-import { readTemplate } from "../template-file";
+import { formatIssue, readTemplate, warnLoad } from "../template-file";
 import { readWorkspace } from "../workspace-file";
 import { isLocalImage } from "./render";
 
@@ -49,7 +43,9 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 	} else {
 		if (options.template !== undefined)
 			throw new CliError("--template needs a .coatworkspace file", 2);
-		const { template, directory } = await readTemplate(io, file);
+		const loaded = await readTemplate(io, file);
+		warnLoad(log, file, loaded);
+		const { template, directory } = loaded;
 		bytes = await encode(await embedImages(template, directory, log), out);
 	}
 	const path = resolve(io.cwd, out);
@@ -59,16 +55,17 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 }
 
 async function encode(template: Template, out: string): Promise<Uint8Array | string> {
-	const writable = raiseFormatVersion(pruneUnusedAssets(template));
 	const json = /\.json$/i.test(out);
 	if (!json && extname(out).toLowerCase() !== ".coat")
 		throw new CliError("--out names a .coat or .coat.json file", 2);
-	try {
-		return json ? serializeTemplate(writable) : await packTemplate(writable);
-	} catch (error) {
-		if (error instanceof CoatError) throw new CliError(error.message);
-		throw error;
-	}
+	const saved = json ? saveTemplate(template, "json") : await saveTemplate(template, "coat");
+	if (saved.ok) return saved.data;
+	throw new CliError(
+		[
+			`cannot write ${out} (${saved.errors.length} ${saved.errors.length === 1 ? "issue" : "issues"})`,
+			...saved.errors.map((issue) => `  ${formatIssue(issue)}`),
+		].join("\n"),
+	);
 }
 
 async function embedImages(
