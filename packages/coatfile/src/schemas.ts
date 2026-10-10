@@ -8,6 +8,8 @@ import type {
 	FrameElement,
 	FrameProperties,
 	MaskElement,
+	VectorBoolean,
+	VectorProperties,
 } from "./types";
 
 export const Vec2Schema = z.object({
@@ -442,8 +444,17 @@ export const RectPropertiesSchema = z.object({
 	cornerSmoothing: z.number().min(0).max(1).optional(),
 });
 
-export const VectorPropertiesSchema = z.object({
-	// SVG path data, any number of subpaths, arcs included.
+export const BooleanOpSchema = z.enum([
+	"union",
+	"subtract",
+	"intersect",
+	"exclude",
+]);
+
+export const VectorBasePropertiesSchema = z.object({
+	// SVG path data, any number of subpaths, arcs included. With `boolean`, the
+	// cached result of the operation, which is what a reader that does not
+	// recompute it draws.
 	d: z.string(),
 	// Which regions of overlapping subpaths are inside; SVG's default is nonzero.
 	fillRule: z.enum(["nonzero", "evenodd"]).optional(),
@@ -451,6 +462,20 @@ export const VectorPropertiesSchema = z.object({
 	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
+});
+
+// A live boolean operation: `operands`, rects or vectors positioned relative
+// to the vector's box, combined bottom-most first. Only rects and vectors
+// combine, which validate() enforces.
+export const VectorBooleanSchema: z.ZodType<VectorBoolean> = z.lazy(() =>
+	z.object({
+		op: BooleanOpSchema,
+		operands: z.array(ElementSchema),
+	}),
+) as z.ZodType<VectorBoolean>;
+
+export const VectorPropertiesSchema = VectorBasePropertiesSchema.extend({
+	boolean: VectorBooleanSchema.optional(),
 });
 
 export const ShadowSchema = z.object({
@@ -828,6 +853,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceFontsBlock(tpl, ctx);
 	enforceGridPlacement(tpl, ctx);
 	enforceImageFraming(tpl, ctx);
+	enforceBooleanOperands(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1172,7 +1198,10 @@ function enforceVisibilityReferences(
 		elements.forEach((raw, i) => {
 			const el = raw as {
 				visibleWhen?: { field: string } | { field: string }[];
-				properties?: { children?: unknown[] };
+				properties?: {
+					children?: unknown[];
+					boolean?: { operands?: unknown[] };
+				};
 			};
 			const when = el.visibleWhen;
 			const conds = when ? (Array.isArray(when) ? when : [when]) : [];
@@ -1189,6 +1218,14 @@ function enforceVisibilityReferences(
 			});
 			if (Array.isArray(el.properties?.children))
 				walk(el.properties.children, [...path, i, "properties", "children"]);
+			if (Array.isArray(el.properties?.boolean?.operands))
+				walk(el.properties.boolean.operands, [
+					...path,
+					i,
+					"properties",
+					"boolean",
+					"operands",
+				]);
 		});
 	}
 	tpl.template_data.forEach((frame, fi) => {
@@ -1393,13 +1430,22 @@ type ElementVisitor = (
 function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
 	function walk(raw: unknown, path: (string | number)[], parentLayout: unknown) {
 		const el = raw as Parameters<ElementVisitor>[0] & {
-			properties?: { children?: unknown[]; mask?: unknown; layout?: unknown };
+			properties?: {
+				children?: unknown[];
+				mask?: unknown;
+				layout?: unknown;
+				boolean?: { operands?: unknown[] };
+			};
 		};
 		visit(el, path, parentLayout);
 		const props = el.properties;
 		if (!props) return;
 		if (el.type === "mask" && props.mask !== undefined)
 			walk(props.mask, [...path, "properties", "mask"], null);
+		if (el.type === "vector" && Array.isArray(props.boolean?.operands))
+			props.boolean.operands.forEach((operand, i) => {
+				walk(operand, [...path, "properties", "boolean", "operands", i], null);
+			});
 		if (Array.isArray(props.children)) {
 			const layout = el.type === "frame" ? props.layout : null;
 			props.children.forEach((child, i) => {
@@ -1454,6 +1500,23 @@ function enforceGridPlacement(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 		};
 		check("column", lc.column, columns);
 		check("row", lc.row, Number.POSITIVE_INFINITY);
+	});
+}
+
+// Only rects and vectors combine in a boolean operation.
+function enforceBooleanOperands(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		if (el.type !== "vector") return;
+		const operands = (el.properties as VectorProperties).boolean?.operands;
+		(operands as { type: string }[] | undefined)?.forEach((operand, i) => {
+			if (operand.type === "rect" || operand.type === "vector") return;
+			addKitIssue(
+				ctx,
+				"invalid_boolean_operand",
+				`boolean operands must be rects or vectors, not "${operand.type}"`,
+				[...path, "properties", "boolean", "operands", i, "type"],
+			);
+		});
 	});
 }
 

@@ -25,6 +25,12 @@ export {
 	resolveLeadingTrim,
 	textClipOutset,
 } from "./bake-text";
+export {
+	type BooleanOp,
+	type BooleanOperand,
+	type BooleanShape,
+	combineShapes,
+} from "./boolean-path";
 export { hslToRgb, mixColor, parseColor, type Rgba, toHex } from "./color";
 export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {

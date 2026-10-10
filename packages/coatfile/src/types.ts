@@ -8,12 +8,14 @@ import type {
 	Vec2,
 } from "@freshcoat-js/engine";
 import type { z } from "zod";
+import type { PathOp } from "./boolean";
 import type {
 	AdjustSchema,
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
 	BearerBarsSchema,
+	BooleanOpSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
 	CornerRadiusSchema,
@@ -44,8 +46,7 @@ import type {
 	TextElementSchema,
 	TextPropertiesSchema,
 	VariantSchema,
-	VectorElementSchema,
-	VectorPropertiesSchema,
+	VectorBasePropertiesSchema,
 	VisibilityConditionSchema,
 } from "./schemas";
 
@@ -73,14 +74,12 @@ export type BarcodeProperties = z.infer<typeof BarcodePropertiesSchema>;
 export type Symbology = z.infer<typeof SymbologySchema>;
 export type BearerBars = z.infer<typeof BearerBarsSchema>;
 export type RectProperties = z.infer<typeof RectPropertiesSchema>;
-export type VectorProperties = z.infer<typeof VectorPropertiesSchema>;
 
 export type TextElement = z.infer<typeof TextElementSchema>;
 export type ImageElement = z.infer<typeof ImageElementSchema>;
 export type QrCodeElement = z.infer<typeof QrCodeElementSchema>;
 export type BarcodeElement = z.infer<typeof BarcodeElementSchema>;
 export type RectElement = z.infer<typeof RectElementSchema>;
-export type VectorElement = z.infer<typeof VectorElementSchema>;
 
 export type VisibilityCondition = z.infer<typeof VisibilityConditionSchema>;
 export type Layout = z.infer<typeof LayoutSchema>;
@@ -92,6 +91,26 @@ export type LayoutChild = z.infer<typeof LayoutChildSchema>;
 export type Constraint = z.infer<typeof ConstraintSchema>;
 export type Constraints = z.infer<typeof ConstraintsSchema>;
 export type LeafElement = z.infer<typeof LeafElementSchema>;
+
+export type BooleanOp = z.infer<typeof BooleanOpSchema>;
+
+export interface VectorBoolean {
+	op: BooleanOp;
+	// Positioned relative to the vector's box, bottom-most first.
+	operands: BooleanOperandElement[];
+}
+
+export interface VectorProperties
+	extends z.infer<typeof VectorBasePropertiesSchema> {
+	boolean?: VectorBoolean;
+}
+
+export interface VectorElement extends ElementShell {
+	type: "vector";
+	properties: VectorProperties;
+}
+
+export type BooleanOperandElement = RectElement | VectorElement;
 
 export interface FrameProperties {
 	fill?: Fill | Fill[];
@@ -232,6 +251,9 @@ export type CompileOptions = {
 	bleed?: boolean;
 	/** Compile only the frames with these names. */
 	frameNames?: string[];
+	/** Rebuilds the path of each vector with a `boolean` operation from the
+	 *  operands that are shown. Without it a vector draws its cached `d`. */
+	pathOp?: PathOp;
 };
 
 export type ValidationError = {

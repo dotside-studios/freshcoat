@@ -39,6 +39,7 @@ import {
 	offsetElements,
 	templateBleed,
 } from "./bleed";
+import { applyBooleans } from "./boolean";
 import { linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
@@ -154,11 +155,12 @@ export function compile(
 		? template.template_data.filter((f) => opts.frameNames?.includes(f.name))
 		: template.template_data;
 	const frames = frameData.map((frame) => {
-		const elements = pruneHiddenElements(
+		const shown = pruneHiddenElements(
 			frame.elements,
 			ctx,
 			template.fields.properties,
 		);
+		const elements = opts.pathOp ? applyBooleans(shown, opts.pathOp) : shown;
 		return compileFrame(
 			{
 				...frame,

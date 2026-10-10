@@ -2,6 +2,7 @@ import { resizeFrames } from "./relayout";
 import { allElements } from "./tree";
 import type {
 	Background,
+	BooleanOperandElement,
 	Element,
 	Size,
 	Template,
@@ -231,8 +232,9 @@ export function applyVariant(
 	return { ...base, template_data: frames };
 }
 
-// Applies element deltas by id, recursing into frame children and a mask's
-// `mask` and `children` so nested elements are reachable. Shell fields in a
+// Applies element deltas by id, recursing into frame children, a mask's
+// `mask` and `children` and a vector's boolean operands so nested elements are
+// reachable. Shell fields in a
 // delta replace the element's own and `properties` merge into its own. A
 // mask's shape is never drawn itself, so `hidden` on it is ignored: dropping
 // it would leave the mask without the shape it clips to. Every element on a
@@ -253,6 +255,20 @@ function applyElementDeltas(
 				properties: {
 					...next.properties,
 					children: walk(next.properties.children),
+				},
+			} as Element;
+		}
+		if (next.type === "vector" && next.properties.boolean) {
+			next = {
+				...next,
+				properties: {
+					...next.properties,
+					boolean: {
+						...next.properties.boolean,
+						operands: walk(
+							next.properties.boolean.operands,
+						) as BooleanOperandElement[],
+					},
 				},
 			} as Element;
 		}
