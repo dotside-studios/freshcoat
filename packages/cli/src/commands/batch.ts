@@ -65,6 +65,7 @@ export type BatchOptions = {
 	margin?: number;
 	gap?: number;
 	cropMarks?: boolean;
+	dryRun?: true;
 	quiet: boolean;
 };
 
@@ -142,7 +143,13 @@ export async function renderBatch(
 				}
 			: {}),
 	};
-	await runPreset(workspace, preset, { root: directory, out: options.out }, log, io);
+	await runPreset(
+		workspace,
+		preset,
+		{ root: directory, out: options.out, ...(options.dryRun ? { dryRun: true } : {}) },
+		log,
+		io,
+	);
 }
 
 function checkName(template: Template, pattern: string): void {

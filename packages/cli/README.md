@@ -3,7 +3,8 @@
 The `freshcoat` command line for [Freshcoat](../../README.md): render a
 template to images, once per spreadsheet row, or a workspace's export preset
 to a zip or PDF, check a
-template and list what it holds, without writing a script. It is built on
+template or workspace and list what it holds, and package a template, without
+writing a script. It is built on
 [`@freshcoat-js/coatfile`](../coatfile), [`@freshcoat-js/engine`](../engine)
 and [`@freshcoat-js/workspace`](../workspace), and runs on Node.
 
@@ -17,6 +18,12 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `2` the command line was wrong. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every
 command.
+
+Fonts fetched from the network, such as Google Fonts, are kept in a cache for
+30 days, so later runs work offline and start faster: `~/.cache/freshcoat` (or
+`$XDG_CACHE_HOME/freshcoat`), `~/Library/Caches/freshcoat` on macOS and
+`%LOCALAPPDATA%\freshcoat\Cache` on Windows. `FRESHCOAT_CACHE_DIR` moves it,
+and `--no-cache` fetches them again without reading or writing it.
 
 ## Commands
 
@@ -113,6 +120,24 @@ template flags are refused. Progress goes to stderr and a
 one-line summary to stdout. The command also warns about text the fonts have no
 glyphs for, and exits 1 when an item fails.
 
+`--records all|pending|failed` exports those records in place of the preset's
+choice, and `--save` writes each record's status back into the workspace, as
+Studio does: `exported` with the time, or `failed` with the error. Together they
+retry what failed:
+
+```sh
+freshcoat render club.coatworkspace --preset "All cards" --save --out cards.zip
+freshcoat render club.coatworkspace --preset "All cards" --records failed --save --out retry.zip
+```
+
+#### Dry runs
+
+`--dry-run` lists what a render would write and writes nothing: a directory
+render's paths, or an export's file names and a line such as `4 items would be
+exported to cards.zip, 8 per sheet · 1 sheet`. Data, values and photos are still
+read and checked, and sheets that cannot be laid out still fail, but no font is
+fetched and nothing is rendered.
+
 ### validate
 
 ```sh
@@ -152,6 +177,23 @@ dataset with its records by status and its columns; and each preset with its
 template, format, record filter, how many items it exports and, on sheets, how
 they lay out or why they cannot. `--json` prints `templates`, `datasets` and
 `presets` arrays, each template with its own inspection as above.
+
+### pack
+
+```sh
+freshcoat pack card.json --out card.coat
+freshcoat pack card.coat --out card.coat.json
+freshcoat pack club.coatworkspace --out templates.zip
+freshcoat pack club.coatworkspace --template Badge.coat --out badge.coat
+```
+
+Packages a template as Studio saves it: the `format_version` raised to the
+lowest that covers the fields it uses, assets nothing uses left out, and images
+it names by a relative path read from its directory and embedded, so the
+package renders anywhere. An image that cannot be read keeps its path, with a
+warning. `--out` names a `.coat` or a `.coat.json`, which carries the assets
+inline. From a `.coatworkspace`, `--template` packs one template, by file name
+or id, and without it every template goes into a `.zip`.
 
 ## From code
 

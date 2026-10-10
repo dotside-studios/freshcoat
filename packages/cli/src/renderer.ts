@@ -1,6 +1,7 @@
 import {
 	type ByteLoader,
 	createRenderer,
+	fetchLoader,
 	type Renderer,
 } from "@freshcoat-js/engine";
 import {
@@ -43,6 +44,7 @@ export async function openRenderer(
 
 function remoteLoader(io: Io): ByteLoader {
 	return async (src) => {
+		if (src.startsWith("data:")) return fetchLoader(src);
 		if (!io.fetch) throw new Error(`cannot fetch ${src}`);
 		const response = await io.fetch(src, {
 			headers: {},

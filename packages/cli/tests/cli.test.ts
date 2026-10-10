@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { packTemplate } from "@freshcoat-js/coatfile/coat";
+import type { Template } from "@freshcoat-js/coatfile";
+import { decodeTemplate, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
 import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
@@ -927,6 +928,161 @@ describe("workspaces in inspect and validate", () => {
 	});
 });
 
+describe("render --dry-run", () => {
+	beforeAll(async () => {
+		await box.write("dry.csv", "name\nAna\nBen\n");
+	});
+
+	test("lists a directory render's files without writing them", async () => {
+		const run = await box.run("render", "badge.json", "--scale", "1", "--scale", "2", "--out", "dry", "--dry-run");
+		expect(run).toEqual({
+			code: 0,
+			stdout: "dry/front.png\ndry/front@2x.png\ndry/back.png\ndry/back@2x.png\n",
+			stderr: "",
+		});
+		await expect(readdir(box.path("dry"))).rejects.toThrow();
+	});
+
+	test("lists an export's files without fetching fonts or writing", async () => {
+		const before = box.fetch.urls.length;
+		const run = await box.run("render", "badge.json", "--data", "dry.csv", "--frame", "front", "--out", "dry.zip", "--dry-run");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toBe(
+			"badge-1-front.png\nbadge-2-front.png\n2 items would be exported to dry.zip\n",
+		);
+		expect(box.fetch.urls).toHaveLength(before);
+		await expect(readFile(box.path("dry.zip"))).rejects.toThrow();
+	});
+
+	test("shows how sheets lay out, or why they cannot", async () => {
+		const run = await box.run("render", "badge.json", "--data", "dry.csv", "--sheets", "a4", "--out", "dry.pdf", "--dry-run");
+		expect(run.stdout).toMatch(/^4 items would be exported to dry\.pdf, \d+ per sheet · 1 sheet\n$/);
+		const tight = await box.run("render", "badge.json", "--sheets", "20x20", "--out", "dry.pdf", "--dry-run");
+		expect(tight.code).toBe(1);
+		expect(tight.stderr).toContain("cannot lay out the sheets:");
+	});
+
+	test("lists a workspace preset's files", async () => {
+		await box.write("dry.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		const run = await box.run("render", "dry.coatworkspace", "--preset", "p_png", "--out", "dry-ws.zip", "--dry-run");
+		expect(run.stdout).toBe(
+			"1-front.png\n1-back.png\n2-front.png\n2-back.png\n4 items would be exported to dry-ws.zip\n",
+		);
+	});
+});
+
+describe("render --records and --save", () => {
+	beforeEach(async () => {
+		const workspace = workspaceOf(card());
+		workspace.datasets[0]!.records[1]!.status = "failed";
+		await box.write("status.coatworkspace", await workspaceBytes(workspace));
+	});
+
+	async function statuses(): Promise<Record<string, number>> {
+		const run = await box.run("inspect", "status.coatworkspace", "--json");
+		return JSON.parse(run.stdout).datasets[0].statuses;
+	}
+
+	test("exports only the records asked for", async () => {
+		const run = await box.run("render", "status.coatworkspace", "--preset", "p_png", "--records", "failed", "--out", "failed.zip", "-q");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toStartWith("2 of 2 items exported");
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("failed.zip"))));
+		expect(Object.keys(zip).filter((name) => name.endsWith(".png")).sort()).toEqual(["1-back.png", "1-front.png"]);
+		expect(await statuses()).toEqual({ pending: 1, failed: 1 });
+	});
+
+	test("writes the statuses back with --save", async () => {
+		const run = await box.run("render", "status.coatworkspace", "--preset", "p_png", "--records", "failed", "--save", "--out", "saved.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("saved the record statuses to status.coatworkspace");
+		expect(await statuses()).toEqual({ pending: 1, exported: 1 });
+	});
+
+	test("refuses them outside a workspace or with --dry-run", async () => {
+		const template = await box.run("render", "badge.json", "--records", "all", "--out", "x.zip");
+		expect(template.code).toBe(2);
+		expect(template.stderr).toContain("--records needs a .coatworkspace file");
+		const dry = await box.run("render", "status.coatworkspace", "--preset", "p_png", "--save", "--dry-run", "--out", "x.zip");
+		expect(dry.code).toBe(2);
+		expect(dry.stderr).toContain("--save and --dry-run do not go together");
+	});
+});
+
+describe("the font cache", () => {
+	test("fetches each font once and skips the cache with --no-cache", async () => {
+		const cached = await sandbox({ cache: true });
+		try {
+			await cached.write("badge.json", JSON.stringify(card()));
+			const first = await cached.run("render", "badge.json", "--frame", "front", "--out", "a", "-q");
+			expect(first.code).toBe(0);
+			const fetched = cached.fetch.urls.length;
+			expect(fetched).toBeGreaterThan(0);
+			await cached.run("render", "badge.json", "--frame", "front", "--out", "b.zip", "-q");
+			expect(cached.fetch.urls).toHaveLength(fetched);
+			expect(await readdir(cached.path(".cache", "fonts"))).toHaveLength(fetched);
+			await cached.run("render", "badge.json", "--frame", "front", "--out", "c", "-q", "--no-cache");
+			expect(cached.fetch.urls.length).toBeGreaterThan(fetched);
+		} finally {
+			await cached.cleanup();
+		}
+	});
+});
+
+describe("pack", () => {
+	beforeAll(async () => {
+		await box.write("pack.coatworkspace", await workspaceBytes(workspaceOf(card())));
+	});
+
+	test("embeds relative images in a .coat that renders anywhere", async () => {
+		const run = await box.run("pack", "badge.json", "--out", "packed/badge.coat");
+		expect(run).toEqual({ code: 0, stdout: "packed/badge.coat\n", stderr: "" });
+		const decoded = await decodeTemplate(new Uint8Array(await readFile(box.path("packed", "badge.coat"))));
+		if (!decoded.ok) throw new Error(decoded.message);
+		const template = decoded.document as Template;
+		expect(template.assets).toHaveLength(1);
+		const rendered = await box.run("render", "packed/badge.coat", "--frame", "front", "--out", "packed", "-q");
+		expect(rendered.code).toBe(0);
+		const pixels = decodePixels(ck, new Uint8Array(await readFile(box.path("packed", "front.png"))));
+		const at = (170 + 70 * 200) * 4;
+		expect([...(pixels?.data.slice(at, at + 3) ?? [])]).toEqual([20, 160, 60]);
+	});
+
+	test("writes .coat.json and raises the format version", async () => {
+		await box.write("old-pack.json", JSON.stringify(card({ format_version: "1.2" } as never)));
+		const run = await box.run("pack", "old-pack.json", "--out", "old.coat.json");
+		expect(run.code).toBe(0);
+		const written = JSON.parse(await readFile(box.path("old.coat.json"), "utf8"));
+		expect(written.format_version).toBe("1.6");
+		expect(written.assets[0].base64).toBeString();
+	});
+
+	test("packs a workspace's templates", async () => {
+		const all = await box.run("pack", "pack.coatworkspace", "--out", "templates.zip");
+		expect(all.code).toBe(0);
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("templates.zip"))));
+		expect(Object.keys(zip)).toEqual(["templates/Badge.coat"]);
+		const one = await box.run("pack", "pack.coatworkspace", "--template", "Badge.coat", "--out", "one.coat");
+		expect(one.code).toBe(0);
+		expect(new TextDecoder().decode((await readFile(box.path("one.coat"))).subarray(0, 2))).toBe("PK");
+	});
+
+	test("refuses outputs and templates it cannot write", async () => {
+		const cases: [string[], number, string][] = [
+			[["badge.json", "--out", "badge.png"], 2, "--out names a .coat or .coat.json file"],
+			[["pack.coatworkspace", "--out", "x.coat"], 2, "a workspace packs into a .zip, or one template with --template"],
+			[["pack.coatworkspace", "--template", "Nope", "--out", "x.coat"], 1, 'no template "Nope"; the workspace has Badge.coat'],
+			[["badge.json", "--template", "x", "--out", "x.coat"], 2, "--template needs a .coatworkspace file"],
+			[["badge.json"], 2, "required option '--out <file>' not specified"],
+		];
+		for (const [argv, code, message] of cases) {
+			const run = await box.run("pack", ...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code });
+			expect(run.stderr).toContain(message);
+		}
+	});
+});
+
 describe("the command line", () => {
 	test("prints the package version", async () => {
 		const run = await box.run("--version");
@@ -937,9 +1093,9 @@ describe("the command line", () => {
 	test("prints help for the tool and each command", async () => {
 		const overview = await box.run("--help");
 		expect(overview.code).toBe(0);
-		for (const name of ["render", "validate", "inspect"])
+		for (const name of ["render", "validate", "inspect", "pack"])
 			expect(overview.stdout).toContain(`  ${name}`);
-		for (const name of ["render", "validate", "inspect"]) {
+		for (const name of ["render", "validate", "inspect", "pack"]) {
 			const flag = await box.run(name, "--help");
 			const word = await box.run("help", name);
 			expect(flag.code).toBe(0);

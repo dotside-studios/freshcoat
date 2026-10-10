@@ -1,4 +1,5 @@
 import type { FontFetch } from "@freshcoat-js/engine";
+import { defaultCacheDir } from "./font-cache";
 
 export type Io = {
 	stdout(text: string): void;
@@ -6,6 +7,7 @@ export type Io = {
 	cwd: string;
 	fetch?: FontFetch;
 	tty?: boolean;
+	cacheDir?: string;
 };
 
 export function processIo(): Io {
@@ -14,6 +16,7 @@ export function processIo(): Io {
 		stderr: (text) => void process.stderr.write(text),
 		cwd: process.cwd(),
 		tty: process.stderr.isTTY === true,
+		cacheDir: defaultCacheDir(),
 	};
 }
 
