@@ -233,7 +233,7 @@ describe("the finish on the CPU", () => {
 		}
 	}, 60_000);
 
-	test("does not keep noise past the default cap without a budget", async () => {
+	test("keeps noise built in strips without a budget", async () => {
 		const size = { width: 2500, height: 2300 };
 		const png = await noisePng(size);
 		const cache = createPaintCache();
@@ -244,7 +244,7 @@ describe("the finish on the CPU", () => {
 			const shader = await paint(size, finish, png, cache, false);
 			const cpu = await paint(size, finish, png, cache, true);
 			expect(Buffer.from(cpu).equals(shader)).toBe(true);
-			expect(paintCacheState(cache).finishNoise).toBeNull();
+			expect(paintCacheState(cache).finishNoise).not.toBeNull();
 		} finally {
 			cache.dispose();
 		}

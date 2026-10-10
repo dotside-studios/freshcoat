@@ -404,15 +404,13 @@ function sharedLength(a: string[], b: string[]): number {
 }
 
 // Keeps the noise of one frame, replacing any other. With an image budget it
-// counts against that budget (see evictUnusedImages), without one it is kept
-// only if it fits the default background cap.
+// counts against that budget (see evictUnusedImages), without one it counts
+// against the default background cap, so backgrounds give way to it.
 export function cacheFinishNoise(
 	state: PaintCacheState,
 	noise: CachedFinishNoise,
 ): void {
-	const fits =
-		state.maxImagePixels > 0 || noise.noise.length <= DEFAULT_MAX_BACKGROUND_PIXELS;
-	state.finishNoise = fits ? noise : null;
+	state.finishNoise = noise;
 	state.stats.finishNoiseBuilds++;
 }
 
