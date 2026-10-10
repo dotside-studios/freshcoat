@@ -18,6 +18,7 @@
 		"./path": "./src/path-data.ts",
 		"./pdf": "./src/pdf/index.ts",
 		"./svg": "./src/svg/index.ts",
+		"./svg/path": "./src/svg/path.ts",
 		"./svg/sniff": "./src/svg/sniff.ts"
 	},
 	"scripts": {

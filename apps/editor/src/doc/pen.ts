@@ -15,7 +15,8 @@ export type PenPoint = Point & { in?: Point; out?: Point };
 
 export type PenPath = { points: PenPoint[]; closed: boolean };
 
-type Segment = [Point, Point, Point, Point];
+/** A segment as its cubic: start, two controls, end. */
+export type Segment = [Point, Point, Point, Point];
 
 export const PEN_STROKE = { color: "#000000", width: 2 } as const;
 
@@ -108,7 +109,7 @@ export function constrain45(from: Point, p: Point): Point {
 	};
 }
 
-function segments(path: PenPath): Segment[] {
+export function segments(path: PenPath): Segment[] {
 	const pts = path.points;
 	const out: Segment[] = [];
 	const count = path.closed ? pts.length : pts.length - 1;
@@ -120,7 +121,7 @@ function segments(path: PenPath): Segment[] {
 	return out;
 }
 
-const isLine = ([p0, c1, c2, p1]: Segment) =>
+export const isLine = ([p0, c1, c2, p1]: Segment) =>
 	c1.x === p0.x && c1.y === p0.y && c2.x === p1.x && c2.y === p1.y;
 
 function extremaOf(a: number, b: number, c: number, d: number): number[] {
