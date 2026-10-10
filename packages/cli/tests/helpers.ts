@@ -115,7 +115,7 @@ export type Sandbox = {
 	cleanup(): Promise<void>;
 };
 
-export async function sandbox(): Promise<Sandbox> {
+export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbox> {
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-cli-"));
 	const fetch = fontFetch();
 	await writeFile(join(dir, "logo.png"), await solidPng(4, 4, [20, 160, 60]));
@@ -136,6 +136,7 @@ export async function sandbox(): Promise<Sandbox> {
 				stderr: (text) => void (stderr += text),
 				cwd: dir,
 				fetch,
+				...(options.cache ? { cacheDir: join(dir, ".cache") } : {}),
 			};
 			const code = await main(argv, io);
 			return { code, stdout, stderr };

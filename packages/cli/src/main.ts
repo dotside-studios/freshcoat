@@ -9,6 +9,7 @@ import { PAPER_SIZES_MM, type PaperName } from "@freshcoat-js/workspace";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { renderBatch } from "./commands/batch";
 import { inspect } from "./commands/inspect";
+import { pack } from "./commands/pack";
 import { render } from "./commands/render";
 import { validateCommand } from "./commands/validate";
 import { renderWorkspace, writesFile } from "./commands/workspace";
@@ -39,11 +40,12 @@ export async function main(
 function program(io: Io) {
 	const root = new Command("freshcoat")
 		.usage("<command> [options]")
-		.description("Render, check and inspect Freshcoat templates and workspaces.")
+		.description("Render, check, inspect and package Freshcoat templates and workspaces.")
 		.version(version(), "-v, --version", "print the version")
 		.helpOption("-h, --help", "show help")
 		.helpCommand("help [command]", "show help for a command")
 		.option("-q, --quiet", "hide warnings and progress")
+		.option("--no-cache", "download fonts again instead of using the font cache")
 		.configureHelp({ showGlobalOptions: true })
 		.configureOutput({
 			writeOut: io.stdout,
@@ -63,6 +65,11 @@ function program(io: Io) {
 			.showHelpAfterError(`Run freshcoat ${name} --help for usage.`);
 	const quiet = (cmd: { optsWithGlobals(): { quiet?: true } }) =>
 		cmd.optsWithGlobals().quiet === true;
+	const ioFor = (cmd: { optsWithGlobals(): { cache?: boolean } }): Io => {
+		if (cmd.optsWithGlobals().cache !== false) return io;
+		const { cacheDir: _, ...uncached } = io;
+		return uncached;
+	};
 
 	command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
@@ -74,6 +81,7 @@ function program(io: Io) {
 			"--out <path>",
 			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need one",
 		)
+		.option("--dry-run", "list what would be written, without rendering")
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
 		.option("--values <file>", "JSON file of field values")
@@ -128,6 +136,14 @@ function program(io: Io) {
 			"--preset <name|id>",
 			"the preset to run, by id or by a name only it has",
 		)
+		.addOption(
+			new Option("--records <which>", "the records to export, over the preset's choice").choices([
+				"all",
+				"pending",
+				"failed",
+			] as const),
+		)
+		.option("--save", "write each record's export status back into the workspace")
 		.addHelpText(
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
@@ -136,9 +152,11 @@ function program(io: Io) {
 			const given = Object.keys(options).filter(
 				(key) => cmd.getOptionValueSource(key) === "cli",
 			);
-			const { preset, out, cropMarks, ...rest } = options;
+			const { preset, out, cropMarks, records, save, ...rest } = options;
+			if (save && rest.dryRun)
+				return cmd.error("error: --save and --dry-run do not go together");
 			if (file.toLowerCase().endsWith(WORKSPACE_EXTENSION)) {
-				const misplaced = given.filter((key) => key !== "preset" && key !== "out").map(flag);
+				const misplaced = given.filter((key) => !WORKSPACE_KEYS.includes(key)).map(flag);
 				if (misplaced.length > 0)
 					return cmd.error(
 						`error: ${misplaced.join(", ")} ${misplaced.length === 1 ? "applies" : "apply"} only to templates`,
@@ -147,25 +165,35 @@ function program(io: Io) {
 					return cmd.error("error: a .coatworkspace needs --out <path>");
 				return renderWorkspace(
 					file,
-					{ ...(preset ? { preset } : {}), out, quiet: quiet(cmd) },
-					io,
+					{
+						...(preset ? { preset } : {}),
+						...(records ? { records } : {}),
+						...(save ? { save } : {}),
+						...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
+						out,
+						quiet: quiet(cmd),
+					},
+					ioFor(cmd),
 				);
 			}
-			if (preset !== undefined)
-				return cmd.error("error: --preset needs a .coatworkspace file");
+			const workspaceOnly = given.filter((key) => ["preset", "records", "save"].includes(key));
+			if (workspaceOnly.length > 0)
+				return cmd.error(
+					`error: ${listed(workspaceOnly, "needs", "need")} a .coatworkspace file`,
+				);
 			const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 			if (rest.data === undefined && (out === undefined || !writesFile(out))) {
 				if (exportOnly.length > 0)
 					return cmd.error(
 						`error: ${listed(exportOnly, "needs", "need")} --data or a .zip or .pdf --out`,
 					);
-				return render(file, { ...rest, ...(out ? { out } : {}), quiet: quiet(cmd) }, io);
+				return render(file, { ...rest, ...(out ? { out } : {}), quiet: quiet(cmd) }, ioFor(cmd));
 			}
 			if (out === undefined)
 				return cmd.error("error: --data needs --out <dir|file.zip|file.pdf>");
 			const problem = exportProblem(given, rest, out);
 			if (problem) return cmd.error(`error: ${problem}`);
-			return renderBatch(file, { ...rest, out, cropMarks, quiet: quiet(cmd) }, io);
+			return renderBatch(file, { ...rest, out, cropMarks, quiet: quiet(cmd) }, ioFor(cmd));
 		});
 
 	command("validate")
@@ -188,9 +216,20 @@ function program(io: Io) {
 		.option("--json", "print the inspection as JSON")
 		.action((file, options) => inspect(file, options, io));
 
+	command("pack")
+		.summary("package a template as .coat or .coat.json")
+		.description(
+			"Package a template as Studio saves it: the format version raised to cover the\nfields it uses, unused assets left out, and images it names by a relative path\nembedded. From a .coatworkspace, --template packs one of its templates, or\nevery template goes into a .zip.",
+		)
+		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
+		.requiredOption("--out <file>", "a .coat or .coat.json file, or a .zip for a whole workspace")
+		.option("--template <name|id>", "the workspace template to pack, by file name or id")
+		.action((file, options, cmd) => pack(file, { ...options, quiet: quiet(cmd) }, io));
+
 	return root;
 }
 
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "dryRun"];
 const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", ...PDF_OPTIONS];

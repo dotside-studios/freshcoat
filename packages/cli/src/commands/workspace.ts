@@ -1,22 +1,34 @@
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
 	type ExportPreset,
+	planExport,
 	SheetLayoutError,
+	sheetSummary,
 	type Workspace,
 } from "@freshcoat-js/workspace";
+import { packWorkspace } from "@freshcoat-js/workspace/archive";
 import {
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
+	planSheets,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
+import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readWorkspace } from "../workspace-file";
 
-export type WorkspaceOptions = { preset?: string; out: string; quiet: boolean };
+export type WorkspaceOptions = {
+	preset?: string;
+	out: string;
+	records?: "all" | "pending" | "failed";
+	save?: true;
+	dryRun?: true;
+	quiet: boolean;
+};
 
 export async function renderWorkspace(
 	file: string,
@@ -37,7 +49,38 @@ export async function renderWorkspace(
 	const preset = findPreset(workspace, options.preset);
 	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
 
-	await runPreset(workspace, preset, { root: dirname(path), out: options.out }, log, io);
+	const chosen: ExportPreset = {
+		...preset,
+		...(options.records ? { records: options.records } : {}),
+		markExported: options.save === true,
+	};
+	await runPreset(
+		workspace,
+		chosen,
+		{
+			root: dirname(path),
+			out: options.out,
+			...(options.dryRun ? { dryRun: true } : {}),
+			...(options.save
+				? {
+						save: async (next: Workspace) => {
+							await saveWorkspace(path, next);
+							log.info(`saved the record statuses to ${file}`);
+						},
+					}
+				: {}),
+		},
+		log,
+		io,
+	);
+}
+
+async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
+	const blob = await packWorkspace(workspace);
+	if (!blob) throw new CliError("could not write the workspace");
+	const temporary = `${path}.${process.pid}.tmp`;
+	await writeFile(temporary, new Uint8Array(await blob.arrayBuffer()));
+	await rename(temporary, path);
 }
 
 export function writesFile(out: string): boolean {
@@ -47,10 +90,16 @@ export function writesFile(out: string): boolean {
 export async function runPreset(
 	workspace: Workspace,
 	preset: ExportPreset,
-	options: { root: string; out: string },
+	options: {
+		root: string;
+		out: string;
+		dryRun?: true;
+		save?: (workspace: Workspace) => Promise<void>;
+	},
 	log: Log,
 	io: Io,
 ): Promise<void> {
+	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
@@ -60,7 +109,7 @@ export async function runPreset(
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
 			fontOptions: {
-				...(io.fetch ? { fetch: io.fetch } : {}),
+				...withFetch(fontFetch(io)),
 				load: createLoader(io, options.root),
 			},
 			output: file ? fileOutput(out) : folderOutput(out),
@@ -75,6 +124,7 @@ export async function runPreset(
 		if (result.fonts) warnAboutFonts(log, result.fonts);
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
 		if (result.cancelled) throw new CliError("the export was cancelled");
+		await options.save?.(result.workspace);
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);
@@ -90,6 +140,24 @@ export async function runPreset(
 		log.endProgress();
 		renderer.dispose();
 	}
+}
+
+function planPreset(
+	workspace: Workspace,
+	preset: ExportPreset,
+	out: string,
+	log: Log,
+): void {
+	const plan = planExport(workspace, preset);
+	const entry = workspace.templates.find((t) => t.id === preset.templateId);
+	const sheets = entry ? planSheets(plan, entry.template, preset) : null;
+	if (sheets?.error !== undefined)
+		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
+	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
+	const layout = sheets?.imposition ? `, ${sheetSummary(sheets.imposition)}` : "";
+	log.out(
+		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
+	);
 }
 
 function presetMessage(

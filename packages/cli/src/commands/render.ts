@@ -16,6 +16,7 @@ import {
 } from "@freshcoat-js/workspace";
 import { checkGlyphs } from "@freshcoat-js/workspace/export";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
+import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readBytes, readTemplate } from "../template-file";
@@ -35,6 +36,7 @@ export type RenderOptions = {
 	scale?: number[];
 	format?: keyof typeof FORMATS;
 	out?: string;
+	dryRun?: true;
 	quiet: boolean;
 };
 
@@ -52,9 +54,22 @@ export async function render(
 	const frameNames = pickFrames(template, options.frame);
 	const read = await readValues(io, template, options.values, options.set ?? {});
 	const values = checkValues(template, read.values);
+	const directoryOut = options.out ?? ".";
+
+	if (options.dryRun) {
+		const names = new Set<string>();
+		for (const frame of template.template_data) {
+			if (frameNames && !frameNames.includes(frame.name)) continue;
+			for (const scale of scales) {
+				const name = outputName(frame.name, scale === 1 ? "" : `@${scale}x`, output.extension, names);
+				log.out(join(directoryOut, name));
+			}
+		}
+		return;
+	}
 
 	const { fonts, ...report } = await resolveTemplateFonts(template, {
-		...(io.fetch ? { fetch: io.fetch } : {}),
+		...withFetch(fontFetch(io)),
 		load: createLoader(io, directory),
 	});
 	warnAboutFonts(log, report);
@@ -75,14 +90,10 @@ export async function render(
 			})),
 			output: { encode: { format: output.format } },
 		});
-		const directoryOut = options.out ?? ".";
 		await mkdir(resolve(io.cwd, directoryOut), { recursive: true });
 		const written = new Set<string>();
 		for (const frame of frames) {
-			const name = `${safeName(frame.name)}${frame.suffix ?? ""}.${output.extension}`;
-			if (written.has(name))
-				throw new CliError(`two frames would both be written as ${name}`);
-			written.add(name);
+			const name = outputName(frame.name, frame.suffix ?? "", output.extension, written);
 			for (const warning of frame.warnings)
 				if (!(warning.kind === "image_load_failed" && warning.src === ""))
 					log.warn(`${frame.name}: ${describeWarning(warning)}`);
@@ -218,6 +229,18 @@ export function checkValues(
 			].join("\n"),
 		);
 	return values;
+}
+
+function outputName(
+	frame: string,
+	suffix: string,
+	extension: string,
+	taken: Set<string>,
+): string {
+	const name = `${safeName(frame)}${suffix}.${extension}`;
+	if (taken.has(name)) throw new CliError(`two frames would both be written as ${name}`);
+	taken.add(name);
+	return name;
 }
 
 function safeName(name: string): string {
