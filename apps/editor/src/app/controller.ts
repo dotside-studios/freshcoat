@@ -1,4 +1,5 @@
 import {
+	allElements,
 	canvasKitPathOp,
 	type Element,
 	formatVersionStatus,
@@ -229,6 +230,10 @@ export class EditorController {
 	private penLayer: { id: string; closed: boolean } | undefined;
 	private shapeHits: ShapeHits | undefined;
 	private kit: CanvasKit | undefined;
+	private kitLoading: Promise<CanvasKit | undefined> | undefined;
+	// Templates a boolean edit left with a cache that was not rebuilt, since
+	// CanvasKit had not loaded on this thread, by the last one that was.
+	private unsettled = new WeakMap<Template, Template>();
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
 	private recentId: string | undefined;
@@ -241,6 +246,7 @@ export class EditorController {
 		this.store.subscribe(() => this.scheduleAutosave());
 		this.store.subscribe(() => this.scheduleValidation());
 		this.store.subscribe(() => this.releaseStaleShapes());
+		this.store.subscribe(() => this.settleUnsettled());
 	}
 
 	/** Frees what the controller holds outside the store. It stays usable. */
@@ -379,14 +385,66 @@ export class EditorController {
 	/** `next` with the cached result of each boolean vector it changed
 	 *  rebuilt from its operands, so a saved file's `d` matches them. A
 	 *  variant's edit is left alone: the variant is drawn from its operands,
-	 *  and the base's cache describes the base. Without the session's
-	 *  CanvasKit the cache is left as it was. */
+	 *  and the base's cache describes the base. Without CanvasKit on this
+	 *  thread (the preview worker has it) the cache is left as it was, and
+	 *  rebuilt once it loads. */
 	private withFreshBooleans(next: Template, scope?: EditScope): Template {
-		const kit = this.kit ?? (loadedCanvasKit() as CanvasKit | undefined);
 		const base = this.base;
-		if (!kit || !base || (scope !== "base" && this.variantId !== undefined))
+		if (!base || (scope !== "base" && this.variantId !== undefined))
 			return next;
-		return settleBooleans(base, next, kit);
+		const kit = this.currentKit();
+		if (!kit) {
+			const elements = next.template_data.flatMap((f) => f.elements);
+			if (allElements(elements).some(isBooleanVector)) {
+				this.unsettled.set(next, this.unsettled.get(base) ?? base);
+				void this.loadKit();
+			}
+			return next;
+		}
+		return settleBooleans(this.unsettled.get(base) ?? base, next, kit);
+	}
+
+	private currentKit(): CanvasKit | undefined {
+		return this.kit ?? (loadedCanvasKit() as CanvasKit | undefined);
+	}
+
+	private loadKit(): Promise<CanvasKit | undefined> {
+		this.kitLoading ??= getCanvasKit().then(
+			(kit) => {
+				this.settleUnsettled();
+				return kit as CanvasKit;
+			},
+			() => {
+				this.kitLoading = undefined;
+				return undefined;
+			},
+		);
+		return this.kitLoading;
+	}
+
+	/** Rebuilds the caches the base is missing, as an edit would have. */
+	private settleUnsettled(): void {
+		const t = this.base;
+		const kit = this.currentKit();
+		const trusted = t && this.unsettled.get(t);
+		if (!t || !kit || !trusted || this.state.doc?.history.tx) return;
+		const next = settleBooleans(trusted, t, kit);
+		this.unsettled.delete(t);
+		if (next !== t) this.dispatch({ type: "settled", from: t, next });
+	}
+
+	private isUnsettled(): boolean {
+		const t = this.base;
+		return t !== null && this.unsettled.has(t);
+	}
+
+	/** Resolves once the base's caches match its operands, before it is
+	 *  written out. */
+	private async settled(): Promise<void> {
+		if (this.isUnsettled()) {
+			await this.loadKit();
+			this.settleUnsettled();
+		}
 	}
 
 	endTx(): void {
@@ -1613,6 +1671,7 @@ export class EditorController {
 	/** The whole workspace as a .coatworkspace download. */
 	async saveWorkspace(): Promise<boolean> {
 		if (this.naming) return false;
+		await this.settled();
 		const before = workspaceSnapshot(this.state);
 		if (!before) return false;
 		// A template from a newer format lost the fields this editor doesn't
@@ -1664,6 +1723,7 @@ export class EditorController {
 
 	/** Every template as its own .coat, in one zip, without the data. */
 	async exportAllTemplates(): Promise<void> {
+		await this.settled();
 		const ws = workspaceSnapshot(this.state);
 		if (!ws) return;
 		const archive = await this.loadArchive(() => this.exportAllTemplates());
@@ -1801,6 +1861,7 @@ export class EditorController {
 
 	async save(kind: "coat" | "json"): Promise<boolean> {
 		if (this.naming || !this.base) return false;
+		await this.settled();
 		if (this.state.doc?.notices.includes(NEWER_FORMAT)) {
 			toast(NEWER_FORMAT, { tone: "danger" });
 			return false;
@@ -1869,14 +1930,18 @@ export class EditorController {
 		if (!workspace) return;
 		clearTimeout(this.autosaveTimer);
 		this.autosaveTimer = setTimeout(() => {
-			const ws = workspaceSnapshot(this.state);
-			const fileName = this.state.workspace?.fileName;
-			if (ws && fileName && isDirty(this.state))
-				void writeAutosave({
-					workspace: ws,
-					fileName,
-					...(this.recentId ? { recentId: this.recentId } : {}),
-				});
+			const write = () => {
+				const ws = workspaceSnapshot(this.state);
+				const fileName = this.state.workspace?.fileName;
+				if (ws && fileName && isDirty(this.state))
+					void writeAutosave({
+						workspace: ws,
+						fileName,
+						...(this.recentId ? { recentId: this.recentId } : {}),
+					});
+			};
+			if (this.isUnsettled()) void this.settled().then(write);
+			else write();
 		}, 1000);
 	}
 
