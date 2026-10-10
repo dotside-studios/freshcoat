@@ -1,11 +1,18 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { version } from "../src/main";
-import { card, type Sandbox, sandbox, workspaceBytes, workspaceOf } from "./helpers";
+import {
+	card,
+	type Sandbox,
+	sandbox,
+	solidPng,
+	workspaceBytes,
+	workspaceOf,
+} from "./helpers";
 
 let box: Sandbox;
 let ck: Awaited<ReturnType<typeof loadCanvasKit>>;
@@ -273,6 +280,151 @@ describe("inspect", () => {
 		const run = await box.run("inspect", "invalid.json");
 		expect(run.code).toBe(1);
 		expect(run.stdout).toBe("");
+	});
+});
+
+describe("render a template with --data", () => {
+	beforeAll(async () => {
+		await box.write("people.csv", "Name,Motto,Team\nAna,Hi,Red\nBen,Yo,Blue\n");
+	});
+
+	async function unzip(path: string): Promise<Record<string, Uint8Array>> {
+		return unzipSync(new Uint8Array(await readFile(path)));
+	}
+
+	test("writes a zip with an image per row and frame", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"people.csv",
+			"--out",
+			"batch/people.zip",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stdout).toMatch(/^4 of 4 items exported to batch\/people\.zip /);
+		expect(run.stderr).toContain("warning: people.csv: no field matches the column Team");
+		expect(Object.keys(await unzip(box.path("batch", "people.zip"))).sort()).toEqual([
+			"badge-1-back.png",
+			"badge-1-front.png",
+			"badge-2-back.png",
+			"badge-2-front.png",
+			"export-report.csv",
+		]);
+	});
+
+	test("takes frames, a variant, a scale, a format and constants", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"people.csv",
+			"--frame",
+			"front",
+			"--variant",
+			"wide",
+			"--scale",
+			"2",
+			"--format",
+			"webp",
+			"--set",
+			"motto=Same",
+			"--out",
+			"wide.zip",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe("");
+		const zip = await unzip(box.path("wide.zip"));
+		expect(Object.keys(zip).filter((name) => name.endsWith(".webp")).sort()).toEqual([
+			"badge-1-front@2x.webp",
+			"badge-2-front@2x.webp",
+		]);
+		expect(decodePixels(ck, zip["badge-1-front@2x.webp"] as Uint8Array)?.width).toBe(800);
+	});
+
+	test("writes a PDF", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"people.csv",
+			"--out",
+			"people.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const bytes = await readFile(box.path("people.pdf"));
+		expect(new TextDecoder().decode(bytes.subarray(0, 5))).toBe("%PDF-");
+	});
+
+	test("loads photos named in the data from its directory", async () => {
+		const photo = card();
+		photo.fields.properties.photo = { type: "string", format: "image" } as never;
+		for (const frame of photo.template_data)
+			for (const element of frame.elements)
+				if (element.type === "image") element.properties.src = "{{photo}}";
+		await box.write("photo.json", JSON.stringify(photo));
+		await mkdir(box.path("rows", "pics"), { recursive: true });
+		await writeFile(
+			box.path("rows", "pics", "blue.png"),
+			await solidPng(4, 4, [20, 40, 200]),
+		);
+		await box.write("rows/people.csv", "name,photo\nAna,pics/blue.png\nBen,pics/gone.png\n");
+		const run = await box.run(
+			"render",
+			"photo.json",
+			"--data",
+			"rows/people.csv",
+			"--frame",
+			"front",
+			"--out",
+			"photos.zip",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("rows/people.csv: row 3, photo: No photo named pics/gone.png");
+		const zip = await unzip(box.path("photos.zip"));
+		const pixels = decodePixels(ck, zip["badge-1-front.png"] as Uint8Array);
+		const at = (170 + 70 * 200) * 4;
+		expect([...(pixels?.data.slice(at, at + 3) ?? [])]).toEqual([20, 40, 200]);
+	});
+
+	test("warns about required fields no column fills", async () => {
+		await box.write("mottos.csv", "motto\nHi\n");
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"mottos.csv",
+			"--out",
+			"mottos.zip",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"no column or --set fills the required field name; it uses its default",
+		);
+	});
+
+	test("refuses bad data and options", async () => {
+		await box.write("empty.csv", "name\n");
+		await box.write("people.dat", "name\nAna\n");
+		const data = ["render", "badge.json", "--data"];
+		const cases: [string[], number, string][] = [
+			[[...data, "people.csv"], 2, "--data needs --out <file.zip|file.pdf>"],
+			[[...data, "people.csv", "--out", "dir"], 2, "--data needs --out <file.zip|file.pdf>"],
+			[[...data, "people.csv", "--out", "x.zip", "--scale", "1", "--scale", "2"], 2, "--data takes one --scale"],
+			[[...data, "people.csv", "--out", "x.pdf", "--format", "jpeg"], 2, "--format applies only to a zip"],
+			[["render", "a.coatworkspace", "--data", "people.csv", "--preset", "p", "--out", "x.zip"], 2, "--data applies only to templates"],
+			[[...data, "none.csv", "--out", "x.zip"], 1, "cannot read none.csv: no such file"],
+			[[...data, "empty.csv", "--out", "x.zip"], 1, "empty.csv has no records"],
+			[[...data, "people.dat", "--out", "x.zip"], 1, "people.dat: .dat is not a table"],
+		];
+		for (const [argv, code, message] of cases) {
+			const run = await box.run(...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code });
+			expect(run.stderr).toContain(message);
+			expect(run.stdout).toBe("");
+		}
 	});
 });
 

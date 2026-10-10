@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { access, mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { WorkspaceReadError } from "@freshcoat-js/workspace/archive";
 import {
 	codepointLabel,
@@ -12,7 +13,7 @@ import {
 import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
-import { openRenderer } from "../renderer";
+import { createLoader, openRenderer } from "../renderer";
 
 export type WorkspaceOptions = { preset: string; out: string; quiet: boolean };
 
@@ -30,17 +31,27 @@ export async function renderWorkspace(
 	const preset = findPreset(workspace, options.preset);
 	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
 
+	await runPreset(workspace, preset, { root: dirname(path), out: options.out }, log, io);
+}
+
+export async function runPreset(
+	workspace: Workspace,
+	preset: ExportPreset,
+	options: { root: string; out: string },
+	log: Log,
+	io: Io,
+): Promise<void> {
 	const out = resolve(io.cwd, options.out);
 	await mkdir(dirname(out), { recursive: true });
-	const renderer = await openRenderer(io, {
-		root: dirname(path),
-		build: "full",
-	});
+	const renderer = await openRenderer(io, { root: options.root, build: "full" });
 	const progress = progressReporter(log);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
-			...(io.fetch ? { fontOptions: { fetch: io.fetch } } : {}),
+			fontOptions: {
+				...(io.fetch ? { fetch: io.fetch } : {}),
+				load: createLoader(io, options.root),
+			},
 			output: fileOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
