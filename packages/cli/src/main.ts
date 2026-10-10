@@ -82,6 +82,11 @@ function program(io: Io) {
 			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need one",
 		)
 		.option("--dry-run", "list what would be written, without rendering")
+		.option(
+			"--jobs <n>",
+			"render an export on this many threads; default from the cores and memory",
+			parseJobs,
+		)
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
 		.option("--values <file>", "JSON file of field values")
@@ -170,6 +175,7 @@ function program(io: Io) {
 						...(records ? { records } : {}),
 						...(save ? { save } : {}),
 						...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
+						...(rest.jobs ? { jobs: rest.jobs } : {}),
 						out,
 						quiet: quiet(cmd),
 					},
@@ -229,10 +235,10 @@ function program(io: Io) {
 	return root;
 }
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "dryRun"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "dryRun", "jobs"];
 const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
-const EXPORT_OPTIONS = ["name", "quality", "bleed", ...PDF_OPTIONS];
+const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", ...PDF_OPTIONS];
 
 function flag(key: string): string {
 	return key === "cropMarks"
@@ -288,6 +294,13 @@ function parseQuality(entry: string): number {
 	const value = Number(entry);
 	if (!Number.isInteger(value) || value < 0 || value > 100)
 		throw new InvalidArgumentError("Expected a whole number from 0 to 100.");
+	return value;
+}
+
+function parseJobs(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 1)
+		throw new InvalidArgumentError("Expected a whole number, 1 or more.");
 	return value;
 }
 

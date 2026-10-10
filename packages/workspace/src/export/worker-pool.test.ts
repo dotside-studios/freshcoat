@@ -1,15 +1,18 @@
-import type { RenderRequest } from "@freshcoat-js/workspace/export";
 import { describe, expect, it } from "vitest";
-import type { WorkerReply, WorkerRequest } from "~/export/protocol";
-import { createWorkerPool, type PoolWorker } from "~/export/worker-pool";
+import type { RenderRequest } from "./item";
+import { createWorkerPool, type PoolWorker } from "./worker-pool";
+import type {
+	RenderWorkerReply as WorkerReply,
+	RenderWorkerRequest as WorkerRequest,
+} from "./worker-protocol";
 
 class FakeWorker implements PoolWorker {
 	static all: FakeWorker[] = [];
 	readonly index: number;
 	received: WorkerRequest[] = [];
 	terminated = false;
-	onmessage: ((event: MessageEvent<WorkerReply>) => void) | null = null;
-	onerror: ((event: ErrorEvent) => void) | null = null;
+	onmessage: ((event: { data: WorkerReply }) => void) | null = null;
+	onerror: ((event: { message?: string }) => void) | null = null;
 
 	constructor() {
 		this.index = FakeWorker.all.length;
@@ -25,7 +28,7 @@ class FakeWorker implements PoolWorker {
 	}
 
 	emit(reply: WorkerReply) {
-		this.onmessage?.({ data: reply } as MessageEvent<WorkerReply>);
+		this.onmessage?.({ data: reply });
 	}
 
 	renders() {
@@ -221,7 +224,7 @@ describe("worker pool", () => {
 	it("a worker that crashes fails its render and is replaced", async () => {
 		const { pool, workers } = fakePool(1);
 		const p = pool.render(request("a"));
-		workers[0].onerror?.({ message: "oom" } as ErrorEvent);
+		workers[0].onerror?.({ message: "oom" });
 		await expect(p).rejects.toThrow("oom");
 		expect(workers[0].terminated).toBe(true);
 		const q = pool.render(request("b"));
@@ -269,7 +272,7 @@ describe("worker pool", () => {
 		const { pool, workers } = fakePool(1);
 		const template = {} as RenderRequest["template"];
 		const p = pool.render({ ...request("a"), template });
-		workers[0].onerror?.({ message: "oom" } as ErrorEvent);
+		workers[0].onerror?.({ message: "oom" });
 		await expect(p).rejects.toThrow("oom");
 		void pool.render({ ...request("b"), template });
 		expect(workers[1].renders()[0]?.template).toBe(template);

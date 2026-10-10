@@ -11,6 +11,7 @@ import { createItemRenderer } from "./item";
 import {
 	boundDatasetOf,
 	inlinePool,
+	type JobPool,
 	type JobProgress,
 	type JobResult,
 	runExportJob,
@@ -36,6 +37,9 @@ export type ExportWorkspaceOptions = {
 	/** How `resolveTemplateFonts` loads them when `fonts` is not given. */
 	fontOptions?: ResolveTemplateFontsOptions;
 	output?: ExportOutput;
+	/** Where the items render; default `inlinePool` over `renderer`. The pool
+	 *  holds its own fonts, and `renderer` still checks glyphs. */
+	pool?: JobPool;
 	signal?: AbortSignal;
 	onProgress?: (progress: JobProgress) => void;
 	/** Also lists the text each item's fonts have no glyphs for, as `glyphs`. */
@@ -109,7 +113,7 @@ export async function exportWorkspace(
 	try {
 		const sink = found.format === "pdf" ? undefined : output?.sink?.();
 		const job = await runExportJob(workspace, found, {
-			pool: inlinePool(items),
+			pool: options.pool ?? inlinePool(items),
 			...(sink ? { sink } : {}),
 			...(signal ? { signal } : {}),
 			...(onProgress ? { onProgress } : {}),

@@ -18,7 +18,13 @@ import { fileOutput, folderOutput, readWorkspaceFile } from "../node";
 import { planExport } from "../plan";
 import { makePng, sha256 } from "../test-fixtures";
 import type { ExportPreset, Workspace } from "../types";
-import { type ExportOutput, exportWorkspace, REPORT_FILE_NAME } from "./index";
+import {
+	createItemRenderer,
+	type ExportOutput,
+	exportWorkspace,
+	type JobPool,
+	REPORT_FILE_NAME,
+} from "./index";
 
 const FONT_CSS = "https://fonts.example/css2?family=Inter";
 const FONT_FILE = "https://fonts.example/inter.ttf";
@@ -393,5 +399,43 @@ describe("export from a workspace file in Node", () => {
 		expect(await readdir(out)).toEqual([name]);
 		const pdf = await PDFDocument.load(await readFile(join(out, name)));
 		expect(pdf.getPageCount()).toBe(2);
+	});
+
+	it("renders through a pool it is given", async () => {
+		const { workspace } = await readWorkspaceFile(await packTo("logo.png"));
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		const items = createItemRenderer({ renderer });
+		const sides: string[] = [];
+		let running = 0;
+		let most = 0;
+		const pool: JobPool = {
+			size: 2,
+			async render(request) {
+				sides.push(request.side);
+				most = Math.max(most, ++running);
+				try {
+					return await items.render(request);
+				} finally {
+					running--;
+				}
+			},
+			cancel() {},
+		};
+		try {
+			const result = await exportWorkspace(workspace, preset, {
+				renderer,
+				fontOptions: { fetch: fontFetch },
+				pool,
+			});
+			expect(result.items.map((i) => i.ok)).toEqual([true, true]);
+			expect(sides).toHaveLength(2);
+			expect(most).toBeLessThanOrEqual(2);
+		} finally {
+			items.dispose();
+			renderer.dispose();
+		}
 	});
 });

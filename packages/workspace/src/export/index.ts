@@ -63,6 +63,7 @@ export {
 	type RenderPrint,
 	withPrintFallback,
 } from "./print";
+export { serveRenders, type WorkerScope } from "./render-worker";
 export {
 	type ExportOutput,
 	type ExportWorkspaceOptions,
@@ -104,3 +105,15 @@ export {
 	retryPreset,
 	unwrittenRecordIds,
 } from "./status";
+export {
+	createWorkerPool,
+	type PoolWorker,
+	RenderCancelledError,
+	type WorkerFactory,
+	type WorkerPool,
+} from "./worker-pool";
+export type {
+	RenderWorkerReply,
+	RenderWorkerRequest,
+	WorkerRenderRequest,
+} from "./worker-protocol";

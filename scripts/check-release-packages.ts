@@ -258,5 +258,28 @@ function checkCli(consumer: string, font: string): void {
 	const png = readFileSync(join(consumer, "rendered", "front.png"));
 	if (png.readUInt32BE(16) !== 1012 || png.readUInt32BE(20) !== 638)
 		throw new Error("freshcoat render wrote an image of the wrong size");
-	console.log("The installed freshcoat command validated, inspected and rendered");
+	writeFileSync(
+		join(consumer, "templates", "people.csv"),
+		"displayName\nAna\nBen\nCleo\nDev\n",
+	);
+	const batch = run(
+		[
+			bin,
+			"render",
+			"templates/card.json",
+			"--data",
+			"templates/people.csv",
+			"--jobs",
+			"2",
+			"--out",
+			"cards.zip",
+			"--quiet",
+		],
+		consumer,
+	);
+	if (!batch.startsWith("4 of 4 items exported to cards.zip"))
+		throw new Error(`freshcoat render --jobs 2 printed "${batch.trim()}"`);
+	console.log(
+		"The installed freshcoat command validated, inspected, rendered and rendered on worker threads",
+	);
 }

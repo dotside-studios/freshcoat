@@ -160,9 +160,9 @@ American spelling, and no em dashes.
 2. Map it in `../../packages/workspace/src/plan.ts`: `imageFormat` (what each
    file is encoded as) and `fileExtension`.
 3. If it needs a new encoding, add it to `OutputFormat` in
-   `src/export/protocol.ts` and encode it in
-   `src/export/render-worker.ts` (the workers use CanvasKit's `full`
-   build, which has the PNG, JPEG and WebP encoders).
+   `../../packages/workspace/src/export/item.ts` and encode it in
+   `createItemRenderer` there, which the workers run (they use CanvasKit's
+   `full` build, which has the PNG, JPEG and WebP encoders).
 4. Offer it in `src/export/ExportSettings.tsx` and name it in
    `src/export/export-ui.ts`.
 5. Test the plan in `../../packages/workspace/src/plan.test.ts`, the job in
