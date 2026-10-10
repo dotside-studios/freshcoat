@@ -64,7 +64,25 @@ const text = (value: string, size: number, x: number, y: number) =>
 		color: "#1d3557",
 	});
 
-const scenes: Record<string, { nodes: Node[]; tolerance?: number; }> = {
+const vend = (
+	value: string,
+	size: number,
+	x: number,
+	y: number,
+	weight: number,
+	style: "normal" | "italic",
+) =>
+	createText({
+		...box(x, y, 160, size * 1.3),
+		text: value,
+		font: { family: "Vend", weight, style, size, lineHeight: 1.2 },
+		color: "#1d3557",
+	});
+
+const scenes: Record<
+	string,
+	{ nodes: Node[]; tolerance?: number; variable?: boolean }
+> = {
 	"shadowed rounded rect": {
 		nodes: [
 			createRect({
@@ -143,6 +161,35 @@ const scenes: Record<string, { nodes: Node[]; tolerance?: number; }> = {
 	},
 	"text with large font overflow": {
 		nodes: [text("Wg", 90, 30, 40)],
+	},
+	"variable font text": {
+		nodes: [vend("Wag jy", 40, 20, 70, 400, "normal")],
+		variable: true,
+	},
+	"heavy variable font text": {
+		nodes: [vend("Wag jy", 40, 20, 70, 900, "normal")],
+		variable: true,
+	},
+	"heavy italic variable font text": {
+		nodes: [vend("Wag jy", 40, 20, 70, 900, "italic")],
+		variable: true,
+	},
+	"variable font text with shadow and decoration": {
+		nodes: [
+			{
+				...vend("Wag jy", 40, 20, 70, 700, "italic"),
+				font: {
+					family: "Vend",
+					weight: 700,
+					style: "italic",
+					size: 40,
+					lineHeight: 1.2,
+					decoration: "underline",
+				},
+				shadow: shadow(5, 5, 8),
+			} as Node,
+		],
+		variable: true,
 	},
 	"masked group": {
 		nodes: [
@@ -262,7 +309,7 @@ describe("shapeTextLines", () => {
 });
 
 describe("drawableBounds", () => {
-	test("text is unbounded while a variable font is in the fallback chain", () => {
+	test("text is bounded while a variable font is in the fallback chain", () => {
 		const shared = createSharedFontProvider(ck, fonts);
 		(shared.provider as { __families?: string[] }).__families = ["Geist", "Vend"];
 		const bin = makeBin();
@@ -272,7 +319,9 @@ describe("drawableBounds", () => {
 				{ width: W, height: H },
 			);
 			const layer = flatten(commands).find((c) => c.op === "drawText") as DrawCommand;
-			expect(drawableBounds(ck, shared.provider, bin, layer, 1)).toBeNull();
+			const b = drawableBounds(ck, shared.provider, bin, layer, 1);
+			expect(b).not.toBeNull();
+			expect((b as number[])[2]).toBeLessThan(W);
 		} finally {
 			bin.free();
 			shared.release();
@@ -290,8 +339,14 @@ describe("drawableBounds", () => {
 					(c) => c.op === "loadFonts" || c.op === "loadImages",
 				);
 				const layers = flatten(commands);
-				const shared = createSharedFontProvider(ck, geist);
-				(shared.provider as { __families?: string[] }).__families = ["Geist"];
+				const shared = createSharedFontProvider(
+					ck,
+					scene.variable
+						? new Map([["Vend", fonts.get("Vend") as Uint8Array[]]])
+						: geist,
+				);
+				(shared.provider as { __families?: string[] }).__families =
+					scene.variable ? ["Vend"] : ["Geist"];
 				const bin = makeBin();
 				try {
 					let bounded = 0;
