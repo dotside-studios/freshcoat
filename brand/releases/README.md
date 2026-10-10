@@ -91,4 +91,4 @@ release. Write the word and a line on the idea at the top of the module.
 
 | Release | Word | Idea | Drawn with |
 |---|---|---|---|
-| [0.4.0](v0.4.0.coat.ts) | *interfere* | Interference rings: concentric circles from three centres, the moiré left where they cross, over blurred colour fields | one live `exclude` boolean over about 70 circles, element blur, overlay blending, a noise pattern, a variable font in the lockup |
+| [0.4.0](v0.4.0.coat.ts) | *interfere* | Interference rings: concentric circles from three centres, the moiré left where they cross, printed flat in two tones of cobalt with a panel cut out for the lockup | a live `exclude` boolean over about 70 circles inside a live `subtract`, a variable font in the lockup |
