@@ -12,12 +12,14 @@ import {
 	type Dataset,
 	type DatasetAsset,
 	type ExportPreset,
+	fileNameTokens,
 	headersOf,
 	importDefaults,
 	newPreset,
 	type PaperName,
 	prepareAssets,
 	unfilledRequired,
+	unknownFileNameTokens,
 	withFieldSource,
 	withVariantSource,
 	type Workspace,
@@ -43,8 +45,6 @@ const ZIP_FORMATS = {
 } as const;
 
 const MAX_ISSUES = 10;
-
-const FILE_NAME_TOKENS = ["template", "side", "index", "record", "variant"];
 
 export type BatchOptions = {
 	data?: string;
@@ -161,13 +161,10 @@ export async function renderBatch(
 }
 
 function checkName(template: Template, pattern: string): void {
-	const known = [...FILE_NAME_TOKENS, ...Object.keys(template.fields.properties)];
-	const unknown = [...pattern.matchAll(/\{\{\s*([^{}]*?)\s*\}\}/g)]
-		.map((match) => match[1] as string)
-		.filter((token) => !known.includes(token));
+	const unknown = unknownFileNameTokens(pattern, template);
 	if (unknown.length > 0)
 		throw new CliError(
-			`--name has no ${unknown.map((token) => `{{${token}}}`).join(", ")}; it takes ${known.map((token) => `{{${token}}}`).join(", ")}`,
+			`--name has no ${unknown.map((token) => `{{${token}}}`).join(", ")}; it takes ${fileNameTokens(template).map((token) => `{{${token}}}`).join(", ")}`,
 		);
 }
 
