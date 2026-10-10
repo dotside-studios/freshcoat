@@ -43,7 +43,10 @@ export async function render(
 	const { template, directory } = await readTemplate(io, file);
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
-	const values = await collectValues(io, template, options.values, options.set ?? {});
+	const values = checkValues(
+		template,
+		await readValues(io, template, options.values, options.set ?? {}),
+	);
 
 	const { fonts, ...report } = await resolveTemplateFonts(template, {
 		...(io.fetch ? { fetch: io.fetch } : {}),
@@ -85,7 +88,7 @@ export async function render(
 	}
 }
 
-function pickVariant(
+export function pickVariant(
 	template: Template,
 	id: string | undefined,
 ): string | undefined {
@@ -98,7 +101,7 @@ function pickVariant(
 	return id;
 }
 
-function pickFrames(
+export function pickFrames(
 	template: Template,
 	names: string[] | undefined,
 ): string[] | undefined {
@@ -112,7 +115,7 @@ function pickFrames(
 	return names;
 }
 
-async function collectValues(
+export async function readValues(
 	io: Io,
 	template: Template,
 	file: string | undefined,
@@ -151,6 +154,13 @@ async function collectValues(
 			`the template has no field ${unknown.map((key) => `"${key}"`).join(", ")}; its fields are ${known.length > 0 ? known.join(", ") : "none"}`,
 		);
 	}
+	return values;
+}
+
+function checkValues(
+	template: Template,
+	values: Record<string, unknown>,
+): Record<string, unknown> {
 	const defaults: Record<string, unknown> = {};
 	for (const [key, field] of Object.entries(template.fields.properties))
 		if (field.default !== undefined) defaults[key] = field.default;

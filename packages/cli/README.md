@@ -1,7 +1,8 @@
 # @freshcoat-js/cli
 
 The `freshcoat` command line for [Freshcoat](../../README.md): render a
-template to images or a workspace's export preset to a zip or PDF, check a
+template to images, once per spreadsheet row, or a workspace's export preset
+to a zip or PDF, check a
 template and list what it holds, without writing a script. It is built on
 [`@freshcoat-js/coatfile`](../coatfile), [`@freshcoat-js/engine`](../engine)
 and [`@freshcoat-js/workspace`](../workspace), and runs on Node.
@@ -25,6 +26,7 @@ command.
 freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --values alex.json --variant amber --frame front
 freshcoat render card.json --scale 1 --scale 2 --format webp --out out
+freshcoat render card.coat --data people.csv --out cards.zip
 freshcoat render club.coatworkspace --preset "All cards" --out cards.zip
 ```
 
@@ -51,6 +53,23 @@ in. A font the template declares loads from its source; any other family is
 looked up on Google Fonts by name, and both cases are reported on stderr when
 a family is guessed or no font data is found. Relative image paths resolve
 against the template's directory, and nothing outside it is read.
+
+#### Spreadsheets
+
+With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
+`.ods`, JSON or NDJSON file, and `--out` names a `.zip` of images and an
+`export-report.csv`, or a `.pdf`. The first row names the fields, matched by
+key or title ignoring case and punctuation; columns no field matches are
+reported and left out, and only the first sheet of a workbook is read. A photo
+named in an image field's column is read from the data file's directory. Files
+are named `<template id>-<row>-<frame>`, with the scale as a suffix for
+anything but 1x.
+
+`--set` and `--values` fill a field the same way in every row, over its
+column. `--variant`, `--frame` and `--format` work as above, `--format` for a
+zip only, and `--scale` takes one value. A required field no column or `--set`
+fills is reported and uses its default. Progress and the summary are those of
+a workspace export, below.
 
 #### Workspaces
 

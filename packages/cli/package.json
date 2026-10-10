@@ -2,7 +2,7 @@
 	"name": "@freshcoat-js/cli",
 	"private": true,
 	"version": "0.3.0",
-	"description": "The freshcoat command line: render, validate and inspect Freshcoat templates and render workspace export presets",
+	"description": "The freshcoat command line: render, validate and inspect Freshcoat templates, batch-render them from spreadsheets and run workspace export presets",
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
