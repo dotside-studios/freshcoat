@@ -1,5 +1,5 @@
 import type { CanvasKit } from "canvaskit-wasm";
-import { paintScene } from "./canvaskit";
+import { collectAssets, paintScene } from "./canvaskit";
 import { compileScene, prepareScene } from "./compile-scene";
 import type { DecodedPixels } from "./decode";
 import {
@@ -266,6 +266,43 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		fonts = new Map([...fonts, ...entries]);
 	};
 
+	// The families these requests describe that the renderer lacks, read through
+	// `loader`.
+	const loadFamilies = async (
+		requests: readonly FontRequest[],
+		loader: ByteLoader,
+	): Promise<FontLoadReport> => {
+		const failed: FontLoadReport["failed"] = [];
+		const loaded: Array<readonly [string, Uint8Array[]]> = [];
+		const byFamily = new Map<string, Extract<FontRequest, { descriptor: unknown }>>();
+		for (const req of requests)
+			if ("descriptor" in req && !byFamily.has(req.family))
+				byFamily.set(req.family, req);
+		await Promise.all(
+			[...byFamily.values()].map(async (req) => {
+				const key = JSON.stringify(req.descriptor);
+				// Bytes given directly win over a descriptor, as they do when painting.
+				if (fonts.has(req.family) && (fontKeys.get(req.family) ?? key) === key)
+					return;
+				try {
+					const bytes = (await fontBytes(resolveFontRequest(req), loader)).filter(
+						(b) => b.length > 0,
+					);
+					if (bytes.length === 0) throw new Error("no font files");
+					fontKeys.set(req.family, key);
+					loaded.push([req.family, bytes]);
+				} catch (e) {
+					failed.push({
+						family: req.family,
+						error: e instanceof Error ? e.message : String(e),
+					});
+				}
+			}),
+		);
+		setFonts(loaded);
+		return { failed };
+	};
+
 	let pending = 0;
 	const serial = <T>(task: () => Promise<T>): Promise<T> => {
 		pending++;
@@ -299,6 +336,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				perCall.set(src, bytes);
 			}
 		}
+		// So the shared provider covers the scene's families and the paint never
+		// reads font files through its per-call loader.
+		await loadFamilies(collectAssets(commands).fonts, mapLoader(images, load));
 		// Held across the paint's awaits, which a setFonts can land between.
 		const shared = fontProvider();
 		shared.retain();
@@ -435,35 +475,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		async loadFonts(requests) {
 			alive();
-			const failed: FontLoadReport["failed"] = [];
-			const loaded: Array<readonly [string, Uint8Array[]]> = [];
-			const byFamily = new Map<string, Extract<FontRequest, { descriptor: unknown }>>();
-			for (const req of requests)
-				if ("descriptor" in req && !byFamily.has(req.family))
-					byFamily.set(req.family, req);
-			await Promise.all(
-				[...byFamily.values()].map(async (req) => {
-					const key = JSON.stringify(req.descriptor);
-					// Bytes given directly win over a descriptor, as they do when painting.
-					if (fonts.has(req.family) && (fontKeys.get(req.family) ?? key) === key)
-						return;
-					try {
-						const bytes = (await fontBytes(resolveFontRequest(req), load)).filter(
-							(b) => b.length > 0,
-						);
-						if (bytes.length === 0) throw new Error("no font files");
-						fontKeys.set(req.family, key);
-						loaded.push([req.family, bytes]);
-					} catch (e) {
-						failed.push({
-							family: req.family,
-							error: e instanceof Error ? e.message : String(e),
-						});
-					}
-				}),
-			);
-			setFonts(loaded);
-			return { failed };
+			return loadFamilies(requests, load);
 		},
 		stats() {
 			return {
