@@ -1,25 +1,20 @@
-import { constants } from "node:fs";
-import { access, mkdir, stat } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
 	type ExportPreset,
 	SheetLayoutError,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { WorkspaceReadError } from "@freshcoat-js/workspace/archive";
 import {
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
 } from "@freshcoat-js/workspace/export";
-import {
-	fileOutput,
-	folderOutput,
-	readWorkspaceFile,
-} from "@freshcoat-js/workspace/node";
+import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
+import { readWorkspace } from "../workspace-file";
 
 export type WorkspaceOptions = { preset?: string; out: string; quiet: boolean };
 
@@ -31,7 +26,7 @@ export async function renderWorkspace(
 	const log = createLog(io, options.quiet);
 
 	const path = resolve(io.cwd, file);
-	const { workspace, warnings } = await readWorkspace(path, file);
+	const { workspace, warnings } = await readWorkspace(io, file);
 	for (const warning of warnings) log.warn(`${file}: ${warning}`);
 
 	if (options.preset === undefined)
@@ -94,25 +89,6 @@ export async function runPreset(
 	} finally {
 		log.endProgress();
 		renderer.dispose();
-	}
-}
-
-async function readWorkspace(path: string, shown: string) {
-	// readWorkspaceFile folds a missing file into "not a readable zip".
-	try {
-		await access(path, constants.R_OK);
-	} catch (error) {
-		const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
-		throw new CliError(
-			`cannot read ${shown}: ${missing ? "no such file" : "permission denied"}`,
-		);
-	}
-	try {
-		return await readWorkspaceFile(path);
-	} catch (error) {
-		if (error instanceof WorkspaceReadError)
-			throw new CliError(`${shown}: ${error.message}`);
-		throw error;
 	}
 }
 

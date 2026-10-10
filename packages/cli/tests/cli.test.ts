@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
+import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
@@ -275,16 +276,6 @@ describe("inspect", () => {
 		expect(run.stdout).toContain('  name  string, required, default "Ana"');
 		expect(run.stdout).toContain("  wide  Wide  400 x 200");
 		expect(run.stdout).toContain("  Inter  400  declared");
-	});
-
-	test("points a workspace at render", async () => {
-		for (const command of ["inspect", "validate"]) {
-			const run = await box.run(command, "club.coatworkspace");
-			expect(run.code).toBe(1);
-			expect(run.stderr).toBe(
-				"freshcoat: club.coatworkspace is a workspace; this command takes a .coat file or template JSON\n",
-			);
-		}
 	});
 
 	test("fails on an invalid template", async () => {
@@ -819,6 +810,123 @@ describe("render a workspace", () => {
 	});
 });
 
+describe("validate warnings", () => {
+	test("lists Studio's issues as warnings and fails on them with --strict", async () => {
+		const linted = card({ safeArea: 20, format_version: "1.2" } as never);
+		linted.variants![0]!.overrides = [
+			{
+				name: "front",
+				elements: [
+					{ id: "ghost", properties: { color: "#000000" } },
+					{ id: "front_name", properties: {} },
+				],
+			},
+		] as never;
+		await box.write("linted.json", JSON.stringify(linted));
+		const run = await box.run("validate", "linted.json");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toBe("linted.json is valid, with 7 warnings\n");
+		for (const line of [
+			'warning: variant "wide" changes "ghost", which is not on side "front" (variant_orphan_override)',
+			'warning: variant "wide" has a change to "front_name" that changes nothing (variant_empty_override)',
+			'warning: front: "front_name" has its left, top and right edges inside the safe area',
+			'warning: back: "back_logo" has its right and bottom edges inside the safe area',
+			"warning: uses fields from format 1.6 but declares 1.2; older readers drop them",
+		])
+			expect(run.stderr).toContain(line);
+		const strict = await box.run("validate", "linted.json", "--strict", "-q");
+		expect(strict).toEqual({
+			code: 1,
+			stdout: "",
+			stderr: "freshcoat: linted.json has 7 warnings\n",
+		});
+	});
+});
+
+describe("workspaces in inspect and validate", () => {
+	beforeAll(async () => {
+		await box.write("club.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		const unbound = workspaceOf(card());
+		unbound.templates[0]!.binding!.fields = {};
+		await box.write("unbound.coatworkspace", await workspaceBytes(unbound));
+		const broken = workspaceOf(card());
+		broken.presets[1]!.layout = { ...DEFAULT_SHEET_LAYOUT, paper: { widthMm: 20, heightMm: 20 } };
+		broken.presets.push({ ...broken.presets[0]!, id: "p_gone", name: "Gone", templateId: "t_gone" });
+		await box.write("broken.coatworkspace", await workspaceBytes(broken));
+	});
+
+	test("inspects a workspace as JSON", async () => {
+		const run = await box.run("inspect", "club.coatworkspace", "--json");
+		expect(run.code).toBe(0);
+		const info = JSON.parse(run.stdout);
+		expect(info).toMatchObject({
+			file: "club.coatworkspace",
+			name: "Badges",
+			formatVersion: "1.0",
+			templates: [
+				{
+					id: "t_badge",
+					fileName: "Badge.coat",
+					dataset: "d_people",
+					unfilled: [],
+					template: { id: "badge", width: 200, height: 100 },
+				},
+			],
+			datasets: [
+				{
+					id: "d_people",
+					name: "People",
+					records: 2,
+					statuses: { pending: 2 },
+					columns: [{ key: "name", type: "text" }],
+				},
+			],
+			presets: [
+				{ id: "p_png", name: "All badges", template: "Badge.coat", format: "png-zip", records: "all", items: 4 },
+				{ id: "p_pdf", name: "Proof", template: "Badge.coat", format: "pdf", records: "all", items: 2 },
+			],
+		});
+	});
+
+	test("inspects a workspace as text", async () => {
+		const run = await box.run("inspect", "unbound.coatworkspace");
+		expect(run.code).toBe(0);
+		for (const line of [
+			"Badges (unbound.coatworkspace)",
+			"  Badge.coat  Badge (badge)  200 x 100  2 frames, 1 variant  bound to People",
+			"    no column fills name",
+			"  People (d_people)  2 records: 2 pending  1 column",
+			"  All badges (p_png)  Badge.coat  png-zip, all records  4 items",
+		])
+			expect(run.stdout).toContain(line);
+	});
+
+	test("shows how a sheet preset lays out, or why it cannot", async () => {
+		const run = await box.run("inspect", "broken.coatworkspace", "--json");
+		const { presets } = JSON.parse(run.stdout);
+		expect(presets[1].error).toBeString();
+		expect(presets[2]).toMatchObject({ template: "t_gone", error: "its template is not in the workspace" });
+	});
+
+	test("validates a workspace", async () => {
+		const run = await box.run("validate", "club.coatworkspace");
+		expect(run).toEqual({ code: 0, stdout: "club.coatworkspace is valid\n", stderr: "" });
+		const unbound = await box.run("validate", "unbound.coatworkspace");
+		expect(unbound.code).toBe(0);
+		expect(unbound.stderr).toBe("warning: Badge.coat: no column fills the required field name\n");
+		expect(unbound.stdout).toBe("unbound.coatworkspace is valid, with 1 warning\n");
+		expect((await box.run("validate", "unbound.coatworkspace", "--strict")).code).toBe(1);
+	});
+
+	test("fails a workspace whose presets cannot run", async () => {
+		const run = await box.run("validate", "broken.coatworkspace");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("broken.coatworkspace is not valid (2 issues)");
+		expect(run.stderr).toContain('  preset "Proof": ');
+		expect(run.stderr).toContain('  preset "Gone": its template is not in the workspace');
+	});
+});
+
 describe("the command line", () => {
 	test("prints the package version", async () => {
 		const run = await box.run("--version");
@@ -854,7 +962,7 @@ describe("the command line", () => {
 	test("points a usage error at the command's help", async () => {
 		const run = await box.run("inspect");
 		expect(run.code).toBe(2);
-		expect(run.stderr).toContain("freshcoat: missing required argument 'template'");
+		expect(run.stderr).toContain("freshcoat: missing required argument 'file'");
 		expect(run.stderr).toContain("Run freshcoat inspect --help for usage.");
 	});
 });
