@@ -1,18 +1,21 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
-import type { Template } from "@freshcoat-js/coatfile";
+import { type Template, templateBleed } from "@freshcoat-js/coatfile";
 import {
 	type AssetFile,
 	applyMapping,
 	autoBinding,
 	type Column,
 	type ColumnMapping,
+	DEFAULT_FILE_NAME_PATTERN,
+	DEFAULT_SHEET_LAYOUT,
 	type Dataset,
 	type DatasetAsset,
 	type ExportPreset,
 	guessMapping,
 	headersOf,
 	newPreset,
+	type PaperName,
 	prepareAssets,
 	unfilledRequired,
 	withFieldSource,
@@ -30,7 +33,7 @@ import {
 	pickVariant,
 	readValues,
 } from "./render";
-import { runPreset } from "./workspace";
+import { runPreset, writesFile } from "./workspace";
 
 const ZIP_FORMATS = {
 	png: "png-zip",
@@ -41,6 +44,8 @@ const ZIP_FORMATS = {
 
 const MAX_ISSUES = 10;
 
+const FILE_NAME_TOKENS = ["template", "side", "index", "record", "variant"];
+
 export type BatchOptions = {
 	data?: string;
 	out: string;
@@ -50,6 +55,16 @@ export type BatchOptions = {
 	frame?: string[];
 	scale?: number[];
 	format?: keyof typeof ZIP_FORMATS;
+	name?: string;
+	quality?: number;
+	bleed?: true;
+	dpi?: number;
+	pdfPages?: "png" | "jpeg" | "vector";
+	sheets?: PaperName | { widthMm: number; heightMm: number };
+	duplex?: "long" | "short";
+	margin?: number;
+	gap?: number;
+	cropMarks?: boolean;
 	quiet: boolean;
 };
 
@@ -62,6 +77,9 @@ export async function renderBatch(
 	const { template, directory } = await readTemplate(io, file);
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
+	if (options.name !== undefined) checkName(template, options.name);
+	if (options.bleed && !Object.values(templateBleed(template)).some((side) => side > 0))
+		throw new CliError("--bleed needs a template with a bleed");
 	const constants = await readValues(io, template, options.values, options.set ?? {});
 	const read =
 		options.data === undefined
@@ -98,17 +116,44 @@ export async function renderBatch(
 			`no column or --set fills the required ${missing.length === 1 ? "field" : "fields"} ${missing.join(", ")}; ${missing.length === 1 ? "it uses its" : "they use their"} default`,
 		);
 
+	const pdf = writesFile(options.out) && options.out.toLowerCase().endsWith(".pdf");
 	const preset: ExportPreset = {
 		...newPreset(templateId, []),
-		format: options.out.toLowerCase().endsWith(".pdf")
-			? "pdf"
-			: ZIP_FORMATS[options.format ?? "png"],
+		format: pdf ? "pdf" : ZIP_FORMATS[options.format ?? "png"],
 		scale: options.scale?.[0] ?? 1,
 		markExported: false,
-		...(options.data === undefined ? { fileName: "{{side}}" } : {}),
+		fileName:
+			options.name ?? (options.data === undefined ? "{{side}}" : DEFAULT_FILE_NAME_PATTERN),
 		...(frameNames ? { sides: frameNames } : {}),
+		...(options.quality !== undefined ? { quality: options.quality } : {}),
+		...(options.bleed ? { bleed: true } : {}),
+		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
+		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
+		...(options.sheets
+			? {
+					layout: {
+						...DEFAULT_SHEET_LAYOUT,
+						paper: options.sheets,
+						cropMarks: options.cropMarks ?? true,
+						duplex: options.duplex ? `${options.duplex}-edge` : "none",
+						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
+						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
+					},
+				}
+			: {}),
 	};
 	await runPreset(workspace, preset, { root: directory, out: options.out }, log, io);
+}
+
+function checkName(template: Template, pattern: string): void {
+	const known = [...FILE_NAME_TOKENS, ...Object.keys(template.fields.properties)];
+	const unknown = [...pattern.matchAll(/\{\{\s*([^{}]*?)\s*\}\}/g)]
+		.map((match) => match[1] as string)
+		.filter((token) => !known.includes(token));
+	if (unknown.length > 0)
+		throw new CliError(
+			`--name has no ${unknown.map((token) => `{{${token}}}`).join(", ")}; it takes ${known.map((token) => `{{${token}}}`).join(", ")}`,
+		);
 }
 
 async function readDataset(

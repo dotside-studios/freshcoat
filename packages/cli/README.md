@@ -28,6 +28,8 @@ freshcoat render card.coat --values alex.json --variant amber --frame front
 freshcoat render card.json --scale 1 --scale 2 --format webp --out out
 freshcoat render card.coat --set photo=alex.jpg --out card.pdf
 freshcoat render card.coat --data people.csv --out cards.zip
+freshcoat render card.coat --data people.csv --name "{{member_id}}-{{side}}" --format jpeg --quality 85 --out cards
+freshcoat render card.coat --data people.csv --sheets a4 --duplex long --bleed --out sheets.pdf
 freshcoat render club.coatworkspace --preset "All cards" --out cards.zip
 ```
 
@@ -66,23 +68,46 @@ nothing outside it is read. An image field left empty is not reported.
 
 With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
 `.ods`, JSON or NDJSON file, and `--out` names a `.zip` of images and an
-`export-report.csv`, or a `.pdf`. The first row names the fields, matched by
+`export-report.csv`, a `.pdf`, or a directory that gets the images and the
+report. The first row names the fields, matched by
 key or title ignoring case and punctuation; columns no field matches are
 reported and left out, and only the first sheet of a workbook is read. A photo
 named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
-anything but 1x.
+anything but 1x, unless `--name` says otherwise.
 
 `--set` and `--values` fill a field the same way in every row, over its
-column. `--variant`, `--frame` and `--format` work as above, `--format` for a
-zip only, and `--scale` takes one value. A required field no column or `--set`
+column. `--variant`, `--frame` and `--format` work as above, `--format` for
+images only, and `--scale` takes one value. A required field no column or `--set`
 fills is reported and uses its default. Progress and the summary are those of
 a workspace export, below.
+
+#### Export options
+
+These shape a zip, PDF or directory written from a template, with or without
+`--data`, as an export preset's settings do in Studio.
+
+| Flag | |
+|---|---|
+| `--name <pattern>` | file names, such as `{{member_id}}-{{side}}`: any field, or `{{template}}`, `{{index}}`, `{{side}}`, `{{record}}` and `{{variant}}`; default `{{template}}-{{index}}-{{side}}` with `--data` and `{{side}}` without |
+| `--quality <n>` | JPEG and WebP quality, 0 to 100, default 90; for a PDF with `--pdf-pages jpeg` |
+| `--bleed` | include the template's bleed around each card |
+| `--dpi <n>` | PDF only: pixels per inch, which sets the page or card size; default 300 |
+| `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
+| `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper, in whichever orientation fits more |
+| `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
+| `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
+| `--no-crop-marks` | with `--sheets`: leave out the crop marks |
+
+A flag that does not fit the output, such as `--dpi` for a zip or `--quality`
+for PNG, is refused, as is `--bleed` for a template without one, a `--name`
+token the template does not have, and sheets the cards do not fit.
 
 #### Workspaces
 
 Runs an export preset from a `.coatworkspace`, chosen with `--preset` by id or
-by a name no other preset has, and writes the zip or PDF to `--out`; both flags
+by a name no other preset has, and writes the zip or PDF to `--out`, or into
+`--out` as a directory when it does not end in `.zip` or `.pdf`; both flags
 are required, the presets are listed when `--preset` is missing, and the
 template flags are refused. Progress goes to stderr and a
 one-line summary to stdout. The command also warns about text the fonts have no

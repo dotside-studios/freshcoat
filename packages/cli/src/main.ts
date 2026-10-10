@@ -5,12 +5,13 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "@commander-js/extra-typings";
+import { PAPER_SIZES_MM, type PaperName } from "@freshcoat-js/workspace";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { renderBatch } from "./commands/batch";
 import { inspect } from "./commands/inspect";
 import { render } from "./commands/render";
 import { validateCommand } from "./commands/validate";
-import { renderWorkspace } from "./commands/workspace";
+import { renderWorkspace, writesFile } from "./commands/workspace";
 import { CliError, type Io, processIo } from "./io";
 
 export function version(): string {
@@ -66,48 +67,78 @@ function program(io: Io) {
 	command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
 		.description(
-			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into one of those; a workspace\npreset writes the same.",
+			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option(
-			"--data <file>",
-			"template: CSV, TSV, Excel, .ods or JSON; the first row names the fields",
+			"--out <path>",
+			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need one",
 		)
-		.option("--values <file>", "template: JSON file of field values")
+		.optionsGroup("Template options:")
+		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
+		.option("--values <file>", "JSON file of field values")
 		.option(
 			"--set <key=value>",
-			"template: one field value; repeatable, overrides --values and --data",
+			"one field value; repeatable, overrides --values and --data",
 			collectSetting,
 		)
-		.option("--variant <id>", "template: render a variant of the template")
-		.option("--frame <name>", "template: render only this frame; repeatable", collect)
-		.option("--scale <n>", "template: pixel density, default 1; repeatable into a directory", collectScale)
+		.option("--variant <id>", "render a variant of the template")
+		.option("--frame <name>", "render only this frame; repeatable", collect)
+		.option("--scale <n>", "pixel density, default 1; repeatable into a directory", collectScale)
 		.addOption(
-			new Option("--format <format>", "template: image format, default png").choices([
+			new Option("--format <format>", "image format, default png").choices([
 				"png",
 				"jpeg",
 				"jpg",
 				"webp",
 			] as const),
 		)
+		.optionsGroup("Export options, with --data or a .zip or .pdf:")
 		.option(
-			"--preset <name|id>",
-			"workspace: the preset to run, by id or by a name only it has",
+			"--name <pattern>",
+			"file names, such as {{member_id}}-{{side}}; default {{template}}-{{index}}-{{side}}",
+		)
+		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", parseQuality)
+		.option("--bleed", "include the template's bleed around each card")
+		.optionsGroup("PDF options:")
+		.option("--dpi <n>", "pixels per inch, which sets the page size; default 300", parsePositive)
+		.addOption(
+			new Option("--pdf-pages <kind>", "what each page holds, default png").choices([
+				"png",
+				"jpeg",
+				"vector",
+			] as const),
 		)
 		.option(
-			"--out <path>",
-			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need a file",
+			"--sheets <paper>",
+			"lay the cards out on a4, letter, legal, a3, tabloid or <w>x<h> mm paper",
+			parsePaper,
+		)
+		.addOption(
+			new Option("--duplex <edge>", "print backs behind fronts, flipped on this edge").choices([
+				"long",
+				"short",
+			] as const),
+		)
+		.option("--margin <mm>", "sheet margin, default 10", parseLength)
+		.option("--gap <mm>", "space between cards, default 0", parseLength)
+		.option("--no-crop-marks", "leave out the crop marks")
+		.optionsGroup("Workspace options:")
+		.option(
+			"--preset <name|id>",
+			"the preset to run, by id or by a name only it has",
 		)
 		.addHelpText(
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
 		)
 		.action((file, options, cmd) => {
-			const { preset, out, data, ...templateOptions } = options;
+			const given = Object.keys(options).filter(
+				(key) => cmd.getOptionValueSource(key) === "cli",
+			);
+			const { preset, out, cropMarks, ...rest } = options;
 			if (file.toLowerCase().endsWith(WORKSPACE_EXTENSION)) {
-				const misplaced = Object.keys(options)
-					.filter((key) => key !== "preset" && key !== "out")
-					.map((key) => `--${key}`);
+				const misplaced = given.filter((key) => key !== "preset" && key !== "out").map(flag);
 				if (misplaced.length > 0)
 					return cmd.error(
 						`error: ${misplaced.join(", ")} ${misplaced.length === 1 ? "applies" : "apply"} only to templates`,
@@ -122,20 +153,19 @@ function program(io: Io) {
 			}
 			if (preset !== undefined)
 				return cmd.error("error: --preset needs a .coatworkspace file");
-			const archive = out !== undefined && /\.(zip|pdf)$/i.test(out);
-			if (data === undefined && !archive)
-				return render(file, { ...templateOptions, ...(out ? { out } : {}), quiet: quiet(cmd) }, io);
-			if (out === undefined || !archive)
-				return cmd.error("error: --data needs --out <file.zip|file.pdf>");
-			if ((templateOptions.scale?.length ?? 0) > 1)
-				return cmd.error("error: a .zip or .pdf takes one --scale");
-			if (templateOptions.format !== undefined && /\.pdf$/i.test(out))
-				return cmd.error("error: --format applies only to a zip");
-			return renderBatch(
-				file,
-				{ ...templateOptions, ...(data ? { data } : {}), out, quiet: quiet(cmd) },
-				io,
-			);
+			const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
+			if (rest.data === undefined && (out === undefined || !writesFile(out))) {
+				if (exportOnly.length > 0)
+					return cmd.error(
+						`error: ${listed(exportOnly, "needs", "need")} --data or a .zip or .pdf --out`,
+					);
+				return render(file, { ...rest, ...(out ? { out } : {}), quiet: quiet(cmd) }, io);
+			}
+			if (out === undefined)
+				return cmd.error("error: --data needs --out <dir|file.zip|file.pdf>");
+			const problem = exportProblem(given, rest, out);
+			if (problem) return cmd.error(`error: ${problem}`);
+			return renderBatch(file, { ...rest, out, cropMarks, quiet: quiet(cmd) }, io);
 		});
 
 	command("validate")
@@ -158,6 +188,43 @@ function program(io: Io) {
 	return root;
 }
 
+const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
+const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
+const EXPORT_OPTIONS = ["name", "quality", "bleed", ...PDF_OPTIONS];
+
+function flag(key: string): string {
+	return key === "cropMarks"
+		? "--no-crop-marks"
+		: `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+}
+
+function listed(keys: string[], one: string, many: string): string {
+	return `${keys.map(flag).join(", ")} ${keys.length === 1 ? one : many}`;
+}
+
+function exportProblem(
+	given: string[],
+	options: { scale?: number[]; format?: string; quality?: number; pdfPages?: string },
+	out: string,
+): string | undefined {
+	const pdf = /\.pdf$/i.test(out);
+	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
+	if (pdf && options.format !== undefined)
+		return "--format applies only to images; a PDF takes --pdf-pages";
+	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
+	if (!pdf && pdfOnly.length > 0)
+		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");
+	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));
+	if (sheetOnly.length > 0 && !given.includes("sheets"))
+		return listed(sheetOnly, "needs --sheets", "need --sheets");
+	if (options.quality !== undefined) {
+		if (pdf && options.pdfPages !== "jpeg") return "--quality needs --pdf-pages jpeg";
+		if (!pdf && (options.format === undefined || options.format === "png"))
+			return "--quality needs --format jpeg or webp";
+	}
+	return undefined;
+}
+
 function collect(value: string, previous: string[] = []): string[] {
 	return [...previous, value];
 }
@@ -172,8 +239,38 @@ function collectSetting(
 }
 
 function collectScale(entry: string, previous: number[] = []): number[] {
+	return [...previous, parsePositive(entry)];
+}
+
+function parseQuality(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 0 || value > 100)
+		throw new InvalidArgumentError("Expected a whole number from 0 to 100.");
+	return value;
+}
+
+function parsePositive(entry: string): number {
 	const value = Number(entry);
 	if (!Number.isFinite(value) || value <= 0)
 		throw new InvalidArgumentError("Expected a positive number.");
-	return [...previous, value];
+	return value;
+}
+
+function parseLength(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isFinite(value) || value < 0)
+		throw new InvalidArgumentError("Expected millimetres, 0 or more.");
+	return value;
+}
+
+function parsePaper(entry: string): PaperName | { widthMm: number; heightMm: number } {
+	const name = entry.toLowerCase();
+	if ((Object.keys(PAPER_SIZES_MM) as string[]).includes(name)) return name as PaperName;
+	const size = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(name);
+	const [width, height] = [Number(size?.[1]), Number(size?.[2])];
+	if (!size || width <= 0 || height <= 0)
+		throw new InvalidArgumentError(
+			`Expected ${Object.keys(PAPER_SIZES_MM).join(", ")} or <width>x<height> in millimetres.`,
+		);
+	return { widthMm: Math.min(width, height), heightMm: Math.max(width, height) };
 }
