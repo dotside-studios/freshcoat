@@ -22,7 +22,7 @@ scheduling and file destinations.
 | `json-schema` | a dataset's schema as JSON Schema 2020-12, in and out |
 | `tabular` | CSV, TSV, Excel, `.ods`, JSON and NDJSON in and out |
 | `dataset` | editing a dataset the way Studio does: cells, records and columns, renames that keep bindings in step, retyping, schema import, search, sort and per-record issues |
-| `mapping` | the import wizard's mapping of source columns to schema columns |
+| `mapping` | the import wizard's mapping of source columns to schema columns, and `importDefaults`: the sheet, header row, date order and mapping an import starts from |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
 | `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
@@ -89,6 +89,13 @@ values, variants and file names. `@freshcoat-js/workspace/export` runs them:
 and writes the outputs in plan order to a zip, or into one PDF, with a report
 of what succeeded or failed. Rendering goes through
 [`@freshcoat-js/coatfile`](../coatfile) and [`@freshcoat-js/engine`](../engine).
+
+`unknownFileNameTokens()` lists the `{{tokens}}` of a file name pattern that
+name no built-in, template field or dataset column; they export as empty text.
+`presetReadiness()` (from `/export`) says whether a preset can run: its
+template, the template's validation issues, the required fields no column
+fills, how the plan lands on sheets, and the first thing that blocks the
+export, with a short message and, for sheets, the whole reason.
 
 A binding fills each field from a column, a fixed value or a serial.
 `autoBinding()` matches fields to columns by key, then by title, and

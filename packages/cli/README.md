@@ -19,6 +19,11 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `--version` prints the version and `--help` works on the tool and on every
 command.
 
+A template is read the way Studio opens it: duplicate element ids are renamed
+rather than refused. `render`, `inspect`, `validate` and `pack` warn, naming the
+file, about the ids renamed, a `format_version` newer than this freshcoat reads,
+and assets whose key is not the hash of their bytes.
+
 Fonts fetched from the network, such as Google Fonts, are kept in a cache for
 30 days, so later runs work offline and start faster: `~/.cache/freshcoat` (or
 `$XDG_CACHE_HOME/freshcoat`), `~/Library/Caches/freshcoat` on macOS and
@@ -76,9 +81,11 @@ nothing outside it is read. An image field left empty is not reported.
 With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
 `.ods`, JSON or NDJSON file, and `--out` names a `.zip` of images and an
 `export-report.csv`, a `.pdf`, or a directory that gets the images and the
-report. The first row names the fields, matched by
-key or title ignoring case and punctuation; columns no field matches are
-reported and left out, and only the first sheet of a workbook is read. A photo
+report. The header row names the fields, matched by
+key or title ignoring case and punctuation; it is the first row with its first
+three cells filled, as in Studio's import, and the rows above it are skipped.
+Columns no field matches are reported and left out, and only the first sheet
+with rows of a workbook is read. A photo
 named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
@@ -159,7 +166,8 @@ warns about what Studio's Issues list shows, without failing:
 
 - a variant change that names a layer its side does not have, or changes
   nothing;
-- a top-level layer with an edge between the trim and the template's safe area;
+- a top-level layer with an edge between the trim and the template's safe area,
+  or for a `card_cr80` template with none, the printer's 3 mm;
 - a `format_version` newer than this freshcoat reads, or older than the fields
   the template uses.
 
@@ -197,7 +205,8 @@ freshcoat pack club.coatworkspace --template Badge.coat --out badge.coat
 ```
 
 Packages a template as Studio saves it: the `format_version` raised to the
-lowest that covers the fields it uses, assets nothing uses left out, and images
+lowest that covers the fields it uses, assets nothing uses left out, the result
+validated (an invalid one is refused, listing its issues), and images
 it names by a relative path read from its directory and embedded, so the
 package renders anywhere. An image that cannot be read keeps its path, with a
 warning. `--out` names a `.coat` or a `.coat.json`, which carries the assets
