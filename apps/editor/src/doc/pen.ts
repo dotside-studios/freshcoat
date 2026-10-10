@@ -50,6 +50,25 @@ export function dragPoint(
 }
 
 /**
+ * The first point dragged as the path closes. Alt shapes only the closing
+ * segment, mirroring the drag into the incoming handle.
+ */
+export function closePoint(
+	anchor: Point,
+	drag: Point,
+	prev: PenPoint | undefined,
+	breakHandles: boolean,
+): PenPoint {
+	if (!breakHandles) return smoothPoint(anchor, drag);
+	return {
+		x: anchor.x,
+		y: anchor.y,
+		...(prev?.out ? { out: prev.out } : {}),
+		in: { x: 2 * anchor.x - drag.x, y: 2 * anchor.y - drag.y },
+	};
+}
+
+/**
  * `p` pulled onto the nearest candidate line within `threshold`, with the
  * guides that show it. The anchors already placed are candidates too.
  */

@@ -35,7 +35,13 @@ import {
 } from "~/doc/geometry";
 import { duplicateElements } from "~/doc/ops";
 import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
-import { constrain45, dragPoint, type PenPath, snapPenPoint } from "~/doc/pen";
+import {
+	closePoint,
+	constrain45,
+	dragPoint,
+	type PenPath,
+	snapPenPoint,
+} from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import { type Tool, working } from "~/state/store";
 import { createDraftStore } from "./draft-store";
@@ -687,7 +693,7 @@ export function Viewport() {
 				if (!path || Math.hypot(p.x - g.start.x, p.y - g.start.y) < limit)
 					return;
 				const points = path.points.slice();
-				points[g.index] = dragPoint(
+				points[g.index] = (g.close ? closePoint : dragPoint)(
 					g.anchor,
 					e.shiftKey ? constrain45(g.anchor, world) : world,
 					points[g.index],

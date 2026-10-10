@@ -15,6 +15,7 @@ import { ShortcutsDialog } from "~/app/ShortcutsDialog";
 import { Viewport } from "~/canvas/Viewport";
 import { getElement } from "~/doc/path";
 import {
+	closePoint,
 	constrain45,
 	dragPoint,
 	PEN_STROKE,
@@ -125,6 +126,22 @@ describe("pen paths", () => {
 			y: 50,
 			out: drag,
 			in: { x: 40, y: 50 },
+		});
+	});
+
+	test("Alt while closing shapes only the incoming handle", () => {
+		const anchor = { x: 0, y: 0 };
+		const drag = { x: 10, y: 20 };
+		expect(closePoint(anchor, drag, anchor, false)).toEqual(
+			smoothPoint(anchor, drag),
+		);
+		expect(
+			closePoint(anchor, drag, { ...anchor, out: { x: 30, y: 0 } }, true),
+		).toEqual({ x: 0, y: 0, out: { x: 30, y: 0 }, in: { x: -10, y: -20 } });
+		expect(closePoint(anchor, drag, anchor, true)).toEqual({
+			x: 0,
+			y: 0,
+			in: { x: -10, y: -20 },
 		});
 	});
 
