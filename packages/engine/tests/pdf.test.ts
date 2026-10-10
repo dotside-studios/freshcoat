@@ -17,6 +17,7 @@ import {
 	createText,
 	type Node,
 } from "../src/node";
+import { paintPdf } from "../src/pdf/paint";
 import { createRenderer, type Renderer } from "../src/renderer";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
@@ -443,5 +444,86 @@ describe("renderPdf", () => {
 			]);
 			expect(at).toEqual([0, 0, 0]);
 		}
+	});
+
+	describe("layers drawn as images", () => {
+		const shadow = { color: "#0008", dx: 2, dy: 3, blur: 4 };
+		const png = () => {
+			const surface = ck.MakeSurface(4, 4);
+			surface.getCanvas().clear(ck.RED);
+			const image = surface.makeImageSnapshot();
+			const bytes = image.encodeToBytes(ck.ImageFormat.PNG, 100) as Uint8Array;
+			image.delete();
+			surface.delete();
+			return bytes;
+		};
+		const pictured = (src: string, x: number) =>
+			createImage({
+				pos: { x, y: 10 },
+				size: { width: 40, height: 40 },
+				src,
+				fit: "cover",
+				shadow,
+			});
+
+		test("covers only the area a layer touches", async () => {
+			const size = 1000;
+			const pdf = await renderer.renderPdf(
+				createFrame({
+					pos: { x: 0, y: 0 },
+					size: { width: size, height: size },
+					children: [
+						createRect({
+							pos: { x: 500, y: 500 },
+							size: { width: 40, height: 40 },
+							fills: [{ kind: "solid", color: "#e63946" }],
+							shadow,
+						}),
+					],
+				}),
+				{ width: size, height: size },
+			);
+			const body = source(pdf.bytes);
+			const edge = Number(/\/Width (\d+)/.exec(body)?.[1]);
+			expect(Number(/\/Height (\d+)/.exec(body)?.[1])).toBe(edge);
+			// 40 units plus the shadow's reach, at 8.192 pixels per unit.
+			expect(edge).toBeGreaterThan(40 * 8);
+			expect(edge).toBeLessThan(120 * 8);
+		});
+
+		test("decodes each image once across layers", async () => {
+			const bytes = new Map([
+				["a.png", png()],
+				["b.png", png()],
+			]);
+			const loads: string[] = [];
+			const commands = renderer.compile(
+				frame([
+					pictured("a.png", 0),
+					pictured("a.png", 60),
+					pictured("b.png", 120),
+					createRect({
+						pos: { x: 0, y: 70 },
+						size: { width: 40, height: 40 },
+						fills: [{ kind: "solid", color: "#00f" }],
+						shadow,
+					}),
+				]),
+				{ width: W, height: H },
+			);
+			const pdf = await paintPdf(ck, commands, {
+				resolveFont: () => {
+					throw new Error("no fonts in this scene");
+				},
+				loadBytes: async (src) => {
+					loads.push(src);
+					return bytes.get(src) as Uint8Array;
+				},
+			});
+			expect(pdf.warnings.filter((w) => w.kind !== "vector_rasterized")).toEqual([]);
+			// Once to embed it, once to decode it for every layer that draws it.
+			expect(loads.filter((src) => src === "a.png")).toHaveLength(2);
+			expect(loads.filter((src) => src === "b.png")).toHaveLength(2);
+		});
 	});
 });
