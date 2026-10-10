@@ -4632,6 +4632,10 @@ function warnSvgFeatures(
 			warnings.push({ kind: "svg_unsupported", src, feature });
 }
 
+// Where on the device the painted surface begins: the drawables are drawn
+// shifted back by it, so a surface smaller than the scene shows that part.
+export type PaintOrigin = { x: number; y: number };
+
 // The CanvasKit paint routine env.paint runs (CanvasKit is the only backend, so
 // there is no painter-strategy indirection): one compiled scene -> a live surface
 // + a PaintOutput. freshcoat paints a single scene here — a card's multiple sides
@@ -4642,10 +4646,6 @@ function warnSvgFeatures(
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
 // `fontProvider` holds every face in rt.fonts; a paint whose fonts all come
 // from there uses it rather than registering its own.
-// Where on the device the painted surface begins: the drawables are drawn
-// shifted back by it, so a surface smaller than the scene shows that part.
-export type PaintOrigin = { x: number; y: number };
-
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
