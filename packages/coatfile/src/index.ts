@@ -147,7 +147,12 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
-export { pruneUnusedAssets } from "./coat";
+export {
+	type SaveResult,
+	pruneUnusedAssets,
+	saveTemplate,
+	writableTemplate,
+} from "./coat";
 export {
 	type HealOptions,
 	healElementIds,

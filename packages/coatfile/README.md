@@ -304,6 +304,13 @@ const read = await decodeTemplate(bytes);          // or JSON text, or JSON byte
 if (read.ok) validate(healElementIds(read.document));
 ```
 
+`saveTemplate(template, "coat" | "json")` is the rule for writing a template out:
+`writableTemplate` (unused assets pruned, `format_version` raised to cover the
+fields used), `validate`, then `packTemplate` or `serializeTemplate`. It returns
+`{ ok: true, data }` or `{ ok: false, errors }`, a refused write (a newer minor)
+reported as an error on `/format_version`. `loadTemplate` is its counterpart for
+reading a file in.
+
 `packTemplate` re-keys every asset by the real hash of its bytes first
 (`rehashAssets`), because that hash becomes its entry name and `unpackTemplate`
 rejects an entry that does not match. Template JSON never had that check, so a

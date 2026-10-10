@@ -19,9 +19,11 @@ import {
 	isCoatPackage,
 	LEGACY_TKIT_MEDIA_TYPE,
 	packTemplate,
+	saveTemplate,
 	serializeTemplate,
 	templateStem,
 	unpackTemplate,
+	writableTemplate,
 } from "../src/coat";
 import { FORMAT_VERSION, formatVersionStatus } from "../src/format";
 import { templateJsonSchema } from "../src/json-schema";
@@ -289,6 +291,57 @@ describe("serializeTemplate", () => {
 		expect(() =>
 			serializeTemplate({ ...fixtures.minimalCard, format_version: "1.99" }),
 		).toThrow(CoatError);
+	});
+});
+
+describe("saveTemplate", () => {
+	test("writes a package and JSON that read back as the same template", async () => {
+		const template = fixtures.minimalCard;
+		const coat = await saveTemplate(template, "coat");
+		const json = saveTemplate(template, "json");
+		expect(coat.ok && json.ok).toBe(true);
+		if (!coat.ok || !json.ok) return;
+		const fromCoat = await decodeTemplate(coat.data);
+		const fromJson = await decodeTemplate(json.data);
+		expect(fromCoat.ok && fromCoat.document).toEqual(
+			fromJson.ok && fromJson.document,
+		);
+	});
+
+	test("prunes unused assets and raises format_version first", async () => {
+		const template = {
+			...(await withAssets()),
+			format_version: "1.0",
+			assets: [
+				...((await withAssets()).assets ?? []),
+				{ sha256: "unused", base64: "AAAA", contentType: "image/png" },
+			],
+		} as Template;
+		const written = writableTemplate(template);
+		expect(written.assets?.some((a) => a.sha256 === "unused")).toBe(false);
+		const json = saveTemplate(template, "json");
+		expect(json.ok && JSON.parse(json.data).assets).toHaveLength(2);
+	});
+
+	test("returns the errors of a template that does not validate", async () => {
+		const bad = { ...fixtures.minimalCard, width: -1 } as Template;
+		const coat = await saveTemplate(bad, "coat");
+		const json = saveTemplate(bad, "json");
+		expect(coat.ok).toBe(false);
+		expect(json.ok).toBe(false);
+		expect(!coat.ok && coat.errors.length).toBeGreaterThan(0);
+	});
+
+	test("maps a refused write to an error on /format_version", async () => {
+		const newer = { ...fixtures.minimalCard, format_version: "1.99" };
+		const coat = await saveTemplate(newer, "coat");
+		const json = saveTemplate(newer, "json");
+		for (const result of [coat, json]) {
+			expect(result.ok).toBe(false);
+			if (result.ok) continue;
+			expect(result.errors[0]?.path).toBe("/format_version");
+			expect(result.errors[0]?.code).toBe("newer_format_version");
+		}
 	});
 });
 
