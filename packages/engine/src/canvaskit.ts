@@ -95,6 +95,7 @@ import {
 	cachedMipmaps,
 	cachedPath,
 	cachedSurface,
+	cachedTile,
 	cachedWorkSurface,
 	closestBackground,
 	evictUnusedBitmaps,
@@ -1482,15 +1483,17 @@ function drawImage(
 	const paint = bin.track(new ck.Paint());
 	paint.setAntiAlias(true);
 	if (cmd.fit === "tile") {
-		const shader = bin.track(
+		const build = () =>
 			img.makeShaderOptions(
 				ck.TileMode.Repeat,
 				ck.TileMode.Repeat,
 				ck.FilterMode.Linear,
 				ck.MipmapMode.None,
-			),
+			);
+		paint.setShader(
+			(bin.cache && cachedTile(bin.cache, cmd.src, img, build)) ??
+				bin.track(build()),
 		);
-		paint.setShader(shader);
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), paint);
 	} else {
 		const r = fitRect(
@@ -1949,17 +1952,18 @@ function drawSvgPicture(
 	if (cmd.fit === "tile") {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
+		const build = () =>
+			img.svgPicture.makeShader(
+				ck.TileMode.Repeat,
+				ck.TileMode.Repeat,
+				ck.FilterMode.Linear,
+				// Typed as optional; CanvasKit also takes null.
+				null as unknown as InputMatrix,
+				ck.LTRBRect(0, 0, img.width, img.height),
+			);
 		paint.setShader(
-			bin.track(
-				img.svgPicture.makeShader(
-					ck.TileMode.Repeat,
-					ck.TileMode.Repeat,
-					ck.FilterMode.Linear,
-					// Typed as optional; CanvasKit also takes null.
-					null as unknown as InputMatrix,
-					ck.LTRBRect(0, 0, img.width, img.height),
-				),
-			),
+			(bin.cache && cachedTile(bin.cache, cmd.src, img, build)) ??
+				bin.track(build()),
 		);
 		canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), paint);
 		return;
@@ -4866,7 +4870,7 @@ async function paintSceneIn(
 				: ck.MakeImageFromEncoded(bytes);
 			if (img) {
 				imageMap.set(src, img);
-				if (cache) cache.images.set(src, { image: img, mipped: null });
+				if (cache) cache.images.set(src, { image: img, mipped: null, tile: null });
 				else bin.track(img);
 				warnSvgFeatures(warnings, src, img);
 			} else

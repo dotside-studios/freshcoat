@@ -5,6 +5,7 @@ import type {
 	Image,
 	Paragraph,
 	Path,
+	Shader,
 	ShapedLine as GlyphLine,
 	Surface,
 	TypefaceFontProvider,
@@ -38,10 +39,12 @@ export type ShapedLine = {
 };
 
 // A decoded image and, once a heavy downscale has asked for it, its mipmapped
-// copy, freed together.
+// copy and, once a tile fill has asked for it, its repeating shader, freed
+// together.
 export type CachedImage = {
 	image: Image | SvgPicture;
 	mipped: Image | null;
+	tile: Shader | null;
 };
 
 // The pixels a paint's leading run of drawables left on its render surface,
@@ -483,8 +486,22 @@ export function forgetImage(state: PaintCacheState, src: string): void {
 	);
 }
 
+// The repeating shader of a cached image, built on first use. null when `image`
+// is not the one cached under `src`.
+export function cachedTile(
+	state: PaintCacheState,
+	src: string,
+	image: Image | SvgPicture,
+	build: () => Shader,
+): Shader | null {
+	const entry = state.images.get(src);
+	if (!entry || entry.image !== image) return null;
+	return (entry.tile ??= build());
+}
+
 function freeImage(entry: CachedImage): void {
-	const { image, mipped } = entry;
+	const { image, mipped, tile } = entry;
+	if (tile) tryFree(() => tile.delete());
 	if (mipped) tryFree(() => mipped.delete());
 	tryFree(() => image.delete());
 }

@@ -7,7 +7,14 @@ import { compileScene } from "../src/compile-scene";
 import { deriveFontMetrics } from "../src/font-metrics";
 import { createSharedFontProvider } from "../src/font-collection";
 import { createPaintCache, type PaintCache } from "../src/index";
-import { createFrame, createRect, createText, type Node } from "../src/node";
+import { encodePng } from "../src/png";
+import {
+	createFrame,
+	createImage,
+	createRect,
+	createText,
+	type Node,
+} from "../src/node";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { Command, FrameFinish, ResolvedFont } from "../src/types";
@@ -352,5 +359,80 @@ describe("the CPU finish", () => {
 		} finally {
 			cache.dispose();
 		}
+	});
+});
+
+describe("tiled images", () => {
+	const SVG = new TextEncoder().encode(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="4" height="8" fill="#b42318"/></svg>',
+	);
+
+	async function tiles(src: string, bytes: Uint8Array) {
+		const tile = (x: number) =>
+			createImage({
+				pos: { x, y: 0 },
+				size: { width: 30, height: 30 },
+				src,
+				fit: "tile",
+			});
+		const commands = compile(
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: { width: 64, height: 32 },
+				children: [tile(0), tile(32)],
+			}),
+			64,
+			32,
+		);
+		const cache = createPaintCache();
+		const env = createHeadlessEnv({
+			fonts: geist,
+			images: new Map([[src, bytes]]),
+			cache,
+		});
+		try {
+			const frames: Uint8Array[] = [];
+			for (let i = 0; i < 3; i++) {
+				const out = await paintScene(ck, commands, env);
+				frames.push(out.readPixels?.()?.data as Uint8Array);
+				out.dispose();
+			}
+			expect(frames[1]).toEqual(frames[0]);
+			expect(frames[2]).toEqual(frames[0]);
+		} finally {
+			cache.dispose();
+		}
+	}
+
+	// Calls to `method` of `proto` while `run` goes.
+	async function countCalls(proto: any, method: string, run: () => Promise<void>) {
+		const real = proto[method];
+		let n = 0;
+		proto[method] = function (...args: unknown[]) {
+			n++;
+			return real.apply(this, args);
+		};
+		try {
+			await run();
+			return n;
+		} finally {
+			proto[method] = real;
+		}
+	}
+
+	test("build a raster's shader once for the cache", async () => {
+		const px = new Uint8Array(4 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : i * 9));
+		const png = await encodePng(px, 4, 4);
+		const made = await countCalls(ck.Image.prototype, "makeShaderOptions", () =>
+			tiles("img://tile.png", png),
+		);
+		expect(made).toBe(1);
+	});
+
+	test("build a picture's shader once for the cache", async () => {
+		const made = await countCalls(ck.Picture.prototype, "makeShader", () =>
+			tiles("img://tile.svg", SVG),
+		);
+		expect(made).toBe(1);
 	});
 });
