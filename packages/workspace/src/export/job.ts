@@ -69,8 +69,6 @@ export type JobItemResult = {
 	unfilled?: string[];
 	/** what the render warned about without failing */
 	warnings?: string[];
-	/** for vector PDF pages: "fallback" when the page is pixels */
-	vector?: "on" | "fallback";
 };
 
 export type JobStats = {
@@ -216,14 +214,10 @@ export function reportCsv(items: JobItemResult[]): string {
 /** What a rendered item's report says about printing. */
 function printResult(
 	out: RenderOutput,
-): Pick<
-	JobItemResult,
-	"print" | "printError" | "gamut" | "warnings" | "vector"
-> {
+): Pick<JobItemResult, "print" | "printError" | "gamut" | "warnings"> {
 	const gamut = gamutPercent(out.gamut);
 	return {
 		print: out.print ?? "off",
-		...(out.vector ? { vector: out.vector } : {}),
 		...(out.printError ? { printError: out.printError } : {}),
 		...(gamut > 0 ? { gamut } : {}),
 		...(out.warnings?.length ? { warnings: out.warnings } : {}),

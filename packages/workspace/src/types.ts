@@ -205,8 +205,8 @@ export type ExportPreset = {
 	size?: ExportSize;
 	/** JPEG and WebP quality, 0..100, default 90 */
 	quality?: number;
-	/** what a PDF page embeds, default png. vector draws each page as PDF
-	 *  vectors, and as a PNG one that uses what a PDF cannot draw */
+	/** what a PDF page embeds, default png. vector draws each card as PDF
+	 *  vectors, with any layer a PDF cannot express as an image */
 	pdfPageImage?: "png" | "jpeg" | "vector";
 	/** default download */
 	destination?: ExportDestination;

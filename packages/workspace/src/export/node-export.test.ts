@@ -288,21 +288,23 @@ describe("export from a workspace file in Node", () => {
 		expect(pdf.getPageCount()).toBe(2);
 	});
 
-	it("draws vector PDF pages, as pixels where a PDF falls short", async () => {
+	it("draws vector PDF pages with one copy of each font", async () => {
 		const out = join(dir, "badges-vector.pdf");
 		const vector: ExportPreset = {
 			...preset,
 			format: "pdf",
 			pdfPageImage: "vector",
 		};
-		const { result } = await exportFrom(
-			await packTo("logo.png"),
-			vector,
-			fileOutput(out),
-		);
-		expect(result.items.map((i) => [i.ok, i.vector])).toEqual([
-			[true, "on"],
-			[true, "on"],
+		const shadowed = fixture("logo.png");
+		const logoElement = shadowed.templates[0]?.template.template_data[0]
+			?.elements[2] as { shadow?: unknown };
+		logoElement.shadow = { color: "#0008", dx: 0, dy: 2, blur: 4 };
+		const file = join(dir, "shadowed.coatworkspace");
+		await writeFile(file, await (await packWorkspace(shadowed)).bytes());
+		const { result } = await exportFrom(file, vector, fileOutput(out));
+		expect(result.items.map((i) => [i.ok, i.warnings])).toEqual([
+			[true, undefined],
+			[true, undefined],
 		]);
 		const pdf = await PDFDocument.load(await readFile(out));
 		expect(pdf.getPageCount()).toBe(2);
@@ -318,25 +320,18 @@ describe("export from a workspace file in Node", () => {
 			form instanceof PDFRawStream &&
 				form.dict.get(PDFName.of("Subtype"))?.toString(),
 		).toBe("/Form");
-
-		const shadowed = fixture("logo.png");
-		const logoElement = shadowed.templates[0]?.template.template_data[0]
-			?.elements[2] as { shadow?: unknown };
-		logoElement.shadow = { color: "#0008", dx: 0, dy: 2, blur: 4 };
-		const file = join(dir, "shadowed.coatworkspace");
-		await writeFile(file, await (await packWorkspace(shadowed)).bytes());
-		const fallback = await exportFrom(
-			file,
-			vector,
-			fileOutput(join(dir, "shadowed.pdf")),
-		);
-		expect(fallback.result.items.map((i) => [i.ok, i.vector])).toEqual([
-			[true, "fallback"],
-			[true, "fallback"],
-		]);
-		expect(fallback.result.items[0]?.warnings).toContain(
-			"Drawn as pixels: PDF has no vector equivalent for shadow: logo",
-		);
+		const fontFiles = pdf.context
+			.enumerateIndirectObjects()
+			.filter(
+				([, obj]) =>
+					obj instanceof PDFDict &&
+					obj.get(PDFName.of("Type")) === PDFName.of("FontDescriptor"),
+			)
+			.map(([, obj]) =>
+				(obj as PDFDict).get(PDFName.of("FontFile2"))?.toString(),
+			);
+		expect(fontFiles).toHaveLength(2);
+		expect(new Set(fontFiles).size).toBe(1);
 	});
 
 	it("lists the characters the fonts can't draw when asked", async () => {

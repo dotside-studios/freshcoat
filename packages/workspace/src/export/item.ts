@@ -54,8 +54,8 @@ export type RenderRequest = {
 	quality?: number;
 	/** render through for-print's card-printer path */
 	print?: RenderPrint;
-	/** draw a one-page PDF of vectors, `dpi` design units to the inch, and
-	 *  `format` instead when the design uses what a PDF cannot draw */
+	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
+	 *  place of `format` */
 	vector?: { dpi: number };
 };
 
@@ -77,20 +77,19 @@ export type RenderOutput = {
 	gamut?: GamutNote[];
 	/** the render's other warnings, described, each once */
 	warnings?: string[];
-	/** set when the request asked for vectors: "fallback" when the bytes are
-	 *  pixels because the design uses what a PDF cannot draw */
-	vector?: "on" | "fallback";
 };
 
 /** The warnings an item reports but still renders with: all but a refused
- *  barcode, which fails it, gamut notes, which `gamut` carries, and an image
- *  with no source, which is an unfilled field. */
+ *  barcode, which fails it, gamut notes, which `gamut` carries, a PDF layer
+ *  drawn as an image, which prints as rendered, and an image with no source,
+ *  which is an unfilled field. */
 function noted(warnings: readonly FrameWarning[]): string[] {
 	const out = new Set<string>();
 	for (const w of warnings)
 		if (
 			w.kind !== "barcode_invalid" &&
 			w.kind !== "gamut_compressed" &&
+			w.kind !== "vector_rasterized" &&
 			!(w.kind === "image_load_failed" && w.src === "")
 		)
 			out.add(describeWarning(w));
@@ -335,7 +334,6 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(req.bleed ? { bleed: true } : {}),
 				frameNames: [req.side],
 			});
-			let drawnAsPixels: string[] = [];
 			if (req.vector) {
 				const [page] = await renderCompiledPdf(renderer, compiled, {
 					frameNames: [req.side],
@@ -345,21 +343,15 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				if (!page) throw new Error("nothing was rendered");
 				for (const w of page.warnings)
 					if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
-				drawnAsPixels = page.warnings
-					.filter((w) => w.kind === "vector_unsupported")
-					.map((w) => `Drawn as pixels: ${describeWarning(w)}`);
-				if (drawnAsPixels.length === 0) {
-					const warnings = noted(page.warnings);
-					return {
-						bytes: page.bytes,
-						crc: crc32(page.bytes),
-						format: "pdf",
-						...exportPixelSize(compiled, req.scale),
-						ms: performance.now() - started,
-						vector: "on",
-						...(warnings.length > 0 ? { warnings } : {}),
-					};
-				}
+				const warnings = noted(page.warnings);
+				return {
+					bytes: page.bytes,
+					crc: crc32(page.bytes),
+					format: "pdf",
+					...exportPixelSize(compiled, req.scale),
+					ms: performance.now() - started,
+					...(warnings.length > 0 ? { warnings } : {}),
+				};
 			}
 			const painted = await withPrintFallback(req.print, async (print) => {
 				const [result] = await renderCompiled(renderer, compiled, {
@@ -389,7 +381,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			for (const w of result.warnings)
 				if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
-			const warnings = [...drawnAsPixels, ...noted(result.warnings)];
+			const warnings = noted(result.warnings);
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),
@@ -401,7 +393,6 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				...(painted.error ? { printError: painted.error } : {}),
 				...(gamut.length > 0 ? { gamut } : {}),
 				...(warnings.length > 0 ? { warnings } : {}),
-				...(req.vector ? { vector: "fallback" as const } : {}),
 			};
 		},
 		setFonts(next) {

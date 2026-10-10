@@ -6,6 +6,7 @@ import {
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
 import { rgbIdat } from "@freshcoat-js/engine/image";
+import { crc32 } from "./crc";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
@@ -141,6 +142,7 @@ export async function assemblePdf(
 				});
 			}
 		}
+		shareFontFiles(lib, doc);
 		return doc.save();
 	}
 	for (const page of pages) {
@@ -162,7 +164,45 @@ export async function assemblePdf(
 			);
 		}
 	}
+	shareFontFiles(lib, doc);
 	return doc.save();
+}
+
+/** Points every font descriptor at one copy of each embedded font file and
+ *  drops the others: each vector page carries the whole files it uses. */
+function shareFontFiles(lib: PdfLib, doc: PDFDocument) {
+	const { PDFDict, PDFName, PDFRawStream, PDFRef } = lib;
+	const type = PDFName.of("Type");
+	const descriptor = PDFName.of("FontDescriptor");
+	const seen = new Map<string, Array<{ ref: PDFRef; bytes: Uint8Array }>>();
+	for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+		if (!(obj instanceof PDFDict) || obj.get(type) !== descriptor) continue;
+		for (const key of ["FontFile2", "FontFile3"].map((k) => PDFName.of(k))) {
+			const ref = obj.get(key);
+			if (!(ref instanceof PDFRef)) continue;
+			const file = doc.context.lookup(ref);
+			if (!(file instanceof PDFRawStream)) continue;
+			const bytes = file.getContents();
+			const hash = `${key.asString()}:${bytes.length}:${crc32(bytes)}`;
+			const same = seen.get(hash) ?? [];
+			const first = same.find(
+				(s) => s.ref === ref || sameBytes(s.bytes, bytes),
+			);
+			if (!first) {
+				seen.set(hash, [...same, { ref, bytes }]);
+				continue;
+			}
+			if (first.ref === ref) continue;
+			obj.set(key, first.ref);
+			doc.context.delete(ref);
+		}
+	}
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
 }
 
 function trimOf(
