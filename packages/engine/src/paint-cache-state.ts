@@ -50,6 +50,9 @@ export type CachedFinishNoise = {
 	noise: Float32Array;
 };
 
+// A bitmap command's pixels uploaded as an image, kept while a paint draws it.
+type CachedBitmap = { image: Image; width: number; height: number };
+
 type CachedSurface = {
 	surface: Surface;
 	canvas: CanvasLike;
@@ -88,6 +91,8 @@ export type PaintCacheState = {
 	linesUsed: Set<string>;
 	paths: Map<string, Path>;
 	pathsUsed: Set<string>;
+	bitmaps: Map<Uint8Array, CachedBitmap>;
+	bitmapsUsed: Set<Uint8Array>;
 	luts: LutImages;
 	surface: CachedSurface | null;
 	workUsed: Set<string>;
@@ -126,6 +131,8 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 		linesUsed: new Set(),
 		paths: new Map(),
 		pathsUsed: new Set(),
+		bitmaps: new Map(),
+		bitmapsUsed: new Set(),
 		luts: createLutImages(),
 		surface: null,
 		workUsed: new Set(),
@@ -137,6 +144,7 @@ export function newPaintCache(opts?: PaintCacheOptions): PaintCache {
 	const clear = () => {
 		freeLines(state);
 		freePaths(state);
+		freeBitmaps(state);
 		const fonts = state.fonts;
 		state.fonts = null;
 		if (fonts) tryFree(() => fonts.fonts.release());
@@ -510,6 +518,43 @@ export function evictUnusedPaths(state: PaintCacheState): void {
 		tryFree(() => path.delete());
 	}
 	state.pathsUsed.clear();
+}
+
+// The image of a bitmap's pixels, uploaded once per pixel array and size and
+// reused by every paint that draws it. Callers must not delete it.
+export function cachedBitmap(
+	state: PaintCacheState,
+	pixels: Uint8Array,
+	width: number,
+	height: number,
+	build: () => Image | null,
+): Image | null {
+	state.bitmapsUsed.add(pixels);
+	const hit = state.bitmaps.get(pixels);
+	if (hit && hit.width === width && hit.height === height) return hit.image;
+	if (hit) {
+		state.bitmaps.delete(pixels);
+		tryFree(() => hit.image.delete());
+	}
+	const image = build();
+	if (image) state.bitmaps.set(pixels, { image, width, height });
+	return image;
+}
+
+export function evictUnusedBitmaps(state: PaintCacheState): void {
+	for (const [pixels, bitmap] of state.bitmaps) {
+		if (state.bitmapsUsed.has(pixels)) continue;
+		state.bitmaps.delete(pixels);
+		tryFree(() => bitmap.image.delete());
+	}
+	state.bitmapsUsed.clear();
+}
+
+function freeBitmaps(state: PaintCacheState): void {
+	for (const bitmap of state.bitmaps.values())
+		tryFree(() => bitmap.image.delete());
+	state.bitmaps.clear();
+	state.bitmapsUsed.clear();
 }
 
 function freePaths(state: PaintCacheState): void {

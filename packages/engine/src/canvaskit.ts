@@ -87,6 +87,7 @@ import {
 	backgroundFits,
 	cacheBackground,
 	cacheFinishNoise,
+	cachedBitmap,
 	cachedFontProvider,
 	cachedLine,
 	cachedMipmaps,
@@ -94,6 +95,7 @@ import {
 	cachedSurface,
 	cachedWorkSurface,
 	closestBackground,
+	evictUnusedBitmaps,
 	evictUnusedImages,
 	evictUnusedLines,
 	evictUnusedPaths,
@@ -1564,13 +1566,11 @@ function drawBitmap(
 ) {
 	const { pos, size, pixels, pixelWidth, pixelHeight } = cmd;
 	if (pixelWidth <= 0 || pixelHeight <= 0) return;
-	const img = makeImageFromPixels(
-		ck,
-		"pixels",
-		pixelWidth,
-		pixelHeight,
-		pixels,
-	);
+	const upload = () =>
+		makeImageFromPixels(ck, "pixels", pixelWidth, pixelHeight, pixels);
+	const img = bin.cache
+		? cachedBitmap(bin.cache, pixels, pixelWidth, pixelHeight, upload)
+		: bin.track(upload());
 	if (!img) return;
 	canvas.save();
 	if (cmd.clip) clipShape(ck, canvas, bin, cmd.clip, pos, size);
@@ -1601,7 +1601,6 @@ function drawBitmap(
 			paint,
 		);
 	}
-	img.delete();
 	canvas.restore();
 }
 
@@ -4954,6 +4953,7 @@ async function paintSceneIn(
 			evictUnusedImages(cache, images);
 			evictUnusedLines(cache);
 			evictUnusedPaths(cache);
+			evictUnusedBitmaps(cache);
 			evictUnusedWork(cache);
 			evictUnusedLutImages(cache.luts);
 		}

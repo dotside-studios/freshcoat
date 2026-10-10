@@ -8,6 +8,7 @@ import { clearFontBytesCache } from "../src/font-bytes";
 import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
+	createBitmap,
 	createFrame,
 	createGroup,
 	createImage,
@@ -608,6 +609,68 @@ describe("PaintCache", () => {
 		const at = (x: number) => px.data[(14 * px.width + x) * 4 + 3];
 		expect(at(14)).toBe(255);
 		expect(at(38)).toBe(0);
+		cache.dispose();
+	});
+
+	function bitmapScene(modules: Uint8Array[]): Node {
+		return createFrame({
+			pos: { x: 0, y: 0 },
+			size: SIZE,
+			children: modules.map((pixels, i) =>
+				createBitmap({
+					pos: { x: 4 + i * 30, y: 4 },
+					size: { width: 24, height: 24 },
+					pixels,
+					pixelWidth: 2,
+					pixelHeight: 2,
+					role: "barcode",
+				}),
+			),
+		});
+	}
+
+	test("a bitmap is uploaded once across paints", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const bits = new Uint8Array([
+			0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255,
+		]);
+		const commands = compile(bitmapScene([bits]), SIZE, fonts);
+		const plain = await pixels(commands, runtime(fonts, new Map()).rt);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		const spy = vi.spyOn(ck, "MakeImage");
+		try {
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(await pixels(commands, rt)).toEqual(plain);
+			expect(spy).toHaveBeenCalledTimes(1);
+		} finally {
+			spy.mockRestore();
+		}
+		expect(paintCacheState(cache).bitmaps.size).toBe(1);
+		cache.dispose();
+	});
+
+	test("a bitmap dropped from the scene is deleted and uploaded again", async () => {
+		await initCk();
+		const fonts = new Map<string, Uint8Array[]>();
+		const a = new Uint8Array(16).fill(255);
+		const b = new Uint8Array(16).fill(128);
+		const cache = createPaintCache();
+		const { rt } = runtime(fonts, new Map(), cache);
+		await pixels(compile(bitmapScene([a, b]), SIZE, fonts), rt);
+		const state = paintCacheState(cache);
+		expect([...state.bitmaps.keys()]).toEqual([a, b]);
+		const dropped = state.bitmaps.get(b)?.image as Image;
+		const del = vi.spyOn(dropped, "delete");
+		await pixels(compile(bitmapScene([a]), SIZE, fonts), rt);
+		expect([...state.bitmaps.keys()]).toEqual([a]);
+		expect(del).toHaveBeenCalledTimes(1);
+		const kept = state.bitmaps.get(a)?.image as Image;
+		const keptDel = vi.spyOn(kept, "delete");
+		cache.clear();
+		expect(keptDel).toHaveBeenCalledTimes(1);
+		expect(state.bitmaps.size).toBe(0);
 		cache.dispose();
 	});
 
