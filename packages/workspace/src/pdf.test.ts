@@ -1,4 +1,10 @@
-import { jpegHeader } from "@freshcoat-js/test-utils";
+import {
+	createFrame,
+	createRenderer,
+	createText,
+} from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/node";
+import { jpegHeader, testFontBytes } from "@freshcoat-js/test-utils";
 import {
 	decodePDFRawStream,
 	PDFArray,
@@ -398,5 +404,96 @@ describe("assemblePdf on sheets", () => {
 		const [m] = placements(doc.getPage(0));
 		expect(m?.[4]).toBe(0);
 		expect(m?.[5]).toBe(0);
+	});
+});
+
+describe("assemblePdf with font subsets", () => {
+	const text = (family: string, value: string) =>
+		createFrame({
+			pos: { x: 0, y: 0 },
+			size: { width: 300, height: 60 },
+			children: [
+				createText({
+					pos: { x: 8, y: 8 },
+					size: { width: 284, height: 40 },
+					text: value,
+					font: {
+						family,
+						weight: 400,
+						style: "normal",
+						size: 22,
+						lineHeight: 1.2,
+					},
+					color: "#1d3557",
+				}),
+			],
+		});
+
+	const page = (bytes: Uint8Array): PdfPage => ({
+		bytes,
+		format: "pdf",
+		widthPx: 300,
+		heightPx: 60,
+	});
+
+	const fontFiles = async (bytes: Uint8Array) => {
+		const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+		const dicts = doc.context
+			.enumerateIndirectObjects()
+			.map(([, obj]) => obj)
+			.filter((obj): obj is PDFDict => obj instanceof PDFDict);
+		const names = (key: string) =>
+			dicts
+				.map((d) => d.get(PDFName.of(key))?.toString())
+				.filter((n) => n !== undefined);
+		return {
+			files: names("FontFile2"),
+			fontNames: names("FontName"),
+			baseFonts: names("BaseFont"),
+		};
+	};
+
+	it("keeps subsets of different fonts that share a name apart", async () => {
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			fonts: {
+				Geist: [testFontBytes("Geist-Regular.ttf")],
+				Hebrew: [testFontBytes("NotoSansHebrew-Regular.ttf")],
+			},
+		});
+		const draw = async (family: string, value: string) => {
+			const size = { width: 300, height: 60 };
+			return (await renderer.renderPdf(text(family, value), size)).bytes;
+		};
+		const [fresh, coat, hebrew] = [
+			await draw("Geist", "Fresh"),
+			await draw("Geist", "coat"),
+			await draw("Hebrew", "שלום"),
+		];
+		renderer.dispose();
+		const doc = await PDFDocument.load(hebrew);
+		const clash = PDFName.of("QQQQQQ+Geist-F0");
+		for (const [, obj] of doc.context.enumerateIndirectObjects())
+			if (obj instanceof PDFDict)
+				for (const key of ["FontName", "BaseFont"])
+					if (obj.has(PDFName.of(key))) obj.set(PDFName.of(key), clash);
+		const renamed = await doc.save();
+		const out = await assemblePdf(
+			[page(fresh), page(coat), page(renamed)],
+			{ dpi: 300 },
+		);
+		const separate = await assemblePdf([page(fresh), page(renamed)], {
+			dpi: 300,
+		});
+		const { files, fontNames, baseFonts } = await fontFiles(out);
+		expect(files).toHaveLength(3);
+		expect(new Set(files).size).toBe(2);
+		expect(new Set(fontNames).size).toBe(2);
+		expect(fontNames).toContain(clash.toString());
+		expect(new Set(baseFonts)).toEqual(new Set(fontNames));
+		expect((await fontFiles(separate)).files).toHaveLength(2);
+		expect(out.length).toBeLessThan(
+			fresh.length + coat.length + renamed.length,
+		);
 	});
 });
