@@ -221,7 +221,9 @@ the records, and **Export** turns templates and records into files.
   - Operands are layers: double-click a selected boolean, or Ctrl or Cmd
     click it, to select the shape under the pointer (Enter selects them all),
     then move, resize, rotate, restyle, hide or delete it. An operand paints
-    nothing of its own, and a hidden one leaves the result. Deleting the last operand
+    nothing of its own, and a hidden one leaves the result. Other layers snap
+    to the boolean's box, not to its operands, which snap only to each other
+    while one of them moves. Deleting the last operand
     deletes the boolean. A boolean's file keeps its last result as the
     layer's path, so a reader that doesn't combine shapes draws the same.
   - Gradient handles on the selected layer: a linear gradient's endpoints, a

@@ -505,6 +505,29 @@ describe("snapping", () => {
 		expect(c.y.map((l) => l.value)).toContain(20);
 	});
 
+	test("an operand offers lines to layers moving inside its boolean only", () => {
+		const b = booleanDoc();
+		const bg = geometryOf(b);
+		const board = { width: b.width, height: b.height };
+		const none = new Set<string>();
+		const noGuides = { x: [], y: [] };
+		const dot = layerBounds("0/7/1", bg);
+		const shape = layerBounds("0/7", bg);
+		if (!dot || !shape) throw new Error("no geometry");
+		const xs = (moving: string[]) =>
+			snapCandidates(bg, board, moving, none, noGuides, b).x.map(
+				(l) => l.value,
+			);
+		const dotEdge = dot.x + dot.width / 2;
+
+		expect(xs(["0/0"])).toContain(shape.x + shape.width);
+		expect(xs(["0/0"])).not.toContain(dotEdge);
+		expect(xs(["0/7/0"])).toContain(dotEdge);
+		expect(
+			snapCandidates(bg, board, ["0/0"], none, noGuides).x.map((l) => l.value),
+		).toContain(dotEdge);
+	});
+
 	test("the mask source offers no lines, and hiding a parent hides its children", () => {
 		const c = snapCandidates(g, artboard, [], new Set(["0/3"]));
 		const xs = c.x.map((l) => l.value);

@@ -361,7 +361,7 @@ export function Viewport() {
 		const { geometry, hidden, view: v } = controller.state;
 		return snapPenPoint(
 			world,
-			snapCandidates(geometry, t, [], hidden, controller.sideGuides()),
+			snapCandidates(geometry, t, [], hidden, controller.sideGuides(), t),
 			path?.points ?? [],
 			SNAP_PX / v.zoom,
 		);
@@ -538,6 +538,7 @@ export function Viewport() {
 			keys,
 			state.hidden,
 			controller.sideGuides(),
+			t,
 		);
 		const rects = new Map<string, Rect>();
 		for (const k of keys) {
@@ -841,6 +842,7 @@ export function Viewport() {
 				keys,
 				state.hidden,
 				controller.sideGuides(),
+				t,
 			),
 		};
 	};
