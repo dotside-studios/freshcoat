@@ -204,6 +204,7 @@ export function pressPath(
 			[target.key],
 			state.hidden,
 			controller.sideGuides(),
+			base,
 		),
 	};
 }

@@ -20,12 +20,17 @@ export function maskRuns(
 	return runs;
 }
 
-// The element arrays nested inside one: a frame's children, and a mask's shape
-// and the content it masks. The shape is still an array until finalizeMasks.
+// The element arrays nested inside one: a frame's children, a mask's shape
+// and the content it masks, and a boolean vector's operands. The shape is still
+// an array until finalizeMasks.
 export function nestedElementArrays(el: Record<string, unknown>): unknown[][] {
 	const props = el.properties as
-		| { children?: unknown; mask?: unknown }
+		| { children?: unknown; mask?: unknown; boolean?: { operands?: unknown } }
 		| undefined;
+	if (el.type === "vector")
+		return Array.isArray(props?.boolean?.operands)
+			? [props.boolean.operands]
+			: [];
 	if (el.type !== "frame" && el.type !== "mask") return [];
 	const out: unknown[][] = [];
 	if (el.type === "mask" && props?.mask)
@@ -106,15 +111,7 @@ export function dropUnfilledSlots(elements: unknown[]): unknown[] {
 export function uniquifyElementIdsDeep(elements: unknown[]): unknown[] {
 	return uniquifyIdsDeep(elements as { id: string }[], {
 		inPlace: true,
-		nested: (el) => {
-			const operands = (
-				el.properties as { boolean?: { operands?: unknown[] } } | undefined
-			)?.boolean?.operands;
-			return (
-				el.type === "vector" && operands
-					? [operands]
-					: nestedElementArrays(el as Record<string, unknown>)
-			) as { id: string }[][];
-		},
+		nested: (el) =>
+			nestedElementArrays(el as Record<string, unknown>) as { id: string }[][],
 	});
 }

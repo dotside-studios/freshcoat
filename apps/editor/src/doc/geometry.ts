@@ -11,6 +11,7 @@ import {
 	isAncestor,
 	isBackgroundPath,
 	isBooleanVector,
+	isOperand,
 	keyOf,
 	MASK_SOURCE,
 	parentKeyOf,
@@ -574,7 +575,9 @@ export type SnapResult = { dx: number; dy: number; guides: Guide[] };
  * The artboard's edges and centre lines, the side's ruler guides, plus the
  * edges and centres of every layer that is not moving, not inside a moving
  * layer, not hidden and not a mask source. Rotated layers offer their painted
- * bounds.
+ * bounds. With `template`, an operand of a boolean offers lines only to a
+ * layer moving inside the same boolean: operands paint nothing, so the
+ * boolean's own box is what other layers snap to.
  */
 export function snapCandidates(
 	geometry: LayerGeometry,
@@ -582,8 +585,10 @@ export function snapCandidates(
 	moving: Iterable<string>,
 	hidden: ReadonlySet<string> = new Set(),
 	guides: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] },
+	template?: Template,
 ): SnapCandidates {
 	const movingKeys = [...moving];
+	const movingParents = new Set(movingKeys.map(parentKeyOf));
 	const hiddenKeys = [...hidden];
 	const W = artboard.width;
 	const H = artboard.height;
@@ -596,6 +601,12 @@ export function snapCandidates(
 		if (!p || isBackgroundPath(p) || p.path.includes(MASK_SOURCE)) continue;
 		const excluded = (k: string) => k === key || isAncestor(k, key);
 		if (movingKeys.some(excluded) || hiddenKeys.some(excluded)) continue;
+		if (
+			template &&
+			isOperand(template, key) &&
+			!movingParents.has(parentKeyOf(key))
+		)
+			continue;
 		const b = layerBounds(key, geometry);
 		if (!b) continue;
 		for (const value of [b.x, b.x + b.width / 2, b.x + b.width])

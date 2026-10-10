@@ -1,4 +1,5 @@
 import {
+	applyBooleans,
 	type BooleanOperandElement,
 	cachePathOp,
 	childElements,
@@ -69,6 +70,20 @@ export function combineShapes(
 	const operands = elements.map(operandOf);
 	if (operands.some((o) => !o)) return null;
 	return combineOperands(ck, operands as BooleanOperand[], op);
+}
+
+const resolved = new WeakMap<Element, Element>();
+
+/** `el` with the result of its boolean rebuilt from its operands by `pathOp`,
+ *  as compile draws it. Under a variant the cached path is the base's. */
+export function resolveBoolean(el: Element, pathOp: PathOp): Element {
+	if (!isBooleanVector(el)) return el;
+	let out = resolved.get(el);
+	if (!out) {
+		out = applyBooleans([el], pathOp)[0] as Element;
+		resolved.set(el, out);
+	}
+	return out;
 }
 
 const boxedOps = new WeakMap<CanvasKit, PathOp>();

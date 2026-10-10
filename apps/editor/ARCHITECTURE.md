@@ -79,7 +79,9 @@ the operands that are shown. The vector's `d` and box are only a cache, and
 `controller.edit` and `previewTx` rebuild them (`settleBooleans` in
 `src/doc/boolean.ts`) for each boolean the edit changed, moving the operands
 so they stay put. An edit scoped to a variant skips it, since the variant is
-drawn from its operands.
+drawn from its operands. With the opt-in preview worker the main thread may
+not have CanvasKit yet: the controller then loads it, rebuilds the caches the
+edit left, and saving, autosave and exporting templates wait for that.
 
 Variants are edited through a **working template**: the base with the active
 variant applied (`working(state)` in `state/store.ts`), ids unchanged, so a

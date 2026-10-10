@@ -206,9 +206,67 @@ export function uniquifyElementIds<T extends { id: string }>(
 export type HealOptions = {
 	/** Also rename ids repeated anywhere in a side's tree, the background
 	 *  included. Default false: `validate` only refuses repeats among a side's
-	 *  top-level elements, and healing renames no more than it must. */
+	 *  top-level elements and those of boolean operands, and healing renames
+	 *  no more than it must. */
 	deep?: boolean;
 } & Omit<FreeIdOptions, "from">;
+
+function collectIds(els: readonly Node[], used: Set<string>): void {
+	for (const el of els) {
+		used.add(el.id);
+		if (el.type !== "vector") for (const list of nestedOf(el)) collectIds(list, used);
+	}
+}
+
+// Gives each boolean operand an id no other element on its side has. The
+// elements that are not operands keep theirs.
+function healOperandIds<T extends { id: string }>(
+	elements: readonly T[],
+	options: HealOptions,
+): T[] {
+	const used = new Set<string>();
+	collectIds(elements, used);
+	const visit = <E extends Node>(el: E): E => {
+		const props = el.properties as Nested | undefined;
+		if (!props) return el;
+		if (el.type === "vector") {
+			const operation = props.boolean;
+			if (!Array.isArray(operation?.operands)) return el;
+			const before = operation.operands as Node[];
+			const operands = uniquifyElementIdsDeep(before, {
+				...options,
+				deep: true,
+				used,
+			});
+			return operands.every((o, i) => o === before[i])
+				? el
+				: {
+						...el,
+						properties: { ...props, boolean: { ...operation, operands } },
+					};
+		}
+		if (el.type !== "frame" && el.type !== "mask") return el;
+		const mask =
+			el.type === "mask" && props.mask && typeof props.mask === "object"
+				? visit(props.mask as Node)
+				: props.mask;
+		const before = Array.isArray(props.children)
+			? (props.children as Node[])
+			: undefined;
+		const children = before?.map(visit);
+		if (mask === props.mask && (children ?? []).every((c, i) => c === before?.[i]))
+			return el;
+		return {
+			...el,
+			properties: {
+				...props,
+				...(children ? { children } : {}),
+				...(mask !== undefined ? { mask } : {}),
+			},
+		};
+	};
+	return elements.map(visit as (el: T) => T);
+}
 
 // Whole-template form of the above, run over a template on the way in.
 // Idempotent, so it is safe on already-clean input.
@@ -230,9 +288,10 @@ export function healElementIds<T>(template: T, options: HealOptions = {}): T {
 				deep,
 				used,
 			});
-			return elements.every((el, i) => el === before[i])
+			const healed = deep ? elements : healOperandIds(elements, options);
+			return healed.every((el, i) => el === before[i])
 				? frame
-				: { ...f, elements };
+				: { ...f, elements: healed };
 		}),
 	} as T;
 }

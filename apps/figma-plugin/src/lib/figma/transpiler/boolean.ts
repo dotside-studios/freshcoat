@@ -31,8 +31,14 @@ export type LiveBoolean = {
 	operands: Operand[];
 };
 
-/** A boolean operation kept live, or why it could not be. */
-export type BooleanResult = { boolean: LiveBoolean } | { blocker: string };
+/** A boolean operand and the Figma layer it came from. */
+export type OperandNode = { node: FigmaNode; operand: Operand };
+
+/** A boolean operation kept live, with every operand at any depth beside its
+ *  layer, or why it could not be. */
+export type BooleanResult =
+	| { boolean: LiveBoolean; operands: OperandNode[] }
+	| { blocker: string };
 
 type Placement = Pick<Operand, "pos" | "size" | "rotation">;
 
@@ -124,6 +130,7 @@ function operandOf(
 	parent: FigmaVectorNode,
 	child: FigmaNode,
 	scale: number,
+	nested: OperandNode[],
 ): Operand | string {
 	const label = `"${child.name}"`;
 	if (child.isMask) return `${label} is a mask`;
@@ -151,14 +158,15 @@ function operandOf(
 	}
 	const path = pathOf(child, scale);
 	if (!path) return `${label} has no fill region`;
-	const nested =
+	const inner =
 		child.type === "BOOLEAN_OPERATION" ? liveBoolean(child, scale) : undefined;
-	if (nested && "blocker" in nested) return nested.blocker;
+	if (inner && "blocker" in inner) return inner.blocker;
+	if (inner) nested.push(...inner.operands);
 	return {
 		id: idOf(child),
 		type: "vector",
 		...placed,
-		properties: { ...path, ...(nested ? { boolean: nested.boolean } : {}) },
+		properties: { ...path, ...(inner ? { boolean: inner.boolean } : {}) },
 	};
 }
 
@@ -173,12 +181,17 @@ export function liveBoolean(
 ): BooleanResult | null {
 	if (!node.booleanOperation || !node.children) return null;
 	const operands: Operand[] = [];
+	const nodes: OperandNode[] = [];
 	for (const child of node.children) {
 		if (child.visible === false) continue;
-		const operand = operandOf(node, child, scale);
+		const operand = operandOf(node, child, scale, nodes);
 		if (typeof operand === "string") return { blocker: operand };
 		operands.push(operand);
+		nodes.push({ node: child, operand });
 	}
 	if (operands.length === 0) return { blocker: "it has no visible children" };
-	return { boolean: { op: OPS[node.booleanOperation], operands } };
+	return {
+		boolean: { op: OPS[node.booleanOperation], operands },
+		operands: nodes,
+	};
 }

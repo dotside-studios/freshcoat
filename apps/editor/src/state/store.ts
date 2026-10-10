@@ -208,6 +208,7 @@ export type Action =
 			preview?: boolean;
 			mergeKey?: string;
 	  }
+	| { type: "settled"; from: Template; next: Template }
 	| { type: "txEnd" }
 	| { type: "validate" }
 	| { type: "txCancel" }
@@ -461,6 +462,10 @@ function reduceAction(state: EditorState, action: Action): EditorState {
 				action.preview
 					? preview(h, h.present, action.guides)
 					: commitGuides(h, action.guides, { mergeKey: action.mergeKey }),
+			);
+		case "settled":
+			return withHistory(state, (h) =>
+				h.present === action.from ? { ...h, present: action.next } : h,
 			);
 		case "txEnd":
 			return withHistory(state, end, { validate: true });
