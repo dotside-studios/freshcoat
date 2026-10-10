@@ -117,22 +117,41 @@ glyphs for, and exits 1 when an item fails.
 
 ```sh
 freshcoat validate card.coat
+freshcoat validate club.coatworkspace --strict
 ```
 
-Prints `card.coat is valid`, or lists each issue on stderr and exits 1.
-`validate` and `inspect` take templates; a `.coatworkspace` is refused.
+Prints `card.coat is valid`, or lists each issue on stderr and exits 1. It also
+warns about what Studio's Issues list shows, without failing:
+
+- a variant change that names a layer its side does not have, or changes
+  nothing;
+- a top-level layer with an edge between the trim and the template's safe area;
+- a `format_version` newer than this freshcoat reads, or older than the fields
+  the template uses.
+
+A `.coatworkspace` is checked as a whole: each template as above, a binding to
+a dataset the workspace does not have, a preset whose template is missing or
+whose sheets the cards do not fit, and, as a warning, required fields no column
+fills. `--strict` exits 1 on warnings too.
 
 ### inspect
 
 ```sh
 freshcoat inspect card.coat
-freshcoat inspect card.coat --json
+freshcoat inspect club.coatworkspace --json
 ```
 
 Lists the frames and their sizes, the fields with their type, requirement and
 default, the variants, and the font families the template uses, with whether it
 declares each. `--json` prints the same as one object with `frames`, `fields`,
 `variants` and `fonts` arrays.
+
+For a `.coatworkspace` it lists each template with its size, frames, variants,
+the dataset it is bound to and the required fields no column fills; each
+dataset with its records by status and its columns; and each preset with its
+template, format, record filter, how many items it exports and, on sheets, how
+they lay out or why they cannot. `--json` prints `templates`, `datasets` and
+`presets` arrays, each template with its own inspection as above.
 
 ## From code
 

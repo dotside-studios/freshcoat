@@ -169,19 +169,22 @@ function program(io: Io) {
 		});
 
 	command("validate")
-		.summary("check a template against the format")
+		.summary("check a template or workspace")
 		.description(
-			"Check a template against the format. Exits 0 when it is valid and 1 when it\nis not, listing each issue. --quiet prints nothing when it is valid.",
+			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, and a format\nversion that does not match the fields in use; for a workspace also required\nfields no column fills. --quiet prints nothing when it is valid.",
 		)
-		.argument("<template>", "a .coat file or template JSON")
-		.action((file, _options, cmd) =>
-			validateCommand(file, { quiet: quiet(cmd) }, io),
+		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
+		.option("--strict", "exit 1 on warnings too")
+		.action((file, options, cmd) =>
+			validateCommand(file, { ...options, quiet: quiet(cmd) }, io),
 		);
 
 	command("inspect")
-		.summary("list a template's frames, fields, variants and fonts")
-		.description("List a template's frames, fields, variants and fonts.")
-		.argument("<template>", "a .coat file or template JSON")
+		.summary("list what a template or workspace holds")
+		.description(
+			"List a template's frames, fields, variants and fonts, or a workspace's\ntemplates and their bindings, datasets with their record statuses, and presets\nwith how many items each exports.",
+		)
+		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option("--json", "print the inspection as JSON")
 		.action((file, options) => inspect(file, options, io));
 
