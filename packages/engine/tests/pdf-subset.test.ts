@@ -12,7 +12,7 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createText } from "../src/node";
 import { readSfnt } from "../src/pdf/sfnt";
-import { subsetFont } from "../src/pdf/subset";
+import { mergeFontSubsets, subsetFont } from "../src/pdf/subset";
 import { createRenderer, type Renderer } from "../src/renderer";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
@@ -456,6 +456,146 @@ describe("subsetFont, CFF outlines", () => {
 	const unifont = "/usr/share/fonts/opentype/unifont/unifont.otf";
 	test.skipIf(!existsSync(unifont))("leaves a CID-keyed font whole", () => {
 		expect(subsetFont(new Uint8Array(readFileSync(unifont)), [1])).toBeNull();
+	});
+});
+
+// `bytes` with the first byte of `tag`'s table past `at` flipped, then
+// checksummed as a font reader would not care to.
+function altered(bytes: Uint8Array, tag: string, at: number): Uint8Array {
+	const out = bytes.slice();
+	const dv = new DataView(out.buffer);
+	for (let i = 0; i < dv.getUint16(4); i++) {
+		const o = 12 + 16 * i;
+		if (String.fromCharCode(...out.subarray(o, o + 4)) === tag)
+			out[dv.getUint32(o + 8) + at] ^= 0xff;
+	}
+	return out;
+}
+
+describe("mergeFontSubsets", () => {
+	const merged = (font: Uint8Array, ...texts: string[]) => {
+		const sets = texts.map((t) => glyphsOf(font, t));
+		const files = sets.map((g) => subsetFont(font, g) as Uint8Array);
+		return {
+			files,
+			glyphs: sets.flat(),
+			union: subsetFont(font, sets.flat()) as Uint8Array,
+			out: mergeFontSubsets(files),
+		};
+	};
+
+	test("joins overlapping and disjoint TrueType subsets into the subset of the union", () => {
+		const { files, glyphs, union, out } = merged(geist, "Fresh é", "coat éx");
+		expect(out).toEqual(union);
+		expect((out as Uint8Array).length).toBeLessThan(
+			files[0].length + files[1].length,
+		);
+		checked(out as Uint8Array);
+		expect(render(out as Uint8Array, glyphs)).toEqual(render(geist, glyphs));
+		sameInfo(geist, out as Uint8Array, glyphs);
+		const missing = glyphsOf(geist, "zQ");
+		expect(blank(render(out as Uint8Array, missing))).toBe(true);
+	});
+
+	test("joins any number of subsets in any order", () => {
+		const { files, union, out } = merged(geist, "ab", "bc", "xyz", "a", "");
+		expect(out).toEqual(union);
+		expect(mergeFontSubsets([...files].reverse())).toEqual(union);
+		expect(mergeFontSubsets([files[2] as Uint8Array])).toEqual(files[2]);
+		expect(mergeFontSubsets([])).toBeNull();
+	});
+
+	test("joins subsets of a font with a long loca, or whose union needs one", () => {
+		const roomy = respaced((n) => n + 100, true);
+		const { union, out } = merged(roomy, "Fresh", "coat Å");
+		expect(out).toEqual(union);
+		const tight = respaced((n) => 4 * Math.floor((n * 1.68) / 4) + 2, false);
+		const [half, rest] = [
+			Array.from({ length: 500 }, (_, i) => i),
+			Array.from({ length: 473 }, (_, i) => i + 500),
+		];
+		const parts = [half, rest].map((g) => subsetFont(tight, g) as Uint8Array);
+		const whole = subsetFont(tight, [...half, ...rest]) as Uint8Array;
+		const format = (b: Uint8Array) => {
+			const head = tablesOf(b).get("head") as Uint8Array;
+			return new DataView(head.buffer, head.byteOffset).getInt16(50);
+		};
+		expect(parts.map(format)).toEqual([0, 0]);
+		expect(format(whole)).toBe(1);
+		expect(mergeFontSubsets(parts)).toEqual(whole);
+	});
+
+	test("joins the metrics of subsets", () => {
+		const { out, glyphs } = merged(hebrew, "של", "ום");
+		sameInfo(hebrew, out as Uint8Array, glyphs);
+		expect(render(out as Uint8Array, glyphs)).toEqual(render(hebrew, glyphs));
+	});
+
+	test("keeps what files of different fonts do not share apart", () => {
+		const a = subsetFont(geist, glyphsOf(geist, "Fresh")) as Uint8Array;
+		const b = subsetFont(hebrew, glyphsOf(hebrew, "שלום")) as Uint8Array;
+		expect(mergeFontSubsets([a, b])).toBeNull();
+		expect(mergeFontSubsets([a, synthetic()])).toBeNull();
+		expect(mergeFontSubsets([a, geist.subarray(0, 5000)])).toBeNull();
+		expect(mergeFontSubsets([a, new Uint8Array(40)])).toBeNull();
+	});
+
+	test("rejects subsets that differ in a table, or disagree about a glyph", () => {
+		const a = subsetFont(geist, glyphsOf(geist, "Fresh")) as Uint8Array;
+		const b = subsetFont(geist, glyphsOf(geist, "coat")) as Uint8Array;
+		expect(mergeFontSubsets([a, b])).not.toBeNull();
+		for (const tag of ["name", "OS/2", "hhea", "maxp", "head", "fpgm"])
+			expect(mergeFontSubsets([a, altered(b, tag, 20)])).toBeNull();
+		const shared = glyphsOf(geist, "e")[0] as number;
+		const c = subsetFont(geist, [shared]) as Uint8Array;
+		expect(mergeFontSubsets([a, c])).not.toBeNull();
+		expect(mergeFontSubsets([a, altered(c, "glyf", 40)])).toBeNull();
+		const hm = altered(c, "hmtx", 4 * shared);
+		expect(mergeFontSubsets([a, hm])).toBeNull();
+	});
+
+	test("joins CFF subsets into the subset of the union", () => {
+		const font = synthetic();
+		const a = subsetFont(font, [1, 3]) as Uint8Array;
+		const b = subsetFont(font, [3, 4]) as Uint8Array;
+		const out = mergeFontSubsets([a, b]) as Uint8Array;
+		expect(out).toEqual(subsetFont(font, [1, 3, 4]));
+		checked(out);
+		expect(render(out, [0, 1, 3, 4])).toEqual(render(font, [0, 1, 3, 4]));
+		for (const g of [2, 5]) expect(blank(render(out, [g]))).toBe(true);
+		sameInfo(font, out, [0, 1, 3, 4]);
+		const empty = subsetFont(font, []) as Uint8Array;
+		expect(mergeFontSubsets([empty, a])).toEqual(a);
+		const rest = subsetFont(font, [2, 5]) as Uint8Array;
+		expect(mergeFontSubsets([a, b, empty, rest])).toEqual(
+			subsetFont(font, [1, 2, 3, 4, 5]),
+		);
+	});
+
+	test("rejects CFF subsets that differ outside the charstrings or disagree on one", () => {
+		const font = synthetic();
+		const a = subsetFont(font, [1, 3]) as Uint8Array;
+		const b = subsetFont(font, [3, 4]) as Uint8Array;
+		expect(mergeFontSubsets([a, altered(b, "OS/2", 4)])).toBeNull();
+		expect(mergeFontSubsets([a, altered(b, "maxp", 5)])).toBeNull();
+		const lone = subsetFont(font, [1]) as Uint8Array;
+		expect(mergeFontSubsets([a, lone])).not.toBeNull();
+		const cff = tablesOf(lone).get("CFF ") as Uint8Array;
+		const glyph = cff.findIndex((v, i) => v === 189 && cff[i + 2] === 21);
+		expect(glyph).toBeGreaterThan(0);
+		expect(mergeFontSubsets([a, altered(lone, "CFF ", glyph)])).toBeNull();
+		const end = cff.length - 1;
+		expect(mergeFontSubsets([a, altered(b, "CFF ", end)])).toBeNull();
+		const other = subsetFont(geist, [1]) as Uint8Array;
+		expect(mergeFontSubsets([a, other])).toBeNull();
+	});
+
+	test.skipIf(!existsSync(inter))("joins subsets of an installed OpenType font", () => {
+		const bytes = new Uint8Array(readFileSync(inter));
+		const { glyphs, union, out } = merged(bytes, "Fresh é", "coat Åx");
+		expect(out).toEqual(union);
+		checked(out as Uint8Array);
+		expect(render(out as Uint8Array, glyphs)).toEqual(render(bytes, glyphs));
 	});
 });
 

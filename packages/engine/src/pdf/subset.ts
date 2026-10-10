@@ -95,23 +95,166 @@ export function subsetFont(
 	}
 }
 
+const same = (a: Uint8Array, b: Uint8Array) =>
+	a.length === b.length && a.every((v, i) => v === b[i]);
+
+const blank = (b: Uint8Array) => b.every((v) => v === 0);
+
+// The glyphs of the subsets `files` of one font, in one file: a glyph is kept
+// where any of them keeps it. Null when they are not all subsets of one font,
+// with the same tables and glyph count, that agree on every glyph they share.
+export function mergeFontSubsets(files: Uint8Array[]): Uint8Array | null {
+	try {
+		const [first, ...rest] = files;
+		if (!first) return null;
+		if (rest.length === 0) return first;
+		const all = files.map(readTables);
+		const [lead] = all as [ReturnType<typeof readTables>];
+		const cff = lead.version === "OTTO";
+		const own = cff ? ["CFF "] : ["glyf", "loca"];
+		const tags = [...lead.tables.keys()].sort().join();
+		const maxp = get(lead.tables, "maxp");
+		const count = new DataView(maxp.buffer, maxp.byteOffset).getUint16(4);
+		const metrics = metricsOf(get(lead.tables, "hhea"));
+		const heads = all.map(({ tables }) => {
+			const head = get(tables, "head").slice();
+			head.fill(0, 8, 12);
+			if (!cff) head.fill(0, 50, 52);
+			return head;
+		});
+		for (const [i, { version, tables }] of all.entries()) {
+			if (version !== lead.version || [...tables.keys()].sort().join() !== tags)
+				return null;
+			if (!same(heads[i] as Uint8Array, heads[0] as Uint8Array)) return null;
+			for (const [tag, table] of tables)
+				if (
+					tag !== "head" &&
+					tag !== "hmtx" &&
+					!own.includes(tag) &&
+					!same(table, get(lead.tables, tag))
+				)
+					return null;
+		}
+		const out: Tables = new Map(lead.tables);
+		const hmtx = get(lead.tables, "hmtx").slice();
+		if (hmtx.length !== 4 * metrics + 2 * Math.max(0, count - metrics))
+			return null;
+		for (const { tables } of all.slice(1)) {
+			const other = get(tables, "hmtx");
+			if (other.length !== hmtx.length) return null;
+			for (let g = 0; g < count; g++) {
+				const [at, size] = metricAt(g, metrics);
+				const [mine, theirs] = [
+					hmtx.subarray(at, at + size),
+					other.subarray(at, at + size),
+				];
+				if (blank(mine)) mine.set(theirs);
+				else if (!blank(theirs) && !same(mine, theirs)) return null;
+			}
+		}
+		out.set("hmtx", hmtx);
+		if (cff) {
+			const parts = all.map(({ tables }) =>
+				readCff(get(tables, "CFF "), count),
+			);
+			const [base] = parts as [Cff];
+			const bytes = (a: Uint8Array | null, b: Uint8Array | null) =>
+				a && b ? same(a, b) : a === b;
+			for (const other of parts) {
+				if (
+					!same(other.head, base.head) ||
+					!same(other.tail, base.tail) ||
+					!same(other.priv, base.priv) ||
+					other.privSize !== base.privSize ||
+					!bytes(other.charset, base.charset) ||
+					!bytes(other.encoding, base.encoding) ||
+					other.entries.length !== base.entries.length ||
+					other.entries.some(
+						(e, i) =>
+							e.op !== base.entries[i]?.op ||
+							(![15, 16, 17, 18].includes(e.op) &&
+								!same(e.raw, (base.entries[i] as Entry).raw)),
+					)
+				)
+					return null;
+			}
+			const glyphs = base.glyphs.map((_, g) => {
+				let found: Uint8Array = ENDCHAR;
+				for (const part of parts) {
+					const glyph = part.glyphs[g] as Uint8Array;
+					if (same(glyph, ENDCHAR)) continue;
+					if (found !== ENDCHAR && !same(found, glyph))
+						throw new Error("clash");
+					found = glyph;
+				}
+				return found;
+			});
+			out.set("CFF ", writeCff(base, glyphs));
+		} else {
+			const readers = all.map(({ tables }) => glyfReader(tables, count));
+			const none = new Uint8Array(0);
+			const pieces = Array.from({ length: count }, (_, g) => {
+				let found: Uint8Array = none;
+				for (const reader of readers) {
+					const piece = reader.piece(g);
+					if (piece.length === 0) continue;
+					if (found.length > 0 && !same(found, piece))
+						throw new Error("clash");
+					found = piece;
+				}
+				return found;
+			});
+			layoutGlyf(lead.tables, pieces, readers.every((r) => r.long), out);
+		}
+		return assemble(lead.version, out);
+	} catch {
+		return null;
+	}
+}
+
 function get(tables: Tables, tag: string): Uint8Array {
 	const table = tables.get(tag);
 	if (!table) throw new Error(`no ${tag}`);
 	return table;
 }
 
+// Where glyph `g`'s metric lies in an hmtx table of `metrics` full metrics: a
+// full one is an advance and a bearing, one after them a bearing alone.
+const metricAt = (g: number, metrics: number): [number, number] =>
+	g < metrics ? [4 * g, 4] : [2 * (g + metrics), 2];
+
+const metricsOf = (hhea: Uint8Array) =>
+	new DataView(hhea.buffer, hhea.byteOffset).getUint16(34);
+
 // Advances and bearings are kept for the kept glyphs only, plus the last full
 // metric, which the glyphs after it share. The rest is zeros, which deflate to
 // nothing.
 function subsetHmtx(hmtx: Uint8Array, hhea: Uint8Array, keep: Set<number>) {
-	const metrics = new DataView(hhea.buffer, hhea.byteOffset).getUint16(34);
+	const metrics = metricsOf(hhea);
 	const out = new Uint8Array(hmtx.length);
 	for (const g of [...keep, metrics - 1]) {
-		const [at, size] = g < metrics ? [4 * g, 4] : [2 * (g + metrics), 2];
+		const [at, size] = metricAt(g, metrics);
 		out.set(hmtx.subarray(at, at + size), at);
 	}
 	return out;
+}
+
+// A glyf table's glyphs, whichever loca format locates them.
+function glyfReader(tables: Tables, count: number) {
+	const head = get(tables, "head");
+	const long = new DataView(head.buffer, head.byteOffset).getInt16(50) === 1;
+	const loca = get(tables, "loca");
+	const lv = new DataView(loca.buffer, loca.byteOffset, loca.byteLength);
+	const glyf = get(tables, "glyf");
+	const at = (g: number) =>
+		long ? lv.getUint32(4 * g) : lv.getUint16(2 * g) * 2;
+	const piece = (g: number) => {
+		const [start, end] = [at(g), at(g + 1)];
+		if (end < start || end > glyf.length) throw new Error("glyph past the end");
+		return glyf.subarray(start, end);
+	};
+	if (loca.length < (count + 1) * (long ? 4 : 2)) throw new Error("short loca");
+	return { long, at, piece, glyf };
 }
 
 // The kept glyphs' outlines, with the components of composites added to
@@ -122,15 +265,8 @@ function subsetGlyf(
 	keep: Set<number>,
 	out: Tables,
 ) {
-	const head = get(tables, "head").slice();
-	const hv = new DataView(head.buffer);
-	const long = hv.getInt16(50) === 1;
-	const loca = get(tables, "loca");
-	const lv = new DataView(loca.buffer, loca.byteOffset, loca.byteLength);
-	const glyf = get(tables, "glyf");
+	const { long, at, piece, glyf } = glyfReader(tables, count);
 	const gv = new DataView(glyf.buffer, glyf.byteOffset, glyf.byteLength);
-	const at = (g: number) =>
-		long ? lv.getUint32(4 * g) : lv.getUint16(2 * g) * 2;
 	for (const g of keep) {
 		if (at(g + 1) <= at(g) || gv.getInt16(at(g)) >= 0) continue;
 		let o = at(g) + 10;
@@ -144,30 +280,39 @@ function subsetGlyf(
 			o += flags & 0x8 ? 2 : flags & 0x40 ? 4 : flags & 0x80 ? 8 : 0;
 		} while (flags & 0x20);
 	}
-	const pieces: Uint8Array[] = [];
+	const pieces = Array.from({ length: count }, (_, g) =>
+		keep.has(g) ? piece(g) : glyf.subarray(0, 0),
+	);
+	layoutGlyf(tables, pieces, long, out);
+}
+
+// The glyf and loca tables of `pieces`, each glyph padded to four bytes, and
+// the head that says which loca format it needs: the long one when `long` or
+// when the glyphs outgrow the short one.
+function layoutGlyf(
+	tables: Tables,
+	pieces: Uint8Array[],
+	long: boolean,
+	out: Tables,
+) {
+	const head = get(tables, "head").slice();
 	const starts = [0];
-	for (let g = 0; g < count; g++) {
-		const piece = keep.has(g)
-			? glyf.subarray(at(g), at(g + 1))
-			: glyf.subarray(0, 0);
-		if (piece.length !== (keep.has(g) ? at(g + 1) - at(g) : 0))
-			throw new Error("glyph past the end");
-		pieces.push(piece);
-		starts.push((starts[g] as number) + ((piece.length + 3) & ~3));
-	}
-	const size = starts[count] as number;
+	pieces.forEach((piece, g) =>
+		starts.push((starts[g] as number) + ((piece.length + 3) & ~3)),
+	);
+	const size = starts[pieces.length] as number;
 	const wide = long || size > 0x1fffe;
-	const newLoca = new Uint8Array(starts.length * (wide ? 4 : 2));
-	const nv = new DataView(newLoca.buffer);
+	const loca = new Uint8Array(starts.length * (wide ? 4 : 2));
+	const nv = new DataView(loca.buffer);
 	starts.forEach((s, i) =>
 		wide ? nv.setUint32(4 * i, s) : nv.setUint16(2 * i, s / 2),
 	);
-	const newGlyf = new Uint8Array(size);
-	pieces.forEach((piece, g) => newGlyf.set(piece, starts[g]));
-	hv.setInt16(50, wide ? 1 : 0);
+	const glyf = new Uint8Array(size);
+	pieces.forEach((piece, g) => glyf.set(piece, starts[g]));
+	new DataView(head.buffer).setInt16(50, wide ? 1 : 0);
 	out.set("head", head);
-	out.set("loca", newLoca);
-	out.set("glyf", newGlyf);
+	out.set("loca", loca);
+	out.set("glyf", glyf);
 }
 
 // The sfnt of `tables`, with the directory, table padding, checksums and the
@@ -300,13 +445,21 @@ function encodingEnd(dv: DataView, o: number): number {
 	return p;
 }
 
-// A name-keyed CFF table with the charstrings of the glyphs not kept replaced
-// by a bare endchar. Everything else is copied, moved as its offsets need.
-function subsetCff(
-	cff: Uint8Array,
-	count: number,
-	keep: Set<number>,
-): Uint8Array {
+type Cff = {
+	head: Uint8Array;
+	entries: Entry[];
+	tail: Uint8Array;
+	charset: Uint8Array | null;
+	encoding: Uint8Array | null;
+	glyphs: Uint8Array[];
+	priv: Uint8Array;
+	privSize: number;
+};
+
+// The parts of a name-keyed CFF table: what comes before and after its Top
+// DICT, the DICT's entries, the charset and encoding if they are stored, the
+// charstrings, and the Private DICT with its local subroutines.
+function readCff(cff: Uint8Array, count: number): Cff {
 	const dv = new DataView(cff.buffer, cff.byteOffset, cff.byteLength);
 	const names = index(dv, dv.getUint8(2));
 	const tops = index(dv, names.end);
@@ -344,32 +497,40 @@ function subsetCff(
 			]);
 		}
 	}
-	const blobs = [
-		charset > 2
-			? slice(charset, charsetEnd(dv, charset, glyphs.items.length))
-			: null,
-		encoding > 1 ? slice(encoding, encodingEnd(dv, encoding)) : null,
-		writeIndex(
-			glyphs.items.map(([s, e], g) => (keep.has(g) ? slice(s, e) : ENDCHAR)),
-		),
+	return {
+		head: slice(0, names.end),
+		entries,
+		tail: slice(tops.end, shared.end),
+		charset:
+			charset > 2
+				? slice(charset, charsetEnd(dv, charset, glyphs.items.length))
+				: null,
+		encoding: encoding > 1 ? slice(encoding, encodingEnd(dv, encoding)) : null,
+		glyphs: glyphs.items.map(([s, e]) => slice(s, e)),
 		priv,
-	];
+		privSize,
+	};
+}
+
+// A name-keyed CFF table of `cff`'s parts with these charstrings. Everything
+// else is copied, moved as its offsets need.
+function writeCff(cff: Cff, glyphs: Uint8Array[]): Uint8Array {
+	const blobs = [cff.charset, cff.encoding, writeIndex(glyphs), cff.priv];
 	const topDict = (at: number[]) =>
 		concat(
-			entries.map((e) =>
-				e.op === 15 && charset > 2
+			cff.entries.map((e) =>
+				e.op === 15 && cff.charset
 					? [...int(at[0] as number), 15]
-					: e.op === 16 && encoding > 1
+					: e.op === 16 && cff.encoding
 						? [...int(at[1] as number), 16]
 						: e.op === 17
 							? [...int(at[2] as number), 17]
 							: e.op === 18
-								? [...int(privSize), ...int(at[3] as number), 18]
+								? [...int(cff.privSize), ...int(at[3] as number), 18]
 								: e.raw,
 			),
 		);
-	const head = slice(0, names.end);
-	const tail = slice(tops.end, shared.end);
+	const { head, tail } = cff;
 	let at =
 		head.length + writeIndex([topDict([0, 0, 0, 0])]).length + tail.length;
 	const starts = blobs.map((blob) => {
@@ -383,4 +544,18 @@ function subsetCff(
 		tail,
 		...blobs.map((b) => b ?? []),
 	]);
+}
+
+// A name-keyed CFF table with the charstrings of the glyphs not kept replaced
+// by a bare endchar.
+function subsetCff(
+	cff: Uint8Array,
+	count: number,
+	keep: Set<number>,
+): Uint8Array {
+	const parts = readCff(cff, count);
+	return writeCff(
+		parts,
+		parts.glyphs.map((glyph, g) => (keep.has(g) ? glyph : ENDCHAR)),
+	);
 }

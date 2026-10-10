@@ -206,7 +206,7 @@ function writeFace(w: PdfWriter, face: EmbeddedFace) {
 }
 
 // Six capital letters from a hash of the subset, as the spec asks of its name.
-function subsetTag(bytes: Uint8Array): string {
+export function subsetTag(bytes: Uint8Array): string {
 	let h = 2166136261;
 	for (const b of bytes) h = Math.imul(h ^ b, 16777619) >>> 0;
 	let tag = "";
