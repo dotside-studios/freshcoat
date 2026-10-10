@@ -92,3 +92,5 @@ release. Write the word and a line on the idea at the top of the module.
 | Release | Word | Idea | Drawn with |
 |---|---|---|---|
 | [0.4.0](v0.4.0.coat.ts) | *interfere* | Interference rings: concentric circles from three centres, the moiré left where they cross, printed flat in two tones of cobalt with a panel cut out for the lockup | a live `exclude` boolean over about 70 circles inside a live `subtract`, a variable font in the lockup |
+| [0.3.0](v0.3.0.coat.ts) | *lighten* | An engraving: ruled lines that start nearly solid and thin to hairlines across the strip, swelling over a slow seeded field, in vermilion on paper, each line cut exactly at a rounded panel for the lockup | one compound vector of 56 filled line shapes, each edge sampled from the field |
+| [0.2.0](v0.2.0.coat.ts) | *arrange* | Truchet tiles: one tile of paired quarter arcs turned one of two ways in every cell, joining into meandering paths, in mint on deep green, the cells behind the lockup left empty | one stroked vector of about 1,000 arcs on a 40 px grid |
