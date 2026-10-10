@@ -130,6 +130,24 @@ describe("createRenderer", () => {
 		renderer.dispose();
 	});
 
+	test("lets go of per-call image bytes once their image is evicted", async () => {
+		const renderer = await createRenderer({ ck });
+		let bytes: Uint8Array | null = (
+			await renderer.render(rect("#ff0000"), { width: 8, height: 8 })
+		).bytes;
+		const ref = new WeakRef(bytes);
+		await renderer.render(image("logo.png"), {
+			width: 8,
+			height: 8,
+			images: new Map([["logo.png", bytes]]),
+		});
+		bytes = null;
+		await renderer.render(rect("#00ff00"), { width: 8, height: 8 });
+		Bun.gc(true);
+		expect(ref.deref()).toBeUndefined();
+		renderer.dispose();
+	});
+
 	test("runs overlapping renders one after another", async () => {
 		const renderer = await createRenderer({ ck });
 		const colors = ["#ff0000", "#00ff00", "#0000ff", "#ffffff"];
