@@ -12,6 +12,7 @@ import {
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
+	largestImagePixels,
 	planSheets,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
@@ -20,6 +21,8 @@ import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readWorkspace } from "../workspace-file";
+import { createWorkerPool, poolSize } from "../worker-pool";
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
 export type WorkspaceOptions = {
 	preset?: string;
@@ -27,6 +30,7 @@ export type WorkspaceOptions = {
 	records?: "all" | "pending" | "failed";
 	save?: true;
 	dryRun?: true;
+	jobs?: number;
 	quiet: boolean;
 };
 
@@ -61,6 +65,7 @@ export async function renderWorkspace(
 			root: dirname(path),
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
+			...(options.jobs ? { jobs: options.jobs } : {}),
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
@@ -94,24 +99,36 @@ export async function runPreset(
 		root: string;
 		out: string;
 		dryRun?: true;
+		jobs?: number;
 		save?: (workspace: Workspace) => Promise<void>;
 	},
 	log: Log,
 	io: Io,
 ): Promise<void> {
 	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
+	const entry = workspace.templates.find((t) => t.id === preset.templateId);
+	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
+	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
+		...withFetch(fontFetch(io)),
+		load: createLoader(io, options.root),
+	});
+	warnAboutFonts(log, report);
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
+	const plan = planExport(workspace, preset);
+	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
+	const pool =
+		threads > 1
+			? await createWorkerPool(threads, { root: options.root, fonts: [...fonts] })
+			: undefined;
 	const renderer = await openRenderer(io, { root: options.root, build: "full" });
 	const progress = progressReporter(log);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
-			fontOptions: {
-				...withFetch(fontFetch(io)),
-				load: createLoader(io, options.root),
-			},
+			fonts,
+			...(pool ? { pool } : {}),
 			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
@@ -121,7 +138,6 @@ export async function runPreset(
 			throw error;
 		});
 		log.endProgress();
-		if (result.fonts) warnAboutFonts(log, result.fonts);
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
 		if (result.cancelled) throw new CliError("the export was cancelled");
 		await options.save?.(result.workspace);
@@ -138,6 +154,7 @@ export async function runPreset(
 			);
 	} finally {
 		log.endProgress();
+		await pool?.dispose();
 		renderer.dispose();
 	}
 }

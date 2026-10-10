@@ -4,10 +4,12 @@ import type { Template } from "@freshcoat-js/coatfile";
 import { decodeTemplate, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
 import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
+import { REPORT_FILE_NAME } from "@freshcoat-js/workspace/export";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import { version } from "../src/main";
+import { poolSize } from "../src/worker-pool";
 import {
 	card,
 	type Sandbox,
@@ -1080,6 +1082,84 @@ describe("pack", () => {
 			expect({ argv, code: run.code }).toEqual({ argv, code });
 			expect(run.stderr).toContain(message);
 		}
+	});
+});
+
+describe("render --jobs", () => {
+	beforeAll(async () => {
+		const rows = ["name", ...Array.from({ length: 6 }, (_, i) => `Person ${i + 1}`)];
+		await box.write("threads.csv", `${rows.join("\n")}\n`);
+	});
+
+	async function images(path: string): Promise<Record<string, Uint8Array>> {
+		const zip = unzipSync(new Uint8Array(await readFile(box.path(path))));
+		delete zip[REPORT_FILE_NAME];
+		return zip;
+	}
+
+	test("renders the same files on worker threads as on one", async () => {
+		const one = await box.run("render", "badge.json", "--data", "threads.csv", "--jobs", "1", "--out", "one-thread.zip", "-q");
+		const two = await box.run("render", "badge.json", "--data", "threads.csv", "--jobs", "2", "--out", "two-threads.zip", "-q");
+		expect([one.code, two.code]).toEqual([0, 0]);
+		expect(two.stdout).toStartWith("12 of 12 items exported to two-threads.zip");
+		const [single, pooled] = [await images("one-thread.zip"), await images("two-threads.zip")];
+		expect(Object.keys(pooled).sort()).toEqual(Object.keys(single).sort());
+		for (const [name, bytes] of Object.entries(single)) expect(pooled[name]).toEqual(bytes);
+	});
+
+	test("sends photos and fonts to the threads", async () => {
+		const run = await box.run(
+			"render",
+			"photo.json",
+			"--data",
+			"rows/people.csv",
+			"--frame",
+			"front",
+			"--jobs",
+			"2",
+			"--out",
+			"photo-threads.zip",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const zip = await images("photo-threads.zip");
+		const pixels = decodePixels(ck, zip["badge-1-front.png"] as Uint8Array);
+		const at = (170 + 70 * 200) * 4;
+		expect([...(pixels?.data.slice(at, at + 3) ?? [])]).toEqual([20, 40, 200]);
+	});
+
+	test("runs a workspace preset and a PDF on threads", async () => {
+		await box.write("threads.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		const zip = await box.run("render", "threads.coatworkspace", "--preset", "p_png", "--jobs", "2", "--out", "ws-threads.zip", "-q");
+		expect(zip.code).toBe(0);
+		expect(Object.keys(await images("ws-threads.zip")).sort()).toEqual([
+			"1-back.png",
+			"1-front.png",
+			"2-back.png",
+			"2-front.png",
+		]);
+		const pdf = await box.run("render", "badge.json", "--data", "threads.csv", "--jobs", "3", "--out", "threads.pdf", "-q");
+		expect(pdf.code).toBe(0);
+		expect((await PDFDocument.load(await readFile(box.path("threads.pdf")))).getPageCount()).toBe(12);
+	});
+
+	test("refuses --jobs outside an export", async () => {
+		const plain = await box.run("render", "badge.json", "--jobs", "2", "--out", "dir");
+		expect(plain.code).toBe(2);
+		expect(plain.stderr).toContain("--jobs needs --data or a .zip or .pdf --out");
+		const zero = await box.run("render", "badge.json", "--jobs", "0", "--out", "x.zip");
+		expect(zero.code).toBe(2);
+		expect(zero.stderr).toContain("Expected a whole number, 1 or more.");
+	});
+});
+
+describe("poolSize", () => {
+	test("takes --jobs up to the items, and otherwise needs a few items per thread", () => {
+		expect(poolSize(12, 0, 2)).toBe(2);
+		expect(poolSize(1, 0, 4)).toBe(1);
+		expect(poolSize(7, 0)).toBe(1);
+		expect(poolSize(1000, 0)).toBeGreaterThanOrEqual(1);
+		expect(poolSize(1000, 0)).toBeLessThanOrEqual(4);
 	});
 });
 
