@@ -14,7 +14,8 @@ These belong to `art.ts` and keep the banners recognisable as a series:
 - the 1600 × 320 strip;
 - the lockup: the logo, a divider and the version, centred over a soft shade.
   `tone` says whether the art behind it is dark or light, and the lockup is
-  drawn to stand out from it;
+  drawn to stand out from it. Art that keeps the middle clear on its own can
+  leave the shade out with `shade: false`;
 - a random source seeded by the version, so a banner renders the same every
   time;
 - the banner is a template module, `v<version>.coat.ts`, rendered by the CLI
@@ -32,29 +33,45 @@ reference for quality, not a template to follow.
 
 ## Choosing the idea
 
+The art starts from a word, not from a feature.
+
 1. **Read the release.** Go through the commits since the last tag and the
-   draft notes. List what the engine, the format or the tools can do now that
-   they could not before, or do much better.
-2. **Pick one or two.** Choose the capabilities that open up something visual,
-   not the most important ones. A performance gain can count if it makes
-   something drawable that was too slow before, such as thousands of shapes.
-   A fix rarely counts, unless it is what makes the idea work.
-3. **Find the idea they make possible.** Ask what picture only exists
-   because of them. One idea, followed through, beats a collage of every
-   feature. The banner should not explain the release; the notes do that.
-4. **Make it ours.** Draw it with the format and the renderer, the way a
-   template author would. Prefer something procedural over an imported image.
-5. **Make it different.** Check the log below and pick a technique, structure
-   or mood the last banners did not use. If the idea resembles a previous one,
-   push it somewhere new or pick another.
+   draft notes, and write two or three plain sentences on what changed for
+   the people who use Freshcoat.
+2. **Find the word.** Distill those sentences into one verb or adjective that
+   describes the release as a whole: *converge*, *loosen*, *sharpen*, *settle*,
+   *unfold*, *quick*, *exact*. Avoid a feature's name; ask what the release
+   does or how it feels. 0.4 folded many pieces into one renderer driven by one
+   command, so its word is *converge*.
+3. **Draw the word, not the release.** No cards, screens, UI or pictures of
+   the features. Ask what the word looks like as form, motion or material:
+   what converges in the world, and how would someone draw it with paper,
+   ink, thread or a ruler?
+4. **Choose how to draw it.** This is where the engine comes in. A technique
+   the release added, or that earlier banners did not use, is a good choice,
+   but the word comes first: never bend the idea to show off a feature.
+5. **Make it different.** Check the log below and pick a word, technique,
+   structure or mood the last banners did not use. If the idea resembles a
+   previous one, push it somewhere new or pick another.
 
-Questions that help:
+Write the word and a line on the idea at the top of the module.
 
-- What could a template not express before this release?
-- What does the change feel like: faster, finer, freer, more exact, more
-  connected? What would that look like?
-- What would surprise someone who knows the previous banners?
-- What would be tedious to draw by hand but is easy to generate?
+## Avoid the generic
+
+Generated art drifts towards the same look: glowing light streaks, floating
+particles, neon on dark purple, soft blurred blobs, lens flares, everything
+symmetric and shining. It reads as stock imagery and says nothing about us.
+Instead:
+
+- **Draw like a designer would.** Look to things people make: print, cut
+  paper, weaving, drafting, signage, typography, supergraphics. Choose a
+  craft and follow its rules.
+- **Limit the means.** A few colours, flat fills, one kind of mark. A
+  constraint gives the art a voice; adding effects takes it away.
+- **Make decisions visible.** Deliberate spacing, alignment and rhythm, and
+  randomness that serves a structure rather than replacing it.
+- **Keep some texture.** Grain, misregistration and uneven ink are fine when
+  they belong to the craft, not as a filter over everything.
 
 ## Constraints
 
@@ -75,8 +92,8 @@ Questions that help:
 ## Making it
 
 1. Copy the last module to `v<version>.coat.ts`, set `VERSION` and replace the
-   art. Comment at the top of the file what the art is and which capabilities
-   it uses.
+   art. Comment at the top of the file the word, what the art is and which
+   capabilities it uses.
 2. Render it and look at it full size and at half size:
 
    ```sh
@@ -90,6 +107,6 @@ Questions that help:
 
 ## Log
 
-| Release | Idea | Drawn with |
-|---|---|---|
-| [0.4.0](v0.4.0.coat.ts) | Interference rings: concentric circles from three centres, the moiré left where they cross, over blurred colour fields | one live `exclude` boolean over about 70 circles, element blur, overlay blending, a noise pattern, a variable font in the lockup |
+| Release | Word | Idea | Drawn with |
+|---|---|---|---|
+| [0.4.0](v0.4.0.coat.ts) | *interfere* | Interference rings: concentric circles from three centres, the moiré left where they cross, over blurred colour fields | one live `exclude` boolean over about 70 circles, element blur, overlay blending, a noise pattern, a variable font in the lockup |

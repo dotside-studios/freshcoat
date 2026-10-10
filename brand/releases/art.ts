@@ -144,11 +144,11 @@ export type Tone = "dark" | "light";
 
 /** The logo and the version, centred, over a shade that keeps them readable
  *  on any art. The same in every banner but for its tone. */
-function lockup(version: string, tone: Tone): Element[] {
+function lockup(version: string, tone: Tone, shaded: boolean): Element[] {
 	const ink = tone === "dark" ? "#ffffff" : "#000000";
 	const shade = tone === "dark" ? "#000000" : "#ffffff";
 	return [
-		rect(0, 0, WIDTH, HEIGHT, {
+		...(shaded ? [rect(0, 0, WIDTH, HEIGHT, {
 			id: "shade",
 			properties: {
 				fill: {
@@ -163,7 +163,7 @@ function lockup(version: string, tone: Tone): Element[] {
 					],
 				},
 			},
-		} as Partial<Element>),
+		} as Partial<Element>)] : []),
 		{
 			id: "lockup",
 			type: "frame",
@@ -200,6 +200,9 @@ export type BannerOptions = {
 	/** The ground under the art. */
 	background: Fill | Fill[];
 	tone: Tone;
+	/** Leave out the shade behind the lockup, for art that keeps the middle
+	 *  clear on its own. */
+	shade?: boolean;
 	fonts?: Template["fonts"];
 };
 
@@ -226,7 +229,7 @@ export function banner(o: BannerOptions): Template {
 					size: { width: WIDTH, height: HEIGHT },
 					properties: { fill: o.background },
 				},
-				elements: [...o.art, ...lockup(o.version, o.tone)],
+				elements: [...o.art, ...lockup(o.version, o.tone, o.shade ?? true)],
 			},
 		],
 	} as Template;
