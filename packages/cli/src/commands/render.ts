@@ -26,7 +26,7 @@ export type RenderOptions = {
 	variant?: string;
 	frame?: string[];
 	scale?: number[];
-	format: keyof typeof FORMATS;
+	format?: keyof typeof FORMATS;
 	out?: string;
 	quiet: boolean;
 };
@@ -37,7 +37,7 @@ export async function render(
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
-	const output = FORMATS[options.format];
+	const output = FORMATS[options.format ?? "png"];
 	const scales = options.scale ?? [1];
 
 	const { template, directory } = await readTemplate(io, file);

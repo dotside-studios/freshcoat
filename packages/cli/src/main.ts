@@ -5,10 +5,10 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "@commander-js/extra-typings";
-import { exportCommand } from "./commands/export";
 import { inspect } from "./commands/inspect";
 import { render } from "./commands/render";
 import { validateCommand } from "./commands/validate";
+import { renderWorkspace } from "./commands/workspace";
 import { CliError, type Io, processIo } from "./io";
 
 export function version(): string {
@@ -36,7 +36,7 @@ export async function main(
 function program(io: Io) {
 	const root = new Command("freshcoat")
 		.usage("<command> [options]")
-		.description("Render, check and export Freshcoat templates.")
+		.description("Render, check and inspect Freshcoat templates and workspaces.")
 		.version(version(), "-v, --version", "print the version")
 		.helpOption("-h, --help", "show help")
 		.helpCommand("help [command]", "show help for a command")
@@ -62,33 +62,58 @@ function program(io: Io) {
 		cmd.optsWithGlobals().quiet === true;
 
 	command("render")
-		.summary("render a template's frames to images")
+		.summary("render a template's frames or a workspace's export preset")
 		.description(
-			"Render each frame of a template to an image. <template> is a .coat file or\ntemplate JSON. Files are named after the frame, with the scale as a suffix\nfor anything but 1x: front.png, front@2x.png.",
+			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. A workspace preset writes a zip of\nimages and a report, or a PDF.",
 		)
-		.argument("<template>", "a .coat file or template JSON")
-		.option("--values <file>", "JSON file of field values")
+		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
+		.option("--values <file>", "template: JSON file of field values")
 		.option(
 			"--set <key=value>",
-			"one field value; repeatable, overrides --values",
+			"template: one field value; repeatable, overrides --values",
 			collectSetting,
 		)
-		.option("--variant <id>", "render a variant of the template")
-		.option("--frame <name>", "render only this frame; repeatable", collect)
-		.option("--scale <n>", "pixel density, default 1; repeatable", collectScale)
+		.option("--variant <id>", "template: render a variant of the template")
+		.option("--frame <name>", "template: render only this frame; repeatable", collect)
+		.option("--scale <n>", "template: pixel density, default 1; repeatable", collectScale)
 		.addOption(
-			new Option("--format <format>", "image format")
-				.choices(["png", "jpeg", "jpg", "webp"] as const)
-				.default("png" as const),
+			new Option("--format <format>", "template: image format, default png").choices([
+				"png",
+				"jpeg",
+				"jpg",
+				"webp",
+			] as const),
 		)
-		.option("--out <dir>", "directory to write to, default the current directory")
+		.option(
+			"--preset <name|id>",
+			"workspace: the preset to run, by id or by a name only it has",
+		)
+		.option(
+			"--out <path>",
+			"template: directory, default the current one; workspace: file, such as cards.zip",
+		)
 		.addHelpText(
 			"after",
-			"\nFonts the template declares are loaded from their sources; others are looked\nup on Google Fonts by name. Relative image paths resolve against the\ntemplate's directory. Written paths are printed on stdout.",
+			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory, and a workspace's dataset photos come from the workspace. Written\npaths, or a workspace export's summary, are printed on stdout. Exits 1 when a\nworkspace export is cancelled or any item fails.",
 		)
-		.action((file, options, cmd) =>
-			render(file, { ...options, quiet: quiet(cmd) }, io),
-		);
+		.action((file, options, cmd) => {
+			const { preset, out, ...templateOptions } = options;
+			if (!WORKSPACE.test(file)) {
+				if (preset !== undefined)
+					return cmd.error("error: --preset needs a .coatworkspace file");
+				return render(file, { ...options, quiet: quiet(cmd) }, io);
+			}
+			const misplaced = Object.keys(templateOptions).map((key) => `--${key}`);
+			if (misplaced.length > 0)
+				return cmd.error(
+					`error: ${misplaced.join(", ")} ${misplaced.length === 1 ? "applies" : "apply"} only to templates`,
+				);
+			if (preset === undefined)
+				return cmd.error("error: a .coatworkspace needs --preset <name|id>");
+			if (out === undefined)
+				return cmd.error("error: a .coatworkspace needs --out <path>");
+			return renderWorkspace(file, { preset, out, quiet: quiet(cmd) }, io);
+		});
 
 	command("validate")
 		.summary("check a template against the format")
@@ -107,24 +132,10 @@ function program(io: Io) {
 		.option("--json", "print the inspection as JSON")
 		.action((file, options) => inspect(file, options, io));
 
-	command("export")
-		.summary("run an export preset from a .coatworkspace")
-		.description(
-			"Run an export preset from a .coatworkspace file. A zip format writes a zip of\nimages and a report; the pdf format writes a PDF. Dataset photos come from\nthe workspace; other relative image paths resolve against its directory.",
-		)
-		.argument("<workspace>", "a .coatworkspace file")
-		.requiredOption("--preset <name|id>", "the preset to run, by id or by a name only it has")
-		.requiredOption("--out <path>", "file to write, such as cards.zip or cards.pdf")
-		.addHelpText(
-			"after",
-			"\nProgress and warnings go to stderr and a summary to stdout. Exits 1 when the\nexport is cancelled or any item fails.",
-		)
-		.action((file, options, cmd) =>
-			exportCommand(file, { ...options, quiet: quiet(cmd) }, io),
-		);
-
 	return root;
 }
+
+const WORKSPACE = /\.coatworkspace$/i;
 
 function collect(value: string, previous: string[] = []): string[] {
 	return [...previous, value];

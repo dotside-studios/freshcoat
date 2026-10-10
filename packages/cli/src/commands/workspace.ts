@@ -14,11 +14,11 @@ import { warnAboutFonts } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { openRenderer } from "../renderer";
 
-export type ExportOptions = { preset: string; out: string; quiet: boolean };
+export type WorkspaceOptions = { preset: string; out: string; quiet: boolean };
 
-export async function exportCommand(
+export async function renderWorkspace(
 	file: string,
-	options: ExportOptions,
+	options: WorkspaceOptions,
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);

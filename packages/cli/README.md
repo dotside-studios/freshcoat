@@ -1,8 +1,8 @@
 # @freshcoat-js/cli
 
 The `freshcoat` command line for [Freshcoat](../../README.md): render a
-template to images, check it, list what it holds and run a workspace's export
-presets, without writing a script. It is built on
+template to images or a workspace's export preset to a zip or PDF, check a
+template and list what it holds, without writing a script. It is built on
 [`@freshcoat-js/coatfile`](../coatfile), [`@freshcoat-js/engine`](../engine)
 and [`@freshcoat-js/workspace`](../workspace), and runs on Node.
 
@@ -25,7 +25,12 @@ command.
 freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --values alex.json --variant amber --frame front
 freshcoat render card.json --scale 1 --scale 2 --format webp --out out
+freshcoat render club.coatworkspace --preset "All cards" --out cards.zip
 ```
+
+Takes a template (a `.coat` file or template JSON) or a `.coatworkspace`.
+
+#### Templates
 
 Renders each frame and prints the path of every file it writes. Files are named
 after the frame, with the scale as a suffix for anything but 1x: `front.png`,
@@ -47,6 +52,14 @@ looked up on Google Fonts by name, and both cases are reported on stderr when
 a family is guessed or no font data is found. Relative image paths resolve
 against the template's directory, and nothing outside it is read.
 
+#### Workspaces
+
+Runs an export preset from a `.coatworkspace`, chosen with `--preset` by id or
+by a name no other preset has, and writes the zip or PDF to `--out`; both flags
+are required and the template flags are refused. Progress goes to stderr and a
+one-line summary to stdout. The command also warns about text the fonts have no
+glyphs for, and exits 1 when an item fails.
+
 ### validate
 
 ```sh
@@ -66,17 +79,6 @@ Lists the frames and their sizes, the fields with their type, requirement and
 default, the variants, and the font families the template uses, with whether it
 declares each. `--json` prints the same as one object with `frames`, `fields`,
 `variants` and `fonts` arrays.
-
-### export
-
-```sh
-freshcoat export club.coatworkspace --preset "All cards" --out cards.zip
-```
-
-Runs an export preset from a `.coatworkspace`, chosen by id or by a name no
-other preset has, and writes the zip or PDF to `--out`. Progress goes to
-stderr and a one-line summary to stdout. The command also warns about text the
-fonts have no glyphs for, and exits 1 when an item fails.
 
 ## From code
 
