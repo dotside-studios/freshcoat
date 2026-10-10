@@ -95,12 +95,12 @@ export async function encodePng(
 	}
 
 	let best = {
-		stream: await deflate(plans[0].rows()),
+		stream: await deflateChunks(plans[0].rows()),
 		channels: plans[0].channels,
 	};
 	for (let i = 1; i < plans.length; i++) {
-		const stream = await deflate(plans[i].rows());
-		if (stream.length < best.stream.length)
+		const stream = await deflateChunks(plans[i].rows());
+		if (stream.total < best.stream.total)
 			best = { stream, channels: plans[i].channels };
 	}
 	return assemble(best.stream, width, height, best.channels);
@@ -233,6 +233,21 @@ function paeth(a: number, b: number, c: number): number {
 // is deliberately not awaited before reading starts — a large frame fills the
 // stream's queue, and waiting for the write to settle first would deadlock.
 export async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
+	const { chunks, total } = await deflateChunks(bytes);
+	const out = new Uint8Array(total);
+	let offset = 0;
+	for (const c of chunks) {
+		out.set(c, offset);
+		offset += c.length;
+	}
+	return out;
+}
+
+// The deflate output as the chunks the stream produced, so an IDAT can be
+// assembled from them without first joining them into one buffer.
+type DeflatedChunks = { chunks: Uint8Array[]; total: number };
+
+async function deflateChunks(bytes: Uint8Array): Promise<DeflatedChunks> {
 	const cs = new CompressionStream("deflate");
 	const writer = cs.writable.getWriter();
 	const written = writer
@@ -248,55 +263,56 @@ export async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 		total += value.length;
 	}
 	await written;
-	const out = new Uint8Array(total);
-	let offset = 0;
-	for (const c of chunks) {
-		out.set(c, offset);
-		offset += c.length;
-	}
-	return out;
+	return { chunks, total };
 }
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
 function assemble(
-	idat: Uint8Array,
+	idat: DeflatedChunks,
 	width: number,
 	height: number,
 	channels: number,
 ): Uint8Array {
-	const ihdr = new Uint8Array(13);
-	const view = new DataView(ihdr.buffer);
-	view.setUint32(0, width);
-	view.setUint32(4, height);
-	ihdr[8] = 8; // bit depth
-	ihdr[9] = channels === 4 ? 6 : 2; // colour type: RGBA / RGB
-	// 10..12: compression 0, filter 0, interlace 0 — the only values PNG defines.
-
-	const chunks = [
-		chunk("IHDR", ihdr),
-		chunk("IDAT", idat),
-		chunk("IEND", new Uint8Array(0)),
-	];
-	const size = PNG_SIGNATURE.length + chunks.reduce((n, c) => n + c.length, 0);
-	const png = new Uint8Array(size);
+	const png = new Uint8Array(
+		PNG_SIGNATURE.length + (12 + 13) + (12 + idat.total) + 12,
+	);
 	png.set(PNG_SIGNATURE, 0);
 	let offset = PNG_SIGNATURE.length;
-	for (const c of chunks) {
-		png.set(c, offset);
-		offset += c.length;
+
+	const view = new DataView(png.buffer);
+	view.setUint32(offset + 8, width);
+	view.setUint32(offset + 12, height);
+	png[offset + 16] = 8; // bit depth
+	png[offset + 17] = channels === 4 ? 6 : 2; // colour type: RGBA / RGB
+	// 10..12: compression 0, filter 0, interlace 0 — the only values PNG defines.
+	offset = sealChunk(png, offset, "IHDR", 13);
+
+	let dst = offset + 8;
+	for (const c of idat.chunks) {
+		png.set(c, dst);
+		dst += c.length;
 	}
+	offset = sealChunk(png, offset, "IDAT", idat.total);
+
+	sealChunk(png, offset, "IEND", 0);
 	return png;
 }
 
-function chunk(type: string, data: Uint8Array): Uint8Array {
-	const out = new Uint8Array(12 + data.length);
-	const view = new DataView(out.buffer);
-	view.setUint32(0, data.length);
-	for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
-	out.set(data, 8);
-	view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
-	return out;
+// Frame the `length` data bytes already at `start + 8`: the length and type
+// before them, the CRC after. Returns where the next chunk starts.
+function sealChunk(
+	png: Uint8Array,
+	start: number,
+	type: string,
+	length: number,
+): number {
+	const view = new DataView(png.buffer);
+	view.setUint32(start, length);
+	for (let i = 0; i < 4; i++) png[start + 4 + i] = type.charCodeAt(i);
+	const end = start + 8 + length;
+	view.setUint32(end, crc32(png.subarray(start + 4, end)));
+	return end + 4;
 }
 
 const CRC_TABLE = (() => {
