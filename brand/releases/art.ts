@@ -1,13 +1,15 @@
 // Shared pieces for the release banners: a seeded random source, the brand
-// palette, operand shapes and the frame every banner is drawn in. A banner is
-// a template module, so the CLI of the release it announces renders it.
+// palette, shapes and the strip every banner is drawn in, with the logo and
+// version centred over the release's own art. A banner is a template module,
+// so the CLI of the release it announces renders it.
 
 import { readFileSync } from "node:fs";
 import type { Element, Fill, Template } from "../../packages/coatfile/src/types";
 import { scalePathData } from "../../packages/engine/src/path-data";
 
-export const WIDTH = 1280;
-export const HEIGHT = 640;
+// A 5:1 strip, wide and thin like a film frame.
+export const WIDTH = 1600;
+export const HEIGHT = 320;
 export const INK = "#0a0f1c";
 
 // The stops of the mark's angular gradient.
@@ -70,27 +72,6 @@ export function ellipsePath(w: number, h: number): string {
 	return `M0 ${ry}A${rx} ${ry} 0 1 0 ${round(w)} ${ry}A${rx} ${ry} 0 1 0 0 ${ry}Z`;
 }
 
-/** A cubic path through `points` as Catmull-Rom, with the control points of
- *  each segment, for drawing its handles. */
-export function smoothPath(points: [number, number][]) {
-	const segments: { from: [number, number]; c1: [number, number]; c2: [number, number]; to: [number, number] }[] = [];
-	for (let i = 0; i < points.length - 1; i++) {
-		const p0 = points[i - 1] ?? points[i];
-		const p1 = points[i];
-		const p2 = points[i + 1];
-		const p3 = points[i + 2] ?? p2;
-		segments.push({
-			from: p1,
-			c1: [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6],
-			c2: [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6],
-			to: p2,
-		});
-	}
-	const pt = (p: [number, number]) => `${round(p[0])} ${round(p[1])}`;
-	const d = `M${pt(points[0])}${segments.map((s) => `C${pt(s.c1)} ${pt(s.c2)} ${pt(s.to)}`).join("")}`;
-	return { d, segments };
-}
-
 export function ellipse(x: number, y: number, w: number, h: number, extra: Partial<Element> = {}): Element {
 	return {
 		id: id("ellipse"),
@@ -129,35 +110,106 @@ const markPath = pick(/<clipPath id="fc-logo"><path d="([^"]+)"/);
 const wordPath = pick(/<path fill="#000" d="([^"]+)"/);
 
 /** The Freshcoat logo drawn as vectors, `height` tall, with the wordmark in `color`. */
-export function logo(x: number, y: number, height: number, color: string): Element[] {
+export function logo(height: number, color: string): Element {
 	const s = height / 120;
+	const size = { width: round(668 * s), height };
+	return {
+		id: "logo",
+		type: "frame",
+		size,
+		properties: {
+			children: [
+				{
+					id: "logo-mark",
+					type: "vector",
+					pos: { x: 0, y: 0 },
+					size: { width: round(138 * s), height },
+					properties: { d: scalePathData(markPath, s), fill: angular(0) },
+				},
+				{
+					id: "logo-wordmark",
+					type: "vector",
+					pos: { x: 0, y: 0 },
+					size,
+					properties: { d: scalePathData(wordPath, s), fill: color },
+				},
+			],
+		},
+	} as Element;
+}
+
+// Google's stylesheet hands a client that is not a browser one static
+// instance, so the variable file comes from the google/fonts repository.
+const ROBOTO_FLEX = {
+	kind: "local",
+	family: "Roboto Flex",
+	files: [
+		{
+			weight: 400,
+			src: "https://raw.githubusercontent.com/google/fonts/main/ofl/robotoflex/RobotoFlex%5BGRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght%5D.ttf",
+		},
+	],
+} as const;
+
+/** The logo and the version, centred, over a shade that keeps them readable
+ *  on any art. The same in every banner. */
+function lockup(version: string): Element[] {
 	return [
+		rect(0, 0, WIDTH, HEIGHT, {
+			id: "shade",
+			properties: {
+				fill: {
+					kind: "radial",
+					center: [0.5, 0.5],
+					radius: 0.26,
+					radiusY: 0.12,
+					stops: [
+						{ offset: 0, color: `${INK}e6` },
+						{ offset: 0.55, color: `${INK}b3` },
+						{ offset: 1, color: `${INK}00` },
+					],
+				},
+			},
+		} as Partial<Element>),
 		{
-			id: "logo-mark",
-			type: "vector",
-			pos: { x, y },
-			size: { width: round(138 * s), height },
-			properties: { d: scalePathData(markPath, s), fill: angular(0) },
-		},
-		{
-			id: "logo-wordmark",
-			type: "vector",
-			pos: { x, y },
-			size: { width: round(668 * s), height },
-			properties: { d: scalePathData(wordPath, s), fill: color },
-		},
-	] as Element[];
+			id: "lockup",
+			type: "frame",
+			pos: { x: 0, y: 0 },
+			size: { width: WIDTH, height: HEIGHT },
+			properties: {
+				layout: { direction: "row", gap: 28, primaryAlign: "center", crossAlign: "center" },
+				children: [
+					logo(58, "#ffffff"),
+					rect(0, 0, 2, 52, { id: "divider", properties: { fill: "#ffffff59" } } as Partial<Element>),
+					{
+						id: "version",
+						type: "text",
+						size: { width: 200, height: 58 },
+						layoutChild: { width: "hug" },
+						properties: {
+							value: version,
+							font: { family: "Roboto Flex", size: 54, lineHeight: 1, variations: { wght: 300, wdth: 100, opsz: 72 } },
+							color: "#ffffff",
+							verticalAlign: "middle",
+						},
+					},
+				],
+			},
+		} as Element,
+	];
 }
 
 export type BannerOptions = {
 	version: string;
 	description: string;
-	fonts: Template["fonts"];
-	elements: Element[];
+	/** The release's own art, drawn behind the lockup. */
+	art: Element[];
+	fonts?: Template["fonts"];
 	background?: Fill | Fill[];
 };
 
-/** The template for a release banner, one frame named after the release. */
+/** The template for a release banner: a strip with the release's art behind
+ *  the logo and version, one frame named after the release. */
 export function banner(o: BannerOptions): Template {
 	return {
 		format_version: "1.6",
@@ -167,7 +219,7 @@ export function banner(o: BannerOptions): Template {
 		description: o.description,
 		width: WIDTH,
 		height: HEIGHT,
-		fonts: o.fonts,
+		fonts: [ROBOTO_FLEX, ...(o.fonts ?? [])],
 		fields: { type: "object", properties: {}, required: [] },
 		template_data: [
 			{
@@ -179,7 +231,7 @@ export function banner(o: BannerOptions): Template {
 					size: { width: WIDTH, height: HEIGHT },
 					properties: { fill: o.background ?? INK },
 				},
-				elements: o.elements,
+				elements: [...o.art, ...lockup(o.version)],
 			},
 		],
 	} as Template;

@@ -28,21 +28,23 @@ bun packages/cli/src/bin.ts render brand/figma-cover.json --out brand/png
 
 ## Release banners
 
-Each GitHub release opens with a 1280 × 640 banner drawn by the release it
-announces. A banner is a template module, `releases/v<version>.coat.ts`, whose
-motifs stand for that release's changes and use the engine's new capabilities
-to draw them. `releases/art.ts` holds what every banner shares: a random source
-seeded by the version, so a banner renders the same each time, the palette of
-the mark, operand shapes, the logo as vectors and the frame.
+Each GitHub release opens with a 1600 × 320 banner: the logo and version
+centred, the same every time, over generative art made for that release. The
+art does not list the release's features; it is one idea drawn with some of
+what the release made possible. Each banner is a template module,
+`releases/v<version>.coat.ts`, rendered by the CLI of the release it
+announces. `releases/art.ts` holds what every banner shares: the strip, the
+lockup, the palette of the mark and a random source seeded by the version, so
+a banner renders the same each time.
 
 ```sh
 bun packages/cli/src/bin.ts render brand/releases/v0.4.0.coat.ts --out brand/releases
 ```
 
 The frame is named after the release, so this writes `releases/v0.4.0.png`.
-For a new release, copy the last module, change `VERSION` and draw what the
-release adds. See [the release guide](../docs/releases.md#release-banner) for
-adding the banner to the release notes.
+For a new release, copy the last module, change `VERSION` and replace its art.
+See [the release guide](../docs/releases.md#release-banner) for adding the
+banner to the release notes.
 
 Figma writes the mark's angular gradient as a CSS `conic-gradient` inside a
 `foreignObject`, which favicons, `<img>` and GitHub do not render. The build

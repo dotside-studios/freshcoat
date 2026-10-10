@@ -119,9 +119,9 @@ publishing tokens. Trusted publishing continues to work without those tokens.
 
 ## Release banner
 
-Each release's notes open with a generative banner rendered by the CLI of
-that release from `brand/releases/v<version>.coat.ts`. Its motifs stand for
-what the release adds, drawn with the engine's new capabilities; see
+Each release's notes open with a banner rendered by the CLI of that release
+from `brand/releases/v<version>.coat.ts`: the logo and version over
+generative art drawn with some of what the release adds; see
 [the brand README](../brand/README.md#release-banners). Render it and commit
 the PNG with the version change, so the tag carries it:
 
