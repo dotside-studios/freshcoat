@@ -934,8 +934,11 @@ class PageBuilder {
 				const outline = cmd.strokeD
 					? ck.Path.MakeFromSVGString(cmd.strokeD)
 					: null;
-				out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
-				outline?.delete();
+				try {
+					out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
+				} finally {
+					outline?.delete();
+				}
 			}
 			return `${out}Q\n`;
 		} finally {
