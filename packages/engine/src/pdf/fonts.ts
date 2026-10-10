@@ -1,290 +1,236 @@
-/// <reference path="./fontkit.d.ts" />
+// Text drawn with the font files themselves: CanvasKit shapes it and reports
+// glyph ids and positions, and the page embeds the TrueType or OpenType file
+// the run used, so the glyphs stay vector and the text selectable. A run whose
+// file a PDF cannot carry as is has no face here and is drawn as pixels.
 
-// Glyph outlines for the faces a scene's text shapes with, read with fontkit:
-// CanvasKit shapes the text and reports glyph ids, but has no way to hand back
-// a glyph's outline.
-
+import type { CanvasKit, GlyphRun, Typeface } from "canvaskit-wasm";
+import { fontArrayBuffer } from "../font-bytes";
 import type { FontVariations } from "../types";
-import { num } from "./writer";
+import { readSfnt, type SfntInfo } from "./sfnt";
+import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 
-type FkGlyph = {
-	path: {
-		commands: PathCommand[];
-		bbox: { minX: number; minY: number; maxX: number; maxY: number };
-	};
-};
-type FkPoint = { x: number; y: number; onCurve: boolean; endContour: boolean };
-type FkAxis = {
-	axisTag: string;
-	minValue: number;
-	defaultValue: number;
-	maxValue: number;
-};
-type FkFont = {
-	unitsPerEm: number;
-	numGlyphs: number;
-	familyName: string;
-	"OS/2"?: { usWeightClass: number; fsSelection: { italic: boolean } };
-	italicAngle: number;
-	fvar?: { axis: FkAxis[] };
-	directory: { tables: Record<string, { transformed?: boolean } | undefined> };
-	variationCoords: number[] | null;
-	_variationProcessor: {
-		transformPoints(id: number, points: FkPoint[]): void;
-	} | null;
-	_transformGlyfTable?(): void;
-	_transformedGlyphs?: Array<TransformedGlyph | undefined>;
-	getGlyph(id: number): FkGlyph;
-	glyphForCodePoint(cp: number): { id: number };
-};
-type TransformedGlyph = {
-	numberOfContours: number;
-	points?: FkPoint[];
-	components?: Array<{ dx: number; dy: number }>;
-};
-type Fontkit = { create(bytes: Uint8Array): unknown };
-
-let fontkit: Promise<Fontkit> | null = null;
-export function loadFontkit(): Promise<Fontkit> {
-	fontkit ??= import("fontkit") as Promise<Fontkit>;
-	return fontkit;
-}
-
-export type PathCommand = { command: string; args: number[] };
-
-export type GlyphOutline = {
-	// In font units, y up.
-	commands: PathCommand[];
-	bbox: [number, number, number, number];
+export type FontFile = {
+	registered: string;
+	bytes: Uint8Array;
+	info: SfntInfo | null;
+	family: string;
+	typeface: Typeface | null;
 };
 
-export type Face = {
-	key: string;
-	unitsPerEm: number;
-	glyphId(codePoint: number): number;
-	outline(id: number): GlyphOutline | null;
-};
-
-type Parsed = {
-	font: FkFont;
-	weight: [number, number];
-	italic: boolean;
-	axes: FkAxis[];
+export type EmbeddedFace = {
+	// The font's resource name on the page.
+	id: string;
+	ref: PdfRef;
+	info: SfntInfo;
+	file: FontFile;
+	// Each glyph drawn, with the text it stands for.
+	used: Map<number, string>;
 };
 
 export type FaceRequest = {
-	family: string;
 	weight: number;
 	italic: boolean;
 	variations?: FontVariations;
 };
 
-export class FaceIndex {
-	private parsed = new Map<Uint8Array, Parsed | null>();
-	private faces = new Map<string, Face>();
-	private ids = new Map<Uint8Array, number>();
+export class FontEmbedder {
+	private files: FontFile[] | null = null;
+	private faces = new Map<FontFile, EmbeddedFace>();
 
 	constructor(
-		private fk: Fontkit,
+		private ck: CanvasKit,
 		private byFamily: Map<string, Uint8Array[]>,
+		private w: PdfWriter,
 	) {}
 
-	// The faces whose name table, or registered family, names `family`,
-	// closest to the request first as CSS font matching ranks them: style,
-	// then weight. CanvasKit reports a face by the name in its file, which
-	// need not be the family it was registered under.
-	candidates(req: FaceRequest): Face[] {
-		const ranked: Array<{ bytes: Uint8Array; p: Parsed; score: number }> = [];
-		for (const [registered, list] of this.byFamily) {
-			for (const bytes of list) {
-				const p = this.parse(bytes);
-				if (
-					!p ||
-					(registered !== req.family && p.font.familyName !== req.family)
-				)
-					continue;
-				const [lo, hi] = p.weight;
-				const distance =
-					req.weight < lo
-						? lo - req.weight
-						: req.weight > hi
-							? req.weight - hi
-							: 0;
-				ranked.push({
-					bytes,
-					p,
-					score: (p.italic === req.italic ? 0 : 10000) + distance,
-				});
-			}
+	// The embeddable file CanvasKit shaped `run` with, or why there is none.
+	file(
+		run: GlyphRun,
+		req: FaceRequest,
+		text: string,
+	): FontFile | { reason: string } {
+		const family = run.typeface?.getFamilyName() ?? "";
+		const named = this.all().filter(
+			(f) => f.family === family || f.registered === family,
+		);
+		if (named.length === 0) return { reason: `font ${family || "unknown"}` };
+		if (named.some((f) => !f.info))
+			return { reason: `font ${family} is not TrueType or OpenType` };
+		const ranked = named
+			.map((f) => ({ f, score: score(f.info as SfntInfo, req) }))
+			.sort((a, b) => a.score - b.score)
+			.map(({ f }) => f);
+		const probes: Array<[string, number]> = [];
+		for (let i = 0; i < run.glyphs.length && probes.length < 4; i++) {
+			const cp = text.codePointAt(run.offsets[i] ?? 0);
+			if (cp === undefined || cp <= 0x20) continue;
+			const ch = String.fromCodePoint(cp);
+			const id = run.typeface?.getGlyphIDs(ch)[0];
+			if (id !== undefined && id === run.glyphs[i]) probes.push([ch, id]);
 		}
-		ranked.sort((a, b) => a.score - b.score);
-		return ranked.map(({ bytes, p }) => this.face(bytes, p, req));
-	}
-
-	private parse(bytes: Uint8Array): Parsed | null {
-		if (this.parsed.has(bytes)) return this.parsed.get(bytes) ?? null;
-		let out: Parsed | null = null;
-		try {
-			const font = this.fk.create(bytes) as FkFont;
-			const axes = font.fvar?.axis ?? [];
-			const wght = axes.find((a) => a.axisTag.trim() === "wght");
-			const os2 = font["OS/2"];
-			out = {
-				font,
-				weight: wght
-					? [wght.minValue, wght.maxValue]
-					: [os2?.usWeightClass ?? 400, os2?.usWeightClass ?? 400],
-				italic: !!os2?.fsSelection.italic || font.italicAngle !== 0,
-				axes,
-			};
-		} catch {
-			out = null;
-		}
-		this.parsed.set(bytes, out);
-		return out;
-	}
-
-	private face(bytes: Uint8Array, p: Parsed, req: FaceRequest): Face {
+		const file = ranked.find((f) =>
+			probes.every(([ch, id]) => f.typeface?.getGlyphIDs(ch)[0] === id),
+		);
+		if (!file) return { reason: `font ${family}` };
+		const info = file.info as SfntInfo;
 		const settings: Record<string, number> = {
 			wght: req.weight,
 			...req.variations,
 		};
-		const coords = p.axes.map((a) => {
-			const v = settings[a.axisTag.trim()];
-			return v === undefined
-				? a.defaultValue
-				: Math.min(a.maxValue, Math.max(a.minValue, v));
+		const instanced = info.axes.some((a) => {
+			const v = settings[a.tag];
+			return (
+				v !== undefined && Math.min(a.max, Math.max(a.min, v)) !== a.default
+			);
 		});
-		const varied = coords.some((c, i) => c !== p.axes[i]?.defaultValue);
-		let id = this.ids.get(bytes);
-		if (id === undefined) {
-			id = this.ids.size;
-			this.ids.set(bytes, id);
+		if (instanced) return { reason: `variable font ${family}` };
+		return file;
+	}
+
+	// The page's font for `file`, embedded with the page.
+	embed(file: FontFile): EmbeddedFace {
+		const info = file.info as SfntInfo;
+		let face = this.faces.get(file);
+		if (!face) {
+			face = {
+				id: `F${this.faces.size}`,
+				ref: this.w.reserve(),
+				info,
+				file,
+				used: new Map(),
+			};
+			this.faces.set(file, face);
 		}
-		const key = varied ? `${id}:${coords.join(",")}` : `${id}`;
-		const hit = this.faces.get(key);
-		if (hit) return hit;
-		const font = varied ? this.instance(bytes, coords) : p.font;
-		const outlines = new Map<number, GlyphOutline | null>();
-		const face: Face = {
-			key,
-			unitsPerEm: font.unitsPerEm,
-			glyphId: (cp) => font.glyphForCodePoint(cp).id,
-			outline: (gid) => {
-				if (outlines.has(gid)) return outlines.get(gid) ?? null;
-				let o: GlyphOutline | null = null;
-				if (gid >= 0 && gid < font.numGlyphs) {
-					const { commands, bbox } = font.getGlyph(gid).path;
-					o = commands.length
-						? { commands, bbox: [bbox.minX, bbox.minY, bbox.maxX, bbox.maxY] }
-						: null;
-				}
-				outlines.set(gid, o);
-				return o;
-			},
-		};
-		this.faces.set(key, face);
 		return face;
 	}
 
-	// A fresh parse at these axis coordinates. fontkit's own getVariation
-	// cannot read a WOFF2 font, and its WOFF2 glyphs skip variation deltas, so
-	// a WOFF2 instance has the deltas applied to its decoded glyphs here.
-	private instance(bytes: Uint8Array, coords: number[]): FkFont {
-		const font = this.fk.create(bytes) as FkFont;
-		if (!font.directory.tables.glyf?.transformed || !font._transformGlyfTable) {
-			font.variationCoords = coords;
-			return font;
+	// The Font resources the page names, written once every glyph is known.
+	write(): Record<string, PdfRef> {
+		const out: Record<string, PdfRef> = {};
+		for (const face of this.faces.values()) {
+			writeFace(this.w, face);
+			out[face.id] = face.ref;
 		}
-		font._transformGlyfTable();
-		const deltas = this.fk.create(bytes) as FkFont;
-		deltas.variationCoords = coords;
-		const processor = deltas._variationProcessor;
-		const base = font._transformedGlyphs ?? [];
-		const Point = base.find((g) => g?.points?.length)?.points?.[0]
-			?.constructor as
-			| (new (
-					onCurve: boolean,
-					endContour: boolean,
-					x: number,
-					y: number,
-			  ) => FkPoint)
-			| undefined;
-		if (!processor || !Point) return font;
-		const phantom = () => [0, 1, 2, 3].map(() => new Point(false, true, 0, 0));
-		const varied: Array<TransformedGlyph | undefined> = [];
-		font._transformedGlyphs = new Proxy(base, {
-			get(target, key) {
-				const gid = typeof key === "string" ? Number(key) : Number.NaN;
-				if (!Number.isInteger(gid)) return Reflect.get(target, key);
-				if (varied[gid]) return varied[gid];
-				const g = target[gid];
-				if (!g) return g;
-				const out: TransformedGlyph = { ...g };
-				if (g.numberOfContours > 0 && g.points) {
-					const points = g.points.map(
-						(q) => new Point(q.onCurve, q.endContour, q.x, q.y),
-					);
-					processor.transformPoints(gid, [...points, ...phantom()]);
-					out.points = points;
-				} else if (g.numberOfContours < 0 && g.components) {
-					const points = g.components.map(
-						(c) => new Point(true, true, c.dx, c.dy),
-					);
-					processor.transformPoints(gid, [...points, ...phantom()]);
-					out.components = g.components.map((c, i) => ({
-						...c,
-						dx: points[i]?.x ?? c.dx,
-						dy: points[i]?.y ?? c.dy,
-					}));
-				}
-				varied[gid] = out;
-				return out;
-			},
-		});
-		return font;
+		return out;
+	}
+
+	dispose() {
+		for (const f of this.files ?? []) f.typeface?.delete();
+		this.files = null;
+	}
+
+	private all(): FontFile[] {
+		if (this.files) return this.files;
+		this.files = [];
+		for (const [registered, list] of this.byFamily)
+			for (const bytes of list) {
+				const typeface = this.ck.Typeface.MakeTypefaceFromData(
+					fontArrayBuffer(bytes),
+				);
+				this.files.push({
+					registered,
+					bytes,
+					info: readSfnt(bytes),
+					family: typeface?.getFamilyName() ?? registered,
+					typeface,
+				});
+			}
+		return this.files;
 	}
 }
 
-// A glyph's outline as construction operators, mapped through `m` when given.
-export function glyphOps(
-	commands: PathCommand[],
-	m?: [number, number, number, number, number, number],
-): string {
-	const out: string[] = [];
-	let x = 0;
-	let y = 0;
-	const p = (a: number, b: number) =>
-		m
-			? `${num(m[0] * a + m[2] * b + m[4])} ${num(m[1] * a + m[3] * b + m[5])}`
-			: `${num(a)} ${num(b)}`;
-	for (const { command, args: a } of commands) {
-		if (command === "moveTo") {
-			[x, y] = a as [number, number];
-			out.push(`${p(x, y)} m`);
-		} else if (command === "lineTo") {
-			[x, y] = a as [number, number];
-			out.push(`${p(x, y)} l`);
-		} else if (command === "quadraticCurveTo") {
-			const [qx, qy, ex, ey] = a as [number, number, number, number];
-			out.push(
-				`${p(x + (2 / 3) * (qx - x), y + (2 / 3) * (qy - y))} ${p(ex + (2 / 3) * (qx - ex), ey + (2 / 3) * (qy - ey))} ${p(ex, ey)} c`,
-			);
-			x = ex;
-			y = ey;
-		} else if (command === "bezierCurveTo") {
-			const [c1x, c1y, c2x, c2y, ex, ey] = a as [
-				number,
-				number,
-				number,
-				number,
-				number,
-				number,
-			];
-			out.push(`${p(c1x, c1y)} ${p(c2x, c2y)} ${p(ex, ey)} c`);
-			x = ex;
-			y = ey;
-		} else if (command === "closePath") out.push("h");
+// CSS font matching's order: style first, then the distance in weight.
+function score(info: SfntInfo, req: FaceRequest): number {
+	const wght = info.axes.find((a) => a.tag === "wght");
+	const [lo, hi] = wght ? [wght.min, wght.max] : [info.weight, info.weight];
+	const distance =
+		req.weight < lo ? lo - req.weight : req.weight > hi ? req.weight - hi : 0;
+	return (info.italic === req.italic ? 0 : 10000) + distance;
+}
+
+function writeFace(w: PdfWriter, face: EmbeddedFace) {
+	const { info, file } = face;
+	const em = (v: number) => (v * 1000) / info.unitsPerEm;
+	const base = name(
+		`${file.family.replace(/[^A-Za-z0-9-]/g, "") || "Font"}-${face.id}`,
+	);
+	const program =
+		info.outlines === "truetype"
+			? { FontFile2: w.flate({ Length1: file.bytes.length }, file.bytes) }
+			: {
+					FontFile3: w.flate({ Subtype: name("OpenType") }, file.bytes),
+				};
+	const descriptor = w.add({
+		Type: name("FontDescriptor"),
+		FontName: base,
+		Flags: 4,
+		FontBBox: info.bbox.map(em),
+		ItalicAngle: info.italicAngle,
+		Ascent: em(info.ascent),
+		Descent: em(info.descent),
+		CapHeight: em(info.capHeight),
+		StemV: 80,
+		...program,
+	});
+	const glyphs = [...face.used.keys()].sort((a, b) => a - b);
+	const widths: Array<number | number[]> = [];
+	for (const g of glyphs) widths.push(g, [em(info.advance(g))]);
+	const cid: PdfDict = {
+		Type: name("Font"),
+		Subtype: name(
+			info.outlines === "truetype" ? "CIDFontType2" : "CIDFontType0",
+		),
+		BaseFont: base,
+		CIDSystemInfo: { Registry: "Adobe", Ordering: "Identity", Supplement: 0 },
+		FontDescriptor: descriptor,
+		DW: 0,
+		W: widths,
+		...(info.outlines === "truetype" ? { CIDToGIDMap: name("Identity") } : {}),
+	};
+	w.set(face.ref, {
+		Type: name("Font"),
+		Subtype: name("Type0"),
+		BaseFont: base,
+		Encoding: name("Identity-H"),
+		DescendantFonts: [w.add(cid)],
+		ToUnicode: w.flate({}, toUnicode(face.used)),
+	});
+}
+
+const hex4 = (n: number) => n.toString(16).padStart(4, "0").toUpperCase();
+
+function toUnicode(used: Map<number, string>): string {
+	const entries = [...used].filter(([, text]) => text.length > 0);
+	const blocks: string[] = [];
+	for (let i = 0; i < entries.length; i += 100) {
+		const chunk = entries.slice(i, i + 100);
+		blocks.push(
+			`${chunk.length} beginbfchar\n${chunk
+				.map(
+					([g, text]) =>
+						`<${hex4(g)}> <${[...text]
+							.flatMap((c) =>
+								Array.from({ length: c.length }, (_, k) => c.charCodeAt(k)),
+							)
+							.map(hex4)
+							.join("")}>`,
+				)
+				.join("\n")}\nendbfchar`,
+		);
 	}
-	return out.length ? `${out.join("\n")}\n` : "";
+	return `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+${blocks.join("\n")}
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`;
 }

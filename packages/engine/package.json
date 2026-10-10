@@ -27,8 +27,7 @@
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
 	"dependencies": {
-		"canvaskit-wasm": "0.41.1",
-		"fontkit": "2.0.4"
+		"canvaskit-wasm": "0.41.1"
 	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",

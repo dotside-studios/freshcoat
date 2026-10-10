@@ -225,22 +225,23 @@ fallback color.
 ## PDF output
 
 `renderer.renderPdf(scene, { width, height, dpi })` lays the scene out as
-`render` does and writes one PDF page of vectors, `dpi` design units to the
-inch. `renderer.paintPdf(commands)` does the same for a compiled scene.
-Shapes, linear and radial gradients, strokes (alignment, dashes, caps, joins
-and trims), clips, alpha and luminance masks, opacity, isolated groups and
-the blend modes PDF defines are drawn natively. Text is shaped by CanvasKit
-exactly as it renders and drawn as glyph outlines read with fontkit, variable
-fonts and WOFF2 included, so it is not selectable. Images are embedded at
-their source resolution, a JPEG as it is; an SVG image is drawn as vectors
-and a bitmap of a few flat colours, as a code is, as rectangles.
+`render` does and writes one PDF page, `dpi` design units to the inch.
+`renderer.paintPdf(commands)` does the same for a compiled scene. Shapes,
+linear and radial gradients, strokes, clips, masks, opacity, isolated groups,
+the blend modes PDF defines, images and SVG images are drawn as vectors, and a
+bitmap of a few flat colours, as a code is, as rectangles. Text is shaped by
+CanvasKit exactly as it renders and set in its own font file, embedded with a
+ToUnicode map so it stays selectable. That takes a TrueType or OpenType file,
+at its default instance when it is variable.
 
-Shadows, blurs, `adjust`, angular and pattern fills, reflected and repeated
+A layer a PDF cannot express is drawn by the CanvasKit painter into a
+transparent image at `rasterDpi` (600 by default) and placed where it belongs:
+shadows, blurs, `adjust`, angular and pattern fills, reflected and repeated
 gradients, tiled images, text on a curve, the `plus` and `linear-burn` blend
-modes, the frame finish and text or filters inside an SVG image have no PDF
-equivalent. Each is left out and reported once per layer as a
-`vector_unsupported` warning, so a caller can render that scene as pixels
-instead.
+modes, text in a WOFF or WOFF2 file or at a variable instance, and SVG images
+holding text or filters. Everything beneath a backdrop blur, or the whole page
+under a frame finish, is one image. Each is reported once per layer as a
+`vector_rasterized` warning.
 
 ## Subpaths
 

@@ -541,9 +541,9 @@ export type PaintWarning =
 			radius: number;
 			min: number;
 	  }
-	// A backend that writes vectors left out something it has no equivalent
-	// for, such as a shadow in a PDF. Rendering the scene as pixels keeps it.
-	| { kind: "vector_unsupported"; feature: string; layer?: string }
+	// A backend that writes vectors drew a layer as an image because it has no
+	// vector equivalent for part of it, such as a shadow in a PDF.
+	| { kind: "vector_rasterized"; feature: string; layer?: string }
 	// A pattern fill's shader failed to compile, so it painted its first colour.
 	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the

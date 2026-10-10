@@ -76,18 +76,6 @@ const LICENSE_FILE_FROM: Record<
 		from: "react",
 		why: "published by the React team from the React repository, under React's license",
 	},
-	brotli: {
-		file: "legal/third-party/brotli-LICENSE",
-		why: "its 1.3.3 npm archive and its readme name the MIT license, with Devon Govett as author, but include no license file; its decoder sources keep Google's Apache-2.0 header",
-	},
-	dfa: {
-		file: "legal/third-party/dfa-LICENSE",
-		why: "its 1.2.0 npm archive and its README name the MIT license, with Devon Govett as author, but include no license file",
-	},
-	fontkit: {
-		file: "legal/third-party/fontkit-LICENSE",
-		why: "its 2.0.4 npm archive and its README name the MIT license, with Devon Govett as author, but include no license file",
-	},
 	"natural-compare-lite": {
 		file: "legal/third-party/natural-compare-lite-LICENSE",
 		why: "its 1.4.0 npm archive points to this MIT license from its README but does not include the license file",

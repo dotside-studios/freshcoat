@@ -117,6 +117,8 @@ export type PaintPdfOptions = {
 	images?: Map<string, Uint8Array>;
 	/** Design units per inch, which sets the page size. Default 72. */
 	dpi?: number;
+	/** Pixels per inch of a layer painted as an image. Default 600. */
+	rasterDpi?: number;
 	title?: string;
 	date?: Date;
 };
@@ -161,8 +163,8 @@ export type Renderer = {
 	): Promise<FrameFor<O>>;
 	/**
 	 * Lays the scene out as `render` does and paints it as one PDF page of
-	 * vectors. What a PDF cannot draw is left out and reported as a
-	 * `vector_unsupported` warning.
+	 * vectors. A layer a PDF cannot express is painted as an image and
+	 * reported as a `vector_rasterized` warning.
 	 */
 	renderPdf(scene: Node, options: RenderPdfOptions): Promise<PdfFrame>;
 	/** Paints a compiled scene as one PDF page of vectors, as `renderPdf`. */
@@ -336,7 +338,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 
 	const doPaintPdf = async (
 		commands: Command[],
-		{ images, dpi, title, date }: PaintPdfOptions,
+		{ images, ...options }: PaintPdfOptions,
 	): Promise<PdfFrame> => {
 		const { paintPdf } = await import("./pdf/paint");
 		return paintPdf(
@@ -347,7 +349,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				fonts,
 				loadBytes: mapLoader(images, load),
 			},
-			{ dpi, title, date },
+			options,
 		);
 	};
 
@@ -379,15 +381,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		renderPdf(scene, pdfOptions) {
 			alive();
+			const { width, height, leadingTrim, ...paint } = pdfOptions;
 			return serial(() =>
-				doPaintPdf(
-					renderer.compile(scene, {
-						width: pdfOptions.width,
-						height: pdfOptions.height,
-						leadingTrim: pdfOptions.leadingTrim,
-					}),
-					pdfOptions,
-				),
+				doPaintPdf(renderer.compile(scene, { width, height, leadingTrim }), paint),
 			);
 		},
 		paintPdf(commands, pdfOptions = {}) {

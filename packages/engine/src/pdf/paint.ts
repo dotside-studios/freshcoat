@@ -1,23 +1,33 @@
-// A Painter for print: lowers a compiled scene to one PDF page of vector
-// operators instead of pixels. Shapes, gradients, strokes, clips, masks, blend
-// modes and images map onto PDF's own model and text becomes glyph outlines.
-// What PDF has no operator for (shadows, blurs, adjustments, angular and
-// pattern fills) is left out and reported as `vector_unsupported`, so a caller
-// can render that scene as pixels instead.
+// A Painter for print: lowers a compiled scene to one PDF page. Shapes,
+// gradients, strokes, clips, masks, blend modes and images map onto PDF's own
+// model, and text is drawn with its embedded font file. A layer PDF has no
+// operator for (a shadow, a blur, an adjustment, text in a font a PDF cannot
+// carry) is painted by the CanvasKit painter into a transparent image at
+// `rasterDpi` and placed where it belongs, and reported as `vector_rasterized`.
 
-import type { CanvasKit, Path, TypefaceFontProvider } from "canvaskit-wasm";
+import type {
+	CanvasKit,
+	GlyphRun,
+	Path,
+	TypefaceFontProvider,
+} from "canvaskit-wasm";
 import {
 	type Bin,
 	collectAssets,
 	focalPoint,
 	makeBin,
+	paintScene,
+	type ShapedTextLine,
 	shapeTextLines,
 } from "../canvaskit";
 import { parseColor } from "../color";
 import { compileScene } from "../compile-scene";
 import { normalizeDash } from "../dash";
 import { fontBytes } from "../font-bytes";
-import { createSharedFontProvider } from "../font-collection";
+import {
+	createSharedFontProvider,
+	type SharedFontProvider,
+} from "../font-collection";
 import { parseImageInfo } from "../image-info";
 import { dataUrlToBytes } from "../loader";
 import { boxPath, outlineGeometry, rectShape } from "../outline";
@@ -38,7 +48,7 @@ import type {
 	ShapeMask,
 	Stroke,
 } from "../types";
-import { type Face, FaceIndex, glyphOps, loadFontkit } from "./fonts";
+import { FontEmbedder, type FontFile } from "./fonts";
 import {
 	cm,
 	type Matrix,
@@ -61,6 +71,8 @@ import {
 export type PdfPaintOptions = {
 	/** Design units per inch. Default 72: one unit is one point. */
 	dpi?: number;
+	/** Pixels per inch of a layer drawn as an image. Default 600. */
+	rasterDpi?: number;
 	title?: string;
 	/** Creation date; fixing it makes the bytes repeatable. */
 	date?: Date;
@@ -96,6 +108,9 @@ const CAP = { butt: 0, round: 1, square: 2 } as const;
 const JOIN = { miter: 0, round: 1, bevel: 2 } as const;
 // Skia's default miter limit.
 const MITER_LIMIT = 4;
+// The longest edge, in pixels, a layer drawn as an image is painted at.
+const MAX_RASTER_EDGE = 8192;
+const MAX_SVG_NESTING = 4;
 
 type Box = { x: number; y: number; w: number; h: number };
 type Rgba = [number, number, number, number];
@@ -106,15 +121,29 @@ type ImageEntry = {
 	height: number;
 	vector?: true;
 } | null;
-
 type SvgScene = {
 	commands: DrawCommand[];
 	width: number;
 	height: number;
 	features: string[];
 };
-
-const MAX_SVG_NESTING = 4;
+type Frame = { data: Uint8Array; width: number; height: number; scale: number };
+// A layer painted as pixels, placed in design units.
+type Patch = { ref: PdfRef; x: number; y: number; w: number; h: number } | null;
+type TextRun = { run: GlyphRun; file: FontFile };
+type TextPlan = {
+	lines: Array<{ line: ShapedTextLine; text: string; runs: TextRun[] }>;
+	reason?: string;
+};
+// Glyphs on one baseline in one colour, shown by one TJ.
+type Segment = {
+	color: string;
+	y: number;
+	head: string;
+	parts: string[];
+	x: number;
+	advance: number;
+};
 
 function rgba(color: string): Rgba {
 	const c = parseColor(color);
@@ -123,6 +152,8 @@ function rgba(color: string): Rgba {
 
 const rgb = (c: Rgba) =>
 	`${num(c[0] / 255)} ${num(c[1] / 255)} ${num(c[2] / 255)}`;
+
+const isDrawable = (c: Command): c is DrawCommand => c.op.startsWith("draw");
 
 export async function paintPdf(
 	canvasKit: unknown,
@@ -167,7 +198,6 @@ export async function paintPdf(
 			warnings.push({ kind: "image_load_failed", src, error: String(e) });
 		}
 	}
-
 	const svgScenes = new Map<string, SvgScene>();
 	const prepare = async (src: string, bytes: Uint8Array, depth: number) => {
 		if (!isSvg(bytes) || svgScenes.has(src) || depth > MAX_SVG_NESTING) return;
@@ -186,96 +216,289 @@ export async function paintPdf(
 			}
 	};
 	for (const [src, bytes] of [...sources]) await prepare(src, bytes, 0);
-	const allCommands = [
-		...commands,
-		...[...svgScenes.values()].flatMap((s) => s.commands),
-	];
 
-	const needsText = allCommands.some(function hasText(c: Command): boolean {
-		if (c.op === "drawText") return true;
-		if (c.op === "drawGroup") return c.children.some(hasText);
-		if (c.op === "drawMasked")
-			return hasText(c.mask) || c.children.some(hasText);
-		return false;
-	});
-	const faces = needsText ? new FaceIndex(await loadFontkit(), byFamily) : null;
 	const shared = createSharedFontProvider(ck, loaded);
 	(shared.provider as { __families?: string[] }).__families = [
 		...new Set(loaded.map((f) => f.family)),
 	];
 	const bin = makeBin();
+	const writer = new PdfWriter();
 	const page = new PageBuilder(
 		ck,
 		shared.provider,
 		bin,
-		faces,
+		writer,
+		new FontEmbedder(ck, byFamily, writer),
 		sources,
 		svgScenes,
 		warnings,
 	);
 	try {
-		const scale = 72 / dpi;
-		let content = `q\n${cm([scale, 0, 0, -scale, 0, create.height * scale])}`;
-		for (const cmd of commands) {
-			if (cmd.op === "finishFrame") page.unsupported("frame finish");
-			else if (
-				cmd.op !== "createCanvas" &&
-				cmd.op !== "loadFonts" &&
-				cmd.op !== "loadImages"
-			)
-				content += page.drawable(cmd);
-		}
+		const drawables = commands.filter(isDrawable);
+		const setup = commands.filter(
+			(c) => c.op === "loadFonts" || c.op === "loadImages",
+		);
+		const finish = commands.find((c) => c.op === "finishFrame");
+		// Everything up to the last layer that reads what lies beneath it, or
+		// the whole page under a frame finish, is one image.
+		let under = finish ? drawables.length : 0;
+		for (let i = under; i < drawables.length; i++)
+			if (hasBackdrop(drawables[i] as DrawCommand)) under = i + 1;
+		if (under > 0) page.rasterized(finish ? "frame finish" : "backdrop blur");
+		const rest = drawables.slice(under);
+		const scale = Math.min(
+			(options.rasterDpi ?? 600) / dpi,
+			MAX_RASTER_EDGE / Math.max(create.width, create.height),
+		);
+		const paint = (layers: Command[]) =>
+			rasterize(ck, create, scale, [...setup, ...layers], rt, shared);
+		const base =
+			under > 0
+				? page.patch(
+						await paint([
+							...drawables.slice(0, under),
+							...(finish ? [finish] : []),
+						]),
+					)
+				: null;
+		for (const cmd of page.plan(rest))
+			page.patches.set(
+				cmd,
+				page.patch(await paint([{ ...cmd, blendMode: undefined }])),
+			);
+		const k = 72 / dpi;
+		let content = `q\n${cm([k, 0, 0, -k, 0, create.height * k])}`;
+		if (base) content += page.placePatch(base);
+		for (const cmd of rest) content += page.drawable(cmd);
 		content += "Q\n";
 		const bytes = await page.save(
 			content,
-			create.width * scale,
-			create.height * scale,
+			create.width * k,
+			create.height * k,
 			options,
 		);
 		return {
 			bytes,
 			warnings,
-			width: create.width * scale,
-			height: create.height * scale,
+			width: create.width * k,
+			height: create.height * k,
 		};
 	} finally {
+		page.dispose();
 		bin.free();
 		shared.release();
 	}
 }
 
+// The layers as the CanvasKit painter draws them, at `scale`.
+async function rasterize(
+	ck: CanvasKit,
+	create: Extract<Command, { op: "createCanvas" }>,
+	scale: number,
+	layers: Command[],
+	rt: PaintTarget,
+	shared: SharedFontProvider,
+): Promise<Frame | null> {
+	const out = await paintScene(
+		ck,
+		[
+			{
+				op: "createCanvas",
+				width: create.width,
+				height: create.height,
+				scale,
+			},
+			...layers,
+		],
+		rt,
+		{ fontProvider: shared },
+	);
+	try {
+		const pixels = out.readPixels?.() ?? null;
+		return pixels ? { ...pixels, scale } : null;
+	} finally {
+		out.dispose();
+	}
+}
+
 class PageBuilder {
-	private w = new PdfWriter();
-	private resources = this.w.reserve();
+	readonly patches = new Map<DrawCommand, Patch>();
+	private resources: PdfRef;
 	private extGStates = new Map<string, string>();
 	private gsDicts: Record<string, PdfDict> = {};
 	private xobjects: Record<string, PdfRef> = {};
 	private xobjectIds = new Map<number, string>();
 	private shadings: Record<string, PdfRef> = {};
-	private glyphs = new Map<string, string | null>();
 	private images = new Map<string, ImageEntry>();
+	private texts = new WeakMap<DrawTextCommand, TextPlan>();
 	private reported = new Set<string>();
-	private layer?: string;
 
 	constructor(
 		private ck: CanvasKit,
 		private provider: TypefaceFontProvider,
 		private bin: Bin,
-		private faces: FaceIndex | null,
+		private w: PdfWriter,
+		private fonts: FontEmbedder,
 		private sources: Map<string, Uint8Array>,
 		private svgScenes: Map<string, SvgScene>,
 		private warnings: PaintWarning[],
-	) {}
+	) {
+		this.resources = w.reserve();
+	}
 
-	unsupported(feature: string) {
-		const key = `${feature}\u0000${this.layer ?? ""}`;
+	rasterized(feature: string, layer?: string) {
+		const key = `${feature}\u0000${layer ?? ""}`;
 		if (this.reported.has(key)) return;
 		this.reported.add(key);
 		this.warnings.push({
-			kind: "vector_unsupported",
+			kind: "vector_rasterized",
 			feature,
-			...(this.layer ? { layer: this.layer } : {}),
+			...(layer ? { layer } : {}),
 		});
+	}
+
+	// The layers to paint as images: each one whose own drawing PDF cannot
+	// express, with everything it holds. The others are walked into.
+	plan(drawables: DrawCommand[]): DrawCommand[] {
+		const out: DrawCommand[] = [];
+		const walk = (cmd: DrawCommand, outer?: string) => {
+			const layer = cmd.id ?? (cmd.op === "drawImage" ? cmd.src : outer);
+			const reason = this.reason(cmd);
+			if (reason) {
+				this.rasterized(reason, layer);
+				out.push(cmd);
+				return;
+			}
+			if (cmd.op === "drawGroup") for (const c of cmd.children) walk(c, layer);
+			if (cmd.op === "drawMasked") {
+				walk(cmd.mask, layer);
+				for (const c of cmd.children) walk(c, layer);
+			}
+		};
+		for (const cmd of drawables) walk(cmd);
+		return out;
+	}
+
+	// Why `cmd` itself, not its children, has to be drawn as pixels.
+	private reason(cmd: DrawCommand): string | null {
+		if (cmd.shadow && (!Array.isArray(cmd.shadow) || cmd.shadow.length > 0))
+			return "shadow";
+		if ((cmd.blur ?? 0) > 0) return "layer blur";
+		const a = cmd.adjust;
+		if (a && (a.colorMatrix || a.lut || a.lut3d || (a.sharpen ?? 0) > 0))
+			return "adjust";
+		if (cmd.blendMode && cmd.blendMode !== "normal" && !BLEND[cmd.blendMode])
+			return `${cmd.blendMode} blend`;
+		switch (cmd.op) {
+			case "drawRect":
+			case "drawPath":
+				return (
+					(cmd.fills ?? []).map(fillReason).find(Boolean) ??
+					(cmd.stroke ? strokeReason(cmd.stroke) : null)
+				);
+			case "drawText":
+				if (cmd.arc || cmd.path) return "text on a curve";
+				return (
+					(cmd.fill ? fillReason(cmd.fill) : null) ??
+					this.textPlan(cmd).reason ??
+					null
+				);
+			case "drawImage": {
+				if (cmd.fit === "tile") return "tiled image";
+				const svg = this.svgScenes.get(cmd.src);
+				const inner = svg?.features[0]
+					? `SVG ${svg.features[0]}`
+					: svg?.commands.map((c) => this.deepReason(c)).find(Boolean);
+				return inner ?? (cmd.stroke ? strokeReason(cmd.stroke) : null);
+			}
+			case "drawQr":
+				return "drawQr op";
+			default:
+				return null;
+		}
+	}
+
+	private deepReason(cmd: DrawCommand): string | null {
+		const children =
+			cmd.op === "drawGroup"
+				? cmd.children
+				: cmd.op === "drawMasked"
+					? [cmd.mask, ...cmd.children]
+					: [];
+		return (
+			this.reason(cmd) ??
+			children.map((c) => this.deepReason(c)).find(Boolean) ??
+			null
+		);
+	}
+
+	// The text shaped, each run matched to the font file it embeds.
+	private textPlan(cmd: DrawTextCommand): TextPlan {
+		const hit = this.texts.get(cmd);
+		if (hit) return hit;
+		const plan: TextPlan = { lines: [] };
+		for (const line of shapeTextLines(this.ck, this.provider, this.bin, cmd)) {
+			const text = line.line.spans.map((s) => s.text).join("");
+			const runs: TextRun[] = [];
+			for (const run of line.runs) {
+				if (!run.glyphs.length) continue;
+				const span = line.line.spans[line.spanAt[run.offsets[0] ?? 0] ?? 0];
+				if (!span) continue;
+				if (run.fakeBold) plan.reason ??= "synthetic bold";
+				const file = this.fonts.file(
+					run,
+					{
+						weight: span.font.weight,
+						italic: span.font.style === "italic",
+						variations: span.font.variations,
+					},
+					text,
+				);
+				if ("reason" in file) plan.reason ??= file.reason;
+				else runs.push({ run, file });
+			}
+			plan.lines.push({ line, text, runs });
+		}
+		this.texts.set(cmd, plan);
+		return plan;
+	}
+
+	// The painted part of a frame, cropped, as an image.
+	patch(frame: Frame | null): Patch {
+		if (!frame) return null;
+		const { data, width, height, scale } = frame;
+		let [x0, y0, x1, y1] = [width, height, -1, -1];
+		for (let y = 0; y < height; y++)
+			for (let x = 0; x < width; x++)
+				if (data[(y * width + x) * 4 + 3] !== 0) {
+					if (x < x0) x0 = x;
+					if (x > x1) x1 = x;
+					if (y < y0) y0 = y;
+					if (y > y1) y1 = y;
+				}
+		if (x1 < 0) return null;
+		const w = x1 - x0 + 1;
+		const h = y1 - y0 + 1;
+		const crop = new Uint8Array(w * h * 4);
+		for (let y = 0; y < h; y++)
+			crop.set(
+				data.subarray(
+					((y0 + y) * width + x0) * 4,
+					((y0 + y) * width + x1 + 1) * 4,
+				),
+				y * w * 4,
+			);
+		return {
+			ref: this.rgbaImage(crop, w, h, true),
+			x: x0 / scale,
+			y: y0 / scale,
+			w: w / scale,
+			h: h / scale,
+		};
+	}
+
+	placePatch(p: NonNullable<Patch>): string {
+		return `q\n${cm([p.w, 0, 0, -p.h, p.x, p.y + p.h])}/${this.xobject(p.ref)} Do\nQ\n`;
 	}
 
 	async save(
@@ -302,6 +525,7 @@ class PageBuilder {
 			ExtGState: ext,
 			XObject: { ...this.xobjects },
 			Shading: { ...this.shadings },
+			Font: this.fonts.write(),
 		});
 		const catalog = w.add({ Type: name("Catalog"), Pages: pages });
 		const date = pdfDate(options.date ?? new Date());
@@ -313,6 +537,10 @@ class PageBuilder {
 		});
 		await w.settle();
 		return w.save(catalog, info);
+	}
+
+	dispose() {
+		this.fonts.dispose();
 	}
 
 	private gs(dict: PdfDict): string {
@@ -364,23 +592,12 @@ class PageBuilder {
 	}
 
 	drawable(cmd: DrawCommand): string {
-		const outer = this.layer;
-		this.layer = cmd.id ?? (cmd.op === "drawImage" ? cmd.src : outer);
-		try {
-			return this.paintDrawable(cmd);
-		} finally {
-			this.layer = outer;
+		if (this.patches.has(cmd)) {
+			const p = this.patches.get(cmd);
+			if (!p) return "";
+			const bm = cmd.blendMode ? BLEND[cmd.blendMode] : undefined;
+			return `q\n${bm ? this.gs({ BM: name(bm) }) : ""}${this.placePatch(p)}Q\n`;
 		}
-	}
-
-	private paintDrawable(cmd: DrawCommand): string {
-		if (cmd.shadow && (!Array.isArray(cmd.shadow) || cmd.shadow.length > 0))
-			this.unsupported("shadow");
-		if ((cmd.blur ?? 0) > 0) this.unsupported("layer blur");
-		if ((cmd.backdropBlur ?? 0) > 0) this.unsupported("backdrop blur");
-		const a = cmd.adjust;
-		if (a && (a.colorMatrix || a.lut || a.lut3d || (a.sharpen ?? 0) > 0))
-			this.unsupported("adjust");
 		let out = "q\n";
 		if (cmd.rotation)
 			out += cm(
@@ -394,10 +611,7 @@ class PageBuilder {
 		if (cmd.clip && cmd.op !== "drawImage") inner += this.clip(cmd.clip, cmd);
 		inner += this.shape(cmd);
 		const opacity = Math.max(0, Math.min(1, cmd.opacity ?? 1));
-		const mode =
-			cmd.blendMode && cmd.blendMode !== "normal" ? cmd.blendMode : null;
-		const bm = mode ? BLEND[mode] : undefined;
-		if (mode && !bm) this.unsupported(`${mode} blend`);
+		const bm = cmd.blendMode ? BLEND[cmd.blendMode] : undefined;
 		const isolated = cmd.op === "drawGroup" && cmd.isolate === true;
 		if (opacity < 1 || bm || isolated) {
 			const fm = this.form(inner, true);
@@ -459,7 +673,6 @@ class PageBuilder {
 			case "drawMasked":
 				return this.masked(cmd);
 			default:
-				this.unsupported(`${(cmd as { op: string }).op} op`);
 				return "";
 		}
 	}
@@ -481,19 +694,9 @@ class PageBuilder {
 		return sh ? `q\n${ops}W${star} n\n${sh}Q\n` : "";
 	}
 
-	// Paints the gradient over the current clip.
+	// Paints a linear or radial gradient over the current clip.
 	private gradient(fill: ResolvedFill, box: Box): string {
-		if (fill.kind === "pattern") {
-			this.unsupported("pattern fill");
-			return "";
-		}
-		if (fill.kind === "angular") {
-			this.unsupported("angular gradient");
-			return "";
-		}
-		if (fill.kind === "solid") return "";
-		if (fill.spread && fill.spread !== "pad")
-			this.unsupported(`${fill.spread} gradient spread`);
+		if (fill.kind !== "linear" && fill.kind !== "radial") return "";
 		const { x, y, w, h } = box;
 		let matrix: Matrix | null = null;
 		let geometry: PdfDict;
@@ -650,8 +853,6 @@ class PageBuilder {
 				if (c[3] <= 0 || width <= 0) return "";
 				return `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams(stroke, width)}${pathOps(ck, path)}S\nQ\n`;
 			}
-			if (normalizeDash(stroke.dash))
-				this.unsupported("dashed gradient stroke");
 			const base = path.copy();
 			const outline = base.makeStroked({
 				width,
@@ -778,135 +979,79 @@ class PageBuilder {
 		}
 	}
 
+	// Each run in its embedded font, one TJ per stretch of glyphs on one
+	// baseline in one colour, every glyph placed where CanvasKit put it.
 	private text(cmd: DrawTextCommand): string {
-		if (cmd.arc || cmd.path) {
-			this.unsupported("text on a curve");
-			return "";
-		}
-		if (!this.faces) return "";
-		const lines = shapeTextLines(this.ck, this.provider, this.bin, cmd);
+		const plan = this.textPlan(cmd);
 		const gradient = cmd.fill && cmd.fill.kind !== "solid" ? cmd.fill : null;
-		let out = "";
-		let clip = "";
-		for (const line of lines) {
-			const source = line.line;
-			const text = source.spans.map((s) => s.text).join("");
-			for (const run of line.runs) {
-				const glyphs = run.glyphs;
-				if (!glyphs.length) continue;
-				const span = source.spans[line.spanAt[run.offsets[0] ?? 0] ?? 0];
-				if (!span) continue;
-				if (run.fakeBold) this.unsupported("synthetic bold");
-				const face = this.face(run, span.font, text);
-				if (!face) {
-					this.unsupported(`glyphs of ${span.font.family}`);
-					continue;
-				}
-				const s = run.size / face.unitsPerEm;
+		const segments: Segment[] = [];
+		let decorations = "";
+		for (const { line, text, runs } of plan.lines) {
+			const spans = line.line.spans;
+			for (const { run, file } of runs) {
+				const face = this.fonts.embed(file);
+				const { info } = face;
 				const sx = (run as { scaleX?: number }).scaleX ?? 1;
-				const skew = run.fakeItalic ? 0.25 * s : 0;
-				let color = "";
-				for (let i = 0; i < glyphs.length; i++) {
-					const gid = glyphs[i] as number;
-					const px = line.x + (run.positions[i * 2] as number);
-					const py = line.y + (run.positions[i * 2 + 1] as number);
-					const m: Matrix = [s * sx, 0, skew, -s, px, py];
-					if (gradient) {
-						const o = face.outline(gid);
-						if (o) clip += glyphOps(o.commands, m);
-						continue;
+				const scale = run.size * sx;
+				const skew = run.fakeItalic ? 0.25 * run.size : 0;
+				let seg: Segment | null = null;
+				for (let i = 0; i < run.glyphs.length; i++) {
+					const gid = run.glyphs[i] as number;
+					const x = line.x + (run.positions[i * 2] as number);
+					const y = line.y + (run.positions[i * 2 + 1] as number);
+					const start = run.offsets[i] ?? 0;
+					if (!face.used.has(gid))
+						face.used.set(gid, text.slice(start, run.offsets[i + 1] ?? start));
+					const owner = spans[line.spanAt[start] ?? 0] ?? spans[0];
+					const c = rgba(owner?.color ?? cmd.color);
+					const color = gradient ? "" : `${this.alpha(c[3])}${rgb(c)} rg\n`;
+					if (seg && seg.color === color && Math.abs(seg.y - y) < 1e-3) {
+						const shift = seg.advance - ((x - seg.x) * 1000) / scale;
+						if (Math.abs(shift) > 0.01) seg.parts.push(num(shift));
+					} else {
+						seg = {
+							color,
+							y,
+							head: `/${face.id} 1 Tf\n${num(scale)} 0 ${num(skew)} ${num(-run.size)} ${num(x)} ${num(y)} Tm\n`,
+							parts: [],
+							x,
+							advance: 0,
+						};
+						segments.push(seg);
 					}
-					const id = this.glyph(face, gid);
-					if (!id) continue;
-					const owner =
-						source.spans[line.spanAt[run.offsets[i] ?? 0] ?? 0] ?? span;
-					const c = rgba(owner.color ?? cmd.color);
-					const next = `${this.alpha(c[3])}${rgb(c)} rg\n`;
-					if (next !== color) {
-						if (color) out += "Q\n";
-						out += `q\n${next}`;
-						color = next;
-					}
-					out += `q\n${cm(m)}/${id} Do\nQ\n`;
+					seg.parts.push(`<${gid.toString(16).padStart(4, "0")}>`);
+					seg.x = x;
+					seg.advance = (info.advance(gid) * 1000) / info.unitsPerEm;
 				}
-				if (color) out += "Q\n";
 			}
 			for (const d of line.decorations) {
 				const rect = `${num(d.x0)} ${num(d.top)} ${num(d.x1 - d.x0)} ${num(d.thickness)} re\n`;
-				if (gradient) clip += rect;
+				if (gradient) decorations += rect;
 				else {
 					const c = rgba(d.color);
-					out += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${rect}f\nQ\n`;
+					decorations += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${rect}f\nQ\n`;
 				}
 			}
 		}
-		if (gradient && clip) {
-			const sh = this.gradient(gradient, {
-				x: cmd.pos.x,
-				y: cmd.pos.y,
-				w: cmd.size.width,
-				h: cmd.size.height,
-			});
-			if (sh) out += `q\n${clip}W n\n${sh}Q\n`;
-		}
-		return out;
-	}
-
-	// The face CanvasKit shaped `run` with: the family's closest face whose
-	// character map agrees with the run's typeface.
-	private face(
-		run: {
-			typeface: {
-				getFamilyName(): string;
-				getGlyphIDs(s: string): Uint16Array;
-			} | null;
-			glyphs: Uint16Array;
-			offsets: Uint32Array;
-		},
-		font: DrawTextCommand["layout"]["font"],
-		text: string,
-	): Face | null {
-		const family = run.typeface?.getFamilyName() || font.family;
-		const candidates = (this.faces as FaceIndex).candidates({
-			family,
-			weight: font.weight,
-			italic: font.style === "italic",
-			variations: font.variations,
-		});
-		const probes: number[] = [];
-		for (let i = 0; i < run.glyphs.length && probes.length < 4; i++) {
-			const cp = text.codePointAt(run.offsets[i] ?? 0);
-			if (cp === undefined || cp <= 0x20) continue;
-			const id = run.typeface?.getGlyphIDs(String.fromCodePoint(cp))[0];
-			if (id !== undefined && id === run.glyphs[i]) probes.push(cp, id);
-		}
-		return (
-			candidates.find((face) => {
-				for (let i = 0; i < probes.length; i += 2)
-					if (face.glyphId(probes[i] as number) !== probes[i + 1]) return false;
-				return true;
-			}) ?? null
-		);
-	}
-
-	private glyph(face: Face, gid: number): string | null {
-		const key = `${face.key}/${gid}`;
-		if (this.glyphs.has(key)) return this.glyphs.get(key) ?? null;
-		const o = face.outline(gid);
-		let id: string | null = null;
-		if (o) {
-			const ref = this.w.flate(
-				{
-					Type: name("XObject"),
-					Subtype: name("Form"),
-					BBox: o.bbox,
-				},
-				`${glyphOps(o.commands)}f\n`,
+		const body = (s: Segment) => `${s.head}[${s.parts.join("")}] TJ\n`;
+		if (!gradient)
+			return (
+				segments.map((s) => `q\n${s.color}BT\n${body(s)}ET\nQ\n`).join("") +
+				decorations
 			);
-			id = this.xobject(ref);
-		}
-		this.glyphs.set(key, id);
-		return id;
+		const sh = this.gradient(gradient, {
+			x: cmd.pos.x,
+			y: cmd.pos.y,
+			w: cmd.size.width,
+			h: cmd.size.height,
+		});
+		if (!sh) return "";
+		// Glyphs drawn in clip mode only clip as one text object.
+		let out = segments.length
+			? `q\nBT\n7 Tr\n${segments.map(body).join("")}ET\n${sh}Q\n`
+			: "";
+		if (decorations) out += `q\n${decorations}W n\n${sh}Q\n`;
+		return out;
 	}
 
 	private image(cmd: DrawImageCommand): string {
@@ -916,28 +1061,24 @@ class PageBuilder {
 		if (img) {
 			out += "q\n";
 			if (cmd.clip) out += this.clip(cmd.clip, cmd);
-			if (cmd.fit === "tile") this.unsupported("tiled image");
-			else {
-				const r = fitRect(
-					img.width,
-					img.height,
-					pos.x,
-					pos.y,
-					size.width,
-					size.height,
-					cmd.fit,
-					cmd,
-				);
-				const kx = r.dw / r.sw;
-				const ky = r.dh / r.sh;
-				const x0 = r.dx - r.sx * kx;
-				const y0 = r.dy - r.sy * ky;
-				const place: Matrix = img.vector
-					? [kx, 0, 0, ky, x0, y0]
-					: [img.width * kx, 0, 0, -img.height * ky, x0, y0 + img.height * ky];
-				out += `${num(r.dx)} ${num(r.dy)} ${num(r.dw)} ${num(r.dh)} re W n\n${cm(place)}/${this.xobject(img.ref)} Do\n`;
-			}
-			out += "Q\n";
+			const r = fitRect(
+				img.width,
+				img.height,
+				pos.x,
+				pos.y,
+				size.width,
+				size.height,
+				cmd.fit === "tile" ? "fill" : cmd.fit,
+				cmd,
+			);
+			const kx = r.dw / r.sw;
+			const ky = r.dh / r.sh;
+			const x0 = r.dx - r.sx * kx;
+			const y0 = r.dy - r.sy * ky;
+			const place: Matrix = img.vector
+				? [kx, 0, 0, ky, x0, y0]
+				: [img.width * kx, 0, 0, -img.height * ky, x0, y0 + img.height * ky];
+			out += `${num(r.dx)} ${num(r.dy)} ${num(r.dw)} ${num(r.dh)} re W n\n${cm(place)}/${this.xobject(img.ref)} Do\nQ\n`;
 		}
 		if (cmd.stroke)
 			out += this.outlineStroke(cmd.clip ?? { kind: "rect" }, cmd, cmd.stroke);
@@ -956,7 +1097,6 @@ class PageBuilder {
 		if (!bytes) return null;
 		const svg = this.svgScenes.get(src);
 		if (svg) {
-			for (const feature of svg.features) this.unsupported(`SVG ${feature}`);
 			const content = svg.commands.map((c) => this.drawable(c)).join("");
 			return {
 				ref: this.xobjects[this.form(content)] as PdfRef,
@@ -1148,6 +1288,28 @@ class PageBuilder {
 	}
 }
 
+function fillReason(fill: ResolvedFill): string | null {
+	if (fill.kind === "pattern") return "pattern fill";
+	if (fill.kind === "angular") return "angular gradient";
+	if (fill.kind !== "solid" && fill.spread && fill.spread !== "pad")
+		return `${fill.spread} gradient spread`;
+	return null;
+}
+
+function strokeReason(stroke: Stroke): string | null {
+	if (!stroke.gradient) return null;
+	if (normalizeDash(stroke.dash)) return "dashed gradient stroke";
+	return fillReason(stroke.gradient);
+}
+
+function hasBackdrop(cmd: DrawCommand): boolean {
+	if ((cmd.backdropBlur ?? 0) > 0) return true;
+	if (cmd.op === "drawGroup") return cmd.children.some(hasBackdrop);
+	if (cmd.op === "drawMasked")
+		return hasBackdrop(cmd.mask) || cmd.children.some(hasBackdrop);
+	return false;
+}
+
 async function svgScene(bytes: Uint8Array): Promise<SvgScene> {
 	const svg = await import("../svg/index");
 	const drawing = svg.parseSvg(new TextDecoder().decode(bytes));
@@ -1167,7 +1329,7 @@ async function svgScene(bytes: Uint8Array): Promise<SvgScene> {
 	const commands = compileScene(svg.svgToNode(drawing), {
 		width,
 		height,
-	}).filter((c): c is DrawCommand => c.op.startsWith("draw"));
+	}).filter(isDrawable);
 	return { commands, width, height, features };
 }
 

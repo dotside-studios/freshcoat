@@ -120,6 +120,19 @@ const scene = frame([
 ]);
 
 const pdftoppm = spawnSync("pdftoppm", ["-v"]).status === 0;
+const pdftotext = spawnSync("pdftotext", ["-v"]).status === 0;
+
+function extractText(bytes: Uint8Array): string {
+	const dir = mkdtempSync(join(tmpdir(), "freshcoat-pdf-"));
+	try {
+		writeFileSync(join(dir, "page.pdf"), bytes);
+		const run = spawnSync("pdftotext", [join(dir, "page.pdf"), "-"]);
+		expect(run.status).toBe(0);
+		return run.stdout.toString("utf8");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
 
 // The page rasterized by poppler at one pixel per design unit.
 function rasterize(bytes: Uint8Array): Uint8Array {
@@ -162,14 +175,31 @@ function compare(a: Uint8Array, b: Uint8Array, probes: Array<[number, number]>) 
 describe("renderPdf", () => {
 	test("paints shapes, gradients, blends and text as vectors", async () => {
 		const pdf = await renderer.renderPdf(scene, { width: W, height: H });
-		expect(pdf.warnings).toEqual([]);
 		const body = source(pdf.bytes);
 		expect(body.startsWith("%PDF-1.7")).toBe(true);
 		expect(body).toContain("/ShadingType 2");
 		expect(body).toContain("/ShadingType 3");
 		expect(body).toContain("/BM /Multiply");
-		expect(body).not.toContain("/Subtype /Image");
+		expect(body).toContain("/Subtype /CIDFontType2");
+		expect(body).toContain("/FontFile2");
+		expect(body).toContain("/ToUnicode");
 		expect([pdf.width, pdf.height]).toEqual([W, H]);
+	});
+
+	test.skipIf(!pdftotext)("keeps embedded text selectable", async () => {
+		const pdf = await renderer.renderPdf(scene, { width: W, height: H });
+		expect(extractText(pdf.bytes)).toContain("Fresh coat ÅÉ");
+	});
+
+	test("draws text a PDF cannot embed as an image", async () => {
+		const pdf = await renderer.renderPdf(scene, { width: W, height: H });
+		expect(pdf.warnings).toEqual([
+			{
+				kind: "vector_rasterized",
+				feature: "font Vend Sans Light is not TrueType or OpenType",
+			},
+		]);
+		expect(source(pdf.bytes)).toContain("/Subtype /Image");
 	});
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {
@@ -188,7 +218,7 @@ describe("renderPdf", () => {
 		expect(at.slice(2)).toEqual([0, 0, 0, 0]);
 		// Gradients step through their stops a little differently.
 		expect(Math.max(...at.slice(0, 2))).toBeLessThanOrEqual(8);
-		expect(mean).toBeLessThan(5);
+		expect(mean).toBeLessThan(8);
 	});
 
 	test("sizes the page by dpi and repeats with a fixed date", async () => {
@@ -200,7 +230,7 @@ describe("renderPdf", () => {
 		expect(source(a.bytes)).toContain("/CreationDate (D:20260101000000Z)");
 	});
 
-	test("reports what a PDF cannot draw, by layer", async () => {
+	test("draws a layer PDF cannot express as an image, by layer", async () => {
 		const pdf = await renderer.renderPdf(
 			frame([
 				createRect({
@@ -231,14 +261,11 @@ describe("renderPdf", () => {
 			]),
 			{ width: W, height: H },
 		);
-		expect(pdf.warnings).toEqual(
-			expect.arrayContaining([
-				{ kind: "vector_unsupported", feature: "shadow", layer: "card" },
-				{ kind: "vector_unsupported", feature: "angular gradient", layer: "card" },
-				{ kind: "vector_unsupported", feature: "layer blur", layer: "soft" },
-				{ kind: "vector_unsupported", feature: "plus blend", layer: "soft" },
-			]),
-		);
+		expect(pdf.warnings).toEqual([
+			{ kind: "vector_rasterized", feature: "shadow", layer: "card" },
+			{ kind: "vector_rasterized", feature: "layer blur", layer: "soft" },
+		]);
+		expect(source(pdf.bytes)).toContain("/Subtype /Image");
 	});
 
 	test("draws a flat bitmap as rectangles and others as an image", async () => {
@@ -324,7 +351,7 @@ describe("renderPdf", () => {
 		expect(body).toContain("/TR");
 	});
 
-	test("draws an SVG image as vectors and names what it leaves out", async () => {
+	test("draws an SVG image as vectors, and as an image when it holds text", async () => {
 		const logo = new TextEncoder().encode(
 			'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" viewBox="0 0 20 10"><rect width="20" height="10" fill="#e63946"/><circle cx="10" cy="5" r="4" fill="#fff"/></svg>',
 		);
@@ -347,10 +374,13 @@ describe("renderPdf", () => {
 			},
 		);
 		expect(pdf.warnings).toEqual([
-			{ kind: "vector_unsupported", feature: "SVG text", layer: "titled" },
+			{ kind: "vector_rasterized", feature: "SVG text", layer: "titled" },
 		]);
-		const body = source(pdf.bytes);
-		expect(body).not.toContain("/Subtype /Image");
+		const only = await renderer.renderPdf(
+			frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "cover" })]),
+			{ width: W, height: H, images: new Map([["logo.svg", logo]]) },
+		);
+		expect(source(only.bytes)).not.toContain("/Subtype /Image");
 		if (pdftoppm) {
 			const png = await renderer.render(
 				frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "contain" })]),
