@@ -1,6 +1,12 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
+import type { Element, Template, VectorElement } from "@freshcoat-js/coatfile";
 import { DEFAULT_FILL, round2 } from "./factories";
-import type { Point, Rect } from "./geometry";
+import {
+	type Guide,
+	type Point,
+	type Rect,
+	type SnapCandidates,
+	snapMove,
+} from "./geometry";
 import { uniqueId } from "./ids";
 
 /** An anchor with its control handles, in template space. A corner point has
@@ -9,9 +15,36 @@ export type PenPoint = Point & { in?: Point; out?: Point };
 
 export type PenPath = { points: PenPoint[]; closed: boolean };
 
-type Segment = [Point, Point, Point, Point];
+/** A segment as its cubic: start, two controls, end. */
+export type Segment = [Point, Point, Point, Point];
 
 export const PEN_STROKE = { color: "#000000", width: 2 } as const;
+
+const CLOSE_PX = 8;
+
+/** How close, in screen px, the pointer must come to the first anchor to
+ *  close the path: wider for a finger or pen than for a mouse. */
+export const penCloseRadius = (coarse: boolean) =>
+	coarse ? CLOSE_PX * 2 : CLOSE_PX;
+
+type VectorProps = VectorElement["properties"];
+
+/** The look the pen last gave a layer: its stroke for open paths, its fill
+ *  for closed ones. */
+export type PenStyle = {
+	stroke?: NonNullable<VectorProps["stroke"]>;
+	fill?: NonNullable<VectorProps["fill"]>;
+};
+
+/** The paint a new path gets: the remembered style, else the defaults. */
+export function penPaint(
+	closed: boolean,
+	style: PenStyle = {},
+): Pick<VectorProps, "fill" | "stroke"> {
+	return closed
+		? { fill: style.fill ?? DEFAULT_FILL }
+		: { stroke: style.stroke ?? { ...PEN_STROKE } };
+}
 
 /** A smooth point at `anchor` whose outgoing handle follows `drag`. */
 export function smoothPoint(anchor: Point, drag: Point): PenPoint {
@@ -21,6 +54,73 @@ export function smoothPoint(anchor: Point, drag: Point): PenPoint {
 		out: { x: drag.x, y: drag.y },
 		in: { x: 2 * anchor.x - drag.x, y: 2 * anchor.y - drag.y },
 	};
+}
+
+/**
+ * `prev` dragged to `drag`. The handles stay mirrored, unless `breakHandles`
+ * is set: then only the outgoing one follows, and the incoming one stays
+ * where `prev` had it (at the anchor for a corner).
+ */
+export function dragPoint(
+	anchor: Point,
+	drag: Point,
+	prev: PenPoint | undefined,
+	breakHandles: boolean,
+): PenPoint {
+	if (!breakHandles) return smoothPoint(anchor, drag);
+	return {
+		x: anchor.x,
+		y: anchor.y,
+		out: { x: drag.x, y: drag.y },
+		...(prev?.in ? { in: prev.in } : {}),
+	};
+}
+
+/**
+ * The first point dragged as the path closes. Alt shapes only the closing
+ * segment, mirroring the drag into the incoming handle.
+ */
+export function closePoint(
+	anchor: Point,
+	drag: Point,
+	prev: PenPoint | undefined,
+	breakHandles: boolean,
+): PenPoint {
+	if (!breakHandles) return smoothPoint(anchor, drag);
+	return {
+		x: anchor.x,
+		y: anchor.y,
+		...(prev?.out ? { out: prev.out } : {}),
+		in: { x: 2 * anchor.x - drag.x, y: 2 * anchor.y - drag.y },
+	};
+}
+
+/**
+ * `p` pulled onto the nearest candidate line within `threshold`, with the
+ * guides that show it. The anchors already placed are candidates too.
+ */
+export function snapPenPoint(
+	p: Point,
+	candidates: SnapCandidates,
+	anchors: readonly Point[],
+	threshold: number,
+): { point: Point; guides: Guide[] } {
+	const withAnchors: SnapCandidates = {
+		x: [
+			...candidates.x,
+			...anchors.map((a) => ({ value: a.x, from: a.y, to: a.y })),
+		],
+		y: [
+			...candidates.y,
+			...anchors.map((a) => ({ value: a.y, from: a.x, to: a.x })),
+		],
+	};
+	const snap = snapMove(
+		{ x: p.x, y: p.y, width: 0, height: 0, rotation: 0 },
+		withAnchors,
+		threshold,
+	);
+	return { point: { x: p.x + snap.dx, y: p.y + snap.dy }, guides: snap.guides };
 }
 
 /** `p` moved onto the nearest 45° line through `from`. */
@@ -35,7 +135,7 @@ export function constrain45(from: Point, p: Point): Point {
 	};
 }
 
-function segments(path: PenPath): Segment[] {
+export function segments(path: PenPath): Segment[] {
 	const pts = path.points;
 	const out: Segment[] = [];
 	const count = path.closed ? pts.length : pts.length - 1;
@@ -47,7 +147,7 @@ function segments(path: PenPath): Segment[] {
 	return out;
 }
 
-const isLine = ([p0, c1, c2, p1]: Segment) =>
+export const isLine = ([p0, c1, c2, p1]: Segment) =>
 	c1.x === p0.x && c1.y === p0.y && c2.x === p1.x && c2.y === p1.y;
 
 function extremaOf(a: number, b: number, c: number, d: number): number[] {
@@ -118,17 +218,39 @@ export function penPathData(path: PenPath, origin: Point = { x: 0, y: 0 }) {
 	return path.closed ? `${d}Z` : d;
 }
 
+/** `path` with an axis it barely spans (under 1) made exactly flat, so the
+ *  layer's 1 unit minimum size never stands in for a real extent. */
+function flattened(path: PenPath, box: Rect): PenPath {
+	const flatX = box.width < 1;
+	const flatY = box.height < 1;
+	if (!flatX && !flatY) return path;
+	const snap = (p: Point): Point => ({
+		x: flatX ? box.x : p.x,
+		y: flatY ? box.y : p.y,
+	});
+	return {
+		...path,
+		points: path.points.map((p) => ({
+			...snap(p),
+			...(p.in ? { in: snap(p.in) } : {}),
+			...(p.out ? { out: snap(p.out) } : {}),
+		})),
+	};
+}
+
 /**
  * The vector layer a finished path becomes, placed at its bounds: an open
- * path is stroked, a closed one filled as a new shape is. Null for a path
- * of fewer than two points.
+ * path is stroked, a closed one filled as a new shape is, both with `style`
+ * when given. Null for a path of fewer than two points.
  */
 export function penElement(
 	path: PenPath,
 	t: Template,
 	side: number,
+	style?: PenStyle,
 ): Element | null {
 	if (path.points.length < 2) return null;
+	path = flattened(path, penBounds(path));
 	const box = penBounds(path);
 	const origin = { x: round2(box.x), y: round2(box.y) };
 	return {
@@ -139,8 +261,9 @@ export function penElement(
 			width: Math.max(1, round2(box.width)),
 			height: Math.max(1, round2(box.height)),
 		},
-		properties: path.closed
-			? { d: penPathData(path, origin), fill: DEFAULT_FILL }
-			: { d: penPathData(path, origin), stroke: { ...PEN_STROKE } },
+		properties: {
+			d: penPathData(path, origin),
+			...penPaint(path.closed, style),
+		},
 	};
 }

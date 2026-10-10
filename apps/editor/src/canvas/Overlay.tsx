@@ -1,5 +1,7 @@
 import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import type { ReactNode } from "react";
+import { useController } from "~/app/context";
+import { DEFAULT_FILL } from "~/doc/factories";
 import {
 	ancestorRects,
 	canTransform,
@@ -13,11 +15,12 @@ import {
 	unionRects,
 	worldCorners,
 } from "~/doc/geometry";
-import { type PenPath, penPathData } from "~/doc/pen";
+import { type PenPath, penCloseRadius, penPaint, penPathData } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import type { View } from "~/state/store";
 import { type DraftStore, useDrafts } from "./draft-store";
 import { GradientHandles } from "./gradient-handles";
+import { PathEditOverlay } from "./PathEditOverlay";
 import { PrintGuides } from "./PrintGuides";
 
 export type OverlayDraft = {
@@ -27,6 +30,8 @@ export type OverlayDraft = {
 	angle?: { at: Point; value: number };
 	/** A gradient handle is being dragged, so its handles stay up. */
 	gradient?: boolean;
+	/** Where a click on the edited path would add a point. */
+	pathHover?: Point;
 };
 
 /** The path the pen tool is drawing, and where the pointer is. */
@@ -49,6 +54,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 	const geometry = useEditor((s) => s.geometry);
 	const selection = useEditor((s) => s.selection);
 	const hover = useEditor((s) => s.hover);
+	const editingPath = useEditor((s) => s.pathEdit !== null);
 	const tool = useEditor((s) => s.tool);
 	const inTx = useEditor((s) => s.doc?.history.tx !== undefined);
 	const coarse = useCoarsePointer();
@@ -63,7 +69,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 		return worldCorners(box.rect, ancestorRects(key, geometry)).map(toScreen);
 	};
 
-	const selected = selection.filter((k) => geometry.has(k));
+	const selected = editingPath ? [] : selection.filter((k) => geometry.has(k));
 	const gradient =
 		(!inTx || draft.gradient) && !draft.marquee && !draft.create ? (
 			<GradientHandles view={view} coarse={coarse} />
@@ -95,7 +101,9 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 					width={1}
 				/>
 			))}
-			{selected.length > 0 ? (
+			{editingPath ? (
+				<PathEditOverlay hover={draft.pathHover} />
+			) : selected.length > 0 ? (
 				<SelectionBox
 					keys={selected}
 					geometry={geometry}
@@ -147,7 +155,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 					/>
 				</>
 			) : null}
-			{pen ? <PenOverlay pen={pen} view={view} /> : null}
+			{pen ? <PenOverlay pen={pen} view={view} coarse={coarse} /> : null}
 			{draft.angle ? (
 				<Label
 					at={{
@@ -161,13 +169,22 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 	);
 }
 
-function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
+function PenOverlay({
+	pen,
+	view,
+	coarse,
+}: {
+	pen: PenDraft;
+	view: View;
+	coarse: boolean;
+}) {
+	const controller = useController();
 	const toScreen = (p: Point) => ({
 		x: view.x + p.x * view.zoom,
 		y: view.y + p.y * view.zoom,
 	});
 	const screen: PenPath = {
-		closed: false,
+		closed: pen.path.closed,
 		points: pen.path.points.map((p) => ({
 			...toScreen(p),
 			...(p.in ? { in: toScreen(p.in) } : {}),
@@ -181,9 +198,23 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 		!!first &&
 		!!cursor &&
 		screen.points.length >= 2 &&
-		Math.hypot(cursor.x - first.x, cursor.y - first.y) <= 8;
+		Math.hypot(cursor.x - first.x, cursor.y - first.y) <=
+			penCloseRadius(coarse);
+	const willClose = screen.closed || closing;
+	const paint = penPaint(willClose, controller.penLook);
+	const anchor = coarse ? 10 : 7;
+	const handle = coarse ? 5 : 3;
 	return (
 		<g data-testid="pen-draft" data-points={pen.path.points.length}>
+			<path
+				data-testid="pen-preview"
+				d={penPathData({ ...screen, closed: willClose })}
+				fill={paint.fill ? solid(paint.fill) : "none"}
+				stroke={paint.stroke ? solid(paint.stroke.color) : "none"}
+				strokeWidth={paint.stroke ? paint.stroke.width * view.zoom : 0}
+				strokeLinecap={paint.stroke?.cap}
+				strokeLinejoin={paint.stroke?.join}
+			/>
 			<path
 				d={penPathData(screen)}
 				className="fill-none stroke-fc-accent"
@@ -195,7 +226,9 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 						closed: false,
 						points: [
 							last,
-							closing && first ? { ...first, out: undefined } : cursor,
+							closing && first
+								? { x: first.x, y: first.y, in: first.in }
+								: cursor,
 						],
 					})}
 					className="fill-none stroke-fc-accent"
@@ -203,30 +236,34 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 					strokeDasharray="4 3"
 				/>
 			) : null}
-			{last?.in && last.out ? (
-				<>
-					<line
-						x1={last.in.x}
-						y1={last.in.y}
-						x2={last.out.x}
-						y2={last.out.y}
-						className="stroke-fc-accent"
-						strokeWidth={1}
-					/>
-					{[last.in, last.out].map((h) => (
-						<circle
-							key={`${h.x},${h.y}`}
-							cx={h.x}
-							cy={h.y}
-							r={3}
-							className="fill-white stroke-fc-accent"
-							strokeWidth={1}
-						/>
-					))}
-				</>
-			) : null}
+			{screen.points.map((p, i) =>
+				[p.in, p.out].map((h, j) =>
+					h ? (
+						<g
+							// biome-ignore lint/suspicious/noArrayIndexKey: handles are ordered per anchor
+							key={`${i}-${j}`}
+						>
+							<line
+								x1={p.x}
+								y1={p.y}
+								x2={h.x}
+								y2={h.y}
+								className="stroke-fc-accent"
+								strokeWidth={1}
+							/>
+							<circle
+								cx={h.x}
+								cy={h.y}
+								r={handle}
+								className="fill-white stroke-fc-accent"
+								strokeWidth={1}
+							/>
+						</g>
+					) : null,
+				),
+			)}
 			{screen.points.map((p, i) => {
-				const size = i === 0 && closing ? 10 : 7;
+				const size = i === 0 && closing ? anchor + 3 : anchor;
 				return (
 					<rect
 						// biome-ignore lint/suspicious/noArrayIndexKey: anchors are ordered points
@@ -246,6 +283,10 @@ function PenOverlay({ pen, view }: { pen: PenDraft; view: View }) {
 			})}
 		</g>
 	);
+}
+
+function solid(paint: unknown): string {
+	return typeof paint === "string" ? paint : DEFAULT_FILL;
 }
 
 function SelectionBox({

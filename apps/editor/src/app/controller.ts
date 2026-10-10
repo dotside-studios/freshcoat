@@ -26,14 +26,17 @@ import {
 	defaultRect,
 	type ElementKind,
 	placeholderSrc,
+	round2,
 } from "~/doc/factories";
 import {
 	type AlignMode,
 	align,
+	canTransform,
 	type LayerGeometry,
 	parentOrigin,
 	type Rect,
 	rectOf,
+	rotatePoint,
 	translateLayers,
 	unionRects,
 } from "~/doc/geometry";
@@ -81,7 +84,7 @@ import {
 	parseKey,
 	siblingsOf,
 } from "~/doc/path";
-import { type PenPath, penElement } from "~/doc/pen";
+import { type PenPath, type PenStyle, penElement } from "~/doc/pen";
 import { type LayerStyle, pasteStyle, readStyle } from "~/doc/style";
 import {
 	activeVariantId,
@@ -89,6 +92,20 @@ import {
 	isHiddenInVariant,
 	isStructuralEdit,
 } from "~/doc/variant-edit";
+import {
+	mapPath,
+	movePoints,
+	type PointRef,
+	parseVectorPath,
+	removePoints,
+	reversePath,
+	type SegmentHit,
+	setVectorPaths,
+	splitSegment,
+	toggleSmooth,
+	vectorFrame,
+	worldToFrame,
+} from "~/doc/vector-edit";
 import { getCanvasKit, loadedCanvasKit } from "~/render/canvaskit";
 import { findSample, type Sample } from "~/samples";
 import { findStarter, type Starter } from "~/samples/starters";
@@ -203,6 +220,8 @@ export class EditorController {
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
 	private copiedStyle: LayerStyle | null = null;
+	private penStyle: PenStyle = {};
+	private penLayer: { id: string; closed: boolean } | undefined;
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
@@ -265,6 +284,28 @@ export class EditorController {
 		this.store.dispatch(action);
 		if (action.type === "setSection" || action.type === "setRecord")
 			this.followRecord(before);
+		if (this.penLayer) this.rememberPenStyle();
+	}
+
+	/** The style the pen gives its next path, from the last pen layer the
+	 *  user restyled. */
+	get penLook(): PenStyle {
+		return this.penStyle;
+	}
+
+	private rememberPenStyle(): void {
+		const layer = this.penLayer;
+		const key = this.state.selection[0];
+		const t = this.base;
+		if (!layer || !t || !key || this.state.selection.length !== 1) return;
+		const el = getElement(t, key);
+		if (!el || !("type" in el) || el.type !== "vector" || el.id !== layer.id)
+			return;
+		const { stroke, fill } = el.properties;
+		if (layer.closed && fill !== undefined && fill !== this.penStyle.fill)
+			this.penStyle = { ...this.penStyle, fill };
+		if (!layer.closed && stroke && stroke !== this.penStyle.stroke)
+			this.penStyle = { ...this.penStyle, stroke };
 	}
 
 	/** Brings Edit's preview to the current record when Edit comes into view
@@ -615,6 +656,125 @@ export class EditorController {
 		this.textEditFrom = undefined;
 	}
 
+	// ── Vector points on the canvas ──────────────────────────────────────────
+
+	/** Starts editing the points of a vector layer on the canvas. False, with
+	 *  the reason shown, for a layer that cannot be: not a vector, in auto
+	 *  layout, under a rotated parent or without a path. */
+	beginPathEdit(key: string | undefined = this.state.selection[0]): boolean {
+		const t = this.template;
+		const el = t && key ? getElement(t, key) : undefined;
+		if (!t || !key || !el || !("type" in el) || el.type !== "vector")
+			return false;
+		if (!canTransform(key, this.state.geometry)) {
+			toast("Can't edit points in auto layout or under a rotated parent", {
+				tone: "warning",
+			});
+			return false;
+		}
+		if (parseVectorPath(el.properties.d).length === 0) {
+			toast("This path has no points to edit", { tone: "warning" });
+			return false;
+		}
+		this.dispatch({ type: "setTool", tool: "move" });
+		this.select([key]);
+		this.dispatch({ type: "pathEdit", edit: { key, selected: [] } });
+		return true;
+	}
+
+	endPathEdit(): void {
+		this.dispatch({ type: "pathEdit", edit: null });
+	}
+
+	/** The vector being edited, its path in its own space and its box. */
+	pathTarget() {
+		const key = this.state.pathEdit?.key;
+		return key ? this.vectorTarget(key) : null;
+	}
+
+	selectPathPoints(selected: PointRef[]): void {
+		const edit = this.state.pathEdit;
+		if (edit) this.dispatch({ type: "pathEdit", edit: { ...edit, selected } });
+	}
+
+	/** Redraws the edited vector as `paths`, as one undo step. */
+	editPath(paths: PenPath[], selected?: PointRef[]): void {
+		const key = this.state.pathEdit?.key;
+		if (!key) return;
+		this.edit((t) => setVectorPaths(t, key, paths));
+		if (selected) this.selectPathPoints(selected);
+	}
+
+	/** Removes the picked points. A layer left with no path is deleted. */
+	removePathPoints(): void {
+		const target = this.pathTarget();
+		const picked = this.state.pathEdit?.selected;
+		if (!target || !picked?.length) return;
+		const paths = removePoints(target.paths, picked);
+		if (paths.length > 0) {
+			this.editPath(paths, []);
+			return;
+		}
+		this.endPathEdit();
+		this.edit((t) => removeElements(t, [target.key]), {
+			select: [],
+			scope: "base",
+		});
+	}
+
+	/** Moves the picked points by a step along the canvas's axes. */
+	nudgePathPoints(dx: number, dy: number): void {
+		const target = this.pathTarget();
+		const picked = this.state.pathEdit?.selected;
+		if (!target || !picked?.length) return;
+		const d = rotatePoint({ x: dx, y: dy }, -target.frame.rotation);
+		this.editPath(movePoints(target.paths, picked, d.x, d.y));
+	}
+
+	/** Turns a point into a corner, or a corner into a smooth point. */
+	togglePathPoint(ref: PointRef): void {
+		const target = this.pathTarget();
+		if (target) this.editPath(toggleSmooth(target.paths, ref), [ref]);
+	}
+
+	/** Adds a point where `hit` is, leaving the shape as it was. */
+	insertPathPoint(hit: SegmentHit): void {
+		const target = this.pathTarget();
+		const split =
+			target && splitSegment(target.paths, hit.path, hit.segment, hit.t);
+		if (split) this.editPath(split.paths, [split.ref]);
+	}
+
+	/** Puts `path`, drawn with the pen in template space from the end of
+	 *  subpath `subpath` of a vector, in place of that subpath, as one undo
+	 *  step. `reversed` when it was drawn from the subpath's start. */
+	continuePath(
+		key: string,
+		subpath: number,
+		reversed: boolean,
+		path: PenPath,
+	): void {
+		const target = this.vectorTarget(key);
+		if (!target) return;
+		const local = mapPath(path, (p) => worldToFrame(target.frame, p));
+		const paths = target.paths.slice();
+		paths[subpath] = reversed ? reversePath(local) : local;
+		this.edit((t) => setVectorPaths(t, key, paths));
+		if (this.state.tool === "pen")
+			this.dispatch({ type: "setTool", tool: "move" });
+	}
+
+	/** A vector's path in its own space and its box. */
+	vectorTarget(key: string) {
+		const t = this.template;
+		const el = t ? getElement(t, key) : undefined;
+		if (!t || !el || !("type" in el) || el.type !== "vector") return null;
+		const frame = vectorFrame(t, key, this.state.geometry);
+		return frame
+			? { key, frame, paths: parseVectorPath(el.properties.d) }
+			: null;
+	}
+
 	/** Inserts a new layer, at the top of `parent` (the side when omitted). */
 	insert(element: Element, parent?: string): string | null {
 		const t = this.template;
@@ -654,13 +814,26 @@ export class EditorController {
 		return key;
 	}
 
-	/** Adds a drawn path as a vector layer on the side, selected, and goes
-	 *  from the pen back to the move tool. */
-	createPath(path: PenPath): string | null {
+	/** Adds a drawn path as a vector layer, in `parent` when given, selected,
+	 *  and goes from the pen back to the move tool. The pen styles it as the
+	 *  last pen layer the user restyled. */
+	createPath(path: PenPath, parent?: string): string | null {
 		const t = this.template;
 		if (!t) return null;
-		const element = penElement(path, t, this.state.side);
-		const key = element ? this.insert(element) : null;
+		let element = penElement(path, t, this.state.side, this.penStyle);
+		const origin = parent ? this.state.geometry.get(parent)?.rect : undefined;
+		if (element && origin)
+			element = {
+				...element,
+				pos: {
+					x: round2((element.pos?.x ?? 0) - origin.x),
+					y: round2((element.pos?.y ?? 0) - origin.y),
+				},
+			};
+		const key = element ? this.insert(element, parent) : null;
+		this.penLayer = element
+			? { id: element.id, closed: path.closed }
+			: undefined;
 		if (this.state.tool === "pen")
 			this.dispatch({ type: "setTool", tool: "move" });
 		return key;

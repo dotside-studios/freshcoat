@@ -31,6 +31,7 @@ import {
 	foldVariantEdit,
 	workingTemplate,
 } from "~/doc/variant-edit";
+import type { PointRef } from "~/doc/vector-edit";
 import type { SchedulerStats } from "~/render/scheduler";
 import type { RenderTimings } from "~/render/session";
 import { type Draft, produce, produceAt } from "./immer";
@@ -171,7 +172,12 @@ export type EditorState = {
 	/** The text layer being edited on the canvas, which the render leaves out
 	 *  while its editor stands in for it. */
 	textEdit: string | null;
+	/** The vector layer whose points are being edited on the canvas, and the
+	 *  points picked. The selection is that layer alone while it lasts. */
+	pathEdit: PathEdit | null;
 };
+
+export type PathEdit = { key: string; selected: PointRef[] };
 
 export type Action =
 	| {
@@ -215,6 +221,7 @@ export type Action =
 	| { type: "select"; keys: string[]; mode?: "replace" | "add" | "toggle" }
 	| { type: "hover"; key: string | null }
 	| { type: "textEdit"; key: string | null }
+	| { type: "pathEdit"; edit: PathEdit | null }
 	| { type: "toggleHidden"; key: string }
 	| { type: "toggleLocked"; key: string }
 	| { type: "setTool"; tool: Tool }
@@ -323,6 +330,7 @@ export function initialState(
 		dataViews: {},
 		activeFill: null,
 		textEdit: null,
+		pathEdit: null,
 	};
 }
 
@@ -395,6 +403,27 @@ export function isDirty(state: EditorState): boolean {
 }
 
 export function reduce(state: EditorState, action: Action): EditorState {
+	return settlePathEdit(reduceAction(state, action));
+}
+
+/** Path editing ends with the layer it edits: when another is selected, the
+ *  tool changes, or the layer is no longer a vector. */
+function settlePathEdit(state: EditorState): EditorState {
+	const edit = state.pathEdit;
+	if (!edit) return state;
+	const t = present(state);
+	const el = t && getElement(t, edit.key);
+	const live =
+		state.tool === "move" &&
+		state.selection.length === 1 &&
+		state.selection[0] === edit.key &&
+		!!el &&
+		"type" in el &&
+		el.type === "vector";
+	return live ? state : { ...state, pathEdit: null };
+}
+
+function reduceAction(state: EditorState, action: Action): EditorState {
 	switch (action.type) {
 		case "open":
 		case "openWorkspace":
@@ -576,6 +605,10 @@ function reduceView(state: EditorState, action: Action): EditorState {
 			return state.textEdit === action.key
 				? state
 				: { ...state, textEdit: action.key };
+		case "pathEdit":
+			return state.pathEdit === action.edit
+				? state
+				: { ...state, pathEdit: action.edit };
 		case "toggleHidden":
 			return { ...state, hidden: toggled(state.hidden, action.key) };
 		case "toggleLocked": {

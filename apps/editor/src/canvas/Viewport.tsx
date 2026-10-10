@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import { ContextMenu } from "@freshcoat-js/ui/menu";
 import {
 	type PointerEvent as ReactPointerEvent,
@@ -35,7 +36,14 @@ import {
 } from "~/doc/geometry";
 import { duplicateElements } from "~/doc/ops";
 import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
-import { constrain45, type PenPath, smoothPoint } from "~/doc/pen";
+import {
+	closePoint,
+	constrain45,
+	dragPoint,
+	type PenPath,
+	penCloseRadius,
+	snapPenPoint,
+} from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
 import { type Tool, working } from "~/state/store";
 import { createDraftStore } from "./draft-store";
@@ -51,6 +59,17 @@ import {
 } from "./gradient-handles";
 import { Overlay } from "./Overlay";
 import {
+	dragPath,
+	isPathGesture,
+	type PathGesture,
+	type PenResume,
+	penResumeAt,
+	pressPath,
+	releasePath,
+	segmentUnder,
+	togglePointAt,
+} from "./path-edit";
+import {
 	printGuidesFor,
 	printGuidesOn,
 	usePrintGuidesVersion,
@@ -62,7 +81,6 @@ import { useLiveRender } from "./use-live-render";
 
 const DRAG_THRESHOLD = { mouse: 3, touch: 6 };
 const SNAP_PX = 6;
-const CLOSE_PX = 8;
 
 const CREATE_KIND: Partial<Record<Tool, ElementKind>> = {
 	frame: "frame",
@@ -135,9 +153,11 @@ type Gesture =
 			start: Point;
 			anchor: Point;
 			index: number;
+			close: boolean;
 			pointerType: string;
 	  }
-	| { kind: "create"; tool: ElementKind; startWorld: Point; parent?: string };
+	| { kind: "create"; tool: ElementKind; startWorld: Point; parent?: string }
+	| PathGesture;
 
 export function Viewport() {
 	const controller = useController();
@@ -146,7 +166,9 @@ export function Viewport() {
 	const template = useEditor(working);
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
+	const coarse = useCoarsePointer();
 	const textEditing = useEditor((s) => s.textEdit !== null);
+	const pathEditing = useEditor((s) => s.pathEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
 	const { canvas, fontsLoading } = useLiveRender();
 	usePrintGuidesVersion();
@@ -164,36 +186,85 @@ export function Viewport() {
 	const [drafts] = useState(createDraftStore);
 	const { setDraft, setPen } = drafts;
 	const penPath = useCallback(() => drafts.get().pen?.path ?? null, [drafts]);
+	// The vector subpath the pen is carrying on, and how many points it began with.
+	const resuming = useRef<(PenResume & { count: number }) | null>(null);
 	const finishPen = useCallback(
 		(path: PenPath | null) => {
+			const resume = resuming.current;
+			resuming.current = null;
 			setPen(null);
-			if (path && path.points.length >= 2) controller.createPath(path);
+			setDraft({});
+			if (resume && path) {
+				if (path.closed || path.points.length > resume.count)
+					controller.continuePath(
+						resume.key,
+						resume.subpath,
+						resume.reversed,
+						path,
+					);
+			} else if (path?.points[0] && path.points.length >= 2)
+				controller.createPath(path, frameUnder(controller, path.points[0]));
 		},
-		[controller, setPen],
+		[controller, setPen, setDraft],
 	);
 
-	// Enter or Esc finishes the path being drawn; Backspace takes back its
-	// last point. Leaving the tool keeps what was drawn.
+	// Enter or Esc finishes the path being drawn; Backspace or undo takes back
+	// its last point, and redo is swallowed so it never reaches the document.
+	// Leaving the tool keeps what was drawn.
 	useEffect(() => {
 		if (tool !== "pen") {
-			const path = penPath();
-			if (path) finishPen(path);
+			finishPen(penPath());
 			return;
 		}
 		const onKey = (e: KeyboardEvent) => {
 			const path = penPath();
 			if (!path || isTyping(e.target)) return;
+			const undo = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z";
 			if (e.key === "Enter" || e.key === "Escape") finishPen(path);
-			else if (e.key === "Backspace" || e.key === "Delete") {
+			else if (
+				e.key === "Backspace" ||
+				e.key === "Delete" ||
+				(undo && !e.shiftKey)
+			) {
 				const points = path.points.slice(0, -1);
 				setPen(points.length ? { path: { ...path, points } } : null);
-			} else return;
+			} else if (!undo) return;
 			e.preventDefault();
 			e.stopImmediatePropagation();
 		};
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, [tool, finishPen, setPen, penPath]);
+
+	// Enter or Esc leaves path editing; Backspace removes the picked points and
+	// the arrows nudge them, as one undo step each.
+	useEffect(() => {
+		if (!pathEditing) return;
+		const step = (e: KeyboardEvent): [number, number] | null => {
+			const n = e.shiftKey ? 10 : 1;
+			const arrow: Record<string, [number, number]> = {
+				ArrowLeft: [-n, 0],
+				ArrowRight: [n, 0],
+				ArrowUp: [0, -n],
+				ArrowDown: [0, n],
+			};
+			return arrow[e.key] ?? null;
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (gesture.current || isTyping(e.target)) return;
+			const picked = controller.state.pathEdit?.selected.length;
+			const nudge = step(e);
+			if (e.key === "Enter" || e.key === "Escape") controller.endPathEdit();
+			else if ((e.key === "Backspace" || e.key === "Delete") && picked)
+				controller.removePathPoints();
+			else if (nudge && picked) controller.nudgePathPoints(...nudge);
+			else return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, [pathEditing, controller]);
 
 	// Mount the session's canvas; it is replaced when the painted size changes.
 	useLayoutEffect(() => {
@@ -277,6 +348,25 @@ export function Viewport() {
 		return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
 	}, []);
 
+	const penTarget = (
+		world: Point,
+		e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+		path: PenPath | null,
+	): { point: Point; guides: Guide[] } => {
+		const last = path?.points.at(-1);
+		if (e.shiftKey && last)
+			return { point: constrain45(last, world), guides: [] };
+		const t = controller.template;
+		if (!t || e.ctrlKey || e.metaKey) return { point: world, guides: [] };
+		const { geometry, hidden, view: v } = controller.state;
+		return snapPenPoint(
+			world,
+			snapCandidates(geometry, t, [], hidden, controller.sideGuides()),
+			path?.points ?? [],
+			SNAP_PX / v.zoom,
+		);
+	};
+
 	const toWorld = useCallback(
 		(p: Point): Point => {
 			const v = controller.state.view;
@@ -326,10 +416,27 @@ export function Viewport() {
 			return;
 		}
 
+		if (state.pathEdit && state.tool === "move") {
+			const held = pressPath(controller, p, world, e.pointerType, e);
+			if (held) {
+				gesture.current = held;
+				return;
+			}
+			controller.endPathEdit();
+		}
+
 		if (state.tool === "pen") {
+			const resume = penPath()
+				? null
+				: penResumeAt(controller, p, penCloseRadius(coarse));
+			if (resume) {
+				resuming.current = { ...resume, count: resume.path.points.length };
+				setPen({ path: resume.path });
+				return;
+			}
+			if (!penPath()) resuming.current = null;
 			const path = penPath() ?? { points: [], closed: false };
 			const first = path.points[0];
-			const last = path.points.at(-1);
 			const v = state.view;
 			if (
 				first &&
@@ -337,19 +444,28 @@ export function Viewport() {
 				Math.hypot(
 					v.x + first.x * v.zoom - p.x,
 					v.y + first.y * v.zoom - p.y,
-				) <= CLOSE_PX
+				) <= penCloseRadius(coarse)
 			) {
-				finishPen({ ...path, closed: true });
+				gesture.current = {
+					kind: "pen",
+					start: p,
+					anchor: { x: first.x, y: first.y },
+					index: 0,
+					close: true,
+					pointerType: e.pointerType,
+				};
 				return;
 			}
-			const anchor = e.shiftKey && last ? constrain45(last, world) : world;
+			const { point: anchor, guides } = penTarget(world, e, path);
 			const points = [...path.points, { x: anchor.x, y: anchor.y }];
 			setPen({ path: { ...path, points } });
+			setDraft({ guides });
 			gesture.current = {
 				kind: "pen",
 				start: p,
 				anchor,
 				index: points.length - 1,
+				close: false,
 				pointerType: e.pointerType,
 			};
 			return;
@@ -466,13 +582,17 @@ export function Viewport() {
 		const world = toWorld(p);
 
 		if (!g) {
-			const path = penPath();
-			if (state.tool === "pen" && path) {
-				const last = path.points.at(-1);
-				setPen({
-					path,
-					cursor: e.shiftKey && last ? constrain45(last, world) : world,
-				});
+			if (state.tool === "pen") {
+				const path = penPath();
+				const { point, guides } = penTarget(world, e, path);
+				setDraft({ guides });
+				if (path) setPen({ path, cursor: point });
+				return;
+			}
+			if (state.pathEdit) {
+				const at =
+					e.pointerType === "mouse" ? segmentUnder(controller, p) : null;
+				setDraft(at ? { pathHover: at } : {});
 				return;
 			}
 			if (e.pointerType === "mouse" && state.tool === "move" && template) {
@@ -481,6 +601,11 @@ export function Viewport() {
 				if (hit !== state.hover)
 					controller.dispatch({ type: "hover", key: hit });
 			}
+			return;
+		}
+
+		if (isPathGesture(g)) {
+			setDraft({ guides: dragPath(controller, g, p, world, e) });
 			return;
 		}
 
@@ -655,8 +780,13 @@ export function Viewport() {
 				if (!path || Math.hypot(p.x - g.start.x, p.y - g.start.y) < limit)
 					return;
 				const points = path.points.slice();
-				points[g.index] = smoothPoint(g.anchor, world);
-				setPen({ path: { ...path, points } });
+				points[g.index] = (g.close ? closePoint : dragPoint)(
+					g.anchor,
+					e.shiftKey ? constrain45(g.anchor, world) : world,
+					points[g.index],
+					e.altKey,
+				);
+				setPen({ path: { ...path, points, closed: g.close } });
 				return;
 			}
 			case "create": {
@@ -725,6 +855,11 @@ export function Viewport() {
 		}
 		gesture.current = null;
 		setCursor(undefined);
+		if (isPathGesture(g)) {
+			releasePath(controller, g);
+			setDraft({});
+			return;
+		}
 		const world = toWorld(local(e));
 		switch (g.kind) {
 			case "press":
@@ -744,6 +879,11 @@ export function Viewport() {
 					controller.edit((t) => withGradient(t, key, index, fill));
 				}
 				break;
+			case "pen": {
+				const path = penPath();
+				if (g.close && path) finishPen({ ...path, closed: true });
+				return;
+			}
 			case "create": {
 				const box = rectFrom(g.startWorld, world, {
 					square: e.shiftKey,
@@ -765,11 +905,19 @@ export function Viewport() {
 		if (onControl(e)) return;
 		const t = controller.template;
 		if (!t || controller.state.tool !== "move") return;
+		if (controller.state.pathEdit) {
+			togglePointAt(controller, local(e), "mouse");
+			return;
+		}
 		const world = toWorld(local(e));
 		const deep = controller.hitTest(world, { deep: true });
 		if (!deep) return;
 		const selected = controller.state.selection;
 		const el = getElement(t, deep);
+		if (selected.includes(deep) && el && "type" in el && el.type === "vector") {
+			controller.beginPathEdit(deep);
+			return;
+		}
 		if (selected.includes(deep) && el && "type" in el && el.type === "text") {
 			if (controller.beginTextEdit(deep)) return;
 			controller.dispatch({ type: "setRightTab", tab: "design" });
@@ -917,6 +1065,7 @@ function onControl(e: { target: EventTarget }): boolean {
 function inTransaction(g: Gesture | null): boolean {
 	if (!g) return false;
 	if (g.kind === "gradient") return g.handle.part !== "line";
+	if (isPathGesture(g)) return g.tx;
 	return g.kind === "move" || g.kind === "resize" || g.kind === "rotate";
 }
 
