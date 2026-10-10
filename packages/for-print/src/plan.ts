@@ -68,8 +68,7 @@ export function classifyIntent(node: Node): LayerIntent {
 }
 
 // One channel's tone LUT, folding gamma then the darkness (Overlay-with-black)
-// step — both per-channel, so they compose into one 256-entry table. Mirrors the
-// order and math of the gamma + darkness pixel steps.
+// step — both per-channel, so they compose into one 256-entry table.
 //
 // `balance` is a channel's cast exponent, applied after the tone steps. Only
 // printFinish sets it, with the tone steps at identity.
@@ -103,9 +102,8 @@ function buildToneLut(
 ): Uint8Array {
 	const t = new Uint8Array(256);
 	for (let i = 0; i < 256; i++) {
-		// gamma is a rounded integer LUT (like gammaStep); darkness then operates on
-		// that rounded value — staging the two rounds so this matches the pixel steps
-		// run in sequence to the LSB.
+		// gamma is rounded to an integer first; darkness then operates on that
+		// rounded value.
 		let v = clamp(255 * (i / 255) ** gamma);
 		if (darkness > 0) {
 			// darkness = Overlay(base, black) at `darkness` opacity, per channel.

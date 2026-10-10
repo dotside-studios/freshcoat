@@ -20,10 +20,10 @@ export const NO_PROCESSING: PrintOptimizeOptions = {
 
 // The whole-frame finishing for-print recommends alongside the per-layer
 // adjustments — the conjunctive/spatial output ops that aren't a per-layer Adjust.
-// Pass to freshcoat's compile/render `finish`. Mirrors the old buffer pipeline's
-// defaults: snap near-black (<30) to resin-friendly black, near-white (>248) to
-// white, and ±2 levels of deterministic monochrome dither to break dye-sub
-// gradient banding without colored grain.
+// Pass to freshcoat's compile/render `finish`. Snaps near-black (<30) to
+// resin-friendly black, near-white (>248) to white, and adds ±2 levels of
+// deterministic monochrome dither to break dye-sub gradient banding without
+// colored grain.
 export const YMCKO_FINISH: FrameFinish = {
 	blackExtract: 30,
 	whiteClamp: 248,

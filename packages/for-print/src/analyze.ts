@@ -1,10 +1,4 @@
-import {
-	type ColorMatrix,
-	concatColorMatrix,
-	contrastMatrix,
-	identityColorMatrix,
-	saturationMatrix,
-} from "@freshcoat-js/engine";
+import { buildAdjust, type ColorMatrix } from "@freshcoat-js/engine";
 import { detectOrientation } from "./geometry";
 import type {
 	GamutReport,
@@ -17,17 +11,10 @@ import type {
 // matrix, or null when both are identity. Shared with the planner so a measurement
 // and the render it describes can never diverge.
 export function correctionMatrix(o: PrintOptimizeOptions): ColorMatrix | null {
-	let m = identityColorMatrix();
-	let touched = false;
-	if (o.saturation !== 1) {
-		m = concatColorMatrix(saturationMatrix(o.saturation), m);
-		touched = true;
-	}
-	if (o.contrast !== 1) {
-		m = concatColorMatrix(contrastMatrix(o.contrast), m);
-		touched = true;
-	}
-	return touched ? m : null;
+	return (
+		buildAdjust({ saturation: o.saturation, contrast: o.contrast })
+			.colorMatrix ?? null
+	);
 }
 
 // Rec.709 luma, the axis chroma is scaled toward.
@@ -233,9 +220,6 @@ export function buildRecommendation(stats: ImageStats): {
 		contrastMul = 1.1;
 		notes.push(
 			"Pastel/light design detected — using gentle settings to preserve subtle colors",
-		);
-		notes.push(
-			"Tip: adjust darkness slider manually to taste, heavy overlay will shift delicate tones",
 		);
 	} else {
 		// --- Saturation ---
