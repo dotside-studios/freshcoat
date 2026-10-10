@@ -1,6 +1,9 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { PdfPage } from "@freshcoat-js/workspace";
-import type { GlyphCheckItem, GlyphIssue } from "@freshcoat-js/workspace/export";
+import type {
+	GlyphCheckItem,
+	GlyphIssue,
+} from "@freshcoat-js/workspace/export";
 import type { AssemblePdfOptions } from "@freshcoat-js/workspace/pdf";
 
 export type PdfAssembleOptions = Omit<AssemblePdfOptions, "onProgress">;

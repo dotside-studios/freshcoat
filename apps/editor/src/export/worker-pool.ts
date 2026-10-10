@@ -1,6 +1,6 @@
 import {
-	exportPoolSize,
 	createWorkerPool as createPool,
+	exportPoolSize,
 	type PoolWorker,
 	type WorkerFactory,
 	type WorkerPool,
