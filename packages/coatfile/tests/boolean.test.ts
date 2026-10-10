@@ -142,6 +142,52 @@ describe("validation", () => {
 		);
 	});
 
+	describe("operand ids", () => {
+		const duplicate = (tpl: Template) => {
+			const result = validate(tpl);
+			if (result.ok) return [];
+			return result.errors
+				.filter((e) => e.code === "duplicate_element_id")
+				.map((e) => e.path);
+		};
+
+		test("may not repeat an element elsewhere in the frame", () => {
+			const other = rect("b", 0, 0, 5);
+			expect(
+				duplicate(template(shape("union", [rect("a", 0, 0, 5)]), other)),
+			).toEqual([]);
+			expect(
+				duplicate(template(shape("union", [rect("a", 0, 0, 5)]), rect("a", 0, 0, 5))),
+			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/0/id"]);
+			expect(
+				duplicate(template(shape("union", [rect("shape", 0, 0, 5)]))),
+			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/0/id"]);
+		});
+
+		test("may not repeat another operand, nested ones included", () => {
+			const inner = shape("union", [rect("c", 0, 0, 5), rect("a", 0, 0, 5)], {
+				id: "inner",
+			});
+			expect(
+				duplicate(template(shape("subtract", [rect("a", 0, 0, 5), inner]))),
+			).toEqual([
+				"/template_data/0/elements/0/properties/boolean/operands/1/properties/boolean/operands/1/id",
+			]);
+			expect(
+				duplicate(
+					template(shape("union", [rect("a", 0, 0, 5), rect("a", 9, 9, 5)])),
+				),
+			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/1/id"]);
+		});
+
+		test("may repeat an id on another side", () => {
+			const tpl = template(shape("union", [rect("a", 0, 0, 5)]));
+			const back = structuredClone(tpl.template_data[0] as never) as never;
+			tpl.template_data.push({ ...(back as object), name: "back" } as never);
+			expect(duplicate(tpl)).toEqual([]);
+		});
+	});
+
 	test("rejects an unknown operation", () => {
 		const bad = shape("union", [rect("a", 0, 0, 5)]);
 		(bad.properties.boolean as { op: string }).op = "merge";

@@ -842,6 +842,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceFrameNameUniqueness(tpl, ctx);
 	enforceBackgroundFrameFill(tpl, ctx);
 	enforceElementIdUniqueness(tpl, ctx);
+	enforceOperandIdUniqueness(tpl, ctx);
 	enforceVariantIdUniqueness(tpl, ctx);
 	enforceVariantSizes(tpl, ctx);
 	enforceVariantOverrideFrameResolution(tpl, ctx);
@@ -1059,6 +1060,34 @@ function enforceElementIdUniqueness(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				seen.add(el.id);
 			}
 		});
+	});
+}
+
+// Variant deltas apply by id, deep, so an operand sharing an id with any other
+// element in its frame tree would take that element's deltas.
+function enforceOperandIdUniqueness(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	const taken = tpl.template_data.map(() => new Set<string>());
+	const idOf = (el: object) => (el as { id: string }).id;
+	const isOperand = (path: (string | number)[]) => path.at(-2) === "operands";
+	const isBackground = (path: (string | number)[]) => path[2] === "background";
+	walkElements(tpl, (el, path) => {
+		if (!isOperand(path) && !isBackground(path))
+			taken[path[1] as number]?.add(idOf(el));
+	});
+	walkElements(tpl, (el, path) => {
+		if (!isOperand(path)) return;
+		const ids = taken[path[1] as number] as Set<string>;
+		const id = idOf(el);
+		if (ids.has(id)) {
+			addKitIssue(
+				ctx,
+				"duplicate_element_id",
+				`duplicate element id "${id}"`,
+				[...path, "id"],
+			);
+		} else {
+			ids.add(id);
+		}
 	});
 }
 

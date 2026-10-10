@@ -416,8 +416,9 @@ const result = read.ok ? validate(healElementIds(read.document)) : null;
 - `healElementIds` suffixes ids that repeat within a frame. `validate` rejects
   those, and a design with three layers named "Vector" produces three elements
   called `Vector` — so this is the common case, not the exotic one. It renames
-  only the top-level repeats `validate` refuses; `{ deep: true }` also renames
-  repeats anywhere in a side's tree.
+  only the repeats `validate` refuses, which are among the top-level elements
+  and for a boolean operand's id, which may not repeat any other element's on
+  its side; `{ deep: true }` also renames repeats anywhere in a side's tree.
 - `uniquifyElementIdsDeep(elements, options)` is the walk behind it: the first
   occurrence keeps its id and later ones get the next free suffix, depth
   first with a mask's shape before its content, so the same tree always gets

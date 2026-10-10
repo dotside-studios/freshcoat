@@ -210,6 +210,42 @@ describe("healElementIds", () => {
 		).toBe(id);
 	});
 
+	test("heals boolean operand ids by default", () => {
+		const operand = (id: string) => ({
+			id,
+			type: "rect",
+			size: { width: 5, height: 5 },
+			properties: { fill: "#000" },
+		});
+		const boolean = (operands: object[]) => ({
+			id: "shape",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 10, height: 10 },
+			properties: { d: "M0 0H5V5Z", boolean: { op: "union", operands } },
+		});
+		const id = (text as Element).id;
+		const t = withElements([
+			text as Element,
+			frame("box", [boolean([operand(id), operand("a"), operand("a")])]),
+		]);
+		expect(validate(t).ok).toBe(false);
+		const healed = healElementIds(t);
+		expect(validate(healed).ok).toBe(true);
+		const [first, box] = healed.template_data[0]?.elements ?? [];
+		expect(first).toBe(text);
+		const [shape] = (box as Extract<Element, { type: "frame" }>).properties
+			.children as Extract<Element, { type: "vector" }>[];
+		expect(shape?.properties.boolean?.operands.map((o) => o.id)).toEqual([
+			`${id}_2`,
+			"a",
+			"a_2",
+		]);
+		expect(healElementIds(healed).template_data[0]).toBe(
+			healed.template_data[0],
+		);
+	});
+
 	test("heals the whole tree with deep", () => {
 		const id = (text as Element).id;
 		const t = withElements([text as Element, frame("box", [text as Element])]);

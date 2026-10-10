@@ -638,6 +638,61 @@ describe("operands as layers", () => {
 	});
 });
 
+describe("ids", () => {
+	const idsOf = (t: Template) =>
+		[...walkLayers(t, 0)]
+			.filter((e) => !("background" in e.path))
+			.map((e) => e.element.id);
+
+	test("a duplicated boolean takes new ids for its operands too", async () => {
+		const c = await liveController();
+		c.select(["0/0"]);
+		c.duplicateSelection();
+		const ids = idsOf(c.base as Template);
+		expect(ids).toEqual(["union", "a", "b", "union-2", "a-2", "b-2"]);
+		expect(validate(c.base as Template).ok).toBe(true);
+	});
+
+	test("a pasted boolean takes new ids, inside another boolean too", async () => {
+		const c = await liveController();
+		const t = c.base as Template;
+		const copy = getElement(t, "0/0") as Element;
+		const top = unwrap(insertElements(t, { side: 0 }, 1, [copy]));
+		expect(idsOf(top.template)).toEqual([
+			"union",
+			"a",
+			"b",
+			"union-2",
+			"a-2",
+			"b-2",
+		]);
+		expect(validate(top.template).ok).toBe(true);
+		const nested = unwrap(insertElements(t, "0/0", 1, [copy]));
+		expect(idsOf(nested.template)).toEqual([
+			"union",
+			"a",
+			"union-2",
+			"a-2",
+			"b-2",
+			"b",
+		]);
+		expect(validate(nested.template).ok).toBe(true);
+	});
+
+	test("a new boolean avoids the ids of the operands it holds", () => {
+		const pair = shapes(square("a", 0, 0), square("union", 50, 0));
+		const out = run(pair, ["0/0", "0/1"], "union");
+		expect(out.el.id).toBe("union-2");
+		expect(validate(out.t).ok).toBe(true);
+	});
+
+	test("a renamed operand can't take an id used elsewhere on the side", async () => {
+		const c = await liveController("union", [square("z", 300, 200)]);
+		const refused = renameElement(c.base as Template, "0/0/0", "z");
+		expect(refused.ok).toBe(false);
+	});
+});
+
 describe("flatten and switching the operation", () => {
 	test("flatten drops the operands and keeps the result", async () => {
 		const c = await liveController();
