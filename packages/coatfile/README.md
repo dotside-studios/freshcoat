@@ -355,8 +355,7 @@ what that minor added.
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
-| 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size` |
-| 1.7 | vector `boolean` |
+| 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -564,7 +563,7 @@ corner between two straight segments by one radius, as Skia's corner path
 effect does; curves and arcs keep their shape. A `polygon` image mask takes the
 same `cornerRadius`.
 
-A vector's `boolean` (1.7) keeps a live boolean operation: `op` (`union`,
+A vector's `boolean` (1.6) keeps a live boolean operation: `op` (`union`,
 `subtract`, `intersect` or `exclude`) and `operands`, rects or vectors
 positioned relative to the vector's box and combined bottom-most first, as
 Figma does. Any other operand type fails validation with
@@ -576,8 +575,8 @@ hidden by either drops out, and a vector with nothing left draws nothing but
 keeps its box. `renderTemplate` passes one made with the renderer's CanvasKit;
 `canvasKitPathOp(renderer.ck)` is that function for `compile`, with results
 kept by operation and operand geometry. When the vector resizes, its operands
-scale with its box on each axis, as `d` does. A 1.6 kit ignores `boolean` and
-draws `d`, but would drop the operands if it re-saved the file.
+scale with its box on each axis, as `d` does. A kit that predates it ignores
+`boolean` and draws `d`, but would drop the operands if it re-saved the file.
 
 `svgToElements` from `@freshcoat-js/coatfile/svg` converts SVG markup into one
 frame of editable `vector`, `frame`, `mask`, `image` and `text` elements in

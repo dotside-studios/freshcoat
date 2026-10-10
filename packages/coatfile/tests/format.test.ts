@@ -217,7 +217,7 @@ describe("minimumFormatVersion", () => {
 		).toBe("1.5");
 	});
 
-	test("1.7: a vector boolean, nested ones and deltas included", () => {
+	test("1.6: a vector boolean, nested ones and deltas included", () => {
 		const vector = (properties: Record<string, unknown>) =>
 			({
 				id: "v",
@@ -230,14 +230,14 @@ describe("minimumFormatVersion", () => {
 		const boolean = { op: "union", operands: [rect("a")] };
 		expect(
 			minimumFormatVersion(withElements(base(), vector({ boolean }))),
-		).toBe("1.7");
+		).toBe("1.6");
 		const nested = { op: "subtract", operands: [vector({ boolean })] };
 		const frame = {
 			id: "f",
 			type: "frame",
 			properties: { children: [vector({ boolean: nested })] },
 		} as Element;
-		expect(minimumFormatVersion(withElements(base(), frame))).toBe("1.7");
+		expect(minimumFormatVersion(withElements(base(), frame))).toBe("1.6");
 	});
 
 	test("1.6: frame isolate, on elements and deltas", () => {

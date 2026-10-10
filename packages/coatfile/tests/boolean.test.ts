@@ -62,7 +62,7 @@ function shape(
 
 function template(...elements: Element[]): Template {
 	return {
-		format_version: "1.7",
+		format_version: "1.6",
 		version: "1.0.0",
 		id: "t",
 		name: "T",
