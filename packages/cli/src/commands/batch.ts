@@ -66,6 +66,7 @@ export type BatchOptions = {
 	gap?: number;
 	cropMarks?: boolean;
 	dryRun?: true;
+	jobs?: number;
 	quiet: boolean;
 };
 
@@ -146,7 +147,12 @@ export async function renderBatch(
 	await runPreset(
 		workspace,
 		preset,
-		{ root: directory, out: options.out, ...(options.dryRun ? { dryRun: true } : {}) },
+		{
+			root: directory,
+			out: options.out,
+			...(options.dryRun ? { dryRun: true } : {}),
+			...(options.jobs ? { jobs: options.jobs } : {}),
+		},
 		log,
 		io,
 	);

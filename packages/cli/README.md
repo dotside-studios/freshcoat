@@ -130,6 +130,15 @@ freshcoat render club.coatworkspace --preset "All cards" --save --out cards.zip
 freshcoat render club.coatworkspace --preset "All cards" --records failed --save --out retry.zip
 ```
 
+#### Threads
+
+An export from a template or a workspace renders on worker threads, each with
+its own CanvasKit and the fonts, the way Studio's export uses web workers: as
+many as the cores and memory allow, at most four and two when the photos are
+over 24 megapixels, and one per eight items, since starting a thread costs more
+than a few renders. `--jobs <n>` sets the number, and `--jobs 1` renders on the
+main thread. The files are the same either way.
+
 #### Dry runs
 
 `--dry-run` lists what a render would write and writes nothing: a directory

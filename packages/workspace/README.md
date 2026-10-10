@@ -133,7 +133,9 @@ const result = await exportWorkspace(workspace, preset, {
 (`findPreset` does that lookup). Unless `fonts` is given, it resolves the
 template's fonts with `resolveTemplateFonts`, passing it `fontOptions`, and
 reports the families it found no bytes for as `result.fonts.missing`. It
-renders one item at a time on the calling thread. The renderer is the host's, so its `load`
+renders one item at a time on the calling thread, or through `pool`, a
+`JobPool` of the host's own, such as worker threads that each hold a
+`createItemRenderer` and the fonts; `renderer` still checks glyphs then. The renderer is the host's, so its `load`
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
@@ -160,8 +162,19 @@ field left empty is not reported.
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable
-stream. `exportPoolSize` picks how many workers from the
-cores, memory and `largestImagePixels` of the job.
+stream.
+
+`createWorkerPool(size, factory)` is that pool. `factory` makes a worker:
+anything with `postMessage`, `terminate`, `onmessage` and `onerror`, such as a
+web `Worker` or an adapter over a Node `worker_threads` one. Each worker calls
+`serveRenders(scope, createRenderer)` with its own scope and a function that
+makes its renderer, with the CanvasKit and image loader of its platform.
+`init(fonts)` hands every worker the fonts and waits for each, workers start
+when first needed and a failed one is replaced, and a template is sent to a
+worker only when it changes. Studio runs it over module workers and the CLI
+over threads, and either pool can be passed to `exportWorkspace` as `pool`.
+`exportPoolSize` picks how many workers from the cores, memory and
+`largestImagePixels` of the job.
 
 `itemRequest` builds the render request `runExportJob` sends for one item,
 with the size `itemSize` gives it, and `imagesOf` lists the photos that item
