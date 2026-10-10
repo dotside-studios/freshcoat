@@ -133,7 +133,9 @@ const result = await exportWorkspace(workspace, preset, {
 (`findPreset` does that lookup). Unless `fonts` is given, it resolves the
 template's fonts with `resolveTemplateFonts`, passing it `fontOptions`, and
 reports the families it found no bytes for as `result.fonts.missing`. It
-renders one item at a time on the calling thread. The renderer is the host's, so its `load`
+renders one item at a time on the calling thread, or through `pool`, a
+`JobPool` of the host's own, such as worker threads that each hold a
+`createItemRenderer` and the fonts; `renderer` still checks glyphs then. The renderer is the host's, so its `load`
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
