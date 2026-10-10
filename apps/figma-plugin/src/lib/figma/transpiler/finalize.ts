@@ -106,7 +106,15 @@ export function dropUnfilledSlots(elements: unknown[]): unknown[] {
 export function uniquifyElementIdsDeep(elements: unknown[]): unknown[] {
 	return uniquifyIdsDeep(elements as { id: string }[], {
 		inPlace: true,
-		nested: (el) =>
-			nestedElementArrays(el as Record<string, unknown>) as { id: string }[][],
+		nested: (el) => {
+			const operands = (
+				el.properties as { boolean?: { operands?: unknown[] } } | undefined
+			)?.boolean?.operands;
+			return (
+				el.type === "vector" && operands
+					? [operands]
+					: nestedElementArrays(el as Record<string, unknown>)
+			) as { id: string }[][];
+		},
 	});
 }

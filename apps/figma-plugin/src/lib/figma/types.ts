@@ -264,6 +264,12 @@ export type FigmaVectorNodeType =
 	| "LINE"
 	| "ELLIPSE";
 
+export type FigmaBooleanOperation =
+	| "UNION"
+	| "SUBTRACT"
+	| "INTERSECT"
+	| "EXCLUDE";
+
 export type FigmaVectorNode = FigmaBaseNode & {
 	type: FigmaVectorNodeType;
 	fills?: FigmaPaint[];
@@ -282,6 +288,10 @@ export type FigmaVectorNode = FigmaBaseNode & {
 	// POLYGON only.
 	pointCount?: number;
 	cornerRadius?: number;
+	// BOOLEAN_OPERATION only. `children` is bottom-most first, as Figma lists
+	// them, and absent when the tree was read without its children.
+	booleanOperation?: FigmaBooleanOperation;
+	children?: FigmaNode[];
 };
 
 export type FigmaContainerNodeType =

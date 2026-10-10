@@ -1,5 +1,6 @@
 import { scalePathData } from "@freshcoat-js/engine/path";
 import type { FigmaBoundingBox, FigmaVectorNode } from "../types";
+import type { LiveBoolean } from "./boolean";
 import { vectorFillRule } from "./classify";
 import { fillsToElement, type StrokeElement, strokeToElement } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
@@ -42,6 +43,7 @@ export function transpileVector(
 			fillRule?: "evenodd";
 			fill?: unknown;
 			stroke?: StrokeElement;
+			boolean?: LiveBoolean;
 		};
 	} = {
 		id: node.name.replace(/[^a-zA-Z0-9_]/g, "_") || node.id.replace(":", "_"),

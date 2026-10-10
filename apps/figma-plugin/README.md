@@ -148,6 +148,17 @@ layers were kept, flattened or skipped.
   renderer smooths only a uniform radius, so a rectangle with different
   corners keeps them unsmoothed (`corner_smoothing_unsupported`). Frames
   keep their radius but not smoothing, which coatfile frames do not carry.
+- **Boolean operations.** A union, subtract, intersect or exclude stays a
+  live boolean `vector`: its `operands` are the visible children, bottom-most
+  first, each a `rect` (with its corner radii) or a `vector` (rectangles,
+  ellipses, stars, polygons, vectors and nested booleans), positioned in the
+  boolean's box. A hidden child is left out, as Figma leaves it out of the
+  result. The cached `d` is Figma's own result, and the fill, stroke and
+  effects are the boolean's, not its children's. If any child cannot be an
+  operand (text, a group or frame, a mask, a line or open path, a rect with
+  corner smoothing, or a skewed, flipped or scaled child), the whole boolean
+  is written as one flat `vector` and the export reports `boolean_flattened`
+  as information. Nothing is rasterized.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,
   linear dodge as `plus`. A frame set to Normal is written with `isolate`, so
   a blended layer inside it mixes only with the frame's content, as in Figma.

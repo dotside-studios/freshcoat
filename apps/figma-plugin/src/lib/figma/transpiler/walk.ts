@@ -16,6 +16,7 @@ import {
 import { transpileBarcode } from "./barcode";
 import { isBarcodeLayerName } from "./barcode-name";
 import { applyBindingOverlay } from "./binding-overlay";
+import { liveBoolean } from "./boolean";
 import {
 	type Classification,
 	classify,
@@ -459,13 +460,23 @@ function walkNode(
 			const r = transpileBarcode(n, ctx);
 			el = r.element;
 			for (const warning of r.warnings) w.sink.warnings.push(warning);
-		} else if (c.kind === "native-vector" && isVectorNode(n))
-			el = transpileVector(n, {
+		} else if (c.kind === "native-vector" && isVectorNode(n)) {
+			const vector = transpileVector(n, {
 				frame: ctx.frame,
 				scale: ctx.scale,
 				worldAnchor: anchor,
 			});
-		else if (c.kind === "native-frame" && isContainerNode(n)) {
+			const live = liveBoolean(n, ctx.scale);
+			if (live && "boolean" in live) vector.properties.boolean = live.boolean;
+			else if (live)
+				w.sink.warnings.push({
+					severity: "info",
+					code: "boolean_flattened",
+					message: `Boolean layer "${n.name}" was kept as one flat vector, not a live boolean operation: ${live.blocker}.`,
+					nodeId: n.id,
+				});
+			el = vector;
+		} else if (c.kind === "native-frame" && isContainerNode(n)) {
 			// Frame's pos is in localFrame coords; its children re-anchor to
 			// the frame's own bbox so children's pos comes out frame-local.
 			// transpileFrame carries the frame's parent-relative rotation; the
