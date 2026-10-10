@@ -5,6 +5,7 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "@commander-js/extra-typings";
+import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { inspect } from "./commands/inspect";
 import { render } from "./commands/render";
 import { validateCommand } from "./commands/validate";
@@ -98,7 +99,7 @@ function program(io: Io) {
 		)
 		.action((file, options, cmd) => {
 			const { preset, out, ...templateOptions } = options;
-			if (!WORKSPACE.test(file)) {
+			if (!file.toLowerCase().endsWith(WORKSPACE_EXTENSION)) {
 				if (preset !== undefined)
 					return cmd.error("error: --preset needs a .coatworkspace file");
 				return render(file, { ...options, quiet: quiet(cmd) }, io);
@@ -134,8 +135,6 @@ function program(io: Io) {
 
 	return root;
 }
-
-const WORKSPACE = /\.coatworkspace$/i;
 
 function collect(value: string, previous: string[] = []): string[] {
 	return [...previous, value];
