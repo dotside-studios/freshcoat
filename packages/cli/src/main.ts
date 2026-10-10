@@ -5,15 +5,22 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "@commander-js/extra-typings";
-import { PAPER_SIZES_MM, type PaperName } from "@freshcoat-js/workspace";
-import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
-import { renderBatch } from "./commands/batch";
+import {
+	ArgumentError,
+	collect,
+	collectScale,
+	collectSetting,
+	parseJobs,
+	parseLength,
+	parsePaper,
+	parsePositive,
+	parseQuality,
+} from "./args";
 import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
-import { render } from "./commands/render";
+import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
-import { renderWorkspace, writesFile } from "./commands/workspace";
-import { CliError, type Io, processIo } from "./io";
+import { CliError, type Io, processIo, UsageError } from "./io";
 
 export function version(): string {
 	const manifest = JSON.parse(
@@ -26,18 +33,23 @@ export async function main(
 	argv: string[],
 	io: Io = processIo(),
 ): Promise<number> {
+	let running: string | undefined;
 	try {
-		await program(io).parseAsync(argv, { from: "user" });
+		await program(io, (name) => {
+			running = name;
+		}).parseAsync(argv, { from: "user" });
 		return 0;
 	} catch (error) {
 		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
 		const message = error instanceof Error ? error.message : String(error);
 		io.stderr(`freshcoat: ${message}\n`);
+		if (error instanceof UsageError && running)
+			io.stderr(`Run freshcoat ${running} --help for usage.\n`);
 		return error instanceof CliError ? error.exitCode : 1;
 	}
 }
 
-function program(io: Io) {
+function program(io: Io, onCommand: (name: string) => void) {
 	const root = new Command("freshcoat")
 		.usage("<command> [options]")
 		.description("Render, check, inspect and package Freshcoat templates and workspaces.")
@@ -53,6 +65,7 @@ function program(io: Io) {
 			outputError: (text, write) => write(text.replace(/^error: /, "freshcoat: ")),
 		})
 		.exitOverride()
+		.hook("preAction", (_root, action) => onCommand(action.name()))
 		.addHelpText(
 			"after",
 			"\nResults go to stdout; progress, warnings and errors go to stderr. Exit codes:\n0 done, 1 the work failed, 2 the command line was wrong.",
@@ -85,7 +98,7 @@ function program(io: Io) {
 		.option(
 			"--jobs <n>",
 			"render an export on this many threads; default from the cores and memory",
-			parseJobs,
+			arg(parseJobs),
 		)
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
@@ -93,11 +106,11 @@ function program(io: Io) {
 		.option(
 			"--set <key=value>",
 			"one field value; repeatable, overrides --values and --data",
-			collectSetting,
+			arg(collectSetting),
 		)
 		.option("--variant <id>", "render a variant of the template")
-		.option("--frame <name>", "render only this frame; repeatable", collect)
-		.option("--scale <n>", "pixel density, default 1; repeatable into a directory", collectScale)
+		.option("--frame <name>", "render only this frame; repeatable", arg(collect))
+		.option("--scale <n>", "pixel density, default 1; repeatable into a directory", arg(collectScale))
 		.addOption(
 			new Option("--format <format>", "image format, default png").choices([
 				"png",
@@ -111,10 +124,10 @@ function program(io: Io) {
 			"--name <pattern>",
 			"file names, such as {{member_id}}-{{side}}; default {{template}}-{{index}}-{{side}}",
 		)
-		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", parseQuality)
+		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", arg(parseQuality))
 		.option("--bleed", "include the template's bleed around each card")
 		.optionsGroup("PDF options:")
-		.option("--dpi <n>", "pixels per inch, which sets the page size; default 300", parsePositive)
+		.option("--dpi <n>", "pixels per inch, which sets the page size; default 300", arg(parsePositive))
 		.addOption(
 			new Option("--pdf-pages <kind>", "what each page holds, default png").choices([
 				"png",
@@ -125,7 +138,7 @@ function program(io: Io) {
 		.option(
 			"--sheets <paper>",
 			"lay the cards out on a4, letter, legal, a3, tabloid or <w>x<h> mm paper",
-			parsePaper,
+			arg(parsePaper),
 		)
 		.addOption(
 			new Option("--duplex <edge>", "print backs behind fronts, flipped on this edge").choices([
@@ -133,8 +146,8 @@ function program(io: Io) {
 				"short",
 			] as const),
 		)
-		.option("--margin <mm>", "sheet margin, default 10", parseLength)
-		.option("--gap <mm>", "space between cards, default 0", parseLength)
+		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
+		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
 		.option("--no-crop-marks", "leave out the crop marks")
 		.optionsGroup("Workspace options:")
 		.option(
@@ -153,54 +166,9 @@ function program(io: Io) {
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
 		)
-		.action((file, options, cmd) => {
-			const given = Object.keys(options).filter(
-				(key) => cmd.getOptionValueSource(key) === "cli",
-			);
-			const { preset, out, cropMarks, records, save, ...rest } = options;
-			if (save && rest.dryRun)
-				return cmd.error("error: --save and --dry-run do not go together");
-			if (file.toLowerCase().endsWith(WORKSPACE_EXTENSION)) {
-				const misplaced = given.filter((key) => !WORKSPACE_KEYS.includes(key)).map(flag);
-				if (misplaced.length > 0)
-					return cmd.error(
-						`error: ${misplaced.join(", ")} ${misplaced.length === 1 ? "applies" : "apply"} only to templates`,
-					);
-				if (out === undefined)
-					return cmd.error("error: a .coatworkspace needs --out <path>");
-				return renderWorkspace(
-					file,
-					{
-						...(preset ? { preset } : {}),
-						...(records ? { records } : {}),
-						...(save ? { save } : {}),
-						...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
-						...(rest.jobs ? { jobs: rest.jobs } : {}),
-						out,
-						quiet: quiet(cmd),
-					},
-					ioFor(cmd),
-				);
-			}
-			const workspaceOnly = given.filter((key) => ["preset", "records", "save"].includes(key));
-			if (workspaceOnly.length > 0)
-				return cmd.error(
-					`error: ${listed(workspaceOnly, "needs", "need")} a .coatworkspace file`,
-				);
-			const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
-			if (rest.data === undefined && (out === undefined || !writesFile(out))) {
-				if (exportOnly.length > 0)
-					return cmd.error(
-						`error: ${listed(exportOnly, "needs", "need")} --data or a .zip or .pdf --out`,
-					);
-				return render(file, { ...rest, ...(out ? { out } : {}), quiet: quiet(cmd) }, ioFor(cmd));
-			}
-			if (out === undefined)
-				return cmd.error("error: --data needs --out <dir|file.zip|file.pdf>");
-			const problem = exportProblem(given, rest, out);
-			if (problem) return cmd.error(`error: ${problem}`);
-			return renderBatch(file, { ...rest, out, cropMarks, quiet: quiet(cmd) }, ioFor(cmd));
-		});
+		.action((file, options, cmd) =>
+			runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd)),
+		);
 
 	command("validate")
 		.summary("check a template or workspace")
@@ -237,97 +205,16 @@ function program(io: Io) {
 	return root;
 }
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "dryRun", "jobs"];
-const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
-const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
-const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", ...PDF_OPTIONS];
-
-function flag(key: string): string {
-	return key === "cropMarks"
-		? "--no-crop-marks"
-		: `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-}
-
-function listed(keys: string[], one: string, many: string): string {
-	return `${keys.map(flag).join(", ")} ${keys.length === 1 ? one : many}`;
-}
-
-function exportProblem(
-	given: string[],
-	options: { scale?: number[]; format?: string; quality?: number; pdfPages?: string },
-	out: string,
-): string | undefined {
-	const pdf = /\.pdf$/i.test(out);
-	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
-	if (pdf && options.format !== undefined)
-		return "--format applies only to images; a PDF takes --pdf-pages";
-	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
-	if (!pdf && pdfOnly.length > 0)
-		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");
-	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));
-	if (sheetOnly.length > 0 && !given.includes("sheets"))
-		return listed(sheetOnly, "needs --sheets", "need --sheets");
-	if (options.quality !== undefined) {
-		if (pdf && options.pdfPages !== "jpeg") return "--quality needs --pdf-pages jpeg";
-		if (!pdf && (options.format === undefined || options.format === "png"))
-			return "--quality needs --format jpeg or webp";
-	}
-	return undefined;
-}
-
-function collect(value: string, previous: string[] = []): string[] {
-	return [...previous, value];
-}
-
-function collectSetting(
-	entry: string,
-	previous: Record<string, string> = {},
-): Record<string, string> {
-	const at = entry.indexOf("=");
-	if (at <= 0) throw new InvalidArgumentError("Expected key=value.");
-	return { ...previous, [entry.slice(0, at)]: entry.slice(at + 1) };
-}
-
-function collectScale(entry: string, previous: number[] = []): number[] {
-	return [...previous, parsePositive(entry)];
-}
-
-function parseQuality(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isInteger(value) || value < 0 || value > 100)
-		throw new InvalidArgumentError("Expected a whole number from 0 to 100.");
-	return value;
-}
-
-function parseJobs(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isInteger(value) || value < 1)
-		throw new InvalidArgumentError("Expected a whole number, 1 or more.");
-	return value;
-}
-
-function parsePositive(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isFinite(value) || value <= 0)
-		throw new InvalidArgumentError("Expected a positive number.");
-	return value;
-}
-
-function parseLength(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isFinite(value) || value < 0)
-		throw new InvalidArgumentError("Expected millimetres, 0 or more.");
-	return value;
-}
-
-function parsePaper(entry: string): PaperName | { widthMm: number; heightMm: number } {
-	const name = entry.toLowerCase();
-	if ((Object.keys(PAPER_SIZES_MM) as string[]).includes(name)) return name as PaperName;
-	const size = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(name);
-	const [width, height] = [Number(size?.[1]), Number(size?.[2])];
-	if (!size || width <= 0 || height <= 0)
-		throw new InvalidArgumentError(
-			`Expected ${Object.keys(PAPER_SIZES_MM).join(", ")} or <width>x<height> in millimetres.`,
-		);
-	return { widthMm: Math.min(width, height), heightMm: Math.max(width, height) };
+/** A value parser for commander, which reports an ArgumentError as its own. */
+function arg<T, P extends unknown[]>(
+	parse: (value: string, ...rest: P) => T,
+): (value: string, ...rest: P) => T {
+	return (value, ...rest) => {
+		try {
+			return parse(value, ...rest);
+		} catch (error) {
+			if (error instanceof ArgumentError) throw new InvalidArgumentError(error.message);
+			throw error;
+		}
+	};
 }

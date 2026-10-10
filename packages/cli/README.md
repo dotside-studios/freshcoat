@@ -225,6 +225,14 @@ import { main } from "@freshcoat-js/cli";
 const code = await main(["validate", "card.coat"]);
 ```
 
+Only `src/main.ts` knows the argument parser, commander: it declares the
+commands and their help and hands typed options to the commands in
+`src/commands`, which take plain objects and an `io`. `planRender` decides
+what `render` runs for a file and its options, and refuses options that do not
+go together with a `UsageError`, which exits 2 and points at the command's
+help. The value parsers in `src/args.ts` throw an `ArgumentError`. Each can be
+tested without the command line.
+
 ## License
 
 Apache-2.0, see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE). Part of

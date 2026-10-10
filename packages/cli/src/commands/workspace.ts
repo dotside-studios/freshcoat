@@ -17,7 +17,7 @@ import {
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
-import { CliError, createLog, type Io, type Log } from "../io";
+import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
@@ -45,9 +45,8 @@ export async function renderWorkspace(
 	for (const warning of warnings) log.warn(`${file}: ${warning}`);
 
 	if (options.preset === undefined)
-		throw new CliError(
+		throw new UsageError(
 			`a .coatworkspace needs --preset <name|id>${presetList(workspace.presets)}`,
-			2,
 		);
 	const preset = findPreset(workspace, options.preset);
 	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
