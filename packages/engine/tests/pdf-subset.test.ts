@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
@@ -13,6 +19,7 @@ import { createRenderer, type Renderer } from "../src/renderer";
 let ck: any;
 const geist = testFontBytes("Geist-Regular.ttf");
 const hebrew = testFontBytes("NotoSansHebrew-Regular.ttf");
+const inter = "/usr/share/fonts/opentype/inter/Inter-Regular.otf";
 
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -268,6 +275,190 @@ describe("subsetFont, TrueType outlines", () => {
 	});
 });
 
+// A name-keyed CFF font of six glyphs, written here so that nothing but the
+// font reader in CanvasKit vouches for the result: one glyph calls a local
+// subroutine, another a global one.
+function synthetic(): Uint8Array {
+	const ops: Record<string, number> = {
+		rmoveto: 21,
+		rlineto: 5,
+		hlineto: 6,
+		vlineto: 7,
+		callsubr: 10,
+		callgsubr: 29,
+		return: 11,
+		endchar: 14,
+	};
+	const num = (v: number) =>
+		v >= -107 && v <= 107 ? [v + 139] : [28, (v >> 8) & 255, v & 255];
+	const code = (...items: Array<number | string>) =>
+		items.flatMap((i) => (typeof i === "string" ? [ops[i] as number] : num(i)));
+	const int5 = (v: number) => [29, v >>> 24, v >>> 16, v >>> 8, v];
+	const u16 = (...v: number[]) => v.flatMap((n) => [(n >> 8) & 255, n & 255]);
+	const u32 = (v: number) => [v >>> 24, v >>> 16, v >>> 8, v];
+	const index = (items: number[][]) =>
+		items.length === 0
+			? [0, 0]
+			: [
+					...u16(items.length),
+					1,
+					...items.reduce(
+						(o, i) => [...o, (o.at(-1) as number) + i.length],
+						[1],
+					),
+					...items.flat(),
+				];
+	const glyphs = [
+		code(0, 0, "rmoveto", 400, 700, -400, "hlineto", "endchar"),
+		code(50, 0, "rmoveto", 300, 700, -300, "hlineto", "endchar"),
+		code(100, 0, "rmoveto", 200, 400, -200, "hlineto", "endchar"),
+		code(0, 0, "rmoveto", -107, "callsubr", "endchar"),
+		code(-107, "callgsubr", "endchar"),
+		code(300, 300, "rmoveto", 100, 100, -100, "hlineto", "endchar"),
+	];
+	const local = code(50, 50, "rmoveto", 300, 300, -300, "hlineto", "return");
+	const global = code(200, 100, "rmoveto", 100, 500, -100, "hlineto", "return");
+	const front = [1, 0, 4, 1, ...index([[...Buffer.from("Synth")]])];
+	const rest = [...index([]), ...index([global])];
+	const charset = [0, ...u16(34, 35, 36, 37, 38)];
+	const strings = index(glyphs);
+	const priv = (subrs: number) => [
+		...code(500),
+		20,
+		...code(0),
+		21,
+		...int5(subrs),
+		19,
+	];
+	const top = (c: number, s: number, p: number) => [
+		...code(0, 0, 1000, 1000),
+		5,
+		...int5(c),
+		15,
+		...int5(s),
+		17,
+		...int5(priv(0).length),
+		...int5(p),
+		18,
+	];
+	const at = front.length + index([top(0, 0, 0)]).length + rest.length;
+	const body = [
+		...charset,
+		...strings,
+		...priv(priv(0).length),
+		...index([local]),
+	];
+	const privAt = at + charset.length + strings.length;
+	const cff = [
+		...front,
+		...index([top(at, at + charset.length, privAt)]),
+		...rest,
+		...body,
+	];
+	const head = new Uint8Array(54);
+	const hv = new DataView(head.buffer);
+	hv.setUint32(0, 0x00010000);
+	hv.setUint32(12, 0x5f0f3cf5);
+	hv.setUint16(18, 1000);
+	hv.setInt16(40, 1000);
+	hv.setInt16(42, 1000);
+	const hhea = new Uint8Array(36);
+	const av = new DataView(hhea.buffer);
+	av.setUint32(0, 0x00010000);
+	av.setInt16(4, 800);
+	av.setInt16(6, -200);
+	av.setUint16(34, 6);
+	const os2 = new Uint8Array(96);
+	new DataView(os2.buffer).setUint16(0, 2);
+	new DataView(os2.buffer).setUint16(4, 400);
+	new DataView(os2.buffer).setInt16(88, 700);
+	const post = new Uint8Array(32);
+	new DataView(post.buffer).setUint32(0, 0x00030000);
+	const family = [...Buffer.from("Synth")].flatMap((c) => [0, c]);
+	const name = [
+		...u16(0, 1, 18),
+		...u16(3, 1, 0x409, 1, family.length, 0),
+		...family,
+	];
+	const cmap = [
+		...u16(0, 1, 3, 1),
+		...u32(12),
+		...u16(4, 32, 0, 4, 4, 1, 0),
+		...u16(0x45, 0xffff, 0, 0x41, 0xffff),
+		...u16((1 - 0x41) & 0xffff, 1, 0, 0),
+	];
+	return sfnt("OTTO", {
+		"CFF ": cff,
+		"OS/2": os2,
+		cmap,
+		head,
+		hhea,
+		hmtx: [500, 600, 450, 700, 300, 400].flatMap((a) => [...u16(a), 0, 0]),
+		maxp: [...u32(0x5000), ...u16(6)],
+		name,
+		post,
+	});
+}
+
+describe("subsetFont, CFF outlines", () => {
+	const font = synthetic();
+
+	test("the test font is a font", () => {
+		expect(render(font, [1, 2, 3, 4, 5])).not.toEqual(
+			render(font, [0, 0, 0, 0, 0]),
+		);
+		expect(readSfnt(font)?.outlines).toBe("cff");
+	});
+
+	test("keeps the charstrings of the glyphs used, with their subroutines", () => {
+		const subset = subsetFont(font, [1, 3, 4]) as Uint8Array;
+		expect(subset).toBeTruthy();
+		const tables = checked(subset);
+		expect([...tables.keys()]).toEqual([
+			"CFF ",
+			"OS/2",
+			"head",
+			"hhea",
+			"hmtx",
+			"maxp",
+			"name",
+			"post",
+		]);
+		expect(render(subset, [0, 1, 3, 4])).toEqual(render(font, [0, 1, 3, 4]));
+		for (const g of [2, 5]) {
+			expect(blank(render(font, [g]))).toBe(false);
+			expect(blank(render(subset, [g]))).toBe(true);
+		}
+		sameInfo(font, subset, [0, 1, 3, 4]);
+		expect(readSfnt(subset)?.outlines).toBe("cff");
+	});
+
+	test("keeps the glyph count with only glyph 0 used", () => {
+		const subset = subsetFont(font, []) as Uint8Array;
+		expect(render(subset, [0])).toEqual(render(font, [0]));
+		expect(blank(render(subset, [1, 2, 3, 4, 5]))).toBe(true);
+		const maxp = checked(subset).get("maxp") as Uint8Array;
+		expect(new DataView(maxp.buffer, maxp.byteOffset).getUint16(4)).toBe(6);
+	});
+
+	test.skipIf(!existsSync(inter))("subsets an installed OpenType font", () => {
+		const bytes = new Uint8Array(readFileSync(inter));
+		const used = glyphsOf(bytes, "Fresh éÅ");
+		const subset = subsetFont(bytes, used) as Uint8Array;
+		expect(subset.length).toBeLessThan(bytes.length / 5);
+		checked(subset);
+		expect(render(subset, used)).toEqual(render(bytes, used));
+		const others = glyphsOf(bytes, "xyzQ");
+		expect(blank(render(subset, others))).toBe(true);
+		sameInfo(bytes, subset, used);
+	});
+
+	const unifont = "/usr/share/fonts/opentype/unifont/unifont.otf";
+	test.skipIf(!existsSync(unifont))("leaves a CID-keyed font whole", () => {
+		expect(subsetFont(new Uint8Array(readFileSync(unifont)), [1])).toBeNull();
+	});
+});
+
 describe("subsets in a PDF", () => {
 	let renderer: Renderer;
 	beforeAll(async () => {
@@ -350,4 +541,21 @@ describe("subsets in a PDF", () => {
 			/[A-Z]{6}\+Geist-F0\s+CID TrueType\s+Identity-H\s+yes yes yes/,
 		);
 	});
+
+	test.skipIf(!existsSync(inter))(
+		"embeds the glyphs used from an OpenType font",
+		async () => {
+			const bytes = new Uint8Array(readFileSync(inter));
+			const cff = await createRenderer({ ck, fonts: { Inter: [bytes] } });
+			const pdf = await cff.renderPdf(page("Inter", "Fresh coat éÅ"), {
+				width: 300,
+				height: 60,
+			});
+			expect(pdf.warnings).toEqual([]);
+			expect(pdf.bytes.length).toBeLessThan(bytes.length / 8);
+			expect(latin(pdf.bytes)).toMatch(/\/BaseFont \/[A-Z]{6}\+Inter-F0/);
+			if (has("pdftotext"))
+				expect(run("pdftotext", pdf.bytes)).toContain("Fresh coat éÅ");
+		},
+	);
 });
