@@ -34,7 +34,7 @@ export function pdfLayout(preset: Pick<ExportPreset, "layout">): PdfLayout {
 }
 
 /** What one output file is encoded as. A PDF's pages are PNGs unless the
- *  preset asks for JPEG pages. */
+ *  preset asks for JPEG pages; a vector page that falls back is a PNG. */
 export function imageFormat(
 	preset: Pick<ExportPreset, "format" | "pdfPageImage">,
 ): "png" | "jpeg" | "webp" {
@@ -48,6 +48,13 @@ export function imageFormat(
 		default:
 			return "png";
 	}
+}
+
+/** Whether a PDF preset draws its pages as vectors. */
+export function vectorPages(
+	preset: Pick<ExportPreset, "format" | "pdfPageImage">,
+): boolean {
+	return preset.format === "pdf" && preset.pdfPageImage === "vector";
 }
 
 /** The extension of each file in a zip of this format. */

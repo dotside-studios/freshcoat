@@ -264,9 +264,14 @@ the fonts, and `summarizeGlyphs` and `codepointLabel` shape it for display.
 
 `src/export/node-export.test.ts` runs this path end to end.
 
-For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images. It can place
-one image per page or impose cards on sheets with crop marks and duplex
-backs. The designs inside the PDF are raster images at the chosen density.
+For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images, or one-page
+PDFs. It can place one per page or impose cards on sheets with crop marks and
+duplex backs. A preset's `pdfPageImage` picks what each page holds: a PNG or a
+JPEG at the chosen density, or `vector`, which draws each card as PDF vectors
+through the engine's [PDF output](../engine/README.md#pdf-output): text in its
+embedded font, and any layer a PDF cannot express, such as a shadow, as an
+image. A card printed with correction is rendered as a PNG. Each font file is
+stored once in the assembled PDF, however many cards use it.
 
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`

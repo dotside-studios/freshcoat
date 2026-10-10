@@ -103,6 +103,33 @@ describe("assemblePdf", () => {
 		expect(image?.dict.has(PDFName.of("SMask"))).toBe(true);
 	});
 
+	it("draws a one-page PDF as its vectors, sized by its pixels", async () => {
+		const source = await PDFDocument.create();
+		const [w, h] = [(1012 / 300) * 72, (638 / 300) * 72];
+		source
+			.addPage([w / 2, h / 2])
+			.drawRectangle({ x: 4, y: 4, width: 20, height: 10 });
+		const vector = await source.save();
+		const pdf = await assemblePdf(
+			[
+				{ bytes: vector, format: "pdf", widthPx: 1012, heightPx: 638 },
+				{ bytes: makePng(2, 2), format: png, widthPx: 1012, heightPx: 638 },
+			],
+			{ dpi: 300 },
+		);
+		const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+		expect(doc.getPageCount()).toBe(2);
+		const page = doc.getPage(0);
+		expect(page.getWidth()).toBeCloseTo(w, 3);
+		expect(page.getHeight()).toBeCloseTo(h, 3);
+		expect(
+			images(page).map((x) => x.dict.get(PDFName.of("Subtype"))?.toString()),
+		).toEqual(["/Form"]);
+		const [m] = placements(page);
+		expect(m?.[0]).toBeCloseTo(2, 4);
+		expect(m?.[3]).toBeCloseTo(2, 4);
+	});
+
 	it("rejects a non-positive dpi", async () => {
 		await expect(assemblePdf([], { dpi: 0 })).rejects.toThrow(/dpi/);
 	});

@@ -140,8 +140,12 @@ the records, and **Export** turns templates and records into files.
     detail as the window narrows.
   - An image export is a zip with an `export-report.csv`; a PDF has one page
     per record and side, sized as the design (or the photo) at the preset's
-    DPI, with PNG or JPEG page images, or lays the cards out on sheets of
-    paper with crop marks (see [Sheets](#sheets)).
+    DPI, with PNG or JPEG page images or as vectors, or lays the cards out
+    on sheets of paper with crop marks (see [Sheets](#sheets)). Vector pages
+    keep shapes and SVG logos sharp at any size and set text in its embedded
+    font, selectable when the font is a TrueType or OpenType file; a layer a
+    PDF cannot express, such as a shadow, or text in a web font file, is drawn
+    as a 600 dpi image in place.
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
   value, or a pattern. One binding serves every preset that exports the
   template. Choosing a dataset matches fields to columns by key or title,
@@ -452,7 +456,7 @@ to fill cards with records.
   photo is landscape or portrait. The preview shows each record at its
   photo's aspect, and Source and Split compare it with the photo.
 - **Formats:** PNG, JPEG or WebP zips (JPEG is flattened over white, since it
-  has no alpha), or a PDF with PNG or JPEG page images. A pattern token whose
+  has no alpha), or a PDF with PNG, JPEG or vector pages. A pattern token whose
   value is a photo's file name drops that extension, so `{{file_name}}`
   names each output after its photo and the format supplies the extension.
 - **Destinations:**

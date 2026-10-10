@@ -33,5 +33,9 @@ describe("printerFileRequest", () => {
 		const request = printerFileRequest(doc(), pdf, item, none);
 		expect(request).toMatchObject({ format: "png" });
 		expect(request).not.toHaveProperty("quality");
+		const vector = preset({ format: "pdf", pdfPageImage: "vector" });
+		const pixels = printerFileRequest(doc(), vector, item, none);
+		expect(pixels).toMatchObject({ format: "png" });
+		expect(pixels).not.toHaveProperty("vector");
 	});
 });

@@ -6,6 +6,7 @@ import {
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
 import { rgbIdat } from "@freshcoat-js/engine/image";
+import { crc32 } from "./crc";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
@@ -15,6 +16,10 @@ type PdfLib = typeof import("pdf-lib");
 type PDFDocument = import("pdf-lib").PDFDocument;
 type PDFPage = import("pdf-lib").PDFPage;
 type PDFRef = import("pdf-lib").PDFRef;
+type PDFEmbeddedPage = import("pdf-lib").PDFEmbeddedPage;
+
+/** An embedded page image, or a vector page drawn as a form. */
+type Embedded = PDFRef | PDFEmbeddedPage;
 
 export type AssemblePdfOptions = {
 	/** pixels per inch: a page is `widthPx / dpi` inches wide */
@@ -56,7 +61,8 @@ export function pageSizePt(
  *  image, so pages of different sizes can share a document. With a sheet
  *  layout, the images are imposed on sheets of paper instead, each drawn at
  *  the card's size, with crop marks at the trim on the pages that aren't
- *  backs. */
+ *  backs. A page given as a one-page PDF is drawn as its vectors, sized as an
+ *  image of `widthPx` by `heightPx` would be. */
 export async function assemblePdf(
 	pages: readonly PdfPage[],
 	options: AssemblePdfOptions,
@@ -75,20 +81,26 @@ export async function assemblePdf(
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);
 	let embedded = 0;
-	const embed = async (page: PdfPage): Promise<PDFRef> => {
+	const embed = async (page: PdfPage): Promise<Embedded> => {
 		const ref =
-			page.format === "jpeg"
-				? (await doc.embedJpg(page.bytes)).ref
-				: (embedRgbPng(lib, doc, page.bytes) ??
-					(await doc.embedPng(page.bytes)).ref);
+			page.format === "pdf"
+				? ((await doc.embedPdf(page.bytes))[0] as PDFEmbeddedPage)
+				: page.format === "jpeg"
+					? (await doc.embedJpg(page.bytes)).ref
+					: (embedRgbPng(lib, doc, page.bytes) ??
+						(await doc.embedPng(page.bytes)).ref);
 		options.onProgress?.(++embedded, pages.length);
 		return ref;
 	};
 	const draw = (
 		out: PDFPage,
-		ref: PDFRef,
+		ref: Embedded,
 		rect: { x: number; y: number; width: number; height: number },
 	) => {
+		if (!(ref instanceof lib.PDFRef)) {
+			out.drawPage(ref, rect);
+			return;
+		}
 		const name = out.node.newXObject("Image", ref);
 		out.pushOperators(
 			...lib.drawImage(name, {
@@ -130,6 +142,7 @@ export async function assemblePdf(
 				});
 			}
 		}
+		shareFontFiles(lib, doc);
 		return doc.save();
 	}
 	for (const page of pages) {
@@ -151,7 +164,45 @@ export async function assemblePdf(
 			);
 		}
 	}
+	shareFontFiles(lib, doc);
 	return doc.save();
+}
+
+/** Points every font descriptor at one copy of each embedded font file and
+ *  drops the others: each vector page carries the whole files it uses. */
+function shareFontFiles(lib: PdfLib, doc: PDFDocument) {
+	const { PDFDict, PDFName, PDFRawStream, PDFRef } = lib;
+	const type = PDFName.of("Type");
+	const descriptor = PDFName.of("FontDescriptor");
+	const seen = new Map<string, Array<{ ref: PDFRef; bytes: Uint8Array }>>();
+	for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+		if (!(obj instanceof PDFDict) || obj.get(type) !== descriptor) continue;
+		for (const key of ["FontFile2", "FontFile3"].map((k) => PDFName.of(k))) {
+			const ref = obj.get(key);
+			if (!(ref instanceof PDFRef)) continue;
+			const file = doc.context.lookup(ref);
+			if (!(file instanceof PDFRawStream)) continue;
+			const bytes = file.getContents();
+			const hash = `${key.asString()}:${bytes.length}:${crc32(bytes)}`;
+			const same = seen.get(hash) ?? [];
+			const first = same.find(
+				(s) => s.ref === ref || sameBytes(s.bytes, bytes),
+			);
+			if (!first) {
+				seen.set(hash, [...same, { ref, bytes }]);
+				continue;
+			}
+			if (first.ref === ref) continue;
+			obj.set(key, first.ref);
+			doc.context.delete(ref);
+		}
+	}
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
 }
 
 function trimOf(

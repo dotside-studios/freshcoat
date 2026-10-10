@@ -492,7 +492,10 @@ export function runExportJob(
 							const size = sizes[index];
 							collector.add({
 								bytes: out.bytes,
-								format: out.format === "jpeg" ? "jpeg" : "png",
+								format:
+									out.format === "jpeg" || out.format === "pdf"
+										? out.format
+										: "png",
 								widthPx:
 									size?.resize !== undefined
 										? size.width

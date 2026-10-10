@@ -114,6 +114,7 @@ export function createWorkerPool(
 					...(msg.print ? { print: msg.print } : {}),
 					...(msg.printError ? { printError: msg.printError } : {}),
 					...(msg.gamut ? { gamut: msg.gamut } : {}),
+					...(msg.warnings ? { warnings: msg.warnings } : {}),
 				});
 			else task.reject(new Error(msg.error));
 			pump();

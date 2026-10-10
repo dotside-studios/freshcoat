@@ -9,6 +9,7 @@ import {
 	imageFormat,
 	pdfRenderScale,
 	planExport,
+	vectorPages,
 } from "./plan";
 import {
 	deepFreeze,
@@ -711,6 +712,11 @@ describe("preset helpers", () => {
 		expect(imageFormat({ format: "webp-zip" })).toBe("webp");
 		expect(imageFormat({ format: "pdf" })).toBe("png");
 		expect(imageFormat({ format: "pdf", pdfPageImage: "jpeg" })).toBe("jpeg");
+		expect(imageFormat({ format: "pdf", pdfPageImage: "vector" })).toBe("png");
+		expect(vectorPages({ format: "pdf", pdfPageImage: "vector" })).toBe(true);
+		expect(vectorPages({ format: "png-zip", pdfPageImage: "vector" })).toBe(
+			false,
+		);
 		expect(fileExtension("jpeg-zip")).toBe("jpg");
 		expect(fileExtension("pdf")).toBe("png");
 	});

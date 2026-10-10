@@ -16,6 +16,7 @@
 		"./image": "./src/image-info.ts",
 		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
+		"./pdf": "./src/pdf/index.ts",
 		"./svg": "./src/svg/index.ts",
 		"./svg/sniff": "./src/svg/sniff.ts"
 	},

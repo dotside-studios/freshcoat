@@ -190,6 +190,9 @@ export {
 	type RendererOptions,
 	type RendererStats,
 	type RenderOptions,
+	type RenderPdfOptions,
+	type PaintPdfOptions,
+	type PdfFrame,
 	type SurfaceCanvas,
 } from "./renderer";
 export { squircleSvg } from "./squircle";

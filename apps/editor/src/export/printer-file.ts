@@ -42,7 +42,7 @@ export function printerFileRequest(
 	// A PDF's pages are PNG unless it embeds JPEG, and the preview shows the
 	// pixels the file holds.
 	if (preset.format === "pdf") {
-		const { quality: _q, ...png } = request;
+		const { quality: _q, vector: _v, ...png } = request;
 		return { ...png, scale: size.scale * cap, format: "png" };
 	}
 	return { ...request, scale: size.scale * cap };
