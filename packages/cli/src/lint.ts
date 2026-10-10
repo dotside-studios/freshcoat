@@ -1,11 +1,10 @@
 import { type Template, templateHints, validate } from "@freshcoat-js/coatfile";
 import {
-	planExport,
 	readsDataset,
 	unfilledRequired,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { planSheets } from "@freshcoat-js/workspace/export";
+import { presetReadiness } from "@freshcoat-js/workspace/export";
 import { formatIssue, newerFormatWarning } from "./template-file";
 
 export type Findings = { errors: string[]; warnings: string[] };
@@ -54,12 +53,11 @@ export function workspaceFindings(workspace: Workspace): Findings {
 			);
 	}
 	for (const preset of workspace.presets) {
-		const entry = workspace.templates.find((t) => t.id === preset.templateId);
-		if (!entry) {
+		const { blocked, sheets } = presetReadiness(workspace, preset);
+		if (blocked?.reason === "missing_template") {
 			errors.push(`preset "${preset.name}": its template is not in the workspace`);
 			continue;
 		}
-		const sheets = planSheets(planExport(workspace, preset), entry.template, preset);
 		if (sheets?.error !== undefined)
 			errors.push(`preset "${preset.name}": ${sheets.error}`);
 	}

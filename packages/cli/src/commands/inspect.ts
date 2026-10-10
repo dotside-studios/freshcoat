@@ -5,7 +5,6 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import {
-	planExport,
 	readsDataset,
 	type RecordStatus,
 	sheetSummary,
@@ -13,7 +12,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
-import { planSheets } from "@freshcoat-js/workspace/export";
+import { presetReadiness } from "@freshcoat-js/workspace/export";
 import { type FontSummary, summarizeFonts } from "../fonts";
 import { createLog, type Io } from "../io";
 import { readTemplate, warnLoad } from "../template-file";
@@ -132,9 +131,7 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 			};
 		}),
 		presets: workspace.presets.map((preset) => {
-			const entry = workspace.templates.find((t) => t.id === preset.templateId);
-			const plan = planExport(workspace, preset);
-			const sheets = entry ? planSheets(plan, entry.template, preset) : null;
+			const { entry, plan, sheets } = presetReadiness(workspace, preset);
 			return {
 				id: preset.id,
 				name: preset.name,
