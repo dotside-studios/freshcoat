@@ -394,7 +394,7 @@ function tileMode(ck: CanvasKit, spread: GradientSpread | undefined) {
 
 // The focus in the circle's own space, before the ellipse's local matrix, or
 // null when the gradient starts from a point at its centre.
-export function focalPoint(
+function focalPoint(
 	fill: Extract<ResolvedFill, { kind: "radial" }>,
 	cx: number,
 	cy: number,

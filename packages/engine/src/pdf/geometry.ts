@@ -4,22 +4,8 @@ import { num } from "./writer";
 
 export type Matrix = [number, number, number, number, number, number];
 
-export const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
-
 export function cm(m: Matrix): string {
 	return `${m.map(num).join(" ")} cm\n`;
-}
-
-// a then b: a point maps through `a` first.
-export function multiply(a: Matrix, b: Matrix): Matrix {
-	return [
-		a[0] * b[0] + a[1] * b[2],
-		a[0] * b[1] + a[1] * b[3],
-		a[2] * b[0] + a[3] * b[2],
-		a[2] * b[1] + a[3] * b[3],
-		a[4] * b[0] + a[5] * b[2] + b[4],
-		a[4] * b[1] + a[5] * b[3] + b[5],
-	];
 }
 
 export function rotateAbout(degrees: number, cx: number, cy: number): Matrix {
@@ -27,15 +13,6 @@ export function rotateAbout(degrees: number, cx: number, cy: number): Matrix {
 	const c = Math.cos(t);
 	const s = Math.sin(t);
 	return [c, s, -s, c, cx - c * cx + s * cy, cy - s * cx - c * cy];
-}
-
-export function scaleAbout(
-	sx: number,
-	sy: number,
-	cx: number,
-	cy: number,
-): Matrix {
-	return [sx, 0, 0, sy, cx - sx * cx, cy - sy * cy];
 }
 
 // The path as construction operators, curves as cubics. A conic becomes the
@@ -87,10 +64,6 @@ export function pathOps(ck: CanvasKit, path: Path, m?: Matrix): string {
 	return out.length ? `${out.join("\n")}\n` : "";
 }
 
-export function isEvenOdd(ck: CanvasKit, path: Path): boolean {
-	return path.getFillType() === ck.FillType.EvenOdd;
-}
-
 // An outline's construction operators and whether it fills even-odd.
 export function outlineOps(
 	ck: CanvasKit,
@@ -109,7 +82,10 @@ export function outlineOps(
 			: ck.Path.MakeFromSVGString(g.d);
 	if (!path) return { ops: "", evenOdd: false };
 	try {
-		return { ops: pathOps(ck, path), evenOdd: isEvenOdd(ck, path) };
+		return {
+			ops: pathOps(ck, path),
+			evenOdd: path.getFillType() === ck.FillType.EvenOdd,
+		};
 	} finally {
 		path.delete();
 	}

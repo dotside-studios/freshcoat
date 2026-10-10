@@ -268,28 +268,26 @@ describe("renderPdf", () => {
 		expect(source(pdf.bytes)).toContain("/Subtype /Image");
 	});
 
-	test("draws a flat bitmap as rectangles and others as an image", async () => {
-		const flat = new Uint8Array(4 * 4 * 4);
+	test("draws a bitmap without smoothing", async () => {
+		const pixels = new Uint8Array(4 * 4 * 4);
 		for (let i = 0; i < 16; i++) {
 			const on = (i + Math.floor(i / 4)) % 2 === 0;
-			flat.set(on ? [0, 0, 0, 255] : [255, 255, 255, 255], i * 4);
+			pixels.set(on ? [0, 0, 0, 255] : [255, 255, 255, 255], i * 4);
 		}
-		const box = { pos: { x: 10, y: 10 }, size: { width: 40, height: 40 } };
-		const codes = await renderer.renderPdf(
-			frame([createBitmap({ ...box, pixels: flat, pixelWidth: 4, pixelHeight: 4 })]),
+		const pdf = await renderer.renderPdf(
+			frame([
+				createBitmap({
+					pos: { x: 10, y: 10 },
+					size: { width: 40, height: 40 },
+					pixels,
+					pixelWidth: 4,
+					pixelHeight: 4,
+				}),
+			]),
 			{ width: W, height: H },
 		);
-		expect(source(codes.bytes)).not.toContain("/Subtype /Image");
-		const soft = flat.slice();
-		soft[3] = 128;
-		const photo = await renderer.renderPdf(
-			frame([createBitmap({ ...box, pixels: soft, pixelWidth: 4, pixelHeight: 4 })]),
-			{ width: W, height: H },
-		);
-		const body = source(photo.bytes);
-		expect(body).toContain("/Subtype /Image");
-		expect(body).toContain("/Interpolate false");
-		expect(body).toContain("/SMask");
+		expect(pdf.warnings).toEqual([]);
+		expect(source(pdf.bytes)).toContain("/Interpolate false");
 	});
 
 	test("embeds a PNG with its alpha and a JPEG as it is", async () => {
@@ -325,30 +323,78 @@ describe("renderPdf", () => {
 		expect(body.includes(source(jpeg))).toBe(true);
 	});
 
-	test("masks content by a shape's luminance", async () => {
+	const masked = (id?: string) =>
+		createMask(
+			createEllipse({
+				pos: { x: 10, y: 10 },
+				size: { width: 60, height: 60 },
+				fills: [{ kind: "solid", color: "#fff" }],
+			}),
+			[
+				createRect({
+					pos: { x: 0, y: 0 },
+					size: { width: 80, height: 80 },
+					fills: [{ kind: "solid", color: "#2a9d8f" }],
+				}),
+			],
+			{ ...(id ? { id } : {}), channel: "luminance", invert: true },
+		);
+
+	test("draws a mask, a gradient stroke and a trim as images", async () => {
 		const pdf = await renderer.renderPdf(
 			frame([
-				createMask(
-					createEllipse({
-						pos: { x: 10, y: 10 },
-						size: { width: 60, height: 60 },
-						fills: [{ kind: "solid", color: "#fff" }],
-					}),
-					[
-						createRect({
-							pos: { x: 0, y: 0 },
-							size: { width: 80, height: 80 },
-							fills: [{ kind: "solid", color: "#2a9d8f" }],
-						}),
-					],
-					{ channel: "luminance", invert: true },
-				),
+				masked("masked"),
+				createEllipse({
+					id: "ring",
+					pos: { x: 100, y: 10 },
+					size: { width: 60, height: 60 },
+					stroke: {
+						color: "#000",
+						width: 6,
+						gradient: {
+							kind: "linear",
+							from: { x: 0, y: 0 },
+							to: { x: 1, y: 1 },
+							stops: [
+								{ offset: 0, color: "#06d6a0" },
+								{ offset: 1, color: "#118ab2" },
+							],
+						},
+					},
+				}),
+				createRect({
+					id: "trimmed",
+					pos: { x: 10, y: 80 },
+					size: { width: 60, height: 30 },
+					stroke: { color: "#000", width: 2, trimEnd: 0.5 },
+				}),
 			]),
 			{ width: W, height: H },
 		);
-		const body = source(pdf.bytes);
-		expect(body).toContain("/S /Luminosity");
-		expect(body).toContain("/TR");
+		expect(pdf.warnings).toEqual([
+			{ kind: "vector_rasterized", feature: "mask", layer: "masked" },
+			{ kind: "vector_rasterized", feature: "gradient stroke", layer: "ring" },
+			{ kind: "vector_rasterized", feature: "stroke trim", layer: "trimmed" },
+		]);
+		if (pdftoppm) {
+			const png = await renderer.render(
+				frame([
+					masked(),
+				]),
+				{ width: W, height: H },
+			);
+			const vec = await renderer.renderPdf(
+				frame([
+					masked(),
+				]),
+				{ width: W, height: H },
+			);
+			const { at } = compare(png.bytes, rasterize(vec.bytes), [
+				[40, 40],
+				[3, 3],
+			]);
+			expect(at).toEqual([0, 0]);
+		}
 	});
 
 	test("draws an SVG image as vectors, and as an image when it holds text", async () => {

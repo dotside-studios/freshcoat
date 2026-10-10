@@ -5,16 +5,10 @@
 // carry) is painted by the CanvasKit painter into a transparent image at
 // `rasterDpi` and placed where it belongs, and reported as `vector_rasterized`.
 
-import type {
-	CanvasKit,
-	GlyphRun,
-	Path,
-	TypefaceFontProvider,
-} from "canvaskit-wasm";
+import type { CanvasKit, GlyphRun, TypefaceFontProvider } from "canvaskit-wasm";
 import {
 	type Bin,
 	collectAssets,
-	focalPoint,
 	makeBin,
 	paintScene,
 	type ShapedTextLine,
@@ -30,34 +24,24 @@ import {
 } from "../font-collection";
 import { parseImageInfo } from "../image-info";
 import { dataUrlToBytes } from "../loader";
-import { boxPath, outlineGeometry, rectShape } from "../outline";
+import { outlineGeometry, rectShape } from "../outline";
 import { fitRect, strokeInset } from "../paint-helpers";
 import type { PaintTarget } from "../runtime-types";
 import { isSvg } from "../svg/sniff";
-import { strokeTrim, trimPath } from "../trim";
+import { strokeTrim } from "../trim";
 import type {
 	BlendMode,
 	Command,
 	DrawCommand,
 	DrawImageCommand,
-	DrawMaskedCommand,
 	DrawTextCommand,
-	GradientFill,
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
 	Stroke,
 } from "../types";
 import { FontEmbedder, type FontFile } from "./fonts";
-import {
-	cm,
-	type Matrix,
-	multiply,
-	outlineOps,
-	pathOps,
-	rotateAbout,
-	scaleAbout,
-} from "./geometry";
+import { cm, type Matrix, outlineOps, pathOps, rotateAbout } from "./geometry";
 import {
 	name,
 	num,
@@ -370,10 +354,6 @@ class PageBuilder {
 				return;
 			}
 			if (cmd.op === "drawGroup") for (const c of cmd.children) walk(c, layer);
-			if (cmd.op === "drawMasked") {
-				walk(cmd.mask, layer);
-				for (const c of cmd.children) walk(c, layer);
-			}
 		};
 		for (const cmd of drawables) walk(cmd);
 		return out;
@@ -391,26 +371,41 @@ class PageBuilder {
 			return `${cmd.blendMode} blend`;
 		switch (cmd.op) {
 			case "drawRect":
+				return (
+					(cmd.fills ?? []).map(fillReason).find(Boolean) ??
+					(cmd.stroke
+						? strokeReason(
+								cmd.stroke,
+								rectShape(cmd.cornerRadius, cmd.cornerSmoothing),
+							)
+						: null)
+				);
 			case "drawPath":
 				return (
 					(cmd.fills ?? []).map(fillReason).find(Boolean) ??
-					(cmd.stroke ? strokeReason(cmd.stroke) : null)
+					(cmd.stroke
+						? strokeReason(cmd.stroke, cmd.strokeD ? null : undefined)
+						: null)
 				);
 			case "drawText":
 				if (cmd.arc || cmd.path) return "text on a curve";
-				return (
-					(cmd.fill ? fillReason(cmd.fill) : null) ??
-					this.textPlan(cmd).reason ??
-					null
-				);
+				if (cmd.fill && cmd.fill.kind !== "solid") return "gradient text";
+				return this.textPlan(cmd).reason ?? null;
 			case "drawImage": {
 				if (cmd.fit === "tile") return "tiled image";
 				const svg = this.svgScenes.get(cmd.src);
 				const inner = svg?.features[0]
 					? `SVG ${svg.features[0]}`
 					: svg?.commands.map((c) => this.deepReason(c)).find(Boolean);
-				return inner ?? (cmd.stroke ? strokeReason(cmd.stroke) : null);
+				return (
+					inner ??
+					(cmd.stroke
+						? strokeReason(cmd.stroke, cmd.clip ?? { kind: "rect" })
+						: null)
+				);
 			}
+			case "drawMasked":
+				return "mask";
 			case "drawQr":
 				return "drawQr op";
 			default:
@@ -419,12 +414,7 @@ class PageBuilder {
 	}
 
 	private deepReason(cmd: DrawCommand): string | null {
-		const children =
-			cmd.op === "drawGroup"
-				? cmd.children
-				: cmd.op === "drawMasked"
-					? [cmd.mask, ...cmd.children]
-					: [];
+		const children = cmd.op === "drawGroup" ? cmd.children : [];
 		return (
 			this.reason(cmd) ??
 			children.map((c) => this.deepReason(c)).find(Boolean) ??
@@ -670,8 +660,6 @@ class PageBuilder {
 				return this.bitmap(cmd);
 			case "drawGroup":
 				return cmd.children.map((c) => this.drawable(c)).join("");
-			case "drawMasked":
-				return this.masked(cmd);
 			default:
 				return "";
 		}
@@ -698,7 +686,6 @@ class PageBuilder {
 	private gradient(fill: ResolvedFill, box: Box): string {
 		if (fill.kind !== "linear" && fill.kind !== "radial") return "";
 		const { x, y, w, h } = box;
-		let matrix: Matrix | null = null;
 		let geometry: PdfDict;
 		if (fill.kind === "linear") {
 			geometry = {
@@ -711,61 +698,24 @@ class PageBuilder {
 				],
 			};
 		} else {
+			const rx = fill.radius * Math.max(w, h);
+			if (!(rx > 0)) return "";
 			const cx = x + fill.center.x * w;
 			const cy = y + fill.center.y * h;
-			const longest = Math.max(w, h);
-			const rx = fill.radius * longest;
-			const ry = (fill.radiusY ?? fill.radius) * longest;
-			if (!(rx > 0 && ry > 0)) return "";
-			const rotation = fill.rotation ?? 0;
-			if (!(ry === rx && rotation % 180 === 0))
-				matrix = multiply(
-					scaleAbout(1, ry / rx, cx, cy),
-					rotateAbout(rotation, cx, cy),
-				);
-			const focus = focalPoint(fill, cx, cy, w, h, rx, ry, rotation);
-			const fr = (fill.focusRadius ?? 0) * longest;
-			geometry = {
-				ShadingType: 3,
-				Coords: focus
-					? [focus[0], focus[1], fr, cx, cy, rx]
-					: [cx, cy, 0, cx, cy, rx],
-			};
+			geometry = { ShadingType: 3, Coords: [cx, cy, 0, cx, cy, rx] };
 		}
-		const stops = fill.stops.map((s) => ({
-			offset: s.offset,
-			color: rgba(s.color),
-		}));
 		const color = this.shading(
 			geometry,
-			"DeviceRGB",
-			stops.map((s) => ({
-				offset: s.offset,
-				c: [s.color[0] / 255, s.color[1] / 255, s.color[2] / 255],
-			})),
+			fill.stops.map((s) => {
+				const c = rgba(s.color);
+				return { offset: s.offset, c: [c[0] / 255, c[1] / 255, c[2] / 255] };
+			}),
 		);
-		let out = matrix ? cm(matrix) : "";
-		if (stops.some((s) => s.color[3] < 1)) {
-			const mask = this.shading(
-				geometry,
-				"DeviceGray",
-				stops.map((s) => ({ offset: s.offset, c: [s.color[3]] })),
-			);
-			const g = this.form(`/${mask} sh\n`, true);
-			out += this.gs({
-				SMask: {
-					Type: name("Mask"),
-					S: name("Luminosity"),
-					G: this.xobjects[g] as PdfRef,
-				},
-			});
-		}
-		return `${out}/${color} sh\n`;
+		return `/${color} sh\n`;
 	}
 
 	private shading(
 		geometry: PdfDict,
-		space: string,
 		stops: Array<{ offset: number; c: number[] }>,
 	): string {
 		const sorted = [...stops].sort((a, b) => a.offset - b.offset);
@@ -814,7 +764,7 @@ class PageBuilder {
 		}
 		const ref = this.w.add({
 			...geometry,
-			ColorSpace: name(space),
+			ColorSpace: name("DeviceRGB"),
 			Function: fn,
 			Extend: [true, true],
 		});
@@ -823,76 +773,21 @@ class PageBuilder {
 		return id;
 	}
 
-	private strokeParams(stroke: Stroke, width: number): string {
-		let out = `${num(width)} w ${CAP[stroke.cap ?? "butt"]} J ${JOIN[stroke.join ?? "miter"]} j ${MITER_LIMIT} M\n`;
+	private strokeParams(stroke: Stroke): string {
+		let out = `${num(stroke.width)} w ${CAP[stroke.cap ?? "butt"]} J ${JOIN[stroke.join ?? "miter"]} j ${MITER_LIMIT} M\n`;
 		const dash = normalizeDash(stroke.dash);
 		if (dash) out += `[${dash.map(num).join(" ")}] 0 d\n`;
 		return out;
 	}
 
-	// `stroke` along `path` at `width`, trimmed.
-	private strokePath(
-		path: Path,
-		stroke: Stroke,
-		width: number,
-		box: Box,
-	): string {
-		const { ck } = this;
-		const trim = strokeTrim(stroke);
-		let owned: Path | null = null;
-		if (trim) {
-			const copy = path.copy();
-			owned = trimPath(ck, copy, trim);
-			if (owned !== copy) copy.delete();
-			if (!owned) return "";
-			path = owned;
-		}
-		try {
-			if (!stroke.gradient) {
-				const c = rgba(stroke.color);
-				if (c[3] <= 0 || width <= 0) return "";
-				return `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams(stroke, width)}${pathOps(ck, path)}S\nQ\n`;
-			}
-			const base = path.copy();
-			const outline = base.makeStroked({
-				width,
-				cap: ck.StrokeCap[
-					({ butt: "Butt", round: "Round", square: "Square" } as const)[
-						stroke.cap ?? "butt"
-					]
-				],
-				join: ck.StrokeJoin[
-					({ miter: "Miter", round: "Round", bevel: "Bevel" } as const)[
-						stroke.join ?? "miter"
-					]
-				],
-				miter_limit: MITER_LIMIT,
-			});
-			if (outline !== base) base.delete();
-			if (!outline) return "";
-			try {
-				const sh = this.gradient(stroke.gradient as GradientFill, box);
-				return sh ? `q\n${pathOps(ck, outline)}W n\n${sh}Q\n` : "";
-			} finally {
-				outline.delete();
-			}
-		} finally {
-			owned?.delete();
-		}
+	// A solid stroke along the outline `ops` builds.
+	private stroke(stroke: Stroke, ops: string): string {
+		const c = rgba(stroke.color);
+		if (!ops || c[3] <= 0 || stroke.width <= 0) return "";
+		return `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams(stroke)}${ops}S\nQ\n`;
 	}
 
-	// An inside or outside stroke along an outline that has no offset of its
-	// own: twice the width, cut to the inside or the outside of `path`.
-	private clippedStroke(path: Path, stroke: Stroke, box: Box): string {
-		const ops = pathOps(this.ck, path);
-		const evenOdd = path.getFillType() === this.ck.FillType.EvenOdd;
-		const cut =
-			stroke.align === "inside"
-				? `${ops}W${evenOdd ? "*" : ""} n\n`
-				: `-1e5 -1e5 2e5 2e5 re\n${ops}W* n\n`;
-		return `q\n${cut}${this.strokePath(path, stroke, stroke.width * 2, box)}Q\n`;
-	}
-
+	// The stroke along `shape`, offset for inside or outside alignment.
 	private outlineStroke(
 		shape: ShapeMask,
 		cmd: {
@@ -901,30 +796,15 @@ class PageBuilder {
 		},
 		stroke: Stroke,
 	): string {
-		const { ck } = this;
-		const { x, y } = cmd.pos;
-		const { width: w, height: h } = cmd.size;
-		const box = { x, y, w, h };
-		const fromTop = strokeTrim(stroke) !== null;
-		const g = outlineGeometry(shape, x, y, w, h, strokeInset(stroke), fromTop);
-		const whole = g ?? outlineGeometry(shape, x, y, w, h, 0, fromTop);
-		if (!whole) return "";
-		const path =
-			whole.kind === "path"
-				? ck.Path.MakeFromSVGString(whole.d)
-				: boxPath(
-						ck,
-						whole.ltrb,
-						whole.kind === "rrect" ? whole.radii : undefined,
-					);
-		if (!path) return "";
-		try {
-			return g
-				? this.strokePath(path, stroke, stroke.width, box)
-				: this.clippedStroke(path, stroke, box);
-		} finally {
-			path.delete();
-		}
+		const g = outlineGeometry(
+			shape,
+			cmd.pos.x,
+			cmd.pos.y,
+			cmd.size.width,
+			cmd.size.height,
+			strokeInset(stroke),
+		);
+		return g ? this.stroke(stroke, outlineOps(this.ck, g).ops) : "";
 	}
 
 	private path(cmd: Extract<DrawCommand, { op: "drawPath" }>): string {
@@ -959,19 +839,8 @@ class PageBuilder {
 				const outline = cmd.strokeD
 					? ck.Path.MakeFromSVGString(cmd.strokeD)
 					: null;
-				try {
-					out +=
-						!outline && strokeInset(cmd.stroke) !== 0
-							? this.clippedStroke(path, cmd.stroke, box)
-							: this.strokePath(
-									outline ?? path,
-									cmd.stroke,
-									cmd.stroke.width,
-									box,
-								);
-				} finally {
-					outline?.delete();
-				}
+				out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
+				outline?.delete();
 			}
 			return `${out}Q\n`;
 		} finally {
@@ -983,7 +852,6 @@ class PageBuilder {
 	// baseline in one colour, every glyph placed where CanvasKit put it.
 	private text(cmd: DrawTextCommand): string {
 		const plan = this.textPlan(cmd);
-		const gradient = cmd.fill && cmd.fill.kind !== "solid" ? cmd.fill : null;
 		const segments: Segment[] = [];
 		let decorations = "";
 		for (const { line, text, runs } of plan.lines) {
@@ -1004,7 +872,7 @@ class PageBuilder {
 						face.used.set(gid, text.slice(start, run.offsets[i + 1] ?? start));
 					const owner = spans[line.spanAt[start] ?? 0] ?? spans[0];
 					const c = rgba(owner?.color ?? cmd.color);
-					const color = gradient ? "" : `${this.alpha(c[3])}${rgb(c)} rg\n`;
+					const color = `${this.alpha(c[3])}${rgb(c)} rg\n`;
 					if (seg && seg.color === color && Math.abs(seg.y - y) < 1e-3) {
 						const shift = seg.advance - ((x - seg.x) * 1000) / scale;
 						if (Math.abs(shift) > 0.01) seg.parts.push(num(shift));
@@ -1025,33 +893,17 @@ class PageBuilder {
 				}
 			}
 			for (const d of line.decorations) {
-				const rect = `${num(d.x0)} ${num(d.top)} ${num(d.x1 - d.x0)} ${num(d.thickness)} re\n`;
-				if (gradient) decorations += rect;
-				else {
-					const c = rgba(d.color);
-					decorations += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${rect}f\nQ\n`;
-				}
+				const c = rgba(d.color);
+				decorations += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${num(d.x0)} ${num(d.top)} ${num(d.x1 - d.x0)} ${num(d.thickness)} re\nf\nQ\n`;
 			}
 		}
-		const body = (s: Segment) => `${s.head}[${s.parts.join("")}] TJ\n`;
-		if (!gradient)
-			return (
-				segments.map((s) => `q\n${s.color}BT\n${body(s)}ET\nQ\n`).join("") +
-				decorations
-			);
-		const sh = this.gradient(gradient, {
-			x: cmd.pos.x,
-			y: cmd.pos.y,
-			w: cmd.size.width,
-			h: cmd.size.height,
-		});
-		if (!sh) return "";
-		// Glyphs drawn in clip mode only clip as one text object.
-		let out = segments.length
-			? `q\nBT\n7 Tr\n${segments.map(body).join("")}ET\n${sh}Q\n`
-			: "";
-		if (decorations) out += `q\n${decorations}W n\n${sh}Q\n`;
-		return out;
+		return (
+			segments
+				.map(
+					(s) => `q\n${s.color}BT\n${s.head}[${s.parts.join("")}] TJ\nET\nQ\n`,
+				)
+				.join("") + decorations
+		);
 	}
 
 	private image(cmd: DrawImageCommand): string {
@@ -1204,102 +1056,49 @@ class PageBuilder {
 		);
 	}
 
-	// A bitmap of a few flat colours, as a code is, becomes rectangles so its
-	// modules stay sharp at any size; anything else is an image drawn without
-	// smoothing.
+	// Drawn without smoothing, so a code's modules stay sharp at any size.
 	private bitmap(cmd: Extract<DrawCommand, { op: "drawBitmap" }>): string {
 		const { pixels, pixelWidth: pw, pixelHeight: ph, pos, size } = cmd;
 		if (pw <= 0 || ph <= 0) return "";
-		const kx = size.width / pw;
-		const ky = size.height / ph;
-		const runs = new Map<number, string[]>();
-		let flat = true;
-		for (let y = 0; y < ph && flat; y++) {
-			let x = 0;
-			while (x < pw) {
-				const i = (y * pw + x) * 4;
-				const a = pixels[i + 3] as number;
-				if (a !== 0 && a !== 255) {
-					flat = false;
-					break;
-				}
-				const key =
-					((pixels[i] as number) << 16) |
-					((pixels[i + 1] as number) << 8) |
-					(pixels[i + 2] as number);
-				let end = x + 1;
-				while (end < pw) {
-					const j = (y * pw + end) * 4;
-					if (
-						pixels[j + 3] !== a ||
-						(a !== 0 &&
-							(pixels[j] !== pixels[i] ||
-								pixels[j + 1] !== pixels[i + 1] ||
-								pixels[j + 2] !== pixels[i + 2]))
-					)
-						break;
-					end++;
-				}
-				if (a === 255) {
-					let list = runs.get(key);
-					if (!list) {
-						if (runs.size >= 4) {
-							flat = false;
-							break;
-						}
-						list = [];
-						runs.set(key, list);
-					}
-					list.push(
-						`${num(pos.x + x * kx)} ${num(pos.y + y * ky)} ${num((end - x) * kx)} ${num(ky)} re`,
-					);
-				}
-				x = end;
-			}
-		}
-		if (flat) {
-			let out = "";
-			for (const [key, rects] of runs)
-				out += `${num(((key >> 16) & 255) / 255)} ${num(((key >> 8) & 255) / 255)} ${num((key & 255) / 255)} rg\n${rects.join("\n")}\nf\n`;
-			return out;
-		}
 		const ref = this.rgbaImage(pixels, pw, ph, false);
 		return `q\n${cm([size.width, 0, 0, -size.height, pos.x, pos.y + size.height])}/${this.xobject(ref)} Do\nQ\n`;
 	}
-
-	private masked(cmd: DrawMaskedCommand): string {
-		const content = this.form(
-			cmd.children.map((c) => this.drawable(c)).join(""),
-			true,
-		);
-		const mask = this.form(this.drawable(cmd.mask), true);
-		const luminance = cmd.channel === "luminance";
-		return `q\n${this.gs({
-			SMask: {
-				Type: name("Mask"),
-				S: name(luminance ? "Luminosity" : "Alpha"),
-				G: this.xobjects[mask] as PdfRef,
-				...(luminance ? { BC: [0, 0, 0] } : {}),
-				...(cmd.invert
-					? { TR: { FunctionType: 2, Domain: [0, 1], C0: [1], C1: [0], N: 1 } }
-					: {}),
-			},
-		})}/${content} Do\nQ\n`;
-	}
 }
 
+// Fills drawn as vectors: solid, linear, and radial gradients that are
+// circles about their centre, all with opaque stops.
 function fillReason(fill: ResolvedFill): string | null {
+	if (fill.kind === "solid") return null;
 	if (fill.kind === "pattern") return "pattern fill";
 	if (fill.kind === "angular") return "angular gradient";
-	if (fill.kind !== "solid" && fill.spread && fill.spread !== "pad")
+	if (fill.spread && fill.spread !== "pad")
 		return `${fill.spread} gradient spread`;
+	if (fill.stops.some((s) => rgba(s.color)[3] < 1))
+		return "transparent gradient stop";
+	if (
+		fill.kind === "radial" &&
+		((fill.radiusY !== undefined && fill.radiusY !== fill.radius) ||
+			(fill.rotation ?? 0) % 180 !== 0 ||
+			fill.focus ||
+			(fill.focusRadius ?? 0) > 0)
+	)
+		return "elliptical or focal radial gradient";
 	return null;
 }
 
-function strokeReason(stroke: Stroke): string | null {
-	if (!stroke.gradient) return null;
-	if (normalizeDash(stroke.dash)) return "dashed gradient stroke";
-	return fillReason(stroke.gradient);
+// Strokes drawn as vectors: a solid colour along the outline, or along its
+// offset when the stroke is aligned. `shape` is the outline an aligned stroke
+// offsets, null when the command carries its own, undefined when it has none.
+function strokeReason(
+	stroke: Stroke,
+	shape: ShapeMask | null | undefined,
+): string | null {
+	if (stroke.gradient) return "gradient stroke";
+	if (strokeTrim(stroke)) return "stroke trim";
+	if (strokeInset(stroke) === 0 || shape === null) return null;
+	if (!shape || !outlineGeometry(shape, 0, 0, 100, 100, strokeInset(stroke)))
+		return "aligned stroke";
+	return null;
 }
 
 function hasBackdrop(cmd: DrawCommand): boolean {
