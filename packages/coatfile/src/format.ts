@@ -199,7 +199,8 @@ export function raiseFormatVersion<T extends Template>(template: T): T {
 		: template;
 }
 
-function formatMinor(formatVersion: string): number {
+/** The minor of a `1.x` version; 0 when there is none. */
+export function formatMinor(formatVersion: string): number {
 	const minor = /^\d+\.(\d+)/.exec(formatVersion.trim())?.[1];
 	return minor === undefined ? 0 : Number(minor);
 }
