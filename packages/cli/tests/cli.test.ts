@@ -24,7 +24,7 @@ async function size(path: string): Promise<[number, number]> {
 	return [pixels.width, pixels.height];
 }
 
-describe("render", () => {
+describe("render a template", () => {
 	test("writes a file per frame at the template's size", async () => {
 		const run = await box.run("render", "badge.json", "--out", "png");
 		expect(run.code).toBe(0);
@@ -175,13 +175,13 @@ describe("render", () => {
 
 	test("refuses bad input", async () => {
 		const cases: [string[], number, string][] = [
-			[["render"], 2, "missing required argument 'template'"],
+			[["render"], 2, "missing required argument 'file'"],
 			[["render", "a.json", "b.json"], 2, "too many arguments for 'render'"],
 			[["render", "badge.json", "--format", "gif"], 2, "Allowed choices are png, jpeg, jpg, webp"],
 			[["render", "badge.json", "--scale", "0"], 2, "Expected a positive number"],
 			[["render", "badge.json", "--set", "name"], 2, "Expected key=value"],
 			[["render", "badge.json", "--bogus"], 2, "unknown option '--bogus'"],
-			[["render", "badge.json", "--out"], 2, "option '--out <dir>' argument missing"],
+			[["render", "badge.json", "--out"], 2, "option '--out <path>' argument missing"],
 			[["render", "nope.json"], 1, "cannot read nope.json: no such file"],
 			[["render", "badge.json", "--variant", "tall"], 1, 'no variant "tall"; the template has wide'],
 			[["render", "badge.json", "--frame", "side"], 1, 'no frame "side"; the template has front, back'],
@@ -276,7 +276,7 @@ describe("inspect", () => {
 	});
 });
 
-describe("export", () => {
+describe("render a workspace", () => {
 	let workspace: string;
 	beforeAll(async () => {
 		workspace = await box.write(
@@ -287,7 +287,7 @@ describe("export", () => {
 
 	test("writes a zip and prints a summary", async () => {
 		const run = await box.run(
-			"export",
+			"render",
 			"badges.coatworkspace",
 			"--preset",
 			"All badges",
@@ -314,7 +314,7 @@ describe("export", () => {
 
 	test("writes a PDF by preset id", async () => {
 		const run = await box.run(
-			"export",
+			"render",
 			"badges.coatworkspace",
 			"--preset",
 			"p_pdf",
@@ -334,7 +334,7 @@ describe("export", () => {
 		if (dataset) dataset.records[1]!.values.name = "김민준";
 		await box.write("hangul.coatworkspace", await workspaceBytes(workspace));
 		const run = await box.run(
-			"export",
+			"render",
 			"hangul.coatworkspace",
 			"--preset",
 			"p_png",
@@ -349,7 +349,7 @@ describe("export", () => {
 
 	test("lists the presets when one is not found", async () => {
 		const run = await box.run(
-			"export",
+			"render",
 			workspace,
 			"--preset",
 			"Nope",
@@ -364,21 +364,31 @@ describe("export", () => {
 
 	test("reports unreadable and missing workspaces", async () => {
 		await box.write("junk.coatworkspace", "not a zip");
-		const junk = await box.run("export", "junk.coatworkspace", "--preset", "a", "--out", "x.zip");
+		const junk = await box.run("render", "junk.coatworkspace", "--preset", "a", "--out", "x.zip");
 		expect(junk.code).toBe(1);
 		expect(junk.stderr).toContain("junk.coatworkspace:");
-		const missing = await box.run("export", "gone.coatworkspace", "--preset", "a", "--out", "x.zip");
+		const missing = await box.run("render", "gone.coatworkspace", "--preset", "a", "--out", "x.zip");
 		expect(missing.code).toBe(1);
 		expect(missing.stderr).toContain("cannot read gone.coatworkspace: no such file");
 	});
 
-	test("requires a preset and an output", async () => {
-		const noPreset = await box.run("export", "badges.coatworkspace", "--out", "x.zip");
-		expect(noPreset.code).toBe(2);
-		expect(noPreset.stderr).toContain("required option '--preset <name|id>' not specified");
-		const noOut = await box.run("export", "badges.coatworkspace", "--preset", "p_png");
-		expect(noOut.code).toBe(2);
-		expect(noOut.stderr).toContain("required option '--out <path>' not specified");
+	test("refuses options that do not fit the file", async () => {
+		const cases: [string[], string][] = [
+			[["render", "badges.coatworkspace", "--out", "x.zip"], "a .coatworkspace needs --preset <name|id>"],
+			[["render", "badges.coatworkspace", "--preset", "p_png"], "a .coatworkspace needs --out <path>"],
+			[
+				["render", "badges.coatworkspace", "--preset", "p_png", "--out", "x.zip", "--scale", "2", "--format", "webp"],
+				"--scale, --format apply only to templates",
+			],
+			[["render", "badge.json", "--preset", "p_png"], "--preset needs a .coatworkspace file"],
+		];
+		for (const [argv, message] of cases) {
+			const run = await box.run(...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code: 2 });
+			expect(run.stderr).toContain(`freshcoat: ${message}`);
+			expect(run.stderr).toContain("Run freshcoat render --help for usage.");
+			expect(run.stdout).toBe("");
+		}
 	});
 });
 
@@ -392,9 +402,9 @@ describe("the command line", () => {
 	test("prints help for the tool and each command", async () => {
 		const overview = await box.run("--help");
 		expect(overview.code).toBe(0);
-		for (const name of ["render", "validate", "inspect", "export"])
+		for (const name of ["render", "validate", "inspect"])
 			expect(overview.stdout).toContain(`  ${name}`);
-		for (const name of ["render", "validate", "inspect", "export"]) {
+		for (const name of ["render", "validate", "inspect"]) {
 			const flag = await box.run(name, "--help");
 			const word = await box.run("help", name);
 			expect(flag.code).toBe(0);
