@@ -225,6 +225,22 @@ describe("compile", () => {
 		expect(rebuilt.d).toBe("M30 30L60 30L60 60L30 60Z");
 	});
 
+	test("a smoothed rect operand rebuilds differently from a plain one", () => {
+		const rounded = (cornerSmoothing?: number) =>
+			rect("a", 0, 0, 60, {
+				properties: {
+					fill: "#000",
+					cornerRadius: 20,
+					...(cornerSmoothing !== undefined ? { cornerSmoothing } : {}),
+				},
+			});
+		const rebuilt = (el: Element) =>
+			pathOf(template(shape("union", [el])), {}, { pathOp: canvasKitPathOp(ck) })
+				.d;
+		expect(rebuilt(rounded(0.6))).not.toBe(rebuilt(rounded()));
+		expect(rebuilt(rounded(0))).toBe(rebuilt(rounded()));
+	});
+
 	test("the vector keeps its authored box", () => {
 		const tpl = template(shape("subtract", operands()));
 		const node = pathOf(tpl, {}, { pathOp: canvasKitPathOp(ck) });

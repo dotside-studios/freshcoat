@@ -45,6 +45,7 @@ function operandOf(el: Element): BooleanOperand | null {
 			...placed,
 			kind: "rect",
 			cornerRadius: el.properties.cornerRadius,
+			cornerSmoothing: el.properties.cornerSmoothing,
 		};
 	if (el.type === "vector")
 		return {

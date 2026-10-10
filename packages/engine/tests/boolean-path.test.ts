@@ -2,6 +2,7 @@ import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
 import { beforeAll, describe, expect, test } from "vitest";
 import { type BooleanOperand, combineShapes } from "../src/boolean-path";
+import { squircleSvg } from "../src/squircle";
 
 let ck: CanvasKit;
 beforeAll(async () => {
@@ -60,6 +61,55 @@ describe("combineShapes", () => {
 			"union",
 		);
 		expect(shape?.d).toContain("C");
+	});
+
+	describe("corner smoothing", () => {
+		const round = (cornerSmoothing?: number): BooleanOperand => ({
+			...square(0, 0),
+			cornerRadius: 20,
+			...(cornerSmoothing !== undefined ? { cornerSmoothing } : {}),
+		});
+
+		test("reshapes a rounded rect to the smoothed outline", () => {
+			const smooth = combineShapes(ck, [round(0.6)], "union");
+			expect(smooth?.d).not.toBe(combineShapes(ck, [round()], "union")?.d);
+			const outline: BooleanOperand = {
+				kind: "path",
+				size: { width: 100, height: 100 },
+				d: squircleSvg(0, 0, 100, 100, 20, 0.6),
+			};
+			expect(smooth).toEqual(combineShapes(ck, [outline], "union"));
+		});
+
+		test("zero smoothing is the plain rounded rect", () => {
+			expect(combineShapes(ck, [round(0)], "union")).toEqual(
+				combineShapes(ck, [round()], "union"),
+			);
+		});
+
+		test("needs a uniform radius", () => {
+			const rect = (extra: object): BooleanOperand => ({
+				kind: "rect",
+				size: { width: 100, height: 100 },
+				...extra,
+			});
+			const perCorner = rect({ cornerRadius: [20, 0, 20, 0] });
+			expect(
+				combineShapes(ck, [rect({ cornerRadius: [20, 0, 20, 0], cornerSmoothing: 0.6 })], "union"),
+			).toEqual(combineShapes(ck, [perCorner], "union"));
+			expect(combineShapes(ck, [rect({ cornerSmoothing: 0.6 })], "union")).toEqual(
+				combineShapes(ck, [rect({})], "union"),
+			);
+		});
+
+		test("is placed and turned like any rect", () => {
+			const shape = combineShapes(
+				ck,
+				[{ ...round(0.6), pos: { x: 30, y: 40 }, rotation: 90 }],
+				"union",
+			);
+			expect(shape?.box).toEqual({ x: 30, y: 40, width: 100, height: 100 });
+		});
 	});
 
 	test("the even-odd fill rule of the result is kept", () => {
