@@ -39,7 +39,7 @@ const template = {
 } as unknown as Template;
 
 describe("renderCompiledPdf", () => {
-	test("paints each side as a page and warns what PDF cannot draw", async () => {
+	test("paints each side as a page and names the layers drawn as images", async () => {
 		const renderer = await createRenderer({ ck: await loadCanvasKit() });
 		const compiled = compile(template, {}, { width: 40, height: 20 });
 		const pages = await renderCompiledPdf(renderer, compiled, { dpi: 72 });
@@ -51,10 +51,10 @@ describe("renderCompiledPdf", () => {
 		expect(new TextDecoder().decode(pages[0]?.bytes.slice(0, 8))).toBe("%PDF-1.7");
 		expect(pages[0]?.warnings).toEqual([]);
 		expect(pages[1]?.warnings).toEqual([
-			{ kind: "vector_unsupported", feature: "shadow", layer: "card" },
+			{ kind: "vector_rasterized", feature: "shadow", layer: "card" },
 		]);
 		expect(describeWarning(pages[1]?.warnings[0] as never)).toBe(
-			"PDF has no vector equivalent for shadow: card",
+			"Drawn as an image in the PDF: shadow (card)",
 		);
 	});
 });

@@ -309,9 +309,8 @@ export type RenderCompiledPdfOptions = {
 	date?: Date;
 };
 
-// Paint each side of a compiled template as one PDF page of vectors. What a
-// PDF cannot draw is left out and warned as `vector_unsupported`; rendering
-// that side with `renderCompiled` keeps it.
+// Paint each side of a compiled template as one PDF page of vectors. A layer a
+// PDF cannot express is painted as an image and warned as `vector_rasterized`.
 export async function renderCompiledPdf(
 	renderer: Renderer,
 	compiled: CompiledTemplate,
@@ -389,8 +388,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Curved text is longer than its circle${w.layer ? `: ${w.layer}` : ""}`;
 		case "arc_radius_clamped":
 			return `Curved text radius raised to its font size${w.layer ? `: ${w.layer}` : ""}`;
-		case "vector_unsupported":
-			return `PDF has no vector equivalent for ${w.feature}${w.layer ? `: ${w.layer}` : ""}`;
+		case "vector_rasterized":
+			return `Drawn as an image in the PDF: ${w.feature}${w.layer ? ` (${w.layer})` : ""}`;
 		case "pattern_unsupported":
 			return `Pattern shader failed, painted solid: ${w.pattern}`;
 		case "barcode_invalid":
