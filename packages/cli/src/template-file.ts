@@ -6,9 +6,13 @@ import {
 	validate,
 } from "@freshcoat-js/coatfile";
 import { decodeTemplate } from "@freshcoat-js/coatfile/coat";
+import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { CliError, type Io } from "./io";
 
-export async function readBytes(io: Io, path: string): Promise<Uint8Array> {
+export async function readBytes(
+	io: Io,
+	path: string,
+): Promise<Uint8Array<ArrayBuffer>> {
 	try {
 		return new Uint8Array(await readFile(resolve(io.cwd, path)));
 	} catch (error) {
@@ -33,6 +37,10 @@ export async function readDocument(
 	io: Io,
 	path: string,
 ): Promise<TemplateDocument> {
+	if (path.toLowerCase().endsWith(WORKSPACE_EXTENSION))
+		throw new CliError(
+			`${path} is a workspace; this command takes a .coat file or template JSON`,
+		);
 	const bytes = await readBytes(io, path);
 	const decoded = await decodeTemplate(bytes);
 	if (!decoded.ok) throw new CliError(`${path}: ${decoded.message}`);

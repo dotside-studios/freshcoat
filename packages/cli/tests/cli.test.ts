@@ -177,7 +177,7 @@ describe("render a template", () => {
 		await box.write("broken.json", JSON.stringify(broken));
 		const run = await box.run("render", "broken.json", "--out", "broken");
 		expect(run.code).toBe(0);
-		expect(run.stderr).toContain("warning: front: image_load_failed");
+		expect(run.stderr).toContain("warning: front: Couldn't load image: missing.png");
 	});
 
 	test("refuses bad input", async () => {
@@ -276,10 +276,110 @@ describe("inspect", () => {
 		expect(run.stdout).toContain("  Inter  400  declared");
 	});
 
+	test("points a workspace at render", async () => {
+		for (const command of ["inspect", "validate"]) {
+			const run = await box.run(command, "club.coatworkspace");
+			expect(run.code).toBe(1);
+			expect(run.stderr).toBe(
+				"freshcoat: club.coatworkspace is a workspace; this command takes a .coat file or template JSON\n",
+			);
+		}
+	});
+
 	test("fails on an invalid template", async () => {
 		const run = await box.run("inspect", "invalid.json");
 		expect(run.code).toBe(1);
 		expect(run.stdout).toBe("");
+	});
+});
+
+describe("render a template to a zip or PDF", () => {
+	test("writes a zip named by frame", async () => {
+		const run = await box.run("render", "badge.json", "--out", "one/badge.zip");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toMatch(/^2 of 2 items exported to one\/badge\.zip /);
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("one", "badge.zip"))));
+		expect(Object.keys(zip).sort()).toEqual(["back.png", "export-report.csv", "front.png"]);
+		expect(decodePixels(ck, zip["front.png"] as Uint8Array)?.width).toBe(200);
+	});
+
+	test("writes a PDF", async () => {
+		const run = await box.run("render", "badge.json", "--frame", "front", "--out", "badge.pdf", "-q");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe("");
+		const bytes = await readFile(box.path("badge.pdf"));
+		expect(new TextDecoder().decode(bytes.subarray(0, 5))).toBe("%PDF-");
+	});
+
+	test("checks the values as a directory render does", async () => {
+		const run = await box.run("render", "badge.json", "--set", "name=", "--out", "x.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("name is required");
+	});
+});
+
+describe("render image values", () => {
+	beforeAll(async () => {
+		const photo = card({ fonts: undefined });
+		photo.fields.properties.photo = { type: "string", format: "image" } as never;
+		for (const frame of photo.template_data)
+			for (const element of frame.elements)
+				if (element.type === "image") element.properties.src = "{{photo}}";
+		await mkdir(box.path("templates"), { recursive: true });
+		await box.write("templates/photo.json", JSON.stringify(photo));
+		await box.write("red.png", await solidPng(4, 4, [200, 20, 20]));
+		await mkdir(box.path("vals"), { recursive: true });
+		await box.write("vals/green.png", await solidPng(4, 4, [20, 200, 20]));
+		await box.write("vals/values.json", JSON.stringify({ photo: "green.png" }));
+	});
+
+	async function logoPixel(path: string): Promise<number[]> {
+		const pixels = decodePixels(ck, new Uint8Array(await readFile(path)));
+		const at = (170 + 70 * 200) * 4;
+		return [...(pixels?.data.slice(at, at + 3) ?? [])];
+	}
+
+	test("reads a --set photo from the working directory", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "set", "-q");
+		expect(run.code).toBe(0);
+		expect(await logoPixel(box.path("set", "front.png"))).toEqual([200, 20, 20]);
+	});
+
+	test("reads a --values photo from the values file's directory", async () => {
+		const run = await box.run("render", "templates/photo.json", "--values", "vals/values.json", "--frame", "front", "--out", "vals-out", "-q");
+		expect(run.code).toBe(0);
+		expect(await logoPixel(box.path("vals-out", "front.png"))).toEqual([20, 200, 20]);
+	});
+
+	test("reads a --set photo into a zip", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "photo.zip", "-q");
+		expect(run.code).toBe(0);
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("photo.zip"))));
+		const pixels = decodePixels(ck, zip["front.png"] as Uint8Array);
+		const at = (170 + 70 * 200) * 4;
+		expect([...(pixels?.data.slice(at, at + 3) ?? [])]).toEqual([200, 20, 20]);
+	});
+
+	test("refuses a photo that is not there", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=gone.png", "--out", "gone");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("cannot read gone.png: no such file");
+	});
+
+	test("says nothing about an empty optional photo", async () => {
+		const run = await box.run("render", "templates/photo.json", "--out", "empty");
+		expect(run.code).toBe(0);
+		expect(run.stderr).not.toContain("image");
+	});
+});
+
+describe("render glyph warnings", () => {
+	test("names the characters the fonts cannot draw", async () => {
+		const run = await box.run("render", "badge.json", "--set", "name=김민준", "--out", "hangul");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"warning: the fonts have no glyphs for U+AE40 U+BBFC U+C900 in front, back; they print as boxes",
+		);
 	});
 });
 
@@ -412,7 +512,7 @@ describe("render a template with --data", () => {
 		const cases: [string[], number, string][] = [
 			[[...data, "people.csv"], 2, "--data needs --out <file.zip|file.pdf>"],
 			[[...data, "people.csv", "--out", "dir"], 2, "--data needs --out <file.zip|file.pdf>"],
-			[[...data, "people.csv", "--out", "x.zip", "--scale", "1", "--scale", "2"], 2, "--data takes one --scale"],
+			[[...data, "people.csv", "--out", "x.zip", "--scale", "1", "--scale", "2"], 2, "a .zip or .pdf takes one --scale"],
 			[[...data, "people.csv", "--out", "x.pdf", "--format", "jpeg"], 2, "--format applies only to a zip"],
 			[["render", "a.coatworkspace", "--data", "people.csv", "--preset", "p", "--out", "x.zip"], 2, "--data applies only to templates"],
 			[[...data, "none.csv", "--out", "x.zip"], 1, "cannot read none.csv: no such file"],
@@ -524,9 +624,16 @@ describe("render a workspace", () => {
 		expect(missing.stderr).toContain("cannot read gone.coatworkspace: no such file");
 	});
 
+	test("lists the presets when none is given", async () => {
+		const run = await box.run("render", "badges.coatworkspace", "--out", "x.zip");
+		expect(run.code).toBe(2);
+		expect(run.stderr).toBe(
+			"freshcoat: a .coatworkspace needs --preset <name|id>\nPresets:\n  All badges  (p_png)\n  Proof  (p_pdf)\n",
+		);
+	});
+
 	test("refuses options that do not fit the file", async () => {
 		const cases: [string[], string][] = [
-			[["render", "badges.coatworkspace", "--out", "x.zip"], "a .coatworkspace needs --preset <name|id>"],
 			[["render", "badges.coatworkspace", "--preset", "p_png"], "a .coatworkspace needs --out <path>"],
 			[
 				["render", "badges.coatworkspace", "--preset", "p_png", "--out", "x.zip", "--scale", "2", "--format", "webp"],

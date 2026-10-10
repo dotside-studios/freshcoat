@@ -26,6 +26,7 @@ command.
 freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --values alex.json --variant amber --frame front
 freshcoat render card.json --scale 1 --scale 2 --format webp --out out
+freshcoat render card.coat --set photo=alex.jpg --out card.pdf
 freshcoat render card.coat --data people.csv --out cards.zip
 freshcoat render club.coatworkspace --preset "All cards" --out cards.zip
 ```
@@ -46,13 +47,20 @@ after the frame, with the scale as a suffix for anything but 1x: `front.png`,
 | `--frame <name>` | render only this frame; repeat it for several |
 | `--scale <n>` | pixel density, default 1; repeat it for several |
 | `--format <png\|jpeg\|webp>` | default `png` |
-| `--out <dir>` | directory to write to, created if needed; default the current one |
+| `--out <path>` | directory to write to, created if needed, default the current one; or a `.zip` or `.pdf` file |
+
+An `--out` ending in `.zip` or `.pdf` writes the frames as one zip, with an
+`export-report.csv`, or one PDF, through the same export as `--data` below;
+files in the zip are named after the frame, and `--scale` takes one value.
 
 Values are checked against the template's fields, with their defaults filled
-in. A font the template declares loads from its source; any other family is
-looked up on Google Fonts by name, and both cases are reported on stderr when
-a family is guessed or no font data is found. Relative image paths resolve
-against the template's directory, and nothing outside it is read.
+in. A photo given to an image field is read from the working directory with
+`--set`, or from the values file's directory with `--values`. A font the
+template declares loads from its source; any other family is looked up on
+Google Fonts by name, and both cases are reported on stderr when a family is
+guessed or no font data is found, as is text the fonts have no glyphs for.
+Relative image paths in the template resolve against its directory, and
+nothing outside it is read. An image field left empty is not reported.
 
 #### Spreadsheets
 
@@ -75,7 +83,8 @@ a workspace export, below.
 
 Runs an export preset from a `.coatworkspace`, chosen with `--preset` by id or
 by a name no other preset has, and writes the zip or PDF to `--out`; both flags
-are required and the template flags are refused. Progress goes to stderr and a
+are required, the presets are listed when `--preset` is missing, and the
+template flags are refused. Progress goes to stderr and a
 one-line summary to stdout. The command also warns about text the fonts have no
 glyphs for, and exits 1 when an item fails.
 
@@ -86,6 +95,7 @@ freshcoat validate card.coat
 ```
 
 Prints `card.coat is valid`, or lists each issue on stderr and exits 1.
+`validate` and `inspect` take templates; a `.coatworkspace` is refused.
 
 ### inspect
 

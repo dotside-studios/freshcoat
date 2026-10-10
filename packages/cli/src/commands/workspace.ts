@@ -4,18 +4,16 @@ import { dirname, resolve } from "node:path";
 import type { ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import { WorkspaceReadError } from "@freshcoat-js/workspace/archive";
 import {
-	codepointLabel,
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
-	summarizeGlyphs,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, readWorkspaceFile } from "@freshcoat-js/workspace/node";
-import { warnAboutFonts } from "../fonts";
+import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 
-export type WorkspaceOptions = { preset: string; out: string; quiet: boolean };
+export type WorkspaceOptions = { preset?: string; out: string; quiet: boolean };
 
 export async function renderWorkspace(
 	file: string,
@@ -28,6 +26,11 @@ export async function renderWorkspace(
 	const { workspace, warnings } = await readWorkspace(path, file);
 	for (const warning of warnings) log.warn(`${file}: ${warning}`);
 
+	if (options.preset === undefined)
+		throw new CliError(
+			`a .coatworkspace needs --preset <name|id>${presetList(workspace.presets)}`,
+			2,
+		);
 	const preset = findPreset(workspace, options.preset);
 	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
 
@@ -58,12 +61,7 @@ export async function runPreset(
 		});
 		log.endProgress();
 		if (result.fonts) warnAboutFonts(log, result.fonts);
-		if (result.glyphs && result.glyphs.length > 0) {
-			const { records, codepoints } = summarizeGlyphs(result.glyphs);
-			log.warn(
-				`the fonts have no glyphs for ${codepoints.map(codepointLabel).join(" ")} in ${records} ${records === 1 ? "record" : "records"}; they print as boxes`,
-			);
-		}
+		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
 		if (result.cancelled) throw new CliError("the export was cancelled");
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
@@ -111,7 +109,12 @@ function presetMessage(
 		matches > 1
 			? `${matches} presets are named "${wanted}"; use an id`
 			: `no preset "${wanted}"`;
-	return `${reason}\nPresets:\n${presets.map((p) => `  ${p.name}  (${p.id})`).join("\n")}`;
+	return `${reason}${presetList(presets)}`;
+}
+
+function presetList(presets: readonly { id: string; name: string }[]): string {
+	if (presets.length === 0) return "; the workspace has none";
+	return `\nPresets:\n${presets.map((p) => `  ${p.name}  (${p.id})`).join("\n")}`;
 }
 
 function progressReporter(log: Log): (progress: JobProgress) => void {

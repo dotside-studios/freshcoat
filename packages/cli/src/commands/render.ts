@@ -1,14 +1,21 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
 	DEFAULT_VARIANT_ID,
-	type FrameWarning,
 	resolveTemplateFonts,
 	type Template,
 	validateValues,
 } from "@freshcoat-js/coatfile";
-import { renderTemplate } from "@freshcoat-js/coatfile/render";
-import { warnAboutFonts } from "../fonts";
+import { describeWarning, renderTemplate } from "@freshcoat-js/coatfile/render";
+import {
+	type AssetFile,
+	assetRef,
+	type DatasetAsset,
+	imageFields,
+	prepareAssets,
+} from "@freshcoat-js/workspace";
+import { checkGlyphs } from "@freshcoat-js/workspace/export";
+import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { readBytes, readTemplate } from "../template-file";
@@ -43,10 +50,8 @@ export async function render(
 	const { template, directory } = await readTemplate(io, file);
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
-	const values = checkValues(
-		template,
-		await readValues(io, template, options.values, options.set ?? {}),
-	);
+	const read = await readValues(io, template, options.values, options.set ?? {});
+	const values = checkValues(template, read.values);
 
 	const { fonts, ...report } = await resolveTemplateFonts(template, {
 		...(io.fetch ? { fetch: io.fetch } : {}),
@@ -58,6 +63,7 @@ export async function render(
 		root: directory,
 		build: output.format === "png" ? "default" : "full",
 		fonts,
+		assets: read.assets,
 	});
 	try {
 		const frames = await renderTemplate(renderer, template, values, {
@@ -78,11 +84,29 @@ export async function render(
 				throw new CliError(`two frames would both be written as ${name}`);
 			written.add(name);
 			for (const warning of frame.warnings)
-				log.warn(`${frame.name}: ${describeWarning(warning)}`);
+				if (!(warning.kind === "image_load_failed" && warning.src === ""))
+					log.warn(`${frame.name}: ${describeWarning(warning)}`);
 			const path = join(directoryOut, name);
 			await writeFile(resolve(io.cwd, path), frame.bytes);
 			log.out(path);
 		}
+		const sides = [...new Set(frames.map((frame) => frame.name))];
+		warnAboutGlyphs(
+			log,
+			sides.flatMap((side) =>
+				checkGlyphs(
+					template,
+					{
+						recordId: "",
+						side,
+						values: values as Record<string, string>,
+						...(variantId ? { variantId } : {}),
+					},
+					renderer,
+				),
+			),
+			"frames",
+		);
 	} finally {
 		renderer.dispose();
 	}
@@ -115,12 +139,16 @@ export function pickFrames(
 	return names;
 }
 
+export function isLocalImage(value: string): boolean {
+	return value !== "" && !/^(https?|data|ws):/i.test(value);
+}
+
 export async function readValues(
 	io: Io,
 	template: Template,
 	file: string | undefined,
 	settings: Record<string, string>,
-): Promise<Record<string, unknown>> {
+): Promise<{ values: Record<string, unknown>; assets: DatasetAsset[] }> {
 	let fromFile: unknown = {};
 	if (file !== undefined) {
 		const text = new TextDecoder().decode(await readBytes(io, file));
@@ -154,10 +182,27 @@ export async function readValues(
 			`the template has no field ${unknown.map((key) => `"${key}"`).join(", ")}; its fields are ${known.length > 0 ? known.join(", ") : "none"}`,
 		);
 	}
-	return values;
+
+	const keys: string[] = [];
+	const files: AssetFile[] = [];
+	for (const { key } of imageFields(template)) {
+		const value = values[key];
+		if (typeof value !== "string" || !isLocalImage(value.trim())) continue;
+		const path =
+			file === undefined || Object.hasOwn(settings, key)
+				? value.trim()
+				: join(dirname(file), value.trim());
+		keys.push(key);
+		files.push({ name: path, blob: new Blob([await readBytes(io, path)]) });
+	}
+	const prepared = await prepareAssets(files);
+	prepared.forEach(({ asset }, i) => {
+		values[keys[i] as string] = assetRef(asset.sha256);
+	});
+	return { values, assets: prepared.map(({ asset }) => asset) };
 }
 
-function checkValues(
+export function checkValues(
 	template: Template,
 	values: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -178,12 +223,4 @@ function checkValues(
 function safeName(name: string): string {
 	const cleaned = name.replace(/[\\/:*?"<>|\p{Cc}]/gu, "_").trim();
 	return cleaned === "" || /^\.+$/.test(cleaned) ? "frame" : cleaned;
-}
-
-export function describeWarning(warning: FrameWarning): string {
-	const { kind, ...rest } = warning as { kind: string } & Record<string, unknown>;
-	const detail = Object.values(rest).filter(
-		(value) => typeof value === "string" || typeof value === "number",
-	);
-	return detail.length > 0 ? `${kind}: ${detail.join(", ")}` : kind;
 }
