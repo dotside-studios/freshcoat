@@ -1,4 +1,9 @@
-import { compile, type Template, validate } from "@freshcoat-js/coatfile";
+import {
+	applyVariant,
+	compile,
+	type Template,
+	validate,
+} from "@freshcoat-js/coatfile";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type ColorwayInput,
@@ -397,6 +402,84 @@ describe("variant ids", () => {
 			"amber-3",
 		]);
 		expect(validate(out.template).ok).toBe(true);
+	});
+});
+
+describe("variant boolean operands", () => {
+	const SHAPE: Box = { x: 40, y: 40, width: 160, height: 60 };
+	const A: Box = { x: 40, y: 40, width: 100, height: 60 };
+	const B: Box = { x: 100, y: 40, width: 100, height: 60 };
+
+	function union(side: Side, children: FigmaNode[]): FigmaNode {
+		return {
+			...container(side, "FRAME", "1:3", "shape", SHAPE, children),
+			type: "BOOLEAN_OPERATION",
+			booleanOperation: "UNION",
+			fillGeometry: [
+				{ path: "M 0 0 L 160 0 L 160 60 L 0 60 Z", windingRule: "NONZERO" },
+			],
+			fills: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+		} as FigmaNode;
+	}
+
+	const pair = (side: Side, b: Partial<FigmaNode> & { box?: Box } = {}) =>
+		card(side, [
+			union(side, [
+				rect(side, "1:4", "a", A),
+				rect(side, "1:5", "b", b.box ?? B, b),
+			]),
+		]);
+
+	it("writes a moved operand as a delta on the operand's id", async () => {
+		const out = await run(pair(BASE), [
+			{ label: "Moved", front: pair(INSTANCE, { box: { ...B, x: 300 } }) },
+		]);
+
+		expect(deltas(out, "moved")).toEqual([
+			{ id: "b", properties: {}, pos: { x: 260, y: 0 } },
+		]);
+		expect(out.warnings.map((w) => w.code)).not.toContain(
+			"variant_structure_mismatch",
+		);
+		expect(validate(out.template as Template).ok).toBe(true);
+	});
+
+	it("writes an operand the instance hides as hidden, and the operation keeps the rest", async () => {
+		const out = await run(pair(BASE), [
+			{ label: "Lone", front: pair(INSTANCE, { visible: false }) },
+		]);
+
+		expect(deltas(out, "lone")).toEqual([
+			{ id: "b", properties: {}, hidden: true },
+		]);
+		expect(out.warnings.map((w) => w.code)).not.toContain(
+			"variant_structure_mismatch",
+		);
+		const applied = applyVariant(out.template as Template, "lone");
+		const [shape] = applied.template_data[0]?.elements ?? [];
+		const operands =
+			shape?.type === "vector" ? shape.properties.boolean?.operands : [];
+		expect(operands?.map((o) => o.id)).toEqual(["a"]);
+	});
+
+	it("hides a boolean as one delta, not one per operand", async () => {
+		const hiddenPair = (side: Side) =>
+			card(side, [
+				{
+					...union(side, [
+						rect(side, "1:4", "a", A),
+						rect(side, "1:5", "b", B),
+					]),
+					visible: side === BASE,
+				} as FigmaNode,
+			]);
+		const out = await run(hiddenPair(BASE), [
+			{ label: "Bare", front: hiddenPair(INSTANCE) },
+		]);
+
+		expect(deltas(out, "bare")).toEqual([
+			{ id: "shape", properties: {}, hidden: true },
+		]);
 	});
 });
 

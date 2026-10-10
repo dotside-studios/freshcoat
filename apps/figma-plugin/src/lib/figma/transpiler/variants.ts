@@ -1,6 +1,13 @@
 import type { FigmaContainerNode, FigmaNode } from "../types";
 import { isContainerNode } from "../types";
 
+// A boolean operation is no container, but its children are layers to pair
+// like a frame's: hiding one changes the operands.
+function childrenOf(n: FigmaNode): FigmaNode[] | undefined {
+	if (isContainerNode(n)) return n.children;
+	return n.type === "BOOLEAN_OPERATION" ? n.children : undefined;
+}
+
 // Colorway variants are authored as INSTANCEs of the card COMPONENT, named
 // `<Card> / <Label>`. The label after the separator identifies the colorway,
 // and the transpiler emits it as a variant: the instance's sides diffed
@@ -49,7 +56,7 @@ export function alignInstanceVisibility(
 
 	const markSubtree = (n: FigmaNode): void => {
 		hiddenBaseNodes.add(n.id);
-		if (isContainerNode(n)) for (const c of n.children) markSubtree(c);
+		for (const c of childrenOf(n) ?? []) markSubtree(c);
 	};
 
 	const alignChildren = (
@@ -78,10 +85,13 @@ export function alignInstanceVisibility(
 		return withAlignedChildren(b, n);
 	};
 
-	const withAlignedChildren = (b: FigmaNode, n: FigmaNode): FigmaNode =>
-		isContainerNode(b) && isContainerNode(n)
-			? ({ ...n, children: alignChildren(b.children, n.children) } as FigmaNode)
+	const withAlignedChildren = (b: FigmaNode, n: FigmaNode): FigmaNode => {
+		const baseChildren = childrenOf(b);
+		const children = childrenOf(n);
+		return baseChildren && children
+			? ({ ...n, children: alignChildren(baseChildren, children) } as FigmaNode)
 			: n;
+	};
 
 	return {
 		frame: {

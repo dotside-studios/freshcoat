@@ -467,8 +467,19 @@ function walkNode(
 				worldAnchor: anchor,
 			});
 			const live = liveBoolean(n, ctx.scale);
-			if (live && "boolean" in live) vector.properties.boolean = live.boolean;
-			else if (live)
+			if (live && "boolean" in live) {
+				vector.properties.boolean = live.boolean;
+				// The operands are elements of their own, so a colorway can hide one.
+				for (const { node, operand } of live.operands)
+					w.sink.trace.push({
+						slot: w.slotName,
+						nodeId: node.id,
+						name: node.name,
+						nodeType: node.type,
+						decision: operand.type === "rect" ? "native-rect" : "native-vector",
+						el: operand,
+					});
+			} else if (live)
 				w.sink.warnings.push({
 					severity: "info",
 					code: "boolean_flattened",

@@ -208,6 +208,8 @@ layers were kept, flattened or skipped.
   the instance changes is diffed against the card, layer by layer: its
   background, each layer's properties, and where a layer sits, its size,
   rotation and opacity. A layer the instance hides is hidden in the variant.
+  The operands of a boolean are layers too: one the instance moves or hides is
+  a change to that operand, and the boolean follows.
   One the card hides and the instance shows stays hidden, with the warning
   `variant_unhide_unsupported`: a variant can hide a layer, not add one. The
   variant's id is its label's slug, suffixed `-2`, `-3` when another colorway
