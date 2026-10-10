@@ -1242,7 +1242,7 @@ function arcTextBounds(
 	cmd: DrawTextCommand,
 	arc: TextArc,
 	fallback: string[],
-	em: Bounds | null,
+	em: RunBox | null,
 ): Bounds[] {
 	const lines = arcLines(ck, provider, bin, cmd, fallback);
 	const [cx, cy] = arcCenter(cmd);
@@ -1268,7 +1268,7 @@ function arcTextBounds(
 function placedGlyphBounds(
 	lines: { arc: ArcLine }[],
 	placed: ArcPlacement,
-	em: Bounds,
+	runBox: RunBox,
 ): Bounds[] {
 	const out: Bounds[] = [];
 	lines.forEach(({ arc: shaped }, li) => {
@@ -1276,6 +1276,7 @@ function placedGlyphBounds(
 			const xforms = placed[li]?.[ri];
 			if (!xforms) return;
 			const size = run.size;
+			const em = runBox(run);
 			const skew = run.fakeItalic
 				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * size
 				: 0;
@@ -2785,19 +2786,27 @@ function textBounds(
 	for (const line of cmd.layout.lines)
 		for (const span of line.spans) families.add(span.font.family);
 	let em: Bounds | null = null;
+	let variable = false;
 	for (const family of families) {
 		const box = familyBox(ck, provider, family);
-		if (box === null) return null;
-		if (box) em = em ? unionBounds(em, box) : box;
+		if (box === null) variable = true;
+		else if (box) em = em ? unionBounds(em, box) : box;
 	}
+	const runBox: RunBox | null =
+		em || variable
+			? (run) => {
+					const own = variable ? glyphBox(ck, bin, run) : null;
+					return em && own ? unionBounds(em, own) : ((own ?? em) as Bounds);
+				}
+			: null;
 	if (cmd.path) {
-		if (!em) return [];
+		if (!runBox) return [];
 		const lines = arcLines(ck, provider, bin, cmd, fallback);
 		const placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
-		return placedGlyphBounds(lines, placed, em);
+		return placedGlyphBounds(lines, placed, runBox);
 	}
 	if (cmd.arc)
-		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, em);
+		return arcTextBounds(ck, provider, bin, cmd, cmd.arc, fallback, runBox);
 	const rows =
 		device && ctm[1] === 0 && ctm[3] === 0 && ctm[4] > 0
 			? {
@@ -2822,7 +2831,7 @@ function textBounds(
 			const { top, thickness } = spanDecoration(ck, provider, span, baseline);
 			out.push([span.x, top, span.x + span.width, top + thickness]);
 		}
-		if (!em) continue;
+		if (!runBox) continue;
 		const shape = () =>
 			shapeLine(ck, provider, cmd, line, fallback, null, null);
 		let shaped: ShapedLine;
@@ -2840,10 +2849,16 @@ function textBounds(
 		const italic = line.spans.some((s) => s.font.style === "italic");
 		let x0 = Number.POSITIVE_INFINITY;
 		let x1 = Number.NEGATIVE_INFINITY;
+		let top = 0;
+		let bottom = 0;
 		for (const run of shaped.para.getShapedLines()[0]?.runs ?? []) {
+			if (variable) bin.track(run.typeface);
+			const em = runBox(run);
 			const skew = italic
 				? FAKE_ITALIC_SKEW * Math.max(-em[1], em[3], 0) * run.size
 				: 0;
+			top = Math.min(top, em[1] * size);
+			bottom = Math.max(bottom, em[3] * size);
 			const pos = run.positions as Float32Array;
 			for (let i = 0; i < pos.length; i += 2) {
 				const x = pos[i] as number;
@@ -2855,12 +2870,31 @@ function textBounds(
 		const slack = size / 8;
 		out.push([
 			left + x0 - slack,
-			baseline + Math.min(0, em[1]) * size - slack,
+			baseline + top - slack,
 			left + x1 + slack,
-			baseline + Math.max(0, em[3]) * size + slack,
+			baseline + bottom + slack,
 		]);
 	}
 	return out;
+}
+
+type RunBox = (run: GlyphRun) => Bounds;
+
+// A run's glyph outlines per unit of size, as painted: at the variation axes
+// and synthetic weight its font carries, which no family box can bound for a
+// variable font.
+function glyphBox(ck: CanvasKit, bin: Bin, run: GlyphRun): Bounds {
+	const rects = runFont(ck, bin, run).getGlyphBounds(run.glyphs);
+	const size = run.size || 1;
+	let box: Bounds = [0, 0, 0, 0];
+	for (let i = 0; i + 3 < rects.length; i += 4)
+		box = unionBounds(box, [
+			(rects[i] as number) / size,
+			(rects[i + 1] as number) / size,
+			(rects[i + 2] as number) / size,
+			(rects[i + 3] as number) / size,
+		]);
+	return box;
 }
 
 const familyBoxes = new WeakMap<

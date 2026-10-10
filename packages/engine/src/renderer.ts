@@ -400,6 +400,7 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		{ images, ...options }: PaintPdfOptions,
 	): Promise<PdfFrame> => {
 		const { paintPdf } = await import("./pdf/paint");
+		await loadFamilies(collectAssets(commands).fonts, mapLoader(images, load));
 		return paintPdf(
 			ck,
 			commands,
