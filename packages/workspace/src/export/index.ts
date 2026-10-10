@@ -63,6 +63,11 @@ export {
 	type RenderPrint,
 	withPrintFallback,
 } from "./print";
+export {
+	type PresetBlock,
+	type PresetReadiness,
+	presetReadiness,
+} from "./readiness";
 export { serveRenders, type WorkerScope } from "./render-worker";
 export {
 	type ExportOutput,
