@@ -1,12 +1,14 @@
 // Text drawn with the font files themselves: CanvasKit shapes it and reports
-// glyph ids and positions, and the page embeds the TrueType or OpenType file
-// the run used, so the glyphs stay vector and the text selectable. A run whose
-// file a PDF cannot carry as is has no face here and is drawn as pixels.
+// glyph ids and positions, and the page embeds the glyphs used from the
+// TrueType or OpenType file the run used, so the glyphs stay vector and the
+// text selectable. A file that cannot be cut down is embedded whole. A run
+// whose file a PDF cannot carry as is has no face here and is drawn as pixels.
 
 import type { CanvasKit, GlyphRun, Typeface } from "canvaskit-wasm";
 import { fontArrayBuffer } from "../font-bytes";
 import type { FontVariations } from "../types";
 import { readSfnt, type SfntInfo } from "./sfnt";
+import { subsetFont } from "./subset";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 
 export type FontFile = {
@@ -44,10 +46,11 @@ export class FontEmbedder {
 	) {}
 
 	// The embeddable file CanvasKit shaped `run` with, or why there is none.
+	// `clusters` holds the text of each cluster by its UTF-8 offset.
 	file(
 		run: GlyphRun,
 		req: FaceRequest,
-		text: string,
+		clusters: Map<number, string>,
 	): FontFile | { reason: string } {
 		const family = run.typeface?.getFamilyName() ?? "";
 		const named = [...this.open(family)];
@@ -63,7 +66,7 @@ export class FontEmbedder {
 			.map(({ f }) => f);
 		const probes: Array<[string, number]> = [];
 		for (let i = 0; i < run.glyphs.length && probes.length < 4; i++) {
-			const cp = text.codePointAt(run.offsets[i] ?? 0);
+			const cp = clusters.get(run.offsets[i] ?? 0)?.codePointAt(0);
 			if (cp === undefined || cp <= 0x20) continue;
 			const ch = String.fromCodePoint(cp);
 			const id = run.typeface?.getGlyphIDs(ch)[0];
@@ -156,15 +159,16 @@ function score(info: SfntInfo, req: FaceRequest): number {
 function writeFace(w: PdfWriter, face: EmbeddedFace) {
 	const { info, file } = face;
 	const em = (v: number) => (v * 1000) / info.unitsPerEm;
+	const subset = subsetFont(file.bytes, face.used.keys());
+	const bytes = subset ?? file.bytes;
+	const family = file.family.replace(/[^A-Za-z0-9-]/g, "") || "Font";
 	const base = name(
-		`${file.family.replace(/[^A-Za-z0-9-]/g, "") || "Font"}-${face.id}`,
+		`${subset ? `${subsetTag(subset)}+` : ""}${family}-${face.id}`,
 	);
 	const program =
 		info.outlines === "truetype"
-			? { FontFile2: w.flate({ Length1: file.bytes.length }, file.bytes) }
-			: {
-					FontFile3: w.flate({ Subtype: name("OpenType") }, file.bytes),
-				};
+			? { FontFile2: w.flate({ Length1: bytes.length }, bytes) }
+			: { FontFile3: w.flate({ Subtype: name("OpenType") }, bytes) };
 	const descriptor = w.add({
 		Type: name("FontDescriptor"),
 		FontName: base,
@@ -200,6 +204,18 @@ function writeFace(w: PdfWriter, face: EmbeddedFace) {
 		DescendantFonts: [w.add(cid)],
 		ToUnicode: w.flate({}, toUnicode(face.used)),
 	});
+}
+
+// Six capital letters from a hash of the subset, as the spec asks of its name.
+export function subsetTag(bytes: Uint8Array): string {
+	let h = 2166136261;
+	for (const b of bytes) h = Math.imul(h ^ b, 16777619) >>> 0;
+	let tag = "";
+	for (let i = 0; i < 6; i++) {
+		tag += String.fromCharCode(65 + (h % 26));
+		h = Math.floor(h / 26);
+	}
+	return tag;
 }
 
 const hex4 = (n: number) => n.toString(16).padStart(4, "0").toUpperCase();

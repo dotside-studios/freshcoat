@@ -256,7 +256,7 @@ subpath.
 | `@freshcoat-js/engine/node` | `loadCanvasKit`, `initCanvasKit`, `fileLoader`, `canvasKitBinDir` for Node and Bun |
 | `@freshcoat-js/engine/browser` | `loadCanvasKit(baseUrl)` for a page or a worker |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
-| `@freshcoat-js/engine/pdf` | `paintPdf`, the PDF painter `renderPdf` and `paintPdf` call, for a runtime of your own |
+| `@freshcoat-js/engine/pdf` | `paintPdf`, the PDF painter `renderPdf` and `paintPdf` call, for a runtime of your own; `mergeFontSubsets` and `subsetTag` for joining the font subsets of several PDFs |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 | `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, and `rgbIdat` for passing an RGB PNG's data through as is |

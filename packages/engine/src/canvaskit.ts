@@ -839,10 +839,13 @@ export type ShapedTextLine = {
 	x: number;
 	y: number;
 	runs: GlyphRun[];
-	// The span each code unit of the line's text belongs to.
+	// The span each UTF-8 byte of the line's text belongs to, indexed as the
+	// runs' offsets are.
 	spanAt: number[];
 	decorations: DecorationRect[];
 };
+
+const utf8 = new TextEncoder();
 
 // A straight text command's lines shaped as drawText shapes them, for a
 // backend that places the glyphs itself. The paragraphs are freed here, the
@@ -868,7 +871,8 @@ export function shapeTextLines(
 			const runs = glyphLines(bin, shaped).flatMap((l) => l.runs);
 			const spanAt: number[] = [];
 			line.spans.forEach((span, i) => {
-				for (let k = 0; k < span.text.length; k++) spanAt.push(i);
+				const bytes = utf8.encode(span.text).length;
+				for (let k = 0; k < bytes; k++) spanAt.push(i);
 			});
 			out.push({
 				line,
