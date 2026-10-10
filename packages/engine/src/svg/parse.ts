@@ -212,6 +212,7 @@ export type SvgDrawing = {
 
 const MAX_DEPTH = 64;
 const MAX_ITEMS = 20000;
+const MAX_WALK = 200_000;
 const MAX_TILES = 1000;
 
 const INHERITED = new Set([
@@ -496,6 +497,8 @@ export function parseSvg(markup: string): SvgDrawing {
 	const viewBox = vb ?? { x: 0, y: 0, width, height };
 
 	let items = 0;
+	// Element visits, which empty content grows without ever adding to `items`.
+	let walked = 0;
 
 	const computeStyle = (el: XmlElement, parent: Declarations): Declarations => {
 		const out: Declarations = {};
@@ -1595,6 +1598,10 @@ export function parseSvg(markup: string): SvgDrawing {
 		}
 		if (items >= MAX_ITEMS) {
 			warn("item-limit", `drawings are limited to ${MAX_ITEMS} shapes`);
+			return [];
+		}
+		if (++walked > MAX_WALK) {
+			warn("walk-limit", `drawings are limited to ${MAX_WALK} elements`);
 			return [];
 		}
 		const name = localName(el.name);
