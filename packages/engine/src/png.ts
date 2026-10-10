@@ -71,7 +71,7 @@ export async function encodePng(
 	// "best" keeps it as a candidate.
 	const opaque = isOpaque(pixels, expected);
 	const adaptive = opts?.effort === "best";
-	// Built and deflated one at a time, keeping only the smallest stream so far:
+	// Built and deflated two at a time, keeping only the smallest stream so far:
 	// at 8192x8192 every candidate's filtered rows alive at once is about a GB.
 	const plans: { channels: 3 | 4; rows: () => Uint8Array }[] = [];
 	if (!opaque || adaptive)
@@ -94,16 +94,17 @@ export async function encodePng(
 			});
 	}
 
-	let best = {
-		stream: await deflateChunks(plans[0].rows()),
-		channels: plans[0].channels,
-	};
-	for (let i = 1; i < plans.length; i++) {
-		const stream = await deflateChunks(plans[i].rows());
-		if (stream.total < best.stream.total)
-			best = { stream, channels: plans[i].channels };
+	let best: { stream: DeflatedChunks; channels: 3 | 4 } | undefined;
+	for (let i = 0; i < plans.length; i += 2) {
+		const pair = plans.slice(i, i + 2);
+		const streams = await Promise.all(
+			pair.map((plan) => deflateChunks(plan.rows())),
+		);
+		for (let j = 0; j < pair.length; j++)
+			if (!best || streams[j].total < best.stream.total)
+				best = { stream: streams[j], channels: pair[j].channels };
 	}
-	return assemble(best.stream, width, height, best.channels);
+	return assemble(best!.stream, width, height, best!.channels);
 }
 
 // Read a frame's pixels straight out of a decode and encode them. The pairing
