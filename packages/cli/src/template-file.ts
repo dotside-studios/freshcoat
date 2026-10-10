@@ -8,6 +8,7 @@ import {
 	verifyAssets,
 } from "@freshcoat-js/coatfile";
 import { CliError, type Io, type Log } from "./io";
+import { evaluateTemplateModule, isTemplateModule } from "./template-module";
 
 export async function readBytes(
 	io: Io,
@@ -54,10 +55,12 @@ export function newerFormatWarning(version: string): string {
 }
 
 /** Reads a template as Studio opens it: duplicate element ids are healed
- *  rather than refused. */
+ *  rather than refused. A script is evaluated first, and its JSON read. */
 export async function readTemplate(io: Io, path: string): Promise<TemplateFile> {
-	const bytes = await readBytes(io, path);
-	const loaded = await loadTemplate(bytes);
+	const input = isTemplateModule(path)
+		? await evaluateTemplateModule(io, path)
+		: await readBytes(io, path);
+	const loaded = await loadTemplate(input);
 	if (!loaded.ok) {
 		if (loaded.reason === "unreadable") throw new CliError(`${path}: ${loaded.message}`);
 		throw new CliError(issueSummary(path, loaded.errors));

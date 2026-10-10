@@ -248,6 +248,69 @@ describe("validate", () => {
 	});
 });
 
+describe("a template module", () => {
+	const source = `import type { Template } from "@freshcoat-js/coatfile";
+const base: Template = ${JSON.stringify(card())};
+console.log("building");
+export default async (): Promise<Template> => ({ ...base, name: "Scripted" });
+`;
+
+	test("renders what its default export resolves to", async () => {
+		await box.write("scripted.coat.ts", source);
+		const run = await box.run("render", "scripted.coat.ts", "--frame", "front", "--out", "scripted");
+		expect(run.code).toBe(0);
+		expect(run.stdout).toBe("scripted/front.png\n");
+		expect(run.stderr).toContain("building");
+		expect(await size(box.path("scripted", "front.png"))).toEqual([200, 100]);
+		const inspected = await box.run("inspect", "scripted.coat.ts");
+		expect(inspected.stdout).toContain("Scripted (badge)");
+	});
+
+	test("takes a template export from another runtime", async () => {
+		await box.write(
+			"named.mjs",
+			`export const template = ${JSON.stringify(card())};`,
+		);
+		const before = process.env.FRESHCOAT_RUNTIME;
+		process.env.FRESHCOAT_RUNTIME = "node";
+		try {
+			const run = await box.run("validate", "named.mjs");
+			expect(run).toEqual({ code: 0, stdout: "named.mjs is valid\n", stderr: "" });
+		} finally {
+			if (before === undefined) delete process.env.FRESHCOAT_RUNTIME;
+			else process.env.FRESHCOAT_RUNTIME = before;
+		}
+	});
+
+	test("reports a module without a template", async () => {
+		await box.write("empty.mjs", "export const x = 1;");
+		const run = await box.run("validate", "empty.mjs");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toBe(
+			"freshcoat: empty.mjs: the module has no default or template export\n",
+		);
+		await box.write("array.mjs", "export default [];");
+		expect((await box.run("validate", "array.mjs")).stderr).toContain(
+			"the module's export is not a template object",
+		);
+	});
+
+	test("reports what the script threw", async () => {
+		await box.write("throws.mjs", 'throw new Error("no data");');
+		const run = await box.run("validate", "throws.mjs");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("throws.mjs: evaluating the module failed with code 1");
+		expect(run.stderr).toContain("no data");
+	});
+
+	test("validates the JSON it produces", async () => {
+		await box.write("invalid.mjs", `export default { ...${JSON.stringify(card())}, width: -1 };`);
+		const run = await box.run("validate", "invalid.mjs");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("invalid.mjs is not a valid template (");
+	});
+});
+
 describe("reading a template as Studio opens it", () => {
 	function duplicated(): Template {
 		const base = card();
