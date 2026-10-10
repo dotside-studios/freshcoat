@@ -24,7 +24,6 @@ the workspace; other relative image paths resolve against its directory.
 Options:
   --preset <name|id>  the preset to run, by id or by a name only it has
   --out <path>        file to write, such as cards.zip or cards.pdf
-  --vector            draw a pdf preset's cards as vectors
   -q, --quiet         hide warnings and progress
   -h, --help          show this help
 
@@ -35,7 +34,6 @@ export async function exportCommand(args: string[], io: Io): Promise<void> {
 	const { values: flags, positionals } = parse(args, {
 		preset: { type: "string" },
 		out: { type: "string" },
-		vector: { type: "boolean" },
 	});
 	const file = exactlyOne(positionals, "workspace file");
 	if (!flags.preset) throw new UsageError("missing --preset");
@@ -46,13 +44,8 @@ export async function exportCommand(args: string[], io: Io): Promise<void> {
 	const { workspace, warnings } = await readWorkspace(path, file);
 	for (const warning of warnings) log.warn(`${file}: ${warning}`);
 
-	const found = findPreset(workspace, flags.preset);
-	if (!found) throw new CliError(presetMessage(workspace.presets, flags.preset));
-	if (flags.vector && found.format !== "pdf")
-		throw new UsageError("--vector needs a pdf preset");
-	const preset = flags.vector
-		? { ...found, pdfPageImage: "vector" as const }
-		: found;
+	const preset = findPreset(workspace, flags.preset);
+	if (!preset) throw new CliError(presetMessage(workspace.presets, flags.preset));
 
 	const out = resolve(io.cwd, flags.out);
 	await mkdir(dirname(out), { recursive: true });

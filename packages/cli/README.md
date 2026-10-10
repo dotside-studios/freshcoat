@@ -25,15 +25,11 @@ command.
 freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --values alex.json --variant amber --frame front
 freshcoat render card.json --scale 1 --scale 2 --format webp --out out
-freshcoat render card.coat --format pdf --dpi 300 --out out
 ```
 
 Renders each frame and prints the path of every file it writes. Files are named
 after the frame, with the scale as a suffix for anything but 1x: `front.png`,
-`front@2x.png`. JPEG files use `.jpg`. `--format pdf` writes each frame as one
-page of vectors, `front.pdf`, sized at `--dpi` design units to the inch. Text
-is set in its embedded font, and a layer a PDF cannot express, such as a
-shadow, is drawn as a 600 dpi image with a note on stderr.
+`front@2x.png`. JPEG files use `.jpg`.
 
 | Flag | |
 |---|---|
@@ -42,8 +38,7 @@ shadow, is drawn as a 600 dpi image with a note on stderr.
 | `--variant <id>` | render a variant of the template |
 | `--frame <name>` | render only this frame; repeat it for several |
 | `--scale <n>` | pixel density, default 1; repeat it for several |
-| `--format <png\|jpeg\|webp\|pdf>` | default `png` |
-| `--dpi <n>` | design units per inch of a PDF page, default 300 |
+| `--format <png\|jpeg\|webp>` | default `png` |
 | `--out <dir>` | directory to write to, created if needed; default the current one |
 
 Values are checked against the template's fields, with their defaults filled
@@ -76,14 +71,12 @@ declares each. `--json` prints the same as one object with `frames`, `fields`,
 
 ```sh
 freshcoat export club.coatworkspace --preset "All cards" --out cards.zip
-freshcoat export club.coatworkspace --preset "Print sheet" --out cards.pdf --vector
 ```
 
 Runs an export preset from a `.coatworkspace`, chosen by id or by a name no
 other preset has, and writes the zip or PDF to `--out`. Progress goes to
 stderr and a one-line summary to stdout. The command also warns about text the
-fonts have no glyphs for, and exits 1 when an item fails. `--vector` draws a
-PDF preset's cards as vectors, as its `pdfPageImage: "vector"` does.
+fonts have no glyphs for, and exits 1 when an item fails.
 
 ## From code
 
