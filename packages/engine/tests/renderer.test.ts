@@ -49,6 +49,33 @@ const text = (family: string) =>
 
 const firstPixel = (data: Uint8Array) => [...data.subarray(0, 4)];
 
+// Holds the bytes only in its own frame, so none of the test's stack slots
+// point at them once it returns.
+async function paintWithImageBytes(
+	renderer: Awaited<ReturnType<typeof createRenderer>>,
+): Promise<WeakRef<Uint8Array>> {
+	const { bytes } = await renderer.render(rect("#ff0000"), {
+		width: 8,
+		height: 8,
+	});
+	await renderer.render(image("logo.png"), {
+		width: 8,
+		height: 8,
+		images: new Map([["logo.png", bytes]]),
+	});
+	return new WeakRef(bytes);
+}
+
+// JavaScriptCore scans the stack conservatively, so one collection can keep an
+// object a stale slot still points at. Collect again on later turns.
+async function collected(ref: WeakRef<object>): Promise<boolean> {
+	for (let i = 0; i < 10 && ref.deref(); i++) {
+		await Bun.sleep(0);
+		Bun.gc(true);
+	}
+	return ref.deref() === undefined;
+}
+
 describe("createRenderer", () => {
 	test("renders PNG bytes by default", async () => {
 		const renderer = await createRenderer({ ck });
@@ -132,19 +159,9 @@ describe("createRenderer", () => {
 
 	test("lets go of per-call image bytes once their image is evicted", async () => {
 		const renderer = await createRenderer({ ck });
-		let bytes: Uint8Array | null = (
-			await renderer.render(rect("#ff0000"), { width: 8, height: 8 })
-		).bytes;
-		const ref = new WeakRef(bytes);
-		await renderer.render(image("logo.png"), {
-			width: 8,
-			height: 8,
-			images: new Map([["logo.png", bytes]]),
-		});
-		bytes = null;
+		const ref = await paintWithImageBytes(renderer);
 		await renderer.render(rect("#00ff00"), { width: 8, height: 8 });
-		Bun.gc(true);
-		expect(ref.deref()).toBeUndefined();
+		expect(await collected(ref)).toBe(true);
 		renderer.dispose();
 	});
 

@@ -1,4 +1,5 @@
 import type {
+	FigmaBooleanOperation,
 	FigmaContainerNode,
 	FigmaContainerNodeType,
 	FigmaGridTrack,
@@ -115,7 +116,13 @@ type AnyVectorNode = AnySceneNode & {
 	arcData?: FigmaVectorNode["arcData"];
 	pointCount?: number;
 	cornerRadius?: unknown;
+	booleanOperation?: unknown;
+	children?: readonly (AnySceneNode & { type: string })[];
 };
+
+const BOOLEAN_OPERATIONS: ReadonlySet<unknown> = new Set<FigmaBooleanOperation>(
+	["UNION", "SUBTRACT", "INTERSECT", "EXCLUDE"],
+);
 
 /** The path a shape node is emitted from.
  *
@@ -133,10 +140,16 @@ type AnyVectorNode = AnySceneNode & {
  *
  *  A LINE has neither: nothing to fill, and no authored path. Its geometry is
  *  the segment across its own width, which is the whole shape (a Figma line has
- *  no height in its own space). */
+ *  no height in its own space).
+ *
+ *  A boolean operand contributes its fill region whatever its paint, so it is
+ *  read from `fillGeometry` alone: an open path or a line has no region, and
+ *  the transpiler keeps the boolean flat rather than combine a stroke's path. */
 function readGeometry(
 	node: AnyVectorNode,
+	operand: boolean,
 ): NonNullable<FigmaVectorNode["fillGeometry"]> {
+	if (operand) return (node.fillGeometry ?? []).map(readVectorPath);
 	const paints = Array.isArray(node.fills) ? node.fills : [];
 	const hasFill = paints.some((f) => f.visible !== false);
 	const resolved = node.fillGeometry ?? [];
@@ -166,7 +179,10 @@ function readVectorPath(p: {
 		: { path: p.data };
 }
 
-export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
+export function readVectorNode(
+	node: AnyVectorNode,
+	opts: ReadOptions = {},
+): FigmaVectorNode {
 	return {
 		...readBaseFields(node),
 		type: node.type as FigmaVectorNodeType,
@@ -178,7 +194,7 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
-		fillGeometry: readGeometry(node),
+		fillGeometry: readGeometry(node, opts.operand === true),
 		...(node.type === "ELLIPSE" && node.arcData
 			? {
 					arcData: {
@@ -194,7 +210,32 @@ export function readVectorNode(node: AnyVectorNode): FigmaVectorNode {
 		...(node.type === "POLYGON" && typeof node.cornerRadius === "number"
 			? { cornerRadius: node.cornerRadius }
 			: {}),
+		...(node.type === "BOOLEAN_OPERATION" &&
+		BOOLEAN_OPERATIONS.has(node.booleanOperation)
+			? {
+					booleanOperation: node.booleanOperation as FigmaBooleanOperation,
+					...readOperands(node, opts.depth),
+				}
+			: {}),
 	};
+}
+
+// Only shapes can be combined, so anything else is read as the node alone:
+// the transpiler needs to know it is there, not what it holds.
+function readOperands(
+	node: AnyVectorNode,
+	depth = Number.POSITIVE_INFINITY,
+): { children?: FigmaNode[] } {
+	if (depth <= 0 || !node.children) return {};
+	const children = node.children
+		.map((c) =>
+			readNode(c, {
+				depth: c.type === "BOOLEAN_OPERATION" ? depth - 1 : 0,
+				operand: true,
+			}),
+		)
+		.filter((c): c is FigmaNode => c !== null);
+	return { children };
 }
 
 type AnyContainerNode = AnySceneNode & {
@@ -230,7 +271,11 @@ type AnyContainerNode = AnySceneNode & {
 };
 
 /** `depth` limits how many levels of children are read; 0 reads the node alone. */
-export type ReadOptions = { depth?: number };
+export type ReadOptions = {
+	depth?: number;
+	/** A boolean operation's child, read for the region it adds to the result. */
+	operand?: boolean;
+};
 
 export function readNode(
 	node: AnySceneNode & { type: string },
@@ -239,7 +284,7 @@ export function readNode(
 	const t = node.type;
 	if (t === "TEXT") return readTextNode(node as never);
 	if (t === "RECTANGLE") return readRectangleNode(node as never);
-	if (isVectorNode(node)) return readVectorNode(node as never);
+	if (isVectorNode(node)) return readVectorNode(node as never, opts);
 	if (isContainerNode(node))
 		return readContainer(node as AnyContainerNode, opts.depth);
 	return null; // unsupported node type — skipped by the caller

@@ -1333,6 +1333,101 @@ describe("Figma API reads", () => {
 		expect(v.fillGeometry).toEqual([{ path: "M0 0 L1 1" }]);
 	});
 
+	describe("boolean operations", () => {
+		const outline = (data: string) => [{ windingRule: "NONZERO", data }];
+		const operation = (extra: Record<string, unknown> = {}) => ({
+			...leaf("1:6", "bool"),
+			type: "BOOLEAN_OPERATION",
+			booleanOperation: "SUBTRACT",
+			fillGeometry: outline("M0 0 L9 9 Z"),
+			children: [
+				{ ...leaf("1:7", "a"), type: "RECTANGLE" },
+				{
+					...leaf("1:8", "b"),
+					type: "ELLIPSE",
+					fillGeometry: outline("M1 1 L2 2 Z"),
+				},
+			],
+			...extra,
+		});
+
+		it("reads the operation and its children, bottom-most first", () => {
+			const node = readNode(operation() as never);
+			if (node?.type !== "BOOLEAN_OPERATION") throw new Error("not a boolean");
+			expect(node.booleanOperation).toBe("SUBTRACT");
+			expect(node.children?.map((c) => [c.id, c.type])).toEqual([
+				["1:7", "RECTANGLE"],
+				["1:8", "ELLIPSE"],
+			]);
+		});
+
+		it("reads a nested boolean's children too", () => {
+			const inner = { ...operation(), id: "1:9" };
+			const node = readNode(operation({ children: [inner] }) as never);
+			if (node?.type !== "BOOLEAN_OPERATION") throw new Error("not a boolean");
+			const [nested] = node.children ?? [];
+			expect(nested).toMatchObject({ booleanOperation: "SUBTRACT" });
+			expect((nested as { children?: unknown[] }).children).toHaveLength(2);
+		});
+
+		it("reads an operand from its fill geometry, whatever its paint", () => {
+			const vectorPaths = vi.fn(() => outline("M5 5 L6 6"));
+			const node = readNode(
+				operation({
+					children: [
+						{
+							...leaf("1:8", "b"),
+							type: "VECTOR",
+							fills: [],
+							fillGeometry: outline("M1 1 L2 2 Z"),
+							get vectorPaths() {
+								return vectorPaths();
+							},
+						},
+					],
+				}) as never,
+			);
+			const [operand] = (node as { children: { fillGeometry: unknown }[] })
+				.children;
+			expect(operand.fillGeometry).toEqual([
+				{ path: "M1 1 L2 2 Z", windingRule: "NONZERO" },
+			]);
+			expect(vectorPaths).not.toHaveBeenCalled();
+		});
+
+		it("reads a non-shape child as the node alone", () => {
+			const grandchild = vi.fn(() => ({ ...leaf("1:11", "g") }));
+			const node = readNode(
+				operation({
+					children: [
+						{
+							...leaf("1:10", "group"),
+							type: "GROUP",
+							get children() {
+								return [grandchild()];
+							},
+						},
+					],
+				}) as never,
+			);
+			const [group] = (node as { children: { type: string }[] }).children;
+			expect(group).toMatchObject({ type: "GROUP", children: [] });
+			expect(grandchild).not.toHaveBeenCalled();
+		});
+
+		it("reads no children at depth 0", () => {
+			const node = readNode(operation() as never, { depth: 0 });
+			expect(node).toMatchObject({ booleanOperation: "SUBTRACT" });
+			expect(node).not.toHaveProperty("children");
+		});
+
+		it("leaves a plain vector without boolean fields", () => {
+			const node = readNode({ ...leaf("1:12", "v"), type: "VECTOR" } as never);
+			expect(node).not.toHaveProperty("booleanOperation");
+			expect(node).not.toHaveProperty("children");
+		});
+	});
+
 	it("depth 0 reads the container without its children", () => {
 		const child = {
 			...leaf("1:5", "child"),
