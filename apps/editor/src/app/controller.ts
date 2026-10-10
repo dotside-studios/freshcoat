@@ -1,6 +1,8 @@
 import {
+	canvasKitPathOp,
 	type Element,
 	formatVersionStatus,
+	type PathOp,
 	type Template,
 	validate,
 } from "@freshcoat-js/coatfile";
@@ -20,7 +22,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
-import { type BooleanOp, settleBooleans } from "~/doc/boolean";
+import { type BooleanOp, resolveBoolean, settleBooleans } from "~/doc/boolean";
 import {
 	createElement,
 	defaultRect,
@@ -1992,6 +1994,8 @@ export class EditorController {
 			shapes: this.shapeHits,
 			tolerance: HIT_TOLERANCE_PX / view.zoom,
 			values,
+			pathOp:
+				ck && this.variantId !== undefined ? canvasKitPathOp(ck) : undefined,
 			operands: (key) =>
 				opts.deep === true || selection.some((s) => isAncestor(key, s)),
 		});
@@ -2041,6 +2045,9 @@ export function hitLayer(
 		shapes?: ShapeHits;
 		tolerance?: number;
 		values?: Record<string, unknown>;
+		/** Rebuilds a boolean vector's path from its operands, for hits under
+		 *  a variant, where the cached path is the base's. */
+		pathOp?: PathOp;
 		/** Whether to look inside the boolean vector at a key, at the shapes it
 		 *  combines. */
 		operands?: (key: string) => boolean;
@@ -2070,7 +2077,14 @@ export function hitLayer(
 		if (!containsPoint(box.rect, box.worldRotation, point, reach)) return null;
 		if (
 			opts.shapes &&
-			!opts.shapes.hits(key, el, box, point, opts.tolerance, opts.values)
+			!opts.shapes.hits(
+				key,
+				opts.pathOp ? resolveBoolean(el, opts.pathOp) : el,
+				box,
+				point,
+				opts.tolerance,
+				opts.values,
+			)
 		)
 			return null;
 		return key;

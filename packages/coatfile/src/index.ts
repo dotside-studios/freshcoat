@@ -1,22 +1,29 @@
 // The render vocabulary, re-exported so a consumer can import it from here.
 export {
+	type ApplyCaseOptions,
+	applyCase,
 	approxEngine,
 	createPaintCache,
+	ellipsePath,
 	encodePng,
 	exportPixelSize,
 	getFontMetrics,
+	isEllipsePath,
+	linearGradientAngle,
+	linearGradientPoints,
 	MAX_EXPORT_DIMENSION,
 	MAX_SUPERSAMPLE,
 	type MeasureText,
 	type PaintCache,
 	type PaintCacheOptions,
 	type PaintCacheStats,
-	readFontMetrics,
 	type Renderer,
+	readFontMetrics,
 	registerFontMetrics,
 	resolveExportScale,
 	resolveSupersample,
 	type SpanFont,
+	type TextCase,
 	type TextEngine,
 } from "@freshcoat-js/engine";
 export {
@@ -63,10 +70,10 @@ export {
 	bleedMm,
 	bleedSize,
 	type CardSizeMm,
-	cardSizeMm,
 	CR80_CORNER_MM,
 	CR80_LONG_MM,
 	CR80_SAFE_MM,
+	cardSizeMm,
 	compactInsets,
 	extendIntoBleed,
 	hasInsets,
@@ -86,6 +93,18 @@ export {
 	templateBleed,
 	templateSafeArea,
 } from "./bleed";
+export {
+	applyBooleans,
+	cachePathOp,
+	canvasKitPathOp,
+	type PathOp,
+} from "./boolean";
+export {
+	pruneUnusedAssets,
+	type SaveResult,
+	saveTemplate,
+	writableTemplate,
+} from "./coat";
 export { compile } from "./compile";
 export {
 	barcodeBox,
@@ -97,31 +116,6 @@ export {
 	resizeVectorPath,
 } from "./constraints";
 export {
-	collectFontBytes,
-	collectFontRequests,
-	type FontCache,
-	type ResolvedTemplateFonts,
-	type ResolveTemplateFontsOptions,
-	resolveTemplateFonts,
-} from "./fonts";
-export {
-	defaultFontFamily,
-	type FontUsage,
-	fontRequestKey,
-	fontUsage,
-	googleCss2Url,
-	googleFamilyParam,
-} from "./font-usage";
-export {
-	FORMAT_MAJOR,
-	FORMAT_MINOR,
-	FORMAT_VERSION,
-	type FormatVersionStatus,
-	formatVersionStatus,
-	minimumFormatVersion,
-	raiseFormatVersion,
-} from "./format";
-export {
 	defaultFieldValues,
 	elementFieldRefs,
 	fieldTitle,
@@ -132,22 +126,39 @@ export {
 	variantFieldRefs,
 	visibilityFieldRefs,
 } from "./fields";
-export { linearGradientAngle, linearGradientPoints } from "@freshcoat-js/engine";
-export { ellipsePath, isEllipsePath } from "@freshcoat-js/engine";
+export {
+	defaultFontFamily,
+	type FontUsage,
+	fontRequestKey,
+	fontUsage,
+	googleCss2Url,
+	googleFamilyParam,
+} from "./font-usage";
+export {
+	collectFontBytes,
+	collectFontRequests,
+	type FontCache,
+	type ResolvedTemplateFonts,
+	type ResolveTemplateFontsOptions,
+	resolveTemplateFonts,
+} from "./fonts";
+export {
+	FORMAT_MAJOR,
+	FORMAT_MINOR,
+	FORMAT_VERSION,
+	type FormatVersionStatus,
+	formatVersionStatus,
+	minimumFormatVersion,
+	raiseFormatVersion,
+} from "./format";
 export {
 	type SafeAreaHint,
-	type TemplateHint,
 	safeAreaHints,
+	type TemplateHint,
 	templateHints,
 } from "./hints";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
-export {
-	parseTrimValue,
-	type ResolvedStrokeTrim,
-	resolveStrokeTrim,
-	type StrokeTrimInput,
-} from "./stroke-trim";
 export {
 	FIELD_FORMATS,
 	FIELD_ID,
@@ -162,13 +173,6 @@ export {
 	tokenIds,
 	wholeToken,
 } from "./mustache";
-export { cachePathOp, canvasKitPathOp, type PathOp } from "./boolean";
-export {
-	type SaveResult,
-	pruneUnusedAssets,
-	saveTemplate,
-	writableTemplate,
-} from "./coat";
 export {
 	type HealOptions,
 	healElementIds,
@@ -181,10 +185,18 @@ export {
 export { type PrepareOptions, prepareTemplate } from "./prepare";
 export { generateMatrix } from "./qr";
 export {
-	type ApplyCaseOptions,
-	applyCase,
-	type TextCase,
-} from "@freshcoat-js/engine";
+	parseTrimValue,
+	type ResolvedStrokeTrim,
+	resolveStrokeTrim,
+	type StrokeTrimInput,
+} from "./stroke-trim";
+export {
+	compiledPattern,
+	PATTERN_CACHE_MAX,
+	type TextRuleBreak,
+	type TextRules,
+	textRuleBreaks,
+} from "./text-rules";
 export { allElements, childElements, walkElements } from "./tree";
 export type {
 	Background,
@@ -199,8 +211,8 @@ export type {
 	Command,
 	CompiledFrame,
 	CompiledTemplate,
-	CompileWarning,
 	CompileOptions,
+	CompileWarning,
 	Constraint,
 	Constraints,
 	DrawBitmapCommand,
@@ -279,13 +291,6 @@ export type {
 	VectorProperties,
 	VisibilityCondition,
 } from "./types";
-export {
-	compiledPattern,
-	PATTERN_CACHE_MAX,
-	type TextRuleBreak,
-	type TextRules,
-	textRuleBreaks,
-} from "./text-rules";
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,

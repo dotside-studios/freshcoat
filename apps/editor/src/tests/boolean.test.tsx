@@ -1,15 +1,16 @@
 import type { Element, Template, VectorElement } from "@freshcoat-js/coatfile";
-import { validate } from "@freshcoat-js/coatfile";
+import { canvasKitPathOp, type PathOp, validate } from "@freshcoat-js/coatfile";
 import { type BooleanOperand, combineShapes } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { CanvasKit } from "canvaskit-wasm";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { COMMAND_BY_ID, findCommand } from "~/app/commands";
-import { EditorController } from "~/app/controller";
+import { EditorController, hitLayer } from "~/app/controller";
 import type { BooleanOp } from "~/doc/boolean";
 import { settleBooleans } from "~/doc/boolean";
 import { applyRect } from "~/doc/geometry";
+import { ShapeHits } from "~/doc/hit-shape";
 import {
 	booleanElements,
 	flattenBooleans,
@@ -760,6 +761,33 @@ describe("canvas", () => {
 		c.select(["0/0/0"]);
 		expect(c.hitTest(inB)).toBe("0/0/1");
 		expect(c.hitTest(inA)).toBe("0/0/0");
+	});
+
+	test("hit-testing a boolean in a variant follows the variant's operands", async () => {
+		const c = await liveController();
+		c.edit(
+			(t) => ({
+				ok: true,
+				template: {
+					...t,
+					variants: [{ id: "narrow", label: "Narrow", overrides: [] }],
+				},
+			}),
+			{ scope: "base" },
+		);
+		c.setVariant("narrow");
+		c.edit((t) => updateElement(t, "0/0/1", { pos: { x: 0, y: 0 } }));
+		const t = c.template as Template;
+		const geometry = geometryOf(t);
+		const shapes = new ShapeHits(ck);
+		const none = new Set<string>();
+		const inBase = { x: 230, y: 130 };
+		const inVariant = { x: 120, y: 130 };
+		const hit = (point: { x: number; y: number }, pathOp?: PathOp) =>
+			hitLayer(t, 0, geometry, none, none, point, { shapes, pathOp });
+		expect(hit(inBase)).toBe("0/0");
+		expect(hit(inBase, canvasKitPathOp(ck))).toBeNull();
+		expect(hit(inVariant, canvasKitPathOp(ck))).toBe("0/0");
 	});
 
 	test("points are not edited on a boolean", async () => {
