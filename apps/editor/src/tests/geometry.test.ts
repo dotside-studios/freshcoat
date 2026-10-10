@@ -26,7 +26,7 @@ import {
 } from "../doc/geometry";
 import { insertElements, unwrap, updateElement } from "../doc/ops";
 import { getElement } from "../doc/path";
-import { doc, frozenDoc, geometryOf } from "./doc-fixture";
+import { booleanDoc, doc, frozenDoc, geometryOf } from "./doc-fixture";
 
 const r = (
 	x: number,
@@ -47,6 +47,78 @@ function expectRect(actual: Rect | undefined, expected: Rect, digits = 6) {
 	for (const k of ["x", "y", "width", "height", "rotation"] as const)
 		expect(actual?.[k], k).toBeCloseTo(expected[k], digits);
 }
+
+describe("collectGeometry with a boolean", () => {
+	const t = booleanDoc();
+	const g = geometryOf(t);
+
+	test("gives each operand a box inside its vector's", () => {
+		expectRect(g.get("0/7")?.rect, r(100, 400, 100, 60));
+		expectRect(g.get("0/7/0")?.rect, r(100, 400, 60, 60));
+		expectRect(g.get("0/7/1")?.rect, r(140, 400, 60, 60));
+		expect(g.get("0/7/1")?.parentKey).toBe("0/7");
+		expect(g.get("0/7/1")?.autoLayoutChild).toBe(false);
+	});
+
+	test("turns with the vector and with itself", () => {
+		const turned: Template = {
+			...t,
+			template_data: [
+				{
+					...t.template_data[0],
+					elements: t.template_data[0].elements.map((e) =>
+						e.id === "shape"
+							? ({
+									...e,
+									rotation: 20,
+									properties: {
+										...e.properties,
+										boolean: {
+											...(e.properties as { boolean: object }).boolean,
+											operands: [
+												{
+													id: "sq",
+													type: "rect",
+													pos: { x: 0, y: 0 },
+													size: { width: 60, height: 60 },
+													rotation: 10,
+													properties: {},
+												},
+											],
+										},
+									},
+								} as Element)
+							: e,
+					),
+				},
+				t.template_data[1],
+			],
+		};
+		const box = geometryOf(turned).get("0/7/0");
+		expect(box?.rect.rotation).toBe(10);
+		expect(box?.worldRotation).toBe(30);
+	});
+
+	test("a vector hidden by visibleWhen leaves its operands without boxes", () => {
+		const hidden: Template = {
+			...t,
+			template_data: [
+				{
+					...t.template_data[0],
+					elements: t.template_data[0].elements.map((e) =>
+						e.id === "shape"
+							? ({ ...e, visibleWhen: { field: "show" } } as Element)
+							: e,
+					),
+				},
+				t.template_data[1],
+			],
+		};
+		const none = geometryOf(hidden, 0, { show: "false" });
+		expect(none.get("0/7")).toBeUndefined();
+		expect(none.get("0/7/0")).toBeUndefined();
+	});
+});
 
 describe("collectGeometry from a real compile", () => {
 	const t = frozenDoc();

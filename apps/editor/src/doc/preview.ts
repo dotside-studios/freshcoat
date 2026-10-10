@@ -10,7 +10,7 @@ import {
 	hiddenElementIds,
 	templateFieldRefs,
 } from "@freshcoat-js/coatfile";
-import { childEntries, keyOf, MASK_SOURCE } from "./path";
+import { childEntries, isBooleanVector, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {
 	side: number;
@@ -102,6 +102,21 @@ function build(
 	const visit = (el: Element, path: number[]): Element => {
 		const key = keyOf({ side, path });
 		const tagged = tag(el, key);
+		if (isBooleanVector(tagged)) {
+			// Hiding an operand takes it out of the combination.
+			const operands = childEntries(tagged).flatMap(([i, c]) =>
+				dropped.has(c.id) || hidden.has(keyOf({ side, path: [...path, i] }))
+					? []
+					: [visit(c, [...path, i])],
+			);
+			return {
+				...tagged,
+				properties: {
+					...tagged.properties,
+					boolean: { ...tagged.properties.boolean, operands },
+				},
+			} as Element;
+		}
 		if (tagged.type !== "frame" && tagged.type !== "mask") return tagged;
 		const kids = childEntries(tagged).map(
 			([i, c]) => [i, c.id, visit(c, [...path, i])] as const,

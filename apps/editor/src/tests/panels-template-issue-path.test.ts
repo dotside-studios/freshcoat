@@ -42,6 +42,22 @@ describe("issuePathToKey", () => {
 		).toBe("0/2/0");
 	});
 
+	test("a boolean's operands", () => {
+		expect(
+			issuePathToKey(
+				"/template_data/0/elements/7/properties/boolean/operands/1/pos",
+			),
+		).toBe("0/7/1");
+		expect(
+			issuePathToKey(
+				"/template_data/0/elements/7/properties/boolean/operands/1/properties/boolean/operands/0",
+			),
+		).toBe("0/7/1/0");
+		expect(
+			issuePathToKey("/template_data/0/elements/7/properties/boolean/op"),
+		).toBe("0/7");
+	});
+
 	test("the background", () => {
 		expect(issuePathToKey("/template_data/1/background/size")).toBe("1/bg");
 	});

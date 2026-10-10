@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hitLayer } from "~/app/controller";
 import type { LayerGeometry } from "~/doc/geometry";
 import { isAncestor, walkLayers } from "~/doc/path";
-import { doc, geometryOf } from "./doc-fixture";
+import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
 function containsPoint(
 	rect: { x: number; y: number; width: number; height: number },
@@ -82,6 +82,35 @@ describe("hitLayer", () => {
 		expect(hitLayer(t, 0, geometry, none, none, centre)).toBe("0/1/2/0");
 		expect(hitLayer(t, 0, geometry, new Set(["0/1"]), none, centre)).toBe(null);
 		expect(hitLayer(t, 0, geometry, none, none, { x: 990, y: 590 })).toBe(null);
+	});
+
+	it("hits a boolean as one shape, and its operands only when asked", () => {
+		const b = booleanDoc();
+		const g = geometryOf(b);
+		const none = new Set<string>();
+		const inDot = { x: 190, y: 430 };
+		expect(hitLayer(b, 0, g, none, none, inDot)).toBe("0/7");
+		expect(hitLayer(b, 0, g, none, none, inDot, { operands: () => true })).toBe(
+			"0/7/1",
+		);
+		expect(
+			hitLayer(
+				b,
+				0,
+				g,
+				none,
+				none,
+				{ x: 110, y: 430 },
+				{
+					operands: (key) => key === "0/7",
+				},
+			),
+		).toBe("0/7/0");
+		expect(
+			hitLayer(b, 0, g, none, new Set(["0/7/1"]), inDot, {
+				operands: () => true,
+			}),
+		).toBe("0/7");
 	});
 
 	it("returns null for a missing side", () => {

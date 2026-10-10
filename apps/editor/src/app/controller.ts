@@ -20,7 +20,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
-import type { BooleanOp } from "~/doc/boolean";
+import { type BooleanOp, settleBooleans } from "~/doc/boolean";
 import {
 	createElement,
 	defaultRect,
@@ -63,6 +63,7 @@ import {
 	booleanElements,
 	changeVariantId,
 	duplicateElements,
+	flattenBooleans,
 	groupElements,
 	insertElements,
 	moveElements,
@@ -70,6 +71,7 @@ import {
 	type ParentRef,
 	removeElements,
 	removeVariant,
+	setBooleanOp,
 	setHiddenInVariant,
 	ungroup,
 	updateElement,
@@ -79,6 +81,7 @@ import {
 	getElement,
 	isAncestor,
 	isBackgroundPath,
+	isBooleanVector,
 	keyOf,
 	parentKeyOf,
 	parseKey,
@@ -223,6 +226,7 @@ export class EditorController {
 	private penStyle: PenStyle = {};
 	private penLayer: { id: string; closed: boolean } | undefined;
 	private shapeHits: ShapeHits | undefined;
+	private kit: CanvasKit | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
 	private recentId: string | undefined;
@@ -329,14 +333,18 @@ export class EditorController {
 		const t = scope === "base" ? this.base : this.template;
 		if (!t) return null;
 		const out = op(t);
-		const result: OpResult =
+		const made: OpResult =
 			"ok" in out && typeof out.ok === "boolean"
 				? (out as OpResult)
 				: { ok: true, template: out as Template };
-		if (!result.ok) {
-			if (!opts.quiet) toast(result.reason, { tone: "warning" });
-			return result;
+		if (!made.ok) {
+			if (!opts.quiet) toast(made.reason, { tone: "warning" });
+			return made;
 		}
+		const result = {
+			...made,
+			template: this.withFreshBooleans(made.template, scope),
+		};
 		const select = opts.select ?? (opts.selectResult ? result.keys : undefined);
 		if (import.meta.env.DEV && scope === "variant" && this.variantId)
 			warnStructural(t, result.template, op);
@@ -358,7 +366,25 @@ export class EditorController {
 	 *  template (`this.template` when the gesture began), unless `scope` is
 	 *  "base". */
 	previewTx(template: Template, select?: string[], scope?: EditScope): void {
-		this.dispatch({ type: "txPreview", next: template, select, scope });
+		this.dispatch({
+			type: "txPreview",
+			next: this.withFreshBooleans(template, scope),
+			select,
+			scope,
+		});
+	}
+
+	/** `next` with the cached result of each boolean vector it changed
+	 *  rebuilt from its operands, so a saved file's `d` matches them. A
+	 *  variant's edit is left alone: the variant is drawn from its operands,
+	 *  and the base's cache describes the base. Without the session's
+	 *  CanvasKit the cache is left as it was. */
+	private withFreshBooleans(next: Template, scope?: EditScope): Template {
+		const kit = this.kit ?? (loadedCanvasKit() as CanvasKit | undefined);
+		const base = this.base;
+		if (!kit || !base || (scope !== "base" && this.variantId !== undefined))
+			return next;
+		return settleBooleans(base, next, kit);
 	}
 
 	endTx(): void {
@@ -502,8 +528,9 @@ export class EditorController {
 		});
 	}
 
-	/** Combines the selected shapes into one vector layer, as one undo step.
-	 *  `ck` stands in for the session's CanvasKit. */
+	/** Combines the selected shapes into one boolean vector layer that keeps
+	 *  them as operands, as one undo step. `ck` stands in for the session's
+	 *  CanvasKit. */
 	async booleanSelection(op: BooleanOp, ck?: CanvasKit): Promise<boolean> {
 		const keys = this.selectedLayers();
 		if (keys.length < 2) {
@@ -517,11 +544,25 @@ export class EditorController {
 			toast(BOOLEAN.couldNotLoad, { tone: "warning" });
 			return false;
 		}
+		this.kit = kit;
 		const result = this.edit((t) => booleanElements(t, keys, op, kit), {
 			scope: "base",
 			selectResult: true,
 		});
 		return result?.ok ?? false;
+	}
+
+	/** Switches the selected boolean layer to `op`. */
+	setBooleanOp(op: BooleanOp): void {
+		const [key] = this.selectedLayers();
+		if (key) this.edit((t) => setBooleanOp(t, key, op), { scope: "base" });
+	}
+
+	/** Turns the selected boolean layers into plain vectors. */
+	flattenSelection(): void {
+		const keys = this.selectedLayers();
+		if (keys.length > 0)
+			this.edit((t) => flattenBooleans(t, keys), { scope: "base" });
 	}
 
 	alignSelection(mode: AlignMode): void {
@@ -666,6 +707,7 @@ export class EditorController {
 		const el = t && key ? getElement(t, key) : undefined;
 		if (!t || !key || !el || !("type" in el) || el.type !== "vector")
 			return false;
+		if (isBooleanVector(el)) return false;
 		if (!canTransform(key, this.state.geometry)) {
 			toast("Can't edit points in auto layout or under a rotated parent", {
 				tone: "warning",
@@ -1950,6 +1992,8 @@ export class EditorController {
 			shapes: this.shapeHits,
 			tolerance: HIT_TOLERANCE_PX / view.zoom,
 			values,
+			operands: (key) =>
+				opts.deep === true || selection.some((s) => isAncestor(key, s)),
 		});
 		if (!hit || opts.deep) return hit;
 		return topmostSelectable(hit, selection);
@@ -1997,6 +2041,9 @@ export function hitLayer(
 		shapes?: ShapeHits;
 		tolerance?: number;
 		values?: Record<string, unknown>;
+		/** Whether to look inside the boolean vector at a key, at the shapes it
+		 *  combines. */
+		operands?: (key: string) => boolean;
 	} = {},
 ): string | null {
 	const frame = t.template_data[side];
@@ -2007,6 +2054,12 @@ export function hitLayer(
 			const children = el.properties.children;
 			for (let i = children.length - 1; i >= 0; i--) {
 				const hit = visit(children[i] as Element, `${key}/${i}`, out);
+				if (hit) return hit;
+			}
+		} else if (isBooleanVector(el) && opts.operands?.(key)) {
+			const operands = el.properties.boolean.operands;
+			for (let i = operands.length - 1; i >= 0; i--) {
+				const hit = visit(solid(operands[i] as Element), `${key}/${i}`, out);
 				if (hit) return hit;
 			}
 		}
@@ -2027,6 +2080,22 @@ export function hitLayer(
 		if (hit) return hit;
 	}
 	return null;
+}
+
+const solids = new WeakMap<Element, Element>();
+
+// An operand paints nothing of its own, so it is hit across its area.
+function solid(el: Element): Element {
+	if (el.type !== "rect" && el.type !== "vector") return el;
+	let out = solids.get(el);
+	if (!out) {
+		out = {
+			...el,
+			properties: { ...el.properties, stroke: undefined },
+		} as Element;
+		solids.set(el, out);
+	}
+	return out;
 }
 
 /**

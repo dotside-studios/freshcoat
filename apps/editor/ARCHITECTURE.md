@@ -72,6 +72,15 @@ they undo in the same timeline, and the workspace saves them in the
 `.coatworkspace` manifest. Datasets have their own history in the workspace
 layer.
 
+A vector can keep a live boolean operation: its operands are layers at the
+indexes under it, from 0, in paint order, as a mask's content is. The render
+session compiles with the CanvasKit path op, so the canvas draws the result of
+the operands that are shown. The vector's `d` and box are only a cache, and
+`controller.edit` and `previewTx` rebuild them (`settleBooleans` in
+`src/doc/boolean.ts`) for each boolean the edit changed, moving the operands
+so they stay put. An edit scoped to a variant skips it, since the variant is
+drawn from its operands.
+
 Variants are edited through a **working template**: the base with the active
 variant applied (`working(state)` in `state/store.ts`), ids unchanged, so a
 layer path means the same layer in both. Hidden layers stay in it, so they

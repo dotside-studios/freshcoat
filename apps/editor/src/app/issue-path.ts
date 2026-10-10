@@ -43,6 +43,13 @@ export function issuePathToKey(
 			} else if (seg[i + 1] === "mask") {
 				indexes.push(MASK_SOURCE);
 				i += 2;
+			} else if (
+				seg[i + 1] === "boolean" &&
+				seg[i + 2] === "operands" &&
+				INDEX.test(seg[i + 3] ?? "")
+			) {
+				indexes.push(Number(seg[i + 3]));
+				i += 4;
 			} else break;
 		}
 		key = keyOf({ side, path: indexes });

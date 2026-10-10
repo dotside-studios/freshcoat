@@ -15,7 +15,7 @@ import {
 	siblingsOf,
 	walkLayers,
 } from "../doc/path";
-import { doc, frozenDoc } from "./doc-fixture";
+import { booleanDoc, doc, frozenDoc } from "./doc-fixture";
 
 describe("fixture", () => {
 	test("validates", () => {
@@ -238,5 +238,53 @@ describe("remapKeys after an edit in place", () => {
 		expect(remapKeys(before, renamed, ["0/5"])).toEqual(["0/5"]);
 		const removed = unwrap(removeElements(before, ["0/5"])).template;
 		expect(remapKeys(before, removed, ["0/5"])).toEqual([]);
+	});
+});
+
+describe("boolean operands", () => {
+	const t = booleanDoc();
+
+	test("validate", () => {
+		const v = validate(t);
+		expect(v.ok ? [] : v.errors).toEqual([]);
+	});
+
+	test("are the indexes of their vector, from 0", () => {
+		expect(getElement(t, "0/7")?.id).toBe("shape");
+		expect(getElement(t, "0/7/0")?.id).toBe("sq");
+		expect(getElement(t, "0/7/1")?.id).toBe("dot");
+		expect(getElement(t, "0/7/2")).toBeUndefined();
+		expect(getElement(t, "0/0/0")).toBeUndefined();
+		expect(parseKey("0/7/1")).toEqual({ side: 0, path: [7, 1] });
+		expect(parentOf("0/7/1")).toEqual({ side: 0, path: [7] });
+	});
+
+	test("are the vector's children and siblings of each other", () => {
+		expect(childPaths(t, "0/7").map((p) => keyOf(p))).toEqual([
+			"0/7/0",
+			"0/7/1",
+		]);
+		expect(siblingsOf(t, "0/7/0").map((p) => keyOf(p))).toEqual([
+			"0/7/0",
+			"0/7/1",
+		]);
+		expect(isAncestor("0/7", "0/7/1")).toBe(true);
+	});
+
+	test("are walked after their vector", () => {
+		const walked = [...walkLayers(t, 0)]
+			.filter((e) => e.key.startsWith("0/7"))
+			.map((e) => [e.key, e.parentKey, e.depth]);
+		expect(walked).toEqual([
+			["0/7", null, 0],
+			["0/7/0", "0/7", 1],
+			["0/7/1", "0/7", 1],
+		]);
+		expect(collectIds(t, 0)).toContain("dot");
+	});
+
+	test("keep their keys through an edit elsewhere", () => {
+		const out = unwrap(removeElements(t, ["0/4"])).template;
+		expect(remapKeys(t, out, ["0/7/1"])).toEqual(["0/6/1"]);
 	});
 });

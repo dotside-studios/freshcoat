@@ -46,6 +46,11 @@ export const BOOLEAN = {
 	notShape: "Only rectangles, ellipses and vectors can be combined",
 	autoLayout: "Layers in auto layout can't be combined",
 	empty: "Nothing would be left of the shapes",
+	notBoolean: "Select a boolean layer",
+	notOperand: "Only rectangles, ellipses and vectors go inside a boolean",
+	lastOperand: "A boolean needs at least one shape",
+	flatten: "Flatten",
+	editPoints: "Flatten the boolean to edit its points",
 	couldNotLoad: "Couldn't load the path engine",
 } as const;
 

@@ -70,7 +70,7 @@ covers shared checks and pull requests.
 - **Design:** frames, shapes, pen paths, text, images, QR codes and barcodes
   (Code 128, EAN-13, UPC-A, Code 39, ITF-14, PDF417, Data Matrix, Aztec).
   Move, resize and rotate with snapping, measure with rulers and guides,
-  combine shapes with boolean operations, edit gradients with handles on the
+  combine shapes with live boolean operations, edit gradients with handles on the
   canvas, set constraints for resizing, and choose fonts from the bundled
   Google Fonts catalog snapshot. Pasted SVG becomes editable layers (paths,
   groups, clips, masks, embedded images, text, markers and pattern fills), an
@@ -134,8 +134,10 @@ covers shared checks and pull requests.
   inspector, but it cannot be dragged on the canvas.
 - A path drawn with the pen can't have its points edited on the canvas
   afterwards; its path data is edited in the inspector.
-- Boolean operations bake their result into one vector layer. The shapes
-  can't be edited separately afterwards, and corner smoothing is left out.
+- Boolean operations keep their shapes as operands until the layer is
+  flattened, and corner smoothing is left out of the result. An operand edited
+  in a variant is combined for that variant only; the layer's saved path is
+  the base template's result.
 - Holding Alt while dragging duplicates the selection. The copies show in the
   layer tree only when the drag ends.
 - The Zip file and Folder destinations need the File System Access API.

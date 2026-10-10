@@ -1,5 +1,6 @@
 import type {
 	Background,
+	BooleanOperandElement,
 	Element,
 	FieldDefinition,
 	FontDescriptor,
@@ -47,11 +48,13 @@ import {
 } from "./geometry";
 import { collectIds, nextFreeId, uniquifyTree } from "./ids";
 import {
+	type BooleanVector,
 	childEntries,
 	compareKeys,
 	getElement,
 	isAncestor,
 	isBackgroundPath,
+	isBooleanVector,
 	keyOf,
 	MASK_SOURCE,
 	parentKeyOf,
@@ -66,6 +69,7 @@ import {
 	updateBackground,
 	updateList,
 	updateSide,
+	withChildren,
 } from "./tree";
 
 export type { OpOk, OpRefused, OpResult, RefusalCode } from "./result";
@@ -125,6 +129,29 @@ function resolveParent(t: Template, parent: ParentRef): ParentInfo | string {
 	return { side: p.side, path: p.path, list };
 }
 
+/** Whether the list at `info` is a boolean vector's operands. */
+function holdsOperands(
+	t: Template,
+	info: { side: number; path: number[] },
+): boolean {
+	return (
+		info.path.length > 0 &&
+		isBooleanVector(getElement(t, { side: info.side, path: info.path }))
+	);
+}
+
+/** The refusal for layers that can't go in `info`: only rects and vectors
+ *  combine. */
+function operandRefusal(
+	t: Template,
+	info: { side: number; path: number[] },
+	elements: Element[],
+): OpRefused | null {
+	return holdsOperands(t, info) && !elements.every(isBooleanShape)
+		? refuse("not_a_shape", BOOLEAN.notOperand)
+		: null;
+}
+
 function parentRefusal(code: string): OpResult {
 	if (code === "background")
 		return refuse("background", "Layers can't go inside the background");
@@ -143,6 +170,8 @@ export function insertElements(
 ): OpResult {
 	const info = resolveParent(t, parent);
 	if (typeof info === "string") return parentRefusal(info);
+	const refused = operandRefusal(t, info, elements);
+	if (refused) return refused;
 	const at = clampIndex(index, info.list.length);
 	const used = usedIds(t, info.side);
 	const fresh = elements.map((el) => uniquifyTree(el, used));
@@ -190,11 +219,47 @@ export function removeElements(t: Template, keys: string[]): OpResult {
 		bySide.set(tg.side, ids);
 	}
 	let next = removed;
-	for (const [side, ids] of bySide)
+	for (const [side, ids] of bySide) {
+		next = updateSide(next, side, (f) => {
+			const elements = withoutEmptyBooleans(f.elements, ids);
+			return elements === f.elements ? f : { ...f, elements };
+		});
 		next = editDeltas(next, t.template_data[side]?.name ?? "", (d) =>
 			ids.has(d.id) ? [] : [d],
 		);
+	}
 	return ok(next, []);
+}
+
+// A boolean with no operands has nothing to combine, so it goes with the last
+// one. `ids` gains the ids it drops.
+function withoutEmptyBooleans(list: Element[], ids: Set<string>): Element[] {
+	const out: Element[] = [];
+	for (const el of list) {
+		const next = withoutEmptyBooleansIn(el, ids);
+		if (next) out.push(next);
+	}
+	return out.length === list.length && out.every((el, i) => el === list[i])
+		? list
+		: out;
+}
+
+function withoutEmptyBooleansIn(el: Element, ids: Set<string>): Element | null {
+	if (el.type === "frame" || el.type === "mask") {
+		const children = withoutEmptyBooleans(el.properties.children, ids);
+		return children === el.properties.children
+			? el
+			: ({ ...el, properties: { ...el.properties, children } } as Element);
+	}
+	if (!isBooleanVector(el)) return el;
+	const operands = withoutEmptyBooleans(el.properties.boolean.operands, ids);
+	if (operands.length === 0) {
+		ids.add(el.id);
+		return null;
+	}
+	return operands === el.properties.boolean.operands
+		? el
+		: withChildren(el, operands);
 }
 
 function removeTargets(t: Template, targets: Target[]): Template {
@@ -234,6 +299,21 @@ export function moveElements(
 		if (parentKey && (tg.key === parentKey || isAncestor(tg.key, parentKey)))
 			return refuse("into_descendant", "A layer can't move inside itself");
 	}
+	const elements = targets.map((tg) => getElement(t, tg.key) as Element);
+	const refused = operandRefusal(t, info, elements);
+	if (refused) return refused;
+	const emptied = targets.some((tg) => {
+		const from = parentKeyOf(tg.key);
+		if (from === null || from === parentKey) return false;
+		const holder = getElement(t, from);
+		return (
+			isBooleanVector(holder) &&
+			holder.properties.boolean.operands.every((_, i) =>
+				targets.some((o) => o.key === `${from}/${i}`),
+			)
+		);
+	});
+	if (emptied) return refuse("last_operand", BOOLEAN.lastOperand);
 
 	const newOrigin =
 		parentKey === null
@@ -406,6 +486,8 @@ export function groupElements(
 			parentPath.every((v, i) => tg.path[i] === v),
 	);
 	if (!siblings) return refuse("not_siblings", "Layers must share a parent");
+	if (holdsOperands(t, { side, path: parentPath }))
+		return refuse("not_a_shape", BOOLEAN.notOperand);
 
 	const rects = targets.map((tg) => rectOf(t, tg.key, geometry) as Rect);
 	const box = unionRects(rects);
@@ -443,7 +525,8 @@ export function groupElements(
 
 /**
  * Combines sibling shapes into one vector layer with `op`, in the bottom-most
- * one's place, keeping its fill, stroke and effects, as Figma does.
+ * one's place, keeping its fill, stroke and effects, as Figma does. The shapes
+ * stay in it as operands, so the result follows their edits.
  */
 export function booleanElements(
 	t: Template,
@@ -476,6 +559,15 @@ export function booleanElements(
 	const shape = combineShapes(ck, elements, op);
 	if (!shape) return refuse("empty_result", BOOLEAN.empty);
 
+	const shifts: PosShift[] = [];
+	const operands = elements.map((el) => {
+		const pos = {
+			x: round2((el.pos?.x ?? 0) - shape.box.x),
+			y: round2((el.pos?.y ?? 0) - shape.box.y),
+		};
+		shifts.push(posShift(el, pos));
+		return { ...el, pos } as BooleanOperandElement;
+	});
 	const bottom = elements[0] as Exclude<
 		Element,
 		{ type: "frame" | "mask" | "text" | "image" | "qr_code" | "barcode" }
@@ -500,6 +592,7 @@ export function booleanElements(
 			...(shape.fillRule ? { fillRule: shape.fillRule } : {}),
 			...(properties.fill !== undefined ? { fill: properties.fill } : {}),
 			...(properties.stroke !== undefined ? { stroke: properties.stroke } : {}),
+			boolean: { op, operands },
 		},
 	};
 	const indexes = targets.map((tg) => tg.path.at(-1) as number);
@@ -508,12 +601,56 @@ export function booleanElements(
 		const rest = list.filter((_, i) => !indexes.includes(i));
 		return [...rest.slice(0, at), combined, ...rest.slice(at)];
 	});
-	const ids = new Set<string>();
-	for (const el of elements) subtreeIds(el, ids);
-	const next = editDeltas(replaced, t.template_data[side]?.name ?? "", (d) =>
-		ids.has(d.id) ? [] : [d],
+	const next = shiftDeltaPositions(
+		replaced,
+		t.template_data[side]?.name ?? "",
+		shifts,
 	);
 	return ok(next, [keyOf({ side, path: [...parentPath, at] })]);
+}
+
+/** Changes how a boolean vector combines its operands. */
+export function setBooleanOp(
+	t: Template,
+	key: string,
+	op: BooleanOp,
+): OpResult {
+	const el = getElement(t, key);
+	if (!isBooleanVector(el)) return refuse("not_a_shape", BOOLEAN.notBoolean);
+	if (el.properties.boolean.op === op) return ok(t, [key]);
+	return updateElement(t, key, {
+		properties: { boolean: { ...el.properties.boolean, op } },
+	});
+}
+
+/** Turns boolean vectors into plain vectors that keep their result. Every
+ *  variant's changes to their operands go with them. */
+export function flattenBooleans(t: Template, keys: string[]): OpResult {
+	const targets = targetsOf(t, keys);
+	if (!Array.isArray(targets)) return targets;
+	const booleans = targets.filter((tg) =>
+		isBooleanVector(getElement(t, tg.key)),
+	);
+	if (booleans.length === 0) return refuse("not_a_shape", BOOLEAN.notBoolean);
+	let next = t;
+	for (const tg of booleans) {
+		next = updateAt(next, tg.side, tg.path, (el) => {
+			const { boolean: _boolean, ...properties } = (el as BooleanVector)
+				.properties;
+			return { ...el, properties } as Element;
+		});
+		const ids = new Set<string>();
+		for (const operand of (getElement(t, tg.key) as BooleanVector).properties
+			.boolean.operands)
+			subtreeIds(operand, ids);
+		next = editDeltas(next, t.template_data[tg.side]?.name ?? "", (d) =>
+			ids.has(d.id) ? [] : [d],
+		);
+	}
+	return ok(
+		next,
+		booleans.map((tg) => tg.key),
+	);
 }
 
 /** Lifts a frame's children into its parent at the frame's index, each

@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { unwrap, updateElement } from "../doc/ops";
 import { getElement, walkLayers } from "../doc/path";
 import { buildPreview } from "../doc/preview";
-import { frozenDoc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
+import { booleanDoc, frozenDoc, PNG_BYTES, PNG_SHA } from "./doc-fixture";
 
 const el = (t: Template, key: string) => getElement(t, key) as Element;
 
@@ -140,6 +140,50 @@ describe("buildPreview", () => {
 			height: t.height,
 		});
 		expect(compiled.frames[0].root.children[1].id).toBe("k:0/0");
+	});
+});
+
+describe("buildPreview with a boolean", () => {
+	test("tags the operands with their keys", () => {
+		const p = buildPreview(booleanDoc(), { side: 0 });
+		expect(el(p.template, "0/7/0").id).toBe("k:0/7/0");
+		expect(p.pathIds.get("k:0/7/1")).toBe("0/7/1");
+	});
+
+	test("leaves an operand hidden in the editor out of the result", () => {
+		const p = buildPreview(booleanDoc(), {
+			side: 0,
+			hidden: new Set(["0/7/0"]),
+		});
+		const shape = el(p.template, "0/7") as Extract<Element, { type: "vector" }>;
+		expect(shape.properties.boolean?.operands.map((o) => o.id)).toEqual([
+			"k:0/7/1",
+		]);
+		expect(shape.opacity).toBeUndefined();
+	});
+
+	test("leaves an operand a variant hides out of the result", () => {
+		const t = booleanDoc();
+		const withVariant: Template = {
+			...t,
+			variants: [
+				{
+					id: "bare",
+					label: "Bare",
+					overrides: [
+						{
+							name: "front",
+							elements: [{ id: "dot", properties: {}, hidden: true }],
+						},
+					],
+				},
+			],
+		};
+		const p = buildPreview(withVariant, { side: 0, variantId: "bare" });
+		const shape = el(p.template, "0/7") as Extract<Element, { type: "vector" }>;
+		expect(shape.properties.boolean?.operands.map((o) => o.id)).toEqual([
+			"k:0/7/0",
+		]);
 	});
 });
 

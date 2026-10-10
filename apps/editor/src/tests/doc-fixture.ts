@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Template } from "@freshcoat-js/coatfile";
+import type { Element, Template, TemplateFrame } from "@freshcoat-js/coatfile";
 import {
 	approxEngine,
 	bytesToBase64,
@@ -255,6 +255,54 @@ export function doc(): Template {
 				base64: bytesToBase64(PNG_BYTES),
 				contentType: "image/png",
 			},
+		],
+	};
+}
+
+/**
+ * `doc()` with a boolean vector `shape` at 0/7 on the front, 100 wide and 60
+ * high at (100, 400): operands 0/7/0 `sq` (a rect) and 0/7/1 `dot` (a vector).
+ */
+export function booleanDoc(): Template {
+	const t = doc();
+	const shape: Element = {
+		id: "shape",
+		type: "vector",
+		pos: { x: 100, y: 400 },
+		size: { width: 100, height: 60 },
+		properties: {
+			d: "M0 0H60V60H0Z",
+			fill: "#336699",
+			boolean: {
+				op: "union",
+				operands: [
+					{
+						id: "sq",
+						type: "rect",
+						pos: { x: 0, y: 0 },
+						size: { width: 60, height: 60 },
+						properties: { fill: "#ff0000" },
+					},
+					{
+						id: "dot",
+						type: "vector",
+						pos: { x: 40, y: 0 },
+						size: { width: 60, height: 60 },
+						properties: { d: "M0 0H60V60H0Z" },
+					},
+				],
+			},
+		},
+	};
+	const [front, ...rest] = t.template_data;
+	return {
+		...t,
+		template_data: [
+			{
+				...(front as TemplateFrame),
+				elements: [...(front as TemplateFrame).elements, shape],
+			},
+			...rest,
 		],
 	};
 }

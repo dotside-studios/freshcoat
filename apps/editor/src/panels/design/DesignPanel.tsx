@@ -4,7 +4,14 @@ import { useMemo, useRef } from "react";
 import { useController } from "~/app/context";
 import { isBooleanShape } from "~/doc/boolean";
 import { ok, resetOverride } from "~/doc/ops";
-import { getElement, isBackgroundPath, keyOf, parseKey } from "~/doc/path";
+import {
+	getElement,
+	isBackgroundPath,
+	isBooleanVector,
+	isOperand,
+	keyOf,
+	parseKey,
+} from "~/doc/path";
 import { activeVariantId, overriddenKeys } from "~/doc/variant-edit";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
@@ -245,12 +252,14 @@ function sections(ins: Inspect) {
 	}
 
 	const types = new Set(layers.map((l) => l.type));
+	const painted = !ins.keys.some((k) => isOperand(ins.template, k));
 	const every = (ok: (type: string) => boolean) => [...types].every(ok);
 
 	return (
 		<div data-testid="design-inspector" data-mode="layers">
 			<AlignSection ins={ins} />
-			{layers.length > 1 && layers.every(isBooleanShape) && (
+			{((layers.length > 1 && layers.every(isBooleanShape)) ||
+				(layers.length === 1 && isBooleanVector(layers[0]))) && (
 				<BooleanSection ins={ins} />
 			)}
 			<LayerSection ins={ins} />
@@ -261,11 +270,11 @@ function sections(ins: Inspect) {
 			{every((t) => t === "vector") && <VectorSection ins={ins} />}
 			{every((t) => t === "frame") && <FrameSection ins={ins} />}
 			{every((t) => t === "mask") && <MaskSection ins={ins} />}
-			{layers.every(hasFills) && <FillSection ins={ins} />}
-			{every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
-			<EffectsSection ins={ins} />
+			{painted && layers.every(hasFills) && <FillSection ins={ins} />}
+			{painted && every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
+			{painted && <EffectsSection ins={ins} />}
 			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
-			<AdjustSection ins={ins} />
+			{painted && <AdjustSection ins={ins} />}
 			<VisibilitySection ins={ins} />
 		</div>
 	);

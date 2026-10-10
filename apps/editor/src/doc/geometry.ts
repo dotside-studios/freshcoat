@@ -1,5 +1,6 @@
 import {
 	type Element,
+	resizeVectorBoolean,
 	resizeVectorPath,
 	type Template,
 } from "@freshcoat-js/coatfile";
@@ -9,6 +10,7 @@ import {
 	getElement,
 	isAncestor,
 	isBackgroundPath,
+	isBooleanVector,
 	keyOf,
 	MASK_SOURCE,
 	parentKeyOf,
@@ -55,22 +57,49 @@ export function collectGeometry(
 	side: number,
 ): LayerGeometry {
 	const out: LayerGeometry = new Map();
+	// A boolean vector draws one path, so its operands have no nodes: their
+	// boxes come from the vector's.
+	const addOperands = (key: string, rect: Rect, worldRotation: number) => {
+		const el = getElement(t, key);
+		if (!isBooleanVector(el)) return;
+		el.properties.boolean.operands.forEach((operand, i) => {
+			const own: Rect = {
+				x: rect.x + (operand.pos?.x ?? 0),
+				y: rect.y + (operand.pos?.y ?? 0),
+				width: operand.size?.width ?? 0,
+				height: operand.size?.height ?? 0,
+				rotation: operand.rotation ?? 0,
+			};
+			const operandKey = `${key}/${i}`;
+			const world = worldRotation + own.rotation;
+			out.set(operandKey, {
+				rect: own,
+				worldRotation: world,
+				parentKey: key,
+				autoLayoutChild: false,
+			});
+			addOperands(operandKey, own, world);
+		});
+	};
 	const visit = (node: Node, inherited: number) => {
 		const rotation = node.rotation ?? 0;
 		const key = node.id === undefined ? undefined : pathIds.get(node.id);
 		if (key !== undefined && node.pos && node.size) {
+			const rect = {
+				x: node.pos.x,
+				y: node.pos.y,
+				width: node.size.width,
+				height: node.size.height,
+				rotation,
+			};
 			out.set(key, {
-				rect: {
-					x: node.pos.x,
-					y: node.pos.y,
-					width: node.size.width,
-					height: node.size.height,
-					rotation,
-				},
+				rect,
 				worldRotation: inherited + rotation,
 				parentKey: parentKeyOf(key),
 				autoLayoutChild: isAutoLayoutChild(t, key),
 			});
+			if (node.kind === "path" || node.kind === "ellipse")
+				addOperands(key, rect, inherited + rotation);
 		}
 		for (const child of nodeChildren(node)) visit(child, inherited + rotation);
 	};
@@ -474,11 +503,13 @@ export function applyRect(
 	}) as Element;
 
 	if (next.type === "vector" && el.type === "vector") {
+		const boolean = resizeVectorBoolean(el, { width, height });
 		next = {
 			...next,
 			properties: {
 				...next.properties,
 				d: resizeVectorPath(el, { width, height }),
+				...(boolean ? { boolean } : {}),
 			},
 		};
 	}

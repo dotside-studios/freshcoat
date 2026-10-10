@@ -3,7 +3,13 @@ import {
 	elementFieldRefs,
 	type Template,
 } from "@freshcoat-js/coatfile";
-import { childEntries, keyOf, type Layer, MASK_SOURCE } from "~/doc/path";
+import {
+	childEntries,
+	isContainer,
+	keyOf,
+	type Layer,
+	MASK_SOURCE,
+} from "~/doc/path";
 
 export type RowKind = "layer" | "background" | "maskSource";
 
@@ -17,7 +23,7 @@ export type LayerRow = {
 	bound: boolean;
 	/** The fields it reads, in the order it names them. */
 	fields: string[];
-	/** A frame or mask, which accepts a drop "on" it. */
+	/** A frame, mask or boolean vector, which accepts a drop "on" it. */
 	container: boolean;
 	/** Topmost first, a mask's source last. */
 	children: LayerRow[];
@@ -35,8 +41,7 @@ function rowFor(
 ): LayerRow {
 	const hit = cache.get(element);
 	if (hit && hit.key === key && hit.kind === kind) return hit;
-	const container =
-		kind === "layer" && (element.type === "frame" || element.type === "mask");
+	const container = kind === "layer" && isContainer(element);
 	const fields = elementFieldRefs(element);
 	const row: LayerRow = {
 		key,

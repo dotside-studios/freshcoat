@@ -2,6 +2,7 @@ import type { Constraint, Constraints, Element } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { isAutoLayoutChild } from "~/doc/geometry";
+import { isOperand } from "~/doc/path";
 import { Row, SharedNotice } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
 import { InspectorSection } from "./InspectorSection";
@@ -29,7 +30,10 @@ export const CONSTRAINT_LABELS: Record<Axis, [Constraint, string][]> = {
  *  box, not by an auto layout. */
 export function takesConstraints(ins: Pick<Inspect, "template" | "keys">) {
 	return ins.keys.every(
-		(k) => !k.endsWith("/bg") && !isAutoLayoutChild(ins.template, k),
+		(k) =>
+			!k.endsWith("/bg") &&
+			!isAutoLayoutChild(ins.template, k) &&
+			!isOperand(ins.template, k),
 	);
 }
 

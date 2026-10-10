@@ -3,6 +3,8 @@ import {
 	childElements,
 	type Element,
 	type Template,
+	type VectorBoolean,
+	type VectorElement,
 } from "@freshcoat-js/coatfile";
 
 export type LayerPath =
@@ -52,16 +54,44 @@ export function toPath(p: LayerPath | string): LayerPath | null {
 }
 
 /** The layers directly inside an element, as `[index, element]` pairs: a
- *  mask's source at -1 first, then children. */
+ *  mask's source at -1 first, then children or boolean operands. */
 export function childEntries(el: Layer): [number, Element][] {
 	const first = el.type === "mask" ? MASK_SOURCE : 0;
 	return childElements(el).map((c, i) => [first + i, c]);
 }
 
-export function isContainer(
-	el: Layer | undefined,
-): el is Extract<Element, { type: "frame" | "mask" }> {
-	return el?.type === "frame" || el?.type === "mask";
+/** A vector that keeps its operands. They are its only layers, at indexes
+ *  from 0 in paint order. */
+export type BooleanVector = VectorElement & {
+	properties: { boolean: VectorBoolean };
+};
+
+/** A layer that holds other layers: a frame, a mask or a boolean vector. */
+export type Container =
+	| Extract<Element, { type: "frame" | "mask" }>
+	| BooleanVector;
+
+export function isBooleanVector(el: Layer | undefined): el is BooleanVector {
+	return el?.type === "vector" && el.properties.boolean !== undefined;
+}
+
+export function isContainer(el: Layer | undefined): el is Container {
+	return el?.type === "frame" || el?.type === "mask" || isBooleanVector(el);
+}
+
+/** Whether the layer is an operand of a boolean vector, which paints no fill,
+ *  stroke or effect of its own. */
+export function isOperand(t: Template, key: string): boolean {
+	const parent = parentKeyOf(key);
+	return parent !== null && isBooleanVector(getElement(t, parent));
+}
+
+/** A container's layers other than a mask's source: its children, or a
+ *  boolean vector's operands. */
+export function childrenOf(el: Container): Element[] {
+	return el.type === "vector"
+		? el.properties.boolean.operands
+		: el.properties.children;
 }
 
 export function getElement(
@@ -78,7 +108,7 @@ export function getElement(
 		if (!el) return undefined;
 		if (i === MASK_SOURCE)
 			el = el.type === "mask" ? el.properties.mask : undefined;
-		else el = isContainer(el) ? el.properties.children[i] : undefined;
+		else el = isContainer(el) ? childrenOf(el)[i] : undefined;
 	}
 	return el;
 }
@@ -108,7 +138,7 @@ export function isAncestor(
 }
 
 /** Every layer in the list that holds `p`, `p` included. A mask source and the
- *  background are alone in theirs. */
+ *  background are alone in theirs. A boolean vector's operands are a list. */
 export function siblingsOf(t: Template, p: LayerPath | string): LayerPath[] {
 	const lp = toPath(p);
 	if (!lp || !getElement(t, lp)) return [];
