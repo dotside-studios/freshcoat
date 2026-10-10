@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import { ContextMenu } from "@freshcoat-js/ui/menu";
 import {
 	type PointerEvent as ReactPointerEvent,
@@ -40,6 +41,7 @@ import {
 	constrain45,
 	dragPoint,
 	type PenPath,
+	penCloseRadius,
 	snapPenPoint,
 } from "~/doc/pen";
 import { useEditor } from "~/state/hooks";
@@ -79,7 +81,6 @@ import { useLiveRender } from "./use-live-render";
 
 const DRAG_THRESHOLD = { mouse: 3, touch: 6 };
 const SNAP_PX = 6;
-const CLOSE_PX = 8;
 
 const CREATE_KIND: Partial<Record<Tool, ElementKind>> = {
 	frame: "frame",
@@ -165,6 +166,7 @@ export function Viewport() {
 	const template = useEditor(working);
 	const view = useEditor((s) => s.view);
 	const tool = useEditor((s) => s.tool);
+	const coarse = useCoarsePointer();
 	const textEditing = useEditor((s) => s.textEdit !== null);
 	const pathEditing = useEditor((s) => s.pathEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
@@ -200,7 +202,8 @@ export function Viewport() {
 						resume.reversed,
 						path,
 					);
-			} else if (path && path.points.length >= 2) controller.createPath(path);
+			} else if (path?.points[0] && path.points.length >= 2)
+				controller.createPath(path, frameUnder(controller, path.points[0]));
 		},
 		[controller, setPen, setDraft],
 	);
@@ -423,7 +426,9 @@ export function Viewport() {
 		}
 
 		if (state.tool === "pen") {
-			const resume = penPath() ? null : penResumeAt(controller, p, CLOSE_PX);
+			const resume = penPath()
+				? null
+				: penResumeAt(controller, p, penCloseRadius(coarse));
 			if (resume) {
 				resuming.current = { ...resume, count: resume.path.points.length };
 				setPen({ path: resume.path });
@@ -439,7 +444,7 @@ export function Viewport() {
 				Math.hypot(
 					v.x + first.x * v.zoom - p.x,
 					v.y + first.y * v.zoom - p.y,
-				) <= CLOSE_PX
+				) <= penCloseRadius(coarse)
 			) {
 				gesture.current = {
 					kind: "pen",

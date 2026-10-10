@@ -1,4 +1,4 @@
-import type { Element, Template } from "@freshcoat-js/coatfile";
+import type { Element, Template, VectorElement } from "@freshcoat-js/coatfile";
 import { DEFAULT_FILL, round2 } from "./factories";
 import {
 	type Guide,
@@ -19,6 +19,32 @@ export type PenPath = { points: PenPoint[]; closed: boolean };
 export type Segment = [Point, Point, Point, Point];
 
 export const PEN_STROKE = { color: "#000000", width: 2 } as const;
+
+const CLOSE_PX = 8;
+
+/** How close, in screen px, the pointer must come to the first anchor to
+ *  close the path: wider for a finger or pen than for a mouse. */
+export const penCloseRadius = (coarse: boolean) =>
+	coarse ? CLOSE_PX * 2 : CLOSE_PX;
+
+type VectorProps = VectorElement["properties"];
+
+/** The look the pen last gave a layer: its stroke for open paths, its fill
+ *  for closed ones. */
+export type PenStyle = {
+	stroke?: NonNullable<VectorProps["stroke"]>;
+	fill?: NonNullable<VectorProps["fill"]>;
+};
+
+/** The paint a new path gets: the remembered style, else the defaults. */
+export function penPaint(
+	closed: boolean,
+	style: PenStyle = {},
+): Pick<VectorProps, "fill" | "stroke"> {
+	return closed
+		? { fill: style.fill ?? DEFAULT_FILL }
+		: { stroke: style.stroke ?? { ...PEN_STROKE } };
+}
 
 /** A smooth point at `anchor` whose outgoing handle follows `drag`. */
 export function smoothPoint(anchor: Point, drag: Point): PenPoint {
@@ -192,17 +218,39 @@ export function penPathData(path: PenPath, origin: Point = { x: 0, y: 0 }) {
 	return path.closed ? `${d}Z` : d;
 }
 
+/** `path` with an axis it barely spans (under 1) made exactly flat, so the
+ *  layer's 1 unit minimum size never stands in for a real extent. */
+function flattened(path: PenPath, box: Rect): PenPath {
+	const flatX = box.width < 1;
+	const flatY = box.height < 1;
+	if (!flatX && !flatY) return path;
+	const snap = (p: Point): Point => ({
+		x: flatX ? box.x : p.x,
+		y: flatY ? box.y : p.y,
+	});
+	return {
+		...path,
+		points: path.points.map((p) => ({
+			...snap(p),
+			...(p.in ? { in: snap(p.in) } : {}),
+			...(p.out ? { out: snap(p.out) } : {}),
+		})),
+	};
+}
+
 /**
  * The vector layer a finished path becomes, placed at its bounds: an open
- * path is stroked, a closed one filled as a new shape is. Null for a path
- * of fewer than two points.
+ * path is stroked, a closed one filled as a new shape is, both with `style`
+ * when given. Null for a path of fewer than two points.
  */
 export function penElement(
 	path: PenPath,
 	t: Template,
 	side: number,
+	style?: PenStyle,
 ): Element | null {
 	if (path.points.length < 2) return null;
+	path = flattened(path, penBounds(path));
 	const box = penBounds(path);
 	const origin = { x: round2(box.x), y: round2(box.y) };
 	return {
@@ -213,8 +261,9 @@ export function penElement(
 			width: Math.max(1, round2(box.width)),
 			height: Math.max(1, round2(box.height)),
 		},
-		properties: path.closed
-			? { d: penPathData(path, origin), fill: DEFAULT_FILL }
-			: { d: penPathData(path, origin), stroke: { ...PEN_STROKE } },
+		properties: {
+			d: penPathData(path, origin),
+			...penPaint(path.closed, style),
+		},
 	};
 }

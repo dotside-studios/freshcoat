@@ -26,6 +26,7 @@ import {
 	defaultRect,
 	type ElementKind,
 	placeholderSrc,
+	round2,
 } from "~/doc/factories";
 import {
 	type AlignMode,
@@ -83,7 +84,7 @@ import {
 	parseKey,
 	siblingsOf,
 } from "~/doc/path";
-import { type PenPath, penElement } from "~/doc/pen";
+import { type PenPath, type PenStyle, penElement } from "~/doc/pen";
 import { type LayerStyle, pasteStyle, readStyle } from "~/doc/style";
 import {
 	activeVariantId,
@@ -219,6 +220,8 @@ export class EditorController {
 	private svgPastePrompt: SvgPastePrompt | undefined;
 	private naming = false;
 	private copiedStyle: LayerStyle | null = null;
+	private penStyle: PenStyle = {};
+	private penLayer: { id: string; closed: boolean } | undefined;
 	private shapeHits: ShapeHits | undefined;
 	private shapesFor: Template | undefined;
 	private textEditFrom: string | undefined;
@@ -281,6 +284,28 @@ export class EditorController {
 		this.store.dispatch(action);
 		if (action.type === "setSection" || action.type === "setRecord")
 			this.followRecord(before);
+		if (this.penLayer) this.rememberPenStyle();
+	}
+
+	/** The style the pen gives its next path, from the last pen layer the
+	 *  user restyled. */
+	get penLook(): PenStyle {
+		return this.penStyle;
+	}
+
+	private rememberPenStyle(): void {
+		const layer = this.penLayer;
+		const key = this.state.selection[0];
+		const t = this.base;
+		if (!layer || !t || !key || this.state.selection.length !== 1) return;
+		const el = getElement(t, key);
+		if (!el || !("type" in el) || el.type !== "vector" || el.id !== layer.id)
+			return;
+		const { stroke, fill } = el.properties;
+		if (layer.closed && fill !== undefined && fill !== this.penStyle.fill)
+			this.penStyle = { ...this.penStyle, fill };
+		if (!layer.closed && stroke && stroke !== this.penStyle.stroke)
+			this.penStyle = { ...this.penStyle, stroke };
 	}
 
 	/** Brings Edit's preview to the current record when Edit comes into view
@@ -789,13 +814,26 @@ export class EditorController {
 		return key;
 	}
 
-	/** Adds a drawn path as a vector layer on the side, selected, and goes
-	 *  from the pen back to the move tool. */
-	createPath(path: PenPath): string | null {
+	/** Adds a drawn path as a vector layer, in `parent` when given, selected,
+	 *  and goes from the pen back to the move tool. The pen styles it as the
+	 *  last pen layer the user restyled. */
+	createPath(path: PenPath, parent?: string): string | null {
 		const t = this.template;
 		if (!t) return null;
-		const element = penElement(path, t, this.state.side);
-		const key = element ? this.insert(element) : null;
+		let element = penElement(path, t, this.state.side, this.penStyle);
+		const origin = parent ? this.state.geometry.get(parent)?.rect : undefined;
+		if (element && origin)
+			element = {
+				...element,
+				pos: {
+					x: round2((element.pos?.x ?? 0) - origin.x),
+					y: round2((element.pos?.y ?? 0) - origin.y),
+				},
+			};
+		const key = element ? this.insert(element, parent) : null;
+		this.penLayer = element
+			? { id: element.id, closed: path.closed }
+			: undefined;
 		if (this.state.tool === "pen")
 			this.dispatch({ type: "setTool", tool: "move" });
 		return key;
