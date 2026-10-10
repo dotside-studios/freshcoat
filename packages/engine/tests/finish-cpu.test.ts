@@ -232,4 +232,21 @@ describe("the finish on the CPU", () => {
 			cache.dispose();
 		}
 	}, 60_000);
+
+	test("does not keep noise past the default cap without a budget", async () => {
+		const size = { width: 2500, height: 2300 };
+		const png = await noisePng(size);
+		const cache = createPaintCache();
+		try {
+			const finish: FrameFinish = {
+				dither: { amount: 2, seed: 0, mode: "per-channel" },
+			};
+			const shader = await paint(size, finish, png, cache, false);
+			const cpu = await paint(size, finish, png, cache, true);
+			expect(Buffer.from(cpu).equals(shader)).toBe(true);
+			expect(paintCacheState(cache).finishNoise).toBeNull();
+		} finally {
+			cache.dispose();
+		}
+	}, 120_000);
 });

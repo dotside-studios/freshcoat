@@ -367,7 +367,8 @@ export function backgroundFits(
 	state: PaintCacheState,
 	pixels: number,
 ): boolean {
-	if (state.maxImagePixels <= 0) return pixels <= DEFAULT_MAX_BACKGROUND_PIXELS;
+	if (state.maxImagePixels <= 0)
+		return pixels + finishNoisePixels(state) <= DEFAULT_MAX_BACKGROUND_PIXELS;
 	return (
 		imagesPixels(state) + finishNoisePixels(state) + pixels <=
 		state.maxImagePixels
@@ -390,7 +391,7 @@ export function cacheBackground(
 	state.stats.backgroundSnapshots++;
 	const budgeted = state.maxImagePixels > 0;
 	const limit = budgeted ? state.maxImagePixels : DEFAULT_MAX_BACKGROUND_PIXELS;
-	let held = budgeted ? imagesPixels(state) + finishNoisePixels(state) : 0;
+	let held = (budgeted ? imagesPixels(state) : 0) + finishNoisePixels(state);
 	for (const bg of state.backgrounds) held += backgroundPixels(bg);
 	while (state.backgrounds.length > 1 && held > limit)
 		held -= backgroundPixels(state.backgrounds.pop() as CachedBackground);
@@ -403,12 +404,15 @@ function sharedLength(a: string[], b: string[]): number {
 }
 
 // Keeps the noise of one frame, replacing any other. With an image budget it
-// counts against that budget (see evictUnusedImages).
+// counts against that budget (see evictUnusedImages), without one it is kept
+// only if it fits the default background cap.
 export function cacheFinishNoise(
 	state: PaintCacheState,
 	noise: CachedFinishNoise,
 ): void {
-	state.finishNoise = noise;
+	const fits =
+		state.maxImagePixels > 0 || noise.noise.length <= DEFAULT_MAX_BACKGROUND_PIXELS;
+	state.finishNoise = fits ? noise : null;
 	state.stats.finishNoiseBuilds++;
 }
 

@@ -3663,6 +3663,9 @@ const FINISH_NOISE_SKSL = `${FINISH_HASH_SKSL}
 		return half4(monochromeDither > 0.5 ? half3(n) : hash3(xy), 1.0);
 	}`;
 
+// Pixels of the float surface a strip of finish noise renders at once.
+const FINISH_NOISE_STRIP_PIXELS = 1 << 20;
+
 function finishEffect(
 	ck: CanvasKit,
 	variant: "finish" | "finish-curve" | "finish-noise",
@@ -3884,27 +3887,40 @@ function finishNoise(
 	if (cache.finishNoise?.key === key) return cache.finishNoise.noise;
 	const effect = finishEffect(ck, "finish-noise");
 	if (!effect) return null;
+	// Rendered and read back in strips, so the float surface and its buffer stay
+	// small however large the frame.
+	const rows = Math.min(
+		info.height,
+		Math.max(1, Math.floor(FINISH_NOISE_STRIP_PIXELS / info.width)),
+	);
 	const target = surface
 		.getCanvas()
-		.makeSurface(imageInfo(ck, "float", info.width, info.height));
+		.makeSurface(imageInfo(ck, "float", info.width, rows));
 	if (!target) return null;
 	bin.track({ delete: () => target.dispose() });
 	const shader = bin.track(effect.makeShader([u.seed, u.monochrome ? 1 : 0]));
 	const paint = bin.track(new ck.Paint());
 	paint.setShader(shader);
 	const canvas = target.getCanvas();
-	canvas.drawRect(ck.XYWHRect(0, 0, info.width, info.height), paint);
 	// CanvasKit sizes its own F32 result in bytes rather than floats, so read
 	// into a buffer of the right length instead.
-	const size = info.width * info.height * 4;
-	const dest = ck.Malloc(Float32Array, size);
+	const dest = ck.Malloc(Float32Array, info.width * rows * 4);
 	try {
-		if (!canvas.readPixels(0, 0, target.imageInfo(), dest)) return null;
-		const rgba = dest.toTypedArray() as Float32Array;
 		const channels = u.monochrome ? 1 : 3;
 		const noise = new Float32Array(info.width * info.height * channels);
-		for (let i = 0, j = 0; i < size; i += 4)
-			for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
+		let j = 0;
+		for (let y = 0; y < info.height; y += rows) {
+			const h = Math.min(rows, info.height - y);
+			canvas.save();
+			canvas.translate(0, -y);
+			canvas.drawRect(ck.XYWHRect(0, y, info.width, h), paint);
+			canvas.restore();
+			const strip = imageInfo(ck, "float", info.width, h);
+			if (!canvas.readPixels(0, 0, strip, dest)) return null;
+			const rgba = dest.toTypedArray() as Float32Array;
+			for (let i = 0, end = info.width * h * 4; i < end; i += 4)
+				for (let k = 0; k < channels; k++) noise[j++] = rgba[i + k] as number;
+		}
 		cacheFinishNoise(cache, { key, noise });
 		return noise;
 	} finally {
