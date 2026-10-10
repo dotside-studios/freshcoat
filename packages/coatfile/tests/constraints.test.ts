@@ -7,6 +7,7 @@ import {
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorBoolean,
 	resizeVectorPath,
 } from "../src/constraints";
 import type {
@@ -577,6 +578,40 @@ describe("resizeVectorPath", () => {
 				height: 5,
 			}),
 		).toBe("M0 0X10");
+	});
+});
+
+describe("resizeVectorBoolean", () => {
+	const operand = {
+		id: "a",
+		type: "rect",
+		pos: { x: 10, y: 20 },
+		size: { width: 30, height: 40 },
+		properties: {},
+	} as Element;
+	const vector = (boolean?: VectorElement["properties"]["boolean"]) =>
+		({
+			id: "v",
+			type: "vector",
+			size: { width: 100, height: 100 },
+			properties: { d: "M0 0", ...(boolean ? { boolean } : {}) },
+		}) as VectorElement;
+
+	test("scales the operands by the box's change on each axis", () => {
+		const operation = resizeVectorBoolean(
+			vector({ op: "union", operands: [operand as never] }),
+			{ width: 200, height: 50 },
+		);
+		expect(operation?.operands[0]).toMatchObject({
+			pos: { x: 20, y: 10 },
+			size: { width: 60, height: 20 },
+		});
+	});
+
+	test("a vector without an operation has none", () => {
+		expect(resizeVectorBoolean(vector(), { width: 5, height: 5 })).toBe(
+			undefined,
+		);
 	});
 });
 

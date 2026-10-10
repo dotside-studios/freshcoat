@@ -175,6 +175,22 @@ function scaleOperand(
 	};
 }
 
+/** A vector's boolean operation for its box at `size`: its operands scale by
+ *  the box's change on each axis, as `resizeVectorPath` scales the path. */
+export function resizeVectorBoolean(
+	el: VectorElement,
+	size: Size,
+): VectorElement["properties"]["boolean"] {
+	const operation = el.properties.boolean;
+	if (!operation || !el.size) return operation;
+	const sx = axisScale(el.size.width, size.width);
+	const sy = axisScale(el.size.height, size.height);
+	return {
+		...operation,
+		operands: operation.operands.map((o) => scaleOperand(o, sx, sy)),
+	};
+}
+
 function resizeElement(
 	el: Element,
 	from: Size,
@@ -199,24 +215,13 @@ function resizeElement(
 
 	if (el.size === undefined || sameSize(box.size, before)) return next;
 	if (next.type === "vector" && el.type === "vector") {
-		const operation = next.properties.boolean;
-		const sx = axisScale(before.width, box.size.width);
-		const sy = axisScale(before.height, box.size.height);
+		const operation = resizeVectorBoolean(el, box.size);
 		return {
 			...next,
 			properties: {
 				...next.properties,
 				d: resizeVectorPath(el, box.size),
-				...(operation
-					? {
-							boolean: {
-								...operation,
-								operands: operation.operands.map((o) =>
-									scaleOperand(o, sx, sy),
-								),
-							},
-						}
-					: {}),
+				...(operation ? { boolean: operation } : {}),
 			},
 		};
 	}

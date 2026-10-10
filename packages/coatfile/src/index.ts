@@ -93,6 +93,7 @@ export {
 	fitDesignSize,
 	resizeElements,
 	resizeTemplate,
+	resizeVectorBoolean,
 	resizeVectorPath,
 } from "./constraints";
 export {

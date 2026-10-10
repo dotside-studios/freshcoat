@@ -564,7 +564,9 @@ leaves the path different from the resized base's.
 - A vector's `d` scales with its box on each axis, arcs included. Path data
   that does not parse keeps its authored coordinates.
 
-`resizeVectorPath(vector, size)` is that path for one vector at a new size, and
+`resizeVectorPath(vector, size)` is that path for one vector at a new size,
+`resizeVectorBoolean(vector, size)` the same for the operands of its boolean
+operation, and
 `barcodeBox(elementOrSymbology, box)` is the box a code takes in `box`: the
 square of its shorter side, centred, for a code that only reads square, and
 `box` itself for any other.

@@ -10,6 +10,7 @@ import type {
 	Template,
 	TextElement,
 	Variant,
+	VectorElement,
 } from "../src/types";
 import { validate } from "../src/validate";
 import { resizeTemplate } from "../src/constraints";
@@ -878,6 +879,28 @@ describe("diffElement", () => {
 			pos: { x: 3, y: 0 },
 			rotation: 15,
 		});
+	});
+
+	test("leaves a vector's boolean operands to their own deltas", () => {
+		const base: VectorElement = {
+			id: "v",
+			type: "vector",
+			properties: {
+				d: "M0 0",
+				boolean: { op: "union", operands: [rect("a", "#000")] },
+			},
+		};
+		const next: VectorElement = {
+			...base,
+			properties: {
+				...base.properties,
+				boolean: {
+					op: "union",
+					operands: [{ ...rect("a", "#000"), pos: { x: 5, y: 0 } }],
+				},
+			},
+		};
+		expect(diffElement(base, next)).toBeUndefined();
 	});
 
 	test("reads a missing pos as 0,0, rotation as 0 and opacity as 1", () => {
