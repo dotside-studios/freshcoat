@@ -41,7 +41,46 @@ and print workflows. If that sounds like your kind of work, see the
 | Bind datasets to templates and batch-export them to ZIPs or PDFs | [`@freshcoat-js/workspace`](packages/workspace/) |
 | Render, validate and batch-export from a terminal or CI | [`@freshcoat-js/cli`](packages/cli/) |
 | Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
-| Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) |
+| Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) ([Figma Community](https://www.figma.com/community/plugin/1685967766479998641)) |
+
+## Quick start
+
+From a terminal, install the command line and render a template:
+
+```sh
+npm install --global @freshcoat-js/cli
+freshcoat render card.coat --set displayName="Alex" --out out
+freshcoat render card.coat --data people.csv --out cards.zip
+```
+
+The first command writes one image per side into `out`. The second renders the
+template once per row of a spreadsheet and zips the results. See the
+[CLI README](packages/cli/README.md) for every option.
+
+From code, install the template package and the renderer:
+
+```sh
+npm install @freshcoat-js/coatfile @freshcoat-js/engine
+```
+
+```ts
+import { readFile, writeFile } from "node:fs/promises";
+import { loadTemplate } from "@freshcoat-js/coatfile";
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/node";
+
+const loaded = await loadTemplate(await readFile("card.coat"));
+if (!loaded.ok) throw new Error("Could not read card.coat");
+
+const renderer = await createRenderer({ ck: await loadCanvasKit() });
+const [front] = await renderTemplate(renderer, loaded.template, { displayName: "Alex" });
+await writeFile("front.png", front.bytes);
+```
+
+Create the renderer once and reuse it. See the
+[coatfile README](packages/coatfile/README.md) for variants, export sizes and
+batch rendering.
 
 Release builds for the SDK packages and the command line include compiled ESM,
 TypeScript declarations and assets. Their source manifests are private and
@@ -56,8 +95,10 @@ Figma plugin bundles.
   assets.
 - **Scenes and rendering:** coatfile compiles a template and values into a
   scene. The engine lays out and paints that scene through CanvasKit, which
-  brings Skia to WebAssembly. Host applications supply fonts, images and the
-  rendering environment.
+  brings Skia to WebAssembly. The host creates one renderer with
+  `createRenderer`, giving it a CanvasKit instance and fonts, and keeps it for
+  the life of the process or worker. The renderer owns text shaping, the paint
+  cache and image decoding.
 - **Production utilities:** print analysis and correction are separate from
   authoring. The workspace package adds datasets, bindings, export plans,
   PDF assembly and sheet imposition for applications that need batch output.
@@ -76,8 +117,9 @@ See the [Studio README](apps/editor/README.md) for features, screenshots,
 limitations and development instructions.
 
 [Freshcoat for Figma](apps/figma-plugin/) exports frames as `.coat` templates
-with optional field bindings and can send them to Studio. See the
-[plugin README](apps/figma-plugin/README.md) for layer naming, supported Figma
+with optional field bindings and can send them to Studio. Install it from the
+[Figma Community listing](https://www.figma.com/community/plugin/1685967766479998641).
+See the [plugin README](apps/figma-plugin/README.md) for layer naming, supported Figma
 features and installation.
 
 ## Develop
@@ -99,6 +141,7 @@ The root `dev` and `build` aliases target Studio for convenience.
 
 - [Architecture](ARCHITECTURE.md): package responsibilities and host boundaries.
 - [Contributing](CONTRIBUTING.md): repository setup, checks and review conventions.
+- [Upgrading from 0.3](docs/migrating-to-0.4.md): what changed in 0.4 and how to move over.
 - [Releases](docs/releases.md): npm publication and Figma release bundles.
 - [Studio](apps/editor/README.md) and [Figma plugin](apps/figma-plugin/README.md):
   application-specific behavior and guides.
