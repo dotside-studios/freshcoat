@@ -117,6 +117,24 @@ After a successful trusted publication, set each package's publishing access
 to **Require two-factor authentication and disallow tokens**, and revoke unused
 publishing tokens. Trusted publishing continues to work without those tokens.
 
+## Release banner
+
+Each release's notes open with a banner rendered by the CLI of that release
+from `brand/releases/v<version>.coat.ts`: the logo and version over
+generative art drawn with some of what the release adds; see
+[the brand README](../brand/README.md#release-banners). Render it and commit
+the PNG with the version change, so the tag carries it:
+
+```sh
+bun packages/cli/src/bin.ts render brand/releases/v0.4.0.coat.ts --out brand/releases
+```
+
+Then start the GitHub release notes with the image at that tag:
+
+```md
+![Freshcoat v0.4.0](https://raw.githubusercontent.com/dotside-studios/freshcoat/v0.4.0/brand/releases/v0.4.0.png)
+```
+
 ## Run the release workflow
 
 Commit the version and schema changes, push the commit and tag, and publish a

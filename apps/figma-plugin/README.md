@@ -8,8 +8,9 @@ export a batch, or render it in your own application with
 The plugin reads the open document through Figma's Plugin API; it needs no
 REST API token. Custom export makes no network requests from the plugin.
 Davi card product mode fetches its product catalog. The plugin is available in
-Figma Community. You can also install a release ZIP or a local build using the
-instructions below. Release builds are packaged as downloadable ZIPs; see the
+[Figma Community](https://www.figma.com/community/plugin/1685967766479998641).
+You can also install a release ZIP or a local build using the instructions
+below. Release builds are packaged as downloadable ZIPs; see the
 [release guide](../../docs/releases.md).
 
 ## Install a release bundle
