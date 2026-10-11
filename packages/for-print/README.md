@@ -32,6 +32,10 @@ and frame-finishing operations that implement them.
 
 ## Usage
 
+```sh
+npm install @freshcoat-js/for-print @freshcoat-js/engine
+```
+
 ### Plan a scene for print
 
 ```ts

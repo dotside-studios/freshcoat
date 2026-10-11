@@ -13,6 +13,10 @@ The model and planning code are independent of React and the DOM and can run
 in a browser, Bun or Node. The host application supplies rendering, job
 scheduling and file destinations.
 
+```sh
+npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
+```
+
 ## What is in it
 
 | Module | What it does |
