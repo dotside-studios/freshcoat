@@ -206,6 +206,25 @@ describe("boolean operations", () => {
 		expect(covers(donut, 50, 50)).toBe(false);
 	});
 
+	test("keeps a rect's corner smoothing as an operand", () => {
+		const plain = square("a", 0, 0, {
+			properties: { fill: "#000000", cornerRadius: 40 },
+		});
+		const smooth = square("a", 0, 0, {
+			properties: { fill: "#000000", cornerRadius: 40, cornerSmoothing: 0.6 },
+		});
+		const other = square("s", 50, 0);
+		const keys = ["0/0", "0/1"];
+		const flat = run(shapes(plain, other), keys, "union").el;
+		const result = run(shapes(smooth, other), keys, "union");
+		expect(result.el.properties.d).not.toBe(flat.properties.d);
+		const operand = result.el.properties.boolean?.operands[0];
+		expect(operand?.type === "rect" && operand.properties.cornerSmoothing).toBe(
+			0.6,
+		);
+		expect(resultOf(result.el)?.d).toBe(result.el.properties.d);
+	});
+
 	test("refuses what it can't combine, leaving the template alone", () => {
 		const t = pair();
 		const code = (keys: string[], tpl = t, op: BooleanOp = "union") => {
@@ -357,6 +376,12 @@ function resultOf(el: VectorElement) {
 		kind: o.type === "rect" ? "rect" : "path",
 		...(o.pos ? { pos: o.pos } : {}),
 		...(o.size ? { size: o.size } : {}),
+		...(o.type === "rect" && o.properties.cornerRadius !== undefined
+			? { cornerRadius: o.properties.cornerRadius }
+			: {}),
+		...(o.type === "rect" && o.properties.cornerSmoothing !== undefined
+			? { cornerSmoothing: o.properties.cornerSmoothing }
+			: {}),
 		...(o.type === "vector" ? { d: o.properties.d } : {}),
 	}));
 	return combineShapes(ck, operands as BooleanOperand[], "union");
@@ -448,6 +473,22 @@ describe("a boolean's cached result", () => {
 		const el = vectorAt(c);
 		expect(el.properties.boolean?.operands.map((o) => o.id)).toEqual(["a"]);
 		expect(el.size).toEqual({ width: 100, height: 100 });
+	});
+
+	test("follows an operand's corner smoothing", async () => {
+		const c = await liveController();
+		c.edit((t) =>
+			updateElement(t, "0/0/0", { properties: { cornerRadius: 40 } }),
+		);
+		const before = vectorAt(c).properties.d;
+		c.edit((t) =>
+			updateElement(t, "0/0/0", {
+				properties: { cornerRadius: 40, cornerSmoothing: 0.6 },
+			}),
+		);
+		const el = vectorAt(c);
+		expect(el.properties.d).not.toBe(before);
+		expect(el.properties.d).toBe(resultOf(el)?.d);
 	});
 
 	test("follows the vector's own resize", async () => {

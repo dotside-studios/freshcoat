@@ -68,6 +68,9 @@ function operandOf(el: BooleanOperandElement): BooleanOperand {
 			...(el.properties.cornerRadius !== undefined
 				? { cornerRadius: el.properties.cornerRadius }
 				: {}),
+			...(el.properties.cornerSmoothing !== undefined
+				? { cornerSmoothing: el.properties.cornerSmoothing }
+				: {}),
 		};
 	return {
 		...placed,

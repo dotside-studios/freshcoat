@@ -207,6 +207,22 @@ describe("live boolean operations", () => {
 		});
 	});
 
+	it("keeps corner smoothing on a rect operand", async () => {
+		const { out, element } = await run(
+			boolean("1:1", BOX, "UNION", [
+				rect("1:2", RECT_BOX, {
+					cornerRadius: 8,
+					cornerSmoothing: 0.6,
+				} as never),
+			]),
+		);
+		expect(element.properties.boolean.operands[0].properties).toEqual({
+			cornerRadius: 8,
+			cornerSmoothing: 0.6,
+		});
+		expect(out.warnings.map((w) => w.code)).not.toContain("boolean_flattened");
+	});
+
 	it("nests a boolean operand with its own boolean", async () => {
 		const inner = boolean(
 			"1:4",
@@ -330,6 +346,16 @@ describe("live boolean operations", () => {
 			expect(warning?.message).toContain('"label" is a text');
 		});
 
+		it("for a rect with corner smoothing on different radii", async () => {
+			const smoothed = rect("1:2", RECT_BOX, {
+				cornerRadius: [8, 0, 8, 0],
+				cornerSmoothing: 0.6,
+			} as never);
+			const out = await flat(boolean("1:1", BOX, "UNION", [smoothed]));
+			const warning = out.warnings.find((w) => w.code === "boolean_flattened");
+			expect(warning?.message).toContain("corner smoothing on different radii");
+		});
+
 		it("for a group child", async () => {
 			const group = {
 				...base("1:3", "group", ELLIPSE_BOX),
@@ -364,14 +390,6 @@ describe("live boolean operations", () => {
 		it("for a child with no fill region", async () => {
 			const open = ellipse("1:3", ELLIPSE_BOX, { fillGeometry: [] } as never);
 			await flat(boolean("1:1", BOX, "UNION", [rect("1:2", RECT_BOX), open]));
-		});
-
-		it("for a rect with corner smoothing", async () => {
-			const smooth = rect("1:2", RECT_BOX, {
-				cornerRadius: 8,
-				cornerSmoothing: 0.6,
-			} as never);
-			await flat(boolean("1:1", BOX, "UNION", [smooth]));
 		});
 
 		it("for a mask child", async () => {
