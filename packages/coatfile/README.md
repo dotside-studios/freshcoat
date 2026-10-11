@@ -17,6 +17,12 @@ the rendering helpers live on the `render` subpath.
 
 ## Quick start
 
+```sh
+npm install @freshcoat-js/coatfile @freshcoat-js/engine
+```
+
+The engine is needed because you create the renderer from it.
+
 For template-to-image output, use `renderTemplate()` with a renderer from the
 coat engine. It loads the fonts the template describes through the renderer
 and paints each side at the template's own size unless you give another.
@@ -163,8 +169,8 @@ the trim's corner whether or not a render includes the bleed. `safeArea` is a
 guide for authoring tools and never changes a render.
 
 A render includes the bleed only when asked: `compile(t, values, { width,
-height, bleed: true })` or `render(…, { …, bleed: true }, …)`. `width` and
-`height` stay the trim's size, and the scene grows by the bleed at the same
+height, bleed: true })` or `renderTemplate(renderer, t, values, { bleed: true
+})`. `width` and `height` stay the trim's size, and the scene grows by the bleed at the same
 scale. The compiled template's `trim`, and each painted result's `trim`, give
 the trim's box inside the output. Without the option, and for a template
 without bleed, the output is exactly what it was.
@@ -230,8 +236,8 @@ That is a `Template` — it validates, compiles and renders unchanged, because
 `compile()` resolves `asset:` srcs against `assets` itself:
 
 ```ts
-import { render } from "@freshcoat-js/coatfile/render";
-const [result] = await render(exported, {}, { width: 1013, height: 638 }, { ck, env, fonts });
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+const [result] = await renderTemplate(renderer, exported, {}, { width: 1013, height: 638 });
 ```
 
 A consumer that wants a template backed by real URLs uploads the bytes and ends
