@@ -16,6 +16,10 @@ card-printer correction policy belongs to
 
 ## Quick start
 
+```sh
+npm install @freshcoat-js/engine
+```
+
 Create a renderer with a CanvasKit instance and render a scene:
 
 ```ts
@@ -298,8 +302,9 @@ underlying model.
   blur, shadows, and a layer's color matrix when it has to run before those or
   before opacity) still produce 8-bit results, so F16 does not help those
   steps. It costs twice the memory per layer, and it turns off the paint
-  cache's background snapshots. Set it with `compileScene`,
-  `renderSceneToPng` or a `createCanvas` command's `precision`.
+  cache's background snapshots. Set it with the `precision` option of
+  `renderer.render`, the `precision` option of `compileScene` (or
+  `renderer.compile`), or a `createCanvas` command's `precision`.
 - **Gradients.** Stops interpolate between unpremultiplied sRGB-encoded
   colors, which is Skia's default.
 - **Patterns.** A pattern mixes its two colors premultiplied, so a
