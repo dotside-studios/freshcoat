@@ -1,7 +1,7 @@
 {
 	"name": "@freshcoat-js/workspace",
 	"private": true,
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "Workspaces, datasets, spreadsheet import and batch export for Freshcoat templates",
 	"license": "Apache-2.0",
 	"repository": {
