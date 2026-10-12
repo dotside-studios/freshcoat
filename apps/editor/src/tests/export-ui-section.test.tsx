@@ -435,6 +435,37 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 
+	test("keeps the alpha channel of a PNG preset on request", async () => {
+		const { controller, user, templateId } = setup();
+		const preset = (format: ExportPreset["format"]): ExportPreset => ({
+			id: "p_1",
+			name: "Icons",
+			templateId,
+			records: "all",
+			sides: "all",
+			format,
+			scale: 1,
+			dpi: 300,
+			fileName: "{{name}}-{{side}}",
+			markExported: true,
+		});
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("png-zip") }),
+		);
+		await user.click(screen.getByRole("tab", { name: "Output" }));
+		const keep = screen.getByRole("checkbox", { name: "Keep alpha channel" });
+		await user.click(keep);
+		expect(controller.state.workspace?.presets[0]?.pngAlpha).toBe("keep");
+		await user.click(keep);
+		expect(controller.state.workspace?.presets[0]?.pngAlpha).toBe("auto");
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: preset("jpeg-zip") }),
+		);
+		expect(
+			screen.queryByRole("checkbox", { name: "Keep alpha channel" }),
+		).toBeNull();
+	});
+
 	test("warns under the file name pattern about tokens that name nothing", async () => {
 		const { controller, user, templateId } = setup();
 		const preset = (fileName: string): ExportPreset => ({

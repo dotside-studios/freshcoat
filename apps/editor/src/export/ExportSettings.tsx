@@ -501,6 +501,17 @@ export function ExportSettings({
 								PDF
 							</SegmentedItem>
 						</SegmentedControl>
+						{preset.format === "png-zip" ? (
+							<>
+								<Checkbox
+									isSelected={preset.pngAlpha === "keep"}
+									onChange={(keep) => set({ pngAlpha: keep ? "keep" : "auto" })}
+								>
+									Keep alpha channel
+								</Checkbox>
+								<Hint>32-bit PNG even when the image is opaque</Hint>
+							</>
+						) : null}
 						{pdf ? (
 							<Row label="Pages">
 								<SegmentedControl
