@@ -55,6 +55,7 @@ export type BatchOptions = {
 	frame?: string[];
 	scale?: number[];
 	format?: keyof typeof ZIP_FORMATS;
+	pngAlpha?: "auto" | "keep";
 	name?: string;
 	quality?: number;
 	bleed?: true;
@@ -130,6 +131,7 @@ export async function renderBatch(
 			options.name ?? (options.data === undefined ? "{{side}}" : DEFAULT_FILE_NAME_PATTERN),
 		...(frameNames ? { sides: frameNames } : {}),
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
+		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),

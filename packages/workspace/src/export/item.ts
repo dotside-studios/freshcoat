@@ -53,6 +53,8 @@ export type RenderRequest = {
 	format: OutputFormat;
 	/** JPEG and WebP, 0..100 */
 	quality?: number;
+	/** PNG only: write RGBA even for an opaque card */
+	pngAlpha?: "keep";
 	/** render through for-print's card-printer path */
 	print?: RenderPrint;
 	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
@@ -216,6 +218,9 @@ export function itemRequest(
 			...(format !== "png"
 				? { quality: preset.quality ?? DEFAULT_QUALITY }
 				: {}),
+			...(preset.format === "png-zip" && preset.pngAlpha === "keep"
+				? { pngAlpha: "keep" as const }
+				: {}),
 			...(print ? { print } : {}),
 			// A PDF page is sized as the design at `dpi`, or as the photo's
 			// pixels when the size follows one.
@@ -371,6 +376,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 						encode: {
 							format: req.format,
 							...(req.quality !== undefined ? { quality: req.quality } : {}),
+							...(req.pngAlpha ? { alpha: req.pngAlpha } : {}),
 						},
 					},
 				});

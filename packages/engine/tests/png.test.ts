@@ -219,6 +219,27 @@ describe("encodePng", () => {
 		}
 	});
 
+	test('alpha "keep" writes RGBA for an opaque frame, losslessly', async () => {
+		const ck = await ckInit();
+		const source = decodePixels(ck, (await render(ck)).bytes);
+		if (!source) throw new Error("decode failed");
+		const px = new Uint8Array(source.data);
+		for (const effort of ["fast", "best"] as const) {
+			const png = await encodePng(px, source.width, source.height, {
+				effort,
+				alpha: "keep",
+			});
+			expect(png[25]).toBe(6);
+			const back = decodePixels(ck, png);
+			if (!back) throw new Error("decode failed");
+			expect(Array.from(back.data)).toEqual(Array.from(source.data));
+		}
+		const auto = await encodePng(px, source.width, source.height, {
+			alpha: "auto",
+		});
+		expect(auto).toEqual(await encodePng(px, source.width, source.height));
+	});
+
 	test("best effort is never worse, and still exact", async () => {
 		const ck = await ckInit();
 		const source = decodePixels(ck, (await render(ck)).bytes);

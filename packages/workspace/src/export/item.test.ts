@@ -124,4 +124,25 @@ describe("itemRequest", () => {
 		);
 		expect(seen[0]).toMatchObject({ format: "jpeg", quality: 70 });
 	});
+
+	it("asks for RGBA only for a png-zip that keeps alpha", () => {
+		const refs = assetsByRef(workspace.datasets[0]?.assets);
+		const request = (p: ExportPreset) => {
+			const planned = planExport(workspace, p)[0];
+			if (!planned) throw new Error("nothing planned");
+			const built = itemRequest(memberCard, p, planned, refs);
+			if ("error" in built) throw new Error(built.error);
+			return built.request;
+		};
+		expect(
+			request({ ...preset, format: "png-zip", pngAlpha: "keep" }).pngAlpha,
+		).toBe("keep");
+		expect(request({ ...preset, format: "png-zip" }).pngAlpha).toBeUndefined();
+		expect(
+			request({ ...preset, format: "png-zip", pngAlpha: "auto" }).pngAlpha,
+		).toBeUndefined();
+		expect(
+			request({ ...preset, format: "pdf", pngAlpha: "keep" }).pngAlpha,
+		).toBeUndefined();
+	});
 });

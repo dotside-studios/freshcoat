@@ -72,6 +72,16 @@ await renderer.render(scene, { width, height, output: { pixels: true } }); // { 
 setting instead. JPEG and WebP need the `full` CanvasKit build; a build
 without the encoder answers in PNG and says so in `format`.
 
+A fully opaque frame is written as an RGB PNG unless `effort: "best"` finds
+RGBA smaller. `alpha: "keep"` always writes RGBA, for a consumer that requires
+a 32-bit PNG, such as a Google Play store icon. It applies to PNG only, and
+`encodePng` takes the same option:
+
+```ts
+await renderer.render(scene, { width, height, output: { encode: { format: "png", alpha: "keep" } } });
+await encodePng(pixels, width, height, { alpha: "keep" });
+```
+
 The `canvas` output keeps the painted canvas live for display. It needs a
 `surface` factory, which makes the canvas each surface is painted on: a DOM
 `<canvas>`, or an `OffscreenCanvas` in a worker. With a cache the renderer

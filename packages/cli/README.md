@@ -93,6 +93,7 @@ after the frame, with the scale as a suffix for anything but 1x: `front.png`,
 | `--frame <name>` | render only this frame; repeat it for several |
 | `--scale <n>` | pixel density, default 1; repeat it for several |
 | `--format <png\|jpeg\|webp>` | default `png` |
+| `--png-alpha <auto\|keep>` | PNG only: `keep` writes RGBA even for an opaque frame, for a consumer that requires a 32-bit PNG; default `auto`, RGB when the frame is opaque |
 | `--out <path>` | directory to write to, created if needed, default the current one; or a `.zip` or `.pdf` file |
 
 An `--out` ending in `.zip` or `.pdf` writes the frames as one zip, with an
@@ -123,7 +124,7 @@ are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
 
 `--set` and `--values` fill a field the same way in every row, over its
-column. `--variant`, `--frame` and `--format` work as above, `--format` for
+column. `--variant`, `--frame`, `--format` and `--png-alpha` work as above, the last two for
 images only, and `--scale` takes one value. A required field no column or `--set`
 fills is reported and uses its default. Progress and the summary are those of
 a workspace export, below.
@@ -145,8 +146,8 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
 | `--no-crop-marks` | with `--sheets`: leave out the crop marks |
 
-A flag that does not fit the output, such as `--dpi` for a zip or `--quality`
-for PNG, is refused, as is `--bleed` for a template without one, a `--name`
+A flag that does not fit the output, such as `--dpi` for a zip, `--quality`
+for PNG or `--png-alpha` for JPEG, WebP or a PDF, is refused, as is `--bleed` for a template without one, a `--name`
 token the template does not have, and sheets the cards do not fit.
 
 #### Workspaces

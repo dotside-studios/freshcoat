@@ -23,9 +23,17 @@ export type PngEffort =
 	// colour and gradients it costs 20–40%, so it is opt-in.
 	| "best";
 
+export type PngAlpha =
+	// Drop the alpha channel of a fully opaque frame (see encodePng).
+	| "auto"
+	// Always write RGBA, for a consumer that requires a 32-bit PNG.
+	| "keep";
+
 export type EncodePngOptions = {
 	// Default "fast".
 	effort?: PngEffort;
+	// Default "auto".
+	alpha?: PngAlpha;
 };
 
 /**
@@ -68,8 +76,8 @@ export async function encodePng(
 	// A fully opaque frame spends a byte per pixel on an alpha channel that says
 	// nothing. Dropping it is not always the smaller stream (long runs of an
 	// identical RGBA pixel compress better than the same runs in RGB), so only
-	// "best" keeps it as a candidate.
-	const opaque = isOpaque(pixels, expected);
+	// "best" keeps it as a candidate. alpha "keep" never drops it.
+	const opaque = opts?.alpha !== "keep" && isOpaque(pixels, expected);
 	const adaptive = opts?.effort === "best";
 	// Built and deflated two at a time, keeping only the smallest stream so far:
 	// at 8192x8192 every candidate's filtered rows alive at once is about a GB.

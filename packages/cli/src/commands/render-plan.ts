@@ -53,6 +53,8 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 	const workspaceOnly = given.filter((key) => WORKSPACE_ONLY.includes(key));
 	if (workspaceOnly.length > 0)
 		throw new UsageError(`${listed(workspaceOnly, "needs", "need")} a .coatworkspace file`);
+	if (rest.pngAlpha !== undefined && rest.format !== undefined && rest.format !== "png")
+		throw new UsageError("--png-alpha needs --format png");
 	if (rest.data === undefined && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)
@@ -76,7 +78,7 @@ export async function runRender(file: string, input: RenderInput, io: Io): Promi
 }
 
 function templateOptions(input: Omit<RenderInput, "out">, out: string | undefined): RenderOptions {
-	const { values, set, variant, frame, scale, format, dryRun, quiet } = input;
+	const { values, set, variant, frame, scale, format, pngAlpha, dryRun, quiet } = input;
 	return {
 		...(values !== undefined ? { values } : {}),
 		...(set !== undefined ? { set } : {}),
@@ -84,6 +86,7 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 		...(frame !== undefined ? { frame } : {}),
 		...(scale !== undefined ? { scale } : {}),
 		...(format !== undefined ? { format } : {}),
+		...(pngAlpha !== undefined ? { pngAlpha } : {}),
 		...(dryRun ? { dryRun } : {}),
 		...(out !== undefined ? { out } : {}),
 		quiet,
@@ -92,13 +95,15 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 
 function exportProblem(
 	given: string[],
-	options: Pick<RenderInput, "scale" | "format" | "quality" | "pdfPages">,
+	options: Pick<RenderInput, "scale" | "format" | "pngAlpha" | "quality" | "pdfPages">,
 	out: string,
 ): string | undefined {
 	const pdf = /\.pdf$/i.test(out);
 	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
 	if (pdf && options.format !== undefined)
 		return "--format applies only to images; a PDF takes --pdf-pages";
+	if (pdf && options.pngAlpha !== undefined)
+		return "--png-alpha applies only to images; a PDF takes --pdf-pages";
 	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
 	if (!pdf && pdfOnly.length > 0)
 		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");

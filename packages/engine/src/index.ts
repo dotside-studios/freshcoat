@@ -162,6 +162,7 @@ export {
 	type EncodePngOptions,
 	encodeDecodedPng,
 	encodePng,
+	type PngAlpha,
 	type PngEffort,
 } from "./png";
 export {

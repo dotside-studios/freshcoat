@@ -288,6 +288,10 @@ the fonts, and `summarizeGlyphs` and `codepointLabel` shape it for display.
 
 `src/export/node-export.test.ts` runs this path end to end.
 
+A `png-zip` preset with `pngAlpha: "keep"` writes every image as RGBA, even
+an opaque card, for a consumer that requires a 32-bit PNG. The default,
+`auto`, writes an opaque card as RGB.
+
 For PDFs, `assemblePdf()` accepts rendered PNG or JPEG images, or one-page
 PDFs. It can place one per page or impose cards on sheets with crop marks and
 duplex backs. A preset's `pdfPageImage` picks what each page holds: a PNG or a

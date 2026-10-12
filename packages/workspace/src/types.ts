@@ -205,6 +205,9 @@ export type ExportPreset = {
 	size?: ExportSize;
 	/** JPEG and WebP quality, 0..100, default 90 */
 	quality?: number;
+	/** png-zip only: "keep" writes RGBA even for an opaque card, for a
+	 *  consumer that requires a 32-bit PNG; default auto */
+	pngAlpha?: "auto" | "keep";
 	/** what a PDF page embeds, default png. vector draws each card as PDF
 	 *  vectors, with any layer a PDF cannot express as an image */
 	pdfPageImage?: "png" | "jpeg" | "vector";
