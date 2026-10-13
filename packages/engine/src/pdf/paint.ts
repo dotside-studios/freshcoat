@@ -1,18 +1,28 @@
 // A Painter for print: lowers a compiled scene to one PDF page. Shapes,
-// gradients, strokes, clips, masks, blend modes and images map onto PDF's own
-// model, and text is drawn with its embedded font file. A layer PDF has no
-// operator for (a shadow, a blur, an adjustment, text in a font a PDF cannot
-// carry) is painted by the CanvasKit painter into a transparent image at
-// `rasterDpi` and placed where it belongs, and reported as `vector_rasterized`.
+// gradients, strokes, clips, blend modes and images map onto PDF's own model,
+// and text is drawn with its embedded font file, along its curve when it has
+// one. A layer PDF has no operator for (a shadow, a blur, an adjustment, text
+// in a font a PDF cannot carry) is painted by the CanvasKit painter into a
+// transparent image at `rasterDpi` and placed where it belongs, and reported
+// as `vector_rasterized`.
 
-import type { CanvasKit, GlyphRun, TypefaceFontProvider } from "canvaskit-wasm";
+import type {
+	CanvasKit,
+	GlyphRun,
+	Path,
+	TypefaceFontProvider,
+} from "canvaskit-wasm";
+import { isHidden } from "../arc-text";
 import {
 	type Bin,
 	collectAssets,
+	type DecorationRect,
 	drawableBounds,
+	focalPoint,
 	makeBin,
+	type PlacedTextBand,
 	paintScene,
-	type ShapedTextLine,
+	placeTextGlyphs,
 	shapeTextLines,
 } from "../canvaskit";
 import { parseColor } from "../color";
@@ -26,24 +36,26 @@ import {
 import { exportPixelSize } from "../export-scale";
 import { parseImageInfo } from "../image-info";
 import { dataUrlToBytes } from "../loader";
-import { outlineGeometry, rectShape } from "../outline";
+import { boxPath, outlineGeometry, rectShape } from "../outline";
 import { createPaintCache } from "../paint-cache";
 import { fitRect, strokeInset } from "../paint-helpers";
 import type { PaintTarget } from "../runtime-types";
 import { isSvg } from "../svg/sniff";
-import { strokeTrim } from "../trim";
+import { strokeTrim, trimPath } from "../trim";
 import type {
 	BlendMode,
 	Command,
 	DrawCommand,
 	DrawImageCommand,
 	DrawTextCommand,
+	GradientFill,
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
 	Stroke,
+	TextLine,
 } from "../types";
-import { FontEmbedder, type FontFile } from "./fonts";
+import { FontEmbedder, type FontFile, unwrapFonts } from "./fonts";
 import { cm, type Matrix, outlineOps, pathOps, rotateAbout } from "./geometry";
 import {
 	name,
@@ -93,11 +105,17 @@ const BLEND: Partial<Record<BlendMode, string>> = {
 
 const CAP = { butt: 0, round: 1, square: 2 } as const;
 const JOIN = { miter: 0, round: 1, bevel: 2 } as const;
+const STROKE_CAP = { butt: "Butt", round: "Round", square: "Square" } as const;
+const STROKE_JOIN = { miter: "Miter", round: "Round", bevel: "Bevel" } as const;
 // Skia's default miter limit.
 const MITER_LIMIT = 4;
+// The resolution scale a gradient stroke's outline is flattened at.
+const STROKE_PRECISION = 8;
 // The longest edge, in pixels, a layer drawn as an image is painted at.
 const MAX_RASTER_EDGE = 8192;
 const MAX_SVG_NESTING = 4;
+// Skia's cap on the dashes one stroke is cut into.
+const MAX_DASHES = 1000000;
 // Device pixels kept around a layer's bounds for antialiasing.
 const RASTER_PAD = 2;
 // Decoded pixels the layers of one page share.
@@ -131,13 +149,19 @@ type Frame = {
 type Area = { x: number; y: number; width: number; height: number };
 // A layer painted as pixels, placed in design units.
 type Patch = { ref: PdfRef; x: number; y: number; w: number; h: number } | null;
-type TextRun = { run: GlyphRun; file: FontFile };
+// `xforms` places each glyph of a run on a curve.
+type TextRun = { run: GlyphRun; file: FontFile; xforms?: Float32Array };
 type TextPlan = {
 	lines: Array<{
-		line: ShapedTextLine;
+		spans: TextLine["spans"];
+		spanAt: number[];
+		x: number;
+		y: number;
+		decorations: DecorationRect[];
 		clusters: Map<number, string>;
 		runs: TextRun[];
 	}>;
+	bands: PlacedTextBand[];
 	reason?: string;
 };
 
@@ -290,6 +314,7 @@ export async function paintPdf(
 	};
 	for (const [src, bytes] of [...sources]) await prepare(src, bytes, 0);
 
+	const embeddable = await unwrapFonts(byFamily);
 	const shared = createSharedFontProvider(ck, loaded);
 	(shared.provider as { __families?: string[] }).__families = [
 		...new Set(loaded.map((f) => f.family)),
@@ -301,7 +326,7 @@ export async function paintPdf(
 		shared.provider,
 		bin,
 		writer,
-		new FontEmbedder(ck, byFamily, writer),
+		new FontEmbedder(ck, embeddable, writer),
 		sources,
 		svgScenes,
 		warnings,
@@ -551,7 +576,6 @@ class PageBuilder {
 						: null)
 				);
 			case "drawText":
-				if (cmd.arc || cmd.path) return "text on a curve";
 				if (cmd.fill && cmd.fill.kind !== "solid") return "gradient text";
 				return this.textPlan(cmd).reason ?? null;
 			case "drawImage": {
@@ -589,16 +613,27 @@ class PageBuilder {
 	private textPlan(cmd: DrawTextCommand): TextPlan {
 		const hit = this.texts.get(cmd);
 		if (hit) return hit;
-		const plan: TextPlan = { lines: [] };
-		for (const line of shapeTextLines(this.ck, this.provider, this.bin, cmd)) {
+		const curved = cmd.arc || cmd.path;
+		const placed = curved
+			? placeTextGlyphs(this.ck, this.provider, this.bin, cmd)
+			: null;
+		const lines = placed
+			? placed.lines.map((l) => ({ ...l, x: 0, y: 0, decorations: [] }))
+			: shapeTextLines(this.ck, this.provider, this.bin, cmd).map((l) => ({
+					...l,
+					xforms: [] as Float32Array[],
+				}));
+		const plan: TextPlan = { lines: [], bands: placed?.bands ?? [] };
+		for (const line of lines) {
+			const spans = line.line.spans;
 			const clusters = lineClusters(
-				line.line.spans.map((s) => s.text).join(""),
+				spans.map((s) => s.text).join(""),
 				line.runs,
 			);
 			const runs: TextRun[] = [];
-			for (const run of line.runs) {
+			for (const [r, run] of line.runs.entries()) {
 				if (!run.glyphs.length) continue;
-				const span = line.line.spans[line.spanAt[run.offsets[0] ?? 0] ?? 0];
+				const span = spans[line.spanAt[run.offsets[0] ?? 0] ?? 0];
 				if (!span) continue;
 				if (run.fakeBold) plan.reason ??= "synthetic bold";
 				const file = this.fonts.file(
@@ -611,9 +646,21 @@ class PageBuilder {
 					clusters,
 				);
 				if ("reason" in file) plan.reason ??= file.reason;
+				else if (curved) {
+					const xforms = line.xforms[r] ?? new Float32Array();
+					runs.push({ run, file, xforms });
+				}
 				else runs.push({ run, file });
 			}
-			plan.lines.push({ line, clusters, runs });
+			plan.lines.push({
+				spans,
+				spanAt: line.spanAt,
+				x: line.x,
+				y: line.y,
+				decorations: line.decorations,
+				clusters,
+				runs,
+			});
 		}
 		this.texts.set(cmd, plan);
 		return plan;
@@ -848,11 +895,14 @@ class PageBuilder {
 		return sh ? `q\n${ops}W${star} n\n${sh}Q\n` : "";
 	}
 
-	// Paints a linear or radial gradient over the current clip.
+	// Paints a linear or radial gradient over the current clip. An ellipse is
+	// its circle under a matrix, a focus the start circle of a two-circle
+	// shading, and transparent stops a soft mask of the same shading in grey.
 	private gradient(fill: ResolvedFill, box: Box): string {
 		if (fill.kind !== "linear" && fill.kind !== "radial") return "";
 		const { x, y, w, h } = box;
 		let geometry: PdfDict;
+		let out = "";
 		if (fill.kind === "linear") {
 			geometry = {
 				ShadingType: 2,
@@ -864,25 +914,70 @@ class PageBuilder {
 				],
 			};
 		} else {
-			const rx = fill.radius * Math.max(w, h);
-			if (!(rx > 0)) return "";
+			const longest = Math.max(w, h);
+			const rx = fill.radius * longest;
+			const ry = (fill.radiusY ?? fill.radius) * longest;
+			if (!(rx > 0) || !(ry > 0)) return "";
 			const cx = x + fill.center.x * w;
 			const cy = y + fill.center.y * h;
-			geometry = { ShadingType: 3, Coords: [cx, cy, 0, cx, cy, rx] };
+			const rotation = fill.rotation ?? 0;
+			if (ry !== rx || rotation % 180 !== 0) {
+				const k = ry / rx;
+				out += cm(rotateAbout(rotation, cx, cy));
+				out += cm([1, 0, 0, k, 0, cy - k * cy]);
+			}
+			const focus = focalPoint(fill, cx, cy, w, h, rx, ry, rotation);
+			const fr = (fill.focusRadius ?? 0) * longest;
+			geometry = {
+				ShadingType: 3,
+				Coords: focus
+					? [focus[0], focus[1], fr, cx, cy, rx]
+					: [cx, cy, 0, cx, cy, rx],
+			};
 		}
+		const stops = fill.stops.map((s) => ({
+			offset: s.offset,
+			c: rgba(s.color),
+		}));
 		const color = this.shading(
 			geometry,
-			fill.stops.map((s) => {
-				const c = rgba(s.color);
-				return { offset: s.offset, c: [c[0] / 255, c[1] / 255, c[2] / 255] };
-			}),
+			stops.map(({ offset, c }) => ({
+				offset,
+				c: [c[0] / 255, c[1] / 255, c[2] / 255],
+			})),
+			"DeviceRGB",
 		);
-		return `/${color} sh\n`;
+		if (!color) return "";
+		if (stops.some(({ c }) => c[3] < 1)) {
+			const alpha = this.shading(
+				geometry,
+				stops.map(({ offset, c }) => ({ offset, c: [c[3]] })),
+				"DeviceGray",
+			);
+			out += this.gs({
+				SMask: {
+					Type: name("Mask"),
+					S: name("Luminosity"),
+					G: this.w.flate(
+						{
+							Type: name("XObject"),
+							Subtype: name("Form"),
+							BBox: [-1e5, -1e5, 1e5, 1e5],
+							Resources: this.resources,
+							Group: { S: name("Transparency"), CS: name("DeviceGray") },
+						},
+						`/${alpha} sh\n`,
+					),
+				},
+			});
+		}
+		return `${out}/${color} sh\n`;
 	}
 
 	private shading(
 		geometry: PdfDict,
 		stops: Array<{ offset: number; c: number[] }>,
+		space: string,
 	): string {
 		const sorted = [...stops].sort((a, b) => a.offset - b.offset);
 		const first = sorted[0];
@@ -930,7 +1025,7 @@ class PageBuilder {
 		}
 		const ref = this.w.add({
 			...geometry,
-			ColorSpace: name("DeviceRGB"),
+			ColorSpace: name(space),
 			Function: fn,
 			Extend: [true, true],
 		});
@@ -953,6 +1048,52 @@ class PageBuilder {
 		return `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams(stroke)}${ops}S\nQ\n`;
 	}
 
+	// The stroke along `path`, cut to its trim, in its colour or its gradient
+	// over `box`.
+	private strokePath(stroke: Stroke, path: Path, box: Box): string {
+		const trim = strokeTrim(stroke);
+		const cut = trim ? trimPath(this.ck, path, trim) : null;
+		if (trim && !cut) return "";
+		try {
+			const along = cut ?? path;
+			return stroke.gradient
+				? this.gradientStroke(stroke, stroke.gradient, along, box)
+				: this.stroke(stroke, pathOps(this.ck, along));
+		} finally {
+			cut?.delete();
+		}
+	}
+
+	// A gradient stroke: the gradient painted through the outline of the
+	// stroke, which CanvasKit's stroker draws as Skia does, dashes included.
+	private gradientStroke(
+		stroke: Stroke,
+		gradient: GradientFill,
+		path: Path,
+		box: Box,
+	): string {
+		const { ck } = this;
+		if (!(stroke.width > 0)) return "";
+		const dash = normalizeDash(stroke.dash);
+		const dashed = dash ? dashPath(ck, path, dash) : null;
+		const outline = (dashed ?? path).makeStroked({
+			width: stroke.width,
+			miter_limit: MITER_LIMIT,
+			precision: STROKE_PRECISION,
+			cap: ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]],
+			join: ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]],
+		});
+		dashed?.delete();
+		if (!outline) return "";
+		try {
+			const ops = pathOps(ck, outline);
+			const sh = this.gradient(gradient, box);
+			return ops && sh ? `q\n${ops}W n\n${sh}Q\n` : "";
+		} finally {
+			outline.delete();
+		}
+	}
+
 	// The stroke along `shape`, offset for inside or outside alignment.
 	private outlineStroke(
 		shape: ShapeMask,
@@ -962,15 +1103,29 @@ class PageBuilder {
 		},
 		stroke: Stroke,
 	): string {
-		const g = outlineGeometry(
-			shape,
-			cmd.pos.x,
-			cmd.pos.y,
-			cmd.size.width,
-			cmd.size.height,
-			strokeInset(stroke),
-		);
-		return g ? this.stroke(stroke, outlineOps(this.ck, g).ops) : "";
+		const { x, y } = cmd.pos;
+		const { width: w, height: h } = cmd.size;
+		const trimmed = strokeTrim(stroke) !== null;
+		const plain = !stroke.gradient && !trimmed;
+		const g = outlineGeometry(shape, x, y, w, h, strokeInset(stroke), trimmed);
+		if (!g) return "";
+		if (plain) return this.stroke(stroke, outlineOps(this.ck, g).ops);
+		const path =
+			g.kind === "path"
+				? this.ck.Path.MakeFromSVGString(g.d)
+				: g.kind === "rrect" && !trimmed
+					? skiaRRect(this.ck, g.ltrb, g.radii)
+					: boxPath(
+							this.ck,
+							g.ltrb,
+							g.kind === "rrect" ? g.radii : undefined,
+						);
+		if (!path) return "";
+		try {
+			return this.strokePath(stroke, path, { x, y, w, h });
+		} finally {
+			path.delete();
+		}
 	}
 
 	private path(cmd: Extract<DrawCommand, { op: "drawPath" }>): string {
@@ -1006,7 +1161,7 @@ class PageBuilder {
 					? ck.Path.MakeFromSVGString(cmd.strokeD)
 					: null;
 				try {
-					out += this.stroke(cmd.stroke, outline ? pathOps(ck, outline) : ops);
+					out += this.strokePath(cmd.stroke, outline ?? path, box);
 				} finally {
 					outline?.delete();
 				}
@@ -1018,15 +1173,16 @@ class PageBuilder {
 	}
 
 	// Each run in its embedded font, one TJ per stretch of glyphs on one
-	// baseline in one colour, every glyph placed where CanvasKit put it.
+	// baseline in one colour, every glyph placed where CanvasKit put it. A glyph
+	// on a curve gets a text matrix of its own.
 	private text(cmd: DrawTextCommand): string {
 		const plan = this.textPlan(cmd);
 		const segments: Segment[] = [];
 		let decorations = "";
-		for (const { line, clusters, runs } of plan.lines) {
-			const spans = line.line.spans;
+		for (const line of plan.lines) {
+			const { spans, clusters, runs } = line;
 			const texts = glyphTexts(runs.map((r) => r.run), clusters);
-			for (const [r, { run, file }] of runs.entries()) {
+			for (const [r, { run, file, xforms }] of runs.entries()) {
 				const face = this.fonts.embed(file);
 				const { info } = face;
 				const sx = (run as { scaleX?: number }).scaleX ?? 1;
@@ -1034,6 +1190,8 @@ class PageBuilder {
 				const skew = run.fakeItalic ? 0.25 * run.size : 0;
 				let seg: Segment | null = null;
 				for (let i = 0; i < run.glyphs.length; i++) {
+					if (xforms && (xforms.length < 4 * i + 4 || isHidden(xforms, i)))
+						continue;
 					const gid = run.glyphs[i] as number;
 					const x = line.x + (run.positions[i * 2] as number);
 					const y = line.y + (run.positions[i * 2 + 1] as number);
@@ -1042,6 +1200,27 @@ class PageBuilder {
 					const owner = spans[line.spanAt[start] ?? 0] ?? spans[0];
 					const c = rgba(owner?.color ?? cmd.color);
 					const color = `${this.alpha(c[3])}${rgb(c)} rg\n`;
+					if (xforms) {
+						const [sc, ss, tx, ty] = xforms.subarray(4 * i, 4 * i + 4);
+						const m = [
+							scale * (sc as number),
+							scale * (ss as number),
+							skew * (sc as number) + run.size * (ss as number),
+							skew * (ss as number) - run.size * (sc as number),
+							tx as number,
+							ty as number,
+						];
+						seg = null;
+						segments.push({
+							color,
+							y,
+							head: `/${face.id} 1 Tf\n${m.map(num).join(" ")} Tm\n`,
+							parts: [`<${gid.toString(16).padStart(4, "0")}>`],
+							x,
+							advance: 0,
+						});
+						continue;
+					}
 					if (seg && seg.color === color && Math.abs(seg.y - y) < 1e-3) {
 						const shift = seg.advance - ((x - seg.x) * 1000) / scale;
 						if (Math.abs(shift) > 0.01) seg.parts.push(num(shift));
@@ -1066,6 +1245,7 @@ class PageBuilder {
 				decorations += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${num(d.x0)} ${num(d.top)} ${num(d.x1 - d.x0)} ${num(d.thickness)} re\nf\nQ\n`;
 			}
 		}
+		for (const band of plan.bands) decorations += this.band(band);
 		return (
 			segments
 				.map(
@@ -1073,6 +1253,29 @@ class PageBuilder {
 				)
 				.join("") + decorations
 		);
+	}
+
+	// An arc text decoration, stroked along its circle.
+	private band(b: PlacedTextBand): string {
+		const { ck } = this;
+		const builder = new ck.PathBuilder();
+		let path: Path | null = null;
+		try {
+			const deg = 180 / Math.PI;
+			builder.addArc(
+				ck.LTRBRect(b.cx - b.r, b.cy - b.r, b.cx + b.r, b.cy + b.r),
+				Math.min(b.a0, b.a1) * deg - 90,
+				Math.abs(b.a1 - b.a0) * deg,
+			);
+			path = builder.detach();
+			return this.stroke(
+				{ color: b.color, width: b.thickness },
+				pathOps(ck, path),
+			);
+		} finally {
+			path?.delete();
+			builder.delete();
+		}
 	}
 
 	private image(cmd: DrawImageCommand): string {
@@ -1234,40 +1437,93 @@ class PageBuilder {
 	}
 }
 
-// Fills drawn as vectors: solid, linear, and radial gradients that are
-// circles about their centre, all with opaque stops.
+// Fills drawn as vectors: solid, and linear and radial gradients that pad.
 function fillReason(fill: ResolvedFill): string | null {
 	if (fill.kind === "solid") return null;
 	if (fill.kind === "pattern") return "pattern fill";
 	if (fill.kind === "angular") return "angular gradient";
 	if (fill.spread && fill.spread !== "pad")
 		return `${fill.spread} gradient spread`;
-	if (fill.stops.some((s) => rgba(s.color)[3] < 1))
-		return "transparent gradient stop";
-	if (
-		fill.kind === "radial" &&
-		((fill.radiusY !== undefined && fill.radiusY !== fill.radius) ||
-			(fill.rotation ?? 0) % 180 !== 0 ||
-			fill.focus ||
-			(fill.focusRadius ?? 0) > 0)
-	)
-		return "elliptical or focal radial gradient";
 	return null;
 }
 
-// Strokes drawn as vectors: a solid colour along the outline, or along its
-// offset when the stroke is aligned. `shape` is the outline an aligned stroke
-// offsets, null when the command carries its own, undefined when it has none.
+// Strokes drawn as vectors: a colour or a gradient fill draws as one, along
+// the outline, or along its offset when the stroke is aligned, cut to its trim.
+// `shape` is the outline an aligned stroke offsets, null when the command
+// carries its own, undefined when it has none.
 function strokeReason(
 	stroke: Stroke,
 	shape: ShapeMask | null | undefined,
 ): string | null {
-	if (stroke.gradient) return "gradient stroke";
-	if (strokeTrim(stroke)) return "stroke trim";
+	const gradient = stroke.gradient ? fillReason(stroke.gradient) : null;
+	if (gradient) return `${gradient} stroke`;
 	if (strokeInset(stroke) === 0 || shape === null) return null;
 	if (!shape || !outlineGeometry(shape, 0, 0, 100, 100, strokeInset(stroke)))
 		return "aligned stroke";
 	return null;
+}
+
+// A rounded rect as Skia's drawRRect outlines it, starting where its dashes do.
+function skiaRRect(
+	ck: CanvasKit,
+	ltrb: readonly [number, number, number, number],
+	radii: readonly [number, number, number, number],
+): Path {
+	const [tl, tr, br, bl] = radii;
+	const builder = new ck.PathBuilder();
+	try {
+		builder.addRRect(Float32Array.of(...ltrb, tl, tl, tr, tr, br, br, bl, bl));
+		return builder.detach();
+	} finally {
+		builder.delete();
+	}
+}
+
+// `path` dashed as Skia's dash effect cuts it: the pattern starts afresh on
+// each contour, and on a closed one a dash running into the end joins the
+// dash it began with.
+function dashPath(ck: CanvasKit, path: Path, dash: number[]): Path | null {
+	const cmds: number[] = [];
+	let count = 0;
+	const iter = new ck.ContourMeasureIter(path, false, 1);
+	try {
+		for (let m = iter.next(); m; m = iter.next()) {
+			const add = (from: number, to: number, move: boolean) => {
+				const seg = m?.getSegment(from, to, move);
+				if (!seg) return;
+				const c = Array.from(seg.toCmds());
+				seg.delete();
+				cmds.push(...(move || c[0] !== ck.MOVE_VERB ? c : c.slice(3)));
+			};
+			try {
+				const length = m.length();
+				const closed = m.isClosed();
+				let skip = closed;
+				let added = false;
+				let index = 0;
+				let distance = 0;
+				while (distance < length) {
+					if (++count > MAX_DASHES) return null;
+					const on = dash[index] as number;
+					added = false;
+					if (index % 2 === 0 && !skip && on > 0) {
+						added = true;
+						add(distance, distance + on, true);
+					}
+					distance += on;
+					skip = false;
+					index = (index + 1) % dash.length;
+				}
+				if (closed && (dash[0] as number) > 0)
+					add(0, dash[0] as number, !added);
+			} finally {
+				m.delete();
+			}
+		}
+	} finally {
+		iter.delete();
+	}
+	return ck.Path.MakeFromCmds(cmds);
 }
 
 function hasBackdrop(cmd: DrawCommand): boolean {

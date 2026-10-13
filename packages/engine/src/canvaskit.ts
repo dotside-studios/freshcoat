@@ -406,7 +406,7 @@ function tileMode(ck: CanvasKit, spread: GradientSpread | undefined) {
 
 // The focus in the circle's own space, before the ellipse's local matrix, or
 // null when the gradient starts from a point at its centre.
-function focalPoint(
+export function focalPoint(
 	fill: Extract<ResolvedFill, { kind: "radial" }>,
 	cx: number,
 	cy: number,
@@ -887,6 +887,67 @@ export function shapeTextLines(
 		}
 	}
 	return out;
+}
+
+export type PlacedTextLine = {
+	line: TextLine;
+	runs: GlyphRun[];
+	// Each run's RSXforms, four floats per glyph, as drawText places them.
+	xforms: Float32Array[];
+	spanAt: number[];
+};
+
+// An arc text decoration: a band of `thickness` along the circle of radius `r`
+// about (cx, cy), from angle `a0` to `a1` in radians clockwise from the top.
+export type PlacedTextBand = {
+	cx: number;
+	cy: number;
+	r: number;
+	a0: number;
+	a1: number;
+	thickness: number;
+	color: string;
+};
+
+// A curved text command's glyphs placed as drawText places them, for a
+// backend that draws each glyph itself.
+export function placeTextGlyphs(
+	ck: CanvasKit,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+): { lines: PlacedTextLine[]; bands: PlacedTextBand[] } {
+	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	const lines = arcLines(ck, provider, bin, cmd, fallback);
+	const shaped = lines.map((l) => l.arc);
+	let placed: ArcPlacement = [];
+	const bands: PlacedTextBand[] = [];
+	if (cmd.path) placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+	else if (cmd.arc) {
+		const [cx, cy] = arcCenter(cmd);
+		placed = placeOnArc(shaped, cmd.arc, cx, cy);
+		for (const d of arcDecorations(lines, arcRings(shaped, cmd.arc), cmd.arc))
+			bands.push({
+				cx,
+				cy,
+				r: d.r,
+				a0: d.a0,
+				a1: d.a1,
+				thickness: d.thickness,
+				color: d.span.color ?? cmd.color ?? "#000000",
+			});
+	}
+	return {
+		lines: lines.map(({ line, arc }, li) => {
+			const spanAt: number[] = [];
+			line.spans.forEach((span, i) => {
+				const bytes = utf8.encode(span.text).length;
+				for (let k = 0; k < bytes; k++) spanAt.push(i);
+			});
+			return { line, runs: arc.runs, xforms: placed[li] ?? [], spanAt };
+		}),
+		bands,
+	};
 }
 
 const decorationMetrics = new WeakMap<

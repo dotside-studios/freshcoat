@@ -241,23 +241,26 @@ fallback color.
 `renderer.renderPdf(scene, { width, height, dpi })` lays the scene out as
 `render` does and writes one PDF page, `dpi` design units to the inch.
 `renderer.paintPdf(commands)` does the same for a compiled scene. Shapes,
-solid fills, linear gradients and circular radial ones, solid strokes
-(aligned, dashed, capped and joined), clips, opacity, isolated groups, the
-blend modes PDF defines, images and SVG images are drawn as vectors; a JPEG is
-embedded as it is. Text is shaped by CanvasKit exactly as it renders and set in
-its own font file, embedded with a ToUnicode map so it stays selectable. That
-takes a TrueType or OpenType file, at its default instance when it is variable.
+solid fills, linear and radial gradients (elliptical and focal ones too, with
+transparent stops drawn through a soft mask), solid and gradient strokes
+(aligned, dashed, capped, joined and trimmed), clips, opacity, isolated groups,
+the blend modes PDF defines, images and SVG images are drawn as vectors; a JPEG
+is embedded as it is. Text is shaped by CanvasKit exactly as it renders and set
+in its own font file, embedded with a ToUnicode map so it stays selectable, each
+glyph placed along its circle or path when the text follows a curve. That takes
+a TrueType or OpenType file, or a WOFF or WOFF2 file unpacked to one (WOFF2
+where the runtime's `DecompressionStream` reads Brotli). A variable TrueType
+font is fixed at the instance the text uses before it is embedded.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
 preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
-with transparent stops, a spread, or an elliptical or focal shape, gradient
-and trimmed strokes, strokes aligned to a path, gradient-filled text, text on
-a curve, the `plus` and `linear-burn` blend modes, text in a WOFF or WOFF2 file
-or at a variable instance, and SVG images holding text or filters. Bitmaps are
-drawn without smoothing. Everything beneath a backdrop blur, or the whole page
-under a frame finish, is one image. Each image layer is reported once as a
-`vector_rasterized` warning.
+with a spread, strokes aligned to a path, gradient-filled text, the `plus` and
+`linear-burn` blend modes, text in a font collection, a variable CFF2 font or a
+WOFF2 file the runtime cannot unpack, and SVG images holding text or filters.
+Bitmaps are drawn without smoothing. Everything beneath a backdrop blur, or the
+whole page under a frame finish, is one image. Each image layer is reported
+once as a `vector_rasterized` warning.
 
 ## Subpaths
 
