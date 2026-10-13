@@ -24,6 +24,7 @@ export {
 	itemSize,
 	itemTemplate,
 	type OutputFormat,
+	PIECES_NEED_RASTER_PAGES,
 	type RenderOutput,
 	type RenderRequest,
 	referencedAssets,

@@ -188,6 +188,7 @@ export {
 	type PrepareOptions,
 	prepareTemplate,
 } from "./prepare";
+export { pieceSize, pieceSpec } from "./piece";
 export {
 	type ResolvedSlice,
 	type ResolveSlicesOptions,

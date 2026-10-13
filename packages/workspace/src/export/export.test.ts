@@ -252,7 +252,7 @@ describe("runExportJob with split: pieces", () => {
 	});
 
 	it("replaces the preset's bleed with the piece's own", async () => {
-		const bled: Workspace = {
+		const bled = {
 			...posterWorkspace,
 			templates: posterWorkspace.templates.map((t) => ({
 				...t,
@@ -279,7 +279,7 @@ describe("runExportJob with split: pieces", () => {
 					),
 				},
 			})),
-		};
+		} as Workspace;
 		const files = await zipOf(bled, { ...posterPreset, bleed: true });
 		expect(sizeOf(files["poster-1-front-left.png"])).toEqual([210, 210]);
 		expect(sizeOf(files["poster-1-front-right.png"])).toEqual([200, 200]);

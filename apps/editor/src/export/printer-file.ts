@@ -20,7 +20,7 @@ export const PRINTER_FILE_MAX_EDGE = 2048;
 
 export type PrinterFileItem = Pick<
 	ExportItem,
-	"side" | "values" | "variantId"
+	"side" | "values" | "variantId" | "piece"
 > & { key: string };
 
 /** The render request for one item's printer file: the export's own, through
