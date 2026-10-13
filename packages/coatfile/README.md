@@ -216,6 +216,9 @@ For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
 The CR80 constants (`CR80_LONG_MM`, `CR80_SHORT_MM`, `CR80_CORNER_MM`,
 `CR80_SAFE_MM`) and `MM_PER_INCH` are re-exported from the engine.
+`pxToUnit`, `unitToPx` and `parseLength` convert design px to and from mm,
+in and pt at a DPI, and `resolveUnitSuffixes` rewrites `3mm` or `12pt` in
+typed text as numbers in another unit.
 
 ## Inline assets
 

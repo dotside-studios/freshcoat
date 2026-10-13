@@ -27,6 +27,8 @@ export interface NumberFieldProps {
 	formatOptions?: Intl.NumberFormatOptions;
 	/** Maximum fraction digits kept. Defaults to formatOptions or 2. */
 	precision?: number;
+	/** Reads typed text in place of the built-in parser. Its result is clamped but not rounded. */
+	parse?: (text: string, value: number | null) => number | null;
 	placeholder?: string;
 	isDisabled?: boolean;
 	id?: string;
@@ -128,6 +130,7 @@ export function NumberField({
 	unit,
 	formatOptions,
 	precision,
+	parse: parseText,
 	placeholder = "Mixed",
 	isDisabled,
 	id,
@@ -152,11 +155,13 @@ export function NumberField({
 		[digits, formatOptions],
 	);
 
-	const clamp = (v: number) => Math.min(max, Math.max(min, roundTo(v, digits)));
+	const limit = (v: number) => Math.min(max, Math.max(min, v));
+	const clamp = (v: number) => limit(roundTo(v, digits));
 	const display =
 		value === null ? "" : `${formatter.format(value)}${unit ?? ""}`;
 
 	function parse(text: string): number | null {
+		if (parseText) return parseText(text, value);
 		let t = text.trim();
 		if (unit) t = t.split(unit).join("");
 		t = t.replace(/px/gi, "");
@@ -176,7 +181,7 @@ export function NumberField({
 		if (draft === null) return;
 		const parsed = parse(draft);
 		setDraft(null);
-		if (parsed !== null) emit(clamp(parsed));
+		if (parsed !== null) emit(parseText ? limit(parsed) : clamp(parsed));
 	}
 
 	function multiplier(e: { shiftKey: boolean; altKey: boolean }) {
