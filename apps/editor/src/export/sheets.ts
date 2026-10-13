@@ -9,6 +9,8 @@ export type PaperChoice = PaperName | "custom";
 
 export const PAPER_LABEL: Record<PaperChoice, string> = {
 	a4: "A4",
+	a5: "A5",
+	a6: "A6",
 	letter: "Letter",
 	legal: "Legal",
 	a3: "A3",
@@ -18,6 +20,8 @@ export const PAPER_LABEL: Record<PaperChoice, string> = {
 
 export const PAPER_CHOICES: PaperChoice[] = [
 	"a4",
+	"a5",
+	"a6",
 	"letter",
 	"legal",
 	"a3",

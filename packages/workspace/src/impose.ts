@@ -12,6 +12,8 @@ export const PAPER_SIZES_MM: Record<
 	{ widthMm: number; heightMm: number }
 > = {
 	a4: { widthMm: 210, heightMm: 297 },
+	a5: { widthMm: 148, heightMm: 210 },
+	a6: { widthMm: 105, heightMm: 148 },
 	letter: { widthMm: 215.9, heightMm: 279.4 },
 	legal: { widthMm: 215.9, heightMm: 355.6 },
 	a3: { widthMm: 297, heightMm: 420 },

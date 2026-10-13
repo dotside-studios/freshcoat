@@ -148,7 +148,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--cut-lines` | PDF only: draw the cut lines over each page's art; see below |
 | `--dpi <n>` | PDF only: pixels per inch, which sets the page or card size; default 300 |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
-| `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper, in whichever orientation fits more |
+| `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `a5`, `a6`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper, in whichever orientation fits more |
 | `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
 | `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
 | `--copies <n\|fill>` | with `--sheets`: repeat each card `n` times before the next, or `fill` a sheet with each; default 1 |
