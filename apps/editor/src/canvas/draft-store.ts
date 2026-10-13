@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { createExternalStore } from "~/state/external-store";
 import type { OverlayDraft, PenDraft } from "./Overlay";
 
 export type Drafts = { draft: OverlayDraft; pen: PenDraft | null };
@@ -13,20 +14,12 @@ export type DraftStore = {
 };
 
 export function createDraftStore(): DraftStore {
-	let state: Drafts = { draft: {}, pen: null };
-	const listeners = new Set<() => void>();
-	const set = (next: Drafts) => {
-		state = next;
-		for (const l of listeners) l();
-	};
+	const store = createExternalStore<Drafts>({ draft: {}, pen: null });
 	return {
-		get: () => state,
-		setDraft: (draft) => set({ ...state, draft }),
-		setPen: (pen) => set({ ...state, pen }),
-		subscribe: (listener) => {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
+		get: store.get,
+		setDraft: (draft) => store.set((s) => ({ ...s, draft })),
+		setPen: (pen) => store.set((s) => ({ ...s, pen })),
+		subscribe: store.subscribe,
 	};
 }
 

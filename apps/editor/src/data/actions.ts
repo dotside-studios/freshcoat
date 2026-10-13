@@ -17,11 +17,11 @@ import {
 	replaceDataset,
 } from "@freshcoat-js/workspace/dataset";
 import { TABLE_EXTENSIONS } from "@freshcoat-js/workspace/tabular";
-import { useSyncExternalStore } from "react";
 import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
+import { createExternalStore } from "~/state/external-store";
 import type { BindingPatch } from "~/state/workspace";
 
 export function currentDataset(
@@ -243,24 +243,12 @@ export type PhotoImportProgress = {
 	cancel(): void;
 };
 
-let progress: PhotoImportProgress | null = null;
-const listeners = new Set<() => void>();
-
-function setProgress(next: PhotoImportProgress | null): void {
-	progress = next;
-	for (const listener of listeners) listener();
-}
+const progress = createExternalStore<PhotoImportProgress | null>(null);
+const setProgress = progress.set;
 
 /** The photo import running now, if any, for a progress bar. */
 export function usePhotoImportProgress(): PhotoImportProgress | null {
-	return useSyncExternalStore(
-		(listener) => {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
-		() => progress,
-		() => null,
-	);
+	return progress.useStore();
 }
 
 const collator = new Intl.Collator(undefined, {
