@@ -1,7 +1,10 @@
 import type { Dataset } from "@freshcoat-js/workspace";
-import { useSyncExternalStore } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import {
+	createExternalStore,
+	type ExternalStore,
+} from "~/state/external-store";
 import type { EditorState } from "~/state/store";
 import type { GridUiStore } from "./grid-state";
 
@@ -19,11 +22,7 @@ export type DataView = {
 	ui: GridUiStore;
 };
 
-export type DataViewStore = {
-	get(): DataView | null;
-	subscribe(listener: () => void): () => void;
-	set(view: DataView | null): void;
-};
+export type DataViewStore = ExternalStore<DataView | null>;
 
 const sessions = new WeakMap<object, DataViewStore>();
 
@@ -34,31 +33,12 @@ export function dataViewFor(
 ): DataViewStore {
 	let store = sessions.get(controller);
 	if (!store) {
-		const listeners = new Set<() => void>();
-		let view: DataView | null = null;
-		store = {
-			get: () => view,
-			subscribe(listener) {
-				listeners.add(listener);
-				return () => listeners.delete(listener);
-			},
-			set(next) {
-				if (
-					next?.shown === view?.shown &&
-					next?.selected === view?.selected &&
-					next?.ui === view?.ui
-				)
-					return;
-				view = next;
-				for (const l of listeners) l();
-			},
-		};
+		store = createExternalStore<DataView | null>(null);
 		sessions.set(controller, store);
 	}
 	return store;
 }
 
 export function useDataView(): DataView | null {
-	const store = dataViewFor(useController());
-	return useSyncExternalStore(store.subscribe, store.get, store.get);
+	return dataViewFor(useController()).useStore();
 }

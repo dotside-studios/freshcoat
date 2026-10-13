@@ -2,6 +2,7 @@ import { type ToastOptions, toast } from "@freshcoat-js/ui/toast";
 import { useSyncExternalStore } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import { createExternalStore } from "~/state/external-store";
 import type { Section } from "~/state/workspace";
 
 export type TaskOptions = {
@@ -55,22 +56,14 @@ export type Tasks = {
 export function createTasks(
 	controller: Pick<EditorController, "state">,
 ): Tasks {
-	const listeners = new Set<() => void>();
+	const store = createExternalStore<readonly TaskSnapshot[]>([]);
 	const aborters = new Map<string, AbortController>();
-	let snapshot: readonly TaskSnapshot[] = [];
-	const set = (next: readonly TaskSnapshot[]) => {
-		snapshot = next;
-		for (const l of listeners) l();
-	};
 
 	return {
-		getSnapshot: () => snapshot,
-		subscribe(listener) {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
+		getSnapshot: store.get,
+		subscribe: store.subscribe,
 		cancel(id) {
-			if (snapshot.find((t) => t.id === id)?.cancellable)
+			if (store.get().find((t) => t.id === id)?.cancellable)
 				aborters.get(id)?.abort();
 		},
 		start(options) {
@@ -85,7 +78,7 @@ export function createTasks(
 				cancellable: !!options.cancellable,
 				progress: null,
 			};
-			set([...snapshot.filter((t) => t.id !== id), entry]);
+			store.set((tasks) => [...tasks.filter((t) => t.id !== id), entry]);
 			return {
 				signal: aborter.signal,
 				report(r) {
@@ -96,13 +89,15 @@ export function createTasks(
 						total: r.total,
 						failed: r.failed ?? 0,
 					};
-					set(snapshot.map((t) => (t.id === id ? { ...t, progress } : t)));
+					store.set((tasks) =>
+						tasks.map((t) => (t.id === id ? { ...t, progress } : t)),
+					);
 				},
 				end(status) {
 					// A task that took over the id keeps its entry.
 					if (aborters.get(id) === aborter) {
 						aborters.delete(id);
-						set(snapshot.filter((t) => t.id !== id));
+						store.set((tasks) => tasks.filter((t) => t.id !== id));
 					}
 					const shown = options.onEnd?.({ status, report: last });
 					if (shown && controller.state.section !== options.section) {
