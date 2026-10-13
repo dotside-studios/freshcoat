@@ -292,6 +292,20 @@ describe("dynamic image shape", () => {
 		expect(r.warnings.map((w) => w.code)).toEqual(["image_stroke_unsupported"]);
 	});
 
+	it("leaves out a stroke with a width per side, and warns", () => {
+		const r = dynamicElement(
+			baseImage({
+				name: "{{avatar}}",
+				strokes: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
+				strokeWeights: { top: 4, right: 0, bottom: 4, left: 0 },
+			}),
+		);
+		expect(r.element.properties).not.toHaveProperty("stroke");
+		expect(r.warnings.map((w) => w.code)).toEqual([
+			"stroke_weight_mixed_unsupported",
+		]);
+	});
+
 	it("masks a round ellipse as a circle", () => {
 		const { element } = dynamicElement(shapeNode({ type: "ELLIPSE" }));
 		expect(element.properties.mask).toBe("circle");

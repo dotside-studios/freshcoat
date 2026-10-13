@@ -632,6 +632,7 @@ function walkNode(
 	}
 }
 
+// Per-side weights Figma reported but could not be read.
 function shapeWarnings(n: FigmaNode, warnings: TemplateWarning[]): void {
 	if (
 		(isRectangleNode(n) || isContainerNode(n)) &&

@@ -3,7 +3,12 @@ import {
 	type Gradient,
 	linearGradientAngle,
 } from "@freshcoat-js/coatfile";
-import type { FigmaNode, FigmaPaint, FigmaSolidPaint } from "../types";
+import type {
+	FigmaNode,
+	FigmaPaint,
+	FigmaSolidPaint,
+	FigmaStrokeWeights,
+} from "../types";
 import {
 	angularPlacement,
 	channel,
@@ -247,12 +252,34 @@ export function fillsToElement(
 
 export type StrokeElement = {
 	color: string | Gradient;
-	width: number;
+	width: number | FigmaStrokeWeights;
 	dash?: number[];
 	cap?: "round" | "square";
 	join?: "round" | "bevel";
 	align?: "inside" | "outside";
 };
+
+function strokeWidth(
+	node: { strokeWeight?: number; strokeWeights?: FigmaStrokeWeights },
+	scale: number,
+): number | FigmaStrokeWeights | undefined {
+	const half = (w: number) => Math.round(w * scale * 2) / 2;
+	if (node.strokeWeight !== undefined) {
+		const width = half(node.strokeWeight);
+		return width > 0 ? width : undefined;
+	}
+	const w = node.strokeWeights;
+	if (!w) return undefined;
+	const sides = {
+		top: Math.max(0, half(w.top)),
+		right: Math.max(0, half(w.right)),
+		bottom: Math.max(0, half(w.bottom)),
+		left: Math.max(0, half(w.left)),
+	};
+	const { top, right, bottom, left } = sides;
+	if (!(Math.max(top, right, bottom, left) > 0)) return undefined;
+	return top === right && top === bottom && top === left ? top : sides;
+}
 
 // Solids composite into one colour, and a lone gradient maps as a fill would.
 // classify rasterizes anything else (`stroke_flattened`).
@@ -284,21 +311,37 @@ function scaleDash(
 	return even.map((d) => Math.round(d * scale * 100) / 100);
 }
 
+type StrokeSource = {
+	strokes?: FigmaPaint[];
+	strokeWeight?: number;
+	strokeWeights?: FigmaStrokeWeights;
+	strokeCap?: string;
+	strokeJoin?: string;
+	strokeAlign?: string;
+	dashPattern?: number[];
+};
+
+/** A stroke of one width, for an element that takes no width per side. */
 export function strokeToElement(
-	node: {
-		strokes?: FigmaPaint[];
-		strokeWeight?: number;
-		strokeCap?: string;
-		strokeJoin?: string;
-		strokeAlign?: string;
-		dashPattern?: number[];
-	},
+	node: StrokeSource,
+	scale: number,
+	box?: PaintBox,
+): (StrokeElement & { width: number }) | undefined {
+	return boxStrokeToElement(
+		{ ...node, strokeWeights: undefined },
+		scale,
+		box,
+	) as (StrokeElement & { width: number }) | undefined;
+}
+
+/** A rect or frame stroke, whose per-side weights map to a width per side. */
+export function boxStrokeToElement(
+	node: StrokeSource,
 	scale: number,
 	box?: PaintBox,
 ): StrokeElement | undefined {
-	if (node.strokeWeight === undefined) return undefined;
-	const width = Math.round(node.strokeWeight * scale * 2) / 2;
-	if (!(width > 0)) return undefined;
+	const width = strokeWidth(node, scale);
+	if (width === undefined) return undefined;
 	const color = strokeColor(node.strokes, box);
 	if (color === undefined) return undefined;
 	const dash = scaleDash(node.dashPattern, scale);
