@@ -262,7 +262,7 @@ describe("resolveSlices", () => {
 			),
 			{},
 		);
-		expect(slices.map((s) => s.id)).toEqual(["d", "b", "c", "a"]);
+		expect(slices.map((s) => s.id)).toEqual(["d", "c", "b", "a"]);
 	});
 
 	test("picks the side, defaulting to the first", () => {

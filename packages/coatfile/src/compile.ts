@@ -43,7 +43,7 @@ import { applyBooleans } from "./boolean";
 import { linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
-import { prepareTemplate } from "./prepare";
+import { fieldContext, prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
@@ -137,13 +137,7 @@ export function compile(
 		);
 	}
 
-	const ctx: Record<string, unknown> = {};
-	for (const [k, def] of Object.entries(template.fields.properties)) {
-		if (def.default !== undefined) ctx[k] = def.default;
-	}
-	for (const [k, val] of Object.entries(values)) {
-		if (val !== undefined && val !== null) ctx[k] = val;
-	}
+	const ctx = fieldContext(template, values);
 
 	const bleed = opts.bleed ? templateBleed(template) : NO_INSETS;
 	const withBleed = hasInsets(bleed);
@@ -237,7 +231,9 @@ function compileFrame(
 	};
 	const children: Node[] = [
 		compileBackground(frame.background, ctx, targetWidth, targetHeight, ratio),
-		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
+		...frame.elements
+			.filter((el) => el.type !== "slice")
+			.map((el) => compileElement(el, ctx, ratio, scope)),
 	];
 	const root: GroupNode = {
 		kind: "group",
@@ -418,6 +414,8 @@ function compileElement(
 				...(props.channel === "luminance" ? { channel: "luminance" } : {}),
 				...(props.invert === true ? { invert: true } : {}),
 			} satisfies MaskNode;
+		case "slice":
+			throw new Error("compile: a slice is not painted");
 		case "frame":
 			return compileFrameElement(transform, props, ratio, ctx, scope);
 		default:

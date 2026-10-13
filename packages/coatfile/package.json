@@ -18,6 +18,7 @@
 		"./fills": "./src/fills.ts",
 		"./fonts": "./src/font-usage.ts",
 		"./render": "./src/render.ts",
+		"./slices": "./src/slices.ts",
 		"./svg": "./src/svg.ts",
 		"./normalize": "./src/normalize.ts",
 		"./coat": "./src/coat.ts",

@@ -21,9 +21,10 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
+//   1.7  `slice` element
 
 export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 6;
+export const FORMAT_MINOR = 7;
 
 /** What a writer puts in `format_version` for a template it produced. */
 export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
@@ -74,6 +75,7 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
+			if (o.type === "slice") need(7);
 			if (
 				o.type === "barcode" &&
 				(o.properties as Record<string, unknown> | undefined)?.bearerBars !==

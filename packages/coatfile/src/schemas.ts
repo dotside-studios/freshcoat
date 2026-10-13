@@ -661,6 +661,47 @@ export const VectorElementSchema = z.object({
 	properties: VectorPropertiesSchema,
 });
 
+/** An inset from each edge of the trim, in design units: one number for every
+ *  side, or each side on its own. */
+export const InsetsSchema = z.union([
+	z.number(),
+	z.object({
+		top: z.number(),
+		right: z.number(),
+		bottom: z.number(),
+		left: z.number(),
+	}),
+]);
+
+export const SliceShapeSchema = z.union([
+	z.object({
+		kind: z.literal("rect"),
+		cornerRadius: CornerRadiusSchema.optional(),
+	}),
+	z.object({
+		kind: z.literal("path"),
+		// SVG path data in the slice box's own coordinates, as a vector's `d`.
+		d: z.string(),
+		fillRule: z.enum(["nonzero", "evenodd"]).optional(),
+	}),
+]);
+
+// A region of a side that becomes its own output piece and/or whose edge is a
+// cut line. It owns nothing and never paints; exporters read it.
+export const SliceElementSchema = z.object({
+	...elementShellShape,
+	type: z.literal("slice"),
+	properties: z.object({
+		// Used in file names. Defaults to the element id.
+		name: z.string().optional(),
+		shape: SliceShapeSchema.optional(),
+		output: z.enum(["piece", "none"]).optional(),
+		edge: z.enum(["none", "through", "kiss", "score", "perforate"]).optional(),
+		bleed: InsetsSchema.optional(),
+		order: z.number().optional(),
+	}),
+});
+
 // Non-frame leaf elements. Frames are added to the element union separately
 // (FrameElementSchema) and may nest via FramePropertiesSchema.children.
 export const LeafElementSchema = z.discriminatedUnion("type", [
@@ -670,6 +711,7 @@ export const LeafElementSchema = z.discriminatedUnion("type", [
 	BarcodeElementSchema,
 	RectElementSchema,
 	VectorElementSchema,
+	SliceElementSchema,
 ]);
 
 export const FrameElementSchema: z.ZodType<FrameElement> = z.lazy(() =>
@@ -787,18 +829,6 @@ export const TemplateWarningSchema = z.object({
  *  — belongs to that exporter and not to the format. */
 export const TemplateSourceSchema = z.looseObject({ kind: z.string() });
 
-/** An inset from each edge of the trim, in design units: one number for every
- *  side, or each side on its own. */
-export const InsetsSchema = z.union([
-	z.number(),
-	z.object({
-		top: z.number(),
-		right: z.number(),
-		bottom: z.number(),
-		left: z.number(),
-	}),
-]);
-
 export const TemplateSchema = z
 	.object({
 		$schema: z.string().optional(),
@@ -855,6 +885,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceGridPlacement(tpl, ctx);
 	enforceImageFraming(tpl, ctx);
 	enforceBooleanOperands(tpl, ctx);
+	enforceSlices(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1580,6 +1611,80 @@ function enforceImageFraming(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				"invalid_image_focus",
 				'focus text must be "x,y" with both in [0, 1], or reference a field',
 				[...path, "properties", "focus"],
+			);
+		}
+	});
+}
+
+// A slice marks a region of the side, so it sits directly in a side's
+// `elements`, is axis-aligned, has a real size, and is named uniquely.
+function enforceSlices(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	const names = tpl.template_data.map(() => new Set<string>());
+	walkElements(tpl, (el, path) => {
+		if (el.type !== "slice") return;
+		const slice = el as {
+			id?: string;
+			size?: { width?: number; height?: number };
+			rotation?: number;
+			properties?: { name?: string; bleed?: unknown };
+		};
+		const topLevel = path.length === 4 && path[2] === "elements";
+		if (!topLevel) {
+			addKitIssue(
+				ctx,
+				"slice_not_top_level",
+				"a slice must be a top-level element of a side",
+				path,
+			);
+			return;
+		}
+		const size = slice.size;
+		if (
+			!size ||
+			!(Number.isFinite(size.width) && (size.width as number) > 0) ||
+			!(Number.isFinite(size.height) && (size.height as number) > 0)
+		) {
+			addKitIssue(
+				ctx,
+				"slice_size_required",
+				"a slice needs a size with a positive width and height",
+				[...path, "size"],
+			);
+		}
+		if (slice.rotation !== undefined && slice.rotation !== 0) {
+			addKitIssue(ctx, "slice_rotated", "a slice cannot be rotated", [
+				...path,
+				"rotation",
+			]);
+		}
+		const name = slice.properties?.name ?? slice.id;
+		const seen = names[path[1] as number];
+		if (typeof name === "string" && seen) {
+			if (seen.has(name)) {
+				addKitIssue(
+					ctx,
+					"slice_name_duplicate",
+					`duplicate slice name "${name}"`,
+					[...path, "properties", "name"],
+				);
+			} else seen.add(name);
+		}
+		const bleed = slice.properties?.bleed;
+		const entries: [string | undefined, number][] =
+			typeof bleed === "number"
+				? [[undefined, bleed]]
+				: bleed && typeof bleed === "object"
+					? Object.entries(bleed as Record<string, number>)
+					: [];
+		for (const [side, n] of entries) {
+			if (Number.isFinite(n) && n >= 0) continue;
+			addKitIssue(
+				ctx,
+				"invalid_inset",
+				"slice bleed must be a non-negative number",
+				side === undefined
+					? [...path, "properties", "bleed"]
+					: [...path, "properties", "bleed", side],
 			);
 		}
 	});

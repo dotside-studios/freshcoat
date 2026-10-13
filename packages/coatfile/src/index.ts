@@ -183,7 +183,16 @@ export {
 	uniquifyElementIds,
 	uniquifyElementIdsDeep,
 } from "./normalize";
-export { type PrepareOptions, prepareTemplate } from "./prepare";
+export {
+	fieldContext,
+	type PrepareOptions,
+	prepareTemplate,
+} from "./prepare";
+export {
+	type ResolvedSlice,
+	type ResolveSlicesOptions,
+	resolveSlices,
+} from "./slices";
 export { generateMatrix } from "./qr";
 export {
 	parseTrimValue,
@@ -273,6 +282,8 @@ export type {
 	ShapeMask,
 	Sides,
 	Size,
+	SliceElement,
+	SliceShape,
 	Stroke,
 	Symbology,
 	Template,
