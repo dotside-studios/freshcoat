@@ -15,6 +15,7 @@ import {
 	resolveSlices,
 	type Sides,
 	type Template,
+	templateBleed,
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import {
@@ -25,7 +26,15 @@ import {
 import { orientedSize } from "@freshcoat-js/engine/image";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
-import { DEFAULT_QUALITY, exportSize, imageFormat, vectorPages } from "../plan";
+import { type ItemCuts, itemCuts } from "../cut";
+import {
+	DEFAULT_QUALITY,
+	exportCutFile,
+	exportCutLines,
+	exportSize,
+	imageFormat,
+	vectorPages,
+} from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
 import { createJobCaches } from "./caches";
 import {
@@ -70,6 +79,8 @@ export type RenderRequest = {
 	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
 	 *  place of `format` */
 	vector?: { dpi: number };
+	/** also work out the item's cut lines */
+	cut?: true;
 };
 
 export type RenderOutput = {
@@ -80,6 +91,8 @@ export type RenderOutput = {
 	height: number;
 	/** CRC-32 of `bytes` */
 	crc?: number;
+	/** the item's cut lines, when the request asked and it has any */
+	cut?: ItemCuts;
 	ms: number;
 	/** set when the request asked for print: "fallback" when the print path
 	 *  failed and the bytes are a plain render */
@@ -295,6 +308,9 @@ export function itemRequest(
 						vector: { dpi: size.resize ? preset.dpi / size.scale : preset.dpi },
 					}
 				: {}),
+			...(exportCutFile(preset) !== "none" || exportCutLines(preset)
+				? { cut: true as const }
+				: {}),
 		},
 	};
 }
@@ -414,6 +430,26 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					throw new Error(`no slice "${req.piece}" on side "${req.side}"`);
 				piece = pieceSpec(renderer.ck, slice);
 			}
+			let cut: ItemCuts | undefined;
+			if (req.cut) {
+				const lines = itemCuts(
+					template,
+					{
+						values: req.values,
+						side: req.side,
+						variantId,
+						...(req.piece !== undefined ? { piece: req.piece } : {}),
+					},
+					{
+						pathOp,
+						...(req.resize ? { resize: req.resize } : {}),
+						...(req.bleed && req.piece === undefined
+							? { bleed: templateBleed(template) }
+							: {}),
+					},
+				);
+				if (lines.lines.length > 0) cut = lines;
+			}
 			const compiled = compile(template, req.values, {
 				width: design.width,
 				height: design.height,
@@ -438,6 +474,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					bytes: page.bytes,
 					crc: crc32(page.bytes),
 					format: "pdf",
+					...(cut ? { cut } : {}),
 					...exportPixelSize(compiled, req.scale),
 					ms: performance.now() - started,
 					...(warnings.length > 0 ? { warnings } : {}),
@@ -476,6 +513,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),
+				...(cut ? { cut } : {}),
 				format: (result.format ?? "png") as OutputFormat,
 				width: result.width,
 				height: result.height,

@@ -449,31 +449,32 @@ describe("runExportJob with cut files", () => {
 		right: { name: "right", edge: "kiss" },
 		cut: { name: "cut", output: "none", edge: "score" },
 	};
-	const edged = (bleed?: number): Workspace => ({
-		...posterWorkspace,
-		templates: posterWorkspace.templates.map((t) => ({
-			...t,
-			template: {
-				...t.template,
-				...(bleed ? { bleed } : {}),
-				template_data: t.template.template_data.map((f) =>
-					f.name === "front"
-						? {
-								...f,
-								elements: f.elements.map((el) =>
-									el.id in edges
-										? {
-												...el,
-												properties: { ...el.properties, slice: edges[el.id] },
-											}
-										: el,
-								),
-							}
-						: f,
-				),
-			},
-		})),
-	});
+	const edged = (bleed?: number) =>
+		({
+			...posterWorkspace,
+			templates: posterWorkspace.templates.map((t) => ({
+				...t,
+				template: {
+					...t.template,
+					...(bleed ? { bleed } : {}),
+					template_data: t.template.template_data.map((f) =>
+						f.name === "front"
+							? {
+									...f,
+									elements: f.elements.map((el) =>
+										el.id in edges
+											? {
+													...el,
+													properties: { ...el.properties, slice: edges[el.id] },
+												}
+											: el,
+									),
+								}
+							: f,
+					),
+				},
+			})),
+		}) as Workspace;
 	const zipOf = async (ws: Workspace, p: ExportPreset) => {
 		const result = await runExportJob(ws, p, { pool: inlinePool(items) });
 		items.endJob();

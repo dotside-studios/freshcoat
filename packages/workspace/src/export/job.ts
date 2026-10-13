@@ -5,9 +5,11 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { templateStem } from "@freshcoat-js/coatfile/coat";
+import { cutDxf } from "../cut-dxf";
+import { cutSvg } from "../cut-svg";
 import { slug } from "../ids";
 import { type Imposition, SheetLayoutError } from "../impose";
-import { planExport, vectorPages } from "../plan";
+import { exportCutFile, planExport, vectorPages } from "../plan";
 import type {
 	Dataset,
 	ExportItem,
@@ -179,6 +181,17 @@ export function jobFileName(
 	preset: ExportPreset,
 ): string {
 	return `${jobStem(workspace, preset)}.${preset.format === "pdf" ? "pdf" : "zip"}`;
+}
+
+/** A cut file's bytes. */
+function cutFileBytes(
+	kind: "svg" | "dxf",
+	cut: NonNullable<RenderOutput["cut"]>,
+	dpi: number,
+): Uint8Array {
+	return new TextEncoder().encode(
+		kind === "svg" ? cutSvg(cut, dpi) : cutDxf(cut, dpi),
+	);
 }
 
 function csvCell(value: string): string {
@@ -506,7 +519,17 @@ export function runExportJob(
 						if (sink) {
 							await sink.ready;
 							if (settled) return;
-							await sink.add(plan[index].fileName, out.bytes, out.crc);
+							const { fileName } = plan[index];
+							await sink.add(fileName, out.bytes, out.crc);
+							const cutFile = exportCutFile(preset);
+							if (cutFile !== "none" && out.cut) {
+								await sink.ready;
+								if (settled) return;
+								await sink.add(
+									`${fileName.replace(/\.[^.]*$/, "")}.${cutFile}`,
+									cutFileBytes(cutFile, out.cut, preset.dpi),
+								);
+							}
 						} else if (collector) {
 							const size = sizes[index];
 							collector.add({
