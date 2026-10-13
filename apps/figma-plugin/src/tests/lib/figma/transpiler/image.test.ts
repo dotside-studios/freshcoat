@@ -209,22 +209,25 @@ describe("dynamic image shape", () => {
 		expect(element.properties).not.toHaveProperty("mask");
 	});
 
-	it("rounds per-corner radii to the largest, and warns", () => {
+	it("keeps per-corner radii", () => {
 		const r = dynamicElement(
 			baseImage({ name: "{{avatar}}", cornerRadius: [24, 24, 0, 0] }),
 		);
-		expect(r.element.properties.cornerRadius).toBe(24);
-		expect(r.warnings.map((w) => w.code)).toEqual([
-			"image_corner_radius_approximated",
-		]);
+		expect(r.element.properties.cornerRadius).toEqual([24, 24, 0, 0]);
+		expect(r.warnings).toEqual([]);
 	});
 
-	it("maps corner smoothing to a squircle mask", () => {
+	it("keeps corner smoothing on per-corner radii", () => {
 		const { element } = dynamicElement(
-			baseImage({ name: "{{avatar}}", cornerRadius: 20, cornerSmoothing: 0.6 }),
+			baseImage({
+				name: "{{avatar}}",
+				cornerRadius: [20, 0, 10, 0],
+				cornerSmoothing: 0.6,
+			}),
 		);
-		expect(element.properties.mask).toEqual({ kind: "squircle", radius: 20 });
-		expect(element.properties).not.toHaveProperty("cornerRadius");
+		expect(element.properties.cornerRadius).toEqual([20, 0, 10, 0]);
+		expect(element.properties.cornerSmoothing).toBe(0.6);
+		expect(element.properties).not.toHaveProperty("mask");
 	});
 
 	it("keeps the stroke", () => {

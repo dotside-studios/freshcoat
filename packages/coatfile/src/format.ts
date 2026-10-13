@@ -21,7 +21,8 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
-//   1.7  rect and vector `slice`; text `stroke`
+//   1.7  rect and vector `slice`; text `stroke`; frame `cornerSmoothing`;
+//        per-corner image `cornerRadius` and image `cornerSmoothing`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -63,6 +64,7 @@ export function minimumFormatVersion(template: Template): string {
 		need(1);
 
 	const frameIds = new Set<string>();
+	const imageIds = new Set<string>();
 	const textIds = new Set<string>();
 	const visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
@@ -93,6 +95,11 @@ export function minimumFormatVersion(template: Template): string {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
 				if (usesIsolate(o.properties)) need(6);
+				if (usesCornerSmoothing(o.properties)) need(7);
+			}
+			if (o.type === "image") {
+				imageIds.add(o.id);
+				if (usesImageCorners(o.properties)) need(7);
 			}
 		}
 		if (o.blendMode === "linear-burn") need(5);
@@ -121,6 +128,10 @@ export function minimumFormatVersion(template: Template): string {
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
+				if (frameIds.has(delta.id) && usesCornerSmoothing(delta.properties))
+					need(7);
+				if (imageIds.has(delta.id) && usesImageCorners(delta.properties))
+					need(7);
 				if (usesBoolean(delta.properties)) need(6);
 				if (usesSlice(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
@@ -148,6 +159,18 @@ function usesPerCornerRadius(properties: unknown): boolean {
 		typeof properties === "object" &&
 		Array.isArray((properties as Record<string, unknown>).cornerRadius)
 	);
+}
+
+function usesCornerSmoothing(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).cornerSmoothing !== undefined
+	);
+}
+
+function usesImageCorners(properties: unknown): boolean {
+	return usesPerCornerRadius(properties) || usesCornerSmoothing(properties);
 }
 
 function usesBoolean(properties: unknown): boolean {
