@@ -3,7 +3,7 @@
 // The charts say what the printer DID to what it was sent; a preset is the
 // pre-correction that undoes it. So the fit is a small inverse problem per knob,
 // solved against the same math the render uses: the tone knobs are searched
-// through `printAdjust`'s own LUT, and chroma is the factor `correctionMatrix`
+// through the planner's own tone LUT, and chroma is the factor `correctionMatrix`
 // scales it back by. Whatever the charts cannot see (sharpness, and a contrast
 // that no ribbon needs because black is out of reach) stays where it was put.
 //
@@ -13,7 +13,7 @@
 
 import { assessCalibration, type CalibrationBlocker } from "./assess";
 import type { ChartReading, PatchReading } from "./measure";
-import { printAdjust } from "./plan";
+import { buildToneLut } from "./plan";
 import type { PrintOptimizeOptions } from "./types";
 
 export type FitTargetPresetOptions = {
@@ -113,8 +113,6 @@ function blockersOf(reading: ChartReading): CalibrationBlocker[] {
 const measurePatches = (reading: ChartReading): PatchReading[] =>
 	reading.patches.filter((p) => p.role === "measure");
 
-// ── Tone ───────────────────────────────────────────────────────────────────
-
 type ToneCurve = { levels: number[]; values: number[] };
 
 // What the printer returned for each level sent, one value per level. Every
@@ -137,7 +135,6 @@ function toneCurve(reading: ChartReading): ToneCurve | null {
 	return { levels, values: levels.map((l) => median(byLevel.get(l) ?? [])) };
 }
 
-// Piecewise-linear interpolation, flat beyond the ends.
 function interpolate(xs: number[], ys: number[], x: number): number {
 	if (x <= xs[0]) return ys[0];
 	for (let i = 1; i < xs.length; i++) {
@@ -160,7 +157,10 @@ const floorOf = (curve: ToneCurve) => (curve.levels[0] <= 8 ? curve.values[0] : 
 // cannot reach black returns its floor for any dark level, and asking the
 // correction to beat that is asking for density the ribbon does not have.
 function toneError(curve: ToneCurve, knobs: ToneKnobs): number {
-	const lut = printAdjust({ ...NEUTRAL, ...knobs }).lut?.r;
+	const lut =
+		knobs.gamma !== 1 || knobs.darkness > 0
+			? buildToneLut(knobs.gamma, knobs.darkness, 1)
+			: undefined;
 	const floor = floorOf(curve);
 	let sum = 0;
 	for (const level of curve.levels) {
@@ -215,8 +215,6 @@ function fitTone(curve: ToneCurve): ToneFit | Failure {
 		floor: floorOf(curve),
 	};
 }
-
-// ── Chroma ─────────────────────────────────────────────────────────────────
 
 const chromaOf = (rgb: [number, number, number]) =>
 	(Math.max(...rgb) - Math.min(...rgb)) / 255;
@@ -298,8 +296,6 @@ function fitChroma(
 		fromRamps: false,
 	};
 }
-
-// ── The fit ────────────────────────────────────────────────────────────────
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
