@@ -69,6 +69,7 @@ export type BatchOptions = {
 	duplex?: "long" | "short";
 	margin?: number;
 	gap?: number;
+	copies?: number | "fill";
 	cropMarks?: boolean;
 	pieces?: true;
 	cut?: "svg" | "dxf";
@@ -170,6 +171,7 @@ export async function renderBatch(
 						duplex: options.duplex ? `${options.duplex}-edge` : "none",
 						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
 						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
+						...(options.copies !== undefined ? { copies: options.copies } : {}),
 					},
 				}
 			: {}),

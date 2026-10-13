@@ -84,6 +84,7 @@ import {
 	type PaperChoice,
 	paperChoice,
 	sheetsFor,
+	withCopies,
 } from "./sheets";
 import { destinationSupport } from "./sinks";
 
@@ -1193,6 +1194,34 @@ function LayoutGroup({
 								{`Gap widened to ${Math.round(sheets.imposition.gapMm * 10) / 10} mm for bleed`}
 							</Hint>
 						) : null}
+						<Row label="Copies">
+							<div className="flex min-w-0 items-center gap-2">
+								<NumberField
+									aria-label="Copies"
+									value={
+										sheet.copies === "fill"
+											? (sheets?.imposition?.copies ?? 1)
+											: (sheet.copies ?? 1)
+									}
+									min={1}
+									max={999}
+									step={1}
+									precision={0}
+									isDisabled={sheet.copies === "fill"}
+									onChange={(copies) =>
+										onChange(withCopies(sheet, Math.max(1, Math.round(copies))))
+									}
+								/>
+								<Checkbox
+									isSelected={sheet.copies === "fill"}
+									onChange={(fill) =>
+										onChange(withCopies(sheet, fill ? "fill" : 1))
+									}
+								>
+									Fill sheet
+								</Checkbox>
+							</div>
+						</Row>
 						<Checkbox
 							isSelected={sheet.cropMarks}
 							onChange={(cropMarks) => patch({ cropMarks })}

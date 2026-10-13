@@ -104,6 +104,8 @@ describe("planRender", () => {
 			["card.coat", { data: "people.csv" }, "--data needs --out <dir|file.zip|file.pdf>"],
 			["card.coat", { out: "x.zip", dpi: 72 }, "--dpi applies only to a .pdf"],
 			["card.coat", { out: "x.pdf", cropMarks: false, margin: 2 }, "--no-crop-marks, --margin need --sheets"],
+			["card.coat", { out: "x.pdf", copies: "fill" }, "--copies needs --sheets"],
+			["card.coat", { out: "x.zip", copies: 2 }, "--copies applies only to a .pdf"],
 			["card.coat", { out: "x.pdf", quality: 50 }, "--quality needs --pdf-pages jpeg"],
 			["card.coat", { out: "x.zip", quality: 50 }, "--quality needs --format jpeg or webp"],
 			["card.coat", { out: "x.pdf", format: "jpeg" }, "--format applies only to images; a PDF takes --pdf-pages"],
