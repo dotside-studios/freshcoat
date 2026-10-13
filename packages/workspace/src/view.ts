@@ -135,7 +135,8 @@ function cellText(cell: CellValue | undefined): string {
 	return isEmptyValue(cell) ? "" : String(cell).trim().toLowerCase();
 }
 
-/** The test a filter makes of a cell, or why it cannot make one. */
+/** The test a filter makes of a cell, or why it cannot make one. A
+ *  `contains` filter with no value keeps every record, negated or not. */
 export function filterTest(
 	filter: ViewFilter,
 	columns: readonly Column[],
@@ -143,6 +144,7 @@ export function filterTest(
 	const column = columns.find((c) => c.key === filter.column);
 	if (!column) return `No column "${filter.column}" to filter on`;
 	const value = (filter.value ?? "").trim();
+	if (filter.op === "contains" && value === "") return () => true;
 	const test = baseTest(filter.op, column, value);
 	if (typeof test === "string") return test;
 	return filter.not ? (cell) => !test(cell) : test;

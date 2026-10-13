@@ -131,7 +131,7 @@ keep the records every filter matches, so they can test joined columns:
 | `op` | matches a cell that |
 |---|---|
 | `equals` | equals `value`: as a number, a date or yes and no for those column types, else as text ignoring case and surrounding space; with no value, is empty |
-| `contains` | holds `value` as text, ignoring case |
+| `contains` | holds `value` as text, ignoring case; with no value, every cell |
 | `empty` | is empty |
 | `lt`, `lte`, `gt`, `gte` | is a number or date below or above `value`; empty cells never match |
 

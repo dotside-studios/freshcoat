@@ -73,6 +73,15 @@ describe("filters", () => {
 		).toEqual(["r_00000002", "r_00000003", "r_00000004"]);
 	});
 
+	it("keeps every record for contains with no value, negated or not", () => {
+		for (const not of [false, true])
+			expect(
+				ids(
+					filtered({ column: "tier", op: "contains", value: "", not }).dataset,
+				),
+			).toEqual(ids(base));
+	});
+
 	it("empty, and equals with no value, and not", () => {
 		const empty = ids(filtered({ column: "tier", op: "empty" }).dataset);
 		expect(empty).toEqual(["r_00000004", "r_00000005"]);

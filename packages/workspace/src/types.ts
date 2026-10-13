@@ -110,7 +110,8 @@ export type VariantFallback = Extract<
 >;
 
 /** How a filter compares a cell with its value. `lt`, `lte`, `gt` and `gte`
- *  apply to number, integer and date columns; `empty` takes no value. */
+ *  apply to number, integer and date columns; `empty` takes no value, and
+ *  `contains` with no value keeps every record. */
 export type FilterOp =
 	| "equals"
 	| "contains"
