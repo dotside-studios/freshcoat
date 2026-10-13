@@ -6,7 +6,8 @@
 //
 // Only the tables a viewer reads for a CID font with an identity map are kept.
 // There is no cmap (the spec does not use one there), and no layout, kerning or
-// variation tables, as only a font's default instance is ever embedded.
+// variation tables, as a variable font is fixed at an instance before it is
+// embedded.
 
 import { assemble, type Tables } from "../sfnt-write";
 import { tagAt } from "./sfnt";
@@ -29,7 +30,7 @@ const KEPT = [
 
 const ENDCHAR = Uint8Array.of(14);
 
-function readTables(bytes: Uint8Array): {
+export function readTables(bytes: Uint8Array): {
 	version: string;
 	tables: Tables;
 } {
@@ -45,7 +46,7 @@ function readTables(bytes: Uint8Array): {
 	return { version: tagAt(bytes, 0), tables };
 }
 
-function concat(parts: ArrayLike<number>[]): Uint8Array {
+export function concat(parts: ArrayLike<number>[]): Uint8Array {
 	const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
 	let at = 0;
 	for (const p of parts) {
@@ -201,7 +202,7 @@ export function mergeFontSubsets(files: Uint8Array[]): Uint8Array | null {
 	}
 }
 
-function get(tables: Tables, tag: string): Uint8Array {
+export function get(tables: Tables, tag: string): Uint8Array {
 	const table = tables.get(tag);
 	if (!table) throw new Error(`no ${tag}`);
 	return table;
@@ -229,7 +230,7 @@ function subsetHmtx(hmtx: Uint8Array, hhea: Uint8Array, keep: Set<number>) {
 }
 
 // A glyf table's glyphs, whichever loca format locates them.
-function glyfReader(tables: Tables, count: number) {
+export function glyfReader(tables: Tables, count: number) {
 	const head = get(tables, "head");
 	const long = new DataView(head.buffer, head.byteOffset).getInt16(50) === 1;
 	const loca = get(tables, "loca");
@@ -278,7 +279,7 @@ function subsetGlyf(
 // The glyf and loca tables of `pieces`, each glyph padded to four bytes, and
 // the head that says which loca format it needs: the long one when `long` or
 // when the glyphs outgrow the short one.
-function layoutGlyf(
+export function layoutGlyf(
 	tables: Tables,
 	pieces: Uint8Array[],
 	long: boolean,
