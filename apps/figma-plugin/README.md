@@ -209,10 +209,11 @@ layers were kept, flattened or skipped.
   rotation and opacity. A layer the instance hides is hidden in the variant.
   The operands of a boolean are layers too: one the instance moves or hides is
   a change to that operand, and the boolean follows.
-  One the card hides and the instance shows stays hidden, with the warning
-  `variant_unhide_unsupported`: a variant can hide a layer, not add one. The
-  variant's id is its label's slug, suffixed `-2`, `-3` when another colorway
-  (or Default) already has it.
+  A layer the card hides and an instance shows goes in the file with
+  `hidden: true`, so Default leaves it out, and that variant shows it with
+  `hidden: false`; one no colorway shows is left out of the file. A hidden
+  mask layer stays hidden. The variant's id is its label's slug, suffixed `-2`,
+  `-3` when another colorway (or Default) already has it.
 - **Barcodes.** A layer named `barcode:{{sku}}` draws a Code 128 barcode of the
   field in the layer's box; `barcode:ean13:{{sku}}` names a symbology, and
   `barcode:ean13:5901234123457` a literal value. Options follow a `;` as for QR
