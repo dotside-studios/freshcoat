@@ -1,7 +1,7 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
 import { getElement } from "~/doc/path";
-import { isSliceable, setSlice } from "~/doc/slice";
+import { hasOpenPath, isSliceable, setSlice } from "~/doc/slice";
 import { doc } from "./doc-fixture";
 
 const sliceOf = (t: Template, key: string) =>
@@ -40,5 +40,56 @@ describe("slice ops", () => {
 		if (!again.ok) throw new Error(again.reason);
 		expect(sliceOf(again.template, "0/1")).toBeUndefined();
 		expect(sliceOf(again.template, "0/4")).toBeUndefined();
+	});
+});
+
+const N = doc().template_data[0]?.elements.length ?? 0;
+const KEYS = { fold: `0/${N}`, loop: `0/${N + 1}`, mixed: `0/${N + 2}` };
+
+function withVectors(): Template {
+	const t = doc();
+	const front = t.template_data[0];
+	if (!front) throw new Error("fixture");
+	const vector = (id: string, d: string): Element => ({
+		id,
+		type: "vector",
+		pos: { x: 0, y: 0 },
+		size: { width: 100, height: 10 },
+		properties: { d },
+	});
+	return {
+		...t,
+		template_data: [
+			{
+				...front,
+				elements: [
+					...front.elements,
+					vector("fold", "M0 5H100"),
+					vector("loop", "M0 0H100V10H0Z"),
+					vector("mixed", "M0 0H10V10Z M20 0H60"),
+				],
+			},
+			...t.template_data.slice(1),
+		],
+	};
+}
+
+describe("open paths as slices", () => {
+	test("finds an open subpath in a plain vector", () => {
+		const t = withVectors();
+		expect(hasOpenPath(t, KEYS.fold)).toBe(true);
+		expect(hasOpenPath(t, KEYS.loop)).toBe(false);
+		expect(hasOpenPath(t, KEYS.mixed)).toBe(true);
+		expect(hasOpenPath(t, "0/0")).toBe(false);
+	});
+
+	test("turning on a slice for an open vector makes it a score line, not a piece", () => {
+		const on = setSlice(withVectors(), [KEYS.fold, KEYS.loop], true);
+		if (!on.ok) throw new Error(on.reason);
+		expect(sliceOf(on.template, KEYS.fold)).toEqual({
+			output: "none",
+			edge: "score",
+		});
+		expect(sliceOf(on.template, KEYS.loop)).toEqual({});
 	});
 });

@@ -3,7 +3,7 @@ import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
-import { isSliceable } from "~/doc/slice";
+import { hasOpenPath, isSliceable, newSlice } from "~/doc/slice";
 import { CommitField, Row } from "./controls";
 import { commonValue, type Inspect, propsOf } from "./field-helpers";
 import { InspectorSection } from "./InspectorSection";
@@ -50,6 +50,8 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 	const edge = some((s) => s.edge ?? "none");
 	const bleed = some((s) => s.bleed ?? 0);
 
+	const open = ins.keys.some((k) => hasOpenPath(ins.template, k));
+
 	return (
 		<InspectorSection title="Slice">
 			<Row label="">
@@ -57,9 +59,11 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 					isSelected={on === true}
 					isIndeterminate={on === null}
 					onChange={(next) =>
-						ins.setProps("slice-on", (el) => {
+						ins.setProps("slice-on", (el, key) => {
 							const has = sliceOf(el as Element) !== undefined;
-							return has === next ? null : { slice: next ? {} : undefined };
+							return has === next
+								? null
+								: { slice: next ? newSlice(ins.template, key) : undefined };
 						})
 					}
 				>
@@ -91,10 +95,20 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 								if (v) edit("output", v === "piece" ? undefined : "none");
 							}}
 						>
-							<ToggleGroupItem id="piece">Piece</ToggleGroupItem>
+							<ToggleGroupItem id="piece" isDisabled={open}>
+								Piece
+							</ToggleGroupItem>
 							<ToggleGroupItem id="none">None</ToggleGroupItem>
 						</ToggleGroup>
 					</Row>
+					{open ? (
+						<p
+							className="m-0 text-fc-faint text-fc-sm"
+							data-testid="slice-open-hint"
+						>
+							An open path is a cut line, so it can't be a piece
+						</p>
+					) : null}
 					<Row label="Edge">
 						<Select
 							aria-label="Slice edge"

@@ -212,3 +212,57 @@ describe("Slice in the layer menu and the layers panel", () => {
 		expect(screen.queryByRole("menuitem", { name: /slice/i })).toBeNull();
 	});
 });
+
+describe("Slice section for open paths", () => {
+	const front = () => doc().template_data[0]?.elements.length ?? 0;
+	const KEY = () => `0/${front()}`;
+	function withFold(slice?: object): Template {
+		const t = doc();
+		const side = t.template_data[0];
+		if (!side) throw new Error("fixture");
+		const fold = {
+			id: "fold",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 10 },
+			properties: { d: "M0 5H100", ...(slice ? { slice } : {}) },
+		} as Element;
+		return {
+			...t,
+			template_data: [
+				{ ...side, elements: [...side.elements, fold] },
+				...t.template_data.slice(1),
+			],
+		};
+	}
+
+	it("turns on as a score line with no piece", () => {
+		const c = setup([KEY()], withFold());
+		fireEvent.click(checkbox());
+		expect(slice(c, KEY())).toEqual({ output: "none", edge: "score" });
+	});
+
+	it("disables Piece with a hint, and keeps None usable", () => {
+		setup([KEY()], withFold({ output: "none", edge: "score" }));
+		expect(screen.getByRole("radio", { name: "Piece" })).toHaveProperty(
+			"disabled",
+			true,
+		);
+		expect(screen.getByRole("radio", { name: "None" })).toHaveProperty(
+			"disabled",
+			false,
+		);
+		expect(screen.getByTestId("slice-open-hint").textContent).toBe(
+			"An open path is a cut line, so it can't be a piece",
+		);
+	});
+
+	it("leaves Piece on for a closed shape", () => {
+		setup(["0/0"], withSlice());
+		expect(screen.getByRole("radio", { name: "Piece" })).toHaveProperty(
+			"disabled",
+			false,
+		);
+		expect(screen.queryByTestId("slice-open-hint")).toBeNull();
+	});
+});
