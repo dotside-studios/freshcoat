@@ -190,7 +190,9 @@ function fillsFlattenReason(
 
 // A coatfile stroke takes one paint: solids composited into one colour, or a
 // single gradient.
-function strokeFlattens(n: FigmaNode & { strokeWeight?: number }): boolean {
+function strokeFlattens(
+	n: FigmaNode & { strokes?: FigmaPaint[]; strokeWeight?: number },
+): boolean {
 	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
 	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0 || compositeSolids(visible) !== null) return false;
@@ -259,6 +261,8 @@ export function classify(
 ): Classification {
 	if (n.visible === false) return { kind: "skip" };
 	if (n.opacity === 0) return { kind: "skip" };
+	// A slice paints nothing; the walk imports it apart from the layer stack.
+	if (n.type === "SLICE") return { kind: "skip" };
 
 	// A `qr:` or `barcode:` name marks a code placeholder: only its name (the
 	// encoded value) and bounding box matter — the modules are regenerated at

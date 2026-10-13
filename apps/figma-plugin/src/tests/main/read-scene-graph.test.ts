@@ -1447,3 +1447,47 @@ describe("Figma API reads", () => {
 		).toHaveLength(1);
 	});
 });
+
+describe("readNode (slice)", () => {
+	const slice = {
+		id: "2:1",
+		name: "Left",
+		type: "SLICE",
+		visible: true,
+		absoluteBoundingBox: { x: 10, y: 20, width: 300, height: 200 },
+		absoluteTransform: [
+			[1, 0, 10],
+			[0, 1, 20],
+		],
+		relativeTransform: [
+			[1, 0, 10],
+			[0, 1, 20],
+		],
+		width: 300,
+		height: 200,
+		rotation: 0,
+	};
+
+	it("reads a slice as a bare node with its geometry", () => {
+		const out = readNode(slice as never);
+		expect(out).toMatchObject({
+			id: "2:1",
+			name: "Left",
+			type: "SLICE",
+			width: 300,
+			height: 200,
+			absoluteBoundingBox: { x: 10, y: 20, width: 300, height: 200 },
+		});
+	});
+
+	it("keeps a slice among its parent frame's children", () => {
+		const frame = readFrameTree({
+			id: "1:1",
+			name: "Front",
+			type: "FRAME",
+			absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 300 },
+			children: [slice],
+		} as never);
+		expect(frame.children.map((c) => c.type)).toEqual(["SLICE"]);
+	});
+});
