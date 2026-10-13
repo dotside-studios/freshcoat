@@ -1,7 +1,13 @@
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
-import { PDFDocument } from "pdf-lib";
+import {
+	decodePDFRawStream,
+	PDFArray,
+	PDFDocument,
+	type PDFPage,
+	PDFRawStream,
+} from "pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { SheetLayoutError } from "../impose";
 import { planExport } from "../plan";
@@ -14,7 +20,7 @@ import {
 	sha256,
 	workspace,
 } from "../test-fixtures";
-import type { ExportPreset, SheetLayout, Workspace } from "../types";
+import type { ExportPreset, PdfPage, SheetLayout, Workspace } from "../types";
 import {
 	createItemRenderer,
 	IMAGE_CACHE_PIXELS,
@@ -584,6 +590,98 @@ describe("runExportJob with cut files", () => {
 		const b = await run({ cutFile: "svg" });
 		items.endJob();
 		expect(b.items).toEqual(a.items);
+	});
+
+	describe("into a PDF", () => {
+		const pdfOf = async (ws: Workspace, p: ExportPreset) => {
+			let pages: PdfPage[] = [];
+			const result = await runExportJob(ws, p, {
+				pool: inlinePool(items),
+				assemblePdf: async (given, o) => {
+					pages = given;
+					return (await import("../pdf")).assemblePdf(given, o);
+				},
+			});
+			items.endJob();
+			const blob = result.file?.blob;
+			if (!blob) throw new Error("no pdf");
+			const doc = await PDFDocument.load(
+				new Uint8Array(await blob.arrayBuffer()),
+			);
+			return { pages, doc };
+		};
+		const pdf = (changes: Partial<ExportPreset> = {}): ExportPreset => ({
+			...posterPreset,
+			format: "pdf",
+			...changes,
+		});
+		const red = (page: PDFPage) => {
+			const contents = page.node.Contents();
+			const streams =
+				contents instanceof PDFArray
+					? contents.asArray().map((ref) => page.doc.context.lookup(ref))
+					: [contents];
+			return streams.some(
+				(stream) =>
+					stream instanceof PDFRawStream &&
+					new TextDecoder("latin1")
+						.decode(decodePDFRawStream(stream).decode())
+						.includes("1 0 0 RG"),
+			);
+		};
+
+		it("hands each page its piece's lines when the preset draws them", async () => {
+			const { pages, doc } = await pdfOf(edged(), pdf({ cutLines: true }));
+			expect(pages.map((p) => p.cut?.lines.map((l) => l.name))).toEqual([
+				["left", "cut"],
+				["right"],
+				undefined,
+				["left", "cut"],
+				undefined,
+			]);
+			const flags = doc.getPages().map(red);
+			expect(flags).toEqual([true, false, false, true, false]);
+		});
+
+		it("draws none by default", async () => {
+			const { pages, doc } = await pdfOf(edged(), pdf());
+			expect(pages.every((p) => p.cut === undefined)).toBe(true);
+			expect(doc.getPages().some(red)).toBe(false);
+		});
+
+		it("draws the lines of vector pages", async () => {
+			const { pages } = await pdfOf(
+				edged(),
+				pdf({
+					split: "none",
+					sides: ["front"],
+					pdfPageImage: "vector",
+					cutLines: true,
+				}),
+			);
+			expect(pages.map((p) => p.cut?.lines.length)).toEqual([3, 2]);
+		});
+
+		it("lays the lines out on sheets", async () => {
+			const { doc } = await pdfOf(
+				edged(),
+				pdf({
+					sides: ["front"],
+					cutLines: true,
+					layout: {
+						kind: "sheet",
+						paper: "a4",
+						orientation: "portrait",
+						marginMm: 10,
+						gapMm: 0,
+						cropMarks: false,
+						duplex: "none",
+					},
+				}),
+			);
+			expect(doc.getPageCount()).toBe(1);
+			expect(red(doc.getPages()[0] as PDFPage)).toBe(true);
+		});
 	});
 
 	it("ignores the cut file option for a PDF", async () => {

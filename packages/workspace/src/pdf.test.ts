@@ -6,11 +6,13 @@ import {
 	PDFArray,
 	PDFDict,
 	PDFDocument,
+	PDFHexString,
 	PDFName,
 	type PDFPage,
 	PDFRawStream,
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
+import type { ItemCuts } from "./cut";
 import { imposeSheets } from "./impose";
 import { assemblePdf, pageSizePt, rgbIdat } from "./pdf";
 import { makePng, makeRgbaPng } from "./test-fixtures";
@@ -490,5 +492,220 @@ describe("assemblePdf with font subsets", () => {
 		expect(out.length).toBeLessThan(
 			fresh.length + coat.length + renamed.length,
 		);
+	});
+});
+
+/** The first point each `m` moves to, in page points from the bottom-left. */
+function moves(page: PDFPage): [number, number][] {
+	return [...content(page).matchAll(/(-?[\d.]+) (-?[\d.]+) m\b/g)].map(
+		(m) => [Number(m[1]), Number(m[2])] as [number, number],
+	);
+}
+
+const cut: ItemCuts = {
+	width: 856,
+	height: 540,
+	lines: [
+		{
+			kind: "through",
+			name: "box",
+			path: "M100 100L200 100L200 200L100 200Z",
+			fillRule: "nonzero",
+		},
+		{
+			kind: "perforate",
+			name: "tear",
+			path: "M0 300C10 300 20 310 30 320",
+			fillRule: "nonzero",
+		},
+	],
+};
+
+describe("assemblePdf with cut lines", () => {
+	it("strokes each line over the art in its kind's colour at a quarter point", async () => {
+		const bytes = await assemblePdf(
+			[
+				{
+					bytes: makePng(4, 3),
+					format: png,
+					widthPx: 856,
+					heightPx: 540,
+					cut,
+				},
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(bytes);
+		const [page] = doc.getPages() as [PDFPage];
+		const ops = content(page);
+		expect(ops).toContain("1 0 0 RG");
+		expect(ops).toContain("0 0.627 0 RG");
+		expect(ops).toContain("0.25 w");
+		expect(ops).toContain("c\n");
+		expect(ops.indexOf(" Do")).toBeLessThan(ops.indexOf(" RG"));
+		expect(strokes(page)).toBe(2);
+		// one point to a design unit at 72 dpi, measured up from the bottom
+		expect(moves(page)).toEqual([
+			[100, 540 - 100],
+			[0, 540 - 300],
+		]);
+	});
+
+	it("puts the strokes in an optional content group named Cut", async () => {
+		const bytes = await assemblePdf(
+			[
+				{
+					bytes: makePng(4, 3),
+					format: png,
+					widthPx: 856,
+					heightPx: 540,
+					cut,
+				},
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(bytes);
+		const props = doc.catalog.lookup(PDFName.of("OCProperties"), PDFDict);
+		const groups = props.lookup(PDFName.of("OCGs"), PDFArray);
+		expect(groups.size()).toBe(1);
+		const group = doc.context.lookup(groups.get(0), PDFDict);
+		expect(group.lookup(PDFName.of("Name"), PDFHexString).decodeText()).toBe(
+			"Cut",
+		);
+		const [page] = doc.getPages() as [PDFPage];
+		expect(content(page)).toMatch(/\/OC \/Cut BDC[\s\S]*EMC/);
+		const resources = page.node.Resources()?.lookup(PDFName.of("Properties"));
+		expect(resources).toBeInstanceOf(PDFDict);
+		expect((resources as PDFDict).get(PDFName.of("Cut"))).toBe(groups.get(0));
+	});
+
+	it("scales the lines to a page whose pixels are not the design units", async () => {
+		const bytes = await assemblePdf(
+			[
+				{
+					bytes: makePng(4, 3),
+					format: png,
+					widthPx: 1712,
+					heightPx: 1080,
+					cut,
+				},
+			],
+			{ dpi: 144 },
+		);
+		const doc = await PDFDocument.load(bytes);
+		const [page] = doc.getPages() as [PDFPage];
+		expect(page.getWidth()).toBeCloseTo(856, 3);
+		expect(moves(page)[0]).toEqual([100, 540 - 100]);
+	});
+
+	it("draws nothing for pages without lines, and no group", async () => {
+		const bytes = await assemblePdf(
+			[
+				{
+					bytes: makePng(4, 3),
+					format: png,
+					widthPx: 100,
+					heightPx: 100,
+					cut: { width: 100, height: 100, lines: [] },
+				},
+				{ bytes: makePng(4, 3), format: png, widthPx: 100, heightPx: 100 },
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(bytes);
+		for (const page of doc.getPages()) expect(strokes(page)).toBe(0);
+		expect(doc.catalog.get(PDFName.of("OCProperties"))).toBeUndefined();
+	});
+
+	it("shares one group between pages", async () => {
+		const page = {
+			bytes: makePng(4, 3),
+			format: png,
+			widthPx: 856,
+			heightPx: 540,
+			cut,
+		};
+		const doc = await PDFDocument.load(
+			await assemblePdf([page, page, page], { dpi: 72 }),
+		);
+		const props = doc.catalog.lookup(PDFName.of("OCProperties"), PDFDict);
+		expect(props.lookup(PDFName.of("OCGs"), PDFArray).size()).toBe(1);
+	});
+
+	it("is repeatable", async () => {
+		const pages = [
+			{ bytes: makePng(4, 3), format: png, widthPx: 856, heightPx: 540, cut },
+		];
+		const date = new Date("2026-01-01T00:00:00Z");
+		expect(await assemblePdf(pages, { dpi: 72, date })).toEqual(
+			await assemblePdf(pages, { dpi: 72, date }),
+		);
+	});
+
+	describe("on sheets", () => {
+		const withCut = (count: number) =>
+			cards(count).map((page) => ({ ...page, cut }));
+
+		it("positions each card's lines like its art", async () => {
+			const bytes = await assemblePdf(withCut(2), {
+				dpi: 300,
+				layout: sheet({ cropMarks: false }),
+				cardMm: card,
+			});
+			const doc = await PDFDocument.load(bytes);
+			const [page] = doc.getPages() as [PDFPage];
+			// 856 units across 85.6 mm: a tenth of a millimetre to a unit
+			const at = (xMm: number, yMm: number): [number, number] => [
+				(xMm + 10) * K,
+				A4[1] - (yMm + 10) * K,
+			];
+			const [first, , second] = moves(page);
+			expect(first?.[0]).toBeCloseTo(at(19.4, 13.5)[0], 2);
+			expect(first?.[1]).toBeCloseTo(at(19.4, 13.5)[1], 2);
+			expect(second?.[0]).toBeCloseTo(at(105, 13.5)[0], 2);
+			expect(second?.[1]).toBeCloseTo(at(105, 13.5)[1], 2);
+			expect(strokes(page)).toBe(4);
+		});
+
+		it("keeps the lines on the trimmed card when the art has bleed", async () => {
+			const bleed = 3;
+			const bled = cards(1).map((page) => ({
+				...page,
+				cut: { ...cut, width: 886, height: 570 },
+			}));
+			const doc = await PDFDocument.load(
+				await assemblePdf(bled, {
+					dpi: 300,
+					layout: sheet({ cropMarks: false }),
+					cardMm: card,
+					bleedMm: bleed,
+				}),
+			);
+			const [page] = doc.getPages() as [PDFPage];
+			const [first] = moves(page);
+			// the art starts `bleed` left of the card, 886 units over 91.6 mm
+			const mmPerUnit = (85.6 + 2 * bleed) / 886;
+			expect(first?.[0]).toBeCloseTo((19.4 - bleed + 100 * mmPerUnit) * K, 2);
+			expect(first?.[1]).toBeCloseTo(
+				A4[1] - (13.5 - bleed + 100 * mmPerUnit) * K,
+				2,
+			);
+		});
+
+		it("draws the lines of back pages too", async () => {
+			const doc = await PDFDocument.load(
+				await assemblePdf(
+					cards(1, 2).map((page) => ({ ...page, cut })),
+					{
+						dpi: 300,
+						layout: sheet({ duplex: "long-edge", cropMarks: false }),
+						cardMm: card,
+					},
+				),
+			);
+			const [front, back] = doc.getPages() as [PDFPage, PDFPage];
+			expect(strokes(front)).toBe(2);
+			expect(strokes(back)).toBe(2);
+		});
 	});
 });
