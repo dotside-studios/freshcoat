@@ -7,6 +7,7 @@ import {
 	DEFAULT_PRINT_TARGET,
 	PRINT_TARGETS,
 	parsePrintProfile,
+	printTarget,
 } from "@freshcoat-js/for-print";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
@@ -43,6 +44,7 @@ import {
 import {
 	BLEED_NEEDS_TEMPLATE_SIZE,
 	presetBleed,
+	printProfileMismatch,
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 } from "@freshcoat-js/workspace/export";
@@ -687,6 +689,10 @@ export function ExportSettings({
 
 const NO_TARGET = "none";
 
+function targetName(id: string): string {
+	return printTarget(id)?.name ?? id;
+}
+
 /** The default target is left implicit, so a preset reads the same as before
  *  targets existed. */
 function withTarget(print: PresetPrint, key: string): PresetPrint {
@@ -712,6 +718,7 @@ function PrintGroup({
 	const [measuring, setMeasuring] = useState(false);
 	const profile = print.profile;
 	const label = profile ? profileLabel(profile) : null;
+	const mismatch = printProfileMismatch(print);
 	const importProfile = async (files: FileList | null) => {
 		const file = files?.[0];
 		if (!file) return;
@@ -738,6 +745,9 @@ function PrintGroup({
 						print.enabled
 							? (print.target ?? DEFAULT_PRINT_TARGET.id)
 							: NO_TARGET
+					}
+					triggerValue={
+						print.enabled ? printTarget(print.target)?.shortName : undefined
 					}
 					onChange={(key) => onChange(withTarget(print, String(key)))}
 				>
@@ -794,6 +804,12 @@ function PrintGroup({
 								)}
 							</div>
 						</Row>
+						{mismatch ? (
+							<Hint tone="warning" testId="export-print-profile-mismatch">
+								Profile was measured on {targetName(mismatch.profileTarget)},
+								not {targetName(mismatch.presetTarget)}
+							</Hint>
+						) : null}
 						<CalibrateDialog
 							isOpen={measuring}
 							onOpenChange={setMeasuring}
