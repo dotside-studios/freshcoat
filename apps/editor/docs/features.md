@@ -738,20 +738,24 @@ refreshes it.
 
 ## Print output
 
-A preset's Print group has "Optimize for card printer", which renders
-through for-print's card-printer path (photo analysis, gray balance and the
-whole-frame finish), as Davi's card shop does. The Davi card starters open with
-a "Card printer" preset that has it on.
+A preset's Print group has a **Print target** select: None, or "Card printer
+(YMCKO dye-sub)" (shown as "Card printer" once chosen), which renders through
+for-print's card-printer path (photo analysis, gray balance and the whole-frame
+finish), as Davi's card shop does.
+The Davi card starters open with a "Card printer" preset that has it set.
+Presets saved before targets existed read as the card printer when print was
+on.
 
 - **Profile:** None, Measure…, or Import… of a `.json` print profile, shown
   with its name and date and removable. A malformed one is refused with a
-  message.
+  message. A profile measured on another print target than the preset's
+  shows a warning naming both; the export still runs.
 - **Measure printer:** Measure… opens a dialog that makes a profile from the
   printer itself. Download chart gives the gray balance chart as a PNG to print
   at 100% with color correction off. Choose photo… takes a photo of the printed
   card, and the four corner marks are clicked clockwise from top left (Clear
   corners starts over). Save profile needs a name; printer, ribbon and stock
-  are optional. A photo that can't make a profile says why: overexposed,
+  are optional. The profile records the print target it was measured on. A photo that can't make a profile says why: overexposed,
   uneven light, an uneven print, or patches outside the photo.
 - **Printer file:** the preview's "Printer file" toggle renders the current
   record through the same path. The note under it reads "Printer file, not

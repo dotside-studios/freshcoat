@@ -74,6 +74,11 @@ describe("planRender", () => {
 			["club.coatworkspace", { out: "x.zip", pngAlpha: "keep" }, "--png-alpha applies only to templates"],
 			["card.coat", { out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
 			["card.coat", { out: "x.zip", where: [{ column: "name", op: "empty" }] }, "--where needs --data or a .coatworkspace file"],
+			["card.coat", { out: "x.zip", outputIntent: "fogra.icc" }, "--output-intent applies only to a .pdf"],
+			["card.coat", { out: "x.zip", outputIntent: false }, "--no-output-intent applies only to a .pdf"],
+			["card.coat", { outputIntent: false }, "--no-output-intent needs --data or a .zip or .pdf --out"],
+			["card.coat", { out: "x.pdf", outputIntentId: "FOGRA39" }, "--output-intent-id needs --output-intent <file>"],
+			["club.coatworkspace", { out: "x.pdf", outputIntent: "fogra.icc" }, "--output-intent applies only to templates"],
 		];
 		for (const [file, options, message] of cases)
 			expect({ file, options, message: refusal(file, options) }).toEqual({ file, options, message });

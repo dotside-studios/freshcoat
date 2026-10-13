@@ -3,7 +3,12 @@ import {
 	type Template,
 	templateBleed,
 } from "@freshcoat-js/coatfile";
-import { parsePrintProfile } from "@freshcoat-js/for-print";
+import {
+	DEFAULT_PRINT_TARGET,
+	PRINT_TARGETS,
+	parsePrintProfile,
+	printTarget,
+} from "@freshcoat-js/for-print";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
@@ -20,6 +25,9 @@ import type {
 	ExportDestination,
 	ExportItem,
 	ExportPreset,
+	IccProfileAsset,
+	PdfOutputIntent,
+	PresetPrint,
 	SheetLayout,
 } from "@freshcoat-js/workspace";
 import {
@@ -31,6 +39,7 @@ import {
 	imageFormat,
 	paperSize,
 	pdfLayout,
+	readOutputProfile,
 	sheetSummary,
 	unfilledRequired,
 	unknownFileNameTokens,
@@ -38,6 +47,7 @@ import {
 import {
 	BLEED_NEEDS_TEMPLATE_SIZE,
 	presetBleed,
+	printProfileMismatch,
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 } from "@freshcoat-js/workspace/export";
@@ -187,8 +197,12 @@ export function ExportSettings({
 }) {
 	const controller = useController();
 	const templates = useEditor((s) => s.workspace?.templates);
-	const set = (patch: Partial<ExportPreset>) =>
-		controller.dispatch({ type: "setPreset", preset: { ...preset, ...patch } });
+	const set = (patch: Partial<ExportPreset>, profile?: IccProfileAsset) =>
+		controller.dispatch({
+			type: "setPreset",
+			preset: { ...preset, ...patch },
+			...(profile ? { profile } : {}),
+		});
 	const sideNames = template?.template_data.map((f) => f.name) ?? [];
 	const chosen = preset.sides === "all" ? sideNames : preset.sides;
 	const toggleSide = (name: string, on: boolean) => {
@@ -591,6 +605,14 @@ export function ExportSettings({
 							onChange={(layout) => set({ layout })}
 						/>
 					) : null}
+					{pdf ? (
+						<OutputIntentGroup
+							preset={preset}
+							onChange={(outputIntent, profile) =>
+								set({ outputIntent }, profile)
+							}
+						/>
+					) : null}
 					<PrintGroup preset={preset} onChange={(print) => set({ print })} />
 				</TabPanel>
 				<TabPanel id="files">
@@ -680,9 +702,24 @@ export function ExportSettings({
 	);
 }
 
+const NO_TARGET = "none";
+
+function targetName(id: string): string {
+	return printTarget(id)?.name ?? id;
+}
+
+/** The default target is left implicit, so a preset reads the same as before
+ *  targets existed. */
+function withTarget(print: PresetPrint, key: string): PresetPrint {
+	const { target: _drop, ...rest } = print;
+	if (key === NO_TARGET) return { ...print, enabled: false };
+	if (key === DEFAULT_PRINT_TARGET.id) return { ...rest, enabled: true };
+	return { ...rest, enabled: true, target: key };
+}
+
 /**
- * Output through for-print: a switch, the printer's measured profile, and
- * the per-photo analysis under More.
+ * Output through for-print: the print target, the printer's measured
+ * profile, and the per-photo analysis under More.
  */
 function PrintGroup({
 	preset,
@@ -696,6 +733,7 @@ function PrintGroup({
 	const [measuring, setMeasuring] = useState(false);
 	const profile = print.profile;
 	const label = profile ? profileLabel(profile) : null;
+	const mismatch = printProfileMismatch(print);
 	const importProfile = async (files: FileList | null) => {
 		const file = files?.[0];
 		if (!file) return;
@@ -715,12 +753,28 @@ function PrintGroup({
 	return (
 		<PanelSection title="Print">
 			<div data-testid="export-print" className="contents">
-				<Switch
-					isSelected={print.enabled}
-					onChange={(enabled) => onChange({ ...print, enabled })}
+				<Select
+					label="Print target"
+					labelPosition="side"
+					value={
+						print.enabled
+							? (print.target ?? DEFAULT_PRINT_TARGET.id)
+							: NO_TARGET
+					}
+					triggerValue={
+						print.enabled ? printTarget(print.target)?.shortName : undefined
+					}
+					onChange={(key) => onChange(withTarget(print, String(key)))}
 				>
-					Optimize for card printer
-				</Switch>
+					<SelectItem id={NO_TARGET} textValue="None">
+						None
+					</SelectItem>
+					{PRINT_TARGETS.map((t) => (
+						<SelectItem key={t.id} id={t.id} textValue={t.name}>
+							{t.name}
+						</SelectItem>
+					))}
+				</Select>
 				{print.enabled ? (
 					<>
 						<Row label="Profile">
@@ -765,12 +819,24 @@ function PrintGroup({
 								)}
 							</div>
 						</Row>
+						{mismatch ? (
+							<Hint tone="warning" testId="export-print-profile-mismatch">
+								Profile was measured on {targetName(mismatch.profileTarget)},
+								not {targetName(mismatch.presetTarget)}
+							</Hint>
+						) : null}
 						<CalibrateDialog
 							isOpen={measuring}
 							onOpenChange={setMeasuring}
 							onSave={(measured) => {
 								setError(null);
-								onChange({ ...print, profile: measured });
+								onChange({
+									...print,
+									profile: {
+										...measured,
+										target: print.target ?? DEFAULT_PRINT_TARGET.id,
+									},
+								});
 							}}
 						/>
 						{error ? (
@@ -801,6 +867,101 @@ function PrintGroup({
 						</Disclosure>
 					</>
 				) : null}
+			</div>
+		</PanelSection>
+	);
+}
+
+/**
+ * What the PDF declares it was prepared for: sRGB, the space cards are drawn
+ * in, or a profile of the press's condition, such as a print shop's CMYK one.
+ * The cards stay sRGB either way; the printer converts them.
+ */
+function OutputIntentGroup({
+	preset,
+	onChange,
+}: {
+	preset: ExportPreset;
+	onChange: (intent: PdfOutputIntent, profile?: IccProfileAsset) => void;
+}) {
+	const profiles = useEditor((s) => s.workspace?.profiles);
+	const [error, setError] = useState<string | null>(null);
+	const intent = preset.outputIntent ?? { kind: "srgb" };
+	const profile =
+		intent.kind === "profile"
+			? profiles?.find((p) => p.sha256 === intent.sha256)
+			: undefined;
+	const profileName = profile
+		? profile.description || profile.name
+		: "Missing profile";
+	const choose = async (files: FileList | null) => {
+		const file = files?.[0];
+		if (!file) return;
+		const read = await readOutputProfile(
+			new Uint8Array(await file.arrayBuffer()),
+			file.name,
+		);
+		if (!read.ok) {
+			setError(`Couldn't use ${file.name}: ${read.message}`);
+			return;
+		}
+		setError(null);
+		onChange({ kind: "profile", sha256: read.profile.sha256 }, read.profile);
+	};
+	return (
+		<PanelSection title="Color">
+			<div data-testid="export-output-intent" className="contents">
+				<Row label="Intent">
+					<Select
+						aria-label="Output intent"
+						value={intent.kind}
+						onChange={(key) => {
+							setError(null);
+							if (key === "srgb" || key === "none") onChange({ kind: key });
+						}}
+					>
+						<SelectItem id="srgb" textValue="sRGB">
+							sRGB
+						</SelectItem>
+						{intent.kind === "profile" ? (
+							<SelectItem id="profile" textValue={profileName}>
+								{profileName}
+							</SelectItem>
+						) : null}
+						<SelectItem id="none" textValue="None">
+							None
+						</SelectItem>
+					</Select>
+				</Row>
+				<div className="pl-18">
+					<FileTrigger
+						acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
+						onSelect={(files) => void choose(files)}
+					>
+						<Button>Custom profile…</Button>
+					</FileTrigger>
+				</div>
+				{error ? (
+					<p
+						role="alert"
+						className="m-0 pl-18 text-fc-danger-text text-fc-sm"
+						data-testid="export-output-intent-error"
+					>
+						{error}
+					</p>
+				) : intent.kind === "profile" && !profile ? (
+					<Hint tone="warning" testId="export-output-intent-hint">
+						The profile is not in this workspace; choose it again
+					</Hint>
+				) : (
+					<Hint testId="export-output-intent-hint">
+						{intent.kind === "profile"
+							? "Cards stay sRGB; the printer converts them to this profile"
+							: intent.kind === "none"
+								? "No intent: each printer reads the colors its own way"
+								: "Declares sRGB, the space cards are drawn in"}
+					</Hint>
+				)}
 			</div>
 		</PanelSection>
 	);

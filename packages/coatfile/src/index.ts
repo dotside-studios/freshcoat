@@ -73,6 +73,7 @@ export {
 	CR80_CORNER_MM,
 	CR80_LONG_MM,
 	CR80_SAFE_MM,
+	CR80_SHORT_MM,
 	cardSizeMm,
 	compactInsets,
 	extendIntoBleed,

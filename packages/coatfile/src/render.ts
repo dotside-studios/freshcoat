@@ -6,6 +6,7 @@ import {
 	type PlanPolicy,
 	type PrintPlan,
 	type PrintPlanOptions,
+	type PrintTarget,
 	planForPrint,
 } from "@freshcoat-js/for-print";
 import {
@@ -18,6 +19,7 @@ import {
 	missingGlyphs,
 	type Node,
 	type Output,
+	type OutputIntent,
 	type PdfFrame,
 	type Renderer,
 	resolveExportScale,
@@ -59,9 +61,11 @@ export type PrintRenderOptions = {
 	// Analyze each photo per-image (decode + correct with its own recommendation).
 	// Off = sync, preset-based planning (no image decode). Default: false.
 	analyze?: boolean;
-	// Per-intent correction policy (see for-print PlanPolicy). Default: photos -> YMCKO.
+	// The kind of printer (see for-print PrintTarget). Default: YMCKO_DYE_SUB.
+	target?: PrintTarget;
+	// Per-intent correction policy (see for-print PlanPolicy). Default: the target's.
 	policy?: PlanPolicy;
-	// Whole-frame finishing pass. Default: YMCKO_FINISH. Pass `false` to disable.
+	// Whole-frame finishing pass. Default: the target's finish. Pass `false` to disable.
 	finish?: FrameFinish | false;
 	// The printer's measured cast (see for-print PrintProfile), applied as the
 	// finish's curve, including when `finish` is false.
@@ -127,6 +131,7 @@ function resolvePrint(
 	return {
 		analyze: o.analyze ?? false,
 		plan: {
+			...(o.target ? { target: o.target } : {}),
 			...(o.policy ? { policy: o.policy } : {}),
 			...(o.balance ? { balance: o.balance } : {}),
 			...(o.finish !== undefined ? { finish: o.finish } : {}),
@@ -309,6 +314,8 @@ export type RenderCompiledPdfOptions = {
 	dpi?: number;
 	title?: string;
 	date?: Date;
+	/** Default sRGB; false for none. See the engine's "PDF output". */
+	outputIntent?: OutputIntent | false;
 };
 
 // Paint each side of a compiled template as one PDF page of vectors. A layer a
@@ -322,7 +329,7 @@ export async function renderCompiledPdf(
 		(f) => !options.frameNames || options.frameNames.includes(f.name),
 	);
 	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
-	const { images, dpi, title, date } = options;
+	const { images, dpi, title, date, outputIntent } = options;
 	const results: TemplatePdfFrame[] = [];
 	for (const f of frames) {
 		const commands = renderer.compile(f.root as Node, {
@@ -331,7 +338,13 @@ export async function renderCompiledPdf(
 			fonts: f.assets.fonts,
 			images: f.assets.images,
 		});
-		const page = await renderer.paintPdf(commands, { images, dpi, title, date });
+		const page = await renderer.paintPdf(commands, {
+			images,
+			dpi,
+			title,
+			date,
+			...(outputIntent !== undefined ? { outputIntent } : {}),
+		});
 		results.push({
 			...page,
 			warnings: [...(f.warnings ?? []), ...page.warnings],

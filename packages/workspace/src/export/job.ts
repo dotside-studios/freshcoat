@@ -5,8 +5,13 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { templateStem } from "@freshcoat-js/coatfile/coat";
+import {
+	type OutputIntent,
+	resolveOutputIntent,
+} from "@freshcoat-js/engine/icc";
 import { slug } from "../ids";
 import { SheetLayoutError } from "../impose";
+import { presetOutputIntent } from "../output-intent";
 import { planExport } from "../plan";
 import type {
 	Dataset,
@@ -119,6 +124,7 @@ export type AssemblePdf = (
 		layout?: SheetLayout;
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
+		outputIntent?: OutputIntent | false;
 	},
 	extras?: AssembleExtras,
 ) => Promise<Uint8Array>;
@@ -358,6 +364,16 @@ export function runExportJob(
 	const pageOf = (item: ExportItem) =>
 		withBleed(variantSize(template, item.variantId), pageBleed);
 	const sideIndex = withSideIndex(plan).map((item) => item.sideIndex);
+	// A missing or unreadable profile is refused before anything renders.
+	let outputIntent: OutputIntent | false | undefined;
+	if (pdf) {
+		try {
+			outputIntent = presetOutputIntent(workspace, preset);
+			resolveOutputIntent(outputIntent);
+		} catch (e) {
+			return Promise.reject(e);
+		}
+	}
 	if (sheet) {
 		// Refused before anything renders, rather than after every page has.
 		const sheets = planSheets(plan, template, preset);
@@ -445,6 +461,7 @@ export function runExportJob(
 							title: preset.name || workspace.name,
 							...(sheet ? { layout: sheet, cardMm } : {}),
 							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
+							...(outputIntent !== undefined ? { outputIntent } : {}),
 						},
 						{
 							signal: assembly.signal,

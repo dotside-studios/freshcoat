@@ -410,7 +410,7 @@ describe("renderPdf", () => {
 			expect(pdf.warnings).toEqual([]);
 			const body = source(pdf.bytes);
 			expect(body).not.toContain("/DCTDecode");
-			expect(body).not.toContain("/ICCBased");
+			expect(body).not.toContain("/ColorSpace [/ICCBased");
 		}
 	});
 

@@ -7,6 +7,8 @@
 //   data/<datasetId>/schema.json      the columns, as JSON Schema
 //   data/<datasetId>/records.json     the records
 //   data/<datasetId>/assets/<sha>.<ext>
+//   profiles/<sha>.icc                each ICC profile a PDF preset's output
+//                                     intent names, once
 //
 // A template is read from the path its manifest entry names, so a workspace
 // written with `templates/<entryId>.tkit` entries opens unchanged.
@@ -24,9 +26,11 @@ import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
+import { readOutputProfile, usedProfiles } from "./output-intent";
 import type {
 	Dataset,
 	DatasetAsset,
+	IccProfileAsset,
 	TemplateEntry,
 	UnpackErrorCode,
 	UnpackResult,
@@ -52,7 +56,10 @@ const FALLBACK_FORMAT_VERSION = "1.1";
 /** The version a workspace is written at when a binding has a view, which
  *  a reader of 1.1 drops. */
 const VIEW_FORMAT_VERSION = "1.2";
-const READ_MINOR = 2;
+/** The version a workspace is written at when a preset has an output intent,
+ *  which a reader of 1.2 drops. */
+const INTENT_FORMAT_VERSION = "1.3";
+const READ_MINOR = 3;
 
 const MIMETYPE_ENTRY = "mimetype";
 const MANIFEST_ENTRY = "workspace.json";
@@ -192,6 +199,7 @@ const PresetSchema = z.object({
 	print: z
 		.object({
 			enabled: z.boolean(),
+			target: z.string().min(1).optional(),
 			analyze: z.boolean().optional(),
 			// Refused rather than dropped: a preset that quietly lost its
 			// printer's correction would print cards nobody could account for.
@@ -210,6 +218,13 @@ const PresetSchema = z.object({
 		.optional(),
 	layout: LayoutSchema.optional(),
 	bleed: z.boolean().optional(),
+	outputIntent: z
+		.discriminatedUnion("kind", [
+			z.object({ kind: z.literal("srgb") }),
+			z.object({ kind: z.literal("profile"), sha256: z.string() }),
+			z.object({ kind: z.literal("none") }),
+		])
+		.optional(),
 });
 
 const GuidesSchema = z.record(
@@ -252,6 +267,16 @@ const ManifestSchema = z.object({
 		}),
 	),
 	presets: z.array(PresetSchema),
+	profiles: z
+		.array(
+			z.object({
+				sha256: z.string(),
+				name: z.string(),
+				identifier: z.string().optional(),
+				path: z.string(),
+			}),
+		)
+		.optional(),
 });
 
 export type WorkspaceManifest = z.infer<typeof ManifestSchema>;
@@ -284,7 +309,13 @@ function templatePath(entry: TemplateEntry): string {
 	return `templates/${entry.id}${COAT_EXTENSION}`;
 }
 
+function profilePath(profile: IccProfileAsset): string {
+	return `profiles/${profile.sha256}.icc`;
+}
+
 function formatVersionOf(ws: Workspace): string {
+	if (ws.presets.some((p) => p.outputIntent !== undefined))
+		return INTENT_FORMAT_VERSION;
 	if (ws.templates.some((t) => t.binding?.view !== undefined))
 		return VIEW_FORMAT_VERSION;
 	if (
@@ -298,6 +329,7 @@ function formatVersionOf(ws: Workspace): string {
 }
 
 function manifestOf(ws: Workspace): WorkspaceManifest {
+	const profiles = usedProfiles(ws.profiles, ws.presets);
 	return {
 		format: WORKSPACE_FORMAT,
 		formatVersion: formatVersionOf(ws),
@@ -322,6 +354,18 @@ function manifestOf(ws: Workspace): WorkspaceManifest {
 			})),
 		})),
 		presets: ws.presets,
+		...(profiles.length > 0
+			? {
+					profiles: profiles.map((profile) => ({
+						sha256: profile.sha256,
+						name: profile.name,
+						...(profile.identifier !== undefined
+							? { identifier: profile.identifier }
+							: {}),
+						path: profilePath(profile),
+					})),
+				}
+			: {}),
 	};
 }
 
@@ -332,6 +376,8 @@ async function* workspaceEntries(ws: Workspace): AsyncGenerator<ZipEntry> {
 		level: 0,
 	};
 	yield { name: MANIFEST_ENTRY, data: json(manifestOf(ws)), level: 6 };
+	for (const profile of usedProfiles(ws.profiles, ws.presets))
+		yield { name: profilePath(profile), data: profile.bytes, level: 6 };
 	for (const entry of ws.templates) {
 		yield {
 			name: templatePath(entry),
@@ -631,6 +677,22 @@ async function readDataset(
 	};
 }
 
+async function readProfile(
+	read: ReadEntries,
+	item: NonNullable<WorkspaceManifest["profiles"]>[number],
+): Promise<IccProfileAsset> {
+	const bytes = entry(read, item.path);
+	const profile = await readOutputProfile(bytes, item.name, item.identifier);
+	if (!profile.ok)
+		throw new UnpackError("invalid_entry", `${item.path}: ${profile.message}`);
+	if (profile.profile.sha256 !== item.sha256)
+		throw new UnpackError(
+			"asset_hash_mismatch",
+			`${item.path} hashes to ${profile.profile.sha256}`,
+		);
+	return profile.profile;
+}
+
 /** A `.coatworkspace` read back, or the reason it cannot be. The file is
  *  read as a stream, and each photo in it becomes a Blob of its own. */
 export async function unpackWorkspace(
@@ -659,6 +721,20 @@ export async function unpackWorkspace(
 		for (const item of manifest.datasets) {
 			datasets.push(await readDataset(read, item, warnings));
 		}
+		const profiles: IccProfileAsset[] = [];
+		for (const item of manifest.profiles ?? []) {
+			profiles.push(await readProfile(read, item));
+		}
+		for (const preset of manifest.presets) {
+			const intent = preset.outputIntent;
+			if (
+				intent?.kind === "profile" &&
+				!profiles.some((p) => p.sha256 === intent.sha256)
+			)
+				warnings.push(
+					`${preset.name}: the output intent's profile is missing; the preset cannot export a PDF until one is chosen`,
+				);
+		}
 		return {
 			ok: true,
 			workspace: {
@@ -667,6 +743,7 @@ export async function unpackWorkspace(
 				templates,
 				datasets,
 				presets: manifest.presets,
+				...(profiles.length > 0 ? { profiles } : {}),
 			},
 			warnings,
 		};

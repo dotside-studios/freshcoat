@@ -1,12 +1,19 @@
 import type { FrameWarning } from "@freshcoat-js/coatfile";
 import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
-import type { ChannelBalance } from "@freshcoat-js/for-print";
+import {
+	type ChannelBalance,
+	DEFAULT_PRINT_TARGET,
+	printTarget,
+	profileTarget,
+} from "@freshcoat-js/for-print";
 import type { ExportPreset, PresetPrint } from "../types";
 
 /** What a render request carries when the preset prints: plain data, so it
  *  can cross to a worker as it is. */
 export type RenderPrint = {
 	analyze: boolean;
+	/** a PrintTarget id; absent is the default target */
+	target?: string;
 	/** the profile's measured cast, when it has one */
 	balance?: ChannelBalance;
 };
@@ -37,15 +44,33 @@ export function printRequest(
 	const balance = print.profile?.balance;
 	return {
 		analyze: print.analyze ?? true,
+		...(print.target ? { target: print.target } : {}),
 		...(balance ? { balance } : {}),
 	};
 }
 
-/** What an item render hands `renderCompiled`. The finish is coatfile's
- *  default, YMCKO, with the balance as its curve. */
+/** The target ids of a preset and its profile when the profile was measured
+ *  on another target; null when print is off, there is no profile, or they
+ *  agree. A warning, not a block: the export still runs. */
+export function printProfileMismatch(
+	print: PresetPrint | undefined,
+): { profileTarget: string; presetTarget: string } | null {
+	if (!print?.enabled || !print.profile) return null;
+	const measured = profileTarget(print.profile);
+	const chosen = print.target ?? DEFAULT_PRINT_TARGET.id;
+	return measured === chosen
+		? null
+		: { profileTarget: measured, presetTarget: chosen };
+}
+
+/** What an item render hands `renderCompiled`: the target's finish, with the
+ *  balance as its curve. Throws for a target this build does not know. */
 export function printRenderOptions(print: RenderPrint): PrintRenderOptions {
+	const target = printTarget(print.target);
+	if (!target) throw new Error(`Unknown print target "${print.target}"`);
 	return {
 		analyze: print.analyze,
+		...(print.target ? { target } : {}),
 		...(print.balance ? { balance: print.balance } : {}),
 	};
 }

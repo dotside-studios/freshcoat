@@ -1,8 +1,10 @@
+import { cr80Pixels } from "@freshcoat-js/engine";
 import type { CardOrientation, CropRegion } from "./types";
 
 // CR80 card dimensions at 300dpi
-export const CR80_LONG = 1012; // 3.375"
-export const CR80_SHORT = 638; // 2.125"
+const CR80_300DPI = cr80Pixels(300);
+export const CR80_LONG = CR80_300DPI.long;
+export const CR80_SHORT = CR80_300DPI.short;
 export const CR80_ASPECT = CR80_LONG / CR80_SHORT; // ~1.586
 
 export function defaultCropRegion(): CropRegion {
