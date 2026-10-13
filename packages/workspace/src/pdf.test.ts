@@ -343,6 +343,54 @@ describe("assemblePdf on sheets", () => {
 		expect(strokes(duplex.getPage(1))).toBe(0);
 	});
 
+	it("draws registration targets, a colour bar and a slug when asked", async () => {
+		const bytes = await assemblePdf(cards(3, 2), {
+			dpi: 300,
+			title: "Members",
+			date: new Date("2026-10-13T12:00:00Z"),
+			layout: sheet({
+				duplex: "long-edge",
+				cropMarks: false,
+				registrationMarks: true,
+				colorBar: true,
+				slug: true,
+			}),
+			cardMm: card,
+		});
+		const doc = await PDFDocument.load(bytes);
+		const text = (page: PDFPage) =>
+			[...content(page).matchAll(/<([0-9A-F]+)> Tj/g)]
+				.map(([, hex]) =>
+					new TextDecoder("latin1").decode(
+						Uint8Array.from(hex?.match(/../g) ?? [], (h) => parseInt(h, 16)),
+					),
+				)
+				.join("");
+		for (const [i, side] of ["Front", "Back"].entries()) {
+			const page = doc.getPage(i);
+			// a circle and two lines for each of four targets, and the bar's outline
+			expect(strokes(page)).toBe(4 * 3 + 1);
+			expect(
+				content(page)
+					.split(/\s+/)
+					.filter((t) => t === "f"),
+			).toHaveLength(12);
+			expect(text(page)).toBe(`Members · Sheet 1 of 1 · ${side} · 2026-10-13`);
+		}
+	});
+
+	it("cuts a long slug to its margin", async () => {
+		const bytes = await assemblePdf(cards(1), {
+			dpi: 300,
+			title: `Ünïcode ✓ ${"x".repeat(200)}`,
+			layout: sheet({ slug: true }),
+			cardMm: card,
+		});
+		const page = (await PDFDocument.load(bytes)).getPage(0);
+		expect(content(page)).toContain("Tj");
+		expect(content(page)).toContain("85> Tj");
+	});
+
 	it("puts duplex backs in the mirrored slots, shifted by the offset", async () => {
 		const bytes = await assemblePdf(cards(3, 2), {
 			dpi: 300,

@@ -21,7 +21,15 @@ import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
 import { normalizePath } from "@freshcoat-js/engine/svg";
 import { crc32 } from "./crc";
 import { CUT_KINDS, CUT_STYLES, type ItemCuts } from "./cut";
-import { cropMarks, imposeSheets } from "./impose";
+import {
+	imposeSheets,
+	REGISTRATION_MARK_RADIUS_MM,
+	REGISTRATION_MARK_SIZE_MM,
+	type SheetMarks,
+	SLUG_FONT_PT,
+	sheetMarks,
+	slugText,
+} from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
 export { rgbIdat };
@@ -225,8 +233,11 @@ export async function assemblePdf(
 		});
 		const width = imposition.paper.widthMm * PT_PER_MM;
 		const height = imposition.paper.heightMm * PT_PER_MM;
-		const marks = options.layout.cropMarks ? cropMarks(imposition) : [];
-		for (const sheet of imposition.pages) {
+		const layout = options.layout;
+		const font = layout.slug
+			? await doc.embedFont(lib.StandardFonts.Helvetica)
+			: undefined;
+		for (const [index, sheet] of imposition.pages.entries()) {
 			const out = doc.addPage([width, height]);
 			for (const slot of sheet.slots) {
 				const image = await embed(slot.item);
@@ -240,15 +251,19 @@ export async function assemblePdf(
 				draw(out, image, art);
 				if (slot.item.cut) drawCut(out, slot.item.cut, art);
 			}
-			if (sheet.side === "back") continue;
-			for (const mark of marks) {
-				out.drawLine({
-					start: { x: mark.x1 * PT_PER_MM, y: height - mark.y1 * PT_PER_MM },
-					end: { x: mark.x2 * PT_PER_MM, y: height - mark.y2 * PT_PER_MM },
-					thickness: CROP_MARK_WIDTH_PT,
-					color: rgb(0, 0, 0),
-				});
-			}
+			const marks = sheetMarks(imposition, layout, sheet.side);
+			const slug =
+				marks.slug && font
+					? fitText(
+							font,
+							slugText(imposition, index, {
+								...(options.title !== undefined ? { job: options.title } : {}),
+								date,
+							}),
+							marks.slug.widthMm * PT_PER_MM,
+						)
+					: "";
+			drawMarks(lib, out, marks, slug, font);
 		}
 		await finishDocument(lib, doc, intent, profiles);
 		return doc.save();
@@ -275,6 +290,93 @@ export async function assemblePdf(
 	}
 	await finishDocument(lib, doc, intent, profiles);
 	return doc.save();
+}
+
+/** Marks are drawn in pure black, as the RGB pipeline has no registration
+ *  colour. Once a Separation /All space exists, registration targets and
+ *  crop marks belong in it so they print on every plate. */
+const REGISTRATION_BLACK = [0, 0, 0] as const;
+
+function drawMarks(
+	lib: PdfLib,
+	out: PDFPage,
+	marks: SheetMarks,
+	slug: string,
+	font: import("pdf-lib").PDFFont | undefined,
+) {
+	const height = out.getHeight();
+	const color = lib.rgb(...REGISTRATION_BLACK);
+	const at = (x: number, y: number) => ({
+		x: x * PT_PER_MM,
+		y: height - y * PT_PER_MM,
+	});
+	const line = (x1: number, y1: number, x2: number, y2: number) =>
+		out.drawLine({
+			start: at(x1, y1),
+			end: at(x2, y2),
+			thickness: CROP_MARK_WIDTH_PT,
+			color,
+		});
+	for (const mark of marks.crop) line(mark.x1, mark.y1, mark.x2, mark.y2);
+	const half = REGISTRATION_MARK_SIZE_MM / 2;
+	for (const { x, y } of marks.registration) {
+		const radius = REGISTRATION_MARK_RADIUS_MM * PT_PER_MM;
+		out.drawEllipse({
+			...at(x, y),
+			xScale: radius,
+			yScale: radius,
+			borderColor: color,
+			borderWidth: CROP_MARK_WIDTH_PT,
+		});
+		line(x - half, y, x + half, y);
+		line(x, y - half, x, y + half);
+	}
+	if (marks.colorBar.length > 0) {
+		for (const patch of marks.colorBar) {
+			const size = patch.sizeMm * PT_PER_MM;
+			out.drawRectangle({
+				...at(patch.x, patch.y + patch.sizeMm),
+				width: size,
+				height: size,
+				color: lib.rgb(...patch.rgb),
+			});
+		}
+		const first = marks.colorBar[0] as SheetMarks["colorBar"][number];
+		const last = marks.colorBar[marks.colorBar.length - 1] as typeof first;
+		out.drawRectangle({
+			...at(first.x, first.y + first.sizeMm),
+			width: (last.x + last.sizeMm - first.x) * PT_PER_MM,
+			height: first.sizeMm * PT_PER_MM,
+			borderColor: color,
+			borderWidth: CROP_MARK_WIDTH_PT,
+		});
+	}
+	if (marks.slug && font && slug) {
+		const { x, y, heightMm } = marks.slug;
+		out.drawText(slug, {
+			...at(x, y + heightMm * 0.8),
+			font,
+			size: SLUG_FONT_PT,
+			color,
+		});
+	}
+}
+
+/** `text` in the font's character set, cut with an ellipsis to `width`
+ *  points. */
+function fitText(
+	font: import("pdf-lib").PDFFont,
+	text: string,
+	width: number,
+): string {
+	const known = new Set(font.getCharacterSet());
+	let fitted = [...text]
+		.map((c) => (known.has(c.codePointAt(0) ?? 0) ? c : "?"))
+		.join("");
+	const fits = (t: string) => font.widthOfTextAtSize(t, SLUG_FONT_PT) <= width;
+	if (fits(fitted)) return fitted;
+	while (fitted.length > 0 && !fits(`${fitted}…`)) fitted = fitted.slice(0, -1);
+	return fitted.length > 0 ? `${fitted.trimEnd()}…` : "";
 }
 
 async function finishDocument(
