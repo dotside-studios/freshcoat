@@ -36,7 +36,7 @@ import {
 	renderBoundsOf,
 	toAuthorSpace,
 } from "./coordinates";
-import { extractEffects } from "./effects";
+import { extractEffects, hasVisibleEffect } from "./effects";
 import { addVisibility, maskRuns } from "./finalize";
 import { layoutChildFromNode, transpileFrame } from "./frame";
 import { withoutGuides } from "./guides";
@@ -359,8 +359,7 @@ function walkNode(
 		// to hang them on. See groupLayer for the coordinate work that costs.
 		const fx = extractEffects(n.effects, scale, localFrame.rotation);
 		if (
-			fx.shadow !== undefined ||
-			fx.blur !== undefined ||
+			hasVisibleEffect(fx) ||
 			elementBlendMode(n) !== undefined ||
 			groupIsolates(n)
 		) {
@@ -605,9 +604,7 @@ function walkNode(
 		const worldRotation =
 			localFrame.rotation + ((el.rotation as number | undefined) ?? 0);
 		const fx = extractEffects(n.effects, scale, worldRotation);
-		if (fx.shadow) el.shadow = fx.shadow;
-		if (fx.blur !== undefined) el.blur = fx.blur;
-		if (fx.backdropBlur !== undefined) el.backdropBlur = fx.backdropBlur;
+		if (fx.effects) el.effects = fx.effects;
 		// classify() declines to rasterize a layer set to Multiply/Screen/…
 		// precisely because the element can carry the mode itself. Dropping it
 		// here would composite that layer as Normal with nothing to say so —
@@ -696,8 +693,7 @@ function groupLayer(
 		size: box.size,
 		properties: { children: [] as unknown[] },
 	};
-	if (fx.shadow !== undefined) el.shadow = fx.shadow;
-	if (fx.blur !== undefined) el.blur = fx.blur;
+	if (fx.effects) el.effects = fx.effects;
 	const blend = elementBlendMode(n);
 	if (blend) el.blendMode = blend;
 	if (n.blendMode === "NORMAL")
