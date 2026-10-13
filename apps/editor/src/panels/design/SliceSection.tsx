@@ -115,6 +115,7 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 					<Row label="Bleed">
 						<NumberField
 							aria-label="Slice bleed"
+							className="min-w-0 flex-1"
 							min={0}
 							value={typeof bleed === "number" ? bleed : null}
 							placeholder={bleed === null ? "Mixed" : undefined}
