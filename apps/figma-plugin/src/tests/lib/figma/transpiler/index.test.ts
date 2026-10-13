@@ -2676,11 +2676,11 @@ describe("transpile (bound text names its element)", () => {
 		expect(t.template_data[1].elements[0].id).toBe("name");
 	});
 
-	it("keeps a stroked bound text as text and warns that the stroke is dropped", async () => {
+	it("keeps a bound text with an image stroke as text and warns that the stroke is dropped", async () => {
 		const stroked = (layerName: string, id: string) => {
 			const frame = side(layerName, id);
 			Object.assign(frame.children[0], {
-				strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+				strokes: [{ type: "IMAGE", imageHash: "h", scaleMode: "FILL" }],
 				strokeWeight: 2,
 			});
 			return frame;
@@ -2706,6 +2706,44 @@ describe("transpile (bound text names its element)", () => {
 		expect(
 			out.warnings.filter((w) => w.code === "text_stroke_unsupported"),
 		).toHaveLength(2);
+	});
+
+	it("carries a solid text stroke without a warning", async () => {
+		const stroked = (id: string) => {
+			const frame = side("{{name}}", id);
+			Object.assign(frame.children[0], {
+				strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+				strokeWeight: 2,
+				strokeAlign: "OUTSIDE",
+			});
+			return frame;
+		};
+		const pick = (nodeId: string) => ({
+			fileKey: "FK",
+			nodeId,
+			nodeName: nodeId,
+			width: 1012,
+			height: 638,
+		});
+		const out = await transpile({
+			product: EXACT_PRODUCT,
+			picks: { front: pick("front"), back: pick("back") },
+			metadata: META,
+			fetchNodeTree: async (_k, id) => stroked(id),
+			renderImage: vi.fn(),
+		});
+		const t = out.template as {
+			template_data: Array<{
+				elements: Array<{ properties: { stroke?: unknown } }>;
+			}>;
+		};
+		expect(t.template_data[0].elements[0].properties.stroke).toMatchObject({
+			color: "#ff0000",
+			align: "outside",
+		});
+		expect(out.warnings.some((w) => w.code.startsWith("text_stroke"))).toBe(
+			false,
+		);
 	});
 });
 

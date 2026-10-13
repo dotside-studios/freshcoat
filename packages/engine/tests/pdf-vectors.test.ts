@@ -406,3 +406,51 @@ describe("text on a curve", () => {
 		expect(await difference(scene)).toBeLessThan(3);
 	});
 });
+
+describe("stroked text", () => {
+	const stroked = (align: "center" | "outside" | "inside", y: number) =>
+		createText({
+			pos: { x: 10, y },
+			size: { width: 180, height: 36 },
+			text: `Ink ${align}`,
+			font: { family: "Geist", weight: 400, style: "normal", size: 28, lineHeight: 1.2 },
+			color: "#1d3557",
+			stroke: { color: "#e63946", width: 1.5, join: "round", align },
+		});
+	const scene = frame([stroked("center", 2), stroked("outside", 40), stroked("inside", 78)]);
+
+	test("strokes the glyphs with a text render mode", async () => {
+		const { page } = await vectors(scene);
+		expect(page).toContain("0.902 0.2235 0.2745 RG\n1.5 w 0 J 1 j 4 M\nBT\n1 Tr\n");
+		expect(page).toContain("0.902 0.2235 0.2745 RG\n3 w 0 J 1 j 4 M\nBT\n1 Tr\n");
+		expect(page).toMatch(/BT\n7 Tr\n(?:[^\n]*\n)*?ET\nq\n[^\n]* RG\n3 w/);
+	});
+
+	test("rasterizes a gradient stroke", async () => {
+		const pdf = await renderer.renderPdf(
+			frame([
+				createText({
+					pos: { x: 10, y: 10 },
+					size: { width: 180, height: 36 },
+					text: "Ink",
+					font: { family: "Geist", weight: 400, style: "normal", size: 28, lineHeight: 1.2 },
+					color: "#1d3557",
+					id: "ink",
+					stroke: {
+						color: "#000",
+						width: 2,
+						gradient: { kind: "linear", from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, stops: stops("#000", "#fff") },
+					},
+				}),
+			]),
+			{ width: W, height: H },
+		);
+		expect(pdf.warnings).toEqual([
+			{ kind: "vector_rasterized", feature: "gradient text stroke", layer: "ink" },
+		]);
+	});
+
+	test.skipIf(!pdftoppm)("matches the raster render", async () => {
+		expect(await difference(scene)).toBeLessThan(6);
+	});
+});

@@ -82,6 +82,34 @@ describe("pasteStyle", () => {
 		});
 	});
 
+	it("gives text the shape's stroke without dash, cap or trim", () => {
+		const t = unwrap(
+			updateElement(doc(), "0/0", {
+				properties: {
+					stroke: {
+						color: "#0000ff",
+						width: 2,
+						dash: [4, 2],
+						cap: "round",
+						join: "round",
+						align: "outside",
+						trimEnd: 0.5,
+					},
+				},
+			}),
+		).template;
+		const out = unwrap(
+			pasteStyle(t, ["0/1/1"], readStyle(el(t, "0/0"))),
+		).template;
+		const text = el(out, "0/1/1");
+		expect(text.type === "text" && text.properties.stroke).toEqual({
+			color: "#0000ff",
+			width: 2,
+			join: "round",
+			align: "outside",
+		});
+	});
+
 	it("copies text style between text layers, keeping the content", () => {
 		const t = unwrap(
 			updateElement(doc(), "0/4", {

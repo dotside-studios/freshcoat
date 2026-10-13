@@ -1,6 +1,6 @@
 import { wholeToken } from "@freshcoat-js/coatfile/mustache";
 import type { FigmaBoundingBox, FigmaTextNode, FigmaTextStyle } from "../types";
-import { compositeSolids, figmaPaintToFill } from "./colors";
+import { compositeSolids, figmaPaintToFill, strokeToElement } from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
 export function textLayoutSizing(
@@ -159,6 +159,7 @@ export function transpileText(
 	const properties: Record<string, unknown> = {
 		font: baseFont,
 		...paintProperties(node, size, color),
+		...strokeProperties(node, ctx.scale, size),
 		align: ALIGN[node.style.textAlignHorizontal] ?? "left",
 		verticalAlign: VALIGN[node.style.textAlignVertical] ?? "top",
 		// Figma's "Vertical trim". Emitted only for CAP_HEIGHT, because STANDARD is
@@ -271,6 +272,18 @@ function paintProperties(
 	if (!paint) return {};
 	const result = figmaPaintToFill(paint, size);
 	return result.kind === "fill" ? { fill: result.value } : {};
+}
+
+// A text stroke takes no dash or cap; classify() rasterizes a dashed one.
+function strokeProperties(
+	node: FigmaTextNode,
+	scale: number,
+	size: { width: number; height: number },
+): Record<string, unknown> {
+	const stroke = strokeToElement(node, scale, size);
+	if (!stroke) return {};
+	const { dash: _dash, cap: _cap, ...text } = stroke;
+	return { stroke: text };
 }
 
 // Walk characters + characterStyleOverrides; group consecutive chars that

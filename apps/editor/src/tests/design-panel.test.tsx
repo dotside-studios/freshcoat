@@ -71,7 +71,7 @@ describe("DesignPanel", () => {
 			"Hi {{ name }}",
 		);
 		expect(spinbutton("Font size")).toHaveProperty("value", "16");
-		expect(screen.queryByText("Stroke")).toBeNull();
+		expect(screen.getByText("Stroke")).toBeTruthy();
 		expect(screen.getByText("Text")).toBeTruthy();
 		expect(screen.getByText("Fill")).toBeTruthy();
 	});
@@ -187,7 +187,7 @@ describe("DesignPanel", () => {
 		const stroke = () => screen.getByRole("button", { name: "Stroke" });
 		await user.click(stroke());
 		expect(stroke().getAttribute("aria-expanded")).toBe("false");
-		act(() => c.select(["0/1/1"]));
+		act(() => c.select(["0/2"]));
 		expect(screen.queryByRole("button", { name: "Stroke" })).toBeNull();
 		act(() => c.select(["0/1"]));
 		expect(stroke().getAttribute("aria-expanded")).toBe("false");

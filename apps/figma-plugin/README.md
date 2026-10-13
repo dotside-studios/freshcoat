@@ -118,10 +118,13 @@ layers were kept, flattened or skipped.
 - **Small caps.** Case Small caps sets the `smcp` font feature, and Forced
   small caps `smcp` and `c2sc`, on the element or on the runs that use them,
   beside any OpenType features the layer sets.
-- **Text strokes.** coatfile text has no stroke, so a stroked text layer is
-  rasterized (`text_stroke_flattened`). A layer bound to a text field stays
-  text so the field still works, and its stroke is dropped with the warning
-  `text_stroke_unsupported`.
+- **Text strokes.** A text layer's stroke becomes the element's `stroke`:
+  its weight, position, join and one solid or gradient paint (solids stacked
+  in one stroke composite into one colour). A stroke coatfile text cannot
+  carry, an image paint, a gradient stacked with other paints or a dash, is
+  rasterized with the layer (`text_stroke_flattened`). A layer bound to a text
+  field stays text so the field still works, and such a stroke is dropped with
+  the warning `text_stroke_unsupported`.
 - **Text fields and runs.** A bound `text:` field keeps the layer's runs only
   when the runs spell out the template, each token whole inside one run, as in
   a layer whose content is `Hi {{name}}` with the token in bold: the value is

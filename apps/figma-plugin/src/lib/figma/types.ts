@@ -230,6 +230,9 @@ export type FigmaTextNode = FigmaBaseNode & {
 	fills: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	strokeJoin?: string;
+	strokeAlign?: string;
+	dashPattern?: number[];
 	characterStyleOverrides?: number[];
 	styleOverrideTable?: Record<string, Partial<FigmaTextStyle>>;
 };
