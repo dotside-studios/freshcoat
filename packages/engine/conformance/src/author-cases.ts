@@ -818,6 +818,66 @@ add(
 	],
 );
 
+// A tall stem, stroked red, so each alignment's band sits at a known offset
+// from the glyph edge.
+const strokedStem = (align: "center" | "outside" | "inside") =>
+	frame([
+		createText({
+			...box(40, 0, 80, H),
+			text: "I",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 96,
+				lineHeight: 96,
+			},
+			align: "center",
+			verticalAlign: "middle",
+			color: "#000000",
+			stroke: { color: "#ff0000", width: 3, align },
+		}),
+	]);
+
+add(
+	"text-stroke-center",
+	"a center text stroke straddles the glyph edge, over the fill",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("center"),
+	[
+		px([75, 60], [255, 0, 0, 255], "on the stem's edge, over the fill"),
+		px([80, 60], [0, 0, 0, 255], "the stem's middle, fill"),
+		px([72, 60], [255, 255, 255, 255], "past half the width, untouched"),
+	],
+);
+
+add(
+	"text-stroke-outside",
+	"an outside text stroke lies beyond the glyph edge, under the fill",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("outside"),
+	[
+		px([73, 60], [255, 0, 0, 255], "just outside the stem"),
+		px([77, 60], [0, 0, 0, 255], "just inside the stem, the fill covers it"),
+		px([70, 60], [255, 255, 255, 255], "past the width, untouched"),
+	],
+);
+
+add(
+	"text-stroke-inside",
+	"an inside text stroke lies within the glyph edge",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("inside"),
+	[
+		px([77, 60], [255, 0, 0, 255], "just inside the stem"),
+		px([80, 60], [0, 0, 0, 255], "the stem's middle, fill"),
+		px([73, 60], [255, 255, 255, 255], "just outside the stem, untouched"),
+	],
+);
+
 // ─── blend modes (exact per-channel formulas) ─────────────────────────────────
 
 // darken and lighten are per-channel min and max, so the expected value is not

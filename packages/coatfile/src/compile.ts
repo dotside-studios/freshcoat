@@ -565,6 +565,15 @@ function compileText(
 	// A gradient text fill (mapped to the box) overrides the solid color.
 	const resolvedFill = resolveFill(props.fill as Fill | undefined, ratio);
 	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
+	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
+	if (stroke)
+		node.stroke = {
+			color: stroke.color,
+			...(stroke.gradient ? { gradient: stroke.gradient } : {}),
+			width: stroke.width,
+			...(stroke.join ? { join: stroke.join } : {}),
+			...(stroke.align ? { align: stroke.align } : {}),
+		};
 	return node;
 }
 

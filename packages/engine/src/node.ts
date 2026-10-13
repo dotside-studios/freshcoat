@@ -12,6 +12,7 @@ import type {
 	ResolvedFill,
 	TextArc,
 	TextPath,
+	TextStroke,
 	ResolvedFont,
 	Shadows,
 	ShapeMask,
@@ -160,6 +161,7 @@ export type TextNode = Transform & {
 	font: ResolvedFont;
 	color?: string;
 	fill?: ResolvedFill;
+	stroke?: TextStroke;
 	// start and end follow the resolved direction.
 	align?: "left" | "center" | "right" | "justify" | "start" | "end";
 	// How a justified paragraph sets its last line (and any line ending in a hard
