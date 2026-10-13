@@ -1,4 +1,4 @@
-import { type Template, validate } from "@freshcoat-js/coatfile";
+import { type Element, type Template, validate } from "@freshcoat-js/coatfile";
 import type {
 	DataRecord,
 	Dataset,
@@ -27,6 +27,7 @@ import {
 	recordLabel,
 	selectedIds,
 	settingsSummary,
+	sliceUse,
 	statusActions,
 } from "~/export/export-ui";
 import { photoWatermark } from "~/samples/photo-watermark";
@@ -114,6 +115,49 @@ describe("readouts", () => {
 				layout: DEFAULT_SHEET_LAYOUT,
 			}),
 		).toBe("PDF · 2× · 300 DPI · Sheets · Download");
+	});
+
+	test("the settings summary says when pieces are split", () => {
+		const preset = newPreset("t_doc", [], "p_1");
+		expect(settingsSummary({ ...preset, split: "pieces" })).toBe(
+			"PNG · 1× · Pieces · Download",
+		);
+		expect(settingsSummary({ ...preset, split: "none" })).toBe(
+			"PNG · 1× · Download",
+		);
+	});
+
+	test("what a template's slices offer an export", () => {
+		expect(sliceUse(undefined)).toEqual({ slices: false, cuts: false });
+		expect(sliceUse(doc())).toEqual({ slices: false, cuts: false });
+		const sliced = (slice: object): Template => {
+			const t = doc();
+			const front = t.template_data[0];
+			if (!front) throw new Error("fixture");
+			return {
+				...t,
+				template_data: [
+					{
+						...front,
+						elements: front.elements.map((e) =>
+							e.id === "a"
+								? ({ ...e, properties: { ...e.properties, slice } } as Element)
+								: e,
+						),
+					},
+					...t.template_data.slice(1),
+				],
+			};
+		};
+		expect(sliceUse(sliced({}))).toEqual({ slices: true, cuts: false });
+		expect(sliceUse(sliced({ edge: "none" }))).toEqual({
+			slices: true,
+			cuts: false,
+		});
+		expect(sliceUse(sliced({ edge: "kiss" }))).toEqual({
+			slices: true,
+			cuts: true,
+		});
 	});
 
 	test("durations and ETAs", () => {

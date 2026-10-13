@@ -436,6 +436,22 @@ export function ExportSection() {
 		currentToken,
 	]);
 
+	// The files the previewed record and side export as pieces.
+	const pieceFiles = useMemo(
+		() =>
+			plan
+				.filter(
+					(i) =>
+						i.piece !== undefined &&
+						i.recordId === currentId &&
+						i.side === side &&
+						(currentToken === undefined ||
+							variantToken(i.variantId) === currentToken),
+				)
+				.map((i) => i.fileName),
+		[plan, currentId, side, currentToken],
+	);
+
 	const assetsByRef = useMemo(
 		() => toAssetsByRef(dataset?.assets),
 		[dataset?.assets],
@@ -938,6 +954,19 @@ export function ExportSection() {
 									</div>
 								)}
 							</div>
+							{!sheetMode && pieceFiles.length > 0 ? (
+								<ul
+									className="m-0 flex shrink-0 list-none flex-wrap gap-x-3 border-fc-border border-t bg-fc-panel px-3 py-1 font-fc-mono text-fc-muted text-fc-sm"
+									data-testid="export-piece-files"
+									aria-label="Piece files"
+								>
+									{pieceFiles.map((name) => (
+										<li key={name} className="min-w-0 truncate">
+											{name}
+										</li>
+									))}
+								</ul>
+							) : null}
 							{bottom}
 						</>
 					)}
