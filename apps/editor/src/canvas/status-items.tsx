@@ -10,6 +10,7 @@ import { plural, VARIANT_UI } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { STATUS_PRIORITY } from "~/app/status/priority";
 import type { StatusItem } from "~/app/status/types";
+import { formatSize, useLengthUnit } from "~/app/units";
 import { getElement } from "~/doc/path";
 import { activeVariantId } from "~/doc/variant-edit";
 import { useEditor, useThrottledEditor } from "~/state/hooks";
@@ -25,6 +26,7 @@ function FrameStatus() {
 	const template = useEditor((s) => s.doc?.history.present ?? null);
 	const side = useEditor((s) => s.side);
 	const size = useEditor(working);
+	const { unit, dpi } = useLengthUnit();
 	const hasVariants = useEditor(
 		(s) => (s.doc?.history.present.variants?.length ?? 0) > 0,
 	);
@@ -55,7 +57,7 @@ function FrameStatus() {
 				</>
 			) : null}
 			<span className="shrink-0">
-				· {size?.width} × {size?.height}
+				· {size ? formatSize(size.width, size.height, unit, dpi) : null}
 			</span>
 		</span>
 	);

@@ -7,14 +7,16 @@ import {
 } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { NumberField } from "@freshcoat-js/ui/number-field";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useRef, useState } from "react";
 import { useController } from "~/app/context";
 import { INSETS } from "~/app/copy";
+import { useDisplayUnit } from "~/app/units";
+import { wholePx } from "~/doc/new-document";
 import { resizeTemplate, setTemplateInsets, setVariantSize } from "~/doc/ops";
 import { resizeWithConstraints } from "~/doc/resize";
 import { activeVariantId } from "~/doc/variant-edit";
+import { LengthField } from "~/panels/design/LengthField";
 import { useEditor } from "~/state/hooks";
 import { present } from "~/state/store";
 import LinkIcon from "~icons/mingcute/link-line";
@@ -108,14 +110,13 @@ export function TemplateInsets({
 	return (
 		<div className={cn("flex items-start gap-1", className)}>
 			{linked ? (
-				<NumberField
+				<LengthField
 					aria-label={label}
 					className="min-w-0 flex-1"
 					value={typeof compact === "number" ? compact : null}
 					placeholder={INSETS.mixed}
 					min={0}
 					max={MAX_SIDE}
-					precision={2}
 					onChange={(n) => set(() => n, inset)}
 				/>
 			) : (
@@ -124,7 +125,7 @@ export function TemplateInsets({
 					data-testid={`${inset}-sides`}
 				>
 					{SIDES.map((side) => (
-						<NumberField
+						<LengthField
 							key={side}
 							label={INSETS.sides[side]}
 							aria-label={`${label} ${INSETS.sideNames[side]}`}
@@ -132,7 +133,6 @@ export function TemplateInsets({
 							value={sides[side]}
 							min={0}
 							max={MAX_SIDE}
-							precision={2}
 							onChange={(n) =>
 								set(
 									(t) => ({ ...resolveInsets(t[inset]), [side]: n }),
@@ -183,6 +183,7 @@ export function TemplateSizeFields({
 	ratio?: number;
 }) {
 	const controller = useController();
+	const unit = useDisplayUnit();
 	const sized = useSizedVariant();
 	const base = useEditor(present);
 	const shown = sized && base ? variantSize(base, sized) : template;
@@ -199,29 +200,29 @@ export function TemplateSizeFields({
 
 	return (
 		<>
-			<NumberField
+			<LengthField
 				label="W"
 				aria-label={sized ? "Variant width" : "Template width"}
 				className="min-w-0 flex-1"
 				value={shown.width}
 				min={1}
 				max={MAX_SIDE}
-				precision={0}
-				onChange={(w) =>
-					resize(w, ratio ? clampSide(Math.round(w / ratio)) : shown.height)
-				}
+				onChange={(v) => {
+					const w = clampSide(wholePx(v, unit));
+					resize(w, ratio ? clampSide(Math.round(w / ratio)) : shown.height);
+				}}
 			/>
-			<NumberField
+			<LengthField
 				label="H"
 				aria-label={sized ? "Variant height" : "Template height"}
 				className="min-w-0 flex-1"
 				value={shown.height}
 				min={1}
 				max={MAX_SIDE}
-				precision={0}
-				onChange={(h) =>
-					resize(ratio ? clampSide(Math.round(h * ratio)) : shown.width, h)
-				}
+				onChange={(v) => {
+					const h = clampSide(wholePx(v, unit));
+					resize(ratio ? clampSide(Math.round(h * ratio)) : shown.width, h);
+				}}
 			/>
 		</>
 	);

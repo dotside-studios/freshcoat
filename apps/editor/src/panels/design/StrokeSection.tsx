@@ -23,6 +23,7 @@ import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
+import { LengthField } from "./LengthField";
 
 export type Stroke = NonNullable<RectProperties["stroke"]>;
 
@@ -145,9 +146,10 @@ export function StrokeSection({
 								onChange={(c) => set("stroke-color", { color: c })}
 							/>
 						)}
-						<NumberField
+						<LengthField
 							label="W"
 							aria-label="Stroke width"
+							bare
 							className="w-[68px] shrink-0"
 							min={0}
 							value={pick("width") as number | null}

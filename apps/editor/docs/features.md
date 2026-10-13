@@ -13,7 +13,8 @@ the records, and **Export** turns templates and records into files.
 - **Workspaces:**
   - Start from a starter, a preset size (CR80 card, A4, square, poster,
     badge, US and EU business card, 4 × 6 in and A6 postcard, 4 × 6 in
-    shipping label) or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
+    shipping label), a custom size in px, mm or in (mm and in are rounded
+    up to whole px at 300 DPI), or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
     template `.json` with **Open file…** (Ctrl/Cmd+O). Files saved before the rename, `.tkit` and `.tkit.json`,
     still open. A template opened on its own becomes a one-template workspace.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
@@ -203,14 +204,28 @@ the records, and **Export** turns templates and records into files.
   - The side's name above the artboard and in the status bar is a menu of
     the sides, so they switch with the panels closed; Alt+, and Alt+. step
     through them.
-  - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
-    They follow the pan and zoom, and mark the selection's extent with its
-    edges' positions.
+  - Rulers: View > Rulers or Shift+R shows top and left rulers in the
+    display unit. They follow the pan and zoom, and mark the selection's
+    extent with its edges' positions.
+  - Units: View > Units, or the menu in the rulers' corner, shows lengths in
+    pixels, millimeters, inches or points. The choice is remembered in this
+    browser. Designs stay in design px; mm, in and pt convert at the active
+    template's export preset DPI (300 by default), not at 72, so a CR80 card
+    reads 85.68 × 54.02 mm. Rulers step 1, 2, 5 or 10 mm and halve inches
+    down to 1/16. The inspector's position, size, corner radius, stroke
+    width and font size, the side's size, bleed and safe area, guides, the
+    canvas size label and the status bar follow the unit. A field also
+    takes a typed suffix in any unit, such as `3mm`, `0.125in`, `12pt`,
+    `40px` or `1cm`, within an expression (`10mm + 2`). Shown values are
+    rounded (2 places, 3 for inches), and a field that is left as shown
+    keeps its px value, so switching units never moves anything.
   - Guides: drag from a ruler onto the canvas to add a guide, and drag it
     back onto the ruler to remove it. Moving and resizing snap to guides as
     they do to layers. A guide is a slider for the keyboard: focus a ruler
     and press Enter to add one at the middle of the view, then arrow keys
-    move it (Shift for 10) and Delete removes it. View > Remove guides clears
+    move it by one unit (1 px, 1 mm, 1/16 in or 1 pt; Shift for 10) and
+    Delete removes it. A dragged guide snaps to 1 px, 0.1 mm, 1/32 in or
+    0.5 pt. View > Remove guides clears
     the side. Each side keeps its own guides, and adding, moving and removing
     them are undo steps. Guides are saved in the `.coatworkspace`, not the
     template, so a `.coat` and every export are unchanged.
