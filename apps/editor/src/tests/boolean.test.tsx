@@ -491,6 +491,24 @@ describe("a boolean's cached result", () => {
 		expect(el.properties.d).toBe(resultOf(el)?.d);
 	});
 
+	test("follows an operand's corner smoothing on per-corner radii", async () => {
+		const c = await liveController();
+		c.edit((t) =>
+			updateElement(t, "0/0/0", {
+				properties: { cornerRadius: [40, 0, 20, 0] },
+			}),
+		);
+		const before = vectorAt(c).properties.d;
+		c.edit((t) =>
+			updateElement(t, "0/0/0", {
+				properties: { cornerRadius: [40, 0, 20, 0], cornerSmoothing: 0.6 },
+			}),
+		);
+		const el = vectorAt(c);
+		expect(el.properties.d).not.toBe(before);
+		expect(el.properties.d).toBe(resultOf(el)?.d);
+	});
+
 	test("follows the vector's own resize", async () => {
 		const c = await liveController();
 		const resized = applyRect(

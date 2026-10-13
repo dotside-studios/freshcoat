@@ -1,6 +1,7 @@
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import { outlinePath, rectShape } from "./outline";
 import { roundCorners } from "./round-corners";
+import type { CornerRadius } from "./types";
 
 export type BooleanOp = "union" | "subtract" | "intersect" | "exclude";
 
@@ -17,7 +18,7 @@ export type BooleanOperand = {
 	| {
 			kind: "rect";
 			cornerRadius?: number | number[];
-			/** Figma corner smoothing, 0 to 1. Applies to a uniform radius. */
+			/** Figma corner smoothing, 0 to 1. */
 			cornerSmoothing?: number;
 	  }
 	| {
@@ -63,11 +64,12 @@ function localPath(ck: CanvasKit, shape: BooleanOperand): Path | null {
 	}
 	const w = shape.size?.width ?? 0;
 	const h = shape.size?.height ?? 0;
-	if (typeof shape.cornerRadius === "number") {
-		const mask = rectShape(shape.cornerRadius, shape.cornerSmoothing);
-		if (mask.kind === "rounded-rect" && mask.smoothing)
-			return outlinePath(ck, mask, w, h);
-	}
+	const mask = rectShape(
+		shape.cornerRadius as CornerRadius | undefined,
+		shape.cornerSmoothing,
+	);
+	if (mask.kind === "rounded-rect" && mask.smoothing)
+		return outlinePath(ck, mask, w, h);
 	const [tl, tr, br, bl] = radiiOf(shape.cornerRadius, w, h);
 	const builder = new ck.PathBuilder();
 	builder.addRRect(Float32Array.of(0, 0, w, h, tl, tl, tr, tr, br, br, bl, bl));

@@ -19,8 +19,7 @@ export type OutlineGeometry =
 	  }
 	| { kind: "path"; d: string };
 
-// The shape a rect draws with `cornerRadius` and `cornerSmoothing`. Smoothing
-// applies to a uniform radius; per-corner radii stay circular.
+// The shape a rect draws with `cornerRadius` and `cornerSmoothing`.
 export function rectShape(
 	cornerRadius: CornerRadius | undefined,
 	cornerSmoothing: number | undefined,
@@ -29,7 +28,7 @@ export function rectShape(
 	if (typeof cr === "number" ? cr <= 0 : !cr.some((r) => r > 0))
 		return { kind: "rect" };
 	const smoothing = cornerSmoothing ?? 0;
-	return smoothing > 0 && typeof cr === "number"
+	return smoothing > 0
 		? { kind: "rounded-rect", radius: cr, smoothing }
 		: { kind: "rounded-rect", radius: cr };
 }
@@ -44,10 +43,8 @@ export function outlineIsPath(shape: ShapeMask): boolean {
 
 function smoothedRadius(
 	shape: Extract<ShapeMask, { kind: "rounded-rect" }>,
-): number | null {
-	return (shape.smoothing ?? 0) > 0 && typeof shape.radius === "number"
-		? shape.radius
-		: null;
+): CornerRadius | null {
+	return (shape.smoothing ?? 0) > 0 ? shape.radius : null;
 }
 
 // The outline of `shape` over the box (x, y, w, h) moved in by `inset` on
@@ -88,7 +85,7 @@ export function outlineGeometry(
 						iy,
 						iw,
 						ih,
-						Math.max(0, smoothR - inset),
+						insetCorner(smoothR, inset),
 						shape.smoothing ?? 0,
 					),
 				};

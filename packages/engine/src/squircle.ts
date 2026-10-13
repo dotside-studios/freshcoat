@@ -2,7 +2,7 @@
 // corners blend from a plain circular arc (smoothing 0) to a
 // continuous-curvature superellipse (smoothing → 1), matching Figma's
 // corner-smoothing control. Ported from figma-squircle (tienphaw/figma-squircle,
-// MIT), specialized to a uniform radius + smoothing.
+// MIT). Each corner takes its own radius and the shared smoothing.
 
 function toRadians(deg: number): number {
 	return (deg * Math.PI) / 180;
@@ -43,6 +43,70 @@ function getPathParamsForCorner(
 	const b = (p - arcSectionLength - c - d) / 3;
 	const a = 2 * b;
 	return { a, b, c, d, p, arcSectionLength, cornerRadius };
+}
+
+const NONE: CornerParams = {
+	a: 0,
+	b: 0,
+	c: 0,
+	d: 0,
+	p: 0,
+	cornerRadius: 0,
+	arcSectionLength: 0,
+};
+
+type Corner = "tl" | "tr" | "br" | "bl";
+
+const ADJACENT: Record<Corner, [Corner, "h" | "v"][]> = {
+	tl: [
+		["tr", "h"],
+		["bl", "v"],
+	],
+	tr: [
+		["tl", "h"],
+		["br", "v"],
+	],
+	br: [
+		["bl", "h"],
+		["tr", "v"],
+	],
+	bl: [
+		["br", "h"],
+		["tl", "v"],
+	],
+};
+
+// Splits each edge between the corners on it, largest radius first: a corner
+// takes its share of an edge by radius, or what a corner already placed on
+// that edge left over. Its radius is clamped to that budget.
+function distribute(
+	radii: Record<Corner, number>,
+	w: number,
+	h: number,
+): Record<Corner, { radius: number; budget: number }> {
+	const radius = { ...radii };
+	const budget: Record<Corner, number> = { tl: -1, tr: -1, br: -1, bl: -1 };
+	const order = (Object.keys(radius) as Corner[]).sort(
+		(x, y) => radius[y] - radius[x],
+	);
+	for (const corner of order) {
+		const r = radius[corner];
+		budget[corner] = Math.min(
+			...ADJACENT[corner].map(([other, axis]) => {
+				const side = axis === "h" ? w : h;
+				if (budget[other] >= 0) return side - budget[other];
+				const sum = r + radius[other];
+				return sum > 0 ? (r / sum) * side : 0;
+			}),
+		);
+		radius[corner] = Math.min(r, budget[corner]);
+	}
+	return {
+		tl: { radius: radius.tl, budget: budget.tl },
+		tr: { radius: radius.tr, budget: budget.tr },
+		br: { radius: radius.br, budget: budget.br },
+		bl: { radius: radius.bl, budget: budget.bl },
+	};
 }
 
 function topRight({
@@ -86,31 +150,42 @@ function topLeft({
 	return `c 0 ${n(-a)} 0 ${n(-(a + b))} ${n(d)} ${n(-(a + b + c))} a ${n(r)} ${n(r)} 0 0 1 ${n(arc)} ${n(-arc)} c ${n(c)} ${n(-d)} ${n(b + c)} ${n(-d)} ${n(a + b + c)} ${n(-d)}`;
 }
 
-// SVG path for a smoothed rounded rect at (x, y) sized w×h with a uniform radius
-// and smoothing in [0, 1]. Corners are identical, so one param set drives all four.
+// SVG path for a smoothed rounded rect at (x, y) sized w×h with smoothing in
+// [0, 1], and a uniform radius or radii [topLeft, topRight, bottomRight,
+// bottomLeft].
 export function squircleSvg(
 	x: number,
 	y: number,
 	w: number,
 	h: number,
-	radius: number,
+	radius: number | readonly [number, number, number, number],
 	smoothing: number,
 ): string {
-	const budget = Math.min(w, h) / 2;
-	const r = Math.min(radius, budget);
-	if (r <= 0)
+	const [tl, tr, br, bl] = (
+		typeof radius === "number" ? [radius, radius, radius, radius] : radius
+	).map((r) => Math.max(0, r));
+	if (!(tl > 0 || tr > 0 || br > 0 || bl > 0) || w <= 0 || h <= 0)
 		return `M ${n(x)} ${n(y)} H ${n(x + w)} V ${n(y + h)} H ${n(x)} Z`;
-	const cp = getPathParamsForCorner(r, smoothing, budget);
-	const p = cp.p;
+	const fit = distribute({ tl, tr, br, bl }, w, h);
+	const params = (c: Corner) =>
+		fit[c].radius > 0
+			? getPathParamsForCorner(fit[c].radius, smoothing, fit[c].budget)
+			: NONE;
+	const ptl = params("tl");
+	const ptr = params("tr");
+	const pbr = params("br");
+	const pbl = params("bl");
 	return [
-		`M ${n(x + w - p)} ${n(y)}`,
-		topRight(cp),
-		`L ${n(x + w)} ${n(y + h - p)}`,
-		bottomRight(cp),
-		`L ${n(x + p)} ${n(y + h)}`,
-		bottomLeft(cp),
-		`L ${n(x)} ${n(y + p)}`,
-		topLeft(cp),
+		`M ${n(x + w - ptr.p)} ${n(y)}`,
+		ptr.p > 0 ? topRight(ptr) : "",
+		`L ${n(x + w)} ${n(y + h - pbr.p)}`,
+		pbr.p > 0 ? bottomRight(pbr) : "",
+		`L ${n(x + pbl.p)} ${n(y + h)}`,
+		pbl.p > 0 ? bottomLeft(pbl) : "",
+		`L ${n(x)} ${n(y + ptl.p)}`,
+		ptl.p > 0 ? topLeft(ptl) : "",
 		"Z",
-	].join(" ");
+	]
+		.filter(Boolean)
+		.join(" ");
 }

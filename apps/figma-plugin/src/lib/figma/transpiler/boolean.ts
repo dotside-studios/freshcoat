@@ -147,8 +147,6 @@ function operandOf(
 	if (!placed) return `${label} is skewed, flipped or scaled`;
 	if (child.type === "RECTANGLE") {
 		const corners = scaleCorners(child.cornerRadius, scale);
-		if (Array.isArray(corners) && child.cornerSmoothing)
-			return `${label} has corner smoothing on different radii`;
 		return {
 			id: idOf(child),
 			type: "rect",

@@ -213,8 +213,7 @@ the records, and **Export** turns templates and records into files.
     shapes away from the bottom-most. The shapes stay in it as operands, so
     the result follows every edit to them, and a boolean selected with other
     shapes becomes an operand of the new one. Each is one undo step.
-    Rotation and corner radius are part of the result, and corner smoothing
-    is not.
+    Rotation, corner radius and corner smoothing are part of the result.
   - A selected boolean layer shows its operation pressed in the Boolean
     toolbar; the others switch it. Flatten, in the toolbar, Object > Flatten
     and the layer menu, turns it into a plain vector that keeps the result,
