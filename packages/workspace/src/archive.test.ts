@@ -19,6 +19,7 @@ import {
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
+import { DEFAULT_SHEET_LAYOUT } from "./impose";
 import { readOutputProfile } from "./output-intent";
 import { exportSize, pdfLayout } from "./plan";
 import {
@@ -590,6 +591,21 @@ describe("packWorkspace", () => {
 		expect(imposed).toEqual(sheets);
 	});
 
+	it("keeps a preset on A5 and A6 paper", async () => {
+		const onPaper = (paper: "a5" | "a6"): ExportPreset => ({
+			...(ws.presets[0] as ExportPreset),
+			id: `p_${paper}`,
+			format: "pdf",
+			layout: { ...DEFAULT_SHEET_LAYOUT, paper },
+		});
+		const presets = [onPaper("a5"), onPaper("a6")];
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		expect(result.workspace.presets).toEqual(presets);
+	});
+
 	it("keeps a preset's bleed and reads an older preset as trim only", async () => {
 		const bled: ExportPreset = {
 			...(ws.presets[0] as ExportPreset),
@@ -651,7 +667,7 @@ describe("packWorkspace", () => {
 	it("refuses a preset whose sheet layout is malformed", async () => {
 		const bad = {
 			...(ws.presets[0] as ExportPreset),
-			layout: { kind: "sheet", paper: "a5", orientation: "auto" },
+			layout: { kind: "sheet", paper: "b5", orientation: "auto" },
 		} as unknown as ExportPreset;
 		const result = await unpackWorkspace(
 			await packWorkspace({ ...ws, presets: [bad] }),
