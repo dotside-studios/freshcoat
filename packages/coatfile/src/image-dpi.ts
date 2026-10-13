@@ -171,19 +171,30 @@ function* drawnImages(
 	}
 }
 
+export type ImageSizeMemo = {
+	get(src: string): Promise<Size | undefined> | undefined;
+	set(src: string, size: Promise<Size | undefined>): void;
+};
+
 /**
  * The images a compiled scene draws below `min` at `dpi` design units to
  * the inch, each layer once. `load` gives a src's bytes, as the paint reads
- * them; a src it cannot give is skipped, and so is one `skip` names.
+ * them; a src it cannot give is skipped, and so is one `skip` names. `sizes`
+ * keeps what was read across calls.
  */
 export async function imageDpiWarnings(
 	commands: readonly unknown[],
 	load: (src: string) => Promise<Uint8Array | undefined>,
-	options: { dpi: number; min?: number; skip?: (src: string) => boolean },
+	options: {
+		dpi: number;
+		min?: number;
+		skip?: (src: string) => boolean;
+		sizes?: ImageSizeMemo;
+	},
 ): Promise<ImageDpiWarning[]> {
 	const min = options.min ?? DEFAULT_MIN_IMAGE_DPI;
 	if (!(min > 0) || !(options.dpi > 0)) return [];
-	const sizes = new Map<string, Promise<Size | undefined>>();
+	const sizes = options.sizes ?? new Map<string, Promise<Size | undefined>>();
 	const sizeOf = (src: string) => {
 		let size = sizes.get(src);
 		if (!size) {

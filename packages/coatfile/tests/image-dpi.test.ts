@@ -93,6 +93,36 @@ describe("image DPI at render time", () => {
 		);
 	});
 
+	test("reads an image the renderer loads once across renders", async () => {
+		const fixed = {
+			...template,
+			template_data: template.template_data.map((f) => ({
+				...f,
+				elements: f.elements.map((el) =>
+					el.type === "image"
+						? { ...el, properties: { ...el.properties, src: "logo.png" } }
+						: el,
+				),
+			})),
+		} as Template;
+		const loads = async (imageDpi?: { dpi: number }) => {
+			let count = 0;
+			const bytes = png(600, 400);
+			const renderer = await createRenderer({
+				ck,
+				cache: false,
+				load: async () => {
+					count++;
+					return bytes;
+				},
+			});
+			for (let i = 0; i < 3; i++)
+				await renderTemplate(renderer, fixed, {}, imageDpi ? { imageDpi } : {});
+			return count;
+		};
+		expect(await loads({ dpi: 300 })).toBe((await loads()) + 1);
+	});
+
 	test("checks a vector PDF page too", async () => {
 		const renderer = await createRenderer({ ck, cache: false });
 		const images = new Map([["ws:small", png(600, 400)]]);

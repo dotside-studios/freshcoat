@@ -169,6 +169,7 @@ export {
 	type ImageDpiOptions,
 	type ImageDpiWarning,
 	type ImageFraming,
+	type ImageSizeMemo,
 	imageDpiIssues,
 	imageDpiWarnings,
 	imagePixelSize,

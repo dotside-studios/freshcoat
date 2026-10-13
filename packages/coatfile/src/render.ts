@@ -30,7 +30,11 @@ import {
 } from "@freshcoat-js/engine";
 import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
-import { type ImageDpiWarning, imageDpiWarnings } from "./image-dpi";
+import {
+	type ImageDpiWarning,
+	imageDpiWarnings,
+	type ImageSizeMemo,
+} from "./image-dpi";
 import { pieceSpec } from "./piece";
 import { hasOpenSubpath } from "./slices";
 import { resolveSlices } from "./slices";
@@ -389,6 +393,11 @@ export type RenderCompiledPdfOptions = {
 	imageDpi?: ImageDpiCheck;
 };
 
+// The sizes of the images a renderer loads itself, so a batch reads each one
+// once. Bytes handed to a render are read again: the same src may name other
+// bytes next time.
+const loadedSizes = new WeakMap<Renderer, Map<string, ReturnType<ImageSizeMemo["get"]>>>();
+
 function checkImageDpi(
 	renderer: Renderer,
 	commands: Command[],
@@ -396,7 +405,21 @@ function checkImageDpi(
 	check: ImageDpiCheck | undefined,
 ): Promise<ImageDpiWarning[]> {
 	if (!check) return Promise.resolve([]);
-	return imageDpiWarnings(commands, (src) => renderer.loadBytes(src, images), check);
+	let loaded = loadedSizes.get(renderer);
+	if (!loaded) {
+		loaded = new Map();
+		loadedSizes.set(renderer, loaded);
+	}
+	const shared = loaded;
+	const local = new Map<string, ReturnType<ImageSizeMemo["get"]>>();
+	const sizes: ImageSizeMemo = {
+		get: (src) => (images?.has(src) ? local : shared).get(src),
+		set: (src, size) => void (images?.has(src) ? local : shared).set(src, size),
+	};
+	return imageDpiWarnings(commands, (src) => renderer.loadBytes(src, images), {
+		...check,
+		sizes,
+	});
 }
 
 // Paint each side of a compiled template as one PDF page of vectors. A layer a
