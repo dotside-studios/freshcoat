@@ -18,6 +18,7 @@ import type {
 	ExportItem,
 	ExportPreset,
 	ExportSize,
+	ExportSplit,
 	PdfLayout,
 	Workspace,
 } from "./types";
@@ -31,6 +32,12 @@ export const DEFAULT_QUALITY = 90;
 /** A preset's size; a preset from before sizes follows the template. */
 export function exportSize(preset: Pick<ExportPreset, "size">): ExportSize {
 	return preset.size ?? { kind: "template" };
+}
+
+/** Whether a preset writes one file per slice piece; a preset from before
+ *  splits writes whole sides. */
+export function exportSplit(preset: Pick<ExportPreset, "split">): ExportSplit {
+	return preset.split ?? "none";
 }
 
 /** How a PDF preset places its images; a preset from before layouts puts
@@ -311,7 +318,7 @@ export function planExport(
 			: `@${preset.scale}x`;
 	const extension = fileExtension(preset.format);
 	const everyVariant = binding?.variant?.kind === "all";
-	const split = preset.split === "pieces";
+	const split = exportSplit(preset) === "pieces";
 	const expandFileName = compileFileName(
 		fileNamePattern(preset.fileName, everyVariant, split),
 		records.length,

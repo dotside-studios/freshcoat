@@ -472,6 +472,21 @@ describe("packWorkspace", () => {
 		expect(kept).toEqual(bled);
 	});
 
+	it("keeps a preset's split and reads an older preset as whole sides", async () => {
+		const split: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_split",
+			split: "pieces",
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [...ws.presets, split] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		const [older, kept] = result.workspace.presets;
+		expect(older?.split).toBeUndefined();
+		expect(kept).toEqual(split);
+	});
+
 	it("refuses a preset whose sheet layout is malformed", async () => {
 		const bad = {
 			...(ws.presets[0] as ExportPreset),

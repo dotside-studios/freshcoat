@@ -140,6 +140,7 @@ export {
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
 	exportSize,
+	exportSplit,
 	type FileNameContext,
 	fileExtension,
 	fileNameFor,

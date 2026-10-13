@@ -210,6 +210,7 @@ const PresetSchema = z.object({
 		.optional(),
 	layout: LayoutSchema.optional(),
 	bleed: z.boolean().optional(),
+	split: z.enum(["none", "pieces"]).optional(),
 });
 
 const GuidesSchema = z.record(
