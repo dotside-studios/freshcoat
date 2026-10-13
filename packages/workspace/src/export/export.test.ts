@@ -3,8 +3,16 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { beforeAll, describe, expect, it } from "vitest";
 import { planExport } from "../plan";
-import { photoSha, preset, workspace } from "../test-fixtures";
-import type { ExportPreset } from "../types";
+import {
+	makePng,
+	photoSha,
+	posterPreset,
+	posterWorkspace,
+	preset,
+	sha256,
+	workspace,
+} from "../test-fixtures";
+import type { ExportPreset, Workspace } from "../types";
 import {
 	createItemRenderer,
 	IMAGE_CACHE_PIXELS,
@@ -180,5 +188,158 @@ describe("runExportJob on this thread", () => {
 		);
 		expect(head).toBe("%PDF-");
 		expect(result.file?.name).toBe("all.pdf");
+	});
+});
+
+describe("runExportJob with split: pieces", () => {
+	const zipOf = async (ws: Workspace, p: ExportPreset) => {
+		const result = await runExportJob(ws, p, { pool: inlinePool(items) });
+		items.endJob();
+		expect(result.items.filter((i) => !i.ok)).toEqual([]);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no zip");
+		return unzipSync(new Uint8Array(await blob.arrayBuffer()));
+	};
+	const sizeOf = (bytes: Uint8Array | undefined) => {
+		const d = bytes && decodePixels(ck, bytes);
+		if (!d) throw new Error("no image");
+		return [d.width, d.height];
+	};
+	const colourAt = (bytes: Uint8Array | undefined, x: number, y: number) => {
+		const d = bytes && decodePixels(ck, bytes);
+		if (!d) throw new Error("no image");
+		const at = (y * d.width + x) * 4;
+		return [...d.data.slice(at, at + 3)];
+	};
+
+	it("writes one file per piece and the other sides whole", async () => {
+		const files = await zipOf(posterWorkspace, posterPreset);
+		expect(Object.keys(files).sort()).toEqual([
+			REPORT_FILE_NAME,
+			"poster-1-back.png",
+			"poster-1-front-left.png",
+			"poster-1-front-right.png",
+			"poster-2-back.png",
+			"poster-2-front-left.png",
+		]);
+		expect(sizeOf(files["poster-1-front-left.png"])).toEqual([200, 200]);
+		expect(sizeOf(files["poster-1-back.png"])).toEqual([400, 200]);
+		expect(colourAt(files["poster-1-front-left.png"], 100, 100)).toEqual([
+			255, 0, 0,
+		]);
+		expect(colourAt(files["poster-1-front-right.png"], 100, 100)).toEqual([
+			0, 0, 255,
+		]);
+	});
+
+	it("scales a piece with the preset", async () => {
+		const files = await zipOf(posterWorkspace, { ...posterPreset, scale: 2 });
+		expect(sizeOf(files["poster-1-front-left@2x.png"])).toEqual([400, 400]);
+	});
+
+	it("reports each piece by its file name", async () => {
+		const result = await runExportJob(posterWorkspace, posterPreset, {
+			pool: inlinePool(items),
+		});
+		items.endJob();
+		expect(result.items.map((i) => i.fileName)).toEqual([
+			"poster-1-front-left.png",
+			"poster-1-front-right.png",
+			"poster-1-back.png",
+			"poster-2-front-left.png",
+			"poster-2-back.png",
+		]);
+	});
+
+	it("replaces the preset's bleed with the piece's own", async () => {
+		const bled: Workspace = {
+			...posterWorkspace,
+			templates: posterWorkspace.templates.map((t) => ({
+				...t,
+				template: {
+					...t.template,
+					bleed: 10,
+					template_data: t.template.template_data.map((f) =>
+						f.name === "front"
+							? {
+									...f,
+									elements: f.elements.map((el) =>
+										el.id === "left"
+											? {
+													...el,
+													properties: {
+														...el.properties,
+														slice: { name: "left", bleed: 5 },
+													},
+												}
+											: el,
+									),
+								}
+							: f,
+					),
+				},
+			})),
+		};
+		const files = await zipOf(bled, { ...posterPreset, bleed: true });
+		expect(sizeOf(files["poster-1-front-left.png"])).toEqual([210, 210]);
+		expect(sizeOf(files["poster-1-front-right.png"])).toEqual([200, 200]);
+		expect(sizeOf(files["poster-1-back.png"])).toEqual([420, 220]);
+	});
+
+	it("scales a piece by the factor its side gets under an image size", async () => {
+		const photo = makePng(100, 50);
+		const ref = `ws:${sha256(photo)}`;
+		const template = posterWorkspace.templates[0];
+		if (!template) throw new Error("no template");
+		const withPhoto: Workspace = {
+			...posterWorkspace,
+			templates: [
+				{
+					...template,
+					template: {
+						...template.template,
+						fields: {
+							...template.template.fields,
+							properties: {
+								...template.template.fields.properties,
+								photo: { type: "string", format: "image" },
+							},
+						},
+					},
+					binding: {
+						datasetId: "d_posters",
+						fields: {
+							...template.binding?.fields,
+							photo: { kind: "column", column: "photo" },
+						},
+					},
+				},
+			],
+			datasets: posterWorkspace.datasets.map((d) => ({
+				...d,
+				columns: [...d.columns, { key: "photo", type: "image" as const }],
+				records: d.records.map((r) => ({
+					...r,
+					values: { ...r.values, photo: ref },
+				})),
+				assets: [
+					{
+						sha256: sha256(photo),
+						contentType: "image/png",
+						name: "p.png",
+						size: photo.length,
+						width: 100,
+						height: 50,
+						blob: new Blob([photo], { type: "image/png" }),
+					},
+				],
+			})),
+		};
+		const files = await zipOf(withPhoto, {
+			...posterPreset,
+			size: { kind: "image", field: "photo" },
+		});
+		expect(sizeOf(files["poster-1-back.png"])).toEqual([100, 50]);
+		expect(sizeOf(files["poster-1-front-left.png"])).toEqual([50, 50]);
 	});
 });
