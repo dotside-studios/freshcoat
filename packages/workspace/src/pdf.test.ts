@@ -71,6 +71,50 @@ describe("assemblePdf", () => {
 		expect(new TextDecoder("latin1").decode(bytes)).toContain("/DCTDecode");
 	});
 
+	it("draws a JPEG page carrying an ICC profile in that profile", async () => {
+		const profile = new Uint8Array(200).map((_, i) => i);
+		new DataView(profile.buffer).setUint32(0, profile.length);
+		profile.set(new TextEncoder().encode("RGB "), 16);
+		profile.set(new TextEncoder().encode("acsp"), 36);
+		const head = [...new TextEncoder().encode("ICC_PROFILE"), 0, 1, 1];
+		const length = 2 + head.length + profile.length;
+		const plain = jpegHeader({ width: 40, height: 30 });
+		const tagged = new Uint8Array([
+			0xff,
+			0xd8,
+			0xff,
+			0xe2,
+			length >> 8,
+			length & 0xff,
+			...head,
+			...profile,
+			...plain.subarray(2),
+		]);
+		const page = { format: "jpeg" as const, widthPx: 40, heightPx: 30 };
+		const pdf = await assemblePdf(
+			[
+				{ ...page, bytes: tagged },
+				{ ...page, bytes: tagged.slice() },
+				{ ...page, bytes: plain },
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+		const spaces = doc
+			.getPages()
+			.map((p) => images(p)[0]?.dict.lookup(PDFName.of("ColorSpace")));
+		expect(spaces[2]?.toString()).toBe("/DeviceRGB");
+		const [a, b] = spaces;
+		expect(a).toBeInstanceOf(PDFArray);
+		expect(a?.toString()).toBe(b?.toString());
+		const ref = (a as PDFArray).get(1);
+		expect((a as PDFArray).get(0)).toBe(PDFName.of("ICCBased"));
+		const stream = doc.context.lookup(ref) as PDFRawStream;
+		expect(stream.dict.get(PDFName.of("N"))?.toString()).toBe("3");
+		expect(decodePDFRawStream(stream).decode()).toEqual(profile);
+		expect(images(doc.getPage(0))[0]?.getContents()).toEqual(tagged);
+	});
+
 	it("passes an RGB PNG's IDAT through with the PNG predictor", async () => {
 		const bytes = makePng(30, 20);
 		const pdf = await assemblePdf(

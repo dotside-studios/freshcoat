@@ -342,7 +342,9 @@ JPEG at the chosen density, or `vector`, which draws each card as PDF vectors
 through the engine's [PDF output](../engine/README.md#pdf-output): text in its
 embedded font, and any layer a PDF cannot express, such as a shadow, as an
 image. A card printed with correction is rendered as a PNG. Each font file is
-stored once in the assembled PDF, however many cards use it.
+stored once in the assembled PDF, however many cards use it. A gray or RGB
+JPEG carrying an ICC profile, as the engine's JPEGs carry sRGB, is drawn in an
+`ICCBased` space holding that profile, each distinct profile stored once.
 
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`

@@ -244,12 +244,17 @@ fallback color.
 solid fills, linear and radial gradients (elliptical and focal ones too, with
 transparent stops drawn through a soft mask), solid and gradient strokes
 (aligned, dashed, capped, joined and trimmed), clips, opacity, isolated groups,
-the blend modes PDF defines, images and SVG images are drawn as vectors; a JPEG
-is embedded as it is. Text is shaped by CanvasKit exactly as it renders and set
-in its own font file, embedded with a ToUnicode map so it stays selectable, each
-glyph placed along its circle or path when the text follows a curve. That takes
-a TrueType, OpenType, WOFF or WOFF2 file. A variable TrueType font is fixed at
-the instance the text uses before it is embedded.
+the blend modes PDF defines, images and SVG images are drawn as vectors. A gray
+or RGB JPEG is embedded as it is, in `DeviceGray` or `DeviceRGB` when it
+carries no ICC profile and in an `ICCBased` space holding its own profile when
+it does, each distinct profile stored once per PDF. A JPEG whose profile cannot
+be read or does not match its components, and a CMYK or EXIF-rotated one, is
+decoded to sRGB instead, as other images are. Text is shaped by CanvasKit
+exactly as it renders and set in its own font file, embedded with a ToUnicode
+map so it stays selectable, each glyph placed along its circle or path when the
+text follows a curve. That takes a TrueType, OpenType, WOFF or WOFF2 file. A
+variable TrueType font is fixed at the instance the text uses before it is
+embedded.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
@@ -274,7 +279,7 @@ subpath.
 | `@freshcoat-js/engine/pdf` | `paintPdf`, the PDF painter `renderPdf` and `paintPdf` call, for a runtime of your own; `mergeFontSubsets` and `subsetTag` for joining the font subsets of several PDFs |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
-| `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, and `rgbIdat` for passing an RGB PNG's data through as is |
+| `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, `rgbIdat` for passing an RGB PNG's data through as is, and `jpegFrame`, `jpegIccProfile` and `iccComponents` for passing a JPEG through with its ICC profile |
 
 ## Staying warm
 
@@ -328,8 +333,9 @@ underlying model.
   layer is still looked up by its nearest 8-bit level, so a LUT carries 8-bit
   precision whatever the working precision.
 - **Output.** The output surface and every readback (`readPixels`, encoding)
-  are 8-bit, unpremultiplied, sRGB. The engine's PNG writer adds no `sRGB`,
-  `gAMA`, `iCCP` or `cHRM` chunk, and an untagged PNG is read as sRGB.
+  are 8-bit, unpremultiplied, sRGB. The engine's PNG writer tags every PNG
+  with an `sRGB` chunk (perceptual intent) and the `gAMA` and `cHRM` values
+  the PNG spec gives alongside it, for readers that do not know `sRGB`.
   Skia's PNG writer, used only as a fallback, writes an `sRGB` chunk. JPEG and
   WebP come from Skia's encoders, which embed the snapshot's sRGB ICC profile.
   JPEG is flattened over white first.

@@ -284,7 +284,11 @@ function assemble(
 	channels: number,
 ): Uint8Array {
 	const png = new Uint8Array(
-		PNG_SIGNATURE.length + (12 + 13) + (12 + idat.total) + 12,
+		PNG_SIGNATURE.length +
+			(12 + 13) +
+			SRGB_CHUNKS.length +
+			(12 + idat.total) +
+			12,
 	);
 	png.set(PNG_SIGNATURE, 0);
 	let offset = PNG_SIGNATURE.length;
@@ -296,6 +300,8 @@ function assemble(
 	png[offset + 17] = channels === 4 ? 6 : 2; // colour type: RGBA / RGB
 	// 10..12: compression 0, filter 0, interlace 0 — the only values PNG defines.
 	offset = sealChunk(png, offset, "IHDR", 13);
+	png.set(SRGB_CHUNKS, offset);
+	offset += SRGB_CHUNKS.length;
 
 	let dst = offset + 8;
 	for (const c of idat.chunks) {
@@ -340,3 +346,29 @@ function crc32(bytes: Uint8Array): number {
 		c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
 	return (c ^ 0xffffffff) >>> 0;
 }
+
+// Every frame is sRGB: an sRGB chunk with the perceptual intent, and the gAMA
+// and cHRM values the PNG spec gives for a reader that does not know sRGB.
+const SRGB_CHUNKS = (() => {
+	const chunks: Array<[string, number[]]> = [
+		["sRGB", [0]],
+		["gAMA", [45455]],
+		["cHRM", [31270, 32900, 64000, 33000, 30000, 60000, 15000, 6000]],
+	];
+	const parts = chunks.map(([type, values]) => {
+		const length = type === "sRGB" ? 1 : values.length * 4;
+		const chunk = new Uint8Array(12 + length);
+		const view = new DataView(chunk.buffer);
+		if (type === "sRGB") chunk[8] = values[0];
+		else values.forEach((v, i) => view.setUint32(8 + i * 4, v));
+		sealChunk(chunk, 0, type, length);
+		return chunk;
+	});
+	const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+	let at = 0;
+	for (const p of parts) {
+		out.set(p, at);
+		at += p.length;
+	}
+	return out;
+})();
