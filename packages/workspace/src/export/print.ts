@@ -1,12 +1,14 @@
 import type { FrameWarning } from "@freshcoat-js/coatfile";
 import type { PrintRenderOptions } from "@freshcoat-js/coatfile/render";
-import type { ChannelBalance } from "@freshcoat-js/for-print";
+import { type ChannelBalance, printTarget } from "@freshcoat-js/for-print";
 import type { ExportPreset, PresetPrint } from "../types";
 
 /** What a render request carries when the preset prints: plain data, so it
  *  can cross to a worker as it is. */
 export type RenderPrint = {
 	analyze: boolean;
+	/** a PrintTarget id; absent is the default target */
+	target?: string;
 	/** the profile's measured cast, when it has one */
 	balance?: ChannelBalance;
 };
@@ -37,15 +39,19 @@ export function printRequest(
 	const balance = print.profile?.balance;
 	return {
 		analyze: print.analyze ?? true,
+		...(print.target ? { target: print.target } : {}),
 		...(balance ? { balance } : {}),
 	};
 }
 
-/** What an item render hands `renderCompiled`. The finish is coatfile's
- *  default, YMCKO, with the balance as its curve. */
+/** What an item render hands `renderCompiled`: the target's finish, with the
+ *  balance as its curve. Throws for a target this build does not know. */
 export function printRenderOptions(print: RenderPrint): PrintRenderOptions {
+	const target = printTarget(print.target);
+	if (!target) throw new Error(`Unknown print target "${print.target}"`);
 	return {
 		analyze: print.analyze,
+		...(print.target ? { target } : {}),
 		...(print.balance ? { balance: print.balance } : {}),
 	};
 }

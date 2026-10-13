@@ -372,6 +372,27 @@ describe("packWorkspace", () => {
 		expect(printed).toEqual(printPreset);
 	});
 
+	it("keeps a preset's print target and reads one without it as the default", async () => {
+		const targeted: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_target",
+			print: { enabled: true, target: "ymcko-dye-sub" },
+		};
+		const untargeted: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_untargeted",
+			print: { enabled: true },
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [targeted, untargeted] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		const [kept, plain] = result.workspace.presets;
+		expect(kept).toEqual(targeted);
+		expect(plain).toEqual(untargeted);
+		expect(plain?.print?.target).toBeUndefined();
+	});
+
 	it("keeps a preset's sheet layout and reads a phase 4 preset as single", async () => {
 		const sheets: ExportPreset = {
 			...(ws.presets[0] as ExportPreset),

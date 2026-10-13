@@ -156,6 +156,8 @@ export type RecordFilter = "all" | "pending" | "failed" | "selected";
 /** Output through for-print's card-printer path. Absent reads as off. */
 export type PresetPrint = {
 	enabled: boolean;
+	/** a for-print PrintTarget id; default "ymcko-dye-sub" */
+	target?: string;
 	/** correct each photo from its own analysis; default true */
 	analyze?: boolean;
 	/** a measured printer, as for-print's own JSON */
