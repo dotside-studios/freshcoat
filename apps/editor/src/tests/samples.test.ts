@@ -135,4 +135,58 @@ describe("newDocument", () => {
 		expect(custom.template_data.map((f) => f.name)).toEqual(["front"]);
 		expectValid(custom);
 	});
+
+	test("print presets carry their size, sides, bleed and safe area", () => {
+		const made = (id: string) => {
+			const p = PRESETS.find((preset) => preset.id === id);
+			if (!p) throw new Error(`no preset ${id}`);
+			const t = newDocument(p, VEND_SANS);
+			return {
+				size: [t.width, t.height],
+				sides: t.template_data.map((f) => f.name),
+				bleed: t.bleed,
+				safeArea: t.safeArea,
+			};
+		};
+		const twoSided = ["front", "back"];
+		expect(made("business-card")).toEqual({
+			size: [1050, 600],
+			sides: twoSided,
+			bleed: 38,
+			safeArea: 38,
+		});
+		expect(made("business-card-eu")).toEqual({
+			size: [1004, 650],
+			sides: twoSided,
+			bleed: 35,
+			safeArea: 35,
+		});
+		expect(made("postcard")).toEqual({
+			size: [1800, 1200],
+			sides: twoSided,
+			bleed: 38,
+			safeArea: 38,
+		});
+		expect(made("postcard-a6")).toEqual({
+			size: [1748, 1240],
+			sides: twoSided,
+			bleed: 35,
+			safeArea: 35,
+		});
+		expect(made("shipping-label")).toEqual({
+			size: [1200, 1800],
+			sides: ["front"],
+			bleed: undefined,
+			safeArea: 38,
+		});
+	});
+
+	test("a preset without bleed or safe area leaves both out", () => {
+		const card = newDocument(
+			PRESETS.find((p) => p.id === "card-cr80") ?? PRESETS[0],
+			VEND_SANS,
+		);
+		expect("bleed" in card).toBe(false);
+		expect("safeArea" in card).toBe(false);
+	});
 });
