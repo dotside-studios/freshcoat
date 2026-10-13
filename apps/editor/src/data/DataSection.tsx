@@ -13,13 +13,11 @@ import {
 import {
 	addRecords,
 	applySchema,
-	cellIssue,
 	columnsFromTemplate,
 	deleteRecords,
 	duplicateRecords,
 	emptyDataset,
 	filterRecords,
-	issueCount,
 	recordIndexMap,
 	type SortSpec,
 	schemaChanges,
@@ -37,9 +35,7 @@ import {
 import type { Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
-import { formatBytes, formatNumber } from "~/app/format";
 import { useEditor } from "~/state/hooks";
-import type { EditorState } from "~/state/store";
 import AddIcon from "~icons/mingcute/add-line";
 import ImportIcon from "~icons/mingcute/file-import-line";
 import FolderIcon from "~icons/mingcute/folder-open-line";
@@ -73,19 +69,19 @@ import {
 	type ColumnFilter,
 	filterByColumns,
 	filterByStatus,
-	photoBytes,
 	type RecordsView,
 	rememberView,
 	type StatusFilter,
 	viewFor,
 } from "./gallery-model";
-import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
+import { GridUiStore, selectionIds } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
 import { announceImport } from "./imported";
 import { sortGridRecords } from "./model";
 import { RecordPanel } from "./RecordPanel";
 import { RecordsGallery } from "./RecordsGallery";
 import { type GridHandle, RecordsGrid } from "./RecordsGrid";
+import { dataViewFor, selectActiveDataset } from "./status-state";
 
 // The same breakpoint as Edit: below it the side panels cover the grid.
 const OVERLAY_BELOW = 960;
@@ -96,17 +92,11 @@ export type InspectorTab = "record" | "columns";
 
 type Panels = { left: boolean; right: boolean };
 
-function selectActive(s: EditorState): Dataset | undefined {
-	const ws = s.workspace;
-	if (!ws) return undefined;
-	return ws.datasets.find((d) => d.id === ws.activeDatasetId) ?? ws.datasets[0];
-}
-
 export function DataSection() {
 	const controller = useController();
 	const hasWorkspace = useEditor((s) => !!s.workspace);
 	const count = useEditor((s) => s.workspace?.datasets.length ?? 0);
-	const dataset = useEditor(selectActive);
+	const dataset = useEditor(selectActiveDataset);
 	const narrow = useBelow(OVERLAY_BELOW);
 	// Below the fold width the right panel is a sheet over the records.
 	const tablet = useBelow(FOLD_DATA_BELOW);
@@ -621,6 +611,14 @@ function RecordsPane({
 		[selection, rows],
 	);
 
+	const shownCount = rows.length;
+	const selectedCount = selectedIds.length;
+	useEffect(() => {
+		const store = dataViewFor(controller);
+		store.set({ shown: shownCount, selected: selectedCount, ui });
+	}, [controller, shownCount, selectedCount, ui]);
+	useEffect(() => () => dataViewFor(controller).set(null), [controller]);
+
 	// Focusing a record, in either view, brings up the Record tab.
 	const { recordFocused } = inspector;
 	useEffect(() => {
@@ -933,12 +931,6 @@ function RecordsPane({
 					/>
 				)}
 				<DataJobBar onShowFailed={() => setStatusFilter("failed")} />
-				<DataStatusBar
-					dataset={dataset}
-					shown={rows.length}
-					selected={selectedIds.length}
-					ui={ui}
-				/>
 			</div>
 			<SidePanel
 				side="right"
@@ -980,62 +972,6 @@ function RecordsPane({
 				</Tabs>
 			</SidePanel>
 		</>
-	);
-}
-
-function DataStatusBar({
-	dataset,
-	shown,
-	selected,
-	ui,
-}: {
-	dataset: Dataset;
-	shown: number;
-	selected: number;
-	ui: GridUiStore;
-}) {
-	const issues = useMemo(() => issueCount(dataset), [dataset]);
-	const bytes = useMemo(() => photoBytes(dataset), [dataset]);
-	const active = useGridUi(ui, (s) => s.active);
-	const record = active
-		? dataset.records.find((r) => r.id === active.row)
-		: undefined;
-	const activeIssue =
-		record && active ? cellIssue(dataset, record, active.col) : undefined;
-	const n = dataset.records.length;
-	const photos = dataset.assets.length;
-	return (
-		<footer
-			data-testid="data-status"
-			className="flex h-6 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-fc-border border-t bg-fc-panel px-3 text-fc-muted text-fc-sm tabular-nums pointer-coarse:h-8"
-		>
-			<span className="min-w-0 truncate font-medium text-fc-text">
-				{dataset.name}
-			</span>
-			<span data-testid="data-status-records">
-				{shown !== n ? `${formatNumber(shown)} of ` : ""}
-				{plural(n, "record")}
-			</span>
-			{selected ? (
-				<span className="text-fc-text" data-testid="data-status-selected">
-					{formatNumber(selected)} selected
-				</span>
-			) : null}
-			<span className={issues ? "text-fc-danger-text" : undefined}>
-				{plural(issues, "issue")}
-			</span>
-			<span>{plural(dataset.columns.length, "column")}</span>
-			{photos ? (
-				<span data-testid="data-status-photos">
-					{plural(photos, "photo")}, {formatBytes(bytes)}
-				</span>
-			) : null}
-			{activeIssue && active ? (
-				<span className="min-w-0 truncate text-fc-danger-text">
-					{active.col}: {activeIssue}
-				</span>
-			) : null}
-		</footer>
 	);
 }
 

@@ -8,7 +8,9 @@ import { useController } from "~/app/context";
 import { plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { useEditor } from "~/state/hooks";
+import { STATUS_PRIORITY } from "./priority";
 import { type TaskSnapshot, tasksFor, useTasks } from "./tasks";
+import type { StatusItem } from "./types";
 
 /** The rows tests and e2e find by an id, by task id. */
 const ROW_TEST_IDS: Record<string, string> = {
@@ -57,7 +59,7 @@ function Bar({
 }
 
 /**
- * The running tasks, compact, for the menu bar. A task whose section is
+ * The running tasks, compact, for the status bar. A task whose section is
  * showing is left out, since that section shows it in full. Pressing it
  * lists the tasks, each with Cancel and Show where they apply.
  */
@@ -75,16 +77,16 @@ export function Activity() {
 			<RACButton
 				aria-label={`${title}, show activity`}
 				data-testid="activity"
-				className="flex h-6 shrink-0 cursor-default items-center gap-2 rounded-[3px] px-1.5 text-fc-muted text-fc-sm outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-hovered:bg-fc-hover"
+				className="flex h-6 shrink-0 cursor-default items-center gap-2 rounded-[3px] px-1.5 pointer-coarse:h-8 text-fc-muted text-fc-sm outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-hovered:bg-fc-hover"
 			>
-				<span className="hidden max-w-40 truncate md:inline">{title}</span>
+				<span className="max-w-40 truncate @max-[48rem]:hidden">{title}</span>
 				<Bar label={title} progress={progress} className="w-16" />
 				<span className="whitespace-nowrap tabular-nums">
 					{progressText(progress)}
 				</span>
 			</RACButton>
 			<Popover
-				placement="bottom end"
+				placement="top end"
 				className="flex w-72 max-w-[calc(100vw-1rem)] flex-col"
 			>
 				<Dialog data-testid="activity-popover" title="Activity">
@@ -146,3 +148,12 @@ function TaskRow({ task, onShow }: { task: TaskSnapshot; onShow: () => void }) {
 		</li>
 	);
 }
+
+export const ACTIVITY_ITEM: StatusItem = {
+	id: "activity",
+	name: "Activity",
+	sections: "all",
+	align: "end",
+	priority: STATUS_PRIORITY.activity,
+	component: Activity,
+};
