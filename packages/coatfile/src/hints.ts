@@ -4,6 +4,7 @@ import {
 	formatVersionStatus,
 	minimumFormatVersion,
 } from "./format";
+import { type ImageDpiOptions, imageDpiIssues } from "./image-dpi";
 import { isOpenVector } from "./slices";
 import type { Sides, Template } from "./types";
 import { checkVariants, type VariantIssue } from "./variants";
@@ -24,10 +25,26 @@ export type SafeAreaHint = {
 	safe: Sides;
 };
 
+export type ImageDpiHint = {
+	kind: "image_dpi";
+	/** Frame index in `template_data`. */
+	side: number;
+	/** The frame's name. */
+	sideName: string;
+	/** The layer's id. */
+	id: string;
+	src: string;
+	/** The effective resolution at the export DPI, rounded down. */
+	dpi: number;
+	/** The resolution it falls short of. */
+	min: number;
+};
+
 export type TemplateHint =
 	/** A variant change that changes nothing or names a layer that is gone. */
 	| { kind: "variant"; issue: VariantIssue }
 	| SafeAreaHint
+	| ImageDpiHint
 	/** An open path with a slice that says it is a piece; it exports as a cut
 	 *  line only. */
 	| { kind: "slice_open_piece"; side: number; sideName: string; id: string }
@@ -52,6 +69,24 @@ export function safeAreaHints(t: Template): SafeAreaHint[] {
 	}));
 }
 
+/** Image layers with a fixed src that print below the minimum resolution.
+ *  Only images whose pixel size is known are checked: those the template
+ *  carries, and those `options.pixelSize` gives. */
+export function imageDpiHints(
+	t: Template,
+	options: ImageDpiOptions = {},
+): ImageDpiHint[] {
+	return imageDpiIssues(t, options).map(({ side, id, src, dpi, min }) => ({
+		kind: "image_dpi",
+		side,
+		sideName: t.template_data[side]?.name ?? String(side),
+		id,
+		src,
+		dpi,
+		min,
+	}));
+}
+
 /** Open paths whose slice says `output: "piece"`, stated or by default. */
 function openPieceHints(t: Template): TemplateHint[] {
 	const hints: TemplateHint[] = [];
@@ -73,15 +108,21 @@ function openPieceHints(t: Template): TemplateHint[] {
 
 /**
  * What is worth telling an author about a template that is valid: variant
- * issues, layers inside the safe area, and a format version that does not
- * match the file. Each hint carries its data; wording is the caller's.
+ * issues, layers inside the safe area, images below the print resolution,
+ * and a format version that does not match the file. Each hint carries its
+ * data; wording is the caller's. `images` sets how the resolution check
+ * runs.
  */
-export function templateHints(t: Template): TemplateHint[] {
+export function templateHints(
+	t: Template,
+	images: ImageDpiOptions = {},
+): TemplateHint[] {
 	const hints: TemplateHint[] = checkVariants(t).map((issue) => ({
 		kind: "variant",
 		issue,
 	}));
 	hints.push(...safeAreaHints(t));
+	hints.push(...imageDpiHints(t, images));
 	hints.push(...openPieceHints(t));
 	const declared = t.format_version;
 	if (formatVersionStatus(declared) === "newer")
