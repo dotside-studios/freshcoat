@@ -1,4 +1,8 @@
 import { useSyncExternalStore } from "react";
+import {
+	createExternalStore,
+	type ExternalStore,
+} from "~/state/external-store";
 
 export type CellRef = { row: string; col: string };
 
@@ -13,30 +17,25 @@ export type GridUiState = {
 /** The grid's cursor, kept outside React state so a cell re-renders only
  *  when it starts or stops being active or edited. */
 export class GridUiStore {
-	private state: GridUiState;
-	private listeners = new Set<() => void>();
+	private store: ExternalStore<GridUiState>;
 
 	constructor(active: CellRef | null = null) {
-		this.state = { active, editing: null };
+		this.store = createExternalStore<GridUiState>({ active, editing: null });
 	}
 
-	get = (): GridUiState => this.state;
+	get = (): GridUiState => this.store.get();
 
-	subscribe = (fn: () => void): (() => void) => {
-		this.listeners.add(fn);
-		return () => this.listeners.delete(fn);
-	};
+	subscribe = (fn: () => void): (() => void) => this.store.subscribe(fn);
 
 	set(patch: Partial<GridUiState>): void {
-		const next = { ...this.state, ...patch };
-		if (
-			sameCell(next.active, this.state.active) &&
-			sameCell(next.editing, this.state.editing) &&
-			next.editing?.seed === this.state.editing?.seed
-		)
-			return;
-		this.state = next;
-		for (const fn of this.listeners) fn();
+		this.store.set((prev) => {
+			const next = { ...prev, ...patch };
+			return sameCell(next.active, prev.active) &&
+				sameCell(next.editing, prev.editing) &&
+				next.editing?.seed === prev.editing?.seed
+				? prev
+				: next;
+		});
 	}
 }
 

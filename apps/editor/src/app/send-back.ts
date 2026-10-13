@@ -1,7 +1,7 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { toast } from "@freshcoat-js/ui/toast";
-import { useSyncExternalStore } from "react";
 import { sendableTemplate } from "~/doc/io";
+import { createExternalStore } from "~/state/external-store";
 import type { EditorController } from "./controller";
 import { plural } from "./copy";
 
@@ -21,30 +21,22 @@ export type SendReply =
 	| { kind: "rejected"; reason: string }
 	| { kind: "timeout" };
 
-let target: SendBackTarget | null = null;
-const listeners = new Set<() => void>();
-
-function subscribe(fn: () => void) {
-	listeners.add(fn);
-	return () => {
-		listeners.delete(fn);
-	};
-}
+const target = createExternalStore<SendBackTarget | null>(null);
 
 export function setSendBackTarget(next: SendBackTarget | null): void {
-	target = next;
-	for (const fn of listeners) fn();
+	target.set(next);
 }
 
 export function getSendBackTarget(): SendBackTarget | null {
-	return target;
+	return target.get();
 }
 
 export function useSendBackTarget(
 	templateId: string | undefined,
 ): SendBackTarget | null {
-	const current = useSyncExternalStore(subscribe, getSendBackTarget);
-	return current && current.templateId === templateId ? current : null;
+	return target.useStore((current) =>
+		current && current.templateId === templateId ? current : null,
+	);
 }
 
 export function hostOf(origin: string): string {
@@ -87,7 +79,8 @@ export function postTemplate(
 
 export async function sendBack(controller: EditorController): Promise<void> {
 	const active = controller.state.workspace?.activeTemplateId;
-	const to = target && target.templateId === active ? target : null;
+	const current = target.get();
+	const to = current && current.templateId === active ? current : null;
 	const base = controller.base;
 	if (!to || !base) return;
 	const host = hostOf(to.origin);
