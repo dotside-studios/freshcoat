@@ -121,6 +121,58 @@ describe("EditableText", () => {
 	});
 });
 
+describe("EditableText stroke", () => {
+	// Red and black pixels on a row through the stem of an "I", at 4x.
+	function redColumns(align: "center" | "outside" | "inside") {
+		const t = laid(
+			"I",
+			{
+				font: { family: "Geist", size: 80, lineHeight: 1 },
+				color: "#000000",
+				stroke: { color: "#ff0000", width: 2, align },
+			},
+			{ width: 60, height: 80 },
+		);
+		const surface = ck.MakeSurface(240, 320);
+		if (!surface) throw new Error("no surface");
+		const canvas = surface.getCanvas();
+		canvas.clear(ck.WHITE);
+		canvas.scale(4, 4);
+		t.paint(canvas);
+		const info = {
+			width: 240,
+			height: 1,
+			colorType: ck.ColorType.RGBA_8888,
+			alphaType: ck.AlphaType.Unpremul,
+			colorSpace: ck.ColorSpace.SRGB,
+		};
+		const row = canvas.readPixels(0, 160, info) as Uint8Array;
+		surface.delete();
+		const red: number[] = [];
+		const black: number[] = [];
+		for (let x = 0; x < 240; x++) {
+			const [r, g] = [row[x * 4] as number, row[x * 4 + 1] as number];
+			if (r > 200 && g < 60) red.push(x);
+			if (r < 60) black.push(x);
+		}
+		return { red, black };
+	}
+
+	it("layers the stroke by its alignment", () => {
+		const center = redColumns("center");
+		const outside = redColumns("outside");
+		const inside = redColumns("inside");
+		for (const c of [center, outside, inside]) {
+			expect(c.red.length).toBeGreaterThan(0);
+			expect(c.black.length).toBeGreaterThan(0);
+		}
+		const left = (c: { red: number[] }) => Math.min(...c.red);
+		expect(left(outside)).toBeLessThan(left(center));
+		expect(left(center)).toBeLessThan(left(inside));
+		expect(Math.min(...inside.black)).toBeGreaterThan(left(inside));
+	});
+});
+
 describe("casedText", () => {
 	it("keeps tokens and indices", () => {
 		expect(casedText("hi {{ name }} there", "upper")).toBe(
