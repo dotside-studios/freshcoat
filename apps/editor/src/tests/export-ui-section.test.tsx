@@ -1,4 +1,5 @@
 import type { Template } from "@freshcoat-js/coatfile";
+import { iccProfile } from "@freshcoat-js/test-utils";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import type { JobFile, JobResult } from "@freshcoat-js/workspace/export";
 import {
@@ -464,6 +465,87 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(
 			screen.queryByRole("checkbox", { name: "Keep alpha channel" }),
 		).toBeNull();
+	});
+
+	test("a PDF preset declares sRGB, a custom profile or nothing", async () => {
+		const { controller, user, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: {
+					id: "p_1",
+					name: "Print shop",
+					templateId,
+					records: "all",
+					sides: "all",
+					format: "pdf",
+					scale: 1,
+					dpi: 300,
+					fileName: "{{name}}-{{side}}",
+					markExported: true,
+				},
+			}),
+		);
+		await user.click(screen.getByRole("tab", { name: "Print" }));
+		const group = screen.getByTestId("export-output-intent");
+		const hint = () =>
+			screen.getByTestId("export-output-intent-hint").textContent;
+		expect(hint()).toBe("Declares sRGB, the space cards are drawn in");
+		const input = group.querySelector("input[type=file]") as HTMLInputElement;
+
+		await user.upload(
+			input,
+			new File([iccProfile({ space: "Lab " }) as BlobPart], "lab.icc"),
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("export-output-intent-error").textContent).toBe(
+				'Couldn\'t use lab.icc: its colour space "Lab" is not gray, RGB or CMYK',
+			),
+		);
+		expect(
+			controller.state.workspace?.presets[0]?.outputIntent,
+		).toBeUndefined();
+
+		const fogra = iccProfile({ description: "Coated FOGRA39" });
+		await user.upload(input, new File([fogra as BlobPart], "fogra.icc"));
+		await waitFor(() =>
+			expect(hint()).toBe(
+				"Coated FOGRA39: cards stay sRGB, the printer converts them",
+			),
+		);
+		const ws = controller.state.workspace;
+		const sha = ws?.profiles?.[0]?.sha256;
+		expect(ws?.profiles).toHaveLength(1);
+		expect(ws?.profiles?.[0]).toMatchObject({
+			name: "fogra.icc",
+			description: "Coated FOGRA39",
+			bytes: fogra,
+		});
+		expect(ws?.presets[0]?.outputIntent).toEqual({
+			kind: "profile",
+			sha256: sha,
+		});
+		expect(
+			within(group).getByRole("button", { name: /Coated FOGRA39/ }),
+		).toBeTruthy();
+
+		await chooseOption(
+			user,
+			within(group).getByRole("button", { name: /Coated FOGRA39/ }),
+			"None",
+		);
+		expect(controller.state.workspace?.presets[0]?.outputIntent).toEqual({
+			kind: "none",
+		});
+		expect(hint()).toBe("No intent: each printer reads the colors its own way");
+		// Picking the same file again keeps one copy.
+		await user.upload(input, new File([fogra as BlobPart], "again.icc"));
+		await waitFor(() =>
+			expect(controller.state.workspace?.presets[0]?.outputIntent?.kind).toBe(
+				"profile",
+			),
+		);
+		expect(controller.state.workspace?.profiles).toHaveLength(1);
 	});
 
 	test("warns under the file name pattern about tokens that name nothing", async () => {

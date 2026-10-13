@@ -15,9 +15,11 @@ import {
 	fileNameTokens,
 	headersOf,
 	importDefaults,
+	type IccProfileAsset,
 	newPreset,
 	type PaperName,
 	prepareAssets,
+	readOutputProfile,
 	unfilledRequired,
 	unknownFileNameTokens,
 	withFieldSource,
@@ -68,6 +70,9 @@ export type BatchOptions = {
 	margin?: number;
 	gap?: number;
 	cropMarks?: boolean;
+	/** an ICC file; false declares none */
+	outputIntent?: string | false;
+	outputIntentId?: string;
 	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
@@ -108,6 +113,11 @@ export async function renderBatch(
 	if (variantId) binding = withVariantSource(binding, { kind: "fixed", id: variantId });
 	if (options.where) binding = withView(binding, { filters: options.where });
 
+	const profile =
+		typeof options.outputIntent === "string"
+			? await readProfile(io, options.outputIntent, options.outputIntentId)
+			: undefined;
+
 	const templateId = "t_template";
 	const workspace: Workspace = {
 		formatVersion: "1.0",
@@ -115,6 +125,7 @@ export async function renderBatch(
 		templates: [{ id: templateId, fileName: basename(file), template, binding }],
 		datasets: [dataset],
 		presets: [],
+		...(profile ? { profiles: [profile] } : {}),
 	};
 	const missing =
 		options.data === undefined
@@ -139,6 +150,11 @@ export async function renderBatch(
 		...(options.bleed ? { bleed: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
+		...(profile
+			? { outputIntent: { kind: "profile", sha256: profile.sha256 } }
+			: options.outputIntent === false
+				? { outputIntent: { kind: "none" } }
+				: {}),
 		...(options.sheets
 			? {
 					layout: {
@@ -164,6 +180,16 @@ export async function renderBatch(
 		log,
 		io,
 	);
+}
+
+async function readProfile(
+	io: Io,
+	file: string,
+	identifier: string | undefined,
+): Promise<IccProfileAsset> {
+	const read = await readOutputProfile(await readBytes(io, file), basename(file), identifier);
+	if (!read.ok) throw new CliError(`--output-intent ${file}: ${read.message}`);
+	return read.profile;
 }
 
 function checkName(template: Template, pattern: string): void {

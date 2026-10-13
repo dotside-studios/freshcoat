@@ -116,6 +116,14 @@ const BUNDLED_ASSETS: Array<{
 		source: "apps/editor/src/samples/fonts/VendSans-Variable-latin.woff2",
 		licenseFile: "apps/editor/src/samples/fonts/OFL.txt",
 	},
+	{
+		name: "Compact ICC Profiles, sRGB-v2-magic.icc",
+		version: "commit bdd84663",
+		license: "CC0-1.0",
+		repository: "https://github.com/saucecontrol/Compact-ICC-Profiles",
+		source: "packages/engine/icc/sRGB-v2-magic.icc",
+		licenseFile: "legal/third-party/Compact-ICC-Profiles-LICENSE",
+	},
 ];
 
 /** npm packages whose files are bundled as assets, named in the summary. */
@@ -395,7 +403,7 @@ function render(entries: Entry[], assets: Entry[], kits: string[]): string {
 		"",
 		...kits.map((k) => `- \`${k}\`: ${KITS[k]}`),
 		"",
-		"## Bundled fonts and runtime",
+		"## Bundled fonts, runtime and color profile",
 		"",
 		"| Asset | License | Source |",
 		"|---|---|---|",

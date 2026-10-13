@@ -1,7 +1,13 @@
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
-import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
+import { SRGB_OUTPUT_INTENT } from "@freshcoat-js/engine/icc";
+import {
+	iccProfile,
+	loadCanvasKit,
+	testFontBytes,
+} from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import { beforeAll, describe, expect, it } from "vitest";
+import { MissingProfileError, readOutputProfile } from "../output-intent";
 import { planExport } from "../plan";
 import { photoSha, preset, workspace } from "../test-fixtures";
 import type { ExportPreset } from "../types";
@@ -104,6 +110,28 @@ describe("createItemRenderer", () => {
 	});
 });
 
+describe("createItemRenderer vector pages", () => {
+	it("tags RGB as sRGB unless asked not to", async () => {
+		const page = async (untagged?: true) => {
+			const out = await items.render({
+				template,
+				values: { name: "Ana" },
+				side: "front",
+				scale: 1,
+				images: [],
+				format: "png",
+				vector: { dpi: 300, ...(untagged ? { untagged } : {}) },
+			});
+			expect(out.format).toBe("pdf");
+			return new TextDecoder("latin1").decode(out.bytes);
+		};
+		expect(await page()).toContain("/DefaultRGB [/ICCBased");
+		const untagged = await page(true);
+		expect(untagged).not.toContain("ICCBased");
+		expect(untagged).not.toContain("OutputIntents");
+	});
+});
+
 describe("runExportJob on this thread", () => {
 	it("writes every planned file and the report to one zip", async () => {
 		const small: ExportPreset = { ...preset, scale: 0.25 };
@@ -180,5 +208,107 @@ describe("runExportJob on this thread", () => {
 		);
 		expect(head).toBe("%PDF-");
 		expect(result.file?.name).toBe("all.pdf");
+	});
+
+	describe("output intent", () => {
+		const pdf: ExportPreset = {
+			...preset,
+			format: "pdf",
+			scale: 0.25,
+			records: "selected",
+			selected: ["r_00000004"],
+		};
+		const intentFor = async (
+			p: ExportPreset,
+			ws = workspace,
+		): Promise<unknown> => {
+			let seen: unknown = "not called";
+			await runExportJob(ws, p, {
+				pool: inlinePool(items),
+				assemblePdf: async (_pages, options) => {
+					seen = options.outputIntent;
+					return new Uint8Array();
+				},
+			});
+			return seen;
+		};
+
+		it("hands assemblePdf the preset's intent", async () => {
+			expect(await intentFor(pdf)).toBe(SRGB_OUTPUT_INTENT);
+			expect(await intentFor({ ...pdf, outputIntent: { kind: "none" } })).toBe(
+				false,
+			);
+			const read = await readOutputProfile(
+				iccProfile({ description: "Coated FOGRA39" }),
+				"fogra.icc",
+				"FOGRA39",
+			);
+			if (!read.ok) throw new Error(read.message);
+			expect(
+				await intentFor(
+					{
+						...pdf,
+						outputIntent: { kind: "profile", sha256: read.profile.sha256 },
+					},
+					{ ...workspace, profiles: [read.profile] },
+				),
+			).toEqual({
+				profile: read.profile.bytes,
+				identifier: "FOGRA39",
+				info: "Coated FOGRA39",
+			});
+		});
+
+		it("refuses a missing profile before rendering", async () => {
+			let rendered = 0;
+			await expect(
+				runExportJob(
+					workspace,
+					{ ...pdf, outputIntent: { kind: "profile", sha256: "f".repeat(64) } },
+					{
+						pool: inlinePool({
+							render: (r) => {
+								rendered++;
+								return items.render(r);
+							},
+						}),
+					},
+				),
+			).rejects.toThrow(MissingProfileError);
+			expect(rendered).toBe(0);
+		});
+
+		it("leaves vector pages untagged for a PDF without an intent", async () => {
+			let untagged: unknown[] = [];
+			await runExportJob(
+				workspace,
+				{ ...pdf, pdfPageImage: "vector", outputIntent: { kind: "none" } },
+				{
+					pool: inlinePool({
+						render: (r) => {
+							untagged.push(r.vector?.untagged);
+							return items.render(r);
+						},
+					}),
+					assemblePdf: async () => new Uint8Array(),
+				},
+			);
+			expect(untagged).toEqual([true, true]);
+			untagged = [];
+			await runExportJob(
+				workspace,
+				{ ...pdf, pdfPageImage: "vector" },
+				{
+					pool: inlinePool({
+						render: (r) => {
+							untagged.push(r.vector?.untagged);
+							return items.render(r);
+						},
+					}),
+					assemblePdf: async () => new Uint8Array(),
+				},
+			);
+			expect(untagged).toEqual([undefined, undefined]);
+		});
 	});
 });

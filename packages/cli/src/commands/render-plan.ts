@@ -16,7 +16,18 @@ export type RenderPlan =
 
 const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
-const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
+const PDF_OPTIONS = [
+	"dpi",
+	"pdfPages",
+	"sheets",
+	"duplex",
+	"margin",
+	"gap",
+	"cropMarks",
+	"outputIntent",
+	"noOutputIntent",
+	"outputIntentId",
+];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", ...PDF_OPTIONS];
 
@@ -27,7 +38,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		.filter(([key, value]) =>
 			key === "cropMarks" ? value === false : value !== undefined && key !== "quiet",
 		)
-		.map(([key]) => key);
+		.map(([key, value]) => (key === "outputIntent" && value === false ? "noOutputIntent" : key));
 	const { preset, out, records, save, ...rest } = input;
 	if (save && rest.dryRun) throw new UsageError("--save and --dry-run do not go together");
 
@@ -98,7 +109,10 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 
 function exportProblem(
 	given: string[],
-	options: Pick<RenderInput, "scale" | "format" | "pngAlpha" | "quality" | "pdfPages">,
+	options: Pick<
+		RenderInput,
+		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "outputIntent"
+	>,
 	out: string,
 ): string | undefined {
 	const pdf = /\.pdf$/i.test(out);
@@ -110,6 +124,8 @@ function exportProblem(
 	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
 	if (!pdf && pdfOnly.length > 0)
 		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");
+	if (given.includes("outputIntentId") && typeof options.outputIntent !== "string")
+		return "--output-intent-id needs --output-intent <file>";
 	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));
 	if (sheetOnly.length > 0 && !given.includes("sheets"))
 		return listed(sheetOnly, "needs --sheets", "need --sheets");

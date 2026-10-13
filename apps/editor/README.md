@@ -153,8 +153,11 @@ covers shared checks and pull requests.
 - Phone widths are not supported. Below about 720px the menu bar and the
   section toolbars do not fit, and at 390px the page scrolls sideways.
 - Print output is for-print's correction for Davi's card printers, not ICC
-  color management or soft-proofing. The printer file preview is the file that
-  is sent, not a proof of the printed card.
+  color management. A PDF declares an output intent, sRGB by default or a
+  print shop's ICC profile chosen under Print > Color, and tags its RGB as
+  sRGB, so a RIP knows what it was made for; Studio does not convert colors to
+  that profile, check gamut against it, or soft-proof. The printer file
+  preview is the file that is sent, not a proof of the printed card.
 - A zip past 4 GB or 65,535 files is written as zip64, which some older
   unzip tools cannot open. Download still hands over 512 MB parts, so that a
   job never holds more than one part in memory.

@@ -5,6 +5,7 @@ import {
 	type Binding,
 	type Dataset,
 	type ExportPreset,
+	type IccProfileAsset,
 	newId,
 	type RecordStatus,
 	type Workspace,
@@ -288,7 +289,12 @@ export type Action =
 			errors?: Record<string, string>;
 			fromJob?: true;
 	  }
-	| { type: "setPreset"; preset: ExportPreset }
+	| {
+			type: "setPreset";
+			preset: ExportPreset;
+			/** kept in the workspace for the preset's output intent */
+			profile?: IccProfileAsset;
+	  }
 	| { type: "removePreset"; id: string }
 	| { type: "setActivePreset"; id: string | null }
 	| { type: "setPreviewRecord"; id: string | null }
@@ -841,14 +847,17 @@ function reduceWorkspace(state: EditorState, action: Action): EditorState {
 				),
 			);
 		case "setPreset": {
-			const { preset } = action;
+			const { preset, profile } = action;
 			const at = ws.presets.findIndex((p) => p.id === preset.id);
+			const profiles = ws.profiles ?? [];
 			return edit((w) => {
 				w.presets = produce(ws.presets, (list) => {
 					if (at >= 0) list[at] = preset;
 					else list.push(preset);
 				});
 				if (at < 0) w.activePresetId = preset.id;
+				if (profile && !profiles.some((p) => p.sha256 === profile.sha256))
+					w.profiles = [...profiles, profile];
 			});
 		}
 		case "removePreset": {

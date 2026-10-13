@@ -156,7 +156,15 @@ export function publishedManifest(
 		private: false,
 		main: "./src/index.js",
 		types: "./src/index.d.ts",
-		files: ["src", "fixtures", "schema", "LICENSE", "NOTICE", "README.md"],
+		files: [
+			"src",
+			"fixtures",
+			"schema",
+			"icc",
+			"LICENSE",
+			"NOTICE",
+			"README.md",
+		],
 		publishConfig: { access: "public" },
 		...(bin
 			? {
@@ -255,7 +263,7 @@ export async function buildPackages(tag?: string): Promise<void> {
 				throw new Error(`${data.name}: ${path} lost its shebang`);
 			chmodSync(built, 0o755);
 		}
-		for (const asset of ["LICENSE", "NOTICE", "README.md", "schema"]) {
+		for (const asset of ["LICENSE", "NOTICE", "README.md", "schema", "icc"]) {
 			if (existsSync(join(packageRoot, asset)))
 				cpSync(join(packageRoot, asset), join(output, asset), {
 					recursive: true,

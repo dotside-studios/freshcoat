@@ -117,6 +117,24 @@ describe("autosave", () => {
 		expect((await store.read())?.recentId).toBe("recent_1");
 	});
 
+	it("keeps the output intent profiles, and writes again when they change", async () => {
+		const store = createAutosaveStore(freshDb());
+		const ws = workspace([]);
+		await store.write({ workspace: ws, fileName: "a" });
+		const profile = {
+			sha256: "icc1",
+			name: "fogra.icc",
+			description: "Coated FOGRA39",
+			identifier: "FOGRA39",
+			bytes: new Uint8Array([1, 2, 3]),
+		};
+		await store.write({
+			workspace: { ...ws, profiles: [profile] },
+			fileName: "a",
+		});
+		expect((await store.read())?.workspace.profiles).toEqual([profile]);
+	});
+
 	it("hands back one stored photo by its sha", async () => {
 		const db = freshDb();
 		const store = createAutosaveStore(db);

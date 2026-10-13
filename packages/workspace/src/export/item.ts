@@ -58,8 +58,9 @@ export type RenderRequest = {
 	/** render through for-print's card-printer path */
 	print?: RenderPrint;
 	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
-	 *  place of `format` */
-	vector?: { dpi: number };
+	 *  place of `format`; `untagged` leaves its RGB DeviceRGB, for a PDF that
+	 *  declares no output intent */
+	vector?: { dpi: number; untagged?: true };
 };
 
 export type RenderOutput = {
@@ -226,7 +227,12 @@ export function itemRequest(
 			// pixels when the size follows one.
 			...(vector
 				? {
-						vector: { dpi: size.resize ? preset.dpi / size.scale : preset.dpi },
+						vector: {
+							dpi: size.resize ? preset.dpi / size.scale : preset.dpi,
+							...(preset.outputIntent?.kind === "none"
+								? { untagged: true as const }
+								: {}),
+						},
 					}
 				: {}),
 		},
@@ -346,6 +352,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					frameNames: [req.side],
 					images,
 					dpi: req.vector.dpi,
+					...(req.vector.untagged ? { outputIntent: false as const } : {}),
 				});
 				if (!page) throw new Error("nothing was rendered");
 				for (const w of page.warnings)
