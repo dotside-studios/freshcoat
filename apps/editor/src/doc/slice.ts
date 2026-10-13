@@ -1,7 +1,7 @@
 import type { SliceModifier, Template } from "@freshcoat-js/coatfile";
-import { parseVectorPath } from "./vector-edit";
 import { type OpResult, ok, updateElement } from "./ops";
 import { getElement, parseKey } from "./path";
+import { parseVectorPath } from "./vector-edit";
 
 /** Whether the layer can carry a `slice`: a rect or vector directly on a
  *  side, which is all the format allows. */
