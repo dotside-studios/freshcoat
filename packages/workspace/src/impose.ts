@@ -463,6 +463,254 @@ export function cropMarks(imposition: Imposition<unknown>): CropMark[] {
 	return marks;
 }
 
+/** A registration target's crosshair runs this far across... */
+export const REGISTRATION_MARK_SIZE_MM = 6;
+/** ...around a circle of this radius. */
+export const REGISTRATION_MARK_RADIUS_MM = 2;
+/** Each colour bar patch is a square this wide. */
+export const COLOR_BAR_PATCH_MM = 4;
+/** The slug's type size. */
+export const SLUG_FONT_PT = 6;
+/** Room kept between a mark and the paper's edge, a card's bleed, a crop
+ *  mark or another mark. */
+export const MARK_CLEARANCE_MM = 1;
+
+/** Black at 100, 75, 50, 25, 10 and 0 percent, then cyan, magenta, yellow,
+ *  red, green and blue, as RGB from 0 to 1. */
+export const COLOR_BAR_STEPS: readonly (readonly [number, number, number])[] = [
+	[0, 0, 0],
+	[0.25, 0.25, 0.25],
+	[0.5, 0.5, 0.5],
+	[0.75, 0.75, 0.75],
+	[0.9, 0.9, 0.9],
+	[1, 1, 1],
+	[0, 1, 1],
+	[1, 0, 1],
+	[1, 1, 0],
+	[1, 0, 0],
+	[0, 1, 0],
+	[0, 0, 1],
+];
+
+const PT_PER_MM = 72 / 25.4;
+
+/** A registration target's centre, in millimetres from the page's top-left
+ *  corner. */
+export type RegistrationMark = { x: number; y: number };
+
+export type ColorPatch = {
+	x: number;
+	y: number;
+	sizeMm: number;
+	rgb: readonly [number, number, number];
+};
+
+/** Where the slug line goes: `y` is the top of its type, and the text is cut
+ *  to `widthMm`. */
+export type SlugBox = {
+	x: number;
+	y: number;
+	widthMm: number;
+	heightMm: number;
+};
+
+export type SheetMarks = {
+	crop: CropMark[];
+	registration: RegistrationMark[];
+	colorBar: ColorPatch[];
+	slug: SlugBox | null;
+};
+
+export type SheetMarkOptions = Pick<
+	SheetLayout,
+	| "cropMarks"
+	| "registrationMarks"
+	| "colorBar"
+	| "slug"
+	| "duplex"
+	| "backOffsetMm"
+>;
+
+type Margins = {
+	/** from the paper's edge to the cards' bleed */
+	top: number;
+	bottom: number;
+	left: number;
+	right: number;
+	/** the cards' bleed edges */
+	x0: number;
+	x1: number;
+	y0: number;
+	y1: number;
+};
+
+function margins(imposition: Imposition<unknown>): Margins {
+	const { paper, card, columns, rows, originMm } = imposition;
+	const gap = imposition.gapMm;
+	const bleed = imposition.bleedMm ?? NO_BLEED;
+	const x0 = originMm.x - bleed.left;
+	const y0 = originMm.y - bleed.top;
+	const x1 =
+		originMm.x + columns * card.widthMm + (columns - 1) * gap + bleed.right;
+	const y1 =
+		originMm.y + rows * card.heightMm + (rows - 1) * gap + bleed.bottom;
+	return {
+		top: y0,
+		bottom: paper.heightMm - y1,
+		left: x0,
+		right: paper.widthMm - x1,
+		x0,
+		x1,
+		y0,
+		y1,
+	};
+}
+
+/** The spot along an edge nearest its middle, larger on a tie, where a
+ *  target clears every cut line in `cuts` and the paper's ends; null if
+ *  there is none. */
+function along(length: number, cutsAt: number[]): number | null {
+	const half = REGISTRATION_MARK_SIZE_MM / 2 + MARK_CLEARANCE_MM;
+	const clear = (at: number) =>
+		at >= half - 1e-9 &&
+		at <= length - half + 1e-9 &&
+		cutsAt.every((c) => Math.abs(c - at) >= half - 1e-9);
+	const middle = length / 2;
+	const candidates = [middle, ...cutsAt.flatMap((c) => [c - half, c + half])]
+		.filter(clear)
+		.sort((a, b) => Math.abs(a - middle) - Math.abs(b - middle) || b - a);
+	return candidates[0] ?? null;
+}
+
+/** The registration targets of a front: one centred in each margin deep
+ *  enough to hold it, moved along the edge off any crop mark. */
+function frontTargets(
+	imposition: Imposition<unknown>,
+	m: Margins,
+	withCrop: boolean,
+): RegistrationMark[] {
+	const { paper, card, columns, rows, originMm, gapMm } = imposition;
+	const depth = REGISTRATION_MARK_SIZE_MM + 2 * MARK_CLEARANCE_MM;
+	const xs = withCrop ? cuts(originMm.x, card.widthMm, gapMm, columns) : [];
+	const ys = withCrop ? cuts(originMm.y, card.heightMm, gapMm, rows) : [];
+	const out: RegistrationMark[] = [];
+	const x = along(paper.widthMm, xs);
+	const y = along(paper.heightMm, ys);
+	if (x !== null) {
+		if (m.top >= depth) out.push({ x, y: m.top / 2 });
+		if (m.bottom >= depth) out.push({ x, y: paper.heightMm - m.bottom / 2 });
+	}
+	if (y !== null) {
+		if (m.left >= depth) out.push({ x: m.left / 2, y });
+		if (m.right >= depth) out.push({ x: paper.widthMm - m.right / 2, y });
+	}
+	return out;
+}
+
+/** How far crop marks reach into a margin past the cards' bleed. */
+const CROP_REACH_MM = CROP_MARK_OFFSET_MM + CROP_MARK_LENGTH_MM;
+
+/** The span along a top or bottom margin from the cards' left bleed edge up
+ *  to the first target in the band `[top, bottom]`, or the right bleed edge. */
+function runFromLeft(
+	m: Margins,
+	targets: RegistrationMark[],
+	top: number,
+	bottom: number,
+): [number, number] {
+	const r = REGISTRATION_MARK_SIZE_MM / 2;
+	let end = m.x1;
+	for (const t of targets)
+		if (t.y + r > top && t.y - r < bottom && t.x + r > m.x0)
+			end = Math.min(end, t.x - r - MARK_CLEARANCE_MM);
+	return [m.x0, end];
+}
+
+/**
+ * Every printer's mark of one page, in millimetres from its top-left corner:
+ * crop marks on fronts, registration targets centred in each margin, a
+ * colour bar along the bottom margin and a slug line along the top. A mark
+ * is left out where its margin has no room for it; the colour bar and slug
+ * sit outside the crop marks and stop short of a target.
+ *
+ * A back's targets are its front's, mirrored as the flip mirrors the sheet
+ * and moved by the back offset, so they land behind the front's.
+ */
+export function sheetMarks(
+	imposition: Imposition<unknown>,
+	options: SheetMarkOptions,
+	side: SheetPage<unknown>["side"],
+): SheetMarks {
+	const { paper } = imposition;
+	const m = margins(imposition);
+	const crop =
+		options.cropMarks && side !== "back" ? cropMarks(imposition) : [];
+	let registration: RegistrationMark[] = [];
+	if (options.registrationMarks) {
+		registration = frontTargets(imposition, m, options.cropMarks);
+		if (side === "back") {
+			const mirrorColumns =
+				(options.duplex === "long-edge") ===
+				(imposition.paper.orientation === "portrait");
+			const dx = options.backOffsetMm?.x ?? 0;
+			const dy = options.backOffsetMm?.y ?? 0;
+			registration = registration.map((t) => ({
+				x: (mirrorColumns ? paper.widthMm - t.x : t.x) + dx,
+				y: (mirrorColumns ? t.y : paper.heightMm - t.y) + dy,
+			}));
+		}
+	}
+	const reach = options.cropMarks ? CROP_REACH_MM : 0;
+	const pad = MARK_CLEARANCE_MM / 2;
+
+	const colorBar: ColorPatch[] = [];
+	if (options.colorBar) {
+		const size = COLOR_BAR_PATCH_MM;
+		const room = m.bottom - reach;
+		if (room >= size + 2 * pad) {
+			const y = paper.heightMm - (room + size) / 2;
+			const [start, end] = runFromLeft(m, registration, y, y + size);
+			if (end - start >= COLOR_BAR_STEPS.length * size - 1e-9)
+				for (const [i, rgb] of COLOR_BAR_STEPS.entries())
+					colorBar.push({ x: start + i * size, y, sizeMm: size, rgb });
+		}
+	}
+
+	let slug: SlugBox | null = null;
+	if (options.slug) {
+		const height = SLUG_FONT_PT / PT_PER_MM;
+		const room = m.top - reach;
+		if (room >= height + 2 * pad) {
+			const y = (room - height) / 2;
+			const [start, end] = runFromLeft(m, registration, y, y + height);
+			if (end - start >= 20)
+				slug = { x: start, y, widthMm: end - start, heightMm: height };
+		}
+	}
+	return { crop, registration, colorBar, slug };
+}
+
+/** The slug line's words for one page: "Members · Sheet 2 of 5 · Back ·
+ *  2026-10-13". Single-sided sheets name no side. */
+export function slugText(
+	imposition: Imposition<unknown>,
+	pageIndex: number,
+	info: { job?: string; date: Date },
+): string {
+	const pages = imposition.pages;
+	const side = pages[pageIndex]?.side ?? "any";
+	const sheet = pages
+		.slice(0, pageIndex + 1)
+		.filter((p) => p.side !== "back").length;
+	const parts = [
+		info.job?.trim(),
+		`Sheet ${sheet} of ${imposition.sheets}`,
+		side === "any" ? undefined : side === "front" ? "Front" : "Back",
+		info.date.toISOString().slice(0, 10),
+	];
+	return parts.filter(Boolean).join(" · ");
+}
+
 /** "10 per sheet · 21 sheets" and friends, for a summary line, with
  *  "· 3 copies each" when cards repeat. */
 export function sheetSummary(imposition: Imposition<unknown>): string {

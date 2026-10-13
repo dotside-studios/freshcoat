@@ -14,6 +14,7 @@ import {
 	parseCopies,
 	parseJobs,
 	parseLength,
+	parseMarks,
 	parsePaper,
 	parsePositive,
 	parseQuality,
@@ -168,6 +169,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"--copies <n|fill>",
 			"repeat each card this many times, or fill a sheet with it; default 1",
 			arg(parseCopies),
+		)
+		.option(
+			"--marks <list>",
+			"printer's marks on sheets: none, or any of crop, registration, colorbar, slug; default crop",
+			arg(parseMarks),
 		)
 		.option("--no-crop-marks", "leave out the crop marks")
 		.option(

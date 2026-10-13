@@ -599,6 +599,15 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   1 mm outside each cut line, in the margin and in gaps wide enough to hold
   them (10 mm), never across a card. They are drawn on fronts only, since
   the cut is made from the front.
+- **Registration marks, Color bar, Slug** (off by default): a crosshair
+  target centered in each margin, on fronts and backs, with a back's
+  targets landing behind its front's; a strip of gray steps and color
+  patches in the bottom margin; and a line in the top margin with the
+  preset's name, "Sheet 2 of 5", the side when double-sided, and the date.
+  Each is drawn only where its margin has room, the color bar and slug
+  outside the crop marks and clear of a target. Marks are pure black until
+  PDFs gain a registration color. See
+  [Printer's marks](../../../packages/workspace/README.md#printers-marks).
 - **Double-sided:** when it is on, "Flip on" picks Long edge or Short edge,
   to match the printer's setting. Each record's back goes on the next page
   in the slot that lands behind its front. A flip mirrors the sheet across
@@ -619,7 +628,7 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   whole message on hover.
 - **Sheet preview:** Sheet joins Output, Source and Split in the preview
   toolbar. It draws the current sheet at its paper's aspect, each slot with
-  its record rendered at a low scale, plus the crop marks, and steps with
+  its record rendered at a low scale, plus the marks, and steps with
   "Sheet 3 of 21". A Front and Back switch picks the side of a double-sided
   sheet. Picking a record in the filmstrip moves to its sheet and outlines
   its slot. With "Include bleed", each slot shows its bleed around the trim

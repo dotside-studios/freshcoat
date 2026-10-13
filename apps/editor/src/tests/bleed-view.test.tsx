@@ -100,12 +100,7 @@ describe("bleed on the sheet preview", () => {
 			...(bleedMm ? { bleedMm } : {}),
 		});
 		render(
-			<SheetPreview
-				template={template}
-				imposition={imposition}
-				page={0}
-				cropMarks={false}
-			/>,
+			<SheetPreview template={template} imposition={imposition} page={0} />,
 		);
 		return imposition;
 	}
