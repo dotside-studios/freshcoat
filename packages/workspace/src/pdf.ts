@@ -5,7 +5,12 @@ import {
 	MM_PER_INCH,
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
-import { rgbIdat } from "@freshcoat-js/engine/image";
+import {
+	iccComponents,
+	jpegFrame,
+	jpegIccProfile,
+	rgbIdat,
+} from "@freshcoat-js/engine/image";
 import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
 import { crc32 } from "./crc";
 import { cropMarks, imposeSheets } from "./impose";
@@ -84,13 +89,15 @@ export async function assemblePdf(
 	doc.setCreationDate(date);
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);
+	const profiles: IccProfiles = new Map();
 	let embedded = 0;
 	const embed = async (page: PdfPage): Promise<Embedded> => {
 		const ref =
 			page.format === "pdf"
 				? ((await doc.embedPdf(page.bytes))[0] as PDFEmbeddedPage)
 				: page.format === "jpeg"
-					? (await doc.embedJpg(page.bytes)).ref
+					? (embedProfiledJpeg(lib, doc, page.bytes, profiles) ??
+						(await doc.embedJpg(page.bytes)).ref)
 					: (embedRgbPng(lib, doc, page.bytes) ??
 						(await doc.embedPng(page.bytes)).ref);
 		options.onProgress?.(++embedded, pages.length);
@@ -357,4 +364,54 @@ export function embedRgbPng(
 		},
 	});
 	return context.register(lib.PDFRawStream.of(dict, idat.data));
+}
+
+/** The ICC profiles a document already holds, by checksum. */
+export type IccProfiles = Map<
+	number,
+	Array<{ bytes: Uint8Array; ref: PDFRef }>
+>;
+
+/** Embeds a gray or RGB JPEG that carries an ICC profile as it is, drawn in
+ *  that profile, which is written once per document however many images
+ *  share it. Returns undefined for a JPEG without a usable profile, which
+ *  `embedJpg` handles instead. */
+export function embedProfiledJpeg(
+	lib: PdfLib,
+	doc: PDFDocument,
+	bytes: Uint8Array,
+	profiles: IccProfiles,
+): PDFRef | undefined {
+	const frame = jpegFrame(bytes);
+	if (!frame || (frame.components !== 1 && frame.components !== 3))
+		return undefined;
+	const profile = jpegIccProfile(bytes);
+	if (
+		typeof profile === "string" ||
+		iccComponents(profile) !== frame.components
+	)
+		return undefined;
+	const { context } = doc;
+	const key = crc32(profile);
+	const same = profiles.get(key) ?? [];
+	let entry = same.find((p) => sameBytes(p.bytes, profile));
+	if (!entry) {
+		entry = {
+			bytes: profile,
+			ref: context.register(
+				context.flateStream(profile, { N: frame.components }),
+			),
+		};
+		profiles.set(key, [...same, entry]);
+	}
+	const dict = context.obj({
+		Type: "XObject",
+		Subtype: "Image",
+		Width: frame.width,
+		Height: frame.height,
+		ColorSpace: [lib.PDFName.of("ICCBased"), entry.ref],
+		BitsPerComponent: 8,
+		Filter: "DCTDecode",
+	});
+	return context.register(lib.PDFRawStream.of(dict, bytes));
 }
