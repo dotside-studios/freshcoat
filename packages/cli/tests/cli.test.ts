@@ -7,7 +7,7 @@ import { DEFAULT_SHEET_LAYOUT, type Workspace } from "@freshcoat-js/workspace";
 import { REPORT_FILE_NAME } from "@freshcoat-js/workspace/export";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { version } from "../src/main";
 import { poolSize } from "../src/worker-pool";
 import {
@@ -1522,6 +1522,125 @@ describe("the command line", () => {
 		expect(run.code).toBe(2);
 		expect(run.stderr).toContain("freshcoat: missing required argument 'file'");
 		expect(run.stderr).toContain("Run freshcoat inspect --help for usage.");
+	});
+});
+
+describe("render cut files", () => {
+	const edged = (): Template => {
+		const base = card({ format_version: "1.7" } as never);
+		const rect = (id: string, x: number, slice: Record<string, unknown>, extra = {}) => ({
+			id,
+			type: "rect",
+			pos: { x, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: { fill: "#ff0000", slice: { name: id, ...slice } },
+			...extra,
+		});
+		return {
+			...base,
+			template_data: base.template_data.map((frame) =>
+				frame.name === "front"
+					? {
+							...frame,
+							elements: [
+								rect("left", 0, { edge: "through" }),
+								rect("right", 100, { edge: "kiss" }),
+								{ ...rect("fold", 20, { edge: "score", output: "none" }), size: { width: 40, height: 2 } },
+								...frame.elements,
+							],
+						}
+					: frame,
+			),
+		} as Template;
+	};
+	let workspace: Workspace;
+
+	beforeAll(async () => {
+		await box.write("edged.json", JSON.stringify(edged()));
+		workspace = workspaceOf(edged());
+		await box.write("edged.coatworkspace", await workspaceBytes(workspace));
+	});
+
+	async function zipOf(path: string): Promise<Record<string, Uint8Array>> {
+		return unzipSync(new Uint8Array(await readFile(box.path(path))));
+	}
+	const text = (bytes: Uint8Array | undefined) => new TextDecoder().decode(bytes);
+
+	test("writes an SVG beside each piece that has lines", async () => {
+		const run = await box.run("render", "edged.json", "--pieces", "--cut", "svg", "--out", "cut-dir", "-q");
+		expect(run.code).toBe(0);
+		expect((await readdir(box.path("cut-dir"))).sort()).toEqual([
+			"back.png",
+			"export-report.csv",
+			"front-left.png",
+			"front-left.svg",
+			"front-right.png",
+			"front-right.svg",
+		]);
+		const left = await readFile(box.path("cut-dir", "front-left.svg"), "utf8");
+		expect(left).toContain('viewBox="0 0 100 100"');
+		expect(left).toContain('<g id="through">');
+		expect(left).toContain('<g id="score">');
+	});
+
+	test("writes a DXF of the whole frame into a zip", async () => {
+		const run = await box.run("render", "edged.json", "--cut", "dxf", "--frame", "front", "--out", "cut.zip", "-q");
+		expect(run.code).toBe(0);
+		const files = await zipOf("cut.zip");
+		expect(Object.keys(files).sort()).toEqual(["front.dxf", "front.png", REPORT_FILE_NAME]);
+		const dxf = text(files["front.dxf"]);
+		for (const layer of ["THROUGH", "KISS", "SCORE"]) expect(dxf).toContain(layer);
+		expect(dxf).toContain("$INSUNITS");
+	});
+
+	test("draws the cut lines of a PDF", async () => {
+		const run = await box.run("render", "edged.json", "--frame", "front", "--cut-lines", "--dpi", "72", "--out", "cut.pdf", "-q");
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("cut.pdf")));
+		const [page] = pdf.getPages();
+		const stream = page?.node.Contents();
+		expect(stream).toBeDefined();
+		const plain = await box.run("render", "edged.json", "--frame", "front", "--dpi", "72", "--out", "plain.pdf", "-q");
+		expect(plain.code).toBe(0);
+		const withLines = (await readFile(box.path("cut.pdf"))).length;
+		const without = (await readFile(box.path("plain.pdf"))).length;
+		expect(withLines).toBeGreaterThan(without);
+		expect(pdf.catalog.has(PDFName.of("OCProperties"))).toBe(true);
+	});
+
+	test("takes --cut and --cut-lines for a workspace preset", async () => {
+		const run = await box.run("render", "edged.coatworkspace", "--preset", "p_png", "--cut", "svg", "--out", "ws-cut.zip", "-q");
+		expect(run.code).toBe(0);
+		expect(Object.keys(await zipOf("ws-cut.zip")).filter((name) => name.endsWith(".svg")).sort()).toEqual([
+			"1-front.svg",
+			"2-front.svg",
+		]);
+		const lines = await box.run("render", "edged.coatworkspace", "--preset", "p_pdf", "--cut-lines", "--out", "ws-cut.pdf", "-q");
+		expect(lines.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("ws-cut.pdf")));
+		expect(pdf.catalog.has(PDFName.of("OCProperties"))).toBe(true);
+	});
+
+	test("refuses a cut option the preset's format does not take", async () => {
+		const png = await box.run("render", "edged.coatworkspace", "--preset", "p_png", "--cut-lines", "--out", "x.zip", "-q");
+		expect(png.code).toBe(1);
+		expect(png.stderr).toContain("--cut-lines applies only to a PDF preset");
+		const pdf = await box.run("render", "edged.coatworkspace", "--preset", "p_pdf", "--cut", "svg", "--out", "x.pdf", "-q");
+		expect(pdf.code).toBe(1);
+		expect(pdf.stderr).toContain("--cut applies only to an image preset");
+	});
+
+	test("refuses an unknown cut format", async () => {
+		const run = await box.run("render", "edged.json", "--cut", "ai", "--out", "x.zip");
+		expect(run.code).toBe(2);
+		expect(run.stderr).toContain("--cut");
+	});
+
+	test("warns when no slice has an edge to cut", async () => {
+		const run = await box.run("render", "badge.json", "--cut", "svg", "--out", "no-edges.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: no slice has an edge to cut");
+		expect(Object.keys(await zipOf("no-edges.zip")).sort()).toEqual(["back.png", REPORT_FILE_NAME, "front.png"]);
 	});
 });
 

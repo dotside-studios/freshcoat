@@ -56,6 +56,29 @@ describe("planRender", () => {
 		});
 	});
 
+	test("exports a template's cut files into a directory, a zip or a PDF", () => {
+		expect(planRender("card.coat", input({ cut: "svg" }))).toEqual({
+			kind: "batch",
+			options: { cut: "svg", out: ".", cropMarks: true, quiet: false },
+		});
+		expect(planRender("card.coat", input({ cut: "dxf", out: "x.zip" })).kind).toBe("batch");
+		expect(planRender("card.coat", input({ cutLines: true, out: "x.pdf" }))).toEqual({
+			kind: "batch",
+			options: { cutLines: true, out: "x.pdf", cropMarks: true, quiet: false },
+		});
+	});
+
+	test("passes --cut and --cut-lines to a workspace preset", () => {
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", cut: "dxf" }))).toEqual({
+			kind: "workspace",
+			options: { preset: "All", cut: "dxf", out: "x.zip", quiet: false },
+		});
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.pdf", cutLines: true }))).toEqual({
+			kind: "workspace",
+			options: { preset: "All", cutLines: true, out: "x.pdf", quiet: false },
+		});
+	});
+
 	test("runs a workspace preset with only the workspace options", () => {
 		expect(
 			planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", records: "failed", save: true, jobs: 2 })),
@@ -91,6 +114,9 @@ describe("planRender", () => {
 			["card.coat", { out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
 			["card.coat", { pieces: true, out: "x.pdf", pdfPages: "vector" }, "--pieces does not go with --pdf-pages vector"],
 			["card.coat", { pieces: true, out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
+			["card.coat", { cut: "svg", out: "x.pdf" }, "--cut applies only to images; a PDF takes --cut-lines"],
+			["card.coat", { cutLines: true, out: "x.zip" }, "--cut-lines applies only to a .pdf"],
+			["card.coat", { cutLines: true, out: "cards", data: "people.csv" }, "--cut-lines applies only to a .pdf"],
 			["card.coat", { out: "x.zip", where: [{ column: "name", op: "empty" }] }, "--where needs --data or a .coatworkspace file"],
 		];
 		for (const [file, options, message] of cases)
