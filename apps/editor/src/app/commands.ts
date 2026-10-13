@@ -1,3 +1,4 @@
+import { boundDataset } from "@freshcoat-js/workspace";
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
@@ -49,8 +50,8 @@ const hasSides = (s: EditorState) =>
 const hasVariants = (s: EditorState) =>
 	(s.doc?.history.present.variants?.length ?? 0) > 0;
 const hasRecords = (s: EditorState) => {
-	const id = activeSlot(s)?.binding?.datasetId;
-	return !!s.workspace?.datasets.find((d) => d.id === id)?.records.length;
+	return !!boundDataset(activeSlot(s)?.binding, s.workspace?.datasets ?? [])
+		?.records.length;
 };
 const tool = (t: Tool, label: string, key: string): Command => ({
 	id: `tool.${t}`,

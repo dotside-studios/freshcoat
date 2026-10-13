@@ -155,6 +155,15 @@ the records, and **Export** turns templates and records into files.
   the import toast. Required fields left unfilled are counted on the binding,
   under the record stepper and beside the Export button. In Edit, the record
   stepper previews real records on the canvas.
+  - Under the dataset picker, Records filters and joins what the binding
+    reads, saved with it. Join adds a second dataset's columns, with a prefix,
+    to each record whose column equals that dataset's key; "Only records with
+    a match" drops the rest. Each filter is a column, a condition (is,
+    contains, is empty, their opposites, and <, ≤, >, ≥ for numbers and
+    dates) and a value; every filter must match. It counts the records kept,
+    names records with no match and keys held twice, and a filter or join that
+    cannot apply keeps nothing and blocks Export with the reason. Fields,
+    the variant column, the Edit preview and Export all read the view.
 - **Current record:** Edit's preview, Data's focused record and Export's
   preview share one current record. Moving to a record in one section moves
   the others to it when their dataset has it.

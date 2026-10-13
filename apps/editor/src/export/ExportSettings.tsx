@@ -23,6 +23,7 @@ import type {
 	SheetLayout,
 } from "@freshcoat-js/workspace";
 import {
+	boundDataset,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
 	exportSize,
@@ -205,12 +206,10 @@ export function ExportSettings({
 	const lossy = imageFormat(preset) !== "png";
 	const datasets = useEditor((s) => s.workspace?.datasets);
 	const bindingOf = templates?.find((t) => t.id === preset.templateId)?.binding;
-	const boundDataset = bindingOf
-		? datasets?.find((d) => d.id === bindingOf.datasetId)
-		: undefined;
-	const boundTo = boundDataset?.name;
+	const viewed = datasets ? boundDataset(bindingOf, datasets) : undefined;
+	const boundTo = viewed?.name;
 	const unknownTokens = template
-		? unknownFileNameTokens(preset.fileName, template, boundDataset)
+		? unknownFileNameTokens(preset.fileName, template, viewed)
 		: [];
 	const sharedBy =
 		useEditor((s) => s.workspace?.presets)?.filter(
