@@ -20,7 +20,7 @@ import {
 import { FontEmbedder } from "../src/pdf/fonts";
 import { glyphTexts, lineClusters, paintPdf } from "../src/pdf/paint";
 import { PdfWriter } from "../src/pdf/writer";
-import { createRenderer, type Renderer } from "../src/renderer";
+import { createRenderer, type RenderPdfOptions, type Renderer } from "../src/renderer";
 
 // Geist alone in a font collection, which a PDF cannot embed.
 function collection(sfnt: Uint8Array): Uint8Array {
@@ -216,22 +216,27 @@ describe("renderPdf", () => {
 		expect(source(pdf.bytes)).not.toContain("/Subtype /Image");
 	});
 
-	test("draws text a PDF cannot embed as an image", async () => {
+	test("draws text a PDF cannot embed as outlines", async () => {
 		const collected = await createRenderer({
 			ck,
-			fonts: { Collected: [collection(testFontBytes("Geist-Regular.ttf"))] },
-		});
-		const pdf = await collected.renderPdf(
-			frame([label("Collected", 400, "In a collection", 8)]),
-			{ width: W, height: H },
-		);
-		expect(pdf.warnings).toEqual([
-			{
-				kind: "vector_rasterized",
-				feature: "font Geist is not TrueType or OpenType",
+			fonts: {
+				Collected: [collection(testFontBytes("Geist-Regular.ttf"))],
+				Blended: [testFontBytes("VendSans-Variable-CFF2.otf")],
 			},
+		});
+		const scene = frame([
+			label("Collected", 400, "In a collection", 8),
+			label("Blended", 700, "CFF2 at 700", 40),
 		]);
-		expect(source(pdf.bytes)).toContain("/Subtype /Image");
+		const pdf = await collected.renderPdf(scene, { width: W, height: H });
+		expect(pdf.warnings).toEqual([]);
+		const body = source(pdf.bytes);
+		expect(body).not.toContain("/Font");
+		expect(body).not.toContain("/Subtype /Image");
+		if (pdftoppm) {
+			const png = await collected.render(scene, { width: W, height: H });
+			expect(compare(png.bytes, rasterize(pdf.bytes), []).mean).toBeLessThan(4);
+		}
 	});
 
 	test("embeds text set in a WOFF2 file", async () => {
@@ -623,6 +628,176 @@ describe("renderPdf", () => {
 			expect(loads.filter((src) => src === "a.png")).toHaveLength(2);
 			expect(loads.filter((src) => src === "b.png")).toHaveLength(2);
 		});
+	});
+});
+
+describe("text as outlines", () => {
+	const outlined = (scene: Node, extra: Partial<RenderPdfOptions> = {}) =>
+		renderer.renderPdf(scene, { width: W, height: H, text: "outline", ...extra });
+
+	test("draws every glyph as a path, with no font in the file", async () => {
+		const pdf = await outlined(scene);
+		expect(pdf.warnings).toEqual([]);
+		const body = source(pdf.bytes);
+		for (const font of ["/Font", "/FontFile", "/ToUnicode", "/Type0"])
+			expect(body).not.toContain(font);
+		expect(body).not.toContain("/Subtype /Image");
+		expect(body).toContain("/BM /Multiply");
+	});
+
+	test.skipIf(!pdftoppm)("looks as the embedded text does", async () => {
+		const embedded = rasterize((await renderer.renderPdf(scene, { width: W, height: H })).bytes);
+		const outlines = rasterize((await outlined(scene)).bytes);
+		const png = await renderer.render(scene, { width: W, height: H });
+		// Poppler hints glyphs drawn from a font and not paths, so the two differ
+		// at their edges by about what either differs from the raster render.
+		expect(compare(embedded, outlines, []).mean).toBeLessThan(3);
+		expect(compare(png.bytes, outlines, []).mean).toBeLessThan(8);
+	});
+
+	test.skipIf(!pdftotext)("leaves no text to extract", async () => {
+		expect(extractText((await outlined(scene)).bytes).trim()).toBe("");
+	});
+
+	test("outlines a CFF font and a WOFF2 variable font at its instance", async () => {
+		const cff = await createRenderer({
+			ck,
+			fonts: {
+				CFF: [testFontBytes("VendSans-Regular-CFF.otf")],
+				Vend: [testFontBytes("VendSans-Variable-latin.woff2")],
+			},
+		});
+		const page = frame([label("CFF", 400, "Set in CFF", 8), label("Vend", 300, "Light", 40)]);
+		expect(source((await cff.renderPdf(page, { width: W, height: H })).bytes)).toContain("/FontFile3");
+		const pdf = await cff.renderPdf(page, { width: W, height: H, text: "outline" });
+		expect(pdf.warnings).toEqual([]);
+		expect(source(pdf.bytes)).not.toContain("/Font");
+		if (pdftoppm) {
+			const png = await cff.render(page, { width: W, height: H });
+			expect(compare(png.bytes, rasterize(pdf.bytes), []).mean).toBeLessThan(4);
+		}
+	});
+
+	test("outlines the layers that ask for it and embeds the rest", async () => {
+		const pdf = await renderer.renderPdf(
+			frame([
+				{ ...label("Geist", 400, "Outlined", 8), pdfText: "outline" } as Node,
+				label("Vend", 400, "Embedded", 40),
+			]),
+			{ width: W, height: H },
+		);
+		const body = source(pdf.bytes);
+		expect(body.match(/\/FontFile2/g)).toHaveLength(1);
+		expect(body).toMatch(/\/BaseFont \/[A-Z]{6}\+VendSans/);
+		expect(body).not.toMatch(/\/BaseFont \/[A-Z]{6}\+Geist/);
+	});
+
+	// Gradients, aligned strokes, opacity, blends and curves, which embedded
+	// text draws as an image for the gradient.
+	const styled = frame([
+		createText({
+			pos: { x: 8, y: 4 },
+			size: { width: 184, height: 40 },
+			text: "Gradient",
+			font: { family: "Vend", weight: 700, style: "normal", size: 32, lineHeight: 1.2 },
+			color: "#000000",
+			fill: {
+				kind: "linear",
+				from: { x: 0, y: 0 },
+				to: { x: 1, y: 1 },
+				stops: [
+					{ offset: 0, color: "#ff5a36" },
+					{ offset: 1, color: "#3a86ff" },
+				],
+			},
+			stroke: { color: "#111111", width: 1.5, align: "inside" },
+		}),
+		createText({
+			pos: { x: 8, y: 44 },
+			size: { width: 184, height: 30 },
+			text: "Outside",
+			font: { family: "Geist", weight: 400, style: "normal", size: 24, lineHeight: 1.2 },
+			color: "#1d3557",
+			stroke: { color: "#e63946", width: 2, align: "outside" },
+			opacity: 0.7,
+			blendMode: "multiply",
+		}),
+		createText({
+			pos: { x: 100, y: 40 },
+			size: { width: 90, height: 80 },
+			text: "Around the ring",
+			font: { family: "Geist", weight: 400, style: "normal", size: 12, lineHeight: 1.2 },
+			color: "#2a9d8f",
+			arc: { startAngle: 0 },
+		}),
+	]);
+
+	test("paints gradients, strokes, opacity, blends and curves as vectors", async () => {
+		const embedded = await renderer.renderPdf(styled, { width: W, height: H });
+		expect(embedded.warnings).toEqual([{ kind: "vector_rasterized", feature: "gradient text" }]);
+		const pdf = await outlined(styled);
+		expect(pdf.warnings).toEqual([]);
+		const body = source(pdf.bytes);
+		expect(body).not.toContain("/Font");
+		expect(body).not.toContain("/Subtype /Image");
+		expect(body).toContain("/ShadingType 2");
+		expect(body).toContain("/BM /Multiply");
+		if (pdftoppm) {
+			const png = await renderer.render(styled, { width: W, height: H });
+			expect(compare(png.bytes, rasterize(pdf.bytes), []).mean).toBeLessThan(6);
+		}
+	});
+
+	test("draws a gradient stroke along the outlines", async () => {
+		const pdf = await outlined(
+			frame([
+				createText({
+					pos: { x: 8, y: 8 },
+					size: { width: 184, height: 40 },
+					text: "Stroked",
+					font: { family: "Geist", weight: 400, style: "normal", size: 32, lineHeight: 1.2 },
+					color: "#ffffff",
+					stroke: {
+						color: "#000000",
+						width: 2,
+						gradient: {
+							kind: "linear",
+							from: { x: 0, y: 0 },
+							to: { x: 1, y: 0 },
+							stops: [
+								{ offset: 0, color: "#ff5a36" },
+								{ offset: 1, color: "#3a86ff" },
+							],
+						},
+					},
+				}),
+			]),
+		);
+		expect(pdf.warnings).toEqual([]);
+		expect(source(pdf.bytes)).toContain("/ShadingType 2");
+	});
+
+	test("still draws as an image what PDF has no operator for", async () => {
+		const pdf = await outlined(
+			frame([
+				{
+					...label("Geist", 400, "Angular", 8),
+					id: "angular",
+					fill: {
+						kind: "angular",
+						center: { x: 0.5, y: 0.5 },
+						rotation: 0,
+						stops: [
+							{ offset: 0, color: "#000" },
+							{ offset: 1, color: "#f00" },
+						],
+					},
+				} as Node,
+			]),
+		);
+		expect(pdf.warnings).toEqual([
+			{ kind: "vector_rasterized", feature: "angular gradient text", layer: "angular" },
+		]);
 	});
 });
 
