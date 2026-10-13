@@ -84,6 +84,17 @@ export {
 	validateRecord,
 } from "./columns";
 export {
+	CUT_KINDS,
+	CUT_STYLES,
+	type CutKind,
+	type CutLine,
+	type ItemCuts,
+	type ItemCutsOptions,
+	itemCuts,
+} from "./cut";
+export { cutDxf, DXF_CHORD_TOLERANCE_MM } from "./cut-dxf";
+export { cutSvg } from "./cut-svg";
+export {
 	freshId,
 	isValidKey,
 	newId,
