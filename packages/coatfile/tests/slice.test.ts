@@ -164,6 +164,26 @@ describe("slice validation", () => {
 		).toContain("slice_size_required");
 	});
 
+	test("an open path may be a cut line but not a piece", () => {
+		const line = { d: "M0 1 L40 1" };
+		const open = (modifier: Modifier) =>
+			codes(template(vector("l", modifier, line)));
+		expect(open({ output: "none", edge: "score" })).toEqual([]);
+		expect(open({ edge: "score" })).toContain("slice_piece_open_path");
+		expect(open({ output: "piece" })).toContain("slice_piece_open_path");
+		const mixed = { d: "M0 0 L10 0 L10 10 Z M20 0 L30 0" };
+		expect(codes(template(vector("m", { output: "piece" }, mixed)))).toContain(
+			"slice_piece_open_path",
+		);
+		expect(
+			codes(template(vector("c", { output: "piece" }, { d: "M0 0 L9 0 L9 9 Z" }))),
+		).toEqual([]);
+	});
+
+	test("a rect is always closed, so it may be a piece", () => {
+		expect(codes(template(shape("r", { output: "piece" })))).toEqual([]);
+	});
+
 	test("may be rotated", () => {
 		expect(codes(template(shape("s", {}, { rotation: 15 })))).toEqual([]);
 	});
@@ -311,6 +331,37 @@ describe("resolveSlices", () => {
 		);
 		expect(s.path).toContain("C");
 		expect(s.box.width).toBeLessThan(40);
+	});
+
+	test("an open path stays open, and a closed one stays closed", () => {
+		const [line] = resolveSlices(
+			template(vector("l", { output: "none", edge: "score" }, { d: "M0 1 L40 1" })),
+		);
+		expect(line?.path).toBe("M10 21L50 21");
+		expect(line?.box).toEqual({ x: 10, y: 21, width: 40, height: 0 });
+		const [both] = resolveSlices(
+			template(
+				vector(
+					"b",
+					{ output: "none", edge: "score" },
+					{ d: "M0 0 L10 0 L10 10 Z M20 0 L30 0" },
+				),
+			),
+		);
+		expect(both?.path).toBe("M10 20L20 20L20 30ZM30 20L40 20");
+	});
+
+	test("a curve with open ends stays open under corner rounding", () => {
+		const [curve] = resolveSlices(
+			template(
+				vector(
+					"c",
+					{ output: "none", edge: "perforate" },
+					{ d: "M0 0 C10 0 20 10 30 10", cornerRadius: 4 },
+				),
+			),
+		);
+		expect(curve?.path).not.toContain("Z");
 	});
 
 	test("a rotated shape turns about its centre", () => {
