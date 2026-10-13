@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import {
+	DEFAULT_IMAGE_DPI_UNITS,
+	DEFAULT_MIN_IMAGE_DPI,
 	DEFAULT_VARIANT_ID,
 	resolveTemplateFonts,
 	type Template,
@@ -36,6 +38,7 @@ export type RenderOptions = {
 	scale?: number[];
 	format?: keyof typeof FORMATS;
 	pngAlpha?: "auto" | "keep";
+	minDpi?: number;
 	out?: string;
 	dryRun?: true;
 	quiet: boolean;
@@ -83,8 +86,10 @@ export async function render(
 		fonts,
 		assets: read.assets,
 	});
+	const minDpi = options.minDpi ?? DEFAULT_MIN_IMAGE_DPI;
 	try {
 		const frames = await renderTemplate(renderer, template, values, {
+			...(minDpi > 0 ? { imageDpi: { dpi: DEFAULT_IMAGE_DPI_UNITS, min: minDpi } } : {}),
 			...(variantId ? { variantId } : {}),
 			...(frameNames ? { frameNames } : {}),
 			exports: scales.map((value) => ({

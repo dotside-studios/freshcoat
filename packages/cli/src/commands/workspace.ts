@@ -41,6 +41,7 @@ export type WorkspaceOptions = {
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
+	minDpi?: number;
 	quiet: boolean;
 };
 
@@ -69,6 +70,7 @@ export async function renderWorkspace(
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
 		...(options.cutLines ? { cutLines: true } : {}),
+		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 	};
 	if (options.cut && preset.format === "pdf")
 		throw new CliError(`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`);
@@ -179,6 +181,8 @@ export async function runPreset(
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
 		if (result.cancelled) throw new CliError("the export was cancelled");
 		await options.save?.(result.workspace);
+		for (const item of result.items)
+			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning}`);
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);

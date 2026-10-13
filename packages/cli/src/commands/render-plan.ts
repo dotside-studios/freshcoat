@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "minDpi", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
@@ -60,6 +60,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.pieces ? { pieces: rest.pieces } : {}),
 				...(rest.cut ? { cut: rest.cut } : {}),
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
+				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
 				out,
 				quiet: input.quiet,
 			},
@@ -99,7 +100,7 @@ export async function runRender(file: string, input: RenderInput, io: Io): Promi
 }
 
 function templateOptions(input: Omit<RenderInput, "out">, out: string | undefined): RenderOptions {
-	const { values, set, variant, frame, scale, format, pngAlpha, dryRun, quiet } = input;
+	const { values, set, variant, frame, scale, format, pngAlpha, minDpi, dryRun, quiet } = input;
 	return {
 		...(values !== undefined ? { values } : {}),
 		...(set !== undefined ? { set } : {}),
@@ -108,6 +109,7 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 		...(scale !== undefined ? { scale } : {}),
 		...(format !== undefined ? { format } : {}),
 		...(pngAlpha !== undefined ? { pngAlpha } : {}),
+		...(minDpi !== undefined ? { minDpi } : {}),
 		...(dryRun ? { dryRun } : {}),
 		...(out !== undefined ? { out } : {}),
 		quiet,

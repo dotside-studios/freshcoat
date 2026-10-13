@@ -110,6 +110,14 @@ guessed or no font data is found, as is text the fonts have no glyphs for.
 Relative image paths in the template resolve against its directory, and
 nothing outside it is read. An image field left empty is not reported.
 
+Each image is checked for the resolution it prints at: its pixels over the
+inches its layer covers at 300 design units to the inch (or the export's
+`--dpi`), after its crop and fit, on the axis with fewer. One under 300 is
+reported, as `warning: front: Image prints at 200 DPI, under 300: photo`, and in
+an export's `warnings` and `export-report.csv`. `--min-dpi <n>` sets the
+threshold, and `--min-dpi 0` turns the check off. It applies to a workspace
+preset too, over the preset's own `minImageDpi`.
+
 #### Spreadsheets
 
 With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
@@ -280,6 +288,13 @@ warns about what Studio's Issues list shows, without failing:
   nothing;
 - a top-level layer with an edge between the trim and the template's safe area,
   or for a `card_cr80` template with none, the printer's 3 mm;
+- an image that prints below 300 DPI, such as a 600 px wide image placed 3 in
+  wide, as `warning: front: "photo" prints at 200 DPI, under 300`. The layer is
+  measured at `--dpi` design units to the inch, default 300, and checked
+  against `--min-dpi`, default 300, 0 for none. In a workspace each template
+  takes its presets' lowest `dpi` and highest `minImageDpi` unless the flags
+  say otherwise. Embedded images and images named by a path beside the file
+  are checked; an image bound to a field is checked when it renders;
 - a `format_version` newer than this freshcoat reads, or older than the fields
   the template uses.
 
