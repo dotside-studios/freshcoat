@@ -246,16 +246,17 @@ solid fills, linear gradients and circular radial ones, solid strokes
 blend modes PDF defines, images and SVG images are drawn as vectors; a JPEG is
 embedded as it is. Text is shaped by CanvasKit exactly as it renders and set in
 its own font file, embedded with a ToUnicode map so it stays selectable. That
-takes a TrueType or OpenType file, at its default instance when it is variable.
+takes a TrueType, OpenType, WOFF or WOFF2 file, at its default instance when
+it is variable.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
 preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
 with transparent stops, a spread, or an elliptical or focal shape, gradient
 and trimmed strokes, strokes aligned to a path, gradient-filled text, text on
-a curve, the `plus` and `linear-burn` blend modes, text in a WOFF or WOFF2 file
-or at a variable instance, and SVG images holding text or filters. Bitmaps are
-drawn without smoothing. Everything beneath a backdrop blur, or the whole page
+a curve, the `plus` and `linear-burn` blend modes, text at a variable
+instance, and SVG images holding text or filters. Bitmaps are drawn without
+smoothing. Everything beneath a backdrop blur, or the whole page
 under a frame finish, is one image. Each image layer is reported once as a
 `vector_rasterized` warning.
 

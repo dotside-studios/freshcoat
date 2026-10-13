@@ -27,8 +27,8 @@ export type SfntInfo = {
 export const tagAt = (b: Uint8Array, o: number) =>
 	String.fromCharCode(b[o] ?? 0, b[o + 1] ?? 0, b[o + 2] ?? 0, b[o + 3] ?? 0);
 
-// Null for anything a PDF cannot carry as is: WOFF and WOFF2, collections,
-// CFF2 outlines and files whose tables do not read.
+// Null for anything a PDF cannot carry as is: WOFF and WOFF2 (see
+// sfntBytes), collections, CFF2 outlines and files whose tables do not read.
 export function readSfnt(bytes: Uint8Array): SfntInfo | null {
 	try {
 		const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

@@ -30,7 +30,7 @@ be published separately. They are not listed below.
 
 ## Packages
 
-51 packages: 35 MIT, 8 Apache-2.0, 2 0BSD, 2 BSD-3-Clause, 2 OFL-1.1, 1 MIT AND Zlib, 1 Unlicense.
+53 packages: 37 MIT, 8 Apache-2.0, 2 0BSD, 2 BSD-3-Clause, 2 OFL-1.1, 1 MIT AND Zlib, 1 Unlicense.
 
 | Package | Version | License | Repository |
 |---|---|---|---|
@@ -54,6 +54,8 @@ be published separately. They are not listed below.
 | @tanstack/virtual-core | 3.17.11 | MIT | https://github.com/TanStack/virtual |
 | @webgpu/types | 0.1.21 | BSD-3-Clause | https://github.com/gpuweb/types |
 | aria-hidden | 1.2.6 | MIT | https://github.com/theKashey/aria-hidden |
+| base64-js | 1.5.1 | MIT | https://github.com/beatgammit/base64-js |
+| brotli | 2.1.0 | MIT | https://github.com/devongovett/brotli.js |
 | bwip-js | 4.11.4 | MIT | https://github.com/metafloor/bwip-js |
 | canvaskit-wasm | 0.41.1 | BSD-3-Clause | https://github.com/google/skia/tree/main/modules/canvaskit |
 | client-only | 0.0.1 | MIT | https://reactjs.org/ |
@@ -740,6 +742,64 @@ License: MIT
 MIT License
 
 Copyright (c) 2017 Anton Korzunov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### base64-js 1.5.1
+
+License: MIT
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2014 Jameson Little
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### brotli 2.1.0
+
+License: MIT
+
+brotli ships no license file. It is declared MIT by its package.json and README, by Devon Govett, whose 2.1.0 npm archive and repository include no license file, reproduced here from legal/third-party/brotli-LICENSE.
+
+```text
+The MIT License (MIT)
+
+Copyright (c) Devon Govett <devongovett@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
