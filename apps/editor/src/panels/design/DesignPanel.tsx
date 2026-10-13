@@ -46,7 +46,7 @@ import { TextSection } from "./TextSection";
 import { VectorSection } from "./VectorSection";
 import { VisibilitySection } from "./VisibilitySection";
 
-const STROKED = new Set(["rect", "vector", "frame", "image"]);
+const STROKED = new Set(["rect", "vector", "frame", "image", "text"]);
 
 /** Keeps the previous array while its entries are the same objects, so the
  *  sections see a stable list across unrelated document changes. */
@@ -273,7 +273,9 @@ function sections(ins: Inspect) {
 			{every((t) => t === "mask") && <MaskSection ins={ins} />}
 			{takesSlice(ins) && <SliceSection ins={ins} />}
 			{painted && layers.every(hasFills) && <FillSection ins={ins} />}
-			{painted && every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
+			{painted && every((t) => STROKED.has(t)) && (
+				<StrokeSection ins={ins} text={types.has("text")} />
+			)}
 			{painted && <EffectsSection ins={ins} />}
 			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			{painted && <AdjustSection ins={ins} />}

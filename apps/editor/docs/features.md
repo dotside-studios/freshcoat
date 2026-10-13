@@ -190,7 +190,8 @@ the records, and **Export** turns templates and records into files.
     style, without the content. Pasting a style is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
-    `{{field}}` tokens, even while a record preview fills the fields in. Esc,
+    `{{field}}` tokens, even while a record preview fills the fields in. The
+    box shows the layer's stroke, a gradient one in its first stop's colour. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector. Typing `{{` there, or in the inspector's
     text content, suggests field keys: arrows choose, Enter or Tab inserts,
@@ -282,9 +283,10 @@ the records, and **Export** turns templates and records into files.
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - A stroke sits inside, centered on or outside the edge of any stroked
-    layer: rectangle, frame, image or vector. Its paint is a solid colour or a
-    linear, radial or angular gradient, edited with the same controls as a
-    gradient fill. The canvas gradient handles follow fills only.
+    layer: rectangle, frame, image, vector or text. Its paint is a solid colour
+    or a linear, radial or angular gradient, edited with the same controls as a
+    gradient fill. The canvas gradient handles follow fills only. A text
+    stroke takes a position and a join but no dash, trim or cap.
   - Rectangles and frames can set each corner's radius on its own. A frame
     applies its corners to its fill, its stroke and its clip.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,

@@ -353,6 +353,7 @@ function lowerText(
 		layout,
 		color: node.color ?? "#000000",
 		fill: node.fill,
+		...(node.stroke && node.stroke.width > 0 ? { stroke: node.stroke } : {}),
 		...(node.path
 			? { path: resolveTextPath(node, node.path, siblings) }
 			: node.arc
