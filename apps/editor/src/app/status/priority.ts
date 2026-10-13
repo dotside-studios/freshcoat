@@ -13,6 +13,7 @@ export const STATUS_PRIORITY = {
 	cellIssue: 330,
 	// end
 	zoom: 300,
+	renderError: 250,
 	render: 200,
 	record: 100,
 	activity: 50,

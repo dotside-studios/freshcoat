@@ -8,7 +8,6 @@ import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
 import { plural, VARIANT_UI } from "~/app/copy";
 import { formatNumber } from "~/app/format";
-import { useRenderStats } from "~/app/render-stats";
 import { STATUS_PRIORITY } from "~/app/status/priority";
 import type { StatusItem } from "~/app/status/types";
 import { getElement } from "~/doc/path";
@@ -130,19 +129,23 @@ function RecordStep() {
 	);
 }
 
-/** The render error, or the render timings when they are switched on. */
+/** The render error. It is pinned, so hiding the timings never hides it. */
+function RenderError() {
+	const error = useThrottledEditor(selectRender, 250);
+	if (error.status !== "error") return null;
+	return (
+		<span className="truncate text-fc-danger" title={error.error}>
+			Couldn't render: {error.error}
+		</span>
+	);
+}
+
+/** The render timings, once the editor has rendered. */
 function RenderStatus() {
 	const render = useThrottledEditor(selectRender, 250);
-	const showStats = useRenderStats();
 	const t = render.timings;
 	const stats = render.stats;
-	if (render.status === "error")
-		return (
-			<span className="truncate text-fc-danger" title={render.error}>
-				Couldn't render: {render.error}
-			</span>
-		);
-	if (!t || !showStats) return null;
+	if (render.status === "error" || !t) return null;
 	return (
 		<TooltipTrigger delay={300}>
 			<RACButton
@@ -286,8 +289,18 @@ export const EDIT_STATUS_ITEMS: readonly StatusItem[] = [
 		component: RecordStep,
 	},
 	{
+		id: "render-error",
+		name: "Render error",
+		pinned: true,
+		sections: ["edit"],
+		align: "end",
+		priority: STATUS_PRIORITY.renderError,
+		component: RenderError,
+	},
+	{
 		id: "render",
-		name: "Render",
+		name: "Render stats",
+		hiddenByDefault: true,
 		sections: ["edit"],
 		align: "end",
 		priority: STATUS_PRIORITY.render,

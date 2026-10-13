@@ -775,11 +775,18 @@ written in the browser's language (`navigator.language`): 2,400 records in
 the US, 2.400 records in Germany. They all go through `src/app/format.ts`, and
 the unit tests pin it to en-US.
 
-## Render stats
+## Status bar
 
 The status bar shows user facts: the side, the size, the selection, issues
-and the zoom. View > Render stats, off by default and remembered per
-browser (`freshcoat.renderStats`), adds the render timings.
+and the zoom in Edit, and the dataset's counts in Data. Right-clicking it
+(or pressing Shift+F10 or the context-menu key while it has focus) lists the
+items of the current section, each with a check. Choosing one hides or shows
+it, and the choice is remembered per browser (`freshcoat.statusItems`).
+
+The render timings are one of these items, off by default. View > Render
+stats turns it on and off, and the menu checks it. A render error always
+shows, whatever is hidden. A setting saved by an earlier version
+(`freshcoat.renderStats`) is carried over the first time the page loads.
 
 ## The `.coatworkspace` format
 

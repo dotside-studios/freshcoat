@@ -10,7 +10,7 @@ import { type EditorState, type Tool, working } from "~/state/store";
 import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
-import { toggleRenderStats } from "./render-stats";
+import { toggleStatusItem } from "./status/visibility";
 import { setThemePreference, type ThemePreference } from "./theme";
 
 export type CommandContext = {
@@ -634,7 +634,7 @@ export const COMMANDS: Command[] = [
 		label: "Render stats",
 		group: "View",
 		sections: ["edit", "data", "export"],
-		run: () => toggleRenderStats(),
+		run: () => toggleStatusItem("render"),
 	},
 	themeCommand("light", "Light"),
 	themeCommand("dark", "Dark"),

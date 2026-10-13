@@ -1,12 +1,24 @@
 import { emptyDataset } from "@freshcoat-js/workspace/dataset";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { StatusBar } from "~/app/StatusBar";
 import { tasksFor, withTask } from "~/app/status/tasks";
+import { isStatusItemHidden, toggleStatusItem } from "~/app/status/visibility";
 import { fastUser } from "./aria";
 import { doc } from "./doc-fixture";
+
+// jsdom has no CSS.escape, which react-aria uses to find a menu's items by key.
+globalThis.CSS ??= {} as typeof CSS;
+CSS.escape ??= (value: string) =>
+	value.replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 
 afterEach(cleanup);
 
@@ -78,5 +90,48 @@ describe("status bar sections", () => {
 		expect(screen.getByTestId("data-status-records").textContent).toBe(
 			"0 records",
 		);
+	});
+});
+
+describe("status bar context menu", () => {
+	afterEach(() => {
+		for (const id of ["zoom", "render"])
+			if (isStatusItemHidden(id) !== (id === "render")) toggleStatusItem(id);
+	});
+
+	it("lists the section's items with a check each, and hides one", async () => {
+		const { user } = mount();
+		fireEvent.contextMenu(screen.getByRole("contentinfo"));
+		const zoom = await screen.findByRole("menuitemcheckbox", { name: "Zoom" });
+		const render = screen.getByRole("menuitemcheckbox", {
+			name: "Render stats",
+		});
+		expect(zoom.getAttribute("aria-checked")).toBe("true");
+		expect(render.getAttribute("aria-checked")).toBe("false");
+		expect(
+			screen.queryByRole("menuitemcheckbox", { name: "Dataset name" }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("menuitemcheckbox", { name: "Render error" }),
+		).toBeNull();
+		await user.click(zoom);
+		expect(screen.queryByTestId("zoom-field")).toBeNull();
+		expect(
+			screen
+				.getByRole("menuitemcheckbox", { name: "Zoom" })
+				.getAttribute("aria-checked"),
+		).toBe("false");
+		await user.click(screen.getByRole("menuitemcheckbox", { name: "Zoom" }));
+		expect(screen.getByTestId("zoom-field")).toBeTruthy();
+	});
+
+	it("lists the Data items in the Data section", async () => {
+		const { c } = mount();
+		act(() => c.dispatch({ type: "setSection", section: "data" }));
+		fireEvent.contextMenu(screen.getByTestId("data-status"));
+		expect(
+			await screen.findByRole("menuitemcheckbox", { name: "Record count" }),
+		).toBeTruthy();
+		expect(screen.queryByRole("menuitemcheckbox", { name: "Zoom" })).toBeNull();
 	});
 });

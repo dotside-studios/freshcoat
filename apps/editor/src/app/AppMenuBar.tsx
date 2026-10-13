@@ -28,8 +28,8 @@ import SendIconFill from "~icons/mingcute/send-fill";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
 import { useController } from "./context";
 import { FreshcoatMark } from "./Logo";
-import { useRenderStats } from "./render-stats";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
+import { useHiddenStatusItems } from "./status/visibility";
 import { useThemePreference } from "./theme";
 
 type Submenu = { label: string; items: (string | "-")[] };
@@ -169,7 +169,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const disabled = useMemo(() => disabledSig.split(","), [disabledSig]);
 	const panels = useEditor((s) => s.panels);
 	const theme = useThemePreference();
-	const renderStats = useRenderStats();
+	const renderStats = !useHiddenStatusItems().has("render");
 	const rulers = useEditor((s) => s.rulers);
 	usePrintGuidesVersion();
 	const guides = useEditor((s) =>
