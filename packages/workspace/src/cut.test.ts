@@ -208,3 +208,44 @@ describe("itemCuts for a piece", () => {
 		).toThrow(/no slice "tear"/);
 	});
 });
+
+describe("itemCuts with open vector lines", () => {
+	const fold = {
+		id: "fold",
+		type: "vector",
+		pos: { x: 30, y: 50 },
+		size: { width: 40, height: 2 },
+		properties: {
+			d: "M0 1 L40 1",
+			slice: { name: "fold", edge: "score", output: "none" },
+		},
+	};
+	const front = sheet.template_data[0];
+	const open: Template = {
+		...sheet,
+		template_data: [
+			{
+				...(front as NonNullable<typeof front>),
+				elements: [
+					...(front?.elements ?? []).filter((e) => e.id !== "fold"),
+					fold,
+				],
+			},
+			...sheet.template_data.slice(1),
+		],
+	} as Template;
+
+	it("keeps the line open on a whole side, moved by the bleed", () => {
+		const line = itemCuts(open, side, { bleed }).lines.find(
+			(l) => l.name === "fold",
+		);
+		expect(line?.path).toBe("M40 61L80 61");
+	});
+
+	it("keeps it open inside a piece", () => {
+		const line = itemCuts(open, { ...side, piece: "sticker" }).lines.find(
+			(l) => l.name === "fold",
+		);
+		expect(line?.path).toBe("M14 25L54 25");
+	});
+});

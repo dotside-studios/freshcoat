@@ -551,6 +551,36 @@ describe("assemblePdf with cut lines", () => {
 		]);
 	});
 
+	it("closes only the subpaths that are closed", async () => {
+		const bytes = await assemblePdf(
+			[
+				{
+					bytes: makePng(4, 3),
+					format: png,
+					widthPx: 856,
+					heightPx: 540,
+					cut: {
+						width: 856,
+						height: 540,
+						lines: [
+							{
+								kind: "score",
+								name: "a",
+								path: "M0 10L50 10",
+								fillRule: "nonzero",
+							},
+						],
+					},
+				},
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(bytes);
+		const [page] = doc.getPages() as [PDFPage];
+		expect(content(page)).not.toMatch(/\bh\n/);
+		expect(strokes(page)).toBe(1);
+	});
+
 	it("puts the strokes in an optional content group named Cut", async () => {
 		const bytes = await assemblePdf(
 			[

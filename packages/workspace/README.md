@@ -405,6 +405,12 @@ corner:
   lies wholly inside the piece's box (a fold line across a card, say). One that
   only crosses the box is left out, not clipped.
 
+Author a fold, score or perforation as an open `vector` path with `output: "none"`
+(see Slices in the [coatfile README](../coatfile/README.md#slices)): an open
+subpath stays open in the SVG (no `Z`), the DXF (a polyline that is not
+closed) and the PDF stroke, so the cutter runs along it once. A rect is always
+closed, so a thin rect would be cut along both long edges.
+
 Lines keep their kind and the slice's name. Slices are resolved with the
 record's values and variant, so a slice a value hides has no line.
 

@@ -59,6 +59,11 @@ describe("cutSvg", () => {
 		expect(svg).toContain(`stroke="${CUT_STYLES.score.color}"`);
 	});
 
+	it("leaves an open path open", () => {
+		expect(svg).toContain('d="M40 60L80 60"');
+		expect(svg).not.toContain('d="M40 60L80 60Z"');
+	});
+
 	it("names each path by its slice, escaped", () => {
 		expect(svg).toContain('data-name="sticker"');
 		expect(svg).toContain('data-name="badge &amp; &lt;more&gt;"');
