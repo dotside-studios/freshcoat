@@ -1,0 +1,140 @@
+{
+	"id": "clip-per-corner-smoothed",
+	"title": "a clipping group smooths its per-corner radii",
+	"profile": "core",
+	"requires": [
+		"group.clip",
+		"shape.perCornerRadius",
+		"shape.cornerSmoothing"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "group",
+				"children": [
+					{
+						"kind": "rect",
+						"pos": {
+							"x": 0,
+							"y": 0
+						},
+						"size": {
+							"width": 120,
+							"height": 100
+						},
+						"fills": [
+							{
+								"kind": "solid",
+								"color": "#000000"
+							}
+						]
+					}
+				],
+				"pos": {
+					"x": 20,
+					"y": 10
+				},
+				"size": {
+					"width": 120,
+					"height": 100
+				},
+				"clip": true,
+				"cornerRadius": [
+					30,
+					0,
+					0,
+					0
+				],
+				"cornerSmoothing": 1
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				48,
+				10
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "a circular arc fills here",
+			"tolerance": 40
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				20,
+				38
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "a circular arc fills here",
+			"tolerance": 40
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				138,
+				12
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the square top-right corner"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the interior"
+		}
+	]
+}

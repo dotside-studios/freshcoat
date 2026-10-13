@@ -9,6 +9,8 @@ import { decodePixels } from "../src/decode";
 import {
 	createEllipse,
 	createFrame,
+	createGroup,
+	createImage,
 	createPath,
 	createRect,
 	createText,
@@ -133,9 +135,13 @@ function poppler(tool: string, args: string[], bytes: Uint8Array, out?: string) 
 
 // Mean absolute channel difference between the raster render and the PDF as
 // poppler draws it, at one pixel per unit.
-async function difference(node: Node): Promise<number> {
-	const png = await renderer.render(node, { width: W, height: H });
-	const pdf = await renderer.renderPdf(node, { width: W, height: H });
+async function difference(
+	node: Node,
+	images?: Map<string, Uint8Array>,
+): Promise<number> {
+	const opts = { width: W, height: H, images };
+	const png = await renderer.render(node, opts);
+	const pdf = await renderer.renderPdf(node, opts);
 	const page = poppler("pdftoppm", ["-png", "-r", "72", "-singlefile"], pdf.bytes, "page");
 	const a = decodePixels(ck, png.bytes);
 	const b = decodePixels(ck, page);
@@ -265,6 +271,51 @@ describe("strokes", () => {
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {
 		expect(await difference(stroked)).toBeLessThan(2);
+	});
+});
+
+describe("smoothed corners", () => {
+	const logo = new TextEncoder().encode(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" viewBox="0 0 20 10"><rect width="20" height="10" fill="#e63946"/></svg>',
+	);
+	const smoothed = {
+		cornerRadius: [30, 0, 12, 0] as [number, number, number, number],
+		cornerSmoothing: 0.6,
+	};
+	const scene = frame([
+		createGroup(
+			[
+				createRect({
+					pos: { x: 0, y: 0 },
+					size: { width: 90, height: 100 },
+					fills: [{ kind: "solid", color: "#264653" }],
+					stroke: { color: "#e76f51", width: 4, align: "inside" },
+					...smoothed,
+				}),
+			],
+			{ pos: { x: 5, y: 10 }, size: { width: 90, height: 100 }, clip: true, ...smoothed },
+		),
+		createImage({
+			pos: { x: 105, y: 10 },
+			size: { width: 90, height: 100 },
+			src: "logo.svg",
+			fit: "cover",
+			mask: { kind: "rounded-rect", radius: smoothed.cornerRadius, smoothing: 0.6 },
+			stroke: { color: "#000", width: 3 },
+		}),
+	]);
+	const images = new Map([["logo.svg", logo]]);
+
+	test("keeps a smoothed frame and image outline as vector paths", async () => {
+		const pdf = await renderer.renderPdf(scene, { width: W, height: H, images });
+		expect(pdf.warnings).toEqual([]);
+		expect(latin1(pdf.bytes)).not.toContain("/Subtype /Image");
+		const page = streams(pdf.bytes).join("\n");
+		expect(page.match(/ c\n(?:[^\n]* [lc]\n)*h\n(?:[^\n]*\n)*?W n\n/g)?.length).toBeGreaterThanOrEqual(2);
+	});
+
+	test.skipIf(!pdftoppm)("matches the raster render", async () => {
+		expect(await difference(scene, images)).toBeLessThan(2);
 	});
 });
 

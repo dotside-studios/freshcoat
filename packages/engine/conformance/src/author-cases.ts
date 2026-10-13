@@ -469,6 +469,53 @@ add(
 	],
 );
 
+// At smoothing 1 a 30px corner starts its curve 60px along the edge and hugs
+// the edge longer than a circular arc does. 28px in, on the edge row, the arc
+// has already reached the edge and the smoothed corner has not.
+add(
+	"clip-per-corner-smoothed",
+	"a clipping group smooths its per-corner radii",
+	"core",
+	["group.clip", "shape.perCornerRadius", "shape.cornerSmoothing"],
+	frame([
+		createGroup(
+			[createRect({ ...box(0, 0, 120, 100), fills: solid("#000000") })],
+			{
+				...box(20, 10, 120, 100),
+				clip: true,
+				cornerRadius: [30, 0, 0, 0],
+				cornerSmoothing: 1,
+			},
+		),
+	]),
+	[
+		px([48, 10], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([20, 38], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([138, 12], [0, 0, 0, 255], "the square top-right corner"),
+		px([80, 60], [0, 0, 0, 255], "the interior"),
+	],
+);
+
+add(
+	"image-per-corner-smoothed",
+	"an image clip smooths its per-corner radii",
+	"core",
+	["draw.image", "shape.perCornerRadius", "shape.cornerSmoothing"],
+	frame([
+		createImage({
+			...box(30, 10, 100, 100),
+			src: CHECKER_SRC,
+			fit: "cover",
+			mask: { kind: "rounded-rect", radius: [30, 0, 0, 0], smoothing: 1 },
+		}),
+	]),
+	[
+		px([58, 10], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([30, 38], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([117, 22], [...CHECKER_B, 255], "the square top-right block", 45),
+	],
+);
+
 // ─── D6: the semantics that live only in the painter ──────────────────────────
 
 // rotation is applied to the canvas matrix OUTSIDE the layer, so the layer and
