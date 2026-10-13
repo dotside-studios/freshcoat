@@ -509,7 +509,7 @@ export function ExportSettings({
 								>
 									Keep alpha channel
 								</Checkbox>
-								<Hint>32-bit PNG even when the image is opaque</Hint>
+								<Hint>32-bit even when opaque</Hint>
 							</>
 						) : null}
 						{pdf ? (
