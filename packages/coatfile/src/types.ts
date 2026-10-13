@@ -37,6 +37,7 @@ import type {
 	QrCodePropertiesSchema,
 	RectElementSchema,
 	RectPropertiesSchema,
+	SliceModifierSchema,
 	SymbologySchema,
 	StrokeSchema,
 	TemplateFrameSchema,
@@ -80,6 +81,7 @@ export type ImageElement = z.infer<typeof ImageElementSchema>;
 export type QrCodeElement = z.infer<typeof QrCodeElementSchema>;
 export type BarcodeElement = z.infer<typeof BarcodeElementSchema>;
 export type RectElement = z.infer<typeof RectElementSchema>;
+export type SliceModifier = z.infer<typeof SliceModifierSchema>;
 
 export type VisibilityCondition = z.infer<typeof VisibilityConditionSchema>;
 export type Layout = z.infer<typeof LayoutSchema>;
@@ -191,6 +193,8 @@ export type CompiledTemplate = {
 	height: number;
 	/** Where the trim lies in the scene, when it was compiled with bleed. */
 	trim?: { x: number; y: number; width: number; height: number };
+	/** Where the slice box lies in the scene, when it was compiled as a piece. */
+	piece?: { x: number; y: number; width: number; height: number };
 	frames: CompiledFrame[];
 };
 
@@ -237,6 +241,14 @@ export type FrameAssets = {
 	images: string[];
 };
 
+/** A slice piece to cut from a side, in trim coordinates and design units. */
+export type PieceSpec = {
+	box: { x: number; y: number; width: number; height: number };
+	bleed: Sides;
+	/** The outline grown by the bleed. Without it the piece is the whole box. */
+	mask?: { d: string; fillRule: "nonzero" | "evenodd" };
+};
+
 export type CompileOptions = {
 	width: number;
 	height: number;
@@ -251,6 +263,10 @@ export type CompileOptions = {
 	bleed?: boolean;
 	/** Compile only the frames with these names. */
 	frameNames?: string[];
+	/** Compile one slice piece instead of the whole side: the scene is the
+	 *  slice's box grown by its bleed, at the same scale. `width` x `height`
+	 *  stays the trim's size. Takes the place of `bleed`. */
+	piece?: PieceSpec;
 	/** Rebuilds the path of each vector with a `boolean` operation from the
 	 *  operands that are shown. Without it a vector draws its cached `d`. */
 	pathOp?: PathOp;

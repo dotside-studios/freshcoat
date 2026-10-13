@@ -233,14 +233,7 @@ export function boxPath(
 	const [l, t, r, b] = ltrb;
 	if (!radii) builder.addRect(ck.LTRBRect(l, t, r, b));
 	else {
-		const fit = Math.min(
-			1,
-			(r - l) / (radii[0] + radii[1]) || 1,
-			(b - t) / (radii[1] + radii[2]) || 1,
-			(r - l) / (radii[2] + radii[3]) || 1,
-			(b - t) / (radii[3] + radii[0]) || 1,
-		);
-		const [tl, tr, br, bl] = radii.map((v) => Math.max(0, v) * fit);
+		const [tl, tr, br, bl] = fitRadii(ltrb, radii);
 		const w = Math.SQRT1_2;
 		builder.moveTo(l + tl, t);
 		builder.lineTo(r - tr, t);
@@ -256,4 +249,36 @@ export function boxPath(
 	const path = builder.detach();
 	builder.delete();
 	return path;
+}
+
+// Corner radii scaled down together until neighbouring corners fit their edge.
+function fitRadii(
+	[l, t, r, b]: readonly [number, number, number, number],
+	radii: readonly [number, number, number, number],
+): [number, number, number, number] {
+	const fit = Math.min(
+		1,
+		(r - l) / (radii[0] + radii[1]) || 1,
+		(b - t) / (radii[1] + radii[2]) || 1,
+		(r - l) / (radii[2] + radii[3]) || 1,
+		(b - t) / (radii[3] + radii[0]) || 1,
+	);
+	const [tl, tr, br, bl] = radii.map((v) => Math.max(0, v) * fit);
+	return [tl as number, tr as number, br as number, bl as number];
+}
+
+/** An outline as SVG path data, with `boxPath`'s corners as circular arcs. */
+export function outlineSvg(g: OutlineGeometry): string {
+	if (g.kind === "path") return g.d;
+	const [l, t, r, b] = g.ltrb;
+	if (g.kind === "rect") return `M ${l} ${t} H ${r} V ${b} H ${l} Z`;
+	const [tl, tr, br, bl] = fitRadii(g.ltrb, g.radii);
+	const arc = (rad: number, x: number, y: number) =>
+		rad > 0 ? ` A ${rad} ${rad} 0 0 1 ${x} ${y}` : "";
+	return (
+		`M ${l + tl} ${t} H ${r - tr}${arc(tr, r, t + tr)}` +
+		` V ${b - br}${arc(br, r - br, b)}` +
+		` H ${l + bl}${arc(bl, l, b - bl)}` +
+		` V ${t + tl}${arc(tl, l + tl, t)} Z`
+	);
 }

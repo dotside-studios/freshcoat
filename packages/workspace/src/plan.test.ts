@@ -1,7 +1,10 @@
+import type { Template } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
 import { resolveValues, variantsFor } from "./binding";
 import { toTemplateValue } from "./columns";
 import {
+	exportCutFile,
+	exportCutLines,
 	exportSize,
 	fileExtension,
 	fileNameFor,
@@ -17,6 +20,8 @@ import {
 	deepFreeze,
 	type memberCard,
 	members,
+	posterPreset,
+	posterWorkspace,
 	preset,
 	workspace,
 } from "./test-fixtures";
@@ -734,6 +739,7 @@ describe("unknownFileNameTokens", () => {
 			"index",
 			"record",
 			"variant",
+			"slice",
 			"name",
 			"number",
 			"photo",
@@ -769,5 +775,217 @@ describe("unknownFileNameTokens", () => {
 			"a b",
 			"",
 		]);
+	});
+});
+
+describe("planExport with split: pieces", () => {
+	const pieces = (changes: Partial<ExportPreset> = {}) =>
+		planExport(posterWorkspace, { ...posterPreset, ...changes });
+	const names = (items: ExportItem[]) => items.map((i) => i.fileName);
+
+	it("plans one item per shown piece, in slice order, and the back whole", () => {
+		const items = pieces();
+		expect(items.map((i) => [i.key, i.side, i.piece])).toEqual([
+			["r_p0000001:front:left", "front", "left"],
+			["r_p0000001:front:right", "front", "right"],
+			["r_p0000001:back", "back", undefined],
+			["r_p0000002:front:left", "front", "left"],
+			["r_p0000002:back", "back", undefined],
+		]);
+		expect(names(items)).toEqual([
+			"poster-1-front-left.png",
+			"poster-1-front-right.png",
+			"poster-1-back.png",
+			"poster-2-front-left.png",
+			"poster-2-back.png",
+		]);
+	});
+
+	it("does not split unless asked", () => {
+		for (const split of [undefined, "none"] as const) {
+			const items = pieces({ split });
+			expect(items.map((i) => i.key)).toEqual([
+				"r_p0000001:front",
+				"r_p0000001:back",
+				"r_p0000002:front",
+				"r_p0000002:back",
+			]);
+			expect(items.some((i) => i.piece !== undefined)).toBe(false);
+		}
+	});
+
+	it("sizes a piece by its box and bleed in design units", () => {
+		const [left] = pieces();
+		expect(left?.pieceSize).toEqual({ width: 200, height: 200 });
+		expect(pieces()[2]?.pieceSize).toBeUndefined();
+	});
+
+	it("names the slice with a token, leaving the pattern alone when it has one", () => {
+		const items = pieces({ fileName: "{{slice}}_{{side}}_{{name}}" });
+		expect(names(items)).toEqual([
+			"left_front_Spring.png",
+			"right_front_Spring.png",
+			"_back_Spring.png",
+			"left_front_Summer.png",
+			"_back_Summer.png",
+		]);
+	});
+
+	it("appends the slice to a pattern without one, never leaving a dash behind", () => {
+		expect(fileNamePattern("{{index}}", false, true)).toBe(
+			"{{index}}-{{slice}}",
+		);
+		expect(fileNamePattern("{{index}}-{{slice}}", false, true)).toBe(
+			"{{index}}-{{slice}}",
+		);
+		expect(fileNamePattern("{{index}}", false, false)).toBe("{{index}}");
+		expect(names(pieces({ fileName: "{{name}}" }))).toEqual([
+			"Spring-left.png",
+			"Spring-right.png",
+			"Spring.png",
+			"Summer-left.png",
+			"Summer.png",
+		]);
+	});
+
+	it("keeps names unique when pieces and sides collide", () => {
+		const out = names(pieces({ fileName: "x" }));
+		expect(new Set(out.map((n) => n.toLowerCase())).size).toBe(out.length);
+	});
+
+	it("hides a piece for a record whose values hide it", () => {
+		const second = pieces().filter((i) => i.recordId === "r_p0000002");
+		expect(second.map((i) => i.piece)).toEqual(["left", undefined]);
+	});
+
+	it("makes no piece of an open path, whatever its slice says", () => {
+		const entry = posterWorkspace
+			.templates[0] as Workspace["templates"][number];
+		const front = entry.template.template_data[0];
+		if (!front) throw new Error("fixture");
+		const fold = {
+			id: "fold",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 10 },
+			properties: { d: "M0 5H100", slice: { output: "piece", edge: "score" } },
+		} as never;
+		const open: Workspace = {
+			...posterWorkspace,
+			templates: [
+				{
+					...entry,
+					template: {
+						...entry.template,
+						template_data: [
+							{ ...front, elements: [...front.elements, fold] },
+							...entry.template.template_data.slice(1),
+						],
+					},
+				},
+			],
+		};
+		const items = planExport(open, posterPreset);
+		expect(items.map((i) => i.piece)).toEqual(pieces().map((i) => i.piece));
+	});
+
+	it("moves and hides pieces in a variant", () => {
+		const solo: Workspace = {
+			...posterWorkspace,
+			templates: [
+				{
+					...(posterWorkspace.templates[0] as Workspace["templates"][number]),
+					binding: {
+						datasetId: "d_posters",
+						fields: {
+							name: { kind: "column", column: "name" },
+							showRight: { kind: "constant", value: "true" },
+						},
+						variant: { kind: "fixed", id: "solo" },
+					},
+				},
+			],
+		};
+		const items = planExport(solo, posterPreset);
+		expect(items.filter((i) => i.side === "front").map((i) => i.piece)).toEqual(
+			["right", "right"],
+		);
+		expect(items[0]?.variantId).toBe("solo");
+	});
+
+	it("adds the variant to a piece's key when every variant is exported", () => {
+		const all: Workspace = {
+			...posterWorkspace,
+			templates: [
+				{
+					...(posterWorkspace.templates[0] as Workspace["templates"][number]),
+					binding: {
+						datasetId: "d_posters",
+						fields: {
+							name: { kind: "column", column: "name" },
+							showRight: { kind: "constant", value: "true" },
+						},
+						variant: { kind: "all" },
+					},
+				},
+			],
+		};
+		const items = planExport(all, {
+			...posterPreset,
+			records: "selected",
+			selected: ["r_p0000001"],
+		});
+		expect(items.map((i) => i.key)).toEqual([
+			"r_p0000001:front:left:default",
+			"r_p0000001:front:right:default",
+			"r_p0000001:back:default",
+			"r_p0000001:front:right:solo",
+			"r_p0000001:back:solo",
+		]);
+		expect(names(items)).toEqual([
+			"poster-1-front-default-left.png",
+			"poster-1-front-default-right.png",
+			"poster-1-back-default.png",
+			"poster-1-front-solo-right.png",
+			"poster-1-back-solo.png",
+		]);
+	});
+
+	it("exports a side with no pieces whole", () => {
+		const items = pieces({ sides: ["back"] });
+		expect(items.map((i) => i.key)).toEqual([
+			"r_p0000001:back",
+			"r_p0000002:back",
+		]);
+	});
+
+	it("lists the slice among the file name tokens", () => {
+		const template = posterWorkspace.templates[0]?.template as Pick<
+			Template,
+			"fields"
+		>;
+		expect(fileNameTokens(template)).toContain("slice");
+		expect(unknownFileNameTokens("{{slice}}", template)).toEqual([]);
+	});
+});
+
+describe("cut options", () => {
+	it("read an older preset as writing no cut files", () => {
+		expect(exportCutFile(preset)).toBe("none");
+		expect(exportCutLines(preset)).toBe(false);
+	});
+
+	it("write cut files for images only", () => {
+		expect(exportCutFile({ ...preset, cutFile: "svg" })).toBe("svg");
+		expect(exportCutFile({ ...preset, format: "pdf", cutFile: "svg" })).toBe(
+			"none",
+		);
+	});
+
+	it("draw cut lines on PDFs only", () => {
+		expect(exportCutLines({ ...preset, format: "pdf", cutLines: true })).toBe(
+			true,
+		);
+		expect(exportCutLines({ ...preset, cutLines: true })).toBe(false);
 	});
 });

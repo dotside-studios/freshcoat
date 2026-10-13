@@ -23,6 +23,8 @@ export function templateWarnings(template: Template): string[] {
 				return newerFormatWarning(hint.declared);
 			case "format_low":
 				return `uses fields from format ${hint.needed} but declares ${hint.declared}; older readers drop them`;
+			case "slice_open_piece":
+				return `${hint.sideName}: "${hint.id}" is an open path, so it exports as a cut line, not a piece`;
 		}
 	});
 }

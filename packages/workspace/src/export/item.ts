@@ -8,11 +8,14 @@ import {
 	fitDesignSize,
 	hasInsets,
 	MAX_EXPORT_DIMENSION,
+	pieceSpec,
 	type Renderer,
 	resizeTemplate,
 	resolveExportScale,
+	resolveSlices,
 	type Sides,
 	type Template,
+	templateBleed,
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import {
@@ -23,7 +26,15 @@ import {
 import { orientedSize } from "@freshcoat-js/engine/image";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
-import { DEFAULT_QUALITY, exportSize, imageFormat, vectorPages } from "../plan";
+import { type ItemCuts, itemCuts } from "../cut";
+import {
+	DEFAULT_QUALITY,
+	exportCutFile,
+	exportCutLines,
+	exportSize,
+	imageFormat,
+	vectorPages,
+} from "../plan";
 import type { DatasetAsset, ExportItem, ExportPreset } from "../types";
 import { createJobCaches } from "./caches";
 import {
@@ -35,6 +46,11 @@ import {
 } from "./print";
 import { presetBleed } from "./sheets";
 
+/** Why a preset that splits into pieces can't draw its PDF pages as vectors:
+ *  a piece is cut from the rendered side. */
+export const PIECES_NEED_RASTER_PAGES =
+	"Pieces need PNG or JPEG pages, not vector";
+
 export type OutputFormat = "png" | "jpeg" | "webp";
 
 export type RenderRequest = {
@@ -42,6 +58,9 @@ export type RenderRequest = {
 	values: Record<string, string>;
 	variantId?: string;
 	side: string;
+	/** render this slice of the side, by name, in place of the whole side; it
+	 *  takes the place of `bleed` */
+	piece?: string;
 	/** device pixels per design unit */
 	scale: number;
 	/** the dataset photos this item's values name, by `ws:` reference */
@@ -61,6 +80,8 @@ export type RenderRequest = {
 	 *  place of `format`; `untagged` leaves its RGB DeviceRGB, for a PDF that
 	 *  declares no output intent */
 	vector?: { dpi: number; untagged?: true };
+	/** also work out the item's cut lines */
+	cut?: true;
 };
 
 export type RenderOutput = {
@@ -71,6 +92,8 @@ export type RenderOutput = {
 	height: number;
 	/** CRC-32 of `bytes` */
 	crc?: number;
+	/** the item's cut lines, when the request asked and it has any */
+	cut?: ItemCuts;
 	ms: number;
 	/** set when the request asked for print: "fallback" when the print path
 	 *  failed and the bytes are a plain render */
@@ -110,6 +133,36 @@ export type ItemSize = {
 	bleed?: true;
 };
 
+/** What sizes an item: its values and variant, and the piece of a side it is
+ *  when it is one. */
+type SizedItem = Pick<ExportItem, "values" | "variantId"> &
+	Partial<Pick<ExportItem, "side" | "piece">>;
+
+/** A piece's size in design units: its box and its bleed, as the side is laid
+ *  out at `resize` when it is. */
+function pieceDesignSize(
+	template: Template,
+	item: SizedItem,
+	resize?: { width: number; height: number },
+): { width: number; height: number } | { error: string } {
+	try {
+		const slice = resolveSlices(template, {
+			frameName: item.side ?? template.template_data[0]?.name,
+			values: item.values,
+			variantId: item.variantId,
+			...(resize ? { resize } : {}),
+		}).find((s) => s.name === item.piece);
+		if (!slice) return { error: `No slice "${item.piece}" on this side` };
+		const { box, bleed } = slice;
+		return {
+			width: box.width + bleed.left + bleed.right,
+			height: box.height + bleed.top + bleed.bottom,
+		};
+	} catch (e) {
+		return { error: e instanceof Error ? e.message : String(e) };
+	}
+}
+
 /**
  * What one item renders at. A template size is the item's variant's size at
  * the preset's scale, with the bleed around it when the preset includes it. A
@@ -117,15 +170,27 @@ export type ItemSize = {
  * variant is laid out by its constraints at the photo's aspect and rendered at
  * the density that makes it exactly that many pixels. Neither goes past
  * `MAX_EXPORT_DIMENSION`, the longest edge the render allows.
+ *
+ * A piece is its box and bleed at the same density its side would get, with
+ * no template bleed around it: the preset's bleed does not apply.
  */
 export function itemSize(
-	template: Pick<Template, "width" | "height" | "bleed" | "variants">,
+	template: Template,
 	preset: ExportPreset,
-	item: Pick<ExportItem, "values" | "variantId">,
+	item: SizedItem,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): ItemSize | { error: string } {
 	const size = exportSize(preset);
 	const design = variantSize(template, item.variantId);
+	if (size.kind === "template" && item.piece !== undefined) {
+		const piece = pieceDesignSize(template, item);
+		if ("error" in piece) return piece;
+		const scale = resolveExportScale(
+			{ kind: "scale", value: preset.scale },
+			piece,
+		);
+		return { ...exportPixelSize(piece, scale), scale };
+	}
 	if (size.kind === "template") {
 		const bleed = presetBleed(template, preset);
 		const full = withBleed(design, bleed);
@@ -157,7 +222,18 @@ export function itemSize(
 	const width = Math.max(1, Math.round(seen.width * cap));
 	const height = Math.max(1, Math.round(seen.height * cap));
 	const resize = fitDesignSize(design, width, height);
-	return { width, height, scale: width / resize.width, resize };
+	const scale = width / resize.width;
+	if (item.piece !== undefined) {
+		const piece = pieceDesignSize(template, item, resize);
+		if ("error" in piece) return piece;
+		return {
+			width: Math.max(1, Math.round(piece.width * scale)),
+			height: Math.max(1, Math.round(piece.height * scale)),
+			scale,
+			resize,
+		};
+	}
+	return { width, height, scale, resize };
 }
 
 /** A dataset's photos by their `ws:` reference. */
@@ -196,9 +272,11 @@ export function imagesOf(
 export function itemRequest(
 	template: Template,
 	preset: ExportPreset,
-	item: Pick<ExportItem, "values" | "variantId" | "side">,
+	item: Pick<ExportItem, "values" | "variantId" | "side" | "piece">,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): { request: RenderRequest; size: ItemSize } | { error: string } {
+	if (item.piece !== undefined && vectorPages(preset))
+		return { error: PIECES_NEED_RASTER_PAGES };
 	const size = itemSize(template, preset, item, assets);
 	if ("error" in size) return size;
 	const format = imageFormat(preset);
@@ -211,6 +289,7 @@ export function itemRequest(
 			values: item.values,
 			...(item.variantId !== undefined ? { variantId: item.variantId } : {}),
 			side: item.side,
+			...(item.piece !== undefined ? { piece: item.piece } : {}),
 			scale: size.scale,
 			images: imagesOf(item, assets),
 			...(size.resize ? { resize: size.resize } : {}),
@@ -235,6 +314,9 @@ export function itemRequest(
 						},
 					}
 				: {}),
+			...(exportCutFile(preset) !== "none" || exportCutLines(preset)
+				? { cut: true as const }
+				: {}),
 		},
 	};
 }
@@ -249,7 +331,7 @@ export function itemRequest(
 export function itemTemplate(
 	template: Template,
 	preset: ExportPreset,
-	item: Pick<ExportItem, "values" | "variantId">,
+	item: SizedItem,
 	assets: ReadonlyMap<string, DatasetAsset>,
 ): Template {
 	const size = itemSize(template, preset, item, assets);
@@ -338,14 +420,51 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			const variantId = activeVariantId(template, req.variantId);
 			const images = await photosFor(req.images);
 			const design = req.resize ?? variantSize(template, variantId);
+			const pathOp = canvasKitPathOp(renderer.ck);
+			let piece: ReturnType<typeof pieceSpec> | undefined;
+			if (req.piece !== undefined) {
+				if (req.vector) throw new Error(PIECES_NEED_RASTER_PAGES);
+				const slices = resolveSlices(template, {
+					frameName: req.side,
+					values: req.values,
+					variantId,
+					pathOp,
+					...(req.resize ? { resize: req.resize } : {}),
+				});
+				const slice = slices.find((s) => s.name === req.piece);
+				if (!slice)
+					throw new Error(`no slice "${req.piece}" on side "${req.side}"`);
+				piece = pieceSpec(renderer.ck, slice);
+			}
+			let cut: ItemCuts | undefined;
+			if (req.cut) {
+				const lines = itemCuts(
+					template,
+					{
+						values: req.values,
+						side: req.side,
+						variantId,
+						...(req.piece !== undefined ? { piece: req.piece } : {}),
+					},
+					{
+						pathOp,
+						...(req.resize ? { resize: req.resize } : {}),
+						...(req.bleed && req.piece === undefined
+							? { bleed: templateBleed(template) }
+							: {}),
+					},
+				);
+				if (lines.lines.length > 0) cut = lines;
+			}
 			const compiled = compile(template, req.values, {
 				width: design.width,
 				height: design.height,
 				variantId,
 				...(req.resize ? { resize: req.resize } : {}),
-				...(req.bleed ? { bleed: true } : {}),
+				...(req.bleed && !piece ? { bleed: true } : {}),
+				...(piece ? { piece } : {}),
 				frameNames: [req.side],
-				pathOp: canvasKitPathOp(renderer.ck),
+				pathOp,
 			});
 			if (req.vector) {
 				const [page] = await renderCompiledPdf(renderer, compiled, {
@@ -362,6 +481,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					bytes: page.bytes,
 					crc: crc32(page.bytes),
 					format: "pdf",
+					...(cut ? { cut } : {}),
 					...exportPixelSize(compiled, req.scale),
 					ms: performance.now() - started,
 					...(warnings.length > 0 ? { warnings } : {}),
@@ -400,6 +520,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),
+				...(cut ? { cut } : {}),
 				format: (result.format ?? "png") as OutputFormat,
 				width: result.width,
 				height: result.height,

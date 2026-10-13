@@ -68,6 +68,21 @@ export function prepareTemplate(
 	return out;
 }
 
+/** The values a template is read with: field defaults, then `values` that are set. */
+export function fieldContext(
+	template: Template,
+	values: Record<string, unknown>,
+): Record<string, unknown> {
+	const ctx: Record<string, unknown> = {};
+	for (const [k, def] of Object.entries(template.fields.properties)) {
+		if (def.default !== undefined) ctx[k] = def.default;
+	}
+	for (const [k, val] of Object.entries(values)) {
+		if (val !== undefined && val !== null) ctx[k] = val;
+	}
+	return ctx;
+}
+
 function withoutVariants(t: Template): Template {
 	if (t.variants === undefined) return t;
 	const { variants: _variants, ...rest } = t;

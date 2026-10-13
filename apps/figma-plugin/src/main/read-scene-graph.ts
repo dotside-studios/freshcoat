@@ -285,6 +285,7 @@ export function readNode(
 	if (t === "TEXT") return readTextNode(node as never);
 	if (t === "RECTANGLE") return readRectangleNode(node as never);
 	if (isVectorNode(node)) return readVectorNode(node as never, opts);
+	if (t === "SLICE") return { ...readBaseFields(node), type: "SLICE" };
 	if (isContainerNode(node))
 		return readContainer(node as AnyContainerNode, opts.depth);
 	return null; // unsupported node type — skipped by the caller

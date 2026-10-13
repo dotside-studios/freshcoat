@@ -91,6 +91,7 @@ export function createWorkerPool(
 					height: msg.height,
 					ms: msg.ms,
 					...(msg.crc !== undefined ? { crc: msg.crc } : {}),
+					...(msg.cut ? { cut: msg.cut } : {}),
 					...(msg.print ? { print: msg.print } : {}),
 					...(msg.printError ? { printError: msg.printError } : {}),
 					...(msg.gamut ? { gamut: msg.gamut } : {}),

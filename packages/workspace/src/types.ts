@@ -1,5 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { PrintProfile } from "@freshcoat-js/for-print";
+import type { ItemCuts } from "./cut";
 
 export type ColumnType =
 	| "text"
@@ -178,6 +179,12 @@ export type TemplateEntry = {
 	guides?: TemplateGuides;
 };
 
+/** Whether an export writes a side whole, or one file per slice piece. */
+export type ExportSplit = "none" | "pieces";
+
+/** The cutter file written beside each image of a zip: none, SVG or DXF. */
+export type ExportCutFile = "none" | "svg" | "dxf";
+
 export type ExportFormat = "png-zip" | "jpeg-zip" | "webp-zip" | "pdf";
 
 /** How big each output is: the template's own size, or the size of the photo
@@ -297,6 +304,14 @@ export type ExportPreset = {
 	/** include the template's bleed around each card; default false, the
 	 *  trim alone */
 	bleed?: boolean;
+	/** `pieces` exports each slice of a side as its own file; a side with no
+	 *  slices exports whole. Default none. */
+	split?: ExportSplit;
+	/** image zips: a file of the item's cut lines beside each image that has
+	 *  any, with the image's name. Default none. */
+	cutFile?: ExportCutFile;
+	/** PDF only: draw the cut lines over the art. Default false. */
+	cutLines?: boolean;
 	/** PDF only; default srgb */
 	outputIntent?: PdfOutputIntent;
 };
@@ -357,6 +372,10 @@ export type ExportItem = {
 	fileName: string;
 	values: Record<string, string>;
 	variantId?: string;
+	/** the slice this item is the piece of; unset for a whole side */
+	piece?: string;
+	/** a piece's size in design units: its box and its bleed */
+	pieceSize?: { width: number; height: number };
 	/** required fields the binding leaves to their defaults: unbound, or
 	 *  bound to a missing column. The item still renders. */
 	unfilled?: string[];
@@ -373,6 +392,9 @@ export type WrittenTable = {
 };
 
 export type PdfPage = {
+	/** the item's cut lines, drawn over the art in an optional content group
+	 *  named Cut; in the image's design units */
+	cut?: ItemCuts;
 	/** a PNG, a JPEG or a one-page PDF, as `format` says */
 	bytes: Uint8Array;
 	format: "png" | "jpeg" | "pdf";

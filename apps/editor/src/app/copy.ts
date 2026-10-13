@@ -210,8 +210,8 @@ export const VARIANT_EXPORT = {
 			? "Default only, no variant changes anything"
 			: `Default and ${plural(variants, "variant")}`,
 	unbound: "Not bound. Fields use their defaults.",
-	fileNameTokens:
-		"Tokens: {{template}} {{side}} {{index}} {{record}} {{variant}} and any column key",
+	fileNameTokens: (slices: boolean) =>
+		`Tokens: {{template}} {{side}} {{index}} {{record}} {{variant}}${slices ? " {{slice}}" : ""} and any column key`,
 	/** under the file name pattern, for tokens that export as empty text */
 	unknownTokens: (tokens: readonly string[]) => {
 		const list = tokens.map((t) => `{{${t}}}`).join(", ");
@@ -219,6 +219,12 @@ export const VARIANT_EXPORT = {
 			? `${list} isn't a field or column`
 			: `${list} aren't fields or columns`;
 	},
+} as const;
+
+/** What the issues list says about an open path whose slice is a piece. */
+export const SLICE_HINT_COPY = {
+	openPiece:
+		"An open path can't be a slice piece, so it exports as a cut line only. Set its output to None",
 } as const;
 
 /** What a validation issue says in the Issues list, by its code. The code

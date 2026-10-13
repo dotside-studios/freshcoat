@@ -40,6 +40,7 @@ import { LayerSection } from "./LayerSection";
 import { MaskSection } from "./MaskSection";
 import { QrSection } from "./QrSection";
 import { SideSection } from "./SideSection";
+import { SliceSection, takesSlice } from "./SliceSection";
 import { StrokeSection } from "./StrokeSection";
 import { TextSection } from "./TextSection";
 import { VectorSection } from "./VectorSection";
@@ -270,6 +271,7 @@ function sections(ins: Inspect) {
 			{every((t) => t === "vector") && <VectorSection ins={ins} />}
 			{every((t) => t === "frame") && <FrameSection ins={ins} />}
 			{every((t) => t === "mask") && <MaskSection ins={ins} />}
+			{takesSlice(ins) && <SliceSection ins={ins} />}
 			{painted && layers.every(hasFills) && <FillSection ins={ins} />}
 			{painted && every((t) => STROKED.has(t)) && <StrokeSection ins={ins} />}
 			{painted && <EffectsSection ins={ins} />}

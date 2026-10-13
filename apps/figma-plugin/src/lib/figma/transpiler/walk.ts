@@ -44,6 +44,13 @@ import { transpileImage } from "./image";
 import { canHoldImage } from "./image-shape";
 import { transpileQr } from "./qr";
 import { transpileRect } from "./rect";
+import {
+	applySliceMarker,
+	dedupeSliceNames,
+	importSlices,
+	parseSliceMarker,
+	warnSliceMarkerOnNonShape,
+} from "./slice";
 import { textLayoutSizing, transpileText } from "./text";
 import { decomposeTransform, nodeExtent } from "./transform";
 import type { NodeTrace } from "./types";
@@ -150,6 +157,8 @@ export type Walker = {
 	constraintScope: ConstraintScope;
 	flattenMarkers: SlottedMarker[];
 	staticImageMarkers: StaticImageMarker[];
+	// The array a side's own layers land in, where a slice marker is honored.
+	topLevel?: unknown[];
 };
 
 export function createWalker(
@@ -311,6 +320,8 @@ function walkNode(
 	// carries its own on its element, so it resets this to 1 for its subtree.
 	inheritedOpacity: number,
 ) {
+	// walkSide imports slices on their own, wherever they were drawn.
+	if (n.type === "SLICE") return;
 	const { scale } = w;
 	const c = classify(n, w.resolveBinding);
 	if (c.kind === "skip") {
@@ -336,7 +347,9 @@ function walkNode(
 		}
 		return;
 	}
+	const sliceMarker = parseSliceMarker(n.name);
 	if (c.kind === "container") {
+		if (sliceMarker) warnSliceMarkerOnNonShape(n, w.sink.warnings);
 		const containerEntry = record(w, n, "container");
 		if (!isContainerNode(n)) return;
 		// A group carrying an effect, a blend mode or Normal's isolation has to
@@ -406,6 +419,7 @@ function walkNode(
 	};
 
 	if (c.kind === "flatten") {
+		if (sliceMarker) warnSliceMarkerOnNonShape(n, w.sink.warnings);
 		flattenTo(c.reason, record(w, n, "flatten", c.reason));
 		return;
 	}
@@ -605,6 +619,14 @@ function walkNode(
 		applyOpacity(el, inheritedOpacity * opacityOf(n));
 		applyConstraints(w, el, n);
 		applyBindingOverlay(n, el, w.sink.overlayMeta, w.resolveBinding);
+		if (sliceMarker)
+			applySliceMarker(
+				n,
+				el,
+				sliceMarker,
+				target === w.topLevel && w.frame.children.includes(n),
+				w.sink.warnings,
+			);
 		entry.el = el;
 		target.push(el);
 	}
@@ -782,6 +804,7 @@ function maskLayer(
 // card — so its children live in plain world space, anchored to its AABB.
 export function walkSide(w: Walker): unknown[] {
 	const elements: unknown[] = [];
+	w.topLevel = elements;
 	const slotFrame: RasterFrame = {
 		box: w.frame.absoluteBoundingBox,
 		transform: null,
@@ -798,5 +821,14 @@ export function walkSide(w: Walker): unknown[] {
 		},
 		1,
 	);
+	// Slices paint nothing, so at the bottom of the stack they move no layer's
+	// paint order.
+	const slices = importSlices(w.frame, w.scale, w.sink.warnings);
+	for (const { node, el } of slices) {
+		w.sink.counts.native++;
+		record(w, node, "native-rect").el = el;
+	}
+	elements.unshift(...slices.map((s) => s.el));
+	dedupeSliceNames(elements, w.sink.warnings);
 	return elements;
 }

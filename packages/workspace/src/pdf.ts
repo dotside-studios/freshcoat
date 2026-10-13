@@ -18,7 +18,9 @@ import {
 	rgbIdat,
 } from "@freshcoat-js/engine/image";
 import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
+import { normalizePath } from "@freshcoat-js/engine/svg";
 import { crc32 } from "./crc";
+import { CUT_KINDS, CUT_STYLES, type ItemCuts } from "./cut";
 import { cropMarks, imposeSheets } from "./impose";
 import type { PdfLayout, PdfPage } from "./types";
 
@@ -61,6 +63,8 @@ export type AssemblePdfOptions = {
 };
 
 const CROP_MARK_WIDTH_PT = 0.25;
+const CUT_LINE_WIDTH_PT = 0.25;
+const CUT_GROUP_NAME = "Cut";
 
 const POINTS_PER_INCH = 72;
 const PT_PER_MM = POINTS_PER_INCH / MM_PER_INCH;
@@ -82,7 +86,9 @@ export function pageSizePt(
  *  layout, the images are imposed on sheets of paper instead, each drawn at
  *  the card's size, with crop marks at the trim on the pages that aren't
  *  backs. A page given as a one-page PDF is drawn as its vectors, sized as an
- *  image of `widthPx` by `heightPx` would be. */
+ *  image of `widthPx` by `heightPx` would be. A page with `cut` lines gets
+ *  them stroked over its image, in an optional content group named Cut that a
+ *  viewer can hide. */
 export async function assemblePdf(
 	pages: readonly PdfPage[],
 	options: AssemblePdfOptions,
@@ -114,6 +120,83 @@ export async function assemblePdf(
 						(await doc.embedPng(page.bytes)).ref);
 		options.onProgress?.(++embedded, pages.length);
 		return ref;
+	};
+	let cutGroup: PDFRef | undefined;
+	const drawCut = (
+		out: PDFPage,
+		cut: ItemCuts,
+		rect: { x: number; y: number; width: number; height: number },
+	) => {
+		if (cut.lines.length === 0) return;
+		const { PDFName, PDFOperator, PDFOperatorNames } = lib;
+		if (!cutGroup) {
+			cutGroup = doc.context.register(
+				doc.context.obj({
+					Type: "OCG",
+					Name: lib.PDFHexString.fromText(CUT_GROUP_NAME),
+				}),
+			);
+			doc.catalog.set(
+				PDFName.of("OCProperties"),
+				doc.context.obj({
+					OCGs: [cutGroup],
+					D: { Order: [cutGroup], ON: [cutGroup] },
+				}),
+			);
+		}
+		const resources = out.node.Resources();
+		if (!resources) return;
+		let properties = resources.lookupMaybe(
+			PDFName.of("Properties"),
+			lib.PDFDict,
+		);
+		if (!properties) {
+			properties = doc.context.obj({});
+			resources.set(PDFName.of("Properties"), properties);
+		}
+		properties.set(PDFName.of(CUT_GROUP_NAME), cutGroup);
+		const sx = rect.width / cut.width;
+		const sy = rect.height / cut.height;
+		const at = (x: number, y: number) => ({
+			x: rect.x + x * sx,
+			y: rect.y + rect.height - y * sy,
+		});
+		const ops = [
+			PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [
+				PDFName.of("OC"),
+				PDFName.of(CUT_GROUP_NAME),
+			]),
+			lib.pushGraphicsState(),
+			lib.setLineWidth(CUT_LINE_WIDTH_PT),
+		];
+		for (const kind of CUT_KINDS) {
+			const [r, g, b] = CUT_STYLES[kind].rgb;
+			const color = lib.setStrokingColor(rgb(r, g, b));
+			for (const line of cut.lines) {
+				if (line.kind !== kind) continue;
+				ops.push(color);
+				for (const s of normalizePath(line.path)) {
+					if (s.op === "M") {
+						const p = at(s.x, s.y);
+						ops.push(lib.moveTo(p.x, p.y));
+					} else if (s.op === "L") {
+						const p = at(s.x, s.y);
+						ops.push(lib.lineTo(p.x, p.y));
+					} else if (s.op === "C") {
+						const a = at(s.x1, s.y1);
+						const b = at(s.x2, s.y2);
+						const p = at(s.x, s.y);
+						ops.push(lib.appendBezierCurve(a.x, a.y, b.x, b.y, p.x, p.y));
+					} else ops.push(lib.closePath());
+				}
+				ops.push(lib.stroke());
+			}
+		}
+		ops.push(
+			lib.popGraphicsState(),
+			PDFOperator.of(PDFOperatorNames.EndMarkedContent),
+		);
+		out.pushOperators(...ops);
 	};
 	const draw = (
 		out: PDFPage,
@@ -148,12 +231,14 @@ export async function assemblePdf(
 			for (const slot of sheet.slots) {
 				const image = await embed(slot.item);
 				// pdf-lib measures up from the bottom-left corner.
-				draw(out, image, {
+				const art = {
 					x: (slot.xMm - bleed.left) * PT_PER_MM,
 					y: height - (slot.yMm + card.heightMm + bleed.bottom) * PT_PER_MM,
 					width: (card.widthMm + bleed.left + bleed.right) * PT_PER_MM,
 					height: (card.heightMm + bleed.top + bleed.bottom) * PT_PER_MM,
-				});
+				};
+				draw(out, image, art);
+				if (slot.item.cut) drawCut(out, slot.item.cut, art);
 			}
 			if (sheet.side === "back") continue;
 			for (const mark of marks) {
@@ -177,6 +262,7 @@ export async function assemblePdf(
 		);
 		const out = doc.addPage([width, height]);
 		draw(out, image, { x: 0, y: 0, width, height });
+		if (page.cut) drawCut(out, page.cut, { x: 0, y: 0, width, height });
 		if (Object.values(bleed).some((n) => n > 0)) {
 			out.setBleedBox(0, 0, width, height);
 			out.setTrimBox(

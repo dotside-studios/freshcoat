@@ -22,6 +22,7 @@ import { Slider } from "@freshcoat-js/ui/slider";
 import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type {
+	ExportCutFile,
 	ExportDestination,
 	ExportItem,
 	ExportPreset,
@@ -34,7 +35,9 @@ import {
 	boundDataset,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
+	exportCutFile,
 	exportSize,
+	exportSplit,
 	imageFields,
 	imageFormat,
 	paperSize,
@@ -72,6 +75,7 @@ import {
 	formatPageSize,
 	RECORD_FILTERS,
 	settingsSummary,
+	sliceUse,
 } from "./export-ui";
 import { profileLabel } from "./print";
 import {
@@ -169,6 +173,12 @@ function Unavailable({
 	);
 }
 
+const CUT_FILES: [ExportCutFile, string][] = [
+	["none", "None"],
+	["svg", "SVG"],
+	["dxf", "DXF"],
+];
+
 const segmentedFull = "flex w-full";
 const segmentedItemFull =
 	"min-w-0 flex-1 px-1.5 pointer-coarse:min-w-0 pointer-coarse:px-2";
@@ -222,6 +232,7 @@ export function ExportSettings({
 	const bindingOf = templates?.find((t) => t.id === preset.templateId)?.binding;
 	const viewed = datasets ? boundDataset(bindingOf, datasets) : undefined;
 	const boundTo = viewed?.name;
+	const use = sliceUse(template);
 	const unknownTokens = template
 		? unknownFileNameTokens(preset.fileName, template, viewed)
 		: [];
@@ -595,6 +606,38 @@ export function ExportSettings({
 							</>
 						) : null}
 					</PanelSection>
+					{use.slices ? (
+						<PanelSection title="Slices">
+							<Checkbox
+								isSelected={exportSplit(preset) === "pieces"}
+								onChange={(on) => set({ split: on ? "pieces" : "none" })}
+							>
+								Split into slice pieces
+							</Checkbox>
+							{use.cuts && !pdf ? (
+								<Select
+									label="Cut file"
+									labelPosition="side"
+									value={exportCutFile(preset)}
+									onChange={(key) => set({ cutFile: key as ExportCutFile })}
+								>
+									{CUT_FILES.map(([id, label]) => (
+										<SelectItem key={id} id={id} textValue={label}>
+											{label}
+										</SelectItem>
+									))}
+								</Select>
+							) : null}
+							{use.cuts && pdf ? (
+								<Checkbox
+									isSelected={preset.cutLines === true}
+									onChange={(cutLines) => set({ cutLines })}
+								>
+									Cut lines
+								</Checkbox>
+							) : null}
+						</PanelSection>
+					) : null}
 				</TabPanel>
 				<TabPanel id="print">
 					{pdf ? (
@@ -686,8 +729,11 @@ export function ExportSettings({
 								{VARIANT_EXPORT.unknownTokens(unknownTokens)}
 							</p>
 						) : null}
-						<p className="m-0 text-fc-faint text-fc-sm">
-							{VARIANT_EXPORT.fileNameTokens}
+						<p
+							className="m-0 text-fc-faint text-fc-sm"
+							data-testid="export-file-tokens"
+						>
+							{VARIANT_EXPORT.fileNameTokens(use.slices)}
 						</p>
 						<Checkbox
 							isSelected={preset.markExported}

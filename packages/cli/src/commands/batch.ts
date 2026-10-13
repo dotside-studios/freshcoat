@@ -70,6 +70,9 @@ export type BatchOptions = {
 	margin?: number;
 	gap?: number;
 	cropMarks?: boolean;
+	pieces?: true;
+	cut?: "svg" | "dxf";
+	cutLines?: true;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
 	outputIntentId?: string;
@@ -148,6 +151,9 @@ export async function renderBatch(
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
+		...(options.pieces ? { split: "pieces" as const } : {}),
+		...(options.cut ? { cutFile: options.cut } : {}),
+		...(options.cutLines ? { cutLines: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
 		...(profile

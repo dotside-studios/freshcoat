@@ -436,12 +436,37 @@ export const CornerRadiusSchema = z.union([
 	z.tuple([z.number(), z.number(), z.number(), z.number()]),
 ]);
 
+/** An inset from each edge of the trim, in design units: one number for every
+ *  side, or each side on its own. */
+export const InsetsSchema = z.union([
+	z.number(),
+	z.object({
+		top: z.number(),
+		right: z.number(),
+		bottom: z.number(),
+		left: z.number(),
+	}),
+]);
+
+// Marks a rect or vector's outline as an output piece and/or a cut line. It is
+// not a container and does not clip or paint; the shape renders as it would
+// without it, and exporters read the modifier.
+export const SliceModifierSchema = z.object({
+	// Used in file names. Defaults to the element id.
+	name: z.string().optional(),
+	output: z.enum(["piece", "none"]).optional(),
+	edge: z.enum(["none", "through", "kiss", "score", "perforate"]).optional(),
+	bleed: InsetsSchema.optional(),
+	order: z.number().optional(),
+});
+
 export const RectPropertiesSchema = z.object({
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
 	cornerRadius: CornerRadiusSchema.optional(),
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
+	slice: SliceModifierSchema.optional(),
 });
 
 export const BooleanOpSchema = z.enum([
@@ -476,6 +501,7 @@ export const VectorBooleanSchema: z.ZodType<VectorBoolean> = z.lazy(() =>
 
 export const VectorPropertiesSchema = VectorBasePropertiesSchema.extend({
 	boolean: VectorBooleanSchema.optional(),
+	slice: SliceModifierSchema.optional(),
 });
 
 export const ShadowSchema = z.object({
@@ -787,18 +813,6 @@ export const TemplateWarningSchema = z.object({
  *  — belongs to that exporter and not to the format. */
 export const TemplateSourceSchema = z.looseObject({ kind: z.string() });
 
-/** An inset from each edge of the trim, in design units: one number for every
- *  side, or each side on its own. */
-export const InsetsSchema = z.union([
-	z.number(),
-	z.object({
-		top: z.number(),
-		right: z.number(),
-		bottom: z.number(),
-		left: z.number(),
-	}),
-]);
-
 export const TemplateSchema = z
 	.object({
 		$schema: z.string().optional(),
@@ -855,6 +869,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceGridPlacement(tpl, ctx);
 	enforceImageFraming(tpl, ctx);
 	enforceBooleanOperands(tpl, ctx);
+	enforceSlices(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1584,3 +1599,68 @@ function enforceImageFraming(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 		}
 	});
 }
+
+// The slice modifier marks a region of the side, so it sits on a shape
+// directly in a side's `elements`, has a real size, and is named uniquely.
+function enforceSlices(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	const names = tpl.template_data.map(() => new Set<string>());
+	walkElements(tpl, (el, path) => {
+		const slice = (el.properties as { slice?: SliceProps } | undefined)?.slice;
+		if (slice === undefined) return;
+		const topLevel = path.length === 4 && path[2] === "elements";
+		if (!topLevel) {
+			addKitIssue(
+				ctx,
+				"slice_not_top_level",
+				"a slice must be on a top-level element of a side",
+				[...path, "properties", "slice"],
+			);
+			return;
+		}
+		const size = (el as { size?: { width?: number; height?: number } }).size;
+		if (
+			!size ||
+			!(Number.isFinite(size.width) && (size.width as number) > 0) ||
+			!(Number.isFinite(size.height) && (size.height as number) > 0)
+		) {
+			addKitIssue(
+				ctx,
+				"slice_size_required",
+				"an element with a slice needs a size with a positive width and height",
+				[...path, "size"],
+			);
+		}
+		const name = slice.name ?? (el as { id?: string }).id;
+		const seen = names[path[1] as number];
+		if (typeof name === "string" && seen) {
+			if (seen.has(name)) {
+				addKitIssue(
+					ctx,
+					"slice_name_duplicate",
+					`duplicate slice name "${name}"`,
+					[...path, "properties", "slice", "name"],
+				);
+			} else seen.add(name);
+		}
+		const bleed = slice.bleed;
+		const entries: [string | undefined, number][] =
+			typeof bleed === "number"
+				? [[undefined, bleed]]
+				: bleed && typeof bleed === "object"
+					? Object.entries(bleed as Record<string, number>)
+					: [];
+		for (const [side, n] of entries) {
+			if (Number.isFinite(n) && n >= 0) continue;
+			addKitIssue(
+				ctx,
+				"invalid_inset",
+				"slice bleed must be a non-negative number",
+				side === undefined
+					? [...path, "properties", "slice", "bleed"]
+					: [...path, "properties", "slice", "bleed", side],
+			);
+		}
+	});
+}
+
+type SliceProps = { name?: string; bleed?: unknown };

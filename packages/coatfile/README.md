@@ -386,6 +386,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
+| 1.7 | rect and vector `slice` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -757,6 +758,77 @@ A single opaque rect or ellipse renders as a clip. Anything else (a path, an
 image's alpha, a gradient, text, luminance, `invert`) renders through an
 offscreen layer. The figma plugin emits one for every Figma "Use as mask" layer
 and the layers above it.
+
+## Slices
+
+A `slice` property on a `rect` or `vector` marks its outline as an output piece
+(a digital export split, a poster panel, a die-cut sticker) and/or a cut line
+for a Cricut or Silhouette. It is a modifier, in the spirit of Figma's "Use as
+mask". It differs from a `mask` in three ways: it is not a container, it does
+not clip, and it acts at export, where an exporter reads the resolved slices.
+The shape keeps its geometry and paints exactly as it would without the
+modifier, so a visible sticker border can itself be the cut line. A shape with
+no fill or stroke paints nothing, which is how a pure split region is authored.
+
+```jsonc
+{
+  "id": "panel-1", "type": "rect",
+  "pos": { "x": 0, "y": 0 }, "size": { "width": 600, "height": 800 },
+  "properties": {
+    "cornerRadius": 24,                            // the shape's own geometry
+    "slice": {
+      "name": "left",                              // file name; default the id
+      "output": "piece",                           // or "none": a cut line only
+      "edge": "through",                           // none, through, kiss, score, perforate
+      "bleed": 12,                                 // design units, one number or per side
+      "order": 1                                   // default: document order
+    }
+  }
+}
+```
+
+The outline is the shape's own: a rect's `cornerRadius` (a number or per
+corner) and `cornerSmoothing`, or a vector's `d`, `fillRule`, `cornerRadius`
+and live `boolean`. The element may be rotated; the outline turns about the
+center of its box. It must sit directly in a side's `elements` (not in a frame,
+a mask, a boolean's operands or a background), needs a positive `size`, and its
+slice name (`name`, else the element `id`) must be unique on its side. A
+variant delta can set or replace `slice` through `properties`, as it does any
+other property. `visibleWhen` and `constraints` apply as for any element.
+
+A fold, score or perforation is a line, not a region: author it as a `vector`
+whose `d` is an open path (`"M0 1 L180 1"`) with `output: "none"` and the
+`edge`. Open subpaths stay open in the resolved `path` and in every cut file, so
+a cutter scores the line once, where a thin rect would be cut along both long
+edges. Closed subpaths stay closed, and a rect is always closed. A piece is cut
+from a closed outline, so a vector with an open subpath is never a piece:
+`resolveSlices` reports its `output` as `none` whatever the modifier says, an
+export makes no piece of it and still draws its cut line, and `renderTemplate`
+with `piece` naming it throws. Validation does not refuse it, since a slice
+never changes how a side paints; `templateHints` reports `slice_open_piece` for
+one that says `output: "piece"` (or leaves it at the default). A vector with a
+live `boolean` is not read for open subpaths.
+
+`resolveSlices(template, { frameName, values, variantId, resize, pathOp })`
+returns a side's shown slices after the variant, values and relayout, sorted by
+`order` then document order. Each has an SVG `path` in trim coordinates, closed as its shape is
+and its `box`, the axis-aligned bounds of that path, plus `name`, `fillRule`,
+`output`, `edge`, resolved `bleed` sides and `order`. Pass the same `pathOp` as
+for `compile` to recompute a vector's live `boolean`; without it the cached `d`
+is the outline.
+
+To render one piece as a raster, pass `piece` (a slice name or id) to
+`renderTemplate`, with the side in `frameNames` if it is not the first. The
+result is the slice's `box` grown by its `bleed`, at the render's scale, cut
+from the side's whole composite: every layer, above and below the slice shape,
+with the shape painted as normal. Art that runs to the trim keeps running into
+the template's `bleed` where the piece's bleed reaches past it. Unless the
+outline is exactly its box (an unrotated rect with square corners), everything
+outside the outline grown by the bleed is transparent; with per-side bleeds the
+largest side sets that growth. The frame's `piece` gives the box's place in the
+pixels, as `trim` does for a bleed render. `piece` takes the place of `bleed`,
+and a slice with `output: "none"` can be rendered by name. An unknown name
+throws.
 
 ## Grid layout
 

@@ -92,6 +92,7 @@ import {
 	siblingsOf,
 } from "~/doc/path";
 import { type PenPath, type PenStyle, penElement } from "~/doc/pen";
+import { setSlice } from "~/doc/slice";
 import { type LayerStyle, pasteStyle, readStyle } from "~/doc/style";
 import {
 	activeVariantId,
@@ -705,6 +706,11 @@ export class EditorController {
 	/** Removes every guide on the active side, as one undo step. */
 	clearGuides(): void {
 		this.withSideGuides(clearGuides);
+	}
+
+	/** Makes the selected top-level shapes slices, or plain shapes again. */
+	setSlice(on: boolean, keys = this.selectedLayers()): void {
+		this.edit((t) => setSlice(t, keys, on), { mergeKey: "slice" });
 	}
 
 	toggleHidden(keys = this.state.selection): void {

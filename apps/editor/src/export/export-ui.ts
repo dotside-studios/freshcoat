@@ -9,6 +9,7 @@ import type {
 } from "@freshcoat-js/workspace";
 import {
 	exportSize,
+	exportSplit,
 	fileExtension,
 	fileNameFor,
 	pdfLayout,
@@ -55,6 +56,7 @@ export function settingsSummary(preset: ExportPreset): string {
 	];
 	if (pdf) parts.push(`${preset.dpi} DPI`);
 	if (pdf && pdfLayout(preset).kind === "sheet") parts.push("Sheets");
+	if (exportSplit(preset) === "pieces") parts.push("Pieces");
 	if (preset.print?.enabled) parts.push("Card printer");
 	parts.push(
 		pdf ? "Download" : DESTINATION_LABEL[preset.destination ?? "download"],
@@ -77,6 +79,25 @@ export const SETTABLE_STATUSES: RecordStatus[] = [
 	"exported",
 	"skipped",
 ];
+
+/** What a template's slices offer an export: pieces to split into, and, when
+ *  one has an edge, cut files and cut lines. Slices sit on top-level layers. */
+export function sliceUse(template: Template | undefined): {
+	slices: boolean;
+	cuts: boolean;
+} {
+	let slices = false;
+	let cuts = false;
+	for (const side of template?.template_data ?? [])
+		for (const el of side.elements) {
+			const slice = (el.properties as { slice?: { edge?: string } } | undefined)
+				?.slice;
+			if (!slice) continue;
+			slices = true;
+			if (slice.edge !== undefined && slice.edge !== "none") cuts = true;
+		}
+	return { slices, cuts };
+}
 
 /** What the preset's first file will be called. With nothing planned, the
  *  pattern is shown against the template's first side. */

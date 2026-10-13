@@ -256,6 +256,9 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	cornerSmoothing?: number;
 };
 
+/** A Figma slice: an export region with no paint of its own. */
+export type FigmaSliceNode = FigmaBaseNode & { type: "SLICE" };
+
 export type FigmaVectorNodeType =
 	| "VECTOR"
 	| "BOOLEAN_OPERATION"
@@ -343,6 +346,7 @@ export type FigmaNode =
 	| FigmaTextNode
 	| FigmaRectangleNode
 	| FigmaVectorNode
+	| FigmaSliceNode
 	| FigmaContainerNode;
 
 export function isContainerNode(n: { type: string }): n is FigmaContainerNode {
@@ -361,6 +365,10 @@ export function isTextNode(n: FigmaNode): n is FigmaTextNode {
 
 export function isRectangleNode(n: FigmaNode): n is FigmaRectangleNode {
 	return n.type === "RECTANGLE";
+}
+
+export function isSliceNode(n: { type: string }): n is FigmaSliceNode {
+	return n.type === "SLICE";
 }
 
 export function isVectorNode(n: { type: string }): n is FigmaVectorNode {

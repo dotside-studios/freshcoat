@@ -6,6 +6,7 @@ import {
 } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { getElement } from "~/doc/path";
+import { isSlice, isSliceable } from "~/doc/slice";
 import { useEditor } from "~/state/hooks";
 import type { EditorState } from "~/state/store";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
@@ -130,6 +131,9 @@ export function LayerMenuItems({ onRename }: { onRename?: () => void }) {
 		selection.length > 0 && selection.every((k) => state.hidden.has(k));
 	const allLocked =
 		selection.length > 0 && selection.every((k) => state.locked.has(k));
+	const sliceable =
+		layers.length > 0 && !!t && layers.every((k) => isSliceable(t, k));
+	const allSlices = sliceable && layers.every((k) => isSlice(t, k));
 	const variantId = controller.variantId;
 	const variant = controller.base?.variants?.find((v) => v.id === variantId);
 	const inVariant = variant ? controller.variantVisibility(layers) : [];
@@ -193,6 +197,14 @@ export function LayerMenuItems({ onRename }: { onRename?: () => void }) {
 				ids={BOOLEAN_OPS}
 				state={state}
 			/>
+			{sliceable ? (
+				<MenuItem
+					id="slice"
+					onAction={() => controller.setSlice(!allSlices, layers)}
+				>
+					{allSlices ? "Remove slice" : "Use as slice"}
+				</MenuItem>
+			) : null}
 			<MenuSeparator />
 			<MenuItem
 				id="hide"

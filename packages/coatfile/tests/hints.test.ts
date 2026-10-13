@@ -85,6 +85,28 @@ describe("templateHints", () => {
 		expect(safeAreaHints(card({}, [rect("near", 10, 100, 100, 50)]))).toEqual([]);
 	});
 
+	test("lists an open path set as a slice piece, not a cut line or a closed one", () => {
+		const vector = (id: string, d: string, slice: object, extra = {}) =>
+			({
+				id,
+				type: "vector",
+				pos: { x: 0, y: 0 },
+				size: { width: 40, height: 30 },
+				properties: { d, slice, ...extra },
+			}) as Element;
+		const t = card({ format_version: "1.7" }, [
+			vector("fold", "M0 1 L40 1", { output: "none", edge: "score" }),
+			vector("loop", "M0 0 L9 0 L9 9 Z", {}),
+			vector("bad", "M0 1 L40 1", {}),
+			vector("worse", "M0 0 L9 0 L9 9 Z M20 0 L30 0", { output: "piece" }),
+			vector("live", "M0 1 L40 1", {}, { boolean: { op: "union", operands: [] } }),
+		]);
+		expect(templateHints(t)).toEqual([
+			{ kind: "slice_open_piece", side: 0, sideName: "front", id: "bad" },
+			{ kind: "slice_open_piece", side: 0, sideName: "front", id: "worse" },
+		]);
+	});
+
 	test("reports variant issues as they are", () => {
 		const t = card({
 			variants: [

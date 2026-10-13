@@ -20,6 +20,7 @@ import { Button as RACButton } from "react-aria-components";
 import { type SafeAreaHint, safeAreaHints } from "~/canvas/print-guides";
 import { removeUnusedChanges } from "~/doc/ops";
 import { walkLayers } from "~/doc/path";
+import { openPieceKeys } from "~/doc/slice";
 import { createField } from "~/panels/content/field-def";
 import { Badge, goToReference, referenceLabel } from "~/panels/content/shared";
 import { useEditor } from "~/state/hooks";
@@ -27,7 +28,7 @@ import type { BarcodeIssue } from "~/state/store";
 import CheckIcon from "~icons/mingcute/check-circle-line";
 import WarnIcon from "~icons/mingcute/warning-line";
 import { useController } from "./context";
-import { CONTENT, plural, VARIANT_UI } from "./copy";
+import { CONTENT, plural, SLICE_HINT_COPY, VARIANT_UI } from "./copy";
 import {
 	canCreateField,
 	issueMessage,
@@ -132,6 +133,7 @@ export function IssuesList({ template }: { template: Template }) {
 		useIssues(template);
 	const codes = useEditor((s) => s.render.barcodes ?? NO_CODES);
 	const hints = useMemo(() => safeAreaHints(template), [template]);
+	const openPieces = useMemo(() => openPieceKeys(template), [template]);
 
 	return (
 		<div className="flex flex-col gap-2" data-testid="issues-list">
@@ -160,6 +162,13 @@ export function IssuesList({ template }: { template: Template }) {
 				<IssueList label="Print hints">
 					{hints.map((hint) => (
 						<HintRow key={hint.key} template={template} hint={hint} />
+					))}
+				</IssueList>
+			) : null}
+			{openPieces.length > 0 ? (
+				<IssueList label="Slice hints">
+					{openPieces.map((key) => (
+						<OpenPieceRow key={key} template={template} layerKey={key} />
 					))}
 				</IssueList>
 			) : null}
@@ -392,6 +401,36 @@ function HintRow({
 				}
 			>
 				{hint.message}
+			</Entry>
+		</li>
+	);
+}
+
+function OpenPieceRow({
+	template,
+	layerKey,
+}: {
+	template: Template;
+	layerKey: string;
+}) {
+	const controller = useController();
+	const layer = referenceLabel(template, layerKey);
+	return (
+		<li data-testid="slice-hint" data-level="info">
+			<Entry
+				as="div"
+				tone="muted"
+				code="slice_open_piece"
+				link={
+					<EntryLink
+						label={`Select ${layer}`}
+						onPress={() => goToReference(controller, layerKey)}
+					>
+						{layer}
+					</EntryLink>
+				}
+			>
+				{SLICE_HINT_COPY.openPiece}
 			</Entry>
 		</li>
 	);

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { planExport } from "../plan";
-import { preset, workspace } from "../test-fixtures";
+import {
+	posterPreset,
+	posterWorkspace,
+	preset,
+	workspace,
+} from "../test-fixtures";
 import type { ExportPreset, SheetLayout, Workspace } from "../types";
 import { presetReadiness } from "./readiness";
 
@@ -18,6 +23,51 @@ const sheetsPreset: ExportPreset = {
 		duplex: "none",
 	},
 };
+
+describe("presetReadiness with pieces", () => {
+	const pdf: ExportPreset = { ...posterPreset, format: "pdf" };
+
+	it("blocks vector PDF pages", () => {
+		const r = presetReadiness(posterWorkspace, {
+			...pdf,
+			pdfPageImage: "vector",
+		});
+		expect(r.blocked).toEqual({
+			reason: "pieces",
+			message: "Pieces need PNG or JPEG pages, not vector",
+		});
+	});
+
+	it("lets vector pages through when nothing is split", () => {
+		const r = presetReadiness(posterWorkspace, {
+			...pdf,
+			split: "none",
+			pdfPageImage: "vector",
+		});
+		expect(r.blocked).toBeNull();
+	});
+
+	it("blocks sheets whose pieces differ in size", () => {
+		const r = presetReadiness(posterWorkspace, {
+			...pdf,
+			layout: sheetsPreset.layout,
+		});
+		expect(r.blocked).toMatchObject({
+			reason: "sheets",
+			message: "Sheets need one piece size",
+		});
+	});
+
+	it("lays out sheets of pieces that share a size", () => {
+		const r = presetReadiness(posterWorkspace, {
+			...pdf,
+			sides: ["front"],
+			layout: sheetsPreset.layout,
+		});
+		expect(r.blocked).toBeNull();
+		expect(r.sheets?.imposition?.pages.flatMap((p) => p.slots)).toHaveLength(3);
+	});
+});
 
 describe("presetReadiness", () => {
 	it("is not blocked when the preset can run", () => {

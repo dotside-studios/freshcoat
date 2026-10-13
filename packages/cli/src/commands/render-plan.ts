@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
@@ -27,9 +27,10 @@ const PDF_OPTIONS = [
 	"outputIntent",
 	"noOutputIntent",
 	"outputIntentId",
+	"cutLines",
 ];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
-const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", ...PDF_OPTIONS];
+const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
 
 /** What `render` runs for `file` and these options, or the UsageError that
  *  says why they do not go together. */
@@ -56,6 +57,9 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.where ? { where: rest.where } : {}),
 				...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
 				...(rest.jobs ? { jobs: rest.jobs } : {}),
+				...(rest.pieces ? { pieces: rest.pieces } : {}),
+				...(rest.cut ? { cut: rest.cut } : {}),
+				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
 				out,
 				quiet: input.quiet,
 			},
@@ -69,7 +73,8 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	if (rest.data === undefined && (out === undefined || !writesFile(out))) {
+	const exporting = rest.pieces || rest.cut || rest.cutLines;
+	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)
 			throw new UsageError(
@@ -77,10 +82,12 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 			);
 		return { kind: "template", options: templateOptions(rest, out) };
 	}
-	if (out === undefined) throw new UsageError("--data needs --out <dir|file.zip|file.pdf>");
-	const problem = exportProblem(given, rest, out);
+	if (out === undefined && !exporting)
+		throw new UsageError("--data needs --out <dir|file.zip|file.pdf>");
+	const to = out ?? ".";
+	const problem = exportProblem(given, rest, to);
 	if (problem) throw new UsageError(problem);
-	return { kind: "batch", options: { ...rest, out } };
+	return { kind: "batch", options: { ...rest, out: to } };
 }
 
 /** Plans `render` and runs what it chose. */
@@ -111,16 +118,20 @@ function exportProblem(
 	given: string[],
 	options: Pick<
 		RenderInput,
-		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "outputIntent"
+		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "outputIntent" | "pieces" | "cut"
 	>,
 	out: string,
 ): string | undefined {
 	const pdf = /\.pdf$/i.test(out);
 	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
+	if (options.pieces && options.pdfPages === "vector")
+		return "--pieces does not go with --pdf-pages vector";
 	if (pdf && options.format !== undefined)
 		return "--format applies only to images; a PDF takes --pdf-pages";
 	if (pdf && options.pngAlpha !== undefined)
 		return "--png-alpha applies only to images; a PDF takes --pdf-pages";
+	if (pdf && options.cut !== undefined)
+		return "--cut applies only to images; a PDF takes --cut-lines";
 	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
 	if (!pdf && pdfOnly.length > 0)
 		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");

@@ -274,3 +274,143 @@ export function deepFreeze<T>(value: T): T {
 	for (const child of Object.values(value)) deepFreeze(child);
 	return Object.freeze(value);
 }
+
+const sliceRect = (
+	id: string,
+	fill: string,
+	x: number,
+	slice: Record<string, unknown>,
+	extra: Record<string, unknown> = {},
+) => ({
+	id,
+	type: "rect",
+	pos: { x, y: 0 },
+	size: { width: 200, height: 200 },
+	properties: { fill, slice },
+	...extra,
+});
+
+/** A 400 by 200 poster whose front splits into a left and a right piece (the
+ *  right one only while `showRight` is true) and a cut line that makes no
+ *  file. Its back has no slices. The `solo` variant drops the left piece and
+ *  moves the right one to the left edge. */
+export const poster: Template = {
+	format_version: "1.7",
+	id: "poster",
+	name: "Poster",
+	width: 400,
+	height: 200,
+	fields: {
+		type: "object",
+		properties: {
+			name: { type: "string", default: "Poster" },
+			showRight: { type: "string", format: "boolean", default: "true" },
+		},
+	},
+	template_data: [
+		{
+			name: "front",
+			background: {
+				id: "front_bg",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 400, height: 200 },
+				properties: { fill: "#ffffff" },
+			},
+			elements: [
+				sliceRect("left", "#ff0000", 0, { name: "left" }),
+				sliceRect(
+					"right",
+					"#0000ff",
+					200,
+					{ name: "right" },
+					{ visibleWhen: { field: "showRight" } },
+				),
+				sliceRect("cut", "#00000000", 0, { name: "cut", output: "none" }),
+			],
+		},
+		{
+			name: "back",
+			background: {
+				id: "back_bg",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 400, height: 200 },
+				properties: { fill: "#00ff00" },
+			},
+			elements: [],
+		},
+	],
+	variants: [
+		{
+			id: "solo",
+			label: "Solo",
+			overrides: [
+				{
+					name: "front",
+					elements: [
+						{ id: "left", properties: {}, hidden: true },
+						{ id: "right", properties: {}, pos: { x: 0, y: 0 } },
+					],
+				},
+			],
+		},
+	],
+} as Template;
+
+export const posters: Dataset = {
+	id: "d_posters",
+	name: "Posters",
+	columns: [
+		{ key: "name", type: "text", required: true },
+		{ key: "show", type: "boolean", default: true },
+	],
+	records: [
+		{
+			id: "r_p0000001",
+			values: { name: "Spring", show: true },
+			status: "pending",
+		},
+		{
+			id: "r_p0000002",
+			values: { name: "Summer", show: false },
+			status: "pending",
+		},
+	],
+	assets: [],
+};
+
+export const posterPreset: ExportPreset = {
+	id: "p_poster",
+	name: "Posters",
+	templateId: "t_poster",
+	records: "all",
+	sides: "all",
+	format: "png-zip",
+	scale: 1,
+	dpi: 300,
+	fileName: "{{template}}-{{index}}-{{side}}",
+	markExported: false,
+	split: "pieces",
+};
+
+export const posterWorkspace: Workspace = {
+	formatVersion: "1.0",
+	name: "Posters",
+	templates: [
+		{
+			id: "t_poster",
+			fileName: "Poster.coat",
+			template: poster,
+			binding: {
+				datasetId: "d_posters",
+				fields: {
+					name: { kind: "column", column: "name" },
+					showRight: { kind: "column", column: "show" },
+				},
+			},
+		},
+	],
+	datasets: [posters],
+	presets: [posterPreset],
+};

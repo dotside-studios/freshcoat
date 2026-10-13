@@ -1,6 +1,7 @@
 import { boundDataset } from "@freshcoat-js/workspace";
 import { toggleBleed } from "~/canvas/bleed-view";
 import { togglePrintGuides } from "~/canvas/print-guides";
+import { toggleSlices } from "~/canvas/slice-guides";
 import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
 import type { BooleanOp } from "~/doc/boolean";
@@ -628,6 +629,13 @@ export const COMMANDS: Command[] = [
 		sections: ["edit", "export"],
 		enabled: hasDoc,
 		run: () => toggleBleed(),
+	},
+	{
+		id: "view.slices",
+		label: "Slices",
+		group: "View",
+		enabled: hasDoc,
+		run: () => toggleSlices(),
 	},
 	{
 		id: "view.renderStats",

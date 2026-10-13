@@ -42,6 +42,7 @@ import CloseIcon from "~icons/mingcute/close-line";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import LockIcon from "~icons/mingcute/lock-line";
+import SliceIcon from "~icons/mingcute/scissors-line";
 import SearchIcon from "~icons/mingcute/search-line";
 import UnlockIcon from "~icons/mingcute/unlock-line";
 import { dropToMove } from "./drop";
@@ -527,6 +528,14 @@ function RowLabel({ row }: { row: LayerRow }) {
 			>
 				{row.id}
 			</span>
+			{row.sliced ? (
+				<SliceIcon
+					role="img"
+					aria-label="Slice"
+					data-testid="layer-slice"
+					className={cn("size-3 shrink-0 text-fc-faint", dim && "opacity-45")}
+				/>
+			) : null}
 			{marks?.changed.has(row.key) ? (
 				<span
 					role="img"

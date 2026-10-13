@@ -1532,6 +1532,64 @@
 												"type": "number",
 												"minimum": 0,
 												"maximum": 1
+											},
+											"slice": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string"
+													},
+													"output": {
+														"type": "string",
+														"enum": [
+															"piece",
+															"none"
+														]
+													},
+													"edge": {
+														"type": "string",
+														"enum": [
+															"none",
+															"through",
+															"kiss",
+															"score",
+															"perforate"
+														]
+													},
+													"bleed": {
+														"anyOf": [
+															{
+																"type": "number"
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"top": {
+																		"type": "number"
+																	},
+																	"right": {
+																		"type": "number"
+																	},
+																	"bottom": {
+																		"type": "number"
+																	},
+																	"left": {
+																		"type": "number"
+																	}
+																},
+																"required": [
+																	"top",
+																	"right",
+																	"bottom",
+																	"left"
+																]
+															}
+														]
+													},
+													"order": {
+														"type": "number"
+													}
+												}
 											}
 										}
 									}
@@ -3580,6 +3638,64 @@
 															"type": "number",
 															"minimum": 0,
 															"maximum": 1
+														},
+														"slice": {
+															"type": "object",
+															"properties": {
+																"name": {
+																	"type": "string"
+																},
+																"output": {
+																	"type": "string",
+																	"enum": [
+																		"piece",
+																		"none"
+																	]
+																},
+																"edge": {
+																	"type": "string",
+																	"enum": [
+																		"none",
+																		"through",
+																		"kiss",
+																		"score",
+																		"perforate"
+																	]
+																},
+																"bleed": {
+																	"anyOf": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "object",
+																			"properties": {
+																				"top": {
+																					"type": "number"
+																				},
+																				"right": {
+																					"type": "number"
+																				},
+																				"bottom": {
+																					"type": "number"
+																				},
+																				"left": {
+																					"type": "number"
+																				}
+																			},
+																			"required": [
+																				"top",
+																				"right",
+																				"bottom",
+																				"left"
+																			]
+																		}
+																	]
+																},
+																"order": {
+																	"type": "number"
+																}
+															}
 														}
 													}
 												}
@@ -8338,6 +8454,64 @@
 											"type": "number",
 											"minimum": 0,
 											"maximum": 1
+										},
+										"slice": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string"
+												},
+												"output": {
+													"type": "string",
+													"enum": [
+														"piece",
+														"none"
+													]
+												},
+												"edge": {
+													"type": "string",
+													"enum": [
+														"none",
+														"through",
+														"kiss",
+														"score",
+														"perforate"
+													]
+												},
+												"bleed": {
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "object",
+															"properties": {
+																"top": {
+																	"type": "number"
+																},
+																"right": {
+																	"type": "number"
+																},
+																"bottom": {
+																	"type": "number"
+																},
+																"left": {
+																	"type": "number"
+																}
+															},
+															"required": [
+																"top",
+																"right",
+																"bottom",
+																"left"
+															]
+														}
+													]
+												},
+												"order": {
+													"type": "number"
+												}
+											}
 										}
 									}
 								}
@@ -9547,6 +9721,64 @@
 												"op",
 												"operands"
 											]
+										},
+										"slice": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string"
+												},
+												"output": {
+													"type": "string",
+													"enum": [
+														"piece",
+														"none"
+													]
+												},
+												"edge": {
+													"type": "string",
+													"enum": [
+														"none",
+														"through",
+														"kiss",
+														"score",
+														"perforate"
+													]
+												},
+												"bleed": {
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "object",
+															"properties": {
+																"top": {
+																	"type": "number"
+																},
+																"right": {
+																	"type": "number"
+																},
+																"bottom": {
+																	"type": "number"
+																},
+																"left": {
+																	"type": "number"
+																}
+															},
+															"required": [
+																"top",
+																"right",
+																"bottom",
+																"left"
+															]
+														}
+													]
+												},
+												"order": {
+													"type": "number"
+												}
+											}
 										}
 									},
 									"required": [

@@ -5,6 +5,8 @@ import {
 	memberCard,
 	members,
 	photoSha,
+	poster,
+	posterPreset,
 	preset,
 	workspace,
 } from "../test-fixtures";
@@ -144,5 +146,55 @@ describe("itemRequest", () => {
 		expect(
 			request({ ...preset, format: "pdf", pngAlpha: "keep" }).pngAlpha,
 		).toBeUndefined();
+	});
+});
+
+describe("pieces", () => {
+	const piece = { values: {}, side: "front", piece: "left" };
+
+	it("sizes a piece by its box at the preset's scale, bleed or not", () => {
+		const size = itemSize(poster, { ...posterPreset, scale: 2 }, piece, assets);
+		expect(size).toEqual({ width: 400, height: 400, scale: 2 });
+		const bled = itemSize(
+			poster,
+			{ ...posterPreset, bleed: true },
+			piece,
+			assets,
+		);
+		expect(bled).toEqual({ width: 200, height: 200, scale: 1 });
+	});
+
+	it("asks the renderer for the piece and no bleed", () => {
+		const built = itemRequest(
+			poster,
+			{ ...posterPreset, bleed: true },
+			piece,
+			assets,
+		);
+		if ("error" in built) throw new Error(built.error);
+		expect(built.request.piece).toBe("left");
+		expect(built.request.bleed).toBeUndefined();
+	});
+
+	it("names the slice a side lacks", () => {
+		const built = itemRequest(
+			poster,
+			posterPreset,
+			{ ...piece, piece: "nope" },
+			assets,
+		);
+		expect(built).toEqual({ error: 'No slice "nope" on this side' });
+	});
+
+	it("refuses vector PDF pages", () => {
+		const built = itemRequest(
+			poster,
+			{ ...posterPreset, format: "pdf", pdfPageImage: "vector" },
+			piece,
+			assets,
+		);
+		expect(built).toEqual({
+			error: "Pieces need PNG or JPEG pages, not vector",
+		});
 	});
 });

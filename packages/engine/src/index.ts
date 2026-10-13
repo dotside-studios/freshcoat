@@ -194,7 +194,10 @@ export { resolveLayout, rotatedFootprint } from "./resolve-layout";
 export {
 	ellipsePath,
 	isEllipsePath,
+	type OutlineGeometry,
+	outlineGeometry,
 	outlinePath,
+	outlineSvg,
 	rectShape,
 } from "./outline";
 export { type StrokeTrim, strokeTrim, trimPath } from "./trim";

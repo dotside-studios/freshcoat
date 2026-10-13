@@ -1,4 +1,4 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import type { Element, Template } from "@freshcoat-js/coatfile";
 import { iccProfile } from "@freshcoat-js/test-utils";
 import type { Dataset, ExportPreset, Workspace } from "@freshcoat-js/workspace";
 import type { JobFile, JobResult } from "@freshcoat-js/workspace/export";
@@ -167,9 +167,47 @@ function fakeRunner() {
 	return { runner, started, finish: (r: JobResult) => finish?.(r) };
 }
 
-function setup() {
+/** The fixture with two slices on the front: `left` cut through and `right`
+ *  kissed, the second added beside the fixture's layers. */
+function withSlices(edges: [string, string] = ["through", "kiss"]): Template {
+	const t = doc();
+	const front = t.template_data[0];
+	if (!front) throw new Error("fixture");
+	const edge = (e: string) => (e === "none" ? {} : { edge: e });
+	return {
+		...t,
+		template_data: [
+			{
+				...front,
+				elements: [
+					...front.elements.map((e) =>
+						e.id === "a"
+							? ({
+									...e,
+									properties: {
+										...e.properties,
+										slice: { name: "left", ...edge(edges[0]) },
+									},
+								} as Element)
+							: e,
+					),
+					{
+						id: "r",
+						type: "rect",
+						pos: { x: 500, y: 0 },
+						size: { width: 100, height: 100 },
+						properties: { slice: { name: "right", ...edge(edges[1]) } },
+					} as Element,
+				],
+			},
+			...t.template_data.slice(1),
+		],
+	};
+}
+
+function setup(template: Template = doc()) {
 	const controller = new EditorController();
-	controller.dispatch({ type: "open", template: doc(), fileName: "doc.coat" });
+	controller.dispatch({ type: "open", template, fileName: "doc.coat" });
 	controller.dispatch({ type: "datasetEdit", datasets: [people] });
 	const templateId = controller.state.workspace?.activeTemplateId as string;
 	controller.dispatch({
@@ -465,6 +503,157 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(
 			screen.queryByRole("checkbox", { name: "Keep alpha channel" }),
 		).toBeNull();
+	});
+
+	describe("slices", () => {
+		const preset = (
+			templateId: string,
+			patch: Partial<ExportPreset> = {},
+		): ExportPreset => ({
+			id: "p_1",
+			name: "Pieces",
+			templateId,
+			records: "all",
+			sides: "all",
+			format: "png-zip",
+			scale: 1,
+			dpi: 300,
+			fileName: "{{record}}-{{side}}",
+			markExported: true,
+			...patch,
+		});
+		const stored = (c: EditorController) => c.state.workspace?.presets[0];
+
+		test("offers nothing about slices to a template without any", async () => {
+			const { controller, user, templateId } = setup();
+			act(() =>
+				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			expect(
+				screen.queryByRole("checkbox", { name: /slice pieces/ }),
+			).toBeNull();
+			expect(screen.queryByRole("button", { name: /Cut file/ })).toBeNull();
+			await user.click(screen.getByRole("tab", { name: "Files" }));
+			expect(
+				screen.getByTestId("export-file-tokens").textContent,
+			).not.toContain("{{slice}}");
+		});
+
+		test("splits into pieces, which the plan, the count and the file names follow", async () => {
+			const { controller, user, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
+			);
+			expect(button("Export 6 files")).toBeTruthy();
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			const split = screen.getByRole("checkbox", {
+				name: "Split into slice pieces",
+			});
+			expect(split).toHaveProperty("checked", false);
+			await user.click(split);
+			expect(stored(controller)?.split).toBe("pieces");
+			// 3 records x (2 pieces on the front + the whole back).
+			expect(button("Export 9 files")).toBeTruthy();
+			await user.click(screen.getByRole("tab", { name: "Files" }));
+			expect(screen.getByTestId("export-file-tokens").textContent).toContain(
+				"{{slice}}",
+			);
+			expect(screen.getByTestId("export-file-example").textContent).toBe(
+				"e.g. r1-front-left.png",
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			await user.click(
+				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
+			);
+			expect(stored(controller)?.split).toBe("none");
+		});
+
+		test("lists the piece files of the previewed record and side", async () => {
+			const { controller, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
+			);
+			expect(screen.queryByTestId("export-piece-files")).toBeNull();
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, { split: "pieces" }),
+				}),
+			);
+			const files = screen.getByTestId("export-piece-files");
+			expect(files.textContent).toBe("r1-front-left.pngr1-front-right.png");
+		});
+
+		test("picks a cut file for image zips when an edge cuts", async () => {
+			const { controller, user, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			const select = screen.getByLabelText("Cut file");
+			await chooseOption(user, select, "SVG");
+			expect(stored(controller)?.cutFile).toBe("svg");
+			await chooseOption(user, screen.getByLabelText("Cut file"), "DXF");
+			expect(stored(controller)?.cutFile).toBe("dxf");
+			await chooseOption(user, screen.getByLabelText("Cut file"), "None");
+			expect(stored(controller)?.cutFile).toBe("none");
+			expect(screen.queryByRole("checkbox", { name: "Cut lines" })).toBeNull();
+		});
+
+		test("hides the cut choices when no slice has an edge", async () => {
+			const { controller, user, templateId } = setup(
+				withSlices(["none", "none"]),
+			);
+			act(() =>
+				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			expect(
+				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
+			).toBeTruthy();
+			expect(screen.queryByLabelText("Cut file")).toBeNull();
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, { format: "pdf" }),
+				}),
+			);
+			expect(screen.queryByRole("checkbox", { name: "Cut lines" })).toBeNull();
+		});
+
+		test("draws cut lines on a PDF", async () => {
+			const { controller, user, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, { format: "pdf" }),
+				}),
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			expect(screen.queryByLabelText("Cut file")).toBeNull();
+			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
+			expect(stored(controller)?.cutLines).toBe(true);
+			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
+			expect(stored(controller)?.cutLines).toBe(false);
+		});
+
+		test("says why pieces of vector pages can't run", async () => {
+			const { controller, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, {
+						format: "pdf",
+						pdfPageImage: "vector",
+						split: "pieces",
+					}),
+				}),
+			);
+			expect(screen.getByTestId("export-blocked").textContent).toBe(
+				"Pieces need PNG or JPEG pages, not vector",
+			);
+		});
 	});
 
 	test("a PDF preset declares sRGB, a custom profile or nothing", async () => {
