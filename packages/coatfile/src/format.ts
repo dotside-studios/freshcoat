@@ -21,7 +21,7 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
-//   1.7  rect and vector `slice`
+//   1.7  rect and vector `slice`; text `stroke`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -63,6 +63,7 @@ export function minimumFormatVersion(template: Template): string {
 		need(1);
 
 	const frameIds = new Set<string>();
+	const textIds = new Set<string>();
 	const visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
 			for (const item of node) visit(item);
@@ -75,6 +76,7 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
+			if (o.type === "text") textIds.add(o.id);
 			if (usesSlice(o.properties)) need(7);
 			if (
 				o.type === "barcode" &&
@@ -85,6 +87,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 			if (o.type === "text" && usesArc(o.properties)) need(6);
 			if (o.type === "text" && usesTextPath(o.properties)) need(6);
+			if (o.type === "text" && usesTextStroke(o.properties)) need(7);
 			if (o.type === "vector" && usesBoolean(o.properties)) need(6);
 			if (o.type === "frame") {
 				frameIds.add(o.id);
@@ -120,6 +123,8 @@ export function minimumFormatVersion(template: Template): string {
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
 				if (usesBoolean(delta.properties)) need(6);
 				if (usesSlice(delta.properties)) need(7);
+				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
+					need(7);
 			}
 		}
 	}
@@ -158,6 +163,14 @@ function usesSlice(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).slice !== undefined
+	);
+}
+
+function usesTextStroke(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).stroke !== undefined
 	);
 }
 
