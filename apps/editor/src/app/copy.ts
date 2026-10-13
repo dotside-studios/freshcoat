@@ -221,6 +221,12 @@ export const VARIANT_EXPORT = {
 	},
 } as const;
 
+/** What the issues list says about an open path whose slice is a piece. */
+export const SLICE_HINT_COPY = {
+	openPiece:
+		"An open path can't be a slice piece, so it exports as a cut line only. Set its output to None",
+} as const;
+
 /** What a validation issue says in the Issues list, by its code. The code
  *  itself stays in the entry's tooltip. */
 export const ISSUE_COPY = {
@@ -264,7 +270,5 @@ export const ISSUE_COPY = {
 	sides: "The sides aren't valid",
 	fields: "The fields aren't valid",
 	unknownSetting: (name: string) => `Unknown setting ${name}`,
-	slicePieceOpenPath:
-		"An open path can't be a slice piece. Set its output to None",
 	invalid: (what: string) => `${what} isn't valid`,
 } as const;

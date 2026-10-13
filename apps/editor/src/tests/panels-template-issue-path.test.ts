@@ -179,16 +179,6 @@ describe("issueMessage", () => {
 		expect(said(broken)).toEqual(["Dark changes inside, which isn't a side"]);
 	});
 
-	test("a slice piece that is an open path", () => {
-		expect(
-			issueMessage({
-				path: "/template_data/0/elements/6/properties/slice/output",
-				code: "slice_piece_open_path",
-				message: "coatfile's own wording",
-			}),
-		).toBe("An open path can't be a slice piece. Set its output to None");
-	});
-
 	test("a code without copy keeps the coatfile's message", () => {
 		expect(
 			issueMessage({ path: "/x", code: "something_new", message: "As is" }),

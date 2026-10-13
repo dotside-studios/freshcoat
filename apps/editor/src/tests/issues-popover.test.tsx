@@ -77,7 +77,7 @@ describe("the issues list", () => {
 		expect(controller.state.selection).toEqual(["0/1/1"]);
 	});
 
-	test("an open path set as a slice piece reads as words and links to the layer", async () => {
+	test("an open path set as a slice piece is a hint that links to the layer, not an error", async () => {
 		const t = doc();
 		const side = t.template_data[0];
 		if (!side) throw new Error("fixture");
@@ -102,13 +102,14 @@ describe("the issues list", () => {
 			],
 		} as Template;
 		const { controller, user } = mount(<List />, broken);
-		const list = screen.getByRole("region", { name: "Validation" });
+		expect(screen.queryByRole("region", { name: "Validation" })).toBeNull();
+		const list = screen.getByRole("region", { name: "Slice hints" });
 		expect(
 			within(list).getByText(
-				"An open path can't be a slice piece. Set its output to None",
+				"An open path can't be a slice piece, so it exports as a cut line only. Set its output to None",
 			),
 		).toBeTruthy();
-		await user.click(within(list).getByTestId("issue-path"));
+		await user.click(within(list).getByRole("button", { name: /Select/ }));
 		expect(controller.state.selection).toEqual([key]);
 	});
 

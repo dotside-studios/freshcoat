@@ -1,7 +1,8 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
 import { describe, expect, test } from "vitest";
+import { updateElement } from "~/doc/ops";
 import { getElement } from "~/doc/path";
-import { hasOpenPath, isSliceable, setSlice } from "~/doc/slice";
+import { hasOpenPath, isSliceable, openPieceKeys, setSlice } from "~/doc/slice";
 import { doc } from "./doc-fixture";
 
 const sliceOf = (t: Template, key: string) =>
@@ -91,5 +92,20 @@ describe("open paths as slices", () => {
 			edge: "score",
 		});
 		expect(sliceOf(on.template, KEYS.loop)).toEqual({});
+	});
+});
+
+describe("open paths set as pieces", () => {
+	test("are listed by layer key, and a cut line or closed shape is not", () => {
+		const t = withVectors();
+		expect(openPieceKeys(t)).toEqual([]);
+		const on = setSlice(t, [KEYS.fold, KEYS.loop], true);
+		if (!on.ok) throw new Error(on.reason);
+		expect(openPieceKeys(on.template)).toEqual([]);
+		const piece = updateElement(t, KEYS.mixed, {
+			properties: { slice: { output: "piece" } },
+		});
+		if (!piece.ok) throw new Error(piece.reason);
+		expect(openPieceKeys(piece.template)).toEqual([KEYS.mixed]);
 	});
 });
