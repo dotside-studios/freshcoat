@@ -133,6 +133,7 @@ function program(io: Io, onCommand: (name: string) => void) {
 		)
 		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", arg(parseQuality))
 		.option("--bleed", "include the template's bleed around each card")
+		.option("--pieces", "write each slice of a frame as its own file; a frame with none is written whole")
 		.optionsGroup("PDF options:")
 		.option("--dpi <n>", "pixels per inch, which sets the page size; default 300", arg(parsePositive))
 		.addOption(

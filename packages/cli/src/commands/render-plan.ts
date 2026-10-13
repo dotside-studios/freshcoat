@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
@@ -45,6 +45,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.where ? { where: rest.where } : {}),
 				...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
 				...(rest.jobs ? { jobs: rest.jobs } : {}),
+				...(rest.pieces ? { pieces: rest.pieces } : {}),
 				out,
 				quiet: input.quiet,
 			},
@@ -58,7 +59,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	if (rest.data === undefined && (out === undefined || !writesFile(out))) {
+	if (rest.data === undefined && !rest.pieces && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)
 			throw new UsageError(
@@ -66,10 +67,12 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 			);
 		return { kind: "template", options: templateOptions(rest, out) };
 	}
-	if (out === undefined) throw new UsageError("--data needs --out <dir|file.zip|file.pdf>");
-	const problem = exportProblem(given, rest, out);
+	if (out === undefined && !rest.pieces)
+		throw new UsageError("--data needs --out <dir|file.zip|file.pdf>");
+	const to = out ?? ".";
+	const problem = exportProblem(given, rest, to);
 	if (problem) throw new UsageError(problem);
-	return { kind: "batch", options: { ...rest, out } };
+	return { kind: "batch", options: { ...rest, out: to } };
 }
 
 /** Plans `render` and runs what it chose. */
@@ -98,11 +101,13 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 
 function exportProblem(
 	given: string[],
-	options: Pick<RenderInput, "scale" | "format" | "pngAlpha" | "quality" | "pdfPages">,
+	options: Pick<RenderInput, "scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "pieces">,
 	out: string,
 ): string | undefined {
 	const pdf = /\.pdf$/i.test(out);
 	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
+	if (options.pieces && options.pdfPages === "vector")
+		return "--pieces does not go with --pdf-pages vector";
 	if (pdf && options.format !== undefined)
 		return "--format applies only to images; a PDF takes --pdf-pages";
 	if (pdf && options.pngAlpha !== undefined)

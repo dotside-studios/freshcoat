@@ -68,6 +68,7 @@ export type BatchOptions = {
 	margin?: number;
 	gap?: number;
 	cropMarks?: boolean;
+	pieces?: true;
 	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
@@ -137,6 +138,7 @@ export async function renderBatch(
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
+		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
 		...(options.sheets

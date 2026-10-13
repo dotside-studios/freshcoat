@@ -1613,7 +1613,7 @@ describe("render slice pieces", () => {
 		const run = await box.run("render", "badge.json", "--pieces", "--out", "no-slices.zip");
 		expect(run.code).toBe(0);
 		expect(run.stderr).toContain("warning: no slices to split; exporting whole sides");
-		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual([REPORT_FILE_NAME, "back.png", "front.png"]);
+		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual(["back.png", REPORT_FILE_NAME, "front.png"]);
 	});
 
 	test("refuses vector PDF pages for a workspace preset", async () => {

@@ -15,6 +15,7 @@ import {
 	findPreset,
 	type JobProgress,
 	largestImagePixels,
+	type PresetReadiness,
 	presetReadiness,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
@@ -34,6 +35,7 @@ export type WorkspaceOptions = {
 	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
+	pieces?: true;
 	quiet: boolean;
 };
 
@@ -59,6 +61,7 @@ export async function renderWorkspace(
 		...preset,
 		...(options.records ? { records: options.records } : {}),
 		markExported: options.save === true,
+		...(options.pieces ? { split: "pieces" as const } : {}),
 	};
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
@@ -129,6 +132,7 @@ export async function runPreset(
 	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
 	const readiness = presetReadiness(workspace, preset);
 	checkView(readiness.viewProblems);
+	checkPieces(preset, readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
@@ -187,8 +191,10 @@ function planPreset(
 	out: string,
 	log: Log,
 ): void {
-	const { plan, sheets, viewProblems } = presetReadiness(workspace, preset);
+	const readiness = presetReadiness(workspace, preset);
+	const { plan, sheets, viewProblems } = readiness;
 	checkView(viewProblems);
+	checkPieces(preset, readiness, log);
 	if (sheets?.error !== undefined)
 		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
@@ -196,6 +202,21 @@ function planPreset(
 	log.out(
 		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
 	);
+}
+
+/** Refuses pieces on vector pages, and warns when a split finds no slice. */
+function checkPieces(
+	preset: ExportPreset,
+	readiness: Pick<PresetReadiness, "blocked" | "plan">,
+	log: Log,
+): void {
+	if (readiness.blocked?.reason === "pieces")
+		throw new CliError(readiness.blocked.message);
+	if (
+		preset.split === "pieces" &&
+		!readiness.plan.some((item) => item.piece !== undefined)
+	)
+		log.warn("no slices to split; exporting whole sides");
 }
 
 function checkView(problems: readonly string[]): void {
