@@ -143,6 +143,8 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--quality <n>` | JPEG and WebP quality, 0 to 100, default 90; for a PDF with `--pdf-pages jpeg` |
 | `--bleed` | include the template's bleed around each card |
 | `--pieces` | write each slice of a frame as its own file instead of the whole frame; see below |
+| `--cut <svg\|dxf>` | images only: write the cut lines of each image beside it, as `<name>.svg` or `<name>.dxf`; see below |
+| `--cut-lines` | PDF only: draw the cut lines over each page's art; see below |
 | `--dpi <n>` | PDF only: pixels per inch, which sets the page or card size; default 300 |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
 | `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper, in whichever orientation fits more |
@@ -172,6 +174,25 @@ freshcoat render sticker.coat --pieces --out pieces
 freshcoat render poster.coat --data editions.csv --pieces --name "{{edition}}_{{slice}}" --out posters.zip
 ```
 
+`--cut` and `--cut-lines` write the cut lines of the slices that have an `edge`
+(`through`, `kiss`, `score` or `perforate`), aligned with the art. With `--cut`,
+each image of a zip or directory gets a file of the same base name: an SVG
+sized in millimetres at its density, with a group per edge kind in red
+(through), magenta (kiss), blue (score) and green (perforate), or an R12 DXF in
+millimetres with a layer per kind. An image with no cut line gets no file, and
+a template with no edge warns. A piece has its own outline and the lines of
+`output: "none"` slices that lie wholly inside its box; one that only crosses it
+is left out. With `--cut-lines`, a PDF draws the same lines as 0.25 pt strokes
+over each page or card, in an optional content group named Cut. The
+[workspace README](../workspace/README.md#cut-files) has the details, and how
+to open the files in Cricut Design Space and Silhouette Studio. Either flag on
+its own exports into the `--out` directory, the current one by default.
+
+```sh
+freshcoat render sticker.coat --pieces --cut svg --out pieces
+freshcoat render sheet.coat --cut-lines --out sheet.pdf
+```
+
 #### Workspaces
 
 Runs an export preset from a `.coatworkspace`, chosen with `--preset` by id or
@@ -193,6 +214,8 @@ freshcoat render club.coatworkspace --preset "All cards" --records failed --save
 ```
 
 `--pieces` exports the preset as one file per slice, as for a template above.
+`--cut` and `--cut-lines` set the preset's cut options, and are refused on a
+preset of the other kind: `--cut` needs an image preset, `--cut-lines` a PDF one.
 
 `--where <filter>` exports only the records that match, over the records view
 saved with the template's binding, if any; repeat it and every filter must

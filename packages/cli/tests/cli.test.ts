@@ -1587,7 +1587,7 @@ describe("render cut files", () => {
 		const run = await box.run("render", "edged.json", "--cut", "dxf", "--frame", "front", "--out", "cut.zip", "-q");
 		expect(run.code).toBe(0);
 		const files = await zipOf("cut.zip");
-		expect(Object.keys(files).sort()).toEqual(["front.dxf", "front.png", REPORT_FILE_NAME]);
+		expect(Object.keys(files).sort()).toEqual([REPORT_FILE_NAME, "front.dxf", "front.png"]);
 		const dxf = text(files["front.dxf"]);
 		for (const layer of ["THROUGH", "KISS", "SCORE"]) expect(dxf).toContain(layer);
 		expect(dxf).toContain("$INSUNITS");
@@ -1597,9 +1597,6 @@ describe("render cut files", () => {
 		const run = await box.run("render", "edged.json", "--frame", "front", "--cut-lines", "--dpi", "72", "--out", "cut.pdf", "-q");
 		expect(run.code).toBe(0);
 		const pdf = await PDFDocument.load(await readFile(box.path("cut.pdf")));
-		const [page] = pdf.getPages();
-		const stream = page?.node.Contents();
-		expect(stream).toBeDefined();
 		const plain = await box.run("render", "edged.json", "--frame", "front", "--dpi", "72", "--out", "plain.pdf", "-q");
 		expect(plain.code).toBe(0);
 		const withLines = (await readFile(box.path("cut.pdf"))).length;

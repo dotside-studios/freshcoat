@@ -69,6 +69,8 @@ export type BatchOptions = {
 	gap?: number;
 	cropMarks?: boolean;
 	pieces?: true;
+	cut?: "svg" | "dxf";
+	cutLines?: true;
 	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
@@ -139,6 +141,8 @@ export async function renderBatch(
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
 		...(options.pieces ? { split: "pieces" as const } : {}),
+		...(options.cut ? { cutFile: options.cut } : {}),
+		...(options.cutLines ? { cutLines: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
 		...(options.sheets
