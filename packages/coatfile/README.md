@@ -209,8 +209,33 @@ template sets its own, the printer's 3 mm safe area, scaled from the template's
 long side (`printGuideMetrics`). `templateHints(t)` is the advice a valid
 template earns, as typed data for the caller to word: `variant` (from
 `checkVariants`), `safe_area` (layers inside `printGuidesFor(t).safe`, with side,
-layer id and edges), `format_newer` (a format newer than this kit reads) and
+layer id and edges), `image_dpi` (images that print below the minimum
+resolution, below), `format_newer` (a format newer than this kit reads) and
 `format_low` (fields used from a later minor than the declared version).
+
+### Image resolution
+
+`effectiveImageDpi(pixels, placed, dpi, { fit, crop, focus })` is the
+resolution an image prints at: its source pixels over the inches they cover,
+where `placed` is the layer's box in design units and `dpi` the design units to
+the inch. Only the part of the source a crop or a `cover` keeps counts, a
+`contain` counts the box it fills, and the axis with fewer pixels to the inch
+wins. A tile is drawn one pixel to the unit, so it prints at `dpi`. A 600 px
+wide image placed 900 units (3 in) wide at 300 DPI prints at 200.
+
+`templateHints(t, { dpi, min, pixelSize })` reports an `image_dpi` hint, with
+side, layer id, src, `dpi` (rounded down) and `min`, for each image layer below
+`min` (`DEFAULT_MIN_IMAGE_DPI`, 300; 0 turns it off) at `dpi`
+(`DEFAULT_IMAGE_DPI_UNITS`, 300). Sizes come from the template's own `asset:`
+and `data:` images (`inlineImageSize`) and from `pixelSize(src)` for the rest;
+an image it has no size for is skipped. `imageDpiHints` gives only these.
+
+An image bound to a field is known only at render time. `imageDpi: { dpi, min }`
+on `renderCompiled`, `renderTemplate` or `renderCompiledPdf` adds an
+`image_low_dpi` warning (layer, src, `dpi`, `min`) for each image the scene
+draws below `min`, read from the bytes the paint uses; `describeWarning` words
+it as `Image prints at 200 DPI, under 300: photo`. `imageDpiWarnings(commands,
+load, { dpi, min })` runs the same check over compiled commands.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
