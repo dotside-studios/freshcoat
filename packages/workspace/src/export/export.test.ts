@@ -1,7 +1,9 @@
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
+import { PDFDocument } from "pdf-lib";
 import { beforeAll, describe, expect, it } from "vitest";
+import { SheetLayoutError } from "../impose";
 import { planExport } from "../plan";
 import {
 	makePng,
@@ -12,12 +14,13 @@ import {
 	sha256,
 	workspace,
 } from "../test-fixtures";
-import type { ExportPreset, Workspace } from "../types";
+import type { ExportPreset, SheetLayout, Workspace } from "../types";
 import {
 	createItemRenderer,
 	IMAGE_CACHE_PIXELS,
 	type ItemRenderer,
 	inlinePool,
+	PIECES_NEED_RASTER_PAGES,
 	REPORT_FILE_NAME,
 	type RenderRequest,
 	runExportJob,
@@ -341,5 +344,101 @@ describe("runExportJob with split: pieces", () => {
 		});
 		expect(sizeOf(files["poster-1-back.png"])).toEqual([100, 50]);
 		expect(sizeOf(files["poster-1-front-left.png"])).toEqual([50, 50]);
+	});
+});
+
+describe("runExportJob with split: pieces into a PDF", () => {
+	const pdf = (changes: Partial<ExportPreset>): ExportPreset => ({
+		...posterPreset,
+		format: "pdf",
+		...changes,
+	});
+	const sheet: SheetLayout = {
+		kind: "sheet",
+		paper: "a4",
+		orientation: "portrait",
+		marginMm: 10,
+		gapMm: 0,
+		cropMarks: false,
+		duplex: "none",
+	};
+	const run = async (p: ExportPreset, assemblePdf?: never) => {
+		const result = await runExportJob(posterWorkspace, p, {
+			pool: inlinePool(items),
+			...(assemblePdf ? { assemblePdf } : {}),
+		});
+		items.endJob();
+		return result;
+	};
+	const load = async (result: Awaited<ReturnType<typeof run>>) => {
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no pdf");
+		return PDFDocument.load(new Uint8Array(await blob.arrayBuffer()));
+	};
+
+	it("makes a page for each piece, sized by its own pixels", async () => {
+		const doc = await load(await run(pdf({})));
+		const sizes = doc
+			.getPages()
+			.map((page) => page.getSize())
+			.map(({ width, height }) => [Math.round(width), Math.round(height)]);
+		// 200 and 400 px at 300 dpi are 48 and 96 pt
+		expect(sizes).toEqual([
+			[48, 48],
+			[48, 48],
+			[96, 48],
+			[48, 48],
+			[96, 48],
+		]);
+	});
+
+	it("sizes pages by the preset's scale and dpi", async () => {
+		const doc = await load(await run(pdf({ scale: 2, dpi: 144 })));
+		const [first] = doc.getPages().map((page) => page.getSize());
+		expect([first?.width, first?.height]).toEqual([200, 200]);
+	});
+
+	it("imposes pieces of one size on sheets as cards of that size", async () => {
+		let options: Record<string, unknown> | undefined;
+		const result = await runExportJob(
+			posterWorkspace,
+			pdf({ sides: ["front"], layout: sheet }),
+			{
+				pool: inlinePool(items),
+				assemblePdf: async (pages, o) => {
+					options = o;
+					return (await import("../pdf")).assemblePdf(pages, o);
+				},
+			},
+		);
+		items.endJob();
+		const mm = (200 / 300) * 25.4;
+		expect(options?.cardMm).toEqual({ widthMm: mm, heightMm: mm });
+		expect(options?.bleedMm).toBeUndefined();
+		const doc = await load(result);
+		expect(doc.getPageCount()).toBe(1);
+		const [page] = doc.getPages();
+		expect([
+			Math.round(page?.getWidth() ?? 0),
+			Math.round(page?.getHeight() ?? 0),
+		]).toEqual([595, 842]);
+	});
+
+	it("refuses sheets when the items differ in size", async () => {
+		await expect(run(pdf({ layout: sheet }))).rejects.toThrow(SheetLayoutError);
+		await expect(run(pdf({ layout: sheet }))).rejects.toThrow(/one piece size/);
+	});
+
+	it("refuses vector pages", async () => {
+		await expect(run(pdf({ pdfPageImage: "vector" }))).rejects.toThrow(
+			PIECES_NEED_RASTER_PAGES,
+		);
+	});
+
+	it("still draws a preset that does not split as vectors", async () => {
+		const result = await run(
+			pdf({ split: "none", pdfPageImage: "vector", sides: ["back"] }),
+		);
+		expect(result.items.every((i) => i.ok)).toBe(true);
 	});
 });
