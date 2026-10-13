@@ -3,7 +3,11 @@ import {
 	type Template,
 	templateBleed,
 } from "@freshcoat-js/coatfile";
-import { parsePrintProfile } from "@freshcoat-js/for-print";
+import {
+	DEFAULT_PRINT_TARGET,
+	PRINT_TARGETS,
+	parsePrintProfile,
+} from "@freshcoat-js/for-print";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
@@ -20,6 +24,7 @@ import type {
 	ExportDestination,
 	ExportItem,
 	ExportPreset,
+	PresetPrint,
 	SheetLayout,
 } from "@freshcoat-js/workspace";
 import {
@@ -681,9 +686,20 @@ export function ExportSettings({
 	);
 }
 
+const NO_TARGET = "none";
+
+/** The default target is left implicit, so a preset reads the same as before
+ *  targets existed. */
+function withTarget(print: PresetPrint, key: string): PresetPrint {
+	const { target: _drop, ...rest } = print;
+	if (key === NO_TARGET) return { ...print, enabled: false };
+	if (key === DEFAULT_PRINT_TARGET.id) return { ...rest, enabled: true };
+	return { ...rest, enabled: true, target: key };
+}
+
 /**
- * Output through for-print: a switch, the printer's measured profile, and
- * the per-photo analysis under More.
+ * Output through for-print: the print target, the printer's measured
+ * profile, and the per-photo analysis under More.
  */
 function PrintGroup({
 	preset,
@@ -716,12 +732,25 @@ function PrintGroup({
 	return (
 		<PanelSection title="Print">
 			<div data-testid="export-print" className="contents">
-				<Switch
-					isSelected={print.enabled}
-					onChange={(enabled) => onChange({ ...print, enabled })}
+				<Select
+					label="Print target"
+					labelPosition="side"
+					value={
+						print.enabled
+							? (print.target ?? DEFAULT_PRINT_TARGET.id)
+							: NO_TARGET
+					}
+					onChange={(key) => onChange(withTarget(print, String(key)))}
 				>
-					Optimize for card printer
-				</Switch>
+					<SelectItem id={NO_TARGET} textValue="None">
+						None
+					</SelectItem>
+					{PRINT_TARGETS.map((t) => (
+						<SelectItem key={t.id} id={t.id} textValue={t.name}>
+							{t.name}
+						</SelectItem>
+					))}
+				</Select>
 				{print.enabled ? (
 					<>
 						<Row label="Profile">
@@ -771,7 +800,13 @@ function PrintGroup({
 							onOpenChange={setMeasuring}
 							onSave={(measured) => {
 								setError(null);
-								onChange({ ...print, profile: measured });
+								onChange({
+									...print,
+									profile: {
+										...measured,
+										target: print.target ?? DEFAULT_PRINT_TARGET.id,
+									},
+								});
 							}}
 						/>
 						{error ? (

@@ -10,6 +10,7 @@ import {
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import {
+	choosePrintTarget,
 	mod,
 	openSample,
 	probePath,
@@ -93,11 +94,6 @@ async function openExportWithPreset(page: Page) {
 	await settingsTab(page, "Print");
 }
 
-const printSwitch = (page: Page) =>
-	page
-		.getByTestId("export-settings")
-		.getByRole("switch", { name: "Optimize for card printer" });
-
 async function shot(page: Page, name: string) {
 	if (!SHOTS) return;
 	await page.screenshot({ path: join(SHOTS, `${name}.png`) });
@@ -147,11 +143,7 @@ test("a printing PNG export carries the finish, and the report says so", async (
 		true,
 	);
 
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
-	await expect(printSwitch(page)).toBeChecked();
+	await choosePrintTarget(page);
 	expect(
 		await page.evaluate(
 			() =>
@@ -199,10 +191,7 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 }) => {
 	test.setTimeout(240_000);
 	await openExportWithPreset(page);
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
+	await choosePrintTarget(page);
 	const group = page.getByTestId("export-print-profile");
 	await expect(group).toContainText("None");
 
@@ -380,10 +369,7 @@ test("a printer is measured from a photo of the printed chart", async ({
 }) => {
 	test.setTimeout(240_000);
 	await openExportWithPreset(page);
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
+	await choosePrintTarget(page);
 	const group = page.getByTestId("export-print-profile");
 	await group.getByRole("button", { name: "Measure…" }).click();
 	const dialog = page.getByRole("dialog", { name: "Measure printer" });
