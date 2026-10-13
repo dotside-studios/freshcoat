@@ -442,3 +442,156 @@ describe("runExportJob with split: pieces into a PDF", () => {
 		expect(result.items.every((i) => i.ok)).toBe(true);
 	});
 });
+
+describe("runExportJob with cut files", () => {
+	const edges: Record<string, Record<string, unknown>> = {
+		left: { name: "left", edge: "through" },
+		right: { name: "right", edge: "kiss" },
+		cut: { name: "cut", output: "none", edge: "score" },
+	};
+	const edged = (bleed?: number): Workspace => ({
+		...posterWorkspace,
+		templates: posterWorkspace.templates.map((t) => ({
+			...t,
+			template: {
+				...t.template,
+				...(bleed ? { bleed } : {}),
+				template_data: t.template.template_data.map((f) =>
+					f.name === "front"
+						? {
+								...f,
+								elements: f.elements.map((el) =>
+									el.id in edges
+										? {
+												...el,
+												properties: { ...el.properties, slice: edges[el.id] },
+											}
+										: el,
+								),
+							}
+						: f,
+				),
+			},
+		})),
+	});
+	const zipOf = async (ws: Workspace, p: ExportPreset) => {
+		const result = await runExportJob(ws, p, { pool: inlinePool(items) });
+		items.endJob();
+		expect(result.items.filter((i) => !i.ok)).toEqual([]);
+		const blob = result.file?.blob;
+		if (!blob) throw new Error("no zip");
+		return unzipSync(new Uint8Array(await blob.arrayBuffer()));
+	};
+	const text = (bytes: Uint8Array | undefined) =>
+		new TextDecoder().decode(bytes);
+
+	it("writes an SVG beside each piece that has lines, with its name", async () => {
+		const files = await zipOf(edged(), { ...posterPreset, cutFile: "svg" });
+		expect(Object.keys(files).sort()).toEqual([
+			REPORT_FILE_NAME,
+			"poster-1-back.png",
+			"poster-1-front-left.png",
+			"poster-1-front-left.svg",
+			"poster-1-front-right.png",
+			"poster-1-front-right.svg",
+			"poster-2-back.png",
+			"poster-2-front-left.png",
+			"poster-2-front-left.svg",
+		]);
+		const left = text(files["poster-1-front-left.svg"]);
+		expect(left).toContain('viewBox="0 0 200 200"');
+		expect(left).toContain('<g id="through">');
+		expect(left).toContain('<g id="score">');
+		expect(left).not.toContain('id="kiss"');
+		const right = text(files["poster-1-front-right.svg"]);
+		expect(right).toContain('<g id="kiss">');
+		expect(right).not.toContain('id="score"');
+	});
+
+	it("writes DXF files in place of SVG", async () => {
+		const files = await zipOf(edged(), { ...posterPreset, cutFile: "dxf" });
+		const names = Object.keys(files);
+		expect(names).toContain("poster-1-front-left.dxf");
+		expect(names.some((n) => n.endsWith(".svg"))).toBe(false);
+		expect(text(files["poster-1-front-left.dxf"])).toContain("THROUGH");
+	});
+
+	it("writes nothing by default or for none", async () => {
+		for (const cutFile of [undefined, "none" as const]) {
+			const files = await zipOf(edged(), {
+				...posterPreset,
+				...(cutFile ? { cutFile } : {}),
+			});
+			expect(Object.keys(files).filter((n) => !n.endsWith(".png"))).toEqual([
+				REPORT_FILE_NAME,
+			]);
+		}
+	});
+
+	it("writes no file for an item without lines", async () => {
+		const files = await zipOf(posterWorkspace, {
+			...posterPreset,
+			cutFile: "svg",
+		});
+		expect(Object.keys(files).some((n) => n.endsWith(".svg"))).toBe(false);
+	});
+
+	it("names the sidecar like its image, scale suffix and all, in design units", async () => {
+		const files = await zipOf(edged(), {
+			...posterPreset,
+			scale: 2,
+			cutFile: "svg",
+		});
+		expect(Object.keys(files)).toContain("poster-1-front-left@2x.svg");
+		expect(text(files["poster-1-front-left@2x.svg"])).toContain(
+			'viewBox="0 0 200 200"',
+		);
+	});
+
+	it("covers a whole side, with the preset's bleed around it", async () => {
+		const files = await zipOf(edged(10), {
+			...posterPreset,
+			split: "none",
+			bleed: true,
+			cutFile: "svg",
+		});
+		const front = text(files["poster-1-front.svg"]);
+		expect(front).toContain('viewBox="0 0 420 220"');
+		expect(front).toMatch(/d="M10 10L/);
+		expect(Object.keys(files)).not.toContain("poster-1-back.svg");
+	});
+
+	it("leaves the trim alone when the preset has no bleed", async () => {
+		const files = await zipOf(edged(10), {
+			...posterPreset,
+			split: "none",
+			cutFile: "svg",
+		});
+		expect(text(files["poster-1-front.svg"])).toContain(
+			'viewBox="0 0 400 200"',
+		);
+	});
+
+	it("reports the same items as without cut files", async () => {
+		const run = (changes: Partial<ExportPreset>) =>
+			runExportJob(
+				edged(),
+				{ ...posterPreset, ...changes },
+				{ pool: inlinePool(items) },
+			);
+		const a = await run({});
+		const b = await run({ cutFile: "svg" });
+		items.endJob();
+		expect(b.items).toEqual(a.items);
+	});
+
+	it("ignores the cut file option for a PDF", async () => {
+		const result = await runExportJob(
+			edged(),
+			{ ...posterPreset, format: "pdf", cutFile: "svg" },
+			{ pool: inlinePool(items) },
+		);
+		items.endJob();
+		expect(result.file?.mediaType).toBe("application/pdf");
+	});
+});
