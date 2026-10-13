@@ -320,8 +320,9 @@ describe("records view", () => {
 		expect(screen.getByTestId("view-count").textContent).toBe("2 of 2 records");
 		await user.click(screen.getByText("Add filter", { selector: "button" }));
 		expect(last()?.view).toEqual({
-			filters: [{ column: "name", op: "equals", value: "" }],
+			filters: [{ column: "name", op: "contains", value: "" }],
 		});
+		expect(screen.getByTestId("view-count").textContent).toBe("2 of 2 records");
 		await choose(user, /Filter column/, "age");
 		await choose(user, /Filter condition/, "≥");
 		await user.type(

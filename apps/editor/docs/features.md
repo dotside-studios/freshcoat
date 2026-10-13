@@ -160,7 +160,8 @@ the records, and **Export** turns templates and records into files.
     to each record whose column equals that dataset's key; "Only records with
     a match" drops the rest. Each filter is a column, a condition (is,
     contains, is empty, their opposites, and <, ≤, >, ≥ for numbers and
-    dates) and a value; every filter must match. It counts the records kept,
+    dates) and a value; every filter must match. A new filter starts as
+    "contains" with no value, which keeps every record until a value is typed. It counts the records kept,
     names records with no match and keys held twice, and a filter or join that
     cannot apply keeps nothing and blocks Export with the reason. Fields,
     the variant column, the Edit preview and Export all read the view.

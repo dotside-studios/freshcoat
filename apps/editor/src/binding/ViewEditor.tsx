@@ -121,7 +121,7 @@ export function ViewEditor({
 		const column = columns[0]?.key ?? "";
 		onChange({
 			...current,
-			filters: [...current.filters, { column, op: "equals", value: "" }],
+			filters: [...current.filters, { column, op: "contains", value: "" }],
 		});
 	};
 
@@ -161,7 +161,10 @@ export function ViewEditor({
 			</Select>
 			{join ? (
 				<div className="flex flex-col gap-1" data-testid="view-join">
-					<div className="flex min-w-0 items-center gap-1">
+					<div className="flex min-w-0 items-center gap-2">
+						<span className="w-16 shrink-0 truncate text-fc-muted text-fc-sm">
+							On
+						</span>
 						<KeySelect
 							label="Join on"
 							columns={base.columns}
@@ -263,62 +266,61 @@ function FilterRow({
 	const id = choiceId(filter);
 	return (
 		<div
-			className="flex min-w-0 items-center gap-1"
+			className="flex min-w-0 flex-col gap-1 border-fc-border border-t pt-1.5"
 			data-testid={`view-filter-${filter.column}`}
 		>
-			<KeySelect
-				label="Filter column"
-				columns={columns}
-				value={filter.column}
-				onChange={(key) => {
-					const next = columns.find((c) => c.key === key);
-					const keeps = choicesFor(next).some((c) => c.id === id);
-					onChange(
-						keeps
-							? { ...filter, column: key }
-							: { column: key, op: "equals", value: filter.value ?? "" },
-					);
-				}}
-			/>
-			<Select
-				aria-label="Filter condition"
-				className="w-24 shrink-0"
-				value={choices.some((c) => c.id === id) ? id : null}
-				placeholder={filter.op}
-				onChange={(key) => {
-					const choice = choices.find((c) => c.id === key);
-					if (!choice) return;
-					onChange({
-						column: filter.column,
-						op: choice.op,
-						...(choice.op !== "empty" ? { value: filter.value ?? "" } : {}),
-						...(choice.not ? { not: true } : {}),
-					});
-				}}
-			>
-				{choices.map((c) => (
-					<SelectItem key={c.id} id={c.id} textValue={c.label}>
-						{c.label}
-					</SelectItem>
-				))}
-			</Select>
-			{filter.op === "empty" ? (
-				<span className="min-w-0 flex-1" />
-			) : (
+			<div className="flex min-w-0 items-center gap-1">
+				<KeySelect
+					label="Filter column"
+					columns={columns}
+					value={filter.column}
+					onChange={(key) => {
+						const next = columns.find((c) => c.key === key);
+						const keeps = choicesFor(next).some((c) => c.id === id);
+						onChange(
+							keeps
+								? { ...filter, column: key }
+								: { column: key, op: "equals", value: filter.value ?? "" },
+						);
+					}}
+				/>
+				<Select
+					aria-label="Filter condition"
+					className="w-32 shrink-0"
+					value={choices.some((c) => c.id === id) ? id : null}
+					placeholder={filter.op}
+					onChange={(key) => {
+						const choice = choices.find((c) => c.id === key);
+						if (!choice) return;
+						onChange({
+							column: filter.column,
+							op: choice.op,
+							...(choice.op !== "empty" ? { value: filter.value ?? "" } : {}),
+							...(choice.not ? { not: true } : {}),
+						});
+					}}
+				>
+					{choices.map((c) => (
+						<SelectItem key={c.id} id={c.id} textValue={c.label}>
+							{c.label}
+						</SelectItem>
+					))}
+				</Select>
+				<IconButton
+					aria-label="Remove filter"
+					onPress={() => onChange(undefined)}
+				>
+					<CloseIcon />
+				</IconButton>
+			</div>
+			{filter.op === "empty" ? null : (
 				<TextField
 					aria-label="Filter value"
-					className="min-w-0 flex-1"
 					value={filter.value ?? ""}
 					placeholder={placeholderFor(column)}
 					onChange={(value) => onChange({ ...filter, value })}
 				/>
 			)}
-			<IconButton
-				aria-label="Remove filter"
-				onPress={() => onChange(undefined)}
-			>
-				<CloseIcon />
-			</IconButton>
 		</div>
 	);
 }
