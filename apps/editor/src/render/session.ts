@@ -5,6 +5,8 @@ import {
 	hasInsets,
 	imageDpiWarnings,
 	NO_BLEED,
+	type PrintCheckOptions,
+	printCheckWarnings,
 	type Sides,
 	type Template,
 	templateBleed,
@@ -34,6 +36,8 @@ export type RenderInput<G> = {
 	/** Warns for images in `images` that print below `min` at `dpi` design
 	 *  units to the inch, but for those `skip` names. */
 	imageDpi?: { dpi: number; min: number; skip?: (src: string) => boolean };
+	/** Runs the print checks on the laid-out side. */
+	printChecks?: PrintCheckOptions;
 };
 
 export type RenderTimings = {
@@ -142,6 +146,9 @@ export function createRenderSession(
 						input.imageDpi,
 					)
 				: [];
+			const printWarnings = input.printChecks
+				? printCheckWarnings(commands, input.printChecks)
+				: [];
 			const t4 = performance.now();
 
 			return {
@@ -153,6 +160,7 @@ export function createRenderSession(
 					...(frame.warnings ?? []),
 					...result.warnings,
 					...dpiWarnings,
+					...printWarnings,
 				],
 				scale,
 				bleed,

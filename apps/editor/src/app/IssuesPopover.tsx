@@ -20,6 +20,7 @@ import { Button as RACButton } from "react-aria-components";
 import {
 	imageDpiHints,
 	type PrintHint,
+	printCheckHints,
 	safeAreaHints,
 	useImageDpi,
 } from "~/canvas/print-guides";
@@ -142,6 +143,7 @@ export function IssuesList({ template }: { template: Template }) {
 		() => [
 			...safeAreaHints(template),
 			...imageDpiHints(template, { dpi, min: minDpi }),
+			...printCheckHints(template, dpi),
 		],
 		[template, dpi, minDpi],
 	);
@@ -173,7 +175,11 @@ export function IssuesList({ template }: { template: Template }) {
 			{hints.length > 0 ? (
 				<IssueList label="Print hints">
 					{hints.map((hint) => (
-						<HintRow key={hint.key} template={template} hint={hint} />
+						<HintRow
+							key={`${hint.code}:${hint.key}`}
+							template={template}
+							hint={hint}
+						/>
 					))}
 				</IssueList>
 			) : null}
@@ -398,7 +404,7 @@ function HintRow({
 	const controller = useController();
 	const layer = referenceLabel(template, hint.key);
 	return (
-		<li data-testid="print-hint" data-level="info">
+		<li data-testid="print-hint" data-level="info" data-code={hint.code}>
 			<Entry
 				as="div"
 				tone="muted"
