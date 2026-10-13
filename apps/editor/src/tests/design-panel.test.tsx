@@ -253,18 +253,63 @@ describe("DesignPanel", () => {
 			color: "#000000",
 			width: 1,
 		});
-		expect(e.shadow).toMatchObject({ dx: 0, dy: 4 });
+		expect(e.effects).toMatchObject([{ type: "shadow", dx: 0, dy: 4 }]);
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("sets and clears a background blur as one shared field", () => {
+	it("adds a background blur as one shared effect", () => {
 		const c = setup(["0/0", "0/1"]);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Add background blur" }),
+		);
 		typeInto(spinbutton("Background blur"), "16");
-		expect(el(c, "0/0").backdropBlur).toBe(16);
-		expect(el(c, "0/1").backdropBlur).toBe(16);
+		expect(el(c, "0/0").effects).toEqual([
+			{ type: "backdropBlur", radius: 16 },
+		]);
+		expect(el(c, "0/1").effects).toEqual([
+			{ type: "backdropBlur", radius: 16 },
+		]);
 		expect(validate(c.template).ok).toBe(true);
-		typeInto(spinbutton("Background blur"), "0");
-		expect("backdropBlur" in el(c, "0/0")).toBe(false);
+		// Only one of each blur: the add button is gone until it is removed.
+		expect(
+			screen.queryByRole("button", { name: "Add background blur" }),
+		).toBeNull();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Remove background blur" }),
+		);
+		expect("effects" in el(c, "0/0")).toBe(false);
+	});
+
+	it("keeps one list of effects and hides one without dropping it", () => {
+		const c = setup(["0/0"]);
+		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
+		fireEvent.click(screen.getByRole("button", { name: "Add layer blur" }));
+		fireEvent.click(screen.getByRole("button", { name: "Shadow 1 visible" }));
+		const e = el(c, "0/0");
+		expect(e.effects).toMatchObject([
+			{ type: "shadow", hidden: true },
+			{ type: "blur" },
+		]);
+		fireEvent.click(screen.getByRole("button", { name: "Shadow 1 visible" }));
+		expect(el(c, "0/0").effects?.[0]).not.toHaveProperty("hidden");
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("an edit moves legacy effects into effects", () => {
+		const t = doc();
+		Object.assign(getElement(t, "0/0") as Element, {
+			shadow: { color: "#000000", dx: 1, dy: 2, blur: 3 },
+			blur: 4,
+		});
+		const c = setup(["0/0"], t);
+		fireEvent.click(screen.getByRole("button", { name: "Remove layer blur" }));
+		const e = el(c, "0/0");
+		expect(e.effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 1, dy: 2, blur: 3 },
+		]);
+		expect(e.shadow).toBeUndefined();
+		expect(e.blur).toBeUndefined();
+		expect(validate(c.template).ok).toBe(true);
 	});
 
 	it("positions an image's stroke outside", () => {
