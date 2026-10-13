@@ -14,15 +14,9 @@ import {
 	writeComposite,
 	writeSimple,
 } from "./glyf";
+import { assemble, type Tables } from "../sfnt-write";
 import { tagAt } from "./sfnt";
-import {
-	assemble,
-	get,
-	glyfReader,
-	layoutGlyf,
-	readTables,
-	type Tables,
-} from "./subset";
+import { get, glyfReader, layoutGlyf, readTables } from "./subset";
 
 const DROPPED = ["fvar", "gvar", "avar", "HVAR", "VVAR", "MVAR", "STAT", "cvar"];
 

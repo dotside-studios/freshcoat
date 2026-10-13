@@ -136,9 +136,8 @@ covers shared checks and pull requests.
 - A path drawn with the pen can't have its points edited on the canvas
   afterwards; its path data is edited in the inspector.
 - Boolean operations keep their shapes as operands until the layer is
-  flattened, and corner smoothing is left out of the result. An operand edited
-  in a variant is combined for that variant only; the layer's saved path is
-  the base template's result.
+  flattened. An operand edited in a variant is combined for that variant
+  only; the layer's saved path is the base template's result.
 - Holding Alt while dragging duplicates the selection. The copies show in the
   layer tree only when the drag ends.
 - The Zip file and Folder destinations need the File System Access API.

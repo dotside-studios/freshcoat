@@ -9,10 +9,10 @@
 import type { CanvasKit, GlyphRun, Typeface } from "canvaskit-wasm";
 import { fontArrayBuffer } from "../font-bytes";
 import type { FontVariations } from "../types";
+import { sfntBytes } from "../woff";
 import { instanceFont } from "./instance";
 import { readSfnt, type SfntInfo } from "./sfnt";
 import { subsetFont } from "./subset";
-import { unwrapWoff } from "./woff";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 
 export type FontFile = {
@@ -38,19 +38,6 @@ export type FaceRequest = {
 	italic: boolean;
 	variations?: FontVariations;
 };
-
-// Each font file as an sfnt where it is a WOFF or WOFF2 file that unwraps.
-export async function unwrapFonts(
-	byFamily: Map<string, Uint8Array[]>,
-): Promise<Map<string, Uint8Array[]>> {
-	const out = new Map<string, Uint8Array[]>();
-	for (const [family, list] of byFamily)
-		out.set(
-			family,
-			await Promise.all(list.map(async (b) => (await unwrapWoff(b)) ?? b)),
-		);
-	return out;
-}
 
 export class FontEmbedder {
 	private files = new Map<string, FontFile[]>();
@@ -175,16 +162,25 @@ export class FontEmbedder {
 				const typeface = this.ck.Typeface.MakeTypefaceFromData(
 					fontArrayBuffer(bytes),
 				);
+				const sfnt = unpack(bytes);
 				list.push({
 					registered,
-					bytes,
-					info: readSfnt(bytes),
+					bytes: sfnt,
+					info: readSfnt(sfnt),
 					family: typeface?.getFamilyName() ?? registered,
 					typeface,
 				});
 			}
 		}
 		return list;
+	}
+}
+
+function unpack(bytes: Uint8Array): Uint8Array {
+	try {
+		return sfntBytes(bytes);
+	} catch {
+		return bytes;
 	}
 }
 

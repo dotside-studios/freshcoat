@@ -55,7 +55,7 @@ import type {
 	Stroke,
 	TextLine,
 } from "../types";
-import { FontEmbedder, type FontFile, unwrapFonts } from "./fonts";
+import { FontEmbedder, type FontFile } from "./fonts";
 import { cm, type Matrix, outlineOps, pathOps, rotateAbout } from "./geometry";
 import {
 	name,
@@ -314,7 +314,6 @@ export async function paintPdf(
 	};
 	for (const [src, bytes] of [...sources]) await prepare(src, bytes, 0);
 
-	const embeddable = await unwrapFonts(byFamily);
 	const shared = createSharedFontProvider(ck, loaded);
 	(shared.provider as { __families?: string[] }).__families = [
 		...new Set(loaded.map((f) => f.family)),
@@ -326,7 +325,7 @@ export async function paintPdf(
 		shared.provider,
 		bin,
 		writer,
-		new FontEmbedder(ck, embeddable, writer),
+		new FontEmbedder(ck, byFamily, writer),
 		sources,
 		svgScenes,
 		warnings,

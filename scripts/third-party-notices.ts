@@ -72,6 +72,10 @@ const LICENSE_FILE_FROM: Record<
 	string,
 	{ from?: string; file?: string; why: string }
 > = {
+	brotli: {
+		file: "legal/third-party/brotli-LICENSE",
+		why: "declared MIT by its package.json and README, by Devon Govett, whose 2.1.0 npm archive and repository include no license file",
+	},
 	"client-only": {
 		from: "react",
 		why: "published by the React team from the React repository, under React's license",

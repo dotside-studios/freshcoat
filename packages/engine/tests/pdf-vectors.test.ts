@@ -16,9 +16,9 @@ import {
 } from "../src/node";
 import { instanceFont } from "../src/pdf/instance";
 import { readSfnt } from "../src/pdf/sfnt";
-import { unwrapWoff } from "../src/pdf/woff";
 import { createRenderer, type Renderer } from "../src/renderer";
 import type { GradientFill } from "../src/types";
+import { sfntBytes } from "../src/woff";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
@@ -283,18 +283,8 @@ describe("text in WOFF and variable fonts", () => {
 		line("Vend", 700, "Bold instance", 82),
 	]);
 
-	test("unwraps WOFF and WOFF2 to the font they hold", async () => {
-		const sfnt = await unwrapWoff(woff1(geist));
-		expect(sfnt).not.toBeNull();
-		expect(readSfnt(sfnt as Uint8Array)?.outlines).toBe("truetype");
-		const unwrapped = await unwrapWoff(vend);
-		const info = readSfnt(unwrapped as Uint8Array);
-		expect(info?.axes.map((a) => a.tag)).toEqual(["wght"]);
-		expect(await unwrapWoff(geist)).toBeNull();
-	});
-
-	test("fixes a variable font at an instance", async () => {
-		const unwrapped = (await unwrapWoff(vend)) as Uint8Array;
+	test("fixes a variable font at an instance", () => {
+		const unwrapped = sfntBytes(vend);
 		const bold = instanceFont(unwrapped, { wght: 700 }) as Uint8Array;
 		const light = readSfnt(unwrapped);
 		const info = readSfnt(bold);

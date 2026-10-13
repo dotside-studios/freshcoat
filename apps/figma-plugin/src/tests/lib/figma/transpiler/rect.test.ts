@@ -383,6 +383,15 @@ describe("transpileRect strokes and corners", () => {
 		expect(el.properties.cornerSmoothing).toBe(0.6);
 	});
 
+	it("emits corner smoothing with per-corner radii", () => {
+		const el = transpileRect(
+			baseRect({ cornerRadius: [12, 0, 24, 4], cornerSmoothing: 0.6 }),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties.cornerRadius).toEqual([12, 0, 24, 4]);
+		expect(el.properties.cornerSmoothing).toBe(0.6);
+	});
+
 	it("omits corner smoothing without a corner radius", () => {
 		const el = transpileRect(baseRect({ cornerSmoothing: 0.6 }), {
 			frame: FRAME,

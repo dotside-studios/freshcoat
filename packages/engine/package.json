@@ -28,7 +28,9 @@
 		"conformance:regen": "bun run conformance/src/author-cases.ts && bun run conformance/src/generate-goldens.ts"
 	},
 	"dependencies": {
-		"canvaskit-wasm": "0.41.1"
+		"brotli": "^2.1.0",
+		"canvaskit-wasm": "0.41.1",
+		"fflate": "^0.8.3"
 	},
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",

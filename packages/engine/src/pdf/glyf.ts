@@ -1,5 +1,5 @@
-// Reading and writing TrueType glyph records, for the decoders that rebuild a
-// glyf table: WOFF2's transformed glyf and a variable font's instance.
+// Reading and writing TrueType glyph records, for rebuilding a glyf table at a
+// variable font's instance.
 
 import { concat } from "./subset";
 

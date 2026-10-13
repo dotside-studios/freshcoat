@@ -622,18 +622,6 @@ function shapeWarnings(n: FigmaNode, warnings: TemplateWarning[]): void {
 			message: `Layer "${n.name}" has a different stroke weight per side, so its stroke was dropped.`,
 			nodeId: n.id,
 		});
-	if (
-		isRectangleNode(n) &&
-		Array.isArray(n.cornerRadius) &&
-		n.cornerRadius.some((c) => c > 0) &&
-		n.cornerSmoothing
-	)
-		warnings.push({
-			severity: "warn",
-			code: "corner_smoothing_unsupported",
-			message: `Layer "${n.name}" has different corner radii, so its corner smoothing is ignored.`,
-			nodeId: n.id,
-		});
 }
 
 // A layer named `if:{{field}}` shows only while the field is set. Everything
