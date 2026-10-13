@@ -13,6 +13,7 @@ import {
 	collectSetting,
 	parseJobs,
 	parseLength,
+	parseOffset,
 	parsePaper,
 	parsePositive,
 	parseQuality,
@@ -165,6 +166,12 @@ function program(io: Io, onCommand: (name: string) => void) {
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
 		.option("--no-crop-marks", "leave out the crop marks")
 		.option(
+			"--back-offset <x,y>",
+			"with --duplex, move every back page this many mm, for a printer that drifts; y is down",
+			arg(parseOffset),
+		)
+		.option("--blank-backs", "with --duplex, give a one-sided template empty back pages")
+		.option(
 			"--output-intent <file>",
 			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
 		)
@@ -172,6 +179,17 @@ function program(io: Io, onCommand: (name: string) => void) {
 		.option(
 			"--output-intent-id <name>",
 			"the condition --output-intent describes, such as FOGRA39; default the profile's description",
+		)
+		.optionsGroup("Print options:")
+		.addOption(
+			new Option(
+				"--print-target <target>",
+				"correct the cards for this printer, as a preset's print target does; default none",
+			).choices(["none", "ymcko"] as const),
+		)
+		.option(
+			"--print-profile <file>",
+			"with --print-target, a measured printer profile, as Studio saves it",
 		)
 		.optionsGroup("Workspace options:")
 		.option(

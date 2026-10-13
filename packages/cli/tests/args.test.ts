@@ -6,6 +6,7 @@ import {
 	collectSetting,
 	parseJobs,
 	parseLength,
+	parseOffset,
 	parsePaper,
 	parseQuality,
 } from "../src/args";
@@ -21,6 +22,7 @@ describe("argument parsers", () => {
 		expect(parseQuality("0")).toBe(0);
 		expect(parseJobs("3")).toBe(3);
 		expect(parseLength("0")).toBe(0);
+		expect(parseOffset("-1.5, 2")).toEqual({ x: -1.5, y: 2 });
 		expect(parsePaper("A4")).toBe("a4");
 		expect(parsePaper("297x210")).toEqual({ widthMm: 210, heightMm: 297 });
 	});
@@ -33,6 +35,9 @@ describe("argument parsers", () => {
 			[() => parseQuality("101"), "Expected a whole number from 0 to 100."],
 			[() => parseJobs("1.5"), "Expected a whole number, 1 or more."],
 			[() => parseLength("-1"), "Expected millimetres, 0 or more."],
+			[() => parseOffset("1"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
+			[() => parseOffset("1,"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
+			[() => parseOffset("1,2,3"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
 			[() => parsePaper("b5"), "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres."],
 		];
 		for (const [parse, message] of refusals) {

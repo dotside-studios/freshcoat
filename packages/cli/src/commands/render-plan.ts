@@ -24,12 +24,15 @@ const PDF_OPTIONS = [
 	"margin",
 	"gap",
 	"cropMarks",
+	"backOffset",
+	"blankBacks",
 	"outputIntent",
 	"noOutputIntent",
 	"outputIntentId",
 	"cutLines",
 ];
-const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
+const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks", "backOffset", "blankBacks"];
+const DUPLEX_OPTIONS = ["backOffset", "blankBacks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
 
 /** What `render` runs for `file` and these options, or the UsageError that
@@ -73,7 +76,9 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	const exporting = rest.pieces || rest.cut || rest.cutLines;
+	if (rest.printProfile !== undefined && (rest.printTarget ?? "none") === "none")
+		throw new UsageError("--print-profile needs --print-target ymcko");
+	const exporting = rest.pieces || rest.cut || rest.cutLines || rest.printTarget !== undefined;
 	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)
@@ -140,6 +145,9 @@ function exportProblem(
 	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));
 	if (sheetOnly.length > 0 && !given.includes("sheets"))
 		return listed(sheetOnly, "needs --sheets", "need --sheets");
+	const duplexOnly = given.filter((key) => DUPLEX_OPTIONS.includes(key));
+	if (duplexOnly.length > 0 && !given.includes("duplex"))
+		return listed(duplexOnly, "needs --duplex", "need --duplex");
 	if (options.quality !== undefined) {
 		if (pdf && options.pdfPages !== "jpeg") return "--quality needs --pdf-pages jpeg";
 		if (!pdf && (options.format === undefined || options.format === "png"))

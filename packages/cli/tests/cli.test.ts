@@ -1820,3 +1820,137 @@ describe("render slice pieces", () => {
 		expect(run.stderr).toContain("Pieces need PNG or JPEG pages, not vector");
 	});
 });
+
+describe("render print options", () => {
+	const profile = { version: 1 as const, name: "Shop printer", target: "ymcko-dye-sub", balance: { r: 1.1, g: 1, b: 0.9 } };
+	const layout = { ...DEFAULT_SHEET_LAYOUT, paper: "a4" as const, duplex: "long-edge" as const };
+
+	beforeAll(async () => {
+		await box.write("printing.csv", "name\nAna\nBen\n");
+		await box.write("printer.json", JSON.stringify(profile));
+		const workspace = workspaceOf(card());
+		const base = workspace.presets[0] as Workspace["presets"][number];
+		workspace.presets = [
+			{ ...base, id: "p_print", print: { enabled: true, profile } },
+			{ ...base, id: "p_offset", format: "pdf", layout: { ...layout, backOffsetMm: { x: 1.5, y: -2 } } },
+			{ ...base, id: "p_blank", format: "pdf", sides: ["front"], layout: { ...layout, blankBacks: true } },
+		];
+		await box.write("printing.coatworkspace", await workspaceBytes(workspace));
+	});
+
+	async function images(path: string): Promise<Record<string, Uint8Array>> {
+		const zip = unzipSync(new Uint8Array(await readFile(box.path(path))));
+		delete zip[REPORT_FILE_NAME];
+		return zip;
+	}
+
+	async function pages(path: string): Promise<string[]> {
+		const pdf = await PDFDocument.load(await readFile(box.path(path)));
+		return pdf.getPages().map((page) => {
+			const { width, height } = page.getMediaBox();
+			const contents = page.node.Contents();
+			const streams = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
+			const text = streams
+				.map((ref) => pdf.context.lookup(ref) as PDFRawStream)
+				.map((stream) => new TextDecoder().decode(decodePDFRawStream(stream).decode()))
+				.join("\n");
+			return `${Math.round(width)}x${Math.round(height)}\n${text}`;
+		});
+	}
+
+	const template = ["render", "badge.json", "--data", "printing.csv", "--name", "{{index}}-{{side}}", "-q"];
+	const preset = (id: string, out: string) =>
+		box.run("render", "printing.coatworkspace", "--preset", id, "--out", out, "-q");
+
+	test("corrects for the printer as a preset's print target and profile do", async () => {
+		const runs = [
+			await box.run(...template, "--print-target", "ymcko", "--print-profile", "printer.json", "--out", "print.zip"),
+			await preset("p_print", "print-preset.zip"),
+			await box.run(...template, "--print-target", "none", "--out", "plain.zip"),
+		];
+		expect(runs.map((run) => run.code)).toEqual([0, 0, 0]);
+		const [printed, fromPreset, plain] = [
+			await images("print.zip"),
+			await images("print-preset.zip"),
+			await images("plain.zip"),
+		];
+		expect(Object.keys(printed).sort()).toEqual(["1-back.png", "1-front.png", "2-back.png", "2-front.png"]);
+		for (const [name, bytes] of Object.entries(printed)) {
+			expect(fromPreset[name]).toEqual(bytes);
+			expect(plain[name]).not.toEqual(bytes);
+		}
+		const report = unzipSync(new Uint8Array(await readFile(box.path("print.zip"))))[REPORT_FILE_NAME];
+		expect(new TextDecoder().decode(report).split("\n")[1]).toContain(",on,");
+	});
+
+	test("writes corrected images into the --out directory on its own", async () => {
+		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko", "--out", "print-dir", "-q");
+		expect(run.code).toBe(0);
+		expect((await readdir(box.path("print-dir"))).sort()).toEqual(["export-report.csv", "front.png"]);
+	});
+
+	test("moves the backs as a preset's back offset does", async () => {
+		const sheets = ["--sheets", "a4", "--duplex", "long", "--out"];
+		const runs = [
+			await box.run(...template, ...sheets, "offset.pdf", "--back-offset", "1.5,-2"),
+			await preset("p_offset", "offset-preset.pdf"),
+			await box.run(...template, ...sheets, "no-offset.pdf"),
+		];
+		expect(runs.map((run) => run.code)).toEqual([0, 0, 0]);
+		const offset = await pages("offset.pdf");
+		expect(offset).toHaveLength(2);
+		expect(await pages("offset-preset.pdf")).toEqual(offset);
+		const still = await pages("no-offset.pdf");
+		expect(still[0]).toEqual(offset[0]);
+		expect(still[1]).not.toEqual(offset[1]);
+	});
+
+	test("gives a one-sided template blank backs as a preset does", async () => {
+		const sheets = ["--frame", "front", "--sheets", "a4", "--duplex", "long", "--out"];
+		const runs = [
+			await box.run(...template, ...sheets, "blank.pdf", "--blank-backs"),
+			await preset("p_blank", "blank-preset.pdf"),
+			await box.run(...template, ...sheets, "fronts.pdf"),
+		];
+		expect(runs.map((run) => run.code)).toEqual([0, 0, 0]);
+		const blank = await pages("blank.pdf");
+		expect(blank).toHaveLength(2);
+		expect(await pages("blank-preset.pdf")).toEqual(blank);
+		expect(await pages("fronts.pdf")).toHaveLength(1);
+	});
+
+	test("warns about a profile measured on another target", async () => {
+		await box.write("other.json", JSON.stringify({ ...profile, target: "thermal" }));
+		const run = await box.run("render", "badge.json", "--print-target", "ymcko", "--print-profile", "other.json", "--out", "other.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"--print-profile other.json was measured on thermal, not Card printer (YMCKO dye-sub)",
+		);
+	});
+
+	test("refuses a file that is not a print profile", async () => {
+		await box.write("cast.json", JSON.stringify({ ...profile, balance: { r: 9, g: 1, b: 1 } }));
+		const run = await box.run("render", "badge.json", "--print-target", "ymcko", "--print-profile", "cast.json", "--out", "cast.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("--print-profile cast.json: balance.r is 9, outside the");
+	});
+
+	test("refuses print and back options that do not fit", async () => {
+		const cases: [string[], string][] = [
+			[["badge.json", "--back-offset", "1,2", "--out", "x.zip"], "--back-offset applies only to a .pdf"],
+			[["badge.json", "--blank-backs", "--out", "x.pdf"], "--blank-backs needs --sheets"],
+			[["badge.json", "--back-offset", "1,2", "--blank-backs", "--sheets", "a4", "--out", "x.pdf"], "--back-offset, --blank-backs need --duplex"],
+			[["badge.json", "--back-offset", "1", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf"], "Expected <x>,<y> in millimetres, such as 0.5,-1"],
+			[["badge.json", "--blank-backs"], "--blank-backs needs --data or a .zip or .pdf --out"],
+			[["badge.json", "--print-profile", "printer.json", "--out", "x.zip"], "--print-profile needs --print-target ymcko"],
+			[["badge.json", "--print-target", "none", "--print-profile", "printer.json"], "--print-profile needs --print-target ymcko"],
+			[["badge.json", "--print-target", "cmyk"], "Allowed choices are none, ymcko"],
+			[["printing.coatworkspace", "--preset", "p_print", "--print-target", "ymcko", "--out", "x.zip"], "--print-target applies only to templates"],
+		];
+		for (const [argv, message] of cases) {
+			const run = await box.run("render", ...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code: 2 });
+			expect(run.stderr).toContain(message);
+		}
+	});
+});

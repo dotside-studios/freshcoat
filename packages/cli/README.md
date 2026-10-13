@@ -151,6 +151,10 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
 | `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
 | `--no-crop-marks` | with `--sheets`: leave out the crop marks |
+| `--back-offset <x,y>` | with `--sheets` and `--duplex`: move every back page this many millimetres, for a printer that drifts; `y` is measured down the page, so `0.5,-1` moves the backs right and up |
+| `--blank-backs` | with `--sheets` and `--duplex`: give a one-sided template empty back pages, so every front lands on a front side |
+| `--print-target <none\|ymcko>` | correct the cards for a YMCKO dye-sublimation card printer, as an export preset's print target does in Studio; default `none` |
+| `--print-profile <file>` | with `--print-target ymcko`: a measured printer profile, the JSON Studio saves from Measure |
 | `--output-intent <file>` | PDF only: declare this ICC profile, such as the print shop's FOGRA39 or GRACoL CMYK profile, as the PDF's output intent in place of sRGB. The cards stay RGB, tagged sRGB; the intent tells the printer what to convert them to |
 | `--output-intent-id <name>` | with `--output-intent`: the condition's identifier, such as `FOGRA39`; default the profile's description |
 | `--no-output-intent` | PDF only: declare no output intent and leave RGB untagged |
@@ -165,6 +169,22 @@ carries its own output intent, set in Studio.
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \
   --output-intent PSOcoated_v3.icc --output-intent-id FOGRA51 --out print.pdf
+```
+
+`--print-target ymcko` runs each card through the card printer path of
+[for-print](../for-print/README.md), as a preset with that print target does:
+each photo is corrected from its own analysis, near-black and near-white snap to
+the ribbon's black and white, and a `--print-profile` adds the cast its
+measurement found. A card the path fails on is written uncorrected, and the
+report's `print` column says `fallback`. A profile measured on another target
+warns. On its own, `--print-target` exports into the `--out` directory, the
+current one by default, with a report.
+
+```sh
+freshcoat render member.coat --data members.csv --print-target ymcko \
+  --print-profile shop-printer.json --out cards
+freshcoat render member.coat --data members.csv --sheets letter --duplex long \
+  --back-offset 0.5,-1 --out duplex.pdf
 ```
 
 `--pieces` splits a frame on the `slice` shapes of a template (see Slices in the
