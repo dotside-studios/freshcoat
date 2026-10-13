@@ -645,6 +645,8 @@ const elementShellShape = {
 	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),
+	// Kept in the file but not drawn; a variant delta's `hidden: false` shows it.
+	hidden: z.boolean().optional(),
 	// Several conditions must all hold.
 	visibleWhen: z
 		.union([VisibilityConditionSchema, z.array(VisibilityConditionSchema)])
@@ -775,7 +777,8 @@ export const VariantSchema = z.object({
 						size: SizeSchema.optional(),
 						rotation: z.number().optional(),
 						opacity: z.number().min(0).max(1).optional(),
-						// Leaves the element out of the variant.
+						// `true` leaves the element out of the variant; `false` shows one
+						// the base hides.
 						hidden: z.boolean().optional(),
 					}),
 				)
