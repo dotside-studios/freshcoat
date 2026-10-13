@@ -16,6 +16,7 @@ import type {
 	SheetLayout,
 	Workspace,
 } from "../types";
+import { boundDataset } from "../view";
 import {
 	assetsByRef,
 	type ItemRenderer,
@@ -233,8 +234,7 @@ export function boundDatasetOf(
 	preset: ExportPreset,
 ): Dataset | undefined {
 	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	const id = entry?.binding?.datasetId;
-	return id ? workspace.datasets.find((d) => d.id === id) : undefined;
+	return boundDataset(entry?.binding, workspace.datasets);
 }
 
 /** The pixel count of the largest photo the preset's items use, as stored,

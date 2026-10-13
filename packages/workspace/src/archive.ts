@@ -49,7 +49,10 @@ export const WORKSPACE_FORMAT_VERSION = "1.0";
 /** The version a workspace is written at when it uses a variant fallback,
  *  which a reader of 1.0 drops. */
 const FALLBACK_FORMAT_VERSION = "1.1";
-const READ_MINOR = 1;
+/** The version a workspace is written at when a binding has a view, which
+ *  a reader of 1.1 drops. */
+const VIEW_FORMAT_VERSION = "1.2";
+const READ_MINOR = 2;
 
 const MIMETYPE_ENTRY = "mimetype";
 const MANIFEST_ENTRY = "workspace.json";
@@ -99,6 +102,26 @@ const ImageVariantSchema = z.object({
 	field: z.string(),
 });
 
+const ViewSchema = z.object({
+	filters: z.array(
+		z.object({
+			column: z.string(),
+			op: z.enum(["equals", "contains", "empty", "lt", "lte", "gt", "gte"]),
+			value: z.string().optional(),
+			not: z.boolean().optional(),
+		}),
+	),
+	join: z
+		.object({
+			datasetId: z.string(),
+			on: z.string(),
+			key: z.string(),
+			prefix: z.string(),
+			inner: z.boolean().optional(),
+		})
+		.optional(),
+});
+
 const BindingSchema = z.object({
 	datasetId: z.string(),
 	fields: z.record(z.string(), FieldSourceSchema),
@@ -116,6 +139,7 @@ const BindingSchema = z.object({
 			ImageVariantSchema,
 		])
 		.optional(),
+	view: ViewSchema.optional(),
 });
 
 const LayoutSchema = z.discriminatedUnion("kind", [
@@ -260,15 +284,23 @@ function templatePath(entry: TemplateEntry): string {
 	return `templates/${entry.id}${COAT_EXTENSION}`;
 }
 
-function manifestOf(ws: Workspace): WorkspaceManifest {
-	return {
-		format: WORKSPACE_FORMAT,
-		formatVersion: ws.templates.some(
+function formatVersionOf(ws: Workspace): string {
+	if (ws.templates.some((t) => t.binding?.view !== undefined))
+		return VIEW_FORMAT_VERSION;
+	if (
+		ws.templates.some(
 			(t) =>
 				t.binding?.variant?.kind === "column" && t.binding.variant.fallback,
 		)
-			? FALLBACK_FORMAT_VERSION
-			: WORKSPACE_FORMAT_VERSION,
+	)
+		return FALLBACK_FORMAT_VERSION;
+	return WORKSPACE_FORMAT_VERSION;
+}
+
+function manifestOf(ws: Workspace): WorkspaceManifest {
+	return {
+		format: WORKSPACE_FORMAT,
+		formatVersion: formatVersionOf(ws),
 		name: ws.name,
 		templates: ws.templates.map((entry) => ({
 			id: entry.id,

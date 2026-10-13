@@ -160,6 +160,20 @@ export {
 } from "./status";
 export type * from "./types";
 export {
+	applyView,
+	bindingView,
+	boundDataset,
+	emptyView,
+	FILTER_OPS,
+	filterTest,
+	formatFilter,
+	isEmptyView,
+	keyText,
+	parseFilter,
+	type ViewResult,
+	withView,
+} from "./view";
+export {
 	blobOutput,
 	createZipWriter,
 	streamOutput,

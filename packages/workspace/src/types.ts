@@ -109,11 +109,54 @@ export type VariantFallback = Extract<
 	{ kind: "fixed" } | { kind: "image" }
 >;
 
+/** How a filter compares a cell with its value. `lt`, `lte`, `gt` and `gte`
+ *  apply to number, integer and date columns; `empty` takes no value. */
+export type FilterOp =
+	| "equals"
+	| "contains"
+	| "empty"
+	| "lt"
+	| "lte"
+	| "gt"
+	| "gte";
+
+export type ViewFilter = {
+	column: string;
+	op: FilterOp;
+	/** as typed: a number, a date or text, read for the column's type */
+	value?: string;
+	/** keeps the records the condition does not match */
+	not?: boolean;
+};
+
+/** A second dataset's columns added to each record whose `on` cell equals
+ *  a `key` cell of that dataset, compared as trimmed text. */
+export type ViewJoin = {
+	datasetId: string;
+	/** column of the bound dataset */
+	on: string;
+	/** column of the joined dataset */
+	key: string;
+	/** put before each joined column's key */
+	prefix: string;
+	/** a record with no match is dropped, rather than kept with the joined
+	 *  cells empty; default false */
+	inner?: boolean;
+};
+
+/** The records a binding reads: the bound dataset, joined to a second one,
+ *  then the records every filter matches. */
+export type DatasetView = {
+	filters: ViewFilter[];
+	join?: ViewJoin;
+};
+
 export type Binding = {
 	datasetId: string;
 	/** template field key -> source; absent = the field's default */
 	fields: Record<string, FieldSource>;
 	variant?: VariantSource;
+	view?: DatasetView;
 };
 
 /** Ruler guides on one side, in template units: vertical guides at `x`,

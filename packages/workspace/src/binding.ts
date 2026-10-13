@@ -17,6 +17,7 @@ import type {
 	FieldSource,
 	VariantSource,
 } from "./types";
+import { boundDataset } from "./view";
 
 /** A dataset's columns by key, the first of any that share one. */
 export function columnsByKey(dataset: Dataset): Map<string, Column> {
@@ -426,6 +427,5 @@ export function unfilledRequired(
 	datasets: readonly Dataset[],
 ): string[] {
 	if (!readsDataset(binding)) return [];
-	const dataset = datasets.find((d) => d.id === binding.datasetId);
-	return unmatchedRequired(template, binding, dataset);
+	return unmatchedRequired(template, binding, boundDataset(binding, datasets));
 }
