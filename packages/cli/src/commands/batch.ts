@@ -66,6 +66,7 @@ export type BatchOptions = {
 	bleed?: true;
 	dpi?: number;
 	pdfPages?: "png" | "jpeg" | "vector";
+	pdfText?: "embed" | "outline";
 	sheets?: PaperName | { widthMm: number; heightMm: number };
 	duplex?: "long" | "short";
 	margin?: number;
@@ -159,6 +160,7 @@ export async function renderBatch(
 		...(options.cutLines ? { cutLines: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
+		...(options.pdfText ? { pdfText: options.pdfText } : {}),
 		...(profile
 			? { outputIntent: { kind: "profile", sha256: profile.sha256 } }
 			: options.outputIntent === false

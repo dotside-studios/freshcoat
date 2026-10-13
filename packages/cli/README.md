@@ -148,6 +148,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--cut-lines` | PDF only: draw the cut lines over each page's art; see below |
 | `--dpi <n>` | PDF only: pixels per inch, which sets the page or card size; default 300 |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
+| `--pdf-text <embed\|outline>` | with `--pdf-pages vector`: `embed` sets text in its fonts, selectable; `outline` draws each glyph as a shape, so the PDF holds no font, as print shops that want outlined text ask. Default `embed`. See [Text as outlines](../engine/README.md#text-as-outlines) |
 | `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `a5`, `a6`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper, in whichever orientation fits more |
 | `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
 | `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
@@ -168,6 +169,10 @@ carries its own output intent, set in Studio.
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \
   --output-intent PSOcoated_v3.icc --output-intent-id FOGRA51 --out print.pdf
+```
+
+```sh
+freshcoat render card.coat --dpi 300 --pdf-pages vector --pdf-text outline --out card.pdf
 ```
 
 `--pieces` splits a frame on the `slice` shapes of a template (see Slices in the

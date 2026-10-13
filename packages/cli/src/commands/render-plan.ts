@@ -19,6 +19,7 @@ const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
 	"pdfPages",
+	"pdfText",
 	"sheets",
 	"duplex",
 	"margin",
@@ -120,7 +121,7 @@ function exportProblem(
 	given: string[],
 	options: Pick<
 		RenderInput,
-		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "outputIntent" | "pieces" | "cut"
+		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "pdfText" | "outputIntent" | "pieces" | "cut"
 	>,
 	out: string,
 ): string | undefined {
@@ -137,6 +138,8 @@ function exportProblem(
 	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
 	if (!pdf && pdfOnly.length > 0)
 		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");
+	if (options.pdfText !== undefined && options.pdfPages !== "vector")
+		return "--pdf-text needs --pdf-pages vector";
 	if (given.includes("outputIntentId") && typeof options.outputIntent !== "string")
 		return "--output-intent-id needs --output-intent <file>";
 	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));

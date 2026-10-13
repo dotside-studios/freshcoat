@@ -151,6 +151,12 @@ function program(io: Io, onCommand: (name: string) => void) {
 				"vector",
 			] as const),
 		)
+		.addOption(
+			new Option(
+				"--pdf-text <mode>",
+				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
+			).choices(["embed", "outline"] as const),
+		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
 			"--sheets <paper>",

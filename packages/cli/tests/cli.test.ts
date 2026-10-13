@@ -807,6 +807,25 @@ describe("render export options", () => {
 		expect(await mediaBoxes(await readFile(box.path("dpi.pdf")))).toEqual(["0 0 200 100"]);
 	});
 
+	test("draws vector pages' text as outlines, with no font", async () => {
+		const fonts = async (path: string) => {
+			const pdf = await PDFDocument.load(await readFile(box.path(path)));
+			return pdf.context
+				.enumerateIndirectObjects()
+				.filter(
+					([, obj]) =>
+						obj instanceof PDFDict && obj.get(PDFName.of("Type")) === PDFName.of("Font"),
+				).length;
+		};
+		const base = ["render", "badge.json", "--frame", "front", "--dpi", "300", "--pdf-pages", "vector"];
+		expect((await box.run(...base, "--out", "embedded.pdf", "-q")).code).toBe(0);
+		expect(await fonts("embedded.pdf")).toBeGreaterThan(0);
+		const run = await box.run(...base, "--pdf-text", "outline", "--out", "outlined.pdf", "-q");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe("");
+		expect(await fonts("outlined.pdf")).toBe(0);
+	});
+
 	test("lays cards out on sheets", async () => {
 		const run = await box.run(
 			"render",
@@ -968,6 +987,7 @@ describe("render export options", () => {
 			[["badge.json", "--name", "x", "--out", "dir"], "--name needs --data or a .zip or .pdf --out"],
 			[["badge.json", "--bleed", "--quality", "50"], "--bleed, --quality need --data or a .zip or .pdf --out"],
 			[["badge.json", "--dpi", "72", "--out", "x.zip"], "--dpi applies only to a .pdf"],
+			[["badge.json", "--pdf-text", "outline", "--out", "x.pdf"], "--pdf-text needs --pdf-pages vector"],
 			[["badge.json", "--duplex", "long", "--out", "x.pdf"], "--duplex needs --sheets"],
 			[["badge.json", "--no-crop-marks", "--margin", "2", "--out", "x.pdf"], "--no-crop-marks, --margin need --sheets"],
 			[["badge.json", "--quality", "50", "--out", "x.zip"], "--quality needs --format jpeg or webp"],
