@@ -7,6 +7,8 @@ import {
 	createPrintProfile,
 	parsePrintProfile,
 	profileCacheKey,
+	profileMedia,
+	profileTarget,
 } from "../src/profile";
 
 const neutralReading = (): ChartReading => {
@@ -194,5 +196,57 @@ describe("profileCacheKey", () => {
 	test("no profile and an unmeasured profile share the one key", () => {
 		expect(profileCacheKey(undefined)).toBe("none");
 		expect(profileCacheKey({ name: "p" })).toBe("none");
+	});
+});
+
+describe("target and media", () => {
+	test("a profile without a target reads as YMCKO dye-sub", () => {
+		const result = parsePrintProfile({ name: "p" });
+		if (!result.ok) throw new Error(result.message);
+		expect(result.profile.target).toBeUndefined();
+		expect(profileTarget(result.profile)).toBe("ymcko-dye-sub");
+	});
+
+	test("keeps the target it was measured on", () => {
+		const result = parsePrintProfile({ name: "p", target: "some-laser" });
+		if (!result.ok) throw new Error(result.message);
+		expect(result.profile.target).toBe("some-laser");
+		expect(profileTarget(result.profile)).toBe("some-laser");
+	});
+
+	test("refuses an empty target", () => {
+		const result = parsePrintProfile({ name: "p", target: " " });
+		expect(result).toMatchObject({ ok: false });
+	});
+
+	test("reads media, and ribbon from older profiles", () => {
+		const media = parsePrintProfile({
+			name: "p",
+			conditions: { media: "toner set 2" },
+		});
+		if (!media.ok) throw new Error(media.message);
+		expect(media.profile.conditions).toEqual({ media: "toner set 2" });
+		expect(profileMedia(media.profile.conditions)).toBe("toner set 2");
+
+		const ribbon = parsePrintProfile({
+			name: "p",
+			conditions: { ribbon: "batch A" },
+		});
+		if (!ribbon.ok) throw new Error(ribbon.message);
+		expect(profileMedia(ribbon.profile.conditions)).toBe("batch A");
+		expect(profileMedia(undefined)).toBeUndefined();
+	});
+
+	test("createPrintProfile records the target and media", () => {
+		const result = createPrintProfile(neutralReading(), {
+			name: "p",
+			target: "ymcko-dye-sub",
+			conditions: { media: "batch A" },
+		});
+		if (!result.ok) throw new Error("profile was not created");
+		expect(result.profile).toMatchObject({
+			target: "ymcko-dye-sub",
+			conditions: { media: "batch A" },
+		});
 	});
 });

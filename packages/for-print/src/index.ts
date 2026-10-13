@@ -49,8 +49,17 @@ export {
 	type PrintProfileParse,
 	parsePrintProfile,
 	profileCacheKey,
+	profileMedia,
+	profileTarget,
 	UNMEASURED_PROFILE,
 } from "./profile";
+export {
+	DEFAULT_PRINT_TARGET,
+	PRINT_TARGETS,
+	type PrintTarget,
+	printTarget,
+	YMCKO_DYE_SUB,
+} from "./target";
 export type {
 	CardOrientation,
 	ChannelBalance,
