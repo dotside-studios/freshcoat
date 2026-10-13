@@ -169,6 +169,7 @@ export {
 	imageFormat,
 	pdfLayout,
 	pdfRenderScale,
+	presetImageDpi,
 	planExport,
 	unknownFileNameTokens,
 } from "./plan";

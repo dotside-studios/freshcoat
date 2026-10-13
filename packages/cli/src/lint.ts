@@ -1,6 +1,4 @@
 import {
-	DEFAULT_IMAGE_DPI_UNITS,
-	DEFAULT_MIN_IMAGE_DPI,
 	type ImageDpiOptions,
 	type Template,
 	templateHints,
@@ -8,6 +6,7 @@ import {
 } from "@freshcoat-js/coatfile";
 import {
 	bindingView,
+	presetImageDpi,
 	readsDataset,
 	unfilledRequired,
 	type Workspace,
@@ -48,20 +47,6 @@ function andList(items: readonly string[]): string {
 		: `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-/** The check a workspace template gets: its presets' lowest DPI and highest
- *  minimum, unless the command line names them. */
-function presetDpiCheck(workspace: Workspace, templateId: string, given: DpiCheck): DpiCheck {
-	const presets = workspace.presets.filter((preset) => preset.templateId === templateId);
-	return {
-		dpi: given.dpi ?? (presets.length > 0 ? Math.min(...presets.map((p) => p.dpi)) : DEFAULT_IMAGE_DPI_UNITS),
-		min:
-			given.min ??
-			(presets.length > 0
-				? Math.max(...presets.map((p) => p.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI))
-				: DEFAULT_MIN_IMAGE_DPI),
-	};
-}
-
 export function workspaceFindings(workspace: Workspace, dpi: DpiCheck = {}): Findings {
 	const errors: string[] = [];
 	const warnings: string[] = [];
@@ -69,7 +54,7 @@ export function workspaceFindings(workspace: Workspace, dpi: DpiCheck = {}): Fin
 		const checked = validate(entry.template);
 		if (!checked.ok)
 			errors.push(...checked.errors.map((issue) => `${entry.fileName}: ${formatIssue(issue)}`));
-		const images = presetDpiCheck(workspace, entry.id, dpi);
+		const images = { ...presetImageDpi(workspace.presets, entry.id), ...dpi };
 		warnings.push(...templateWarnings(entry.template, images).map((w) => `${entry.fileName}: ${w}`));
 		const binding = entry.binding;
 		if (!readsDataset(binding)) continue;
