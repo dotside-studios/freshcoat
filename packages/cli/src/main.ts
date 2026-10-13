@@ -13,6 +13,7 @@ import {
 	collectSetting,
 	parseJobs,
 	parseLength,
+	parseMarks,
 	parsePaper,
 	parsePositive,
 	parseQuality,
@@ -163,6 +164,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 		)
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
+		.option(
+			"--marks <list>",
+			"printer's marks on sheets: none, or any of crop, registration, colorbar, slug; default crop",
+			arg(parseMarks),
+		)
 		.option("--no-crop-marks", "leave out the crop marks")
 		.option(
 			"--output-intent <file>",

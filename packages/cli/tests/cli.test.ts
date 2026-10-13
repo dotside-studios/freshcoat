@@ -831,6 +831,39 @@ describe("render export options", () => {
 		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
 	});
 
+	test("draws the printer's marks --marks names", async () => {
+		const marked = async (...flags: string[]) => {
+			const run = await box.run("render", "badge.json", "--sheets", "a4", ...flags, "--out", "marks.pdf", "-q");
+			expect(run.code).toBe(0);
+			const page = (await PDFDocument.load(await readFile(box.path("marks.pdf")))).getPage(0);
+			const text = page.node
+				.Contents()
+				?.asArray()
+				.map((ref) => {
+					const stream = page.doc.context.lookup(ref) as PDFRawStream;
+					return new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode());
+				})
+				.join("\n") ?? "";
+			const tokens = text.split(/\s+/);
+			return {
+				strokes: tokens.filter((t) => t === "S").length,
+				fills: tokens.filter((t) => t === "f").length,
+				slug: tokens.includes("Tj"),
+			};
+		};
+		const crop = await marked();
+		expect(crop.strokes).toBeGreaterThan(0);
+		expect(crop).toMatchObject({ fills: 0, slug: false });
+		expect(await marked("--marks", "none")).toEqual({ strokes: 0, fills: 0, slug: false });
+		expect(await marked("--marks", "colorbar,slug", "--no-crop-marks")).toEqual({
+			strokes: 1,
+			fills: 12,
+			slug: true,
+		});
+		const all = await marked("--marks", "crop,registration,colorbar,slug", "--no-crop-marks");
+		expect(all).toEqual({ strokes: 4 * 3 + 1, fills: 12, slug: true });
+	});
+
 	test("takes a custom paper size and says when the cards do not fit", async () => {
 		const fits = await box.run("render", "badge.json", "--sheets", "100x50", "--no-crop-marks", "--out", "custom.pdf", "-q");
 		expect(fits.code).toBe(0);

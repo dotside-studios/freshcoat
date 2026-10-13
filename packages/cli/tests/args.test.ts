@@ -6,6 +6,7 @@ import {
 	collectSetting,
 	parseJobs,
 	parseLength,
+	parseMarks,
 	parsePaper,
 	parseQuality,
 } from "../src/args";
@@ -23,6 +24,8 @@ describe("argument parsers", () => {
 		expect(parseLength("0")).toBe(0);
 		expect(parsePaper("A4")).toBe("a4");
 		expect(parsePaper("297x210")).toEqual({ widthMm: 210, heightMm: 297 });
+		expect(parseMarks("Crop, registration,slug,crop")).toEqual(["crop", "registration", "slug"]);
+		expect(parseMarks("none")).toEqual([]);
 	});
 
 	test("refuse the rest with an ArgumentError", () => {
@@ -33,6 +36,8 @@ describe("argument parsers", () => {
 			[() => parseQuality("101"), "Expected a whole number from 0 to 100."],
 			[() => parseJobs("1.5"), "Expected a whole number, 1 or more."],
 			[() => parseLength("-1"), "Expected millimetres, 0 or more."],
+			[() => parseMarks("crop,bleed"), "Expected none, or a list of crop, registration, colorbar, slug."],
+			[() => parseMarks(""), "Expected none, or a list of crop, registration, colorbar, slug."],
 			[() => parsePaper("b5"), "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres."],
 		];
 		for (const [parse, message] of refusals) {
