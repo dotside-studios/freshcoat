@@ -11,6 +11,8 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useBleedShown } from "~/canvas/bleed-view";
+import { BLEED_SHADE } from "~/canvas/PrintGuides";
 import { displayDensity } from "~/render/session";
 import { useDocumentFonts } from "~/render/use-document-fonts";
 import {
@@ -29,7 +31,8 @@ export const SHEET_SIDE_LABEL = { front: "Front", back: "Back" } as const;
 
 /**
  * One page of an imposed PDF: the paper at its aspect, each slot's record
- * rendered small, and the crop marks a front carries.
+ * rendered small with its bleed when the cards carry one, and the crop marks
+ * a front carries.
  */
 export function SheetPreview({
 	template,
@@ -59,6 +62,8 @@ export function SheetPreview({
 	const fonts = useDocumentFonts(template);
 	const page = imposition.pages[pageIndex];
 	const { paper, card } = imposition;
+	const bleedOn = useBleedShown();
+	const bleed = bleedOn ? imposition.bleedMm : undefined;
 
 	useLayoutEffect(() => {
 		const el = boxRef.current;
@@ -109,12 +114,13 @@ export function SheetPreview({
 				values: slot.item.values,
 				fonts: loaded,
 				density,
+				...(bleed ? { bleed: true } : {}),
 				...(slot.item.variantId ? { variantId: slot.item.variantId } : {}),
 				...(assets ? { assets } : {}),
 			};
 			return { slot, req, key: thumbKey(req) };
 		});
-	}, [page, fonts.fonts, density, template, assets]);
+	}, [page, fonts.fonts, density, template, assets, bleed]);
 
 	const [drawn, setDrawn] = useState<Map<string, HTMLCanvasElement>>(
 		() => new Map(),
@@ -192,6 +198,16 @@ export function SheetPreview({
 							itemKey={slot.item.key}
 							current={showsRecord(slot.item, currentRecordId, currentVariant)}
 							renderKey={requests[i]?.key}
+							canvasStyle={
+								bleed
+									? {
+											left: `${(-bleed.left / card.widthMm) * 100}%`,
+											top: `${(-bleed.top / card.heightMm) * 100}%`,
+											width: `${((card.widthMm + bleed.left + bleed.right) / card.widthMm) * 100}%`,
+											height: `${((card.heightMm + bleed.top + bleed.bottom) / card.heightMm) * 100}%`,
+										}
+									: undefined
+							}
 							style={{
 								left: `${(slot.xMm / paper.widthMm) * 100}%`,
 								top: `${(slot.yMm / paper.heightMm) * 100}%`,
@@ -200,6 +216,33 @@ export function SheetPreview({
 							}}
 						/>
 					))}
+					{bleed && page ? (
+						<svg
+							className="pointer-events-none absolute inset-0 size-full"
+							viewBox={`0 0 ${paper.widthMm} ${paper.heightMm}`}
+							preserveAspectRatio="none"
+							aria-hidden="true"
+							data-testid="sheet-bleed-shade"
+						>
+							<path
+								d={page.slots
+									.map(({ xMm: x, yMm: y }) => {
+										const ox = x - bleed.left;
+										const oy = y - bleed.top;
+										const ow = card.widthMm + bleed.left + bleed.right;
+										const oh = card.heightMm + bleed.top + bleed.bottom;
+										return (
+											`M${ox} ${oy}H${ox + ow}V${oy + oh}H${ox}Z` +
+											`M${x} ${y}H${x + card.widthMm}V${y + card.heightMm}H${x}Z`
+										);
+									})
+									.join("")}
+								fillRule="evenodd"
+								className="fill-white"
+								opacity={BLEED_SHADE}
+							/>
+						</svg>
+					) : null}
 					{marks.length > 0 ? (
 						<svg
 							className="pointer-events-none absolute inset-0 size-full"
@@ -242,12 +285,15 @@ function SlotCanvas({
 	itemKey,
 	current,
 	renderKey,
+	canvasStyle,
 	style,
 }: {
 	source: HTMLCanvasElement | undefined;
 	itemKey: string;
 	current: boolean;
 	renderKey: string | undefined;
+	/** where the canvas sits when it carries bleed past the slot */
+	canvasStyle?: CSSProperties;
 	style: CSSProperties;
 }) {
 	const ref = useRef<HTMLCanvasElement>(null);
@@ -275,7 +321,11 @@ function SlotCanvas({
 		>
 			<canvas
 				ref={ref}
-				className={cn("block size-full", !source && "invisible")}
+				className={cn(
+					canvasStyle ? "absolute block" : "block size-full",
+					!source && "invisible",
+				)}
+				style={canvasStyle}
 			/>
 		</div>
 	);

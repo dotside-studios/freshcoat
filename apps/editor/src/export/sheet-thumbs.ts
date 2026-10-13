@@ -19,6 +19,8 @@ export type SheetThumbRequest = {
 	assets?: readonly DatasetAsset[];
 	/** device pixels per template unit */
 	density: number;
+	/** paints the template's bleed around the trim */
+	bleed?: boolean;
 };
 
 const templateIds = new WeakMap<object, number>();
@@ -41,6 +43,7 @@ export function thumbKey(req: SheetThumbRequest): string {
 		req.side,
 		req.variantId ?? "",
 		req.density,
+		req.bleed ? "bleed" : "",
 		JSON.stringify(req.values),
 	].join("|");
 }
@@ -121,6 +124,7 @@ export function renderSheetThumb(
 			values: req.values,
 			fonts: req.fonts,
 			scale: req.density,
+			...(req.bleed ? { bleed: true } : {}),
 			collect: () => null,
 		});
 		const copy = document.createElement("canvas");

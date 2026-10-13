@@ -52,7 +52,7 @@ const frame = (children: Node[]) =>
 		children,
 	});
 
-const label = (family: string, weight: 400 | 700, value: string, y: number) =>
+const label = (family: string, weight: 300 | 400 | 700, value: string, y: number) =>
 	createText({
 		pos: { x: 8, y },
 		size: { width: 184, height: 30 },
@@ -199,10 +199,21 @@ describe("renderPdf", () => {
 		expect(pdf.warnings).toEqual([
 			{
 				kind: "vector_rasterized",
-				feature: "font Vend Sans Light is not TrueType or OpenType",
+				feature: "variable font Vend Sans Light",
 			},
 		]);
 		expect(source(pdf.bytes)).toContain("/Subtype /Image");
+	});
+
+	test("embeds text set in a WOFF2 file", async () => {
+		const pdf = await renderer.renderPdf(frame([label("Vend", 300, "Light", 8)]), {
+			width: W,
+			height: H,
+		});
+		expect(pdf.warnings).toEqual([]);
+		const body = source(pdf.bytes);
+		expect(body).toContain("/FontFile2");
+		expect(body).not.toContain("/Subtype /Image");
 	});
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {

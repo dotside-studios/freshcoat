@@ -1,3 +1,9 @@
+import {
+	hasInsets,
+	NO_BLEED,
+	type Sides,
+	templateBleed,
+} from "@freshcoat-js/coatfile";
 import { boundDataset } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,16 +29,19 @@ import { useDocumentFonts } from "~/render/use-document-fonts";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import { activeSlot } from "~/state/workspace";
+import { useBleedShown } from "./bleed-view";
 
 /**
  * Keeps the active side painted. Every document, value, side, variant,
  * visibility or density change requests a render; the scheduler coalesces them
  * so a drag paints as often as the pipeline keeps up. Returns the canvas the
- * session paints into, and the density it was painted at.
+ * session paints into, the density it was painted at and the bleed painted
+ * around the trim.
  */
 export function useLiveRender(): {
 	canvas: HTMLCanvasElement | null;
 	scale: number;
+	bleed: Sides;
 	fontsLoading: boolean;
 } {
 	const controller = useController();
@@ -52,6 +61,8 @@ export function useLiveRender(): {
 		return boundDataset(activeSlot(s)?.binding, s.workspace?.datasets ?? [])
 			?.assets;
 	});
+	const bleedOn = useBleedShown();
+	const bleed = !!shown && bleedOn && hasInsets(templateBleed(shown));
 	const fonts = useDocumentFonts(template);
 	controller.fonts = fonts.fonts;
 	const datasetImages = usePreviewImages(datasetAssets, values, liveEdge());
@@ -69,6 +80,7 @@ export function useLiveRender(): {
 	const [output, setOutput] = useState<{
 		canvas: HTMLCanvasElement;
 		scale: number;
+		bleed: Sides;
 	} | null>(null);
 	// The main thread paints unless the worker is opted into and the browser
 	// allows it, and again once the worker has failed.
@@ -127,9 +139,15 @@ export function useLiveRender(): {
 						for (const resolve of snapshotWaiters.splice(0))
 							resolve(frame.snapshot);
 					setOutput((prev) =>
-						prev?.canvas === frame.canvas && prev.scale === frame.scale
+						prev?.canvas === frame.canvas &&
+						prev.scale === frame.scale &&
+						sameSides(prev.bleed, frame.bleed)
 							? prev
-							: { canvas: frame.canvas, scale: frame.scale },
+							: {
+									canvas: frame.canvas,
+									scale: frame.scale,
+									bleed: frame.bleed,
+								},
 					);
 					controller.dispatch({
 						type: "rendered",
@@ -206,6 +224,7 @@ export function useLiveRender(): {
 			fonts: fonts.fonts,
 			photos: datasetImages,
 			density,
+			...(bleed ? { bleed: true } : {}),
 		});
 		heldForPhotos.current?.release();
 		heldForPhotos.current = null;
@@ -218,14 +237,25 @@ export function useLiveRender(): {
 		values,
 		fonts.fonts,
 		density,
+		bleed,
 		datasetImages,
 	]);
 
 	return {
 		canvas: output?.canvas ?? null,
 		scale: output?.scale ?? density,
+		bleed: output?.bleed ?? NO_BLEED,
 		fontsLoading: fonts.loading,
 	};
+}
+
+function sameSides(a: Sides, b: Sides): boolean {
+	return (
+		a.top === b.top &&
+		a.right === b.right &&
+		a.bottom === b.bottom &&
+		a.left === b.left
+	);
 }
 
 type Held = { done: Promise<void>; release(): void };

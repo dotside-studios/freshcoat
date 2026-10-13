@@ -1,7 +1,10 @@
 import {
 	type Element,
+	extendIntoBleed,
+	hasInsets,
 	resizeVectorBoolean,
 	resizeVectorPath,
+	type Sides,
 	type Template,
 } from "@freshcoat-js/coatfile";
 import type { Node } from "@freshcoat-js/engine";
@@ -121,6 +124,48 @@ export function collectGeometry(
 		parentKey: null,
 		autoLayoutChild: false,
 	});
+	return out;
+}
+
+/**
+ * Layer boxes read off a render with bleed, moved back to trim coordinates.
+ * A layer the bleed grew past the trim keeps its own box, and so does the
+ * background.
+ */
+export function trimGeometry(
+	geometry: LayerGeometry,
+	elements: readonly Element[],
+	pathIds: Map<string, string>,
+	trim: { width: number; height: number },
+	bleed: Sides,
+): LayerGeometry {
+	if (!hasInsets(bleed)) return geometry;
+	const own = new Map<string, Rect>();
+	extendIntoBleed([...elements], trim, bleed).forEach((grown, i) => {
+		const el = elements[i];
+		const key = el && pathIds.get(el.id);
+		if (!el?.size || grown === el || key === undefined) return;
+		own.set(key, {
+			x: el.pos?.x ?? 0,
+			y: el.pos?.y ?? 0,
+			width: el.size.width,
+			height: el.size.height,
+			rotation: 0,
+		});
+	});
+	const out: LayerGeometry = new Map();
+	for (const [key, box] of geometry) {
+		const parsed = parseKey(key);
+		const rect =
+			parsed && isBackgroundPath(parsed)
+				? { x: 0, y: 0, ...trim, rotation: 0 }
+				: (own.get(key) ?? {
+						...box.rect,
+						x: box.rect.x - bleed.left,
+						y: box.rect.y - bleed.top,
+					});
+		out.set(key, { ...box, rect });
+	}
 	return out;
 }
 

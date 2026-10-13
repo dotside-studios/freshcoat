@@ -53,9 +53,9 @@ export type TextEngine = {
 		direction?: "ltr" | "rtl",
 	) => { lines: InlineShapedLine[]; missing?: number[] };
 	// Optional: a family's vertical metrics as the engine's own backend reads
-	// them. The sfnt reader (readFontMetrics) parses ttf/otf only, so a family
-	// delivered as woff2 — what Google Fonts serves a browser — has none; an
-	// engine holding the decoded face can still answer. Used to resolve AUTO line
+	// them. A family the sfnt reader (readFontMetrics) cannot parse, such as
+	// a font collection, has none; an engine holding the decoded face can still
+	// answer. Used to resolve AUTO line
 	// heights (see ./line-height).
 	metricsFor?: (family: string) => FontVMetrics | undefined;
 };

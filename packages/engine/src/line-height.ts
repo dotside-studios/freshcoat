@@ -27,8 +27,8 @@ export function autoLineHeight(metrics: FontVMetrics | undefined): number {
 // Where a family's vertical metrics come from: an explicit map (what
 // deriveFontMetrics builds from font bytes), else the global registry, else
 // nothing. A caller with a live text engine passes `engine.metricsFor` as
-// `probe` — the sfnt reader can't parse woff2, which is exactly what a browser
-// is served, and the engine's backend already has the decoded face.
+// `probe`, for the files the sfnt reader can't parse, as the engine's backend
+// already has the decoded face.
 export type MetricsLookup = (family: string) => FontVMetrics | undefined;
 
 export function metricsLookup(

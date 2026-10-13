@@ -87,16 +87,27 @@ describe("combineShapes", () => {
 			);
 		});
 
-		test("needs a uniform radius", () => {
+		test("smooths per-corner radii", () => {
 			const rect = (extra: object): BooleanOperand => ({
 				kind: "rect",
 				size: { width: 100, height: 100 },
 				...extra,
 			});
-			const perCorner = rect({ cornerRadius: [20, 0, 20, 0] });
-			expect(
-				combineShapes(ck, [rect({ cornerRadius: [20, 0, 20, 0], cornerSmoothing: 0.6 })], "union"),
-			).toEqual(combineShapes(ck, [perCorner], "union"));
+			const smooth = combineShapes(
+				ck,
+				[rect({ cornerRadius: [20, 0, 40, 0], cornerSmoothing: 0.6 })],
+				"union",
+			);
+			expect(smooth?.d).not.toBe(
+				combineShapes(ck, [rect({ cornerRadius: [20, 0, 40, 0] })], "union")
+					?.d,
+			);
+			const outline: BooleanOperand = {
+				kind: "path",
+				size: { width: 100, height: 100 },
+				d: squircleSvg(0, 0, 100, 100, [20, 0, 40, 0], 0.6),
+			};
+			expect(smooth).toEqual(combineShapes(ck, [outline], "union"));
 			expect(combineShapes(ck, [rect({ cornerSmoothing: 0.6 })], "union")).toEqual(
 				combineShapes(ck, [rect({})], "union"),
 			);

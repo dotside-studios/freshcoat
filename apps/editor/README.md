@@ -136,9 +136,8 @@ covers shared checks and pull requests.
 - A path drawn with the pen can't have its points edited on the canvas
   afterwards; its path data is edited in the inspector.
 - Boolean operations keep their shapes as operands until the layer is
-  flattened, and corner smoothing is left out of the result. An operand edited
-  in a variant is combined for that variant only; the layer's saved path is
-  the base template's result.
+  flattened. An operand edited in a variant is combined for that variant
+  only; the layer's saved path is the base template's result.
 - Holding Alt while dragging duplicates the selection. The copies show in the
   layer tree only when the drag ends.
 - The Zip file and Folder destinations need the File System Access API.
@@ -159,10 +158,9 @@ covers shared checks and pull requests.
 - A zip past 4 GB or 65,535 files is written as zip64, which some older
   unzip tools cannot open. Download still hands over 512 MB parts, so that a
   job never holds more than one part in memory.
-- The canvas and the sheet preview show the trim only. Bleed is drawn as a
-  guide line, and what fills it appears only in an export with "Include
-  bleed". Bleed and safe area take one value for every side; a file can set
-  each side, but Studio edits them together.
+- The sheet preview shows the bleed only for a preset with "Include
+  bleed", since only then is it printed. On the canvas, a layer is hit and
+  selected by its own box, not by the part the bleed adds to it.
 - Sheets are a PDF feature. PNG, JPEG and WebP presets are one file per card
   side. Sheets also need Template size: a preset sized from each photo (Match
   image) can't be imposed, since every slot is the template's size and a

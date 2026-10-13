@@ -145,10 +145,9 @@ layers were kept, flattened or skipped.
   rasterized (`stroke_flattened`). A stroke with a different weight per side is dropped
   (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
   zero is left out.
-- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`. The
-  renderer smooths only a uniform radius, so a rectangle with different
-  corners keeps them unsmoothed (`corner_smoothing_unsupported`). Frames
-  keep their radius but not smoothing, which coatfile frames do not carry.
+- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`, with
+  one radius or a different radius per corner. Frames keep their radius but
+  not smoothing, which coatfile frames do not carry.
 - **Boolean operations.** A union, subtract, intersect or exclude stays a
   live boolean `vector`: its `operands` are the visible children, bottom-most
   first, each a `rect` (with its corner radii and smoothing) or a `vector` (rectangles,
@@ -156,7 +155,7 @@ layers were kept, flattened or skipped.
   boolean's box. A hidden child is left out, as Figma leaves it out of the
   result. The cached `d` is Figma's own result, and the fill, stroke and
   effects are the boolean's, not its children's. If any child cannot be an
-  operand (text, a group or frame, a mask, a line or open path, a skewed, flipped or scaled child, or a rect with corner smoothing on different radii), the whole boolean
+  operand (text, a group or frame, a mask, a line or open path, or a skewed, flipped or scaled child), the whole boolean
   is written as one flat `vector` and the export reports `boolean_flattened`
   as information. Nothing is rasterized.
 - **Blend modes.** Every Figma layer blend mode is carried as `blendMode`,

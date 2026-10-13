@@ -170,7 +170,7 @@ export function Viewport() {
 	const textEditing = useEditor((s) => s.textEdit !== null);
 	const pathEditing = useEditor((s) => s.pathEdit !== null);
 	const renderStatus = useEditor((s) => s.render.status);
-	const { canvas, fontsLoading } = useLiveRender();
+	const { canvas, bleed, fontsLoading } = useLiveRender();
 	usePrintGuidesVersion();
 	const guides = useEditor((s) =>
 		printGuidesOn(
@@ -272,12 +272,18 @@ export function Viewport() {
 		if (!host || !canvas) return;
 		if (canvas.parentElement !== host) {
 			host.querySelector("canvas")?.remove();
-			canvas.className = "absolute inset-0 size-full";
+			canvas.className = "absolute";
 			canvas.setAttribute("aria-hidden", "true");
 			canvas.dataset.testid = "artboard-canvas";
 			host.prepend(canvas);
 		}
-	}, [canvas]);
+		// The bleed hangs outside the artboard, which stays the trim.
+		const z = view.zoom;
+		canvas.style.left = `${-bleed.left * z}px`;
+		canvas.style.top = `${-bleed.top * z}px`;
+		canvas.style.width = `calc(100% + ${(bleed.left + bleed.right) * z}px)`;
+		canvas.style.height = `calc(100% + ${(bleed.top + bleed.bottom) * z}px)`;
+	}, [canvas, bleed, view.zoom]);
 
 	useEffect(() => {
 		const el = ref.current;
@@ -1016,7 +1022,7 @@ export function Viewport() {
 							className="absolute flex text-fc-muted text-fc-sm"
 							style={{
 								left: Math.round(view.x),
-								top: Math.round(view.y) - 20,
+								top: Math.round(view.y - bleed.top * view.zoom) - 20,
 								maxWidth: Math.max(40, template.width * view.zoom),
 							}}
 							data-canvas-control

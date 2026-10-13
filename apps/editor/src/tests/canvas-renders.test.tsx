@@ -38,7 +38,12 @@ vi.mock("~/canvas/Guides", async (load) => {
 	return { ...m, Guides: counted("Guides", m.Guides) };
 });
 vi.mock("~/canvas/use-live-render", () => ({
-	useLiveRender: () => ({ canvas: null, scale: 1, fontsLoading: false }),
+	useLiveRender: () => ({
+		canvas: null,
+		scale: 1,
+		bleed: { top: 0, right: 0, bottom: 0, left: 0 },
+		fontsLoading: false,
+	}),
 }));
 
 vi.stubGlobal(

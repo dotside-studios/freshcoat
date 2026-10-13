@@ -2593,13 +2593,10 @@ describe("transpile (shape warnings)", () => {
 		).toContain("stroke_weight_mixed_unsupported");
 	});
 
-	it("warns when per-corner radii ignore corner smoothing", async () => {
+	it("does not warn about corner smoothing on per-corner radii", async () => {
 		expect(
 			await warningsFor({ cornerRadius: [8, 0, 8, 0], cornerSmoothing: 0.6 }),
-		).toContain("corner_smoothing_unsupported");
-		expect(
-			await warningsFor({ cornerRadius: 8, cornerSmoothing: 0.6 }),
-		).not.toContain("corner_smoothing_unsupported");
+		).toEqual([]);
 	});
 });
 

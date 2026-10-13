@@ -241,6 +241,22 @@ describe("compile", () => {
 		expect(rebuilt(rounded(0))).toBe(rebuilt(rounded()));
 	});
 
+	test("a smoothed rect operand with per-corner radii keeps its smoothing", () => {
+		const rounded = (cornerSmoothing?: number) =>
+			rect("a", 0, 0, 60, {
+				properties: {
+					fill: "#000",
+					cornerRadius: [20, 0, 30, 0],
+					...(cornerSmoothing !== undefined ? { cornerSmoothing } : {}),
+				},
+			});
+		const rebuilt = (el: Element) =>
+			pathOf(template(shape("union", [el])), {}, { pathOp: canvasKitPathOp(ck) })
+				.d;
+		expect(rebuilt(rounded(0.6))).not.toBe(rebuilt(rounded()));
+		expect(rebuilt(rounded(0))).toBe(rebuilt(rounded()));
+	});
+
 	test("the vector keeps its authored box", () => {
 		const tpl = template(shape("subtract", operands()));
 		const node = pathOf(tpl, {}, { pathOp: canvasKitPathOp(ck) });

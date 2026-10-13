@@ -11,6 +11,7 @@ import {
 	safeAreaHints,
 	setPrintGuides,
 } from "~/canvas/print-guides";
+import { openFile, saveJson } from "~/doc/io";
 import { getElement } from "~/doc/path";
 import { resizeWithConstraints } from "~/doc/resize";
 import { withConstraint } from "~/panels/design/ConstraintsSection";
@@ -214,10 +215,11 @@ describe("Resize with constraints", () => {
 		expect((c.template as Template).safeArea).toBeUndefined();
 	});
 
-	test("shows sides set apart as mixed", () => {
+	test("starts linked for one value, unlinked for sides set apart", () => {
 		const c = open({
 			...doc(),
-			bleed: { top: 1, right: 2, bottom: 3, left: 4 },
+			bleed: 12,
+			safeArea: { top: 1, right: 2, bottom: 3, left: 4 },
 		});
 		render(
 			<ControllerProvider controller={c}>
@@ -225,8 +227,86 @@ describe("Resize with constraints", () => {
 			</ControllerProvider>,
 		);
 		const bleed = screen.getByRole("spinbutton", { name: "Template bleed" });
+		expect((bleed as HTMLInputElement).value).toBe("12");
+		expect(screen.queryByTestId("bleed-sides")).toBeNull();
+		const sides = within(screen.getByTestId("safeArea-sides"))
+			.getAllByRole("spinbutton")
+			.map((f) => (f as HTMLInputElement).value);
+		expect(sides).toEqual(["1", "2", "3", "4"]);
+	});
+
+	test("sets one side unlinked, keeping the others, one undo step", async () => {
+		const c = open({ ...doc(), bleed: 8 });
+		render(
+			<ControllerProvider controller={c}>
+				<Size />
+			</ControllerProvider>,
+		);
+		const user = fastUser();
+		await user.click(screen.getByRole("button", { name: "Link bleed sides" }));
+		expect((c.template as Template).bleed).toBe(8);
+		const left = screen.getByRole("spinbutton", {
+			name: "Template bleed left",
+		});
+		await user.clear(left);
+		await user.type(left, "20{Enter}");
+		expect((c.template as Template).bleed).toEqual({
+			top: 8,
+			right: 8,
+			bottom: 8,
+			left: 20,
+		});
+		expect(c.state.doc?.history.past).toHaveLength(1);
+		c.undo();
+		expect((c.template as Template).bleed).toBe(8);
+	});
+
+	test("linking sides set apart shows them mixed and leaves the file", async () => {
+		const sides = { top: 1, right: 2, bottom: 3, left: 4 };
+		const c = open({ ...doc(), bleed: sides });
+		render(
+			<ControllerProvider controller={c}>
+				<Size />
+			</ControllerProvider>,
+		);
+		const user = fastUser();
+		await user.click(screen.getByRole("button", { name: "Link bleed sides" }));
+		const bleed = screen.getByRole("spinbutton", { name: "Template bleed" });
 		expect((bleed as HTMLInputElement).value).toBe("");
 		expect(bleed.getAttribute("placeholder")).toBe("Mixed");
+		expect((c.template as Template).bleed).toEqual(sides);
+		expect(c.state.doc?.history.past).toHaveLength(0);
+		await user.type(bleed, "5{Enter}");
+		expect((c.template as Template).bleed).toBe(5);
+	});
+
+	test("sides set in the file round-trip unchanged", async () => {
+		const even = { top: 6, right: 6, bottom: 6, left: 6 };
+		const apart = { top: 1, right: 2, bottom: 3, left: 4 };
+		const file = JSON.stringify({
+			...doc(),
+			format_version: "1.5",
+			bleed: even,
+			safeArea: apart,
+		});
+		const loaded = await openFile(file, "doc.coat.json");
+		if (loaded.kind !== "ok") throw new Error(loaded.kind);
+		const c = open(loaded.template);
+		render(
+			<ControllerProvider controller={c}>
+				<Size />
+			</ControllerProvider>,
+		);
+		const user = fastUser();
+		await user.click(screen.getByRole("button", { name: "Link bleed sides" }));
+		await user.click(
+			screen.getByRole("button", { name: "Link safe area sides" }),
+		);
+		const saved = saveJson(c.template as Template);
+		if (!saved.ok) throw new Error("not saved");
+		const t = JSON.parse(saved.data) as Template;
+		expect(t.bleed).toEqual(even);
+		expect(t.safeArea).toEqual(apart);
 	});
 
 	test("refuses a size the plain resize refuses", () => {

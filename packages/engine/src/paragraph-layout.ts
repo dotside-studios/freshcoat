@@ -384,9 +384,9 @@ export function createParagraphEngine(
 	};
 
 	// A family's vertical metrics as Skia reads them from the decoded face, for
-	// the AUTO line height (see ./line-height). This exists because the sfnt
-	// reader parses ttf/otf only and a browser is served woff2 — the bytes are
-	// already decoded here, so ask the engine that holds them. Measured off a
+	// the AUTO line height (see ./line-height). This covers the files the sfnt
+	// reader cannot parse, such as font collections: the bytes are already
+	// decoded here, so ask the engine that holds them. Measured off a
 	// probe paragraph at PROBE_EM, which reports the line box the font itself
 	// declares; cached per family, since it costs a shape.
 	const metricsCache = new Map<string, FontVMetrics | undefined>();
