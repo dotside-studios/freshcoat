@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { Template } from "@freshcoat-js/coatfile";
 import { decodeTemplate, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
-import { DEFAULT_SHEET_LAYOUT } from "@freshcoat-js/workspace";
+import { DEFAULT_SHEET_LAYOUT, type Workspace } from "@freshcoat-js/workspace";
 import { REPORT_FILE_NAME } from "@freshcoat-js/workspace/export";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
@@ -1223,6 +1223,112 @@ describe("render --records and --save", () => {
 		const dry = await box.run("render", "status.coatworkspace", "--preset", "p_png", "--save", "--dry-run", "--out", "x.zip");
 		expect(dry.code).toBe(2);
 		expect(dry.stderr).toContain("--save and --dry-run do not go together");
+	});
+});
+
+describe("render --where and records views", () => {
+	function viewWorkspace(): Workspace {
+		const workspace = workspaceOf(card());
+		const people = workspace.datasets[0]!;
+		people.columns.push({ key: "team", type: "text" }, { key: "age", type: "integer" });
+		people.records = [
+			{ id: "r_00000001", values: { name: "Ana", team: "red", age: 30 }, status: "pending" },
+			{ id: "r_00000002", values: { name: "Ben", team: "blue", age: 17 }, status: "pending" },
+			{ id: "r_00000003", values: { name: "Cy", team: "red", age: 12 }, status: "pending" },
+		];
+		workspace.datasets.push({
+			id: "d_teams",
+			name: "Teams",
+			columns: [
+				{ key: "code", type: "text" },
+				{ key: "city", type: "text" },
+			],
+			records: [
+				{ id: "t1", values: { code: "red", city: "Manila" }, status: "pending" },
+				{ id: "t2", values: { code: "red", city: "Cebu" }, status: "pending" },
+			],
+			assets: [],
+		});
+		return workspace;
+	}
+
+	async function itemNames(path: string): Promise<string[]> {
+		const zip = unzipSync(new Uint8Array(await readFile(box.path(path))));
+		return Object.keys(zip).filter((name) => name.endsWith(".png")).sort();
+	}
+
+	test("exports only matching records, and --save keeps the saved view", async () => {
+		await box.write("where.coatworkspace", await workspaceBytes(viewWorkspace()));
+		const run = await box.run(
+			"render", "where.coatworkspace", "--preset", "p_png", "--where", "team=RED", "--where", "age>=18", "--save", "--out", "where.zip", "-q",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stdout).toStartWith("2 of 2 items exported");
+		expect(await itemNames("where.zip")).toEqual(["1-back.png", "1-front.png"]);
+		const inspected = JSON.parse((await box.run("inspect", "where.coatworkspace", "--json")).stdout);
+		expect(inspected.templates[0].view).toBeUndefined();
+		expect(inspected.datasets[0].statuses).toEqual({ pending: 2, exported: 1 });
+	});
+
+	test("reads a saved view with a join, and names it in inspect and validate", async () => {
+		const workspace = viewWorkspace();
+		workspace.templates[0]!.binding = {
+			...workspace.templates[0]!.binding!,
+			fields: { name: { kind: "column", column: "team_city" } },
+			view: {
+				filters: [{ column: "age", op: "lt", value: "18" }],
+				join: { datasetId: "d_teams", on: "team", key: "code", prefix: "team_", inner: true },
+			},
+		};
+		await box.write("joined.coatworkspace", await workspaceBytes(workspace));
+		const dry = await box.run("render", "joined.coatworkspace", "--preset", "p_png", "--dry-run", "--out", "x.zip");
+		expect(dry.stdout).toBe("1-front.png\n1-back.png\n2 items would be exported to x.zip\n");
+		const inspected = await box.run("inspect", "joined.coatworkspace");
+		expect(inspected.stdout).toContain(
+			"    view: inner joined to Teams on team = code as team_*, where age<18: 1 record (1 unmatched; duplicate keys red)",
+		);
+		const json = JSON.parse((await box.run("inspect", "joined.coatworkspace", "--json")).stdout);
+		expect(json.templates[0].view).toEqual({
+			filters: ["age<18"],
+			join: { dataset: "d_teams", on: "team", key: "code", prefix: "team_", inner: true },
+			records: 1,
+			unmatched: 1,
+			duplicateKeys: ["red"],
+			problems: [],
+		});
+		const valid = await box.run("validate", "joined.coatworkspace");
+		expect(valid.code).toBe(0);
+		expect(valid.stderr).toContain(
+			'Badge.coat: records view: the joined dataset has more than one record for "red"; the first is used',
+		);
+	});
+
+	test("refuses a view that cannot apply", async () => {
+		await box.write("bad.coatworkspace", await workspaceBytes(viewWorkspace()));
+		const run = await box.run("render", "bad.coatworkspace", "--preset", "p_png", "--where", "name<b", "--out", "bad.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("cannot read the records: name is text; only numbers and dates compare");
+		const bad = await box.run("render", "bad.coatworkspace", "--preset", "p_png", "--where", "name", "--out", "bad.zip");
+		expect(bad.code).toBe(2);
+		expect(bad.stderr).toContain("Expected <column><op><value>");
+		const workspace = viewWorkspace();
+		workspace.templates[0]!.binding!.view = {
+			filters: [],
+			join: { datasetId: "d_gone", on: "team", key: "code", prefix: "" },
+		};
+		await box.write("gone.coatworkspace", await workspaceBytes(workspace));
+		const invalid = await box.run("validate", "gone.coatworkspace");
+		expect(invalid.code).toBe(1);
+		expect(invalid.stderr).toContain("Badge.coat: records view: The joined dataset is not in the workspace");
+	});
+
+	test("filters --data rows by field key", async () => {
+		await box.write("teams.csv", "name,motto\nAna,Hi\nBen,Yo\nCy,Hey\n");
+		const run = await box.run(
+			"render", "badge.json", "--data", "teams.csv", "--where", "motto~h", "--frame", "front", "--out", "teams.zip", "-q",
+		);
+		expect(run.code).toBe(0);
+		expect(run.stdout).toStartWith("2 of 2 items exported");
 	});
 });
 

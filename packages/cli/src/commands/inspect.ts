@@ -5,6 +5,8 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import {
+	bindingView,
+	formatFilter,
 	readsDataset,
 	type RecordStatus,
 	sheetSummary,
@@ -84,6 +86,14 @@ export type WorkspaceInspection = {
 		id: string;
 		fileName: string;
 		dataset?: string;
+		view?: {
+			filters: string[];
+			join?: { dataset: string; on: string; key: string; prefix: string; inner: boolean };
+			records: number;
+			unmatched: number;
+			duplicateKeys: string[];
+			problems: string[];
+		};
 		unfilled: string[];
 		template: Inspection;
 	}[];
@@ -115,6 +125,7 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 			id: entry.id,
 			fileName: entry.fileName,
 			...(readsDataset(entry.binding) ? { dataset: entry.binding.datasetId } : {}),
+			...viewOf(entry.binding, workspace),
 			unfilled: unfilledRequired(entry.template, entry.binding, workspace.datasets),
 			template: inspectTemplate(entry.fileName, entry.template),
 		})),
@@ -144,6 +155,36 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 				...(!entry ? { error: "its template is not in the workspace" } : {}),
 			};
 		}),
+	};
+}
+
+function viewOf(
+	binding: Workspace["templates"][number]["binding"],
+	workspace: Workspace,
+): Pick<WorkspaceInspection["templates"][number], "view"> {
+	const view = binding?.view;
+	const result = bindingView(binding, workspace.datasets);
+	if (!view || !result) return {};
+	const { join } = view;
+	return {
+		view: {
+			filters: view.filters.map(formatFilter),
+			...(join
+				? {
+						join: {
+							dataset: join.datasetId,
+							on: join.on,
+							key: join.key,
+							prefix: join.prefix,
+							inner: join.inner === true,
+						},
+					}
+				: {}),
+			records: result.dataset.records.length,
+			unmatched: result.unmatched.length,
+			duplicateKeys: result.duplicateKeys,
+			problems: result.problems,
+		},
 	};
 }
 
@@ -179,6 +220,7 @@ function describeWorkspace(info: WorkspaceInspection): string {
 		"Templates",
 		...info.templates.flatMap((t) => [
 			`  ${t.fileName}  ${t.template.name} (${t.template.id})  ${t.template.width} x ${t.template.height}  ${plural(t.template.frames.length, "frame")}, ${plural(t.template.variants.length, "variant")}  ${t.dataset ? `bound to ${datasetName(t.dataset)}` : "not bound"}`,
+			...(t.view ? describeView(t.view, datasetName) : []),
 			...(t.unfilled.length > 0
 				? [`    no column fills ${t.unfilled.join(", ")}`]
 				: []),
@@ -203,6 +245,30 @@ function describeWorkspace(info: WorkspaceInspection): string {
 				)),
 	];
 	return lines.join("\n");
+}
+
+function describeView(
+	view: NonNullable<WorkspaceInspection["templates"][number]["view"]>,
+	datasetName: (id: string) => string,
+): string[] {
+	const parts = [
+		...(view.join
+			? [
+					`${view.join.inner ? "inner " : ""}joined to ${datasetName(view.join.dataset)} on ${view.join.on} = ${view.join.key}${view.join.prefix ? ` as ${view.join.prefix}*` : ""}`,
+				]
+			: []),
+		...(view.filters.length > 0 ? [`where ${view.filters.join(", ")}`] : []),
+	];
+	const notes = [
+		...(view.unmatched > 0 ? [`${view.unmatched} unmatched`] : []),
+		...(view.duplicateKeys.length > 0
+			? [`duplicate keys ${view.duplicateKeys.join(", ")}`]
+			: []),
+	];
+	return [
+		`    view: ${parts.join(", ")}: ${view.records} ${view.records === 1 ? "record" : "records"}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}`,
+		...view.problems.map((p) => `    view problem: ${p}`),
+	];
 }
 
 function describe(info: Inspection): string {

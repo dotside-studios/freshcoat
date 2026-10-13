@@ -1,4 +1,9 @@
-import { PAPER_SIZES_MM, type PaperName } from "@freshcoat-js/workspace";
+import {
+	PAPER_SIZES_MM,
+	type PaperName,
+	parseFilter,
+	type ViewFilter,
+} from "@freshcoat-js/workspace";
 
 export class ArgumentError extends Error {
 	constructor(message: string) {
@@ -18,6 +23,14 @@ export function collectSetting(
 	const at = entry.indexOf("=");
 	if (at <= 0) throw new ArgumentError("Expected key=value.");
 	return { ...previous, [entry.slice(0, at)]: entry.slice(at + 1) };
+}
+
+export function collectFilter(entry: string, previous: ViewFilter[] = []): ViewFilter[] {
+	try {
+		return [...previous, parseFilter(entry)];
+	} catch (error) {
+		throw new ArgumentError(error instanceof Error ? error.message : String(error));
+	}
 }
 
 export function collectScale(entry: string, previous: number[] = []): number[] {

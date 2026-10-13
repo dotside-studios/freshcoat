@@ -47,6 +47,12 @@ describe("planRender", () => {
 			kind: "workspace",
 			options: { preset: "All", records: "failed", save: true, jobs: 2, out: "x.zip", quiet: false },
 		});
+		const where = [{ column: "tier", op: "equals" as const, value: "gold" }];
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", where }))).toEqual({
+			kind: "workspace",
+			options: { preset: "All", where, out: "x.zip", quiet: false },
+		});
+		expect(planRender("card.coat", input({ data: "people.csv", out: "x.zip", where })).kind).toBe("batch");
 	});
 
 	test("refuses options that do not go together", () => {
@@ -67,6 +73,7 @@ describe("planRender", () => {
 			["card.coat", { pngAlpha: "keep", out: "x.pdf" }, "--png-alpha applies only to images; a PDF takes --pdf-pages"],
 			["club.coatworkspace", { out: "x.zip", pngAlpha: "keep" }, "--png-alpha applies only to templates"],
 			["card.coat", { out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
+			["card.coat", { out: "x.zip", where: [{ column: "name", op: "empty" }] }, "--where needs --data or a .coatworkspace file"],
 		];
 		for (const [file, options, message] of cases)
 			expect({ file, options, message: refusal(file, options) }).toEqual({ file, options, message });

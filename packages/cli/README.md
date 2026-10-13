@@ -75,6 +75,7 @@ freshcoat render card.coat --data people.csv --out cards.zip
 freshcoat render card.coat --data people.csv --name "{{member_id}}-{{side}}" --format jpeg --quality 85 --out cards
 freshcoat render card.coat --data people.csv --sheets a4 --duplex long --bleed --out sheets.pdf
 freshcoat render club.coatworkspace --preset "All cards" --out cards.zip
+freshcoat render club.coatworkspace --preset "All cards" --where tier=gold --out gold.zip
 ```
 
 Takes a template (a `.coat` file or template JSON) or a `.coatworkspace`.
@@ -123,6 +124,8 @@ named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
 
+`--where` keeps the rows that match, by field key, as for a workspace below.
+
 `--set` and `--values` fill a field the same way in every row, over its
 column. `--variant`, `--frame`, `--format` and `--png-alpha` work as above, the last two for
 images only, and `--scale` takes one value. A required field no column or `--set`
@@ -170,6 +173,27 @@ freshcoat render club.coatworkspace --preset "All cards" --save --out cards.zip
 freshcoat render club.coatworkspace --preset "All cards" --records failed --save --out retry.zip
 ```
 
+`--where <filter>` exports only the records that match, over the records view
+saved with the template's binding, if any; repeat it and every filter must
+match. A filter is a column key, an operator and a value:
+
+| Filter | Keeps records whose cell |
+|---|---|
+| `tier=gold` | equals `gold`: as a number, date or yes and no in those columns, else as text ignoring case |
+| `tier=` | is empty |
+| `name~ann` | contains `ann`, ignoring case |
+| `points<10`, `points<=10`, `points>10`, `points>=10` | is a number or date below or above the value |
+| `tier!=gold`, `tier!=`, `name!~ann`, `not points>10` | does not match |
+
+Quote a filter with `<` or `>` so the shell does not read it as a redirect.
+`--where` applies to this run only: `--save` writes the record statuses and
+leaves the saved view alone. A filter on a missing column, or with a value its
+column cannot compare, exits 1 before anything renders.
+
+```sh
+freshcoat render club.coatworkspace --preset "All cards" --records pending --where "joined>=2024-01-01" --out new.zip
+```
+
 #### Threads
 
 An export from a template or a workspace renders on worker threads, each with
@@ -205,9 +229,10 @@ warns about what Studio's Issues list shows, without failing:
   the template uses.
 
 A `.coatworkspace` is checked as a whole: each template as above, a binding to
-a dataset the workspace does not have, a preset whose template is missing or
-whose sheets the cards do not fit, and, as a warning, required fields no column
-fills. `--strict` exits 1 on warnings too.
+a dataset the workspace does not have, a records view that cannot apply, a
+preset whose template is missing or whose sheets the cards do not fit, and, as
+warnings, required fields no column fills and keys more than one joined record
+holds. `--strict` exits 1 on warnings too.
 
 ### inspect
 
@@ -222,11 +247,14 @@ declares each. `--json` prints the same as one object with `frames`, `fields`,
 `variants` and `fonts` arrays.
 
 For a `.coatworkspace` it lists each template with its size, frames, variants,
-the dataset it is bound to and the required fields no column fills; each
+the dataset it is bound to, its records view (the join, the filters as
+`--where` writes them and how many records they keep) and the required fields
+no column fills; each
 dataset with its records by status and its columns; and each preset with its
 template, format, record filter, how many items it exports and, on sheets, how
 they lay out or why they cannot. `--json` prints `templates`, `datasets` and
-`presets` arrays, each template with its own inspection as above.
+`presets` arrays, each template with its own inspection as above and, with a
+view, a `view` object.
 
 ### pack
 

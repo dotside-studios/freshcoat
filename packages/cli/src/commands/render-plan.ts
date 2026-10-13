@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "dryRun", "jobs", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = ["dpi", "pdfPages", "sheets", "duplex", "margin", "gap", "cropMarks"];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
@@ -42,6 +42,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(preset ? { preset } : {}),
 				...(records ? { records } : {}),
 				...(save ? { save } : {}),
+				...(rest.where ? { where: rest.where } : {}),
 				...(rest.dryRun ? { dryRun: rest.dryRun } : {}),
 				...(rest.jobs ? { jobs: rest.jobs } : {}),
 				out,
@@ -55,6 +56,8 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError(`${listed(workspaceOnly, "needs", "need")} a .coatworkspace file`);
 	if (rest.pngAlpha !== undefined && rest.format !== undefined && rest.format !== "png")
 		throw new UsageError("--png-alpha needs --format png");
+	if (rest.where !== undefined && rest.data === undefined)
+		throw new UsageError("--where needs --data or a .coatworkspace file");
 	if (rest.data === undefined && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)

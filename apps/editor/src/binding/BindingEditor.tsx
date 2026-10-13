@@ -10,6 +10,7 @@ import type {
 	VariantSource,
 } from "@freshcoat-js/workspace";
 import {
+	bindingView,
 	imageFields,
 	readsDataset,
 	rebindDataset,
@@ -23,6 +24,7 @@ import {
 	variantSourceOfKind,
 	withFieldSource,
 	withVariantSource,
+	withView,
 } from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import { useController } from "~/app/context";
@@ -30,6 +32,7 @@ import { EMPTY, VARIANT_EXPORT } from "~/app/copy";
 import { useEditor } from "~/state/hooks";
 import WarningIcon from "~icons/mingcute/warning-line";
 import { SOURCE_KINDS } from "./binding";
+import { ViewEditor } from "./ViewEditor";
 
 const NONE = "__none__";
 
@@ -41,10 +44,11 @@ export type BindingEditorProps = {
 	className?: string;
 };
 
-/** Which dataset a template reads from, where each of its fields gets its
- *  value, and which variants it exports. With no dataset only the variant
- *  choice remains, held by a binding with no dataset id. Controlled: every
- *  change is a whole new binding. */
+/** Which dataset a template reads from, which of its records through a
+ *  filter and join, where each of its fields gets its value, and which
+ *  variants it exports. With no dataset only the variant choice remains,
+ *  held by a binding with no dataset id. Controlled: every change is a whole
+ *  new binding. */
 export function BindingEditor({
 	template,
 	binding,
@@ -58,6 +62,8 @@ export function BindingEditor({
 		: undefined;
 	const fields = useMemo(() => templateFields(template), [template]);
 	const missing = bound !== undefined && dataset === undefined;
+	const view = bindingView(bound, datasets);
+	const viewed = view?.dataset;
 
 	return (
 		<div
@@ -86,6 +92,15 @@ export function BindingEditor({
 					Dataset not found. Choose another.
 				</p>
 			) : null}
+			{bound && dataset && view ? (
+				<ViewEditor
+					base={dataset}
+					view={bound.view}
+					result={view}
+					datasets={datasets}
+					onChange={(next) => onChange(withView(bound, next))}
+				/>
+			) : null}
 			{bound ? (
 				<>
 					<div className="flex flex-col divide-y divide-fc-border rounded-[3px] border border-fc-border">
@@ -99,7 +114,7 @@ export function BindingEditor({
 									key={field.key}
 									field={field}
 									source={bound.fields[field.key]}
-									dataset={dataset}
+									dataset={viewed}
 									onChange={(source) =>
 										onChange(withFieldSource(bound, field.key, source))
 									}
@@ -110,7 +125,7 @@ export function BindingEditor({
 					<VariantRow
 						template={template}
 						source={bound.variant}
-						dataset={dataset}
+						dataset={viewed}
 						onChange={(source) => onChange(withVariantSource(bound, source))}
 					/>
 				</>

@@ -15,6 +15,7 @@ import {
 } from "@freshcoat-js/coatfile/coat";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
+	boundDataset,
 	newId,
 	newPreset,
 	rebindDataset,
@@ -1816,9 +1817,7 @@ export class EditorController {
 		const t = this.base;
 		const slot = activeSlot(this.state);
 		const binding = slot?.binding;
-		const dataset = this.state.workspace?.datasets.find(
-			(d) => d.id === binding?.datasetId,
-		);
+		const dataset = boundDataset(binding, this.state.workspace?.datasets ?? []);
 		const index = dataset?.records.findIndex((r) => r.id === recordId) ?? -1;
 		const record = dataset?.records[index];
 		if (!t || !binding || !dataset || !record) return;
@@ -1834,9 +1833,11 @@ export class EditorController {
 
 	/** The records the Edit preview steps through: the bound dataset's. */
 	previewRecords(): readonly { id: string }[] {
-		const id = activeSlot(this.state)?.binding?.datasetId;
 		return (
-			this.state.workspace?.datasets.find((d) => d.id === id)?.records ?? []
+			boundDataset(
+				activeSlot(this.state)?.binding,
+				this.state.workspace?.datasets ?? [],
+			)?.records ?? []
 		);
 	}
 
