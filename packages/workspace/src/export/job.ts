@@ -6,8 +6,8 @@ import {
 } from "@freshcoat-js/coatfile";
 import { templateStem } from "@freshcoat-js/coatfile/coat";
 import { slug } from "../ids";
-import { SheetLayoutError } from "../impose";
-import { planExport } from "../plan";
+import { type Imposition, SheetLayoutError } from "../impose";
+import { planExport, vectorPages } from "../plan";
 import type {
 	Dataset,
 	ExportItem,
@@ -22,6 +22,7 @@ import {
 	type ItemRenderer,
 	type ItemSize,
 	itemRequest,
+	PIECES_NEED_RASTER_PAGES,
 	type RenderOutput,
 	type RenderRequest,
 	withBleed,
@@ -31,6 +32,7 @@ import {
 	planSheets,
 	presetBleed,
 	presetBleedMm,
+	type SheetItem,
 	sheetLayout,
 	withSideIndex,
 } from "./sheets";
@@ -322,6 +324,7 @@ export function runExportJob(
 	const plan: ExportItem[] = entry ? planExport(workspace, preset) : [];
 	const total = plan.length;
 	const pdf = preset.format === "pdf";
+	const pieced = plan.some((item) => item.piece !== undefined);
 	const concurrency = Math.max(1, pool.size);
 	const windowSize = 2 * concurrency;
 	const stats: JobStats = {
@@ -352,18 +355,34 @@ export function runExportJob(
 	// a record's sides by their place in the plan, so a failed front still
 	// leaves its back in the mirrored slot.
 	const sheet = pdf ? sheetLayout(preset) : null;
-	const cardMm = cardSizeMm(template.width, template.height, preset.dpi);
-	const pageBleedMm = pdf ? presetBleedMm(template, preset) : undefined;
 	const pageBleed = presetBleed(template, preset);
 	const pageOf = (item: ExportItem) =>
 		withBleed(variantSize(template, item.variantId), pageBleed);
+	/** A page's pixels: a piece's are what rendered, as its size depends on
+	 *  the outline; a side's are its own or the photo's. */
+	const pagePx = (index: number, out: RenderOutput, size?: ItemSize) =>
+		plan[index]?.piece !== undefined
+			? { width: out.width, height: out.height }
+			: size?.resize !== undefined
+				? { width: size.width, height: size.height }
+				: pageOf(plan[index] as ExportItem);
 	const sideIndex = withSideIndex(plan).map((item) => item.sideIndex);
+	if (pdf && pieced && vectorPages(preset))
+		return Promise.reject(new Error(PIECES_NEED_RASTER_PAGES));
+	// Pieces are cards of their own size, bleed and all.
+	let pieceSheets: Imposition<SheetItem> | undefined;
 	if (sheet) {
 		// Refused before anything renders, rather than after every page has.
 		const sheets = planSheets(plan, template, preset);
 		if (sheets?.error !== undefined)
 			return Promise.reject(new SheetLayoutError(sheets.error));
+		if (pieced) pieceSheets = sheets?.imposition;
 	}
+	const cardMm =
+		pieceSheets?.card ??
+		cardSizeMm(template.width, template.height, preset.dpi);
+	const pageBleedMm =
+		pdf && !pieced ? presetBleedMm(template, preset) : undefined;
 
 	const results: (JobItemResult | undefined)[] = new Array(total);
 	const outputs: (RenderOutput | undefined)[] = new Array(total);
@@ -496,14 +515,8 @@ export function runExportJob(
 									out.format === "jpeg" || out.format === "pdf"
 										? out.format
 										: "png",
-								widthPx:
-									size?.resize !== undefined
-										? size.width
-										: pageOf(plan[index]).width,
-								heightPx:
-									size?.resize !== undefined
-										? size.height
-										: pageOf(plan[index]).height,
+								widthPx: pagePx(index, out, size).width,
+								heightPx: pagePx(index, out, size).height,
 								...(sheet
 									? {
 											recordId: plan[index].recordId,

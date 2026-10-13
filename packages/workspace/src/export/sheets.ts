@@ -76,6 +76,10 @@ export const SHEETS_NEED_TEMPLATE_SIZE = "Sheets need Template size";
  *  every slot is one card's size. */
 export const SHEETS_NEED_ONE_SIZE = "Sheets need one card size";
 
+/** Why a plan of pieces that differ in size can't be laid out on sheets:
+ *  every slot is one card's size, and a piece has no bleed to trim. */
+export const SHEETS_NEED_ONE_PIECE_SIZE = "Sheets need one piece size";
+
 /** What the job bar says for a card that doesn't fit, where the full
  *  message, with both sizes in it, would be cut off. */
 export const SHEETS_DONT_FIT = "Doesn't fit the paper";
@@ -120,6 +124,8 @@ export function planSheets(
 			error: SHEETS_NEED_TEMPLATE_SIZE,
 			shortError: SHEETS_NEED_TEMPLATE_SIZE,
 		};
+	if (plan.some((item) => item.piece !== undefined))
+		return planPieceSheets(plan, template, preset, layout);
 	const sized = (id?: string) => {
 		const size = variantSize(template, id);
 		return size.width === template.width && size.height === template.height;
@@ -136,6 +142,52 @@ export function planSheets(
 			cardSizeMm(template.width, template.height, preset.dpi),
 			layout,
 			{ bleedMm: presetBleedMm(template, preset) },
+		);
+		return { layout, imposition };
+	} catch (e) {
+		if (e instanceof SheetLayoutError)
+			return { layout, error: e.message, shortError: shortSheetError(e) };
+		throw e;
+	}
+}
+
+/** A plan with pieces on sheets: each is a card of its own size with its bleed
+ *  baked in, so all the plan's items must share one size, a side exported
+ *  whole being its variant's size with the preset's bleed. */
+function planPieceSheets(
+	plan: readonly ExportItem[],
+	template: Pick<Template, "width" | "height" | "bleed" | "variants">,
+	preset: ExportPreset,
+	layout: SheetLayout,
+): SheetPlan {
+	const bleed = presetBleed(template, preset);
+	const whole = (item: ExportItem) => {
+		const size = variantSize(template, item.variantId);
+		return {
+			width: size.width + bleed.left + bleed.right,
+			height: size.height + bleed.top + bleed.bottom,
+		};
+	};
+	const sizeOf = (item: ExportItem) =>
+		item.piece !== undefined && item.pieceSize ? item.pieceSize : whole(item);
+	const one = sizeOf(plan[0] as ExportItem);
+	const same = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+	if (
+		!plan.every((item) => {
+			const size = sizeOf(item);
+			return same(size.width, one.width) && same(size.height, one.height);
+		})
+	)
+		return {
+			layout,
+			error: SHEETS_NEED_ONE_PIECE_SIZE,
+			shortError: SHEETS_NEED_ONE_PIECE_SIZE,
+		};
+	try {
+		const imposition = imposeSheets(
+			withSideIndex(plan),
+			cardSizeMm(one.width, one.height, preset.dpi),
+			layout,
 		);
 		return { layout, imposition };
 	} catch (e) {
