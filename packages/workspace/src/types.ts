@@ -178,6 +178,9 @@ export type TemplateEntry = {
 	guides?: TemplateGuides;
 };
 
+/** Whether an export writes a side whole, or one file per slice piece. */
+export type ExportSplit = "none" | "pieces";
+
 export type ExportFormat = "png-zip" | "jpeg-zip" | "webp-zip" | "pdf";
 
 /** How big each output is: the template's own size, or the size of the photo
@@ -272,6 +275,9 @@ export type ExportPreset = {
 	/** include the template's bleed around each card; default false, the
 	 *  trim alone */
 	bleed?: boolean;
+	/** `pieces` exports each slice of a side as its own file; a side with no
+	 *  slices exports whole. Default none. */
+	split?: ExportSplit;
 };
 
 export type Workspace = {
@@ -328,6 +334,10 @@ export type ExportItem = {
 	fileName: string;
 	values: Record<string, string>;
 	variantId?: string;
+	/** the slice this item is the piece of; unset for a whole side */
+	piece?: string;
+	/** a piece's size in design units: its box and its bleed */
+	pieceSize?: { width: number; height: number };
 	/** required fields the binding leaves to their defaults: unbound, or
 	 *  bound to a missing column. The item still renders. */
 	unfilled?: string[];
