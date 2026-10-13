@@ -62,9 +62,17 @@ const sheet: Template = {
 					edge: "score",
 					output: "none",
 				}),
-				rect("tear", 300, 0, 4, 200, { name: "tear", edge: "perforate" }, {
-					visibleWhen: { field: "strip" },
-				}),
+				rect(
+					"tear",
+					300,
+					0,
+					4,
+					200,
+					{ name: "tear", edge: "perforate" },
+					{
+						visibleWhen: { field: "strip" },
+					},
+				),
 				rect("plain", 320, 100, 50, 50, { name: "plain" }),
 			],
 		},
@@ -192,7 +200,11 @@ describe("itemCuts for a piece", () => {
 
 	it("follows the values", () => {
 		expect(() =>
-			itemCuts(sheet, { values: { strip: "false" }, side: "front", piece: "tear" }),
+			itemCuts(sheet, {
+				values: { strip: "false" },
+				side: "front",
+				piece: "tear",
+			}),
 		).toThrow(/no slice "tear"/);
 	});
 });
