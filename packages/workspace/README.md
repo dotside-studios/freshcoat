@@ -377,6 +377,70 @@ bleed since it is baked in; otherwise the job is refused with a
 `SheetLayoutError` ("Sheets need one piece size"). Pieces are raster only:
 `pdfPageImage: "vector"` with pieces is refused.
 
+### Cut files
+
+A cutter needs the outline of what it cuts, not the picture. A slice with an
+`edge` other than `none` is a cut line, and a preset can write those lines
+with its images.
+
+- `cutFile: "svg" | "dxf"` (default `none`), for the image zips: beside each
+  image, a file of its cut lines with the image's base name, so
+  `poster-1-front-left.png` gets `poster-1-front-left.svg` (the `@2x` of a
+  scaled export stays in the name). An item with no cut line gets no file. A
+  PDF ignores it.
+- `cutLines: true` (default `false`), for a PDF: the lines are stroked over each
+  page's art, 0.25 pt wide, in an optional content group named Cut that a
+  viewer can switch off. On sheets each card's lines sit on its art, bleed
+  and all, and are drawn on backs too. `assemblePdf()` draws the lines of any
+  `PdfPage.cut`.
+
+`itemCuts(template, item, { bleed, resize, pathOp })` works out the lines of
+one item, in the item image's own design units with the origin at its top-left
+corner:
+
+- A whole side has a line for every shown slice with an edge, moved by the
+  bleed when the image includes it.
+- A piece has its own outline, if its edge is not none, with the slice box at
+  the slice's own bleed, plus every `output: "none"` slice with an edge that
+  lies wholly inside the piece's box (a fold line across a card, say). One that
+  only crosses the box is left out, not clipped.
+
+Lines keep their kind and the slice's name. Slices are resolved with the
+record's values and variant, so a slice a value hides has no line.
+
+| Edge | SVG group, PDF stroke | DXF layer (ACI colour) |
+|---|---|---|
+| `through` | `through`, red `#FF0000` | `THROUGH` (1) |
+| `kiss` | `kiss`, magenta `#FF00FF` | `KISS` (6) |
+| `score` | `score`, blue `#0000FF` | `SCORE` (5) |
+| `perforate` | `perforate`, green `#00A000` | `PERFORATE` (3) |
+
+`CUT_STYLES` holds the table. `cutSvg(cuts, dpi)` writes an SVG sized in
+millimetres (design units / `dpi` x 25.4) with a viewBox in the item's design
+units, so it lies exactly over the item's image; it has a group per kind
+present and unfilled hairline paths, curves kept. `cutDxf(cuts, dpi)` writes
+ASCII DXF R12 (`AC1009`) in millimetres (`$INSUNITS` 4, `$MEASUREMENT` 1), y up,
+with a layer per kind present. Each line is a closed or open POLYLINE, the only
+polygon R12 has: LWPOLYLINE arrived with R13, and R12 is what the oldest
+importers still read. Curves are flattened to chords within 0.05 mm.
+
+The job writes the sidecars as the images go into the zip, working the lines out
+where it renders, so a live boolean on a vector is the shape it is rendered as.
+The files share the image's size and origin, whatever its pixel density.
+
+#### Cricut and Silhouette
+
+- Cricut Design Space: upload the PNG piece for Print Then Cut, or the SVG for
+  a cut-only job.
+- Silhouette Studio Basic Edition: open the DXF for the cut lines and the PNG
+  for the art. Basic reads DXF but not SVG.
+- Silhouette Studio Designer Edition and above: open the SVG, or the PDF with
+  its lines, and cut by line colour: red through, magenta kiss, blue score,
+  green perforate.
+
+To register the art and the lines, place both at the same top-left corner:
+they share size and origin.
+
 Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License
