@@ -67,5 +67,7 @@ export function layerIcon(layer: Layer, background = false): Icon {
 			return FrameIcon;
 		case "mask":
 			return MaskIcon;
+		case "slice":
+			return RectIcon;
 	}
 }
