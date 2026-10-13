@@ -23,6 +23,8 @@ export type LayerRow = {
 	bound: boolean;
 	/** The fields it reads, in the order it names them. */
 	fields: string[];
+	/** A rect or vector with the `slice` modifier. */
+	sliced: boolean;
 	/** A frame, mask or boolean vector, which accepts a drop "on" it. */
 	container: boolean;
 	/** Topmost first, a mask's source last. */
@@ -50,6 +52,7 @@ function rowFor(
 		element,
 		bound: fields.length > 0,
 		fields,
+		sliced: (element.properties as { slice?: unknown }).slice !== undefined,
 		container,
 		children: children(),
 	};

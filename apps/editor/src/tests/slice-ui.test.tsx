@@ -108,7 +108,9 @@ describe("Slice section", () => {
 			"slice" in (getElement(c.template as Template, "0/0")?.properties ?? {}),
 		).toBe(false);
 		act(() => c.undo());
-		expect(slice(c)).toEqual({});
+		expect(slice(c)).toBeUndefined();
+		act(() => c.redo());
+		expect(slice(c)).toBeUndefined();
 	});
 
 	it("edits the name, output, edge and bleed", async () => {
@@ -152,7 +154,7 @@ describe("Slice section", () => {
 	it("shows a mixed selection as indeterminate and sets all of it", () => {
 		const t = withSlice({ edge: "through" });
 		const c = setup(["0/0", "0/5"], t);
-		expect(checkbox().getAttribute("aria-checked")).toBe("mixed");
+		expect((checkbox() as HTMLInputElement).indeterminate).toBe(true);
 		fireEvent.click(checkbox());
 		expect(slice(c, "0/0")).toEqual({ edge: "through" });
 		expect(slice(c, "0/5")).toEqual({});
@@ -206,7 +208,7 @@ describe("Slice in the layer menu and the layers panel", () => {
 			within(screen.getByTestId("layer-row-0/4")).getByText("title"),
 		);
 		fireEvent.contextMenu(screen.getByTestId("layer-row-0/4"));
-		await screen.findByRole("menuitem", { name: "Group" });
+		await screen.findByRole("menuitem", { name: /^Group/ });
 		expect(screen.queryByRole("menuitem", { name: /slice/i })).toBeNull();
 	});
 });
