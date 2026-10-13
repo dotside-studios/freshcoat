@@ -1,9 +1,13 @@
 // @vitest-environment node
 
-import { sampleValues } from "@freshcoat-js/coatfile";
+import { NO_BLEED, sampleValues, type Template } from "@freshcoat-js/coatfile";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import { type LiveRequest, renderLiveFrame } from "~/render/live-frame";
+import {
+	type LiveRequest,
+	renderLiveFrame,
+	trimCrop,
+} from "~/render/live-frame";
 import {
 	createWorkerBackend,
 	type PreviewWorkerLike,
@@ -36,6 +40,16 @@ function request(over: Partial<LiveRequest> = {}): LiveRequest {
 }
 
 describe("preview sync", () => {
+	test("carries the bleed choice", () => {
+		const sender = createPreviewSender();
+		const receiver = createPreviewReceiver();
+		const plain = request();
+		expect(receiver.apply(sender.encode(plain)).bleed).toBeUndefined();
+		const bled = receiver.apply(sender.encode({ ...plain, bleed: true }));
+		expect(bled.bleed).toBe(true);
+		expect(bled.template).toBe(receiver.apply(sender.encode(plain)).template);
+	});
+
 	test("sends the template on a new identity, and assets, fonts and photos once", () => {
 		const sender = createPreviewSender();
 		const receiver = createPreviewReceiver();
@@ -148,6 +162,7 @@ const RESULT = {
 	barcodes: [],
 	timings: { compile: 1, layout: 1, lower: 1, paint: 1, total: 4 },
 	scale: 1,
+	bleed: NO_BLEED,
 	stats: {
 		paints: 1,
 		surfaceCreates: 1,
@@ -329,6 +344,77 @@ describe("main-thread fallback", () => {
 		expect(combine).toHaveBeenCalled();
 		expect(out.geometry.get("0/7/1")?.parentKey).toBe("0/7");
 		combine.mockRestore();
+		session.dispose();
+	});
+
+	test("paints the bleed around the trim and keeps trim layer boxes", async () => {
+		const base = doc();
+		const front = base.template_data[0];
+		if (!front) throw new Error("no front");
+		const template: Template = {
+			...base,
+			bleed: { top: 10, right: 20, bottom: 30, left: 40 },
+			template_data: [
+				{
+					...front,
+					elements: [
+						...front.elements,
+						{
+							id: "full",
+							type: "rect",
+							pos: { x: 0, y: 0 },
+							size: { width: 1000, height: 600 },
+							properties: { fill: "#ff0000" },
+						},
+						{
+							id: "edge",
+							type: "frame",
+							pos: { x: 0, y: 0 },
+							size: { width: 200, height: 100 },
+							properties: {
+								fill: "#00ff00",
+								children: [
+									{
+										id: "c",
+										type: "rect",
+										pos: { x: 5, y: 5 },
+										size: { width: 10, height: 10 },
+										properties: { fill: "#0000ff" },
+									},
+								],
+							},
+						},
+					],
+				},
+			],
+		};
+		const session = createRenderSession(
+			ck,
+			(width, height) => ({ width, height }) as OffscreenCanvas,
+		);
+		const trim = await renderLiveFrame(session, request({ template }));
+		const bled = await renderLiveFrame(
+			session,
+			request({ template, bleed: true }),
+		);
+		expect(trim.bleed).toEqual(NO_BLEED);
+		expect(bled.bleed).toEqual(template.bleed);
+		expect(bled.canvas).toMatchObject({ width: 1060, height: 640 });
+		expect(trim.canvas).toMatchObject({ width: 1000, height: 600 });
+		expect(bled.geometry).toEqual(trim.geometry);
+		expect(bled.geometry.get("0/7")?.rect).toMatchObject({
+			x: 0,
+			y: 0,
+			width: 1000,
+			height: 600,
+		});
+		expect(bled.geometry.get("0/8/0")?.rect).toMatchObject({ x: 5, y: 5 });
+		expect(trimCrop({ width: 1060, height: 640 }, bled)).toEqual({
+			x: 40,
+			y: 10,
+			width: 1000,
+			height: 600,
+		});
 		session.dispose();
 	});
 

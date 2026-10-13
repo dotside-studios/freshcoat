@@ -1,6 +1,10 @@
-import type { Template } from "@freshcoat-js/coatfile";
+import type { Sides, Template } from "@freshcoat-js/coatfile";
 import type { Node, PaintCacheStats } from "@freshcoat-js/engine";
-import { collectGeometry, type LayerGeometry } from "~/doc/geometry";
+import {
+	collectGeometry,
+	type LayerGeometry,
+	trimGeometry,
+} from "~/doc/geometry";
 import { buildPreview } from "~/doc/preview";
 import type { BarcodeIssue } from "~/state/store";
 import type { RenderSession, RenderTimings } from "./session";
@@ -18,6 +22,8 @@ export type LiveRequest = {
 	photos: Map<string, Uint8Array>;
 	/** Device pixels per template unit. */
 	density: number;
+	/** Paints the template's bleed around the trim. */
+	bleed?: boolean;
 };
 
 export type LiveResult = {
@@ -27,12 +33,14 @@ export type LiveResult = {
 	timings: RenderTimings;
 	/** The density actually painted at, after the export clamp. */
 	scale: number;
+	/** The bleed painted around the trim, in template units. */
+	bleed: Sides;
 };
 
 export type LiveFrame = LiveResult & {
 	/** The element on screen that shows the frame. */
 	canvas: HTMLCanvasElement;
-	/** A readable copy of the frame, when one was asked for. */
+	/** A readable copy of the frame's trim, when one was asked for. */
 	snapshot?: HTMLCanvasElement;
 };
 
@@ -61,14 +69,23 @@ export async function renderLiveFrame(
 		values: request.values,
 		fonts: request.fonts,
 		scale: request.density,
+		...(request.bleed ? { bleed: true } : {}),
 		collect: (root: Node) =>
 			collectGeometry(root, preview.pathIds, template, side),
 	});
+	const shown = preview.template;
 	return {
 		canvas: out.canvas,
-		geometry: out.geometry,
+		geometry: trimGeometry(
+			out.geometry,
+			shown.template_data[0]?.elements ?? [],
+			preview.pathIds,
+			{ width: shown.width, height: shown.height },
+			out.bleed,
+		),
 		timings: out.timings,
 		scale: out.scale,
+		bleed: out.bleed,
 		...splitWarnings(out.warnings, preview.pathIds),
 	};
 }
@@ -84,7 +101,7 @@ export function createMainBackend(session: RenderSession): LiveBackend {
 			return {
 				...result,
 				canvas: el,
-				...(snapshot ? { snapshot: copyCanvas(el) } : {}),
+				...(snapshot ? { snapshot: copyCanvas(el, trimCrop(el, result)) } : {}),
 			};
 		},
 		cacheStats: () => session.stats(),
@@ -92,13 +109,32 @@ export function createMainBackend(session: RenderSession): LiveBackend {
 	};
 }
 
+type Crop = { x: number; y: number; width: number; height: number };
+
+/** The trim's part of a frame painted with bleed, in device pixels. */
+export function trimCrop(
+	size: { width: number; height: number },
+	frame: { scale: number; bleed: Sides },
+): Crop {
+	const { scale, bleed } = frame;
+	const x = Math.round(bleed.left * scale);
+	const y = Math.round(bleed.top * scale);
+	return {
+		x,
+		y,
+		width: size.width - x - Math.round(bleed.right * scale),
+		height: size.height - y - Math.round(bleed.bottom * scale),
+	};
+}
+
 function copyCanvas(
 	source: CanvasImageSource & { width: number; height: number },
+	crop: Crop = { x: 0, y: 0, width: source.width, height: source.height },
 ) {
 	const copy = document.createElement("canvas");
-	copy.width = source.width;
-	copy.height = source.height;
-	copy.getContext("2d")?.drawImage(source, 0, 0);
+	copy.width = crop.width;
+	copy.height = crop.height;
+	copy.getContext("2d")?.drawImage(source, -crop.x, -crop.y);
 	return copy;
 }
 

@@ -2,7 +2,11 @@ import {
 	canvasKitPathOp,
 	compile,
 	type FrameWarning,
+	hasInsets,
+	NO_BLEED,
+	type Sides,
 	type Template,
+	templateBleed,
 } from "@freshcoat-js/coatfile";
 import {
 	createRenderer,
@@ -22,6 +26,8 @@ export type RenderInput<G> = {
 	fonts: Map<string, Uint8Array[]>;
 	/** Device pixels per template unit. */
 	scale: number;
+	/** Paints the template's bleed around the trim. */
+	bleed?: boolean;
 	/** Reads layer boxes off the laid-out scene. */
 	collect: (prepared: Node) => G;
 };
@@ -41,6 +47,8 @@ export type RenderOutput<G> = {
 	timings: RenderTimings;
 	/** The density actually painted at, after the export clamp. */
 	scale: number;
+	/** The bleed painted around the trim, in template units. */
+	bleed: Sides;
 };
 
 export type RenderSession = {
@@ -90,10 +98,12 @@ export function createRenderSession(
 				fonts = input.fonts;
 			}
 			const t0 = performance.now();
+			const bleed = input.bleed ? templateBleed(template) : NO_BLEED;
 			const compiled = compile(template, input.values, {
 				width: template.width,
 				height: template.height,
 				pathOp,
+				...(hasInsets(bleed) ? { bleed: true } : {}),
 			});
 			const frame = compiled.frames[0];
 			if (!frame) throw new Error("template has no side to render");
@@ -103,7 +113,7 @@ export function createRenderSession(
 			const geometry = input.collect(prepared);
 			const t2 = performance.now();
 
-			const design = { width: template.width, height: template.height };
+			const design = { width: compiled.width, height: compiled.height };
 			const scale = resolveExportScale(
 				{ kind: "scale", value: input.scale },
 				design,
@@ -130,6 +140,7 @@ export function createRenderSession(
 				// the compile warnings are read off the frame.
 				warnings: [...(frame.warnings ?? []), ...result.warnings],
 				scale,
+				bleed,
 				timings: {
 					compile: t1 - t0,
 					layout: t2 - t1,

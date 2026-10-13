@@ -21,7 +21,7 @@ import type { View } from "~/state/store";
 import { type DraftStore, useDrafts } from "./draft-store";
 import { GradientHandles } from "./gradient-handles";
 import { PathEditOverlay } from "./PathEditOverlay";
-import { PrintGuides } from "./PrintGuides";
+import { BleedShade, PrintGuides } from "./PrintGuides";
 
 export type OverlayDraft = {
 	marquee?: Rect;
@@ -85,6 +85,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 			aria-hidden="true"
 			data-testid="overlay"
 		>
+			<BleedShade view={view} />
 			<PrintGuides view={view} />
 			{hover && !selection.includes(hover) ? (
 				<Poly

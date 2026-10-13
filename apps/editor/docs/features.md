@@ -56,11 +56,15 @@ the records, and **Export** turns templates and records into files.
   A layer whose edge falls between the trim and the safe line is listed
   under "Print hints" in the status bar's Issues list.
 - **Bleed and safe area:** Template setup's Size group, and Design with
-  nothing selected, set a Bleed and a Safe area in template units, one value
-  for every side. A file with sides set apart shows Mixed until a value is
-  typed. The print guides draw the bleed as a dotted line outside the trim
-  and the safe area as a dashed line inside it, and are on by default for
-  any template that has either. A template's own safe area replaces the
+  nothing selected, set a Bleed and a Safe area in template units. Each is
+  one value for every side while linked; the link button beside it switches
+  to a top, right, bottom and left field. A file with sides set apart opens
+  unlinked, and linking it shows Mixed until a value is typed. Linking or
+  unlinking alone leaves the file as it is. The canvas paints what fills the
+  bleed past the trim under a wash of the pasteboard, so the trim reads
+  clearly; View > Bleed hides it for the session. The print guides draw the
+  bleed as a dotted line outside the trim and the safe area as a dashed line
+  inside it, and are on by default for any template that has either. A template's own safe area replaces the
   CR80 one, and its print hints follow it. The safe area must leave room
   inside the template, so a resize that would take that room away is
   refused. The format is described in the
@@ -593,7 +597,8 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   its record rendered at a low scale, plus the crop marks, and steps with
   "Sheet 3 of 21". A Front and Back switch picks the side of a double-sided
   sheet. Picking a record in the filmstrip moves to its sheet and outlines
-  its slot.
+  its slot. With "Include bleed", each slot shows its bleed around the trim
+  under a white wash, unless View > Bleed hides it.
 
 ## Variants
 

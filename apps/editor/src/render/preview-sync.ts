@@ -11,6 +11,7 @@ export type PreviewUpdate = {
 	side: number;
 	variantId?: string;
 	density: number;
+	bleed?: boolean;
 	template?: Template;
 	/** The template's assets by sha256, in order; null when it has none. */
 	assets?: string[] | null;
@@ -55,6 +56,7 @@ export function createPreviewSender() {
 			const update: PreviewUpdate = {
 				side: request.side,
 				density: request.density,
+				...(request.bleed ? { bleed: true } : {}),
 				...(request.variantId !== undefined
 					? { variantId: request.variantId }
 					: {}),
@@ -182,6 +184,7 @@ export function createPreviewReceiver() {
 				fonts,
 				photos,
 				density: update.density,
+				...(update.bleed ? { bleed: true } : {}),
 			};
 		},
 	};
