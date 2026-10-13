@@ -29,6 +29,9 @@
 	--color-fc-success: #22915c;
 	--color-fc-success-text: #16774a;
 	--color-fc-guide: #ff3d7f;
+	--color-fc-slice-cut: #e5383b;
+	--color-fc-slice-kiss: #d11fb4;
+	--color-fc-slice-score: #2f6fed;
 	--color-fc-tooltip: #ffffff;
 	--color-fc-scrim: rgb(20 20 24 / 0.32);
 	--color-fc-checker-a: #ffffff;
@@ -99,6 +102,9 @@
 	--color-fc-success: #30a46c;
 	--color-fc-success-text: #5cd49a;
 	--color-fc-guide: #ff3d7f;
+	--color-fc-slice-cut: #e5383b;
+	--color-fc-slice-kiss: #d11fb4;
+	--color-fc-slice-score: #2f6fed;
 	--color-fc-tooltip: #111113;
 	--color-fc-scrim: rgb(0 0 0 / 0.55);
 	--color-fc-checker-a: #c4c4c8;

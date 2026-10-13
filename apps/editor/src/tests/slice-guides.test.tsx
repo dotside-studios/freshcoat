@@ -82,7 +82,7 @@ describe("slices on the canvas", () => {
 		expect(a?.getAttribute("data-slice-output")).toBe("piece");
 		expect(a?.getAttribute("d")).toMatch(/^M\s*10[ ,]20/);
 		expect(a?.getAttribute("vector-effect")).toBe("non-scaling-stroke");
-		expect(a?.getAttribute("fill")).toBe("none");
+		expect(a?.getAttribute("class")).toContain("fill-none");
 		const rot = outline("rot");
 		expect(rot?.getAttribute("data-slice-edge")).toBe("through");
 		expect(rot?.getAttribute("data-slice-output")).toBe("none");
@@ -94,11 +94,11 @@ describe("slices on the canvas", () => {
 		const c = canvas(t);
 		const look = () => {
 			const a = outline("a");
-			return [a?.getAttribute("stroke"), a?.getAttribute("stroke-dasharray")];
+			return [a?.getAttribute("class"), a?.getAttribute("stroke-dasharray")];
 		};
 		const kiss = look();
 		const through = [
-			outline("rot")?.getAttribute("stroke"),
+			outline("rot")?.getAttribute("class"),
 			outline("rot")?.getAttribute("stroke-dasharray"),
 		];
 		expect(kiss[0]).not.toBe(through[0]);

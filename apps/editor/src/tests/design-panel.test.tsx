@@ -152,13 +152,14 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("orders a rect's sections Layer, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
+	it("orders a rect's sections Layer, Slice, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
 		setup(["0/0"]);
 		const titles = screen
 			.getAllByRole("heading", { level: 3 })
 			.map((h) => h.textContent);
 		expect(titles).toEqual([
 			"Layer",
+			"Slice",
 			"Fill",
 			"Stroke",
 			"Effects",

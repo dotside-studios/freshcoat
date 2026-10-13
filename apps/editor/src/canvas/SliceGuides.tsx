@@ -42,8 +42,7 @@ export function SliceGuides({ view }: { view: View }) {
 					<path
 						key={s.id}
 						d={s.path}
-						fill="none"
-						stroke={SLICE_EDGE[s.edge].stroke}
+						className={`fill-none ${SLICE_EDGE[s.edge].stroke}`}
 						strokeWidth={1}
 						strokeDasharray={SLICE_EDGE[s.edge].dash}
 						vectorEffect="non-scaling-stroke"
@@ -67,8 +66,7 @@ function SliceLabel({ slice, view }: { slice: ResolvedSlice; view: View }) {
 			x={view.x + slice.box.x * view.zoom}
 			y={view.y + slice.box.y * view.zoom - 3}
 			fontSize={LABEL_SIZE}
-			fill={SLICE_EDGE[slice.edge].stroke}
-			className="font-sans"
+			className={`font-sans ${SLICE_EDGE[slice.edge].text}`}
 			data-testid="slice-label"
 			data-slice-id={slice.id}
 		>

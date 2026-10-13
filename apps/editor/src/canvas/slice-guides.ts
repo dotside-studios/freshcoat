@@ -33,12 +33,36 @@ export function useSlicesShown(): boolean {
 
 type Edge = ResolvedSlice["edge"];
 
-/** How each kind of edge is stroked. Dash lengths are in screen pixels, since
- *  the outlines are non-scaling. */
-export const SLICE_EDGE: Record<Edge, { stroke: string; dash: string }> = {
-	none: { stroke: "#e5383b", dash: "5 3" },
-	through: { stroke: "#e5383b", dash: "5 3" },
-	kiss: { stroke: "#d11fb4", dash: "5 3" },
-	score: { stroke: "#2f6fed", dash: "14 4" },
-	perforate: { stroke: "#e5383b", dash: "1.5 3" },
+/** How each kind of edge is stroked: a theme colour as stroke and fill
+ *  classes, and dash lengths in screen pixels, since the outlines are
+ *  non-scaling. */
+export const SLICE_EDGE: Record<
+	Edge,
+	{ stroke: string; text: string; dash: string }
+> = {
+	none: {
+		stroke: "stroke-fc-slice-cut",
+		text: "fill-fc-slice-cut",
+		dash: "5 3",
+	},
+	through: {
+		stroke: "stroke-fc-slice-cut",
+		text: "fill-fc-slice-cut",
+		dash: "5 3",
+	},
+	kiss: {
+		stroke: "stroke-fc-slice-kiss",
+		text: "fill-fc-slice-kiss",
+		dash: "5 3",
+	},
+	score: {
+		stroke: "stroke-fc-slice-score",
+		text: "fill-fc-slice-score",
+		dash: "14 4",
+	},
+	perforate: {
+		stroke: "stroke-fc-slice-cut",
+		text: "fill-fc-slice-cut",
+		dash: "1.5 3",
+	},
 };
