@@ -10,6 +10,7 @@ import type {
 import type { z } from "zod";
 import type { PathOp } from "./boolean";
 import type { ImageDpiWarning } from "./image-dpi";
+import type { PrintCheckWarning } from "./print-checks";
 import type {
 	AdjustSchema,
 	BackgroundSchema,
@@ -235,13 +236,14 @@ export type PrintWarning = {
 	pullback: number;
 };
 
-/** What a rendered frame reports: the painter's warnings, then compile's and
- *  the print planner's. */
+/** What a rendered frame reports: the painter's warnings, then compile's, the
+ *  print planner's and the print checks'. */
 export type FrameWarning =
 	| PaintWarning
 	| CompileWarning
 	| PrintWarning
-	| ImageDpiWarning;
+	| ImageDpiWarning
+	| PrintCheckWarning;
 
 export type FrameAssets = {
 	fonts: FontRequest[];

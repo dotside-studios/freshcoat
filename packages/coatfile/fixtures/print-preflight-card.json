@@ -1,0 +1,82 @@
+{
+	"format_version": "1.6",
+	"version": "1.0.0",
+	"id": "print-preflight-card",
+	"name": "Print preflight",
+	"description": "One layer for each print check: small text, a thin face, a hairline, rich-black small text and art short of the bleed.",
+	"product": "card_cr80",
+	"width": 1012,
+	"height": 638,
+	"bleed": 24,
+	"fields": {
+		"type": "object",
+		"properties": {
+			"name": { "type": "string", "title": "Name", "default": "Ada" }
+		}
+	},
+	"template_data": [
+		{
+			"name": "front",
+			"background": {
+				"id": "front_bg",
+				"type": "rect",
+				"properties": { "fill": "#ffffff" }
+			},
+			"elements": [
+				{
+					"id": "band",
+					"type": "rect",
+					"pos": { "x": 0, "y": 0 },
+					"size": { "width": 1012, "height": 120 },
+					"properties": {
+						"fill": "#0f766e",
+						"stroke": { "color": "#134e4a", "width": 4 }
+					}
+				},
+				{
+					"id": "fine_print",
+					"type": "text",
+					"pos": { "x": 64, "y": 560 },
+					"size": { "width": 600, "height": 30 },
+					"properties": {
+						"value": "Terms apply",
+						"font": { "family": "Inter", "size": 20 },
+						"color": "#000000"
+					}
+				},
+				{
+					"id": "thin_label",
+					"type": "text",
+					"pos": { "x": 64, "y": 500 },
+					"size": { "width": 600, "height": 40 },
+					"properties": {
+						"value": "Member",
+						"font": { "family": "Inter", "size": 27, "weight": 200 },
+						"color": "#000000"
+					}
+				},
+				{
+					"id": "rule",
+					"type": "rect",
+					"pos": { "x": 64, "y": 300 },
+					"size": { "width": 884, "height": 2 },
+					"properties": {
+						"fill": "#ffffff",
+						"stroke": { "color": "#000000", "width": 0.5 }
+					}
+				},
+				{
+					"id": "name",
+					"type": "text",
+					"pos": { "x": 64, "y": 200 },
+					"size": { "width": 884, "height": 60 },
+					"properties": {
+						"value": "{{name}}",
+						"font": { "family": "Inter", "size": 36, "weight": 700 },
+						"color": "#101828"
+					}
+				}
+			]
+		}
+	]
+}
