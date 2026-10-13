@@ -1061,6 +1061,30 @@ describe("validate warnings for a CR80 card", () => {
 	});
 });
 
+describe("validate warnings for slices", () => {
+	test("warns that an open path slice exports as a cut line only", async () => {
+		const t = card({ format_version: "1.7" });
+		const front = t.template_data[0]!;
+		front.elements = [
+			...front.elements,
+			{
+				id: "fold",
+				type: "vector",
+				pos: { x: 10, y: 50 },
+				size: { width: 100, height: 2 },
+				properties: { d: "M0 1L100 1", slice: { edge: "score" } },
+			},
+		];
+		await box.write("open-slice.json", JSON.stringify(t));
+		const run = await box.run("validate", "open-slice.json");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe(
+			'warning: front: "fold" is an open path, so it exports as a cut line, not a piece\n',
+		);
+		expect(run.stdout).toBe("open-slice.json is valid, with 1 warning\n");
+	});
+});
+
 describe("workspaces in inspect and validate", () => {
 	beforeAll(async () => {
 		await box.write("club.coatworkspace", await workspaceBytes(workspaceOf(card())));
