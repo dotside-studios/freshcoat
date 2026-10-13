@@ -202,6 +202,7 @@ export {
 	resolveStrokeTrim,
 	type StrokeTrimInput,
 } from "./stroke-trim";
+export { strokeSides, widestStroke } from "./stroke-width";
 export {
 	compiledPattern,
 	PATTERN_CACHE_MAX,
@@ -220,6 +221,7 @@ export type {
 	BlendMode,
 	BooleanOp,
 	BooleanOperandElement,
+	BoxStroke,
 	Command,
 	CompiledFrame,
 	CompiledTemplate,
@@ -286,6 +288,7 @@ export type {
 	Size,
 	SliceModifier,
 	Stroke,
+	StrokeSideWidths,
 	Symbology,
 	Template,
 	TemplateFrame,

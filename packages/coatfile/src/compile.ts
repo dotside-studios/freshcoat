@@ -48,6 +48,7 @@ import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
+import { strokeSides, widestStroke } from "./stroke-width";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -75,6 +76,7 @@ import type {
 	ShapeMask,
 	Size,
 	Stroke,
+	StrokeSideWidths,
 	Symbology,
 	Template,
 	TemplateFrame,
@@ -1241,7 +1243,7 @@ function hasOverrides(span: TextSpanInput): boolean {
 
 type StrokeInput = {
 	color: string | Gradient;
-	width: number;
+	width: number | StrokeSideWidths;
 	dash?: number[];
 	cap?: Stroke["cap"];
 	join?: Stroke["join"];
@@ -1261,13 +1263,35 @@ function resolveStroke(
 					color: color.stops[0]?.color ?? "#000000",
 					gradient: resolveFill(color, ratio) as GradientFill,
 				}),
-		width: stroke.width * ratio,
+		...resolveStrokeWidth(stroke.width, ratio),
 		dash: stroke.dash?.map((d) => d * ratio),
 		cap: stroke.cap,
 		join: stroke.join,
 		align: stroke.align,
 		...resolveStrokeTrim(stroke),
 	};
+}
+
+// A per-side width becomes the engine's `sides`, with `width` the widest. Four
+// equal sides are one width.
+function resolveStrokeWidth(
+	width: number | StrokeSideWidths,
+	ratio: number,
+): Pick<Stroke, "width" | "sides"> {
+	const s = strokeSides(width);
+	if (!s) return { width: (width as number) * ratio };
+	const sides = {
+		top: s.top * ratio,
+		right: s.right * ratio,
+		bottom: s.bottom * ratio,
+		left: s.left * ratio,
+	};
+	const widest = widestStroke(sides);
+	const uniform =
+		sides.top === sides.right &&
+		sides.top === sides.bottom &&
+		sides.top === sides.left;
+	return uniform ? { width: widest } : { width: widest, sides };
 }
 
 function scaleShadow(
