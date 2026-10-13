@@ -386,7 +386,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice` |
+| 1.7 | rect and vector `slice`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -926,10 +926,14 @@ stroke and its dashes all sample the same gradient as a fill would.
 "stroke": { "width": 4, "align": "inside", "color": { "kind": "linear", "angle": 0, "stops": [ … ] } }
 ```
 
-A `rect` or `frame` takes `cornerRadius` as one number or per corner,
-`[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
-fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
-an `outside` stroke beyond its clip, so the clip never hides it.
+A `rect`, `frame` or `image` takes `cornerRadius` as one number or per
+corner, `[topLeft, topRight, bottomRight, bottomLeft]`, and `cornerSmoothing`
+from 0 to 1, Figma's corner smoothing. A frame applies them to its fill, its
+stroke, its backdrop blur and, with `clipsContent`, its clip. A clipping frame
+draws an `outside` stroke beyond its clip, so the clip never hides it. An
+image applies them to its clip and its stroke; its `mask` wins over both.
+Frame `cornerSmoothing`, per-corner image radii and image `cornerSmoothing`
+need 1.7. A smoothed outline is a path, so PDF keeps it vector.
 
 `trimStart` and `trimEnd` draw only part of a stroke, as fractions of
 the outline's length from its start; `trimOffset` rotates that part along the

@@ -370,6 +370,12 @@ export const ImageCropSchema = z.object({
 	height: z.number().gt(0).max(1),
 });
 
+// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
+export const CornerRadiusSchema = z.union([
+	z.number(),
+	z.tuple([z.number(), z.number(), z.number(), z.number()]),
+]);
+
 export const ImagePropertiesSchema = z.object({
 	src: z.string(),
 	fit: z.enum(["cover", "contain", "fill", "tile"]),
@@ -385,7 +391,8 @@ export const ImagePropertiesSchema = z.object({
 	// The part of the source that is drawn, before `fit` places it. Ignored by
 	// `tile`.
 	crop: ImageCropSchema.optional(),
-	cornerRadius: z.number().optional(),
+	cornerRadius: CornerRadiusSchema.optional(),
+	cornerSmoothing: z.number().min(0).max(1).optional(),
 	mask: ImageMaskSchema.optional(),
 	stroke: StrokeSchema.optional(),
 });
@@ -429,12 +436,6 @@ export const BarcodePropertiesSchema = z.object({
 	// itf14 only. Default "none".
 	bearerBars: BearerBarsSchema.optional(),
 });
-
-// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
-export const CornerRadiusSchema = z.union([
-	z.number(),
-	z.tuple([z.number(), z.number(), z.number(), z.number()]),
-]);
 
 /** An inset from each edge of the trim, in design units: one number for every
  *  side, or each side on its own. */
@@ -711,6 +712,7 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 		fill: FillsSchema.optional(),
 		stroke: StrokeSchema.optional(),
 		cornerRadius: CornerRadiusSchema.optional(),
+		cornerSmoothing: z.number().min(0).max(1).optional(),
 		// Figma's `clipsContent`. When true, children are clipped to the frame,
 		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
