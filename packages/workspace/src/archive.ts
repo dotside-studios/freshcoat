@@ -194,6 +194,7 @@ const PresetSchema = z.object({
 	destination: z.enum(["download", "zip-file", "folder"]).optional(),
 	scale: z.number().min(1).max(4),
 	dpi: z.number().positive(),
+	minImageDpi: z.number().min(0).optional(),
 	fileName: z.string(),
 	markExported: z.boolean(),
 	print: z
