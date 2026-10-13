@@ -282,8 +282,9 @@ function fontRun(font: ResolvedFont, color: string | undefined): TextRun {
 /**
  * The print checks on a side's lowered commands, in the units they are drawn
  * in, `dpi` to the inch. Text is read as laid out, after fields are filled and
- * `fit` has shrunk it, and a stroke as scaled by its path's viewBox. One
- * warning per layer and check, the worst.
+ * `fit` has shrunk it, and a stroke as scaled by its path's viewBox. A part
+ * drawn without an id of its own, such as a barcode's caption, is reported as
+ * the layer it is in. One warning per layer and check, the worst.
  */
 export function printCheckWarnings(
 	commands: readonly { op: string }[],
@@ -297,26 +298,30 @@ export function printCheckWarnings(
 		if (prev && measure(prev) <= measure(issue)) return;
 		found.set(key, { kind: "print_check", ...(layer ? { layer } : {}), issue });
 	};
-	const visit = (cmd: DrawCommand) => {
-		if (cmd.op === "drawGroup") cmd.children.forEach(visit);
-		else if (cmd.op === "drawMasked") cmd.children.forEach(visit);
+	const visit = (cmd: DrawCommand, parent: string | undefined) => {
+		const layer = cmd.id ?? parent;
+		if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
+			for (const c of cmd.children) visit(c, layer);
 		if (cmd.op === "drawText") {
 			const solid = cmd.fill === undefined || cmd.fill.kind === "solid";
 			const runs = cmd.layout.lines.flatMap((line) =>
 				line.spans.map((s) => fontRun(s.font, solid ? s.color : undefined)),
 			);
-			const all = runs.length > 0 ? runs : [fontRun(cmd.layout.font, solid ? cmd.color : undefined)];
-			for (const issue of textIssues(all, o)) add(cmd.id, issue);
+			const all =
+				runs.length > 0
+					? runs
+					: [fontRun(cmd.layout.font, solid ? cmd.color : undefined)];
+			for (const issue of textIssues(all, o)) add(layer, issue);
 		}
 		const stroke = (cmd as { stroke?: Stroke | TextStroke }).stroke;
 		const issue = strokeIssue(
 			stroke ? stroke.width * commandStrokeScale(cmd) : undefined,
 			o,
 		);
-		if (issue) add(cmd.id, issue);
+		if (issue) add(layer, issue);
 	};
 	for (const cmd of commands)
-		if (cmd.op.startsWith("draw")) visit(cmd as DrawCommand);
+		if (cmd.op.startsWith("draw")) visit(cmd as DrawCommand, undefined);
 	return [...found.values()];
 }
 
