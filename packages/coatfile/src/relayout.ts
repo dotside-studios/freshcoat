@@ -225,17 +225,6 @@ function resizeElement(
 			},
 		};
 	}
-	if (next.type === "slice" && el.type === "slice") {
-		const shape = el.properties.shape;
-		if (shape?.kind !== "path") return next;
-		return {
-			...next,
-			properties: {
-				...next.properties,
-				shape: { ...shape, d: resizePath(shape.d, before, box.size) },
-			},
-		};
-	}
 	if (next.type === "frame") {
 		const auto = next.properties.layout !== undefined;
 		return {

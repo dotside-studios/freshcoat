@@ -231,9 +231,7 @@ function compileFrame(
 	};
 	const children: Node[] = [
 		compileBackground(frame.background, ctx, targetWidth, targetHeight, ratio),
-		...frame.elements
-			.filter((el) => el.type !== "slice")
-			.map((el) => compileElement(el, ctx, ratio, scope)),
+		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
 	];
 	const root: GroupNode = {
 		kind: "group",
@@ -414,8 +412,6 @@ function compileElement(
 				...(props.channel === "luminance" ? { channel: "luminance" } : {}),
 				...(props.invert === true ? { invert: true } : {}),
 			} satisfies MaskNode;
-		case "slice":
-			throw new Error("compile: a slice is not painted");
 		case "frame":
 			return compileFrameElement(transform, props, ratio, ctx, scope);
 		default:

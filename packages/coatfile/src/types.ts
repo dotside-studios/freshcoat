@@ -37,8 +37,7 @@ import type {
 	QrCodePropertiesSchema,
 	RectElementSchema,
 	RectPropertiesSchema,
-	SliceElementSchema,
-	SliceShapeSchema,
+	SliceModifierSchema,
 	SymbologySchema,
 	StrokeSchema,
 	TemplateFrameSchema,
@@ -82,8 +81,7 @@ export type ImageElement = z.infer<typeof ImageElementSchema>;
 export type QrCodeElement = z.infer<typeof QrCodeElementSchema>;
 export type BarcodeElement = z.infer<typeof BarcodeElementSchema>;
 export type RectElement = z.infer<typeof RectElementSchema>;
-export type SliceElement = z.infer<typeof SliceElementSchema>;
-export type SliceShape = z.infer<typeof SliceShapeSchema>;
+export type SliceModifier = z.infer<typeof SliceModifierSchema>;
 
 export type VisibilityCondition = z.infer<typeof VisibilityConditionSchema>;
 export type Layout = z.infer<typeof LayoutSchema>;

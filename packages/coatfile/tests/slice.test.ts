@@ -11,7 +11,7 @@ type Modifier = Record<string, unknown>;
 // is a pure split region unless `props` paints it.
 const shape = (
 	id: string,
-	modifier: Modifier | undefined = {},
+	modifier: Modifier | null = {},
 	extra: Record<string, unknown> = {},
 	props: Record<string, unknown> = {},
 ): Element =>
@@ -26,7 +26,7 @@ const shape = (
 
 const vector = (
 	id: string,
-	modifier: Modifier | undefined = {},
+	modifier: Modifier | null = {},
 	props: Record<string, unknown> = {},
 	extra: Record<string, unknown> = {},
 ): Element =>
@@ -177,7 +177,7 @@ describe("slice validation", () => {
 	});
 
 	test("a shape without the modifier takes no part", () => {
-		expect(codes(template(shape("a", undefined), shape("a2", undefined)))).toEqual(
+		expect(codes(template(shape("a", null), shape("a2", null)))).toEqual(
 			[],
 		);
 	});
@@ -228,7 +228,7 @@ describe("slice compile", () => {
 		const paint = { fill: "#ff0000", cornerRadius: 4 };
 		const size = { width: 100, height: 80 };
 		const plain = compile(
-			template(shape("s", undefined, {}, paint), vector("v", undefined)),
+			template(shape("s", null, {}, paint), vector("v", null)),
 			{},
 			size,
 		);
@@ -246,7 +246,7 @@ describe("slice compile", () => {
 	test("an unpainted shape draws nothing", () => {
 		const c = compile(template(shape("s")), {}, { width: 100, height: 80 });
 		const [node] = c.frames[0].root.children.slice(-1);
-		expect(node).toMatchObject({ kind: "rect", fills: [] });
+		expect(node).toMatchObject({ kind: "rect", fills: undefined, stroke: undefined });
 	});
 });
 
@@ -331,7 +331,10 @@ describe("resolveSlices", () => {
 			operands: [rect("a"), rect("b")],
 		};
 		const el = vector("v", {}, { boolean, d: "M0 0 L40 0 L0 30 Z" });
-		const pathOp = () => ({ d: "M0 0 L20 0 L20 10 Z" });
+		const pathOp = () => ({
+			d: "M0 0 L20 0 L20 10 Z",
+			box: { x: 0, y: 0, width: 20, height: 10 },
+		});
 		const [live] = resolveSlices(template(el), { pathOp });
 		expect(live.path).toBe("M10 20L30 20L30 30Z");
 		const [cached] = resolveSlices(template(el), {});
@@ -352,7 +355,7 @@ describe("resolveSlices", () => {
 	});
 
 	test("shapes without the modifier are ignored", () => {
-		expect(ids(resolveSlices(template(rect("r"), shape("s"), vector("v", undefined))))).toEqual(
+		expect(ids(resolveSlices(template(rect("r"), shape("s"), vector("v", null))))).toEqual(
 			["s"],
 		);
 	});

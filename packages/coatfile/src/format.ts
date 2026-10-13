@@ -21,7 +21,7 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
-//   1.7  `slice` element
+//   1.7  rect and vector `slice`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -75,7 +75,7 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.type === "barcode") need(3);
-			if (o.type === "slice") need(7);
+			if (usesSlice(o.properties)) need(7);
 			if (
 				o.type === "barcode" &&
 				(o.properties as Record<string, unknown> | undefined)?.bearerBars !==
@@ -119,6 +119,7 @@ export function minimumFormatVersion(template: Template): string {
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
 				if (usesBoolean(delta.properties)) need(6);
+				if (usesSlice(delta.properties)) need(7);
 			}
 		}
 	}
@@ -149,6 +150,14 @@ function usesBoolean(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).boolean !== undefined
+	);
+}
+
+function usesSlice(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).slice !== undefined
 	);
 }
 
