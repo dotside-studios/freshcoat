@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { createExternalStore } from "~/state/external-store";
 
 export type ThemePreference = "light" | "dark" | "system";
 export type Theme = "light" | "dark";
@@ -11,7 +11,6 @@ export type Theme = "light" | "dark";
 export const THEME_STORAGE_KEY = "freshcoat.theme";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const listeners = new Set<() => void>();
 
 export function parseThemePreference(
 	value: string | null | undefined,
@@ -36,7 +35,7 @@ function readOverride(): Theme | null {
 	return value === "light" || value === "dark" ? value : null;
 }
 
-let preference: ThemePreference = "light";
+const preference = createExternalStore<ThemePreference>("light");
 let override: Theme | null = null;
 
 export function resolveTheme(
@@ -48,7 +47,7 @@ export function resolveTheme(
 
 function apply() {
 	const theme =
-		override ?? resolveTheme(preference, matchMedia(DARK_QUERY).matches);
+		override ?? resolveTheme(preference.get(), matchMedia(DARK_QUERY).matches);
 	document.documentElement.dataset.theme = theme;
 	document
 		.querySelector('meta[name="color-scheme"]')
@@ -57,34 +56,30 @@ function apply() {
 
 /** Reads the preference and the URL, applies them and follows the system. */
 export function initTheme() {
-	preference = readStored();
+	preference.set(readStored());
 	override = readOverride();
 	apply();
 	matchMedia(DARK_QUERY).addEventListener("change", () => {
-		if (!override && preference === "system") apply();
+		if (!override && preference.get() === "system") apply();
 	});
 }
 
 export function getThemePreference(): ThemePreference {
-	return preference;
+	return preference.get();
 }
 
 /** Saves the preference. Choosing one also drops this tab's `?theme=`. */
 export function setThemePreference(next: ThemePreference) {
-	preference = next;
 	override = null;
 	try {
 		localStorage.setItem(THEME_STORAGE_KEY, next);
 	} catch {
 		// Private windows can refuse storage; the choice still holds for the tab.
 	}
+	preference.set(next);
 	apply();
-	for (const l of listeners) l();
 }
 
 export function useThemePreference(): ThemePreference {
-	return useSyncExternalStore((l) => {
-		listeners.add(l);
-		return () => listeners.delete(l);
-	}, getThemePreference);
+	return preference.useStore();
 }

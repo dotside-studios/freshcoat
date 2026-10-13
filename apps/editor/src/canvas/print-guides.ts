@@ -6,8 +6,8 @@ import {
 	templateBleed,
 	templateSafeArea,
 } from "@freshcoat-js/coatfile";
-import { useSyncExternalStore } from "react";
 import { keyOf } from "~/doc/path";
+import { createExternalStore } from "~/state/external-store";
 import { type EditorState, present } from "~/state/store";
 
 export {
@@ -36,15 +36,7 @@ export function hasPrintGuides(t: GuideSource): boolean {
 // Each template in a workspace keeps its own choice for the session; one never
 // touched follows its product.
 const choices = new Map<string, boolean>();
-const listeners = new Set<() => void>();
-let version = 0;
-
-function subscribe(fn: () => void) {
-	listeners.add(fn);
-	return () => {
-		listeners.delete(fn);
-	};
-}
+const version = createExternalStore(0);
 
 export function printGuidesOn(
 	templateId: string | undefined,
@@ -57,8 +49,7 @@ export function printGuidesOn(
 
 export function setPrintGuides(templateId: string, on: boolean): void {
 	choices.set(templateId, on);
-	version++;
-	for (const fn of listeners) fn();
+	version.set((v) => v + 1);
 }
 
 /** View > Print guides: flips the active template's guides. */
@@ -71,11 +62,7 @@ export function togglePrintGuides(s: EditorState): void {
 
 /** Re-renders when any template's choice changes. */
 export function usePrintGuidesVersion(): number {
-	return useSyncExternalStore(
-		subscribe,
-		() => version,
-		() => version,
-	);
+	return version.useStore();
 }
 
 // ── Safe-area hints ──────────────────────────────────────────────────────────
