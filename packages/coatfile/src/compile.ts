@@ -46,6 +46,7 @@ import { parseImageFocus } from "./image-focus";
 import { fieldContext, prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
+import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { walkElements } from "./tree";
 import type {
@@ -139,10 +140,16 @@ export function compile(
 
 	const ctx = fieldContext(template, values);
 
-	const bleed = opts.bleed ? templateBleed(template) : NO_INSETS;
+	const piece = opts.piece;
+	const bleed = opts.bleed && !piece ? templateBleed(template) : NO_INSETS;
 	const withBleed = hasInsets(bleed);
-	const width = opts.width + (bleed.left + bleed.right) * ratio;
-	const height = opts.height + (bleed.top + bleed.bottom) * ratio;
+	const pieceScene = piece ? pieceSize(piece) : null;
+	const width = pieceScene
+		? pieceScene.width * ratio
+		: opts.width + (bleed.left + bleed.right) * ratio;
+	const height = pieceScene
+		? pieceScene.height * ratio
+		: opts.height + (bleed.top + bleed.bottom) * ratio;
 	const trim = { width: template.width, height: template.height };
 
 	const frameData = opts.frameNames
@@ -156,16 +163,18 @@ export function compile(
 		);
 		const elements = opts.pathOp ? applyBooleans(shown, opts.pathOp) : shown;
 		return compileFrame(
-			{
-				...frame,
-				elements: withBleed
-					? offsetElements(
-							extendIntoBleed(elements, trim, bleed),
-							bleed.left,
-							bleed.top,
-						)
-					: elements,
-			},
+			piece
+				? pieceFrame(frame, elements, trim, templateBleed(template), piece)
+				: {
+						...frame,
+						elements: withBleed
+							? offsetElements(
+									extendIntoBleed(elements, trim, bleed),
+									bleed.left,
+									bleed.top,
+								)
+							: elements,
+					},
 			template,
 			ctx,
 			ratio,
@@ -174,6 +183,20 @@ export function compile(
 		);
 	});
 
+	if (piece) {
+		const box = pieceBox(piece);
+		return {
+			width,
+			height,
+			piece: {
+				x: box.x * ratio,
+				y: box.y * ratio,
+				width: box.width * ratio,
+				height: box.height * ratio,
+			},
+			frames,
+		};
+	}
 	if (!withBleed) return { width, height, frames };
 	return {
 		width,

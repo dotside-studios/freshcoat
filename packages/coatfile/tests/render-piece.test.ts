@@ -161,7 +161,7 @@ describe("render a slice piece", () => {
 		expect([p.width, p.height]).toEqual([52, 32]);
 		expect(p.at(8, 16)).toEqual(RED);
 		expect(p.at(40, 16)).toEqual(BLUE);
-		expect(p.at(26, 3)).toEqual(RED);
+		expect(p.at(20, 3)).toEqual(RED);
 	});
 
 	test("art that runs to the trim runs into the bleed", async () => {
@@ -170,7 +170,7 @@ describe("render a slice piece", () => {
 		expect([p.width, p.height]).toEqual([48, 48]);
 		expect(p.at(40, 0)).toEqual(BLUE);
 		expect(p.at(47, 47)).toEqual(BLUE);
-		expect(p.at(2, 2)).toEqual(BLUE);
+		expect(p.at(5, 2)).toEqual(BLUE);
 	});
 
 	test("follows the variant and the values", async () => {

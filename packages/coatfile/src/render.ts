@@ -25,11 +25,14 @@ import {
 	sampleImageNode,
 	withExportScale,
 } from "@freshcoat-js/engine";
-import { canvasKitPathOp } from "./boolean";
+import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
+import { pieceSpec } from "./piece";
+import { resolveSlices } from "./slices";
 import type {
 	CompiledTemplate,
 	FrameWarning,
+	PieceSpec,
 	PrintWarning,
 	Template,
 } from "./types";
@@ -48,6 +51,8 @@ export type TemplateFrame<O extends Output = DefaultOutput> = Omit<
 	suffix?: string;
 	/** Where the trim lies in the pixels, when the render includes bleed. */
 	trim?: { x: number; y: number; width: number; height: number };
+	/** Where the slice box lies in the pixels, when the render is a piece. */
+	piece?: { x: number; y: number; width: number; height: number };
 };
 
 // Print-optimization toggle. When enabled, each frame's node tree is run through
@@ -111,6 +116,11 @@ export type RenderTemplateOptions<O extends Output = DefaultOutput> =
 		/** Include the template's bleed around the trim. Off by default, so the
 		 *  output is the trim alone. */
 		bleed?: boolean;
+		/** Render one slice piece of a side, by slice name or id: its box grown
+		 *  by the slice's bleed, with everything outside the outline grown by
+		 *  that bleed transparent. Takes the place of `bleed`. Needs one side:
+		 *  `frameNames` picks it, else the first. */
+		piece?: string;
 	};
 
 type ResolvedPrint = {
@@ -184,6 +194,32 @@ function scaleBox(
 	};
 }
 
+function resolvePiece(
+	renderer: Renderer,
+	template: Template,
+	values: Record<string, unknown>,
+	options: RenderTemplateOptions<Output>,
+	pathOp: PathOp,
+): { side: string; spec: PieceSpec } {
+	if ((options.frameNames?.length ?? 0) > 1)
+		throw new Error("a piece is cut from one side; name one in frameNames");
+	const side = options.frameNames?.[0] ?? template.template_data[0]?.name ?? "";
+	const slices = resolveSlices(template, {
+		frameName: side,
+		values,
+		variantId: options.variantId,
+		pathOp,
+	});
+	const slice = slices.find(
+		(s) => s.name === options.piece || s.id === options.piece,
+	);
+	if (!slice)
+		throw new Error(
+			`no slice "${options.piece}" on side "${side}" (has: ${slices.map((s) => s.name).join(", ") || "none"})`,
+		);
+	return { side, spec: pieceSpec(renderer.ck, slice) };
+}
+
 // Compile a template and paint each of its sides. The template's fonts load
 // through the renderer.
 export async function renderTemplate<O extends Output = DefaultOutput>(
@@ -195,13 +231,22 @@ export async function renderTemplate<O extends Output = DefaultOutput>(
 	// Without an encoder a barcode draws as a placeholder; a failed load still
 	// renders, and the placeholder's warning says why.
 	const size = variantSize(template, options.variantId);
+	const pathOp = canvasKitPathOp(renderer.ck);
+	const piece =
+		options.piece === undefined
+			? undefined
+			: resolvePiece(renderer, template, values, options, pathOp);
 	const compiled = compile(template, values, {
 		width: options.width ?? size.width,
 		height: options.height ?? size.height,
 		variantId: options.variantId,
-		...(options.frameNames ? { frameNames: options.frameNames } : {}),
-		...(options.bleed ? { bleed: true } : {}),
-		pathOp: canvasKitPathOp(renderer.ck),
+		...(piece
+			? { frameNames: [piece.side], piece: piece.spec }
+			: {
+					...(options.frameNames ? { frameNames: options.frameNames } : {}),
+					...(options.bleed ? { bleed: true } : {}),
+				}),
+		pathOp,
 	});
 	return renderCompiled(renderer, compiled, options);
 }
@@ -290,6 +335,7 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 				suffix: setting.suffix,
 				...exportPixelSize(design, scale),
 				...(compiled.trim ? { trim: scaleBox(compiled.trim, scale) } : {}),
+				...(compiled.piece ? { piece: scaleBox(compiled.piece, scale) } : {}),
 			} as unknown as TemplateFrame<O>);
 		}
 	}
