@@ -5,10 +5,15 @@ import {
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { templateStem } from "@freshcoat-js/coatfile/coat";
+import {
+	type OutputIntent,
+	resolveOutputIntent,
+} from "@freshcoat-js/engine/icc";
 import { cutDxf } from "../cut-dxf";
 import { cutSvg } from "../cut-svg";
 import { slug } from "../ids";
 import { type Imposition, SheetLayoutError } from "../impose";
+import { presetOutputIntent } from "../output-intent";
 import {
 	exportCutFile,
 	exportCutLines,
@@ -128,6 +133,7 @@ export type AssemblePdf = (
 		layout?: SheetLayout;
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
+		outputIntent?: OutputIntent | false;
 	},
 	extras?: AssembleExtras,
 ) => Promise<Uint8Array>;
@@ -389,6 +395,16 @@ export function runExportJob(
 		return Promise.reject(new Error(PIECES_NEED_RASTER_PAGES));
 	// Pieces are cards of their own size, bleed and all.
 	let pieceSheets: Imposition<SheetItem> | undefined;
+	// A missing or unreadable profile is refused before anything renders.
+	let outputIntent: OutputIntent | false | undefined;
+	if (pdf) {
+		try {
+			outputIntent = presetOutputIntent(workspace, preset);
+			resolveOutputIntent(outputIntent);
+		} catch (e) {
+			return Promise.reject(e);
+		}
+	}
 	if (sheet) {
 		// Refused before anything renders, rather than after every page has.
 		const sheets = planSheets(plan, template, preset);
@@ -482,6 +498,7 @@ export function runExportJob(
 							title: preset.name || workspace.name,
 							...(sheet ? { layout: sheet, cardMm } : {}),
 							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
+							...(outputIntent !== undefined ? { outputIntent } : {}),
 						},
 						{
 							signal: assembly.signal,

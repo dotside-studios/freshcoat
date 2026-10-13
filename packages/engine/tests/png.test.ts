@@ -256,6 +256,35 @@ describe("encodePng", () => {
 		expect(best.length).toBeLessThanOrEqual(fast.length);
 	});
 
+	test("tags the frame as sRGB before its image data", async () => {
+		const png = await encodePng(new Uint8Array(16).fill(255), 2, 2);
+		const view = new DataView(png.buffer, png.byteOffset);
+		const chunks: Array<{ type: string; data: Uint8Array }> = [];
+		for (let at = 8; at < png.length; ) {
+			const length = view.getUint32(at);
+			const type = String.fromCharCode(...png.subarray(at + 4, at + 8));
+			chunks.push({ type, data: png.subarray(at + 8, at + 8 + length) });
+			at += 12 + length;
+		}
+		expect(chunks.map((c) => c.type)).toEqual([
+			"IHDR",
+			"sRGB",
+			"gAMA",
+			"cHRM",
+			"IDAT",
+			"IEND",
+		]);
+		const words = (data: Uint8Array) =>
+			Array.from({ length: data.length / 4 }, (_, i) =>
+				new DataView(data.buffer, data.byteOffset).getUint32(i * 4),
+			);
+		expect(Array.from(chunks[1].data)).toEqual([0]);
+		expect(words(chunks[2].data)).toEqual([45455]);
+		expect(words(chunks[3].data)).toEqual([
+			31270, 32900, 64000, 33000, 30000, 60000, 15000, 6000,
+		]);
+	});
+
 	test("rejects a buffer that cannot hold the frame", async () => {
 		await expect(encodePng(new Uint8Array(4), 2, 2)).rejects.toThrow(
 			/expected 16 bytes/,

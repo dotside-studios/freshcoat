@@ -147,6 +147,13 @@ export {
 	sampleRows,
 } from "./mapping";
 export {
+	MissingProfileError,
+	presetOutputIntent,
+	type ReadOutputProfile,
+	readOutputProfile,
+	usedProfiles,
+} from "./output-intent";
+export {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,

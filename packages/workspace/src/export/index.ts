@@ -59,6 +59,7 @@ export {
 	type PrintOutcome,
 	printEnabled,
 	printFallbacks,
+	printProfileMismatch,
 	printRenderOptions,
 	printRequest,
 	type RenderPrint,

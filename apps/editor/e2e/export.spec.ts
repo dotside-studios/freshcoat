@@ -2,7 +2,14 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
-import { mod, openSample, probePath, settingsTab, state } from "./helpers";
+import {
+	choosePrintTarget,
+	mod,
+	openSample,
+	probePath,
+	settingsTab,
+	state,
+} from "./helpers";
 
 /** Adds a dataset of `count` members whose columns are the template's field keys. */
 async function addDataset(
@@ -281,9 +288,14 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	});
 	// Outside Export, the menu bar shows the job, and leaving the page warns.
 	await page.getByTestId("section-switcher").getByText("Edit").click();
-	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	await expect(page.getByTestId("activity")).toHaveText(/\d+ \/ 80/);
 	expect(await unloadWarns(page)).toBe(true);
-	await page.getByTestId("job-indicator").click();
+	await page.getByTestId("activity").click();
+	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	await page
+		.getByTestId("job-indicator")
+		.getByRole("button", { name: "Show" })
+		.click();
 	await page
 		.getByTestId("export-job")
 		.getByRole("button", { name: "Cancel" })
@@ -448,12 +460,15 @@ test.describe("at tablet width", () => {
 		await page.getByRole("button", { name: "New preset" }).first().click();
 		await page.getByRole("button", { name: "Settings" }).first().click();
 		await settingsTab(page, "Print");
-		const toggle = page.getByRole("switch", {
-			name: "Optimize for card printer",
-		});
+		await choosePrintTarget(page);
+		await page
+			.getByTestId("export-print")
+			.getByRole("button", { name: "More" })
+			.click();
+		const toggle = page.getByRole("switch", { name: "Analyze photos" });
 		await toggle.focus();
 		await page.keyboard.press("Space");
-		await expect(toggle).toBeChecked();
+		await expect(toggle).not.toBeChecked();
 		await page.keyboard.press("Tab");
 		// Checkboxes and switches keep their hidden input inside the sheet's
 		// scroller, so nothing overflows the app's root for focus to reveal.

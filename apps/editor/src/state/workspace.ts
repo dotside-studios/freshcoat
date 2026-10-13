@@ -4,6 +4,7 @@ import {
 	type DataRecord,
 	type Dataset,
 	type ExportPreset,
+	type IccProfileAsset,
 	mapDatasetRecords,
 	newId,
 	type RecordStatus,
@@ -61,6 +62,8 @@ export type WorkspaceState = {
 	activeDatasetId: string | null;
 	presets: ExportPreset[];
 	activePresetId: string | null;
+	/** ICC profiles the presets' output intents name */
+	profiles?: IccProfileAsset[];
 	/** What was last opened or saved; dirty is a comparison with it. */
 	saved: Workspace;
 };
@@ -88,6 +91,7 @@ export function workspaceState(
 		activeDatasetId: ws.datasets[0]?.id ?? null,
 		presets: ws.presets,
 		activePresetId: ws.presets[0]?.id ?? null,
+		...(ws.profiles ? { profiles: ws.profiles } : {}),
 		saved: ws,
 	};
 }
@@ -134,6 +138,7 @@ export function workspaceOf(
 		}),
 		datasets: ws.datasets,
 		presets: ws.presets,
+		...(ws.profiles ? { profiles: ws.profiles } : {}),
 	};
 }
 
@@ -144,7 +149,11 @@ export function workspaceDirty(state: EditorState): boolean {
 	const saved = state.workspace?.saved;
 	if (!now || !saved) return false;
 	if (now.name !== saved.name) return true;
-	if (now.datasets !== saved.datasets || now.presets !== saved.presets)
+	if (
+		now.datasets !== saved.datasets ||
+		now.presets !== saved.presets ||
+		now.profiles !== saved.profiles
+	)
 		return true;
 	if (now.templates.length !== saved.templates.length) return true;
 	return now.templates.some((t, i) => {

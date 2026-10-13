@@ -203,6 +203,7 @@ function sameWorkspace(a: Workspace, b: Workspace): boolean {
 		a.name === b.name &&
 		a.datasets === b.datasets &&
 		a.presets === b.presets &&
+		a.profiles === b.profiles &&
 		a.templates.length === b.templates.length &&
 		a.templates.every((t, i) => {
 			const o = b.templates[i];

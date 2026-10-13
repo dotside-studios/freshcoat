@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
+import { StatusBar } from "../app/StatusBar";
 import { renameColumnEverywhere } from "../data/actions";
 import { DataSection } from "../data/DataSection";
 import { forgetViews } from "../data/gallery-model";
@@ -34,9 +35,11 @@ function setup(withData = true) {
 	if (withData)
 		controller.dispatch({ type: "datasetEdit", datasets: [dataset()] });
 	const user = fastUser();
+	controller.dispatch({ type: "setSection", section: "data" });
 	render(
 		<ControllerProvider controller={controller}>
 			<DataSection />
+			<StatusBar />
 		</ControllerProvider>,
 	);
 	return user;
@@ -103,9 +106,11 @@ describe("Data section", { timeout: 15_000 }, () => {
 		controller.dispatch({ type: "datasetEdit", datasets: [dataset()] });
 		controller.dispatch({ type: "setRecord", id: "r_2" });
 		const user = fastUser();
+		controller.dispatch({ type: "setSection", section: "data" });
 		render(
 			<ControllerProvider controller={controller}>
 				<DataSection />
+				<StatusBar />
 			</ControllerProvider>,
 		);
 		const panel = screen.getByTestId("record-panel");

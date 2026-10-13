@@ -128,6 +128,12 @@ a PDF cannot express is drawn as an image, with a `vector_rasterized` warning
 one of a result's `warnings` into a line of readable text, such as
 `Couldn't load image: logo.png`.
 
+`print: true` (or a `PrintRenderOptions` object) renders through
+[`@freshcoat-js/for-print`](../for-print)'s planner and whole-frame finish.
+`print.target` picks the for-print `PrintTarget`, default `YMCKO_DYE_SUB`;
+`policy`, `finish` and `balance` override parts of it, and `analyze: true`
+corrects each photo from its own analysis.
+
 ### PNG size
 
 PNG is written by the coat engine's own encoder.
@@ -208,6 +214,8 @@ layer id and edges), `format_newer` (a format newer than this kit reads) and
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
+The CR80 constants (`CR80_LONG_MM`, `CR80_SHORT_MM`, `CR80_CORNER_MM`,
+`CR80_SAFE_MM`) and `MM_PER_INCH` are re-exported from the engine.
 
 ## Inline assets
 

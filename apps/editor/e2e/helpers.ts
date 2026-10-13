@@ -8,6 +8,24 @@ export async function settingsTab(page: Page, name: string) {
 	await page.getByTestId("export-settings").getByRole("tab", { name }).click();
 }
 
+export const CARD_PRINTER = "Card printer (YMCKO dye-sub)";
+const CARD_PRINTER_SHORT = "Card printer";
+
+/** The Print group's target select. */
+export const printTarget = (page: Page) =>
+	page
+		.getByTestId("export-print")
+		.getByRole("button", { name: /Print target/ });
+
+/** Picks a print target, or "None", in the Print group. */
+export async function choosePrintTarget(page: Page, name = CARD_PRINTER) {
+	await printTarget(page).click();
+	await page.getByRole("listbox").getByRole("option", { name }).click();
+	await expect(printTarget(page)).toContainText(
+		name === CARD_PRINTER ? CARD_PRINTER_SHORT : name,
+	);
+}
+
 /** Opens a bundled sample from the welcome screen and waits for its first paint. */
 export async function openSample(page: Page, id = "membership-card") {
 	await page.goto("/");

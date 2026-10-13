@@ -3,11 +3,20 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { Template } from "@freshcoat-js/coatfile";
 import { decodeTemplate, packTemplate } from "@freshcoat-js/coatfile/coat";
 import { decodePixels } from "@freshcoat-js/engine";
+import { SRGB_PROFILE } from "@freshcoat-js/engine/icc";
 import { DEFAULT_SHEET_LAYOUT, type Workspace } from "@freshcoat-js/workspace";
 import { REPORT_FILE_NAME } from "@freshcoat-js/workspace/export";
-import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
+import { iccProfile, loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
-import { PDFDocument, PDFName } from "pdf-lib";
+import {
+	decodePDFRawStream,
+	PDFArray,
+	PDFDict,
+	PDFDocument,
+	PDFHexString,
+	PDFName,
+	PDFRawStream,
+} from "pdf-lib";
 import { version } from "../src/main";
 import { poolSize } from "../src/worker-pool";
 import {
@@ -829,6 +838,50 @@ describe("render export options", () => {
 		const tight = await box.run("render", "badge.json", "--sheets", "20x20", "--out", "tight.pdf");
 		expect(tight.code).toBe(1);
 		expect(tight.stderr).toContain("cannot lay out the sheets:");
+	});
+
+	test("declares an output intent: sRGB, a profile file, or none", async () => {
+		const intents = async (path: string) => {
+			const pdf = await PDFDocument.load(await readFile(box.path(path)));
+			const list = pdf.catalog.lookupMaybe(PDFName.of("OutputIntents"), PDFArray);
+			return (list?.asArray() ?? []).map((ref) => {
+				const intent = pdf.context.lookup(ref, PDFDict);
+				const text = (key: string) => (intent.lookup(PDFName.of(key)) as PDFHexString).decodeText();
+				const dest = pdf.context.lookup(intent.get(PDFName.of("DestOutputProfile"))) as PDFRawStream;
+				return {
+					id: text("OutputConditionIdentifier"),
+					info: text("Info"),
+					n: dest.dict.get(PDFName.of("N"))?.toString(),
+					bytes: decodePDFRawStream(dest).decode(),
+				};
+			});
+		};
+		const base = ["render", "badge.json", "--frame", "front", "-q", "--out"];
+		expect((await box.run(...base, "srgb.pdf")).code).toBe(0);
+		expect(await intents("srgb.pdf")).toEqual([
+			{ id: "sRGB IEC61966-2.1", info: "sRGB IEC61966-2.1", n: "3", bytes: SRGB_PROFILE },
+		]);
+
+		const fogra = iccProfile({ description: "Coated FOGRA39 (ISO 12647-2:2004)" });
+		await box.write("fogra.icc", fogra);
+		const run = await box.run(...base, "fogra.pdf", "--output-intent", "fogra.icc", "--output-intent-id", "FOGRA39");
+		expect(run.code).toBe(0);
+		expect(await intents("fogra.pdf")).toEqual([
+			{ id: "FOGRA39", info: "Coated FOGRA39 (ISO 12647-2:2004)", n: "4", bytes: fogra },
+		]);
+
+		expect((await box.run(...base, "none.pdf", "--no-output-intent")).code).toBe(0);
+		expect(await intents("none.pdf")).toEqual([]);
+	});
+
+	test("refuses a file that is not an output profile", async () => {
+		await box.write("lab.icc", iccProfile({ space: "Lab " }));
+		const run = await box.run("render", "badge.json", "--out", "lab.pdf", "--output-intent", "lab.icc");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain('--output-intent lab.icc: its colour space "Lab" is not gray, RGB or CMYK');
+		await box.write("text.icc", "not a profile");
+		const text = await box.run("render", "badge.json", "--out", "text.pdf", "--output-intent", "text.icc");
+		expect(text.stderr).toContain("--output-intent text.icc: too short to be an ICC profile");
 	});
 
 	test("writes a workspace preset into a directory", async () => {

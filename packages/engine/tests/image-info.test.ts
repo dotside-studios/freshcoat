@@ -8,6 +8,8 @@ import {
 } from "@freshcoat-js/test-utils";
 import { describe, expect, it } from "vitest";
 import {
+	iccComponents,
+	jpegIccProfile,
 	orientedSize,
 	parseImageInfo,
 	readImageInfo,
@@ -138,6 +140,97 @@ describe("image-info", () => {
 				Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0, 2, 0xff, 0xd9]),
 			),
 		).toBeNull();
+	});
+});
+
+// A profile header of `size` bytes in colour space `space`, the rest a counter.
+function profile(size: number, space = "RGB "): Uint8Array {
+	const p = new Uint8Array(size);
+	for (let i = 0; i < size; i++) p[i] = i & 0xff;
+	new DataView(p.buffer).setUint32(0, size);
+	p.set(new TextEncoder().encode(space), 16);
+	p.set(new TextEncoder().encode("acsp"), 36);
+	return p;
+}
+
+const app2 = (data: Uint8Array, seq: number, count: number, length?: number) => {
+	const head = [...new TextEncoder().encode("ICC_PROFILE"), 0, seq, count];
+	const len = length ?? 2 + head.length + data.length;
+	return [0xff, 0xe2, len >> 8, len & 0xff, ...head, ...data];
+};
+
+const jpegWith = (...segments: number[][]) =>
+	new Uint8Array([
+		0xff,
+		0xd8,
+		...segments.flat(),
+		0xff,
+		0xc0,
+		0,
+		11,
+		8,
+		0,
+		1,
+		0,
+		1,
+		1,
+		1,
+		0x11,
+		0,
+		0xff,
+		0xda,
+	]);
+
+describe("jpegIccProfile", () => {
+	const icc = profile(300);
+
+	it("joins a profile split across segments in sequence order", () => {
+		const parts = [icc.subarray(0, 100), icc.subarray(100, 250), icc.subarray(250)];
+		const out = jpegIccProfile(
+			jpegWith(app2(parts[2], 3, 3), app2(parts[0], 1, 3), app2(parts[1], 2, 3)),
+		);
+		expect(out).toEqual(icc);
+		expect(iccComponents(out as Uint8Array)).toBe(3);
+		expect(jpegIccProfile(jpegWith(app2(icc, 1, 1)))).toEqual(icc);
+	});
+
+	it("says none for a JPEG without one, or a profile after the scan", () => {
+		expect(jpegIccProfile(jpegHeader({ width: 4, height: 4 }))).toBe("none");
+		const late = new Uint8Array([...jpegWith(), ...app2(icc, 1, 1)]);
+		expect(jpegIccProfile(late)).toBe("none");
+		expect(jpegIccProfile(pngHeader(2, 2))).toBe("none");
+	});
+
+	it("rejects missing, repeated, truncated and inconsistent segments", () => {
+		const a = icc.subarray(0, 150);
+		const b = icc.subarray(150);
+		for (const bytes of [
+			jpegWith(app2(a, 1, 2)),
+			jpegWith(app2(a, 1, 2), app2(a, 1, 2)),
+			jpegWith(app2(a, 1, 2), app2(b, 2, 3)),
+			jpegWith(app2(a, 0, 2), app2(b, 2, 2)),
+			jpegWith(app2(a, 3, 2), app2(b, 2, 2)),
+			jpegWith(app2(icc, 1, 1, 15)),
+			new Uint8Array([0xff, 0xd8, ...app2(icc, 1, 1)].slice(0, 200)),
+		])
+			expect(jpegIccProfile(bytes)).toBe("invalid");
+	});
+});
+
+describe("iccComponents", () => {
+	it("counts the components of the profile's colour space", () => {
+		expect(iccComponents(profile(128, "GRAY"))).toBe(1);
+		expect(iccComponents(profile(128, "RGB "))).toBe(3);
+		expect(iccComponents(profile(128, "CMYK"))).toBe(4);
+		expect(iccComponents(profile(128, "Lab "))).toBeNull();
+	});
+
+	it("rejects what is not a profile", () => {
+		expect(iccComponents(profile(64))).toBeNull();
+		expect(iccComponents(profile(300).subarray(0, 200))).toBeNull();
+		const unsigned = profile(128);
+		unsigned[36] = 0;
+		expect(iccComponents(unsigned)).toBeNull();
 	});
 });
 

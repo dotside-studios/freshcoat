@@ -9,7 +9,7 @@ const PRODUCTS: Record<string, ProductRegistryEntry> = {
 	card_cr80: {
 		sku: "card_cr80",
 		displayName: "CR80 Card",
-		width: 1012, // CR80_LONG in packages/for-print/src/geometry.ts
+		width: 1012, // cr80Pixels(300) in packages/engine/src/card.ts
 		height: 638,
 		frames: [
 			{ name: "front", label: "Front", required: true },

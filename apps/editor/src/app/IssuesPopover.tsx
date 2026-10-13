@@ -35,6 +35,8 @@ import {
 	issuePathToKey,
 	missingField,
 } from "./issue-path";
+import { STATUS_PRIORITY } from "./status/priority";
+import type { StatusItem } from "./status/types";
 
 const EMPTY: ValidationError[] = [];
 const NONE: string[] = [];
@@ -568,3 +570,12 @@ function withKeys<T>(
 		return [n > 1 ? `${base}#${n}` : base, item];
 	});
 }
+
+export const ISSUES_ITEM: StatusItem = {
+	id: "issues",
+	name: "Issues",
+	sections: ["edit"],
+	align: "start",
+	priority: STATUS_PRIORITY.issues,
+	component: IssuesPopover,
+};

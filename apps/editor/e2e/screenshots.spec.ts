@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { expect, type Page, test } from "@playwright/test";
 import {
+	choosePrintTarget,
 	dragTemplate,
 	mod,
 	probePath,
@@ -593,13 +594,7 @@ for (const size of SIZES) {
 				await page.getByRole("button", { name: "New preset" }).first().click();
 				await reveal(page, "export-settings", "Settings");
 				await settingsTab(page, "Print");
-				await page
-					.getByTestId("export-print")
-					.getByText("Optimize for card printer")
-					.click();
-				await expect(
-					page.getByRole("switch", { name: "Optimize for card printer" }),
-				).toBeChecked();
+				await choosePrintTarget(page);
 				// The profile row, so the whole group is in view in a sheet.
 				await page
 					.getByTestId("export-print-profile")

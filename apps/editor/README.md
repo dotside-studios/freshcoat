@@ -133,8 +133,8 @@ covers shared checks and pull requests.
   column; filters all have to match, with no "any of" grouping.
 - A layer whose ancestor is rotated can be selected and edited in the
   inspector, but it cannot be dragged on the canvas.
-- A path drawn with the pen can't have its points edited on the canvas
-  afterwards; its path data is edited in the inspector.
+- Points can't be edited on the canvas for a boolean layer, a layer in auto
+  layout or a layer under a rotated parent; edit those in the inspector.
 - Boolean operations keep their shapes as operands until the layer is
   flattened. An operand edited in a variant is combined for that variant
   only; the layer's saved path is the base template's result.
@@ -153,8 +153,11 @@ covers shared checks and pull requests.
 - Phone widths are not supported. Below about 720px the menu bar and the
   section toolbars do not fit, and at 390px the page scrolls sideways.
 - Print output is for-print's correction for Davi's card printers, not ICC
-  color management or soft-proofing. The printer file preview is the file that
-  is sent, not a proof of the printed card.
+  color management. A PDF declares an output intent, sRGB by default or a
+  print shop's ICC profile chosen under Print > Color, and tags its RGB as
+  sRGB, so a RIP knows what it was made for; Studio does not convert colors to
+  that profile, check gamut against it, or soft-proof. The printer file
+  preview is the file that is sent, not a proof of the printed card.
 - A zip past 4 GB or 65,535 files is written as zip64, which some older
   unzip tools cannot open. Download still hands over 512 MB parts, so that a
   job never holds more than one part in memory.

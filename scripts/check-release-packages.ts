@@ -46,6 +46,14 @@ try {
 			if (!entries.includes(required))
 				throw new Error(`${filename} is missing ${required}`);
 		}
+		// The sRGB profile the engine embeds ships as a file too, with its license.
+		if (directory === "engine")
+			for (const required of [
+				"package/icc/sRGB-v2-magic.icc",
+				"package/icc/LICENSE",
+			])
+				if (!entries.includes(required))
+					throw new Error(`${filename} is missing ${required}`);
 		const staged = JSON.parse(
 			readFileSync(join(stagingRoot, directory, "package.json"), "utf8"),
 		);
@@ -157,6 +165,11 @@ const xlsx = await writeTable(dataset, "xlsx");
 assert.deepEqual((await readTable(xlsx.bytes, "members.xlsx")).sheets[0].rows, [["displayName"], ["Ana"], ["Ben"]]);
 const pdf = await assemblePdf([{ bytes: files["1-front@0.25x.png"], format: "png", widthPx: 253, heightPx: 160 }], { dpi: 75 });
 assert.equal(new TextDecoder().decode(pdf.slice(0, 5)), "%PDF-");
+const { PDFDocument, PDFName } = await import(require.resolve("pdf-lib"));
+assert.ok((await PDFDocument.load(pdf)).catalog.has(PDFName.of("OutputIntents")));
+const { SRGB_PROFILE, readIccProfile } = loaded.get("@freshcoat-js/engine/icc");
+assert.deepEqual(new Uint8Array(readFileSync(join(process.cwd(), "node_modules/@freshcoat-js/engine/icc/sRGB-v2-magic.icc"))), SRGB_PROFILE);
+assert.equal(readIccProfile(SRGB_PROFILE).ok, true);
 const { parseImageInfo } = loaded.get("@freshcoat-js/workspace/image-info");
 assert.equal(parseImageInfo(files["1-front@0.25x.png"]).width, 253);
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat-js/coatfile/schema/coatfile.v1.schema.json"), "utf8"));

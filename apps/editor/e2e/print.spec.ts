@@ -10,6 +10,8 @@ import {
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import {
+	CARD_PRINTER,
+	choosePrintTarget,
 	mod,
 	openSample,
 	probePath,
@@ -93,11 +95,6 @@ async function openExportWithPreset(page: Page) {
 	await settingsTab(page, "Print");
 }
 
-const printSwitch = (page: Page) =>
-	page
-		.getByTestId("export-settings")
-		.getByRole("switch", { name: "Optimize for card printer" });
-
 async function shot(page: Page, name: string) {
 	if (!SHOTS) return;
 	await page.screenshot({ path: join(SHOTS, `${name}.png`) });
@@ -147,11 +144,7 @@ test("a printing PNG export carries the finish, and the report says so", async (
 		true,
 	);
 
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
-	await expect(printSwitch(page)).toBeChecked();
+	await choosePrintTarget(page);
 	expect(
 		await page.evaluate(
 			() =>
@@ -199,10 +192,7 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 }) => {
 	test.setTimeout(240_000);
 	await openExportWithPreset(page);
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
+	await choosePrintTarget(page);
 	const group = page.getByTestId("export-print-profile");
 	await expect(group).toContainText("None");
 
@@ -235,10 +225,22 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 	});
 	if (!created.ok) throw new Error(`no profile: ${created.reason}`);
 	expect(created.profile.balance?.r).not.toBeCloseTo(1, 2);
+	await chooseFile(
+		"elsewhere.json",
+		JSON.stringify({ ...created.profile, target: "some-other-printer" }),
+	);
+	const mismatch = page.getByTestId("export-print-profile-mismatch");
+	await expect(mismatch).toContainText(
+		`Profile was measured on some-other-printer, not ${CARD_PRINTER}`,
+	);
+	await group.getByRole("button", { name: "Remove profile" }).click();
+	await expect(mismatch).toHaveCount(0);
+
 	await chooseFile("smart-51.json", JSON.stringify(created.profile, null, 2));
 	await expect(error).toHaveCount(0);
 	await expect(group).toContainText("Smart-51 / ribbon A / PVC");
 	await expect(group).toContainText("Sep 1, 2026");
+	await expect(mismatch).toHaveCount(0);
 	if (SHOTS) {
 		await page
 			.getByTestId("export-print")
@@ -380,10 +382,7 @@ test("a printer is measured from a photo of the printed chart", async ({
 }) => {
 	test.setTimeout(240_000);
 	await openExportWithPreset(page);
-	await page
-		.getByTestId("export-print")
-		.getByText("Optimize for card printer")
-		.click();
+	await choosePrintTarget(page);
 	const group = page.getByTestId("export-print-profile");
 	await group.getByRole("button", { name: "Measure…" }).click();
 	const dialog = page.getByRole("dialog", { name: "Measure printer" });

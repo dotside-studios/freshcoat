@@ -41,6 +41,14 @@ export {
 	repeatSpread,
 } from "./measure";
 export {
+	type FitTargetPresetFailure,
+	type FitTargetPresetOptions,
+	type FitTargetPresetReading,
+	type FitTargetPresetResult,
+	type FittedKnob,
+	fitTargetPreset,
+} from "./fit-preset";
+export {
 	createPrintProfile,
 	type PrintProfileCreation,
 	type PrintProfileDetails,

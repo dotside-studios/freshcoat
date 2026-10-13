@@ -207,6 +207,8 @@ export type RecordFilter = "all" | "pending" | "failed" | "selected";
 /** Output through for-print's card-printer path. Absent reads as off. */
 export type PresetPrint = {
 	enabled: boolean;
+	/** a for-print PrintTarget id; default "ymcko-dye-sub" */
+	target?: string;
 	/** correct each photo from its own analysis; default true */
 	analyze?: boolean;
 	/** a measured printer, as for-print's own JSON */
@@ -241,6 +243,29 @@ export type SheetLayout = {
 
 /** How a PDF places its images: one per page, or imposed on sheets. */
 export type PdfLayout = { kind: "single" } | SheetLayout;
+
+/** What a PDF declares it was prepared for. `srgb`, the default, is the
+ *  space Freshcoat draws in; `profile` names one of the workspace's
+ *  `profiles`, such as a print shop's CMYK condition; `none` declares
+ *  nothing. */
+export type PdfOutputIntent =
+	| { kind: "srgb" }
+	| { kind: "profile"; sha256: string }
+	| { kind: "none" };
+
+/** An ICC profile a preset's output intent names, held once in the
+ *  workspace however many presets name it. */
+export type IccProfileAsset = {
+	sha256: string;
+	/** the file it was read from */
+	name: string;
+	/** the profile's own description */
+	description: string;
+	/** the OutputConditionIdentifier a PDF writes, such as FOGRA39; default
+	 *  the description */
+	identifier?: string;
+	bytes: Uint8Array;
+};
 
 export type ExportPreset = {
 	id: string;
@@ -287,6 +312,8 @@ export type ExportPreset = {
 	cutFile?: ExportCutFile;
 	/** PDF only: draw the cut lines over the art. Default false. */
 	cutLines?: boolean;
+	/** PDF only; default srgb */
+	outputIntent?: PdfOutputIntent;
 };
 
 export type Workspace = {
@@ -296,6 +323,8 @@ export type Workspace = {
 	templates: TemplateEntry[];
 	datasets: Dataset[];
 	presets: ExportPreset[];
+	/** ICC profiles the presets' output intents name */
+	profiles?: IccProfileAsset[];
 };
 
 export type CellIssue = { column: string; message: string };

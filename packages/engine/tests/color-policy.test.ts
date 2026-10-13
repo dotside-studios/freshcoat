@@ -168,7 +168,7 @@ describe("color policy", () => {
 		expect(b.bytes).toEqual(a.bytes);
 	});
 
-	test("PNG output is 8-bit RGB(A) and untagged, which reads as sRGB", async () => {
+	test("PNG output is 8-bit RGB(A) and tagged sRGB", async () => {
 		const ck = await ckInit();
 		for (const precision of ["u8", "f16"] as const) {
 			const out = await renderSceneToPng(ramp(), {
@@ -179,8 +179,10 @@ describe("color policy", () => {
 			});
 			expect(out.format).toBe("png");
 			const chunks = pngChunks(out.bytes);
-			for (const tag of ["sRGB", "iCCP", "gAMA", "cHRM"])
-				expect(chunks).not.toContain(tag);
+			expect(chunks.slice(0, chunks.indexOf("IDAT"))).toEqual(
+				expect.arrayContaining(["sRGB", "gAMA", "cHRM"]),
+			);
+			expect(chunks).not.toContain("iCCP");
 			expect(out.bytes[24]).toBe(8);
 		}
 	});

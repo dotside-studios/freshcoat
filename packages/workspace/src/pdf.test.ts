@@ -1,6 +1,11 @@
 import { createFrame, createRenderer, createText } from "@freshcoat-js/engine";
+import { SRGB_PROFILE } from "@freshcoat-js/engine/icc";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
-import { jpegHeader, testFontBytes } from "@freshcoat-js/test-utils";
+import {
+	iccProfile,
+	jpegHeader,
+	testFontBytes,
+} from "@freshcoat-js/test-utils";
 import {
 	decodePDFRawStream,
 	PDFArray,
@@ -10,6 +15,7 @@ import {
 	PDFName,
 	type PDFPage,
 	PDFRawStream,
+	type PDFRef,
 } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import type { ItemCuts } from "./cut";
@@ -71,6 +77,50 @@ describe("assemblePdf", () => {
 		]);
 		// the JPEG's own bytes are the stream, with the DCT filter
 		expect(new TextDecoder("latin1").decode(bytes)).toContain("/DCTDecode");
+	});
+
+	it("draws a JPEG page carrying an ICC profile in that profile", async () => {
+		const profile = new Uint8Array(200).map((_, i) => i);
+		new DataView(profile.buffer).setUint32(0, profile.length);
+		profile.set(new TextEncoder().encode("RGB "), 16);
+		profile.set(new TextEncoder().encode("acsp"), 36);
+		const head = [...new TextEncoder().encode("ICC_PROFILE"), 0, 1, 1];
+		const length = 2 + head.length + profile.length;
+		const plain = jpegHeader({ width: 40, height: 30 });
+		const tagged = new Uint8Array([
+			0xff,
+			0xd8,
+			0xff,
+			0xe2,
+			length >> 8,
+			length & 0xff,
+			...head,
+			...profile,
+			...plain.subarray(2),
+		]);
+		const page = { format: "jpeg" as const, widthPx: 40, heightPx: 30 };
+		const pdf = await assemblePdf(
+			[
+				{ ...page, bytes: tagged },
+				{ ...page, bytes: tagged.slice() },
+				{ ...page, bytes: plain },
+			],
+			{ dpi: 72 },
+		);
+		const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+		const spaces = doc
+			.getPages()
+			.map((p) => images(p)[0]?.dict.lookup(PDFName.of("ColorSpace")));
+		expect(spaces[2]?.toString()).toBe("/DeviceRGB");
+		const [a, b] = spaces;
+		expect(a).toBeInstanceOf(PDFArray);
+		expect(a?.toString()).toBe(b?.toString());
+		const ref = (a as PDFArray).get(1);
+		expect((a as PDFArray).get(0)).toBe(PDFName.of("ICCBased"));
+		const stream = doc.context.lookup(ref) as PDFRawStream;
+		expect(stream.dict.get(PDFName.of("N"))?.toString()).toBe("3");
+		expect(decodePDFRawStream(stream).decode()).toEqual(profile);
+		expect(images(doc.getPage(0))[0]?.getContents()).toEqual(tagged);
 	});
 
 	it("passes an RGB PNG's IDAT through with the PNG predictor", async () => {
@@ -744,5 +794,164 @@ describe("assemblePdf with cut lines", () => {
 			expect(strokes(front)).toBe(2);
 			expect(strokes(back)).toBe(2);
 		});
+	});
+});
+
+describe("assemblePdf output intent", () => {
+	const load = async (bytes: Uint8Array) =>
+		PDFDocument.load(bytes, { updateMetadata: false });
+	const intentOf = (doc: PDFDocument) => {
+		const list = doc.catalog.lookup(PDFName.of("OutputIntents"));
+		if (!(list instanceof PDFArray)) return undefined;
+		expect(list.size()).toBe(1);
+		return list.lookup(0, PDFDict);
+	};
+	const textOf = (dict: PDFDict, key: string) =>
+		(dict.lookup(PDFName.of(key)) as PDFHexString).decodeText();
+	const profileOf = (doc: PDFDocument, ref: unknown) => {
+		const stream = doc.context.lookup(ref as PDFRef) as PDFRawStream;
+		return {
+			n: stream.dict.get(PDFName.of("N"))?.toString(),
+			bytes: decodePDFRawStream(stream).decode(),
+		};
+	};
+	/** Every stream an ICCBased space names, by object number. */
+	const iccStreams = (doc: PDFDocument) => {
+		const refs = new Set<string>();
+		const text = doc.context
+			.enumerateIndirectObjects()
+			.map(([, obj]) => obj.toString())
+			.join("\n");
+		for (const m of text.matchAll(/\/ICCBased (\d+ \d+ R)/g))
+			refs.add(m[1] as string);
+		return refs;
+	};
+	const pages = [
+		{ bytes: makePng(4, 3), format: png, widthPx: 40, heightPx: 30 },
+		{ bytes: makePng(4, 3), format: png, widthPx: 40, heightPx: 30 },
+	];
+
+	it("declares sRGB by default and tags every page's RGB as sRGB", async () => {
+		const doc = await load(await assemblePdf(pages, { dpi: 72 }));
+		const intent = intentOf(doc) as PDFDict;
+		expect(intent.get(PDFName.of("Type"))).toBe(PDFName.of("OutputIntent"));
+		expect(intent.get(PDFName.of("S"))).toBe(PDFName.of("GTS_PDFX"));
+		expect(textOf(intent, "OutputConditionIdentifier")).toBe(
+			"sRGB IEC61966-2.1",
+		);
+		expect(textOf(intent, "Info")).toBe("sRGB IEC61966-2.1");
+		expect(textOf(intent, "RegistryName")).toBe("http://www.color.org");
+		const dest = intent.get(PDFName.of("DestOutputProfile"));
+		expect(profileOf(doc, dest)).toEqual({ n: "3", bytes: SRGB_PROFILE });
+		for (const page of doc.getPages()) {
+			const spaces = page.node
+				.Resources()
+				?.lookup(PDFName.of("ColorSpace"), PDFDict);
+			expect(spaces?.get(PDFName.of("DefaultRGB"))?.toString()).toBe(
+				`[ /ICCBased ${dest?.toString()} ]`,
+			);
+		}
+		expect(iccStreams(doc)).toEqual(new Set([dest?.toString()]));
+	});
+
+	it("declares a caller's CMYK profile once", async () => {
+		const cmyk = iccProfile({ description: "Coated FOGRA39" });
+		const doc = await load(
+			await assemblePdf(pages, {
+				dpi: 72,
+				outputIntent: { profile: cmyk, identifier: "FOGRA39" },
+			}),
+		);
+		const intent = intentOf(doc) as PDFDict;
+		expect(textOf(intent, "OutputConditionIdentifier")).toBe("FOGRA39");
+		expect(textOf(intent, "Info")).toBe("Coated FOGRA39");
+		expect(intent.has(PDFName.of("RegistryName"))).toBe(false);
+		expect(profileOf(doc, intent.get(PDFName.of("DestOutputProfile")))).toEqual(
+			{ n: "4", bytes: cmyk },
+		);
+		// The CMYK profile is the intent's; content is tagged sRGB.
+		expect(iccStreams(doc).size).toBe(1);
+		const streams = doc.context
+			.enumerateIndirectObjects()
+			.filter(
+				([, obj]) =>
+					obj instanceof PDFRawStream && obj.dict.has(PDFName.of("N")),
+			);
+		expect(streams.length).toBe(2);
+	});
+
+	it("keeps one sRGB profile across vector pages that each carry one", async () => {
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			fonts: { Geist: [testFontBytes("Geist-Regular.ttf")] },
+		});
+		const card = (value: string) =>
+			createFrame({
+				pos: { x: 0, y: 0 },
+				size: { width: 120, height: 60 },
+				children: [
+					createText({
+						pos: { x: 8, y: 8 },
+						size: { width: 104, height: 40 },
+						text: value,
+						font: {
+							family: "Geist",
+							weight: 400,
+							style: "normal",
+							size: 20,
+							lineHeight: 1.2,
+						},
+						color: "#1d3557",
+					}),
+				],
+			});
+		const vector = async (value: string) => ({
+			bytes: (await renderer.renderPdf(card(value), { width: 120, height: 60 }))
+				.bytes,
+			format: "pdf" as const,
+			widthPx: 120,
+			heightPx: 60,
+		});
+		const doc = await load(
+			await assemblePdf([await vector("one"), await vector("two"), ...pages], {
+				dpi: 72,
+			}),
+		);
+		const dest = intentOf(doc)?.get(PDFName.of("DestOutputProfile"));
+		expect(iccStreams(doc)).toEqual(new Set([dest?.toString()]));
+		const profiles = doc.context
+			.enumerateIndirectObjects()
+			.filter(
+				([, obj]) =>
+					obj instanceof PDFRawStream && obj.dict.has(PDFName.of("N")),
+			);
+		expect(profiles.length).toBe(1);
+		renderer.dispose();
+	});
+
+	it("false leaves the intent and the tagging out", async () => {
+		const doc = await load(
+			await assemblePdf(pages, { dpi: 72, outputIntent: false }),
+		);
+		expect(intentOf(doc)).toBeUndefined();
+		expect(iccStreams(doc).size).toBe(0);
+		expect(doc.getPage(0).node.Resources()?.has(PDFName.of("ColorSpace"))).toBe(
+			false,
+		);
+	});
+
+	it("rejects a profile that cannot describe the output", async () => {
+		await expect(
+			assemblePdf(pages, {
+				dpi: 72,
+				outputIntent: { profile: iccProfile({ space: "Lab " }) },
+			}),
+		).rejects.toThrow(/output intent profile: .*not gray, RGB or CMYK/);
+		await expect(
+			assemblePdf(pages, {
+				dpi: 72,
+				outputIntent: { profile: new Uint8Array(64) },
+			}),
+		).rejects.toThrow(/too short/);
 	});
 });
