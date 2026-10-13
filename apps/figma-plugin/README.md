@@ -292,6 +292,52 @@ doesn't reach past (or into) the frame, `guide_duplicate` for a second guide of
 the same kind on one slot (the first wins), and `guide_safe_area_exceeds_trim`
 for a safe area that leaves no room on the canvas (it is dropped).
 
+## Slices
+
+A slice marks a region of a side as an output piece (a digital export split, a
+poster panel, a die-cut sticker) or a cut line for a Cricut or Silhouette. It
+becomes the `slice` modifier on a top-level `rect` or `vector`; see coatfile's
+[Slices](../../packages/coatfile/README.md#slices). Slices need format 1.7,
+which is what the export writes.
+
+**Figma slices.** Every visible slice made with the Slice tool, wherever it sits
+in the frame, becomes a `rect` with no fill and no stroke at the slice's place
+and size, named after the layer (`slice: { name }`, a piece with no cut edge). A
+slice in a nested frame or group is lifted out to the top level, since the
+modifier is only read there. The rects sit at the bottom of the layer stack, so
+no other layer changes its paint order. A rotated slice keeps its rotation. A
+slice's export settings are not read.
+
+**Layer-name markers.** To make a shape that is already part of the design a
+slice, end its name with a marker:
+
+| Layer name | Slice |
+|---|---|
+| `Left panel #slice` | A piece named `Left panel`, with no cut edge |
+| `Sticker #cut` | A piece cut through (`edge: "through"`) |
+| `Sticker #kiss` | A piece kiss cut |
+| `Fold #score` | Scored (`edge: "score"`) |
+| `Tear #perforate` | Perforated |
+
+The marker is case-insensitive and is taken off the name, so the slice and the
+element are named `Left panel`. The shape keeps its fill, stroke and corners, so
+a visible sticker border can be its own cut line. A marker works on a rectangle,
+ellipse, polygon, star, vector or line that sits directly in the exported
+frame. An open path (a line or an unclosed pen path) has no region, so it
+becomes a cut line only (`output: "none"`) and needs an edge marker; a flat
+line is given a box one unit across so the slice has an area.
+
+A marker that cannot be honored is ignored, and the export warns:
+`slice_marker_not_top_level` for a layer inside a group, frame or mask,
+`slice_marker_not_shape` for a layer that is not a rectangle or a vector (text,
+a frame, an image or a rasterized layer), and `slice_open_path_piece` for
+`#slice` on an open path.
+
+A slice name must be unique on a side. When two agree, the later one is named
+`Name-2`, `Name-3` and so on, and the export warns with `slice_name_renamed`.
+`slice_empty` and `slice_transform_unsupported` report a Figma slice that was
+skipped for having no area or a skewed transform.
+
 ## Open in Freshcoat
 
 **Open in Freshcoat** (Export step 4, and the result card) hands the template
