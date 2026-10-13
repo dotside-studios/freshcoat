@@ -315,6 +315,7 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].
 	cornerRadius?: number | [number, number, number, number];
+	cornerSmoothing?: number;
 	clipsContent?: boolean;
 	componentProperties?: Record<string, { value: string; type: string }>;
 	componentId?: string;
