@@ -378,6 +378,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
+| 1.7 | the `slice` element |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -749,6 +750,42 @@ A single opaque rect or ellipse renders as a clip. Anything else (a path, an
 image's alpha, a gradient, text, luminance, `invert`) renders through an
 offscreen layer. The figma plugin emits one for every Figma "Use as mask" layer
 and the layers above it.
+
+## Slices
+
+A `slice` marks a region of a side that becomes its own output piece (a digital
+export split, a poster panel, a die-cut sticker) and/or whose edge is a cut line
+for a Cricut or Silhouette. Unlike a `mask` it is not a container: it owns
+nothing, does not clip, and never paints, so it changes no render. It acts at
+export, where an exporter reads the resolved slices.
+
+```jsonc
+{
+  "id": "panel-1", "type": "slice",
+  "pos": { "x": 0, "y": 0 }, "size": { "width": 600, "height": 800 },
+  "properties": {
+    "name": "left",                                // file name; default the id
+    "shape": { "kind": "rect", "cornerRadius": 24 },  // or { "kind": "path", "d": "M0 0…Z" }
+    "output": "piece",                             // or "none": a cut line only
+    "edge": "through",                             // none, through, kiss, score, perforate
+    "bleed": 12,                                   // design units, one number or per side
+    "order": 1                                     // default: document order
+  }
+}
+```
+
+`shape` is a rect with optional per-corner `cornerRadius`, or a `path` whose `d`
+is in the slice's own box coordinates, as a vector's is. A slice must sit
+directly in a side's `elements` (not in a frame, mask or boolean), cannot be
+rotated, needs a positive `size`, and its name (`name`, else `id`) must be
+unique on its side. Opacity, blend, shadow, blur and adjust are ignored. Variant
+deltas, `visibleWhen` and `constraints` apply as for any element.
+
+`resolveSlices(template, { frameName, values, variantId, resize })` returns a
+side's shown slices after the variant, values and relayout, sorted by `order`
+then document order. Each has its `box` and a closed SVG `path` in trim
+coordinates, plus `name`, `fillRule`, `output`, `edge`, resolved `bleed` sides
+and `order`.
 
 ## Grid layout
 
