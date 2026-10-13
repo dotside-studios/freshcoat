@@ -16,6 +16,7 @@ import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
+import { createExternalStore } from "~/state/external-store";
 import { workspaceSnapshot } from "~/state/workspace";
 import { selectedRunLabel, statusActions } from "./export-ui";
 import { openSink } from "./sinks";
@@ -112,30 +113,24 @@ export function createExportJobs(
 		((file: JobFile) =>
 			void downloadBytes(file.blob, file.name, file.mediaType));
 	const now = deps.now ?? (() => Date.now());
-	const listeners = new Set<() => void>();
 	let nextId = 1;
-	let snapshot: ExportJobsSnapshot = {
+	const store = createExternalStore<ExportJobsSnapshot>({
 		runner: runner.getSnapshot(),
 		job: null,
 		lastPreset: null,
 		lastResult: null,
 		unwritten: [],
 		history: [],
-	};
-	const set = (patch: Partial<ExportJobsSnapshot>) => {
-		snapshot = { ...snapshot, ...patch };
-		for (const l of listeners) l();
-	};
+	});
+	const set = (patch: Partial<ExportJobsSnapshot>) =>
+		store.set((s) => ({ ...s, ...patch }));
 	const unsubscribe = runner.subscribe(() =>
 		set({ runner: runner.getSnapshot() }),
 	);
 
 	const jobs: ExportJobs = {
-		getSnapshot: () => snapshot,
-		subscribe(listener) {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
+		getSnapshot: store.get,
+		subscribe: store.subscribe,
 		async run(own, label, options = {}) {
 			const workspace = workspaceSnapshot(controller.state);
 			if (!workspace) return null;
@@ -213,7 +208,7 @@ export function createExportJobs(
 				unwritten: result?.cancelled
 					? unwrittenRecordIds(workspace, preset, result)
 					: [],
-				history: [entry, ...snapshot.history].slice(0, HISTORY_SIZE),
+				history: [entry, ...store.get().history].slice(0, HISTORY_SIZE),
 			});
 			if (result?.file && !result.cancelled) download(result.file);
 			if (controller.state.section !== "export") {

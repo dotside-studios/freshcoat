@@ -133,8 +133,8 @@ covers shared checks and pull requests.
   column; filters all have to match, with no "any of" grouping.
 - A layer whose ancestor is rotated can be selected and edited in the
   inspector, but it cannot be dragged on the canvas.
-- A path drawn with the pen can't have its points edited on the canvas
-  afterwards; its path data is edited in the inspector.
+- Points can't be edited on the canvas for a boolean layer, a layer in auto
+  layout or a layer under a rotated parent; edit those in the inspector.
 - Boolean operations keep their shapes as operands until the layer is
   flattened. An operand edited in a variant is combined for that variant
   only; the layer's saved path is the base template's result.

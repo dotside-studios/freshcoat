@@ -11,6 +11,7 @@ import {
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { settleAssets } from "~/app/source-assets";
 import { fontCache } from "~/render/font-cache";
+import { createExternalStore } from "~/state/external-store";
 import { assemblePdf } from "./pdf-client";
 import {
 	createWorkerPool,
@@ -92,20 +93,13 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 	let pool: ReturnType<typeof createPool> | null = null;
 	let poolFonts: Map<string, Uint8Array[]> | null = null;
 	let controller: AbortController | null = null;
-	let snapshot = IDLE;
-	const listeners = new Set<() => void>();
-
-	const set = (next: Partial<ExportRunnerSnapshot>) => {
-		snapshot = { ...snapshot, ...next };
-		for (const listener of listeners) listener();
-	};
+	const store = createExternalStore(IDLE);
+	const set = (next: Partial<ExportRunnerSnapshot>) =>
+		store.set((s) => ({ ...s, ...next }));
 
 	return {
-		getSnapshot: () => snapshot,
-		subscribe(listener) {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
+		getSnapshot: store.get,
+		subscribe: store.subscribe,
 		async start(workspace, preset, job = {}) {
 			controller?.abort();
 			const own = new AbortController();
