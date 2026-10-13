@@ -66,7 +66,7 @@ export function card(overrides: Partial<Template> = {}): Template {
 					size: { width: 180, height: 30 },
 					properties: {
 						value: "{{name}}",
-						font: { family: "Inter", size: 20 },
+						font: { family: "Inter", size: 26 },
 						color: "#111111",
 					},
 				},

@@ -1225,10 +1225,73 @@ describe("validate warnings for image resolution", () => {
 	test("follows --min-dpi and --dpi", async () => {
 		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "150")).stderr).toBe("");
 		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "0", "--strict")).code).toBe(0);
-		expect((await box.run("validate", "low-dpi.json", "--dpi", "450")).stderr).toBe("");
+		expect((await box.run("validate", "low-dpi.json", "--dpi", "450")).stderr).not.toContain("DPI");
 		expect((await box.run("validate", "low-dpi.json", "--dpi", "150")).stderr).toBe(
 			'warning: front: "front_logo" prints at 100 DPI, under 300\nwarning: back: "back_logo" prints at 150 DPI, under 300\n',
 		);
+	});
+});
+
+describe("print checks", () => {
+	beforeAll(async () => {
+		const t = card({ bleed: 10 } as never);
+		const front = t.template_data[0]!;
+		front.elements = [
+			{
+				id: "band",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 200, height: 20 },
+				properties: { fill: "#0f766e", stroke: { color: "#000000", width: 2 } },
+			},
+			{
+				id: "rule",
+				type: "rect",
+				pos: { x: 10, y: 60 },
+				size: { width: 100, height: 1 },
+				properties: { fill: "#ffffff", stroke: { color: "#000000", width: 0.5 } },
+			},
+			{
+				id: "fine",
+				type: "text",
+				pos: { x: 10, y: 70 },
+				size: { width: 180, height: 20 },
+				properties: { value: "Terms", font: { family: "Inter", size: 12 }, color: "#000000" },
+			},
+			{
+				id: "ink",
+				type: "text",
+				pos: { x: 10, y: 30 },
+				size: { width: 180, height: 30 },
+				properties: { value: "{{name}}", font: { family: "Inter", size: 26 }, color: "{{motto}}" },
+			},
+		];
+		await box.write("print.json", JSON.stringify(t));
+	});
+
+	test("validate warns for small text, hairlines and art short of bleed", async () => {
+		const run = await box.run("validate", "print.json");
+		expect(run.code).toBe(0);
+		for (const line of [
+			'warning: front: "band": Runs to the trim on the left, top and right but not into the bleed; a cut that drifts shows a white edge',
+			'warning: front: "rule": Stroke is 0.12 pt at print size, below 0.25 pt; it may not print',
+			'warning: front: "fine": Text is 2.88 pt at print size, below 6 pt',
+		])
+			expect(run.stderr).toContain(line);
+		expect(run.stderr).not.toContain('"ink"');
+		const strict = await box.run("validate", "print.json", "--strict", "-q");
+		expect(strict.code).toBe(1);
+	});
+
+	test("render checks field-bound text with its values", async () => {
+		const run = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#101828", "--out", "print-out");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"warning: front: 6.24 pt text in #101828 may print as rich black and blur if plates are out of register; pure black (#000000) is safer: ink",
+		);
+		expect(run.stderr).toContain("warning: front: Text is 2.88 pt at print size, below 6 pt: fine");
+		const plain = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#000000", "--out", "print-out");
+		expect(plain.stderr).not.toContain("rich black");
 	});
 });
 
