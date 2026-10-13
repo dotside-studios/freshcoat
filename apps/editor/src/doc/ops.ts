@@ -570,7 +570,7 @@ export function booleanElements(
 	});
 	const bottom = elements[0] as Exclude<
 		Element,
-		{ type: "frame" | "mask" | "slice" | "text" | "image" | "qr_code" | "barcode" }
+		{ type: "frame" | "mask" | "text" | "image" | "qr_code" | "barcode" }
 	>;
 	const {
 		id: _id,
