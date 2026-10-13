@@ -11,8 +11,9 @@ the records, and **Export** turns templates and records into files.
 ## Overview
 
 - **Workspaces:**
-  - Start from a starter, a preset size (CR80 card, A4, square, poster, badge)
-    or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
+  - Start from a starter, a preset size (CR80 card, A4, square, poster,
+    badge, US and EU business card, 4 × 6 in and A6 postcard, 4 × 6 in
+    shipping label) or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
     template `.json` with **Open file…** (Ctrl/Cmd+O). Files saved before the rename, `.tkit` and `.tkit.json`,
     still open. A template opened on its own becomes a one-template workspace.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
@@ -190,7 +191,8 @@ the records, and **Export** turns templates and records into files.
     style, without the content. Pasting a style is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
-    `{{field}}` tokens, even while a record preview fills the fields in. Esc,
+    `{{field}}` tokens, even while a record preview fills the fields in. The
+    box shows the layer's stroke, a gradient one in its first stop's colour. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector. Typing `{{` there, or in the inspector's
     text content, suggests field keys: arrows choose, Enter or Tab inserts,
@@ -282,11 +284,13 @@ the records, and **Export** turns templates and records into files.
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - A stroke sits inside, centered on or outside the edge of any stroked
-    layer: rectangle, frame, image or vector. Its paint is a solid colour or a
-    linear, radial or angular gradient, edited with the same controls as a
-    gradient fill. The canvas gradient handles follow fills only.
-  - Rectangles and frames can set each corner's radius on its own. A frame
-    applies its corners to its fill, its stroke and its clip.
+    layer: rectangle, frame, image, vector or text. Its paint is a solid colour
+    or a linear, radial or angular gradient, edited with the same controls as a
+    gradient fill. The canvas gradient handles follow fills only. A text
+    stroke takes a position and a join but no dash, trim or cap.
+  - Rectangles, frames and images can set each corner's radius on its own
+    and smooth their corners. A frame applies its corners to its fill, its
+    stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text content, image source, QR value and barcode value have an Insert
@@ -396,7 +400,7 @@ action.
 |---|---|
 | `?sample=<id>` | a bundled sample: `membership-card`, `certificate`, `minimal` |
 | `?starter=<id>` | a starter: `davi-card`, `photo-watermark`, `event-badge`; `davi-card-portrait` opens `davi-card` |
-| `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge` |
+| `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge`, `business-card`, `business-card-eu`, `postcard`, `postcard-a6`, `shipping-label` |
 
 A template can also arrive in the fragment, as the Figma plugin sends it:
 `#coat=<data>`, with `#open=1` pointing at **Open file…** when the template
@@ -582,7 +586,7 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   bleed when it is narrower ("Gap widened to 6 mm for bleed"), and crop
   marks start outside the bleed. Bleed needs Template size.
 
-- **Paper:** A4, Letter, Legal, A3, Tabloid, or Custom in millimeters.
+- **Paper:** A4, A5, A6, Letter, Legal, A3, Tabloid, or Custom in millimeters.
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more
   cards, portrait on a tie. Margin (10 mm by default) and Gap (0) are in
   millimeters. The grid is centered inside the margins.

@@ -723,6 +723,27 @@ test("readNode reads a frame's four corners when cornerRadius is mixed", () => {
 	]);
 });
 
+test("readNode reads a frame's corner smoothing", () => {
+	const frame = (cornerSmoothing: number) =>
+		readNode({
+			id: "1:9",
+			name: "card",
+			type: "FRAME",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 40 },
+			effects: [],
+			fills: [],
+			strokes: [],
+			children: [],
+			cornerRadius: 12,
+			cornerSmoothing,
+		} as never) as { cornerSmoothing?: number };
+	expect(frame(0.6).cornerSmoothing).toBe(0.6);
+	expect("cornerSmoothing" in frame(0)).toBe(false);
+});
+
 test("readContainer copies auto-layout container + child fields", () => {
 	const node = {
 		id: "1:2",

@@ -46,7 +46,14 @@ function clean(s: Stroke): Stroke {
 	return out as Stroke;
 }
 
-export function StrokeSection({ ins }: { ins: Inspect }) {
+/** `text` offers what a text stroke takes: no dash, trim or cap. */
+export function StrokeSection({
+	ins,
+	text = false,
+}: {
+	ins: Inspect;
+	text?: boolean;
+}) {
 	const strokes = ins.layers.map(strokeOf);
 	const all = strokes.every(Boolean);
 	const none = strokes.every((s) => !s);
@@ -172,55 +179,61 @@ export function StrokeSection({ ins }: { ins: Inspect }) {
 							<ToggleGroupItem id="outside">Outside</ToggleGroupItem>
 						</ToggleGroup>
 					</Row>
-					<DashField
-						value={commonValue(strokes.map((s) => s?.dash ?? []))}
-						onCommit={(dash) => set("stroke-dash", { dash })}
-					/>
-					<Row label="Trim">
-						{TRIMS.map(({ key, label, fallback }) => {
-							const v = commonValue(strokes.map((s) => s?.[key] ?? fallback));
-							return (
-								<NumberField
-									key={key}
-									aria-label={label}
-									className="min-w-0 flex-1"
-									unit="%"
-									precision={0}
-									min={key === "trimOffset" ? undefined : 0}
-									max={key === "trimOffset" ? undefined : 100}
-									value={typeof v === "number" ? Math.round(v * 100) : null}
-									placeholder={typeof v === "string" ? v : "Mixed"}
-									onChange={(pct) => {
-										const f = pct / 100;
-										set(`stroke-${key}`, {
-											[key]: f === fallback ? undefined : f,
-										});
-									}}
-								/>
-							);
-						})}
-					</Row>
+					{!text && (
+						<DashField
+							value={commonValue(strokes.map((s) => s?.dash ?? []))}
+							onCommit={(dash) => set("stroke-dash", { dash })}
+						/>
+					)}
+					{!text && (
+						<Row label="Trim">
+							{TRIMS.map(({ key, label, fallback }) => {
+								const v = commonValue(strokes.map((s) => s?.[key] ?? fallback));
+								return (
+									<NumberField
+										key={key}
+										aria-label={label}
+										className="min-w-0 flex-1"
+										unit="%"
+										precision={0}
+										min={key === "trimOffset" ? undefined : 0}
+										max={key === "trimOffset" ? undefined : 100}
+										value={typeof v === "number" ? Math.round(v * 100) : null}
+										placeholder={typeof v === "string" ? v : "Mixed"}
+										onChange={(pct) => {
+											const f = pct / 100;
+											set(`stroke-${key}`, {
+												[key]: f === fallback ? undefined : f,
+											});
+										}}
+									/>
+								);
+							})}
+						</Row>
+					)}
 					<Pair>
-						<Select
-							aria-label="Stroke cap"
-							value={cap}
-							placeholder="Mixed"
-							onChange={(v) =>
-								set("stroke-cap", {
-									cap: v === "butt" ? undefined : (v as Stroke["cap"]),
-								})
-							}
-						>
-							<SelectItem id="butt" textValue="Butt cap">
-								Butt cap
-							</SelectItem>
-							<SelectItem id="round" textValue="Round cap">
-								Round cap
-							</SelectItem>
-							<SelectItem id="square" textValue="Square cap">
-								Square cap
-							</SelectItem>
-						</Select>
+						{!text && (
+							<Select
+								aria-label="Stroke cap"
+								value={cap}
+								placeholder="Mixed"
+								onChange={(v) =>
+									set("stroke-cap", {
+										cap: v === "butt" ? undefined : (v as Stroke["cap"]),
+									})
+								}
+							>
+								<SelectItem id="butt" textValue="Butt cap">
+									Butt cap
+								</SelectItem>
+								<SelectItem id="round" textValue="Round cap">
+									Round cap
+								</SelectItem>
+								<SelectItem id="square" textValue="Square cap">
+									Square cap
+								</SelectItem>
+							</Select>
+						)}
 						<Select
 							aria-label="Stroke join"
 							value={join}

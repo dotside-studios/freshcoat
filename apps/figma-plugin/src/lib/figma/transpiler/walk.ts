@@ -23,8 +23,8 @@ import {
 	elementBlendMode,
 	type FlattenReason,
 	groupIsolates,
-	hasTextStroke,
 	isQrLayerName,
+	textStrokeUnmappable,
 } from "./classify";
 import type { FlattenMarker } from "./coalesce";
 import { elementConstraints, groupConstraints } from "./constraints";
@@ -433,11 +433,11 @@ function walkNode(
 			// The binding names the element (see transpileText) — resolved the
 			// same way the image branch below resolves its own.
 			el = transpileText(n, ctx, w.resolveBinding(n)?.bind.text);
-			if (hasTextStroke(n))
+			if (textStrokeUnmappable(n))
 				w.sink.warnings.push({
 					severity: "warn",
 					code: "text_stroke_unsupported",
-					message: `Text layer "${n.name}" has a stroke, which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
+					message: `Text layer "${n.name}" has a stroke coatfile text cannot carry (an image or mixed paint, or a dash), which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
 					nodeId: n.id,
 				});
 		} else if (c.kind === "native-rect" && isRectangleNode(n))

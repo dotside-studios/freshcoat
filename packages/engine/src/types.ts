@@ -186,6 +186,13 @@ export type Stroke = {
 	trimOffset?: number;
 };
 
+// A text stroke: no dash, cap or trim. `outside` draws a double-width stroke
+// under the fill, `inside` one clipped to the glyphs.
+export type TextStroke = Pick<
+	Stroke,
+	"color" | "gradient" | "width" | "join" | "align"
+>;
+
 export type GradientSpread = "pad" | "reflect" | "repeat";
 
 export type GradientFill = Extract<
@@ -414,6 +421,7 @@ export type DrawTextCommand = DrawCommandBase & {
 	layout: BakedTextLayout;
 	color: string;
 	fill?: ResolvedFill;
+	stroke?: TextStroke;
 	arc?: TextArc;
 	path?: TextPath;
 };

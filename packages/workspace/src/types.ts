@@ -215,7 +215,14 @@ export type PresetPrint = {
 	profile?: PrintProfile;
 };
 
-export type PaperName = "a4" | "letter" | "legal" | "a3" | "tabloid";
+export type PaperName =
+	| "a4"
+	| "a5"
+	| "a6"
+	| "letter"
+	| "legal"
+	| "a3"
+	| "tabloid";
 
 /** Cards imposed on sheets of paper, for a PDF. */
 export type SheetLayout = {

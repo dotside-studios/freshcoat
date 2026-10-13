@@ -9,43 +9,12 @@ Read [CONTRIBUTING.md](../CONTRIBUTING.md) first, and say on the issue (or
 open one) that you are taking a task, so two people don't do the same one.
 Paths are relative to `freshcoat/`.
 
-## 1. A5 paper for sheets
+## 1. A shipping label starter
 
-Sheets offer A4, Letter, Legal, A3, Tabloid and Custom. Add A5
-(148 × 210 mm), which suits badges and postcards.
-
-- **Files:**
-  - `packages/workspace/src/types.ts`: `PaperName`;
-  - `packages/workspace/src/impose.ts`: `PAPER_SIZES_MM`;
-  - `packages/workspace/src/archive.ts`: the `paper` enum in the preset schema;
-  - `apps/editor/src/export/sheets.ts`: `PAPER_LABEL` and `PAPER_CHOICES`.
-- **Done when:**
-  - the Paper select in a Sheets preset lists A5, after A4;
-  - a `.coatworkspace` with an A5 preset saves and opens again;
-  - `packages/workspace/src/impose.test.ts` imposes CR80 cards (85.6 × 54 mm) on A5 and checks
-    the count and orientation Auto picks;
-  - Sheets in [features.md](features.md) lists A5.
-
-## 2. A business card size on the welcome screen
-
-The welcome screen's new-template sizes are CR80 card, A4 landscape, square,
-portrait poster and badge. Add a US business card: 3.5 × 2 in at 300 dpi
-(1050 × 600), front and back.
-
-- **Files:** `apps/editor/src/doc/new-document.ts` (`PRESETS`), which both the
-  welcome screen and `?new=<id>` read.
-- **Done when:**
-  - the welcome screen shows it, and `/?new=business-card` opens it;
-  - `apps/editor/src/tests/samples.test.ts` still validates every preset, and a
-    new case checks its size and two sides;
-  - the `?new=` row of the Links table in [features.md](features.md) lists
-    `business-card`.
-
-## 3. A shipping label starter
-
-Add a 4 × 6 in shipping label (1200 × 1800 at 300 dpi) with `name`,
-`address`, `city` and `tracking` fields and a Code 128 of `{{tracking}}`,
-opening with a PDF preset of one label per page.
+The blank 4 × 6 in shipping label size (1200 × 1800 at 300 dpi) is already a
+new-template preset. Add a starter of that size with `name`, `address`,
+`city` and `tracking` fields and a Code 128 of `{{tracking}}`, opening with a
+PDF preset of one label per page.
 
 - **Files:** a new `apps/editor/src/samples/shipping-label.ts`, modeled on
   `event-badge.ts`, and an entry in `STARTERS` in
@@ -60,7 +29,7 @@ opening with a PDF preset of one label per page.
   - `apps/editor/e2e/starters.spec.ts` opens it and exports one record;
   - it has no Davi branding.
 
-## 4. Add a gradient stop from the keyboard
+## 2. Add a gradient stop from the keyboard
 
 On the stop bar, arrow keys move the selected stop and Delete removes it, but
 adding a stop needs a pointer.
@@ -75,7 +44,7 @@ adding a stop needs a pointer.
   - `apps/editor/src/tests/stop-bar.test.tsx` covers the middle and the last stop;
   - the Inspector bullet in [features.md](features.md) mentions it.
 
-## 5. Move a gradient stop to either end
+## 3. Move a gradient stop to either end
 
 Home and End on a focused stop could put it at 0% and 100%, as they do on any
 ARIA slider (each stop is already `role="slider"`).
@@ -87,7 +56,7 @@ ARIA slider (each stop is already `role="slider"`).
     after the stops are re-sorted;
   - a test in `apps/editor/src/tests/stop-bar.test.tsx` covers both keys.
 
-## 6. A test for the barcode type list
+## 4. A test for the barcode type list
 
 The Barcode section's Type select groups the eight symbologies under 1D and
 2D, labeled by coatfile's `symbologyLabel`. No test opens it.
@@ -98,7 +67,7 @@ The Barcode section's Type select groups the eight symbologies under 1D and
   128, EAN-13, UPC-A, Code 39 and ITF-14, and 2D lists PDF417, Data Matrix and
   Aztec, in that order and with exactly those labels.
 
-## 7. Search the keyboard shortcuts
+## 5. Search the keyboard shortcuts
 
 The shortcuts sheet (`?`) lists every command with keys, grouped, with no way
 to find one.
@@ -112,7 +81,7 @@ to find one.
   - a new `apps/editor/src/tests/shortcuts-dialog.test.tsx` covers a match, no
     match and clearing the field.
 
-## 8. Width and height in the export report
+## 6. Width and height in the export report
 
 Every image export writes `export-report.csv` with `file`, `record`, `side`,
 `status`, `error`, `print` and `gamut`. With sizes taken from each photo, the
@@ -127,7 +96,7 @@ output size varies per file and is worth recording.
   - `apps/editor/src/tests/export-job.test.ts` checks the header and one row of
     each kind.
 
-## 9. Guard more British spellings in the copy
+## 7. Guard more British spellings in the copy
 
 The copy guard keeps "colour", "centre" and "optimis" out of the interface.
 The style guide asks for American spelling throughout.

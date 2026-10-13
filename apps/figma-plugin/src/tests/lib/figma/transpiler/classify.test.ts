@@ -141,17 +141,53 @@ describe("classify", () => {
 			...over,
 		});
 
-		it("is rasterized", () => {
-			expect(classify(stroked())).toEqual({
-				kind: "flatten",
-				reason: "text_stroke_flattened",
-			});
+		const image = {
+			type: "IMAGE",
+			imageHash: "h",
+			scaleMode: "FILL",
+		};
+		const linear = {
+			type: "GRADIENT_LINEAR",
+			gradientHandlePositions: [
+				{ x: 0, y: 0.5 },
+				{ x: 1, y: 0.5 },
+				{ x: 0, y: 1 },
+			],
+			gradientStops: [
+				{ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+				{ position: 1, color: { r: 0, g: 0, b: 1, a: 1 } },
+			],
+		};
+
+		it("stays native with a solid or single gradient paint", () => {
+			expect(classify(stroked()).kind).toBe("native-text");
+			expect(classify(stroked({ strokes: [linear] })).kind).toBe("native-text");
+		});
+
+		it("is rasterized when the stroke cannot map", () => {
+			const flattened = { kind: "flatten", reason: "text_stroke_flattened" };
+			expect(classify(stroked({ strokes: [image] }))).toEqual(flattened);
+			expect(
+				classify(
+					stroked({
+						strokes: [
+							linear,
+							{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } },
+						],
+					}),
+				),
+			).toEqual(flattened);
+			expect(classify(stroked({ dashPattern: [4, 2] }))).toEqual(flattened);
 		});
 
 		it("stays native when bound to a field", () => {
-			expect(classify(stroked({ name: "{{name}}" })).kind).toBe("native-text");
+			const bound = { strokes: [image] };
+			expect(classify(stroked({ ...bound, name: "{{name}}" })).kind).toBe(
+				"native-text",
+			);
 			expect(
-				classify(stroked({ binding: { bind: { text: "{{name}}" } } })).kind,
+				classify(stroked({ ...bound, binding: { bind: { text: "{{name}}" } } }))
+					.kind,
 			).toBe("native-text");
 		});
 

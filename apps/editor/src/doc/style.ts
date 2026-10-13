@@ -51,12 +51,24 @@ const hasFill = (el: Layer) =>
 	el.type === "vector" ||
 	el.type === "frame" ||
 	el.type === "text";
-const hasStroke = (el: Layer) =>
+const hasCorners = (el: Layer) =>
 	el.type === "rect" ||
 	el.type === "vector" ||
 	el.type === "frame" ||
 	el.type === "image";
-const hasCorners = hasStroke;
+const hasStroke = (el: Layer) => hasCorners(el) || el.type === "text";
+
+/** A stroke as a text layer takes it: no dash, cap or trim. */
+function textStroke(stroke: Stroke | undefined): Stroke | undefined {
+	if (!stroke) return undefined;
+	const { color, width, join, align } = stroke;
+	return {
+		color,
+		width,
+		...(join ? { join } : {}),
+		...(align ? { align } : {}),
+	};
+}
 
 export function readStyle(el: Layer): LayerStyle {
 	const p = el.properties as Record<string, unknown>;
@@ -96,14 +108,16 @@ export function stylePatch(el: Layer, style: LayerStyle): ElementPatch {
 			}
 		} else props.fill = style.fill.fill;
 	}
-	if (style.stroke && hasStroke(el)) props.stroke = style.stroke.stroke;
+	if (style.stroke && hasStroke(el))
+		props.stroke =
+			el.type === "text"
+				? textStroke(style.stroke.stroke)
+				: style.stroke.stroke;
 	if (style.corners && hasCorners(el)) {
 		const r = style.corners.cornerRadius;
 		props.cornerRadius =
-			el.type === "rect" || el.type === "frame" || typeof r !== "object"
-				? r
-				: r[0];
-		if (el.type === "rect")
+			el.type !== "vector" || typeof r !== "object" ? r : r[0];
+		if (el.type !== "vector")
 			props.cornerSmoothing = style.corners.cornerSmoothing;
 	}
 	if (style.text && el.type === "text") {

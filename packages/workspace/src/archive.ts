@@ -154,7 +154,7 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 	z.object({
 		kind: z.literal("sheet"),
 		paper: z.union([
-			z.enum(["a4", "letter", "legal", "a3", "tabloid"]),
+			z.enum(["a4", "a5", "a6", "letter", "legal", "a3", "tabloid"]),
 			z.object({
 				widthMm: z.number().positive(),
 				heightMm: z.number().positive(),

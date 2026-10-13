@@ -137,6 +137,71 @@ describe("imposeSheets", () => {
 		expect(tabloid.paper).toMatchObject({ widthMm: 279.4, heightMm: 431.8 });
 		const letter = imposeSheets(items(1), CR80, layout({ paper: "letter" }));
 		expect(letter.paper).toMatchObject({ widthMm: 215.9, heightMm: 279.4 });
+		const a5 = imposeSheets(items(1), CR80, layout({ paper: "a5" }));
+		expect(a5.paper).toMatchObject({ widthMm: 148, heightMm: 210 });
+		const a6 = imposeSheets(
+			items(1),
+			CR80,
+			layout({ paper: "a6", orientation: "landscape" }),
+		);
+		expect(a6.paper).toMatchObject({ widthMm: 148, heightMm: 105 });
+	});
+
+	it("fits four CR80 cards on A5, in landscape under auto", () => {
+		// portrait 1 × 3, landscape 2 × 2
+		const out = imposeSheets(
+			items(13),
+			CR80,
+			layout({ paper: "a5", orientation: "auto" }),
+		);
+		expect(out.paper).toEqual({
+			widthMm: 210,
+			heightMm: 148,
+			orientation: "landscape",
+		});
+		expect([out.columns, out.rows]).toEqual([2, 2]);
+		expect(out.perSheet).toBe(4);
+		expect(out.sheets).toBe(4);
+	});
+
+	it("fits CR80 cards on A6 by its margin, and 85 × 55 cards with bleed", () => {
+		const wide = imposeSheets(
+			items(3),
+			CR80,
+			layout({ paper: "a6", orientation: "auto" }),
+		);
+		expect(wide.paper.orientation).toBe("landscape");
+		expect(wide.perSheet).toBe(1);
+		const narrow = imposeSheets(
+			items(3),
+			CR80,
+			layout({ paper: "a6", orientation: "auto", marginMm: 5 }),
+		);
+		expect(narrow.paper.orientation).toBe("portrait");
+		expect([narrow.columns, narrow.rows]).toEqual([1, 2]);
+		expect(narrow.sheets).toBe(2);
+		const card = imposeSheets(
+			items(2),
+			{ widthMm: 85, heightMm: 55 },
+			layout({ paper: "a6", orientation: "auto", marginMm: 5 }),
+			{ bleedMm: 3 },
+		);
+		expect(card.gapMm).toBe(6);
+		expect([card.columns, card.rows]).toEqual([1, 2]);
+		expect(card.sheets).toBe(1);
+	});
+
+	it("fits four A6 postcards on A4 and two on A5", () => {
+		const a6 = { widthMm: 148, heightMm: 105 };
+		const flat = layout({ orientation: "auto", marginMm: 0 });
+		const onA4 = imposeSheets(items(4), a6, flat);
+		expect(onA4.perSheet).toBe(4);
+		expect(onA4.paper.orientation).toBe("landscape");
+		expect(onA4.originMm.x).toBeCloseTo(0.5, 9);
+		const onA5 = imposeSheets(items(4), a6, { ...flat, paper: "a5" });
+		expect(onA5.paper.orientation).toBe("portrait");
+		expect([onA5.columns, onA5.rows]).toEqual([1, 2]);
+		expect(onA5.sheets).toBe(2);
 	});
 
 	describe("auto orientation", () => {
