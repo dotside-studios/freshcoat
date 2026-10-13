@@ -796,6 +796,19 @@ and its `box`, the axis-aligned bounds of that path, plus `name`, `fillRule`,
 for `compile` to recompute a vector's live `boolean`; without it the cached `d`
 is the outline.
 
+To render one piece as a raster, pass `piece` (a slice name or id) to
+`renderTemplate`, with the side in `frameNames` if it is not the first. The
+result is the slice's `box` grown by its `bleed`, at the render's scale, cut
+from the side's whole composite: every layer, above and below the slice shape,
+with the shape painted as normal. Art that runs to the trim keeps running into
+the template's `bleed` where the piece's bleed reaches past it. Unless the
+outline is exactly its box (an unrotated rect with square corners), everything
+outside the outline grown by the bleed is transparent; with per-side bleeds the
+largest side sets that growth. The frame's `piece` gives the box's place in the
+pixels, as `trim` does for a bleed render. `piece` takes the place of `bleed`,
+and a slice with `output: "none"` can be rendered by name. An unknown name
+throws.
+
 ## Grid layout
 
 A frame's `layout` is a flex layout (`direction`, as before) or a grid:
