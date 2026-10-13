@@ -2018,3 +2018,59 @@ describe("path text", () => {
 		expect(validate(tpl).ok).toBe(false);
 	});
 });
+
+describe("text stroke", () => {
+	const withStroke = (stroke: TextElement["properties"]["stroke"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "ink",
+			type: "text",
+			pos: { x: 20, y: 0 },
+			size: { width: 60, height: 20 },
+			properties: {
+				value: "Ink",
+				font: { family: "Comfortaa", size: 10 },
+				stroke,
+			},
+		});
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.id === "ink")!;
+	};
+
+	test("scales the width and keeps join and align", () => {
+		const text = withStroke({
+			color: "#ff0000",
+			width: 1.5,
+			join: "round",
+			align: "outside",
+		});
+		expect(text.stroke).toEqual({
+			color: "#ff0000",
+			width: 3,
+			join: "round",
+			align: "outside",
+		});
+	});
+
+	test("a gradient colour carries through", () => {
+		const text = withStroke({
+			color: {
+				kind: "linear",
+				angle: 0,
+				stops: [
+					{ offset: 0, color: "#000" },
+					{ offset: 1, color: "#fff" },
+				],
+			},
+			width: 1,
+		});
+		expect(text.stroke?.color).toBe("#000");
+		expect(text.stroke?.gradient?.kind).toBe("linear");
+	});
+
+	test("a zero width draws no stroke", () => {
+		expect(withStroke({ color: "#000", width: 0 }).stroke).toBeUndefined();
+	});
+});
