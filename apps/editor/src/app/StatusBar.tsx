@@ -33,7 +33,7 @@ export function StatusBar() {
 				data-testid={section === "data" ? "data-status" : undefined}
 				// biome-ignore lint/a11y/noNoninteractiveTabindex: focus gives the keyboard the bar's context menu (Shift+F10) even when no item in it is focusable
 				tabIndex={0}
-				className="@container flex h-6 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-fc-border border-t bg-fc-app px-3 text-fc-muted text-fc-sm tabular-nums outline-none focus-visible:-outline-offset-1 focus-visible:outline-1 focus-visible:outline-fc-accent focus-visible:outline-solid pointer-coarse:h-8"
+				className="@container flex h-6 shrink-0 has-[>:only-child]:hidden items-center gap-4 overflow-hidden whitespace-nowrap border-fc-border border-t bg-fc-app px-3 text-fc-muted text-fc-sm tabular-nums outline-none focus-visible:-outline-offset-1 focus-visible:outline-1 focus-visible:outline-fc-accent focus-visible:outline-solid pointer-coarse:h-8"
 			>
 				<Slot items={items} align="start" />
 				<span className="flex-1" />
