@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 export type TestFont =
 	| "Geist-Regular.ttf"
 	| "NotoSansHebrew-Regular.ttf"
+	| "VendSans-Regular-CFF.otf"
+	| "VendSans-Variable-CFF2.otf"
 	| "VendSans-Variable-latin.woff2";
 
 export function testFontPath(name: TestFont): string {
