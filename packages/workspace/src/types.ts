@@ -304,6 +304,9 @@ export type ExportPreset = {
 	/** what a PDF page embeds, default png. vector draws each card as PDF
 	 *  vectors, with any layer a PDF cannot express as an image */
 	pdfPageImage?: "png" | "jpeg" | "vector";
+	/** vector PDF pages only: "outline" draws text as the outlines of its
+	 *  glyphs, with no font in the PDF; default embed */
+	pdfText?: "embed" | "outline";
 	/** default download */
 	destination?: ExportDestination;
 	/** PNG density, 1..4; a size from an image ignores it */
