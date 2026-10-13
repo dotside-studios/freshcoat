@@ -10,6 +10,7 @@ import {
 import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import {
+	CARD_PRINTER,
 	choosePrintTarget,
 	mod,
 	openSample,
@@ -224,10 +225,22 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 	});
 	if (!created.ok) throw new Error(`no profile: ${created.reason}`);
 	expect(created.profile.balance?.r).not.toBeCloseTo(1, 2);
+	await chooseFile(
+		"elsewhere.json",
+		JSON.stringify({ ...created.profile, target: "some-other-printer" }),
+	);
+	const mismatch = page.getByTestId("export-print-profile-mismatch");
+	await expect(mismatch).toContainText(
+		`Profile was measured on some-other-printer, not ${CARD_PRINTER}`,
+	);
+	await group.getByRole("button", { name: "Remove profile" }).click();
+	await expect(mismatch).toHaveCount(0);
+
 	await chooseFile("smart-51.json", JSON.stringify(created.profile, null, 2));
 	await expect(error).toHaveCount(0);
 	await expect(group).toContainText("Smart-51 / ribbon A / PVC");
 	await expect(group).toContainText("Sep 1, 2026");
+	await expect(mismatch).toHaveCount(0);
 	if (SHOTS) {
 		await page
 			.getByTestId("export-print")

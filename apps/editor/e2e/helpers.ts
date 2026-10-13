@@ -9,6 +9,7 @@ export async function settingsTab(page: Page, name: string) {
 }
 
 export const CARD_PRINTER = "Card printer (YMCKO dye-sub)";
+const CARD_PRINTER_SHORT = "Card printer";
 
 /** The Print group's target select. */
 export const printTarget = (page: Page) =>
@@ -20,7 +21,9 @@ export const printTarget = (page: Page) =>
 export async function choosePrintTarget(page: Page, name = CARD_PRINTER) {
 	await printTarget(page).click();
 	await page.getByRole("listbox").getByRole("option", { name }).click();
-	await expect(printTarget(page)).toContainText(name);
+	await expect(printTarget(page)).toContainText(
+		name === CARD_PRINTER ? CARD_PRINTER_SHORT : name,
+	);
 }
 
 /** Opens a bundled sample from the welcome screen and waits for its first paint. */

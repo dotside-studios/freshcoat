@@ -10,6 +10,7 @@ import type { PrintOptimizeOptions } from "./types";
 export interface PrintTarget {
 	id: string;
 	name: string;
+	shortName?: string;
 	preset: PrintOptimizeOptions;
 	recommend(stats: ImageStats): {
 		recommendation: PrintOptimizeOptions;
@@ -174,6 +175,7 @@ function recommendDyeSub(stats: ImageStats): {
 export const YMCKO_DYE_SUB: PrintTarget = {
 	id: "ymcko-dye-sub",
 	name: "Card printer (YMCKO dye-sub)",
+	shortName: "Card printer",
 	preset: DYE_SUB_PRESET,
 	recommend: recommendDyeSub,
 	finish: DYE_SUB_FINISH,

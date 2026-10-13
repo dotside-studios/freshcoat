@@ -102,6 +102,7 @@ A `PrintTarget` bundles what one kind of printer needs:
 interface PrintTarget {
   id: string;                     // "ymcko-dye-sub"
   name: string;                   // for UI
+  shortName?: string;             // for tight UI, such as a closed select
   preset: PrintOptimizeOptions;   // photos, without per-image analysis
   recommend(stats: ImageStats): { recommendation; notes };
   finish: FrameFinish;            // the whole-frame finish
@@ -118,7 +119,9 @@ black for the resin K panel and dithers in monochrome against dye-sub banding.
 (`undefined` reads as the default).
 
 A custom target is plain data plus a `recommend` function. Other printers need
-tuning against real test prints, so none ship yet.
+tuning against real test prints, so none ship yet. Rather than hand-tuning a
+new target's `preset`, derive it from printed charts with `fitTargetPreset`
+(see [Tuning a target's preset](#tuning-a-targets-preset)).
 
 ```ts
 const plan = await planForPrint(nodeTree, { sample, target: myTarget });
@@ -141,7 +144,8 @@ requests via the target's `finish`.
 The chart, measurement and fitting tools live in a separate entry point,
 `@freshcoat-js/for-print/calibration`: chart specs (`grayBalanceChart`,
 `chartScene`, …), reading a photographed chart (`readChart`, `homographyFrom`),
-quality checks (`assessCalibration`) and fitting (`fitChannelBalance`).
+quality checks (`assessCalibration`) and fitting (`fitChannelBalance`,
+`fitTargetPreset`).
 
 `profileFromPhoto(photo, corners, details)` is the whole flow in one call: it
 reads a photo of the printed gray balance chart, given the four fiducial
@@ -162,9 +166,53 @@ It remains compatible with older profiles and normalizes them to the current
 reads `media` or else `ribbon`.
 
 Profiles describe measured channel balance for a printer, ribbon and stock
-combination. They are not ICC profiles. A profile's `balance` corrects the
+combination. They are not ICC profiles. A target's tone and chroma preset is
+fitted separately by `fitTargetPreset` and is not stored in a profile. A profile's `balance` corrects the
 composited card, never a layer: pass it to `planForPrint` or `printFinish()`,
 which apply it as the whole-frame finish's curve.
+
+### Tuning a target's preset
+
+`fitTargetPreset` turns photographed charts into a suggested `preset` for a
+new printer, ribbon and stock. Print a tone chart (`toneWedgeChart` or
+`grayBalanceChart`) and a chroma chart (`chromaRampChart`, or `hueSweepChart`
+as a weaker substitute), read each with `readChart`, and fit:
+
+```ts
+import { fitTargetPreset } from "@freshcoat-js/for-print/calibration";
+
+const fit = fitTargetPreset({ tone: toneReading, chroma: chromaReading });
+if (fit.ok) {
+  fit.preset;  // PrintOptimizeOptions, a starting point for PrintTarget.preset
+  fit.fitted;  // which of "gamma" | "darkness" | "saturation" were measured
+  fit.notes;   // what was measured, and what was left at a default and why
+} else {
+  fit.reason;  // "no-charts" | "unsafe-reading" | "not-enough-data" | "implausible-response"
+}
+```
+
+- **gamma, darkness** come from how the printer renders sent levels. The
+  correction pre-compensates it: a printer that returns tones too dark gets
+  `gamma` below 1 (the tone LUT lifts them), one that returns them too light
+  gets `gamma` above 1. The search runs through `printAdjust`'s own LUT, so
+  the number is what the render does. `darkness` is kept only when the shadows
+  come back lighter than gamma alone explains; otherwise it stays 0.
+- **saturation** is the inverse of the share of sent chroma the printer keeps.
+  Each hue's ramp is read only below its gamut edge (the step where it stops
+  following its early trend), and hues are combined by median. A hue sweep has
+  no ramp, so it uses an upper quartile and says so in `notes`. When a tone
+  chart is also given, chroma is read after undoing the measured tone response.
+- **contrast** is never fitted and stays at its default: a printer that cannot
+  reach black is not fixed by a contrast boost, and the notes say when that is
+  the case. **sharpness** cannot be measured from these charts and stays at
+  `options.defaults.sharpness` (0 if unset).
+
+A missing chart leaves its knobs at `options.defaults` (neutral if unset). An
+unusable capture (clipped stock, missed patches, uneven light or print, too few
+levels, an implausible response) is refused rather than fitted around. The
+result is a starting point for `PrintTarget.preset`, to be checked against a
+real print; it is not a per-image correction, and it is separate from the cast
+`balance` below.
 
 ## License
 

@@ -97,7 +97,7 @@ function toneLut(gamma: number, darkness: number, balance = 1): Uint8Array {
 const toneMemo = new Map<string, Uint8Array>();
 const TONE_MEMO_MAX = 64;
 
-function buildToneLut(
+export function buildToneLut(
 	gamma: number,
 	darkness: number,
 	balance: number,
