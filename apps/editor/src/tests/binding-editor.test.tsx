@@ -41,16 +41,18 @@ function template(): Template {
 function Harness({
 	initial,
 	log,
+	datasets = [people],
 }: {
 	initial?: Binding;
 	log: (Binding | undefined)[];
+	datasets?: Dataset[];
 }) {
 	const [binding, setBinding] = useState<Binding | undefined>(initial);
 	return (
 		<BindingEditor
 			template={template()}
 			binding={binding}
-			datasets={[people]}
+			datasets={datasets}
 			onChange={(next) => {
 				log.push(next);
 				setBinding(next);
@@ -59,9 +61,9 @@ function Harness({
 	);
 }
 
-function setup(initial?: Binding) {
+function setup(initial?: Binding, datasets?: Dataset[]) {
 	const log: (Binding | undefined)[] = [];
-	render(<Harness initial={initial} log={log} />);
+	render(<Harness initial={initial} log={log} datasets={datasets} />);
 	return {
 		log,
 		user: fastUser(),
@@ -274,5 +276,125 @@ describe("template binding editor", () => {
 		const user = fastUser();
 		await choose(user, /Dataset/, "People");
 		expect(controller.state.workspace?.templates[0]?.binding).toEqual(bound);
+	});
+});
+
+describe("records view", () => {
+	const staff: Dataset = {
+		...people,
+		columns: [...people.columns, { key: "age", type: "integer" }],
+		records: [
+			{
+				id: "r1",
+				values: { name: "Ana", job: "cook", age: 30 },
+				status: "pending",
+			},
+			{
+				id: "r2",
+				values: { name: "Ben", job: "", age: 17 },
+				status: "pending",
+			},
+		],
+	};
+	const jobs: Dataset = {
+		id: "d_jobs",
+		name: "Job titles",
+		columns: [
+			{ key: "job", type: "text" },
+			{ key: "title", type: "text" },
+		],
+		records: [
+			{
+				id: "j1",
+				values: { job: "cook", title: "Head cook" },
+				status: "pending",
+			},
+			{ id: "j2", values: { job: "cook", title: "Sous" }, status: "pending" },
+		],
+		assets: [],
+	};
+	const both = [staff, jobs];
+
+	test("adds a filter, takes its condition and value, and counts the records", async () => {
+		const { user, last } = setup(bound, both);
+		expect(screen.getByTestId("view-count").textContent).toBe("2 of 2 records");
+		await user.click(screen.getByText("Add filter", { selector: "button" }));
+		expect(last()?.view).toEqual({
+			filters: [{ column: "name", op: "contains", value: "" }],
+		});
+		expect(screen.getByTestId("view-count").textContent).toBe("2 of 2 records");
+		await choose(user, /Filter column/, "age");
+		await choose(user, /Filter condition/, "≥");
+		await user.type(
+			screen.getByRole("textbox", { name: "Filter value" }),
+			"18",
+		);
+		expect(last()?.view).toEqual({
+			filters: [{ column: "age", op: "gte", value: "18" }],
+		});
+		expect(screen.getByTestId("view-count").textContent).toBe("1 of 2 records");
+	});
+
+	test("an empty condition takes no value, and removing the last filter drops the view", async () => {
+		const { user, last } = setup(
+			{
+				...bound,
+				view: { filters: [{ column: "job", op: "equals", value: "x" }] },
+			},
+			both,
+		);
+		await choose(user, /Filter condition/, "is not empty");
+		expect(last()?.view).toEqual({
+			filters: [{ column: "job", op: "empty", not: true }],
+		});
+		expect(screen.queryByRole("textbox", { name: "Filter value" })).toBeNull();
+		await user.click(
+			screen.getByLabelText("Remove filter", { selector: "button" }),
+		);
+		expect(last()).not.toHaveProperty("view");
+	});
+
+	test("names a filter that cannot apply", () => {
+		setup(
+			{
+				...bound,
+				view: { filters: [{ column: "age", op: "gt", value: "old" }] },
+			},
+			both,
+		);
+		expect(screen.getByTestId("view-notes").textContent).toContain(
+			'"old" is not a number, for age',
+		);
+		expect(screen.getByTestId("view-count").textContent).toBe("0 of 2 records");
+	});
+
+	test("joins a dataset on a shared column and offers its columns to fields", async () => {
+		const { user, last } = setup(bound, both);
+		await choose(user, /^Join$/, "Job titles");
+		expect(last()?.view).toEqual({
+			filters: [],
+			join: {
+				datasetId: "d_jobs",
+				on: "job",
+				key: "job",
+				prefix: "job_titles_",
+			},
+		});
+		expect(screen.getByTestId("view-notes").textContent).toContain(
+			"1 record with no match",
+		);
+		expect(screen.getByTestId("view-notes").textContent).toContain(
+			"More than one joined record for cook; the first is used",
+		);
+		await user.click(screen.getByText("Only records with a match"));
+		expect(last()?.view?.join?.inner).toBe(true);
+		expect(screen.getByTestId("view-count").textContent).toBe("1 of 2 records");
+		await choose(user, /Column for name/, "job_titles_title");
+		expect(last()?.fields.name).toEqual({
+			kind: "column",
+			column: "job_titles_title",
+		});
+		await choose(user, /^Join$/, "None");
+		expect(last()).not.toHaveProperty("view");
 	});
 });

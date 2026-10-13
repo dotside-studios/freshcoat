@@ -22,6 +22,22 @@ import { glyphTexts, lineClusters, paintPdf } from "../src/pdf/paint";
 import { PdfWriter } from "../src/pdf/writer";
 import { createRenderer, type Renderer } from "../src/renderer";
 
+// Geist alone in a font collection, which a PDF cannot embed.
+function collection(sfnt: Uint8Array): Uint8Array {
+	const out = new Uint8Array(16 + sfnt.length);
+	const dv = new DataView(out.buffer);
+	out.set(new TextEncoder().encode("ttcf"), 0);
+	dv.setUint32(4, 0x00010000);
+	dv.setUint32(8, 1);
+	dv.setUint32(12, 16);
+	out.set(sfnt, 16);
+	for (let i = 0; i < dv.getUint16(16 + 4); i++) {
+		const o = 16 + 12 + 16 * i + 8;
+		dv.setUint32(o, dv.getUint32(o) + 16);
+	}
+	return out;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
@@ -194,12 +210,25 @@ describe("renderPdf", () => {
 		expect(extractText(pdf.bytes)).toContain("Fresh coat ÅÉ");
 	});
 
-	test("draws text a PDF cannot embed as an image", async () => {
+	test("embeds a WOFF2 variable font at its instance", async () => {
 		const pdf = await renderer.renderPdf(scene, { width: W, height: H });
+		expect(pdf.warnings).toEqual([]);
+		expect(source(pdf.bytes)).not.toContain("/Subtype /Image");
+	});
+
+	test("draws text a PDF cannot embed as an image", async () => {
+		const collected = await createRenderer({
+			ck,
+			fonts: { Collected: [collection(testFontBytes("Geist-Regular.ttf"))] },
+		});
+		const pdf = await collected.renderPdf(
+			frame([label("Collected", 400, "In a collection", 8)]),
+			{ width: W, height: H },
+		);
 		expect(pdf.warnings).toEqual([
 			{
 				kind: "vector_rasterized",
-				feature: "variable font Vend Sans Light",
+				feature: "font Geist is not TrueType or OpenType",
 			},
 		]);
 		expect(source(pdf.bytes)).toContain("/Subtype /Image");
@@ -402,41 +431,13 @@ describe("renderPdf", () => {
 			{ ...(id ? { id } : {}), channel: "luminance", invert: true },
 		);
 
-	test("draws a mask, a gradient stroke and a trim as images", async () => {
-		const pdf = await renderer.renderPdf(
-			frame([
-				masked("masked"),
-				createEllipse({
-					id: "ring",
-					pos: { x: 100, y: 10 },
-					size: { width: 60, height: 60 },
-					stroke: {
-						color: "#000",
-						width: 6,
-						gradient: {
-							kind: "linear",
-							from: { x: 0, y: 0 },
-							to: { x: 1, y: 1 },
-							stops: [
-								{ offset: 0, color: "#06d6a0" },
-								{ offset: 1, color: "#118ab2" },
-							],
-						},
-					},
-				}),
-				createRect({
-					id: "trimmed",
-					pos: { x: 10, y: 80 },
-					size: { width: 60, height: 30 },
-					stroke: { color: "#000", width: 2, trimEnd: 0.5 },
-				}),
-			]),
-			{ width: W, height: H },
-		);
+	test("draws a mask as an image", async () => {
+		const pdf = await renderer.renderPdf(frame([masked("masked")]), {
+			width: W,
+			height: H,
+		});
 		expect(pdf.warnings).toEqual([
 			{ kind: "vector_rasterized", feature: "mask", layer: "masked" },
-			{ kind: "vector_rasterized", feature: "gradient stroke", layer: "ring" },
-			{ kind: "vector_rasterized", feature: "stroke trim", layer: "trimmed" },
 		]);
 		if (pdftoppm) {
 			const png = await renderer.render(

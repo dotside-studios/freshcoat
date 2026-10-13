@@ -30,7 +30,13 @@ import {
 	sha256,
 	workspace,
 } from "./test-fixtures";
-import type { ExportPreset, UnpackResult, Workspace } from "./types";
+import type {
+	Binding,
+	DatasetView,
+	ExportPreset,
+	UnpackResult,
+	Workspace,
+} from "./types";
 
 const ws: Workspace = deepFreeze(workspace);
 
@@ -269,6 +275,58 @@ describe("packWorkspace", () => {
 		expect(result.ok && result.workspace.templates[0].binding?.variant).toEqual(
 			variant,
 		);
+	});
+
+	it("writes 1.2 for a view and reads it back", async () => {
+		const [member, plain] = ws.templates;
+		const view: DatasetView = {
+			filters: [
+				{ column: "tier", op: "equals", value: "gold" },
+				{ column: "points", op: "gte", value: "100", not: true },
+				{ column: "photo", op: "empty" },
+			],
+			join: {
+				datasetId: "d_members",
+				on: "number",
+				key: "number",
+				prefix: "self_",
+				inner: true,
+			},
+		};
+		const w: Workspace = {
+			...ws,
+			templates: [
+				{ ...member, binding: { ...(member.binding as Binding), view } },
+				plain,
+			],
+		};
+		const packed = await packWorkspace(w);
+		const files = unzipSync(new Uint8Array(await packed.arrayBuffer()));
+		expect(manifestOf(files).formatVersion).toBe("1.2");
+		const result = await unpackWorkspace(packed);
+		expect(result.ok && result.warnings).toEqual([]);
+		expect(result.ok && result.workspace.templates[0].binding).toEqual(
+			w.templates[0].binding,
+		);
+		const again = await unpackWorkspace(
+			await packWorkspace(result.ok ? result.workspace : w),
+		);
+		expect(again.ok && again.workspace.templates[0].binding?.view).toEqual(
+			view,
+		);
+	});
+
+	it("refuses a view with an unknown filter op", async () => {
+		const result = await repack((f) => {
+			const m = manifestOf(f);
+			m.templates[0].binding = {
+				datasetId: "d_members",
+				fields: {},
+				view: { filters: [{ column: "tier", op: "like" }] },
+			};
+			f["workspace.json"] = strToU8(JSON.stringify(m));
+		});
+		expect(codeOf(result)).toBe("invalid_manifest");
 	});
 
 	it("keeps guides in the manifest and leaves the template alone", async () => {
@@ -663,7 +721,7 @@ describe("unpackWorkspace rejections", () => {
 		const minor = await withVersion("1.3");
 		expect(minor.ok).toBe(true);
 		expect(minor.ok && minor.warnings).toHaveLength(1);
-		const read = await withVersion("1.1");
+		const read = await withVersion("1.2");
 		expect(read.ok && read.warnings).toEqual([]);
 	});
 

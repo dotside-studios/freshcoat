@@ -5,7 +5,11 @@ import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
 import { PanelSection } from "@freshcoat-js/ui/panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import type { Dataset } from "@freshcoat-js/workspace";
-import { readsDataset, unfilledRequired } from "@freshcoat-js/workspace";
+import {
+	boundDataset,
+	readsDataset,
+	unfilledRequired,
+} from "@freshcoat-js/workspace";
 import { useMemo } from "react";
 import {
 	Disclosure,
@@ -28,9 +32,10 @@ export function RecordStepper() {
 	const binding = useEditor((s) => activeSlot(s)?.binding);
 	const datasets = useEditor((s) => s.workspace?.datasets);
 	const templateId = useEditor((s) => s.workspace?.activeTemplateId);
-	const dataset = readsDataset(binding)
-		? datasets?.find((d) => d.id === binding.datasetId)
-		: undefined;
+	const dataset =
+		readsDataset(binding) && datasets
+			? boundDataset(binding, datasets)
+			: undefined;
 	if (!templateId || !datasets || datasets.length === 0) return null;
 	if (!dataset)
 		return <DatasetPicker datasets={datasets} templateId={templateId} />;

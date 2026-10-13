@@ -7,11 +7,17 @@ import type {
 	TemplateEntry,
 	Workspace,
 } from "../types";
+import { bindingView } from "../view";
 import { planSheets, type SheetPlan } from "./sheets";
 
 /** Why a preset can't run, as data: the caller words it. */
 export type PresetBlock = {
-	reason: "missing_template" | "template_issues" | "sheets" | "nothing";
+	reason:
+		| "missing_template"
+		| "template_issues"
+		| "view"
+		| "sheets"
+		| "nothing";
 	/** A few words for a button or a bar. */
 	message: string;
 	/** The whole reason, when `message` is short of it. */
@@ -28,6 +34,8 @@ export type PresetReadiness = {
 	issues: number;
 	/** The required fields no column fills. */
 	unfilled: string[];
+	/** Why the binding's view cannot be applied. */
+	viewProblems: string[];
 	/** Why the export can't run, or null when it can. */
 	blocked: PresetBlock | null;
 };
@@ -35,7 +43,8 @@ export type PresetReadiness = {
 /**
  * Whether a preset can run, and what stands in the way, in the order Studio's
  * Export button checks: the template is missing, the template has issues, the
- * sheets don't lay out, there is nothing to export. `plan` is the preset's own
+ * binding's view cannot be applied, the sheets don't lay out, there is
+ * nothing to export. `plan` is the preset's own
  * unless the caller already holds one, such as the plan of chosen records.
  */
 export function presetReadiness(
@@ -50,19 +59,23 @@ export function presetReadiness(
 	const unfilled = entry
 		? unfilledRequired(entry.template, entry.binding, workspace.datasets)
 		: [];
+	const viewProblems =
+		bindingView(entry?.binding, workspace.datasets)?.problems ?? [];
 	return {
 		entry,
 		plan,
 		sheets,
 		issues,
 		unfilled,
-		blocked: blockOf(entry, issues, sheets, plan),
+		viewProblems,
+		blocked: blockOf(entry, issues, viewProblems, sheets, plan),
 	};
 }
 
 function blockOf(
 	entry: TemplateEntry | undefined,
 	issues: number,
+	viewProblems: readonly string[],
 	sheets: SheetPlan | null,
 	plan: readonly ExportItem[],
 ): PresetBlock | null {
@@ -72,6 +85,12 @@ function blockOf(
 		return {
 			reason: "template_issues",
 			message: `Template has ${issues} ${issues === 1 ? "issue" : "issues"}`,
+		};
+	if (viewProblems.length > 0)
+		return {
+			reason: "view",
+			message: "Records view has problems",
+			detail: viewProblems.join("; "),
 		};
 	if (sheets?.error)
 		return {

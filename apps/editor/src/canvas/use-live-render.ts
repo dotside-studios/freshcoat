@@ -4,6 +4,7 @@ import {
 	type Sides,
 	templateBleed,
 } from "@freshcoat-js/coatfile";
+import { boundDataset } from "@freshcoat-js/workspace";
 import type { CanvasKit } from "canvaskit-wasm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
@@ -57,8 +58,8 @@ export function useLiveRender(): {
 	const values = useEditor((s) => s.values);
 	const zoom = useEditor((s) => s.view.zoom);
 	const datasetAssets = useEditor((s) => {
-		const id = activeSlot(s)?.binding?.datasetId;
-		return s.workspace?.datasets.find((d) => d.id === id)?.assets;
+		return boundDataset(activeSlot(s)?.binding, s.workspace?.datasets ?? [])
+			?.assets;
 	});
 	const bleedOn = useBleedShown();
 	const bleed = !!shown && bleedOn && hasInsets(templateBleed(shown));

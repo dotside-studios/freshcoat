@@ -129,8 +129,8 @@ covers shared checks and pull requests.
   double-clicking one focuses its content field. The on-canvas editor for plain
   text draws in the browser, so its line breaks can differ slightly from the
   render until the edit ends.
-- Datasets cannot be joined or filtered by a query; an export takes one
-  dataset per template.
+- A template reads one dataset, joined to at most one other on a single key
+  column; filters all have to match, with no "any of" grouping.
 - A layer whose ancestor is rotated can be selected and edited in the
   inspector, but it cannot be dragged on the canvas.
 - A path drawn with the pen can't have its points edited on the canvas

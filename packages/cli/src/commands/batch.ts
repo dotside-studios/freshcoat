@@ -22,6 +22,8 @@ import {
 	unknownFileNameTokens,
 	withFieldSource,
 	withVariantSource,
+	type ViewFilter,
+	withView,
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
@@ -66,6 +68,7 @@ export type BatchOptions = {
 	margin?: number;
 	gap?: number;
 	cropMarks?: boolean;
+	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
 	quiet: boolean;
@@ -103,6 +106,7 @@ export async function renderBatch(
 			value: typeof value === "string" ? value : JSON.stringify(value),
 		});
 	if (variantId) binding = withVariantSource(binding, { kind: "fixed", id: variantId });
+	if (options.where) binding = withView(binding, { filters: options.where });
 
 	const templateId = "t_template";
 	const workspace: Workspace = {

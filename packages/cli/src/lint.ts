@@ -1,5 +1,6 @@
 import { type Template, templateHints, validate } from "@freshcoat-js/coatfile";
 import {
+	bindingView,
 	readsDataset,
 	unfilledRequired,
 	type Workspace,
@@ -46,6 +47,12 @@ export function workspaceFindings(workspace: Workspace): Findings {
 			errors.push(`${entry.fileName}: bound to a dataset the workspace does not have`);
 			continue;
 		}
+		const view = bindingView(binding, workspace.datasets);
+		errors.push(...(view?.problems ?? []).map((p) => `${entry.fileName}: records view: ${p}`));
+		if (view && view.duplicateKeys.length > 0)
+			warnings.push(
+				`${entry.fileName}: records view: the joined dataset has more than one record for ${view.duplicateKeys.map((k) => `"${k}"`).join(", ")}; the first is used`,
+			);
 		const unfilled = unfilledRequired(entry.template, binding, workspace.datasets);
 		if (unfilled.length > 0)
 			warnings.push(

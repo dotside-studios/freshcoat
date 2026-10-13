@@ -2,6 +2,7 @@ import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
+import { boundDataset } from "@freshcoat-js/workspace";
 import { useState } from "react";
 import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { SideMenu, VariantMenu } from "~/canvas/SideVariantMenus";
@@ -199,8 +200,10 @@ function ZoomField({ zoom }: { zoom: number }) {
 function RecordStep() {
 	const controller = useController();
 	const shown = useEditor((s) => {
-		const id = activeSlot(s)?.binding?.datasetId;
-		const records = s.workspace?.datasets.find((d) => d.id === id)?.records;
+		const records = boundDataset(
+			activeSlot(s)?.binding,
+			s.workspace?.datasets ?? [],
+		)?.records;
 		if (!records?.length) return null;
 		const at = s.previewRecordId
 			? records.findIndex((r) => r.id === s.previewRecordId)

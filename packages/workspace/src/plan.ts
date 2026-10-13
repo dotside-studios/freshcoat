@@ -16,6 +16,7 @@ import type {
 	PdfLayout,
 	Workspace,
 } from "./types";
+import { boundDataset } from "./view";
 
 export const DEFAULT_FILE_NAME_PATTERN = "{{template}}-{{index}}-{{side}}";
 export const DEFAULT_DPI = 300;
@@ -243,6 +244,9 @@ function sidesOf(template: Template, preset: ExportPreset): string[] {
  * keys end in the variant (`default` for Default), and their file names carry
  * it (`fileNamePattern`).
  *
+ * A binding with a view reads the records the view keeps, with its joined
+ * columns; a view with problems keeps none.
+ *
  * When the binding reads a dataset but leaves required fields unfilled, as
  * `unfilledRequired` finds them, every item lists them in `unfilled`.
  */
@@ -253,9 +257,7 @@ export function planExport(
 	const entry = workspace.templates.find((t) => t.id === preset.templateId);
 	if (entry === undefined) return [];
 	const { template, binding } = entry;
-	const dataset = binding
-		? workspace.datasets.find((d) => d.id === binding.datasetId)
-		: undefined;
+	const dataset = boundDataset(binding, workspace.datasets);
 	const sides = sidesOf(template, preset);
 	const records: (DataRecord | undefined)[] = dataset
 		? selectRecords(dataset, preset)

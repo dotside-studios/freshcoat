@@ -1,13 +1,16 @@
 // Text drawn with the font files themselves: CanvasKit shapes it and reports
 // glyph ids and positions, and the page embeds the glyphs used from the
 // TrueType or OpenType file the run used, so the glyphs stay vector and the
-// text selectable. A file that cannot be cut down is embedded whole. A run
-// whose file a PDF cannot carry as is has no face here and is drawn as pixels.
+// text selectable. A WOFF or WOFF2 file is unwrapped first, and a variable
+// TrueType font is fixed at the instance the run was drawn at. A file that
+// cannot be cut down is embedded whole. A run whose file a PDF cannot carry
+// has no face here and is drawn as pixels.
 
 import type { CanvasKit, GlyphRun, Typeface } from "canvaskit-wasm";
 import { fontArrayBuffer } from "../font-bytes";
 import type { FontVariations } from "../types";
 import { sfntBytes } from "../woff";
+import { instanceFont } from "./instance";
 import { readSfnt, type SfntInfo } from "./sfnt";
 import { subsetFont } from "./subset";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
@@ -39,6 +42,7 @@ export type FaceRequest = {
 export class FontEmbedder {
 	private files = new Map<string, FontFile[]>();
 	private faces = new Map<FontFile, EmbeddedFace>();
+	private instances = new Map<FontFile, Map<string, FontFile | null>>();
 
 	constructor(
 		private ck: CanvasKit,
@@ -79,17 +83,40 @@ export class FontEmbedder {
 		if (!file) return { reason: `font ${family}` };
 		const info = file.info as SfntInfo;
 		const settings: Record<string, number> = {
-			wght: req.weight,
+			wght: req.weight || 400,
 			...req.variations,
 		};
-		const instanced = info.axes.some((a) => {
+		const coords: Record<string, number> = {};
+		for (const a of info.axes) {
 			const v = settings[a.tag];
-			return (
-				v !== undefined && Math.min(a.max, Math.max(a.min, v)) !== a.default
-			);
-		});
-		if (instanced) return { reason: `variable font ${family}` };
-		return file;
+			if (v === undefined) continue;
+			const c = Math.min(a.max, Math.max(a.min, v));
+			if (c !== a.default) coords[a.tag] = c;
+		}
+		if (Object.keys(coords).length === 0) return file;
+		return this.instance(file, coords) ?? { reason: `variable font ${family}` };
+	}
+
+	// `file` fixed at `coords`, made once per instance.
+	private instance(
+		file: FontFile,
+		coords: Record<string, number>,
+	): FontFile | null {
+		let byKey = this.instances.get(file);
+		if (!byKey) {
+			byKey = new Map();
+			this.instances.set(file, byKey);
+		}
+		const key = Object.entries(coords)
+			.sort(([a], [b]) => (a < b ? -1 : 1))
+			.map(([t, v]) => `${t}=${v}`)
+			.join(",");
+		if (byKey.has(key)) return byKey.get(key) ?? null;
+		const bytes = instanceFont(file.bytes, coords);
+		const info = bytes ? readSfnt(bytes) : null;
+		const made = bytes && info ? { ...file, bytes, info } : null;
+		byKey.set(key, made);
+		return made;
 	}
 
 	// The page's font for `file`, embedded with the page.

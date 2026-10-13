@@ -2,8 +2,11 @@ import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
 	type ExportPreset,
+	readsDataset,
 	SheetLayoutError,
 	sheetSummary,
+	type ViewFilter,
+	withView,
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import { packWorkspace } from "@freshcoat-js/workspace/archive";
@@ -28,6 +31,7 @@ export type WorkspaceOptions = {
 	out: string;
 	records?: "all" | "pending" | "failed";
 	save?: true;
+	where?: ViewFilter[];
 	dryRun?: true;
 	jobs?: number;
 	quiet: boolean;
@@ -57,7 +61,7 @@ export async function renderWorkspace(
 		markExported: options.save === true,
 	};
 	await runPreset(
-		workspace,
+		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,
 		{
 			root: dirname(path),
@@ -67,7 +71,7 @@ export async function renderWorkspace(
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
-							await saveWorkspace(path, next);
+							await saveWorkspace(path, { ...workspace, datasets: next.datasets });
 							log.info(`saved the record statuses to ${file}`);
 						},
 					}
@@ -76,6 +80,25 @@ export async function renderWorkspace(
 		log,
 		io,
 	);
+}
+
+/** The workspace with `filters` added to the view of the preset's template's
+ *  binding, for this run only. */
+function withFilters(
+	workspace: Workspace,
+	preset: ExportPreset,
+	filters: ViewFilter[],
+): Workspace {
+	const entry = workspace.templates.find((t) => t.id === preset.templateId);
+	const binding = entry?.binding;
+	if (!entry || !readsDataset(binding))
+		throw new CliError(`--where needs the template of preset "${preset.name}" to be bound to a dataset`);
+	const view = binding.view ?? { filters: [] };
+	const next = { ...entry, binding: withView(binding, { ...view, filters: [...view.filters, ...filters] }) };
+	return {
+		...workspace,
+		templates: workspace.templates.map((t) => (t === entry ? next : t)),
+	};
 }
 
 async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
@@ -105,6 +128,7 @@ export async function runPreset(
 ): Promise<void> {
 	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
 	const readiness = presetReadiness(workspace, preset);
+	checkView(readiness.viewProblems);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
@@ -163,7 +187,8 @@ function planPreset(
 	out: string,
 	log: Log,
 ): void {
-	const { plan, sheets } = presetReadiness(workspace, preset);
+	const { plan, sheets, viewProblems } = presetReadiness(workspace, preset);
+	checkView(viewProblems);
 	if (sheets?.error !== undefined)
 		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
@@ -171,6 +196,11 @@ function planPreset(
 	log.out(
 		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
 	);
+}
+
+function checkView(problems: readonly string[]): void {
+	if (problems.length > 0)
+		throw new CliError(`cannot read the records: ${problems.join("; ")}`);
 }
 
 function presetMessage(
