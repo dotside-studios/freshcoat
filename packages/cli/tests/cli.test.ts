@@ -534,6 +534,26 @@ describe("render image values", () => {
 		expect(run.code).toBe(0);
 		expect(run.stderr).not.toContain("image");
 	});
+
+	test("warns for a photo that prints below the minimum DPI", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front: Image prints at 30 DPI, under 300: front_logo");
+		const off = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi", "--min-dpi", "0");
+		expect(off.stderr).not.toContain("DPI");
+		const lower = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi", "--min-dpi", "20");
+		expect(lower.stderr).not.toContain("DPI");
+	});
+
+	test("lists a low-DPI photo in an export's warnings and report", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front.png: Image prints at 30 DPI, under 300: front_logo");
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("low-dpi.zip"))));
+		expect(new TextDecoder().decode(zip[REPORT_FILE_NAME])).toContain(
+			"Image prints at 30 DPI, under 300: front_logo",
+		);
+	});
 });
 
 describe("render glyph warnings", () => {
@@ -1177,6 +1197,38 @@ describe("validate warnings for a CR80 card", () => {
 		const run = await box.run("validate", "cr80-own.json");
 		expect(run.stderr).toBe("");
 		expect(run.stdout).toBe("cr80-own.json is valid\n");
+	});
+});
+
+describe("validate warnings for image resolution", () => {
+	beforeAll(async () => {
+		const t = card({ width: 1012, height: 638 });
+		for (const frame of t.template_data) frame.background.size = { width: 1012, height: 638 };
+		const logo = t.template_data[0]!.elements[1]!;
+		logo.pos = { x: 0, y: 0 };
+		logo.size = { width: 900, height: 600 };
+		if (logo.type === "image") logo.properties = { src: "photo.png", fit: "fill" };
+		await box.write("photo.png", await solidPng(600, 400, [20, 40, 200]));
+		await box.write("low-dpi.json", JSON.stringify(t));
+	});
+
+	test("warns for a 600 px image placed 3 in wide at 300 DPI", async () => {
+		const run = await box.run("validate", "low-dpi.json");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe('warning: front: "front_logo" prints at 200 DPI, under 300\n');
+		expect(run.stdout).toBe("low-dpi.json is valid, with 1 warning\n");
+		const strict = await box.run("validate", "low-dpi.json", "--strict", "-q");
+		expect(strict.code).toBe(1);
+		expect(strict.stderr).toBe("freshcoat: low-dpi.json has 1 warning\n");
+	});
+
+	test("follows --min-dpi and --dpi", async () => {
+		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "150")).stderr).toBe("");
+		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "0", "--strict")).code).toBe(0);
+		expect((await box.run("validate", "low-dpi.json", "--dpi", "450")).stderr).toBe("");
+		expect((await box.run("validate", "low-dpi.json", "--dpi", "150")).stderr).toBe(
+			'warning: front: "front_logo" prints at 100 DPI, under 300\nwarning: back: "back_logo" prints at 150 DPI, under 300\n',
+		);
 	});
 });
 

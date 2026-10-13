@@ -154,11 +154,27 @@ export {
 	raiseFormatVersion,
 } from "./format";
 export {
+	type ImageDpiHint,
+	imageDpiHints,
 	type SafeAreaHint,
 	safeAreaHints,
 	type TemplateHint,
 	templateHints,
 } from "./hints";
+export {
+	DEFAULT_IMAGE_DPI_UNITS,
+	DEFAULT_MIN_IMAGE_DPI,
+	effectiveImageDpi,
+	type ImageDpiIssue,
+	type ImageDpiOptions,
+	type ImageDpiWarning,
+	type ImageFraming,
+	type ImageSizeMemo,
+	imageDpiIssues,
+	imageDpiWarnings,
+	imagePixelSize,
+	inlineImageSize,
+} from "./image-dpi";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {

@@ -9,6 +9,7 @@ import type {
 } from "@freshcoat-js/engine";
 import type { z } from "zod";
 import type { PathOp } from "./boolean";
+import type { ImageDpiWarning } from "./image-dpi";
 import type {
 	AdjustSchema,
 	BackgroundSchema,
@@ -236,7 +237,11 @@ export type PrintWarning = {
 
 /** What a rendered frame reports: the painter's warnings, then compile's and
  *  the print planner's. */
-export type FrameWarning = PaintWarning | CompileWarning | PrintWarning;
+export type FrameWarning =
+	| PaintWarning
+	| CompileWarning
+	| PrintWarning
+	| ImageDpiWarning;
 
 export type FrameAssets = {
 	fonts: FontRequest[];

@@ -12,6 +12,7 @@ export type PreviewUpdate = {
 	variantId?: string;
 	density: number;
 	bleed?: boolean;
+	imageDpi?: { dpi: number; min: number };
 	template?: Template;
 	/** The template's assets by sha256, in order; null when it has none. */
 	assets?: string[] | null;
@@ -57,6 +58,7 @@ export function createPreviewSender() {
 				side: request.side,
 				density: request.density,
 				...(request.bleed ? { bleed: true } : {}),
+				...(request.imageDpi ? { imageDpi: request.imageDpi } : {}),
 				...(request.variantId !== undefined
 					? { variantId: request.variantId }
 					: {}),
@@ -185,6 +187,7 @@ export function createPreviewReceiver() {
 				photos,
 				density: update.density,
 				...(update.bleed ? { bleed: true } : {}),
+				...(update.imageDpi ? { imageDpi: update.imageDpi } : {}),
 			};
 		},
 	};

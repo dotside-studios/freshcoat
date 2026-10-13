@@ -3,6 +3,7 @@ import {
 	applyVariant,
 	canvasKitPathOp,
 	compile,
+	DEFAULT_MIN_IMAGE_DPI,
 	exportPixelSize,
 	type FrameWarning,
 	fitDesignSize,
@@ -20,6 +21,7 @@ import {
 } from "@freshcoat-js/coatfile";
 import {
 	describeWarning,
+	type ImageDpiCheck,
 	renderCompiled,
 	renderCompiledPdf,
 } from "@freshcoat-js/coatfile/render";
@@ -82,6 +84,9 @@ export type RenderRequest = {
 	vector?: { dpi: number; untagged?: true };
 	/** also work out the item's cut lines */
 	cut?: true;
+	/** warn for images that print below `min` at `dpi` design units to the
+	 *  inch */
+	imageDpi?: ImageDpiCheck;
 };
 
 export type RenderOutput = {
@@ -282,6 +287,8 @@ export function itemRequest(
 	const format = imageFormat(preset);
 	const print = printRequest(preset.print);
 	const vector = vectorPages(preset) && !print;
+	const dpi = size.resize ? preset.dpi / size.scale : preset.dpi;
+	const minImageDpi = preset.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI;
 	return {
 		size,
 		request: {
@@ -307,7 +314,7 @@ export function itemRequest(
 			...(vector
 				? {
 						vector: {
-							dpi: size.resize ? preset.dpi / size.scale : preset.dpi,
+							dpi,
 							...(preset.outputIntent?.kind === "none"
 								? { untagged: true as const }
 								: {}),
@@ -317,6 +324,7 @@ export function itemRequest(
 			...(exportCutFile(preset) !== "none" || exportCutLines(preset)
 				? { cut: true as const }
 				: {}),
+			...(minImageDpi > 0 ? { imageDpi: { dpi, min: minImageDpi } } : {}),
 		},
 	};
 }
@@ -472,6 +480,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					images,
 					dpi: req.vector.dpi,
 					...(req.vector.untagged ? { outputIntent: false as const } : {}),
+					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
 				});
 				if (!page) throw new Error("nothing was rendered");
 				for (const w of page.warnings)
@@ -492,6 +501,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					frameNames: [req.side],
 					images,
 					...(print ? { print } : {}),
+					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
 					exports: [
 						req.scale === 1
 							? {}

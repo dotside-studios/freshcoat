@@ -161,6 +161,7 @@ const preset: ExportPreset = {
 	format: "png-zip",
 	scale: 0.5,
 	dpi: 300,
+	minImageDpi: 0,
 	fileName: "{{index}}-{{side}}",
 	markExported: false,
 };
@@ -221,6 +222,31 @@ async function packTo(logoSrc: string): Promise<string> {
 }
 
 describe("export from a workspace file in Node", () => {
+	it("reports images below the minimum resolution in the export report", async () => {
+		const { minImageDpi: _, ...checked } = preset;
+		const out = join(dir, "low-dpi.zip");
+		const { result } = await exportFrom(
+			await packTo("logo.png"),
+			checked,
+			fileOutput(out),
+		);
+		expect(result.items.map((i) => i.warnings)).toEqual([
+			[
+				"Image prints at 12 DPI, under 300: photo",
+				"Image prints at 6 DPI, under 300: logo",
+			],
+			["Image prints at 6 DPI, under 300: logo"],
+		]);
+		const zip = unzipSync(new Uint8Array(await readFile(out)));
+		const rows = new TextDecoder()
+			.decode(zip[REPORT_FILE_NAME])
+			.trim()
+			.split("\r\n");
+		expect(rows[2]?.endsWith(',"Image prints at 6 DPI, under 300: logo"')).toBe(
+			true,
+		);
+	});
+
 	it("streams a zip to disk with a relative image source", async () => {
 		const out = join(dir, "badges.zip");
 		const { workspace, result } = await exportFrom(

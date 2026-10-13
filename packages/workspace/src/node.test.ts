@@ -15,7 +15,7 @@ import { preset, workspace } from "./test-fixtures";
 import type { ExportPreset, Workspace } from "./types";
 
 const fonts = new Map([["Inter", [testFontBytes("Geist-Regular.ttf")]]]);
-const small: ExportPreset = { ...preset, scale: 0.25 };
+const small: ExportPreset = { ...preset, scale: 0.25, minImageDpi: 0 };
 
 let dir: string;
 let renderer: Renderer;

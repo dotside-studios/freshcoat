@@ -17,7 +17,12 @@ import {
 	useState,
 } from "react";
 import { Button as RACButton } from "react-aria-components";
-import { type SafeAreaHint, safeAreaHints } from "~/canvas/print-guides";
+import {
+	imageDpiHints,
+	type PrintHint,
+	safeAreaHints,
+	useImageDpi,
+} from "~/canvas/print-guides";
 import { removeUnusedChanges } from "~/doc/ops";
 import { walkLayers } from "~/doc/path";
 import { openPieceKeys } from "~/doc/slice";
@@ -132,7 +137,14 @@ export function IssuesList({ template }: { template: Template }) {
 	const { issues, notices, paint, variantIssues, warnings, total } =
 		useIssues(template);
 	const codes = useEditor((s) => s.render.barcodes ?? NO_CODES);
-	const hints = useMemo(() => safeAreaHints(template), [template]);
+	const { dpi, min: minDpi } = useImageDpi();
+	const hints = useMemo(
+		() => [
+			...safeAreaHints(template),
+			...imageDpiHints(template, { dpi, min: minDpi }),
+		],
+		[template, dpi, minDpi],
+	);
 	const openPieces = useMemo(() => openPieceKeys(template), [template]);
 
 	return (
@@ -381,7 +393,7 @@ function HintRow({
 	hint,
 }: {
 	template: Template;
-	hint: SafeAreaHint;
+	hint: PrintHint;
 }) {
 	const controller = useController();
 	const layer = referenceLabel(template, hint.key);
@@ -390,7 +402,7 @@ function HintRow({
 			<Entry
 				as="div"
 				tone="muted"
-				code="safe_area"
+				code={hint.code}
 				link={
 					<EntryLink
 						label={`Select ${layer}`}

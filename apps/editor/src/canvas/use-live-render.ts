@@ -30,6 +30,7 @@ import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import { activeSlot } from "~/state/workspace";
 import { useBleedShown } from "./bleed-view";
+import { useImageDpi } from "./print-guides";
 
 /**
  * Keeps the active side painted. Every document, value, side, variant,
@@ -57,6 +58,7 @@ export function useLiveRender(): {
 	);
 	const values = useEditor((s) => s.values);
 	const zoom = useEditor((s) => s.view.zoom);
+	const { dpi, min: minDpi } = useImageDpi();
 	const datasetAssets = useEditor((s) => {
 		return boundDataset(activeSlot(s)?.binding, s.workspace?.datasets ?? [])
 			?.assets;
@@ -225,6 +227,7 @@ export function useLiveRender(): {
 			photos: datasetImages,
 			density,
 			...(bleed ? { bleed: true } : {}),
+			...(minDpi > 0 ? { imageDpi: { dpi, min: minDpi } } : {}),
 		});
 		heldForPhotos.current?.release();
 		heldForPhotos.current = null;
@@ -239,6 +242,8 @@ export function useLiveRender(): {
 		density,
 		bleed,
 		datasetImages,
+		dpi,
+		minDpi,
 	]);
 
 	return {

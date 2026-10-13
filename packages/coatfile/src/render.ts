@@ -10,6 +10,7 @@ import {
 	planForPrint,
 } from "@freshcoat-js/for-print";
 import {
+	type Command,
 	type DefaultOutput,
 	type ExportSetting,
 	exportPixelSize,
@@ -29,6 +30,11 @@ import {
 } from "@freshcoat-js/engine";
 import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
+import {
+	type ImageDpiWarning,
+	imageDpiWarnings,
+	type ImageSizeMemo,
+} from "./image-dpi";
 import { pieceSpec } from "./piece";
 import { hasOpenSubpath } from "./slices";
 import { resolveSlices } from "./slices";
@@ -95,9 +101,14 @@ export type RenderCompiledOptions<O extends Output = DefaultOutput> = {
 	analysisKey?: (src: string) => string | undefined;
 	// Image bytes for this render only, by src (see the renderer's PaintOptions).
 	images?: Map<string, Uint8Array>;
+	// Warn with `image_low_dpi` for each image that prints below `min` (default
+	// 300) when the compiled scene is `dpi` design units to the inch.
+	imageDpi?: ImageDpiCheck;
 	// Default: PNG.
 	output?: O;
 };
+
+export type ImageDpiCheck = { dpi: number; min?: number };
 
 // The two sizes here are different knobs, and mixing them up is the easy mistake:
 //
@@ -324,6 +335,12 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 			finish: plan.finish,
 			prepared,
 		});
+		const dpiWarnings = await checkImageDpi(
+			renderer,
+			commands,
+			options.images,
+			options.imageDpi,
+		);
 		// One bake, one paint per density: the command stream is identical across
 		// export settings apart from the density on its createCanvas, so each
 		// extra size re-rasterizes the same scene instead of re-compiling it.
@@ -338,7 +355,12 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 				...result,
 				// Compile and planning found these, so they sit alongside what the
 				// painter found.
-				warnings: [...(f.warnings ?? []), ...result.warnings, ...planWarnings],
+				warnings: [
+					...(f.warnings ?? []),
+					...result.warnings,
+					...planWarnings,
+					...dpiWarnings,
+				],
 				name: f.name,
 				scale,
 				supersample,
@@ -367,7 +389,38 @@ export type RenderCompiledPdfOptions = {
 	date?: Date;
 	/** Default sRGB; false for none. See the engine's "PDF output". */
 	outputIntent?: OutputIntent | false;
+	/** Warn for images that print below `min` at `dpi`. */
+	imageDpi?: ImageDpiCheck;
 };
+
+// The sizes of the images a renderer loads itself, so a batch reads each one
+// once. Bytes handed to a render are read again: the same src may name other
+// bytes next time.
+const loadedSizes = new WeakMap<Renderer, Map<string, ReturnType<ImageSizeMemo["get"]>>>();
+
+function checkImageDpi(
+	renderer: Renderer,
+	commands: Command[],
+	images: Map<string, Uint8Array> | undefined,
+	check: ImageDpiCheck | undefined,
+): Promise<ImageDpiWarning[]> {
+	if (!check) return Promise.resolve([]);
+	let loaded = loadedSizes.get(renderer);
+	if (!loaded) {
+		loaded = new Map();
+		loadedSizes.set(renderer, loaded);
+	}
+	const shared = loaded;
+	const local = new Map<string, ReturnType<ImageSizeMemo["get"]>>();
+	const sizes: ImageSizeMemo = {
+		get: (src) => (images?.has(src) ? local : shared).get(src),
+		set: (src, size) => void (images?.has(src) ? local : shared).set(src, size),
+	};
+	return imageDpiWarnings(commands, (src) => renderer.loadBytes(src, images), {
+		...check,
+		sizes,
+	});
+}
 
 // Paint each side of a compiled template as one PDF page of vectors. A layer a
 // PDF cannot express is painted as an image and warned as `vector_rasterized`.
@@ -389,6 +442,12 @@ export async function renderCompiledPdf(
 			fonts: f.assets.fonts,
 			images: f.assets.images,
 		});
+		const dpiWarnings = await checkImageDpi(
+			renderer,
+			commands,
+			images,
+			options.imageDpi,
+		);
 		const page = await renderer.paintPdf(commands, {
 			images,
 			dpi,
@@ -398,7 +457,7 @@ export async function renderCompiledPdf(
 		});
 		results.push({
 			...page,
-			warnings: [...(f.warnings ?? []), ...page.warnings],
+			warnings: [...(f.warnings ?? []), ...page.warnings, ...dpiWarnings],
 			name: f.name,
 		});
 	}
@@ -462,6 +521,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Barcode: ${w.message}`;
 		case "gamut_compressed":
 			return `Colour pulled into printer range: ${Math.round(w.clipped * 100)}%${w.layer ? ` of ${w.layer}` : ""}`;
+		case "image_low_dpi":
+			return `Image prints at ${w.dpi} DPI, under ${w.min}: ${w.layer ?? (w.src.startsWith("data:") ? "inline data" : w.src)}`;
 		default:
 			return (w as { kind: string }).kind;
 	}
