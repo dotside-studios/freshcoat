@@ -82,6 +82,37 @@ describe("buildPreview", () => {
 		expect(mask?.type === "mask" && mask.properties.mask.id).toBe("k:0/2/-1");
 	});
 
+	test("a layer hidden in Default is left out until a variant shows it", () => {
+		const own = unwrap(updateElement(frozenDoc(), "0/0", { hidden: true }));
+		const t: Template = {
+			...own.template,
+			variants: [
+				...(own.template.variants ?? []),
+				{
+					id: "shown",
+					label: "Shown",
+					overrides: [
+						{
+							name: "front",
+							elements: [{ id: "a", properties: {}, hidden: false }],
+						},
+					],
+				},
+			],
+		};
+		const ids = (variantId?: string) =>
+			buildPreview(t, {
+				side: 0,
+				variantId,
+			}).template.template_data[0]?.elements.map((e) => e.id);
+		expect(ids()).not.toContain("k:0/0");
+		expect(ids()).toContain("k:0/1");
+		expect(ids("dark")).not.toContain("k:0/0");
+		expect(ids("shown")).toContain("k:0/0");
+		const shown = buildPreview(t, { side: 0, variantId: "shown" });
+		expect(el(shown.template, "0/0").hidden).toBeUndefined();
+	});
+
 	test("an unknown variant renders the default", () => {
 		const p = buildPreview(frozenDoc(), { side: 0, variantId: "nope" });
 		expect(el(p.template, "0/0").properties).toMatchObject({ fill: "#111111" });

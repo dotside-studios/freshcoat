@@ -21,8 +21,9 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
-//   1.7  rect and vector `slice`; text `stroke`; frame `cornerSmoothing`;
-//        per-corner image `cornerRadius` and image `cornerSmoothing`
+//   1.7  rect and vector `slice`; element `hidden`; text `stroke`; frame
+//        `cornerSmoothing`; per-corner image `cornerRadius` and image
+//        `cornerSmoothing`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -77,6 +78,7 @@ export function minimumFormatVersion(template: Template): string {
 			need(2);
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
+			if (o.hidden !== undefined) need(7);
 			if (o.type === "barcode") need(3);
 			if (o.type === "text") textIds.add(o.id);
 			if (usesSlice(o.properties)) need(7);

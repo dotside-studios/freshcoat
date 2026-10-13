@@ -1,6 +1,7 @@
-// Conditional visibility. An element carrying `visibleWhen` is dropped from the
-// scene before layout when its condition does not hold, so an auto-layout frame
-// closes the gap it leaves exactly as a hidden layer does in Figma.
+// Conditional visibility. An element carrying `hidden: true`, or `visibleWhen`
+// whose condition does not hold, is dropped from the scene before layout, so an
+// auto-layout frame closes the gap it leaves exactly as a hidden layer does in
+// Figma.
 
 import type {
 	BooleanOperandElement,
@@ -47,7 +48,8 @@ export function isElementVisible(
 	return conds.every((c) => conditionHolds(c, values, fields));
 }
 
-/** The elements shown for these values, recursing into frames, masks and boolean operands. */
+/** The elements shown for these values, recursing into frames, masks and
+ *  boolean operands. An element with `hidden: true` is never shown. */
 export function pruneHiddenElements(
 	elements: Element[],
 	values: Record<string, unknown>,
@@ -55,7 +57,8 @@ export function pruneHiddenElements(
 ): Element[] {
 	const out: Element[] = [];
 	for (const el of elements) {
-		if (!isElementVisible(el, values, fields)) continue;
+		if (el.hidden === true || !isElementVisible(el, values, fields))
+			continue;
 		if (el.type === "frame" || el.type === "mask") {
 			// A mask's shape is not shown, so only what it masks is pruned.
 			out.push({

@@ -5,10 +5,12 @@
 
 import {
 	activeVariantId,
+	allElements,
 	applyVariant,
 	type Background,
 	diffElement,
 	type Element,
+	isHiddenBy,
 	variantDeltas as readVariantDeltas,
 	type SideDeltas,
 	sameJson,
@@ -98,13 +100,19 @@ export function overriddenKeys(
 	];
 }
 
+/** Whether the layer is left out in the variant: its delta's `hidden` when
+ *  one sets it, else the layer's own (`isHiddenBy`). */
 export function isHiddenInVariant(
 	t: Template,
 	variantId: string,
 	sideName: string,
 	elementId: string,
 ): boolean {
-	return mergedDelta(t, variantId, sideName, elementId)?.hidden === true;
+	const frame = t.template_data.find((f) => f.name === sideName);
+	const own = allElements(frame?.elements ?? []).find(
+		(el) => el.id === elementId,
+	);
+	return isHiddenBy(own ?? {}, mergedDelta(t, variantId, sideName, elementId));
 }
 
 const deltasCache = new WeakMap<
@@ -129,9 +137,12 @@ function variantDeltas(
 	return out;
 }
 
-function deltaChanges(d: VariantElementDelta | undefined): boolean {
+function deltaChanges(
+	d: VariantElementDelta | undefined,
+	el: Pick<Element, "hidden">,
+): boolean {
 	if (!d) return false;
-	if (d.hidden === true) return true;
+	if (d.hidden !== undefined && d.hidden !== (el.hidden === true)) return true;
 	for (const k in d.properties) if (d.properties[k] !== undefined) return true;
 	return VARIANT_SHELL_KEYS.some((k) => d[k] !== undefined);
 }
@@ -147,7 +158,10 @@ function sideChangedKeys(
 		const changed =
 			e.key.endsWith("/bg") && "background" in e.path
 				? deltas?.background !== undefined
-				: deltaChanges(deltas?.elements.get(e.element.id));
+				: deltaChanges(
+						deltas?.elements.get(e.element.id),
+						e.element as Element,
+					);
 		if (changed) out.push(e.key);
 	}
 	return out;
@@ -375,8 +389,8 @@ function elementDelta(
 	hidden: boolean | undefined,
 ): VariantElementDelta | undefined {
 	const d = diffElement(b, n);
-	if (hidden !== true) return d;
-	return { ...(d ?? { id: b.id, properties: {} }), hidden: true };
+	if (hidden === undefined) return d;
+	return { ...(d ?? { id: b.id, properties: {} }), hidden };
 }
 
 function foldStructural(
