@@ -11,14 +11,17 @@ import type { z } from "zod";
 import type { PathOp } from "./boolean";
 import type {
 	AdjustSchema,
+	BackdropBlurEffectSchema,
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
 	BearerBarsSchema,
+	BlurEffectSchema,
 	BooleanOpSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
 	CornerRadiusSchema,
+	EffectSchema,
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
@@ -37,6 +40,7 @@ import type {
 	QrCodePropertiesSchema,
 	RectElementSchema,
 	RectPropertiesSchema,
+	ShadowEffectSchema,
 	SliceModifierSchema,
 	SymbologySchema,
 	StrokeSchema,
@@ -92,6 +96,10 @@ export type ElementAdjust = z.infer<typeof AdjustSchema>;
 export type LayoutChild = z.infer<typeof LayoutChildSchema>;
 export type Constraint = z.infer<typeof ConstraintSchema>;
 export type Constraints = z.infer<typeof ConstraintsSchema>;
+export type ShadowEffect = z.infer<typeof ShadowEffectSchema>;
+export type BlurEffect = z.infer<typeof BlurEffectSchema>;
+export type BackdropBlurEffect = z.infer<typeof BackdropBlurEffectSchema>;
+export type Effect = z.infer<typeof EffectSchema>;
 export type LeafElement = z.infer<typeof LeafElementSchema>;
 
 export type BooleanOp = z.infer<typeof BooleanOpSchema>;
@@ -159,6 +167,7 @@ export interface ElementShell {
 	shadow?: Shadows;
 	blur?: number;
 	backdropBlur?: number;
+	effects?: Effect[];
 	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;

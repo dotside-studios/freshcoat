@@ -492,6 +492,14 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.3");
 	});
 
+	test("1.7: element effects", () => {
+		const t = withElements(
+			base(),
+			rect("a", { effects: [{ type: "blur", radius: 2 }] }),
+		);
+		expect(minimumFormatVersion(t)).toBe("1.7");
+	});
+
 	test("never exceeds what this kit writes", () => {
 		expect(
 			minimumFormatVersion(fixtures.fullFeatureCard) <= FORMAT_VERSION,

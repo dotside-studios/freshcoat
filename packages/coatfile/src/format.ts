@@ -23,7 +23,7 @@ import type { Template } from "./types";
 //        gradient stroke `color`; variant `size`; vector `boolean`
 //   1.7  rect and vector `slice`; element `hidden`; text `stroke`; frame
 //        `cornerSmoothing`; per-corner image `cornerRadius` and image
-//        `cornerSmoothing`
+//        `cornerSmoothing`; element `effects`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -79,6 +79,7 @@ export function minimumFormatVersion(template: Template): string {
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
 			if (o.hidden !== undefined) need(7);
+			if (o.effects !== undefined) need(7);
 			if (o.type === "barcode") need(3);
 			if (o.type === "text") textIds.add(o.id);
 			if (usesSlice(o.properties)) need(7);

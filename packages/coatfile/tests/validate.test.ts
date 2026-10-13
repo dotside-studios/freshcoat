@@ -886,6 +886,85 @@ test("patterns that only parse without the u flag are still enforced", () => {
 	expect(compiledPattern("^\\p{L}+$")?.flags).toBe("u");
 });
 
+describe("validate (effects)", () => {
+	const withEffects = (extra: object) => ({
+		...minimalValid,
+		format_version: "1.7",
+		template_data: [
+			{
+				...minimalValid.template_data[0],
+				elements: [
+					{
+						id: "r",
+						type: "rect",
+						pos: { x: 0, y: 0 },
+						size: { width: 10, height: 10 },
+						properties: { fill: "#000" },
+						...extra,
+					},
+				],
+			},
+		],
+	});
+	const shadow = { type: "shadow", color: "#000", dx: 0, dy: 1, blur: 2 };
+
+	test("accepts shadows, a blur and a backdrop blur, hidden or not", () => {
+		const r = validate(
+			withEffects({
+				effects: [
+					shadow,
+					{ ...shadow, inset: true, spread: 1, hidden: true },
+					{ type: "blur", radius: 3 },
+					{ type: "backdropBlur", radius: 4, hidden: true },
+				],
+			}),
+		);
+		expect(r.ok).toBe(true);
+	});
+
+	test.each(["shadow", "blur", "backdropBlur"])(
+		"rejects effects together with %s",
+		(key) => {
+			const legacy =
+				key === "shadow"
+					? { color: "#000", dx: 0, dy: 1, blur: 2 }
+					: 3;
+			const r = validate(withEffects({ effects: [], [key]: legacy }));
+			expect(r.ok).toBe(false);
+			if (!r.ok)
+				expect(r.errors.map((e) => e.code)).toContain("effects_with_legacy_field");
+		},
+	);
+
+	test.each(["blur", "backdropBlur"])("rejects a second %s effect", (type) => {
+		const r = validate(
+			withEffects({
+				effects: [
+					{ type, radius: 1 },
+					shadow,
+					{ type, radius: 2 },
+				],
+			}),
+		);
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.errors).toEqual([
+				expect.objectContaining({
+					code: "duplicate_effect",
+					path: expect.stringContaining("effects/2"),
+				}),
+			]);
+		}
+	});
+
+	test("rejects a negative radius", () => {
+		const r = validate(
+			withEffects({ effects: [{ type: "blur", radius: -1 }] }),
+		);
+		expect(r.ok).toBe(false);
+	});
+});
+
 test("mistyped unicode patterns are invalid instead of literal", () => {
 	const field = (pattern: string) => ({
 		type: "object" as const,

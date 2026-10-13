@@ -144,6 +144,7 @@ export {
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "./fonts";
+export { effectsOf } from "./effects";
 export {
 	FORMAT_MAJOR,
 	FORMAT_MINOR,
@@ -215,9 +216,11 @@ export type {
 	BakedTextLayout,
 	BarcodeElement,
 	BarcodeProperties,
+	BackdropBlurEffect,
 	BearerBars,
 	BitmapRole,
 	BlendMode,
+	BlurEffect,
 	BooleanOp,
 	BooleanOperandElement,
 	Command,
@@ -235,6 +238,7 @@ export type {
 	DrawQrCommand,
 	DrawRectCommand,
 	DrawTextCommand,
+	Effect,
 	Element,
 	ElementAdjust,
 	ElementShell,
@@ -281,6 +285,7 @@ export type {
 	ResolvedFont,
 	SetupCommand,
 	Shadow,
+	ShadowEffect,
 	ShapeMask,
 	Sides,
 	Size,
