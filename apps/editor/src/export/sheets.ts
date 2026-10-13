@@ -38,3 +38,12 @@ export function paperChoice(layout: SheetLayout): PaperChoice {
 export function sheetsFor(preset: ExportPreset): SheetLayout {
 	return preset.layout?.kind === "sheet" ? preset.layout : DEFAULT_SHEET_LAYOUT;
 }
+
+/** The layout with each card repeated `copies` times; 1 leaves the key out. */
+export function withCopies(
+	layout: SheetLayout,
+	copies: number | "fill",
+): SheetLayout {
+	const { copies: _, ...rest } = layout;
+	return copies === 1 ? rest : { ...rest, copies };
+}

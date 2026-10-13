@@ -107,6 +107,8 @@ describe("planRender", () => {
 			["card.coat", { out: "x.pdf", marks: ["slug"] }, "--marks needs --sheets"],
 			["card.coat", { out: "x.zip", marks: ["slug"] }, "--marks applies only to a .pdf"],
 			["club.coatworkspace", { out: "x.pdf", marks: ["slug"] }, "--marks applies only to templates"],
+			["card.coat", { out: "x.pdf", copies: "fill" }, "--copies needs --sheets"],
+			["card.coat", { out: "x.zip", copies: 2 }, "--copies applies only to a .pdf"],
 			["card.coat", { out: "x.pdf", quality: 50 }, "--quality needs --pdf-pages jpeg"],
 			["card.coat", { out: "x.zip", quality: 50 }, "--quality needs --format jpeg or webp"],
 			["card.coat", { out: "x.pdf", format: "jpeg" }, "--format applies only to images; a PDF takes --pdf-pages"],

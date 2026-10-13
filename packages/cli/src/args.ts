@@ -65,6 +65,14 @@ export function parseLength(entry: string): number {
 	return value;
 }
 
+export function parseCopies(entry: string): number | "fill" {
+	if (entry.toLowerCase() === "fill") return "fill";
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 1)
+		throw new ArgumentError("Expected a whole number, 1 or more, or fill.");
+	return value;
+}
+
 export function parsePaper(
 	entry: string,
 ): PaperName | { widthMm: number; heightMm: number } {

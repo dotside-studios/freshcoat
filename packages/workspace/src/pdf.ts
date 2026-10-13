@@ -117,7 +117,16 @@ export async function assemblePdf(
 	const bleed = resolveBleedMm(options.bleedMm);
 	const profiles: IccProfiles = new Map();
 	let embedded = 0;
-	const embed = async (page: PdfPage): Promise<Embedded> => {
+	const cache = new Map<PdfPage, Promise<Embedded>>();
+	const embed = (page: PdfPage): Promise<Embedded> => {
+		let ref = cache.get(page);
+		if (!ref) {
+			ref = embedOnce(page);
+			cache.set(page, ref);
+		}
+		return ref;
+	};
+	const embedOnce = async (page: PdfPage): Promise<Embedded> => {
 		const ref =
 			page.format === "pdf"
 				? ((await doc.embedPdf(page.bytes))[0] as PDFEmbeddedPage)

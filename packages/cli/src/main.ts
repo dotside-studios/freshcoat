@@ -11,6 +11,7 @@ import {
 	collectFilter,
 	collectScale,
 	collectSetting,
+	parseCopies,
 	parseJobs,
 	parseLength,
 	parseMarks,
@@ -164,6 +165,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 		)
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
+		.option(
+			"--copies <n|fill>",
+			"repeat each card this many times, or fill a sheet with it; default 1",
+			arg(parseCopies),
+		)
 		.option(
 			"--marks <list>",
 			"printer's marks on sheets: none, or any of crop, registration, colorbar, slug; default crop",

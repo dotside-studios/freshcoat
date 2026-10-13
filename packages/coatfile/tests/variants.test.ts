@@ -15,6 +15,7 @@ import type {
 import { validate } from "../src/validate";
 import { resizeTemplate } from "../src/constraints";
 import { minimumFormatVersion } from "../src/format";
+import { pruneHiddenElements } from "../src/visibility";
 import {
 	activeVariantId,
 	applyVariant,
@@ -27,6 +28,7 @@ import {
 	hiddenElementIds,
 	isEmptyDelta,
 	isEmptyVariant,
+	isHiddenBy,
 	mergedElementDelta,
 	sameJson,
 	sideBackground,
@@ -415,6 +417,170 @@ describe("applyVariant hidden", () => {
 			);
 		expect(names()).toContain("title");
 		expect(names("v")).not.toContain("title");
+	});
+});
+
+describe("base hidden", () => {
+	const hideInBase = (t: Template, ...hide: string[]): Template => {
+		const mark = (el: Element): Element => {
+			const next = hide.includes(el.id) ? { ...el, hidden: true } : el;
+			if (next.type === "frame")
+				return {
+					...next,
+					properties: {
+						...next.properties,
+						children: next.properties.children.map(mark),
+					},
+				};
+			if (next.type === "mask")
+				return {
+					...next,
+					properties: {
+						...next.properties,
+						mask: mark(next.properties.mask),
+						children: next.properties.children.map(mark),
+					},
+				};
+			return next;
+		};
+		return {
+			...t,
+			template_data: t.template_data.map((f) => ({
+				...f,
+				elements: f.elements.map(mark),
+			})),
+		};
+	};
+	const drawn = (t: Template, variantId?: string, values = {}) =>
+		compile(t, values, {
+			width: 100,
+			height: 60,
+			variantId,
+		}).frames[0].root.children.map((n) => n.id);
+
+	test("isHiddenBy: a delta's hidden wins, else the element's own", () => {
+		expect(isHiddenBy({ hidden: true }, undefined)).toBe(true);
+		expect(isHiddenBy({ hidden: true }, { hidden: false })).toBe(false);
+		expect(isHiddenBy({}, { hidden: true })).toBe(true);
+		expect(isHiddenBy({ hidden: false }, { hidden: undefined })).toBe(false);
+	});
+
+	test("Default leaves it out, and the file keeps it", () => {
+		const t = hideInBase(front([]), "title");
+		expect(validate(t).ok).toBe(true);
+		expect(drawn(t)).not.toContain("title");
+		expect(drawn(t, "v")).not.toContain("title");
+		expect(byId(frame(t, "front").elements, "title")?.hidden).toBe(true);
+		expect(hiddenElementIds(t, undefined, "front")).toEqual(
+			new Set(["title"]),
+		);
+		expect(hiddenElementIds(t, "v", "front")).toEqual(new Set(["title"]));
+	});
+
+	test("a variant's hidden: false shows it", () => {
+		const t = hideInBase(
+			front([{ id: "title", properties: {}, hidden: false }]),
+			"title",
+		);
+		expect(drawn(t)).not.toContain("title");
+		expect(drawn(t, "v")).toContain("title");
+		expect(hiddenElementIds(t, "v", "front").has("title")).toBe(false);
+		const kept = frame(applyVariant(t, "v", { hidden: "keep" }), "front");
+		expect(byId(kept.elements, "title")?.hidden).toBeUndefined();
+	});
+
+	test("keep marks what the variant hides and what the base hides", () => {
+		const t = hideInBase(
+			front([{ id: "back_rect", properties: {}, hidden: true }]),
+			"title",
+		);
+		const out = applyVariant(t, "v", { hidden: "keep" });
+		expect(byId(frame(out, "front").elements, "title")?.hidden).toBe(true);
+		const t2 = front([{ id: "title", properties: {}, hidden: true }]);
+		const out2 = applyVariant(t2, "v", { hidden: "keep" });
+		expect(byId(frame(out2, "front").elements, "title")?.hidden).toBe(true);
+	});
+
+	test("merged deltas: any hidden: true wins over hidden: false", () => {
+		const shown = (elements: Parameters<typeof front>[0]) =>
+			drawn(hideInBase(front(elements), "title"), "v").includes("title");
+		expect(
+			shown([
+				{ id: "title", properties: {}, hidden: false },
+				{ id: "title", properties: {}, hidden: true },
+			]),
+		).toBe(false);
+		expect(
+			shown([
+				{ id: "title", properties: {}, hidden: true },
+				{ id: "title", properties: {}, hidden: false },
+			]),
+		).toBe(false);
+		expect(
+			shown([
+				{ id: "title", properties: { color: "#000000" } },
+				{ id: "title", properties: {}, hidden: false },
+			]),
+		).toBe(true);
+	});
+
+	test("visibleWhen still applies to an element a variant shows", () => {
+		const base = hideInBase(
+			front([{ id: "title", properties: {}, hidden: false }]),
+			"title",
+		);
+		const when = (visibleWhen: Element["visibleWhen"]): Template => ({
+			...base,
+			template_data: base.template_data.map((f) => ({
+				...f,
+				elements: f.elements.map((el) =>
+					el.id === "title" ? { ...el, visibleWhen } : el,
+				),
+			})),
+		});
+		expect(drawn(when({ field: "displayName" }), "v")).toContain("title");
+		expect(
+			drawn(when({ field: "displayName", not: true }), "v"),
+		).not.toContain("title");
+		expect(drawn(when({ field: "displayName" }))).not.toContain("title");
+	});
+
+	test("a mask's shape ignores it; what the mask holds does not", () => {
+		const t = hideInBase(front([]), "mask_shape", "masked_rect");
+		for (const out of [applyVariant(t, "v"), t]) {
+			const shown = pruneHiddenElements(frame(out, "front").elements, {}, {});
+			const m = byId(shown, "masked") as MaskElement;
+			expect(m.properties.mask.id).toBe("mask_shape");
+			expect(m.properties.children).toEqual([]);
+		}
+	});
+
+	test("a hidden boolean operand is left out of the combination", () => {
+		const op = (id: string, hidden?: boolean): VectorElement => ({
+			id,
+			type: "vector",
+			size: { width: 10, height: 10 },
+			properties: { d: "M0 0H10V10Z" },
+			...(hidden ? { hidden } : {}),
+		});
+		const vector: VectorElement = {
+			id: "combo",
+			type: "vector",
+			size: { width: 10, height: 10 },
+			properties: {
+				d: "",
+				boolean: { op: "union", operands: [op("a"), op("b", true)] },
+			},
+		};
+		const shown = pruneHiddenElements([vector], {}, {})[0] as VectorElement;
+		expect(shown.properties.boolean?.operands.map((o) => o.id)).toEqual(["a"]);
+	});
+
+	test("needs format 1.7", () => {
+		const t = hideInBase(front([]), "deep_rect");
+		expect(minimumFormatVersion(t)).toBe("1.7");
+		const shown = { ...t, template_data: template.template_data };
+		expect(minimumFormatVersion(shown)).toBe("1.0");
 	});
 });
 

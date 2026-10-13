@@ -39,8 +39,6 @@ export type AlignedInstance = {
 	frame: FigmaContainerNode;
 	/** Base node ids (with every descendant) the instance hides. */
 	hiddenBaseNodes: Set<string>;
-	/** Instance layers the base hides and the instance shows. */
-	unhidden: FigmaNode[];
 };
 
 // Pairs a colorway instance's side with the base side it was made from, layer
@@ -52,7 +50,6 @@ export function alignInstanceVisibility(
 	instance: FigmaContainerNode,
 ): AlignedInstance {
 	const hiddenBaseNodes = new Set<string>();
-	const unhidden: FigmaNode[] = [];
 
 	const markSubtree = (n: FigmaNode): void => {
 		hiddenBaseNodes.add(n.id);
@@ -78,10 +75,7 @@ export function alignInstanceVisibility(
 			} as FigmaNode;
 			return withAlignedChildren(b, shown);
 		}
-		if (!renders(b) && renders(n)) {
-			unhidden.push(n);
-			return { ...n, visible: false } as FigmaNode;
-		}
+		if (!renders(b) && renders(n)) return { ...n, visible: false } as FigmaNode;
 		return withAlignedChildren(b, n);
 	};
 
@@ -99,6 +93,85 @@ export function alignInstanceVisibility(
 			children: alignChildren(base.children ?? [], instance.children ?? []),
 		},
 		hiddenBaseNodes,
-		unhidden,
+	};
+}
+
+export type RevealedBase = {
+	/** The base side with every layer a colorway shows drawn, and every layer
+	 *  under one that no colorway shows left hidden. */
+	frame: FigmaContainerNode;
+	/** For each layer the card hides and a colorway shows, its node id and
+	 *  those of its descendants. Its elements go in the file hidden. */
+	revealed: Map<string, Set<string>>;
+	/** For each layer drawn only because a colorway shows it, a colorway layer
+	 *  that draws it. The card's own layer may export blank, being hidden. */
+	rasterSource: Map<string, string>;
+};
+
+// Draws the layers the card hides and some colorway shows, so the base has an
+// element for each that a colorway can show. Pairs layers as
+// alignInstanceVisibility does. A hidden mask stays hidden: drawn on the base,
+// it would mask the layers above it there too.
+export function revealShownLayers(
+	base: FigmaContainerNode,
+	instances: FigmaContainerNode[],
+): RevealedBase {
+	const shownIn = new Map<string, FigmaNode>();
+	const collect = (b: FigmaNode, n: FigmaNode): void => {
+		if (!renders(n)) return;
+		if (!shownIn.has(b.id)) shownIn.set(b.id, n);
+		pairChildren(b, n);
+	};
+	const pairChildren = (b: FigmaNode, n: FigmaNode): void => {
+		const baseChildren = childrenOf(b) ?? [];
+		(childrenOf(n) ?? []).forEach((child, i) => {
+			const pair = baseChildren[i];
+			if (pair && pair.name === child.name) collect(pair, child);
+		});
+	};
+	for (const instance of instances) pairChildren(base, instance);
+
+	const revealed = new Map<string, Set<string>>();
+	const rasterSource = new Map<string, string>();
+
+	const subtreeIds = (n: FigmaNode, into: Set<string>): Set<string> => {
+		into.add(n.id);
+		for (const c of childrenOf(n) ?? []) subtreeIds(c, into);
+		return into;
+	};
+
+	const reveal = (b: FigmaNode, underHidden: boolean): FigmaNode => {
+		if (!underHidden && renders(b)) return withRevealedChildren(b, false);
+		const n = shownIn.get(b.id);
+		if (b.isMask && !renders(b)) return b;
+		if (!n) return renders(b) ? ({ ...b, visible: false } as FigmaNode) : b;
+		rasterSource.set(b.id, n.id);
+		if (renders(b)) return withRevealedChildren(b, true);
+		revealed.set(b.id, subtreeIds(b, new Set()));
+		const shown = {
+			...b,
+			visible: true,
+			opacity: b.opacity === 0 ? n.opacity : b.opacity,
+		} as FigmaNode;
+		return withRevealedChildren(shown, true);
+	};
+
+	const withRevealedChildren = (b: FigmaNode, underHidden: boolean) => {
+		const children = childrenOf(b);
+		return children
+			? ({
+					...b,
+					children: children.map((c) => reveal(c, underHidden)),
+				} as FigmaNode)
+			: b;
+	};
+
+	return {
+		frame: {
+			...base,
+			children: (base.children ?? []).map((c) => reveal(c, false)),
+		},
+		revealed,
+		rasterSource,
 	};
 }

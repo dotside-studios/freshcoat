@@ -56,9 +56,9 @@ export type SideDeltas = {
 
 /**
  * Two deltas for one element as one, `b` applied after `a`: its `properties`
- * merge over `a`'s, a shell field it sets replaces `a`'s, and the element is
- * hidden when either hides it. A later `hidden: false` does not show an
- * element an earlier delta hides.
+ * merge over `a`'s, a shell field it sets replaces `a`'s, and `hidden: true`
+ * from either wins. A later `hidden: false` does not show an element an earlier
+ * delta hides; it only overrides the element's own `hidden`.
  */
 function mergeDelta(
 	a: VariantElementDelta,
@@ -133,16 +133,32 @@ export function mergedElementDelta(
 	return sideDeltas(t, variantId, sideName).elements.get(elementId);
 }
 
-/** Ids of the elements on a side a variant hides: any of its deltas for the
- *  element says `hidden: true`. */
+/**
+ * Whether an element is left out: a delta says `hidden: true`, or the element
+ * has `hidden: true` and no delta says `hidden: false`. `visibleWhen` is
+ * checked separately, so an element shown here can still be dropped by it.
+ */
+export function isHiddenBy(
+	el: Pick<Element, "hidden">,
+	d: Pick<VariantElementDelta, "hidden"> | undefined,
+): boolean {
+	if (d?.hidden !== undefined) return d.hidden;
+	return el.hidden === true;
+}
+
+/** Ids of the elements on a side that are hidden in a variant, or in Default
+ *  when `variantId` is absent or unknown: see `isHiddenBy`. */
 export function hiddenElementIds(
-	t: Pick<Template, "variants">,
+	t: Pick<Template, "variants" | "template_data">,
 	variantId: string | undefined,
 	sideName: string,
 ): Set<string> {
+	const deltas = sideDeltas(t, variantId, sideName).elements;
 	const out = new Set<string>();
-	for (const [id, d] of sideDeltas(t, variantId, sideName).elements)
-		if (d.hidden === true) out.add(id);
+	for (const [id, d] of deltas) if (d.hidden === true) out.add(id);
+	const frame = t.template_data.find((f) => f.name === sideName);
+	for (const el of allElements(frame?.elements ?? []))
+		if (isHiddenBy(el, deltas.get(el.id))) out.add(el.id);
 	return out;
 }
 
@@ -157,10 +173,10 @@ export function sideBackground(
 
 export type ApplyVariantOptions = {
 	/**
-	 * What happens to an element a delta marks `hidden`. `"drop"` (the default)
-	 * removes it and its subtree, which is what rendering wants. `"keep"` leaves
-	 * it in place, so an editor can still list and select it; the delta's own
-	 * `hidden` is then the only record of it.
+	 * What happens to an element the variant hides (`isHiddenBy`). `"drop"`
+	 * (the default) removes it and its subtree, which is what rendering wants.
+	 * `"keep"` leaves it in place with `hidden: true`, so an editor can still
+	 * list and select it.
 	 */
 	hidden?: "drop" | "keep";
 };
@@ -235,9 +251,10 @@ export function applyVariant(
 // Applies element deltas by id, recursing into frame children, a mask's
 // `mask` and `children` and a vector's boolean operands so nested elements are
 // reachable. Shell fields in a
-// delta replace the element's own and `properties` merge into its own. A
-// mask's shape is never drawn itself, so `hidden` on it is ignored: dropping
-// it would leave the mask without the shape it clips to. Every element on a
+// delta replace the element's own and `properties` merge into its own, and a
+// delta's `hidden` replaces the element's. A mask's shape is never drawn
+// itself, so `hidden` on it is ignored: dropping it would leave the mask
+// without the shape it clips to. Every element on a
 // frame, mask or overridden path is a fresh object, so the input's elements are
 // never written to.
 function applyElementDeltas(
@@ -245,7 +262,6 @@ function applyElementDeltas(
 	byId: Map<string, VariantElementDelta>,
 	dropHidden: boolean,
 ): Element[] {
-	const isHidden = (el: Element) => byId.get(el.id)?.hidden === true;
 	const one = (el: Element): Element => {
 		const d = byId.get(el.id);
 		let next = d ? applyDelta(el, d) : el;
@@ -285,13 +301,18 @@ function applyElementDeltas(
 		return next;
 	};
 	const walk = (els: Element[]): Element[] =>
-		(dropHidden ? els.filter((el) => !isHidden(el)) : els).map(one);
+		(dropHidden
+			? els.filter((el) => !isHiddenBy(el, byId.get(el.id)))
+			: els
+		).map(one);
 	return walk(elements);
 }
 
 function applyDelta(el: Element, d: VariantElementDelta): Element {
+	const { hidden: _hidden, ...rest } = el;
 	return {
-		...el,
+		...(d.hidden === undefined ? el : rest),
+		...(d.hidden === true ? { hidden: true } : {}),
 		...(d.pos !== undefined ? { pos: d.pos } : {}),
 		...(d.size !== undefined ? { size: d.size } : {}),
 		...(d.rotation !== undefined ? { rotation: d.rotation } : {}),

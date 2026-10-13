@@ -579,6 +579,7 @@ describe("packWorkspace", () => {
 				duplex: "short-edge",
 				backOffsetMm: { x: 0.5, y: -0.25 },
 				blankBacks: true,
+				copies: "fill",
 			},
 		};
 		const result = await unpackWorkspace(

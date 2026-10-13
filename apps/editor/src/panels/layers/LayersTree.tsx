@@ -58,8 +58,9 @@ const RenamingContext = createContext<Renaming>({
 	stop() {},
 });
 
-/** What the active variant does to each layer on the side: changes a value,
- *  or hides it. Null with no active variant. */
+/** What the active variant does to each layer of the base on the side:
+ *  changes a value, shows a layer hidden in Default, or hides it. With no
+ *  active variant, the layers hidden in Default. */
 type VariantMarks = {
 	label: string;
 	changed: Set<string>;
@@ -75,20 +76,27 @@ function variantMarks(
 	const id = t ? activeVariantId(t, variantId) : undefined;
 	const frame = t?.template_data[side];
 	const variant = t?.variants?.find((v) => v.id === id);
-	if (!t || !frame || !variant) return null;
-	const hiddenIds = hiddenElementIds(t, variant.id, frame.name);
+	if (!t || !frame) return null;
+	const hiddenIds = hiddenElementIds(t, variant?.id, frame.name);
+	if (!variant && hiddenIds.size === 0) return null;
 	const changed = new Set<string>();
 	const hidden = new Set<string>();
 	for (const e of walkLayers(t, side)) {
 		if ("background" in e.path) {
-			if (overrideBackground(t, variant.id, frame.name)) changed.add(e.key);
+			if (variant && overrideBackground(t, variant.id, frame.name))
+				changed.add(e.key);
 			continue;
 		}
-		if (overriddenKeys(t, variant.id, frame.name, e.element.id).length > 0)
+		const hid = hiddenIds.has(e.element.id);
+		if (hid) hidden.add(e.key);
+		if (
+			variant &&
+			((!hid && (e.element as { hidden?: boolean }).hidden === true) ||
+				overriddenKeys(t, variant.id, frame.name, e.element.id).length > 0)
+		)
 			changed.add(e.key);
-		if (hiddenIds.has(e.element.id)) hidden.add(e.key);
 	}
-	return { label: variant.label, changed, hidden };
+	return { label: variant?.label ?? VARIANT_UI.default, changed, hidden };
 }
 
 function ancestorsOf(key: string): string[] {
@@ -159,16 +167,14 @@ export function LayersTree({ filter = "" }: { filter?: string }) {
 	const hiddenInTree = useMemo(() => hiddenInTreeOf(store), [store]);
 	// A drag moves layers without renaming or restacking them, so the tree
 	// shows the state the drag started from until it ends.
-	const template = useEditor((s) => {
-		const base = s.doc?.history.tx?.base ?? present(s);
-		return base && workingTemplate(base, s.variantId);
-	});
-	const side = useEditor((s) => s.side);
+	const base = useEditor((s) => s.doc?.history.tx?.base ?? present(s));
 	const variantId = useEditor((s) => s.variantId);
+	const template = base && workingTemplate(base, variantId);
+	const side = useEditor((s) => s.side);
 	const selection = useEditor((s) => s.selection);
 	const marks = useMemo(
-		() => variantMarks(template, variantId, side),
-		[template, variantId, side],
+		() => variantMarks(base, variantId, side),
+		[base, variantId, side],
 	);
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const fromTree = useRef(false);

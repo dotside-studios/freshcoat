@@ -44,7 +44,7 @@ import {
 	hiddenElements,
 	traceElementsByNode,
 } from "./variant-deltas";
-import { alignInstanceVisibility } from "./variants";
+import { alignInstanceVisibility, revealShownLayers } from "./variants";
 import { makeThrowawaySink } from "./walk";
 
 export type {
@@ -178,7 +178,13 @@ export async function transpile(
 			}
 		}
 		const scale = authorWidth / frame.absoluteBoundingBox.width;
-		baseSideFrames[slot.name] = frame;
+		// A layer the card hides and a colorway shows is walked like any other,
+		// and goes in the file hidden.
+		const shown = revealShownLayers(
+			frame,
+			(input.variants ?? []).flatMap((cw) => cw.perSide[slot.name] ?? []),
+		);
+		baseSideFrames[slot.name] = shown.frame;
 		slotScale[slot.name] = scale;
 		slotFileKey[slot.name] = pick.fileKey;
 		slotGuides.push({
@@ -186,22 +192,45 @@ export async function transpile(
 			guides: readSlotGuides(frame, slot.name, scale, warnings),
 		});
 
-		const { background, elements } = await buildSideElements(frame, slot.name, {
-			scale,
-			fileKey: pick.fileKey,
-			authorWidth,
-			authorHeight,
-			renderImage: input.renderImage,
-			resolveBinding,
-			sink: {
-				counts,
-				warnings,
-				overlayMeta,
-				visibilityFields,
-				assets: allAssets,
-				trace,
+		const { background, elements } = await buildSideElements(
+			shown.frame,
+			slot.name,
+			{
+				scale,
+				fileKey: pick.fileKey,
+				authorWidth,
+				authorHeight,
+				renderImage:
+					shown.rasterSource.size > 0
+						? (req) =>
+								input.renderImage({
+									...req,
+									nodeIds: req.nodeIds.map(
+										(id) => shown.rasterSource.get(id) ?? id,
+									),
+								})
+						: input.renderImage,
+				resolveBinding,
+				sink: {
+					counts,
+					warnings,
+					overlayMeta,
+					visibilityFields,
+					assets: allAssets,
+					trace,
+				},
 			},
-		});
+		);
+		if (shown.revealed.size > 0) {
+			const elementsByNode = traceElementsByNode(trace, slot.name);
+			const byId = flattenElementsById(elements);
+			for (const nodes of shown.revealed.values()) {
+				for (const id of hiddenElements(elements, elementsByNode, nodes).top) {
+					const el = byId.get(id);
+					if (el) el.hidden = true;
+				}
+			}
+		}
 		baseElementsBySlot[slot.name] = elements;
 
 		templateData.push({ name: slot.name, background, elements });
@@ -297,16 +326,7 @@ export async function transpile(
 			// still takes its place in the id sequence, and read what it hid.
 			const aligned = baseFrame
 				? alignInstanceVisibility(baseFrame, frame)
-				: { frame, hiddenBaseNodes: new Set<string>(), unhidden: [] };
-			for (const n of aligned.unhidden) {
-				warnings.push({
-					severity: "warn",
-					code: "variant_unhide_unsupported",
-					message: `Layer "${n.name}" is hidden on the card and shown in colorway "${colorway.label}". A colorway can hide a layer but not show one, so it stays hidden.`,
-					nodeId: n.id,
-					slot: slot.name,
-				});
-			}
+				: { frame, hiddenBaseNodes: new Set<string>() };
 
 			const sideSink = makeThrowawaySink();
 			const { background: vBg, elements: vEls } = await buildSideElements(
@@ -359,8 +379,11 @@ export async function transpile(
 
 			const elementDeltas: VariantElementDelta[] = [];
 			for (const [id, baseEl] of baseById) {
+				// Hidden on the card, it stays hidden unless the colorway shows it.
+				const cardHidden = baseEl.hidden === true;
 				if (hidden.top.has(id)) {
-					elementDeltas.push({ id, properties: {}, hidden: true });
+					if (!cardHidden)
+						elementDeltas.push({ id, properties: {}, hidden: true });
 					continue;
 				}
 				if (hidden.within.has(id)) continue;
@@ -370,7 +393,12 @@ export async function transpile(
 				const d = diffElement(baseEl as Element, varEl as Element, {
 					epsilon: 1e-6,
 				});
-				if (d) elementDeltas.push(d);
+				if (cardHidden)
+					elementDeltas.push({
+						...(d ?? { id, properties: {} }),
+						hidden: false,
+					});
+				else if (d) elementDeltas.push(d);
 			}
 
 			if (bgDiffers || elementDeltas.length > 0) {

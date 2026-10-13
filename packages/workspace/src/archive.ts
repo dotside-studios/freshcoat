@@ -170,6 +170,9 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 		duplex: z.enum(["none", "long-edge", "short-edge"]),
 		backOffsetMm: z.object({ x: z.number(), y: z.number() }).optional(),
 		blankBacks: z.boolean().optional(),
+		copies: z
+			.union([z.number().int().positive(), z.literal("fill")])
+			.optional(),
 	}),
 ]);
 

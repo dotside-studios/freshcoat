@@ -408,6 +408,22 @@ describe("assemblePdf on sheets", () => {
 		expectPlacement(back[2], 106, 69.5);
 	});
 
+	it("embeds each image once however many copies it fills", async () => {
+		const progress: [number, number][] = [];
+		const bytes = await assemblePdf(cards(1), {
+			dpi: 300,
+			layout: sheet({ copies: "fill" }),
+			cardMm: card,
+			onProgress: (done, total) => progress.push([done, total]),
+		});
+		const doc = await PDFDocument.load(bytes);
+		expect(placements(doc.getPage(0))).toHaveLength(10);
+		expect(progress).toEqual([[1, 1]]);
+		expect(
+			new TextDecoder("latin1").decode(bytes).match(/\/Subtype \/Image/g),
+		).toHaveLength(1);
+	});
+
 	it("sizes cards from the first page when not told", async () => {
 		const pages = cards(1).map((p) => ({ ...p, widthPx: 1200, heightPx: 900 }));
 		const doc = await PDFDocument.load(

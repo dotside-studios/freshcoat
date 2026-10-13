@@ -590,6 +590,11 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more
   cards, portrait on a tie. Margin (10 mm by default) and Gap (0) are in
   millimeters. The grid is centered inside the margins.
+- **Copies:** each card is repeated this many times (1 by default) before
+  the next record's, step and repeat for a sheet of the same design. "Fill
+  sheet" repeats each card once per slot, so every record gets a full sheet;
+  the count then shows how many fit. Under Double-sided, each copy's back
+  lands behind its own front.
 - **Crop marks** (on by default): 0.25 pt black lines 4 mm long, starting
   1 mm outside each cut line, in the margin and in gaps wide enough to hold
   them (10 mm), never across a card. They are drawn on fronts only, since
@@ -615,7 +620,8 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   backs" puts an empty back page after each sheet of fronts, so a duplex
   printer keeps its page pairs (off by default: fronts only).
 - **Summary:** a line under the group reads "10 per sheet · 21 sheets" for
-  the records the Export button would run. A layout that can't be imposed (a
+  the records the Export button would run, with "· 10 copies each" when
+  cards repeat. A layout that can't be imposed (a
   card larger than the paper inside its margins, or a template with more
   than two sides under Double-sided) says why inline and disables Export;
   the job bar shows a short form, such as "Doesn't fit the paper", with the

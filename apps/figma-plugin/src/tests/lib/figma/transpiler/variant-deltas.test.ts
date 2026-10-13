@@ -1,6 +1,7 @@
 import {
 	applyVariant,
 	compile,
+	minimumFormatVersion,
 	type Template,
 	validate,
 } from "@freshcoat-js/coatfile";
@@ -8,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	type ColorwayInput,
 	type ProductRegistryEntry,
+	type TranspileInput,
 	type TranspileOutput,
 	transpile,
 } from "~/lib/figma/transpiler/index";
@@ -96,6 +98,7 @@ function card(side: Side, children: FigmaNode[]): FigmaContainerNode {
 function run(
 	base: FigmaContainerNode,
 	colorways: Array<{ label: string; front: FigmaContainerNode }>,
+	renderImage: TranspileInput["renderImage"] = vi.fn(),
 ): Promise<TranspileOutput> {
 	const variants: ColorwayInput[] = colorways.map((c, i) => ({
 		instanceId: `I:${i}`,
@@ -117,7 +120,7 @@ function run(
 		variants,
 		metadata: { id: "t", name: "T", version: "1.0.0", formatVersion: "1.4" },
 		fetchNodeTree: vi.fn(async () => base),
-		renderImage: vi.fn(),
+		renderImage,
 	});
 }
 
@@ -133,6 +136,13 @@ type Out = {
 function deltas(out: TranspileOutput, variantId: string): Delta[] {
 	const v = (out.template as Out).variants?.find((x) => x.id === variantId);
 	return v?.overrides.flatMap((o) => o.elements ?? []) ?? [];
+}
+
+function baseElements(out: TranspileOutput): Array<Record<string, unknown>> {
+	const t = out.template as {
+		template_data: Array<{ elements: Array<Record<string, unknown>> }>;
+	};
+	return t.template_data[0]?.elements ?? [];
 }
 
 const LOGO: Box = { x: 40, y: 40, width: 100, height: 60 };
@@ -348,30 +358,201 @@ describe("variant visibility", () => {
 		]);
 	});
 
-	it("warns about a layer the instance shows and the base hides, and leaves it hidden", async () => {
-		const base = card(BASE, [
-			rect(BASE, "1:2", "extra", LOGO, { visible: false }),
-			rect(BASE, "1:3", "logo", { ...LOGO, y: 200 }),
+	const extraAndLogo = (side: Side, extraVisible: boolean, extra = {}) =>
+		card(side, [
+			rect(side, "1:2", "extra", LOGO, { visible: extraVisible, ...extra }),
+			rect(side, "1:3", "logo", { ...LOGO, y: 200 }),
 		]);
-		const shown = card(INSTANCE, [
-			rect(INSTANCE, "1:2", "extra", LOGO),
-			rect(INSTANCE, "1:3", "logo", { ...LOGO, y: 200 }),
-		]);
-		const out = await run(base, [{ label: "Loud", front: shown }]);
 
-		expect(out.warnings).toContainEqual(
-			expect.objectContaining({
-				severity: "warn",
-				code: "variant_unhide_unsupported",
-				nodeId: "I9;1:2",
-				slot: "front",
-			}),
-		);
+	it("writes a layer the card hides and the instance shows as hidden, shown in the variant", async () => {
+		const out = await run(extraAndLogo(BASE, false), [
+			{ label: "Loud", front: extraAndLogo(INSTANCE, true) },
+		]);
+
+		expect(baseElements(out)).toEqual([
+			expect.objectContaining({ id: "extra", hidden: true }),
+			expect.not.objectContaining({ hidden: expect.anything() }),
+		]);
+		expect(baseElements(out)[1]?.id).toBe("logo");
+		expect(deltas(out, "loud")).toEqual([
+			{ id: "extra", properties: {}, hidden: false },
+		]);
 		expect(out.warnings.map((w) => w.code)).not.toContain(
 			"variant_structure_mismatch",
 		);
-		const v = (out.template as Out).variants?.find((x) => x.id === "loud");
-		expect(v?.overrides).toEqual([]);
+		expect(validate(out.template).ok).toBe(true);
+		expect(minimumFormatVersion(out.template as Template)).toBe("1.7");
+
+		const drawn = (variantId: string) =>
+			findNode(
+				compile(
+					out.template as Template,
+					{},
+					{ width: 1000, height: 600, variantId },
+				).frames[0]?.root,
+				"extra",
+			);
+		expect(drawn("default")).toBeUndefined();
+		expect(drawn("loud")).toBeDefined();
+	});
+
+	it("writes no hidden key for a colorway that keeps the layer hidden", async () => {
+		const out = await run(extraAndLogo(BASE, false), [
+			{ label: "Quiet", front: extraAndLogo(INSTANCE, false) },
+			{
+				label: "Loud",
+				front: extraAndLogo(INSTANCE, true, {
+					fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 } }],
+				}),
+			},
+			{ label: "Faded", front: extraAndLogo(INSTANCE, true, { opacity: 0 }) },
+		]);
+
+		expect(deltas(out, "quiet")).toEqual([]);
+		expect(deltas(out, "faded")).toEqual([]);
+		expect(deltas(out, "loud")).toEqual([
+			{ id: "extra", properties: { fill: "#0000ff" }, hidden: false },
+		]);
+		expect(baseElements(out).map((e) => e.id)).toEqual(["extra", "logo"]);
+	});
+
+	it("shows a layer at zero opacity on the card at the colorway's opacity", async () => {
+		const out = await run(extraAndLogo(BASE, true, { opacity: 0 }), [
+			{ label: "Half", front: extraAndLogo(INSTANCE, true, { opacity: 0.5 }) },
+		]);
+
+		expect(baseElements(out)[0]).toMatchObject({
+			id: "extra",
+			opacity: 0.5,
+			hidden: true,
+		});
+		expect(deltas(out, "half")).toEqual([
+			{ id: "extra", properties: {}, hidden: false },
+		]);
+	});
+
+	it("leaves out a layer the card hides and no colorway shows", async () => {
+		const out = await run(extraAndLogo(BASE, false), [
+			{ label: "Quiet", front: extraAndLogo(INSTANCE, false) },
+		]);
+
+		expect(baseElements(out).map((e) => e.id)).toEqual(["logo"]);
+		expect(deltas(out, "quiet")).toEqual([]);
+	});
+
+	it("hides a shown frame as one element, and a colorway can still hide a layer in it", async () => {
+		const panel = (side: Side, visible: boolean, dotVisible = true) =>
+			card(side, [
+				container(
+					side,
+					"FRAME",
+					"1:3",
+					"panel",
+					{ x: 100, y: 100, width: 300, height: 200 },
+					[
+						rect(
+							side,
+							"1:4",
+							"dot",
+							{ x: 120, y: 120, width: 40, height: 40 },
+							{ visible: dotVisible },
+						),
+					],
+					{
+						visible,
+						fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+					} as Partial<FigmaNode>,
+				),
+			]);
+		const out = await run(panel(BASE, false), [
+			{ label: "Panel", front: panel(INSTANCE, true) },
+			{ label: "Empty", front: panel(INSTANCE, true, false) },
+		]);
+
+		const frame = baseElements(out)[0] as {
+			hidden?: boolean;
+			properties: { children: Array<Record<string, unknown>> };
+		};
+		expect(frame.hidden).toBe(true);
+		expect(frame.properties.children[0]).not.toHaveProperty("hidden");
+		expect(deltas(out, "panel")).toEqual([
+			{ id: "panel", properties: {}, hidden: false },
+		]);
+		expect(deltas(out, "empty")).toEqual([
+			{ id: "panel", properties: {}, hidden: false },
+			{ id: "dot", properties: {}, hidden: true },
+		]);
+	});
+
+	it("writes a hidden layer inside a shown frame hidden too", async () => {
+		const panel = (side: Side, visible: boolean, dotVisible: boolean) =>
+			card(side, [
+				container(
+					side,
+					"FRAME",
+					"1:3",
+					"panel",
+					{ x: 100, y: 100, width: 300, height: 200 },
+					[
+						rect(
+							side,
+							"1:4",
+							"dot",
+							{ x: 120, y: 120, width: 40, height: 40 },
+							{ visible: dotVisible },
+						),
+					],
+					{ visible },
+				),
+			]);
+		const out = await run(panel(BASE, false, false), [
+			{ label: "Both", front: panel(INSTANCE, true, true) },
+			{ label: "Frame", front: panel(INSTANCE, true, false) },
+		]);
+
+		const frame = baseElements(out)[0] as {
+			hidden?: boolean;
+			properties: { children: Array<Record<string, unknown>> };
+		};
+		expect(frame.hidden).toBe(true);
+		expect(frame.properties.children[0]).toMatchObject({
+			id: "dot",
+			hidden: true,
+		});
+		expect(deltas(out, "both")).toEqual([
+			{ id: "panel", properties: {}, hidden: false },
+			{ id: "dot", properties: {}, hidden: false },
+		]);
+		expect(deltas(out, "frame")).toEqual([
+			{ id: "panel", properties: {}, hidden: false },
+		]);
+	});
+
+	it("takes a shown layer's raster from the colorway that shows it", async () => {
+		const photo = {
+			fills: [{ type: "IMAGE", scaleMode: "FILL", imageRef: "img" }],
+		} as Partial<FigmaNode>;
+		const renderImage = vi.fn(async (req: { nodeIds: string[] }) => ({
+			blob: new Blob([new Uint8Array([1])], { type: "image/png" }),
+			sha256: `SHA_${req.nodeIds[0]}`,
+		}));
+		const out = await run(
+			extraAndLogo(BASE, false, photo),
+			[{ label: "Photo", front: extraAndLogo(INSTANCE, true, photo) }],
+			renderImage,
+		);
+
+		const requested = renderImage.mock.calls.map(([req]) => req.nodeIds[0]);
+		expect(requested).not.toContain("1:2");
+		expect(requested).toContain("I9;1:2");
+		expect(baseElements(out)[0]).toMatchObject({
+			id: "image_1_2",
+			properties: expect.objectContaining({ src: "asset:SHA_I9;1:2" }),
+			hidden: true,
+		});
+		expect(deltas(out, "photo")).toEqual([
+			{ id: "image_1_2", properties: {}, hidden: false },
+		]);
 	});
 });
 

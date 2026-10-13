@@ -43,7 +43,7 @@ export const SHEET_SIDE_LABEL = { front: "Front", back: "Back" } as const;
 /**
  * One page of an imposed PDF: the paper at its aspect, each slot's record
  * rendered small with its bleed when the cards carry one, and the printer's
- * marks the layout asks for.
+ * marks the layout asks for. Copies of one card share a render.
  */
 export function SheetPreview({
 	template,
@@ -146,8 +146,10 @@ export function SheetPreview({
 		const keys = new Set(requests.map((r) => r.key));
 		setDrawn((m) => new Map([...m].filter(([k]) => keys.has(k))));
 		setError(null);
+		const started = new Set<string>();
 		for (const { req, key } of requests) {
-			if (peekSheetThumb(req)) continue;
+			if (started.has(key) || peekSheetThumb(req)) continue;
+			started.add(key);
 			renderSheetThumb(req, abort.signal).then(
 				(canvas) => {
 					if (!abort.signal.aborted)
@@ -222,7 +224,7 @@ export function SheetPreview({
 				>
 					{(page?.slots ?? []).map((slot, i) => (
 						<SlotCanvas
-							key={slot.item.key}
+							key={`${slot.xMm},${slot.yMm}`}
 							source={sources[i]}
 							itemKey={slot.item.key}
 							current={showsRecord(slot.item, currentRecordId, currentVariant)}
