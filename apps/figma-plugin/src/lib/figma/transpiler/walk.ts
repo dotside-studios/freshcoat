@@ -44,6 +44,7 @@ import { transpileImage } from "./image";
 import { canHoldImage } from "./image-shape";
 import { transpileQr } from "./qr";
 import { transpileRect } from "./rect";
+import { dedupeSliceNames, importSlices } from "./slice";
 import { textLayoutSizing, transpileText } from "./text";
 import { decomposeTransform, nodeExtent } from "./transform";
 import type { NodeTrace } from "./types";
@@ -311,6 +312,8 @@ function walkNode(
 	// carries its own on its element, so it resets this to 1 for its subtree.
 	inheritedOpacity: number,
 ) {
+	// walkSide imports slices on their own, wherever they were drawn.
+	if (n.type === "SLICE") return;
 	const { scale } = w;
 	const c = classify(n, w.resolveBinding);
 	if (c.kind === "skip") {
@@ -798,5 +801,14 @@ export function walkSide(w: Walker): unknown[] {
 		},
 		1,
 	);
+	// Slices paint nothing, so at the bottom of the stack they move no layer's
+	// paint order.
+	const slices = importSlices(w.frame, w.scale, w.sink.warnings);
+	for (const { node, el } of slices) {
+		w.sink.counts.native++;
+		record(w, node, "native-rect").el = el;
+	}
+	elements.unshift(...slices.map((s) => s.el));
+	dedupeSliceNames(elements, w.sink.warnings);
 	return elements;
 }
