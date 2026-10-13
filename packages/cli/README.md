@@ -185,7 +185,7 @@ a template with no edge warns. A piece has its own outline and the lines of
 is left out. With `--cut-lines`, a PDF draws the same lines as 0.25 pt strokes
 over each page or card, in an optional content group named Cut. The
 [workspace README](../workspace/README.md#cut-files) has the details, and how
-to open the files in Cricut Design Space and Silhouette Studio. Either flag on
+to open the files in Cricut Design Space and Silhouette Studio. `--cut` on
 its own exports into the `--out` directory, the current one by default.
 
 ```sh
