@@ -896,36 +896,35 @@ function OutputIntentGroup({
 		<PanelSection title="Color">
 			<div data-testid="export-output-intent" className="contents">
 				<Row label="Intent">
-					<div className="flex min-h-fc-control min-w-0 items-center gap-1">
-						<Select
-							aria-label="Output intent"
-							className="min-w-0 flex-1"
-							value={intent.kind}
-							onChange={(key) => {
-								setError(null);
-								if (key === "srgb" || key === "none") onChange({ kind: key });
-							}}
-						>
-							<SelectItem id="srgb" textValue="sRGB">
-								sRGB
+					<Select
+						aria-label="Output intent"
+						value={intent.kind}
+						onChange={(key) => {
+							setError(null);
+							if (key === "srgb" || key === "none") onChange({ kind: key });
+						}}
+					>
+						<SelectItem id="srgb" textValue="sRGB">
+							sRGB
+						</SelectItem>
+						{intent.kind === "profile" ? (
+							<SelectItem id="profile" textValue={profileName}>
+								{profileName}
 							</SelectItem>
-							{intent.kind === "profile" ? (
-								<SelectItem id="profile" textValue={profileName}>
-									{profileName}
-								</SelectItem>
-							) : null}
-							<SelectItem id="none" textValue="None">
-								None
-							</SelectItem>
-						</Select>
-						<FileTrigger
-							acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
-							onSelect={(files) => void choose(files)}
-						>
-							<Button>Custom profile…</Button>
-						</FileTrigger>
-					</div>
+						) : null}
+						<SelectItem id="none" textValue="None">
+							None
+						</SelectItem>
+					</Select>
 				</Row>
+				<div className="pl-18">
+					<FileTrigger
+						acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
+						onSelect={(files) => void choose(files)}
+					>
+						<Button>Custom profile…</Button>
+					</FileTrigger>
+				</div>
 				{error ? (
 					<p
 						role="alert"
@@ -941,7 +940,7 @@ function OutputIntentGroup({
 				) : (
 					<Hint testId="export-output-intent-hint">
 						{intent.kind === "profile"
-							? `${profileName}: cards stay sRGB, the printer converts them`
+							? "Cards stay sRGB; the printer converts them to this profile"
 							: intent.kind === "none"
 								? "No intent: each printer reads the colors its own way"
 								: "Declares sRGB, the space cards are drawn in"}

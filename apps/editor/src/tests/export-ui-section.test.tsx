@@ -510,7 +510,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.upload(input, new File([fogra as BlobPart], "fogra.icc"));
 		await waitFor(() =>
 			expect(hint()).toBe(
-				"Coated FOGRA39: cards stay sRGB, the printer converts them",
+				"Cards stay sRGB; the printer converts them to this profile",
 			),
 		);
 		const ws = controller.state.workspace;
