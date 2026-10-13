@@ -83,7 +83,6 @@ import { GridUiStore, selectionIds, useGridUi } from "./grid-state";
 import { type ImportTarget, ImportWizard } from "./ImportWizard";
 import { announceImport } from "./imported";
 import { sortGridRecords } from "./model";
-import { PhotoImportBar } from "./PhotoImportBar";
 import { RecordPanel } from "./RecordPanel";
 import { RecordsGallery } from "./RecordsGallery";
 import { type GridHandle, RecordsGrid } from "./RecordsGrid";
@@ -336,7 +335,6 @@ export function DataSection() {
 				/>
 			) : null}
 			{confirmElement}
-			<PhotoImportBar />
 		</div>
 	);
 }

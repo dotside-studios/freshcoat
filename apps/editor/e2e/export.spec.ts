@@ -281,9 +281,14 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	});
 	// Outside Export, the menu bar shows the job, and leaving the page warns.
 	await page.getByTestId("section-switcher").getByText("Edit").click();
-	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	await expect(page.getByTestId("activity")).toHaveText(/\d+ \/ 80/);
 	expect(await unloadWarns(page)).toBe(true);
-	await page.getByTestId("job-indicator").click();
+	await page.getByTestId("activity").click();
+	await expect(page.getByTestId("job-indicator")).toHaveText(/\d+ \/ 80/);
+	await page
+		.getByTestId("job-indicator")
+		.getByRole("button", { name: "Show" })
+		.click();
 	await page
 		.getByTestId("export-job")
 		.getByRole("button", { name: "Cancel" })
