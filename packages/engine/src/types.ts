@@ -169,6 +169,9 @@ export type Stroke = {
 	// as a fill is.
 	gradient?: GradientFill;
 	width: number;
+	// A width for each side of a rect, in place of `width`, which then holds
+	// the widest. Only drawRect honours it; see `sideStrokeGeometry`.
+	sides?: StrokeSides;
 	// Empty array or undefined = solid line.
 	dash?: number[];
 	// Line cap/join. Omitted = canvas defaults (butt cap, miter join).
@@ -192,6 +195,13 @@ export type TextStroke = Pick<
 	Stroke,
 	"color" | "gradient" | "width" | "join" | "align"
 >;
+
+export type StrokeSides = {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+};
 
 export type GradientSpread = "pad" | "reflect" | "repeat";
 
