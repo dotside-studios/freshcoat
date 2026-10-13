@@ -22,6 +22,7 @@ import { type DraftStore, useDrafts } from "./draft-store";
 import { GradientHandles } from "./gradient-handles";
 import { PathEditOverlay } from "./PathEditOverlay";
 import { BleedShade, PrintGuides } from "./PrintGuides";
+import { SliceGuides } from "./SliceGuides";
 
 export type OverlayDraft = {
 	marquee?: Rect;
@@ -87,6 +88,7 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 		>
 			<BleedShade view={view} />
 			<PrintGuides view={view} />
+			<SliceGuides view={view} />
 			{hover && !selection.includes(hover) ? (
 				<Poly
 					points={outline(hover)}

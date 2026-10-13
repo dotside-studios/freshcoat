@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { COMMAND_BY_ID } from "~/app/commands";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
-import { setSlicesShown, toggleSlices } from "~/canvas/slice-guides";
 import { SliceGuides } from "~/canvas/SliceGuides";
+import { setSlicesShown, toggleSlices } from "~/canvas/slice-guides";
 import { doc } from "./doc-fixture";
 
 const VIEW = { x: 100, y: 50, zoom: 0.5 };
@@ -14,10 +14,16 @@ const VIEW = { x: 100, y: 50, zoom: 0.5 };
  *  (no output, shown only while `show` is on), and on the back's `a`. */
 function sliced(): Template {
 	const t = doc();
-	const mark = (id: string, slice: object, extra: object = {}) => (e: Element) =>
-		e.id === id
-			? ({ ...e, ...extra, properties: { ...e.properties, slice } } as Element)
-			: e;
+	const mark =
+		(id: string, slice: object, extra: object = {}) =>
+		(e: Element) =>
+			e.id === id
+				? ({
+						...e,
+						...extra,
+						properties: { ...e.properties, slice },
+					} as Element)
+				: e;
 	const front = t.template_data[0];
 	const back = t.template_data[1];
 	if (!front || !back) throw new Error("fixture");
@@ -67,8 +73,10 @@ afterEach(cleanup);
 describe("slices on the canvas", () => {
 	test("outlines each slice of the side, by edge, in trim coordinates", () => {
 		canvas(sliced());
-		const group = screen.getByTestId("slice-guides");
-		expect(group.getAttribute("transform")).toBe("translate(100 50) scale(0.5)");
+		const group = screen.getByTestId("slice-guides").firstElementChild;
+		expect(group?.getAttribute("transform")).toBe(
+			"translate(100 50) scale(0.5)",
+		);
 		const a = outline("a");
 		expect(a?.getAttribute("data-slice-edge")).toBe("kiss");
 		expect(a?.getAttribute("data-slice-output")).toBe("piece");
@@ -95,7 +103,7 @@ describe("slices on the canvas", () => {
 		];
 		expect(kiss[0]).not.toBe(through[0]);
 		c.select([]);
-		act(() => c.setSide(1));
+		act(() => c.dispatch({ type: "setSide", side: 1 }));
 		const score = look();
 		expect(score[0]).not.toBe(kiss[0]);
 		expect(score[0]).not.toBe(through[0]);
@@ -117,12 +125,16 @@ describe("slices on the canvas", () => {
 		if (!front) throw new Error("fixture");
 		const plain = {
 			...t,
+			variants: undefined,
 			template_data: [
 				{
 					...front,
 					elements: front.elements.map((e) =>
 						e.id === "a"
-							? ({ ...e, properties: { ...e.properties, slice: {} } } as Element)
+							? ({
+									...e,
+									properties: { ...e.properties, slice: {} },
+								} as Element)
 							: e,
 					),
 				},
@@ -137,7 +149,7 @@ describe("slices on the canvas", () => {
 		act(() => c.dispatch({ type: "setValue", field: "show", value: "false" }));
 		expect(outline("rot")).toBeNull();
 		expect(outline("a")).not.toBeNull();
-		act(() => c.setSide(1));
+		act(() => c.dispatch({ type: "setSide", side: 1 }));
 		expect(outline("a")?.getAttribute("data-slice-edge")).toBe("score");
 	});
 

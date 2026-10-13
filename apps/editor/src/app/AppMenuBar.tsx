@@ -15,6 +15,7 @@ import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { type ReactNode, useMemo } from "react";
 import { useBleedShown } from "~/canvas/bleed-view";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
+import { useSlicesShown } from "~/canvas/slice-guides";
 import { JobIndicator } from "~/export/JobIndicator";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
@@ -141,6 +142,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 			"view.clearGuides",
 			"view.printGuides",
 			"view.bleed",
+			"view.slices",
 			"view.renderStats",
 			"theme",
 		],
@@ -177,6 +179,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 		printGuidesOn(s.workspace?.activeTemplateId, present(s)),
 	);
 	const bleed = useBleedShown();
+	const slices = useSlicesShown();
 	const sendTarget = useSendBackTarget(
 		useEditor((s) => s.workspace?.activeTemplateId),
 	);
@@ -197,6 +200,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 					(id === "view.rulers" && rulers) ||
 					(id === "view.printGuides" && guides) ||
 					(id === "view.bleed" && bleed) ||
+					(id === "view.slices" && slices) ||
 					(id === "view.renderStats" && renderStats) ? (
 						<CheckIcon />
 					) : undefined
