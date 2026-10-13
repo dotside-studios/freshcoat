@@ -1524,3 +1524,106 @@ describe("the command line", () => {
 		expect(run.stderr).toContain("Run freshcoat inspect --help for usage.");
 	});
 });
+
+describe("render slice pieces", () => {
+	const sliced = (): Template => {
+		const base = card({ format_version: "1.7" } as never);
+		const rect = (id: string, x: number, fill: string) => ({
+			id,
+			type: "rect",
+			pos: { x, y: 0 },
+			size: { width: 100, height: 100 },
+			properties: { fill, slice: { name: id } },
+		});
+		return {
+			...base,
+			template_data: base.template_data.map((frame) =>
+				frame.name === "front"
+					? { ...frame, elements: [rect("left", 0, "#ff0000"), rect("right", 100, "#0000ff"), ...frame.elements] }
+					: frame,
+			),
+		} as Template;
+	};
+	let workspace: Workspace;
+
+	beforeAll(async () => {
+		await box.write("sliced.json", JSON.stringify(sliced()));
+		await box.write("pair.csv", "name\nAna\nBen\n");
+		workspace = workspaceOf(sliced());
+		await box.write("sliced.coatworkspace", await workspaceBytes(workspace));
+	});
+
+	async function zipOf(path: string): Promise<Record<string, Uint8Array>> {
+		return unzipSync(new Uint8Array(await readFile(box.path(path))));
+	}
+
+	test("writes a file per piece beside the sides without slices", async () => {
+		const run = await box.run("render", "sliced.json", "--pieces", "--out", "pieces-dir", "-q");
+		expect(run.code).toBe(0);
+		expect((await readdir(box.path("pieces-dir"))).sort()).toEqual([
+			"back.png",
+			"export-report.csv",
+			"front-left.png",
+			"front-right.png",
+		]);
+		expect(await size(box.path("pieces-dir", "front-left.png"))).toEqual([100, 100]);
+		expect(await size(box.path("pieces-dir", "back.png"))).toEqual([200, 100]);
+	});
+
+	test("names pieces of each row of --data with {{slice}}", async () => {
+		const run = await box.run(
+			"render", "sliced.json", "--data", "pair.csv", "--pieces",
+			"--name", "{{name}}_{{slice}}", "--frame", "front", "--out", "pieces.zip", "-q",
+		);
+		expect(run.code).toBe(0);
+		expect(Object.keys(await zipOf("pieces.zip")).sort()).toEqual([
+			"Ana_left.png", "Ana_right.png", "Ben_left.png", "Ben_right.png", REPORT_FILE_NAME,
+		]);
+	});
+
+	test("lists the files a dry run would write", async () => {
+		const run = await box.run("render", "sliced.json", "--pieces", "--dry-run", "--out", "nowhere");
+		expect(run.code).toBe(0);
+		expect(run.stdout.split("\n")).toEqual([
+			"front-left.png", "front-right.png", "back.png", "3 items would be exported to nowhere", "",
+		]);
+	});
+
+	test("lays a PDF out with one page per piece", async () => {
+		const run = await box.run("render", "sliced.json", "--pieces", "--frame", "front", "--dpi", "72", "--out", "pieces.pdf", "-q");
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("pieces.pdf")));
+		expect(pdf.getPages().map((page) => [page.getWidth(), page.getHeight()])).toEqual([[100, 100], [100, 100]]);
+	});
+
+	test("splits a workspace preset", async () => {
+		const run = await box.run("render", "sliced.coatworkspace", "--preset", "p_png", "--pieces", "--out", "ws-pieces.zip", "-q");
+		expect(run.code).toBe(0);
+		const names = Object.keys(await zipOf("ws-pieces.zip")).filter((name) => name.endsWith(".png"));
+		expect(names.sort()).toEqual([
+			"1-back.png", "1-front-left.png", "1-front-right.png",
+			"2-back.png", "2-front-left.png", "2-front-right.png",
+		]);
+		const whole = await box.run("render", "sliced.coatworkspace", "--preset", "p_png", "--out", "ws-whole.zip", "-q");
+		expect(whole.code).toBe(0);
+		expect(Object.keys(await zipOf("ws-whole.zip")).filter((name) => name.endsWith(".png"))).toHaveLength(4);
+	});
+
+	test("warns when there is nothing to split and exports whole sides", async () => {
+		const run = await box.run("render", "badge.json", "--pieces", "--out", "no-slices.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: no slices to split; exporting whole sides");
+		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual([REPORT_FILE_NAME, "back.png", "front.png"]);
+	});
+
+	test("refuses vector PDF pages for a workspace preset", async () => {
+		const vector: Workspace = {
+			...workspace,
+			presets: workspace.presets.map((p) => (p.id === "p_pdf" ? { ...p, pdfPageImage: "vector" as const } : p)),
+		};
+		await box.write("vector.coatworkspace", await workspaceBytes(vector));
+		const run = await box.run("render", "vector.coatworkspace", "--preset", "p_pdf", "--pieces", "--out", "v.pdf", "-q");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("Pieces need PNG or JPEG pages, not vector");
+	});
+});

@@ -40,6 +40,22 @@ describe("planRender", () => {
 		});
 	});
 
+	test("exports a template's pieces into a directory, a zip or a PDF", () => {
+		expect(planRender("card.coat", input({ pieces: true }))).toEqual({
+			kind: "batch",
+			options: { pieces: true, out: ".", cropMarks: true, quiet: false },
+		});
+		expect(planRender("card.coat", input({ pieces: true, out: "dir" })).kind).toBe("batch");
+		expect(planRender("card.coat", input({ pieces: true, out: "x.pdf", pdfPages: "jpeg" })).kind).toBe("batch");
+	});
+
+	test("passes --pieces to a workspace preset", () => {
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", pieces: true }))).toEqual({
+			kind: "workspace",
+			options: { preset: "All", pieces: true, out: "x.zip", quiet: false },
+		});
+	});
+
 	test("runs a workspace preset with only the workspace options", () => {
 		expect(
 			planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", records: "failed", save: true, jobs: 2 })),
@@ -73,6 +89,8 @@ describe("planRender", () => {
 			["card.coat", { pngAlpha: "keep", out: "x.pdf" }, "--png-alpha applies only to images; a PDF takes --pdf-pages"],
 			["club.coatworkspace", { out: "x.zip", pngAlpha: "keep" }, "--png-alpha applies only to templates"],
 			["card.coat", { out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
+			["card.coat", { pieces: true, out: "x.pdf", pdfPages: "vector" }, "--pieces does not go with --pdf-pages vector"],
+			["card.coat", { pieces: true, out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
 			["card.coat", { out: "x.zip", where: [{ column: "name", op: "empty" }] }, "--where needs --data or a .coatworkspace file"],
 		];
 		for (const [file, options, message] of cases)
