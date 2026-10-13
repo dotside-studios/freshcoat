@@ -119,6 +119,12 @@ function program(io: Io, onCommand: (name: string) => void) {
 				"webp",
 			] as const),
 		)
+		.addOption(
+			new Option(
+				"--png-alpha <mode>",
+				"keep writes RGBA even for an opaque frame; default auto",
+			).choices(["auto", "keep"] as const),
+		)
 		.optionsGroup("Export options, with --data or a .zip or .pdf:")
 		.option(
 			"--name <pattern>",

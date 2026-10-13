@@ -25,6 +25,10 @@ describe("planRender", () => {
 			options: { out: "out", scale: [1, 2], set: { name: "Ana" }, quiet: false },
 		});
 		expect(planRender("card.coat", input())).toEqual({ kind: "template", options: { quiet: false } });
+		expect(planRender("card.coat", input({ pngAlpha: "keep", format: "png" }))).toEqual({
+			kind: "template",
+			options: { pngAlpha: "keep", format: "png", quiet: false },
+		});
 	});
 
 	test("exports a template to a zip, a PDF or, with --data, a directory", () => {
@@ -58,6 +62,10 @@ describe("planRender", () => {
 			["card.coat", { out: "x.pdf", quality: 50 }, "--quality needs --pdf-pages jpeg"],
 			["card.coat", { out: "x.zip", quality: 50 }, "--quality needs --format jpeg or webp"],
 			["card.coat", { out: "x.pdf", format: "jpeg" }, "--format applies only to images; a PDF takes --pdf-pages"],
+			["card.coat", { pngAlpha: "keep", format: "webp" }, "--png-alpha needs --format png"],
+			["card.coat", { pngAlpha: "keep", format: "jpg", out: "x.zip" }, "--png-alpha needs --format png"],
+			["card.coat", { pngAlpha: "keep", out: "x.pdf" }, "--png-alpha applies only to images; a PDF takes --pdf-pages"],
+			["club.coatworkspace", { out: "x.zip", pngAlpha: "keep" }, "--png-alpha applies only to templates"],
 			["card.coat", { out: "x.zip", scale: [1, 2] }, "an export takes one --scale"],
 		];
 		for (const [file, options, message] of cases)

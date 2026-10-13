@@ -133,7 +133,8 @@ one of a result's `warnings` into a line of readable text, such as
 PNG is written by the coat engine's own encoder.
 `output: { encode: { format: "png", effort: "best" } }` also searches filtered
 encodings for a smaller file, at the cost of more encoding work. Compression
-gains depend on the image.
+gains depend on the image. `alpha: "keep"` writes RGBA even for an opaque
+frame, for a consumer that requires a 32-bit PNG.
 
 ## Canvas and `product`
 

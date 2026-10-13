@@ -120,7 +120,8 @@ the records, and **Export** turns templates and records into files.
 - **Export:**
   - Presets name a template, which records (all, pending, failed or
     selected), which sides, the size (the template's, or each record's
-    photo), the format (PNG, JPEG or WebP zip, or PDF) with its quality,
+    photo), the format (PNG, JPEG or WebP zip, or PDF) with its quality
+    (or, for PNG, whether to keep the alpha channel of an opaque card),
     where the files go, and a file name pattern such as
     `{{member_id}}-{{side}}`.
   - The preview comes first, with a filmstrip of the records the preset

@@ -35,6 +35,7 @@ export type RenderOptions = {
 	frame?: string[];
 	scale?: number[];
 	format?: keyof typeof FORMATS;
+	pngAlpha?: "auto" | "keep";
 	out?: string;
 	dryRun?: true;
 	quiet: boolean;
@@ -90,7 +91,12 @@ export async function render(
 				constraint: { kind: "scale", value },
 				suffix: value === 1 ? "" : `@${value}x`,
 			})),
-			output: { encode: { format: output.format } },
+			output: {
+				encode: {
+					format: output.format,
+					...(options.pngAlpha ? { alpha: options.pngAlpha } : {}),
+				},
+			},
 		});
 		await mkdir(resolve(io.cwd, directoryOut), { recursive: true });
 		const written = new Set<string>();

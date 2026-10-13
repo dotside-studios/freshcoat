@@ -104,6 +104,40 @@ describe("render a template", () => {
 		}
 	});
 
+	test("keeps the alpha channel of an opaque frame with --png-alpha keep", async () => {
+		await box.write("icon.coat", await packTemplate(card()));
+		const colourType = async (path: string) => (await readFile(path))[25];
+		const plain = await box.run("render", "icon.coat", "--frame", "front", "--out", "plain");
+		expect(plain.code).toBe(0);
+		expect(await colourType(box.path("plain", "front.png"))).toBe(2);
+		const kept = await box.run(
+			"render",
+			"icon.coat",
+			"--png-alpha",
+			"keep",
+			"--frame",
+			"front",
+			"--out",
+			"kept",
+		);
+		expect(kept.code).toBe(0);
+		expect(await colourType(box.path("kept", "front.png"))).toBe(6);
+		const zipped = await box.run(
+			"render",
+			"icon.coat",
+			"--png-alpha",
+			"keep",
+			"--frame",
+			"front",
+			"--out",
+			"kept.zip",
+			"-q",
+		);
+		expect(zipped.code).toBe(0);
+		const unzipped = unzipSync(new Uint8Array(await readFile(box.path("kept.zip"))));
+		expect(unzipped["front.png"]?.[25]).toBe(6);
+	});
+
 	test("renders a variant at its own size", async () => {
 		const run = await box.run(
 			"render",
@@ -820,6 +854,9 @@ describe("render export options", () => {
 			[["badge.json", "--quality", "50", "--out", "x.zip"], "--quality needs --format jpeg or webp"],
 			[["badge.json", "--quality", "50", "--out", "x.pdf"], "--quality needs --pdf-pages jpeg"],
 			[["badge.json", "--format", "jpeg", "--out", "x.pdf"], "--format applies only to images; a PDF takes --pdf-pages"],
+			[["badge.json", "--png-alpha", "keep", "--format", "jpeg", "--out", "x.zip"], "--png-alpha needs --format png"],
+			[["badge.json", "--png-alpha", "keep", "--out", "x.pdf"], "--png-alpha applies only to images; a PDF takes --pdf-pages"],
+			[["badge.json", "--png-alpha", "always", "--out", "x.zip"], "Allowed choices are auto, keep"],
 			[["badge.json", "--scale", "1", "--scale", "2", "--out", "x.zip"], "an export takes one --scale"],
 			[["badge.json", "--quality", "101", "--out", "x.zip"], "Expected a whole number from 0 to 100"],
 			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
