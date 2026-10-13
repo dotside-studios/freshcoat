@@ -211,6 +211,8 @@ const PresetSchema = z.object({
 	layout: LayoutSchema.optional(),
 	bleed: z.boolean().optional(),
 	split: z.enum(["none", "pieces"]).optional(),
+	cutFile: z.enum(["none", "svg", "dxf"]).optional(),
+	cutLines: z.boolean().optional(),
 });
 
 const GuidesSchema = z.record(

@@ -150,6 +150,8 @@ export {
 	DEFAULT_DPI,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
+	exportCutFile,
+	exportCutLines,
 	exportSize,
 	exportSplit,
 	type FileNameContext,

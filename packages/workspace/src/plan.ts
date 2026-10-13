@@ -14,6 +14,7 @@ import { toTemplateValue } from "./columns";
 import type {
 	DataRecord,
 	Dataset,
+	ExportCutFile,
 	ExportFormat,
 	ExportItem,
 	ExportPreset,
@@ -38,6 +39,21 @@ export function exportSize(preset: Pick<ExportPreset, "size">): ExportSize {
  *  splits writes whole sides. */
 export function exportSplit(preset: Pick<ExportPreset, "split">): ExportSplit {
 	return preset.split ?? "none";
+}
+
+/** The cutter file a preset writes beside each image; none for a PDF, and for
+ *  a preset from before cut files. */
+export function exportCutFile(
+	preset: Pick<ExportPreset, "format" | "cutFile">,
+): ExportCutFile {
+	return preset.format === "pdf" ? "none" : (preset.cutFile ?? "none");
+}
+
+/** Whether a preset draws cut lines on its PDF pages. */
+export function exportCutLines(
+	preset: Pick<ExportPreset, "format" | "cutLines">,
+): boolean {
+	return preset.format === "pdf" && preset.cutLines === true;
 }
 
 /** How a PDF preset places its images; a preset from before layouts puts

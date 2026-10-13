@@ -181,6 +181,9 @@ export type TemplateEntry = {
 /** Whether an export writes a side whole, or one file per slice piece. */
 export type ExportSplit = "none" | "pieces";
 
+/** The cutter file written beside each image of a zip: none, SVG or DXF. */
+export type ExportCutFile = "none" | "svg" | "dxf";
+
 export type ExportFormat = "png-zip" | "jpeg-zip" | "webp-zip" | "pdf";
 
 /** How big each output is: the template's own size, or the size of the photo
@@ -278,6 +281,11 @@ export type ExportPreset = {
 	/** `pieces` exports each slice of a side as its own file; a side with no
 	 *  slices exports whole. Default none. */
 	split?: ExportSplit;
+	/** image zips: a file of the item's cut lines beside each image that has
+	 *  any, with the image's name. Default none. */
+	cutFile?: ExportCutFile;
+	/** PDF only: draw the cut lines over the art. Default false. */
+	cutLines?: boolean;
 };
 
 export type Workspace = {
