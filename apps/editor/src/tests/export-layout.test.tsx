@@ -273,6 +273,14 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 			within(layoutGroup()).getByRole("checkbox", { name: "Crop marks" }),
 		);
 		expect(current().layout).toMatchObject({ cropMarks: false });
+		for (const [name, key] of [
+			["Registration marks", "registrationMarks"],
+			["Color bar", "colorBar"],
+			["Slug", "slug"],
+		] as const) {
+			await user.click(within(layoutGroup()).getByRole("checkbox", { name }));
+			expect(current().layout).toMatchObject({ [key]: true });
+		}
 	});
 
 	test("double-sided pairs sheets, with the offset under More", async () => {

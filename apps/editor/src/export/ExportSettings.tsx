@@ -1200,6 +1200,24 @@ function LayoutGroup({
 							Crop marks
 						</Checkbox>
 						<Checkbox
+							isSelected={sheet.registrationMarks ?? false}
+							onChange={(registrationMarks) => patch({ registrationMarks })}
+						>
+							Registration marks
+						</Checkbox>
+						<Checkbox
+							isSelected={sheet.colorBar ?? false}
+							onChange={(colorBar) => patch({ colorBar })}
+						>
+							Color bar
+						</Checkbox>
+						<Checkbox
+							isSelected={sheet.slug ?? false}
+							onChange={(slug) => patch({ slug })}
+						>
+							Slug
+						</Checkbox>
+						<Checkbox
 							isSelected={sheet.duplex !== "none"}
 							onChange={(on) => patch({ duplex: on ? "long-edge" : "none" })}
 						>
