@@ -76,6 +76,8 @@ export type Imposition<T> = {
 	columns: number;
 	rows: number;
 	perSheet: number;
+	/** how many slots each card takes, "fill" resolved to `perSheet` */
+	copies: number;
 	/** the layout's gap, or `minGapMm` of the bleed when that is wider */
 	gapMm: number;
 	/** set when the cards carry bleed; each slot is still its trim's corner */
@@ -189,6 +191,24 @@ function checkNumbers(card: CardSizeMm, layout: SheetLayout, bleed: BleedMm) {
 	const offset = layout.backOffsetMm;
 	if (offset && !(Number.isFinite(offset.x) && Number.isFinite(offset.y)))
 		throw new SheetLayoutError("The back offset needs two numbers");
+	const copies = layout.copies;
+	if (
+		copies !== undefined &&
+		copies !== "fill" &&
+		!(Number.isInteger(copies) && copies >= 1)
+	)
+		throw new SheetLayoutError("Copies needs a whole number from 1, or fill");
+}
+
+/** How many times each card repeats: `copies`, or a sheet's worth for "fill". */
+export function copiesPerCard(layout: SheetLayout, perSheet: number): number {
+	const copies = layout.copies ?? 1;
+	return copies === "fill" ? perSheet : copies;
+}
+
+function repeat<T>(list: readonly T[], times: number): T[] {
+	if (times === 1) return [...list];
+	return list.flatMap((entry) => Array.from({ length: times }, () => entry));
 }
 
 type Group<T> = { front?: T; back?: T };
@@ -235,6 +255,9 @@ function records<T extends ImposeItem>(items: readonly T[]): Group<T>[] {
  * Flipping a sheet over its long edge mirrors it across that edge, so a
  * portrait sheet mirrors its columns and a landscape one its rows; a short
  * edge flip is the other way about.
+ *
+ * With `copies`, each card takes that many consecutive slots before the
+ * next card's; under duplex each copy's back sits behind its own front.
  *
  * With `bleedMm`, each card is placed by its trim and its bleed hangs
  * outside the slot: into the margin at the grid's edge, and into the gap
@@ -291,18 +314,20 @@ export function imposeSheets<T extends ImposeItem>(
 		rotated: false,
 	});
 
+	const copies = copiesPerCard(layout, perSheet);
 	const pages: SheetPage<T>[] = [];
 	let sheets = 0;
 	if (layout.duplex === "none") {
-		for (let i = 0; i < items.length; i += perSheet) {
+		const placed = repeat(items, copies);
+		for (let i = 0; i < placed.length; i += perSheet) {
 			pages.push({
 				side: "any",
-				slots: items.slice(i, i + perSheet).map((item, n) => slot(item, n)),
+				slots: placed.slice(i, i + perSheet).map((item, n) => slot(item, n)),
 			});
 		}
 		sheets = pages.length;
 	} else {
-		const groups = records(items);
+		const groups = repeat(records(items), copies);
 		const backs =
 			layout.blankBacks === true || groups.some((r) => r.back !== undefined);
 		const mirrorColumns =
@@ -341,6 +366,7 @@ export function imposeSheets<T extends ImposeItem>(
 		columns,
 		rows,
 		perSheet,
+		copies,
 		gapMm: layout.gapMm,
 		...(minGapMm(bleed) > 0 ? { bleedMm: { ...bleed } } : {}),
 		originMm: { x: originX, y: originY },
@@ -435,8 +461,10 @@ export function cropMarks(imposition: Imposition<unknown>): CropMark[] {
 	return marks;
 }
 
-/** "10 per sheet · 21 sheets" and friends, for a summary line. */
+/** "10 per sheet · 21 sheets" and friends, for a summary line, with
+ *  "· 3 copies each" when cards repeat. */
 export function sheetSummary(imposition: Imposition<unknown>): string {
-	const { perSheet, sheets } = imposition;
-	return `${perSheet} per sheet · ${sheets} ${sheets === 1 ? "sheet" : "sheets"}`;
+	const { perSheet, sheets, copies } = imposition;
+	const each = copies > 1 ? ` · ${copies} copies each` : "";
+	return `${perSheet} per sheet · ${sheets} ${sheets === 1 ? "sheet" : "sheets"}${each}`;
 }

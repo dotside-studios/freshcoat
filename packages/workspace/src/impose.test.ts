@@ -326,6 +326,131 @@ describe("imposeSheets", () => {
 		});
 	});
 
+	describe("copies", () => {
+		const names = (page?: { slots: { item: Item }[] }) =>
+			page?.slots.map((s) => s.item.name);
+
+		it("repeats each record's item before the next record", () => {
+			const out = imposeSheets(items(4), CR80, layout({ copies: 3 }));
+			expect(out.copies).toBe(3);
+			expect(out.sheets).toBe(2);
+			expect(names(out.pages[0])).toEqual([
+				"1f",
+				"1f",
+				"1f",
+				"2f",
+				"2f",
+				"2f",
+				"3f",
+				"3f",
+				"3f",
+				"4f",
+			]);
+			expect(names(out.pages[1])).toEqual(["4f", "4f"]);
+			expect(sheetSummary(out)).toBe("10 per sheet · 2 sheets · 3 copies each");
+		});
+
+		it("repeats each side single-sided", () => {
+			const out = imposeSheets(items(1, 2), CR80, layout({ copies: 2 }));
+			expect(names(out.pages[0])).toEqual(["1f", "1f", "1b", "1b"]);
+		});
+
+		it("fills a sheet per record", () => {
+			const out = imposeSheets(items(2), CR80, layout({ copies: "fill" }));
+			expect(out.copies).toBe(10);
+			expect(out.pages).toHaveLength(2);
+			expect(names(out.pages[0])).toEqual(Array(10).fill("1f"));
+			expect(names(out.pages[1])).toEqual(Array(10).fill("2f"));
+			expect(sheetSummary(out)).toBe(
+				"10 per sheet · 2 sheets · 10 copies each",
+			);
+		});
+
+		it("fills by the orientation that fits more", () => {
+			const out = imposeSheets(
+				items(1),
+				{ widthMm: 50, heightMm: 30 },
+				layout({ orientation: "auto", copies: "fill" }),
+			);
+			expect(out.pages[0]?.slots).toHaveLength(out.perSheet);
+			expect(out.copies).toBe(out.perSheet);
+		});
+
+		it("puts each copy's back behind its own front", () => {
+			const out = imposeSheets(
+				items(2, 2),
+				CR80,
+				layout({
+					duplex: "long-edge",
+					copies: 3,
+					backOffsetMm: { x: 1, y: 2 },
+				}),
+			);
+			expect(placed(out.pages[0] as never)).toEqual([
+				["1f", 19.4, 13.5],
+				["1f", 105, 13.5],
+				["1f", 19.4, 67.5],
+				["2f", 105, 67.5],
+				["2f", 19.4, 121.5],
+				["2f", 105, 121.5],
+			]);
+			expect(placed(out.pages[1] as never)).toEqual([
+				["1b", 106, 15.5],
+				["1b", 20.4, 15.5],
+				["1b", 106, 69.5],
+				["2b", 20.4, 69.5],
+				["2b", 106, 123.5],
+				["2b", 20.4, 123.5],
+			]);
+		});
+
+		it("fills front and back pages under duplex, short edge", () => {
+			const out = imposeSheets(
+				items(2, 2),
+				CR80,
+				layout({ duplex: "short-edge", copies: "fill" }),
+			);
+			expect(
+				out.pages.map((p) => [p.side, names(p)?.[0], p.slots.length]),
+			).toEqual([
+				["front", "1f", 10],
+				["back", "1b", 10],
+				["front", "2f", 10],
+				["back", "2b", 10],
+			]);
+			const fronts = out.pages[0]?.slots ?? [];
+			const backs = out.pages[1]?.slots ?? [];
+			const at = (s: { xMm: number; yMm: number }) =>
+				`${round(s.xMm)},${round(s.yMm)}`;
+			expect(new Set(backs.map(at))).toEqual(new Set(fronts.map(at)));
+		});
+
+		it("keeps blank backs for a one-sided template's copies", () => {
+			const out = imposeSheets(
+				items(1),
+				CR80,
+				layout({ duplex: "long-edge", blankBacks: true, copies: 4 }),
+			);
+			expect(out.pages.map((p) => [p.side, p.slots.length])).toEqual([
+				["front", 4],
+				["back", 0],
+			]);
+		});
+
+		it("crops the whole grid of a filled sheet", () => {
+			const one = imposeSheets(items(1), CR80, layout());
+			const filled = imposeSheets(items(1), CR80, layout({ copies: "fill" }));
+			expect(cropMarks(filled)).toEqual(cropMarks(one));
+		});
+
+		it("refuses copies that aren't a whole number from 1", () => {
+			for (const copies of [0, -1, 1.5, Number.NaN])
+				expect(() => imposeSheets(items(1), CR80, layout({ copies }))).toThrow(
+					SheetLayoutError,
+				);
+		});
+	});
+
 	describe("errors", () => {
 		const error = (fn: () => unknown) => {
 			try {
