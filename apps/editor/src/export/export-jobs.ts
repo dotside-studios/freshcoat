@@ -16,6 +16,7 @@ import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
+import { tasksFor, withTask } from "~/app/status/tasks";
 import { createExternalStore } from "~/state/external-store";
 import { workspaceSnapshot } from "~/state/workspace";
 import { selectedRunLabel, statusActions } from "./export-ui";
@@ -172,12 +173,31 @@ export function createExportJobs(
 				startedAt: now(),
 			};
 			set({ job });
-			const result = await runner.start(workspace, preset, {
-				...(sink ? { sink } : {}),
-				...(options.confirmLargePdf
-					? { confirmLargePdf: options.confirmLargePdf }
-					: {}),
-			});
+			const result = await withTask(
+				tasksFor(controller),
+				{
+					id: "export",
+					title: `Exporting ${job.presetName}`,
+					section: "export",
+					cancellable: true,
+				},
+				(report, signal) => {
+					const mirror = () => {
+						const p = runner.getSnapshot().progress;
+						if (p) report({ done: p.done, total: p.total, failed: p.failed });
+					};
+					const unsubscribeProgress = runner.subscribe(mirror);
+					signal.addEventListener("abort", () => runner.cancel());
+					return runner
+						.start(workspace, preset, {
+							...(sink ? { sink } : {}),
+							...(options.confirmLargePdf
+								? { confirmLargePdf: options.confirmLargePdf }
+								: {}),
+						})
+						.finally(unsubscribeProgress);
+				},
+			);
 			// A job that never ran leaves its destination open.
 			if (!result) await sink?.abort();
 			const error = runner.getSnapshot().error;

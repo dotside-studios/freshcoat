@@ -22,6 +22,7 @@ import {
 import { produce } from "~/state/immer";
 import { ControllerProvider } from "../app/context";
 import { EditorController } from "../app/controller";
+import { StatusBar } from "../app/StatusBar";
 import { DataSection } from "../data/DataSection";
 import {
 	CARD_GAP,
@@ -375,9 +376,11 @@ describe("Data section with a photo dataset", () => {
 			fileName: "doc.coat",
 		});
 		controller.dispatch({ type: "datasetEdit", datasets: [d] });
+		controller.dispatch({ type: "setSection", section: "data" });
 		render(
 			<ControllerProvider controller={controller}>
 				<DataSection />
+				<StatusBar />
 			</ControllerProvider>,
 		);
 		return fastUser();
@@ -415,9 +418,11 @@ describe("Data section with a photo dataset", () => {
 				variant: { kind: "image", field: "photo" },
 			},
 		});
+		controller.dispatch({ type: "setSection", section: "data" });
 		render(
 			<ControllerProvider controller={controller}>
 				<DataSection />
+				<StatusBar />
 			</ControllerProvider>,
 		);
 		doubleClick(card("r_1"));
@@ -455,9 +460,11 @@ describe("Data section with a photo dataset", () => {
 				variant: { kind: "image", field: "photo" },
 			},
 		});
+		controller.dispatch({ type: "setSection", section: "data" });
 		render(
 			<ControllerProvider controller={controller}>
 				<DataSection />
+				<StatusBar />
 			</ControllerProvider>,
 		);
 		doubleClick(card("r_1"));

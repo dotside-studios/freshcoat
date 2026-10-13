@@ -21,7 +21,7 @@ import type { EditorController } from "~/app/controller";
 import { plural } from "~/app/copy";
 import { downloadBytes } from "~/app/download";
 import { formatNumber } from "~/app/format";
-import { createExternalStore } from "~/state/external-store";
+import { tasksFor, withTask } from "~/app/status/tasks";
 import type { BindingPatch } from "~/state/workspace";
 
 export function currentDataset(
@@ -234,77 +234,63 @@ export function isPhotoDrop(dt: DataTransfer): boolean {
 	);
 }
 
-// ── Progress ──────────────────────────────────────────────────────────────
-
-export type PhotoImportProgress = {
-	label: string;
-	done: number;
-	total: number;
-	cancel(): void;
-};
-
-const progress = createExternalStore<PhotoImportProgress | null>(null);
-const setProgress = progress.set;
-
-/** The photo import running now, if any, for a progress bar. */
-export function usePhotoImportProgress(): PhotoImportProgress | null {
-	return progress.useStore();
-}
-
 const collator = new Intl.Collator(undefined, {
 	numeric: true,
 	sensitivity: "base",
 });
 
 /** Opens zips, drops hidden files and non-images, and hashes and measures
- *  the rest two at a time, with a progress bar. */
-async function preparePhotos(
+ *  the rest two at a time, as a task with a progress bar. */
+function preparePhotos(
+	controller: EditorController,
 	source: readonly (File | PickedFile)[],
 ): Promise<{ prepared: PreparedAsset[]; skipped: number } | null> {
-	const aborter = new AbortController();
-	const report = (done: number, total: number) =>
-		setProgress({
-			label: "Reading photos",
-			done,
-			total,
-			cancel: () => aborter.abort(),
-		});
-	report(0, source.length);
-	try {
-		const { files, skipped: leftOut } = await collectPhotoFiles(source, {
-			signal: aborter.signal,
-		});
-		let skipped = 0;
-		for (const { path, reason } of leftOut) {
-			if (reason === "unreadable")
-				toast(`Couldn't read ${path.slice(path.lastIndexOf("/") + 1)}`, {
-					tone: "danger",
+	return withTask(
+		tasksFor(controller),
+		{
+			id: "photo-import",
+			title: "Reading photos",
+			section: "data",
+			cancellable: true,
+		},
+		async (report, signal) => {
+			const progress = (done: number, total: number) => report({ done, total });
+			progress(0, source.length);
+			try {
+				const { files, skipped: leftOut } = await collectPhotoFiles(source, {
+					signal,
 				});
-			else skipped += 1;
-		}
-		if (files.length === 0) {
-			toast(
-				skipped
-					? `No images found: ${plural(skipped, "file")} skipped`
-					: "No images found",
-				{ tone: "warning" },
-			);
-			return null;
-		}
-		files.sort((a, b) => collator.compare(a.name, b.name));
-		report(0, files.length);
-		const prepared = await prepareAssets(files, {
-			onProgress: report,
-			signal: aborter.signal,
-		});
-		return { prepared, skipped };
-	} catch (e) {
-		if (!aborter.signal.aborted) throw e;
-		toast("Photo import canceled");
-		return null;
-	} finally {
-		setProgress(null);
-	}
+				let skipped = 0;
+				for (const { path, reason } of leftOut) {
+					if (reason === "unreadable")
+						toast(`Couldn't read ${path.slice(path.lastIndexOf("/") + 1)}`, {
+							tone: "danger",
+						});
+					else skipped += 1;
+				}
+				if (files.length === 0) {
+					toast(
+						skipped
+							? `No images found: ${plural(skipped, "file")} skipped`
+							: "No images found",
+						{ tone: "warning" },
+					);
+					return null;
+				}
+				files.sort((a, b) => collator.compare(a.name, b.name));
+				progress(0, files.length);
+				const prepared = await prepareAssets(files, {
+					onProgress: progress,
+					signal,
+				});
+				return { prepared, skipped };
+			} catch (e) {
+				if (!signal.aborted) throw e;
+				toast("Photo import canceled");
+				return null;
+			}
+		},
+	);
 }
 
 type PhotoSource = readonly (File | PickedFile)[] | "files" | "folder";
@@ -349,7 +335,7 @@ export async function importPhotos(
 ): Promise<number> {
 	const chosen = await resolveSource(source);
 	if (chosen.length === 0) return 0;
-	const ready = await preparePhotos(chosen);
+	const ready = await preparePhotos(controller, chosen);
 	if (!ready) return 0;
 	const dataset = currentDataset(controller, datasetId);
 	if (!dataset) return 0;
@@ -402,7 +388,7 @@ export async function newDatasetFromPhotos(
 ): Promise<Dataset | null> {
 	const chosen = await resolveSource(source);
 	if (chosen.length === 0) return null;
-	const ready = await preparePhotos(chosen);
+	const ready = await preparePhotos(controller, chosen);
 	if (!ready) return null;
 	const ws = controller.state.workspace;
 	if (!ws) return null;
@@ -446,7 +432,7 @@ export async function photosIntoEmptyDataset(
 	}
 	const chosen = await resolveSource(source);
 	if (chosen.length === 0) return;
-	const ready = await preparePhotos(chosen);
+	const ready = await preparePhotos(controller, chosen);
 	if (!ready) return;
 	let added = 0;
 	editDataset(controller, datasetId, (d) => {

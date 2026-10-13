@@ -105,8 +105,8 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 						<RightPanel />
 					</SidePanel>
 				</div>
-				<StatusBar />
 			</div>
+			<StatusBar />
 		</>
 	);
 }

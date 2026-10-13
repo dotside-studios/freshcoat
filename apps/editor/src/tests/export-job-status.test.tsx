@@ -5,9 +5,9 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
+import { Activity } from "~/app/status/Activity";
 import { DataJobBar } from "~/data/ExportSelected";
 import { exportJobsFor } from "~/export/export-jobs";
-import { JobIndicator } from "~/export/JobIndicator";
 import type {
 	ExportRunner,
 	ExportRunnerSnapshot,
@@ -126,24 +126,45 @@ function setup() {
 	return { controller, preset, fake, jobs, downloads, user: fastUser() };
 }
 
-describe("job indicator", () => {
+describe("export activity", () => {
 	test("shows a running job outside Export and opens Export", async () => {
 		const { controller, preset, jobs, fake, user } = setup();
 		render(
 			<ControllerProvider controller={controller}>
-				<JobIndicator />
+				<Activity />
 			</ControllerProvider>,
 		);
-		expect(screen.queryByTestId("job-indicator")).toBeNull();
+		expect(screen.queryByTestId("activity")).toBeNull();
 		await act(async () => {
 			void jobs.run(preset);
 		});
-		const indicator = await screen.findByTestId("job-indicator");
+		const indicator = await screen.findByTestId("activity");
+		expect(indicator.textContent).toContain("Exporting All");
 		expect(indicator.textContent).toContain("1 / 3");
-		await user.click(button(/Exporting All/));
+		await user.click(indicator);
+		expect(screen.getByTestId("job-indicator").textContent).toContain("1 / 3");
+		await user.click(button("Show"));
 		expect(controller.state.section).toBe("export");
-		expect(screen.queryByTestId("job-indicator")).toBeNull();
+		expect(screen.queryByTestId("activity")).toBeNull();
 		act(() => fake.finish({ items: [], cancelled: false, ms: 1 }));
+	});
+
+	test("cancels the job from the popover", async () => {
+		const { controller, preset, jobs, user } = setup();
+		render(
+			<ControllerProvider controller={controller}>
+				<Activity />
+			</ControllerProvider>,
+		);
+		await act(async () => {
+			void jobs.run(preset);
+		});
+		await user.click(await screen.findByTestId("activity"));
+		await user.click(button("Cancel"));
+		await waitFor(() =>
+			expect(jobs.getSnapshot().history[0]?.state).toBe("cancelled"),
+		);
+		expect(screen.queryByTestId("activity")).toBeNull();
 	});
 });
 

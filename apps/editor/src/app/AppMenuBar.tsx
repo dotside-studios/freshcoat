@@ -15,7 +15,6 @@ import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { type ReactNode, useMemo } from "react";
 import { useBleedShown } from "~/canvas/bleed-view";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
-import { JobIndicator } from "~/export/JobIndicator";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
 import { isDirty, present } from "~/state/store";
@@ -29,8 +28,8 @@ import SendIconFill from "~icons/mingcute/send-fill";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
 import { useController } from "./context";
 import { FreshcoatMark } from "./Logo";
-import { useRenderStats } from "./render-stats";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
+import { useHiddenStatusItems } from "./status/visibility";
 import { useThemePreference } from "./theme";
 
 type Submenu = { label: string; items: (string | "-")[] };
@@ -170,7 +169,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const disabled = useMemo(() => disabledSig.split(","), [disabledSig]);
 	const panels = useEditor((s) => s.panels);
 	const theme = useThemePreference();
-	const renderStats = useRenderStats();
+	const renderStats = !useHiddenStatusItems().has("render");
 	const rulers = useEditor((s) => s.rulers);
 	usePrintGuidesVersion();
 	const guides = useEditor((s) =>
@@ -317,7 +316,6 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 			<div className="flex min-w-0 flex-1 items-center justify-end gap-2 pr-1.5 pl-3 text-fc-muted">
 				{name ? (
 					<>
-						<JobIndicator />
 						<span className="hidden truncate text-fc-text lg:inline">
 							{name}
 						</span>
