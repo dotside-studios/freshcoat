@@ -299,6 +299,7 @@ export function printCheckWarnings(
 		found.set(key, { kind: "print_check", ...(layer ? { layer } : {}), issue });
 	};
 	const visit = (cmd: DrawCommand, parent: string | undefined) => {
+		if (cmd.opacity === 0) return;
 		const layer = cmd.id ?? parent;
 		if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
 			for (const c of cmd.children) visit(c, layer);
