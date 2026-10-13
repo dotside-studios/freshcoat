@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { crc32 } from "node:zlib";
+import { SRGB_OUTPUT_INTENT } from "@freshcoat-js/engine/icc";
 import type {
 	Dataset,
 	ExportPreset,
@@ -407,7 +408,11 @@ describe("runExportJob", () => {
 		expect(pool.requests.every((r) => r.scale === 1)).toBe(true);
 		expect(assemblePdf).toHaveBeenCalledTimes(1);
 		const [pages, options] = assemblePdf.mock.calls[0];
-		expect(options).toEqual({ dpi: 300, title: "Cards PDF" });
+		expect(options).toEqual({
+			dpi: 300,
+			title: "Cards PDF",
+			outputIntent: SRGB_OUTPUT_INTENT,
+		});
 		expect(pages.map((p) => strFromU8(p.bytes))).toEqual([
 			"Member 1|front",
 			"Member 1|back",
@@ -895,6 +900,7 @@ describe("bleed", () => {
 		const [pages, options] = assemblePdf.mock.calls[0] ?? [];
 		expect(pages?.[0]).toMatchObject({ widthPx: 1072, heightPx: 678 });
 		expect(options).toEqual({
+			outputIntent: SRGB_OUTPUT_INTENT,
 			dpi: 254,
 			title: "All members",
 			bleedMm: {

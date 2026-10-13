@@ -24,6 +24,8 @@ import type {
 	ExportDestination,
 	ExportItem,
 	ExportPreset,
+	IccProfileAsset,
+	PdfOutputIntent,
 	PresetPrint,
 	SheetLayout,
 } from "@freshcoat-js/workspace";
@@ -36,6 +38,7 @@ import {
 	imageFormat,
 	paperSize,
 	pdfLayout,
+	readOutputProfile,
 	sheetSummary,
 	unfilledRequired,
 	unknownFileNameTokens,
@@ -192,8 +195,12 @@ export function ExportSettings({
 }) {
 	const controller = useController();
 	const templates = useEditor((s) => s.workspace?.templates);
-	const set = (patch: Partial<ExportPreset>) =>
-		controller.dispatch({ type: "setPreset", preset: { ...preset, ...patch } });
+	const set = (patch: Partial<ExportPreset>, profile?: IccProfileAsset) =>
+		controller.dispatch({
+			type: "setPreset",
+			preset: { ...preset, ...patch },
+			...(profile ? { profile } : {}),
+		});
 	const sideNames = template?.template_data.map((f) => f.name) ?? [];
 	const chosen = preset.sides === "all" ? sideNames : preset.sides;
 	const toggleSide = (name: string, on: boolean) => {
@@ -596,6 +603,14 @@ export function ExportSettings({
 							onChange={(layout) => set({ layout })}
 						/>
 					) : null}
+					{pdf ? (
+						<OutputIntentGroup
+							preset={preset}
+							onChange={(outputIntent, profile) =>
+								set({ outputIntent }, profile)
+							}
+						/>
+					) : null}
 					<PrintGroup preset={preset} onChange={(print) => set({ print })} />
 				</TabPanel>
 				<TabPanel id="files">
@@ -836,6 +851,101 @@ function PrintGroup({
 						</Disclosure>
 					</>
 				) : null}
+			</div>
+		</PanelSection>
+	);
+}
+
+/**
+ * What the PDF declares it was prepared for: sRGB, the space cards are drawn
+ * in, or a profile of the press's condition, such as a print shop's CMYK one.
+ * The cards stay sRGB either way; the printer converts them.
+ */
+function OutputIntentGroup({
+	preset,
+	onChange,
+}: {
+	preset: ExportPreset;
+	onChange: (intent: PdfOutputIntent, profile?: IccProfileAsset) => void;
+}) {
+	const profiles = useEditor((s) => s.workspace?.profiles);
+	const [error, setError] = useState<string | null>(null);
+	const intent = preset.outputIntent ?? { kind: "srgb" };
+	const profile =
+		intent.kind === "profile"
+			? profiles?.find((p) => p.sha256 === intent.sha256)
+			: undefined;
+	const profileName = profile
+		? profile.description || profile.name
+		: "Missing profile";
+	const choose = async (files: FileList | null) => {
+		const file = files?.[0];
+		if (!file) return;
+		const read = await readOutputProfile(
+			new Uint8Array(await file.arrayBuffer()),
+			file.name,
+		);
+		if (!read.ok) {
+			setError(`Couldn't use ${file.name}: ${read.message}`);
+			return;
+		}
+		setError(null);
+		onChange({ kind: "profile", sha256: read.profile.sha256 }, read.profile);
+	};
+	return (
+		<PanelSection title="Color">
+			<div data-testid="export-output-intent" className="contents">
+				<Row label="Intent">
+					<Select
+						aria-label="Output intent"
+						value={intent.kind}
+						onChange={(key) => {
+							setError(null);
+							if (key === "srgb" || key === "none") onChange({ kind: key });
+						}}
+					>
+						<SelectItem id="srgb" textValue="sRGB">
+							sRGB
+						</SelectItem>
+						{intent.kind === "profile" ? (
+							<SelectItem id="profile" textValue={profileName}>
+								{profileName}
+							</SelectItem>
+						) : null}
+						<SelectItem id="none" textValue="None">
+							None
+						</SelectItem>
+					</Select>
+				</Row>
+				<div className="pl-18">
+					<FileTrigger
+						acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
+						onSelect={(files) => void choose(files)}
+					>
+						<Button>Custom profile…</Button>
+					</FileTrigger>
+				</div>
+				{error ? (
+					<p
+						role="alert"
+						className="m-0 pl-18 text-fc-danger-text text-fc-sm"
+						data-testid="export-output-intent-error"
+					>
+						{error}
+					</p>
+				) : intent.kind === "profile" && !profile ? (
+					<Hint tone="warning" testId="export-output-intent-hint">
+						The profile is not in this workspace; choose it again
+					</Hint>
+				) : (
+					<Hint testId="export-output-intent-hint">
+						{intent.kind === "profile"
+							? "Cards stay sRGB; the printer converts them to this profile"
+							: intent.kind === "none"
+								? "No intent: each printer reads the colors its own way"
+								: "Declares sRGB, the space cards are drawn in"}
+					</Hint>
+				)}
 			</div>
 		</PanelSection>
 	);

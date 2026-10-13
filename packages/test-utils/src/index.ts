@@ -6,6 +6,7 @@ export {
 export { type TestFont, testFontBytes, testFontPath } from "./fonts";
 export {
 	gifHeader,
+	iccProfile,
 	jpegHeader,
 	pngHeader,
 	tiff,

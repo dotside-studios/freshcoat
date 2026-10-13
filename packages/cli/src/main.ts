@@ -156,6 +156,15 @@ function program(io: Io, onCommand: (name: string) => void) {
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
 		.option("--no-crop-marks", "leave out the crop marks")
+		.option(
+			"--output-intent <file>",
+			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
+		)
+		.option("--no-output-intent", "declare no output intent")
+		.option(
+			"--output-intent-id <name>",
+			"the condition --output-intent describes, such as FOGRA39; default the profile's description",
+		)
 		.optionsGroup("Workspace options:")
 		.option(
 			"--preset <name|id>",

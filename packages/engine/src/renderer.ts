@@ -14,6 +14,7 @@ import {
 	type SharedFontProvider,
 } from "./font-collection";
 import { deriveFontMetrics } from "./font-metrics";
+import type { OutputIntent } from "./icc";
 import { type ByteLoader, fetchLoader, mapLoader } from "./loader";
 import type { Node } from "./node";
 import {
@@ -121,6 +122,9 @@ export type PaintPdfOptions = {
 	rasterDpi?: number;
 	title?: string;
 	date?: Date;
+	/** Default the sRGB intent; a profile of the press's condition instead;
+	 *  false for none. See "PDF output" in the README. */
+	outputIntent?: OutputIntent | false;
 };
 
 export type RenderPdfOptions = PaintPdfOptions & {

@@ -30,6 +30,12 @@ import { compileScene } from "../compile-scene";
 import { normalizeDash } from "../dash";
 import { fontBytes } from "../font-bytes";
 import {
+	type OutputIntent,
+	type ResolvedOutputIntent,
+	resolveOutputIntent,
+	SRGB_PROFILE,
+} from "../icc";
+import {
 	createSharedFontProvider,
 	type SharedFontProvider,
 } from "../font-collection";
@@ -80,6 +86,10 @@ export type PdfPaintOptions = {
 	title?: string;
 	/** Creation date; fixing it makes the bytes repeatable. */
 	date?: Date;
+	/** What the PDF declares it was prepared for: by default sRGB, the space
+	 *  everything is drawn in; a profile of the press's condition instead;
+	 *  false for none. While one is declared, RGB content is tagged sRGB. */
+	outputIntent?: OutputIntent | false;
 };
 
 export type PdfPaintResult = {
@@ -269,6 +279,7 @@ export async function paintPdf(
 		throw new Error("pdf: scene has no createCanvas command");
 	const dpi = options.dpi ?? 72;
 	if (!(dpi > 0)) throw new Error(`dpi must be positive: ${dpi}`);
+	const intent = resolveOutputIntent(options.outputIntent);
 	const warnings: PaintWarning[] = [];
 	const { fonts, images } = collectAssets(commands);
 
@@ -334,6 +345,7 @@ export async function paintPdf(
 		sources,
 		svgScenes,
 		warnings,
+		intent,
 	);
 	try {
 		const drawables = commands.filter(isDrawable);
@@ -522,6 +534,7 @@ class PageBuilder {
 		private sources: Map<string, Uint8Array>,
 		private svgScenes: Map<string, SvgScene>,
 		private warnings: PaintWarning[],
+		private intent: ResolvedOutputIntent | null,
 	) {
 		this.resources = w.reserve();
 	}
@@ -727,7 +740,7 @@ class PageBuilder {
 			MediaBox: [0, 0, width, height],
 			Resources: this.resources,
 			Contents: contents,
-			Group: { S: name("Transparency"), CS: name("DeviceRGB") },
+			Group: { S: name("Transparency"), CS: this.rgbSpace() },
 		});
 		w.set(pages, { Type: name("Pages"), Kids: [pageRef], Count: 1 });
 		const ext: PdfDict = {};
@@ -737,8 +750,32 @@ class PageBuilder {
 			XObject: { ...this.xobjects },
 			Shading: { ...this.shadings },
 			Font: this.fonts.write(),
+			...(this.intent
+				? { ColorSpace: { DefaultRGB: this.rgbSpace() } }
+				: {}),
 		});
-		const catalog = w.add({ Type: name("Catalog"), Pages: pages });
+		const { intent } = this;
+		const catalog = w.add({
+			Type: name("Catalog"),
+			Pages: pages,
+			...(intent
+				? {
+						OutputIntents: [
+							{
+								Type: name("OutputIntent"),
+								S: name("GTS_PDFX"),
+								OutputConditionIdentifier: intent.identifier,
+								Info: intent.info,
+								...(intent.registry ? { RegistryName: intent.registry } : {}),
+								DestOutputProfile: this.iccProfile(
+									intent.profile,
+									intent.components,
+								),
+							},
+						],
+					}
+				: {}),
+		});
 		const date = pdfDate(options.date ?? new Date());
 		const info = w.add({
 			Producer: "Freshcoat",
@@ -788,7 +825,7 @@ class PageBuilder {
 							Group: {
 								S: name("Transparency"),
 								I: true,
-								CS: name("DeviceRGB"),
+								CS: this.rgbSpace(),
 							},
 						}
 					: {}),
@@ -1411,6 +1448,11 @@ class PageBuilder {
 			return name(components === 1 ? "DeviceGray" : "DeviceRGB");
 		if (profile === "invalid" || iccComponents(profile) !== components)
 			return null;
+		return [name("ICCBased"), this.iccProfile(profile, components)];
+	}
+
+	// One stream per distinct profile, however many images and intents use it.
+	private iccProfile(profile: Uint8Array, components: number): PdfRef {
 		const same = this.iccProfiles.get(profile.length) ?? [];
 		let entry = same.find((p) => sameBytes(p.bytes, profile));
 		if (!entry) {
@@ -1421,7 +1463,15 @@ class PageBuilder {
 			same.push(entry);
 			this.iccProfiles.set(profile.length, same);
 		}
-		return [name("ICCBased"), entry.ref];
+		return entry.ref;
+	}
+
+	// What RGB is blended in: sRGB while an intent is declared, so the group
+	// and the content it holds agree.
+	private rgbSpace(): PdfValue {
+		return this.intent
+			? [name("ICCBased"), this.iccProfile(SRGB_PROFILE, 3)]
+			: name("DeviceRGB");
 	}
 
 	private rgbaImage(

@@ -82,6 +82,17 @@ export {
 	resolveFontRequest,
 } from "./font-bytes";
 export {
+	type IccColorSpace,
+	type IccProfileInfo,
+	type IccProfileResult,
+	type OutputIntent,
+	readIccProfile,
+	resolveOutputIntent,
+	type ResolvedOutputIntent,
+	SRGB_OUTPUT_INTENT,
+	SRGB_PROFILE,
+} from "./icc";
+export {
 	base64ToBytes,
 	type ByteLoader,
 	bytesToBase64,

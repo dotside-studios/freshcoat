@@ -3,7 +3,7 @@ import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	unpackTemplate,
 } from "@freshcoat-js/coatfile/coat";
-import { jpegHeader } from "@freshcoat-js/test-utils";
+import { iccProfile, jpegHeader } from "@freshcoat-js/test-utils";
 import {
 	strFromU8,
 	strToU8,
@@ -19,6 +19,7 @@ import {
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
 } from "./archive";
+import { readOutputProfile } from "./output-intent";
 import { exportSize, pdfLayout } from "./plan";
 import {
 	backSha,
@@ -314,6 +315,117 @@ describe("packWorkspace", () => {
 		expect(again.ok && again.workspace.templates[0].binding?.view).toEqual(
 			view,
 		);
+	});
+
+	describe("output intents", () => {
+		const pdfPreset = (
+			id: string,
+			outputIntent: ExportPreset["outputIntent"],
+		): ExportPreset => ({
+			...(ws.presets[0] as ExportPreset),
+			id,
+			name: id,
+			format: "pdf",
+			...(outputIntent ? { outputIntent } : {}),
+		});
+		const profile = async (description: string) => {
+			const read = await readOutputProfile(
+				iccProfile({ description }),
+				`${description}.icc`,
+				description === "Coated FOGRA39" ? "FOGRA39" : undefined,
+			);
+			if (!read.ok) throw new Error(read.message);
+			return read.profile;
+		};
+
+		it("stores a profile once however many presets name it", async () => {
+			const fogra = await profile("Coated FOGRA39");
+			const unused = await profile("Unused");
+			const intent = { kind: "profile", sha256: fogra.sha256 } as const;
+			const w: Workspace = {
+				...ws,
+				presets: [
+					pdfPreset("p_a", intent),
+					pdfPreset("p_b", intent),
+					pdfPreset("p_c", { kind: "none" }),
+					pdfPreset("p_d", { kind: "srgb" }),
+					pdfPreset("p_e", undefined),
+				],
+				profiles: [fogra, unused],
+			};
+			const files = unzipSync(await packed(w));
+			const manifest = manifestOf(files);
+			expect(manifest.formatVersion).toBe("1.3");
+			expect(manifest.profiles).toEqual([
+				{
+					sha256: fogra.sha256,
+					name: "Coated FOGRA39.icc",
+					identifier: "FOGRA39",
+					path: `profiles/${fogra.sha256}.icc`,
+				},
+			]);
+			expect(
+				Object.keys(files).filter((name) => name.startsWith("profiles/")),
+			).toEqual([`profiles/${fogra.sha256}.icc`]);
+			expect(manifest.presets.map((p: ExportPreset) => p.outputIntent)).toEqual(
+				[intent, intent, { kind: "none" }, { kind: "srgb" }, undefined],
+			);
+
+			const result = await unpackWorkspace(zipSync(files));
+			expect(result.ok && result.warnings).toEqual([]);
+			if (!result.ok) throw new Error(result.message);
+			expect(result.workspace.profiles).toEqual([fogra]);
+			expect(result.workspace.presets).toEqual(w.presets);
+			const again = unzipSync(await packed(result.workspace));
+			expect(again[`profiles/${fogra.sha256}.icc`]).toEqual(fogra.bytes);
+		});
+
+		it("writes 1.0 and no profiles when no preset has an intent", async () => {
+			const files = unzipSync(
+				await packed({ ...ws, profiles: [await profile("Unused")] }),
+			);
+			expect(manifestOf(files).formatVersion).toBe("1.0");
+			expect(manifestOf(files).profiles).toBeUndefined();
+		});
+
+		it("warns of a preset whose profile is missing", async () => {
+			const result = await repack((f) => {
+				const m = manifestOf(f);
+				m.presets[0].format = "pdf";
+				m.presets[0].outputIntent = { kind: "profile", sha256: "0".repeat(64) };
+				f["workspace.json"] = strToU8(JSON.stringify(m));
+			});
+			expect(result.ok && result.warnings).toEqual([
+				`${ws.presets[0]?.name}: the output intent's profile is missing; the preset cannot export a PDF until one is chosen`,
+			]);
+		});
+
+		it("refuses a profile that is not one, or does not match its hash", async () => {
+			const fogra = await profile("Coated FOGRA39");
+			const w: Workspace = {
+				...ws,
+				presets: [pdfPreset("p_a", { kind: "profile", sha256: fogra.sha256 })],
+				profiles: [fogra],
+			};
+			const path = `profiles/${fogra.sha256}.icc`;
+			const edit = async (bytes: Uint8Array) => {
+				const files = unzipSync(await packed(w));
+				files[path] = new Uint8Array(bytes);
+				return unpackWorkspace(zipSync(files));
+			};
+			const bad = await edit(iccProfile({ deviceClass: "abst" }));
+			expect(!bad.ok && bad.code).toBe("invalid_entry");
+			expect(!bad.ok && bad.message).toMatch(
+				/does not describe an output device/,
+			);
+			const other = await edit(iccProfile({ description: "Other" }));
+			expect(codeOf(other)).toBe("asset_hash_mismatch");
+			const files = unzipSync(await packed(w));
+			delete files[path];
+			expect(codeOf(await unpackWorkspace(zipSync(files)))).toBe(
+				"missing_entry",
+			);
+		});
 	});
 
 	it("refuses a view with an unknown filter op", async () => {
@@ -739,10 +851,10 @@ describe("unpackWorkspace rejections", () => {
 				f["workspace.json"] = strToU8(JSON.stringify(m));
 			});
 		expect(codeOf(await withVersion("2.0"))).toBe("newer_version");
-		const minor = await withVersion("1.3");
+		const minor = await withVersion("1.4");
 		expect(minor.ok).toBe(true);
 		expect(minor.ok && minor.warnings).toHaveLength(1);
-		const read = await withVersion("1.2");
+		const read = await withVersion("1.3");
 		expect(read.ok && read.warnings).toEqual([]);
 	});
 

@@ -76,6 +76,7 @@ templates/<id>.coat               each template, in coatfile's own format
 data/<id>/schema.json             the dataset's columns as JSON Schema
 data/<id>/records.json            its records and their export status
 data/<id>/assets/<sha256>.<ext>   photos, referenced from records as ws:<sha256>
+profiles/<sha256>.icc             ICC profiles PDF presets' output intents name
 ```
 
 Templates inside are ordinary `.coat` files: a template opened on its own
@@ -345,6 +346,26 @@ image. A card printed with correction is rendered as a PNG. Each font file is
 stored once in the assembled PDF, however many cards use it. A gray or RGB
 JPEG carrying an ICC profile, as the engine's JPEGs carry sRGB, is drawn in an
 `ICCBased` space holding that profile, each distinct profile stored once.
+
+Every assembled PDF declares an output intent, as the engine's
+[Output intent](../engine/README.md#output-intent) describes: sRGB by default,
+with each page's `/DefaultRGB` set to the same sRGB profile. `assemblePdf()`
+takes `outputIntent`, the engine's `{ profile, identifier?, info?, registry? }`
+for a press's profile such as FOGRA39, or `false` for none; an unusable profile
+fails before anything is embedded. The profile streams that vector pages carry
+are folded into one per distinct profile.
+
+A preset's `outputIntent` is `{ kind: "srgb" }` (the default),
+`{ kind: "none" }`, or `{ kind: "profile", sha256 }`, which names one of the
+workspace's `profiles`. `readOutputProfile(bytes, name, identifier?)` checks a
+file and gives the `IccProfileAsset` to keep there, and
+`presetOutputIntent(workspace, preset)` turns a preset's choice into what
+`assemblePdf()` takes, throwing `MissingProfileError` when the profile is not
+in the workspace. An export job asks for it before it renders anything. A
+profile is written to the archive once, under `profiles/<sha256>.icc`, however
+many presets name it, and one no preset names is left out. A workspace with an
+output intent is written at format 1.3; a 1.2 reader opens it without the
+intents, with a warning.
 
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`

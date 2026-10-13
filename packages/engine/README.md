@@ -265,6 +265,43 @@ and SVG images holding text or filters. Bitmaps are drawn without smoothing.
 Everything beneath a backdrop blur, or the whole page under a frame finish, is
 one image. Each image layer is reported once as a `vector_rasterized` warning.
 
+### Output intent
+
+Every PDF declares an output intent in its catalog's `/OutputIntents`: a
+`GTS_PDFX` intent whose `/DestOutputProfile` is the sRGB IEC61966-2.1 profile
+the engine bundles ([`icc/sRGB-v2-magic.icc`](icc/sRGB-v2-magic.icc), 736
+bytes, CC0), with `/OutputConditionIdentifier` and `/Info` set to
+`sRGB IEC61966-2.1` and `/RegistryName` to `http://www.color.org`. No
+`GTS_PDFXVersion` or PDF/A metadata is written, so the file claims neither
+PDF/X nor PDF/A conformance; the intent only tells a RIP what the content was
+prepared for.
+
+The `outputIntent` option of `renderPdf` and `paintPdf` takes another
+profile, such as a print shop's FOGRA39 or GRACoL CMYK profile:
+
+```ts
+await renderer.renderPdf(scene, {
+	width,
+	height,
+	outputIntent: { profile: fogra39, identifier: "FOGRA39", registry: "http://www.color.org" },
+});
+```
+
+`identifier` and `info` default to the profile's own description. Content stays
+RGB; the intent names the condition the RIP converts it to. `false` writes no
+intent. The profile must be an ICC v2 to v4 printer (`prtr`) or display
+(`mntr`) profile in gray, RGB or CMYK, whose header size matches its length and
+carries the `acsp` signature; anything else is refused with an error naming
+what is wrong. `readIccProfile` on `@freshcoat-js/engine/icc` runs the same
+checks and reads the description.
+
+While an intent is declared, the page's resources map `/DefaultRGB` to an
+`ICCBased` sRGB space and its transparency groups blend in it, so the
+`DeviceRGB` fills, gradients and images are read as sRGB under a CMYK intent
+too. The profile is one stream per PDF, shared with the intent when that is
+sRGB and with any JPEG carrying the same bytes. With `false`, everything stays
+`DeviceRGB` and nothing is tagged.
+
 ## Subpaths
 
 The barrel stays free of DOM and Node APIs; platform code lives on its own
@@ -279,6 +316,7 @@ subpath.
 | `@freshcoat-js/engine/pdf` | `paintPdf`, the PDF painter `renderPdf` and `paintPdf` call, for a runtime of your own; `mergeFontSubsets` and `subsetTag` for joining the font subsets of several PDFs |
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
+| `@freshcoat-js/engine/icc` | `SRGB_PROFILE`, the bundled sRGB profile; `readIccProfile`, which checks a profile can be a PDF's destination output profile and reads its description; `SRGB_OUTPUT_INTENT` and `resolveOutputIntent` |
 | `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, `rgbIdat` for passing an RGB PNG's data through as is, and `jpegFrame`, `jpegIccProfile` and `iccComponents` for passing a JPEG through with its ICC profile |
 
 ## Staying warm
@@ -338,7 +376,11 @@ underlying model.
   the PNG spec gives alongside it, for readers that do not know `sRGB`.
   Skia's PNG writer, used only as a fallback, writes an `sRGB` chunk. JPEG and
   WebP come from Skia's encoders, which embed the snapshot's sRGB ICC profile.
-  JPEG is flattened over white first.
+  JPEG is flattened over white first. A PDF declares an sRGB output intent and
+  tags its RGB content as sRGB through `/DefaultRGB` (see
+  [Output intent](#output-intent)). A caller's CMYK intent changes what the
+  PDF says it was prepared for, not its content: no colour is converted to
+  CMYK here, and there is no soft-proof.
 
 ## Conformance
 

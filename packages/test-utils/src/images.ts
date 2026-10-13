@@ -177,3 +177,47 @@ export function webpVp8l(width: number, height: number): Uint8Array {
 export function webpVp8x(width: number, height: number): Uint8Array {
 	return riff("VP8X", [0x08, 0, 0, 0, ...le24(width - 1), ...le24(height - 1)]);
 }
+
+/** An ICC profile header, tag table and description: enough for a header
+ *  reader and a PDF's output intent, not a profile a CMM could use. */
+export function iccProfile({
+	space = "CMYK",
+	deviceClass = "prtr",
+	description = "Test CMYK",
+	version = 2,
+}: {
+	space?: "GRAY" | "RGB " | "CMYK" | "Lab ";
+	deviceClass?: string;
+	description?: string;
+	version?: number;
+} = {}): Uint8Array {
+	const desc =
+		version >= 4
+			? concat([
+					text("mluc"),
+					be32(0),
+					be32(1),
+					be32(12),
+					text("enUS"),
+					be32(description.length * 2),
+					be32(28),
+					[...description].flatMap((c) => be16(c.charCodeAt(0))),
+				])
+			: concat([
+					text("desc"),
+					be32(0),
+					be32(description.length + 1),
+					text(description),
+					[0],
+				]);
+	const size = 128 + 4 + 12 + desc.length;
+	const header = new Uint8Array(128);
+	header.set(be32(size), 0);
+	header.set(text("test"), 4);
+	header.set([version, 0x10, 0, 0], 8);
+	header.set(text(deviceClass), 12);
+	header.set(text(space), 16);
+	header.set(text("Lab "), 20);
+	header.set(text("acsp"), 36);
+	return concat([header, be32(1), text("desc"), be32(144), be32(desc.length), desc]);
+}

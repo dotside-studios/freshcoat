@@ -19,6 +19,7 @@ import {
 	missingGlyphs,
 	type Node,
 	type Output,
+	type OutputIntent,
 	type PdfFrame,
 	type Renderer,
 	resolveExportScale,
@@ -313,6 +314,8 @@ export type RenderCompiledPdfOptions = {
 	dpi?: number;
 	title?: string;
 	date?: Date;
+	/** Default sRGB; false for none. See the engine's "PDF output". */
+	outputIntent?: OutputIntent | false;
 };
 
 // Paint each side of a compiled template as one PDF page of vectors. A layer a
@@ -326,7 +329,7 @@ export async function renderCompiledPdf(
 		(f) => !options.frameNames || options.frameNames.includes(f.name),
 	);
 	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
-	const { images, dpi, title, date } = options;
+	const { images, dpi, title, date, outputIntent } = options;
 	const results: TemplatePdfFrame[] = [];
 	for (const f of frames) {
 		const commands = renderer.compile(f.root as Node, {
@@ -335,7 +338,13 @@ export async function renderCompiledPdf(
 			fonts: f.assets.fonts,
 			images: f.assets.images,
 		});
-		const page = await renderer.paintPdf(commands, { images, dpi, title, date });
+		const page = await renderer.paintPdf(commands, {
+			images,
+			dpi,
+			title,
+			date,
+			...(outputIntent !== undefined ? { outputIntent } : {}),
+		});
 		results.push({
 			...page,
 			warnings: [...(f.warnings ?? []), ...page.warnings],
