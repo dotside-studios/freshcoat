@@ -65,6 +65,14 @@ export function parseLength(entry: string): number {
 	return value;
 }
 
+export function parseCopies(entry: string): number | "fill" {
+	if (entry.toLowerCase() === "fill") return "fill";
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 1)
+		throw new ArgumentError("Expected a whole number, 1 or more, or fill.");
+	return value;
+}
+
 export function parsePaper(
 	entry: string,
 ): PaperName | { widthMm: number; heightMm: number } {
@@ -77,4 +85,20 @@ export function parsePaper(
 			`Expected ${Object.keys(PAPER_SIZES_MM).join(", ")} or <width>x<height> in millimetres.`,
 		);
 	return { widthMm: Math.min(width, height), heightMm: Math.max(width, height) };
+}
+
+export const SHEET_MARKS = ["crop", "registration", "colorbar", "slug"] as const;
+export type SheetMark = (typeof SHEET_MARKS)[number];
+
+export function parseMarks(entry: string): SheetMark[] {
+	const names = entry
+		.toLowerCase()
+		.split(",")
+		.map((name) => name.trim())
+		.filter(Boolean);
+	if (names.length === 1 && names[0] === "none") return [];
+	const unknown = names.filter((name) => !(SHEET_MARKS as readonly string[]).includes(name));
+	if (names.length === 0 || unknown.length > 0)
+		throw new ArgumentError(`Expected none, or a list of ${SHEET_MARKS.join(", ")}.`);
+	return [...new Set(names as SheetMark[])];
 }

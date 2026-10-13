@@ -30,6 +30,7 @@ import {
 } from "@freshcoat-js/workspace";
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
 import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
+import type { SheetMark } from "../args";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { readBytes, readTemplate, warnLoad } from "../template-file";
 import {
@@ -69,7 +70,9 @@ export type BatchOptions = {
 	duplex?: "long" | "short";
 	margin?: number;
 	gap?: number;
+	copies?: number | "fill";
 	cropMarks?: boolean;
+	marks?: SheetMark[];
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
@@ -166,10 +169,15 @@ export async function renderBatch(
 					layout: {
 						...DEFAULT_SHEET_LAYOUT,
 						paper: options.sheets,
-						cropMarks: options.cropMarks ?? true,
+						cropMarks:
+							options.cropMarks !== false && (options.marks?.includes("crop") ?? true),
+						...(options.marks?.includes("registration") ? { registrationMarks: true } : {}),
+						...(options.marks?.includes("colorbar") ? { colorBar: true } : {}),
+						...(options.marks?.includes("slug") ? { slug: true } : {}),
 						duplex: options.duplex ? `${options.duplex}-edge` : "none",
 						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
 						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
+						...(options.copies !== undefined ? { copies: options.copies } : {}),
 					},
 				}
 			: {}),

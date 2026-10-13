@@ -650,6 +650,9 @@
 											}
 										}
 									},
+									"hidden": {
+										"type": "boolean"
+									},
 									"visibleWhen": {
 										"anyOf": [
 											{
@@ -1936,6 +1939,9 @@
 											}
 										}
 									},
+									"hidden": {
+										"type": "boolean"
+									},
 									"visibleWhen": {
 										"anyOf": [
 											{
@@ -2809,6 +2815,9 @@
 															]
 														}
 													}
+												},
+												"hidden": {
+													"type": "boolean"
 												},
 												"visibleWhen": {
 													"anyOf": [
@@ -4096,6 +4105,9 @@
 														}
 													}
 												},
+												"hidden": {
+													"type": "boolean"
+												},
 												"visibleWhen": {
 													"anyOf": [
 														{
@@ -5075,6 +5087,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -6314,6 +6329,9 @@
 										}
 									}
 								},
+								"hidden": {
+									"type": "boolean"
+								},
 								"visibleWhen": {
 									"anyOf": [
 										{
@@ -7133,6 +7151,9 @@
 										}
 									}
 								},
+								"hidden": {
+									"type": "boolean"
+								},
 								"visibleWhen": {
 									"anyOf": [
 										{
@@ -7524,6 +7545,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -7942,6 +7966,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -9229,6 +9256,9 @@
 										}
 									}
 								},
+								"hidden": {
+									"type": "boolean"
+								},
 								"visibleWhen": {
 									"anyOf": [
 										{
@@ -10500,6 +10530,9 @@
 									]
 								}
 							}
+						},
+						"hidden": {
+							"type": "boolean"
 						},
 						"visibleWhen": {
 							"anyOf": [
@@ -11901,6 +11934,9 @@
 									]
 								}
 							}
+						},
+						"hidden": {
+							"type": "boolean"
 						},
 						"visibleWhen": {
 							"anyOf": [

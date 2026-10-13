@@ -831,6 +831,61 @@ describe("render export options", () => {
 		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
 	});
 
+	test("draws the printer's marks --marks names", async () => {
+		const marked = async (...flags: string[]) => {
+			const run = await box.run("render", "badge.json", "--sheets", "a4", ...flags, "--out", "marks.pdf", "-q");
+			expect(run.code).toBe(0);
+			const page = (await PDFDocument.load(await readFile(box.path("marks.pdf")))).getPage(0);
+			const contents = page.node.Contents();
+			const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => page.doc.context.lookup(ref)) : [contents];
+			const text = streams
+				.map((stream) =>
+					stream instanceof PDFRawStream
+						? new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode())
+						: "",
+				)
+				.join("\n");
+			const tokens = text.split(/\s+/);
+			return {
+				strokes: tokens.filter((t) => t === "S").length,
+				fills: tokens.filter((t) => t === "f").length,
+				slug: tokens.includes("Tj"),
+			};
+		};
+		const crop = await marked();
+		expect(crop.strokes).toBeGreaterThan(0);
+		expect(crop).toMatchObject({ fills: 0, slug: false });
+		expect(await marked("--marks", "none")).toEqual({ strokes: 0, fills: 0, slug: false });
+		expect(await marked("--marks", "colorbar,slug", "--no-crop-marks")).toEqual({
+			strokes: 1,
+			fills: 12,
+			slug: true,
+		});
+		const all = await marked("--marks", "crop,registration,colorbar,slug", "--no-crop-marks");
+		expect(all).toEqual({ strokes: 4 * 3 + 1, fills: 12, slug: true });
+	});
+
+	test("fills a sheet with copies of one card", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--frame",
+			"front",
+			"--sheets",
+			"a4",
+			"--copies",
+			"fill",
+			"--out",
+			"filled.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("filled.pdf")));
+		expect(pdf.getPageCount()).toBe(1);
+		const dry = await box.run("render", "badge.json", "--frame", "front", "--sheets", "a4", "--copies", "fill", "--out", "filled.pdf", "--dry-run");
+		expect(dry.stdout).toMatch(/, (\d+) per sheet · 1 sheet · \1 copies each\n$/);
+	});
+
 	test("lays cards out on a5 and a6 paper", async () => {
 		for (const [paper, page] of [
 			["a5", /^0 0 (420 595|595 420)$/],

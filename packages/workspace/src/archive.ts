@@ -164,9 +164,15 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 		marginMm: z.number().min(0),
 		gapMm: z.number().min(0),
 		cropMarks: z.boolean(),
+		registrationMarks: z.boolean().optional(),
+		colorBar: z.boolean().optional(),
+		slug: z.boolean().optional(),
 		duplex: z.enum(["none", "long-edge", "short-edge"]),
 		backOffsetMm: z.object({ x: z.number(), y: z.number() }).optional(),
 		blankBacks: z.boolean().optional(),
+		copies: z
+			.union([z.number().int().positive(), z.literal("fill")])
+			.optional(),
 	}),
 ]);
 

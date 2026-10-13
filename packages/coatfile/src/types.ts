@@ -163,6 +163,7 @@ export interface ElementShell {
 	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;
+	hidden?: boolean;
 	visibleWhen?: VisibilityCondition | VisibilityCondition[];
 }
 

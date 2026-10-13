@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+	COLOR_BAR_STEPS,
 	cropMarks,
 	DEFAULT_SHEET_LAYOUT,
 	type ImposeItem,
 	imposeSheets,
 	minGapMm,
 	SheetLayoutError,
+	sheetMarks,
 	sheetSummary,
+	slugText,
 } from "./impose";
 import type { SheetLayout } from "./types";
 
@@ -391,6 +394,131 @@ describe("imposeSheets", () => {
 		});
 	});
 
+	describe("copies", () => {
+		const names = (page?: { slots: { item: Item }[] }) =>
+			page?.slots.map((s) => s.item.name);
+
+		it("repeats each record's item before the next record", () => {
+			const out = imposeSheets(items(4), CR80, layout({ copies: 3 }));
+			expect(out.copies).toBe(3);
+			expect(out.sheets).toBe(2);
+			expect(names(out.pages[0])).toEqual([
+				"1f",
+				"1f",
+				"1f",
+				"2f",
+				"2f",
+				"2f",
+				"3f",
+				"3f",
+				"3f",
+				"4f",
+			]);
+			expect(names(out.pages[1])).toEqual(["4f", "4f"]);
+			expect(sheetSummary(out)).toBe("10 per sheet · 2 sheets · 3 copies each");
+		});
+
+		it("repeats each side single-sided", () => {
+			const out = imposeSheets(items(1, 2), CR80, layout({ copies: 2 }));
+			expect(names(out.pages[0])).toEqual(["1f", "1f", "1b", "1b"]);
+		});
+
+		it("fills a sheet per record", () => {
+			const out = imposeSheets(items(2), CR80, layout({ copies: "fill" }));
+			expect(out.copies).toBe(10);
+			expect(out.pages).toHaveLength(2);
+			expect(names(out.pages[0])).toEqual(Array(10).fill("1f"));
+			expect(names(out.pages[1])).toEqual(Array(10).fill("2f"));
+			expect(sheetSummary(out)).toBe(
+				"10 per sheet · 2 sheets · 10 copies each",
+			);
+		});
+
+		it("fills by the orientation that fits more", () => {
+			const out = imposeSheets(
+				items(1),
+				{ widthMm: 50, heightMm: 30 },
+				layout({ orientation: "auto", copies: "fill" }),
+			);
+			expect(out.pages[0]?.slots).toHaveLength(out.perSheet);
+			expect(out.copies).toBe(out.perSheet);
+		});
+
+		it("puts each copy's back behind its own front", () => {
+			const out = imposeSheets(
+				items(2, 2),
+				CR80,
+				layout({
+					duplex: "long-edge",
+					copies: 3,
+					backOffsetMm: { x: 1, y: 2 },
+				}),
+			);
+			expect(placed(out.pages[0] as never)).toEqual([
+				["1f", 19.4, 13.5],
+				["1f", 105, 13.5],
+				["1f", 19.4, 67.5],
+				["2f", 105, 67.5],
+				["2f", 19.4, 121.5],
+				["2f", 105, 121.5],
+			]);
+			expect(placed(out.pages[1] as never)).toEqual([
+				["1b", 106, 15.5],
+				["1b", 20.4, 15.5],
+				["1b", 106, 69.5],
+				["2b", 20.4, 69.5],
+				["2b", 106, 123.5],
+				["2b", 20.4, 123.5],
+			]);
+		});
+
+		it("fills front and back pages under duplex, short edge", () => {
+			const out = imposeSheets(
+				items(2, 2),
+				CR80,
+				layout({ duplex: "short-edge", copies: "fill" }),
+			);
+			expect(
+				out.pages.map((p) => [p.side, names(p)?.[0], p.slots.length]),
+			).toEqual([
+				["front", "1f", 10],
+				["back", "1b", 10],
+				["front", "2f", 10],
+				["back", "2b", 10],
+			]);
+			const fronts = out.pages[0]?.slots ?? [];
+			const backs = out.pages[1]?.slots ?? [];
+			const at = (s: { xMm: number; yMm: number }) =>
+				`${round(s.xMm)},${round(s.yMm)}`;
+			expect(new Set(backs.map(at))).toEqual(new Set(fronts.map(at)));
+		});
+
+		it("keeps blank backs for a one-sided template's copies", () => {
+			const out = imposeSheets(
+				items(1),
+				CR80,
+				layout({ duplex: "long-edge", blankBacks: true, copies: 4 }),
+			);
+			expect(out.pages.map((p) => [p.side, p.slots.length])).toEqual([
+				["front", 4],
+				["back", 0],
+			]);
+		});
+
+		it("crops the whole grid of a filled sheet", () => {
+			const one = imposeSheets(items(1), CR80, layout());
+			const filled = imposeSheets(items(1), CR80, layout({ copies: "fill" }));
+			expect(cropMarks(filled)).toEqual(cropMarks(one));
+		});
+
+		it("refuses copies that aren't a whole number from 1", () => {
+			for (const copies of [0, -1, 1.5, Number.NaN])
+				expect(() => imposeSheets(items(1), CR80, layout({ copies }))).toThrow(
+					SheetLayoutError,
+				);
+		});
+	});
+
 	describe("errors", () => {
 		const error = (fn: () => unknown) => {
 			try {
@@ -626,5 +754,140 @@ describe("bleed", () => {
 		// 2 × 4, margins only
 		expect(count(15)).toEqual([2, 4, 4 * 2 + 8 * 2]);
 		expect(count(16)).toEqual([2, 4, 4 * (2 + 2 * 3) + 8 * (2 + 2 * 1)]);
+	});
+});
+
+describe("sheetMarks", () => {
+	const all = (overrides: Partial<SheetLayout> = {}) =>
+		layout({
+			registrationMarks: true,
+			colorBar: true,
+			slug: true,
+			...overrides,
+		});
+	const at = (t: { x: number; y: number }) => [round(t.x), round(t.y)];
+
+	it("draws only crop marks by default, and none on backs", () => {
+		const imposition = imposeSheets(items(2, 2), CR80, {
+			...DEFAULT_SHEET_LAYOUT,
+			duplex: "long-edge",
+		});
+		const front = sheetMarks(imposition, DEFAULT_SHEET_LAYOUT, "front");
+		expect(front).toEqual({
+			crop: cropMarks(imposition),
+			registration: [],
+			colorBar: [],
+			slug: null,
+		});
+		expect(sheetMarks(imposition, DEFAULT_SHEET_LAYOUT, "back").crop).toEqual(
+			[],
+		);
+	});
+
+	it("centres a target in each margin, off the crop marks", () => {
+		const imposition = imposeSheets(items(10), CR80, all());
+		const { registration } = sheetMarks(imposition, all(), "any");
+		// the middle column cut at 105 mm pushes top and bottom targets aside
+		expect(registration.map(at)).toEqual([
+			[109, 6.75],
+			[109, 290.25],
+			[9.7, 148.5],
+			[200.3, 148.5],
+		]);
+		const bare = sheetMarks(imposition, all({ cropMarks: false }), "any");
+		expect(bare.registration.map(at)).toEqual([
+			[105, 6.75],
+			[105, 290.25],
+			[9.7, 148.5],
+			[200.3, 148.5],
+		]);
+	});
+
+	it("puts a back's targets behind its front's", () => {
+		const options = all({
+			duplex: "long-edge",
+			backOffsetMm: { x: 1, y: -2 },
+		});
+		const imposition = imposeSheets(items(10, 2), CR80, options);
+		const back = sheetMarks(imposition, options, "back");
+		expect(back.registration.map(at)).toEqual([
+			[102, 4.75],
+			[102, 288.25],
+			[201.3, 146.5],
+			[10.7, 146.5],
+		]);
+		const short = all({ duplex: "short-edge" });
+		const flipped = sheetMarks(
+			imposeSheets(items(10, 2), CR80, short),
+			short,
+			"back",
+		);
+		expect(flipped.registration.map(at)).toEqual([
+			[109, 290.25],
+			[109, 6.75],
+			[9.7, 148.5],
+			[200.3, 148.5],
+		]);
+	});
+
+	it("lays the colour bar and slug outside the crop marks, short of a target", () => {
+		const imposition = imposeSheets(items(10), CR80, all());
+		const { colorBar, slug } = sheetMarks(imposition, all(), "any");
+		expect(colorBar).toHaveLength(COLOR_BAR_STEPS.length);
+		expect(at(colorBar[0] as { x: number; y: number })).toEqual([19.4, 290.75]);
+		const last = colorBar[colorBar.length - 1];
+		expect(round((last?.x ?? 0) + (last?.sizeMm ?? 0))).toBeLessThanOrEqual(
+			105,
+		);
+		for (const patch of colorBar) expect(patch.y).toBeGreaterThan(283.5 + 5);
+		expect(slug).not.toBeNull();
+		expect(round(slug?.x ?? 0)).toBe(19.4);
+		expect(round(slug?.widthMm ?? 0)).toBe(85.6);
+		expect((slug?.y ?? 0) + (slug?.heightMm ?? 0)).toBeLessThan(13.5 - 5);
+	});
+
+	it("leaves out a mark its margin has no room for", () => {
+		const tight = layout({
+			paper: { widthMm: 64, heightMm: 95.6 },
+			orientation: "landscape",
+			marginMm: 5,
+		});
+		const options = {
+			...tight,
+			registrationMarks: true,
+			colorBar: true,
+			slug: true,
+		};
+		const imposition = imposeSheets(items(1), CR80, tight);
+		expect(sheetMarks(imposition, options, "any")).toMatchObject({
+			registration: [],
+			colorBar: [],
+			slug: null,
+		});
+		const bare = sheetMarks(
+			imposition,
+			{ ...options, cropMarks: false },
+			"any",
+		);
+		expect(bare.registration).toEqual([]);
+		expect(bare.colorBar).toHaveLength(COLOR_BAR_STEPS.length);
+		expect(bare.slug).not.toBeNull();
+	});
+});
+
+describe("slugText", () => {
+	const date = new Date("2026-10-13T12:00:00Z");
+
+	it("names the job, sheet, side and date", () => {
+		const imposition = imposeSheets(
+			items(12, 2),
+			CR80,
+			layout({ duplex: "long-edge" }),
+		);
+		expect(slugText(imposition, 3, { job: "Members", date })).toBe(
+			"Members · Sheet 2 of 2 · Back · 2026-10-13",
+		);
+		const single = imposeSheets(items(12), CR80, layout());
+		expect(slugText(single, 0, { date })).toBe("Sheet 1 of 2 · 2026-10-13");
 	});
 });
