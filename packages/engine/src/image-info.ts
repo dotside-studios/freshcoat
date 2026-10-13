@@ -115,6 +115,113 @@ export function rgbIdat(
 	return { width, height, data };
 }
 
+/** The size and component count of a baseline or progressive JPEG, the
+ *  frames a PDF can carry as DCTDecode, or null for any other. */
+export function jpegFrame(
+	b: Uint8Array,
+): { width: number; height: number; components: number } | null {
+	if (b[0] !== 0xff || b[1] !== 0xd8) return null;
+	let i = 2;
+	while (i + 9 < b.length) {
+		if (b[i] !== 0xff) return null;
+		const marker = b[i + 1] as number;
+		if (
+			marker === 0xd8 ||
+			(marker >= 0xd0 && marker <= 0xd7) ||
+			marker === 0x01
+		) {
+			i += 2;
+			continue;
+		}
+		const length = ((b[i + 2] as number) << 8) | (b[i + 3] as number);
+		if (
+			marker >= 0xc0 &&
+			marker <= 0xcf &&
+			marker !== 0xc4 &&
+			marker !== 0xc8 &&
+			marker !== 0xcc
+		) {
+			if (marker !== 0xc0 && marker !== 0xc1 && marker !== 0xc2) return null;
+			return {
+				height: ((b[i + 5] as number) << 8) | (b[i + 6] as number),
+				width: ((b[i + 7] as number) << 8) | (b[i + 8] as number),
+				components: b[i + 9] as number,
+			};
+		}
+		i += 2 + length;
+	}
+	return null;
+}
+
+/** The ICC profile a JPEG embeds in its APP2 ICC_PROFILE segments, joined in
+ *  sequence order. "none" when it carries no profile, "invalid" when a segment
+ *  is truncated, missing, repeated or disagrees on how many there are. */
+export function jpegIccProfile(b: Uint8Array): Uint8Array | "none" | "invalid" {
+	if (sniffImageType(b) !== "image/jpeg") return "none";
+	const chunks: Uint8Array[] = [];
+	let count = 0;
+	let i = 2;
+	for (;;) {
+		while (i < b.length && b[i] !== 0xff) i++;
+		while (i < b.length && b[i] === 0xff) i++;
+		if (i >= b.length) break;
+		const marker = b[i] as number;
+		i++;
+		if (
+			marker === 0xd8 ||
+			marker === 0x01 ||
+			(marker >= 0xd0 && marker <= 0xd7)
+		)
+			continue;
+		if (marker === 0xd9 || marker === 0xda) break;
+		if (i + 2 > b.length) break;
+		const end = i + u16be(b, i);
+		if (marker === 0xe2 && ascii(b, i + 2, 12) === "ICC_PROFILE\0") {
+			if (end > b.length || end < i + 16) return "invalid";
+			const seq = b[i + 14] as number;
+			const total = b[i + 15] as number;
+			if (count === 0) count = total;
+			if (total !== count || seq < 1 || seq > count || chunks[seq - 1])
+				return "invalid";
+			chunks[seq - 1] = b.subarray(i + 16, end);
+		}
+		i = end;
+	}
+	if (count === 0) return "none";
+	let size = 0;
+	for (let n = 0; n < count; n++) {
+		const chunk = chunks[n];
+		if (!chunk) return "invalid";
+		size += chunk.length;
+	}
+	const out = new Uint8Array(size);
+	let at = 0;
+	for (const chunk of chunks) {
+		out.set(chunk, at);
+		at += chunk.length;
+	}
+	return out;
+}
+
+/** How many components an ICC profile's colour space has: 1 for gray, 3 for
+ *  RGB, 4 for CMYK, or null when the header is not a profile's or names
+ *  another space. */
+export function iccComponents(profile: Uint8Array): number | null {
+	if (profile.length < 128 || u32be(profile, 0) !== profile.length)
+		return null;
+	if (ascii(profile, 36, 4) !== "acsp") return null;
+	switch (ascii(profile, 16, 4)) {
+		case "GRAY":
+			return 1;
+		case "RGB ":
+			return 3;
+		case "CMYK":
+			return 4;
+		default:
+			return null;
+	}
+}
+
 function parse(b: Uint8Array): Parsed {
 	if (b.length < 4) return b.length === 0 ? null : "more";
 	if (b.length < 12 && ascii(b, 0, 4) === "RIFF") return "more";

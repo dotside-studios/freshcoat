@@ -24,7 +24,12 @@ import {
 	type SharedFontProvider,
 } from "../font-collection";
 import { exportPixelSize } from "../export-scale";
-import { parseImageInfo } from "../image-info";
+import {
+	iccComponents,
+	jpegFrame,
+	jpegIccProfile,
+	parseImageInfo,
+} from "../image-info";
 import { dataUrlToBytes } from "../loader";
 import { outlineGeometry, rectShape } from "../outline";
 import { createPaintCache } from "../paint-cache";
@@ -477,6 +482,10 @@ class PageBuilder {
 	private xobjectIds = new Map<number, string>();
 	private shadings: Record<string, PdfRef> = {};
 	private images = new Map<string, ImageEntry>();
+	private iccProfiles = new Map<
+		number,
+		Array<{ bytes: Uint8Array; ref: PdfRef }>
+	>();
 	private texts = new WeakMap<DrawTextCommand, TextPlan>();
 	private reported = new Set<string>();
 
@@ -1129,11 +1138,13 @@ class PageBuilder {
 		if (isSvg(bytes)) return null;
 		const jpeg = jpegFrame(bytes);
 		const info = jpeg ? parseImageInfo(bytes) : null;
-		if (
+		const space =
 			jpeg &&
 			(jpeg.components === 1 || jpeg.components === 3) &&
 			(info?.orientation ?? 1) === 1
-		)
+				? this.jpegColorSpace(bytes, jpeg.components)
+				: null;
+		if (jpeg && space)
 			return {
 				ref: this.w.stream(
 					{
@@ -1141,9 +1152,7 @@ class PageBuilder {
 						Subtype: name("Image"),
 						Width: jpeg.width,
 						Height: jpeg.height,
-						ColorSpace: name(
-							jpeg.components === 1 ? "DeviceGray" : "DeviceRGB",
-						),
+						ColorSpace: space,
 						BitsPerComponent: 8,
 						Filter: name("DCTDecode"),
 					},
@@ -1188,6 +1197,29 @@ class PageBuilder {
 		} finally {
 			img.delete();
 		}
+	}
+
+	// Null when the JPEG's profile is unusable, so it takes the decode path.
+	private jpegColorSpace(
+		bytes: Uint8Array,
+		components: number,
+	): PdfValue | null {
+		const profile = jpegIccProfile(bytes);
+		if (profile === "none")
+			return name(components === 1 ? "DeviceGray" : "DeviceRGB");
+		if (profile === "invalid" || iccComponents(profile) !== components)
+			return null;
+		const same = this.iccProfiles.get(profile.length) ?? [];
+		let entry = same.find((p) => sameBytes(p.bytes, profile));
+		if (!entry) {
+			entry = {
+				bytes: profile,
+				ref: this.w.flate({ N: components }, profile),
+			};
+			same.push(entry);
+			this.iccProfiles.set(profile.length, same);
+		}
+		return [name("ICCBased"), entry.ref];
 	}
 
 	private rgbaImage(
@@ -1309,41 +1341,10 @@ function imageSrcs(cmd: DrawCommand): string[] {
 	return [];
 }
 
-// The size and component count of a baseline or progressive JPEG.
-function jpegFrame(
-	b: Uint8Array,
-): { width: number; height: number; components: number } | null {
-	if (b[0] !== 0xff || b[1] !== 0xd8) return null;
-	let i = 2;
-	while (i + 9 < b.length) {
-		if (b[i] !== 0xff) return null;
-		const marker = b[i + 1] as number;
-		if (
-			marker === 0xd8 ||
-			(marker >= 0xd0 && marker <= 0xd7) ||
-			marker === 0x01
-		) {
-			i += 2;
-			continue;
-		}
-		const length = ((b[i + 2] as number) << 8) | (b[i + 3] as number);
-		if (
-			marker >= 0xc0 &&
-			marker <= 0xcf &&
-			marker !== 0xc4 &&
-			marker !== 0xc8 &&
-			marker !== 0xcc
-		) {
-			if (marker !== 0xc0 && marker !== 0xc1 && marker !== 0xc2) return null;
-			return {
-				height: ((b[i + 5] as number) << 8) | (b[i + 6] as number),
-				width: ((b[i + 7] as number) << 8) | (b[i + 8] as number),
-				components: b[i + 9] as number,
-			};
-		}
-		i += 2 + length;
-	}
-	return null;
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
 }
 
 function keyOf(v: PdfValue | undefined): string {

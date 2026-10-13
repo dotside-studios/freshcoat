@@ -337,6 +337,54 @@ describe("renderPdf", () => {
 		expect(body.includes(source(jpeg))).toBe(true);
 	});
 
+	test("tags a JPEG carrying an ICC profile with that profile", async () => {
+		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")));
+		const scene = frame([
+			createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 80 }, src: "a.jpg", fit: "fill" }),
+			createImage({ pos: { x: 100, y: 0 }, size: { width: 80, height: 80 }, src: "b.jpg", fit: "fill" }),
+		]);
+		const images = new Map([
+			["a.jpg", jpeg],
+			["b.jpg", jpeg.slice()],
+		]);
+		const pdf = await renderer.renderPdf(scene, { width: W, height: H, images });
+		expect(pdf.warnings).toEqual([]);
+		const body = source(pdf.bytes);
+		expect(body.includes(source(jpeg))).toBe(true);
+		expect(body).not.toMatch(/\/Subtype \/Image[^>]*\/DeviceRGB/);
+		const profiles = [...body.matchAll(/\/ColorSpace \[\/ICCBased (\d+) 0 R\]/g)];
+		expect(profiles.length).toBe(2);
+		expect(new Set(profiles.map((m) => m[1])).size).toBe(1);
+		expect(body).toMatch(new RegExp(`${profiles[0]?.[1]} 0 obj\\s*<<[^>]*/N 3`));
+		if (pdftoppm) {
+			const png = await renderer.render(scene, { width: W, height: H, images });
+			const { at } = compare(png.bytes, rasterize(pdf.bytes), [
+				[20, 40],
+				[60, 40],
+			]);
+			for (const d of at) expect(d).toBeLessThanOrEqual(4);
+		}
+	});
+
+	test("decodes a JPEG whose ICC profile does not fit it", async () => {
+		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")));
+		const at = source(jpeg).indexOf("ICC_PROFILE\0") + 14;
+		const gray = jpeg.slice();
+		gray.set(new TextEncoder().encode("GRAY"), at + 16);
+		const split = jpeg.slice();
+		split[at - 1] = 2;
+		for (const bytes of [gray, split]) {
+			const pdf = await renderer.renderPdf(
+				frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 80 }, src: "a.jpg", fit: "fill" })]),
+				{ width: W, height: H, images: new Map([["a.jpg", bytes]]) },
+			);
+			expect(pdf.warnings).toEqual([]);
+			const body = source(pdf.bytes);
+			expect(body).not.toContain("/DCTDecode");
+			expect(body).not.toContain("/ICCBased");
+		}
+	});
+
 	const masked = (id?: string) =>
 		createMask(
 			createEllipse({
