@@ -102,6 +102,7 @@ A `PrintTarget` bundles what one kind of printer needs:
 interface PrintTarget {
   id: string;                     // "ymcko-dye-sub"
   name: string;                   // for UI
+  shortName?: string;             // for tight UI, such as a closed select
   preset: PrintOptimizeOptions;   // photos, without per-image analysis
   recommend(stats: ImageStats): { recommendation; notes };
   finish: FrameFinish;            // the whole-frame finish
