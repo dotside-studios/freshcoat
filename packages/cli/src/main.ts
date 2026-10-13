@@ -8,6 +8,7 @@ import {
 import {
 	ArgumentError,
 	collect,
+	collectFilter,
 	collectScale,
 	collectSetting,
 	parseJobs,
@@ -168,6 +169,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 			] as const),
 		)
 		.option("--save", "write each record's export status back into the workspace")
+		.option(
+			"--where <filter>",
+			"export only records that match, such as tier=gold or points>=100; repeatable, with --data too",
+			arg(collectFilter),
+		)
 		.addHelpText(
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
