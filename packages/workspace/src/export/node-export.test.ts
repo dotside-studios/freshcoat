@@ -68,7 +68,7 @@ const card = (logoSrc: string): Template =>
 						size: { width: 240, height: 40 },
 						properties: {
 							value: "{{name}}",
-							font: { family: "Inter", size: 24 },
+							font: { family: "Inter", size: 26 },
 							color: "#111111",
 						},
 					},
@@ -91,7 +91,11 @@ const card = (logoSrc: string): Template =>
 						type: "barcode",
 						pos: { x: 20, y: 120 },
 						size: { width: 240, height: 110 },
-						properties: { value: "{{code}}", symbology: "code128" },
+						properties: {
+							value: "{{code}}",
+							symbology: "code128",
+							textSize: 26,
+						},
 					},
 				],
 			},
@@ -245,6 +249,29 @@ describe("export from a workspace file in Node", () => {
 		expect(rows[2]?.endsWith(',"Image prints at 6 DPI, under 300: logo"')).toBe(
 			true,
 		);
+	});
+
+	it("reports print checks on field-bound text in the export report", async () => {
+		const ws = fixture("logo.png", [
+			"Ana",
+			"Bartholomew Montgomery-Fairweather the Third",
+		]);
+		const name = ws.templates[0]?.template.template_data[0]?.elements[0];
+		if (name?.type === "text") name.properties.fit = "shrink";
+		const file = join(dir, "shrink.coatworkspace");
+		await writeFile(file, await (await packWorkspace(ws)).bytes());
+		const out = join(dir, "shrink.zip");
+		const { result } = await exportFrom(file, preset, fileOutput(out));
+		expect(result.items[0]?.warnings).toBeUndefined();
+		expect(result.items[1]?.warnings).toEqual([
+			expect.stringMatching(/^Text is [\d.]+ pt at print size, below 6 pt: name$/),
+		]);
+		const zip = unzipSync(new Uint8Array(await readFile(out)));
+		const rows = new TextDecoder()
+			.decode(zip[REPORT_FILE_NAME])
+			.trim()
+			.split("\r\n");
+		expect(rows[2]).toMatch(/,"Text is [\d.]+ pt at print size, below 6 pt: name"$/);
 	});
 
 	it("streams a zip to disk with a relative image source", async () => {

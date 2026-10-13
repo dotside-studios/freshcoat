@@ -7,6 +7,7 @@ import {
 	exportPixelSize,
 	type FrameWarning,
 	fitDesignSize,
+	type PrintCheckOptions,
 	hasInsets,
 	MAX_EXPORT_DIMENSION,
 	pieceSpec,
@@ -87,6 +88,8 @@ export type RenderRequest = {
 	/** warn for images that print below `min` at `dpi` design units to the
 	 *  inch */
 	imageDpi?: ImageDpiCheck;
+	/** run the print checks at `dpi` design units to the inch */
+	printChecks?: PrintCheckOptions;
 };
 
 export type RenderOutput = {
@@ -325,6 +328,7 @@ export function itemRequest(
 				? { cut: true as const }
 				: {}),
 			...(minImageDpi > 0 ? { imageDpi: { dpi, min: minImageDpi } } : {}),
+			printChecks: { dpi },
 		},
 	};
 }
@@ -481,6 +485,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					dpi: req.vector.dpi,
 					...(req.vector.untagged ? { outputIntent: false as const } : {}),
 					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
+					...(req.printChecks ? { printChecks: req.printChecks } : {}),
 				});
 				if (!page) throw new Error("nothing was rendered");
 				for (const w of page.warnings)
@@ -502,6 +507,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					images,
 					...(print ? { print } : {}),
 					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
+					...(req.printChecks ? { printChecks: req.printChecks } : {}),
 					exports: [
 						req.scale === 1
 							? {}
