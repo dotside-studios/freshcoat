@@ -858,6 +858,37 @@ describe("planExport with split: pieces", () => {
 		expect(second.map((i) => i.piece)).toEqual(["left", undefined]);
 	});
 
+	it("makes no piece of an open path, whatever its slice says", () => {
+		const entry = posterWorkspace
+			.templates[0] as Workspace["templates"][number];
+		const front = entry.template.template_data[0];
+		if (!front) throw new Error("fixture");
+		const fold = {
+			id: "fold",
+			type: "vector",
+			pos: { x: 0, y: 0 },
+			size: { width: 100, height: 10 },
+			properties: { d: "M0 5H100", slice: { output: "piece", edge: "score" } },
+		} as never;
+		const open: Workspace = {
+			...posterWorkspace,
+			templates: [
+				{
+					...entry,
+					template: {
+						...entry.template,
+						template_data: [
+							{ ...front, elements: [...front.elements, fold] },
+							...entry.template.template_data.slice(1),
+						],
+					},
+				},
+			],
+		};
+		const items = planExport(open, posterPreset);
+		expect(items.map((i) => i.piece)).toEqual(pieces().map((i) => i.piece));
+	});
+
 	it("moves and hides pieces in a variant", () => {
 		const solo: Workspace = {
 			...posterWorkspace,
