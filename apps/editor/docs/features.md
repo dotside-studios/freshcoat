@@ -219,6 +219,12 @@ the records, and **Export** turns templates and records into files.
     the path, press Enter or Esc to finish an open one, and Backspace to take
     back the last point. The path becomes a vector layer, stroked when open
     and filled when closed, whose path data the inspector edits.
+  - Edit points: double-click a selected vector or press Enter to edit its
+    points on the canvas, and press Enter or Esc to leave. Drag anchors and
+    handles, Shift-click to pick several, and use the arrows to nudge or
+    Backspace to remove the picked ones. Double-click a point (or Alt-click
+    it) to switch it between corner and smooth, and click the path to add a
+    point there.
   - Boolean operations: select two or more sibling rectangles, ellipses or
     vectors and choose Union, Subtract, Intersect or Exclude selection from
     Object > Boolean, the Boolean toolbar in Design, or Alt+Shift+U, S, I or
