@@ -28,6 +28,7 @@ npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
 | `dataset` | editing a dataset the way Studio does: cells, records and columns, renames that keep bindings in step, retyping, schema import, search, sort and per-record issues |
 | `mapping` | the import wizard's mapping of source columns to schema columns, and `importDefaults`: the sheet, header row, date order and mapping an import starts from |
 | `binding` | which column, fixed value or pattern fills each field, and the variant each record gets |
+| `view` | the records a binding reads: column filters and a join of a second dataset |
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
 | `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
@@ -117,6 +118,48 @@ landscape, portrait and square variants follows each photo's orientation.
 A column source's `fallback`, a fixed or image source, is what a record
 whose cell names no variant gets. A workspace that uses one is written at
 format 1.1, which a 1.0 reader opens without the fallback.
+
+A binding's `view` narrows and widens the records it reads, and is saved with
+the binding. `join` adds a second dataset's columns to each record whose `on`
+cell equals that dataset's `key` cell, compared as trimmed text, with
+`prefix` put before each joined column's key; a joined column whose key the
+bound dataset already has is left out. When several joined records hold a
+key, the first is used. A record with an empty or unmatched cell keeps its
+joined cells empty, or is dropped when the join is `inner`. `filters` then
+keep the records every filter matches, so they can test joined columns:
+
+| `op` | matches a cell that |
+|---|---|
+| `equals` | equals `value`: as a number, a date or yes and no for those column types, else as text ignoring case and surrounding space; with no value, is empty |
+| `contains` | holds `value` as text, ignoring case |
+| `empty` | is empty |
+| `lt`, `lte`, `gt`, `gte` | is a number or date below or above `value`; empty cells never match |
+
+`not` keeps the records a filter does not match. `boundDataset()` is the
+dataset a binding reads through its view, with the bound dataset's id and the
+records' own ids and statuses, so an export marks the records it read.
+`planExport()`, `unfilledRequired()` and the export job read through it.
+`bindingView()` also lists records with no match, keys more than one joined
+record holds, and the problems that stop a view from applying, such as a
+missing column or a value its column cannot compare; such a view keeps no
+records, and `presetReadiness()` blocks its presets. `parseFilter()` and
+`formatFilter()` read and write the CLI's `--where` text, such as
+`points>=100`. A workspace with a view is written at format 1.2; a 1.1 reader
+opens it without the view, with a warning.
+
+```ts
+import { boundDataset } from "@freshcoat-js/workspace";
+
+const binding = {
+  datasetId: "d_members",
+  fields: { city: { kind: "column", column: "club_city" } },
+  view: {
+    filters: [{ column: "joined", op: "gte", value: "2024-01-01" }],
+    join: { datasetId: "d_clubs", on: "club", key: "code", prefix: "club_" },
+  },
+};
+const records = boundDataset(binding, workspace.datasets)?.records;
+```
 
 A text column's `options` names where its cells pick their value from, kept
 in `schema.json` as `x-freshcoat-options`. `{ kind: "variants", templateId }`
