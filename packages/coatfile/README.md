@@ -793,8 +793,13 @@ whose `d` is an open path (`"M0 1 L180 1"`) with `output: "none"` and the
 `edge`. Open subpaths stay open in the resolved `path` and in every cut file, so
 a cutter scores the line once, where a thin rect would be cut along both long
 edges. Closed subpaths stay closed, and a rect is always closed. A piece is cut
-from a closed outline, so `output: "piece"` (the default) on a vector with an
-open subpath is refused with `slice_piece_open_path`.
+from a closed outline, so a vector with an open subpath is never a piece:
+`resolveSlices` reports its `output` as `none` whatever the modifier says, an
+export makes no piece of it and still draws its cut line, and `renderTemplate`
+with `piece` naming it throws. Validation does not refuse it, since a slice
+never changes how a side paints; `templateHints` reports `slice_open_piece` for
+one that says `output: "piece"` (or leaves it at the default). A vector with a
+live `boolean` is not read for open subpaths.
 
 `resolveSlices(template, { frameName, values, variantId, resize, pathOp })`
 returns a side's shown slices after the variant, values and relayout, sorted by

@@ -113,6 +113,21 @@ describe("render a slice piece", () => {
 		expect(two.frame.piece).toEqual({ x: 10, y: 4, width: 80, height: 80 });
 	});
 
+	test("refuses an open path, which is a cut line and not a piece", async () => {
+		const t = card([
+			{
+				id: "fold",
+				type: "vector",
+				pos: { x: 0, y: 10 },
+				size: { width: 40, height: 10 },
+				properties: { d: "M0 5 L40 5", slice: { edge: "score" } },
+			} as Element,
+		]);
+		await expect(piece(t, "fold")).rejects.toThrow(
+			'slice "fold" is an open path, which is a cut line and not a piece',
+		);
+	});
+
 	test("finds a slice by id as well as by name", async () => {
 		const t = card([sliceOver({ name: "panel" })]);
 		expect((await piece(t, "right")).width).toBe(40);

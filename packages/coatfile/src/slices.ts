@@ -38,6 +38,8 @@ export type ResolvedSlice = {
 	 *  leaves open stays open. */
 	path: string;
 	fillRule: "nonzero" | "evenodd";
+	/** `none` for an open path, whatever the modifier says: a cut line is
+	 *  never a piece. */
 	output: "piece" | "none";
 	edge: "none" | "through" | "kiss" | "score" | "perforate";
 	bleed: Sides;
@@ -46,6 +48,29 @@ export type ResolvedSlice = {
 };
 
 type Sliced = Extract<Element, { type: "rect" | "vector" }>;
+
+/** Whether any subpath of the path data is left open. */
+export function hasOpenSubpath(d: string): boolean {
+	let drawing = false;
+	for (const s of normalizePath(d)) {
+		if (s.op === "M") {
+			if (drawing) return true;
+		} else if (s.op === "Z") drawing = false;
+		else drawing = true;
+	}
+	return drawing;
+}
+
+/** Whether the element is a vector with an open subpath. A live `boolean`
+ *  is not read: its outline is computed. */
+export function isOpenVector(el: Element): boolean {
+	return (
+		el.type === "vector" &&
+		el.properties.boolean === undefined &&
+		typeof el.properties.d === "string" &&
+		hasOpenSubpath(el.properties.d)
+	);
+}
 
 const isSliced = (el: Element): el is Sliced =>
 	(el.type === "rect" || el.type === "vector") &&
@@ -112,7 +137,7 @@ function resolveSlice(
 			el.type === "vector" && el.properties.fillRule === "evenodd"
 				? "evenodd"
 				: "nonzero",
-		output: slice.output ?? "piece",
+		output: isOpenVector(el) ? "none" : (slice.output ?? "piece"),
 		edge: slice.edge ?? "none",
 		bleed: resolveInsets(slice.bleed),
 		order: slice.order ?? index,

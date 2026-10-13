@@ -164,20 +164,10 @@ describe("slice validation", () => {
 		).toContain("slice_size_required");
 	});
 
-	test("an open path may be a cut line but not a piece", () => {
+	test("an open path set as a piece is not a validation error", () => {
 		const line = { d: "M0 1 L40 1" };
-		const open = (modifier: Modifier) =>
-			codes(template(vector("l", modifier, line)));
-		expect(open({ output: "none", edge: "score" })).toEqual([]);
-		expect(open({ edge: "score" })).toContain("slice_piece_open_path");
-		expect(open({ output: "piece" })).toContain("slice_piece_open_path");
-		const mixed = { d: "M0 0 L10 0 L10 10 Z M20 0 L30 0" };
-		expect(codes(template(vector("m", { output: "piece" }, mixed)))).toContain(
-			"slice_piece_open_path",
-		);
-		expect(
-			codes(template(vector("c", { output: "piece" }, { d: "M0 0 L9 0 L9 9 Z" }))),
-		).toEqual([]);
+		expect(codes(template(vector("l", { output: "piece" }, line)))).toEqual([]);
+		expect(codes(template(vector("l", { edge: "score" }, line)))).toEqual([]);
 	});
 
 	test("a rect is always closed, so it may be a piece", () => {
@@ -273,6 +263,30 @@ describe("slice compile", () => {
 const ids = (slices: { id: string }[]) => slices.map((s) => s.id);
 
 describe("resolveSlices", () => {
+	test("an open path is never a piece, whatever its output says", () => {
+		const open = (modifier: Modifier, d = "M0 1 L40 1") =>
+			resolveSlices(template(vector("l", modifier, { d })), {})[0];
+		expect(open({ output: "piece", edge: "score" })).toMatchObject({
+			output: "none",
+			edge: "score",
+			path: "M10 21L50 21",
+		});
+		expect(open({})?.output).toBe("none");
+		expect(open({ output: "piece" }, "M0 0 L10 0 L10 10 Z M20 0 L30 0")?.output).toBe(
+			"none",
+		);
+		expect(open({ output: "piece" }, "M0 0 L9 0 L9 9 Z")?.output).toBe("piece");
+	});
+
+	test("a live boolean vector keeps the output it says", () => {
+		const boolean = { op: "union", operands: [] };
+		const [s] = resolveSlices(
+			template(vector("b", { output: "piece" }, { d: "M0 1 L40 1", boolean })),
+			{},
+		);
+		expect(s?.output).toBe("piece");
+	});
+
 	test("a rect becomes a closed outline in trim coordinates", () => {
 		const [s] = resolveSlices(template(shape("s")), {});
 		expect(s).toEqual({

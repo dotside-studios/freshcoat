@@ -28,6 +28,7 @@ import {
 import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
 import { pieceSpec } from "./piece";
+import { hasOpenSubpath } from "./slices";
 import { resolveSlices } from "./slices";
 import type {
 	CompiledTemplate,
@@ -216,6 +217,10 @@ function resolvePiece(
 	if (!slice)
 		throw new Error(
 			`no slice "${options.piece}" on side "${side}" (has: ${slices.map((s) => s.name).join(", ") || "none"})`,
+		);
+	if (hasOpenSubpath(slice.path))
+		throw new Error(
+			`slice "${options.piece}" is an open path, which is a cut line and not a piece`,
 		);
 	return { side, spec: pieceSpec(renderer.ck, slice) };
 }

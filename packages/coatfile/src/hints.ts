@@ -4,6 +4,7 @@ import {
 	formatVersionStatus,
 	minimumFormatVersion,
 } from "./format";
+import { isOpenVector } from "./slices";
 import type { Sides, Template } from "./types";
 import { checkVariants, type VariantIssue } from "./variants";
 
@@ -27,6 +28,9 @@ export type TemplateHint =
 	/** A variant change that changes nothing or names a layer that is gone. */
 	| { kind: "variant"; issue: VariantIssue }
 	| SafeAreaHint
+	/** An open path with a slice that says it is a piece; it exports as a cut
+	 *  line only. */
+	| { kind: "slice_open_piece"; side: number; sideName: string; id: string }
 	/** Written by a newer 1.x kit than this one reads. */
 	| { kind: "format_newer"; declared: string }
 	/** Uses fields from a later minor than the version it declares. */
@@ -48,6 +52,25 @@ export function safeAreaHints(t: Template): SafeAreaHint[] {
 	}));
 }
 
+/** Open paths whose slice says `output: "piece"`, stated or by default. */
+function openPieceHints(t: Template): TemplateHint[] {
+	const hints: TemplateHint[] = [];
+	t.template_data.forEach((frame, side) => {
+		for (const el of frame.elements) {
+			if (el.type !== "vector" || !isOpenVector(el)) continue;
+			const slice = el.properties.slice;
+			if (slice && (slice.output ?? "piece") === "piece")
+				hints.push({
+					kind: "slice_open_piece",
+					side,
+					sideName: frame.name,
+					id: el.id,
+				});
+		}
+	});
+	return hints;
+}
+
 /**
  * What is worth telling an author about a template that is valid: variant
  * issues, layers inside the safe area, and a format version that does not
@@ -59,6 +82,7 @@ export function templateHints(t: Template): TemplateHint[] {
 		issue,
 	}));
 	hints.push(...safeAreaHints(t));
+	hints.push(...openPieceHints(t));
 	const declared = t.format_version;
 	if (formatVersionStatus(declared) === "newer")
 		hints.push({ kind: "format_newer", declared });
