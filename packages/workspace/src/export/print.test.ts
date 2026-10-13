@@ -1,6 +1,10 @@
 import { YMCKO_DYE_SUB } from "@freshcoat-js/for-print";
 import { describe, expect, it } from "vitest";
-import { printRenderOptions, printRequest } from "./print";
+import {
+	printProfileMismatch,
+	printRenderOptions,
+	printRequest,
+} from "./print";
 
 describe("print target", () => {
 	it("is left to the default when the preset names none", () => {
@@ -22,5 +26,40 @@ describe("print target", () => {
 		expect(() =>
 			printRenderOptions({ analyze: true, target: "unknown" }),
 		).toThrow('Unknown print target "unknown"');
+	});
+});
+
+describe("print profile mismatch", () => {
+	const profile = { name: "Printer" };
+
+	it("is null when print is off, there is no profile, or the targets agree", () => {
+		expect(printProfileMismatch(undefined)).toBeNull();
+		expect(
+			printProfileMismatch({
+				enabled: false,
+				profile: { ...profile, target: "x" },
+			}),
+		).toBeNull();
+		expect(printProfileMismatch({ enabled: true })).toBeNull();
+		expect(printProfileMismatch({ enabled: true, profile })).toBeNull();
+		expect(
+			printProfileMismatch({
+				enabled: true,
+				target: "other",
+				profile: { ...profile, target: "other" },
+			}),
+		).toBeNull();
+	});
+
+	it("names both targets when the profile was measured on another", () => {
+		expect(
+			printProfileMismatch({
+				enabled: true,
+				profile: { ...profile, target: "other" },
+			}),
+		).toEqual({ profileTarget: "other", presetTarget: "ymcko-dye-sub" });
+		expect(
+			printProfileMismatch({ enabled: true, target: "other", profile }),
+		).toEqual({ profileTarget: "ymcko-dye-sub", presetTarget: "other" });
 	});
 });
