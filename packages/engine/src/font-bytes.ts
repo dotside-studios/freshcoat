@@ -15,10 +15,9 @@ export function resolveFontRequest(
 	return { kind: "none" };
 }
 
-// Old UA nudges Google Fonts / Fontsource to serve one unsubsetted TTF, which the
-// sfnt metrics reader (readFontMetrics) can parse; it cannot parse WOFF2.
+// Old UA nudges Google Fonts / Fontsource to serve one unsubsetted TTF.
 // Browsers treat user-agent as a forbidden header and ignore it, falling back to
-// WOFF2, which CanvasKit decodes fine.
+// WOFF2, which every font reader here decodes.
 const TTF_UA =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.30 (KHTML, like Gecko)";
 const FONT_FETCH_TIMEOUT_MS = 8000;

@@ -7,6 +7,7 @@
 //   2. Fallback: registerFontMetrics(family, bytes) into the module registry,
 //      which compile consults when a family isn't in CompileOptions.fontMetrics.
 import type { FontVMetrics } from "./types";
+import { sfntBytes } from "./woff";
 
 const registry = new Map<string, FontVMetrics>();
 
@@ -40,13 +41,15 @@ export function deriveFontMetrics(
 }
 
 // Read OS/2 sTypoAscender/Descender/LineGap + sCapHeight and head.unitsPerEm
-// from an sfnt (ttf/otf) buffer, normalized per em. Returns null on anything
+// from a ttf, otf, woff or woff2 buffer, normalized per em. Returns null on anything
 // unexpected so callers fall back.
 export function readFontMetrics(
 	data: Uint8Array | ArrayBuffer,
 ): FontVMetrics | null {
-	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
 	try {
+		const bytes = sfntBytes(
+			data instanceof Uint8Array ? data : new Uint8Array(data),
+		);
 		const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 		const numTables = dv.getUint16(4);
 		let os2 = 0;
