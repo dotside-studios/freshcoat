@@ -267,7 +267,7 @@ subpath.
 
 | Subpath | What it is |
 |---|---|
-| `@freshcoat-js/engine` | `createRenderer`, node types, `compileScene`, layout, adjust and export-scale math, byte loaders |
+| `@freshcoat-js/engine` | `createRenderer`, node types, `compileScene`, layout, adjust and export-scale math, byte loaders, CR80 card size (`CR80_LONG_MM`, `CR80_SHORT_MM`, `cr80Pixels(dpi)`, …) |
 | `@freshcoat-js/engine/node` | `loadCanvasKit`, `initCanvasKit`, `fileLoader`, `canvasKitBinDir` for Node and Bun |
 | `@freshcoat-js/engine/browser` | `loadCanvasKit(baseUrl)` for a page or a worker |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |

@@ -214,6 +214,8 @@ layer id and edges), `format_newer` (a format newer than this kit reads) and
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
+The CR80 constants (`CR80_LONG_MM`, `CR80_SHORT_MM`, `CR80_CORNER_MM`,
+`CR80_SAFE_MM`) and `MM_PER_INCH` are re-exported from the engine.
 
 ## Inline assets
 

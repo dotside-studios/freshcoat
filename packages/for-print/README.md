@@ -24,8 +24,8 @@ or communicate with a printer.
 - **Recommend finishing**: the whole-frame output ops that aren't per-layer
   (the target's `finish`, or `printFinish(balance, target)` with a measured
   cast → the coat engine's `FrameFinish`).
-- **CR80 geometry**: format spec + crop fitting (`cr80Dimensions`,
-  `fitCr80CropToImage`, …).
+- **CR80 geometry**: crop fitting (`cr80Dimensions`, `fitCr80CropToImage`, …)
+  at 300 dpi, from the engine's CR80 size (`cr80Pixels`).
 
 Its only runtime package dependency is the engine. Printer-specific decisions
 stay here, in a `PrintTarget`; the engine supplies the color matrices, lookup tables, sharpening

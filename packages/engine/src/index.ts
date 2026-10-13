@@ -19,6 +19,14 @@ export {
 } from "./adjust";
 export { approxEngine } from "./approx-layout";
 export {
+	CR80_CORNER_MM,
+	CR80_LONG_MM,
+	CR80_SAFE_MM,
+	CR80_SHORT_MM,
+	cr80Pixels,
+	MM_PER_INCH,
+} from "./card";
+export {
 	type BakeTextOptions,
 	bakeText,
 	resolveDirection,

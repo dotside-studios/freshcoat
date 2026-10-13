@@ -1,4 +1,10 @@
-import { rotatedFootprint } from "@freshcoat-js/engine";
+import {
+	CR80_CORNER_MM,
+	CR80_LONG_MM,
+	CR80_SAFE_MM,
+	MM_PER_INCH,
+	rotatedFootprint,
+} from "@freshcoat-js/engine";
 import type { Element, Insets, Sides, Template } from "./types";
 
 export const NO_INSETS: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -58,7 +64,13 @@ export function bleedSize(t: Pick<Template, "width" | "height" | "bleed">): {
 	};
 }
 
-export const MM_PER_INCH = 25.4;
+export {
+	CR80_CORNER_MM,
+	CR80_LONG_MM,
+	CR80_SAFE_MM,
+	CR80_SHORT_MM,
+	MM_PER_INCH,
+} from "@freshcoat-js/engine";
 
 export type CardSizeMm = { widthMm: number; heightMm: number };
 
@@ -216,13 +228,8 @@ export function safeAreaIssues(
 	return out;
 }
 
-// A CR80 card is 85.60 x 53.98 mm with corners cut to a 3.18 mm radius, and
-// the printer keeps 3 mm inside the trim clear of anything that must survive
-// the cut. The guides are sized from the template's own long side, so a
-// portrait card or a 1013-wide design gets the same physical insets.
-export const CR80_LONG_MM = 85.6;
-export const CR80_CORNER_MM = 3.18;
-export const CR80_SAFE_MM = 3;
+// The guides are sized from the template's own long side, so a portrait card
+// or a 1013-wide design gets the same physical insets.
 
 export type PrintGuideMetrics = {
 	/** Trim corner radius, in template units. */
