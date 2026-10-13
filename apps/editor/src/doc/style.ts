@@ -116,10 +116,8 @@ export function stylePatch(el: Layer, style: LayerStyle): ElementPatch {
 	if (style.corners && hasCorners(el)) {
 		const r = style.corners.cornerRadius;
 		props.cornerRadius =
-			el.type === "rect" || el.type === "frame" || typeof r !== "object"
-				? r
-				: r[0];
-		if (el.type === "rect")
+			el.type !== "vector" || typeof r !== "object" ? r : r[0];
+		if (el.type !== "vector")
 			props.cornerSmoothing = style.corners.cornerSmoothing;
 	}
 	if (style.text && el.type === "text") {

@@ -148,9 +148,8 @@ layers were kept, flattened or skipped.
   rasterized (`stroke_flattened`). A stroke with a different weight per side is dropped
   (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
   zero is left out.
-- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`, with
-  one radius or a different radius per corner. Frames keep their radius but
-  not smoothing, which coatfile frames do not carry.
+- **Corners.** Rectangles, frames and bound images keep corner smoothing as
+  `cornerSmoothing`, with one radius or a different radius per corner.
 - **Boolean operations.** A union, subtract, intersect or exclude stays a
   live boolean `vector`: its `operands` are the visible children, bottom-most
   first, each a `rect` (with its corner radii and smoothing) or a `vector` (rectangles,
@@ -196,9 +195,8 @@ layers were kept, flattened or skipped.
   `image_crop_unsupported`. A static image is rasterized as Figma draws it,
   filters and crop included.
 - **Field image shapes.** A bound image keeps its layer's outline and stroke.
-  A rectangle's corner radius becomes `cornerRadius`, or a `squircle` mask
-  with corner smoothing. Images take one radius, so different corners all get
-  the largest (`image_corner_radius_approximated`). A full ellipse becomes a
+  A rectangle's corner radii become `cornerRadius`, one number or per
+  corner, and its corner smoothing `cornerSmoothing`. A full ellipse becomes a
   `circle` or `ellipse` mask and a polygon a `polygon` mask, its box grown so
   the vertices land where Figma draws them; the photo fills that box. Partial
   arcs, donuts and polygons with rounded corners are rasterized and cannot

@@ -152,7 +152,7 @@ function program(io: Io, onCommand: (name: string) => void) {
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
 			"--sheets <paper>",
-			"lay the cards out on a4, letter, legal, a3, tabloid or <w>x<h> mm paper",
+			"lay the cards out on a4, a5, a6, letter, legal, a3, tabloid or <w>x<h> mm paper",
 			arg(parsePaper),
 		)
 		.addOption(

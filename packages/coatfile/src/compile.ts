@@ -319,11 +319,7 @@ function compileBackground(
 		fit: (props.fit as ImageNode["fit"]) ?? "cover",
 		...imageFraming(props),
 		stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
-		mask: resolveImageClip(
-			props.cornerRadius as number | undefined,
-			props.mask as ImageMaskInput | undefined,
-			1,
-		),
+		mask: resolveImageClip(props, 1),
 	};
 }
 
@@ -375,11 +371,7 @@ function compileElement(
 				fit: (props.fit as ImageNode["fit"]) ?? "cover",
 				...imageFraming(props),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
-				mask: resolveImageClip(
-					props.cornerRadius as number | undefined,
-					props.mask as ImageMaskInput | undefined,
-					ratio,
-				),
+				mask: resolveImageClip(props, ratio),
 			} satisfies ImageNode;
 		case "vector": {
 			const stroke = resolveStroke(
@@ -662,6 +654,11 @@ function compileFrameElement(
 	const fills = resolveFills(props.fill as Fill | Fill[] | undefined, ratio);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
 	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
+	const smoothing = cornerSmoothing(props);
+	const corners = {
+		cornerRadius,
+		...(smoothing !== undefined ? { cornerSmoothing: smoothing } : {}),
+	};
 	const clip = props.clipsContent === true;
 	// An outside stroke lies wholly beyond the box, so a clipping frame draws it
 	// outside its clip.
@@ -676,7 +673,7 @@ function compileFrameElement(
 					size,
 					fills,
 					stroke: bgStroke,
-					cornerRadius,
+					...corners,
 				}
 			: null;
 
@@ -699,7 +696,7 @@ function compileFrameElement(
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		clip,
-		cornerRadius,
+		...corners,
 		...(props.isolate === true ? { isolate: true } : {}),
 	};
 
@@ -753,11 +750,11 @@ function compileFrameElement(
 		adjust,
 		layoutChild,
 		...(isolate ? { isolate } : {}),
-		...(backdropBlur ? { backdropBlur, cornerRadius } : {}),
+		...(backdropBlur ? { backdropBlur, ...corners } : {}),
 		kind: "group",
 		children: [
 			{ ...content, pos: { x: 0, y: 0 } },
-			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, cornerRadius },
+			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, ...corners },
 		],
 	};
 }
@@ -1313,10 +1310,11 @@ function imageFraming(props: Record<string, unknown>): {
 }
 
 function resolveImageClip(
-	cornerRadius: number | undefined,
-	mask: ImageMaskInput | undefined,
+	props: Record<string, unknown>,
 	ratio: number,
 ): ShapeMask | undefined {
+	const mask = props.mask as ImageMaskInput | undefined;
+	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	if (mask !== undefined) {
 		if (cornerRadius !== undefined) {
 			console.warn(
@@ -1338,10 +1336,11 @@ function resolveImageClip(
 			...(mask.cornerRadius ? { cornerRadius: mask.cornerRadius * ratio } : {}),
 		};
 	}
-	if (typeof cornerRadius === "number") {
-		return { kind: "rounded-rect", radius: cornerRadius * ratio };
-	}
-	return undefined;
+	if (cornerRadius === undefined) return undefined;
+	const smoothing = cornerSmoothing(props);
+	return smoothing
+		? { kind: "rounded-rect", radius: cornerRadius, smoothing }
+		: { kind: "rounded-rect", radius: cornerRadius };
 }
 
 // Scales every numeric coordinate in an SVG path string by `ratio`.
@@ -1358,6 +1357,12 @@ function scalePathString(d: string, ratio: number): string {
 			return Number.isFinite(val) ? String(val) : n;
 		});
 	}
+}
+
+function cornerSmoothing(props: Record<string, unknown>): number | undefined {
+	return typeof props.cornerSmoothing === "number" && props.cornerSmoothing > 0
+		? props.cornerSmoothing
+		: undefined;
 }
 
 function scaleCorner(cr: unknown, ratio: number): CornerRadius | undefined {
