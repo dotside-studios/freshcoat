@@ -918,7 +918,8 @@ export function ExportSection() {
 										imposition={imposition}
 										page={sheetPage}
 										assets={dataset?.assets}
-										cropMarks={sheets?.layout.cropMarks ?? false}
+										{...(sheets ? { marks: sheets.layout } : {})}
+										job={preset.name || workspace?.name}
 										currentRecordId={currentId}
 										currentVariant={currentToken}
 									/>

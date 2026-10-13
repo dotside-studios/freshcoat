@@ -32,7 +32,7 @@ npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
 | `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
-| `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
+| `impose` | cards on sheets of paper: paper sizes, printer's marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
@@ -383,6 +383,32 @@ trim with the bleed outside the slot. The gap between cards is widened to
 `minGapMm(bleed)`, twice the bleed, when the layout's is narrower, and crop
 marks sit on the trim and start outside the bleed. One card per page, each
 page gets a trim box inside its bleed box.
+
+### Printer's marks
+
+A sheet layout's `cropMarks` (on by default) draws crop marks on fronts.
+Three more marks are off unless asked for, and each is drawn only where its
+margin has room:
+
+- `registrationMarks`: a 6 mm crosshair over a 2 mm circle, centred in each
+  margin at least 8 mm deep, on fronts and backs. A target that would cross
+  a crop mark moves along its edge until it clears it. A back's targets are
+  its front's mirrored as the flip mirrors the sheet and moved by
+  `backOffsetMm`, so held to the light they land on each other.
+- `colorBar`: twelve 4 mm patches along the bottom margin, from the cards'
+  left edge: black at 100, 75, 50, 25, 10 and 0 percent, then cyan, magenta,
+  yellow, red, green and blue, in an outline.
+- `slug`: one 6 pt Helvetica line along the top margin, such as "Members ·
+  Sheet 2 of 5 · Back · 2026-10-13": the PDF's title, the sheet, the side
+  under duplex, and the PDF's date. A slug wider than its room is cut with
+  an ellipsis.
+
+The colour bar and slug sit outside the crop marks and stop short of a
+target. `sheetMarks(imposition, layout, side)` gives every mark of a page in
+millimetres, as `assemblePdf()` draws them and Studio previews them, and
+`slugText(imposition, page, { job, date })` the slug's words. Marks are
+pure RGB black, as PDFs carry no Separation colour space yet; registration
+colour, which prints on every plate, waits on spot colour support.
 
 ### Slice pieces
 

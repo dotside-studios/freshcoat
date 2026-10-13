@@ -238,6 +238,13 @@ export type SheetLayout = {
 	gapMm: number;
 	/** default true */
 	cropMarks: boolean;
+	/** a target centred in each margin, on fronts and backs; default false */
+	registrationMarks?: boolean;
+	/** grey and colour patches in the bottom margin; default false */
+	colorBar?: boolean;
+	/** job name, sheet number, side and date in the top margin; default
+	 *  false */
+	slug?: boolean;
 	/** default none */
 	duplex: "none" | "long-edge" | "short-edge";
 	/** default 0,0; moves every back page, for a printer that drifts. `y` is
