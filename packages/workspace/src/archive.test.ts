@@ -487,6 +487,34 @@ describe("packWorkspace", () => {
 		expect(kept).toEqual(split);
 	});
 
+	it("keeps a preset's cut options and reads an older preset as having none", async () => {
+		const cut: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_cut",
+			cutFile: "dxf",
+			cutLines: true,
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [...ws.presets, cut] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		const [older, kept] = result.workspace.presets;
+		expect(older?.cutFile).toBeUndefined();
+		expect(older?.cutLines).toBeUndefined();
+		expect(kept).toEqual(cut);
+	});
+
+	it("refuses a preset with an unknown cut file", async () => {
+		const bad = {
+			...(ws.presets[0] as ExportPreset),
+			cutFile: "ai",
+		} as unknown as ExportPreset;
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [bad] }),
+		);
+		expect(result).toMatchObject({ ok: false, code: "invalid_manifest" });
+	});
+
 	it("refuses a preset whose sheet layout is malformed", async () => {
 		const bad = {
 			...(ws.presets[0] as ExportPreset),

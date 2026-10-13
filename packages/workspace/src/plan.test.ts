@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { resolveValues, variantsFor } from "./binding";
 import { toTemplateValue } from "./columns";
 import {
+	exportCutFile,
+	exportCutLines,
 	exportSize,
 	fileExtension,
 	fileNameFor,
@@ -933,5 +935,26 @@ describe("planExport with split: pieces", () => {
 		>;
 		expect(fileNameTokens(template)).toContain("slice");
 		expect(unknownFileNameTokens("{{slice}}", template)).toEqual([]);
+	});
+});
+
+describe("cut options", () => {
+	it("read an older preset as writing no cut files", () => {
+		expect(exportCutFile(preset)).toBe("none");
+		expect(exportCutLines(preset)).toBe(false);
+	});
+
+	it("write cut files for images only", () => {
+		expect(exportCutFile({ ...preset, cutFile: "svg" })).toBe("svg");
+		expect(exportCutFile({ ...preset, format: "pdf", cutFile: "svg" })).toBe(
+			"none",
+		);
+	});
+
+	it("draw cut lines on PDFs only", () => {
+		expect(exportCutLines({ ...preset, format: "pdf", cutLines: true })).toBe(
+			true,
+		);
+		expect(exportCutLines({ ...preset, cutLines: true })).toBe(false);
 	});
 });
