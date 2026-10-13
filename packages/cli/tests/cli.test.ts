@@ -836,14 +836,15 @@ describe("render export options", () => {
 			const run = await box.run("render", "badge.json", "--sheets", "a4", ...flags, "--out", "marks.pdf", "-q");
 			expect(run.code).toBe(0);
 			const page = (await PDFDocument.load(await readFile(box.path("marks.pdf")))).getPage(0);
-			const text = page.node
-				.Contents()
-				?.asArray()
-				.map((ref) => {
-					const stream = page.doc.context.lookup(ref) as PDFRawStream;
-					return new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode());
-				})
-				.join("\n") ?? "";
+			const contents = page.node.Contents();
+			const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => page.doc.context.lookup(ref)) : [contents];
+			const text = streams
+				.map((stream) =>
+					stream instanceof PDFRawStream
+						? new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode())
+						: "",
+				)
+				.join("\n");
 			const tokens = text.split(/\s+/);
 			return {
 				strokes: tokens.filter((t) => t === "S").length,
