@@ -788,9 +788,17 @@ slice name (`name`, else the element `id`) must be unique on its side. A
 variant delta can set or replace `slice` through `properties`, as it does any
 other property. `visibleWhen` and `constraints` apply as for any element.
 
+A fold, score or perforation is a line, not a region: author it as a `vector`
+whose `d` is an open path (`"M0 1 L180 1"`) with `output: "none"` and the
+`edge`. Open subpaths stay open in the resolved `path` and in every cut file, so
+a cutter scores the line once, where a thin rect would be cut along both long
+edges. Closed subpaths stay closed, and a rect is always closed. A piece is cut
+from a closed outline, so `output: "piece"` (the default) on a vector with an
+open subpath is refused with `slice_piece_open_path`.
+
 `resolveSlices(template, { frameName, values, variantId, resize, pathOp })`
 returns a side's shown slices after the variant, values and relayout, sorted by
-`order` then document order. Each has a closed SVG `path` in trim coordinates
+`order` then document order. Each has an SVG `path` in trim coordinates, closed as its shape is
 and its `box`, the axis-aligned bounds of that path, plus `name`, `fillRule`,
 `output`, `edge`, resolved `bleed` sides and `order`. Pass the same `pathOp` as
 for `compile` to recompute a vector's live `boolean`; without it the cached `d`

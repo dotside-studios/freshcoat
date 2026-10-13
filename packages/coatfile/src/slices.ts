@@ -34,7 +34,8 @@ export type ResolvedSlice = {
 	name: string;
 	/** The axis-aligned bounds of the outline, in trim coordinates. */
 	box: { x: number; y: number; width: number; height: number };
-	/** The closed outline of the shape, in trim coordinates. */
+	/** The outline of the shape, in trim coordinates. A subpath the shape
+	 *  leaves open stays open. */
 	path: string;
 	fillRule: "nonzero" | "evenodd";
 	output: "piece" | "none";

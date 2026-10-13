@@ -1,3 +1,4 @@
+import { normalizePath } from "@freshcoat-js/engine/svg";
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
@@ -1630,6 +1631,21 @@ function enforceSlices(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				[...path, "size"],
 			);
 		}
+		const props = el.properties as { d?: unknown; boolean?: unknown };
+		if (
+			el.type === "vector" &&
+			(slice.output ?? "piece") === "piece" &&
+			props.boolean === undefined &&
+			typeof props.d === "string" &&
+			hasOpenSubpath(props.d)
+		) {
+			addKitIssue(
+				ctx,
+				"slice_piece_open_path",
+				'a slice with output "piece" needs a closed outline; an open path is a cut line, with output "none"',
+				[...path, "properties", "slice", "output"],
+			);
+		}
 		const name = slice.name ?? (el as { id?: string }).id;
 		const seen = names[path[1] as number];
 		if (typeof name === "string" && seen) {
@@ -1663,4 +1679,16 @@ function enforceSlices(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	});
 }
 
-type SliceProps = { name?: string; bleed?: unknown };
+type SliceProps = { name?: string; bleed?: unknown; output?: string };
+
+// Whether any subpath of the path data is left open.
+function hasOpenSubpath(d: string): boolean {
+	let drawing = false;
+	for (const s of normalizePath(d)) {
+		if (s.op === "M") {
+			if (drawing) return true;
+		} else if (s.op === "Z") drawing = false;
+		else drawing = true;
+	}
+	return drawing;
+}
