@@ -831,6 +831,27 @@ describe("render export options", () => {
 		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
 	});
 
+	test("fills a sheet with copies of one card", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--frame",
+			"front",
+			"--sheets",
+			"a4",
+			"--copies",
+			"fill",
+			"--out",
+			"filled.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("filled.pdf")));
+		expect(pdf.getPageCount()).toBe(1);
+		const dry = await box.run("render", "badge.json", "--frame", "front", "--sheets", "a4", "--copies", "fill", "--out", "filled.pdf", "--dry-run");
+		expect(dry.stdout).toMatch(/, (\d+) per sheet · 1 sheet · \1 copies each\n$/);
+	});
+
 	test("takes a custom paper size and says when the cards do not fit", async () => {
 		const fits = await box.run("render", "badge.json", "--sheets", "100x50", "--no-crop-marks", "--out", "custom.pdf", "-q");
 		expect(fits.code).toBe(0);
