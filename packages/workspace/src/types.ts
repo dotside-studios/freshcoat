@@ -1,5 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { PrintProfile } from "@freshcoat-js/for-print";
+import type { ItemCuts } from "./cut";
 
 export type ColumnType =
 	| "text"
@@ -362,6 +363,9 @@ export type WrittenTable = {
 };
 
 export type PdfPage = {
+	/** the item's cut lines, drawn over the art in an optional content group
+	 *  named Cut; in the image's design units */
+	cut?: ItemCuts;
 	/** a PNG, a JPEG or a one-page PDF, as `format` says */
 	bytes: Uint8Array;
 	format: "png" | "jpeg" | "pdf";

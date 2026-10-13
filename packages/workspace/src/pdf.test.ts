@@ -671,7 +671,7 @@ describe("assemblePdf with cut lines", () => {
 			const bleed = 3;
 			const bled = cards(1).map((page) => ({
 				...page,
-				cut: { ...cut, width: 886, height: 570 },
+				cut: { ...cut, width: 916, height: 600 },
 			}));
 			const doc = await PDFDocument.load(
 				await assemblePdf(bled, {
@@ -683,11 +683,18 @@ describe("assemblePdf with cut lines", () => {
 			);
 			const [page] = doc.getPages() as [PDFPage];
 			const [first] = moves(page);
-			// the art starts `bleed` left of the card, 886 units over 91.6 mm
-			const mmPerUnit = (85.6 + 2 * bleed) / 886;
-			expect(first?.[0]).toBeCloseTo((19.4 - bleed + 100 * mmPerUnit) * K, 2);
+			const slot = imposeSheets(bled, card, sheet({ cropMarks: false }), {
+				bleedMm: bleed,
+			}).pages[0]?.slots[0];
+			if (!slot) throw new Error("no slot");
+			// the art starts `bleed` left of the card, a tenth of a mm to a unit
+			const mmPerUnit = 0.1;
+			expect(first?.[0]).toBeCloseTo(
+				(slot.xMm - bleed + 100 * mmPerUnit) * K,
+				2,
+			);
 			expect(first?.[1]).toBeCloseTo(
-				A4[1] - (13.5 - bleed + 100 * mmPerUnit) * K,
+				A4[1] - (slot.yMm - bleed + 100 * mmPerUnit) * K,
 				2,
 			);
 		});

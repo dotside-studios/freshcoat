@@ -9,7 +9,12 @@ import { cutDxf } from "../cut-dxf";
 import { cutSvg } from "../cut-svg";
 import { slug } from "../ids";
 import { type Imposition, SheetLayoutError } from "../impose";
-import { exportCutFile, planExport, vectorPages } from "../plan";
+import {
+	exportCutFile,
+	exportCutLines,
+	planExport,
+	vectorPages,
+} from "../plan";
 import type {
 	Dataset,
 	ExportItem,
@@ -540,6 +545,7 @@ export function runExportJob(
 										: "png",
 								widthPx: pagePx(index, out, size).width,
 								heightPx: pagePx(index, out, size).height,
+								...(out.cut && exportCutLines(preset) ? { cut: out.cut } : {}),
 								...(sheet
 									? {
 											recordId: plan[index].recordId,
