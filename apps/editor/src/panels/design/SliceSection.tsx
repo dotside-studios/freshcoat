@@ -103,7 +103,7 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 					</Row>
 					{open ? (
 						<p
-							className="m-0 text-fc-faint text-fc-sm"
+							className="m-0 pl-16 text-fc-faint text-fc-sm"
 							data-testid="slice-open-hint"
 						>
 							An open path is a cut line, so it can't be a piece
