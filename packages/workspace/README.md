@@ -351,6 +351,32 @@ trim with the bleed outside the slot. The gap between cards is widened to
 `minGapMm(bleed)`, twice the bleed, when the layout's is narrower, and crop
 marks sit on the trim and start outside the bleed. One card per page, each
 page gets a trim box inside its bleed box.
+
+### Slice pieces
+
+A preset with `split: "pieces"` exports each slice of a side as its own file
+instead of the whole side (see Slices in the
+[coatfile README](../coatfile/README.md#slices)). For each record, variant and
+side, `planExport()` resolves the slices with that record's values and variant
+and plans one item per slice whose `output` is `piece`, in slice order, with
+the slice's name as `piece` and its size in design units as `pieceSize`. A
+slice a value hides, or a variant hides or moves, is planned accordingly. A
+side with no pieces exports whole, as it does without `split`. Keys end in the
+slice (`record:side:piece`, then the variant when every variant is exported).
+
+The file name token `{{slice}}` is the slice's name, empty for a side exported
+whole. A pattern that does not name it gets `-{{slice}}` appended, without a
+dangling `-` for a whole side. A piece is rendered at its box plus the slice's
+own bleed, at the preset's scale; it replaces the preset's `bleed`. With a size
+from an image, a piece is scaled by the factor its side would be.
+
+In a PDF, a single layout makes one page per piece, sized by its own pixels at
+the preset's `dpi`. On sheets, every card is one size, so the pieces are
+imposed when all the job's items share one size, taken as the card with no
+bleed since it is baked in; otherwise the job is refused with a
+`SheetLayoutError` ("Sheets need one piece size"). Pieces are raster only:
+`pdfPageImage: "vector"` with pieces is refused.
+
 Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 
 ## License
