@@ -136,7 +136,8 @@ export function LayerMenuItems({ onRename }: { onRename?: () => void }) {
 	const allSlices = sliceable && layers.every((k) => isSlice(t, k));
 	const variantId = controller.variantId;
 	const variant = controller.base?.variants?.find((v) => v.id === variantId);
-	const inVariant = variant ? controller.variantVisibility(layers) : [];
+	const scopeLabel = variant?.label ?? VARIANT_UI.default;
+	const inVariant = controller.variantVisibility(layers);
 	const allHiddenInVariant =
 		inVariant.length > 0 && inVariant.every((l) => l.hidden);
 
@@ -222,19 +223,17 @@ export function LayerMenuItems({ onRename }: { onRename?: () => void }) {
 			>
 				{allLocked ? "Unlock" : "Lock"}
 			</MenuItem>
-			{variant ? (
-				<MenuItem
-					id="hide-in-variant"
-					isDisabled={inVariant.length === 0}
-					onAction={() =>
-						controller.setHiddenInVariant(layers, !allHiddenInVariant)
-					}
-				>
-					{allHiddenInVariant
-						? VARIANT_UI.showIn(variant.label)
-						: VARIANT_UI.hideIn(variant.label)}
-				</MenuItem>
-			) : null}
+			<MenuItem
+				id="hide-in-variant"
+				isDisabled={inVariant.length === 0}
+				onAction={() =>
+					controller.setHiddenInVariant(layers, !allHiddenInVariant)
+				}
+			>
+				{allHiddenInVariant
+					? VARIANT_UI.showIn(scopeLabel)
+					: VARIANT_UI.hideIn(scopeLabel)}
+			</MenuItem>
 		</>
 	);
 }
