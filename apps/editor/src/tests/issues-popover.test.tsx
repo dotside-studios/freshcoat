@@ -77,6 +77,41 @@ describe("the issues list", () => {
 		expect(controller.state.selection).toEqual(["0/1/1"]);
 	});
 
+	test("an open path set as a slice piece reads as words and links to the layer", async () => {
+		const t = doc();
+		const side = t.template_data[0];
+		if (!side) throw new Error("fixture");
+		const key = `0/${side.elements.length}`;
+		const broken = {
+			...t,
+			template_data: [
+				{
+					...side,
+					elements: [
+						...side.elements,
+						{
+							id: "fold",
+							type: "vector",
+							pos: { x: 0, y: 0 },
+							size: { width: 100, height: 10 },
+							properties: { d: "M0 5H100", slice: { output: "piece" } },
+						},
+					],
+				},
+				...t.template_data.slice(1),
+			],
+		} as Template;
+		const { controller, user } = mount(<List />, broken);
+		const list = screen.getByRole("region", { name: "Validation" });
+		expect(
+			within(list).getByText(
+				"An open path can't be a slice piece. Set its output to None",
+			),
+		).toBeTruthy();
+		await user.click(within(list).getByTestId("issue-path"));
+		expect(controller.state.selection).toEqual([key]);
+	});
+
 	test("an unknown field offers to create it, which clears the issue", async () => {
 		const { controller, user } = mount(<List />);
 		breakText(controller);

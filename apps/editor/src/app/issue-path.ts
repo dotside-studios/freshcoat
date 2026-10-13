@@ -171,6 +171,8 @@ export function issueMessage(
 			return C.fontFileSrc;
 		case "invalid_background_type":
 			return C.backgroundType;
+		case "slice_piece_open_path":
+			return C.slicePieceOpenPath;
 		case "not_an_object":
 			return C.notATemplate;
 		case "invalid_template_data":

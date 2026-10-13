@@ -264,5 +264,7 @@ export const ISSUE_COPY = {
 	sides: "The sides aren't valid",
 	fields: "The fields aren't valid",
 	unknownSetting: (name: string) => `Unknown setting ${name}`,
+	slicePieceOpenPath:
+		"An open path can't be a slice piece. Set its output to None",
 	invalid: (what: string) => `${what} isn't valid`,
 } as const;
