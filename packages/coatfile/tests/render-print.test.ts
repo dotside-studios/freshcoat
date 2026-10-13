@@ -3,6 +3,7 @@
 // white-clamp is observable without needing image assets.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
+import { type PrintTarget, YMCKO_DYE_SUB } from "@freshcoat-js/for-print";
 import { describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
@@ -91,5 +92,38 @@ describe("renderTemplate() print toggle", () => {
 		const d = decodePixels(ck, front.bytes)!;
 		const at = (20 * d.width + 20) * 4;
 		expect([...d.data.slice(at, at + 3)]).toEqual([245, 250, 250]);
+	});
+
+	test("a custom target brings its own finish and policy", async () => {
+		const ck = await ckInit();
+		const renderer = await createRenderer({ ck, cache: false });
+		const render = async (target: PrintTarget) => {
+			const [front] = await renderTemplate(
+				renderer,
+				template,
+				{},
+				{
+					width: 40,
+					height: 40,
+					print: { target },
+				},
+			);
+			return centerR(ck, front.bytes);
+		};
+		const plain: PrintTarget = { ...YMCKO_DYE_SUB, id: "plain", finish: {} };
+		expect(await render(plain)).toBe(250);
+		const darker: PrintTarget = {
+			...plain,
+			policy: {
+				graphic: {
+					saturation: 1,
+					contrast: 1,
+					sharpness: 0,
+					gamma: 2,
+					darkness: 0,
+				},
+			},
+		};
+		expect(await render(darker)).toBeLessThan(250);
 	});
 });

@@ -18,11 +18,15 @@ import {
 	type CalibrationBlocker,
 } from "./assess";
 import type { ChartReading } from "./measure";
+import { DEFAULT_PRINT_TARGET } from "./target";
 import type { ChannelBalance } from "./types";
 import { z } from "zod";
 
 export interface PrintProfileConditions {
 	printer?: string;
+	// The ribbon, ink or toner loaded.
+	media?: string;
+	/** @deprecated Written by older profiles; read through `profileMedia`. */
 	ribbon?: string;
 	stock?: string;
 }
@@ -36,6 +40,9 @@ export interface PrintProfile {
 	// tells someone six months later that the profile no longer describes what is
 	// in the machine, so it is required and should be specific.
 	name: string;
+	// The PrintTarget id this was measured on. Absent reads as "ymcko-dye-sub",
+	// the only target profiles were made for before this field existed.
+	target?: string;
 	// The measured cast correction. Absent means a profile exists but no gray ramp
 	// has been read into it yet.
 	balance?: ChannelBalance;
@@ -54,6 +61,7 @@ export interface PrintProfile {
 
 export type PrintProfileDetails = {
 	name: string;
+	target?: string;
 	measuredAt?: string;
 	notes?: string;
 	conditions?: PrintProfileConditions;
@@ -102,6 +110,7 @@ export function createPrintProfile(
 		profile: {
 			version: 1,
 			name: details.name.trim(),
+			...(details.target ? { target: details.target } : {}),
 			balance,
 			assessment,
 			...(details.measuredAt ? { measuredAt: details.measuredAt } : {}),
@@ -109,6 +118,16 @@ export function createPrintProfile(
 			...(conditions.data ? { conditions: conditions.data } : {}),
 		},
 	};
+}
+
+export function profileTarget(profile: PrintProfile): string {
+	return profile.target ?? DEFAULT_PRINT_TARGET.id;
+}
+
+export function profileMedia(
+	conditions: PrintProfileConditions | undefined,
+): string | undefined {
+	return conditions?.media ?? conditions?.ribbon;
 }
 
 // Identity for a render cache. A correction is part of what produced a PNG, so a
@@ -148,6 +167,7 @@ const conditionField = (field: keyof PrintProfileConditions) => {
 const conditionsSchema = z.object(
 	{
 		printer: conditionField("printer"),
+		media: conditionField("media"),
 		ribbon: conditionField("ribbon"),
 		stock: conditionField("stock"),
 	},
@@ -202,6 +222,11 @@ const profileSchema = z.object(
 			.min(1, {
 				error: "profile needs a name saying which printer it describes",
 			}),
+		target: z
+			.string({ error: "profile target must be a target id" })
+			.trim()
+			.min(1, { error: "profile target must be a target id" })
+			.optional(),
 		balance: balanceSchema.nullish(),
 		conditions: conditionsSchema.nullish(),
 		assessment: assessmentSchema.nullish(),
@@ -240,6 +265,7 @@ export function parsePrintProfile(input: unknown): PrintProfileParse {
 	const raw = result.data;
 
 	const profile: PrintProfile = { version: 1, name: raw.name };
+	if (raw.target !== undefined) profile.target = raw.target;
 	if (raw.balance) profile.balance = raw.balance;
 	if (raw.measuredAt !== undefined) profile.measuredAt = raw.measuredAt;
 	if (raw.notes !== undefined) profile.notes = raw.notes;

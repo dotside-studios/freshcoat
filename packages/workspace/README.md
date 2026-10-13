@@ -354,6 +354,9 @@ trim with the bleed outside the slot. The gap between cards is widened to
 marks sit on the trim and start outside the bleed. One card per page, each
 page gets a trim box inside its bleed box.
 Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
+A preset's `print.target` names the for-print print target; absent reads as
+`ymcko-dye-sub`, and an id this build does not know renders the item plain,
+with the reason, through the print fallback.
 
 ## License
 

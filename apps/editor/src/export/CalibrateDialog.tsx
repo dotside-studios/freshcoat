@@ -108,7 +108,7 @@ function CalibrateBody({
 		if (!photo || corners.length !== 4) return;
 		const conditions = {
 			...(printer.trim() ? { printer: printer.trim() } : {}),
-			...(ribbon.trim() ? { ribbon: ribbon.trim() } : {}),
+			...(ribbon.trim() ? { media: ribbon.trim() } : {}),
 			...(stock.trim() ? { stock: stock.trim() } : {}),
 		};
 		const result = profileFromPhoto(
