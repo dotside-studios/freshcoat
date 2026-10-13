@@ -203,6 +203,15 @@ export const FillSchema = z.union([
 // (index 0 = furthest back), matching Figma's stacked-fill semantic.
 export const FillsSchema = z.union([FillSchema, z.array(FillSchema)]);
 
+// A text element's stroke: StrokeSchema without dash, cap or trim. Default
+// center. Spans do not override it.
+export const TextStrokeSchema = z.object({
+	color: z.union([z.string(), ...GradientSchema.options]),
+	width: z.number(),
+	join: z.enum(["round", "bevel", "miter"]).optional(),
+	align: z.enum(["inside", "outside", "center"]).optional(),
+});
+
 const FontDescriptorObjectSchema = z.object({
 	family: z.string().optional(),
 	size: z.number().optional(),
@@ -256,6 +265,7 @@ export const TextPropertiesSchema = z.object({
 	// Optional gradient fill for the text (mapped to the element box). `color`
 	// remains the solid fallback.
 	fill: FillSchema.optional(),
+	stroke: TextStrokeSchema.optional(),
 	// start and end follow `direction`.
 	align: z
 		.enum(["left", "center", "right", "justify", "start", "end"])

@@ -109,6 +109,66 @@ describe("transpileText", () => {
 		expect("features" in (none.properties.font as object)).toBe(false);
 	});
 
+	describe("stroke", () => {
+		const red = { type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } } as const;
+
+		it("maps weight, alignment, join and a solid paint", () => {
+			const el = transpileText(
+				baseText({
+					strokes: [red],
+					strokeWeight: 3,
+					strokeAlign: "OUTSIDE",
+					strokeJoin: "ROUND",
+				}),
+				{ frame: FRAME, scale: 2 },
+			);
+			expect(el.properties.stroke).toEqual({
+				color: "#ff0000",
+				width: 6,
+				join: "round",
+				align: "outside",
+			});
+		});
+
+		it("maps a center stroke without an align", () => {
+			const el = transpileText(
+				baseText({ strokes: [red], strokeWeight: 1, strokeAlign: "CENTER" }),
+				{ frame: FRAME, scale: SCALE },
+			);
+			expect(el.properties.stroke).toEqual({ color: "#ff0000", width: 1 });
+		});
+
+		it("maps a single gradient paint", () => {
+			const el = transpileText(
+				baseText({
+					strokes: [
+						{
+							type: "GRADIENT_LINEAR",
+							gradientHandlePositions: [
+								{ x: 0, y: 0.5 },
+								{ x: 1, y: 0.5 },
+								{ x: 0, y: 1 },
+							],
+							gradientStops: [
+								{ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+								{ position: 1, color: { r: 0, g: 0, b: 1, a: 1 } },
+							],
+						},
+					],
+					strokeWeight: 2,
+				}),
+				{ frame: FRAME, scale: SCALE },
+			);
+			const stroke = el.properties.stroke as { color: { kind: string } };
+			expect(stroke.color.kind).toBe("linear");
+		});
+
+		it("is absent without a visible stroke", () => {
+			const el = transpileText(baseText(), { frame: FRAME, scale: SCALE });
+			expect("stroke" in el.properties).toBe(false);
+		});
+	});
+
 	describe("small caps", () => {
 		const withCase = (
 			textCase: FigmaTextNode["style"]["textCase"],

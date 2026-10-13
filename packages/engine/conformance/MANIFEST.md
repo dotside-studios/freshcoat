@@ -137,7 +137,7 @@ in full.
 
 ## Coverage
 
-72 cases.
+78 cases.
 
 | Covered | Cases |
 |---|---|
@@ -149,7 +149,7 @@ in full.
 | Shadows | `shadow-spread`, `shadow-inset`, `shadow-stacked` |
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing` |
 | Containers | `group-fills`, `group-isolate`, `group-pass-through` |
-| Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines` |
+| Text | `text-basic`, `text-align-right`, `text-align-justify`, `text-direction-rtl`, `text-font-features`, `text-max-lines`, `text-stroke-center`, `text-stroke-outside`, `text-stroke-inside` |
 | Adjust | `adjust-color-matrix`, `adjust-gamma-lut`, `adjust-saturation-zero`, `adjust-lut3d`, `adjust-sharpen`, `adjust-preserve-hue`, `adjust-preserve-hue-with-lut`, `adjust-alpha-matrix-falls-back`, `adjust-in-rotated-group`, `adjust-lut-keeps-blend` |
 | Effect order | `adjust-lut-keeps-shadow-color`, `adjust-matrix-keeps-shadow-color` |
 | Backdrop blur | `backdrop-blur`, `backdrop-blur-under-fill`, `backdrop-blur-in-isolated-group`, `backdrop-blur-in-mask`, `backdrop-blur-mask-node`, `backdrop-blur-text` |

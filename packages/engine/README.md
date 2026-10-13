@@ -119,7 +119,9 @@ own interior or exterior under its `fillRule`. `trimStart`, `trimEnd` and
 rect trims clockwise from its top left, an ellipse clockwise from its top and a
 path along its own direction. The trim cuts the outline before the `dash`
 pattern, so dashes start at the trimmed start and caps sit on the trimmed
-ends. A clipping group's
+ends. A text node's `stroke` takes `color` or `gradient`, `width`, `join` and
+`align`: `center` strokes over the fill, `outside` draws twice the width under
+it and `inside` twice the width kept where the glyphs cover. A clipping group's
 `cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
 
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter
@@ -252,14 +254,15 @@ be read or does not match its components, and a CMYK or EXIF-rotated one, is
 decoded to sRGB instead, as other images are. Text is shaped by CanvasKit
 exactly as it renders and set in its own font file, embedded with a ToUnicode
 map so it stays selectable, each glyph placed along its circle or path when the
-text follows a curve. That takes a TrueType, OpenType, WOFF or WOFF2 file. A
+text follows a curve. A solid text stroke is drawn with the glyphs in
+stroke mode (`1 Tr`), an `inside` one clipped to them (`7 Tr`). That takes a TrueType, OpenType, WOFF or WOFF2 file. A
 variable TrueType font is fixed at the instance the text uses before it is
 embedded.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
 preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
-with a spread, strokes aligned to a path, gradient-filled text, the `plus` and
+with a spread, strokes aligned to a path, gradient-filled or gradient-stroked text, the `plus` and
 `linear-burn` blend modes, text in a font collection or a variable CFF2 font,
 and SVG images holding text or filters. Bitmaps are drawn without smoothing.
 Everything beneath a backdrop blur, or the whole page under a frame finish, is
