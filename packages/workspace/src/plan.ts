@@ -1,4 +1,9 @@
-import { DEFAULT_VARIANT_ID, type Template } from "@freshcoat-js/coatfile";
+import {
+	DEFAULT_VARIANT_ID,
+	type ResolvedSlice,
+	resolveSlices,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import {
 	columnsByKey,
 	resolveValues,
@@ -86,6 +91,8 @@ export type FileNameContext = {
 	record: string;
 	/** the variant's id; absent or undefined is Default, named `default` */
 	variant?: string;
+	/** the slice a piece is cut from; absent or empty for a whole side */
+	slice?: string;
 	/** column key -> cell text */
 	cells?: Record<string, string>;
 	/** template field key -> value, for tokens that name no column */
@@ -93,16 +100,22 @@ export type FileNameContext = {
 };
 
 const VARIANT_TOKEN = /\{\{\s*variant\s*\}\}/;
+const SLICE_TOKEN = /\{\{\s*slice\s*\}\}/;
 
 /** The pattern an export names its files with. The empty pattern is the
- *  default one, and when every variant is exported a pattern that does not
- *  name the variant gets `-{{variant}}` appended, so no two files share a
+ *  default one. When every variant is exported a pattern that does not name
+ *  the variant gets `-{{variant}}` appended, and when pieces are exported one
+ *  that does not name the slice gets `-{{slice}}`, so no two files share a
  *  name. */
-export function fileNamePattern(pattern: string, everyVariant = false): string {
-	const source = pattern.trim() === "" ? DEFAULT_FILE_NAME_PATTERN : pattern;
-	return everyVariant && !VARIANT_TOKEN.test(source)
-		? `${source}-{{variant}}`
-		: source;
+export function fileNamePattern(
+	pattern: string,
+	everyVariant = false,
+	split = false,
+): string {
+	let source = pattern.trim() === "" ? DEFAULT_FILE_NAME_PATTERN : pattern;
+	if (everyVariant && !VARIANT_TOKEN.test(source)) source += "-{{variant}}";
+	if (split && !SLICE_TOKEN.test(source)) source += "-{{slice}}";
+	return source;
 }
 
 /** The extensions a photo arrives with. A value ending in one is a photo's
@@ -124,7 +137,14 @@ type FileNamePart = { literal: string } | { token: string };
 const FILE_NAME_TOKEN = "\\{\\{\\s*([^{}]*?)\\s*\\}\\}";
 
 /** What every pattern may name, besides fields and columns. */
-const BUILT_IN_TOKENS = ["template", "side", "index", "record", "variant"];
+const BUILT_IN_TOKENS = [
+	"template",
+	"side",
+	"index",
+	"record",
+	"variant",
+	"slice",
+];
 
 /** The tokens a pattern may name: the built-ins, the template's field keys and
  *  the dataset's column keys. */
@@ -164,6 +184,7 @@ function cleanFileName(text: string): string {
 function compileFileName(
 	source: string,
 	count: number,
+	appendedSlice = false,
 ): (ctx: FileNameContext) => string {
 	const width = String(Math.max(count, 1)).length;
 	const parts: FileNamePart[] = [];
@@ -190,6 +211,8 @@ function compileFileName(
 				return ctx.record;
 			case "variant":
 				return ctx.variant ?? DEFAULT_VARIANT_ID;
+			case "slice":
+				return ctx.slice ?? "";
 			default:
 				return (ctx.cells?.[token] ?? ctx.values?.[token] ?? "").replace(
 					SOURCE_EXTENSION,
@@ -205,6 +228,9 @@ function compileFileName(
 				"literal" in part
 					? part.literal
 					: cleanFileName(tokenValue(part.token, ctx));
+		// A whole side has no slice for an appended `-{{slice}}` to name.
+		if (appendedSlice && !ctx.slice && clean.endsWith("-"))
+			clean = clean.slice(0, -1);
 		return clean === "" || /^\.+$/.test(clean) ? "file" : clean;
 	};
 }
@@ -231,6 +257,15 @@ function sidesOf(template: Template, preset: ExportPreset): string[] {
 	return names.filter((name) => wanted.has(name));
 }
 
+/** A piece's size in design units: the slice's box and its bleed. */
+function pieceSizeOf(slice: ResolvedSlice): { width: number; height: number } {
+	const { box, bleed } = slice;
+	return {
+		width: box.width + bleed.left + bleed.right,
+		height: box.height + bleed.top + bleed.bottom,
+	};
+}
+
 /**
  * One item per selected record and side, in record order then side order,
  * with the values and variant each renders with and a unique file name. A
@@ -243,6 +278,12 @@ function sidesOf(template: Template, preset: ExportPreset): string[] {
  * something), each with all its sides before the next variant's. Those items'
  * keys end in the variant (`default` for Default), and their file names carry
  * it (`fileNamePattern`).
+ *
+ * With `split: "pieces"`, a side is planned once per slice shown for that
+ * record and variant whose `output` is `piece`, in slice order, with the
+ * slice's name as `piece`, its size as `pieceSize` and the name at the end of
+ * its key. A side with no such slice is planned whole. The file name carries
+ * the slice (`{{slice}}`, appended to a pattern that lacks it).
  *
  * A binding with a view reads the records the view keeps, with its joined
  * columns; a view with problems keeps none.
@@ -270,9 +311,11 @@ export function planExport(
 			: `@${preset.scale}x`;
 	const extension = fileExtension(preset.format);
 	const everyVariant = binding?.variant?.kind === "all";
+	const split = preset.split === "pieces";
 	const expandFileName = compileFileName(
-		fileNamePattern(preset.fileName, everyVariant),
+		fileNamePattern(preset.fileName, everyVariant, split),
 		records.length,
+		split && !SLICE_TOKEN.test(preset.fileName),
 	);
 	const columns = dataset ? columnsByKey(dataset) : undefined;
 	const unfilled = unfilledRequired(template, binding, workspace.datasets);
@@ -309,29 +352,48 @@ export function planExport(
 		}
 		const recordId = record?.id ?? "";
 		for (const variantId of variantIds) {
+			const variantKey = everyVariant ? [variantId ?? DEFAULT_VARIANT_ID] : [];
 			for (const side of sides) {
-				const base = expandFileName({
-					template: template.id,
-					side,
-					index: recordIndex + 1,
-					count: records.length,
-					record: recordId,
-					variant: variantId,
-					cells,
-					values,
-				});
-				items.push({
-					key: everyVariant
-						? `${recordId}:${side}:${variantId ?? DEFAULT_VARIANT_ID}`
-						: `${recordId}:${side}`,
-					recordId,
-					recordIndex,
-					side,
-					fileName: `${unique(base)}${suffix}.${extension}`,
-					values,
-					...(variantId !== undefined ? { variantId } : {}),
-					...(unfilled.length > 0 ? { unfilled } : {}),
-				});
+				const slices = split
+					? resolveSlices(template, {
+							frameName: side,
+							values,
+							variantId,
+						}).filter((slice) => slice.output === "piece")
+					: [];
+				const cuts: (ResolvedSlice | undefined)[] =
+					slices.length > 0 ? slices : [undefined];
+				for (const slice of cuts) {
+					const base = expandFileName({
+						template: template.id,
+						side,
+						index: recordIndex + 1,
+						count: records.length,
+						record: recordId,
+						variant: variantId,
+						...(slice ? { slice: slice.name } : {}),
+						cells,
+						values,
+					});
+					items.push({
+						key: [
+							recordId,
+							side,
+							...(slice ? [slice.name] : []),
+							...variantKey,
+						].join(":"),
+						recordId,
+						recordIndex,
+						side,
+						fileName: `${unique(base)}${suffix}.${extension}`,
+						values,
+						...(variantId !== undefined ? { variantId } : {}),
+						...(slice
+							? { piece: slice.name, pieceSize: pieceSizeOf(slice) }
+							: {}),
+						...(unfilled.length > 0 ? { unfilled } : {}),
+					});
+				}
 			}
 		}
 	});

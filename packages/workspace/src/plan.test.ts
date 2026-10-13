@@ -737,6 +737,7 @@ describe("unknownFileNameTokens", () => {
 			"index",
 			"record",
 			"variant",
+			"slice",
 			"name",
 			"number",
 			"photo",
@@ -909,10 +910,10 @@ describe("planExport with split: pieces", () => {
 			"r_p0000001:back:solo",
 		]);
 		expect(names(items)).toEqual([
-			"poster-1-front-left-default.png",
-			"poster-1-front-right-default.png",
+			"poster-1-front-default-left.png",
+			"poster-1-front-default-right.png",
 			"poster-1-back-default.png",
-			"poster-1-front-right-solo.png",
+			"poster-1-front-solo-right.png",
 			"poster-1-back-solo.png",
 		]);
 	});
