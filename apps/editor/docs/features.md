@@ -582,7 +582,7 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   bleed when it is narrower ("Gap widened to 6 mm for bleed"), and crop
   marks start outside the bleed. Bleed needs Template size.
 
-- **Paper:** A4, Letter, Legal, A3, Tabloid, or Custom in millimeters.
+- **Paper:** A4, A5, A6, Letter, Legal, A3, Tabloid, or Custom in millimeters.
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more
   cards, portrait on a tie. Margin (10 mm by default) and Gap (0) are in
   millimeters. The grid is centered inside the margins.
