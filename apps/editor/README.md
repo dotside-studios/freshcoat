@@ -159,10 +159,9 @@ covers shared checks and pull requests.
 - A zip past 4 GB or 65,535 files is written as zip64, which some older
   unzip tools cannot open. Download still hands over 512 MB parts, so that a
   job never holds more than one part in memory.
-- The canvas and the sheet preview show the trim only. Bleed is drawn as a
-  guide line, and what fills it appears only in an export with "Include
-  bleed". Bleed and safe area take one value for every side; a file can set
-  each side, but Studio edits them together.
+- The sheet preview shows the bleed only for a preset with "Include
+  bleed", since only then is it printed. On the canvas, a layer is hit and
+  selected by its own box, not by the part the bleed adds to it.
 - Sheets are a PDF feature. PNG, JPEG and WebP presets are one file per card
   side. Sheets also need Template size: a preset sized from each photo (Match
   image) can't be imposed, since every slot is the template's size and a

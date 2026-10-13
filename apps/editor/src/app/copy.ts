@@ -179,6 +179,10 @@ export const INSETS = {
 	bleedLabel: "Template bleed",
 	safeAreaLabel: "Template safe area",
 	mixed: "Mixed",
+	sides: { top: "T", right: "R", bottom: "B", left: "L" },
+	sideNames: { top: "top", right: "right", bottom: "bottom", left: "left" },
+	link: "Same value on every side",
+	unlink: "Set each side",
 	negative: "Bleed and safe area can't be negative",
 	safeAreaTooLarge: "The safe area must fit inside the template",
 } as const;

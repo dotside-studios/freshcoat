@@ -1,10 +1,12 @@
 import {
 	compactInsets,
 	resolveInsets,
+	type Sides,
 	type Template,
 	variantSize,
 } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { cn } from "@freshcoat-js/ui/lib/cn";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import { useRef, useState } from "react";
@@ -63,7 +65,7 @@ export function SizeSection({ template }: { template: Template }) {
 					<span className="w-16 shrink-0 truncate text-fc-muted text-fc-sm">
 						{INSETS[key]}
 					</span>
-					<TemplateInsetField
+					<TemplateInsets
 						template={template}
 						inset={key}
 						className="min-w-0 flex-1"
@@ -74,9 +76,15 @@ export function SizeSection({ template }: { template: Template }) {
 	);
 }
 
-/** One value for every side of the template's bleed or safe area. Sides set
- *  apart in the file show as mixed until a value is typed. */
-export function TemplateInsetField({
+const SIDES = ["top", "right", "bottom", "left"] as const;
+
+/**
+ * The template's bleed or safe area: one value for every side while linked,
+ * else a field per side. Sides set apart in the file start unlinked; linked,
+ * they show as mixed until a value is typed. Linking or unlinking alone
+ * leaves the file as it is.
+ */
+export function TemplateInsets({
 	template,
 	inset,
 	className,
@@ -86,23 +94,64 @@ export function TemplateInsetField({
 	className?: string;
 }) {
 	const controller = useController();
-	const compact = compactInsets(resolveInsets(template[inset]));
+	const [choice, setChoice] = useState<boolean>();
+	const sides = resolveInsets(template[inset]);
+	const compact = compactInsets(sides);
+	const linked = choice ?? typeof compact === "number";
+	const label = inset === "bleed" ? INSETS.bleedLabel : INSETS.safeAreaLabel;
+	const set = (value: (t: Template) => number | Sides, mergeKey: string) =>
+		controller.edit((t) => setTemplateInsets(t, inset, value(t)), {
+			mergeKey,
+			scope: "base",
+		});
+
 	return (
-		<NumberField
-			aria-label={inset === "bleed" ? INSETS.bleedLabel : INSETS.safeAreaLabel}
-			className={className}
-			value={typeof compact === "number" ? compact : null}
-			placeholder={INSETS.mixed}
-			min={0}
-			max={MAX_SIDE}
-			precision={2}
-			onChange={(n) =>
-				controller.edit((t) => setTemplateInsets(t, inset, n), {
-					mergeKey: inset,
-					scope: "base",
-				})
-			}
-		/>
+		<div className={cn("flex items-start gap-1", className)}>
+			{linked ? (
+				<NumberField
+					aria-label={label}
+					className="min-w-0 flex-1"
+					value={typeof compact === "number" ? compact : null}
+					placeholder={INSETS.mixed}
+					min={0}
+					max={MAX_SIDE}
+					precision={2}
+					onChange={(n) => set(() => n, inset)}
+				/>
+			) : (
+				<div
+					className="grid min-w-0 flex-1 grid-cols-2 gap-1"
+					data-testid={`${inset}-sides`}
+				>
+					{SIDES.map((side) => (
+						<NumberField
+							key={side}
+							label={INSETS.sides[side]}
+							aria-label={`${label} ${INSETS.sideNames[side]}`}
+							className="min-w-0"
+							value={sides[side]}
+							min={0}
+							max={MAX_SIDE}
+							precision={2}
+							onChange={(n) =>
+								set(
+									(t) => ({ ...resolveInsets(t[inset]), [side]: n }),
+									`${inset}.${side}`,
+								)
+							}
+						/>
+					))}
+				</div>
+			)}
+			<ToggleButton
+				aria-label={`Link ${inset === "bleed" ? "bleed" : "safe area"} sides`}
+				tooltip={linked ? INSETS.unlink : INSETS.link}
+				isSelected={linked}
+				onChange={setChoice}
+			>
+				{linked ? <LinkIcon /> : <UnlinkIcon />}
+			</ToggleButton>
+		</div>
 	);
 }
 

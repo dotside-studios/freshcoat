@@ -1,6 +1,6 @@
 import { INSETS, TEMPLATE_SETUP } from "~/app/copy";
 import {
-	TemplateInsetField,
+	TemplateInsets,
 	TemplateSizeFields,
 	useSizedVariant,
 } from "../setup/SizeSection";
@@ -32,11 +32,7 @@ export function SideSection({ ins }: { ins: Inspect }) {
 			</p>
 			{(["bleed", "safeArea"] as const).map((key) => (
 				<Row key={key} label={INSETS[key]}>
-					<TemplateInsetField
-						template={t}
-						inset={key}
-						className="min-w-0 flex-1"
-					/>
+					<TemplateInsets template={t} inset={key} className="min-w-0 flex-1" />
 				</Row>
 			))}
 		</InspectorSection>

@@ -1,3 +1,4 @@
+import { toggleBleed } from "~/canvas/bleed-view";
 import { togglePrintGuides } from "~/canvas/print-guides";
 import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
@@ -618,6 +619,14 @@ export const COMMANDS: Command[] = [
 		group: "View",
 		enabled: hasDoc,
 		run: ({ controller }) => togglePrintGuides(controller.state),
+	},
+	{
+		id: "view.bleed",
+		label: "Bleed",
+		group: "View",
+		sections: ["edit", "export"],
+		enabled: hasDoc,
+		run: () => toggleBleed(),
 	},
 	{
 		id: "view.renderStats",

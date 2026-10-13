@@ -18,7 +18,12 @@ import { frameToWorld, parseVectorPath, vectorFrame } from "~/doc/vector-edit";
 import { doc, geometryOf } from "./doc-fixture";
 
 vi.mock("~/canvas/use-live-render", () => ({
-	useLiveRender: () => ({ canvas: null, scale: 1, fontsLoading: false }),
+	useLiveRender: () => ({
+		canvas: null,
+		scale: 1,
+		bleed: { top: 0, right: 0, bottom: 0, left: 0 },
+		fontsLoading: false,
+	}),
 }));
 
 vi.stubGlobal(

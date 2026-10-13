@@ -1,5 +1,5 @@
 import { loadCanvasKit } from "@freshcoat-js/engine/browser";
-import { renderLiveFrame } from "./live-frame";
+import { renderLiveFrame, trimCrop } from "./live-frame";
 import type { PreviewReply, PreviewRequest } from "./preview-protocol";
 import { createPreviewReceiver } from "./preview-sync";
 import { createRenderSession, type RenderSession } from "./session";
@@ -72,7 +72,10 @@ async function render(msg: Extract<PreviewRequest, { type: "render" }>) {
 	if (!(canvas instanceof OffscreenCanvas))
 		throw new Error("the frame was painted off any canvas");
 	const bitmap = canvas.transferToImageBitmap();
-	const snapshot = msg.snapshot ? await createImageBitmap(bitmap) : undefined;
+	const crop = trimCrop(bitmap, result);
+	const snapshot = msg.snapshot
+		? await createImageBitmap(bitmap, crop.x, crop.y, crop.width, crop.height)
+		: undefined;
 	if (
 		display.canvas.width !== bitmap.width ||
 		display.canvas.height !== bitmap.height
