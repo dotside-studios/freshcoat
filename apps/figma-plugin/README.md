@@ -118,10 +118,13 @@ layers were kept, flattened or skipped.
 - **Small caps.** Case Small caps sets the `smcp` font feature, and Forced
   small caps `smcp` and `c2sc`, on the element or on the runs that use them,
   beside any OpenType features the layer sets.
-- **Text strokes.** coatfile text has no stroke, so a stroked text layer is
-  rasterized (`text_stroke_flattened`). A layer bound to a text field stays
-  text so the field still works, and its stroke is dropped with the warning
-  `text_stroke_unsupported`.
+- **Text strokes.** A text layer's stroke becomes the element's `stroke`:
+  its weight, position, join and one solid or gradient paint (solids stacked
+  in one stroke composite into one colour). A stroke coatfile text cannot
+  carry, an image paint, a gradient stacked with other paints or a dash, is
+  rasterized with the layer (`text_stroke_flattened`). A layer bound to a text
+  field stays text so the field still works, and such a stroke is dropped with
+  the warning `text_stroke_unsupported`.
 - **Text fields and runs.** A bound `text:` field keeps the layer's runs only
   when the runs spell out the template, each token whole inside one run, as in
   a layer whose content is `Hi {{name}}` with the token in bold: the value is
@@ -145,9 +148,8 @@ layers were kept, flattened or skipped.
   rasterized (`stroke_flattened`). A stroke with a different weight per side is dropped
   (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
   zero is left out.
-- **Corners.** Rectangles keep corner smoothing as `cornerSmoothing`, with
-  one radius or a different radius per corner. Frames keep their radius but
-  not smoothing, which coatfile frames do not carry.
+- **Corners.** Rectangles, frames and bound images keep corner smoothing as
+  `cornerSmoothing`, with one radius or a different radius per corner.
 - **Boolean operations.** A union, subtract, intersect or exclude stays a
   live boolean `vector`: its `operands` are the visible children, bottom-most
   first, each a `rect` (with its corner radii and smoothing) or a `vector` (rectangles,
@@ -193,9 +195,8 @@ layers were kept, flattened or skipped.
   `image_crop_unsupported`. A static image is rasterized as Figma draws it,
   filters and crop included.
 - **Field image shapes.** A bound image keeps its layer's outline and stroke.
-  A rectangle's corner radius becomes `cornerRadius`, or a `squircle` mask
-  with corner smoothing. Images take one radius, so different corners all get
-  the largest (`image_corner_radius_approximated`). A full ellipse becomes a
+  A rectangle's corner radii become `cornerRadius`, one number or per
+  corner, and its corner smoothing `cornerSmoothing`. A full ellipse becomes a
   `circle` or `ellipse` mask and a polygon a `polygon` mask, its box grown so
   the vertices land where Figma draws them; the photo fills that box. Partial
   arcs, donuts and polygons with rounded corners are rasterized and cannot
@@ -209,10 +210,11 @@ layers were kept, flattened or skipped.
   rotation and opacity. A layer the instance hides is hidden in the variant.
   The operands of a boolean are layers too: one the instance moves or hides is
   a change to that operand, and the boolean follows.
-  One the card hides and the instance shows stays hidden, with the warning
-  `variant_unhide_unsupported`: a variant can hide a layer, not add one. The
-  variant's id is its label's slug, suffixed `-2`, `-3` when another colorway
-  (or Default) already has it.
+  A layer the card hides and an instance shows goes in the file with
+  `hidden: true`, so Default leaves it out, and that variant shows it with
+  `hidden: false`; one no colorway shows is left out of the file. A hidden
+  mask layer stays hidden. The variant's id is its label's slug, suffixed `-2`,
+  `-3` when another colorway (or Default) already has it.
 - **Barcodes.** A layer named `barcode:{{sku}}` draws a Code 128 barcode of the
   field in the layer's box; `barcode:ean13:{{sku}}` names a symbology, and
   `barcode:ean13:5901234123457` a literal value. Options follow a `;` as for QR

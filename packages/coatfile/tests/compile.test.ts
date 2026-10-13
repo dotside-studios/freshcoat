@@ -560,6 +560,55 @@ describe("compile (frame → group)", () => {
 		]);
 	});
 
+	test("corner smoothing reaches the background, the clip and an outside stroke", () => {
+		const cmds = getCommands(
+			withFrame({
+				fill: "#000",
+				stroke: { color: "#000", width: 4, align: "outside" },
+				cornerRadius: [4, 0, 2, 0],
+				cornerSmoothing: 0.6,
+				clipsContent: true,
+				children: [],
+			}),
+			{},
+			{ width: 200, height: 120 },
+		);
+		const [outer, content] = findDraws(cmds, "drawGroup");
+		const shape = {
+			kind: "rounded-rect",
+			radius: [8, 0, 4, 0],
+			smoothing: 0.6,
+		};
+		expect(content!.clip).toEqual(shape);
+		const bg = (content as { children: DrawCommand[] })
+			.children[0] as DrawRectCommand;
+		expect(bg.cornerSmoothing).toBe(0.6);
+		expect(outer!.children[1]).toMatchObject({
+			op: "drawRect",
+			cornerRadius: [8, 0, 4, 0],
+			cornerSmoothing: 0.6,
+		});
+	});
+
+	test("a smoothed frame's backdropBlur takes its smoothed box", () => {
+		const tpl = withFrame({
+			fill: "#fff8",
+			cornerRadius: 6,
+			cornerSmoothing: 0.6,
+			children: [],
+		});
+		tpl.template_data[0].elements[0].backdropBlur = 10;
+		const group = findDraw(
+			getCommands(tpl, {}, { width: 100, height: 60 }),
+			"drawGroup",
+		)!;
+		expect(group.backdropClip).toEqual({
+			kind: "rounded-rect",
+			radius: 6,
+			smoothing: 0.6,
+		});
+	});
+
 	test("a clipping frame draws an outside stroke beyond its clip", () => {
 		const stroke = { color: "#000", width: 4, align: "outside" };
 		const cmds = getCommands(
@@ -819,6 +868,19 @@ describe("compile (image masks → draw command clip)", () => {
 		expect(findDraw(cmds, "drawImage")!.clip).toEqual({
 			kind: "rounded-rect",
 			radius: 16,
+		});
+	});
+
+	test("per-corner cornerRadius and cornerSmoothing lower to a smoothed clip", () => {
+		const cmds = getCommands(
+			withImage({ cornerRadius: [8, 0, 4, 0], cornerSmoothing: 0.6 }),
+			{},
+			{ width: 200, height: 120 },
+		);
+		expect(findDraw(cmds, "drawImage")!.clip).toEqual({
+			kind: "rounded-rect",
+			radius: [16, 0, 8, 0],
+			smoothing: 0.6,
 		});
 	});
 
@@ -2016,5 +2078,61 @@ describe("path text", () => {
 			},
 		});
 		expect(validate(tpl).ok).toBe(false);
+	});
+});
+
+describe("text stroke", () => {
+	const withStroke = (stroke: TextElement["properties"]["stroke"]) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0]!.elements.push({
+			id: "ink",
+			type: "text",
+			pos: { x: 20, y: 0 },
+			size: { width: 60, height: 20 },
+			properties: {
+				value: "Ink",
+				font: { family: "Comfortaa", size: 10 },
+				stroke,
+			},
+		});
+		return findDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		).find((t) => t.id === "ink")!;
+	};
+
+	test("scales the width and keeps join and align", () => {
+		const text = withStroke({
+			color: "#ff0000",
+			width: 1.5,
+			join: "round",
+			align: "outside",
+		});
+		expect(text.stroke).toEqual({
+			color: "#ff0000",
+			width: 3,
+			join: "round",
+			align: "outside",
+		});
+	});
+
+	test("a gradient colour carries through", () => {
+		const text = withStroke({
+			color: {
+				kind: "linear",
+				angle: 0,
+				stops: [
+					{ offset: 0, color: "#000" },
+					{ offset: 1, color: "#fff" },
+				],
+			},
+			width: 1,
+		});
+		expect(text.stroke?.color).toBe("#000");
+		expect(text.stroke?.gradient?.kind).toBe("linear");
+	});
+
+	test("a zero width draws no stroke", () => {
+		expect(withStroke({ color: "#000", width: 0 }).stroke).toBeUndefined();
 	});
 });

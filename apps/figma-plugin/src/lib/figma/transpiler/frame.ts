@@ -158,6 +158,7 @@ export function transpileFrame(
 			fill?: unknown;
 			stroke?: StrokeElement;
 			cornerRadius?: number | [number, number, number, number];
+			cornerSmoothing?: number;
 			clipsContent?: boolean;
 			isolate?: boolean;
 			layout?: unknown;
@@ -178,6 +179,8 @@ export function transpileFrame(
 
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
+	if (corners !== undefined && node.cornerSmoothing)
+		out.properties.cornerSmoothing = Math.min(1, node.cornerSmoothing);
 
 	const stroke = strokeToElement(node, ctx.scale, placed.size);
 	if (stroke) out.properties.stroke = stroke;

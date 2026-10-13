@@ -75,6 +75,9 @@ type AnyTextNode = AnySceneNode & {
 	fills: readonly AnyPaint[] | typeof figma.mixed;
 	strokes?: readonly AnyPaint[];
 	strokeWeight?: unknown;
+	strokeJoin?: unknown;
+	strokeAlign?: unknown;
+	dashPattern?: unknown;
 	getStyledTextSegments: (fields: string[]) => AnyTextSegment[];
 };
 
@@ -287,7 +290,19 @@ export function readTextNode(node: AnyTextNode): FigmaTextNode {
 		style,
 		fills,
 		...(strokes.length > 0
-			? { strokes, strokeWeight: plainNumber(node.strokeWeight) }
+			? {
+					strokes,
+					strokeWeight: plainNumber(node.strokeWeight),
+					...(typeof node.strokeJoin === "string"
+						? { strokeJoin: node.strokeJoin }
+						: {}),
+					...(typeof node.strokeAlign === "string"
+						? { strokeAlign: node.strokeAlign }
+						: {}),
+					...(Array.isArray(node.dashPattern) && node.dashPattern.length > 0
+						? { dashPattern: [...node.dashPattern] as number[] }
+						: {}),
+				}
 			: {}),
 		characterStyleOverrides: overrides,
 		styleOverrideTable: table,

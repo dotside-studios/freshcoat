@@ -598,6 +598,7 @@ class PageBuilder {
 				);
 			case "drawText":
 				if (cmd.fill && cmd.fill.kind !== "solid") return "gradient text";
+				if (cmd.stroke?.gradient) return "gradient text stroke";
 				return this.textPlan(cmd).reason ?? null;
 			case "drawImage": {
 				if (cmd.fit === "tile") return "tiled image";
@@ -1291,13 +1292,22 @@ class PageBuilder {
 			}
 		}
 		for (const band of plan.bands) decorations += this.band(band);
-		return (
-			segments
-				.map(
-					(s) => `q\n${s.color}BT\n${s.head}[${s.parts.join("")}] TJ\nET\nQ\n`,
-				)
-				.join("") + decorations
-		);
+		const show = (s: Segment) => `${s.head}[${s.parts.join("")}] TJ\n`;
+		const filled =
+			segments.map((s) => `q\n${s.color}BT\n${show(s)}ET\nQ\n`).join("") +
+			decorations;
+		const stroke = cmd.stroke;
+		const c = stroke ? rgba(stroke.color) : null;
+		if (!stroke || !c || c[3] <= 0 || !(stroke.width > 0)) return filled;
+		// Every fill, then every stroke, as CanvasKit layers them. An aligned
+		// stroke is twice as wide, under the fill or clipped to the glyphs (7 Tr).
+		const align = stroke.align ?? "center";
+		const width = align === "center" ? stroke.width : stroke.width * 2;
+		const glyphs = segments.map(show).join("");
+		const stroked = `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams({ ...stroke, width })}BT\n1 Tr\n${glyphs}ET\nQ\n`;
+		if (align === "outside") return stroked + filled;
+		if (align === "center") return filled + stroked;
+		return `${filled}q\nBT\n7 Tr\n${glyphs}ET\n${stroked}Q\n`;
 	}
 
 	// An arc text decoration, stroked along its circle.

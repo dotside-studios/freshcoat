@@ -119,6 +119,7 @@ export interface FrameProperties {
 	fill?: Fill | Fill[];
 	stroke?: z.infer<typeof StrokeSchema>;
 	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
+	cornerSmoothing?: number;
 	clipsContent?: boolean;
 	isolate?: boolean;
 	layout?: Layout;
@@ -162,6 +163,7 @@ export interface ElementShell {
 	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;
+	hidden?: boolean;
 	visibleWhen?: VisibilityCondition | VisibilityCondition[];
 }
 

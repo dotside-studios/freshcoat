@@ -46,6 +46,18 @@ describe("pasteStyle", () => {
 		expect(rect.rotation).toBe(30);
 	});
 
+	it("copies per-corner radii and smoothing onto an image", () => {
+		const t = styled();
+		const out = unwrap(
+			pasteStyle(t, ["0/2/0"], readStyle(el(t, "0/0"))),
+		).template;
+		const image = el(out, "0/2/0");
+		expect(image.type === "image" && image.properties).toMatchObject({
+			cornerRadius: [1, 2, 3, 4],
+			cornerSmoothing: 0.6,
+		});
+	});
+
 	it("clears what the source lacks", () => {
 		const t = styled();
 		const out = unwrap(
@@ -67,6 +79,34 @@ describe("pasteStyle", () => {
 			value: "Hi {{ name }}",
 			color: "#00ff00",
 			font: { family: "Inter", size: 16 },
+		});
+	});
+
+	it("gives text the shape's stroke without dash, cap or trim", () => {
+		const t = unwrap(
+			updateElement(doc(), "0/0", {
+				properties: {
+					stroke: {
+						color: "#0000ff",
+						width: 2,
+						dash: [4, 2],
+						cap: "round",
+						join: "round",
+						align: "outside",
+						trimEnd: 0.5,
+					},
+				},
+			}),
+		).template;
+		const out = unwrap(
+			pasteStyle(t, ["0/1/1"], readStyle(el(t, "0/0"))),
+		).template;
+		const text = el(out, "0/1/1");
+		expect(text.type === "text" && text.properties.stroke).toEqual({
+			color: "#0000ff",
+			width: 2,
+			join: "round",
+			align: "outside",
 		});
 	});
 

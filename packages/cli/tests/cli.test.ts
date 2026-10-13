@@ -851,6 +851,38 @@ describe("render export options", () => {
 		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
 	});
 
+	test("fills a sheet with copies of one card", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--frame",
+			"front",
+			"--sheets",
+			"a4",
+			"--copies",
+			"fill",
+			"--out",
+			"filled.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("filled.pdf")));
+		expect(pdf.getPageCount()).toBe(1);
+		const dry = await box.run("render", "badge.json", "--frame", "front", "--sheets", "a4", "--copies", "fill", "--out", "filled.pdf", "--dry-run");
+		expect(dry.stdout).toMatch(/, (\d+) per sheet · 1 sheet · \1 copies each\n$/);
+	});
+
+	test("lays cards out on a5 and a6 paper", async () => {
+		for (const [paper, page] of [
+			["a5", /^0 0 (420 595|595 420)$/],
+			["a6", /^0 0 (298 420|420 298)$/],
+		] as const) {
+			const run = await box.run("render", "badge.json", "--sheets", paper, "--out", `${paper}.pdf`, "-q");
+			expect(run.code).toBe(0);
+			expect((await mediaBoxes(await readFile(box.path(`${paper}.pdf`))))[0]).toMatch(page);
+		}
+	});
+
 	test("takes a custom paper size and says when the cards do not fit", async () => {
 		const fits = await box.run("render", "badge.json", "--sheets", "100x50", "--no-crop-marks", "--out", "custom.pdf", "-q");
 		expect(fits.code).toBe(0);
@@ -932,7 +964,7 @@ describe("render export options", () => {
 			[["badge.json", "--png-alpha", "always", "--out", "x.zip"], "Allowed choices are auto, keep"],
 			[["badge.json", "--scale", "1", "--scale", "2", "--out", "x.zip"], "an export takes one --scale"],
 			[["badge.json", "--quality", "101", "--out", "x.zip"], "Expected a whole number from 0 to 100"],
-			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
+			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, a5, a6, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
 			[["badges.coatworkspace", "--preset", "p_png", "--name", "x", "--out", "x.zip"], "--name applies only to templates"],
 		];
 		for (const [argv, message] of cases) {

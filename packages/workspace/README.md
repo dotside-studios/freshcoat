@@ -369,6 +369,13 @@ many presets name it, and one no preset names is left out. A workspace with an
 output intent is written at format 1.3; a 1.2 reader opens it without the
 intents, with a warning.
 
+A sheet layout's `copies` repeats each card that many times before the next
+one, for step and repeat; `"fill"` repeats it once per slot, so each record
+fills a sheet. `imposeSheets()` resolves it into the imposition's `copies`, and
+`sheetSummary()` adds "· 10 copies each". Under duplex each copy's back sits
+in the mirrored slot behind its own front. `assemblePdf()` embeds each image
+once however many slots it fills.
+
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`
 (coatfile's `bleedMm(pixels, dpi)` converts it). On sheets, each card is placed by its

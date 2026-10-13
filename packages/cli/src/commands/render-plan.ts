@@ -23,13 +23,14 @@ const PDF_OPTIONS = [
 	"duplex",
 	"margin",
 	"gap",
+	"copies",
 	"cropMarks",
 	"outputIntent",
 	"noOutputIntent",
 	"outputIntentId",
 	"cutLines",
 ];
-const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks"];
+const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
 
 /** What `render` runs for `file` and these options, or the UsageError that

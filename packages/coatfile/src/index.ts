@@ -335,6 +335,7 @@ export {
 	hiddenElementIds,
 	isEmptyDelta,
 	isEmptyVariant,
+	isHiddenBy,
 	mergedElementDelta,
 	type SameJsonOptions,
 	type SideDeltas,

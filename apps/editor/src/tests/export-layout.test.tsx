@@ -18,7 +18,14 @@ import {
 	shortSheetError,
 	withSideIndex,
 } from "@freshcoat-js/workspace/export";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
 import {
 	afterEach,
 	beforeAll,
@@ -297,6 +304,34 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		).toBeTruthy();
 		// a two-sided template has backs of its own
 		expect(screen.queryByLabelText("Blank backs")).toBeNull();
+	});
+
+	test("Copies repeats each card, or fills a sheet with it", async () => {
+		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
+		await openTab(user, "Print");
+		const copies = within(layoutGroup()).getByRole("spinbutton", {
+			name: "Copies",
+		});
+		fireEvent.focus(copies);
+		fireEvent.change(copies, { target: { value: "2" } });
+		fireEvent.keyDown(copies, { key: "Enter" });
+		expect(current().layout).toMatchObject({ copies: 2 });
+		// 42 items, 2 of each, 10 to an A4
+		expect(screen.getByTestId("export-sheet-summary").textContent).toBe(
+			"10 per sheet · 9 sheets · 2 copies each",
+		);
+		await user.click(
+			within(layoutGroup()).getByRole("checkbox", { name: "Fill sheet" }),
+		);
+		expect(current().layout).toMatchObject({ copies: "fill" });
+		expect(screen.getByTestId("export-sheet-summary").textContent).toBe(
+			"10 per sheet · 42 sheets · 10 copies each",
+		);
+		expect(copies).toHaveProperty("disabled", true);
+		await user.click(
+			within(layoutGroup()).getByRole("checkbox", { name: "Fill sheet" }),
+		);
+		expect(current().layout).toEqual(DEFAULT_SHEET_LAYOUT);
 	});
 
 	test("a card that doesn't fit shows inline and blocks Export", async () => {

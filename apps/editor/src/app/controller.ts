@@ -76,6 +76,7 @@ import {
 	removeElements,
 	removeVariant,
 	setBooleanOp,
+	setHiddenInDefault,
 	setHiddenInVariant,
 	ungroup,
 	updateElement,
@@ -87,6 +88,7 @@ import {
 	isBackgroundPath,
 	isBooleanVector,
 	keyOf,
+	MASK_SOURCE,
 	parentKeyOf,
 	parseKey,
 	siblingsOf,
@@ -1152,38 +1154,45 @@ export class EditorController {
 		return true;
 	}
 
-	/** The selected layers (or `keys`) the active variant can hide, with
-	 *  whether it hides each: empty with no active variant. */
+	/** The selected layers (or `keys`) that can be hidden in the active
+	 *  variant, or in Default with none, with whether each is. A mask's shape
+	 *  is never drawn, so it is left out. */
 	variantVisibility(
 		keys: readonly string[] = this.selectedLayers(),
 	): { key: string; side: string; id: string; hidden: boolean }[] {
 		const t = this.base;
 		const variant = this.variantId;
-		if (!t || variant === undefined) return [];
+		if (!t) return [];
 		return keys.flatMap((key) => {
 			const p = parseKey(key);
-			if (!p || isBackgroundPath(p)) return [];
+			if (!p || isBackgroundPath(p) || p.path.at(-1) === MASK_SOURCE) return [];
 			const side = t.template_data[p.side]?.name;
-			const el = getElement(t, key);
-			if (side === undefined || !el || !("id" in el) || !el.id) return [];
+			const el = getElement(t, key) as Element | undefined;
+			if (side === undefined || !el?.id) return [];
 			const id = el.id;
-			return [
-				{ key, side, id, hidden: isHiddenInVariant(t, variant, side, id) },
-			];
+			const hidden =
+				variant === undefined
+					? el.hidden === true
+					: isHiddenInVariant(t, variant, side, id);
+			return [{ key, side, id, hidden }];
 		});
 	}
 
-	/** Hides layers in the active variant, or shows them again, as one undo
-	 *  step. The eye in the layers tree is a view setting; this is saved. */
+	/** Hides layers in the active variant, or in Default with none, or shows
+	 *  them again, as one undo step. The eye in the layers tree is a view
+	 *  setting; this is saved. */
 	setHiddenInVariant(keys: readonly string[], hidden: boolean): void {
 		const variant = this.variantId;
 		const layers = this.variantVisibility(keys);
-		if (variant === undefined || layers.length === 0) return;
+		if (layers.length === 0) return;
 		this.edit(
 			(t) => {
 				let next = t;
 				for (const l of layers) {
-					const r = setHiddenInVariant(next, variant, l.side, l.id, hidden);
+					const r =
+						variant === undefined
+							? setHiddenInDefault(next, l.key, hidden)
+							: setHiddenInVariant(next, variant, l.side, l.id, hidden);
 					if (!r.ok) return r;
 					next = r.template;
 				}

@@ -215,7 +215,14 @@ export type PresetPrint = {
 	profile?: PrintProfile;
 };
 
-export type PaperName = "a4" | "letter" | "legal" | "a3" | "tabloid";
+export type PaperName =
+	| "a4"
+	| "a5"
+	| "a6"
+	| "letter"
+	| "legal"
+	| "a3"
+	| "tabloid";
 
 /** Cards imposed on sheets of paper, for a PDF. */
 export type SheetLayout = {
@@ -239,6 +246,9 @@ export type SheetLayout = {
 	/** a one-sided template under duplex gets empty back pages; default false,
 	 *  fronts only */
 	blankBacks?: boolean;
+	/** each card repeated this many times before the next; "fill" repeats it
+	 *  once per slot on a sheet. Default 1 */
+	copies?: number | "fill";
 };
 
 /** How a PDF places its images: one per page, or imposed on sheets. */

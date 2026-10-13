@@ -8,7 +8,13 @@ import {
 	spanTextStyle,
 	toColor,
 } from "@freshcoat-js/engine";
-import type { Canvas, CanvasKit, Paragraph, TextAlign } from "canvaskit-wasm";
+import type {
+	Canvas,
+	CanvasKit,
+	Paint,
+	Paragraph,
+	TextAlign,
+} from "canvaskit-wasm";
 
 export type TextProps = TextElement["properties"];
 export type Box = { x: number; y: number; width: number; height: number };
@@ -19,6 +25,8 @@ type Block = {
 	end: number;
 	top: number;
 	para: Paragraph;
+	// The same paragraph painted with the layer's stroke.
+	outline?: Paragraph;
 	emptyX: number;
 };
 type Line = { block: Block; start: number; top: number; height: number };
@@ -74,6 +82,7 @@ export class EditableText {
 	fontSize = 0;
 	private blocks: Block[] = [];
 	private lines: Line[] = [];
+	private strokeAlign: "center" | "outside" | "inside" = "center";
 	private set: SharedFontProvider | null = null;
 
 	constructor(private readonly ck: CanvasKit) {}
@@ -151,25 +160,27 @@ export class EditableText {
 			start: ck.TextAlign.Start,
 			end: ck.TextAlign.End,
 		};
+		const textStyle = {
+			...spanTextStyle(ck, { ...font, size }, families),
+			color: toColor(ck, props.color ?? ""),
+			...(lineHeight
+				? { heightMultiplier: lineHeight, halfLeading: true }
+				: {}),
+			...(font.decoration
+				? {
+						decoration:
+							font.decoration === "underline"
+								? ck.UnderlineDecoration
+								: ck.LineThroughDecoration,
+					}
+				: {}),
+		};
 		const style = new ck.ParagraphStyle({
 			textAlign: textAlign[align] ?? ck.TextAlign.Left,
 			textDirection: rtl ? ck.TextDirection.RTL : ck.TextDirection.LTR,
-			textStyle: {
-				...spanTextStyle(ck, { ...font, size }, families),
-				color: toColor(ck, props.color ?? ""),
-				...(lineHeight
-					? { heightMultiplier: lineHeight, halfLeading: true }
-					: {}),
-				...(font.decoration
-					? {
-							decoration:
-								font.decoration === "underline"
-									? ck.UnderlineDecoration
-									: ck.LineThroughDecoration,
-						}
-					: {}),
-			},
+			textStyle,
 		});
+		const pen = this.pen(props.stroke);
 		const edge =
 			align === "center"
 				? 0.5
@@ -189,7 +200,23 @@ export class EditableText {
 			const para = builder.build();
 			builder.delete();
 			para.layout(width);
-			const block = { start, end: start + part.length, top, para, emptyX };
+			let outline: Paragraph | undefined;
+			if (pen) {
+				const b = makeParagraphBuilder(ck, style, provider);
+				b.pushPaintStyle(new ck.TextStyle(textStyle), pen.fg, pen.bg);
+				b.addText(part);
+				outline = b.build();
+				b.delete();
+				outline.layout(width);
+			}
+			const block = {
+				start,
+				end: start + part.length,
+				top,
+				para,
+				outline,
+				emptyX,
+			};
 			this.blocks.push(block);
 			const metrics = para.getLineMetrics();
 			for (const lm of metrics)
@@ -206,6 +233,30 @@ export class EditableText {
 		}
 		this.height = top - spacing;
 		this.fontSize = size;
+		pen?.fg.delete();
+		pen?.bg.delete();
+	}
+
+	// A stroke paint for the outline paragraphs. A gradient stroke shows its
+	// first stop, the colour it compiles to as a fallback.
+	private pen(stroke: TextProps["stroke"]): { fg: Paint; bg: Paint } | null {
+		if (!stroke || !(stroke.width > 0)) return null;
+		const { ck } = this;
+		this.strokeAlign = stroke.align ?? "center";
+		const color =
+			typeof stroke.color === "string"
+				? stroke.color
+				: (stroke.color.stops[0]?.color ?? "");
+		const fg = new ck.Paint();
+		fg.setAntiAlias(true);
+		fg.setStyle(ck.PaintStyle.Stroke);
+		fg.setColor(toColor(ck, color));
+		fg.setStrokeWidth(stroke.width * (this.strokeAlign === "center" ? 1 : 2));
+		const join = { miter: "Miter", round: "Round", bevel: "Bevel" } as const;
+		fg.setStrokeJoin(ck.StrokeJoin[join[stroke.join ?? "miter"]]);
+		const bg = new ck.Paint();
+		bg.setColor(ck.TRANSPARENT);
+		return { fg, bg };
 	}
 
 	private blockAt(index: number): Block {
@@ -339,12 +390,39 @@ export class EditableText {
 			.flatMap((s) => this.rects(s.start, s.end));
 	}
 
+	/** The text, and its stroke layered as the render layers it. */
 	paint(canvas: Canvas): void {
-		for (const b of this.blocks) canvas.drawParagraph(b.para, 0, b.top);
+		const fill = () => {
+			for (const b of this.blocks) canvas.drawParagraph(b.para, 0, b.top);
+		};
+		const stroke = () => {
+			for (const b of this.blocks)
+				if (b.outline) canvas.drawParagraph(b.outline, 0, b.top);
+		};
+		if (!this.blocks.some((b) => b.outline)) {
+			fill();
+			return;
+		}
+		if (this.strokeAlign === "outside") stroke();
+		fill();
+		if (this.strokeAlign === "center") stroke();
+		if (this.strokeAlign !== "inside") return;
+		const keep = new this.ck.Paint();
+		keep.setBlendMode(this.ck.BlendMode.DstIn);
+		canvas.saveLayer();
+		stroke();
+		canvas.saveLayer(keep);
+		fill();
+		canvas.restore();
+		canvas.restore();
+		keep.delete();
 	}
 
 	private clear(): void {
-		for (const b of this.blocks) b.para.delete();
+		for (const b of this.blocks) {
+			b.para.delete();
+			b.outline?.delete();
+		}
 		this.blocks = [];
 		this.lines = [];
 	}

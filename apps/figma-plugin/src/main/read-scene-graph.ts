@@ -247,6 +247,7 @@ type AnyContainerNode = AnySceneNode & {
 	strokeAlign?: unknown;
 	dashPattern?: unknown;
 	cornerRadius?: unknown;
+	cornerSmoothing?: unknown;
 	topLeftRadius?: number;
 	topRightRadius?: number;
 	bottomRightRadius?: number;
@@ -318,6 +319,9 @@ function readContainer(
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
 		cornerRadius: readCornerRadius(node),
+		...(readCornerSmoothing(node.cornerSmoothing) !== undefined
+			? { cornerSmoothing: readCornerSmoothing(node.cornerSmoothing) }
+			: {}),
 		clipsContent: node.clipsContent,
 		layoutMode: node.layoutMode as never,
 		itemSpacing: node.itemSpacing,

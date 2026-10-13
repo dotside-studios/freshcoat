@@ -71,7 +71,10 @@ function dynamicImageElement(
 	};
 }
 
-type ImageShape = Pick<ImageProperties, "cornerRadius" | "mask" | "stroke">;
+type ImageShape = Pick<
+	ImageProperties,
+	"cornerRadius" | "cornerSmoothing" | "mask" | "stroke"
+>;
 
 function imageShape(
 	node: FigmaRectangleNode | FigmaVectorNode,
@@ -91,7 +94,7 @@ function imageShape(
 				"An image stroke, or a stack of strokes that are not all solid, on an image was left out.",
 			nodeId: node.id,
 		});
-	const clip = imageClip(node, size, scale, warnings);
+	const clip = imageClip(node, size, scale);
 	return { ...clip, ...(stroke ? { stroke } : {}) };
 }
 
@@ -99,8 +102,7 @@ function imageClip(
 	node: FigmaRectangleNode | FigmaVectorNode,
 	size: { width: number; height: number },
 	scale: number,
-	warnings: TemplateWarning[],
-): Pick<ImageProperties, "cornerRadius" | "mask"> {
+): Pick<ImageProperties, "cornerRadius" | "cornerSmoothing" | "mask"> {
 	if (node.type === "ELLIPSE")
 		return { mask: size.width === size.height ? "circle" : "ellipse" };
 	if (node.type === "POLYGON")
@@ -108,21 +110,12 @@ function imageClip(
 	if (node.type !== "RECTANGLE") return {};
 	const corners = scaleCorners(node.cornerRadius, scale);
 	if (corners === undefined) return {};
-	let radius: number;
-	if (typeof corners === "number") radius = corners;
-	else {
-		// An image takes one radius for all four corners.
-		radius = Math.max(...corners);
-		if (corners.some((c) => c !== radius))
-			warnings.push({
-				severity: "warn",
-				code: "image_corner_radius_approximated",
-				message: `Image corners were rounded to ${radius} on every side.`,
-				nodeId: node.id,
-			});
-	}
-	if (node.cornerSmoothing) return { mask: { kind: "squircle", radius } };
-	return { cornerRadius: radius };
+	return {
+		cornerRadius: corners,
+		...(node.cornerSmoothing
+			? { cornerSmoothing: Math.min(1, node.cornerSmoothing) }
+			: {}),
+	};
 }
 
 // Figma stretches a polygon's vertices to fill its box, while the polygon mask

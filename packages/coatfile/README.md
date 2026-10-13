@@ -411,7 +411,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -651,8 +651,8 @@ Figma does. Any other operand type fails validation with
 `invalid_boolean_operand`. A vector operand can carry its own `boolean`. `d`
 stays required and is the cached result, which is what a reader without a path
 op draws. `compile` takes a `pathOp` that rebuilds `d` (and `fillRule`) from
-the operands left after `visibleWhen`, the variant and `resize`: an operand
-hidden by either drops out, and a vector with nothing left draws nothing but
+the operands left after `hidden`, `visibleWhen`, the variant and `resize`: an
+operand hidden by any of them drops out, and a vector with nothing left draws nothing but
 keeps its box. `renderTemplate` passes one made with the renderer's CanvasKit;
 `canvasKitPathOp(renderer.ck)` is that function for `compile`, with results
 kept by operation and operand geometry. When the vector resizes, its operands
@@ -936,7 +936,8 @@ forms.
 ## Strokes and corners
 
 A stroke's `align` is `center` (the default), `inside` or `outside`, and every
-stroked `rect`, `image`, `vector` and `frame` honors it. A rect, frame or
+stroked `rect`, `image`, `vector`, `frame` and `text` honors it (see
+[Text stroke](#text-stroke)). A rect, frame or
 image strokes its outline inset or outset by half the width, following its
 corners or mask. A vector strokes at twice the width, clipped to its own
 interior or exterior under its `fillRule`, so an `evenodd` hole counts as
@@ -951,10 +952,14 @@ stroke and its dashes all sample the same gradient as a fill would.
 "stroke": { "width": 4, "align": "inside", "color": { "kind": "linear", "angle": 0, "stops": [ … ] } }
 ```
 
-A `rect` or `frame` takes `cornerRadius` as one number or per corner,
-`[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
-fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
-an `outside` stroke beyond its clip, so the clip never hides it.
+A `rect`, `frame` or `image` takes `cornerRadius` as one number or per
+corner, `[topLeft, topRight, bottomRight, bottomLeft]`, and `cornerSmoothing`
+from 0 to 1, Figma's corner smoothing. A frame applies them to its fill, its
+stroke, its backdrop blur and, with `clipsContent`, its clip. A clipping frame
+draws an `outside` stroke beyond its clip, so the clip never hides it. An
+image applies them to its clip and its stroke; its `mask` wins over both.
+Frame `cornerSmoothing`, per-corner image radii and image `cornerSmoothing`
+need 1.7. A smoothed outline is a path, so PDF keeps it vector.
 
 `trimStart` and `trimEnd` draw only part of a stroke, as fractions of
 the outline's length from its start; `trimOffset` rotates that part along the
@@ -1041,8 +1046,13 @@ share and validation paths as every other field. An unset toggle is its
 `default` (or off), so it is never reported missing even when listed in
 `required`.
 
+An element with `hidden: true` (1.7) stays in the file but is never drawn,
+whatever its `visibleWhen` says; a [variant](#variants) can show it again. Both
+are applied before layout, and an element is drawn only when neither drops it.
+
 `isElementVisible` and `fieldIsSet` are exported for a consumer that needs the
-same answer compile gets.
+same answer compile gets. `isElementVisible` tests `visibleWhen` alone;
+`pruneHiddenElements` also drops `hidden: true`.
 
 ## Variants
 
@@ -1062,6 +1072,34 @@ deltas, matched by id at any depth, inside frames and masks too:
   "hidden": true                        // 1.4: leave the element out
 }
 ```
+
+An element can be hidden in the base with its own `hidden: true` (1.7): it stays
+in the file but Default does not draw it. A delta with `hidden: false` shows it
+in that variant, so a layer only some variants use is written once:
+
+```jsonc
+// in template_data
+{ "id": "foil", "type": "rect", "hidden": true, "properties": { "fill": "#d4af37" } }
+// in the "gold" variant's override
+{ "id": "foil", "properties": {}, "hidden": false }
+```
+
+Whether an element is drawn is decided in this order:
+
+1. a delta with `hidden: true` leaves it out; with several deltas for one
+   element, any `hidden: true` wins over a `hidden: false`;
+2. else a delta with `hidden: false` shows it;
+3. else its own `hidden: true` leaves it out;
+4. an element left in is then still tested by its `visibleWhen`, which a
+   variant cannot change.
+
+Leaving an element out leaves out everything inside it. A mask's shape is never
+drawn itself, so `hidden` on it, in the base or a delta, is ignored; what the
+mask holds is hidden as any element is. A hidden boolean operand drops out of
+the combination. `isHiddenBy(element, delta)` answers steps 1 to 3 for one
+element and its merged delta. A reader older than 1.7 does not know an
+element's own `hidden` and draws the element in Default and in every variant;
+`minimumFormatVersion` stamps 1.7 when an element uses it.
 
 `properties` is required even when a delta changes only the shell, so write
 `{}`. A 1.3 reader then still accepts the file, drops the keys it does not know
@@ -1098,7 +1136,8 @@ whether a variant draws exactly as Default.
 `applyVariant(template, variantId, { hidden })` returns the template with one
 variant applied, which is what `compile` draws for `variantId`. A hidden element
 and everything inside it is removed by default (`hidden: "drop"`); `"keep"`
-leaves it in, for an editor that still lists it. A mask's shape is never drawn
+leaves it in with `hidden: true`, and without `hidden` where the variant shows
+it, for an editor that still lists it. A mask's shape is never drawn
 itself, so hiding it has no effect. The input is not mutated, `variants` is
 kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
@@ -1113,9 +1152,10 @@ variantId, sideName, elementId)` is one element's merged delta: later
 `properties` merge over earlier ones, and a later shell field replaces an
 earlier one only when it is set. An element is hidden when any of its deltas
 says `hidden: true`, so a later `hidden: false` does not show it again.
-`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, and
+`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, the
+base's own `hidden` included and Default's with no variant, and
 `sideBackground(t, variantId, sideName)` is the background it sets. An absent
-or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
+or unknown variant id reads as having no deltas. `VARIANT_SHELL_KEYS` lists the shell
 fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
 nothing beyond its id.
 
@@ -1338,6 +1378,28 @@ falls past either end is hidden; on a closed path the text wraps past the
 start point, and only what would run more than a whole lap is hidden. Either
 way the render reports a `text_path_overflow` warning naming the layer. A
 `ref` that names no sibling vector hides the whole text the same way.
+
+### Text stroke
+
+`stroke` (1.7) outlines a text element's glyphs. It takes `color` (a colour
+string or a gradient placed in the element's box), `width`, `join` and
+`align`; `dash`, `cap` and the trims are not part of a text stroke.
+
+```json
+"stroke": { "color": "#e63946", "width": 2, "align": "outside", "join": "round" }
+```
+
+| `align` | Drawn as |
+|---|---|
+| `center` (default) | The stroke on the glyph edge, over the fill |
+| `outside` | Twice the width, under the fill |
+| `inside` | Twice the width, kept where the glyphs cover |
+
+The stroke is the element's, so every span shares it. It follows straight,
+arc and path text, ellipsized and shrink-fitted lines alike. Decorations are
+not stroked. A PDF draws it as vector text (`Tr` 1, with `Tr` 7 clipping an
+`inside` stroke); a gradient stroke is rasterized with a `vector_rasterized`
+warning.
 
 ### Per-span line height
 

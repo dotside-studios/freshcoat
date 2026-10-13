@@ -11,6 +11,7 @@ import {
 	collectFilter,
 	collectScale,
 	collectSetting,
+	parseCopies,
 	parseJobs,
 	parseLength,
 	parseMinDpi,
@@ -158,7 +159,7 @@ function program(io: Io, onCommand: (name: string) => void) {
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
 			"--sheets <paper>",
-			"lay the cards out on a4, letter, legal, a3, tabloid or <w>x<h> mm paper",
+			"lay the cards out on a4, a5, a6, letter, legal, a3, tabloid or <w>x<h> mm paper",
 			arg(parsePaper),
 		)
 		.addOption(
@@ -169,6 +170,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 		)
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
+		.option(
+			"--copies <n|fill>",
+			"repeat each card this many times, or fill a sheet with it; default 1",
+			arg(parseCopies),
+		)
 		.option("--no-crop-marks", "leave out the crop marks")
 		.option(
 			"--output-intent <file>",

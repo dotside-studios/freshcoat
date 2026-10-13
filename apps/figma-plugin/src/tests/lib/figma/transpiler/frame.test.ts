@@ -145,6 +145,22 @@ describe("transpileFrame", () => {
 		expect(el.properties.cornerRadius).toEqual([16, 0, 8, 0]);
 	});
 
+	it("keeps corner smoothing with a corner radius", () => {
+		const el = transpileFrame(
+			baseFrame({ cornerRadius: [8, 0, 4, 0], cornerSmoothing: 0.6 }),
+			{ outerFrame: OUTER_FRAME, scale: 1 },
+		);
+		expect(el.properties.cornerSmoothing).toBe(0.6);
+	});
+
+	it("omits corner smoothing without a corner radius", () => {
+		const el = transpileFrame(baseFrame({ cornerSmoothing: 0.6 }), {
+			outerFrame: OUTER_FRAME,
+			scale: 1,
+		});
+		expect("cornerSmoothing" in el.properties).toBe(false);
+	});
+
 	it("carries an OUTSIDE frame stroke", () => {
 		const el = transpileFrame(
 			baseFrame({
