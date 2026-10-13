@@ -46,6 +46,18 @@ describe("pasteStyle", () => {
 		expect(rect.rotation).toBe(30);
 	});
 
+	it("copies per-corner radii and smoothing onto an image", () => {
+		const t = styled();
+		const out = unwrap(
+			pasteStyle(t, ["0/2/0"], readStyle(el(t, "0/0"))),
+		).template;
+		const image = el(out, "0/2/0");
+		expect(image.type === "image" && image.properties).toMatchObject({
+			cornerRadius: [1, 2, 3, 4],
+			cornerSmoothing: 0.6,
+		});
+	});
+
 	it("clears what the source lacks", () => {
 		const t = styled();
 		const out = unwrap(

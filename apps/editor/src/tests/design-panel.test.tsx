@@ -290,11 +290,30 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("keeps an image's corners uniform", () => {
-		setup(["0/2/0"]);
-		expect(
-			screen.queryByRole("button", { name: "Independent corners" }),
-		).toBeNull();
+	it("splits an image's corners and smooths them", () => {
+		const c = setup(["0/2/0"]);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Independent corners" }),
+		);
+		typeInto(spinbutton("TR radius"), "12");
+		typeInto(spinbutton("Corner smoothing"), "60");
+		expect(el(c, "0/2/0").properties).toMatchObject({
+			cornerRadius: [0, 12, 0, 0],
+			cornerSmoothing: 0.6,
+		});
+		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("smooths a frame's corners", () => {
+		const c = setup(["0/1"]);
+		typeInto(spinbutton("Corner radius"), "16");
+		typeInto(spinbutton("Corner smoothing"), "60");
+		expect(el(c, "0/1").properties).toMatchObject({
+			cornerRadius: 16,
+			cornerSmoothing: 0.6,
+		});
+		typeInto(spinbutton("Corner smoothing"), "0");
+		expect("cornerSmoothing" in el(c, "0/1").properties).toBe(false);
 	});
 
 	it("switches a frame to a grid and edits its tracks and gaps", () => {

@@ -285,8 +285,9 @@ the records, and **Export** turns templates and records into files.
     layer: rectangle, frame, image or vector. Its paint is a solid colour or a
     linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only.
-  - Rectangles and frames can set each corner's radius on its own. A frame
-    applies its corners to its fill, its stroke and its clip.
+  - Rectangles, frames and images can set each corner's radius on its own
+    and smooth their corners. A frame applies its corners to its fill, its
+    stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text content, image source, QR value and barcode value have an Insert
