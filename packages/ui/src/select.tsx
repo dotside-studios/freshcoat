@@ -22,6 +22,8 @@ export interface SelectProps<T extends object>
 	items?: Iterable<T>;
 	children: ReactNode | ((item: T) => ReactNode);
 	triggerClassName?: string;
+	/** Shown in the closed trigger in place of the selected item's text. */
+	triggerValue?: ReactNode;
 }
 
 export const triggerButton =
@@ -34,6 +36,7 @@ export function Select<T extends object>({
 	children,
 	className,
 	triggerClassName,
+	triggerValue,
 	placeholder = "Select…",
 	...props
 }: SelectProps<T>) {
@@ -65,7 +68,9 @@ export function Select<T extends object>({
 					triggerClassName,
 				)}
 			>
-				<SelectValue className="flex-1 truncate data-placeholder:text-fc-faint" />
+				<SelectValue className="flex-1 truncate data-placeholder:text-fc-faint">
+					{({ defaultChildren }) => triggerValue ?? defaultChildren}
+				</SelectValue>
 				<ChevronDownIcon className="size-3.5 shrink-0 text-fc-muted" />
 			</Button>
 			<Popover placement="bottom start" className="min-w-(--trigger-width)">
