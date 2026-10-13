@@ -213,6 +213,35 @@ describe("hitLayer with shapes", () => {
 		expect(tolerant(36, 100)).toBe("0/0");
 	});
 
+	it("hits a per-side stroke only on the sides that have a width", () => {
+		const square = (align: "inside" | "outside"): Element => ({
+			id: align,
+			type: "rect",
+			pos: { x: 50, y: 50 },
+			size: { width: 100, height: 100 },
+			properties: {
+				stroke: {
+					color: "#000000",
+					width: { top: 10, right: 0, bottom: 0, left: 4 },
+					align,
+				},
+			},
+		});
+		const inside = hitter(scene(under, square("inside")));
+		expect(inside(100, 55)).toBe("0/1");
+		expect(inside(100, 62)).toBe("0/0");
+		expect(inside(52, 100)).toBe("0/1");
+		expect(inside(56, 100)).toBe("0/0");
+		expect(inside(148, 100)).toBe("0/0");
+		const outside = hitter(scene(under, square("outside")));
+		expect(outside(100, 44)).toBe("0/1");
+		expect(outside(48, 100)).toBe("0/1");
+		expect(outside(152, 100)).toBe("0/0");
+		const tolerant = hitter(scene(under, square("outside")), 3);
+		expect(tolerant(44, 100)).toBe("0/1");
+		expect(tolerant(42, 100)).toBe("0/0");
+	});
+
 	it("hits a gradient stroke as it hits a solid one", () => {
 		const gradient = {
 			kind: "linear" as const,
