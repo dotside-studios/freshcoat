@@ -199,6 +199,7 @@ const PresetSchema = z.object({
 	print: z
 		.object({
 			enabled: z.boolean(),
+			target: z.string().min(1).optional(),
 			analyze: z.boolean().optional(),
 			// Refused rather than dropped: a preset that quietly lost its
 			// printer's correction would print cards nobody could account for.
