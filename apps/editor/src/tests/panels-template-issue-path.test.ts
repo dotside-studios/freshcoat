@@ -165,8 +165,8 @@ describe("issueMessage", () => {
 		};
 		const el = broken.template_data[0]?.elements[0];
 		if (el) el.opacity = "half";
-		// A layer's schema is a union of its types, so the layer is what fails.
-		expect(said(broken)).toEqual(["This layer isn't valid"]);
+		// The branch of the layer union its type matched names the key.
+		expect(said(broken)).toEqual(["Opacity isn't valid"]);
 		const wide = { ...doc(), width: 0 };
 		expect(said(wide)).toContain("Width must be a whole number above 0");
 	});

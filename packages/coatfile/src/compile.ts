@@ -48,6 +48,7 @@ import { substitute } from "./mustache";
 import { generatePixels } from "./qr";
 import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
+import { strokeSides, widestStroke } from "./stroke-width";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -75,6 +76,7 @@ import type {
 	ShapeMask,
 	Size,
 	Stroke,
+	StrokeSideWidths,
 	Symbology,
 	Template,
 	TemplateFrame,
@@ -294,9 +296,7 @@ function compileBackground(
 		rotation: bg.rotation,
 		opacity: bg.opacity,
 		blendMode: bg.blendMode,
-		shadow: scaleShadow(bg.shadow, 1),
-		blur: bg.blur,
-		backdropBlur: bg.backdropBlur,
+		...lowerEffects(bg, 1),
 		adjust: resolveAdjust(bg.adjust),
 	};
 	if (bg.type === "rect") {
@@ -319,11 +319,7 @@ function compileBackground(
 		fit: (props.fit as ImageNode["fit"]) ?? "cover",
 		...imageFraming(props),
 		stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
-		mask: resolveImageClip(
-			props.cornerRadius as number | undefined,
-			props.mask as ImageMaskInput | undefined,
-			1,
-		),
+		mask: resolveImageClip(props, 1),
 	};
 }
 
@@ -344,12 +340,7 @@ function compileElement(
 		rotation: el.rotation,
 		opacity: el.opacity,
 		blendMode: el.blendMode,
-		shadow: scaleShadow(el.shadow, ratio),
-		blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
-		backdropBlur:
-			typeof el.backdropBlur === "number"
-				? el.backdropBlur * ratio
-				: undefined,
+		...lowerEffects(el, ratio),
 		adjust: resolveAdjust(el.adjust),
 		layoutChild: mapLayoutChild(el.layoutChild, ratio),
 	};
@@ -375,11 +366,7 @@ function compileElement(
 				fit: (props.fit as ImageNode["fit"]) ?? "cover",
 				...imageFraming(props),
 				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
-				mask: resolveImageClip(
-					props.cornerRadius as number | undefined,
-					props.mask as ImageMaskInput | undefined,
-					ratio,
-				),
+				mask: resolveImageClip(props, ratio),
 			} satisfies ImageNode;
 		case "vector": {
 			const stroke = resolveStroke(
@@ -547,6 +534,7 @@ function compileText(
 		// standard — measured against Figma's own absoluteRenderBounds, which
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
+		...(props.pdfText === "outline" ? { pdfText: "outline" as const } : {}),
 		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
 		...(props.path
 			? { path: compileTextPath(props.path as TextPathInput, ratio) }
@@ -565,6 +553,15 @@ function compileText(
 	// A gradient text fill (mapped to the box) overrides the solid color.
 	const resolvedFill = resolveFill(props.fill as Fill | undefined, ratio);
 	if (resolvedFill && resolvedFill.kind !== "solid") node.fill = resolvedFill;
+	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
+	if (stroke)
+		node.stroke = {
+			color: stroke.color,
+			...(stroke.gradient ? { gradient: stroke.gradient } : {}),
+			width: stroke.width,
+			...(stroke.join ? { join: stroke.join } : {}),
+			...(stroke.align ? { align: stroke.align } : {}),
+		};
 	return node;
 }
 
@@ -653,6 +650,11 @@ function compileFrameElement(
 	const fills = resolveFills(props.fill as Fill | Fill[] | undefined, ratio);
 	const stroke = resolveStroke(props.stroke as StrokeInput | undefined, ratio);
 	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
+	const smoothing = cornerSmoothing(props);
+	const corners = {
+		cornerRadius,
+		...(smoothing !== undefined ? { cornerSmoothing: smoothing } : {}),
+	};
 	const clip = props.clipsContent === true;
 	// An outside stroke lies wholly beyond the box, so a clipping frame draws it
 	// outside its clip.
@@ -667,7 +669,7 @@ function compileFrameElement(
 					size,
 					fills,
 					stroke: bgStroke,
-					cornerRadius,
+					...corners,
 				}
 			: null;
 
@@ -690,7 +692,7 @@ function compileFrameElement(
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		clip,
-		cornerRadius,
+		...corners,
 		...(props.isolate === true ? { isolate: true } : {}),
 	};
 
@@ -744,11 +746,11 @@ function compileFrameElement(
 		adjust,
 		layoutChild,
 		...(isolate ? { isolate } : {}),
-		...(backdropBlur ? { backdropBlur, cornerRadius } : {}),
+		...(backdropBlur ? { backdropBlur, ...corners } : {}),
 		kind: "group",
 		children: [
 			{ ...content, pos: { x: 0, y: 0 } },
-			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, cornerRadius },
+			{ kind: "rect", pos: { x: 0, y: 0 }, size, stroke, ...corners },
 		],
 	};
 }
@@ -1235,7 +1237,7 @@ function hasOverrides(span: TextSpanInput): boolean {
 
 type StrokeInput = {
 	color: string | Gradient;
-	width: number;
+	width: number | StrokeSideWidths;
 	dash?: number[];
 	cap?: Stroke["cap"];
 	join?: Stroke["join"];
@@ -1255,13 +1257,68 @@ function resolveStroke(
 					color: color.stops[0]?.color ?? "#000000",
 					gradient: resolveFill(color, ratio) as GradientFill,
 				}),
-		width: stroke.width * ratio,
+		...resolveStrokeWidth(stroke.width, ratio),
 		dash: stroke.dash?.map((d) => d * ratio),
 		cap: stroke.cap,
 		join: stroke.join,
 		align: stroke.align,
 		...resolveStrokeTrim(stroke),
 	};
+}
+
+// The engine's `shadow`, `blur` and `backdropBlur` for an element's effects,
+// hidden ones left out. The engine fixes where each kind applies, so only the
+// shadows keep their array order.
+function lowerEffects(
+	el: Pick<Element, "effects" | "shadow" | "blur" | "backdropBlur">,
+	ratio: number,
+): Pick<Base, "shadow" | "blur" | "backdropBlur"> {
+	if (!el.effects) {
+		return {
+			shadow: scaleShadow(el.shadow, ratio),
+			blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
+			backdropBlur:
+				typeof el.backdropBlur === "number"
+					? el.backdropBlur * ratio
+					: undefined,
+		};
+	}
+	const shown = el.effects.filter((e) => !e.hidden);
+	const shadows: Shadow[] = [];
+	for (const e of shown) {
+		if (e.type !== "shadow") continue;
+		const { type: _type, hidden: _hidden, ...shadow } = e;
+		shadows.push(shadow);
+	}
+	const blur = shown.find((e) => e.type === "blur");
+	const backdropBlur = shown.find((e) => e.type === "backdropBlur");
+	return {
+		shadow: shadows.length > 0 ? scaleShadow(shadows, ratio) : undefined,
+		blur: blur ? blur.radius * ratio : undefined,
+		backdropBlur: backdropBlur ? backdropBlur.radius * ratio : undefined,
+	};
+}
+
+// A per-side width becomes the engine's `sides`, with `width` the widest. Four
+// equal sides are one width.
+function resolveStrokeWidth(
+	width: number | StrokeSideWidths,
+	ratio: number,
+): Pick<Stroke, "width" | "sides"> {
+	const s = strokeSides(width);
+	if (!s) return { width: (width as number) * ratio };
+	const sides = {
+		top: s.top * ratio,
+		right: s.right * ratio,
+		bottom: s.bottom * ratio,
+		left: s.left * ratio,
+	};
+	const widest = widestStroke(sides);
+	const uniform =
+		sides.top === sides.right &&
+		sides.top === sides.bottom &&
+		sides.top === sides.left;
+	return uniform ? { width: widest } : { width: widest, sides };
 }
 
 function scaleShadow(
@@ -1304,10 +1361,11 @@ function imageFraming(props: Record<string, unknown>): {
 }
 
 function resolveImageClip(
-	cornerRadius: number | undefined,
-	mask: ImageMaskInput | undefined,
+	props: Record<string, unknown>,
 	ratio: number,
 ): ShapeMask | undefined {
+	const mask = props.mask as ImageMaskInput | undefined;
+	const cornerRadius = scaleCorner(props.cornerRadius, ratio);
 	if (mask !== undefined) {
 		if (cornerRadius !== undefined) {
 			console.warn(
@@ -1329,10 +1387,11 @@ function resolveImageClip(
 			...(mask.cornerRadius ? { cornerRadius: mask.cornerRadius * ratio } : {}),
 		};
 	}
-	if (typeof cornerRadius === "number") {
-		return { kind: "rounded-rect", radius: cornerRadius * ratio };
-	}
-	return undefined;
+	if (cornerRadius === undefined) return undefined;
+	const smoothing = cornerSmoothing(props);
+	return smoothing
+		? { kind: "rounded-rect", radius: cornerRadius, smoothing }
+		: { kind: "rounded-rect", radius: cornerRadius };
 }
 
 // Scales every numeric coordinate in an SVG path string by `ratio`.
@@ -1349,6 +1408,12 @@ function scalePathString(d: string, ratio: number): string {
 			return Number.isFinite(val) ? String(val) : n;
 		});
 	}
+}
+
+function cornerSmoothing(props: Record<string, unknown>): number | undefined {
+	return typeof props.cornerSmoothing === "number" && props.cornerSmoothing > 0
+		? props.cornerSmoothing
+		: undefined;
 }
 
 function scaleCorner(cr: unknown, ratio: number): CornerRadius | undefined {

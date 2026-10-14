@@ -39,6 +39,7 @@ import {
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
 import { printProfileMismatch } from "@freshcoat-js/workspace/export";
 import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
+import type { SheetMark } from "../args";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { readBytes, readTemplate, warnLoad } from "../template-file";
 import {
@@ -76,18 +77,22 @@ export type BatchOptions = {
 	bleed?: true;
 	dpi?: number;
 	pdfPages?: "png" | "jpeg" | "vector";
+	pdfText?: "embed" | "outline";
 	sheets?: PaperName | { widthMm: number; heightMm: number };
 	duplex?: "long" | "short";
 	margin?: number;
 	gap?: number;
+	copies?: number | "fill";
 	cropMarks?: boolean;
 	backOffset?: { x: number; y: number };
 	blankBacks?: true;
 	printTarget?: "none" | keyof typeof PRINT_TARGETS;
 	printProfile?: string;
+	marks?: SheetMark[];
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
+	minDpi?: number;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
 	outputIntentId?: string;
@@ -173,7 +178,9 @@ export async function renderBatch(
 		...(options.cut ? { cutFile: options.cut } : {}),
 		...(options.cutLines ? { cutLines: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
+		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
+		...(options.pdfText ? { pdfText: options.pdfText } : {}),
 		...(profile
 			? { outputIntent: { kind: "profile", sha256: profile.sha256 } }
 			: options.outputIntent === false
@@ -184,12 +191,17 @@ export async function renderBatch(
 					layout: {
 						...DEFAULT_SHEET_LAYOUT,
 						paper: options.sheets,
-						cropMarks: options.cropMarks ?? true,
+						cropMarks:
+							options.cropMarks !== false && (options.marks?.includes("crop") ?? true),
+						...(options.marks?.includes("registration") ? { registrationMarks: true } : {}),
+						...(options.marks?.includes("colorbar") ? { colorBar: true } : {}),
+						...(options.marks?.includes("slug") ? { slug: true } : {}),
 						duplex: options.duplex ? `${options.duplex}-edge` : "none",
 						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
 						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
 						...(options.backOffset ? { backOffsetMm: options.backOffset } : {}),
 						...(options.blankBacks ? { blankBacks: true } : {}),
+						...(options.copies !== undefined ? { copies: options.copies } : {}),
 					},
 				}
 			: {}),

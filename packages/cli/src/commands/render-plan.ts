@@ -14,24 +14,27 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "minDpi", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
 	"pdfPages",
+	"pdfText",
 	"sheets",
 	"duplex",
 	"margin",
 	"gap",
+	"copies",
 	"cropMarks",
 	"backOffset",
 	"blankBacks",
+	"marks",
 	"outputIntent",
 	"noOutputIntent",
 	"outputIntentId",
 	"cutLines",
 ];
-const SHEET_OPTIONS = ["duplex", "margin", "gap", "cropMarks", "backOffset", "blankBacks"];
+const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks", "marks", "backOffset", "blankBacks"];
 const DUPLEX_OPTIONS = ["backOffset", "blankBacks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
 
@@ -63,6 +66,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.pieces ? { pieces: rest.pieces } : {}),
 				...(rest.cut ? { cut: rest.cut } : {}),
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
+				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
 				out,
 				quiet: input.quiet,
 			},
@@ -104,7 +108,7 @@ export async function runRender(file: string, input: RenderInput, io: Io): Promi
 }
 
 function templateOptions(input: Omit<RenderInput, "out">, out: string | undefined): RenderOptions {
-	const { values, set, variant, frame, scale, format, pngAlpha, dryRun, quiet } = input;
+	const { values, set, variant, frame, scale, format, pngAlpha, minDpi, dryRun, quiet } = input;
 	return {
 		...(values !== undefined ? { values } : {}),
 		...(set !== undefined ? { set } : {}),
@@ -113,6 +117,7 @@ function templateOptions(input: Omit<RenderInput, "out">, out: string | undefine
 		...(scale !== undefined ? { scale } : {}),
 		...(format !== undefined ? { format } : {}),
 		...(pngAlpha !== undefined ? { pngAlpha } : {}),
+		...(minDpi !== undefined ? { minDpi } : {}),
 		...(dryRun ? { dryRun } : {}),
 		...(out !== undefined ? { out } : {}),
 		quiet,
@@ -123,7 +128,7 @@ function exportProblem(
 	given: string[],
 	options: Pick<
 		RenderInput,
-		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "outputIntent" | "pieces" | "cut"
+		"scale" | "format" | "pngAlpha" | "quality" | "pdfPages" | "pdfText" | "outputIntent" | "pieces" | "cut"
 	>,
 	out: string,
 ): string | undefined {
@@ -140,6 +145,8 @@ function exportProblem(
 	const pdfOnly = given.filter((key) => PDF_OPTIONS.includes(key));
 	if (!pdf && pdfOnly.length > 0)
 		return listed(pdfOnly, "applies only to a .pdf", "apply only to a .pdf");
+	if (options.pdfText !== undefined && options.pdfPages !== "vector")
+		return "--pdf-text needs --pdf-pages vector";
 	if (given.includes("outputIntentId") && typeof options.outputIntent !== "string")
 		return "--output-intent-id needs --output-intent <file>";
 	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));

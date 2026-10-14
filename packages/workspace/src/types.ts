@@ -215,7 +215,14 @@ export type PresetPrint = {
 	profile?: PrintProfile;
 };
 
-export type PaperName = "a4" | "letter" | "legal" | "a3" | "tabloid";
+export type PaperName =
+	| "a4"
+	| "a5"
+	| "a6"
+	| "letter"
+	| "legal"
+	| "a3"
+	| "tabloid";
 
 /** Cards imposed on sheets of paper, for a PDF. */
 export type SheetLayout = {
@@ -231,6 +238,13 @@ export type SheetLayout = {
 	gapMm: number;
 	/** default true */
 	cropMarks: boolean;
+	/** a target centred in each margin, on fronts and backs; default false */
+	registrationMarks?: boolean;
+	/** grey and colour patches in the bottom margin; default false */
+	colorBar?: boolean;
+	/** job name, sheet number, side and date in the top margin; default
+	 *  false */
+	slug?: boolean;
 	/** default none */
 	duplex: "none" | "long-edge" | "short-edge";
 	/** default 0,0; moves every back page, for a printer that drifts. `y` is
@@ -239,6 +253,9 @@ export type SheetLayout = {
 	/** a one-sided template under duplex gets empty back pages; default false,
 	 *  fronts only */
 	blankBacks?: boolean;
+	/** each card repeated this many times before the next; "fill" repeats it
+	 *  once per slot on a sheet. Default 1 */
+	copies?: number | "fill";
 };
 
 /** How a PDF places its images: one per page, or imposed on sheets. */
@@ -287,12 +304,18 @@ export type ExportPreset = {
 	/** what a PDF page embeds, default png. vector draws each card as PDF
 	 *  vectors, with any layer a PDF cannot express as an image */
 	pdfPageImage?: "png" | "jpeg" | "vector";
+	/** vector PDF pages only: "outline" draws text as the outlines of its
+	 *  glyphs, with no font in the PDF; default embed */
+	pdfText?: "embed" | "outline";
 	/** default download */
 	destination?: ExportDestination;
 	/** PNG density, 1..4; a size from an image ignores it */
 	scale: number;
 	/** PDF physical size: widthPx / dpi inches (default 300) */
 	dpi: number;
+	/** warn for an image that prints below this many pixels to the inch at
+	 *  `dpi`; default 300, 0 for no check */
+	minImageDpi?: number;
 	/** file name pattern */
 	fileName: string;
 	/** default true */

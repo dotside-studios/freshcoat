@@ -23,8 +23,8 @@ import {
 	elementBlendMode,
 	type FlattenReason,
 	groupIsolates,
-	hasTextStroke,
 	isQrLayerName,
+	textStrokeUnmappable,
 } from "./classify";
 import type { FlattenMarker } from "./coalesce";
 import { elementConstraints, groupConstraints } from "./constraints";
@@ -36,7 +36,7 @@ import {
 	renderBoundsOf,
 	toAuthorSpace,
 } from "./coordinates";
-import { extractEffects } from "./effects";
+import { extractEffects, hasVisibleEffect } from "./effects";
 import { addVisibility, maskRuns } from "./finalize";
 import { layoutChildFromNode, transpileFrame } from "./frame";
 import { withoutGuides } from "./guides";
@@ -359,8 +359,7 @@ function walkNode(
 		// to hang them on. See groupLayer for the coordinate work that costs.
 		const fx = extractEffects(n.effects, scale, localFrame.rotation);
 		if (
-			fx.shadow !== undefined ||
-			fx.blur !== undefined ||
+			hasVisibleEffect(fx) ||
 			elementBlendMode(n) !== undefined ||
 			groupIsolates(n)
 		) {
@@ -433,11 +432,11 @@ function walkNode(
 			// The binding names the element (see transpileText) — resolved the
 			// same way the image branch below resolves its own.
 			el = transpileText(n, ctx, w.resolveBinding(n)?.bind.text);
-			if (hasTextStroke(n))
+			if (textStrokeUnmappable(n))
 				w.sink.warnings.push({
 					severity: "warn",
 					code: "text_stroke_unsupported",
-					message: `Text layer "${n.name}" has a stroke, which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
+					message: `Text layer "${n.name}" has a stroke coatfile text cannot carry (an image or mixed paint, or a dash), which was dropped: it is bound to a field, so it was kept as text instead of rasterized.`,
 					nodeId: n.id,
 				});
 		} else if (c.kind === "native-rect" && isRectangleNode(n))
@@ -605,9 +604,7 @@ function walkNode(
 		const worldRotation =
 			localFrame.rotation + ((el.rotation as number | undefined) ?? 0);
 		const fx = extractEffects(n.effects, scale, worldRotation);
-		if (fx.shadow) el.shadow = fx.shadow;
-		if (fx.blur !== undefined) el.blur = fx.blur;
-		if (fx.backdropBlur !== undefined) el.backdropBlur = fx.backdropBlur;
+		if (fx.effects) el.effects = fx.effects;
 		// classify() declines to rasterize a layer set to Multiply/Screen/…
 		// precisely because the element can carry the mode itself. Dropping it
 		// here would composite that layer as Normal with nothing to say so —
@@ -632,6 +629,7 @@ function walkNode(
 	}
 }
 
+// Per-side weights Figma reported but could not be read.
 function shapeWarnings(n: FigmaNode, warnings: TemplateWarning[]): void {
 	if (
 		(isRectangleNode(n) || isContainerNode(n)) &&
@@ -696,8 +694,7 @@ function groupLayer(
 		size: box.size,
 		properties: { children: [] as unknown[] },
 	};
-	if (fx.shadow !== undefined) el.shadow = fx.shadow;
-	if (fx.blur !== undefined) el.blur = fx.blur;
+	if (fx.effects) el.effects = fx.effects;
 	const blend = elementBlendMode(n);
 	if (blend) el.blendMode = blend;
 	if (n.blendMode === "NORMAL")

@@ -11,8 +11,10 @@ the records, and **Export** turns templates and records into files.
 ## Overview
 
 - **Workspaces:**
-  - Start from a starter, a preset size (CR80 card, A4, square, poster, badge)
-    or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
+  - Start from a starter, a preset size (CR80 card, A4, square, poster,
+    badge, US and EU business card, 4 × 6 in and A6 postcard, 4 × 6 in
+    shipping label), a custom size in px, mm or in (mm and in are rounded
+    up to whole px at 300 DPI), or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
     template `.json` with **Open file…** (Ctrl/Cmd+O). Files saved before the rename, `.tkit` and `.tkit.json`,
     still open. A template opened on its own becomes a one-template workspace.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
@@ -69,6 +71,31 @@ the records, and **Export** turns templates and records into files.
   inside the template, so a resize that would take that room away is
   refused. The format is described in the
   [coatfile guide](../../../packages/coatfile/README.md#bleed-and-safe-area).
+- **Image resolution:** an image that prints below 300 DPI is listed under
+  "Print hints" in the Issues list, as "Prints at 200 DPI, under 300", with a
+  link to the layer. The resolution is the image's pixels over the inches the
+  layer covers, after its crop and fit, on the axis with fewer: a 600 px wide
+  image placed 3 in wide at 300 DPI prints at 200. The template is measured at
+  the lowest DPI of its export presets, 300 without one, and checked against
+  their highest minimum; a preset's `minImageDpi` sets it, and 0 turns the
+  check off. An image bound to a field is checked as the record renders, and
+  shows under "Last render" as "Image prints at 200 DPI, under 300: photo".
+  An export lists the same warning for each item it applies to, in its
+  `export-report.csv`.
+- **Print checks:** the Issues list's "Print hints" also name layers that
+  may not print as they look, each with a link that selects the layer:
+  text below 6 pt at print size (7 pt for a light weight or a Thin or Light
+  family), as "Text is 4.8 pt at print size, below 6 pt"; strokes thinner than
+  0.25 pt; text under 12 pt in a near-black mixed from unequal channels, which
+  may print as rich black and blur if the plates are out of register (advice
+  only, since the colours are sRGB); and, with a bleed, a rect, image or frame
+  that runs to the trim but not into the bleed. Sizes are read at the lowest
+  DPI of the template's export presets, 300 without one. Text whose content or
+  colour comes from a field, or that shrinks to fit, is checked as the record
+  renders and shows under "Last render"; an export lists the same warnings in
+  its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
+  `rich_black_text` and `short_of_bleed`, described in the
+  [coatfile guide](../../../packages/coatfile/README.md#print-checks).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
   under the template size re-places layers by them, and an export sized
@@ -148,9 +175,11 @@ the records, and **Export** turns templates and records into files.
     DPI, with PNG or JPEG page images or as vectors, or lays the cards out
     on sheets of paper with crop marks (see [Sheets](#sheets)). Vector pages
     keep shapes and SVG logos sharp at any size and set text in its embedded
-    font, selectable when the font is a TrueType or OpenType file; a layer a
-    PDF cannot express, such as a shadow, or text in a web font file, is drawn
-    as a 600 dpi image in place.
+    font, selectable, or with Text set to Outline, as the shapes of its
+    glyphs with no font in the file, for a print shop that asks for outlined
+    text. Text in a font collection or a CFF2 variable font is outlined
+    either way. A layer a PDF cannot express, such as a shadow, is drawn as a
+    600 dpi image in place.
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
   value, or a pattern. One binding serves every preset that exports the
   template. Choosing a dataset matches fields to columns by key or title,
@@ -190,7 +219,8 @@ the records, and **Export** turns templates and records into files.
     style, without the content. Pasting a style is one undo step.
   - Double-click a selected text layer to edit it in place: a text box in
     the layer's font stands in for it, with the raw template text and its
-    `{{field}}` tokens, even while a record preview fills the fields in. Esc,
+    `{{field}}` tokens, even while a record preview fills the fields in. The
+    box shows the layer's stroke, a gradient one in its first stop's colour. Esc,
     Mod+Enter or clicking away ends the edit, which is one undo step. Mixed-style
     text is edited in the inspector. Typing `{{` there, or in the inspector's
     text content, suggests field keys: arrows choose, Enter or Tab inserts,
@@ -201,14 +231,28 @@ the records, and **Export** turns templates and records into files.
   - The side's name above the artboard and in the status bar is a menu of
     the sides, so they switch with the panels closed; Alt+, and Alt+. step
     through them.
-  - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
-    They follow the pan and zoom, and mark the selection's extent with its
-    edges' positions.
+  - Rulers: View > Rulers or Shift+R shows top and left rulers in the
+    display unit. They follow the pan and zoom, and mark the selection's
+    extent with its edges' positions.
+  - Units: View > Units, or the menu in the rulers' corner, shows lengths in
+    pixels, millimeters, inches or points. The choice is remembered in this
+    browser. Designs stay in design px; mm, in and pt convert at the active
+    template's export preset DPI (300 by default), not at 72, so a CR80 card
+    reads 85.68 × 54.02 mm. Rulers step 1, 2, 5 or 10 mm and halve inches
+    down to 1/16. The inspector's position, size, corner radius, stroke
+    width and font size, the side's size, bleed and safe area, guides, the
+    canvas size label and the status bar follow the unit. A field also
+    takes a typed suffix in any unit, such as `3mm`, `0.125in`, `12pt`,
+    `40px` or `1cm`, within an expression (`10mm + 2`). Shown values are
+    rounded (2 places, 3 for inches), and a field that is left as shown
+    keeps its px value, so switching units never moves anything.
   - Guides: drag from a ruler onto the canvas to add a guide, and drag it
     back onto the ruler to remove it. Moving and resizing snap to guides as
     they do to layers. A guide is a slider for the keyboard: focus a ruler
     and press Enter to add one at the middle of the view, then arrow keys
-    move it (Shift for 10) and Delete removes it. View > Remove guides clears
+    move it by one unit (1 px, 1 mm, 1/16 in or 1 pt; Shift for 10) and
+    Delete removes it. A dragged guide snaps to 1 px, 0.1 mm, 1/32 in or
+    0.5 pt. View > Remove guides clears
     the side. Each side keeps its own guides, and adding, moving and removing
     them are undo steps. Guides are saved in the `.coatworkspace`, not the
     template, so a `.coat` and every export are unchanged.
@@ -282,11 +326,13 @@ the records, and **Export** turns templates and records into files.
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
   - A stroke sits inside, centered on or outside the edge of any stroked
-    layer: rectangle, frame, image or vector. Its paint is a solid colour or a
-    linear, radial or angular gradient, edited with the same controls as a
-    gradient fill. The canvas gradient handles follow fills only.
-  - Rectangles and frames can set each corner's radius on its own. A frame
-    applies its corners to its fill, its stroke and its clip.
+    layer: rectangle, frame, image, vector or text. Its paint is a solid colour
+    or a linear, radial or angular gradient, edited with the same controls as a
+    gradient fill. The canvas gradient handles follow fills only. A text
+    stroke takes a position and a join but no dash, trim or cap.
+  - Rectangles, frames and images can set each corner's radius on its own
+    and smooth their corners. A frame applies its corners to its fill, its
+    stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Text content, image source, QR value and barcode value have an Insert
@@ -396,7 +442,7 @@ action.
 |---|---|
 | `?sample=<id>` | a bundled sample: `membership-card`, `certificate`, `minimal` |
 | `?starter=<id>` | a starter: `davi-card`, `photo-watermark`, `event-badge`; `davi-card-portrait` opens `davi-card` |
-| `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge` |
+| `?new=<preset>` | a new template: `card-cr80`, `a4-landscape`, `square`, `portrait-poster`, `badge`, `business-card`, `business-card-eu`, `postcard`, `postcard-a6`, `shipping-label` |
 
 A template can also arrive in the fragment, as the Figma plugin sends it:
 `#coat=<data>`, with `#open=1` pointing at **Open file…** when the template
@@ -582,14 +628,28 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   bleed when it is narrower ("Gap widened to 6 mm for bleed"), and crop
   marks start outside the bleed. Bleed needs Template size.
 
-- **Paper:** A4, Letter, Legal, A3, Tabloid, or Custom in millimeters.
+- **Paper:** A4, A5, A6, Letter, Legal, A3, Tabloid, or Custom in millimeters.
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more
   cards, portrait on a tie. Margin (10 mm by default) and Gap (0) are in
   millimeters. The grid is centered inside the margins.
+- **Copies:** each card is repeated this many times (1 by default) before
+  the next record's, step and repeat for a sheet of the same design. "Fill
+  sheet" repeats each card once per slot, so every record gets a full sheet;
+  the count then shows how many fit. Under Double-sided, each copy's back
+  lands behind its own front.
 - **Crop marks** (on by default): 0.25 pt black lines 4 mm long, starting
   1 mm outside each cut line, in the margin and in gaps wide enough to hold
   them (10 mm), never across a card. They are drawn on fronts only, since
   the cut is made from the front.
+- **Registration marks, Color bar, Slug** (off by default): a crosshair
+  target centered in each margin, on fronts and backs, with a back's
+  targets landing behind its front's; a strip of gray steps and color
+  patches in the bottom margin; and a line in the top margin with the
+  preset's name, "Sheet 2 of 5", the side when double-sided, and the date.
+  Each is drawn only where its margin has room, the color bar and slug
+  outside the crop marks and clear of a target. Marks are pure black until
+  PDFs gain a registration color. See
+  [Printer's marks](../../../packages/workspace/README.md#printers-marks).
 - **Double-sided:** when it is on, "Flip on" picks Long edge or Short edge,
   to match the printer's setting. Each record's back goes on the next page
   in the slot that lands behind its front. A flip mirrors the sheet across
@@ -602,14 +662,15 @@ A PDF preset's Layout group chooses **One per page** (the default) or
   backs" puts an empty back page after each sheet of fronts, so a duplex
   printer keeps its page pairs (off by default: fronts only).
 - **Summary:** a line under the group reads "10 per sheet · 21 sheets" for
-  the records the Export button would run. A layout that can't be imposed (a
+  the records the Export button would run, with "· 10 copies each" when
+  cards repeat. A layout that can't be imposed (a
   card larger than the paper inside its margins, or a template with more
   than two sides under Double-sided) says why inline and disables Export;
   the job bar shows a short form, such as "Doesn't fit the paper", with the
   whole message on hover.
 - **Sheet preview:** Sheet joins Output, Source and Split in the preview
   toolbar. It draws the current sheet at its paper's aspect, each slot with
-  its record rendered at a low scale, plus the crop marks, and steps with
+  its record rendered at a low scale, plus the marks, and steps with
   "Sheet 3 of 21". A Front and Back switch picks the side of a double-sided
   sheet. Picking a record in the filmstrip moves to its sheet and outlines
   its slot. With "Include bleed", each slot shows its bleed around the trim

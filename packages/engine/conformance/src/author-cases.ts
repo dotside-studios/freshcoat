@@ -469,6 +469,53 @@ add(
 	],
 );
 
+// At smoothing 1 a 30px corner starts its curve 60px along the edge and hugs
+// the edge longer than a circular arc does. 28px in, on the edge row, the arc
+// has already reached the edge and the smoothed corner has not.
+add(
+	"clip-per-corner-smoothed",
+	"a clipping group smooths its per-corner radii",
+	"core",
+	["group.clip", "shape.perCornerRadius", "shape.cornerSmoothing"],
+	frame([
+		createGroup(
+			[createRect({ ...box(0, 0, 120, 100), fills: solid("#000000") })],
+			{
+				...box(20, 10, 120, 100),
+				clip: true,
+				cornerRadius: [30, 0, 0, 0],
+				cornerSmoothing: 1,
+			},
+		),
+	]),
+	[
+		px([48, 10], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([20, 38], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([138, 12], [0, 0, 0, 255], "the square top-right corner"),
+		px([80, 60], [0, 0, 0, 255], "the interior"),
+	],
+);
+
+add(
+	"image-per-corner-smoothed",
+	"an image clip smooths its per-corner radii",
+	"core",
+	["draw.image", "shape.perCornerRadius", "shape.cornerSmoothing"],
+	frame([
+		createImage({
+			...box(30, 10, 100, 100),
+			src: CHECKER_SRC,
+			fit: "cover",
+			mask: { kind: "rounded-rect", radius: [30, 0, 0, 0], smoothing: 1 },
+		}),
+	]),
+	[
+		px([58, 10], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([30, 38], [255, 255, 255, 255], "a circular arc fills here", 40),
+		px([117, 22], [...CHECKER_B, 255], "the square top-right block", 45),
+	],
+);
+
 // ─── D6: the semantics that live only in the painter ──────────────────────────
 
 // rotation is applied to the canvas matrix OUTSIDE the layer, so the layer and
@@ -815,6 +862,66 @@ add(
 			minDelta: 60,
 			why: "the first glyph's stem is darker than the ground",
 		},
+	],
+);
+
+// A tall stem, stroked red, so each alignment's band sits at a known offset
+// from the glyph edge.
+const strokedStem = (align: "center" | "outside" | "inside") =>
+	frame([
+		createText({
+			...box(40, 0, 80, H),
+			text: "I",
+			font: {
+				family: FAMILY,
+				weight: 400,
+				style: "normal",
+				size: 96,
+				lineHeight: 96,
+			},
+			align: "center",
+			verticalAlign: "middle",
+			color: "#000000",
+			stroke: { color: "#ff0000", width: 3, align },
+		}),
+	]);
+
+add(
+	"text-stroke-center",
+	"a center text stroke straddles the glyph edge, over the fill",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("center"),
+	[
+		px([75, 60], [255, 0, 0, 255], "on the stem's edge, over the fill"),
+		px([80, 60], [0, 0, 0, 255], "the stem's middle, fill"),
+		px([72, 60], [255, 255, 255, 255], "past half the width, untouched"),
+	],
+);
+
+add(
+	"text-stroke-outside",
+	"an outside text stroke lies beyond the glyph edge, under the fill",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("outside"),
+	[
+		px([73, 60], [255, 0, 0, 255], "just outside the stem"),
+		px([77, 60], [0, 0, 0, 255], "just inside the stem, the fill covers it"),
+		px([70, 60], [255, 255, 255, 255], "past the width, untouched"),
+	],
+);
+
+add(
+	"text-stroke-inside",
+	"an inside text stroke lies within the glyph edge",
+	"core",
+	["draw.text", "text.stroke"],
+	strokedStem("inside"),
+	[
+		px([77, 60], [255, 0, 0, 255], "just inside the stem"),
+		px([80, 60], [0, 0, 0, 255], "the stem's middle, fill"),
+		px([73, 60], [255, 255, 255, 255], "just outside the stem, untouched"),
 	],
 );
 
@@ -1373,6 +1480,184 @@ add(
 	[
 		px([44, 60], [0, 0, 0, 255], "inside the circle's left edge"),
 		px([36, 60], [255, 255, 255, 255], "outside the circle's left edge"),
+	],
+);
+
+// A per-side stroke fills the band between the outline moved out and moved in
+// by each side's own width. Inside, the box is 40..120 by 30..90.
+add(
+	"stroke-sides-inside",
+	"an inside per-side stroke gives each side its own width",
+	"core",
+	["draw.stroke", "stroke.sides"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: {
+				color: "#000000",
+				width: 20,
+				sides: { top: 4, right: 12, bottom: 20, left: 0 },
+				align: "inside",
+			},
+		}),
+	]),
+	[
+		px([80, 31], [0, 0, 0, 255], "the 4px top band"),
+		px([80, 36], [255, 255, 255, 255], "below the top band"),
+		px([114, 60], [0, 0, 0, 255], "the 12px right band"),
+		px([104, 60], [255, 255, 255, 255], "left of the right band"),
+		px([80, 80], [0, 0, 0, 255], "the 20px bottom band"),
+		px([80, 66], [255, 255, 255, 255], "above the bottom band"),
+		px([41, 50], [255, 255, 255, 255], "the left side, with no width"),
+	],
+);
+
+// Outside, the band lies beyond the edge, and a sharp corner stays sharp.
+add(
+	"stroke-sides-outside",
+	"an outside per-side stroke lies beyond the edge and keeps sharp corners",
+	"core",
+	["draw.stroke", "stroke.sides", "stroke.align"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: {
+				color: "#000000",
+				width: 8,
+				sides: { top: 8, right: 0, bottom: 0, left: 8 },
+				align: "outside",
+			},
+		}),
+	]),
+	[
+		px([36, 60], [0, 0, 0, 255], "beyond the left edge"),
+		px([44, 60], [255, 255, 255, 255], "inside the left edge"),
+		px([80, 26], [0, 0, 0, 255], "above the top edge"),
+		px([80, 34], [255, 255, 255, 255], "below the top edge"),
+		px([33, 23], [0, 0, 0, 255], "the sharp outer corner"),
+		px([124, 60], [255, 255, 255, 255], "past the right edge, no width"),
+		px([80, 94], [255, 255, 255, 255], "past the bottom edge, no width"),
+	],
+);
+
+// Centred, a side's band straddles its edge, half its width each way.
+add(
+	"stroke-sides-center",
+	"a centred per-side stroke straddles each edge by half its width",
+	"core",
+	["draw.stroke", "stroke.sides"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: {
+				color: "#000000",
+				width: 16,
+				sides: { top: 0, right: 0, bottom: 16, left: 0 },
+			},
+		}),
+	]),
+	[
+		px([80, 84], [0, 0, 0, 255], "inside the bottom edge"),
+		px([80, 96], [0, 0, 0, 255], "beyond the bottom edge"),
+		px([80, 79], [255, 255, 255, 255], "above the band"),
+		px([80, 100], [255, 255, 255, 255], "below the band"),
+		px([41, 60], [255, 255, 255, 255], "the left side, with no width"),
+	],
+);
+
+// A rounded corner's inner radius shrinks by each adjacent width on its own
+// axis, so where the bottom is wide and the left narrow the inner corner is a
+// flat ellipse, 18 wide and 4 tall, and the band beside it stays thin.
+add(
+	"stroke-sides-rounded",
+	"a per-side stroke's inner corner shrinks by each adjacent width",
+	"core",
+	["draw.stroke", "stroke.sides", "shape.cornerRadius"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			cornerRadius: 20,
+			stroke: {
+				color: "#000000",
+				width: 16,
+				sides: { top: 2, right: 2, bottom: 16, left: 2 },
+				align: "inside",
+			},
+		}),
+	]),
+	[
+		px([80, 82], [0, 0, 0, 255], "the 16px bottom band"),
+		px([80, 72], [255, 255, 255, 255], "above the bottom band"),
+		px([55, 72], [255, 255, 255, 255], "inside the flat inner corner"),
+		px([42, 31], [255, 255, 255, 255], "outside the rounded outer corner"),
+	],
+);
+
+// A dash runs along the middle of the band and is cut to it, so it is as thick
+// as the side it lies on. The top runs from the left edge: on 40..50, off
+// 50..60.
+add(
+	"stroke-sides-dashed",
+	"a dashed per-side stroke dashes along the band",
+	"core",
+	["draw.stroke", "stroke.sides", "stroke.dash"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: {
+				color: "#000000",
+				width: 8,
+				sides: { top: 8, right: 8, bottom: 8, left: 0 },
+				dash: [10, 10],
+				align: "inside",
+			},
+		}),
+	]),
+	[
+		px([45, 33], [0, 0, 0, 255], "the first dash on the top"),
+		px([55, 33], [255, 255, 255, 255], "the first gap"),
+		px([65, 33], [0, 0, 0, 255], "the second dash"),
+		px([45, 40], [255, 255, 255, 255], "below the top band"),
+		px([41, 60], [255, 255, 255, 255], "the left side, with no width"),
+	],
+);
+
+// A gradient colour spans the box, as a uniform stroke's does.
+add(
+	"stroke-sides-gradient",
+	"a per-side stroke paints its gradient across the box",
+	"core",
+	["draw.stroke", "stroke.sides", "fill.linear"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: solid("#ffffff"),
+			stroke: {
+				color: "#ff0000",
+				gradient: {
+					kind: "linear",
+					from: { x: 0, y: 0.5 },
+					to: { x: 1, y: 0.5 },
+					stops: [
+						{ offset: 0, color: "#ff0000" },
+						{ offset: 1, color: "#0000ff" },
+					],
+				},
+				width: 10,
+				sides: { top: 0, right: 10, bottom: 0, left: 10 },
+				align: "inside",
+			},
+		}),
+	]),
+	[
+		px([42, 60], [247, 0, 8, 255], "the left band, near the red end", 12),
+		px([117, 60], [8, 0, 247, 255], "the right band, near the blue end", 12),
+		px([80, 32], [255, 255, 255, 255], "the top side, with no width"),
 	],
 );
 

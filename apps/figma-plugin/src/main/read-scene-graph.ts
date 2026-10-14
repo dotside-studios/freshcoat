@@ -5,6 +5,7 @@ import type {
 	FigmaGridTrack,
 	FigmaNode,
 	FigmaRectangleNode,
+	FigmaStrokeWeights,
 	FigmaVectorNode,
 	FigmaVectorNodeType,
 } from "~/lib/figma/types";
@@ -25,12 +26,32 @@ function readDashPattern(value: unknown): number[] | undefined {
 	return [...value];
 }
 
-function readStrokeWeight(value: unknown): {
+type IndividualStrokes = {
+	strokeWeight?: unknown;
+	strokeTopWeight?: unknown;
+	strokeRightWeight?: unknown;
+	strokeBottomWeight?: unknown;
+	strokeLeftWeight?: unknown;
+};
+
+function readStrokeWeight(node: IndividualStrokes): {
 	strokeWeight?: number;
+	strokeWeights?: FigmaStrokeWeights;
 	strokeWeightMixed?: true;
 } {
+	const value = node.strokeWeight;
 	if (typeof value === "number") return { strokeWeight: value };
-	return value === undefined ? {} : { strokeWeightMixed: true };
+	if (value === undefined) return {};
+	const sides = [
+		node.strokeTopWeight,
+		node.strokeRightWeight,
+		node.strokeBottomWeight,
+		node.strokeLeftWeight,
+	];
+	if (!sides.every((v) => typeof v === "number" && Number.isFinite(v)))
+		return { strokeWeightMixed: true };
+	const [top, right, bottom, left] = sides as number[];
+	return { strokeWeights: { top, right, bottom, left } };
 }
 
 function readCornerSmoothing(value: unknown): number | undefined {
@@ -41,6 +62,10 @@ type AnyRectNode = AnySceneNode & {
 	fills?: readonly AnyPaint[];
 	strokes?: readonly AnyPaint[];
 	strokeWeight?: unknown;
+	strokeTopWeight?: unknown;
+	strokeRightWeight?: unknown;
+	strokeBottomWeight?: unknown;
+	strokeLeftWeight?: unknown;
 	strokeCap?: unknown;
 	strokeJoin?: unknown;
 	strokeAlign?: unknown;
@@ -83,7 +108,7 @@ export function readRectangleNode(node: AnyRectNode): FigmaRectangleNode {
 		type: "RECTANGLE",
 		fills: readPaints(node.fills),
 		strokes: readPaints(node.strokes),
-		...readStrokeWeight(node.strokeWeight),
+		...readStrokeWeight(node),
 		strokeCap: readStrokeEnum(node.strokeCap),
 		strokeJoin: readStrokeEnum(node.strokeJoin),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
@@ -244,9 +269,14 @@ type AnyContainerNode = AnySceneNode & {
 	fills?: readonly AnyPaint[];
 	strokes?: readonly AnyPaint[];
 	strokeWeight?: unknown;
+	strokeTopWeight?: unknown;
+	strokeRightWeight?: unknown;
+	strokeBottomWeight?: unknown;
+	strokeLeftWeight?: unknown;
 	strokeAlign?: unknown;
 	dashPattern?: unknown;
 	cornerRadius?: unknown;
+	cornerSmoothing?: unknown;
 	topLeftRadius?: number;
 	topRightRadius?: number;
 	bottomRightRadius?: number;
@@ -314,10 +344,13 @@ function readContainer(
 		children,
 		fills: readPaints(node.fills),
 		strokes: readPaints(node.strokes),
-		...readStrokeWeight(node.strokeWeight),
+		...readStrokeWeight(node),
 		strokeAlign: readStrokeEnum(node.strokeAlign),
 		...dashField(node.dashPattern),
 		cornerRadius: readCornerRadius(node),
+		...(readCornerSmoothing(node.cornerSmoothing) !== undefined
+			? { cornerSmoothing: readCornerSmoothing(node.cornerSmoothing) }
+			: {}),
 		clipsContent: node.clipsContent,
 		layoutMode: node.layoutMode as never,
 		itemSpacing: node.itemSpacing,

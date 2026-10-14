@@ -19,12 +19,15 @@ describe("extractEffects", () => {
 			],
 			2,
 		);
-		expect(fx.shadow).toEqual({
-			color: "rgba(0, 0, 0, 0.4)",
-			dx: 0,
-			dy: 8,
-			blur: 16,
-		});
+		expect(fx.effects).toEqual([
+			{
+				type: "shadow",
+				color: "rgba(0, 0, 0, 0.4)",
+				dx: 0,
+				dy: 8,
+				blur: 16,
+			},
+		]);
 	});
 
 	it("opaque shadow color emits hex (no rgba)", () => {
@@ -40,7 +43,7 @@ describe("extractEffects", () => {
 			],
 			1,
 		);
-		expect((fx.shadow as { color: string }).color).toBe("#000000");
+		expect(fx.effects).toMatchObject([{ color: "#000000" }]);
 	});
 
 	it("LAYER_BLUR → blur scaled with ratio", () => {
@@ -48,7 +51,7 @@ describe("extractEffects", () => {
 			[{ type: "LAYER_BLUR", visible: true, radius: 6 }],
 			2,
 		);
-		expect(fx.blur).toBe(12);
+		expect(fx.effects).toEqual([{ type: "blur", radius: 12 }]);
 	});
 
 	it("BACKGROUND_BLUR → backdropBlur scaled with ratio", () => {
@@ -59,16 +62,17 @@ describe("extractEffects", () => {
 			],
 			2,
 		);
-		expect(fx.backdropBlur).toBe(16);
-		expect(fx.blur).toBeUndefined();
+		expect(fx.effects).toEqual([{ type: "backdropBlur", radius: 16 }]);
 	});
 
-	it("a hidden BACKGROUND_BLUR is dropped", () => {
+	it("a hidden BACKGROUND_BLUR stays in the list as hidden", () => {
 		const fx = extractEffects(
 			[{ type: "BACKGROUND_BLUR", visible: false, radius: 8 }],
 			1,
 		);
-		expect(fx.backdropBlur).toBeUndefined();
+		expect(fx.effects).toEqual([
+			{ type: "backdropBlur", radius: 8, hidden: true },
+		]);
 	});
 
 	it("INNER_SHADOW becomes an inset shadow beside a BACKGROUND_BLUR", () => {
@@ -86,16 +90,18 @@ describe("extractEffects", () => {
 			],
 			1,
 		);
-		expect(fx.shadow).toEqual({
-			color: "#ffffff",
-			dx: 0,
-			dy: 1,
-			blur: 4,
-			spread: 2,
-			inset: true,
-		});
-		expect(fx.blur).toBeUndefined();
-		expect(fx.backdropBlur).toBe(8);
+		expect(fx.effects).toEqual([
+			{
+				type: "shadow",
+				color: "#ffffff",
+				dx: 0,
+				dy: 1,
+				blur: 4,
+				spread: 2,
+				inset: true,
+			},
+			{ type: "backdropBlur", radius: 8 },
+		]);
 	});
 
 	it("scales spread with the ratio like every other length", () => {
@@ -112,10 +118,10 @@ describe("extractEffects", () => {
 			],
 			2,
 		);
-		expect(fx.shadow).toMatchObject({ blur: 8, spread: 6 });
+		expect(fx.effects).toMatchObject([{ blur: 8, spread: 6 }]);
 	});
 
-	it("invisible effects are skipped", () => {
+	it("an invisible effect is kept as hidden", () => {
 		const fx = extractEffects(
 			[
 				{
@@ -128,7 +134,32 @@ describe("extractEffects", () => {
 			],
 			1,
 		);
-		expect(fx).toEqual({});
+		expect(fx.effects).toEqual([
+			{
+				type: "shadow",
+				color: "#000000",
+				dx: 0,
+				dy: 4,
+				blur: 8,
+				hidden: true,
+			},
+		]);
+	});
+
+	it("keeps only the first layer blur and background blur", () => {
+		const fx = extractEffects(
+			[
+				{ type: "LAYER_BLUR", visible: true, radius: 2 },
+				{ type: "LAYER_BLUR", visible: true, radius: 5 },
+				{ type: "BACKGROUND_BLUR", visible: true, radius: 3 },
+				{ type: "BACKGROUND_BLUR", visible: true, radius: 6 },
+			],
+			1,
+		);
+		expect(fx.effects).toEqual([
+			{ type: "blur", radius: 2 },
+			{ type: "backdropBlur", radius: 3 },
+		]);
 	});
 
 	it("multiple shadows come across as a stack, in Figma's own order", () => {
@@ -151,9 +182,9 @@ describe("extractEffects", () => {
 			],
 			1,
 		);
-		expect(fx.shadow).toEqual([
-			{ color: "#000000", dx: 0, dy: 2, blur: 4 },
-			{ color: "#ff0000", dx: 0, dy: 8, blur: 16 },
+		expect(fx.effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 0, dy: 2, blur: 4 },
+			{ type: "shadow", color: "#ff0000", dx: 0, dy: 8, blur: 16 },
 		]);
 	});
 });
@@ -173,40 +204,26 @@ describe("extractEffects (rotated elements)", () => {
 	// inside the rotation it wraps the element in. Left alone, a card turned 90°
 	// exports every shadow pointing sideways.
 	it("expresses the offset in the element's own frame", () => {
-		expect(extractEffects(shadow, 1, 90).shadow).toEqual({
-			color: "#000000",
-			dx: 4,
-			dy: 0,
-			blur: 8,
-		});
-		expect(extractEffects(shadow, 1, -90).shadow).toEqual({
-			color: "#000000",
-			dx: -4,
-			dy: 0,
-			blur: 8,
-		});
-		expect(extractEffects(shadow, 1, 180).shadow).toEqual({
-			color: "#000000",
-			dx: 0,
-			dy: -4,
-			blur: 8,
-		});
+		expect(extractEffects(shadow, 1, 90).effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 4, dy: 0, blur: 8 },
+		]);
+		expect(extractEffects(shadow, 1, -90).effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: -4, dy: 0, blur: 8 },
+		]);
+		expect(extractEffects(shadow, 1, 180).effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 0, dy: -4, blur: 8 },
+		]);
 	});
 
 	it("leaves an unrotated element's offset exactly as authored", () => {
-		expect(extractEffects(shadow, 1).shadow).toEqual({
-			color: "#000000",
-			dx: 0,
-			dy: 4,
-			blur: 8,
-		});
+		expect(extractEffects(shadow, 1).effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 0, dy: 4, blur: 8 },
+		]);
 	});
 
 	it("scales the offset before un-rotating it", () => {
-		expect(extractEffects(shadow, 2, 90).shadow).toMatchObject({
-			dx: 8,
-			dy: 0,
-			blur: 16,
-		});
+		expect(extractEffects(shadow, 2, 90).effects).toMatchObject([
+			{ dx: 8, dy: 0, blur: 16 },
+		]);
 	});
 });

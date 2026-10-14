@@ -249,3 +249,26 @@ describe("NumberField typing", () => {
 		act(() => {});
 	});
 });
+
+describe("NumberField parse", () => {
+	it("uses a custom parser and keeps its digits", async () => {
+		const onChange = vi.fn();
+		render(
+			<NumberField
+				label="W"
+				value={1}
+				precision={2}
+				min={0}
+				parse={(text) => (text === "half" ? 0.125 : null)}
+				onChange={onChange}
+			/>,
+		);
+		const input = screen.getByRole("spinbutton");
+		await userEvent.clear(input);
+		await userEvent.type(input, "half{Enter}");
+		expect(onChange).toHaveBeenLastCalledWith(0.125);
+		await userEvent.clear(input);
+		await userEvent.type(input, "nope{Enter}");
+		expect(onChange).toHaveBeenCalledTimes(1);
+	});
+});

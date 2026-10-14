@@ -128,6 +128,7 @@ import {
 	outlineGeometry,
 	outlineIsPath,
 	rectShape,
+	sideStrokeGeometry,
 } from "./outline";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
 import type {
@@ -148,6 +149,7 @@ import type {
 	DrawImageCommand,
 	DrawMaskedCommand,
 	DrawPathCommand,
+	DrawRectCommand,
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
@@ -160,6 +162,7 @@ import type {
 	Stroke,
 	TextArc,
 	TextPath,
+	TextStroke,
 	TextLine,
 } from "./types";
 
@@ -653,6 +656,48 @@ function drawOutlineStroke(
 	drawClippedStroke(ck, canvas, bin, whole, stroke, box);
 }
 
+// A rect's per-side stroke: its band filled, or for a dash or a trim, the
+// stroke along the band's middle cut to the band.
+function drawSideStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawRectCommand,
+	stroke: Stroke,
+) {
+	if (!stroke.sides) return;
+	const { width: w, height: h } = cmd.size;
+	const g = sideStrokeGeometry(0, 0, w, h, cmd.cornerRadius, cmd.cornerSmoothing, {
+		align: stroke.align,
+		sides: stroke.sides,
+	});
+	if (!g) return;
+	const box = { x: 0, y: 0, w, h };
+	const band = bin.path(ck, g.band, true) as Path;
+	canvas.save();
+	canvas.translate(cmd.pos.x, cmd.pos.y);
+	if (normalizeDash(stroke.dash) || strokeTrim(stroke)) {
+		canvas.clipPath(band, ck.ClipOp.Intersect, true);
+		const mid = bin.path(ck, g.mid) as Path;
+		drawStroke(
+			ck,
+			canvas,
+			bin,
+			{ kind: "path", path: mid },
+			{ ...stroke, width: g.midWidth },
+			box,
+		);
+	} else {
+		const paint = bin.track(new ck.Paint());
+		paint.setAntiAlias(true);
+		if (stroke.gradient)
+			paint.setShader(shaderFor(ck, bin, stroke.gradient, 0, 0, w, h));
+		else paint.setColor(toColor(ck, stroke.color));
+		canvas.drawPath(band, paint);
+	}
+	canvas.restore();
+}
+
 function textStyleOf(
 	ck: CanvasKit,
 	span: DrawTextCommand["layout"]["lines"][number]["spans"][number],
@@ -667,10 +712,115 @@ function textStyleOf(
 	};
 }
 
+// A stroked text's fill and stroke, layered by `align`: center strokes over the
+// fill, outside draws a double-width stroke under it, inside a double-width
+// stroke kept only where the glyphs cover.
+function drawText(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	issues: PaintIssues,
+) {
+	const stroke = cmd.stroke;
+	if (!stroke || !(stroke.width > 0)) {
+		drawTextFill(ck, canvas, provider, bin, cmd, issues);
+		return;
+	}
+	const align = stroke.align ?? "center";
+	const paint = strokePaint(
+		ck,
+		bin,
+		{ ...stroke, width: align === "center" ? stroke.width : stroke.width * 2 },
+		{ x: cmd.pos.x, y: cmd.pos.y, w: cmd.size.width, h: cmd.size.height },
+	);
+	if (align === "outside")
+		drawTextGlyphs(ck, canvas, provider, bin, cmd, paint);
+	drawTextFill(ck, canvas, provider, bin, cmd, issues);
+	if (align === "center") drawTextGlyphs(ck, canvas, provider, bin, cmd, paint);
+	if (align !== "inside") return;
+	canvas.saveLayer();
+	drawTextGlyphs(ck, canvas, provider, bin, cmd, paint);
+	const keep = bin.track(new ck.Paint());
+	keep.setBlendMode(ck.BlendMode.DstIn);
+	canvas.saveLayer(keep);
+	const glyphs = bin.track(new ck.Paint());
+	glyphs.setAntiAlias(true);
+	glyphs.setColor(ck.BLACK);
+	drawTextGlyphs(ck, canvas, provider, bin, cmd, glyphs);
+	canvas.restore();
+	canvas.restore();
+}
+
+// Every glyph of `cmd` drawn with one paint, placed as drawTextFill places it.
+function drawTextGlyphs(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	bin: Bin,
+	cmd: DrawTextCommand,
+	paint: Paint,
+) {
+	const fallback = (provider as { __families?: string[] }).__families ?? [];
+	if (cmd.path || cmd.arc) {
+		const lines = arcLines(ck, provider, bin, cmd, fallback);
+		let placed: ArcPlacement;
+		if (cmd.path) placed = placeOnCommandPath(ck, bin, cmd, cmd.path, lines);
+		else {
+			const [cx, cy] = arcCenter(cmd);
+			placed = placeOnArc(
+				lines.map((l) => l.arc),
+				cmd.arc as TextArc,
+				cx,
+				cy,
+			);
+		}
+		drawPlacedGlyphs(ck, canvas, bin, cmd, lines, placed, paint);
+		return;
+	}
+	const cache = bin.cache;
+	const rows = visibleRows(canvas);
+	for (const line of cmd.layout.lines) {
+		const first = line.spans[0];
+		if (!first) continue;
+		const baseline = line.baseline ?? line.y;
+		if (rows) {
+			const reach = 2 * Math.max(...line.spans.map((s) => s.font.size));
+			if (baseline + reach < rows.top || baseline - reach > rows.bottom)
+				continue;
+		}
+		const shape = () =>
+			shapeLine(ck, provider, cmd, line, fallback, null, null);
+		let shaped: ShapedLine;
+		if (cache)
+			shaped = cachedLine(cache, lineKey(line, cmd.color, fallback), shape);
+		else {
+			shaped = shape();
+			bin.track(shaped.para);
+		}
+		const left =
+			line.direction === "rtl"
+				? Math.min(...line.spans.map((s) => s.x))
+				: first.x;
+		const y = baseline - shaped.ascent;
+		for (const l of glyphLines(bin, shaped))
+			for (const run of l.runs)
+				canvas.drawGlyphs(
+					run.glyphs,
+					run.positions,
+					left,
+					y,
+					runFont(ck, bin, run),
+					paint,
+				);
+	}
+}
+
 // Render each baked line with a ParagraphBuilder — HarfBuzz shaping applies the
 // kerning Figma uses — aligning the paragraph's baseline to the baked
 // baseline via getLineMetrics.
-function drawText(
+function drawTextFill(
 	ck: CanvasKit,
 	canvas: Canvas,
 	provider: TypefaceFontProvider,
@@ -2194,7 +2344,8 @@ function drawShape(
 				);
 			drawOutline(canvas, outline, paint);
 		}
-		if (cmd.stroke)
+		if (cmd.stroke?.sides) drawSideStroke(ck, canvas, bin, cmd, cmd.stroke);
+		else if (cmd.stroke)
 			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
 		drawText(ck, canvas, provider, bin, cmd, issues);
@@ -2727,6 +2878,34 @@ function predictedBounds(
 			[...within, { ctm: m }],
 		);
 	};
+	// drawSideStroke's translate makes its save real.
+	const addSideStroke = (
+		c: DrawRectCommand,
+		stroke: Stroke,
+		m: Affine,
+		within: RecordedSave[],
+	) => {
+		if (!stroke.sides) return;
+		const { width: w, height: h } = c.size;
+		const g = sideStrokeGeometry(0, 0, w, h, c.cornerRadius, c.cornerSmoothing, {
+			align: stroke.align,
+			sides: stroke.sides,
+		});
+		if (!g) return;
+		const pm = translateAffine(m, c.pos.x, c.pos.y);
+		const saves = [...within, { ctm: m }];
+		if (normalizeDash(stroke.dash) || strokeTrim(stroke)) {
+			const [l, t, r, b] = (bin.path(ck, g.mid) as Path).getBounds();
+			add(
+				strokeBounds([l, t, r, b] as Bounds, { ...stroke, width: g.midWidth }),
+				pm,
+				saves,
+			);
+			return;
+		}
+		const [l, t, r, b] = (bin.path(ck, g.band, true) as Path).getBounds();
+		add([l, t, r, b] as Bounds, pm, saves);
+	};
 	const visitShape = (
 		c: DrawCommand,
 		m: Affine,
@@ -2741,14 +2920,15 @@ function predictedBounds(
 				const fill = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 				add(outlineBounds(fill), outlineMatrix(fill, m), within);
 			}
-			if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
+			if (c.stroke?.sides) addSideStroke(c, c.stroke, m, within);
+			else if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawText") {
 			const rows = uncut ? null : device;
 			const glyphs = textBounds(ck, provider, bin, c, m, rows);
 			if (!glyphs) return false;
-			for (const b of glyphs) add(b, m, within);
+			for (const b of glyphs) add(textStrokeBounds(b, c.stroke), m, within);
 			return true;
 		}
 		if (c.op === "drawPath") {
@@ -3128,6 +3308,14 @@ function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
 		radius = f32((width / 2) * multiplier);
 	}
 	return outsetBounds(b, radius);
+}
+
+function textStrokeBounds(b: Bounds, stroke: TextStroke | undefined): Bounds {
+	if (!stroke || stroke.align === "inside") return b;
+	return strokeBounds(
+		b,
+		stroke.align === "outside" ? { ...stroke, width: stroke.width * 2 } : stroke,
+	);
 }
 
 function sortBounds(b: Bounds): Bounds {
@@ -4230,11 +4418,17 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
 	if (cmd.op === "drawRect")
 		return (
+			!cmd.stroke?.sides &&
 			!outlineIsPath(rectShape(cmd.cornerRadius, cmd.cornerSmoothing)) &&
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);
 	if (cmd.op === "drawText")
-		return !cmd.arc && !cmd.path && (!cmd.fill || cmd.fill.kind === "solid");
+		return (
+			!cmd.arc &&
+			!cmd.path &&
+			(!cmd.fill || cmd.fill.kind === "solid") &&
+			!cmd.stroke?.gradient
+		);
 	if (cmd.op === "drawGroup")
 		return cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
@@ -4566,8 +4760,15 @@ function coverage(cmd: DrawCommand): DrawCommand | null {
 	if (cmd.op === "drawMasked") return cmd.mask;
 	if (cmd.op !== "drawText") return null;
 	const { clip: _c, fill: _f, ...text } = layerContent(cmd) as DrawTextCommand;
+	const stroke = text.stroke && {
+		width: text.stroke.width,
+		color: "#000000",
+		...(text.stroke.join ? { join: text.stroke.join } : {}),
+		...(text.stroke.align ? { align: text.stroke.align } : {}),
+	};
 	return {
 		...text,
+		...(stroke ? { stroke } : {}),
 		color: "#000000",
 		layout: {
 			...text.layout,

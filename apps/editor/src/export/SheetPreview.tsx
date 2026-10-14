@@ -1,11 +1,22 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import type { DatasetAsset, Imposition } from "@freshcoat-js/workspace";
-import { cropMarks } from "@freshcoat-js/workspace";
+import type {
+	DatasetAsset,
+	Imposition,
+	SheetMarkOptions,
+} from "@freshcoat-js/workspace";
+import {
+	REGISTRATION_MARK_RADIUS_MM,
+	REGISTRATION_MARK_SIZE_MM,
+	SLUG_FONT_PT,
+	sheetMarks,
+	slugText,
+} from "@freshcoat-js/workspace";
 import { type SheetItem, showsRecord } from "@freshcoat-js/workspace/export";
 import {
 	type CSSProperties,
 	useEffect,
+	useId,
 	useLayoutEffect,
 	useMemo,
 	useRef,
@@ -31,15 +42,16 @@ export const SHEET_SIDE_LABEL = { front: "Front", back: "Back" } as const;
 
 /**
  * One page of an imposed PDF: the paper at its aspect, each slot's record
- * rendered small with its bleed when the cards carry one, and the crop marks
- * a front carries.
+ * rendered small with its bleed when the cards carry one, and the printer's
+ * marks the layout asks for. Copies of one card share a render.
  */
 export function SheetPreview({
 	template,
 	imposition,
 	page: pageIndex,
 	assets,
-	cropMarks: showMarks,
+	marks: markOptions,
+	job,
 	currentRecordId,
 	currentVariant,
 	className,
@@ -49,7 +61,10 @@ export function SheetPreview({
 	/** into `imposition.pages` */
 	page: number;
 	assets?: readonly DatasetAsset[];
-	cropMarks: boolean;
+	/** none when absent */
+	marks?: SheetMarkOptions;
+	/** the slug's job name */
+	job?: string;
 	/** the record the filmstrip points at, outlined when it is on this page */
 	currentRecordId?: string;
 	/** under All variants, which of the record's cards: its variant's id,
@@ -131,8 +146,10 @@ export function SheetPreview({
 		const keys = new Set(requests.map((r) => r.key));
 		setDrawn((m) => new Map([...m].filter(([k]) => keys.has(k))));
 		setError(null);
+		const started = new Set<string>();
 		for (const { req, key } of requests) {
-			if (peekSheetThumb(req)) continue;
+			if (started.has(key) || peekSheetThumb(req)) continue;
+			started.add(key);
 			renderSheetThumb(req, abort.signal).then(
 				(canvas) => {
 					if (!abort.signal.aborted)
@@ -153,8 +170,22 @@ export function SheetPreview({
 	const ready =
 		!!page && requests.length === page.slots.length && sources.every(Boolean);
 	const marks = useMemo(
-		() => (showMarks && page?.side !== "back" ? cropMarks(imposition) : []),
-		[showMarks, page?.side, imposition],
+		() =>
+			markOptions && page
+				? sheetMarks(imposition, markOptions, page.side)
+				: null,
+		[markOptions, page, imposition],
+	);
+	const slugClip = useId();
+	const slug = useMemo(
+		() =>
+			marks?.slug
+				? slugText(imposition, pageIndex, {
+						...(job !== undefined ? { job } : {}),
+						date: new Date(),
+					})
+				: "",
+		[marks, imposition, pageIndex, job],
 	);
 
 	const width = Math.floor(paper.widthMm * pxPerMm);
@@ -193,7 +224,7 @@ export function SheetPreview({
 				>
 					{(page?.slots ?? []).map((slot, i) => (
 						<SlotCanvas
-							key={slot.item.key}
+							key={`${slot.xMm},${slot.yMm}`}
 							source={sources[i]}
 							itemKey={slot.item.key}
 							current={showsRecord(slot.item, currentRecordId, currentVariant)}
@@ -243,7 +274,7 @@ export function SheetPreview({
 							/>
 						</svg>
 					) : null}
-					{marks.length > 0 ? (
+					{marks && marks.crop.length > 0 ? (
 						<svg
 							className="pointer-events-none absolute inset-0 size-full"
 							viewBox={`0 0 ${paper.widthMm} ${paper.heightMm}`}
@@ -251,7 +282,7 @@ export function SheetPreview({
 							aria-hidden="true"
 							data-testid="sheet-crop-marks"
 						>
-							{marks.map((m) => (
+							{marks.crop.map((m) => (
 								<line
 									key={`${m.x1},${m.y1},${m.x2},${m.y2}`}
 									x1={m.x1}
@@ -263,6 +294,86 @@ export function SheetPreview({
 									vectorEffect="non-scaling-stroke"
 								/>
 							))}
+						</svg>
+					) : null}
+					{marks &&
+					(marks.registration.length > 0 ||
+						marks.colorBar.length > 0 ||
+						marks.slug) ? (
+						<svg
+							className="pointer-events-none absolute inset-0 size-full"
+							viewBox={`0 0 ${paper.widthMm} ${paper.heightMm}`}
+							aria-hidden="true"
+							data-testid="sheet-printer-marks"
+						>
+							{marks.registration.map(({ x, y }) => (
+								<g
+									key={`${x},${y}`}
+									className="fill-none stroke-black"
+									data-testid="sheet-registration-mark"
+								>
+									<circle
+										cx={x}
+										cy={y}
+										r={REGISTRATION_MARK_RADIUS_MM}
+										strokeWidth={1}
+										vectorEffect="non-scaling-stroke"
+									/>
+									<path
+										d={`M${x - REGISTRATION_MARK_SIZE_MM / 2} ${y}h${REGISTRATION_MARK_SIZE_MM}M${x} ${y - REGISTRATION_MARK_SIZE_MM / 2}v${REGISTRATION_MARK_SIZE_MM}`}
+										strokeWidth={1}
+										vectorEffect="non-scaling-stroke"
+									/>
+								</g>
+							))}
+							{marks.colorBar.length > 0 ? (
+								<g data-testid="sheet-color-bar">
+									{marks.colorBar.map((p) => (
+										<rect
+											key={p.x}
+											x={p.x}
+											y={p.y}
+											width={p.sizeMm}
+											height={p.sizeMm}
+											fill={`rgb(${p.rgb.map((c) => Math.round(c * 255)).join(" ")})`}
+										/>
+									))}
+									<rect
+										x={marks.colorBar[0]?.x}
+										y={marks.colorBar[0]?.y}
+										width={
+											marks.colorBar.length * (marks.colorBar[0]?.sizeMm ?? 0)
+										}
+										height={marks.colorBar[0]?.sizeMm}
+										className="fill-none stroke-black"
+										strokeWidth={1}
+										vectorEffect="non-scaling-stroke"
+									/>
+								</g>
+							) : null}
+							{marks.slug && slug ? (
+								<>
+									<clipPath id={slugClip}>
+										<rect
+											x={marks.slug.x}
+											y={marks.slug.y - marks.slug.heightMm}
+											width={marks.slug.widthMm}
+											height={marks.slug.heightMm * 3}
+										/>
+									</clipPath>
+									<text
+										x={marks.slug.x}
+										y={marks.slug.y + marks.slug.heightMm * 0.8}
+										fontSize={(SLUG_FONT_PT * 25.4) / 72}
+										fontFamily="Helvetica, Arial, sans-serif"
+										className="fill-black"
+										clipPath={`url(#${slugClip})`}
+										data-testid="sheet-slug"
+									>
+										{slug}
+									</text>
+								</>
+							) : null}
 						</svg>
 					) : null}
 				</div>

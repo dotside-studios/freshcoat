@@ -534,6 +534,26 @@ describe("render image values", () => {
 		expect(run.code).toBe(0);
 		expect(run.stderr).not.toContain("image");
 	});
+
+	test("warns for a photo that prints below the minimum DPI", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front: Image prints at 30 DPI, under 300: front_logo");
+		const off = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi", "--min-dpi", "0");
+		expect(off.stderr).not.toContain("DPI");
+		const lower = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi", "--min-dpi", "20");
+		expect(lower.stderr).not.toContain("DPI");
+	});
+
+	test("lists a low-DPI photo in an export's warnings and report", async () => {
+		const run = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi.zip");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front.png: Image prints at 30 DPI, under 300: front_logo");
+		const zip = unzipSync(new Uint8Array(await readFile(box.path("low-dpi.zip"))));
+		expect(new TextDecoder().decode(zip[REPORT_FILE_NAME])).toContain(
+			"Image prints at 30 DPI, under 300: front_logo",
+		);
+	});
 });
 
 describe("render glyph warnings", () => {
@@ -807,6 +827,25 @@ describe("render export options", () => {
 		expect(await mediaBoxes(await readFile(box.path("dpi.pdf")))).toEqual(["0 0 200 100"]);
 	});
 
+	test("draws vector pages' text as outlines, with no font", async () => {
+		const fonts = async (path: string) => {
+			const pdf = await PDFDocument.load(await readFile(box.path(path)));
+			return pdf.context
+				.enumerateIndirectObjects()
+				.filter(
+					([, obj]) =>
+						obj instanceof PDFDict && obj.get(PDFName.of("Type")) === PDFName.of("Font"),
+				).length;
+		};
+		const base = ["render", "badge.json", "--frame", "front", "--dpi", "300", "--pdf-pages", "vector"];
+		expect((await box.run(...base, "--out", "embedded.pdf", "-q")).code).toBe(0);
+		expect(await fonts("embedded.pdf")).toBeGreaterThan(0);
+		const run = await box.run(...base, "--pdf-text", "outline", "--out", "outlined.pdf", "-q");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe("");
+		expect(await fonts("outlined.pdf")).toBe(0);
+	});
+
 	test("lays cards out on sheets", async () => {
 		const run = await box.run(
 			"render",
@@ -829,6 +868,72 @@ describe("render export options", () => {
 		const boxes = await mediaBoxes(await readFile(box.path("sheets.pdf")));
 		expect(boxes).toHaveLength(2);
 		for (const page of boxes) expect(["0 0 595 842", "0 0 842 595"]).toContain(page);
+	});
+
+	test("draws the printer's marks --marks names", async () => {
+		const marked = async (...flags: string[]) => {
+			const run = await box.run("render", "badge.json", "--sheets", "a4", ...flags, "--out", "marks.pdf", "-q");
+			expect(run.code).toBe(0);
+			const page = (await PDFDocument.load(await readFile(box.path("marks.pdf")))).getPage(0);
+			const contents = page.node.Contents();
+			const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => page.doc.context.lookup(ref)) : [contents];
+			const text = streams
+				.map((stream) =>
+					stream instanceof PDFRawStream
+						? new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode())
+						: "",
+				)
+				.join("\n");
+			const tokens = text.split(/\s+/);
+			return {
+				strokes: tokens.filter((t) => t === "S").length,
+				fills: tokens.filter((t) => t === "f").length,
+				slug: tokens.includes("Tj"),
+			};
+		};
+		const crop = await marked();
+		expect(crop.strokes).toBeGreaterThan(0);
+		expect(crop).toMatchObject({ fills: 0, slug: false });
+		expect(await marked("--marks", "none")).toEqual({ strokes: 0, fills: 0, slug: false });
+		expect(await marked("--marks", "colorbar,slug", "--no-crop-marks")).toEqual({
+			strokes: 1,
+			fills: 12,
+			slug: true,
+		});
+		const all = await marked("--marks", "crop,registration,colorbar,slug", "--no-crop-marks");
+		expect(all).toEqual({ strokes: 4 * 3 + 1, fills: 12, slug: true });
+	});
+
+	test("fills a sheet with copies of one card", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--frame",
+			"front",
+			"--sheets",
+			"a4",
+			"--copies",
+			"fill",
+			"--out",
+			"filled.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("filled.pdf")));
+		expect(pdf.getPageCount()).toBe(1);
+		const dry = await box.run("render", "badge.json", "--frame", "front", "--sheets", "a4", "--copies", "fill", "--out", "filled.pdf", "--dry-run");
+		expect(dry.stdout).toMatch(/, (\d+) per sheet · 1 sheet · \1 copies each\n$/);
+	});
+
+	test("lays cards out on a5 and a6 paper", async () => {
+		for (const [paper, page] of [
+			["a5", /^0 0 (420 595|595 420)$/],
+			["a6", /^0 0 (298 420|420 298)$/],
+		] as const) {
+			const run = await box.run("render", "badge.json", "--sheets", paper, "--out", `${paper}.pdf`, "-q");
+			expect(run.code).toBe(0);
+			expect((await mediaBoxes(await readFile(box.path(`${paper}.pdf`))))[0]).toMatch(page);
+		}
 	});
 
 	test("takes a custom paper size and says when the cards do not fit", async () => {
@@ -902,6 +1007,7 @@ describe("render export options", () => {
 			[["badge.json", "--name", "x", "--out", "dir"], "--name needs --data or a .zip or .pdf --out"],
 			[["badge.json", "--bleed", "--quality", "50"], "--bleed, --quality need --data or a .zip or .pdf --out"],
 			[["badge.json", "--dpi", "72", "--out", "x.zip"], "--dpi applies only to a .pdf"],
+			[["badge.json", "--pdf-text", "outline", "--out", "x.pdf"], "--pdf-text needs --pdf-pages vector"],
 			[["badge.json", "--duplex", "long", "--out", "x.pdf"], "--duplex needs --sheets"],
 			[["badge.json", "--no-crop-marks", "--margin", "2", "--out", "x.pdf"], "--no-crop-marks, --margin need --sheets"],
 			[["badge.json", "--quality", "50", "--out", "x.zip"], "--quality needs --format jpeg or webp"],
@@ -912,7 +1018,7 @@ describe("render export options", () => {
 			[["badge.json", "--png-alpha", "always", "--out", "x.zip"], "Allowed choices are auto, keep"],
 			[["badge.json", "--scale", "1", "--scale", "2", "--out", "x.zip"], "an export takes one --scale"],
 			[["badge.json", "--quality", "101", "--out", "x.zip"], "Expected a whole number from 0 to 100"],
-			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
+			[["badge.json", "--sheets", "b5", "--out", "x.pdf"], "Expected a4, a5, a6, letter, legal, a3, tabloid or <width>x<height> in millimetres"],
 			[["badges.coatworkspace", "--preset", "p_png", "--name", "x", "--out", "x.zip"], "--name applies only to templates"],
 		];
 		for (const [argv, message] of cases) {
@@ -1111,6 +1217,101 @@ describe("validate warnings for a CR80 card", () => {
 		const run = await box.run("validate", "cr80-own.json");
 		expect(run.stderr).toBe("");
 		expect(run.stdout).toBe("cr80-own.json is valid\n");
+	});
+});
+
+describe("validate warnings for image resolution", () => {
+	beforeAll(async () => {
+		const t = card({ width: 1012, height: 638 });
+		for (const frame of t.template_data) frame.background.size = { width: 1012, height: 638 };
+		const logo = t.template_data[0]!.elements[1]!;
+		logo.pos = { x: 0, y: 0 };
+		logo.size = { width: 900, height: 600 };
+		if (logo.type === "image") logo.properties = { src: "photo.png", fit: "fill" };
+		await box.write("photo.png", await solidPng(600, 400, [20, 40, 200]));
+		await box.write("low-dpi.json", JSON.stringify(t));
+	});
+
+	test("warns for a 600 px image placed 3 in wide at 300 DPI", async () => {
+		const run = await box.run("validate", "low-dpi.json");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toBe('warning: front: "front_logo" prints at 200 DPI, under 300\n');
+		expect(run.stdout).toBe("low-dpi.json is valid, with 1 warning\n");
+		const strict = await box.run("validate", "low-dpi.json", "--strict", "-q");
+		expect(strict.code).toBe(1);
+		expect(strict.stderr).toBe("freshcoat: low-dpi.json has 1 warning\n");
+	});
+
+	test("follows --min-dpi and --dpi", async () => {
+		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "150")).stderr).toBe("");
+		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "0", "--strict")).code).toBe(0);
+		expect((await box.run("validate", "low-dpi.json", "--dpi", "450")).stderr).not.toContain("DPI");
+		expect((await box.run("validate", "low-dpi.json", "--dpi", "150")).stderr).toBe(
+			'warning: front: "front_logo" prints at 100 DPI, under 300\nwarning: back: "back_logo" prints at 150 DPI, under 300\n',
+		);
+	});
+});
+
+describe("print checks", () => {
+	beforeAll(async () => {
+		const t = card({ bleed: 10 } as never);
+		const front = t.template_data[0]!;
+		front.elements = [
+			{
+				id: "band",
+				type: "rect",
+				pos: { x: 0, y: 0 },
+				size: { width: 200, height: 20 },
+				properties: { fill: "#0f766e", stroke: { color: "#000000", width: 2 } },
+			},
+			{
+				id: "rule",
+				type: "rect",
+				pos: { x: 10, y: 60 },
+				size: { width: 100, height: 1 },
+				properties: { fill: "#ffffff", stroke: { color: "#000000", width: 0.5 } },
+			},
+			{
+				id: "fine",
+				type: "text",
+				pos: { x: 10, y: 70 },
+				size: { width: 180, height: 20 },
+				properties: { value: "Terms", font: { family: "Inter", size: 12 }, color: "#000000" },
+			},
+			{
+				id: "ink",
+				type: "text",
+				pos: { x: 10, y: 30 },
+				size: { width: 180, height: 30 },
+				properties: { value: "{{name}}", font: { family: "Inter", size: 26 }, color: "{{motto}}" },
+			},
+		];
+		await box.write("print.json", JSON.stringify(t));
+	});
+
+	test("validate warns for small text, hairlines and art short of bleed", async () => {
+		const run = await box.run("validate", "print.json");
+		expect(run.code).toBe(0);
+		for (const line of [
+			'warning: front: "band": Runs to the trim on the left, top and right but not into the bleed; a cut that drifts shows a white edge',
+			'warning: front: "rule": Stroke is 0.12 pt at print size, below 0.25 pt; it may not print',
+			'warning: front: "fine": Text is 2.88 pt at print size, below 6 pt',
+		])
+			expect(run.stderr).toContain(line);
+		expect(run.stderr).not.toContain('"ink"');
+		const strict = await box.run("validate", "print.json", "--strict", "-q");
+		expect(strict.code).toBe(1);
+	});
+
+	test("render checks field-bound text with its values", async () => {
+		const run = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#101828", "--out", "print-out");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"warning: front: 6.24 pt text in #101828 may print as rich black and blur if plates are out of register; pure black (#000000) is safer: ink",
+		);
+		expect(run.stderr).toContain("warning: front: Text is 2.88 pt at print size, below 6 pt: fine");
+		const plain = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#000000", "--out", "print-out");
+		expect(plain.stderr).not.toContain("rich black");
 	});
 });
 

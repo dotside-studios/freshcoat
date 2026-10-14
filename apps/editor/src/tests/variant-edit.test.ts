@@ -707,6 +707,124 @@ describe("variant management", () => {
 	});
 });
 
+describe("a layer hidden in Default", () => {
+	/** doc() with rot (0/5) hidden in Default. */
+	const hiddenRot = () =>
+		unwrap(updateElement(doc(), "0/5", { hidden: true })).template;
+
+	test("stays hidden in a variant until one shows it", () => {
+		const t = hiddenRot();
+		expect(isHiddenInVariant(t, "dark", "front", "rot")).toBe(true);
+		expect(hiddenElementIds(t, undefined, "front")).toEqual(new Set(["rot"]));
+		expect(changedLayerKeys(t, "dark", 0)).not.toContain("0/5");
+		expect(changedLayerCount(t, "dark")).toBe(4);
+	});
+
+	test("setHiddenInVariant shows it with hidden: false and drops that again", () => {
+		const t = hiddenRot();
+		const shown = unwrap(
+			setHiddenInVariant(t, "dark", "front", "rot", false),
+		).template;
+		expect(delta(shown, "rot")).toEqual({
+			id: "rot",
+			properties: {},
+			hidden: false,
+		});
+		expect(isHiddenInVariant(shown, "dark", "front", "rot")).toBe(false);
+		expect(el(shown, "0/5").hidden).toBe(true);
+		expect(hiddenElementIds(shown, "dark", "front").has("rot")).toBe(false);
+		expect(changedLayerKeys(shown, "dark", 0)).toContain("0/5");
+		expect(changedLayerCount(shown, "dark")).toBe(5);
+		const again = unwrap(
+			setHiddenInVariant(shown, "dark", "front", "rot", true),
+		).template;
+		expect(delta(again, "rot")).toBeUndefined();
+		expect(again.variants).toEqual(t.variants);
+		expect(
+			unwrap(setHiddenInVariant(t, "dark", "front", "rot", true)).template,
+		).toBe(t);
+	});
+
+	test("setHiddenInVariant replaces every delta's hidden with one", () => {
+		const t = withDelta(
+			withDelta(hiddenRot(), { id: "rot", properties: {}, hidden: true }),
+			{ id: "rot", properties: { opacity: 1 }, hidden: true },
+		);
+		const shown = unwrap(
+			setHiddenInVariant(t, "dark", "front", "rot", false),
+		).template;
+		const front = shown.variants?.[0]?.overrides.find(
+			(o) => o.name === "front",
+		);
+		expect(front?.elements?.filter((d) => d.id === "rot")).toEqual([
+			{ id: "rot", properties: {}, hidden: false },
+			{ id: "rot", properties: { opacity: 1 } },
+		]);
+		expect(isHiddenInVariant(shown, "dark", "front", "rot")).toBe(false);
+	});
+
+	test("the controller hides and shows it in Default, one step each", () => {
+		const c = opened(doc(), null);
+		const steps = () => c.state.doc?.history.past.length ?? 0;
+		expect(c.variantVisibility(["0/5", "0/bg", "0/2/-1"])).toEqual([
+			{ key: "0/5", side: "front", id: "rot", hidden: false },
+		]);
+		c.setHiddenInVariant(["0/5"], true);
+		expect(el(base(c), "0/5").hidden).toBe(true);
+		expect(c.variantVisibility(["0/5"])[0]?.hidden).toBe(true);
+		expect(steps()).toBe(1);
+		expect(base(c).variants).toEqual(doc().variants);
+		c.setHiddenInVariant(["0/5"], false);
+		expect("hidden" in el(base(c), "0/5")).toBe(false);
+		expect(steps()).toBe(2);
+		c.undo();
+		expect(el(base(c), "0/5").hidden).toBe(true);
+		c.setVariant("dark");
+		expect(c.variantVisibility(["0/5"])[0]?.hidden).toBe(true);
+		c.setHiddenInVariant(["0/5"], false);
+		expect(delta(base(c), "rot")?.hidden).toBe(false);
+		expect(el(base(c), "0/5").hidden).toBe(true);
+	});
+
+	test("a value edit in a variant keeps hidden in the base and the delta", () => {
+		const t = unwrap(
+			setHiddenInVariant(hiddenRot(), "dark", "front", "rot", false),
+		).template;
+		const c = opened(t);
+		expect(el(shown(c), "0/5").hidden).toBeUndefined();
+		c.edit((w) => updateElement(w, "0/5", { opacity: 0.5 }));
+		expect(delta(base(c), "rot")).toEqual({
+			id: "rot",
+			properties: {},
+			opacity: 0.5,
+			hidden: false,
+		});
+		expect(el(base(c), "0/5").hidden).toBe(true);
+		c.edit((w) => updateElement(w, "0/0", { pos: { x: 1, y: 2 } }));
+		expect(delta(base(c), "rot")?.hidden).toBe(false);
+
+		const hid = opened(hiddenRot());
+		hid.edit((w) => updateElement(w, "0/5", { opacity: 0.5 }));
+		expect(delta(base(hid), "rot")).toEqual({
+			id: "rot",
+			properties: {},
+			opacity: 0.5,
+		});
+		expect(el(base(hid), "0/5").hidden).toBe(true);
+	});
+
+	test("a structural edit keeps the base's hidden", () => {
+		const t = hiddenRot();
+		const w = workingTemplate(t, "dark");
+		const next = unwrap(removeElements(w, ["0/0"])).template;
+		const folded = foldVariantEdit(t, "dark", next);
+		expect(el(folded, "0/4").id).toBe("rot");
+		expect(el(folded, "0/4").hidden).toBe(true);
+		const inBase = unwrap(removeElements(t, ["0/0"])).template;
+		expect(el(inBase, "0/4").hidden).toBe(true);
+	});
+});
+
 describe("view state", () => {
 	test("setVariant with an id the base lacks is Default", () => {
 		const c = opened();

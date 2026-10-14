@@ -1,3 +1,4 @@
+import type { LengthUnit } from "@freshcoat-js/coatfile";
 import { type LayerGeometry, layerBounds, unionRects } from "~/doc/geometry";
 
 /** Thickness of each ruler, in screen px. */
@@ -9,14 +10,23 @@ const MIN_TICK_GAP = 5;
 export type Tick = {
 	/** Screen position along the ruler, relative to the viewport. */
 	at: number;
-	/** Design px. */
+	/** In the ruler's unit. */
 	value: number;
 	major: boolean;
 };
 
-/** The smallest 1, 2 or 5 × 10ⁿ design-px step that keeps labels apart. */
-export function majorStep(zoom: number): number {
-	const want = MIN_LABEL_GAP / zoom;
+/** Inches step in halves down to 1/16; other units step 1, 2, 5 × 10ⁿ. */
+const BINARY_UNITS: ReadonlySet<LengthUnit> = new Set(["in"]);
+
+/** The smallest step, in units, that keeps labels apart when one unit is
+ *  `scale` screen px long. */
+export function majorStep(scale: number, unit: LengthUnit = "px"): number {
+	const want = MIN_LABEL_GAP / scale;
+	if (BINARY_UNITS.has(unit) && want < 1) {
+		let step = 1 / 16;
+		while (step < want) step *= 2;
+		return step;
+	}
 	let base = 10 ** Math.floor(Math.log10(want));
 	for (;;) {
 		for (const m of [1, 2, 5]) if (base * m >= want) return base * m;
@@ -24,29 +34,32 @@ export function majorStep(zoom: number): number {
 	}
 }
 
+function subdivisions(step: number, scale: number, unit: LengthUnit): number {
+	const halving = BINARY_UNITS.has(unit) && Number.isInteger(Math.log2(step));
+	for (const parts of halving ? [8, 4, 2] : [10, 5, 2])
+		if ((step / parts) * scale >= MIN_TICK_GAP) return parts;
+	return 1;
+}
+
 /** Ticks for a ruler `length` screen px long whose design origin sits at
- *  screen `origin`. */
+ *  screen `origin`, with one `unit` `pxPerUnit` design px long. */
 export function rulerTicks(
 	origin: number,
 	zoom: number,
 	length: number,
+	unit: LengthUnit = "px",
+	pxPerUnit = 1,
 ): Tick[] {
-	const step = majorStep(zoom);
-	const parts =
-		(step / 10) * zoom >= MIN_TICK_GAP
-			? 10
-			: (step / 5) * zoom >= MIN_TICK_GAP
-				? 5
-				: (step / 2) * zoom >= MIN_TICK_GAP
-					? 2
-					: 1;
+	const scale = zoom * pxPerUnit;
+	const step = majorStep(scale, unit);
+	const parts = subdivisions(step, scale, unit);
 	const minor = step / parts;
-	const first = Math.floor(-origin / zoom / minor);
-	const last = Math.ceil((length - origin) / zoom / minor);
+	const first = Math.floor(-origin / scale / minor);
+	const last = Math.ceil((length - origin) / scale / minor);
 	const out: Tick[] = [];
 	for (let i = first; i <= last; i++) {
 		const value = roundValue(i * minor);
-		out.push({ at: origin + value * zoom, value, major: i % parts === 0 });
+		out.push({ at: origin + value * scale, value, major: i % parts === 0 });
 	}
 	return out;
 }
@@ -57,7 +70,7 @@ export function rulerLabel(value: number): string {
 }
 
 function roundValue(n: number): number {
-	const r = Math.round(n * 1000) / 1000;
+	const r = Math.round(n * 10000) / 10000;
 	return r === 0 ? 0 : r;
 }
 

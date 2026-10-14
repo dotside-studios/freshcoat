@@ -520,9 +520,9 @@ describe("in a transpiled card", () => {
 			}),
 		]);
 		expect(box.type).toBe("rect");
-		expect(box.backdropBlur).toBe(12);
+		expect(box.effects).toEqual([{ type: "backdropBlur", radius: 12 }]);
 		expect(card.type).toBe("frame");
-		expect(card.backdropBlur).toBe(6);
+		expect(card.effects).toEqual([{ type: "backdropBlur", radius: 6 }]);
 	});
 
 	it("flattens a Normal group when nothing in it blends", async () => {

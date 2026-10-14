@@ -5,7 +5,6 @@ import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useContext, useMemo } from "react";
 import { VARIANT_UI } from "~/app/copy";
 import { listFields } from "~/doc/values";
-import { useEditor } from "~/state/hooks";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import {
@@ -52,14 +51,14 @@ function whenPatch(list: VisibilityCondition[]): Element["visibleWhen"] {
 	return list.length === 0 ? undefined : list.length === 1 ? list[0] : list;
 }
 
-/** Hide in <variant> / Show in <variant>, while a variant is active. It is
- *  saved with the variant, unlike the eye in the layers tree. The
- *  conditions below are the same in every variant. */
+/** Hide in <variant> / Show in <variant>, or in Default with no active
+ *  variant. It is saved, unlike the eye in the layers tree. The conditions
+ *  below are the same in every variant. */
 function HideInVariant({ ins }: { ins: Inspect }) {
 	const overrides = useContext(OverridesContext);
-	const variantId = useEditor((s) => s.variantId);
-	const layers = variantId ? ins.controller.variantVisibility(ins.keys) : [];
-	if (!overrides || layers.length === 0) return null;
+	const layers = ins.controller.variantVisibility(ins.keys);
+	if (layers.length === 0) return null;
+	const label = overrides?.label ?? VARIANT_UI.default;
 	const hidden = layers.every((l) => l.hidden);
 	return (
 		<div className="flex flex-col gap-1.5 border-fc-border border-b pb-2">
@@ -70,11 +69,9 @@ function HideInVariant({ ins }: { ins: Inspect }) {
 				onPress={() => ins.controller.setHiddenInVariant(ins.keys, !hidden)}
 			>
 				{hidden ? <EyeIcon /> : <EyeOffIcon />}
-				{hidden
-					? VARIANT_UI.showIn(overrides.label)
-					: VARIANT_UI.hideIn(overrides.label)}
+				{hidden ? VARIANT_UI.showIn(label) : VARIANT_UI.hideIn(label)}
 			</Button>
-			<Notice>{VARIANT_UI.sharedConditions}</Notice>
+			{overrides ? <Notice>{VARIANT_UI.sharedConditions}</Notice> : null}
 		</div>
 	);
 }

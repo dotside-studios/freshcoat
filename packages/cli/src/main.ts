@@ -11,8 +11,11 @@ import {
 	collectFilter,
 	collectScale,
 	collectSetting,
+	parseCopies,
 	parseJobs,
 	parseLength,
+	parseMarks,
+	parseMinDpi,
 	parseOffset,
 	parsePaper,
 	parsePositive,
@@ -102,6 +105,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"render an export on this many threads; default from the cores and memory",
 			arg(parseJobs),
 		)
+		.option(
+			"--min-dpi <n>",
+			"warn for an image that prints below this many pixels per inch; default 300, 0 for none",
+			arg(parseMinDpi),
+		)
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
 		.option("--values <file>", "JSON file of field values")
@@ -150,10 +158,16 @@ function program(io: Io, onCommand: (name: string) => void) {
 				"vector",
 			] as const),
 		)
+		.addOption(
+			new Option(
+				"--pdf-text <mode>",
+				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
+			).choices(["embed", "outline"] as const),
+		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
 			"--sheets <paper>",
-			"lay the cards out on a4, letter, legal, a3, tabloid or <w>x<h> mm paper",
+			"lay the cards out on a4, a5, a6, letter, legal, a3, tabloid or <w>x<h> mm paper",
 			arg(parsePaper),
 		)
 		.addOption(
@@ -164,6 +178,16 @@ function program(io: Io, onCommand: (name: string) => void) {
 		)
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
+		.option(
+			"--copies <n|fill>",
+			"repeat each card this many times, or fill a sheet with it; default 1",
+			arg(parseCopies),
+		)
+		.option(
+			"--marks <list>",
+			"printer's marks on sheets: none, or any of crop, registration, colorbar, slug; default crop",
+			arg(parseMarks),
+		)
 		.option("--no-crop-marks", "leave out the crop marks")
 		.option(
 			"--back-offset <x,y>",
@@ -220,10 +244,20 @@ function program(io: Io, onCommand: (name: string) => void) {
 	command("validate")
 		.summary("check a template or workspace")
 		.description(
-			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, and a format\nversion that does not match the fields in use; for a workspace also required\nfields no column fills. --quiet prints nothing when it is valid.",
+			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, images that\nprint below --min-dpi, and a format version that does not match the fields\nin use; for a workspace also required fields no column fills. An image bound\nto a field is checked when it renders. --quiet prints nothing when it is\nvalid.",
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option("--strict", "exit 1 on warnings too")
+		.option(
+			"--dpi <n>",
+			"design units per inch the images are checked at; default 300, or a workspace preset's",
+			arg(parsePositive),
+		)
+		.option(
+			"--min-dpi <n>",
+			"warn for an image that prints below this many pixels per inch; default 300, or a workspace preset's; 0 for none",
+			arg(parseMinDpi),
+		)
 		.action((file, options, cmd) =>
 			validateCommand(file, { ...options, quiet: quiet(cmd) }, io),
 		);

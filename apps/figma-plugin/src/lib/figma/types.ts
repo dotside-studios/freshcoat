@@ -230,8 +230,18 @@ export type FigmaTextNode = FigmaBaseNode & {
 	fills: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	strokeJoin?: string;
+	strokeAlign?: string;
+	dashPattern?: number[];
 	characterStyleOverrides?: number[];
 	styleOverrideTable?: Record<string, Partial<FigmaTextStyle>>;
+};
+
+export type FigmaStrokeWeights = {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
 };
 
 export type FigmaRectangleNode = FigmaBaseNode & {
@@ -239,7 +249,9 @@ export type FigmaRectangleNode = FigmaBaseNode & {
 	fills: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
-	// Per-side weights, which Figma reports as a mixed strokeWeight.
+	// Per-side weights, when they differ and Figma reports strokeWeight as mixed.
+	strokeWeights?: FigmaStrokeWeights;
+	// A mixed strokeWeight whose sides could not be read.
 	strokeWeightMixed?: true;
 	// Loose string: Figma enums like "ROUND"/"SQUARE"/"NONE"/"MITER"/"BEVEL"
 	// (or figma.mixed for per-segment caps, guarded at read time).
@@ -310,11 +322,13 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	fills?: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	strokeWeights?: FigmaStrokeWeights;
 	strokeWeightMixed?: true;
 	strokeAlign?: string;
 	dashPattern?: number[];
 	// Uniform, or per-corner [topLeft, topRight, bottomRight, bottomLeft].
 	cornerRadius?: number | [number, number, number, number];
+	cornerSmoothing?: number;
 	clipsContent?: boolean;
 	componentProperties?: Record<string, { value: string; type: string }>;
 	componentId?: string;

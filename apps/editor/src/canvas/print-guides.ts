@@ -1,13 +1,20 @@
 import {
+	imageDpiHints as coatImageDpiHints,
+	printHints as coatPrintHints,
 	safeAreaHints as coatSafeAreaHints,
+	DEFAULT_MIN_IMAGE_DPI,
+	describePrintIssue,
 	hasInsets,
 	isPrintedCard,
+	type PrintIssueCode,
 	type Template,
 	templateBleed,
 	templateSafeArea,
 } from "@freshcoat-js/coatfile";
-import { keyOf } from "~/doc/path";
+import { DEFAULT_DPI, presetImageDpi } from "@freshcoat-js/workspace";
+import { keyOf, walkLayers } from "~/doc/path";
 import { createExternalStore } from "~/state/external-store";
+import { useEditor } from "~/state/hooks";
 import { type EditorState, present } from "~/state/store";
 
 export {
@@ -67,19 +74,20 @@ export function usePrintGuidesVersion(): number {
 
 // ── Safe-area hints ──────────────────────────────────────────────────────────
 
-export type SafeAreaHint = {
+export type PrintHint = {
 	/** Layer key, for selecting it. */
 	key: string;
 	side: number;
 	id: string;
 	message: string;
+	code: "safe_area" | "image_dpi" | PrintIssueCode;
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Top-level layers too close to the trim, as hints. Only a template with a
  *  safe area gets hints. */
-export function safeAreaHints(t: Template): SafeAreaHint[] {
+export function safeAreaHints(t: Template): PrintHint[] {
 	return coatSafeAreaHints(t).map(({ side, index, id, edges, safe }) => {
 		const even =
 			safe.left === safe.top &&
@@ -93,6 +101,61 @@ export function safeAreaHints(t: Template): SafeAreaHint[] {
 			side,
 			id,
 			message: `${capitalize(edges.join(" and "))} edge${edges.length > 1 ? "s cross" : " crosses"} the safe area${where}`,
+			code: "safe_area",
 		};
 	});
+}
+
+// ── Image resolution hints ───────────────────────────────────────────────────
+
+/** The resolution check the active template's export presets call for. */
+export function useImageDpi(): { dpi: number; min: number } {
+	const dpi = useEditor((s) =>
+		s.workspace
+			? presetImageDpi(s.workspace.presets, s.workspace.activeTemplateId).dpi
+			: DEFAULT_DPI,
+	);
+	const minDpi = useEditor((s) =>
+		s.workspace
+			? presetImageDpi(s.workspace.presets, s.workspace.activeTemplateId).min
+			: DEFAULT_MIN_IMAGE_DPI,
+	);
+	return { dpi, min: minDpi };
+}
+
+/** Image layers whose own image prints below `min` at `dpi` design units to
+ *  the inch. An image bound to a field is checked by the render instead. */
+export function imageDpiHints(
+	t: Template,
+	check: { dpi: number; min: number },
+): PrintHint[] {
+	return coatImageDpiHints(t, check).flatMap(({ side, id, dpi, min }) => {
+		for (const entry of walkLayers(t, side))
+			if (entry.element.id === id && entry.element.type === "image")
+				return [
+					{
+						key: entry.key,
+						side,
+						id,
+						message: `Prints at ${dpi} DPI, under ${min}`,
+						code: "image_dpi" as const,
+					},
+				];
+		return [];
+	});
+}
+
+// ── Print check hints ────────────────────────────────────────────────────────
+
+/** Layers that may not print as they look at `dpi` design units to the inch:
+ *  small text, hairline strokes, rich-black small text and art short of the
+ *  bleed. Text bound to a field is checked again by the render. */
+export function printCheckHints(t: Template, dpi: number): PrintHint[] {
+	return coatPrintHints(t, { dpi }).map(({ side, path, id, issue }) => ({
+		key: keyOf({ side, path }),
+		side,
+		id,
+		message: describePrintIssue(issue),
+		code: issue.code,
+	}));
 }

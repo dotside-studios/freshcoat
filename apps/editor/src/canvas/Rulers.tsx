@@ -1,4 +1,13 @@
 import {
+	isLengthUnit,
+	LENGTH_UNITS,
+	pxPerUnit,
+	pxToUnit,
+	roundForUnit,
+} from "@freshcoat-js/coatfile";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
+import {
 	type KeyboardEvent,
 	memo,
 	type PointerEvent,
@@ -8,7 +17,14 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { useController } from "~/app/context";
+import {
+	setDisplayUnit,
+	UNIT_LABELS,
+	useDisplayUnit,
+	useLengthUnit,
+} from "~/app/units";
 import { useEditor } from "~/state/hooks";
 import { dragGuide, focusGuide, viewportOf } from "./Guides";
 import {
@@ -22,7 +38,7 @@ type Axis = "x" | "y";
 
 const EDGE_LABEL_ROOM = 30;
 
-/** Top and left rulers in design px, over the canvas's edges. */
+/** Top and left rulers in the display unit, over the canvas's edges. */
 export const Rulers = memo(function Rulers() {
 	const on = useEditor((s) => s.rulers && s.doc !== null);
 	if (!on) return null;
@@ -30,13 +46,7 @@ export const Rulers = memo(function Rulers() {
 		<>
 			<Ruler axis="x" />
 			<Ruler axis="y" />
-			<div
-				data-testid="ruler-corner"
-				aria-hidden="true"
-				className="absolute top-0 left-0 z-10 border-fc-border border-r border-b bg-fc-panel"
-				style={{ width: RULER_SIZE, height: RULER_SIZE }}
-				onPointerDown={(e) => e.stopPropagation()}
-			/>
+			<UnitCorner />
 		</>
 	);
 });
@@ -58,8 +68,10 @@ function Ruler({ axis }: { axis: Axis }) {
 		return e ? e[axis] : null;
 	}, [selection, geometry, axis]);
 
+	const { unit, dpi } = useLengthUnit();
+	const perUnit = pxPerUnit(unit, dpi);
 	const origin = axis === "x" ? view.x : view.y;
-	const ticks = rulerTicks(origin, view.zoom, length);
+	const ticks = rulerTicks(origin, view.zoom, length, unit, perUnit);
 	const toScreen = (v: number) => origin + v * view.zoom;
 	const edges = extent?.map(toScreen) ?? [];
 	const horizontal = axis === "x";
@@ -98,6 +110,7 @@ function Ruler({ axis }: { axis: Axis }) {
 			data-ruler-adds={adds.axis}
 			data-testid={`ruler-${axis}`}
 			data-zoom={view.zoom}
+			data-unit={unit}
 			data-origin={origin}
 			className={
 				horizontal
@@ -190,13 +203,57 @@ function Ruler({ axis }: { axis: Axis }) {
 										horizontal={horizontal}
 										at={at}
 										before={i === 0}
-										text={rulerLabel(Math.round(v * 10) / 10)}
+										text={rulerLabel(
+											unit === "px"
+												? Math.round(v * 10) / 10
+												: roundForUnit(pxToUnit(v, unit, dpi), unit),
+										)}
 									/>
 								</g>
 							);
 						})
 					: null}
 			</svg>
+		</div>
+	);
+}
+
+function UnitCorner() {
+	const unit = useDisplayUnit();
+	return (
+		<div
+			data-testid="ruler-corner"
+			className="absolute top-0 left-0 z-10 flex items-center justify-center border-fc-border border-r border-b bg-fc-panel"
+			style={{ width: RULER_SIZE, height: RULER_SIZE }}
+			onPointerDown={(e) => e.stopPropagation()}
+		>
+			<MenuTrigger>
+				<RACButton
+					aria-label={`Units: ${UNIT_LABELS[unit]}`}
+					className="size-full font-fc text-[8px] text-fc-muted outline-none hover:text-fc-text focus-visible:ring-2 focus-visible:ring-fc-accent focus-visible:ring-inset"
+				>
+					{unit}
+				</RACButton>
+				<Popover placement="bottom start">
+					<Menu
+						aria-label="Units"
+						selectionMode="single"
+						selectedKeys={[unit]}
+						disallowEmptySelection
+						onSelectionChange={(keys) => {
+							if (keys === "all") return;
+							const [next] = keys;
+							if (isLengthUnit(next)) setDisplayUnit(next);
+						}}
+					>
+						{LENGTH_UNITS.map((u) => (
+							<MenuItem key={u} id={u}>
+								{UNIT_LABELS[u]}
+							</MenuItem>
+						))}
+					</Menu>
+				</Popover>
+			</MenuTrigger>
 		</div>
 	);
 }

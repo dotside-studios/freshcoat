@@ -12,6 +12,7 @@ import type {
 	ResolvedFill,
 	TextArc,
 	TextPath,
+	TextStroke,
 	ResolvedFont,
 	Shadows,
 	ShapeMask,
@@ -160,6 +161,7 @@ export type TextNode = Transform & {
 	font: ResolvedFont;
 	color?: string;
 	fill?: ResolvedFill;
+	stroke?: TextStroke;
 	// start and end follow the resolved direction.
 	align?: "left" | "center" | "right" | "justify" | "start" | "end";
 	// How a justified paragraph sets its last line (and any line ending in a hard
@@ -187,6 +189,9 @@ export type TextNode = Transform & {
 	// Sets the text along a path: inline `d` relative to the node's pos, or
 	// `ref`, the id of a sibling path node. Wins over `arc`.
 	path?: TextPathNode;
+	// "outline" draws the text in a PDF as the outlines of its glyphs, with no
+	// font, whatever the export asks for.
+	pdfText?: "outline";
 	// A pre-baked layout, used as is. Without one, compileScene bakes text/spans
 	// through its TextEngine.
 	layout?: BakedTextLayout;

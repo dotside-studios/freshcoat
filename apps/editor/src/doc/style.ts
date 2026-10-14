@@ -1,9 +1,11 @@
-import type {
-	Background,
-	Element,
-	Fill,
-	Template,
-	TextProperties,
+import {
+	type Background,
+	type Effect,
+	type Element,
+	effectsOf,
+	type Fill,
+	type Template,
+	type TextProperties,
 } from "@freshcoat-js/coatfile";
 import { type ElementPatch, updateElement } from "./ops";
 import { getElement } from "./path";
@@ -38,11 +40,7 @@ export type LayerStyle = {
 		cornerRadius: CornerRadius | undefined;
 		cornerSmoothing: number | undefined;
 	};
-	effects: {
-		shadow: Element["shadow"];
-		blur: number | undefined;
-		backdropBlur: number | undefined;
-	};
+	effects: { effects: Effect[] | undefined };
 	text?: TextStyle;
 };
 
@@ -51,21 +49,30 @@ const hasFill = (el: Layer) =>
 	el.type === "vector" ||
 	el.type === "frame" ||
 	el.type === "text";
-const hasStroke = (el: Layer) =>
+const hasCorners = (el: Layer) =>
 	el.type === "rect" ||
 	el.type === "vector" ||
 	el.type === "frame" ||
 	el.type === "image";
-const hasCorners = hasStroke;
+const hasStroke = (el: Layer) => hasCorners(el) || el.type === "text";
+
+/** A stroke as a text layer takes it: no dash, cap or trim. */
+function textStroke(stroke: Stroke | undefined): Stroke | undefined {
+	if (!stroke) return undefined;
+	const { color, width, join, align } = stroke;
+	return {
+		color,
+		width,
+		...(join ? { join } : {}),
+		...(align ? { align } : {}),
+	};
+}
 
 export function readStyle(el: Layer): LayerStyle {
 	const p = el.properties as Record<string, unknown>;
+	const effects = effectsOf(el);
 	const style: LayerStyle = {
-		effects: {
-			shadow: el.shadow,
-			blur: el.blur,
-			backdropBlur: el.backdropBlur,
-		},
+		effects: { effects: effects.length > 0 ? effects : undefined },
 	};
 	if (el.type === "text") {
 		const fill = el.properties.fill ?? el.properties.color;
@@ -96,14 +103,16 @@ export function stylePatch(el: Layer, style: LayerStyle): ElementPatch {
 			}
 		} else props.fill = style.fill.fill;
 	}
-	if (style.stroke && hasStroke(el)) props.stroke = style.stroke.stroke;
+	if (style.stroke && hasStroke(el))
+		props.stroke =
+			el.type === "text"
+				? textStroke(style.stroke.stroke)
+				: style.stroke.stroke;
 	if (style.corners && hasCorners(el)) {
 		const r = style.corners.cornerRadius;
 		props.cornerRadius =
-			el.type === "rect" || el.type === "frame" || typeof r !== "object"
-				? r
-				: r[0];
-		if (el.type === "rect")
+			el.type !== "vector" || typeof r !== "object" ? r : r[0];
+		if (el.type !== "vector")
 			props.cornerSmoothing = style.corners.cornerSmoothing;
 	}
 	if (style.text && el.type === "text") {
@@ -111,7 +120,13 @@ export function stylePatch(el: Layer, style: LayerStyle): ElementPatch {
 		if (el.properties.spans)
 			props.spans = el.properties.spans.map((s) => ({ text: s.text }));
 	}
-	return { ...style.effects, properties: props };
+	return {
+		...style.effects,
+		shadow: undefined,
+		blur: undefined,
+		backdropBlur: undefined,
+		properties: props,
+	};
 }
 
 /** Gives every layer in `keys` the parts of `style` it can take. */

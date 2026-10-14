@@ -1,4 +1,4 @@
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { createRenderer } from "@freshcoat-js/engine";
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
@@ -56,5 +56,38 @@ describe("renderCompiledPdf", () => {
 		expect(describeWarning(pages[1]?.warnings[0] as never)).toBe(
 			"Drawn as an image in the PDF: shadow (card)",
 		);
+	});
+
+	const lettered = (properties: Record<string, unknown> = {}) =>
+		({
+			...template,
+			template_data: [
+				side("front", [
+					{
+						id: "name",
+						type: "text",
+						pos: { x: 2, y: 2 },
+						size: { width: 36, height: 16 },
+						properties: { value: "Ink", font: { family: "Geist", size: 10 }, ...properties },
+					},
+				]),
+			],
+		}) as unknown as Template;
+
+	test("draws text as outlines when asked, or when a layer asks", async () => {
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit(),
+			fonts: { Geist: [testFontBytes("Geist-Regular.ttf")] },
+		});
+		const fonts = async (t: Template, text?: "embed" | "outline") => {
+			const compiled = compile(t, {}, { width: 40, height: 20 });
+			const [page] = await renderCompiledPdf(renderer, compiled, text ? { text } : {});
+			expect(page?.warnings).toEqual([]);
+			return new TextDecoder("latin1").decode(page?.bytes).includes("/FontFile2");
+		};
+		expect(await fonts(lettered())).toBe(true);
+		expect(await fonts(lettered(), "outline")).toBe(false);
+		expect(await fonts(lettered({ pdfText: "outline" }))).toBe(false);
+		expect(await fonts(lettered({ pdfText: "outline" }), "embed")).toBe(false);
 	});
 });

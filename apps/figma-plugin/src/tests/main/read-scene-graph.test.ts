@@ -386,6 +386,30 @@ describe("readRectangleNode", () => {
 		expect(r.strokeWeight).toBeUndefined();
 		expect(r.strokeWeightMixed).toBe(true);
 	});
+
+	it("reads each side of a mixed strokeWeight", () => {
+		const r = readRectangleNode({
+			id: "1:1",
+			name: "box",
+			type: "RECTANGLE",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			rotation: 0,
+			absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+			effects: [],
+			strokeWeight: Symbol("figma.mixed"),
+			strokeTopWeight: 1,
+			strokeRightWeight: 0,
+			strokeBottomWeight: 4,
+			strokeLeftWeight: 0,
+			fills: [],
+			strokes: [],
+		} as never);
+		expect(r.strokeWeight).toBeUndefined();
+		expect(r.strokeWeightMixed).toBeUndefined();
+		expect(r.strokeWeights).toEqual({ top: 1, right: 0, bottom: 4, left: 0 });
+	});
 });
 
 describe("readVectorNode", () => {
@@ -721,6 +745,27 @@ test("readNode reads a frame's four corners when cornerRadius is mixed", () => {
 	expect((out as { cornerRadius?: unknown }).cornerRadius).toEqual([
 		12, 0, 6, 0,
 	]);
+});
+
+test("readNode reads a frame's corner smoothing", () => {
+	const frame = (cornerSmoothing: number) =>
+		readNode({
+			id: "1:9",
+			name: "card",
+			type: "FRAME",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 40 },
+			effects: [],
+			fills: [],
+			strokes: [],
+			children: [],
+			cornerRadius: 12,
+			cornerSmoothing,
+		} as never) as { cornerSmoothing?: number };
+	expect(frame(0.6).cornerSmoothing).toBe(0.6);
+	expect("cornerSmoothing" in frame(0)).toBe(false);
 });
 
 test("readContainer copies auto-layout container + child fields", () => {

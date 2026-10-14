@@ -1,5 +1,10 @@
-import type { FontDescriptor, Template } from "@freshcoat-js/coatfile";
-import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import type {
+	FontDescriptor,
+	LengthUnit,
+	Template,
+} from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION, unitToPx } from "@freshcoat-js/coatfile";
+import { DEFAULT_DPI } from "@freshcoat-js/workspace";
 
 export type Preset = {
 	id: string;
@@ -7,6 +12,8 @@ export type Preset = {
 	width: number;
 	height: number;
 	sides: string[];
+	bleed?: number;
+	safeArea?: number;
 };
 
 export const PRESETS: Preset[] = [
@@ -33,7 +40,71 @@ export const PRESETS: Preset[] = [
 		sides: ["page"],
 	},
 	{ id: "badge", name: "Badge", width: 638, height: 1012, sides: ["front"] },
+	{
+		id: "business-card",
+		name: "Business card US",
+		width: 1050,
+		height: 600,
+		sides: ["front", "back"],
+		bleed: 38,
+		safeArea: 38,
+	},
+	{
+		id: "business-card-eu",
+		name: "Business card EU",
+		width: 1004,
+		height: 650,
+		sides: ["front", "back"],
+		bleed: 35,
+		safeArea: 35,
+	},
+	{
+		id: "postcard",
+		name: "Postcard 4×6 in",
+		width: 1800,
+		height: 1200,
+		sides: ["front", "back"],
+		bleed: 38,
+		safeArea: 38,
+	},
+	{
+		id: "postcard-a6",
+		name: "Postcard A6",
+		width: 1748,
+		height: 1240,
+		sides: ["front", "back"],
+		bleed: 35,
+		safeArea: 35,
+	},
+	{
+		id: "shipping-label",
+		name: "Shipping label 4×6 in",
+		width: 1200,
+		height: 1800,
+		sides: ["front"],
+		safeArea: 38,
+	},
 ];
+
+export const SIZE_UNITS: readonly LengthUnit[] = ["px", "mm", "in"];
+
+/** A custom size given in `unit` as whole design px at `dpi`, rounded up so
+ *  the raster covers it, as `cr80Pixels` does. */
+export function customSize(
+	width: number,
+	height: number,
+	unit: LengthUnit,
+	dpi: number = DEFAULT_DPI,
+): { width: number; height: number } {
+	const px = (v: number) => wholePx(unitToPx(v, unit, dpi), unit);
+	return { width: px(width), height: px(height) };
+}
+
+/** A side length as whole px: rounded in px, and rounded up from a physical
+ *  unit so the raster covers it. */
+export function wholePx(px: number, unit: LengthUnit): number {
+	return Math.max(1, unit === "px" ? Math.round(px) : Math.ceil(px - 1e-6));
+}
 
 /** The id a new blank template starts with. A template that still has it
  *  was never named, and saving it asks for a name first. */
@@ -56,6 +127,8 @@ export function newDocument(
 		name: "Untitled",
 		width: Math.round(preset.width),
 		height: Math.round(preset.height),
+		...(preset.bleed ? { bleed: preset.bleed } : {}),
+		...(preset.safeArea ? { safeArea: preset.safeArea } : {}),
 		fields: { type: "object", properties: {} },
 		fonts: [font],
 		template_data: sides.map((name) => ({

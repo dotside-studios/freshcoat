@@ -1,4 +1,5 @@
 import {
+	DEFAULT_MIN_IMAGE_DPI,
 	DEFAULT_VARIANT_ID,
 	type ResolvedSlice,
 	resolveSlices,
@@ -27,6 +28,21 @@ import { boundDataset } from "./view";
 
 export const DEFAULT_FILE_NAME_PATTERN = "{{template}}-{{index}}-{{side}}";
 export const DEFAULT_DPI = 300;
+
+/** The image resolution check a template's exports call for: its presets'
+ *  lowest `dpi`, where images come out largest, and highest `minImageDpi`.
+ *  A template with no preset gets the defaults. */
+export function presetImageDpi(
+	presets: readonly Pick<ExportPreset, "templateId" | "dpi" | "minImageDpi">[],
+	templateId: string,
+): { dpi: number; min: number } {
+	const own = presets.filter((p) => p.templateId === templateId);
+	if (own.length === 0) return { dpi: DEFAULT_DPI, min: DEFAULT_MIN_IMAGE_DPI };
+	return {
+		dpi: Math.min(...own.map((p) => p.dpi)),
+		min: Math.max(...own.map((p) => p.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI)),
+	};
+}
 
 export const DEFAULT_QUALITY = 90;
 

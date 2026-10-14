@@ -84,6 +84,7 @@ import {
 	type PaperChoice,
 	paperChoice,
 	sheetsFor,
+	withCopies,
 } from "./sheets";
 import { destinationSupport } from "./sinks";
 
@@ -560,6 +561,30 @@ export function ExportSettings({
 									</SegmentedItem>
 								</SegmentedControl>
 							</Row>
+						) : null}
+						{pdf && preset.pdfPageImage === "vector" ? (
+							<>
+								<Row label="Text">
+									<SegmentedControl
+										aria-label="PDF text"
+										className={segmentedFull}
+										selectedKey={preset.pdfText ?? "embed"}
+										onSelectionChange={(key) =>
+											set({ pdfText: key === "outline" ? "outline" : "embed" })
+										}
+									>
+										<SegmentedItem id="embed" className={segmentedItemFull}>
+											Embed fonts
+										</SegmentedItem>
+										<SegmentedItem id="outline" className={segmentedItemFull}>
+											Outline
+										</SegmentedItem>
+									</SegmentedControl>
+								</Row>
+								{preset.pdfText === "outline" ? (
+									<Hint>Glyphs as shapes, no fonts in the PDF</Hint>
+								) : null}
+							</>
 						) : null}
 						{lossy ? (
 							<Row label="Quality">
@@ -1193,11 +1218,57 @@ function LayoutGroup({
 								{`Gap widened to ${Math.round(sheets.imposition.gapMm * 10) / 10} mm for bleed`}
 							</Hint>
 						) : null}
+						<Row label="Copies">
+							<div className="flex min-w-0 items-center gap-2">
+								<NumberField
+									aria-label="Copies"
+									value={
+										sheet.copies === "fill"
+											? (sheets?.imposition?.copies ?? 1)
+											: (sheet.copies ?? 1)
+									}
+									min={1}
+									max={999}
+									step={1}
+									precision={0}
+									isDisabled={sheet.copies === "fill"}
+									onChange={(copies) =>
+										onChange(withCopies(sheet, Math.max(1, Math.round(copies))))
+									}
+								/>
+								<Checkbox
+									isSelected={sheet.copies === "fill"}
+									onChange={(fill) =>
+										onChange(withCopies(sheet, fill ? "fill" : 1))
+									}
+								>
+									Fill sheet
+								</Checkbox>
+							</div>
+						</Row>
 						<Checkbox
 							isSelected={sheet.cropMarks}
 							onChange={(cropMarks) => patch({ cropMarks })}
 						>
 							Crop marks
+						</Checkbox>
+						<Checkbox
+							isSelected={sheet.registrationMarks ?? false}
+							onChange={(registrationMarks) => patch({ registrationMarks })}
+						>
+							Registration marks
+						</Checkbox>
+						<Checkbox
+							isSelected={sheet.colorBar ?? false}
+							onChange={(colorBar) => patch({ colorBar })}
+						>
+							Color bar
+						</Checkbox>
+						<Checkbox
+							isSelected={sheet.slug ?? false}
+							onChange={(slug) => patch({ slug })}
+						>
+							Slug
 						</Checkbox>
 						<Checkbox
 							isSelected={sheet.duplex !== "none"}

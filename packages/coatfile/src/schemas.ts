@@ -203,6 +203,15 @@ export const FillSchema = z.union([
 // (index 0 = furthest back), matching Figma's stacked-fill semantic.
 export const FillsSchema = z.union([FillSchema, z.array(FillSchema)]);
 
+// A text element's stroke: StrokeSchema without dash, cap or trim. Default
+// center. Spans do not override it.
+export const TextStrokeSchema = z.object({
+	color: z.union([z.string(), ...GradientSchema.options]),
+	width: z.number(),
+	join: z.enum(["round", "bevel", "miter"]).optional(),
+	align: z.enum(["inside", "outside", "center"]).optional(),
+});
+
 const FontDescriptorObjectSchema = z.object({
 	family: z.string().optional(),
 	size: z.number().optional(),
@@ -256,6 +265,7 @@ export const TextPropertiesSchema = z.object({
 	// Optional gradient fill for the text (mapped to the element box). `color`
 	// remains the solid fallback.
 	fill: FillSchema.optional(),
+	stroke: TextStrokeSchema.optional(),
 	// start and end follow `direction`.
 	align: z
 		.enum(["left", "center", "right", "justify", "start", "end"])
@@ -283,6 +293,9 @@ export const TextPropertiesSchema = z.object({
 	// Figma "Truncate text": cap the wrapped text at N lines, ellipsizing the
 	// last line if content overflows.
 	maxLines: z.number().int().positive().optional(),
+	// "outline" draws the text in a PDF as the outlines of its glyphs, with no
+	// font, whatever the export asks for.
+	pdfText: z.literal("outline").optional(),
 	// Sets the text along a circle centered on the box, for seals and badges.
 	// Each hard line is one ring and nothing wraps. Angles are degrees clockwise
 	// from 12 o'clock.
@@ -349,7 +362,12 @@ export const ImageMaskSchema = z.union([
 export const StrokeSchema = z.object({
 	// A solid colour, or a gradient placed in the element's box as a fill is.
 	color: z.union([z.string(), ...GradientSchema.options]),
-	width: z.number(),
+	width: z.number({
+		error: (issue) =>
+			issue.input !== null && typeof issue.input === "object"
+				? "a width per side is only for a rect or frame stroke; use one number"
+				: undefined,
+	}),
 	dash: z.array(z.number()).optional(),
 	cap: z.enum(["butt", "round", "square"]).optional(),
 	join: z.enum(["round", "bevel", "miter"]).optional(),
@@ -362,6 +380,19 @@ export const StrokeSchema = z.object({
 	trimOffset: z.union([z.number(), z.string()]).optional(),
 });
 
+// Each side's own stroke width. A side left out has none.
+export const StrokeSideWidthsSchema = z.object({
+	top: z.number().min(0).optional(),
+	right: z.number().min(0).optional(),
+	bottom: z.number().min(0).optional(),
+	left: z.number().min(0).optional(),
+});
+
+// A rect or frame stroke, whose width can differ per side.
+export const BoxStrokeSchema = StrokeSchema.extend({
+	width: z.union([z.number(), StrokeSideWidthsSchema]),
+});
+
 // Fractions of the source image's width and height.
 export const ImageCropSchema = z.object({
 	x: z.number().min(0).max(1),
@@ -369,6 +400,12 @@ export const ImageCropSchema = z.object({
 	width: z.number().gt(0).max(1),
 	height: z.number().gt(0).max(1),
 });
+
+// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
+export const CornerRadiusSchema = z.union([
+	z.number(),
+	z.tuple([z.number(), z.number(), z.number(), z.number()]),
+]);
 
 export const ImagePropertiesSchema = z.object({
 	src: z.string(),
@@ -385,7 +422,8 @@ export const ImagePropertiesSchema = z.object({
 	// The part of the source that is drawn, before `fit` places it. Ignored by
 	// `tile`.
 	crop: ImageCropSchema.optional(),
-	cornerRadius: z.number().optional(),
+	cornerRadius: CornerRadiusSchema.optional(),
+	cornerSmoothing: z.number().min(0).max(1).optional(),
 	mask: ImageMaskSchema.optional(),
 	stroke: StrokeSchema.optional(),
 });
@@ -430,12 +468,6 @@ export const BarcodePropertiesSchema = z.object({
 	bearerBars: BearerBarsSchema.optional(),
 });
 
-// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
-export const CornerRadiusSchema = z.union([
-	z.number(),
-	z.tuple([z.number(), z.number(), z.number(), z.number()]),
-]);
-
 /** An inset from each edge of the trim, in design units: one number for every
  *  side, or each side on its own. */
 export const InsetsSchema = z.union([
@@ -462,7 +494,7 @@ export const SliceModifierSchema = z.object({
 
 export const RectPropertiesSchema = z.object({
 	fill: FillsSchema.optional(),
-	stroke: StrokeSchema.optional(),
+	stroke: BoxStrokeSchema.optional(),
 	cornerRadius: CornerRadiusSchema.optional(),
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
@@ -520,6 +552,33 @@ export const ShadowSchema = z.object({
 /** One shadow, or a stack painted bottom-up (last is nearest the viewer) — the
  *  same one-or-many shape a fill takes. */
 export const ShadowsSchema = z.union([ShadowSchema, z.array(ShadowSchema)]);
+
+// One entry of an element's `effects`. `hidden` keeps an effect in the file
+// without drawing it. Shadows paint in array order. A blur and a backdrop blur
+// apply at the engine's fixed positions in the layer effect order wherever they
+// sit in the array, and an element takes at most one of each.
+export const ShadowEffectSchema = ShadowSchema.extend({
+	type: z.literal("shadow"),
+	hidden: z.boolean().optional(),
+});
+
+export const BlurEffectSchema = z.object({
+	type: z.literal("blur"),
+	radius: z.number().min(0),
+	hidden: z.boolean().optional(),
+});
+
+export const BackdropBlurEffectSchema = z.object({
+	type: z.literal("backdropBlur"),
+	radius: z.number().min(0),
+	hidden: z.boolean().optional(),
+});
+
+export const EffectSchema = z.discriminatedUnion("type", [
+	ShadowEffectSchema,
+	BlurEffectSchema,
+	BackdropBlurEffectSchema,
+]);
 
 const LayoutPaddingSchema = z.object({
 	top: z.number().optional(),
@@ -642,9 +701,14 @@ const elementShellShape = {
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
 	backdropBlur: z.number().min(0).optional(),
+	// Replaces `shadow`, `blur` and `backdropBlur`; an element sets one form or
+	// the other.
+	effects: z.array(EffectSchema).optional(),
 	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),
+	// Kept in the file but not drawn; a variant delta's `hidden: false` shows it.
+	hidden: z.boolean().optional(),
 	// Several conditions must all hold.
 	visibleWhen: z
 		.union([VisibilityConditionSchema, z.array(VisibilityConditionSchema)])
@@ -709,8 +773,9 @@ export const FrameElementSchema: z.ZodType<FrameElement> = z.lazy(() =>
 export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 	z.object({
 		fill: FillsSchema.optional(),
-		stroke: StrokeSchema.optional(),
+		stroke: BoxStrokeSchema.optional(),
 		cornerRadius: CornerRadiusSchema.optional(),
+		cornerSmoothing: z.number().min(0).max(1).optional(),
 		// Figma's `clipsContent`. When true, children are clipped to the frame,
 		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
@@ -775,7 +840,8 @@ export const VariantSchema = z.object({
 						size: SizeSchema.optional(),
 						rotation: z.number().optional(),
 						opacity: z.number().min(0).max(1).optional(),
-						// Leaves the element out of the variant.
+						// `true` leaves the element out of the variant; `false` shows one
+						// the base hides.
 						hidden: z.boolean().optional(),
 					}),
 				)
@@ -870,6 +936,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceImageFraming(tpl, ctx);
 	enforceBooleanOperands(tpl, ctx);
 	enforceSlices(tpl, ctx);
+	enforceEffects(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1502,6 +1569,37 @@ function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
 		frame.elements.forEach((el, ei) => {
 			walk(el, ["template_data", fi, "elements", ei], null);
 		});
+	});
+}
+
+// `effects` stands in for the legacy `shadow`, `blur` and `backdropBlur`, so an
+// element sets one form or the other, and takes at most one blur of each kind.
+function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		const effects = (el as { effects?: { type: string }[] }).effects;
+		if (effects === undefined) return;
+		for (const key of ["shadow", "blur", "backdropBlur"] as const) {
+			if ((el as Record<string, unknown>)[key] === undefined) continue;
+			addKitIssue(
+				ctx,
+				"effects_with_legacy_field",
+				`an element with effects must not also set ${key}`,
+				[...path, key],
+			);
+		}
+		for (const type of ["blur", "backdropBlur"]) {
+			const second = effects.findIndex(
+				(e, i) =>
+					e.type === type && effects.findIndex((o) => o.type === type) < i,
+			);
+			if (second < 0) continue;
+			addKitIssue(
+				ctx,
+				"duplicate_effect",
+				`an element takes at most one ${type} effect`,
+				[...path, "effects", second],
+			);
+		}
 	});
 }
 

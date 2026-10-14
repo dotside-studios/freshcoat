@@ -1,0 +1,84 @@
+{
+	"caseId": "clip-per-corner-smoothed",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 20,
+						"y": 10
+					},
+					"size": {
+						"width": 120,
+						"height": 100
+					},
+					"op": "drawGroup",
+					"clip": {
+						"kind": "rounded-rect",
+						"radius": [
+							30,
+							0,
+							0,
+							0
+						],
+						"smoothing": 1
+					},
+					"children": [
+						{
+							"pos": {
+								"x": 20,
+								"y": 10
+							},
+							"size": {
+								"width": 120,
+								"height": 100
+							},
+							"op": "drawRect",
+							"fills": [
+								{
+									"kind": "solid",
+									"color": "#000000"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "3f6406204a517d0691fbd79a73a01a3febfa8dfff8a2e5f98818d65f57b40475"
+}

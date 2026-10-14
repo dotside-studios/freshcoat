@@ -1,10 +1,19 @@
+import {
+	isLengthUnit,
+	type LengthUnit,
+	pxToUnit,
+	roundForUnit,
+	unitPrecision,
+} from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
+import { Select, SelectItem } from "@freshcoat-js/ui/select";
+import { DEFAULT_DPI } from "@freshcoat-js/workspace";
 import { Fragment, useEffect, useState } from "react";
 import { Button as RACButton } from "react-aria-components";
 import { formatDate } from "~/app/format";
-import { PRESETS } from "~/doc/new-document";
+import { customSize, PRESETS, SIZE_UNITS } from "~/doc/new-document";
 import { SAMPLES, type Sample } from "~/samples";
 import { findStarter, STARTERS } from "~/samples/starters";
 import CloseIcon from "~icons/mingcute/close-line";
@@ -27,6 +36,7 @@ import {
 	templateThumbnail,
 	useThumbnail,
 } from "./template-thumbnails";
+import { parseLengthInput, UNIT_STEP, useDisplayUnit } from "./units";
 
 const RECENT_SHOWN = 6;
 
@@ -92,6 +102,75 @@ function recentPreview(item: RecentItem): {
 	return { width: t.width, height: t.height, source };
 }
 
+function CustomSize({
+	onCreate,
+}: {
+	onCreate: (size: { width: number; height: number }) => void;
+}) {
+	const display = useDisplayUnit();
+	const [unit, setUnit] = useState<LengthUnit>(
+		SIZE_UNITS.includes(display) ? display : "px",
+	);
+	const [size, setSize] = useState({ width: 1080, height: 1080 });
+	const px = customSize(size.width, size.height, unit);
+	const show = (v: number) =>
+		roundForUnit(pxToUnit(v, unit, DEFAULT_DPI), unit);
+	const field = (axis: "width" | "height", label: string, name: string) => (
+		<NumberField
+			label={label}
+			aria-label={`Custom ${name}`}
+			className="w-24"
+			value={size[axis]}
+			min={show(1)}
+			max={show(16384)}
+			precision={unit === "px" ? 0 : unitPrecision(unit)}
+			step={UNIT_STEP[unit]}
+			parse={(text, current) =>
+				parseLengthInput(text, current, unit, DEFAULT_DPI)
+			}
+			onChange={(v) => setSize((s) => ({ ...s, [axis]: v }))}
+		/>
+	);
+	return (
+		<>
+			<span className="text-fc-muted">Custom</span>
+			{field("width", "W", "width")}
+			{field("height", "H", "height")}
+			<Select
+				aria-label="Custom size unit"
+				className="w-16"
+				value={unit}
+				onChange={(next) => {
+					if (!isLengthUnit(next) || next === unit) return;
+					setSize({
+						width: roundForUnit(pxToUnit(px.width, next, DEFAULT_DPI), next),
+						height: roundForUnit(pxToUnit(px.height, next, DEFAULT_DPI), next),
+					});
+					setUnit(next);
+				}}
+			>
+				{SIZE_UNITS.map((u) => (
+					<SelectItem key={u} id={u}>
+						{u}
+					</SelectItem>
+				))}
+			</Select>
+			<Button onPress={() => onCreate(px)}>
+				<FileIcon />
+				Create
+			</Button>
+			{unit === "px" ? null : (
+				<span
+					className="text-fc-faint text-fc-sm tabular-nums"
+					data-testid="custom-size-px"
+				>
+					{px.width} × {px.height} px at {DEFAULT_DPI} dpi
+				</span>
+			)}
+		</>
+	);
+}
+
 /** The welcome screen. `openHint` rings "Open file…" and says what to open,
  *  for a template the Figma plugin downloaded because it was too large for a
  *  link. */
@@ -103,7 +182,6 @@ export function Welcome({
 	openHint?: boolean;
 }) {
 	const { controller } = ctx;
-	const [custom, setCustom] = useState({ width: 1080, height: 1080 });
 	const [autosave, setAutosave] = useState<Autosave | null>(null);
 	const [recent, setRecent] = useState<RecentItem[]>([]);
 
@@ -275,37 +353,9 @@ export function Welcome({
 							))}
 						</ul>
 						<div className="flex flex-wrap items-center gap-2 border-fc-border border-t px-3 py-2.5">
-							<span className="text-fc-muted">Custom</span>
-							<NumberField
-								label="W"
-								aria-label="Custom width"
-								className="w-24"
-								value={custom.width}
-								min={1}
-								max={16384}
-								precision={0}
-								onChange={(v) =>
-									v !== null &&
-									setCustom((c) => ({ ...c, width: Math.round(v) }))
-								}
+							<CustomSize
+								onCreate={(size) => void controller.newDocument(size)}
 							/>
-							<NumberField
-								label="H"
-								aria-label="Custom height"
-								className="w-24"
-								value={custom.height}
-								min={1}
-								max={16384}
-								precision={0}
-								onChange={(v) =>
-									v !== null &&
-									setCustom((c) => ({ ...c, height: Math.round(v) }))
-								}
-							/>
-							<Button onPress={() => void controller.newDocument(custom)}>
-								<FileIcon />
-								Create
-							</Button>
 						</div>
 					</section>
 

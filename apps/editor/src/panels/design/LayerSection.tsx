@@ -27,6 +27,7 @@ import {
 	parseGridLine,
 } from "./field-helpers";
 import { InspectorSection } from "./InspectorSection";
+import { LengthField } from "./LengthField";
 
 export const BLEND_MODES = [
 	"normal",
@@ -242,7 +243,7 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 		<>
 			<Marked keys={POS}>
 				<DisabledHint when={autoAll} tip="Positioned by auto layout">
-					<NumberField
+					<LengthField
 						label="X"
 						value={axis("x")}
 						onChange={write("x")}
@@ -252,7 +253,7 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 			</Marked>
 			<Marked keys={POS}>
 				<DisabledHint when={autoAll} tip="Positioned by auto layout">
-					<NumberField
+					<LengthField
 						label="Y"
 						value={axis("y")}
 						onChange={write("y")}
@@ -261,7 +262,7 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 				</DisabledHint>
 			</Marked>
 			<Marked keys={SIZE}>
-				<NumberField
+				<LengthField
 					label="W"
 					value={axis("width")}
 					min={1}
@@ -269,7 +270,7 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 				/>
 			</Marked>
 			<Marked keys={SIZE}>
-				<NumberField
+				<LengthField
 					label="H"
 					value={axis("height")}
 					min={1}

@@ -213,7 +213,7 @@ describe("override markers", () => {
 			0,
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
-		expect((getElement(base(c), "0/5") as Element).shadow).toBeTruthy();
+		expect((getElement(base(c), "0/5") as Element).effects).toBeTruthy();
 		expect(delta(c, "rot")).toBeUndefined();
 	});
 });
@@ -248,6 +248,46 @@ describe("the layers tree", () => {
 		).toBe(true);
 		// The editor's own eye is a separate view setting.
 		expect(c.state.hidden.has("0/5")).toBe(false);
+	});
+});
+
+describe("a layer hidden in Default", () => {
+	it("is marked in Default and in a variant until the variant shows it", async () => {
+		const c = open();
+		c.select(["0/5"]);
+		const user = mount(
+			c,
+			<>
+				<LayersTree />
+				<DesignPanel />
+			</>,
+		);
+		const row = () => screen.getByTestId("layer-row-0/5");
+		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
+		await user.click(screen.getByRole("button", { name: "Hide in Default" }));
+		expect((getElement(base(c), "0/5") as Element).hidden).toBe(true);
+		expect(
+			within(row())
+				.getByTestId("layer-variant-hidden")
+				.getAttribute("aria-label"),
+		).toBe("Hidden in Default");
+		expect(c.state.hidden.has("0/5")).toBe(false);
+
+		act(() => c.setVariant("dark"));
+		expect(
+			within(row())
+				.getByTestId("layer-variant-hidden")
+				.getAttribute("aria-label"),
+		).toBe("Hidden in Dark");
+		await user.click(screen.getByRole("button", { name: "Show in Dark" }));
+		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
+		expect(within(row()).getByTestId("layer-variant-changed")).toBeTruthy();
+		expect((getElement(base(c), "0/5") as Element).hidden).toBe(true);
+
+		act(() => c.setVariant(undefined));
+		await user.click(screen.getByRole("button", { name: "Show in Default" }));
+		expect("hidden" in (getElement(base(c), "0/5") as Element)).toBe(false);
+		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
 	});
 });
 

@@ -4,6 +4,7 @@ import RadiusIcon from "~icons/mingcute/border-radius-line";
 import SplitIcon from "~icons/mingcute/fullscreen-line";
 import { Pair, Row } from "./controls";
 import { commonValue, type Inspect, propsOf } from "./field-helpers";
+import { LengthField } from "./LengthField";
 
 type Radius = number | [number, number, number, number];
 
@@ -26,12 +27,8 @@ function uniform(r: Radius): number | null {
 /** Corner radius, smoothing and independent corners, shown in the Layer
  *  section for rectangles, frames and images. */
 export function CornerFields({ ins }: { ins: Inspect }) {
-	const rectOnly = ins.layers.every((l) => l.type === "rect");
-	const splittable = ins.layers.every(
-		(l) => l.type === "rect" || l.type === "frame",
-	);
 	const radii = ins.layers.map(radiusOf);
-	const split = splittable && radii.some((r) => Array.isArray(r));
+	const split = radii.some((r) => Array.isArray(r));
 	const single = commonValue(radii.map(uniform));
 	const smoothing = commonValue(
 		ins.layers.map((l) =>
@@ -59,7 +56,7 @@ export function CornerFields({ ins }: { ins: Inspect }) {
 	return (
 		<>
 			<Row label="Corners" keys={["cornerRadius", "cornerSmoothing"]}>
-				<NumberField
+				<LengthField
 					label={<RadiusIcon />}
 					aria-label="Corner radius"
 					className="min-w-0 flex-1"
@@ -67,38 +64,34 @@ export function CornerFields({ ins }: { ins: Inspect }) {
 					value={single}
 					onChange={(v) => setAll("radius", () => v)}
 				/>
-				{rectOnly && (
-					<NumberField
-						label="S"
-						aria-label="Corner smoothing"
-						className="min-w-0 flex-1"
-						unit="%"
-						min={0}
-						max={100}
-						precision={0}
-						value={smoothing}
-						onChange={(v) =>
-							ins.setProps("smoothing", () => ({
-								cornerSmoothing: v === 0 ? undefined : v / 100,
-							}))
-						}
-					/>
-				)}
-				{splittable && (
-					<ToggleButton
-						aria-label="Independent corners"
-						tooltip="Independent corners"
-						isSelected={split}
-						onChange={toggleSplit}
-					>
-						<SplitIcon />
-					</ToggleButton>
-				)}
+				<NumberField
+					label="S"
+					aria-label="Corner smoothing"
+					className="min-w-0 flex-1"
+					unit="%"
+					min={0}
+					max={100}
+					precision={0}
+					value={smoothing}
+					onChange={(v) =>
+						ins.setProps("smoothing", () => ({
+							cornerSmoothing: v === 0 ? undefined : v / 100,
+						}))
+					}
+				/>
+				<ToggleButton
+					aria-label="Independent corners"
+					tooltip="Independent corners"
+					isSelected={split}
+					onChange={toggleSplit}
+				>
+					<SplitIcon />
+				</ToggleButton>
 			</Row>
 			{split && (
 				<Pair cols={4}>
 					{CORNERS.map((name, i) => (
-						<NumberField
+						<LengthField
 							key={name}
 							label={name}
 							aria-label={`${name} radius`}

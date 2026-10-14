@@ -1,6 +1,7 @@
 // What embedding a font file in a PDF needs from it, read straight from its
 // tables: the outline format, the metrics a font descriptor carries, each
-// glyph's advance, and the axes of a variable font.
+// glyph's advance, and the axes of a variable font. A collection is read at
+// its first face, the one CanvasKit draws.
 
 export type SfntAxis = {
 	tag: string;
@@ -11,7 +12,10 @@ export type SfntAxis = {
 
 export type SfntInfo = {
 	// "truetype" outlines embed as FontFile2, "cff" as an OpenType FontFile3.
-	outlines: "truetype" | "cff";
+	// "cff2" has no PDF font type and is drawn as outlines.
+	outlines: "truetype" | "cff" | "cff2";
+	// A face of a collection, which a PDF cannot embed either.
+	collection: boolean;
 	unitsPerEm: number;
 	bbox: [number, number, number, number];
 	ascent: number;
@@ -27,18 +31,27 @@ export type SfntInfo = {
 export const tagAt = (b: Uint8Array, o: number) =>
 	String.fromCharCode(b[o] ?? 0, b[o + 1] ?? 0, b[o + 2] ?? 0, b[o + 3] ?? 0);
 
-// Null for anything a PDF cannot carry as is: WOFF and WOFF2 (see
-// sfntBytes), collections, CFF2 outlines and files whose tables do not read.
+export const embeddable = (info: SfntInfo) =>
+	!info.collection && info.outlines !== "cff2";
+
+// Where a font's table directory starts: past the header of a collection.
+export function faceOffset(bytes: Uint8Array): number {
+	if (tagAt(bytes, 0) !== "ttcf") return 0;
+	return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(12);
+}
+
+// Null for WOFF and WOFF2 (see sfntBytes) and files whose tables do not read.
 export function readSfnt(bytes: Uint8Array): SfntInfo | null {
 	try {
 		const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-		const version = tagAt(bytes, 0);
+		const base = faceOffset(bytes);
+		const version = tagAt(bytes, base);
 		const truetype = version === "\0\x01\0\0" || version === "true";
 		if (!truetype && version !== "OTTO") return null;
 		const tables = new Map<string, number>();
-		const count = dv.getUint16(4);
+		const count = dv.getUint16(base + 4);
 		for (let i = 0; i < count; i++) {
-			const o = 12 + i * 16;
+			const o = base + 12 + i * 16;
 			tables.set(tagAt(bytes, o), dv.getUint32(o + 8));
 		}
 		const head = tables.get("head");
@@ -46,7 +59,8 @@ export function readSfnt(bytes: Uint8Array): SfntInfo | null {
 		const hmtx = tables.get("hmtx");
 		if (head === undefined || hhea === undefined || hmtx === undefined)
 			return null;
-		if (truetype ? !tables.has("glyf") : !tables.has("CFF ")) return null;
+		const cff = tables.has("CFF ") ? "cff" : tables.has("CFF2") ? "cff2" : null;
+		if (truetype ? !tables.has("glyf") : !cff) return null;
 		const unitsPerEm = dv.getUint16(head + 18);
 		if (!unitsPerEm) return null;
 		const os2 = tables.get("OS/2");
@@ -68,7 +82,8 @@ export function readSfnt(bytes: Uint8Array): SfntInfo | null {
 			}
 		}
 		return {
-			outlines: truetype ? "truetype" : "cff",
+			outlines: truetype ? "truetype" : (cff as "cff" | "cff2"),
+			collection: base > 0,
 			unitsPerEm,
 			bbox: [
 				dv.getInt16(head + 36),

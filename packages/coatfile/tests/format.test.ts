@@ -329,6 +329,42 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
+	test("1.7: text stroke, on elements and deltas", () => {
+		const text = (properties: Record<string, unknown>) =>
+			({
+				id: "t",
+				type: "text",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 100 },
+				properties: { value: "Ink", font: { family: "A", size: 10 }, ...properties },
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), text(properties)));
+		expect(need({})).toBe("1.0");
+		expect(need({ stroke: { color: "#000", width: 2 } })).toBe("1.7");
+		expect(
+			need({ stroke: { color: "#000", width: 2, align: "outside" } }),
+		).toBe("1.7");
+		expect(need({ pdfText: "outline" })).toBe("1.7");
+
+		const t = withElements(base(), text({}));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [
+							{ id: "t", properties: { stroke: { color: "#f00", width: 1 } } },
+						],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.7");
+	});
+
 	test("1.6: element backdropBlur", () => {
 		expect(minimumFormatVersion(withElements(base(), rect("r")))).toBe("1.0");
 		expect(
@@ -373,6 +409,77 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.6");
 	});
 
+	test("1.7: frame corner smoothing, on elements and deltas", () => {
+		const frame = (properties: Record<string, unknown>) =>
+			({
+				id: "f",
+				type: "frame",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 20 },
+				properties: { children: [], ...properties },
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), frame(properties)));
+		expect(need({ cornerRadius: 8 })).toBe("1.0");
+		expect(need({ cornerRadius: 8, cornerSmoothing: 0.6 })).toBe("1.7");
+		expect(
+			minimumFormatVersion(
+				withElements(
+					base(),
+					rect("r", {
+						properties: { cornerRadius: 8, cornerSmoothing: 0.6 },
+					} as never),
+				),
+			),
+		).toBe("1.0");
+
+		const t = withElements(base(), frame({ cornerRadius: 8 }));
+		t.variants = [
+			{
+				id: "v",
+				label: "V",
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "f", properties: { cornerSmoothing: 0.6 } }],
+					},
+				],
+			},
+		];
+		expect(minimumFormatVersion(t)).toBe("1.7");
+	});
+
+	test("1.7: per-corner image radii and image corner smoothing", () => {
+		const image = (properties: Record<string, unknown>) =>
+			({
+				id: "i",
+				type: "image",
+				pos: { x: 0, y: 0 },
+				size: { width: 100, height: 20 },
+				properties: { src: "a.png", fit: "cover", ...properties },
+			}) as Element;
+		const need = (properties: Record<string, unknown>) =>
+			minimumFormatVersion(withElements(base(), image(properties)));
+		expect(need({ cornerRadius: 8 })).toBe("1.0");
+		expect(need({ cornerRadius: [8, 0, 8, 0] })).toBe("1.7");
+		expect(need({ cornerRadius: 8, cornerSmoothing: 0.6 })).toBe("1.7");
+
+		const delta = (properties: Record<string, unknown>) => {
+			const t = withElements(base(), image({ cornerRadius: 8 }));
+			t.variants = [
+				{
+					id: "v",
+					label: "V",
+					overrides: [{ name: "front", elements: [{ id: "i", properties }] }],
+				},
+			];
+			return minimumFormatVersion(t);
+		};
+		expect(delta({ cornerRadius: 4 })).toBe("1.0");
+		expect(delta({ cornerRadius: [8, 0, 8, 0] })).toBe("1.7");
+		expect(delta({ cornerSmoothing: 0.6 })).toBe("1.7");
+	});
+
 	test("the highest feature wins", () => {
 		const t = withElements(
 			{ ...base(), $schema: "x" },
@@ -384,6 +491,14 @@ describe("minimumFormatVersion", () => {
 			} as Element,
 		);
 		expect(minimumFormatVersion(t)).toBe("1.3");
+	});
+
+	test("1.7: element effects", () => {
+		const t = withElements(
+			base(),
+			rect("a", { effects: [{ type: "blur", radius: 2 }] }),
+		);
+		expect(minimumFormatVersion(t)).toBe("1.7");
 	});
 
 	test("never exceeds what this kit writes", () => {

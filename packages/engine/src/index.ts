@@ -199,6 +199,8 @@ export {
 	outlinePath,
 	outlineSvg,
 	rectShape,
+	type SideStrokeGeometry,
+	sideStrokeGeometry,
 } from "./outline";
 export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {
@@ -224,6 +226,7 @@ export {
 	type PdfFrame,
 	type SurfaceCanvas,
 } from "./renderer";
+export type { PdfTextMode } from "./pdf/paint";
 export { squircleSvg } from "./squircle";
 export {
 	type ApplyCaseOptions,

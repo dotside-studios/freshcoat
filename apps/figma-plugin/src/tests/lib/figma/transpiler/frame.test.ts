@@ -137,12 +137,44 @@ describe("transpileFrame", () => {
 		expect(el.properties.stroke).toEqual({ color: "#000000", width: 4 });
 	});
 
+	it("carries a width per side", () => {
+		const el = transpileFrame(
+			baseFrame({
+				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+				strokeWeights: { top: 0, right: 0, bottom: 1, left: 0 },
+				strokeAlign: "INSIDE",
+			}),
+			{ outerFrame: OUTER_FRAME, scale: 1 },
+		);
+		expect(el.properties.stroke).toEqual({
+			color: "#000000",
+			width: { top: 0, right: 0, bottom: 1, left: 0 },
+			align: "inside",
+		});
+	});
+
 	it("carries per-corner radii, scaled", () => {
 		const el = transpileFrame(baseFrame({ cornerRadius: [8, 0, 4, 0] }), {
 			outerFrame: OUTER_FRAME,
 			scale: 2,
 		});
 		expect(el.properties.cornerRadius).toEqual([16, 0, 8, 0]);
+	});
+
+	it("keeps corner smoothing with a corner radius", () => {
+		const el = transpileFrame(
+			baseFrame({ cornerRadius: [8, 0, 4, 0], cornerSmoothing: 0.6 }),
+			{ outerFrame: OUTER_FRAME, scale: 1 },
+		);
+		expect(el.properties.cornerSmoothing).toBe(0.6);
+	});
+
+	it("omits corner smoothing without a corner radius", () => {
+		const el = transpileFrame(baseFrame({ cornerSmoothing: 0.6 }), {
+			outerFrame: OUTER_FRAME,
+			scale: 1,
+		});
+		expect("cornerSmoothing" in el.properties).toBe(false);
 	});
 
 	it("carries an OUTSIDE frame stroke", () => {

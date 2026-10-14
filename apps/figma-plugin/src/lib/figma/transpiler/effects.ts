@@ -14,30 +14,38 @@ function shadowColor(c: {
 	return `rgba(${r}, ${g}, ${b}, ${c.a})`;
 }
 
-export type ExtractedShadow = {
-	color: string;
-	dx: number;
-	dy: number;
-	blur: number;
-	spread?: number;
-	inset?: boolean;
-};
+export type ExtractedEffect =
+	| {
+			type: "shadow";
+			color: string;
+			dx: number;
+			dy: number;
+			blur: number;
+			spread?: number;
+			inset?: boolean;
+			hidden?: true;
+	  }
+	| { type: "blur" | "backdropBlur"; radius: number; hidden?: true };
 
 export type ExtractedEffects = {
-	/** One shadow, or the whole stack in paint order. */
-	shadow?: ExtractedShadow | ExtractedShadow[];
-	blur?: number;
-	backdropBlur?: number;
+	/** The node's effects in Figma's order; absent when it has none. */
+	effects?: ExtractedEffect[];
 };
 
+/** Whether any of the effects is drawn. */
+export function hasVisibleEffect(fx: ExtractedEffects): boolean {
+	return fx.effects?.some((e) => !e.hidden) ?? false;
+}
+
 // Extract DROP_SHADOW / INNER_SHADOW / LAYER_BLUR / BACKGROUND_BLUR effects from
-// a Figma node into coatfile's element-shell shadow, blur and backdropBlur
-// fields. Figma's background blur radius maps like its layer blur radius.
+// a Figma node into coatfile's element-shell `effects` list. Figma's background
+// blur radius maps like its layer blur radius.
 //
 // Figma stacks effects the way it stacks fills, first entry bottom-most, and
-// coatfile's shadow array paints in that same order, so the list is carried
-// across as-is. A single shadow is emitted as an object rather than a one-entry
-// array, which keeps the common case's output identical to what it always was.
+// coatfile's shadows paint in that same order, so the list is carried across in
+// Figma's order. An effect Figma has switched off stays in the list as
+// `hidden`, so the designer can turn it back on. Only the first layer blur and
+// the first background blur are kept, since an element takes one of each.
 //
 // `worldRotation` is the element's total rotation in degrees once every frame
 // above it has been composed. Figma measures a shadow's offset on the CANVAS —
@@ -55,33 +63,40 @@ export function extractEffects(
 	const rad = (worldRotation * Math.PI) / 180;
 	const cos = Math.cos(rad);
 	const sin = Math.sin(rad);
-	const out: ExtractedEffects = {};
-	const shadows: ExtractedShadow[] = [];
+	const out: ExtractedEffect[] = [];
+	let blurSeen = false;
+	let backdropSeen = false;
 	for (const e of effects) {
-		if (e.visible === false) continue;
+		const hidden = e.visible === false ? { hidden: true as const } : {};
 		if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
 			const dx = (e.offset?.x ?? 0) * scale;
 			const dy = (e.offset?.y ?? 0) * scale;
 			const spread = (e.spread ?? 0) * scale;
-			shadows.push({
+			out.push({
+				type: "shadow",
 				color: e.color ? shadowColor(e.color) : "#000000",
 				dx: round3(dx * cos + dy * sin),
 				dy: round3(-dx * sin + dy * cos),
 				blur: (e.radius ?? 0) * scale,
 				...(spread !== 0 ? { spread: round3(spread) } : {}),
 				...(e.type === "INNER_SHADOW" ? { inset: true } : {}),
+				...hidden,
 			});
 		}
-		if (e.type === "LAYER_BLUR" && out.blur === undefined) {
-			out.blur = (e.radius ?? 0) * scale;
+		if (e.type === "LAYER_BLUR" && !blurSeen) {
+			blurSeen = true;
+			out.push({ type: "blur", radius: (e.radius ?? 0) * scale, ...hidden });
 		}
-		if (e.type === "BACKGROUND_BLUR" && out.backdropBlur === undefined) {
-			out.backdropBlur = (e.radius ?? 0) * scale;
+		if (e.type === "BACKGROUND_BLUR" && !backdropSeen) {
+			backdropSeen = true;
+			out.push({
+				type: "backdropBlur",
+				radius: (e.radius ?? 0) * scale,
+				...hidden,
+			});
 		}
 	}
-	if (shadows.length === 1) out.shadow = shadows[0];
-	else if (shadows.length > 1) out.shadow = shadows;
-	return out;
+	return out.length > 0 ? { effects: out } : {};
 }
 
 // Un-rotating an offset by a right angle leaves floating-point dust

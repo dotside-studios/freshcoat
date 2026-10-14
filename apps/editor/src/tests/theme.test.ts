@@ -110,6 +110,7 @@ describe("colour literals", () => {
 		{ path: /^(packages\/ui|apps\/editor)\/src\/tests\// },
 		{ path: /^apps\/editor\/src\/samples\// },
 		{ path: /^apps\/editor\/src\/doc\// },
+		{ path: /^apps\/editor\/src\/export\/SheetPreview\.tsx$/, line: /p\.rgb/ },
 		{
 			path: /^apps\/editor\/src\/panels\/design\/(fills\.ts|StrokeSection\.tsx|EffectsSection\.tsx|QrSection\.tsx|BarcodeSection\.tsx)$/,
 		},

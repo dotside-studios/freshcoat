@@ -32,7 +32,7 @@ npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
 | `plan` | a preset and a workspace become a list of export items, with file names and sizes |
 | `presets` | `newPreset` and `duplicatePreset`: a preset with Studio's defaults, under a name no other preset has |
 | `export` | runs a preset: renders each item, writes a zip or a PDF and the export report |
-| `impose` | cards on sheets of paper: paper sizes, crop marks, duplex backs |
+| `impose` | cards on sheets of paper: paper sizes, printer's marks, duplex backs |
 | `pdf` | PDF assembly with pdf-lib, one page per item or one sheet per page |
 | `zip-stream` | the streaming zip writer and reader an export needs; zip64 past 4 GB or 65,535 entries |
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
@@ -212,7 +212,9 @@ the encoder refuses fails its item, since a placeholder would print as if it
 scanned. Other render warnings, such as an image or font that failed to
 load, leave the item rendered and are listed in its `warnings`, described by
 coatfile's `describeWarning` and joined with `; ` in the report. An image
-field left empty is not reported.
+field left empty is not reported. An image that prints below the preset's
+`minImageDpi` (default 300, 0 for no check) at its `dpi` is listed too, as
+"Image prints at 200 DPI, under 300: photo".
 
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
@@ -343,7 +345,11 @@ JPEG at the chosen density, or `vector`, which draws each card as PDF vectors
 through the engine's [PDF output](../engine/README.md#pdf-output): text in its
 embedded font, and any layer a PDF cannot express, such as a shadow, as an
 image. A card printed with correction is rendered as a PNG. Each font file is
-stored once in the assembled PDF, however many cards use it. A gray or RGB
+stored once in the assembled PDF, however many cards use it. A preset's
+`pdfText: "outline"` draws the text of vector pages as the outlines of its
+glyphs instead, so the PDF holds no font (see the engine's
+[Text as outlines](../engine/README.md#text-as-outlines)); a sheet's slug,
+when asked for, is still set in Helvetica. A gray or RGB
 JPEG carrying an ICC profile, as the engine's JPEGs carry sRGB, is drawn in an
 `ICCBased` space holding that profile, each distinct profile stored once.
 
@@ -367,6 +373,13 @@ many presets name it, and one no preset names is left out. A workspace with an
 output intent is written at format 1.3; a 1.2 reader opens it without the
 intents, with a warning.
 
+A sheet layout's `copies` repeats each card that many times before the next
+one, for step and repeat; `"fill"` repeats it once per slot, so each record
+fills a sheet. `imposeSheets()` resolves it into the imposition's `copies`, and
+`sheetSummary()` adds "· 10 copies each". Under duplex each copy's back sits
+in the mirrored slot behind its own front. `assemblePdf()` embeds each image
+once however many slots it fills.
+
 A preset with `bleed: true` asks the host to render each card with its
 template's bleed. Pass that bleed to `assemblePdf()` as `bleedMm`
 (coatfile's `bleedMm(pixels, dpi)` converts it). On sheets, each card is placed by its
@@ -374,6 +387,32 @@ trim with the bleed outside the slot. The gap between cards is widened to
 `minGapMm(bleed)`, twice the bleed, when the layout's is narrower, and crop
 marks sit on the trim and start outside the bleed. One card per page, each
 page gets a trim box inside its bleed box.
+
+### Printer's marks
+
+A sheet layout's `cropMarks` (on by default) draws crop marks on fronts.
+Three more marks are off unless asked for, and each is drawn only where its
+margin has room:
+
+- `registrationMarks`: a 6 mm crosshair over a 2 mm circle, centred in each
+  margin at least 8 mm deep, on fronts and backs. A target that would cross
+  a crop mark moves along its edge until it clears it. A back's targets are
+  its front's mirrored as the flip mirrors the sheet and moved by
+  `backOffsetMm`, so held to the light they land on each other.
+- `colorBar`: twelve 4 mm patches along the bottom margin, from the cards'
+  left edge: black at 100, 75, 50, 25, 10 and 0 percent, then cyan, magenta,
+  yellow, red, green and blue, in an outline.
+- `slug`: one 6 pt Helvetica line along the top margin, such as "Members ·
+  Sheet 2 of 5 · Back · 2026-10-13": the PDF's title, the sheet, the side
+  under duplex, and the PDF's date. A slug wider than its room is cut with
+  an ellipsis.
+
+The colour bar and slug sit outside the crop marks and stop short of a
+target. `sheetMarks(imposition, layout, side)` gives every mark of a page in
+millimetres, as `assemblePdf()` draws them and Studio previews them, and
+`slugText(imposition, page, { job, date })` the slug's words. Marks are
+pure RGB black, as PDFs carry no Separation colour space yet; registration
+colour, which prints on every plate, waits on spot colour support.
 
 ### Slice pieces
 

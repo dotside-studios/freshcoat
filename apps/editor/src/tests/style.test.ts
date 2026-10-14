@@ -32,8 +32,12 @@ describe("pasteStyle", () => {
 			pasteStyle(t, ["0/1", "0/5"], readStyle(el(t, "0/0"))),
 		).template;
 		const frame = el(out, "0/1");
-		expect(frame.shadow).toEqual({ color: "#000000", dx: 1, dy: 2, blur: 3 });
-		expect(frame.blur).toBe(4);
+		expect(frame.effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 1, dy: 2, blur: 3 },
+			{ type: "blur", radius: 4 },
+		]);
+		expect(frame.shadow).toBeUndefined();
+		expect(frame.blur).toBeUndefined();
 		expect(frame.type === "frame" && frame.properties).toMatchObject({
 			fill: ["#ff0000", "#00ff00"],
 			stroke: { color: "#0000ff", width: 2 },
@@ -46,12 +50,25 @@ describe("pasteStyle", () => {
 		expect(rect.rotation).toBe(30);
 	});
 
+	it("copies per-corner radii and smoothing onto an image", () => {
+		const t = styled();
+		const out = unwrap(
+			pasteStyle(t, ["0/2/0"], readStyle(el(t, "0/0"))),
+		).template;
+		const image = el(out, "0/2/0");
+		expect(image.type === "image" && image.properties).toMatchObject({
+			cornerRadius: [1, 2, 3, 4],
+			cornerSmoothing: 0.6,
+		});
+	});
+
 	it("clears what the source lacks", () => {
 		const t = styled();
 		const out = unwrap(
 			pasteStyle(t, ["0/0"], readStyle(el(t, "0/5"))),
 		).template;
 		const rect = el(out, "0/0");
+		expect(rect.effects).toBeUndefined();
 		expect(rect.shadow).toBeUndefined();
 		expect(rect.blur).toBeUndefined();
 		expect(rect.type === "rect" && rect.properties).toEqual({});
@@ -67,6 +84,34 @@ describe("pasteStyle", () => {
 			value: "Hi {{ name }}",
 			color: "#00ff00",
 			font: { family: "Inter", size: 16 },
+		});
+	});
+
+	it("gives text the shape's stroke without dash, cap or trim", () => {
+		const t = unwrap(
+			updateElement(doc(), "0/0", {
+				properties: {
+					stroke: {
+						color: "#0000ff",
+						width: 2,
+						dash: [4, 2],
+						cap: "round",
+						join: "round",
+						align: "outside",
+						trimEnd: 0.5,
+					},
+				},
+			}),
+		).template;
+		const out = unwrap(
+			pasteStyle(t, ["0/1/1"], readStyle(el(t, "0/0"))),
+		).template;
+		const text = el(out, "0/1/1");
+		expect(text.type === "text" && text.properties.stroke).toEqual({
+			color: "#0000ff",
+			width: 2,
+			join: "round",
+			align: "outside",
 		});
 	});
 
@@ -96,7 +141,7 @@ describe("pasteStyle", () => {
 		c.select(["0/1", "0/5"]);
 		const before = c.template;
 		c.pasteStyle();
-		expect(el(c.template as Template, "0/5").blur).toBe(4);
+		expect(el(c.template as Template, "0/5").effects).toHaveLength(2);
 		c.undo();
 		expect(c.template).toEqual(before);
 	});

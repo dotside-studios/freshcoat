@@ -154,7 +154,7 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 	z.object({
 		kind: z.literal("sheet"),
 		paper: z.union([
-			z.enum(["a4", "letter", "legal", "a3", "tabloid"]),
+			z.enum(["a4", "a5", "a6", "letter", "legal", "a3", "tabloid"]),
 			z.object({
 				widthMm: z.number().positive(),
 				heightMm: z.number().positive(),
@@ -164,9 +164,15 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 		marginMm: z.number().min(0),
 		gapMm: z.number().min(0),
 		cropMarks: z.boolean(),
+		registrationMarks: z.boolean().optional(),
+		colorBar: z.boolean().optional(),
+		slug: z.boolean().optional(),
 		duplex: z.enum(["none", "long-edge", "short-edge"]),
 		backOffsetMm: z.object({ x: z.number(), y: z.number() }).optional(),
 		blankBacks: z.boolean().optional(),
+		copies: z
+			.union([z.number().int().positive(), z.literal("fill")])
+			.optional(),
 	}),
 ]);
 
@@ -191,9 +197,11 @@ const PresetSchema = z.object({
 	quality: z.number().min(0).max(100).optional(),
 	pngAlpha: z.enum(["auto", "keep"]).optional(),
 	pdfPageImage: z.enum(["png", "jpeg", "vector"]).optional(),
+	pdfText: z.enum(["embed", "outline"]).optional(),
 	destination: z.enum(["download", "zip-file", "folder"]).optional(),
 	scale: z.number().min(1).max(4),
 	dpi: z.number().positive(),
+	minImageDpi: z.number().min(0).optional(),
 	fileName: z.string(),
 	markExported: z.boolean(),
 	print: z

@@ -476,6 +476,90 @@
 										"type": "number",
 										"minimum": 0
 									},
+									"effects": {
+										"type": "array",
+										"items": {
+											"oneOf": [
+												{
+													"type": "object",
+													"properties": {
+														"color": {
+															"type": "string"
+														},
+														"dx": {
+															"type": "number"
+														},
+														"dy": {
+															"type": "number"
+														},
+														"blur": {
+															"type": "number"
+														},
+														"spread": {
+															"type": "number"
+														},
+														"inset": {
+															"type": "boolean"
+														},
+														"type": {
+															"type": "string",
+															"const": "shadow"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"color",
+														"dx",
+														"dy",
+														"blur",
+														"type"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "blur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "backdropBlur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												}
+											]
+										}
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -649,6 +733,9 @@
 												]
 											}
 										}
+									},
+									"hidden": {
+										"type": "boolean"
 									},
 									"visibleWhen": {
 										"anyOf": [
@@ -1433,7 +1520,32 @@
 														]
 													},
 													"width": {
-														"type": "number"
+														"anyOf": [
+															{
+																"type": "number"
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"top": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"right": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"bottom": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"left": {
+																		"type": "number",
+																		"minimum": 0
+																	}
+																}
+															}
+														]
 													},
 													"dash": {
 														"type": "array",
@@ -1737,6 +1849,90 @@
 										"type": "number",
 										"minimum": 0
 									},
+									"effects": {
+										"type": "array",
+										"items": {
+											"oneOf": [
+												{
+													"type": "object",
+													"properties": {
+														"color": {
+															"type": "string"
+														},
+														"dx": {
+															"type": "number"
+														},
+														"dy": {
+															"type": "number"
+														},
+														"blur": {
+															"type": "number"
+														},
+														"spread": {
+															"type": "number"
+														},
+														"inset": {
+															"type": "boolean"
+														},
+														"type": {
+															"type": "string",
+															"const": "shadow"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"color",
+														"dx",
+														"dy",
+														"blur",
+														"type"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "blur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "backdropBlur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												}
+											]
+										}
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -1911,6 +2107,9 @@
 											}
 										}
 									},
+									"hidden": {
+										"type": "boolean"
+									},
 									"visibleWhen": {
 										"anyOf": [
 											{
@@ -2028,7 +2227,36 @@
 												]
 											},
 											"cornerRadius": {
-												"type": "number"
+												"anyOf": [
+													{
+														"type": "number"
+													},
+													{
+														"type": "array",
+														"prefixItems": [
+															{
+																"type": "number"
+															},
+															{
+																"type": "number"
+															},
+															{
+																"type": "number"
+															},
+															{
+																"type": "number"
+															}
+														],
+														"items": false,
+														"minItems": 4,
+														"maxItems": 4
+													}
+												]
+											},
+											"cornerSmoothing": {
+												"type": "number",
+												"minimum": 0,
+												"maximum": 1
 											},
 											"mask": {
 												"anyOf": [
@@ -2582,6 +2810,90 @@
 													"type": "number",
 													"minimum": 0
 												},
+												"effects": {
+													"type": "array",
+													"items": {
+														"oneOf": [
+															{
+																"type": "object",
+																"properties": {
+																	"color": {
+																		"type": "string"
+																	},
+																	"dx": {
+																		"type": "number"
+																	},
+																	"dy": {
+																		"type": "number"
+																	},
+																	"blur": {
+																		"type": "number"
+																	},
+																	"spread": {
+																		"type": "number"
+																	},
+																	"inset": {
+																		"type": "boolean"
+																	},
+																	"type": {
+																		"type": "string",
+																		"const": "shadow"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"color",
+																	"dx",
+																	"dy",
+																	"blur",
+																	"type"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "blur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "backdropBlur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															}
+														]
+													}
+												},
 												"adjust": {
 													"type": "object",
 													"properties": {
@@ -2755,6 +3067,9 @@
 															]
 														}
 													}
+												},
+												"hidden": {
+													"type": "boolean"
 												},
 												"visibleWhen": {
 													"anyOf": [
@@ -3539,7 +3854,32 @@
 																	]
 																},
 																"width": {
-																	"type": "number"
+																	"anyOf": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "object",
+																			"properties": {
+																				"top": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"right": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"bottom": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"left": {
+																					"type": "number",
+																					"minimum": 0
+																				}
+																			}
+																		}
+																	]
 																},
 																"dash": {
 																	"type": "array",
@@ -3843,6 +4183,90 @@
 													"type": "number",
 													"minimum": 0
 												},
+												"effects": {
+													"type": "array",
+													"items": {
+														"oneOf": [
+															{
+																"type": "object",
+																"properties": {
+																	"color": {
+																		"type": "string"
+																	},
+																	"dx": {
+																		"type": "number"
+																	},
+																	"dy": {
+																		"type": "number"
+																	},
+																	"blur": {
+																		"type": "number"
+																	},
+																	"spread": {
+																		"type": "number"
+																	},
+																	"inset": {
+																		"type": "boolean"
+																	},
+																	"type": {
+																		"type": "string",
+																		"const": "shadow"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"color",
+																	"dx",
+																	"dy",
+																	"blur",
+																	"type"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "blur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "backdropBlur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															}
+														]
+													}
+												},
 												"adjust": {
 													"type": "object",
 													"properties": {
@@ -4017,6 +4441,9 @@
 														}
 													}
 												},
+												"hidden": {
+													"type": "boolean"
+												},
 												"visibleWhen": {
 													"anyOf": [
 														{
@@ -4134,7 +4561,36 @@
 															]
 														},
 														"cornerRadius": {
-															"type": "number"
+															"anyOf": [
+																{
+																	"type": "number"
+																},
+																{
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 4,
+																	"maxItems": 4
+																}
+															]
+														},
+														"cornerSmoothing": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
 														},
 														"mask": {
 															"anyOf": [
@@ -4794,6 +5250,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -4967,6 +5507,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -5510,6 +6053,240 @@
 												}
 											]
 										},
+										"stroke": {
+											"type": "object",
+											"properties": {
+												"color": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "object",
+															"properties": {
+																"kind": {
+																	"type": "string",
+																	"const": "linear"
+																},
+																"angle": {
+																	"type": "number"
+																},
+																"from": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"to": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"stops": {
+																	"type": "array",
+																	"items": {
+																		"type": "object",
+																		"properties": {
+																			"offset": {
+																				"type": "number"
+																			},
+																			"color": {
+																				"type": "string"
+																			}
+																		},
+																		"required": [
+																			"offset",
+																			"color"
+																		]
+																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
+																}
+															},
+															"required": [
+																"kind",
+																"angle",
+																"stops"
+															]
+														},
+														{
+															"type": "object",
+															"properties": {
+																"kind": {
+																	"type": "string",
+																	"const": "radial"
+																},
+																"center": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"radius": {
+																	"type": "number"
+																},
+																"radiusY": {
+																	"type": "number"
+																},
+																"rotation": {
+																	"type": "number"
+																},
+																"focus": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"focusRadius": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"stops": {
+																	"type": "array",
+																	"items": {
+																		"type": "object",
+																		"properties": {
+																			"offset": {
+																				"type": "number"
+																			},
+																			"color": {
+																				"type": "string"
+																			}
+																		},
+																		"required": [
+																			"offset",
+																			"color"
+																		]
+																	}
+																},
+																"spread": {
+																	"type": "string",
+																	"enum": [
+																		"pad",
+																		"reflect",
+																		"repeat"
+																	]
+																}
+															},
+															"required": [
+																"kind",
+																"stops"
+															]
+														},
+														{
+															"type": "object",
+															"properties": {
+																"kind": {
+																	"type": "string",
+																	"const": "angular"
+																},
+																"center": {
+																	"type": "array",
+																	"prefixItems": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "number"
+																		}
+																	],
+																	"items": false,
+																	"minItems": 2,
+																	"maxItems": 2
+																},
+																"rotation": {
+																	"type": "number"
+																},
+																"stops": {
+																	"type": "array",
+																	"items": {
+																		"type": "object",
+																		"properties": {
+																			"offset": {
+																				"type": "number"
+																			},
+																			"color": {
+																				"type": "string"
+																			}
+																		},
+																		"required": [
+																			"offset",
+																			"color"
+																		]
+																	}
+																}
+															},
+															"required": [
+																"kind",
+																"stops"
+															]
+														}
+													]
+												},
+												"width": {
+													"type": "number"
+												},
+												"join": {
+													"type": "string",
+													"enum": [
+														"round",
+														"bevel",
+														"miter"
+													]
+												},
+												"align": {
+													"type": "string",
+													"enum": [
+														"inside",
+														"outside",
+														"center"
+													]
+												}
+											},
+											"required": [
+												"color",
+												"width"
+											]
+										},
 										"align": {
 											"type": "string",
 											"enum": [
@@ -5575,6 +6352,10 @@
 											"type": "integer",
 											"exclusiveMinimum": 0,
 											"maximum": 9007199254740991
+										},
+										"pdfText": {
+											"type": "string",
+											"const": "outline"
 										},
 										"arc": {
 											"type": "object",
@@ -5798,6 +6579,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -5972,6 +6837,9 @@
 										}
 									}
 								},
+								"hidden": {
+									"type": "boolean"
+								},
 								"visibleWhen": {
 									"anyOf": [
 										{
@@ -6089,7 +6957,36 @@
 											]
 										},
 										"cornerRadius": {
-											"type": "number"
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "array",
+													"prefixItems": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "number"
+														},
+														{
+															"type": "number"
+														}
+													],
+													"items": false,
+													"minItems": 4,
+													"maxItems": 4
+												}
+											]
+										},
+										"cornerSmoothing": {
+											"type": "number",
+											"minimum": 0,
+											"maximum": 1
 										},
 										"mask": {
 											"anyOf": [
@@ -6588,6 +7485,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -6761,6 +7742,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -6980,6 +7964,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -7153,6 +8221,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -7398,6 +8469,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -7571,6 +8726,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -8355,7 +9513,32 @@
 													]
 												},
 												"width": {
-													"type": "number"
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "object",
+															"properties": {
+																"top": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"right": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"bottom": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"left": {
+																	"type": "number",
+																	"minimum": 0
+																}
+															}
+														}
+													]
 												},
 												"dash": {
 													"type": "array",
@@ -8659,6 +9842,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -8832,6 +10099,9 @@
 											]
 										}
 									}
+								},
+								"hidden": {
+									"type": "boolean"
 								},
 								"visibleWhen": {
 									"anyOf": [
@@ -9931,6 +11201,90 @@
 							"type": "number",
 							"minimum": 0
 						},
+						"effects": {
+							"type": "array",
+							"items": {
+								"oneOf": [
+									{
+										"type": "object",
+										"properties": {
+											"color": {
+												"type": "string"
+											},
+											"dx": {
+												"type": "number"
+											},
+											"dy": {
+												"type": "number"
+											},
+											"blur": {
+												"type": "number"
+											},
+											"spread": {
+												"type": "number"
+											},
+											"inset": {
+												"type": "boolean"
+											},
+											"type": {
+												"type": "string",
+												"const": "shadow"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"color",
+											"dx",
+											"dy",
+											"blur",
+											"type"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "blur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "backdropBlur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									}
+								]
+							}
+						},
 						"adjust": {
 							"type": "object",
 							"properties": {
@@ -10104,6 +11458,9 @@
 									]
 								}
 							}
+						},
+						"hidden": {
+							"type": "boolean"
 						},
 						"visibleWhen": {
 							"anyOf": [
@@ -10888,7 +12245,32 @@
 											]
 										},
 										"width": {
-											"type": "number"
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "object",
+													"properties": {
+														"top": {
+															"type": "number",
+															"minimum": 0
+														},
+														"right": {
+															"type": "number",
+															"minimum": 0
+														},
+														"bottom": {
+															"type": "number",
+															"minimum": 0
+														},
+														"left": {
+															"type": "number",
+															"minimum": 0
+														}
+													}
+												}
+											]
 										},
 										"dash": {
 											"type": "array",
@@ -10982,6 +12364,11 @@
 											"maxItems": 4
 										}
 									]
+								},
+								"cornerSmoothing": {
+									"type": "number",
+									"minimum": 0,
+									"maximum": 1
 								},
 								"clipsContent": {
 									"type": "boolean"
@@ -11302,6 +12689,90 @@
 							"type": "number",
 							"minimum": 0
 						},
+						"effects": {
+							"type": "array",
+							"items": {
+								"oneOf": [
+									{
+										"type": "object",
+										"properties": {
+											"color": {
+												"type": "string"
+											},
+											"dx": {
+												"type": "number"
+											},
+											"dy": {
+												"type": "number"
+											},
+											"blur": {
+												"type": "number"
+											},
+											"spread": {
+												"type": "number"
+											},
+											"inset": {
+												"type": "boolean"
+											},
+											"type": {
+												"type": "string",
+												"const": "shadow"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"color",
+											"dx",
+											"dy",
+											"blur",
+											"type"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "blur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "backdropBlur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									}
+								]
+							}
+						},
 						"adjust": {
 							"type": "object",
 							"properties": {
@@ -11475,6 +12946,9 @@
 									]
 								}
 							}
+						},
+						"hidden": {
+							"type": "boolean"
 						},
 						"visibleWhen": {
 							"anyOf": [

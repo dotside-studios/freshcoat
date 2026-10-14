@@ -4,7 +4,11 @@ import type {
 	FigmaGridTrack,
 	FigmaNode,
 } from "../types";
-import { fillsToElement, type StrokeElement, strokeToElement } from "./colors";
+import {
+	boxStrokeToElement,
+	fillsToElement,
+	type StrokeElement,
+} from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 import { scaleCorners } from "./rect";
 
@@ -158,6 +162,7 @@ export function transpileFrame(
 			fill?: unknown;
 			stroke?: StrokeElement;
 			cornerRadius?: number | [number, number, number, number];
+			cornerSmoothing?: number;
 			clipsContent?: boolean;
 			isolate?: boolean;
 			layout?: unknown;
@@ -178,8 +183,10 @@ export function transpileFrame(
 
 	const corners = scaleCorners(node.cornerRadius, ctx.scale);
 	if (corners !== undefined) out.properties.cornerRadius = corners;
+	if (corners !== undefined && node.cornerSmoothing)
+		out.properties.cornerSmoothing = Math.min(1, node.cornerSmoothing);
 
-	const stroke = strokeToElement(node, ctx.scale, placed.size);
+	const stroke = boxStrokeToElement(node, ctx.scale, placed.size);
 	if (stroke) out.properties.stroke = stroke;
 
 	if (node.clipsContent === true) {

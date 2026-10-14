@@ -10,6 +10,7 @@ import type {
 	Variant,
 } from "@freshcoat-js/coatfile";
 import {
+	allElements,
 	applyVariant,
 	assetUri,
 	backgroundSwatch,
@@ -31,6 +32,7 @@ import {
 	variantFieldRefs,
 	variantIdFor,
 	walkElements,
+	widestStroke,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -591,7 +593,14 @@ export function booleanElements(
 			d: shape.d,
 			...(shape.fillRule ? { fillRule: shape.fillRule } : {}),
 			...(properties.fill !== undefined ? { fill: properties.fill } : {}),
-			...(properties.stroke !== undefined ? { stroke: properties.stroke } : {}),
+			...(properties.stroke !== undefined
+				? {
+						stroke: {
+							...properties.stroke,
+							width: widestStroke(properties.stroke.width),
+						},
+					}
+				: {}),
 			boolean: { op, operands },
 		},
 	};
@@ -1353,8 +1362,9 @@ export function resetOverride(
 	return ok(withVariant(t, id, { ...v, overrides }), []);
 }
 
-/** Hides a layer in one variant, or shows it again, adding or dropping the
- *  change that says so. */
+/** Hides a layer in one variant, or shows it again. Every change to it loses
+ *  its `hidden`, and one says so again only when the layer's own `hidden`
+ *  differs, so showing a layer hidden in Default writes `hidden: false`. */
 export function setHiddenInVariant(
 	t: Template,
 	id: string,
@@ -1364,17 +1374,19 @@ export function setHiddenInVariant(
 ): OpResult {
 	const v = findVariant(t, id);
 	if (!v) return unknownVariant();
-	const index = t.template_data.findIndex((f) => f.name === side);
-	if (index < 0) return refuse("not_found", VARIANT_COPY.noSide);
-	if (!collectIds(t, index).has(elementId))
-		return refuse("not_found", VARIANT_COPY.noLayer);
+	const frame = t.template_data.find((f) => f.name === side);
+	if (!frame) return refuse("not_found", VARIANT_COPY.noSide);
+	const own = allElements(frame.elements).find((el) => el.id === elementId);
+	if (!own) return refuse("not_found", VARIANT_COPY.noLayer);
+	const want = (own.hidden === true) === hidden ? undefined : hidden;
 	let found = false;
 	const overrides = v.overrides.flatMap((ov): Override[] => {
 		if (ov.name !== side || !ov.elements) return [ov];
 		const elements = ov.elements.flatMap((d): Delta[] => {
 			if (d.id !== elementId) return [d];
 			const { hidden: _h, ...rest } = d;
-			const out: Delta = found || !hidden ? rest : { ...rest, hidden: true };
+			const out: Delta =
+				found || want === undefined ? rest : { ...rest, hidden: want };
 			found = true;
 			return isEmptyDelta(out) ? [] : [out];
 		});
@@ -1382,8 +1394,8 @@ export function setHiddenInVariant(
 		if (elements.length) return [{ ...rest, elements }];
 		return rest.background ? [rest] : [];
 	});
-	if (!found && hidden) {
-		const delta: Delta = { id: elementId, properties: {}, hidden: true };
+	if (!found && want !== undefined) {
+		const delta: Delta = { id: elementId, properties: {}, hidden: want };
 		const at = overrides.findIndex((ov) => ov.name === side);
 		if (at >= 0) {
 			const ov = overrides[at] as Override;
@@ -1392,6 +1404,20 @@ export function setHiddenInVariant(
 	}
 	if (sameOverrides(overrides, v.overrides)) return ok(t, []);
 	return ok(withVariant(t, id, { ...v, overrides }), []);
+}
+
+/** Hides a layer in Default, or shows it again, by its own `hidden`. A
+ *  variant's change can still show or hide it there. */
+export function setHiddenInDefault(
+	t: Template,
+	key: string,
+	hidden: boolean,
+): OpResult {
+	const p = parseKey(key);
+	const el = p && !isBackgroundPath(p) ? (getElement(t, p) as Element) : null;
+	if (!el) return refuse("not_found", NOT_FOUND);
+	if ((el.hidden === true) === hidden) return ok(t, []);
+	return updateElement(t, key, { hidden: hidden ? true : undefined });
 }
 
 /** Drops every variant change whose layer is not on its side

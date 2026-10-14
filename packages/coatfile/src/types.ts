@@ -9,16 +9,22 @@ import type {
 } from "@freshcoat-js/engine";
 import type { z } from "zod";
 import type { PathOp } from "./boolean";
+import type { ImageDpiWarning } from "./image-dpi";
+import type { PrintCheckWarning } from "./print-checks";
 import type {
 	AdjustSchema,
+	BackdropBlurEffectSchema,
 	BackgroundSchema,
 	BarcodeElementSchema,
 	BarcodePropertiesSchema,
 	BearerBarsSchema,
+	BlurEffectSchema,
 	BooleanOpSchema,
+	BoxStrokeSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
 	CornerRadiusSchema,
+	EffectSchema,
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
@@ -37,9 +43,10 @@ import type {
 	QrCodePropertiesSchema,
 	RectElementSchema,
 	RectPropertiesSchema,
+	ShadowEffectSchema,
 	SliceModifierSchema,
 	SymbologySchema,
-	StrokeSchema,
+	StrokeSideWidthsSchema,
 	TemplateFrameSchema,
 	TemplateSchema,
 	TemplateSourceSchema,
@@ -92,6 +99,10 @@ export type ElementAdjust = z.infer<typeof AdjustSchema>;
 export type LayoutChild = z.infer<typeof LayoutChildSchema>;
 export type Constraint = z.infer<typeof ConstraintSchema>;
 export type Constraints = z.infer<typeof ConstraintsSchema>;
+export type ShadowEffect = z.infer<typeof ShadowEffectSchema>;
+export type BlurEffect = z.infer<typeof BlurEffectSchema>;
+export type BackdropBlurEffect = z.infer<typeof BackdropBlurEffectSchema>;
+export type Effect = z.infer<typeof EffectSchema>;
 export type LeafElement = z.infer<typeof LeafElementSchema>;
 
 export type BooleanOp = z.infer<typeof BooleanOpSchema>;
@@ -116,8 +127,9 @@ export type BooleanOperandElement = RectElement | VectorElement;
 
 export interface FrameProperties {
 	fill?: Fill | Fill[];
-	stroke?: z.infer<typeof StrokeSchema>;
+	stroke?: z.infer<typeof BoxStrokeSchema>;
 	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
+	cornerSmoothing?: number;
 	clipsContent?: boolean;
 	isolate?: boolean;
 	layout?: Layout;
@@ -158,9 +170,11 @@ export interface ElementShell {
 	shadow?: Shadows;
 	blur?: number;
 	backdropBlur?: number;
+	effects?: Effect[];
 	adjust?: ElementAdjust;
 	layoutChild?: LayoutChild;
 	constraints?: Constraints;
+	hidden?: boolean;
 	visibleWhen?: VisibilityCondition | VisibilityCondition[];
 }
 
@@ -168,6 +182,10 @@ export type ECLevel = "L" | "M" | "Q" | "H";
 
 export type InlineAsset = z.infer<typeof InlineAssetSchema>;
 export type Insets = z.infer<typeof InsetsSchema>;
+/** A rect or frame stroke, whose width may be one per side. */
+export type BoxStroke = z.infer<typeof BoxStrokeSchema>;
+/** A stroke width for each side, as authored; a side left out is 0. */
+export type StrokeSideWidths = z.infer<typeof StrokeSideWidthsSchema>;
 /** An inset resolved to each side. */
 export type Sides = {
 	top: number;
@@ -232,9 +250,14 @@ export type PrintWarning = {
 	pullback: number;
 };
 
-/** What a rendered frame reports: the painter's warnings, then compile's and
- *  the print planner's. */
-export type FrameWarning = PaintWarning | CompileWarning | PrintWarning;
+/** What a rendered frame reports: the painter's warnings, then compile's, the
+ *  print planner's and the print checks'. */
+export type FrameWarning =
+	| PaintWarning
+	| CompileWarning
+	| PrintWarning
+	| ImageDpiWarning
+	| PrintCheckWarning;
 
 export type FrameAssets = {
 	fonts: FontRequest[];

@@ -1,5 +1,9 @@
 import type { FigmaBoundingBox, FigmaRectangleNode } from "../types";
-import { fillsToElement, type StrokeElement, strokeToElement } from "./colors";
+import {
+	boxStrokeToElement,
+	fillsToElement,
+	type StrokeElement,
+} from "./colors";
 import { FlattenFallbackError, placeLocal, placeWorld } from "./coordinates";
 
 export type TranspileRectContext = {
@@ -55,7 +59,7 @@ export function transpileRect(
 	if (corners !== undefined && node.cornerSmoothing)
 		out.properties.cornerSmoothing = Math.min(1, node.cornerSmoothing);
 
-	const stroke = strokeToElement(node, ctx.scale, size);
+	const stroke = boxStrokeToElement(node, ctx.scale, size);
 	if (stroke) out.properties.stroke = stroke;
 
 	return out;

@@ -2584,13 +2584,22 @@ describe("transpile (shape warnings)", () => {
 		return out.warnings.map((w) => w.code);
 	}
 
-	it("warns when per-side stroke weights drop the stroke", async () => {
+	it("warns when per-side stroke weights it cannot read drop the stroke", async () => {
 		expect(
 			await warningsFor({
 				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
 				strokeWeightMixed: true,
 			}),
 		).toContain("stroke_weight_mixed_unsupported");
+	});
+
+	it("keeps per-side stroke weights on a rect without a warning", async () => {
+		expect(
+			await warningsFor({
+				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+				strokeWeights: { top: 1, right: 0, bottom: 2, left: 0 },
+			}),
+		).toEqual([]);
 	});
 
 	it("does not warn about corner smoothing on per-corner radii", async () => {
@@ -2676,11 +2685,11 @@ describe("transpile (bound text names its element)", () => {
 		expect(t.template_data[1].elements[0].id).toBe("name");
 	});
 
-	it("keeps a stroked bound text as text and warns that the stroke is dropped", async () => {
+	it("keeps a bound text with an image stroke as text and warns that the stroke is dropped", async () => {
 		const stroked = (layerName: string, id: string) => {
 			const frame = side(layerName, id);
 			Object.assign(frame.children[0], {
-				strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+				strokes: [{ type: "IMAGE", imageHash: "h", scaleMode: "FILL" }],
 				strokeWeight: 2,
 			});
 			return frame;
@@ -2706,6 +2715,44 @@ describe("transpile (bound text names its element)", () => {
 		expect(
 			out.warnings.filter((w) => w.code === "text_stroke_unsupported"),
 		).toHaveLength(2);
+	});
+
+	it("carries a solid text stroke without a warning", async () => {
+		const stroked = (id: string) => {
+			const frame = side("{{name}}", id);
+			Object.assign(frame.children[0], {
+				strokes: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }],
+				strokeWeight: 2,
+				strokeAlign: "OUTSIDE",
+			});
+			return frame;
+		};
+		const pick = (nodeId: string) => ({
+			fileKey: "FK",
+			nodeId,
+			nodeName: nodeId,
+			width: 1012,
+			height: 638,
+		});
+		const out = await transpile({
+			product: EXACT_PRODUCT,
+			picks: { front: pick("front"), back: pick("back") },
+			metadata: META,
+			fetchNodeTree: async (_k, id) => stroked(id),
+			renderImage: vi.fn(),
+		});
+		const t = out.template as {
+			template_data: Array<{
+				elements: Array<{ properties: { stroke?: unknown } }>;
+			}>;
+		};
+		expect(t.template_data[0].elements[0].properties.stroke).toMatchObject({
+			color: "#ff0000",
+			align: "outside",
+		});
+		expect(out.warnings.some((w) => w.code.startsWith("text_stroke"))).toBe(
+			false,
+		);
 	});
 });
 
@@ -2933,7 +2980,7 @@ describe("transpile (a group that carries an effect)", () => {
 							type: string;
 							pos: { x: number; y: number };
 							size: { width: number; height: number };
-							shadow?: unknown;
+							effects?: unknown;
 							properties: { children?: Array<{ id: string; pos: unknown }> };
 						}>;
 					};
@@ -2956,16 +3003,19 @@ describe("transpile (a group that carries an effect)", () => {
 
 	it("hangs the effect on that layer, not on each child", async () => {
 		const { group } = await run();
-		expect(group.shadow).toEqual({
-			color: "#ffffff",
-			dx: 0,
-			dy: 2,
-			blur: 3,
-			spread: 1,
-			inset: true,
-		});
+		expect(group.effects).toEqual([
+			{
+				type: "shadow",
+				color: "#ffffff",
+				dx: 0,
+				dy: 2,
+				blur: 3,
+				spread: 1,
+				inset: true,
+			},
+		]);
 		for (const child of group.properties.children ?? [])
-			expect((child as { shadow?: unknown }).shadow).toBeUndefined();
+			expect((child as { effects?: unknown }).effects).toBeUndefined();
 	});
 
 	it("shifts the frame-positioned children onto the group's box", async () => {

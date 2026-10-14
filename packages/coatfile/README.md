@@ -124,7 +124,8 @@ is lowered to fit, and the `scale` on the result is the one actually used.
 so the main entry stays free of the painter. `renderCompiledPdf(renderer,
 compiled, { dpi })` paints each side as one PDF page of vectors instead; a layer
 a PDF cannot express is drawn as an image, with a `vector_rasterized` warning
-(see the engine's [PDF output](../engine/README.md#pdf-output)). `describeWarning(w)` there turns
+(see the engine's [PDF output](../engine/README.md#pdf-output)), and
+`text: "outline"` draws text as glyph outlines with no font in the file. `describeWarning(w)` there turns
 one of a result's `warnings` into a line of readable text, such as
 `Couldn't load image: logo.png`.
 
@@ -209,13 +210,79 @@ template sets its own, the printer's 3 mm safe area, scaled from the template's
 long side (`printGuideMetrics`). `templateHints(t)` is the advice a valid
 template earns, as typed data for the caller to word: `variant` (from
 `checkVariants`), `safe_area` (layers inside `printGuidesFor(t).safe`, with side,
-layer id and edges), `format_newer` (a format newer than this kit reads) and
-`format_low` (fields used from a later minor than the declared version).
+layer id and edges), `image_dpi` (images that print below the minimum
+resolution, below), `print` (layers that may not print as they look, below),
+`format_newer` (a format newer than this kit reads) and `format_low` (fields
+used from a later minor than the declared version).
+
+### Image resolution
+
+`effectiveImageDpi(pixels, placed, dpi, { fit, crop, focus })` is the
+resolution an image prints at: its source pixels over the inches they cover,
+where `placed` is the layer's box in design units and `dpi` the design units to
+the inch. Only the part of the source a crop or a `cover` keeps counts, a
+`contain` counts the box it fills, and the axis with fewer pixels to the inch
+wins. A tile is drawn one pixel to the unit, so it prints at `dpi`. A 600 px
+wide image placed 900 units (3 in) wide at 300 DPI prints at 200.
+
+`templateHints(t, { dpi, min, pixelSize })` reports an `image_dpi` hint, with
+side, layer id, src, `dpi` (rounded down) and `min`, for each image layer below
+`min` (`DEFAULT_MIN_IMAGE_DPI`, 300; 0 turns it off) at `dpi`
+(`DEFAULT_IMAGE_DPI_UNITS`, 300). Sizes come from the template's own `asset:`
+and `data:` images (`inlineImageSize`) and from `pixelSize(src)` for the rest;
+an image it has no size for is skipped. `imageDpiHints` gives only these.
+
+An image bound to a field is known only at render time. `imageDpi: { dpi, min }`
+on `renderCompiled`, `renderTemplate` or `renderCompiledPdf` adds an
+`image_low_dpi` warning (layer, src, `dpi`, `min`) for each image the scene
+draws below `min`, read from the bytes the paint uses; `describeWarning` words
+it as `Image prints at 200 DPI, under 300: photo`. `imageDpiWarnings(commands,
+load, { dpi, min })` runs the same check over compiled commands.
+
+### Print checks
+
+`printHints(t, options)` lists the layers that may not print as they look on
+screen, the checks print plugins for design tools run. Each hint is
+`{ kind: "print", side, sideName, path, id, issue }`, where `path` is the child
+indices from the frame's `elements` down to the layer and `issue.code` is one of:
+
+| Code | Fires when | Threshold (option, default) |
+| --- | --- | --- |
+| `small_text` | A font size is below the minimum at print size. A light face, weight 300 or less or a family named Thin, Hairline or Light, has a higher minimum. Carries `sizePt`, `minPt` and `light`. | `minTextPt`, 6 pt; `minLightTextPt`, 7 pt |
+| `hairline_stroke` | A stroke on a rect, image, vector, frame or text is thinner than the minimum at print size. Carries `widthPt` and `minPt`. | `minStrokePt`, 0.25 pt |
+| `rich_black_text` | Text under the size limit is filled with a near-black mixed from unequal channels. Carries `color`, `sizePt` and `maxPt`. | `richBlackTextPt`, 12 pt |
+| `short_of_bleed` | With a `bleed`, a top-level rect, image or frame runs to a trim edge but stops short of the bleed line, and is not one the render grows into it (see `extendIntoBleed`). Carries `edges`. | the template's `bleed` |
+
+Sizes are read at `dpi` design units to the inch (default 300, so a 25-unit
+font is 6 pt); `unitsToPt` and `unitsToMm` convert. `templateHints(t, images,
+print)` includes them, at the image check's `dpi` unless `print` sets its own,
+and `describePrintIssue(issue)` words one.
+
+The pipeline is sRGB only, so the inks a colour separates into are the
+printer's to decide. `isRichBlack(color)` is a heuristic: a colour whose
+brightest channel is at most 64 of 255 and whose channels differ by at least 8
+is likely to convert to a mix of all four inks, where pure black and neutral
+greys can print from black alone. Small text in such a colour can blur when the
+plates are slightly out of register; the hint is advice, not a measurement.
+
+Text whose content or colour comes from a field, or that `fit: "shrink"`
+scales down, is known only at render time. `printChecks: { dpi, ...thresholds }`
+on `renderCompiled`, `renderTemplate` or `renderCompiledPdf` (where it takes
+the PDF's `dpi`) adds a `print_check` warning (`layer`, `issue`) per layer and
+check, the worst, read off the laid-out text and strokes, a path's stroke
+scaled by its viewBox. A part drawn without an id of its own, such as a
+barcode's caption, is reported as the layer it is in, and a layer drawn at zero
+opacity is skipped. `describeWarning` words it as `Text is 4.8 pt at print
+size, below 6 pt: fine_print`. `printCheckWarnings(commands, options)` runs the
+same checks over compiled commands.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
 The CR80 constants (`CR80_LONG_MM`, `CR80_SHORT_MM`, `CR80_CORNER_MM`,
 `CR80_SAFE_MM`) and `MM_PER_INCH` are re-exported from the engine.
+`pxToUnit`, `unitToPx` and `parseLength` convert design px to and from mm,
+in and pt at a DPI, and `resolveUnitSuffixes` rewrites `3mm` or `12pt` in
+typed text as numbers in another unit.
 
 ## Inline assets
 
@@ -386,7 +453,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -626,8 +693,8 @@ Figma does. Any other operand type fails validation with
 `invalid_boolean_operand`. A vector operand can carry its own `boolean`. `d`
 stays required and is the cached result, which is what a reader without a path
 op draws. `compile` takes a `pathOp` that rebuilds `d` (and `fillRule`) from
-the operands left after `visibleWhen`, the variant and `resize`: an operand
-hidden by either drops out, and a vector with nothing left draws nothing but
+the operands left after `hidden`, `visibleWhen`, the variant and `resize`: an
+operand hidden by any of them drops out, and a vector with nothing left draws nothing but
 keeps its box. `renderTemplate` passes one made with the renderer's CanvasKit;
 `canvasKitPathOp(renderer.ck)` is that function for `compile`, with results
 kept by operation and operand geometry. When the vector resizes, its operands
@@ -911,7 +978,8 @@ forms.
 ## Strokes and corners
 
 A stroke's `align` is `center` (the default), `inside` or `outside`, and every
-stroked `rect`, `image`, `vector` and `frame` honors it. A rect, frame or
+stroked `rect`, `image`, `vector`, `frame` and `text` honors it (see
+[Text stroke](#text-stroke)). A rect, frame or
 image strokes its outline inset or outset by half the width, following its
 corners or mask. A vector strokes at twice the width, clipped to its own
 interior or exterior under its `fillRule`, so an `evenodd` hole counts as
@@ -926,10 +994,34 @@ stroke and its dashes all sample the same gradient as a fill would.
 "stroke": { "width": 4, "align": "inside", "color": { "kind": "linear", "angle": 0, "stops": [ … ] } }
 ```
 
-A `rect` or `frame` takes `cornerRadius` as one number or per corner,
-`[topLeft, topRight, bottomRight, bottomLeft]`. A frame applies it to its
-fill, its stroke and, with `clipsContent`, its clip. A clipping frame draws
-an `outside` stroke beyond its clip, so the clip never hides it.
+From 1.7 a `rect` or `frame` stroke's `width` can be one per side,
+`{ top, right, bottom, left }`, each optional and 0 when left out, as a card
+border or a divider line draws. Every other element keeps one number and
+fails validation with an object. The stroke paints the band between the
+outline moved out and moved in by each side's width, as `align` places it:
+all inward for `inside`, all outward for `outside`, half each way for
+`center`. Figma strokes a frame inside by default, so the plugin writes
+`"align": "inside"` for one. A rounded corner's radius moves by its two
+adjacent widths, one on each axis, so it turns elliptical where they differ;
+with `cornerSmoothing` it moves by their mean. A sharp corner stays sharp,
+so `join` does not apply. A `dash` runs around the whole outline along the
+middle of the band, and each dash is cut to the band, so it is as thick as
+the side it lies on; a trim cuts the same line. A gradient `color` fills the band as it would a uniform stroke.
+Four equal sides draw as one width. `strokeSides` reads a width as each
+side's, and `widestStroke` as its widest side.
+
+```jsonc
+"stroke": { "color": "#e5e7eb", "width": { "bottom": 1 }, "align": "inside" }
+```
+
+A `rect`, `frame` or `image` takes `cornerRadius` as one number or per
+corner, `[topLeft, topRight, bottomRight, bottomLeft]`, and `cornerSmoothing`
+from 0 to 1, Figma's corner smoothing. A frame applies them to its fill, its
+stroke, its backdrop blur and, with `clipsContent`, its clip. A clipping frame
+draws an `outside` stroke beyond its clip, so the clip never hides it. An
+image applies them to its clip and its stroke; its `mask` wins over both.
+Frame `cornerSmoothing`, per-corner image radii and image `cornerSmoothing`
+need 1.7. A smoothed outline is a path, so PDF keeps it vector.
 
 `trimStart` and `trimEnd` draw only part of a stroke, as fractions of
 the outline's length from its start; `trimOffset` rotates that part along the
@@ -1016,8 +1108,13 @@ share and validation paths as every other field. An unset toggle is its
 `default` (or off), so it is never reported missing even when listed in
 `required`.
 
+An element with `hidden: true` (1.7) stays in the file but is never drawn,
+whatever its `visibleWhen` says; a [variant](#variants) can show it again. Both
+are applied before layout, and an element is drawn only when neither drops it.
+
 `isElementVisible` and `fieldIsSet` are exported for a consumer that needs the
-same answer compile gets.
+same answer compile gets. `isElementVisible` tests `visibleWhen` alone;
+`pruneHiddenElements` also drops `hidden: true`.
 
 ## Variants
 
@@ -1037,6 +1134,34 @@ deltas, matched by id at any depth, inside frames and masks too:
   "hidden": true                        // 1.4: leave the element out
 }
 ```
+
+An element can be hidden in the base with its own `hidden: true` (1.7): it stays
+in the file but Default does not draw it. A delta with `hidden: false` shows it
+in that variant, so a layer only some variants use is written once:
+
+```jsonc
+// in template_data
+{ "id": "foil", "type": "rect", "hidden": true, "properties": { "fill": "#d4af37" } }
+// in the "gold" variant's override
+{ "id": "foil", "properties": {}, "hidden": false }
+```
+
+Whether an element is drawn is decided in this order:
+
+1. a delta with `hidden: true` leaves it out; with several deltas for one
+   element, any `hidden: true` wins over a `hidden: false`;
+2. else a delta with `hidden: false` shows it;
+3. else its own `hidden: true` leaves it out;
+4. an element left in is then still tested by its `visibleWhen`, which a
+   variant cannot change.
+
+Leaving an element out leaves out everything inside it. A mask's shape is never
+drawn itself, so `hidden` on it, in the base or a delta, is ignored; what the
+mask holds is hidden as any element is. A hidden boolean operand drops out of
+the combination. `isHiddenBy(element, delta)` answers steps 1 to 3 for one
+element and its merged delta. A reader older than 1.7 does not know an
+element's own `hidden` and draws the element in Default and in every variant;
+`minimumFormatVersion` stamps 1.7 when an element uses it.
 
 `properties` is required even when a delta changes only the shell, so write
 `{}`. A 1.3 reader then still accepts the file, drops the keys it does not know
@@ -1073,7 +1198,8 @@ whether a variant draws exactly as Default.
 `applyVariant(template, variantId, { hidden })` returns the template with one
 variant applied, which is what `compile` draws for `variantId`. A hidden element
 and everything inside it is removed by default (`hidden: "drop"`); `"keep"`
-leaves it in, for an editor that still lists it. A mask's shape is never drawn
+leaves it in with `hidden: true`, and without `hidden` where the variant shows
+it, for an editor that still lists it. A mask's shape is never drawn
 itself, so hiding it has no effect. The input is not mutated, `variants` is
 kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
@@ -1088,9 +1214,10 @@ variantId, sideName, elementId)` is one element's merged delta: later
 `properties` merge over earlier ones, and a later shell field replaces an
 earlier one only when it is set. An element is hidden when any of its deltas
 says `hidden: true`, so a later `hidden: false` does not show it again.
-`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, and
+`hiddenElementIds(t, variantId, sideName)` lists the ids a side hides, the
+base's own `hidden` included and Default's with no variant, and
 `sideBackground(t, variantId, sideName)` is the background it sets. An absent
-or unknown variant id reads as empty. `VARIANT_SHELL_KEYS` lists the shell
+or unknown variant id reads as having no deltas. `VARIANT_SHELL_KEYS` lists the shell
 fields a delta can carry, and `isEmptyDelta(delta)` says whether it carries
 nothing beyond its id.
 
@@ -1313,6 +1440,37 @@ falls past either end is hidden; on a closed path the text wraps past the
 start point, and only what would run more than a whole lap is hidden. Either
 way the render reports a `text_path_overflow` warning naming the layer. A
 `ref` that names no sibling vector hides the whole text the same way.
+
+### Text stroke
+
+`stroke` (1.7) outlines a text element's glyphs. It takes `color` (a colour
+string or a gradient placed in the element's box), `width`, `join` and
+`align`; `dash`, `cap` and the trims are not part of a text stroke.
+
+```json
+"stroke": { "color": "#e63946", "width": 2, "align": "outside", "join": "round" }
+```
+
+| `align` | Drawn as |
+|---|---|
+| `center` (default) | The stroke on the glyph edge, over the fill |
+| `outside` | Twice the width, under the fill |
+| `inside` | Twice the width, kept where the glyphs cover |
+
+The stroke is the element's, so every span shares it. It follows straight,
+arc and path text, ellipsized and shrink-fitted lines alike. Decorations are
+not stroked. A PDF draws it as vector text (`Tr` 1, with `Tr` 7 clipping an
+`inside` stroke); a gradient stroke is rasterized with a `vector_rasterized`
+warning, unless the text is drawn as outlines.
+
+### Outlined text in a PDF
+
+`pdfText: "outline"` (1.7) on a text element draws it in a vector PDF as the
+outlines of its glyphs, with no font, whatever the export asks for: for a
+logotype or a licensed face that must not travel in the file. It looks the
+same but cannot be selected. A whole export does the same with
+`renderCompiledPdf`'s `text: "outline"`. See the engine's
+[Text as outlines](../engine/README.md#text-as-outlines).
 
 ### Per-span line height
 

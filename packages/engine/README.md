@@ -119,7 +119,22 @@ own interior or exterior under its `fillRule`. `trimStart`, `trimEnd` and
 rect trims clockwise from its top left, an ellipse clockwise from its top and a
 path along its own direction. The trim cuts the outline before the `dash`
 pattern, so dashes start at the trimmed start and caps sit on the trimmed
-ends. A clipping group's
+ends. A text node's `stroke` takes `color` or `gradient`, `width`, `join` and
+`align`: `center` strokes over the fill, `outside` draws twice the width under
+it and `inside` twice the width kept where the glyphs cover.
+
+A rect's stroke can carry `sides`, a width for each of `top`, `right`,
+`bottom` and `left`, in place of `width` (which then holds the widest, for
+anything that reads one). The rect paints the band between its outline moved
+out and moved in by each side's width as `align` places it, as one even-odd
+filled path. A rounded corner's radius moves by its two adjacent widths, one
+on each axis, so it turns elliptical where they differ; with
+`cornerSmoothing` it moves by their mean. A sharp corner stays sharp, so
+`join` does not apply. A `dash` or a trim runs along the middle of the band,
+around the whole outline from the top left, and is cut to the band, so each
+dash is as thick as the side it lies on. Other nodes ignore `sides`.
+
+A clipping group's
 `cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
 
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter
@@ -243,7 +258,7 @@ fallback color.
 `renderer.paintPdf(commands)` does the same for a compiled scene. Shapes,
 solid fills, linear and radial gradients (elliptical and focal ones too, with
 transparent stops drawn through a soft mask), solid and gradient strokes
-(aligned, dashed, capped, joined and trimmed), clips, opacity, isolated groups,
+(aligned, dashed, capped, joined and trimmed, and a rect's per-side band), clips, opacity, isolated groups,
 the blend modes PDF defines, images and SVG images are drawn as vectors. A gray
 or RGB JPEG is embedded as it is, in `DeviceGray` or `DeviceRGB` when it
 carries no ICC profile and in an `ICCBased` space holding its own profile when
@@ -252,18 +267,39 @@ be read or does not match its components, and a CMYK or EXIF-rotated one, is
 decoded to sRGB instead, as other images are. Text is shaped by CanvasKit
 exactly as it renders and set in its own font file, embedded with a ToUnicode
 map so it stays selectable, each glyph placed along its circle or path when the
-text follows a curve. That takes a TrueType, OpenType, WOFF or WOFF2 file. A
+text follows a curve. A solid text stroke is drawn with the glyphs in
+stroke mode (`1 Tr`), an `inside` one clipped to them (`7 Tr`). That takes a TrueType, OpenType, WOFF or WOFF2 file. A
 variable TrueType font is fixed at the instance the text uses before it is
 embedded.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
 preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
-with a spread, strokes aligned to a path, gradient-filled text, the `plus` and
-`linear-burn` blend modes, text in a font collection or a variable CFF2 font,
-and SVG images holding text or filters. Bitmaps are drawn without smoothing.
+with a spread, strokes aligned to a path, embedded gradient-filled or
+gradient-stroked text, synthetic bold, the `plus` and `linear-burn` blend
+modes, text whose outlines do not read, and SVG images holding text or
+filters. Bitmaps are drawn without smoothing.
 Everything beneath a backdrop blur, or the whole page under a frame finish, is
 one image. Each image layer is reported once as a `vector_rasterized` warning.
+
+### Text as outlines
+
+`text: "outline"` on `renderPdf` and `paintPdf` draws every glyph as a filled
+path instead, so the file holds no font at all, as print shops that ask for
+outlined text want. A text node's `pdfText: "outline"` does the same for that
+layer alone, whatever the option says. The outlines are read from the font
+file the text was shaped with (CanvasKit's wasm build exposes no glyph paths):
+TrueType outlines, a variable font's fixed at its instance first, and CFF and
+CFF2 charstrings, a CFF2 font's blended at its instance. Each glyph is placed
+exactly where the embedded font would put it, along a curve too. Span
+colours, decorations, opacity and blend modes are drawn as for embedded text,
+and a solid or gradient stroke along the outlines, under the fill for
+`outside` and clipped to it for `inside`. A gradient fill, which embedded text
+draws as an image, is painted through the glyphs as a clip and stays vector.
+Outlined text cannot be selected or searched.
+
+Text in a font a PDF cannot embed, the first face of a font collection or a
+CFF2 variable font, is drawn as outlines without asking.
 
 ### Output intent
 

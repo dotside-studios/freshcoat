@@ -1,0 +1,170 @@
+{
+	"id": "stroke-sides-outside",
+	"title": "an outside per-side stroke lies beyond the edge and keeps sharp corners",
+	"profile": "core",
+	"requires": [
+		"draw.stroke",
+		"stroke.sides",
+		"stroke.align"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 8,
+					"sides": {
+						"top": 8,
+						"right": 0,
+						"bottom": 0,
+						"left": 8
+					},
+					"align": "outside"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				36,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "beyond the left edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				44,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "inside the left edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				26
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "above the top edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				34
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below the top edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				33,
+				23
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the sharp outer corner"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				124,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "past the right edge, no width"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				94
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "past the bottom edge, no width"
+		}
+	]
+}

@@ -41,6 +41,11 @@ async function chooseType(page: Page, label: string) {
 	await settle(page);
 }
 
+// The default caption is small at print size, which the print checks report.
+const SMALL_CAPTION = expect.stringMatching(
+	/^Text is [\d.]+ pt at print size, below 6 pt: /,
+);
+
 test("draw a barcode, bind it to a field, and step records", async ({
 	page,
 }) => {
@@ -58,10 +63,14 @@ test("draw a barcode, bind it to a field, and step records", async ({
 		symbology: "code128",
 	});
 	// The encoder loaded; nothing drew as a placeholder.
-	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
+	expect(await state<string[]>(page, "s.render.warnings")).toEqual([
+		SMALL_CAPTION,
+	]);
 
 	// White behind the bars, so spaces read against the card's dark art.
-	await page.getByRole("button", { name: "Add background" }).click();
+	await page
+		.getByRole("button", { name: "Add background", exact: true })
+		.click();
 	await page.getByLabel("Barcode value").fill("");
 	await page.getByRole("button", { name: "Insert field" }).click();
 	await page.getByRole("menuitem", { name: /display_name/ }).click();
@@ -109,7 +118,9 @@ test("draw a barcode, bind it to a field, and step records", async ({
 	await stepper.getByRole("button", { name: "Next record" }).click();
 	await settle(page);
 	expect(await stripe()).not.toEqual(second);
-	expect(await state<string[]>(page, "s.render.warnings")).toEqual([]);
+	expect(await state<string[]>(page, "s.render.warnings")).toEqual([
+		SMALL_CAPTION,
+	]);
 });
 
 test("an invalid EAN-13 says why inline and in the issues", async ({

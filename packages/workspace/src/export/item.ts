@@ -3,11 +3,13 @@ import {
 	applyVariant,
 	canvasKitPathOp,
 	compile,
+	DEFAULT_MIN_IMAGE_DPI,
 	exportPixelSize,
 	type FrameWarning,
 	fitDesignSize,
 	hasInsets,
 	MAX_EXPORT_DIMENSION,
+	type PrintCheckOptions,
 	pieceSpec,
 	type Renderer,
 	resizeTemplate,
@@ -20,6 +22,7 @@ import {
 } from "@freshcoat-js/coatfile";
 import {
 	describeWarning,
+	type ImageDpiCheck,
 	renderCompiled,
 	renderCompiledPdf,
 } from "@freshcoat-js/coatfile/render";
@@ -78,10 +81,16 @@ export type RenderRequest = {
 	print?: RenderPrint;
 	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
 	 *  place of `format`; `untagged` leaves its RGB DeviceRGB, for a PDF that
-	 *  declares no output intent */
-	vector?: { dpi: number; untagged?: true };
+	 *  declares no output intent; `text` "outline" draws text as glyph
+	 *  outlines, with no font */
+	vector?: { dpi: number; untagged?: true; text?: "outline" };
 	/** also work out the item's cut lines */
 	cut?: true;
+	/** warn for images that print below `min` at `dpi` design units to the
+	 *  inch */
+	imageDpi?: ImageDpiCheck;
+	/** run the print checks at `dpi` design units to the inch */
+	printChecks?: PrintCheckOptions;
 };
 
 export type RenderOutput = {
@@ -282,6 +291,8 @@ export function itemRequest(
 	const format = imageFormat(preset);
 	const print = printRequest(preset.print);
 	const vector = vectorPages(preset) && !print;
+	const dpi = size.resize ? preset.dpi / size.scale : preset.dpi;
+	const minImageDpi = preset.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI;
 	return {
 		size,
 		request: {
@@ -307,9 +318,12 @@ export function itemRequest(
 			...(vector
 				? {
 						vector: {
-							dpi: size.resize ? preset.dpi / size.scale : preset.dpi,
+							dpi,
 							...(preset.outputIntent?.kind === "none"
 								? { untagged: true as const }
+								: {}),
+							...(preset.pdfText === "outline"
+								? { text: "outline" as const }
 								: {}),
 						},
 					}
@@ -317,6 +331,8 @@ export function itemRequest(
 			...(exportCutFile(preset) !== "none" || exportCutLines(preset)
 				? { cut: true as const }
 				: {}),
+			...(minImageDpi > 0 ? { imageDpi: { dpi, min: minImageDpi } } : {}),
+			printChecks: { dpi },
 		},
 	};
 }
@@ -472,6 +488,9 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					images,
 					dpi: req.vector.dpi,
 					...(req.vector.untagged ? { outputIntent: false as const } : {}),
+					...(req.vector.text ? { text: req.vector.text } : {}),
+					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
+					...(req.printChecks ? { printChecks: req.printChecks } : {}),
 				});
 				if (!page) throw new Error("nothing was rendered");
 				for (const w of page.warnings)
@@ -492,6 +511,8 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					frameNames: [req.side],
 					images,
 					...(print ? { print } : {}),
+					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
+					...(req.printChecks ? { printChecks: req.printChecks } : {}),
 					exports: [
 						req.scale === 1
 							? {}

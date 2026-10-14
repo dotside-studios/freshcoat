@@ -5,6 +5,7 @@ import type {
 	FigmaEffect,
 	FigmaNode,
 	FigmaPaint,
+	FigmaStrokeWeights,
 	FigmaTextNode,
 	FigmaVectorNode,
 } from "../types";
@@ -191,9 +192,19 @@ function fillsFlattenReason(
 // A coatfile stroke takes one paint: solids composited into one colour, or a
 // single gradient.
 function strokeFlattens(
-	n: FigmaNode & { strokes?: FigmaPaint[]; strokeWeight?: number },
+	n: FigmaNode & {
+		strokes?: FigmaPaint[];
+		strokeWeight?: number;
+		strokeWeights?: FigmaStrokeWeights;
+	},
 ): boolean {
-	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
+	const weights = n.strokeWeights;
+	const weight =
+		n.strokeWeight ??
+		(weights
+			? Math.max(weights.top, weights.right, weights.bottom, weights.left)
+			: undefined);
+	if (!(weight !== undefined && weight > 0)) return false;
 	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0 || compositeSolids(visible) !== null) return false;
 	return !(
@@ -219,10 +230,19 @@ function textIsNative(n: FigmaTextNode): boolean {
 	return runFills.every((f) => JSON.stringify(f) === base);
 }
 
-/** coatfile text has no stroke, so a visible one is lost unless rasterized. */
 export function hasTextStroke(n: FigmaTextNode): boolean {
 	if ((n.strokeWeight ?? 1) <= 0) return false;
 	return (n.strokes ?? []).some((p) => p.visible !== false);
+}
+
+/** A text stroke coatfile cannot carry: an image or mixed paints, or a dash. */
+export function textStrokeUnmappable(n: FigmaTextNode): boolean {
+	if (!hasTextStroke(n)) return false;
+	return (
+		n.strokeWeight === undefined ||
+		(n.dashPattern?.some((d) => d > 0) ?? false) ||
+		strokeFlattens(n)
+	);
 }
 
 function isTextFieldBound(
@@ -283,7 +303,7 @@ export function classify(
 		if (!textIsNative(n))
 			return { kind: "flatten", reason: "text_mixed_styling_flattened" };
 		// A bound text stays native so the field survives; the walk warns instead.
-		if (hasTextStroke(n) && !isTextFieldBound(n, resolveBinding))
+		if (textStrokeUnmappable(n) && !isTextFieldBound(n, resolveBinding))
 			return { kind: "flatten", reason: "text_stroke_flattened" };
 		return { kind: "native-text" };
 	}
