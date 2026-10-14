@@ -1,9 +1,5 @@
-import { INSETS, TEMPLATE_SETUP } from "~/app/copy";
-import {
-	TemplateInsets,
-	TemplateSizeFields,
-	useSizedVariant,
-} from "../setup/SizeSection";
+import { TEMPLATE_SETUP } from "~/app/copy";
+import { TemplateSizeFields, useSizedVariant } from "../setup/SizeSection";
 import { Row } from "./controls";
 import type { Inspect } from "./field-helpers";
 import { InspectorSection } from "./InspectorSection";
@@ -30,11 +26,6 @@ export function SideSection({ ins }: { ins: Inspect }) {
 			<p className="m-0 pl-[60px] text-fc-faint text-fc-sm">
 				{sized ? TEMPLATE_SETUP.variantSize : TEMPLATE_SETUP.sharedSize}
 			</p>
-			{(["bleed", "safeArea"] as const).map((key) => (
-				<Row key={key} label={INSETS[key]}>
-					<TemplateInsets template={t} inset={key} className="min-w-0 flex-1" />
-				</Row>
-			))}
 		</InspectorSection>
 	);
 }

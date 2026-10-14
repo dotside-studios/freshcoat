@@ -67,7 +67,7 @@ export type Tool =
 	| "qr"
 	| "barcode";
 
-export type RightTab = "design" | "content";
+export type RightTab = "design" | "content" | "print";
 
 /** Tab ids an older build stored or dispatched, mapped to where their
  *  contents live now. */

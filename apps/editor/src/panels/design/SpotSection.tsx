@@ -123,15 +123,16 @@ export function SpotSection({ ins }: { ins: Inspect }) {
 										}}
 									/>
 								</Row>
-								<Row label="">
+								<Row label="Overprint">
 									<Checkbox
+										aria-label="Overprint"
 										isSelected={overprint === true}
 										isIndeterminate={overprint === null}
 										onChange={(next) =>
 											editInk(paint, { overprint: next || undefined })
 										}
 									>
-										Overprint
+										On
 									</Checkbox>
 								</Row>
 							</>

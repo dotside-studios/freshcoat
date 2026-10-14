@@ -102,7 +102,7 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 							})
 						}
 					>
-						<RightPanel />
+						<RightPanel onTemplateSetup={ctx.showTemplateSetup} />
 					</SidePanel>
 				</div>
 			</div>

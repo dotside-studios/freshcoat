@@ -19,6 +19,8 @@ export const OPEN_HINT = "Open the .coat file you downloaded from Figma";
 
 /** Empty-state titles used in more than one place. */
 export const EMPTY = {
+	noPrintSettings: "No print settings",
+	noSideSelection: "Nothing selected",
 	datasets: "No datasets",
 	records: "No records",
 	fields: "No fields",
@@ -131,6 +133,7 @@ export const BINDING = {
 export const CONTENT = {
 	design: "Design",
 	content: "Content",
+	print: "Print",
 	/** The record stepper's heading, before the dataset's name. */
 	tryWith: "Try with",
 	chooseDataset: "Choose a dataset",
