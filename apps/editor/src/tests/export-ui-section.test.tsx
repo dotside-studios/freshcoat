@@ -303,7 +303,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		await ctx.user.click(screen.getByRole("tab", { name: "Records" }));
+		await ctx.user.click(screen.getByRole("radio", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Ada")).toBeTruthy());
 		return { ...ctx, list };
@@ -357,11 +357,10 @@ describe("export section", { timeout: 20_000 }, () => {
 			</ControllerProvider>,
 		);
 		expect(
-			screen.getByRole("tab", { name: "Records", selected: true }),
-		).toBeTruthy();
-		expect(
-			screen.getByRole("tab", { name: "Files", selected: true }),
-		).toBeTruthy();
+			screen
+				.getByRole("radio", { name: "Records" })
+				.getAttribute("aria-checked"),
+		).toBe("true");
 		expect(button("Export 1 selected")).toBeTruthy();
 	});
 
@@ -387,7 +386,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			});
 		});
 		expect(button("Export 0 files")).toHaveProperty("disabled", true);
-		await user.click(screen.getByRole("tab", { name: "Records" }));
+		await user.click(screen.getByRole("radio", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Bo")).toBeTruthy());
 		const row = within(list)
@@ -451,7 +450,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		const notice = screen.getByTestId("export-unbound");
+		const notice = screen.getByTestId("export-check-unbound");
 		expect(notice.textContent).toContain(
 			"Not bound to a dataset, exporting defaults",
 		);
@@ -462,11 +461,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.click(
 			within(notice).getByRole("button", { name: "Bind a dataset" }),
 		);
-		expect(
-			screen
-				.getByRole("tab", { name: "Content" })
-				.getAttribute("aria-selected"),
-		).toBe("true");
 		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 
@@ -786,7 +780,7 @@ describe("export section", { timeout: 20_000 }, () => {
 	});
 
 	test("warns under the file name pattern about tokens that name nothing", async () => {
-		const { controller, user, templateId } = setup();
+		const { controller, templateId } = setup();
 		const preset = (fileName: string): ExportPreset => ({
 			id: "p_1",
 			name: "Names",
@@ -1107,7 +1101,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(
 			controller.state.workspace?.templates.find((t) => t.id === id)?.binding,
 		).toEqual({ datasetId: "", fields: {}, variant: { kind: "all" } });
-		expect(screen.getByTestId("export-unbound")).toBeTruthy();
+		expect(screen.getByTestId("export-check-unbound")).toBeTruthy();
 		expect(button("Export 2 files")).toBeTruthy();
 		expect(screen.getByTestId("export-stepper-position").textContent).toBe(
 			"1 / 2",
@@ -1171,7 +1165,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				.getByRole("radio", { name: /^Failed/ })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		await user.click(screen.getByRole("tab", { name: "Records" }));
+		await user.click(screen.getByRole("radio", { name: "Records" }));
 		expect(
 			screen
 				.getByRole("radio", { name: /^Failed/ })

@@ -242,7 +242,7 @@ function setup(preset: Partial<ExportPreset> = {}) {
 const layoutGroup = () => screen.getByTestId("export-layout");
 describe("the Layout group", { timeout: 20_000 }, () => {
 	test("is offered for a PDF, one per page by default", async () => {
-		const { user } = setup();
+		setup();
 		const group = within(layoutGroup());
 		expect(
 			group
@@ -335,7 +335,7 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 	});
 
 	test("a card that doesn't fit shows inline and blocks Export", async () => {
-		const { update, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
+		const { update } = setup({ layout: DEFAULT_SHEET_LAYOUT });
 		expect(button("Export 42 files")).toHaveProperty("disabled", false);
 		update({ layout: { ...DEFAULT_SHEET_LAYOUT, marginMm: 100 } });
 		const error = screen.getByTestId("export-sheet-error");
@@ -343,14 +343,14 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(error.textContent).toMatch(/too wide/);
 		expect(button("Export 42 files")).toHaveProperty("disabled", true);
 		expect(screen.queryByTestId("export-sheet-summary")).toBeNull();
-		// The job bar says it in a few words, with the whole of it on hover.
-		const bar = screen.getByTestId("export-blocked");
-		expect(bar.textContent).toBe(SHEETS_DONT_FIT);
-		expect(bar.getAttribute("title")).toBe(error.textContent);
+		// The checks say it in a few words, with the whole of it on hover.
+		const check = screen.getByTestId("export-check-blocked");
+		expect(check.textContent).toContain(SHEETS_DONT_FIT);
+		expect(within(check).getByTitle(error.textContent ?? "")).toBeTruthy();
 	});
 
 	test("Sheets is unavailable for a size from each photo", async () => {
-		const { user } = setup({ size: { kind: "image", field: "photo" } });
+		setup({ size: { kind: "image", field: "photo" } });
 		const option = within(layoutGroup()).getByRole("radio", { name: "Sheets" });
 		expect(option).toHaveProperty("disabled", true);
 	});
