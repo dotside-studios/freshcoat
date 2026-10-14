@@ -1178,6 +1178,7 @@ function LayoutGroup({
 	const paper = sheet ? paperChoice(sheet) : "a4";
 	const custom = sheet && typeof sheet.paper !== "string" ? sheet.paper : null;
 	const offset = sheet?.backOffsetMm ?? { x: 0, y: 0 };
+	const marksOn = !!sheet && (sheet.cropMarks || !!sheet.registrationMarks);
 	return (
 		<div data-testid="export-layout" className="contents">
 			<SegmentedControl
@@ -1326,30 +1327,47 @@ function LayoutGroup({
 							</Checkbox>
 						</div>
 					</Row>
-					<Checkbox
-						isSelected={sheet.cropMarks}
-						onChange={(cropMarks) => patch({ cropMarks })}
+					<Switch
+						isSelected={marksOn}
+						onChange={(on) => patch({ cropMarks: on, registrationMarks: on })}
 					>
-						Crop marks
-					</Checkbox>
-					<Checkbox
-						isSelected={sheet.registrationMarks ?? false}
-						onChange={(registrationMarks) => patch({ registrationMarks })}
-					>
-						Registration marks
-					</Checkbox>
-					<Checkbox
-						isSelected={sheet.colorBar ?? false}
-						onChange={(colorBar) => patch({ colorBar })}
-					>
-						Color bar
-					</Checkbox>
-					<Checkbox
-						isSelected={sheet.slug ?? false}
-						onChange={(slug) => patch({ slug })}
-					>
-						Slug
-					</Checkbox>
+						Printer marks
+					</Switch>
+					<Disclosure className="group/more">
+						<RACButton
+							slot="trigger"
+							className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
+						>
+							<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
+							Marks
+						</RACButton>
+						<DisclosurePanel className="flex flex-col gap-2">
+							<Checkbox
+								isSelected={sheet.cropMarks}
+								onChange={(cropMarks) => patch({ cropMarks })}
+							>
+								Crop marks
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.registrationMarks ?? false}
+								onChange={(registrationMarks) => patch({ registrationMarks })}
+							>
+								Registration marks
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.colorBar ?? false}
+								onChange={(colorBar) => patch({ colorBar })}
+							>
+								Color bar
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.slug ?? false}
+								onChange={(slug) => patch({ slug })}
+							>
+								Slug
+							</Checkbox>
+						</DisclosurePanel>
+					</Disclosure>
 					<Checkbox
 						isSelected={sheet.duplex !== "none"}
 						onChange={(on) => patch({ duplex: on ? "long-edge" : "none" })}

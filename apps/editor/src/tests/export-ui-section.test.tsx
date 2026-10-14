@@ -275,7 +275,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(controller.state.workspace?.activePresetId).toBe(presets[0]?.id);
 		// 3 records (the skipped one is left out) × 2 sides.
 		expect(button("Export 6 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-1-front.png",
 		);
@@ -339,7 +338,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(button("Export 2 selected")).toBeTruthy();
 		await user.click(button("Clear selection"));
 		expect(button("Export 2 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Bo-front.png",
 		);
@@ -350,7 +348,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		const rowOf = (name: string) =>
 			within(list).getByText(name).closest('[role="row"]') as HTMLElement;
 		await user.click(within(rowOf("Ada")).getByRole("checkbox"));
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		cleanup();
 		act(() => controller.dispatch({ type: "setSection", section: "edit" }));
 		act(() => controller.dispatch({ type: "setSection", section: "export" }));
@@ -399,7 +396,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.click(within(row).getByRole("checkbox"));
 		expect(controller.state.workspace?.presets[0]?.selected).toEqual(["r2"]);
 		expect(button("Export 1 file")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.getByTestId("export-page-size").textContent).toBe(
 			"Page 3.33 × 2.00 in · 84.7 × 50.8 mm",
 		);
@@ -460,7 +456,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			"Not bound to a dataset, exporting defaults",
 		);
 		expect(button("Export 2 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-front@2x.png",
 		);
@@ -492,7 +487,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		act(() =>
 			controller.dispatch({ type: "setPreset", preset: preset("png-zip") }),
 		);
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		const keep = screen.getByRole("checkbox", { name: "Keep alpha channel" });
 		await user.click(keep);
 		expect(controller.state.workspace?.presets[0]?.pngAlpha).toBe("keep");
@@ -811,7 +805,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				preset: preset("{{name}}-{{side}}"),
 			}),
 		);
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.queryByTestId("export-file-name-unknown")).toBeNull();
 		act(() =>
 			controller.dispatch({
@@ -1045,7 +1038,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			"r3:dark",
 		]);
 		expect(button("Export 6 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Ada-default.png",
 		);
@@ -1106,9 +1098,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 		expect(button("Export 1 file")).toBeTruthy();
 		const settings = screen.getByTestId("export-settings");
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(within(settings).getByText(/\{\{variant\}\}/)).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Content" }));
 		await chooseOption(
 			user,
 			within(settings).getByLabelText(/Variant source/, { selector: "button" }),
