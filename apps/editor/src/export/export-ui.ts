@@ -15,6 +15,7 @@ import {
 	exportSplit,
 	fileExtension,
 	fileNameFor,
+	fileNameTokens,
 	pdfLayout,
 } from "@freshcoat-js/workspace";
 import { type JobResult, recordOutcome } from "@freshcoat-js/workspace/export";
@@ -186,6 +187,27 @@ export function presetLine(
 		pdf ? `${preset.dpi} dpi` : `${preset.scale}×`,
 		records === null ? "not bound" : plural(records, "record"),
 	].join(" · ");
+}
+
+/** The tokens a file name pattern may name, in the groups the insert menu
+ *  shows. */
+export function fileNameTokenGroups(
+	template: Pick<Template, "fields">,
+	dataset?: Pick<Dataset, "columns">,
+): { title: string; tokens: string[] }[] {
+	const fields = Object.keys(template.fields.properties);
+	const columns = (dataset?.columns.map((c) => c.key) ?? []).filter(
+		(key) => !fields.includes(key),
+	);
+	const known = new Set([...fields, ...columns]);
+	return [
+		{
+			title: "Built in",
+			tokens: fileNameTokens(template, dataset).filter((t) => !known.has(t)),
+		},
+		{ title: "Fields", tokens: fields },
+		{ title: "Columns", tokens: columns },
+	].filter((group) => group.tokens.length > 0);
 }
 
 export type StatusFilter = "all" | RecordStatus;

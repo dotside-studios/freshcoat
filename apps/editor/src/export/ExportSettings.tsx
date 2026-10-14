@@ -14,8 +14,10 @@ import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
+import { Menu, MenuItem, MenuSection } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { Slider } from "@freshcoat-js/ui/slider";
@@ -55,12 +57,13 @@ import {
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 } from "@freshcoat-js/workspace/export";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useRef, useState } from "react";
 import {
 	Disclosure,
 	DisclosurePanel,
 	FileTrigger,
 	Focusable,
+	MenuTrigger,
 	Button as RACButton,
 } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -75,6 +78,7 @@ import type { ExportCollapsed, SettingsSectionId } from "./collapsed";
 import {
 	DESTINATION_LABEL,
 	fileNameExample,
+	fileNameTokenGroups,
 	filesSummary,
 	formatPageSize,
 	formatSummary,
@@ -286,6 +290,22 @@ export function ExportSettings({
 		useEditor((s) => s.workspace?.presets)?.filter(
 			(p) => p.templateId === preset.templateId,
 		).length ?? 0;
+	const fileNameBox = useRef<HTMLDivElement>(null);
+	const tokenGroups = template
+		? fileNameTokenGroups(template, boundDataset)
+		: [];
+	const insertToken = (token: string) => {
+		const input = fileNameBox.current?.querySelector("input");
+		const value = preset.fileName;
+		const start = input?.selectionStart ?? value.length;
+		const end = input?.selectionEnd ?? start;
+		const text = `{{${token}}}`;
+		set({ fileName: value.slice(0, start) + text + value.slice(end) });
+		requestAnimationFrame(() => {
+			input?.focus();
+			input?.setSelectionRange(start + text.length, start + text.length);
+		});
+	};
 	const recordCount = new Set(plan.map((item) => item.recordId)).size;
 
 	return (
@@ -779,13 +799,35 @@ export function ExportSettings({
 						)}
 					</>
 				)}
-				<TextField
-					aria-label="File name pattern"
-					value={preset.fileName}
-					placeholder={DEFAULT_FILE_NAME_PATTERN}
-					onChange={(fileName) => set({ fileName })}
-					inputClassName="font-fc-mono"
-				/>
+				<div ref={fileNameBox} className="flex min-w-0 items-center gap-1">
+					<TextField
+						aria-label="File name pattern"
+						className="flex-1"
+						value={preset.fileName}
+						placeholder={DEFAULT_FILE_NAME_PATTERN}
+						onChange={(fileName) => set({ fileName })}
+						inputClassName="font-fc-mono"
+					/>
+					<MenuTrigger>
+						<Button>Insert field</Button>
+						<Popover placement="bottom end">
+							<Menu
+								aria-label="Insert field"
+								onAction={(token) => insertToken(String(token))}
+							>
+								{tokenGroups.map((group) => (
+									<MenuSection key={group.title} title={group.title}>
+										{group.tokens.map((token) => (
+											<MenuItem key={token} id={token}>
+												{token}
+											</MenuItem>
+										))}
+									</MenuSection>
+								))}
+							</Menu>
+						</Popover>
+					</MenuTrigger>
+				</div>
 				<p
 					className="m-0 truncate text-fc-muted text-fc-sm"
 					data-testid="export-file-example"
