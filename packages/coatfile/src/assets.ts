@@ -247,10 +247,27 @@ function rewriteElement(
 		};
 	}
 
+	if (node.type === "qr_code") return rewriteLogo(el, urlByHash, rewrite);
 	if (node.type !== "image") return el;
 	const newSrc = rewrite(node.properties.src, urlByHash);
 	if (newSrc === node.properties.src) return el;
 	return { ...node, properties: { ...node.properties, src: newSrc } };
+}
+
+function rewriteLogo(
+	el: unknown,
+	urlByHash: Map<string, string>,
+	rewrite: AssetSrcRewriter,
+): unknown {
+	const node = el as { properties?: { logo?: unknown } };
+	const logo = node.properties?.logo as { src?: unknown } | undefined;
+	if (typeof logo !== "object" || logo === null) return el;
+	const newSrc = rewrite(logo.src, urlByHash);
+	if (newSrc === logo.src) return el;
+	return {
+		...node,
+		properties: { ...node.properties, logo: { ...logo, src: newSrc } },
+	};
 }
 
 // A variant's element override is a `{ id, properties }` delta, not a full
@@ -266,9 +283,13 @@ function rewriteOverrideElement(
 	if (typeof el !== "object" || el === null) return el;
 	const node = el as { properties?: { src?: unknown } };
 	if (node.properties === undefined) return el;
+	const withLogo = rewriteLogo(el, urlByHash, rewrite) as typeof node;
 	const newSrc = rewrite(node.properties.src, urlByHash);
-	if (newSrc === node.properties.src) return el;
-	return { ...node, properties: { ...node.properties, src: newSrc } };
+	if (newSrc === node.properties.src) return withLogo;
+	return {
+		...withLogo,
+		properties: { ...withLogo.properties, src: newSrc },
+	};
 }
 
 /** Every place a template can carry an image src: each frame's background and

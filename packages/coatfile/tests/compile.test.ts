@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { effectsOf } from "../src/effects";
+import { generateMatrix } from "../src/qr";
 import { validate } from "../src/validate";
 import type {
 	Command,
@@ -1762,12 +1763,13 @@ describe("compile assets (fonts + images)", () => {
 			],
 		};
 		const cmds = getCommands(tpl, {}, { width: 100, height: 60 });
-		// A QR element lowers to a drawGroup containing a drawBitmap whose pixel
-		// dimensions are the module-matrix size (square, > 0 for a filled value).
-		const bmp = findDraw(cmds, "drawBitmap")!;
-		expect(bmp.op).toBe("drawBitmap");
-		expect(bmp.pixelWidth).toBeGreaterThan(0);
-		expect(bmp.pixelHeight).toBe(bmp.pixelWidth);
+		// A QR element lowers to a snapped drawGroup holding a drawPath whose
+		// viewBox is the module-matrix size.
+		const group = findDraws(cmds, "drawGroup").find((c) => c.snap)!;
+		const n = generateMatrix("https://example.com/alex").length;
+		expect(group.snap).toEqual({ columns: n, rows: n });
+		const path = findDraw(cmds, "drawPath")!;
+		expect(path.viewBox).toEqual({ x: 0, y: 0, width: n, height: n });
 	});
 });
 

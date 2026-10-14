@@ -85,6 +85,48 @@ describe("transpileQr", () => {
 		).toBeUndefined();
 	});
 
+	it("applies style options", () => {
+		const el = transpileQr(
+			baseQr(
+				"qr:{{link}};shape=dot;eye=circle;pupil=dot;quiet=4;gradient=#000,#1a237e,45;logo=https://example.com/l.png?a=1;logosize=0.25;logopad=2",
+			),
+			{ frame: FRAME, scale: 1 },
+		);
+		expect(el.properties).toMatchObject({
+			moduleShape: "dot",
+			finderOuter: "circle",
+			finderInner: "dot",
+			quietZone: 4,
+			gradient: {
+				kind: "linear",
+				angle: 45,
+				stops: [
+					{ offset: 0, color: "#000" },
+					{ offset: 1, color: "#1a237e" },
+				],
+			},
+			logo: { src: "https://example.com/l.png?a=1", size: 0.25, padding: 2 },
+		});
+	});
+
+	it("ignores style options it does not know", () => {
+		const el = transpileQr(
+			baseQr(
+				"qr:{{link}};shape=star;eye=dot;pupil=circle;quiet=-1;gradient=#000;logo={{logo}};logosize=2",
+			),
+			{ frame: FRAME, scale: 1 },
+		);
+		for (const key of [
+			"moduleShape",
+			"finderOuter",
+			"finderInner",
+			"quietZone",
+			"gradient",
+			"logo",
+		])
+			expect(el.properties).not.toHaveProperty(key);
+	});
+
 	it("applies parsed options", () => {
 		const el = transpileQr(
 			baseQr("qr:{{link}};ec=H;fg=#000;bg=transparent;margin=4"),

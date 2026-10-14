@@ -241,7 +241,14 @@ export {
 	type ResolveSlicesOptions,
 	resolveSlices,
 } from "./slices";
-export { generateMatrix } from "./qr";
+export { generateMatrix, MAX_QR_LOGO_SIZE, QR_LOGO_H_COVERAGE } from "./qr";
+export {
+	describeQrIssue,
+	MIN_QR_CONTRAST,
+	MIN_QR_QUIET_ZONE,
+	type QrIssue,
+	qrIssues,
+} from "./qr-checks";
 export {
 	parseTrimValue,
 	type ResolvedStrokeTrim,
@@ -329,6 +336,10 @@ export type {
 	PrintWarning,
 	QrCodeElement,
 	QrCodeProperties,
+	QrFinderInner,
+	QrFinderOuter,
+	QrLogo,
+	QrModuleShape,
 	RectElement,
 	RectProperties,
 	ResolvedFill,

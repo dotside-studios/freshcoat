@@ -44,6 +44,10 @@ import type {
 	LeafElementSchema,
 	QrCodeElementSchema,
 	QrCodePropertiesSchema,
+	QrFinderInnerSchema,
+	QrFinderOuterSchema,
+	QrLogoSchema,
+	QrModuleShapeSchema,
 	RectElementSchema,
 	RectPropertiesSchema,
 	ShadowEffectSchema,
@@ -82,6 +86,10 @@ export type Gradient = z.infer<typeof GradientSchema>;
 export type TextProperties = z.infer<typeof TextPropertiesSchema>;
 export type ImageProperties = z.infer<typeof ImagePropertiesSchema>;
 export type QrCodeProperties = z.infer<typeof QrCodePropertiesSchema>;
+export type QrModuleShape = z.infer<typeof QrModuleShapeSchema>;
+export type QrFinderOuter = z.infer<typeof QrFinderOuterSchema>;
+export type QrFinderInner = z.infer<typeof QrFinderInnerSchema>;
+export type QrLogo = z.infer<typeof QrLogoSchema>;
 export type BarcodeProperties = z.infer<typeof BarcodePropertiesSchema>;
 export type Symbology = z.infer<typeof SymbologySchema>;
 export type BearerBars = z.infer<typeof BearerBarsSchema>;

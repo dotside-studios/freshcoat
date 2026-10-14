@@ -153,6 +153,7 @@ import type {
 	BlendMode,
 	Command,
 	DrawBitmapCommand,
+	DrawGroupCommand,
 	DrawCommand,
 	DrawImageCommand,
 	DrawMaskedCommand,
@@ -1755,8 +1756,25 @@ function snapBarcode(
 	cmd: DrawBitmapCommand,
 	grid: number,
 ): { x: number; y: number; width: number; height: number } | null {
-	const m = canvas.getTotalMatrix();
-	const [a, b, c, d, e, f, g, h] = m;
+	return snapModules(
+		canvas.getTotalMatrix(),
+		cmd.pos,
+		cmd.size,
+		cmd.pixelWidth,
+		cmd.pixelHeight,
+		grid,
+	);
+}
+
+function snapModules(
+	m: ArrayLike<number>,
+	pos: { x: number; y: number },
+	size: { width: number; height: number },
+	columns: number,
+	rows: number,
+	grid: number,
+): { x: number; y: number; width: number; height: number } | null {
+	const [a, b, c, d, e, f, g, h] = Array.from(m);
 	const eps = 1e-9;
 	if (
 		Math.abs(b) > eps ||
@@ -1767,7 +1785,6 @@ function snapBarcode(
 		e <= 0
 	)
 		return null;
-	const { pos, size, pixelWidth, pixelHeight } = cmd;
 	const dx = (a * pos.x + c) / grid;
 	const dy = (e * pos.y + f) / grid;
 	const dw = (a * size.width) / grid;
@@ -1785,14 +1802,14 @@ function snapBarcode(
 	// keeps square modules, so both axes take the smaller whole size.
 	let x: { start: number; extent: number };
 	let y: { start: number; extent: number };
-	if (pixelHeight === 1) {
-		x = along(dx, dw, dw / pixelWidth, pixelWidth);
+	if (rows === 1) {
+		x = along(dx, dw, dw / columns, columns);
 		const top = Math.round(dy);
 		y = { start: top, extent: Math.max(1, Math.round(dy + dh) - top) };
 	} else {
-		const module = Math.min(dw / pixelWidth, dh / pixelHeight);
-		x = along(dx, dw, module, pixelWidth);
-		y = along(dy, dh, module, pixelHeight);
+		const module = Math.min(dw / columns, dh / rows);
+		x = along(dx, dw, module, columns);
+		y = along(dy, dh, module, rows);
 	}
 	return {
 		x: x.start * grid,
@@ -1800,6 +1817,24 @@ function snapBarcode(
 		width: x.extent * grid,
 		height: y.extent * grid,
 	};
+}
+
+function groupSnap(
+	m: ArrayLike<number>,
+	cmd: DrawGroupCommand,
+	grid: number,
+): Affine | null {
+	const { snap, pos, size } = cmd;
+	if (!snap || !(size.width > 0 && size.height > 0)) return null;
+	const r = snapModules(m, pos, size, snap.columns, snap.rows, grid);
+	if (!r) return null;
+	const a = m[0] as number;
+	const e = m[4] as number;
+	const kx = r.width / (a * size.width);
+	const ky = r.height / (e * size.height);
+	const x0 = (r.x - (m[2] as number)) / a;
+	const y0 = (r.y - (m[5] as number)) / e;
+	return [kx, 0, x0 - pos.x * kx, 0, ky, y0 - pos.y * ky];
 }
 
 function drawBitmap(
@@ -2414,8 +2449,16 @@ function drawShape(
 			}
 		}
 	} else if (cmd.op === "drawGroup") {
+		const snap = cmd.snap
+			? groupSnap(canvas.getTotalMatrix(), cmd, frame.grid ?? 1)
+			: null;
+		if (snap) {
+			canvas.save();
+			canvas.concat([snap[0], snap[1], snap[2], snap[3], snap[4], snap[5], 0, 0, 1]);
+		}
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
+		if (snap) canvas.restore();
 	} else if (cmd.op === "drawMasked") {
 		drawMasked(ck, canvas, provider, images, bin, cmd, issues, frame);
 	} else {
@@ -2449,7 +2492,7 @@ function drawMasked(
 		children: cmd.children,
 	};
 	const ctm = (canvas.getTotalMatrix() as number[]).slice(0, 6) as Affine;
-	const bounds = originInvariant(cmd.mask, ctm)
+	const bounds = originInvariant(cmd.mask, ctm, frame.grid ?? 1)
 		? layerBounds(ck, canvas, provider, images, bin, content, frame)
 		: null;
 	// A backdrop child blurs what lies beneath the mask, as Figma's does, so the
@@ -3032,7 +3075,11 @@ function predictedBounds(
 			return true;
 		}
 		if (c.op === "drawGroup") {
-			for (const child of c.children) if (!visit(child, m, within)) return false;
+			const snap = c.snap ? groupSnap(m, c, frame.grid ?? 1) : null;
+			const gm = snap ? concatAffine(m, snap) : m;
+			const inGroup = snap ? [...within, { ctm: m }] : within;
+			for (const child of c.children)
+				if (!visit(child, gm, inGroup)) return false;
 			return true;
 		}
 		if (c.op === "drawMasked") {
@@ -4570,7 +4617,7 @@ function layerBounds(
 	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
 	if (!(matrix[0] > 0 && matrix[4] > 0)) return null;
 	const ctm = matrix.slice(0, 6) as Affine;
-	if (!originInvariant(inner, ctm)) return null;
+	if (!originInvariant(inner, ctm, frame.grid ?? 1)) return null;
 	const device = exportPixelSize(frame, frame.scale);
 	const b = predictedBounds(
 		ck,
@@ -4650,9 +4697,11 @@ function layerPaintBoundable(cmd: DrawCommand): boolean {
 // rotations, gradients and sampled images can shift by an edge pixel or a whole
 // column. Rounded corners are accepted: their antialiased edge pixels can move
 // by up to 1/8 coverage (32 levels), which a blur or shadow carries to nearby
-// pixels. layer-bounds.test.ts holds them to that. `m` is the layer's scale and
+// pixels. A snapped grid of square modules is accepted too: its edges sit on
+// pixel boundaries, where float error adds at most a sliver of coverage.
+// layer-bounds.test.ts holds them to that. `m` is the layer's scale and
 // translate.
-function originInvariant(cmd: DrawCommand, m: Affine): boolean {
+function originInvariant(cmd: DrawCommand, m: Affine, grid = 1): boolean {
 	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd) || hasTexture(cmd))
 		return false;
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
@@ -4670,9 +4719,50 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			!cmd.stroke?.gradient
 		);
 	if (cmd.op === "drawGroup")
-		return cmd.children.every((c) => originInvariant(c, m));
+		return cmd.snap
+			? pixelGridEdges(cmd, m, grid)
+			: cmd.children.every((c) => originInvariant(c, m, grid));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
 	return cmd.op === "drawQr";
+}
+
+// Whether a snapped group lands every edge on a device pixel boundary: its grid
+// snaps to whole pixels, and it holds only solid paths of straight edges on
+// whole modules, such as a QR code's square modules.
+function pixelGridEdges(
+	cmd: DrawGroupCommand,
+	m: Affine,
+	grid: number,
+): boolean {
+	const snap = cmd.snap;
+	if (!snap) return false;
+	const r = snapModules(m, cmd.pos, cmd.size, snap.columns, snap.rows, grid);
+	if (!r) return false;
+	const whole = (v: number) => Number.isInteger(v / grid);
+	if (
+		![r.x, r.y, r.width / snap.columns, r.height / snap.rows].every(whole)
+	)
+		return false;
+	return cmd.children.every(
+		(c) =>
+			c.op === "drawPath" &&
+			!c.rotation &&
+			!c.clip &&
+			!c.adjust &&
+			!c.shadow &&
+			!c.blur &&
+			!c.stroke &&
+			(c.fills ?? []).every((f) => f.kind === "solid") &&
+			c.pos.x === cmd.pos.x &&
+			c.pos.y === cmd.pos.y &&
+			c.size.width === cmd.size.width &&
+			c.size.height === cmd.size.height &&
+			!c.viewBox?.x &&
+			!c.viewBox?.y &&
+			c.viewBox?.width === snap.columns &&
+			c.viewBox?.height === snap.rows &&
+			/^[MHVZ\d ]*$/.test(c.d),
+	);
 }
 
 // Whether every pixel edge of a nearest-sampled bitmap lands clear of device

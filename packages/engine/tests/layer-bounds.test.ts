@@ -13,6 +13,7 @@ import {
 	createEllipse,
 	createFrame,
 	createGroup,
+	createPath,
 	createRect,
 	createText,
 	type Node,
@@ -36,6 +37,8 @@ const box = (x: number, y: number, width: number, height: number) => ({
 // A rounded corner's antialiased pixels can move by up to 1/8 coverage under a
 // bounded layer's new origin. See originInvariant.
 const ROUNDED_TOLERANCE = 32;
+// A snapped module edge on a pixel boundary can gain a sliver of coverage.
+const SNAPPED_TOLERANCE = 1;
 
 const FONTS = () =>
 	new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
@@ -94,11 +97,11 @@ async function compare(children: Node[], scale = 1, fonts = FONTS()) {
 	const bounded = await render(children, true, scale, fonts);
 	expect(unbounded.boundedLayers).toBe(0);
 	let maxDiff = 0;
-	for (let i = 0; i < bounded.data.length; i++)
-		maxDiff = Math.max(
-			maxDiff,
-			Math.abs((bounded.data[i] ?? 0) - (unbounded.data[i] ?? 0)),
-		);
+	for (let i = 0; i < bounded.data.length; i++) {
+		const d = Math.abs((bounded.data[i] ?? 0) - (unbounded.data[i] ?? 0));
+		if (d > maxDiff) maxDiff = d;
+	}
+
 	return { maxDiff, boundedLayers: bounded.boundedLayers };
 }
 
@@ -262,6 +265,61 @@ describe("bounded effect layers", () => {
 			}),
 		]);
 		expect(r.boundedLayers).toBe(1);
+		expect(r.maxDiff).toBe(0);
+	});
+
+	// A QR code's square modules as compiled: whole-module rects and eyes in a
+	// snapped grid, inside a shadowed panel.
+	const qrPanel = (x: number, y: number, side: number, d: string) => {
+		const n = 25;
+		return createGroup(
+			[
+				createRect({ ...box(x, y, side + 16, side + 16), fills: solid("#fff") }),
+				createGroup(
+					[
+						createPath({
+							...box(0, 0, side, side),
+							d,
+							viewBox: { x: 0, y: 0, width: n, height: n },
+							fillRule: "evenodd",
+							fills: solid("#1e1b4b"),
+						}),
+					],
+					{ ...box(x + 8, y + 8, side, side), snap: { columns: n, rows: n } },
+				),
+			],
+			{ ...box(x, y, side + 16, side + 16), shadow: shadow(0, 14, 32) },
+		);
+	};
+	const squares = Array.from({ length: 25 }, (_, y) =>
+		Array.from({ length: 25 }, (_, x) =>
+			(x * 31 + y * 17) % 3 ? "" : `M${x} ${y}H${x + 1}V${y + 1}H${x}Z`,
+		).join(""),
+	).join("") + "M0 0H7V7H0ZM1 1H6V6H1ZM2 2H5V5H2Z";
+
+	for (const scale of [1, 2, 1.37, 3.1])
+		test(`snapped square QR modules at ${scale}x`, async () => {
+			for (const [x, y, side] of [
+				[40.3, 20.6, 101.7],
+				[12.77, 9.13, 77.7],
+				[61, 33, 125],
+			] as const) {
+				const r = await compare([qrPanel(x, y, side, squares)], scale);
+				expect(r.boundedLayers).toBe(1);
+				expect(r.maxDiff).toBeLessThanOrEqual(SNAPPED_TOLERANCE);
+			}
+		}, 30_000);
+
+	test("snapped QR modules under a pixel each stay unbounded", async () => {
+		const r = await compare([qrPanel(40.3, 20.6, 20, squares)]);
+		expect(r.boundedLayers).toBe(0);
+		expect(r.maxDiff).toBe(0);
+	});
+
+	test("curved snapped QR modules stay unbounded", async () => {
+		const dot = "M12 12C12.3 12 12.5 12.2 12.5 12.5C12.5 12.8 12.3 13 12 13Z";
+		const r = await compare([qrPanel(40.3, 20.6, 101.7, squares + dot)]);
+		expect(r.boundedLayers).toBe(0);
 		expect(r.maxDiff).toBe(0);
 	});
 

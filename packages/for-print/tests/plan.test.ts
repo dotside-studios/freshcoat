@@ -261,6 +261,21 @@ describe("planScene (sync)", () => {
 		expect(planned.children[0].adjust).toBeUndefined();
 	});
 
+	test("a snapped group follows the code policy", () => {
+		const code = createGroup([rectNode(), imageNode()], {
+			snap: { columns: 25, rows: 25 },
+		});
+		const tree = createGroup([code, rectNode()]);
+		const planned = planScene(tree, {
+			photo: YMCKO_PRESET,
+			graphic: YMCKO_PRESET,
+			code: null,
+		}) as typeof tree;
+		const inner = planned.children[0] as typeof code;
+		expect(inner.children.map((c) => c.adjust)).toEqual([undefined, undefined]);
+		expect(planned.children[1].adjust).toBeDefined();
+	});
+
 	test("does not mutate the input tree", () => {
 		const tree = createGroup([imageNode()]);
 		planScene(tree);

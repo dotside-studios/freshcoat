@@ -240,6 +240,7 @@ with a letter or underscore and contain letters, digits or underscores.
 | `image:{{avatar}}` | Image filled from `avatar` |
 | `color:{{brand}}` | Color filled from `brand` |
 | `qr:{{profile_url}};ec=M;fg=#000` | QR code with error correction and foreground options |
+| `qr:{{profile_url}};shape=dot;eye=circle;pupil=dot` | QR code with dot modules and round eyes |
 | `barcode:{{member_id}}` | Code 128 barcode |
 | `barcode:ean13:{{sku}}` | EAN-13 barcode |
 | `barcode:ean13:5901234123457` | Barcode with a fixed value |
@@ -254,6 +255,23 @@ layer's content also become fields without quotes. A layer named only
 rectangle, full ellipse or sharp-cornered polygon with a single image fill;
 use explicit markers for other kinds. `image:` also binds those shapes when
 they have a plain fill.
+
+A QR marker's options follow the value, each `;key=value`:
+
+| Option | Sets |
+|---|---|
+| `ec` | error correction, `L`, `M`, `Q` or `H` |
+| `fg`, `bg` | module and background colours; `fg` defaults to the layer's own fill, `bg` to transparent |
+| `margin` | inset inside the box, in design units |
+| `quiet` | quiet zone in modules |
+| `shape` | modules: `square`, `dot`, `rounded` or `classy` |
+| `eye` | the finder patterns' ring: `square`, `rounded` or `circle` |
+| `pupil` | the finder patterns' centre: `square`, `rounded` or `dot` |
+| `gradient` | a linear gradient, `#from,#to` or `#from,#to,angle` |
+| `logo` | a centre logo's URL; a `{{field}}` is not read here, so bind one in Freshcoat |
+| `logosize`, `logopad` | the logo's side as a fraction of the code (default 0.2, drawn at most 0.3) and its padding in modules |
+
+An unknown option or value is ignored.
 
 Barcode options follow semicolons: `text=0` hides the human-readable line,
 `fg` and `bg` set colors, `margin` sets the quiet zone in modules, and `ec`

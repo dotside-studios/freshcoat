@@ -6,7 +6,7 @@ import { fixtures } from "../fixtures";
 import { compile } from "../src/compile";
 import type { CompiledTemplate, Template } from "../src/types";
 
-// Bitmaps (the QR matrix) serialise as a short digest rather than thousands of
+// Bitmaps (barcode modules) serialise as a short digest rather than thousands of
 // snapshot lines; any change to a byte still changes the digest.
 function digest(bytes: Uint8Array): string {
 	let h = 0x811c9dc5;
