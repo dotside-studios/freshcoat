@@ -411,7 +411,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -950,6 +950,26 @@ stroke and its dashes all sample the same gradient as a fill would.
 
 ```jsonc
 "stroke": { "width": 4, "align": "inside", "color": { "kind": "linear", "angle": 0, "stops": [ … ] } }
+```
+
+From 1.7 a `rect` or `frame` stroke's `width` can be one per side,
+`{ top, right, bottom, left }`, each optional and 0 when left out, as a card
+border or a divider line draws. Every other element keeps one number and
+fails validation with an object. The stroke paints the band between the
+outline moved out and moved in by each side's width, as `align` places it:
+all inward for `inside`, all outward for `outside`, half each way for
+`center`. Figma strokes a frame inside by default, so the plugin writes
+`"align": "inside"` for one. A rounded corner's radius moves by its two
+adjacent widths, one on each axis, so it turns elliptical where they differ;
+with `cornerSmoothing` it moves by their mean. A sharp corner stays sharp,
+so `join` does not apply. A `dash` runs around the whole outline along the
+middle of the band, and each dash is cut to the band, so it is as thick as
+the side it lies on; a trim cuts the same line. A gradient `color` fills the band as it would a uniform stroke.
+Four equal sides draw as one width. `strokeSides` reads a width as each
+side's, and `widestStroke` as its widest side.
+
+```jsonc
+"stroke": { "color": "#e5e7eb", "width": { "bottom": 1 }, "align": "inside" }
 ```
 
 A `rect`, `frame` or `image` takes `cornerRadius` as one number or per

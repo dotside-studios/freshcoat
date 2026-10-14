@@ -47,7 +47,12 @@ import {
 	parseImageInfo,
 } from "../image-info";
 import { dataUrlToBytes } from "../loader";
-import { boxPath, outlineGeometry, rectShape } from "../outline";
+import {
+	boxPath,
+	outlineGeometry,
+	rectShape,
+	sideStrokeGeometry,
+} from "../outline";
 import { createPaintCache } from "../paint-cache";
 import { fitRect, strokeInset } from "../paint-helpers";
 import type { PaintTarget } from "../runtime-types";
@@ -585,7 +590,9 @@ class PageBuilder {
 					(cmd.stroke
 						? strokeReason(
 								cmd.stroke,
-								rectShape(cmd.cornerRadius, cmd.cornerSmoothing),
+								cmd.stroke.sides
+									? null
+									: rectShape(cmd.cornerRadius, cmd.cornerSmoothing),
 							)
 						: null)
 				);
@@ -906,7 +913,9 @@ class PageBuilder {
 					for (const fill of cmd.fills ?? [])
 						out += this.fill(fill, ops, evenOdd, { x, y, w, h });
 				}
-				if (cmd.stroke) out += this.outlineStroke(shape, cmd, cmd.stroke);
+				if (cmd.stroke?.sides) out += this.sideStroke(cmd, cmd.stroke);
+				else if (cmd.stroke)
+					out += this.outlineStroke(shape, cmd, cmd.stroke);
 				return out;
 			}
 			case "drawPath":
@@ -1171,6 +1180,55 @@ class PageBuilder {
 			return this.strokePath(stroke, path, { x, y, w, h });
 		} finally {
 			path.delete();
+		}
+	}
+
+	// A rect's per-side stroke: its band filled even-odd, or for a dash or a
+	// trim, the stroke along the band's middle clipped to the band.
+	private sideStroke(
+		cmd: Extract<DrawCommand, { op: "drawRect" }>,
+		stroke: Stroke,
+	): string {
+		if (!stroke.sides) return "";
+		const { ck } = this;
+		const { x, y } = cmd.pos;
+		const { width: w, height: h } = cmd.size;
+		const g = sideStrokeGeometry(
+			x,
+			y,
+			w,
+			h,
+			cmd.cornerRadius,
+			cmd.cornerSmoothing,
+			{ align: stroke.align, sides: stroke.sides },
+		);
+		if (!g) return "";
+		const band = ck.Path.MakeFromSVGString(g.band);
+		if (!band) return "";
+		const box = { x, y, w, h };
+		try {
+			const ops = pathOps(ck, band);
+			if (!normalizeDash(stroke.dash) && !strokeTrim(stroke))
+				return this.fill(
+					stroke.gradient ?? { kind: "solid", color: stroke.color },
+					ops,
+					true,
+					box,
+				);
+			const mid = ck.Path.MakeFromSVGString(g.mid);
+			if (!mid) return "";
+			try {
+				const along = this.strokePath(
+					{ ...stroke, width: g.midWidth },
+					mid,
+					box,
+				);
+				return along ? `q\n${ops}W* n\n${along}Q\n` : "";
+			} finally {
+				mid.delete();
+			}
+		} finally {
+			band.delete();
 		}
 	}
 

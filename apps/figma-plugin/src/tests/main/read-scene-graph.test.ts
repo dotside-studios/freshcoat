@@ -386,6 +386,30 @@ describe("readRectangleNode", () => {
 		expect(r.strokeWeight).toBeUndefined();
 		expect(r.strokeWeightMixed).toBe(true);
 	});
+
+	it("reads each side of a mixed strokeWeight", () => {
+		const r = readRectangleNode({
+			id: "1:1",
+			name: "box",
+			type: "RECTANGLE",
+			visible: true,
+			opacity: 1,
+			blendMode: "NORMAL",
+			rotation: 0,
+			absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+			effects: [],
+			strokeWeight: Symbol("figma.mixed"),
+			strokeTopWeight: 1,
+			strokeRightWeight: 0,
+			strokeBottomWeight: 4,
+			strokeLeftWeight: 0,
+			fills: [],
+			strokes: [],
+		} as never);
+		expect(r.strokeWeight).toBeUndefined();
+		expect(r.strokeWeightMixed).toBeUndefined();
+		expect(r.strokeWeights).toEqual({ top: 1, right: 0, bottom: 4, left: 0 });
+	});
 });
 
 describe("readVectorNode", () => {

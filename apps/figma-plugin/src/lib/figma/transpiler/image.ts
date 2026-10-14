@@ -83,9 +83,15 @@ function imageShape(
 	warnings: TemplateWarning[],
 ): ImageShape {
 	const stroke = strokeToElement(node, scale, size);
-	const stroked =
-		(node.strokeWeight ?? 0) > 0 &&
-		(node.strokes ?? []).some((p) => p.visible !== false);
+	const visible = (node.strokes ?? []).some((p) => p.visible !== false);
+	const stroked = (node.strokeWeight ?? 0) > 0 && visible;
+	if ("strokeWeights" in node && node.strokeWeights && visible)
+		warnings.push({
+			severity: "warn",
+			code: "stroke_weight_mixed_unsupported",
+			message: `Layer "${node.name}" has a different stroke weight per side, which an image does not take, so its stroke was dropped.`,
+			nodeId: node.id,
+		});
 	if (!stroke && stroked)
 		warnings.push({
 			severity: "warn",

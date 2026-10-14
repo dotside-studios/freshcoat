@@ -17,6 +17,7 @@ import type {
 	BarcodePropertiesSchema,
 	BearerBarsSchema,
 	BooleanOpSchema,
+	BoxStrokeSchema,
 	ConstraintSchema,
 	ConstraintsSchema,
 	CornerRadiusSchema,
@@ -40,7 +41,7 @@ import type {
 	RectPropertiesSchema,
 	SliceModifierSchema,
 	SymbologySchema,
-	StrokeSchema,
+	StrokeSideWidthsSchema,
 	TemplateFrameSchema,
 	TemplateSchema,
 	TemplateSourceSchema,
@@ -117,7 +118,7 @@ export type BooleanOperandElement = RectElement | VectorElement;
 
 export interface FrameProperties {
 	fill?: Fill | Fill[];
-	stroke?: z.infer<typeof StrokeSchema>;
+	stroke?: z.infer<typeof BoxStrokeSchema>;
 	cornerRadius?: z.infer<typeof CornerRadiusSchema>;
 	cornerSmoothing?: number;
 	clipsContent?: boolean;
@@ -171,6 +172,10 @@ export type ECLevel = "L" | "M" | "Q" | "H";
 
 export type InlineAsset = z.infer<typeof InlineAssetSchema>;
 export type Insets = z.infer<typeof InsetsSchema>;
+/** A rect or frame stroke, whose width may be one per side. */
+export type BoxStroke = z.infer<typeof BoxStrokeSchema>;
+/** A stroke width for each side, as authored; a side left out is 0. */
+export type StrokeSideWidths = z.infer<typeof StrokeSideWidthsSchema>;
 /** An inset resolved to each side. */
 export type Sides = {
 	top: number;

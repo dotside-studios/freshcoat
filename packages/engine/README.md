@@ -121,7 +121,20 @@ path along its own direction. The trim cuts the outline before the `dash`
 pattern, so dashes start at the trimmed start and caps sit on the trimmed
 ends. A text node's `stroke` takes `color` or `gradient`, `width`, `join` and
 `align`: `center` strokes over the fill, `outside` draws twice the width under
-it and `inside` twice the width kept where the glyphs cover. A clipping group's
+it and `inside` twice the width kept where the glyphs cover.
+
+A rect's stroke can carry `sides`, a width for each of `top`, `right`,
+`bottom` and `left`, in place of `width` (which then holds the widest, for
+anything that reads one). The rect paints the band between its outline moved
+out and moved in by each side's width as `align` places it, as one even-odd
+filled path. A rounded corner's radius moves by its two adjacent widths, one
+on each axis, so it turns elliptical where they differ; with
+`cornerSmoothing` it moves by their mean. A sharp corner stays sharp, so
+`join` does not apply. A `dash` or a trim runs along the middle of the band,
+around the whole outline from the top left, and is cut to the band, so each
+dash is as thick as the side it lies on. Other nodes ignore `sides`.
+
+A clipping group's
 `cornerRadius` can be one number or per-corner `[tl, tr, br, bl]`.
 
 `compileScene()` lowers a node tree to the flat `Command[]` list the painter
@@ -245,7 +258,7 @@ fallback color.
 `renderer.paintPdf(commands)` does the same for a compiled scene. Shapes,
 solid fills, linear and radial gradients (elliptical and focal ones too, with
 transparent stops drawn through a soft mask), solid and gradient strokes
-(aligned, dashed, capped, joined and trimmed), clips, opacity, isolated groups,
+(aligned, dashed, capped, joined and trimmed, and a rect's per-side band), clips, opacity, isolated groups,
 the blend modes PDF defines, images and SVG images are drawn as vectors. A gray
 or RGB JPEG is embedded as it is, in `DeviceGray` or `DeviceRGB` when it
 carries no ICC profile and in an `ICCBased` space holding its own profile when

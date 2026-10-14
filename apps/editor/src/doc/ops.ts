@@ -32,6 +32,7 @@ import {
 	variantFieldRefs,
 	variantIdFor,
 	walkElements,
+	widestStroke,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
 import type { CanvasKit } from "canvaskit-wasm";
@@ -592,7 +593,14 @@ export function booleanElements(
 			d: shape.d,
 			...(shape.fillRule ? { fillRule: shape.fillRule } : {}),
 			...(properties.fill !== undefined ? { fill: properties.fill } : {}),
-			...(properties.stroke !== undefined ? { stroke: properties.stroke } : {}),
+			...(properties.stroke !== undefined
+				? {
+						stroke: {
+							...properties.stroke,
+							width: widestStroke(properties.stroke.width),
+						},
+					}
+				: {}),
 			boolean: { op, operands },
 		},
 	};

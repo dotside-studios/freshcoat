@@ -1,0 +1,169 @@
+{
+	"id": "stroke-sides-inside",
+	"title": "an inside per-side stroke gives each side its own width",
+	"profile": "core",
+	"requires": [
+		"draw.stroke",
+		"stroke.sides"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 20,
+					"sides": {
+						"top": 4,
+						"right": 12,
+						"bottom": 20,
+						"left": 0
+					},
+					"align": "inside"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				31
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the 4px top band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				36
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below the top band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				114,
+				60
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the 12px right band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				104,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "left of the right band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				80
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the 20px bottom band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				66
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "above the bottom band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				41,
+				50
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the left side, with no width"
+		}
+	]
+}
