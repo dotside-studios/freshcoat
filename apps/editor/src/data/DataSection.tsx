@@ -35,6 +35,7 @@ import {
 import type { Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
+import { SidePanel } from "~/app/SidePanel";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
 import ImportIcon from "~icons/mingcute/file-import-line";
@@ -258,9 +259,11 @@ export function DataSection() {
 				<div className="relative flex min-h-0 flex-1">
 					<SidePanel
 						side="left"
+						testId="data-panel-left"
 						open={panels.left}
 						overlay={narrow}
-						width={220}
+						escapeCloses
+						defaultWidth={220}
 						onClose={() => onPanels({ left: false })}
 					>
 						<DatasetsList create={create} />
@@ -934,9 +937,11 @@ function RecordsPane({
 			</div>
 			<SidePanel
 				side="right"
+				testId="data-panel-right"
 				open={panels.right}
 				overlay={rightOverlay}
-				width={300}
+				escapeCloses
+				defaultWidth={300}
 				onClose={() => onPanels({ right: false })}
 			>
 				<Tabs
@@ -989,70 +994,4 @@ function useBelow(px: number): boolean {
 		return () => mq.removeEventListener("change", on);
 	}, [px]);
 	return below;
-}
-
-function SidePanel({
-	side,
-	open,
-	overlay,
-	width,
-	onClose,
-	children,
-}: {
-	side: "left" | "right";
-	open: boolean;
-	overlay: boolean;
-	width: number;
-	onClose: () => void;
-	children: ReactNode;
-}) {
-	// Escape closes a sheet before anything under it takes the key.
-	useEffect(() => {
-		if (!open || !overlay) return;
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== "Escape") return;
-			const el = e.target as HTMLElement | null;
-			if (
-				el?.closest?.(
-					"input,textarea,select,[role=dialog],[role=menu],[role=listbox]",
-				)
-			)
-				return;
-			e.preventDefault();
-			e.stopPropagation();
-			onClose();
-		};
-		window.addEventListener("keydown", onKey, true);
-		return () => window.removeEventListener("keydown", onKey, true);
-	}, [open, overlay, onClose]);
-
-	if (!open) return null;
-	return (
-		<>
-			{overlay ? (
-				<div
-					aria-hidden="true"
-					className="absolute inset-0 z-20 bg-fc-scrim"
-					onPointerDown={onClose}
-				/>
-			) : null}
-			<aside
-				data-testid={`data-panel-${side}`}
-				className={cn(
-					"relative z-30 flex min-h-0 shrink-0 flex-col bg-fc-panel",
-					side === "left"
-						? "border-fc-border border-r"
-						: "border-fc-border border-l",
-					overlay &&
-						cn(
-							"absolute inset-y-0 max-w-[85vw] shadow-(--shadow-fc-sheet)",
-							side === "left" ? "left-0" : "right-0",
-						),
-				)}
-				style={{ width }}
-			>
-				{children}
-			</aside>
-		</>
-	);
 }

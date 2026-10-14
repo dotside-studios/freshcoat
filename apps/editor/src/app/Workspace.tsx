@@ -1,5 +1,5 @@
 import { cn } from "@freshcoat-js/ui/lib/cn";
-import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { VariantBar } from "~/canvas/VariantBar";
 import { Viewport } from "~/canvas/Viewport";
 import { LeftPanel } from "~/panels/LeftPanel";
@@ -8,6 +8,7 @@ import { useEditor } from "~/state/hooks";
 import { AppMenuBar } from "./AppMenuBar";
 import type { CommandContext } from "./commands";
 import { useController } from "./context";
+import { SidePanel } from "./SidePanel";
 import { StatusBar } from "./StatusBar";
 import { ToolStrip } from "./ToolStrip";
 
@@ -74,8 +75,11 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 					<ToolStrip ctx={ctx} />
 					<SidePanel
 						side="left"
+						testId="panel-left"
 						open={panels.left}
 						overlay={narrow}
+						leftOverlayClassName="left-10 pointer-coarse:left-12"
+						resizable
 						defaultWidth={compact() ? 220 : 240}
 						onClose={() =>
 							controller.dispatch({
@@ -92,8 +96,10 @@ export function Workspace({ ctx }: { ctx: CommandContext }) {
 					</div>
 					<SidePanel
 						side="right"
+						testId="panel-right"
 						open={panels.right}
 						overlay={narrow}
+						resizable
 						defaultWidth={compact() ? 256 : 280}
 						onClose={() =>
 							controller.dispatch({
@@ -135,113 +141,4 @@ function useNarrow(): boolean {
 		return () => mq.removeEventListener("change", on);
 	}, []);
 	return narrow;
-}
-
-/** A column beside the viewport, or an overlay above it on a narrow window.
- *  The inner edge drags to resize. */
-function SidePanel({
-	side,
-	open,
-	overlay,
-	defaultWidth,
-	onClose,
-	children,
-}: {
-	side: "left" | "right";
-	open: boolean;
-	overlay: boolean;
-	defaultWidth: number;
-	onClose: () => void;
-	children: ReactNode;
-}) {
-	const [width, setWidth] = useState(() => {
-		try {
-			const saved = Number(localStorage.getItem(`freshcoat.panel.${side}`));
-			return saved >= 180 && saved <= 480 ? saved : defaultWidth;
-		} catch {
-			return defaultWidth;
-		}
-	});
-	useEffect(() => {
-		try {
-			localStorage.setItem(`freshcoat.panel.${side}`, String(width));
-		} catch {}
-	}, [side, width]);
-
-	if (!open) return null;
-	return (
-		<>
-			{overlay ? (
-				<div
-					aria-hidden="true"
-					className="absolute inset-0 z-20 bg-fc-scrim"
-					onPointerDown={onClose}
-				/>
-			) : null}
-			<aside
-				data-testid={`panel-${side}`}
-				className={cn(
-					"relative z-30 flex min-h-0 shrink-0 flex-col bg-fc-panel",
-					side === "left"
-						? "border-fc-border border-r"
-						: "border-fc-border border-l",
-					overlay &&
-						cn(
-							"absolute inset-y-0 max-w-[85vw] shadow-(--shadow-fc-sheet)",
-							side === "left" ? "left-10 pointer-coarse:left-12" : "right-0",
-						),
-				)}
-				style={{ width }}
-			>
-				{children}
-				{/* biome-ignore lint/a11y/useSemanticElements: an <hr> cannot take pointer and key input */}
-				<div
-					role="separator"
-					tabIndex={0}
-					aria-orientation="vertical"
-					aria-valuenow={width}
-					aria-valuemin={180}
-					aria-valuemax={480}
-					aria-label={`Resize the ${side} panel`}
-					onKeyDown={(e) => {
-						const step =
-							e.key === "ArrowLeft" ? -16 : e.key === "ArrowRight" ? 16 : 0;
-						if (!step) return;
-						e.preventDefault();
-						setWidth((w) =>
-							Math.min(
-								480,
-								Math.max(180, w + (side === "left" ? step : -step)),
-							),
-						);
-					}}
-					className={cn(
-						"absolute inset-y-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-fc-accent/40",
-						side === "left" ? "-right-1" : "-left-1",
-					)}
-					onPointerDown={(e) => {
-						const startX = e.clientX;
-						const start = width;
-						const el = e.currentTarget;
-						el.setPointerCapture(e.pointerId);
-						const move = (ev: PointerEvent) => {
-							const d = ev.clientX - startX;
-							setWidth(
-								Math.min(
-									480,
-									Math.max(180, start + (side === "left" ? d : -d)),
-								),
-							);
-						};
-						const up = () => {
-							el.removeEventListener("pointermove", move);
-							el.removeEventListener("pointerup", up);
-						};
-						el.addEventListener("pointermove", move);
-						el.addEventListener("pointerup", up);
-					}}
-				/>
-			</aside>
-		</>
-	);
 }
