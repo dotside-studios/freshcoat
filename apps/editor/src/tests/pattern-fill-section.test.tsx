@@ -53,6 +53,7 @@ describe("pattern fill controls", () => {
 		const user = fastUser();
 		const c = setup();
 		await chooseOption(user, button("Fill 1 kind"), "Pattern");
+		fireEvent.click(button("Edit fill 1"));
 		expect(fill(c).fill).toEqual({
 			kind: "pattern",
 			pattern: "noise",
@@ -95,6 +96,7 @@ describe("pattern fill controls", () => {
 			},
 		} as never;
 		const c = setup(t);
+		fireEvent.click(button("Edit fill 1"));
 		await chooseOption(user, button("Fill 1 pattern"), "Paper");
 		expect(fill(c).fill).toEqual({
 			kind: "pattern",

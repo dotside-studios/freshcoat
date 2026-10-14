@@ -20,8 +20,10 @@ import {
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PopoverPanel } from "@freshcoat-js/ui/popover-panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useMemo } from "react";
+import { Button } from "react-aria-components";
 import { useEditor } from "~/state/hooks";
 import ClockwiseIcon from "~icons/mingcute/clockwise-line";
 import ReverseIcon from "~icons/mingcute/transfer-horizontal-line";
@@ -192,42 +194,55 @@ export function FillRow({
 						swatches={swatches}
 						onChange={(c) => onChange("color", c)}
 					/>
-				) : fill.kind === "pattern" ? (
-					<PatternSwatch
-						p={fill}
-						className="h-fc-control min-w-0 flex-1 rounded-[3px]"
-					/>
 				) : (
-					<GradientSwatch
-						g={fill}
-						box={box}
-						className="h-fc-control min-w-0 flex-1 rounded-[3px]"
-					/>
+					<PopoverPanel
+						title={fill.kind === "pattern" ? "Pattern" : "Gradient"}
+						trigger={
+							<Button
+								aria-label={`Edit fill ${index + 1}`}
+								onPress={onActivate}
+								className="min-w-0 flex-1 cursor-default rounded-[3px] outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1"
+							>
+								{fill.kind === "pattern" ? (
+									<PatternSwatch
+										p={fill}
+										className="block h-fc-control w-full rounded-[3px]"
+									/>
+								) : (
+									<GradientSwatch
+										g={fill}
+										box={box}
+										className="block h-fc-control w-full rounded-[3px]"
+									/>
+								)}
+							</Button>
+						}
+					>
+						<div
+							className="contents"
+							onFocusCapture={onActivate}
+							onPointerDownCapture={onActivate}
+						>
+							{fill.kind === "pattern" ? (
+								<PatternEditor
+									p={fill}
+									index={index}
+									swatches={swatches}
+									onChange={onChange}
+								/>
+							) : (
+								<GradientEditor
+									g={fill}
+									name={`fill ${index + 1}`}
+									swatches={swatches}
+									onChange={(field, g) => onChange(field, g)}
+								/>
+							)}
+						</div>
+					</PopoverPanel>
 				)}
 				<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
 			</div>
-			{typeof fill !== "string" && fill.kind === "pattern" && (
-				<PatternEditor
-					p={fill}
-					index={index}
-					swatches={swatches}
-					onChange={onChange}
-				/>
-			)}
-			{isGradient(fill) && (
-				<div
-					className="contents"
-					onFocusCapture={onActivate}
-					onPointerDownCapture={onActivate}
-				>
-					<GradientEditor
-						g={fill}
-						name={`fill ${index + 1}`}
-						swatches={swatches}
-						onChange={(field, g) => onChange(field, g)}
-					/>
-				</div>
-			)}
 		</>
 	);
 }

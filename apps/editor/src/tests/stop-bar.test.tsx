@@ -15,6 +15,7 @@ import { updateElement } from "~/doc/ops";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
 import { StopBar } from "~/panels/design/StopBar";
+import { button } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
 // The bar is 100px wide from x = 0 and 24px tall, so clientX is a percentage.
@@ -181,7 +182,7 @@ describe("stop bar in the inspector", () => {
 	const RECT = "0/0";
 	const gradient: Gradient = { kind: "linear", angle: 0, stops: BW };
 
-	function inspector() {
+	function inspector(open = true) {
 		let t: Template = doc();
 		const r = updateElement(t, RECT, { properties: { fill: gradient } });
 		if (r.ok) t = r.template;
@@ -200,6 +201,7 @@ describe("stop bar in the inspector", () => {
 				<DesignPanel />
 			</ControllerProvider>,
 		);
+		if (open) fireEvent.click(button("Edit fill 1"));
 		const fill = () =>
 			(
 				getElement(c.template as Template, RECT)?.properties as {
@@ -222,8 +224,11 @@ describe("stop bar in the inspector", () => {
 	});
 
 	it("marks the gradient it opened as the one the canvas edits", () => {
-		const { c } = inspector();
+		const { c } = inspector(false);
 		expect(c.state.activeFill).toBeNull();
+		fireEvent.click(button("Edit fill 1"));
+		expect(c.state.activeFill).toEqual({ key: RECT, index: 0 });
+		c.dispatch({ type: "setActiveFill", fill: null });
 		press(screen.getByTestId("stop-bar"), 30);
 		expect(c.state.activeFill).toEqual({ key: RECT, index: 0 });
 	});
