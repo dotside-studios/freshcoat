@@ -517,8 +517,7 @@ they share size and origin.
 
 #### Spot colours for cutters
 
-Print-and-cut RIPs such as Roland VersaWorks, Mimaki RasterLink and Summa
-GoSign find the cut path by its spot colour name, usually `CutContour`. In
+Print-and-cut RIPs such as Roland VersaWorks, Mimaki and Summa find the cut path by its spot colour name, usually `CutContour`. In
 the PDF each kind of line is stroked in a `/Separation` colour space of its
 spot name, tint 1, whose alternate is the kind's colour from the table in
 `DeviceRGB`, so a viewer without the ink still shows red, magenta, blue or
@@ -527,13 +526,9 @@ the cut never knocks a hairline out of the art, and a RIP that prints the
 separation does not leave a white line. The lines stay in the Cut optional
 content group.
 
-Name the spots as your RIP's cut settings do. Common names:
-
-| RIP | Through cut | Other |
-|---|---|---|
-| Roland VersaWorks | `CutContour` | `PerfCutContour` for perforations |
-| Mimaki RasterLink / FineCut | `CutContour` | |
-| Summa GoSign | `CutContour` | `Crease`, `KissCut` |
+Most RIPs cut along `CutContour` by default. Names for the other kinds
+differ from one RIP to the next, so set `cutSpots` to the names in your RIP's
+cut settings.
 
 In Acrobat, Output Preview lists each name under Separations, and Overprint
 Preview shows the art beneath the lines.
