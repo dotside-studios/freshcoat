@@ -2,7 +2,6 @@ import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import {
 	type DataRecord,
 	type ExportItem,
@@ -27,7 +26,7 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { EMPTY } from "~/app/copy";
+import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { selectedInView } from "~/data/gallery-model";
@@ -75,6 +74,7 @@ import {
 	sourceField,
 } from "./preview-mode";
 import { RecordsList } from "./RecordsList";
+import { SelectionBar } from "./SelectionBar";
 import { SheetPreview } from "./SheetPreview";
 
 /** A place the preview steps to: a record, and under All variants one of
@@ -769,36 +769,53 @@ export function ExportSection() {
 	);
 
 	const bottom = preset ? (
-		<Tabs
-			selectedKey={tab}
-			onSelectionChange={(key) => setTab(key as typeof tab)}
+		<div
 			className={cn(
-				"shrink-0 border-fc-border border-t bg-fc-panel",
+				"flex shrink-0 flex-col border-fc-border border-t bg-fc-panel",
 				tab === "records" ? "h-[42%] min-h-[220px]" : "h-[132px]",
 			)}
 			data-testid="export-bottom"
 		>
-			<div className="flex shrink-0 items-center gap-2 border-fc-border border-b pr-2">
-				<TabList aria-label="Records view" className="border-b-0">
-					<Tab id="filmstrip">Filmstrip</Tab>
-					<Tab id="records">Records</Tab>
-				</TabList>
-				<div className="flex-1" />
-				{chosen.length > 0 ? (
-					<span
-						className="flex shrink-0 items-center gap-0.5 text-fc-muted text-fc-sm tabular-nums"
-						data-testid="export-selection"
+			<div className="flex shrink-0 items-center gap-2 border-fc-border border-b px-2 py-1">
+				<SegmentedControl
+					aria-label="Records view"
+					selectedKey={tab}
+					onSelectionChange={(key) => setTab(key as typeof tab)}
+				>
+					<SegmentedItem
+						id="filmstrip"
+						className="min-w-0 px-2.5 pointer-coarse:min-w-0"
 					>
-						{`${chosen.length} selected`}
-						<IconButton
-							aria-label="Clear selection"
-							tooltip="Clear selection"
-							onPress={() => setListSelection([])}
-						>
-							<CloseIcon />
-						</IconButton>
-					</span>
-				) : null}
+						Filmstrip
+					</SegmentedItem>
+					<SegmentedItem
+						id="records"
+						className="min-w-0 px-2.5 pointer-coarse:min-w-0"
+					>
+						Records
+					</SegmentedItem>
+				</SegmentedControl>
+				<div className="flex-1" />
+				<SelectionBar
+					label={
+						chosen.length > 0
+							? `${plural(chosen.length, "record")} selected`
+							: null
+					}
+					onClear={() => setListSelection([])}
+				>
+					<Button
+						size="sm"
+						onPress={() =>
+							controller.dispatch({
+								type: "setPreset",
+								preset: { ...preset, records: "selected", selected: chosen },
+							})
+						}
+					>
+						Save to preset
+					</Button>
+				</SelectionBar>
 				{tab === "filmstrip" && dataset ? (
 					<SegmentedControl
 						aria-label="Filmstrip shows"
@@ -821,47 +838,50 @@ export function ExportSection() {
 					</SegmentedControl>
 				) : null}
 			</div>
-			<TabPanel id="filmstrip" className="flex overflow-hidden">
-				{dataset ? (
-					<Filmstrip
-						entries={entries}
-						currentId={currentKey ?? null}
-						onPick={pickRecord}
-						assetFor={assetFor}
-						labelFor={labelFor}
-						aspect={aspect}
-						selection={selection}
-						onSelectionChange={onStripSelection}
-						emptyText={
-							scope === "failed"
-								? "No failed records"
-								: scope === "export"
-									? "No records match this preset"
-									: EMPTY.records
-						}
-					/>
-				) : (
-					<UnboundHint onBind={showBinding} />
-				)}
-			</TabPanel>
-			<TabPanel id="records" className="flex flex-col overflow-hidden">
-				{dataset ? (
-					<RecordsList
-						dataset={dataset}
-						filter={filter}
-						onFilterChange={setFilter}
-						selection={selection}
-						onSelectionChange={onSelectionChange}
-						previewId={currentId ?? null}
-						onPreview={pickRecord}
-						selectionIsPreset={preset.records === "selected"}
-						dataSelection={dataSelection}
-					/>
-				) : (
-					<UnboundHint onBind={showBinding} />
-				)}
-			</TabPanel>
-		</Tabs>
+			{tab === "filmstrip" ? (
+				<div className="flex min-h-0 flex-1 overflow-hidden">
+					{dataset ? (
+						<Filmstrip
+							entries={entries}
+							currentId={currentKey ?? null}
+							onPick={pickRecord}
+							assetFor={assetFor}
+							labelFor={labelFor}
+							aspect={aspect}
+							selection={selection}
+							onSelectionChange={onStripSelection}
+							emptyText={
+								scope === "failed"
+									? "No failed records"
+									: scope === "export"
+										? "No records match this preset"
+										: EMPTY.records
+							}
+						/>
+					) : (
+						<UnboundHint onBind={showBinding} />
+					)}
+				</div>
+			) : (
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+					{dataset ? (
+						<RecordsList
+							dataset={dataset}
+							filter={filter}
+							onFilterChange={setFilter}
+							selection={selection}
+							onSelectionChange={onSelectionChange}
+							previewId={currentId ?? null}
+							onPreview={pickRecord}
+							selectionIsPreset={preset.records === "selected"}
+							dataSelection={dataSelection}
+						/>
+					) : (
+						<UnboundHint onBind={showBinding} />
+					)}
+				</div>
+			)}
+		</div>
 	) : null;
 
 	return (
