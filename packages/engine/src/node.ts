@@ -17,6 +17,7 @@ import type {
 	Shadows,
 	ShapeMask,
 	Size,
+	SnapGrid,
 	Stroke,
 	Vec2,
 	ViewBox,
@@ -218,6 +219,10 @@ export type GroupNode = Transform & {
 	// only with the group's content (Figma's Normal). Unset is pass-through:
 	// children blend with whatever lies under the group.
 	isolate?: boolean;
+	// The group's box is a grid of modules. Drawn upright, the children are
+	// scaled and moved together so each module covers whole output pixels, as a
+	// barcode bitmap's are. Vector output draws them as placed.
+	snap?: SnapGrid;
 };
 
 // The unified masking primitive: `children` are masked by `mask`'s coverage.

@@ -446,6 +446,21 @@ function validateDrawable(cmd: DrawCommand, path: Path, add: Add): void {
 					`${path}.isolate`,
 					id,
 				);
+			if (
+				cmd.snap !== undefined &&
+				!(
+					Number.isInteger(cmd.snap?.columns) &&
+					Number.isInteger(cmd.snap?.rows) &&
+					cmd.snap.columns > 0 &&
+					cmd.snap.rows > 0
+				)
+			)
+				add(
+					"bad_snap",
+					"snap must have positive integer columns and rows",
+					`${path}.snap`,
+					id,
+				);
 			cmd.children.forEach((c, i) => {
 				validateDrawable(c, sub(path, `.children[${i}]`), add);
 			});

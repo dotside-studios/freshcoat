@@ -289,6 +289,7 @@ function lower(node: Node, ctx: BakeCtx, siblings: Node[] = []): DrawCommand {
 				clip: groupClip(node),
 				...backdropClip(node),
 				...(node.isolate ? { isolate: true } : {}),
+				...(node.snap ? { snap: node.snap } : {}),
 				children: [
 					...groupBackground(node, base),
 					...node.children.map((c) => lower(c, ctx, node.children)),

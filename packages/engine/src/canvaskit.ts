@@ -145,6 +145,7 @@ import type {
 	BlendMode,
 	Command,
 	DrawBitmapCommand,
+	DrawGroupCommand,
 	DrawCommand,
 	DrawImageCommand,
 	DrawMaskedCommand,
@@ -1747,8 +1748,27 @@ function snapBarcode(
 	cmd: DrawBitmapCommand,
 	grid: number,
 ): { x: number; y: number; width: number; height: number } | null {
-	const m = canvas.getTotalMatrix();
-	const [a, b, c, d, e, f, g, h] = m;
+	return snapModules(
+		canvas.getTotalMatrix(),
+		cmd.pos,
+		cmd.size,
+		cmd.pixelWidth,
+		cmd.pixelHeight,
+		grid,
+	);
+}
+
+// The device rect a box of `columns` by `rows` modules snaps to, as
+// snapBarcode does; one row is a 1D code stretched to its bar height.
+function snapModules(
+	m: ArrayLike<number>,
+	pos: { x: number; y: number },
+	size: { width: number; height: number },
+	columns: number,
+	rows: number,
+	grid: number,
+): { x: number; y: number; width: number; height: number } | null {
+	const [a, b, c, d, e, f, g, h] = Array.from(m);
 	const eps = 1e-9;
 	if (
 		Math.abs(b) > eps ||
@@ -1759,7 +1779,6 @@ function snapBarcode(
 		e <= 0
 	)
 		return null;
-	const { pos, size, pixelWidth, pixelHeight } = cmd;
 	const dx = (a * pos.x + c) / grid;
 	const dy = (e * pos.y + f) / grid;
 	const dw = (a * size.width) / grid;
@@ -1777,14 +1796,14 @@ function snapBarcode(
 	// keeps square modules, so both axes take the smaller whole size.
 	let x: { start: number; extent: number };
 	let y: { start: number; extent: number };
-	if (pixelHeight === 1) {
-		x = along(dx, dw, dw / pixelWidth, pixelWidth);
+	if (rows === 1) {
+		x = along(dx, dw, dw / columns, columns);
 		const top = Math.round(dy);
 		y = { start: top, extent: Math.max(1, Math.round(dy + dh) - top) };
 	} else {
-		const module = Math.min(dw / pixelWidth, dh / pixelHeight);
-		x = along(dx, dw, module, pixelWidth);
-		y = along(dy, dh, module, pixelHeight);
+		const module = Math.min(dw / columns, dh / rows);
+		x = along(dx, dw, module, columns);
+		y = along(dy, dh, module, rows);
 	}
 	return {
 		x: x.start * grid,
@@ -1792,6 +1811,26 @@ function snapBarcode(
 		width: x.extent * grid,
 		height: y.extent * grid,
 	};
+}
+
+// The local transform that moves a snapped group's box onto the device rect
+// its module grid snaps to, or null to draw it as placed.
+function groupSnap(
+	m: ArrayLike<number>,
+	cmd: DrawGroupCommand,
+	grid: number,
+): Affine | null {
+	const { snap, pos, size } = cmd;
+	if (!snap || !(size.width > 0 && size.height > 0)) return null;
+	const r = snapModules(m, pos, size, snap.columns, snap.rows, grid);
+	if (!r) return null;
+	const a = m[0] as number;
+	const e = m[4] as number;
+	const kx = r.width / (a * size.width);
+	const ky = r.height / (e * size.height);
+	const x0 = (r.x - (m[2] as number)) / a;
+	const y0 = (r.y - (m[5] as number)) / e;
+	return [kx, 0, x0 - pos.x * kx, 0, ky, y0 - pos.y * ky];
 }
 
 function drawBitmap(
@@ -2387,8 +2426,16 @@ function drawShape(
 			}
 		}
 	} else if (cmd.op === "drawGroup") {
+		const snap = cmd.snap
+			? groupSnap(canvas.getTotalMatrix(), cmd, frame.grid ?? 1)
+			: null;
+		if (snap) {
+			canvas.save();
+			canvas.concat([snap[0], snap[1], snap[2], snap[3], snap[4], snap[5], 0, 0, 1]);
+		}
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
+		if (snap) canvas.restore();
 	} else if (cmd.op === "drawMasked") {
 		drawMasked(ck, canvas, provider, images, bin, cmd, issues, frame);
 	} else {
@@ -3005,7 +3052,11 @@ function predictedBounds(
 			return true;
 		}
 		if (c.op === "drawGroup") {
-			for (const child of c.children) if (!visit(child, m, within)) return false;
+			const snap = c.snap ? groupSnap(m, c, frame.grid ?? 1) : null;
+			const gm = snap ? concatAffine(m, snap) : m;
+			const inGroup = snap ? [...within, { ctm: m }] : within;
+			for (const child of c.children)
+				if (!visit(child, gm, inGroup)) return false;
 			return true;
 		}
 		if (c.op === "drawMasked") {
@@ -4430,7 +4481,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			!cmd.stroke?.gradient
 		);
 	if (cmd.op === "drawGroup")
-		return cmd.children.every((c) => originInvariant(c, m));
+		return !cmd.snap && cmd.children.every((c) => originInvariant(c, m));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
 	return cmd.op === "drawQr";
 }
