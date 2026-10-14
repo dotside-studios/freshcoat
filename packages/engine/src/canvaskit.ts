@@ -131,6 +131,14 @@ import {
 	sideStrokeGeometry,
 } from "./outline";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
+import {
+	CMYK_SCREENS,
+	grainSeed,
+	grainSksl,
+	halftoneSksl,
+	isGrainActive,
+	isHalftoneActive,
+} from "./texture";
 import type {
 	SvgDrawing,
 	SvgFilter,
@@ -2261,7 +2269,26 @@ type PaintIssues = {
 		{ component: "lut" | "lut3d" | "sharpen" | "gamut"; layer?: string }
 	>;
 	patternUnsupported: Map<PatternKind, { pattern: PatternKind; error: string }>;
+	effectUnsupported?: Map<
+		string,
+		{ effect: "grain" | "halftone"; error: string; layer?: string }
+	>;
 };
+
+function reportEffectUnsupported(
+	issues: PaintIssues,
+	cmd: DrawCommand,
+	effect: "grain" | "halftone",
+	error: string,
+) {
+	const layer = cmd.id ?? (cmd.op === "drawImage" ? cmd.src : undefined);
+	issues.effectUnsupported ??= new Map();
+	issues.effectUnsupported.set(`${effect}\u0000${layer ?? ""}`, {
+		effect,
+		error,
+		...(layer !== undefined ? { layer } : {}),
+	});
+}
 
 function reportAdjustUnsupported(
 	issues: PaintIssues,
@@ -3798,6 +3825,218 @@ function paintAdjustedOffscreen(
 	canvas.restore();
 }
 
+function hasTexture(cmd: DrawCommand): boolean {
+	return isGrainActive(cmd.grain) || isHalftoneActive(cmd.halftone);
+}
+
+function withoutTexture(cmd: DrawCommand): DrawCommand {
+	const { grain: _g, halftone: _h, ...rest } = cmd;
+	return rest as DrawCommand;
+}
+
+// Grain and halftone, offscreen as paintAdjustedOffscreen does an adjust: the
+// content renders in device pixels, then draws back through the shaders inside
+// the drawable's layer paint. Without runtime effects or a surface the layer
+// paints plain and reports effect_unsupported.
+function paintTexturedOffscreen(
+	ck: CanvasKit,
+	canvas: Canvas,
+	provider: TypefaceFontProvider,
+	images: Map<string, Image | SvgPicture>,
+	bin: Bin,
+	cmd: DrawCommand,
+	issues: PaintIssues,
+	frame: Frame,
+) {
+	const plain = withoutTexture(cmd);
+	if (measuring.has(canvas)) {
+		paintDrawable(ck, canvas, provider, images, bin, plain, issues, frame);
+		return;
+	}
+	const halftone = isHalftoneActive(cmd.halftone) ? cmd.halftone : null;
+	const grain = isGrainActive(cmd.grain) ? cmd.grain : null;
+	const compile = (key: string, sksl: string) => {
+		let error = "";
+		const eff = cachedEffect(ck, key, () =>
+			typeof ck.RuntimeEffect?.Make === "function"
+				? ck.RuntimeEffect.Make(sksl, (e: string) => {
+						error = e;
+					})
+				: null,
+		);
+		return {
+			eff,
+			error:
+				error ||
+				(typeof ck.RuntimeEffect?.Make === "function"
+					? "the shader failed to compile"
+					: "this CanvasKit build has no runtime effects"),
+		};
+	};
+	const ht = halftone
+		? compile(
+				`halftone-${halftone.mode}-${halftone.shape}`,
+				halftoneSksl(halftone.mode, halftone.shape),
+			)
+		: null;
+	const gr = grain
+		? compile(
+				`grain-${grain.blendMode}-${grain.monochrome ? "m" : "c"}`,
+				grainSksl(grain.blendMode, grain.monochrome),
+			)
+		: null;
+	if (ht && !ht.eff) reportEffectUnsupported(issues, cmd, "halftone", ht.error);
+	if (gr && !gr.eff) reportEffectUnsupported(issues, cmd, "grain", gr.error);
+	if (!ht?.eff && !gr?.eff) {
+		paintDrawable(ck, canvas, provider, images, bin, plain, issues, frame);
+		return;
+	}
+
+	const inner: DrawCommand = {
+		...layerContent(cmd),
+		...(cmd.rotation ? { rotation: cmd.rotation } : {}),
+		...(cmd.adjust ? { adjust: cmd.adjust } : {}),
+	} as DrawCommand;
+	const effects = {
+		...plain,
+		adjust: undefined,
+	} as DrawCommand;
+	const device = exportPixelSize(frame, frame.scale);
+	const matrix = canvas.getTotalMatrix();
+	const reach = Math.ceil(layerReach(effects) * matrixStretch(matrix));
+	const rect = adjustedDeviceRect(
+		ck,
+		canvas,
+		provider,
+		images,
+		bin,
+		inner,
+		frame,
+		device,
+		matrix,
+		0,
+		reach,
+	);
+	if (!rect) return;
+	const surface = makeLayerSurface(
+		ck,
+		canvas,
+		rect.width,
+		rect.height,
+		frame.precision,
+	);
+	if (!surface) {
+		const error = "no offscreen surface could be made";
+		if (halftone) reportEffectUnsupported(issues, cmd, "halftone", error);
+		if (grain) reportEffectUnsupported(issues, cmd, "grain", error);
+		paintDrawable(ck, canvas, provider, images, bin, plain, issues, frame);
+		return;
+	}
+	bin.track({ delete: () => surface.dispose() });
+	const off = surface.getCanvas();
+	off.clear(ck.TRANSPARENT);
+	off.translate(-rect.x, -rect.y);
+	off.concat(matrix);
+	paintDrawable(ck, off, provider, images, bin, inner, issues, frame);
+	const img = bin.track(surface.makeImageSnapshot());
+	let shader = bin.track(
+		img.makeShaderOptions(
+			ck.TileMode.Decal,
+			ck.TileMode.Decal,
+			ck.FilterMode.Nearest,
+			ck.MipmapMode.None,
+			ck.Matrix.translated(rect.x, rect.y),
+		),
+	);
+
+	canvas.save();
+	if (cmd.rotation) {
+		const cx = cmd.pos.x + cmd.size.width / 2;
+		const cy = cmd.pos.y + cmd.size.height / 2;
+		canvas.translate(cx, cy);
+		canvas.rotate(cmd.rotation, 0, 0);
+		canvas.translate(-cx, -cy);
+	}
+	const local = canvas.getTotalMatrix();
+	const inverse = ck.Matrix.invert(local);
+	if (!inverse) throw new Error("texture: non-invertible canvas transform");
+	const { x: px, y: py } = cmd.pos;
+	const lx = [inverse[0], inverse[1], inverse[2] - px];
+	const ly = [inverse[3], inverse[4], inverse[5] - py];
+	if (halftone && ht?.eff) {
+		const dx = [local[0], local[1], local[0] * px + local[1] * py + local[2]];
+		const dy = [local[3], local[4], local[3] * px + local[4] * py + local[5]];
+		const unit = Math.sqrt(Math.abs(local[0] * local[4] - local[1] * local[3]));
+		const cell = Math.max(halftone.cellSize, 1e-3);
+		const screens =
+			halftone.mode === "cmyk"
+				? CMYK_SCREENS.map((s) => ({ angle: s.angle, ink: [...s.ink] }))
+				: [{ angle: 0, ink: inkOf(ck, halftone.color) }];
+		const background = halftone.background
+			? [...toColor(ck, halftone.background)]
+			: [0, 0, 0, 0];
+		const uniforms = [
+			...lx,
+			...ly,
+			...dx,
+			...dy,
+			cell,
+			1 / Math.max(cell * unit, 1e-3),
+			halftone.invert ? 1 : 0,
+			...background,
+		];
+		for (const s of screens) {
+			const a = ((s.angle + halftone.angle) * Math.PI) / 180;
+			uniforms.push(Math.cos(a), Math.sin(a));
+		}
+		for (const s of screens) uniforms.push(...s.ink);
+		shader = bin.track(ht.eff.makeShaderWithChildren(uniforms, [shader]));
+	}
+	if (grain && gr?.eff) {
+		const [seedLo, seedHi] = grainSeed(grain.seed);
+		const uniforms = [
+			...lx,
+			...ly,
+			Math.max(grain.size, 1e-3),
+			Math.min(Math.max(grain.amount, 0), 1),
+			seedLo,
+			seedHi,
+		];
+		shader = bin.track(gr.eff.makeShaderWithChildren(uniforms, [shader]));
+	}
+	const paint = bin.track(new ck.Paint());
+	paint.setShader(shader);
+	const lp = layerPaint(ck, bin, effects, frame.precision);
+	if (lp) {
+		const back = layerPaintBoundable(effects)
+			? invertAffine(local.slice(0, 6).map(f32) as Affine)
+			: null;
+		const affine = local[6] === 0 && local[7] === 0 && local[8] === 1;
+		const bounds =
+			back && affine
+				? mapAffine(back, [
+						rect.x,
+						rect.y,
+						rect.x + rect.width,
+						rect.y + rect.height,
+					])
+				: null;
+		canvas.saveLayer(lp, bounds ? ck.LTRBRect(...bounds) : null);
+	}
+	canvas.concat(inverse);
+	canvas.drawRect(
+		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
+		paint,
+	);
+	if (lp) canvas.restore();
+	canvas.restore();
+}
+
+function inkOf(ck: CanvasKit, color: string): number[] {
+	const c = toColor(ck, color);
+	return [c[0], c[1], c[2]];
+}
+
 // How far, in local units, a layer's blur and shadows can carry its content.
 function layerReach(cmd: DrawCommand): number {
 	const blur =
@@ -4414,7 +4653,8 @@ function layerPaintBoundable(cmd: DrawCommand): boolean {
 // pixels. layer-bounds.test.ts holds them to that. `m` is the layer's scale and
 // translate.
 function originInvariant(cmd: DrawCommand, m: Affine): boolean {
-	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd)) return false;
+	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd) || hasTexture(cmd))
+		return false;
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
 	if (cmd.op === "drawRect")
 		return (
@@ -4653,6 +4893,8 @@ function layerContent(cmd: DrawCommand): DrawCommand {
 		backdropClip: _bc,
 		shadow: _s,
 		adjust: _a,
+		halftone: _h,
+		grain: _g,
 		...rest
 	} = cmd;
 	if (rest.op === "drawGroup") {
@@ -4793,6 +5035,19 @@ function paintDrawable(
 	if (hasBackdrop(cmd)) {
 		paintBackdrop(ck, canvas, provider, images, bin, cmd, issues, frame);
 		cmd = withoutBackdrop(cmd);
+	}
+	if (hasTexture(cmd)) {
+		paintTexturedOffscreen(
+			ck,
+			canvas,
+			provider,
+			images,
+			bin,
+			cmd,
+			issues,
+			frame,
+		);
+		return;
 	}
 	// lut/sharpen can't be a color filter — route the whole drawable through an
 	// offscreen SkSL pass (which re-enters here with a matrix-only adjust).
@@ -5305,6 +5560,8 @@ async function paintSceneIn(
 				warnings.push({ kind: "adjust_unsupported", ...warning });
 			for (const warning of issues.patternUnsupported.values())
 				warnings.push({ kind: "pattern_unsupported", ...warning });
+			for (const warning of issues.effectUnsupported?.values() ?? [])
+				warnings.push({ kind: "effect_unsupported", ...warning });
 			// Only srcs the loader never even attempted: a src it tried and failed
 			// already pushed its own image_load_failed above, with the real error.
 			for (const src of issues.missingImages) {
