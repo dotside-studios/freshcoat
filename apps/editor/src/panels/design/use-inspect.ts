@@ -26,8 +26,6 @@ function useStableList<T>(next: T[]): T[] {
 	return prev.current;
 }
 
-/** The selection as an `Inspect` for the inspector tabs. It is null with no
- *  document; `ins` is null when the side has nothing to inspect. */
 export function useInspect() {
 	const controller = useController();
 	const template = useEditor(working);
