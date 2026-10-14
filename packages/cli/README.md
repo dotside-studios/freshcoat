@@ -119,6 +119,12 @@ an export's `warnings` and `export-report.csv`. `--min-dpi <n>` sets the
 threshold, and `--min-dpi 0` turns the check off. It applies to a workspace
 preset too, over the preset's own `minImageDpi`.
 
+Text and strokes get the print checks at the same DPI, with the record's
+values: text below 6 pt (7 pt for a light face), strokes under 0.25 pt, and
+text under 12 pt in a rich black, as `warning: front: Text is 4.8 pt at print
+size, below 6 pt: fine_print`, and in an export's `warnings` and
+`export-report.csv`.
+
 #### Spreadsheets
 
 With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
@@ -298,6 +304,11 @@ warns about what Studio's Issues list shows, without failing:
   takes its presets' lowest `dpi` and highest `minImageDpi` unless the flags
   say otherwise. Embedded images and images named by a path beside the file
   are checked; an image bound to a field is checked when it renders;
+- a layer that may not print as it looks, at the same `--dpi`: text below 6 pt
+  (7 pt for a light face), a stroke under 0.25 pt, text under 12 pt in a rich
+  black, and with a bleed, art that runs to the trim but not into the bleed, as
+  `warning: front: "fine_print": Text is 4.8 pt at print size, below 6 pt`.
+  Text bound to a field is checked again when it renders;
 - a `format_version` newer than this freshcoat reads, or older than the fields
   the template uses.
 

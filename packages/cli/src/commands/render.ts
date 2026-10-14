@@ -90,6 +90,7 @@ export async function render(
 	try {
 		const frames = await renderTemplate(renderer, template, values, {
 			...(minDpi > 0 ? { imageDpi: { dpi: DEFAULT_IMAGE_DPI_UNITS, min: minDpi } } : {}),
+			printChecks: { dpi: DEFAULT_IMAGE_DPI_UNITS },
 			...(variantId ? { variantId } : {}),
 			...(frameNames ? { frameNames } : {}),
 			exports: scales.map((value) => ({

@@ -176,6 +176,22 @@ export {
 	inlineImageSize,
 } from "./image-dpi";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
+export {
+	describePrintIssue,
+	isLightFace,
+	isRichBlack,
+	POINTS_PER_INCH,
+	PRINT_CHECK_DEFAULTS,
+	type PrintCheckOptions,
+	type PrintCheckWarning,
+	type PrintHint,
+	type PrintIssue,
+	type PrintIssueCode,
+	printCheckWarnings,
+	printHints,
+	unitsToMm,
+	unitsToPt,
+} from "./print-checks";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
 	FIELD_FORMATS,

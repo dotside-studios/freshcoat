@@ -5,6 +5,7 @@ import {
 	minimumFormatVersion,
 } from "./format";
 import { type ImageDpiOptions, imageDpiIssues } from "./image-dpi";
+import { type PrintCheckOptions, type PrintHint, printHints } from "./print-checks";
 import { isOpenVector } from "./slices";
 import type { Sides, Template } from "./types";
 import { checkVariants, type VariantIssue } from "./variants";
@@ -45,6 +46,7 @@ export type TemplateHint =
 	| { kind: "variant"; issue: VariantIssue }
 	| SafeAreaHint
 	| ImageDpiHint
+	| PrintHint
 	/** An open path with a slice that says it is a piece; it exports as a cut
 	 *  line only. */
 	| { kind: "slice_open_piece"; side: number; sideName: string; id: string }
@@ -109,13 +111,15 @@ function openPieceHints(t: Template): TemplateHint[] {
 /**
  * What is worth telling an author about a template that is valid: variant
  * issues, layers inside the safe area, images below the print resolution,
- * and a format version that does not match the file. Each hint carries its
- * data; wording is the caller's. `images` sets how the resolution check
- * runs.
+ * layers that may not print as they look (see `printHints`), and a format
+ * version that does not match the file. Each hint carries its data; wording
+ * is the caller's. `images` sets how the resolution check runs, and `print`
+ * the print checks, at the same `dpi` unless it sets its own.
  */
 export function templateHints(
 	t: Template,
 	images: ImageDpiOptions = {},
+	print: PrintCheckOptions = {},
 ): TemplateHint[] {
 	const hints: TemplateHint[] = checkVariants(t).map((issue) => ({
 		kind: "variant",
@@ -123,6 +127,12 @@ export function templateHints(
 	}));
 	hints.push(...safeAreaHints(t));
 	hints.push(...imageDpiHints(t, images));
+	hints.push(
+		...printHints(t, {
+			...(images.dpi !== undefined ? { dpi: images.dpi } : {}),
+			...print,
+		}),
+	);
 	hints.push(...openPieceHints(t));
 	const declared = t.format_version;
 	if (formatVersionStatus(declared) === "newer")

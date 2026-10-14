@@ -1,5 +1,8 @@
 import {
+	describePrintIssue,
 	imageDpiHints as coatImageDpiHints,
+	printHints as coatPrintHints,
+	type PrintIssueCode,
 	safeAreaHints as coatSafeAreaHints,
 	DEFAULT_MIN_IMAGE_DPI,
 	hasInsets,
@@ -77,7 +80,7 @@ export type PrintHint = {
 	side: number;
 	id: string;
 	message: string;
-	code: "safe_area" | "image_dpi";
+	code: "safe_area" | "image_dpi" | PrintIssueCode;
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -140,4 +143,19 @@ export function imageDpiHints(
 				];
 		return [];
 	});
+}
+
+// ── Print check hints ────────────────────────────────────────────────────────
+
+/** Layers that may not print as they look at `dpi` design units to the inch:
+ *  small text, hairline strokes, rich-black small text and art short of the
+ *  bleed. Text bound to a field is checked again by the render. */
+export function printCheckHints(t: Template, dpi: number): PrintHint[] {
+	return coatPrintHints(t, { dpi }).map(({ side, path, id, issue }) => ({
+		key: keyOf({ side, path }),
+		side,
+		id,
+		message: describePrintIssue(issue),
+		code: issue.code,
+	}));
 }

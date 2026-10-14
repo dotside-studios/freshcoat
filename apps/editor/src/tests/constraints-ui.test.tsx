@@ -1,4 +1,5 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
+import { fixtures } from "@freshcoat-js/coatfile/fixtures";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
@@ -8,6 +9,7 @@ import {
 	printGuideMetrics,
 	printGuidesFor,
 	imageDpiHints,
+	printCheckHints,
 	printGuidesOn,
 	safeAreaHints,
 	setPrintGuides,
@@ -420,5 +422,32 @@ describe("print guides", () => {
 		expect(row).toBeTruthy();
 		await fastUser().click(within(row as HTMLElement).getByRole("button"));
 		expect(c.state.selection).toEqual([hint?.key]);
+	});
+	test("list layers that may not print as they look, and select them", async () => {
+		const t = fixtures.printPreflightCard;
+		expect(
+			printCheckHints(t, 300).map((h) => `${h.key} ${h.code}`),
+		).toEqual([
+			"0/0 short_of_bleed",
+			"0/1 small_text",
+			"0/2 small_text",
+			"0/3 hairline_stroke",
+			"0/4 rich_black_text",
+		]);
+		expect(printCheckHints(fixtures.minimalCard, 300)).toEqual([]);
+		const c = open(t);
+		render(
+			<ControllerProvider controller={c}>
+				<IssuesList template={c.base as Template} />
+			</ControllerProvider>,
+		);
+		const list = screen.getByRole("region", { name: "Print hints" });
+		const row = within(list)
+			.getAllByTestId("print-hint")
+			.find((r) => r.getAttribute("data-code") === "hairline_stroke");
+		expect(row?.textContent).toContain("Stroke is 0.12 pt at print size");
+		await fastUser().click(within(row as HTMLElement).getByRole("button"));
+		expect(c.state.selection).toEqual(["0/3"]);
+		expect(screen.getByTestId("no-issues")).toBeTruthy();
 	});
 });

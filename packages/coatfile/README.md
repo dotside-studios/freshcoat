@@ -210,8 +210,9 @@ long side (`printGuideMetrics`). `templateHints(t)` is the advice a valid
 template earns, as typed data for the caller to word: `variant` (from
 `checkVariants`), `safe_area` (layers inside `printGuidesFor(t).safe`, with side,
 layer id and edges), `image_dpi` (images that print below the minimum
-resolution, below), `format_newer` (a format newer than this kit reads) and
-`format_low` (fields used from a later minor than the declared version).
+resolution, below), `print` (layers that may not print as they look, below),
+`format_newer` (a format newer than this kit reads) and `format_low` (fields
+used from a later minor than the declared version).
 
 ### Image resolution
 
@@ -236,6 +237,43 @@ on `renderCompiled`, `renderTemplate` or `renderCompiledPdf` adds an
 draws below `min`, read from the bytes the paint uses; `describeWarning` words
 it as `Image prints at 200 DPI, under 300: photo`. `imageDpiWarnings(commands,
 load, { dpi, min })` runs the same check over compiled commands.
+
+### Print checks
+
+`printHints(t, options)` lists the layers that may not print as they look on
+screen, the checks print plugins for design tools run. Each hint is
+`{ kind: "print", side, sideName, path, id, issue }`, where `path` is the child
+indices from the frame's `elements` down to the layer and `issue.code` is one of:
+
+| Code | Fires when | Threshold (option, default) |
+| --- | --- | --- |
+| `small_text` | A font size is below the minimum at print size. A light face, weight 300 or less or a family named Thin, Hairline or Light, has a higher minimum. Carries `sizePt`, `minPt` and `light`. | `minTextPt`, 6 pt; `minLightTextPt`, 7 pt |
+| `hairline_stroke` | A stroke on a rect, image, vector, frame or text is thinner than the minimum at print size. Carries `widthPt` and `minPt`. | `minStrokePt`, 0.25 pt |
+| `rich_black_text` | Text under the size limit is filled with a near-black mixed from unequal channels. Carries `color`, `sizePt` and `maxPt`. | `richBlackTextPt`, 12 pt |
+| `short_of_bleed` | With a `bleed`, a top-level rect, image or frame runs to a trim edge but stops short of the bleed line, and is not one the render grows into it (see `extendIntoBleed`). Carries `edges`. | the template's `bleed` |
+
+Sizes are read at `dpi` design units to the inch (default 300, so a 25-unit
+font is 6 pt); `unitsToPt` and `unitsToMm` convert. `templateHints(t, images,
+print)` includes them, at the image check's `dpi` unless `print` sets its own,
+and `describePrintIssue(issue)` words one.
+
+The pipeline is sRGB only, so the inks a colour separates into are the
+printer's to decide. `isRichBlack(color)` is a heuristic: a colour whose
+brightest channel is at most 64 of 255 and whose channels differ by at least 8
+is likely to convert to a mix of all four inks, where pure black and neutral
+greys can print from black alone. Small text in such a colour can blur when the
+plates are slightly out of register; the hint is advice, not a measurement.
+
+Text whose content or colour comes from a field, or that `fit: "shrink"`
+scales down, is known only at render time. `printChecks: { dpi, ...thresholds }`
+on `renderCompiled`, `renderTemplate` or `renderCompiledPdf` (where it takes
+the PDF's `dpi`) adds a `print_check` warning (`layer`, `issue`) per layer and
+check, the worst, read off the laid-out text and strokes, a path's stroke
+scaled by its viewBox. A part drawn without an id of its own, such as a
+barcode's caption, is reported as the layer it is in, and a layer drawn at zero
+opacity is skipped. `describeWarning` words it as `Text is 4.8 pt at print
+size, below 6 pt: fine_print`. `printCheckWarnings(commands, options)` runs the
+same checks over compiled commands.
 
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.

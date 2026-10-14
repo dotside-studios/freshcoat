@@ -36,6 +36,11 @@ import {
 	type ImageSizeMemo,
 } from "./image-dpi";
 import { pieceSpec } from "./piece";
+import {
+	describePrintIssue,
+	type PrintCheckOptions,
+	printCheckWarnings,
+} from "./print-checks";
 import { hasOpenSubpath } from "./slices";
 import { resolveSlices } from "./slices";
 import type {
@@ -106,6 +111,9 @@ export type RenderCompiledOptions<O extends Output = DefaultOutput> = {
 	imageDpi?: ImageDpiCheck;
 	// Default: PNG.
 	output?: O;
+	// Run the print checks on each side as laid out, `dpi` being design units
+	// per inch of the compiled scene. Omit = off.
+	printChecks?: PrintCheckOptions;
 };
 
 export type ImageDpiCheck = { dpi: number; min?: number };
@@ -341,6 +349,9 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 			options.images,
 			options.imageDpi,
 		);
+		const checks = options.printChecks
+			? printCheckWarnings(commands, options.printChecks)
+			: [];
 		// One bake, one paint per density: the command stream is identical across
 		// export settings apart from the density on its createCanvas, so each
 		// extra size re-rasterizes the same scene instead of re-compiling it.
@@ -360,6 +371,7 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 					...result.warnings,
 					...planWarnings,
 					...dpiWarnings,
+					...checks,
 				],
 				name: f.name,
 				scale,
@@ -391,6 +403,8 @@ export type RenderCompiledPdfOptions = {
 	outputIntent?: OutputIntent | false;
 	/** Warn for images that print below `min` at `dpi`. */
 	imageDpi?: ImageDpiCheck;
+	/** Run the print checks, at `dpi` unless these set their own. */
+	printChecks?: PrintCheckOptions;
 };
 
 // The sizes of the images a renderer loads itself, so a batch reads each one
@@ -433,7 +447,7 @@ export async function renderCompiledPdf(
 		(f) => !options.frameNames || options.frameNames.includes(f.name),
 	);
 	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
-	const { images, dpi, title, date, outputIntent } = options;
+	const { images, dpi, title, date, outputIntent, printChecks } = options;
 	const results: TemplatePdfFrame[] = [];
 	for (const f of frames) {
 		const commands = renderer.compile(f.root as Node, {
@@ -455,9 +469,20 @@ export async function renderCompiledPdf(
 			date,
 			...(outputIntent !== undefined ? { outputIntent } : {}),
 		});
+		const checks = printChecks
+			? printCheckWarnings(commands, {
+					...(dpi !== undefined ? { dpi } : {}),
+					...printChecks,
+				})
+			: [];
 		results.push({
 			...page,
-			warnings: [...(f.warnings ?? []), ...page.warnings, ...dpiWarnings],
+			warnings: [
+				...(f.warnings ?? []),
+				...page.warnings,
+				...dpiWarnings,
+				...checks,
+			],
 			name: f.name,
 		});
 	}
@@ -519,6 +544,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Pattern shader failed, painted solid: ${w.pattern}`;
 		case "barcode_invalid":
 			return `Barcode: ${w.message}`;
+		case "print_check":
+			return `${describePrintIssue(w.issue)}${w.layer ? `: ${w.layer}` : ""}`;
 		case "gamut_compressed":
 			return `Colour pulled into printer range: ${Math.round(w.clipped * 100)}%${w.layer ? ` of ${w.layer}` : ""}`;
 		case "image_low_dpi":

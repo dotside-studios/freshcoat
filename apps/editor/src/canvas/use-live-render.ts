@@ -228,6 +228,7 @@ export function useLiveRender(): {
 			density,
 			...(bleed ? { bleed: true } : {}),
 			...(minDpi > 0 ? { imageDpi: { dpi, min: minDpi } } : {}),
+			printChecks: { dpi },
 		});
 		heldForPhotos.current?.release();
 		heldForPhotos.current = null;

@@ -1,4 +1,5 @@
 import {
+	describePrintIssue,
 	type ImageDpiOptions,
 	type Template,
 	templateHints,
@@ -31,6 +32,8 @@ export function templateWarnings(template: Template, images: ImageDpiOptions = {
 			}
 			case "image_dpi":
 				return `${hint.sideName}: "${hint.id}" prints at ${hint.dpi} DPI, under ${hint.min}`;
+			case "print":
+				return `${hint.sideName}: "${hint.id}": ${describePrintIssue(hint.issue)}`;
 			case "format_newer":
 				return newerFormatWarning(hint.declared);
 			case "format_low":
