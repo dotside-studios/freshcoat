@@ -142,6 +142,7 @@ export function JobBar({
 	blocked,
 	blockedDetail,
 	warning,
+	checks,
 	onShowFailed,
 	recordIds,
 	hideRun,
@@ -158,6 +159,8 @@ export function JobBar({
 	blockedDetail?: string;
 	/** what the export will miss though it can run */
 	warning?: string | null;
+	/** the checks, in place of the reason and the warning */
+	checks?: ReactNode;
 	/** narrows the section to the records the last job failed */
 	onShowFailed?: () => void;
 	/** chosen records: the button exports only these, and says so */
@@ -227,7 +230,11 @@ export function JobBar({
 							: `Export ${plural(count, "file")}`}
 				</Button>
 			)}
-			{reason && !running ? (
+			{checks !== undefined ? (
+				running || hideRun ? null : (
+					checks
+				)
+			) : reason && !running ? (
 				<span
 					className="inline-flex min-w-0 items-center gap-1 text-fc-sm text-fc-warning"
 					title={(reason === blocked && blockedDetail) || reason}

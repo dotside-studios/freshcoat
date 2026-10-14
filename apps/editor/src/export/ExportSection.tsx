@@ -28,7 +28,7 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { BINDING, EMPTY } from "~/app/copy";
+import { EMPTY } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { selectedInView } from "~/data/gallery-model";
@@ -42,6 +42,8 @@ import PresetsIcon from "~icons/mingcute/layout-left-line";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import SettingsIcon from "~icons/mingcute/settings-3-line";
+import { ChecksBadge } from "./Checks";
+import { type CheckTarget, exportChecks } from "./checks";
 import { useExportCollapsed } from "./collapsed";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
 import { ExportSettings } from "./ExportSettings";
@@ -61,7 +63,6 @@ import {
 	variantToken,
 	withVariantEntries,
 } from "./filmstrip-model";
-import { GlyphNotice } from "./GlyphNotice";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
 import { PresetList } from "./PresetList";
@@ -535,6 +536,36 @@ export function ExportSection() {
 			onCollapsedChange={narrow ? undefined : setRail}
 		/>
 	);
+	const label = labelColumn(dataset);
+	const currentRecord = dataset?.records.find((r) => r.id === currentId);
+	const labelFor = (record: DataRecord) => recordLabel(record, label);
+	const showBinding = () => {
+		collapsed.set("records", false);
+		collapsed.set("binding", false);
+		if (narrow) setOverlay("settings");
+	};
+	const checks = exportChecks({
+		blocked,
+		unbound,
+		unfilled,
+		glyphs: glyphIssues,
+		failed: scopeCounts.failed,
+		labelFor: (id) => {
+			const record = dataset?.records.find((r) => r.id === id);
+			return record ? labelFor(record) : id;
+		},
+		showSide: sides.length > 1,
+		canPick: !!dataset,
+	});
+	const onCheckTarget = (target: CheckTarget) => {
+		if (target.kind === "binding") showBinding();
+		else if (target.kind === "record") pickRecord(target.recordId);
+		else if (target.kind === "failed") showFailed();
+		else {
+			collapsed.set(target.id, false);
+			if (narrow) setOverlay("settings");
+		}
+	};
 	const settingsPanel = preset ? (
 		<ExportSettings
 			preset={preset}
@@ -544,11 +575,10 @@ export function ExportSection() {
 			outputSize={outputSize}
 			sheets={sheets}
 			collapsed={collapsed}
+			checks={checks}
+			onCheckTarget={onCheckTarget}
 		/>
 	) : null;
-	const label = labelColumn(dataset);
-	const currentRecord = dataset?.records.find((r) => r.id === currentId);
-	const labelFor = (record: DataRecord) => recordLabel(record, label);
 	const aspect = previewTemplate
 		? previewTemplate.width / previewTemplate.height
 		: 1.5;
@@ -743,11 +773,6 @@ export function ExportSection() {
 		</div>
 	);
 
-	const showBinding = () => {
-		collapsed.set("records", false);
-		collapsed.set("binding", false);
-		if (narrow) setOverlay("settings");
-	};
 	const bottom = preset ? (
 		<Tabs
 			selectedKey={tab}
@@ -887,30 +912,6 @@ export function ExportSection() {
 					) : (
 						<>
 							<div className="relative flex min-h-[160px] flex-1 flex-col">
-								{unbound ? (
-									<Notice testId="export-unbound">
-										Not bound to a dataset, exporting defaults
-										<Button
-											variant="ghost"
-											size="sm"
-											className="ml-1 text-fc-warning underline"
-											onPress={showBinding}
-										>
-											Bind a dataset
-										</Button>
-									</Notice>
-								) : null}
-								{glyphIssues ? (
-									<GlyphNotice
-										issues={glyphIssues}
-										labelFor={(id) => {
-											const record = dataset?.records.find((r) => r.id === id);
-											return record ? labelFor(record) : id;
-										}}
-										onPick={dataset ? (id) => pickRecord(id) : undefined}
-										showSide={sides.length > 1}
-									/>
-								) : null}
 								{sheetMode && template && imposition ? (
 									<SheetPreview
 										className="flex-1"
@@ -985,8 +986,12 @@ export function ExportSection() {
 				preset={preset}
 				count={runCount}
 				blocked={blocked?.message ?? null}
+				checks={
+					preset ? (
+						<ChecksBadge checks={checks} onTarget={onCheckTarget} />
+					) : undefined
+				}
 				blockedDetail={blocked?.detail}
-				warning={unfilled > 0 ? BINDING.unfilled(unfilled) : null}
 				onShowFailed={dataset ? showFailed : undefined}
 				recordIds={chosen}
 			/>
@@ -1022,17 +1027,6 @@ function UnboundHint({ onBind }: { onBind: () => void }) {
 				Bind a dataset
 			</Button>
 		</div>
-	);
-}
-
-function Notice({ children, testId }: { children: ReactNode; testId: string }) {
-	return (
-		<p
-			className="m-0 shrink-0 border-fc-border border-b bg-fc-warning/10 px-3 py-1 text-fc-sm text-fc-warning"
-			data-testid={testId}
-		>
-			{children}
-		</p>
 	);
 }
 

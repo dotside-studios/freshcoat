@@ -122,34 +122,31 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		.getByRole("button", { name: "New preset" })
 		.click();
 	await expect(page.getByTestId("export-preset")).toHaveCount(1);
-	await expect(page.getByTestId("export-unbound")).toBeVisible();
+	await expect(page.getByTestId("export-check-unbound")).toBeVisible();
 
 	await chooseDataset(page, "Members");
-	await expect(page.getByTestId("export-unbound")).toHaveCount(0);
+	await expect(page.getByTestId("export-check-unbound")).toHaveCount(0);
 	expect(
 		await state<unknown>(page, "s.workspace.templates[0].binding.fields.tier"),
 	).toEqual({ kind: "column", column: "tier" });
 	await expect(
 		page.getByRole("button", { name: "Export 6 files" }),
 	).toBeEnabled();
-	await expect(page.getByTestId("export-warning")).toHaveCount(0);
+	await expect(page.getByTestId("export-check-unfilled")).toHaveCount(0);
 
 	// A required field left to its default is flagged, and the export still runs.
 	const editor = page.getByTestId("binding-editor");
 	await editor.getByRole("button", { name: /Source for display_name/ }).click();
 	await page.getByRole("option", { name: "Default" }).click();
-	await expect(page.getByTestId("export-warning")).toHaveText(
-		"1 required field unfilled",
-	);
 	await expect(
-		page.getByTestId("export-settings").getByTestId("binding-unfilled"),
-	).toHaveText("1 required field unfilled");
+		page.getByTestId("export-settings").getByTestId("export-check-unfilled"),
+	).toContainText("1 required field unfilled");
 	await expect(
 		page.getByRole("button", { name: "Export 6 files" }),
 	).toBeEnabled();
 	await editor.getByRole("button", { name: /Source for display_name/ }).click();
 	await page.getByRole("option", { name: "Column" }).click();
-	await expect(page.getByTestId("export-warning")).toHaveCount(0);
+	await expect(page.getByTestId("export-check-unfilled")).toHaveCount(0);
 
 	// The filmstrip holds the three records; a click previews one and the
 	// arrow keys step. Record 2 of 3 in the preview.
@@ -325,13 +322,12 @@ test("warns about characters the fonts can't draw, without blocking", async ({
 		.click();
 	await chooseDataset(page, "Intl");
 
-	const notice = page.getByTestId("export-missing-glyphs");
+	const notice = page.getByTestId("export-check-glyphs");
 	await expect(notice).toContainText("1 record has characters", {
 		timeout: 30_000,
 	});
 	await expect(notice).toContainText("\u{10000}");
-	await notice.getByRole("button", { expanded: false }).click();
-	const list = page.getByTestId("export-missing-glyphs-list");
+	const list = page.getByTestId("export-check-glyphs-list");
 	await expect(list).toContainText("U+10000");
 	await list.getByRole("button", { name: "Ship 🚀 \u{10000}" }).click();
 	await expect(page.getByTestId("export-stepper-position")).toHaveText("2 / 3");

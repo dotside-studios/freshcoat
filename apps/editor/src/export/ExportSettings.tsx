@@ -69,6 +69,8 @@ import { TemplateBindingEditor } from "~/binding/BindingEditor";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
 import { CalibrateDialog } from "./CalibrateDialog";
+import { ChecksList } from "./Checks";
+import { type Check, type CheckTarget, checksSummary } from "./checks";
 import type { ExportCollapsed, SettingsSectionId } from "./collapsed";
 import {
 	DESTINATION_LABEL,
@@ -233,6 +235,8 @@ export function ExportSettings({
 	outputSize,
 	sheets = null,
 	collapsed,
+	checks,
+	onCheckTarget,
 }: {
 	preset: ExportPreset;
 	template: Template | undefined;
@@ -244,6 +248,8 @@ export function ExportSettings({
 	/** how the export lands on sheets, when it is laid out on them */
 	sheets?: SheetPlan | null;
 	collapsed: ExportCollapsed;
+	checks: readonly Check[];
+	onCheckTarget: (target: CheckTarget) => void;
 }) {
 	const controller = useController();
 	const templates = useEditor((s) => s.workspace?.templates);
@@ -808,6 +814,14 @@ export function ExportSettings({
 				>
 					Mark exported records
 				</Checkbox>
+			</SettingsSection>
+			<SettingsSection
+				id="checks"
+				title="Checks"
+				summary={checksSummary(checks)}
+				collapsed={collapsed}
+			>
+				<ChecksList checks={checks} onTarget={onCheckTarget} />
 			</SettingsSection>
 		</div>
 	);
