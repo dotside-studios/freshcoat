@@ -1758,8 +1758,6 @@ function snapBarcode(
 	);
 }
 
-// The device rect a box of `columns` by `rows` modules snaps to, as
-// snapBarcode does; one row is a 1D code stretched to its bar height.
 function snapModules(
 	m: ArrayLike<number>,
 	pos: { x: number; y: number },
@@ -1813,8 +1811,6 @@ function snapModules(
 	};
 }
 
-// The local transform that moves a snapped group's box onto the device rect
-// its module grid snaps to, or null to draw it as placed.
 function groupSnap(
 	m: ArrayLike<number>,
 	cmd: DrawGroupCommand,

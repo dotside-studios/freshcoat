@@ -55,7 +55,6 @@ type QrLogo = NonNullable<QrCodeProperties["logo"]>;
 
 const DEFAULT_LOGO_SIZE = 0.2;
 
-/** A two-stop gradient from `from`, or the gradient with one stop recoloured. */
 export function withGradientStop(
 	gradient: QrGradient | undefined,
 	index: 0 | 1,

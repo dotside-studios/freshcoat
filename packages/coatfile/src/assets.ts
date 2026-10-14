@@ -254,7 +254,6 @@ function rewriteElement(
 	return { ...node, properties: { ...node.properties, src: newSrc } };
 }
 
-// A QR code's centre logo is an image src of its own.
 function rewriteLogo(
 	el: unknown,
 	urlByHash: Map<string, string>,

@@ -88,9 +88,7 @@ export const DEFAULT_QR_STYLE: QrStyle = {
 	logoPadding: 1,
 };
 
-// The largest logo side, as a fraction of the symbol's, before it is reduced.
 export const MAX_QR_LOGO_SIZE = 0.3;
-// Above this share of the symbol cleared for a logo, H is used instead of Q.
 export const QR_LOGO_H_COVERAGE = 0.15;
 
 const LEVELS: ECLevel[] = ["L", "M", "Q", "H"];
@@ -103,17 +101,11 @@ export type QrSymbol = {
 	ec: ECLevel;
 	// Modules a side, quiet zone included: the path's coordinate box.
 	grid: number;
-	// The symbol in grid units, filled even-odd.
 	d: string;
-	// The logo's box in grid units, absent without one.
 	logo?: { x: number; y: number; side: number };
-	// Share of the symbol's modules cleared for the logo.
 	coverage: number;
 };
 
-/** A styled symbol as one path. A logo raises error correction to Q, or to H
- *  once it clears more than QR_LOGO_H_COVERAGE of the symbol, and is reduced
- *  to MAX_QR_LOGO_SIZE and to the space between the finder patterns. */
 export function qrSymbol(
 	value: string,
 	ec: ECLevel,
@@ -192,8 +184,6 @@ const K = 0.5522847498;
 
 const num = (v: number) => String(Math.round(v * 1000) / 1000);
 
-// A rectangle with each corner [tl, tr, br, bl] rounded to its radius, wound
-// clockwise.
 function roundRect(
 	x: number,
 	y: number,
@@ -287,7 +277,6 @@ function symbolPath(
 	return parts.join("");
 }
 
-// The finder's ring: its outline and its hole, which even-odd leaves empty.
 function finderOuter(x: number, y: number, shape: QrFinderOuter): string {
 	if (shape === "circle")
 		return circle(x + 3.5, y + 3.5, 3.5) + circle(x + 3.5, y + 3.5, 2.5);

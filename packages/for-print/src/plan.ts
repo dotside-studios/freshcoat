@@ -233,8 +233,6 @@ function withAdjust(node: Node, opts: PrintOptimizeOptions | null): Node {
 // Walk a tree, mapping every node through `leaf` (for drawables) while recursing
 // into group/mask containers. Containers themselves are never adjusted — only
 // their leaves — so corrections apply per drawable, not to a composited subtree.
-// A snapped group is a code drawn as vectors (a QR code), so `code` is set for
-// everything in it.
 function mapTree(
 	node: Node,
 	leaf: (n: Node, code: boolean) => Node,

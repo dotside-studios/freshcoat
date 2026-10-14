@@ -37,8 +37,6 @@ const finite = (raw: string | undefined): number | undefined => {
 	return Number.isFinite(n) ? n : undefined;
 };
 
-// `gradient=#000,#1a237e` or `gradient=#000,#1a237e,45`: two stops and an
-// angle in degrees, default 0.
 function parseGradient(raw: string | undefined) {
 	if (!raw) return undefined;
 	const [from, to, angle] = raw.split(",").map((p) => p.trim());
@@ -53,7 +51,6 @@ function parseGradient(raw: string | undefined) {
 	};
 }
 
-// The style options a marker carries, under the schema's names.
 function styleOptions(opts: Record<string, string>): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 	if (opts.shape && MODULE_SHAPES.has(opts.shape)) out.moduleShape = opts.shape;
@@ -63,7 +60,6 @@ function styleOptions(opts: Record<string, string>): Record<string, unknown> {
 	if (quiet !== undefined && quiet >= 0) out.quietZone = Math.round(quiet);
 	const gradient = parseGradient(opts.gradient);
 	if (gradient) out.gradient = gradient;
-	// A logo is a URL: a marker option registers no field.
 	if (opts.logo && !opts.logo.includes("{{")) {
 		const size = finite(opts.logosize);
 		const padding = finite(opts.logopad);

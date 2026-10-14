@@ -502,7 +502,6 @@ export type DrawGroupCommand = DrawCommandBase & {
 	snap?: SnapGrid;
 };
 
-// A box divided into `columns` by `rows` equal modules, such as a QR code's.
 export type SnapGrid = { columns: number; rows: number };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then

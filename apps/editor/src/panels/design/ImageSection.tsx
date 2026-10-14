@@ -154,8 +154,6 @@ export function fieldSummary(t: Template, src: string): string | null {
 	return field ? `Field · ${field.title ?? id}` : `Field · ${id} (missing)`;
 }
 
-/** Embeds `file` as an asset and writes its `asset:` src into every selected
- *  layer through `patch`. */
 export async function attachImageFile(
 	ins: Inspect,
 	file: File,

@@ -3,7 +3,6 @@ import { hasToken } from "./mustache";
 import { DEFAULT_QR_STYLE, MAX_QR_LOGO_SIZE, qrSymbol } from "./qr";
 import type { QrCodeElement } from "./types";
 
-/** Lowest foreground to background contrast ratio a scanner reads reliably. */
 export const MIN_QR_CONTRAST = 3;
 /** Fewest quiet-zone modules a QR code drawing its own background keeps. ISO
  *  asks for 4; phone scanners read 2. */
@@ -64,8 +63,6 @@ export function qrIssues(el: QrCodeElement): QrIssue[] {
 	return out;
 }
 
-// The light modules between the symbol and the edge of its background: the
-// quiet zone, and the margin in modules when the symbol's size is known.
 function quietZoneModules(el: QrCodeElement): number | null {
 	const p = el.properties;
 	const q = p.quietZone ?? 0;

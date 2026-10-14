@@ -1,5 +1,3 @@
-// A group's `snap`: lowered onto its command, checked by validateCommands, and
-// drawn so each module of its grid covers whole output pixels.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { drawableBounds, makeBin } from "../src/canvaskit";
