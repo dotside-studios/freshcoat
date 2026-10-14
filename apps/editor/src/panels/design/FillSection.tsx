@@ -172,78 +172,76 @@ export function FillRow({
 }) {
 	const kind = fillKind(fill);
 	return (
-		<>
-			<div className="flex min-w-0 items-center gap-1.5">
-				<Select
-					aria-label={`Fill ${index + 1} kind`}
-					className="w-[76px] shrink-0"
-					value={kind}
-					onChange={(v) => onChange("kind", convertFill(fill, v as FillKind))}
-				>
-					{KINDS.map(([id, name]) => (
-						<SelectItem key={id} id={id}>
-							{name}
-						</SelectItem>
-					))}
-				</Select>
-				{typeof fill === "string" ? (
-					<ColorInput
-						aria-label={`Fill ${index + 1} color`}
-						className="min-w-0 flex-1"
-						value={fill}
-						swatches={swatches}
-						onChange={(c) => onChange("color", c)}
-					/>
-				) : (
-					<PopoverPanel
-						title={fill.kind === "pattern" ? "Pattern" : "Gradient"}
-						trigger={
-							<Button
-								aria-label={`Edit fill ${index + 1}`}
-								onPress={onActivate}
-								className="min-w-0 flex-1 cursor-default rounded-[3px] outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1"
-							>
-								{fill.kind === "pattern" ? (
-									<PatternSwatch
-										p={fill}
-										className="block h-fc-control w-full rounded-[3px]"
-									/>
-								) : (
-									<GradientSwatch
-										g={fill}
-										box={box}
-										className="block h-fc-control w-full rounded-[3px]"
-									/>
-								)}
-							</Button>
-						}
-					>
-						<div
-							className="contents"
-							onFocusCapture={onActivate}
-							onPointerDownCapture={onActivate}
+		<div className="flex min-w-0 items-center gap-1.5">
+			<Select
+				aria-label={`Fill ${index + 1} kind`}
+				className="w-[76px] shrink-0"
+				value={kind}
+				onChange={(v) => onChange("kind", convertFill(fill, v as FillKind))}
+			>
+				{KINDS.map(([id, name]) => (
+					<SelectItem key={id} id={id}>
+						{name}
+					</SelectItem>
+				))}
+			</Select>
+			{typeof fill === "string" ? (
+				<ColorInput
+					aria-label={`Fill ${index + 1} color`}
+					className="min-w-0 flex-1"
+					value={fill}
+					swatches={swatches}
+					onChange={(c) => onChange("color", c)}
+				/>
+			) : (
+				<PopoverPanel
+					title={fill.kind === "pattern" ? "Pattern" : "Gradient"}
+					trigger={
+						<Button
+							aria-label={`Edit fill ${index + 1}`}
+							onPress={onActivate}
+							className="min-w-0 flex-1 cursor-default rounded-[3px] outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1"
 						>
 							{fill.kind === "pattern" ? (
-								<PatternEditor
+								<PatternSwatch
 									p={fill}
-									index={index}
-									swatches={swatches}
-									onChange={onChange}
+									className="block h-fc-control w-full rounded-[3px]"
 								/>
 							) : (
-								<GradientEditor
+								<GradientSwatch
 									g={fill}
-									name={`fill ${index + 1}`}
-									swatches={swatches}
-									onChange={(field, g) => onChange(field, g)}
+									box={box}
+									className="block h-fc-control w-full rounded-[3px]"
 								/>
 							)}
-						</div>
-					</PopoverPanel>
-				)}
-				<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
-			</div>
-		</>
+						</Button>
+					}
+				>
+					<div
+						className="contents"
+						onFocusCapture={onActivate}
+						onPointerDownCapture={onActivate}
+					>
+						{fill.kind === "pattern" ? (
+							<PatternEditor
+								p={fill}
+								index={index}
+								swatches={swatches}
+								onChange={onChange}
+							/>
+						) : (
+							<GradientEditor
+								g={fill}
+								name={`fill ${index + 1}`}
+								swatches={swatches}
+								onChange={(field, g) => onChange(field, g)}
+							/>
+						)}
+					</div>
+				</PopoverPanel>
+			)}
+			<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
+		</div>
 	);
 }
 
