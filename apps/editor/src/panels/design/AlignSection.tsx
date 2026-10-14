@@ -25,7 +25,7 @@ const ALIGN: [AlignMode, string, Icon][] = [
 	["vdistribute", "Distribute vertically", DistributeVIcon],
 ];
 
-export function AlignSection({ ins }: { ins: Inspect }) {
+export function AlignRow({ ins }: { ins: Inspect }) {
 	// A count, so a new render result does not re-render the row.
 	const movable = useEditor(
 		(s) => ins.keys.filter((k) => !s.geometry.get(k)?.autoLayoutChild).length,
@@ -34,7 +34,7 @@ export function AlignSection({ ins }: { ins: Inspect }) {
 		<div
 			role="toolbar"
 			aria-label="Align"
-			className="flex items-center justify-between border-fc-border border-b px-1.5 py-1"
+			className="-mx-1 flex items-center justify-between"
 		>
 			{ALIGN.map(([mode, label, Glyph]) => {
 				const key = COMMAND_BY_ID.get(`align.${mode}`)?.keys?.[0];

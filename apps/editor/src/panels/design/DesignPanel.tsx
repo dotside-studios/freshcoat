@@ -16,10 +16,8 @@ import { activeVariantId, overriddenKeys } from "~/doc/variant-edit";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import { AdjustSection } from "./AdjustSection";
-import { AlignSection } from "./AlignSection";
 import { BarcodeSection } from "./BarcodeSection";
 import { BooleanSection } from "./BooleanSection";
-import { ConstraintsSection, takesConstraints } from "./ConstraintsSection";
 import { type Overrides, OverridesContext } from "./controls";
 import { EffectsSection } from "./EffectsSection";
 import { FillSection } from "./FillSection";
@@ -36,7 +34,11 @@ import {
 	InspectorCollapsedProvider,
 	useInspectorCollapsed,
 } from "./InspectorSection";
-import { LayerSection } from "./LayerSection";
+import {
+	AppearanceSection,
+	LayoutSection,
+	PositionSection,
+} from "./LayerSection";
 import { MaskSection } from "./MaskSection";
 import { QrSection } from "./QrSection";
 import { SideSection } from "./SideSection";
@@ -259,12 +261,13 @@ function sections(ins: Inspect) {
 
 	return (
 		<div data-testid="design-inspector" data-mode="layers">
-			<AlignSection ins={ins} />
+			<PositionSection ins={ins} />
 			{((layers.length > 1 && layers.every(isBooleanShape)) ||
 				(layers.length === 1 && isBooleanVector(layers[0]))) && (
 				<BooleanSection ins={ins} />
 			)}
-			<LayerSection ins={ins} />
+			<LayoutSection ins={ins} />
+			<AppearanceSection ins={ins} />
 			{every((t) => t === "text") && <TextSection ins={ins} />}
 			{every((t) => t === "image") && <ImageSection ins={ins} />}
 			{every((t) => t === "qr_code") && <QrSection ins={ins} />}
@@ -279,7 +282,6 @@ function sections(ins: Inspect) {
 			)}
 			{painted && takesSpot(ins) && <SpotSection ins={ins} />}
 			{painted && <EffectsSection ins={ins} />}
-			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			{painted && <AdjustSection ins={ins} />}
 			<VisibilitySection ins={ins} />
 		</div>
