@@ -1,3 +1,4 @@
+import { formatLength, pxPerUnit } from "@freshcoat-js/coatfile";
 import {
 	type KeyboardEvent,
 	memo,
@@ -5,6 +6,13 @@ import {
 } from "react";
 import { useController } from "~/app/context";
 import type { EditorController } from "~/app/controller";
+import {
+	documentDpi,
+	getDisplayUnit,
+	UNIT_SNAP,
+	UNIT_STEP,
+	useLengthUnit,
+} from "~/app/units";
 import { type GuideAxis, sideGuides } from "~/doc/guides";
 import { useEditor } from "~/state/hooks";
 import { present, working } from "~/state/store";
@@ -80,8 +88,10 @@ function Guide({
 	controller: EditorController;
 }) {
 	const vertical = axis === "x";
+	const { unit, dpi } = useLengthUnit();
+	const label = formatLength(value, unit, dpi);
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-		const step = e.shiftKey ? 10 : 1;
+		const step = UNIT_STEP[unit] * pxPerUnit(unit, dpi) * (e.shiftKey ? 10 : 1);
 		const delta = {
 			ArrowLeft: -step,
 			ArrowUp: -step,
@@ -124,7 +134,7 @@ function Guide({
 			aria-valuenow={value}
 			aria-valuemin={Math.min(0, value)}
 			aria-valuemax={Math.max(max, value)}
-			aria-valuetext={`${value} px`}
+			aria-valuetext={label}
 			data-testid={`guide-${axis}-${index}`}
 			data-value={value}
 			className={`group absolute flex justify-center outline-none ${
@@ -149,7 +159,7 @@ function Guide({
 						: { left: RULER_SIZE + 4, top: HIT }
 				}
 			>
-				{value}
+				{unit === "px" ? value : label}
 			</span>
 		</div>
 	);
@@ -188,9 +198,12 @@ export function dragGuide(
 	const box = viewport.getBoundingClientRect();
 	const local = (e: PointerEvent) =>
 		axis === "x" ? e.clientX - box.left : e.clientY - box.top;
+	const unit = getDisplayUnit();
+	const snap = UNIT_SNAP[unit] * pxPerUnit(unit, documentDpi(controller.state));
 	const valueAt = (e: PointerEvent) => {
 		const v = controller.state.view;
-		return Math.round((local(e) - (axis === "x" ? v.x : v.y)) / v.zoom);
+		const px = (local(e) - (axis === "x" ? v.x : v.y)) / v.zoom;
+		return Math.round(px / snap) * snap;
 	};
 	const overRuler = (e: PointerEvent) =>
 		controller.state.rulers && local(e) < RULER_SIZE;

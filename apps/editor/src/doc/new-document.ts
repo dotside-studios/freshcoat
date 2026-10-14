@@ -1,5 +1,10 @@
-import type { FontDescriptor, Template } from "@freshcoat-js/coatfile";
-import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import type {
+	FontDescriptor,
+	LengthUnit,
+	Template,
+} from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION, unitToPx } from "@freshcoat-js/coatfile";
+import { DEFAULT_DPI } from "@freshcoat-js/workspace";
 
 export type Preset = {
 	id: string;
@@ -80,6 +85,26 @@ export const PRESETS: Preset[] = [
 		safeArea: 38,
 	},
 ];
+
+export const SIZE_UNITS: readonly LengthUnit[] = ["px", "mm", "in"];
+
+/** A custom size given in `unit` as whole design px at `dpi`, rounded up so
+ *  the raster covers it, as `cr80Pixels` does. */
+export function customSize(
+	width: number,
+	height: number,
+	unit: LengthUnit,
+	dpi: number = DEFAULT_DPI,
+): { width: number; height: number } {
+	const px = (v: number) => wholePx(unitToPx(v, unit, dpi), unit);
+	return { width: px(width), height: px(height) };
+}
+
+/** A side length as whole px: rounded in px, and rounded up from a physical
+ *  unit so the raster covers it. */
+export function wholePx(px: number, unit: LengthUnit): number {
+	return Math.max(1, unit === "px" ? Math.round(px) : Math.ceil(px - 1e-6));
+}
 
 /** The id a new blank template starts with. A template that still has it
  *  was never named, and saving it asks for a name first. */

@@ -23,6 +23,7 @@ type ZodIssueLite = {
 	path: (string | number)[];
 	message: string;
 	params?: Record<string, unknown>;
+	errors?: ZodIssueLite[][];
 };
 
 const BUILTIN_CODE_MAP: Record<string, string> = {
@@ -40,7 +41,22 @@ const BUILTIN_CODE_MAP: Record<string, string> = {
 };
 
 function adaptIssues(issues: readonly ZodIssueLite[]): ValidationError[] {
-	return issues.map(issueToError);
+	return issues.flatMap(matchedBranch).map(issueToError);
+}
+
+// An element's union fails as a whole. When only one branch matched its
+// `type`, that branch's own issues say what is wrong.
+function matchedBranch(issue: ZodIssueLite): ZodIssueLite[] {
+	if (issue.code !== "invalid_union" || !issue.errors) return [issue];
+	const matched = issue.errors.filter(
+		(branch) =>
+			branch.length > 0 &&
+			!branch.some((i) => i.path.length === 1 && i.path[0] === "type"),
+	);
+	if (matched.length !== 1) return [issue];
+	return (matched[0] as ZodIssueLite[]).flatMap((i) =>
+		matchedBranch({ ...i, path: [...issue.path, ...i.path] }),
+	);
 }
 
 const TOP_LEVEL_FIELD_CODES: Record<string, string> = {

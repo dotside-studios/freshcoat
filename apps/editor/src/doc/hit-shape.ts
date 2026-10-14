@@ -2,6 +2,8 @@ import {
 	type Element,
 	isEllipsePath,
 	resolveStrokeTrim,
+	strokeSides,
+	widestStroke,
 } from "@freshcoat-js/coatfile";
 import {
 	outlinePath,
@@ -9,6 +11,7 @@ import {
 	roundCorners,
 	type ShapeMask,
 	type StrokeTrim,
+	sideStrokeGeometry,
 	strokeInset,
 	strokeTrim,
 	trimPath,
@@ -26,8 +29,11 @@ type Entry = {
 	trim: string;
 	outline: Path | null;
 	paintsFill: boolean;
-	/** The path the stroke outlines: `outline`, or an offset copy of it. */
+	/** The path the stroke outlines: `outline`, an offset copy of it, or a
+	 *  per-side stroke's band. */
 	strokeBase: Path | null;
+	/** A per-side stroke's band, which hits as a fill. */
+	band: boolean;
 	strokeWidth: number;
 	clip: "inside" | "outside" | null;
 	tolerance: number;
@@ -52,8 +58,9 @@ export function isShapeElement(el: Element): el is ShapeElement {
 export function hitReach(el: Element, tolerance = 0): number {
 	if (!isShapeElement(el)) return 0;
 	const stroke = el.properties.stroke;
-	if (!stroke || stroke.width <= 0) return tolerance;
-	const outward = stroke.width / 2 - strokeInset(stroke);
+	const width = stroke ? widestStroke(stroke.width) : 0;
+	if (!stroke || width <= 0) return tolerance;
+	const outward = width / 2 - strokeInset({ width, align: stroke.align });
 	if (el.type === "rect") return outward + tolerance;
 	let multiplier = 1;
 	if ((stroke.join ?? "miter") === "miter") multiplier = 4;
@@ -108,6 +115,7 @@ export class ShapeHits {
 		const entry = this.entry(key, el, box, tolerance, values);
 		if (!entry.outline) return true;
 		const p = localPoint(box, point);
+		if (entry.band && entry.strokeBase?.contains(p.x, p.y)) return true;
 		if (entry.stroke?.contains(p.x, p.y)) {
 			if (!entry.clip) return true;
 			if ((entry.clip === "inside") === entry.outline.contains(p.x, p.y))
@@ -174,7 +182,7 @@ export class ShapeHits {
 	): Entry {
 		const outline = this.outline(el, width, height);
 		const stroke = el.properties.stroke;
-		const stroked = stroke && stroke.width > 0;
+		const stroked = stroke && widestStroke(stroke.width) > 0;
 		const fill = el.properties.fill;
 		const hasFill = Array.isArray(fill) ? fill.length > 0 : fill !== undefined;
 		const entry: Entry = {
@@ -185,14 +193,35 @@ export class ShapeHits {
 			outline,
 			paintsFill: hasFill || !stroked,
 			strokeBase: null,
+			band: false,
 			strokeWidth: 0,
 			clip: null,
 			tolerance: Number.NaN,
 			stroke: null,
 		};
 		if (!outline || !stroke || !stroked) return entry;
-		const inset = strokeInset(stroke);
-		entry.strokeWidth = stroke.width;
+		const sides = strokeSides(stroke.width);
+		if (sides && el.type === "rect") {
+			const g = sideStrokeGeometry(
+				0,
+				0,
+				width,
+				height,
+				el.properties.cornerRadius,
+				el.properties.cornerSmoothing,
+				{ align: stroke.align, sides },
+			);
+			const band = g && this.ck.Path.MakeFromSVGString(g.band);
+			if (band) {
+				band.setFillType(this.ck.FillType.EvenOdd);
+				entry.strokeBase = band;
+				entry.band = true;
+			}
+			return entry;
+		}
+		const strokeWidth = widestStroke(stroke.width);
+		const inset = strokeInset({ width: strokeWidth, align: stroke.align });
+		entry.strokeWidth = strokeWidth;
 		const shape = this.shape(el, trim);
 		let base: Path = outline;
 		if (shape && (inset !== 0 || trim)) {
@@ -200,7 +229,7 @@ export class ShapeHits {
 			if (offset) base = offset;
 		}
 		if (base === outline && inset !== 0) {
-			entry.strokeWidth = stroke.width * 2;
+			entry.strokeWidth = strokeWidth * 2;
 			entry.clip = stroke.align === "inside" ? "inside" : "outside";
 		}
 		if (!trim) {

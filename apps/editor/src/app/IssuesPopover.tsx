@@ -17,7 +17,13 @@ import {
 	useState,
 } from "react";
 import { Button as RACButton } from "react-aria-components";
-import { type SafeAreaHint, safeAreaHints } from "~/canvas/print-guides";
+import {
+	imageDpiHints,
+	type PrintHint,
+	printCheckHints,
+	safeAreaHints,
+	useImageDpi,
+} from "~/canvas/print-guides";
 import { removeUnusedChanges } from "~/doc/ops";
 import { walkLayers } from "~/doc/path";
 import { openPieceKeys } from "~/doc/slice";
@@ -132,7 +138,15 @@ export function IssuesList({ template }: { template: Template }) {
 	const { issues, notices, paint, variantIssues, warnings, total } =
 		useIssues(template);
 	const codes = useEditor((s) => s.render.barcodes ?? NO_CODES);
-	const hints = useMemo(() => safeAreaHints(template), [template]);
+	const { dpi, min: minDpi } = useImageDpi();
+	const hints = useMemo(
+		() => [
+			...safeAreaHints(template),
+			...imageDpiHints(template, { dpi, min: minDpi }),
+			...printCheckHints(template, dpi),
+		],
+		[template, dpi, minDpi],
+	);
 	const openPieces = useMemo(() => openPieceKeys(template), [template]);
 
 	return (
@@ -161,7 +175,11 @@ export function IssuesList({ template }: { template: Template }) {
 			{hints.length > 0 ? (
 				<IssueList label="Print hints">
 					{hints.map((hint) => (
-						<HintRow key={hint.key} template={template} hint={hint} />
+						<HintRow
+							key={`${hint.code}:${hint.key}`}
+							template={template}
+							hint={hint}
+						/>
 					))}
 				</IssueList>
 			) : null}
@@ -376,21 +394,15 @@ function ValidationRow({
 	);
 }
 
-function HintRow({
-	template,
-	hint,
-}: {
-	template: Template;
-	hint: SafeAreaHint;
-}) {
+function HintRow({ template, hint }: { template: Template; hint: PrintHint }) {
 	const controller = useController();
 	const layer = referenceLabel(template, hint.key);
 	return (
-		<li data-testid="print-hint" data-level="info">
+		<li data-testid="print-hint" data-level="info" data-code={hint.code}>
 			<Entry
 				as="div"
 				tone="muted"
-				code="safe_area"
+				code={hint.code}
 				link={
 					<EntryLink
 						label={`Select ${layer}`}

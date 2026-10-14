@@ -1520,7 +1520,32 @@
 														]
 													},
 													"width": {
-														"type": "number"
+														"anyOf": [
+															{
+																"type": "number"
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"top": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"right": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"bottom": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"left": {
+																		"type": "number",
+																		"minimum": 0
+																	}
+																}
+															}
+														]
 													},
 													"dash": {
 														"type": "array",
@@ -3829,7 +3854,32 @@
 																	]
 																},
 																"width": {
-																	"type": "number"
+																	"anyOf": [
+																		{
+																			"type": "number"
+																		},
+																		{
+																			"type": "object",
+																			"properties": {
+																				"top": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"right": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"bottom": {
+																					"type": "number",
+																					"minimum": 0
+																				},
+																				"left": {
+																					"type": "number",
+																					"minimum": 0
+																				}
+																			}
+																		}
+																	]
 																},
 																"dash": {
 																	"type": "array",
@@ -9459,7 +9509,32 @@
 													]
 												},
 												"width": {
-													"type": "number"
+													"anyOf": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "object",
+															"properties": {
+																"top": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"right": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"bottom": {
+																	"type": "number",
+																	"minimum": 0
+																},
+																"left": {
+																	"type": "number",
+																	"minimum": 0
+																}
+															}
+														}
+													]
 												},
 												"dash": {
 													"type": "array",
@@ -12166,7 +12241,32 @@
 											]
 										},
 										"width": {
-											"type": "number"
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "object",
+													"properties": {
+														"top": {
+															"type": "number",
+															"minimum": 0
+														},
+														"right": {
+															"type": "number",
+															"minimum": 0
+														},
+														"bottom": {
+															"type": "number",
+															"minimum": 0
+														},
+														"left": {
+															"type": "number",
+															"minimum": 0
+														}
+													}
+												}
+											]
 										},
 										"dash": {
 											"type": "array",

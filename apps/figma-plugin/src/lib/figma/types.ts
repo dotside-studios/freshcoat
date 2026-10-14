@@ -237,12 +237,21 @@ export type FigmaTextNode = FigmaBaseNode & {
 	styleOverrideTable?: Record<string, Partial<FigmaTextStyle>>;
 };
 
+export type FigmaStrokeWeights = {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+};
+
 export type FigmaRectangleNode = FigmaBaseNode & {
 	type: "RECTANGLE";
 	fills: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
-	// Per-side weights, which Figma reports as a mixed strokeWeight.
+	// Per-side weights, when they differ and Figma reports strokeWeight as mixed.
+	strokeWeights?: FigmaStrokeWeights;
+	// A mixed strokeWeight whose sides could not be read.
 	strokeWeightMixed?: true;
 	// Loose string: Figma enums like "ROUND"/"SQUARE"/"NONE"/"MITER"/"BEVEL"
 	// (or figma.mixed for per-segment caps, guarded at read time).
@@ -313,6 +322,7 @@ export type FigmaContainerNode = FigmaBaseNode & {
 	fills?: FigmaPaint[];
 	strokes?: FigmaPaint[];
 	strokeWeight?: number;
+	strokeWeights?: FigmaStrokeWeights;
 	strokeWeightMixed?: true;
 	strokeAlign?: string;
 	dashPattern?: number[];

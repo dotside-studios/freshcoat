@@ -1,6 +1,7 @@
 import { useCoarsePointer } from "@freshcoat-js/ui/data-table";
 import type { ReactNode } from "react";
 import { useController } from "~/app/context";
+import { formatSize, useLengthUnit } from "~/app/units";
 import { DEFAULT_FILL } from "~/doc/factories";
 import {
 	ancestorRects,
@@ -51,6 +52,7 @@ const HANDLE_CURSOR: Record<Handle, string> = {
 
 export function Overlay({ drafts }: { drafts: DraftStore }) {
 	const { draft, pen } = useDrafts(drafts);
+	const { unit, dpi } = useLengthUnit();
 	const view = useEditor((s) => s.view);
 	const geometry = useEditor((s) => s.geometry);
 	const selection = useEditor((s) => s.selection);
@@ -154,7 +156,12 @@ export function Overlay({ drafts }: { drafts: DraftStore }) {
 							x: draft.create.x + draft.create.width / 2,
 							y: draft.create.y + draft.create.height,
 						})}
-						text={`${fmt(draft.create.width)} × ${fmt(draft.create.height)}`}
+						text={formatSize(
+							draft.create.width,
+							draft.create.height,
+							unit,
+							dpi,
+						)}
 					/>
 				</>
 			) : null}
@@ -311,6 +318,7 @@ function SelectionBox({
 	 *  default endpoints fall on edge midpoints, and a corner still resizes. */
 	between?: ReactNode;
 }) {
+	const { unit, dpi } = useLengthUnit();
 	const single = keys.length === 1 ? geometry.get(keys[0] as string) : null;
 	const box: Rect | null = single
 		? single.rect
@@ -414,7 +422,7 @@ function SelectionBox({
 			{handles ? HANDLES.filter((h) => h.length === 2).map(resizeHandle) : null}
 			<Label
 				at={{ x: bottom.x, y: bottom.y + (handles ? size : 0) + 12 }}
-				text={`${fmt(box.width)} × ${fmt(box.height)}`}
+				text={formatSize(box.width, box.height, unit, dpi)}
 				accent
 			/>
 		</g>

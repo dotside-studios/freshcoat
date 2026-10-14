@@ -1,0 +1,146 @@
+{
+	"id": "stroke-sides-dashed",
+	"title": "a dashed per-side stroke dashes along the band",
+	"profile": "core",
+	"requires": [
+		"draw.stroke",
+		"stroke.sides",
+		"stroke.dash"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 8,
+					"sides": {
+						"top": 8,
+						"right": 8,
+						"bottom": 8,
+						"left": 0
+					},
+					"dash": [
+						10,
+						10
+					],
+					"align": "inside"
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				45,
+				33
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the first dash on the top"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				55,
+				33
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the first gap"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				65,
+				33
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "the second dash"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				45,
+				40
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below the top band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				41,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the left side, with no width"
+		}
+	]
+}

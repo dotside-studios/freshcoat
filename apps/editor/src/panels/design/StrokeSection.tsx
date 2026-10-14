@@ -1,4 +1,8 @@
-import type { RectProperties } from "@freshcoat-js/coatfile";
+import {
+	type RectProperties,
+	type Sides,
+	strokeSides,
+} from "@freshcoat-js/coatfile";
 import {
 	convertFill,
 	type FillKind,
@@ -9,8 +13,15 @@ import { ColorInput } from "@freshcoat-js/ui/color";
 import { TextField } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
+import {
+	ToggleButton,
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@freshcoat-js/ui/toggle";
 import { useEffect, useState } from "react";
+import { INSETS, STROKE_WIDTH } from "~/app/copy";
+import LinkIcon from "~icons/mingcute/link-line";
+import UnlinkIcon from "~icons/mingcute/unlink-line";
 import {
 	AddButton,
 	Notice,
@@ -23,6 +34,7 @@ import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
+import { LengthField } from "./LengthField";
 
 export type Stroke = NonNullable<RectProperties["stroke"]>;
 
@@ -38,6 +50,27 @@ const TRIMS = [
 
 const strokeOf = (el: Inspect["layers"][number]) =>
 	propsOf(el).stroke as Stroke | undefined;
+
+const SIDES = ["top", "right", "bottom", "left"] as const;
+
+const SIDED = new Set(["rect", "frame"]);
+
+type Width = Stroke["width"];
+
+const sidesOf = (w: Width): Sides =>
+	strokeSides(w) ?? {
+		top: w as number,
+		right: w as number,
+		bottom: w as number,
+		left: w as number,
+	};
+
+/** Four equal sides as one width. */
+function compactWidth(s: Sides): Width {
+	return s.top === s.right && s.top === s.bottom && s.top === s.left
+		? s.top
+		: s;
+}
 
 /** Drops keys set to undefined, so a cleared option leaves no trace. */
 function clean(s: Stroke): Stroke {
@@ -84,6 +117,23 @@ export function StrokeSection({
 
 	const pick = <K extends keyof Stroke>(k: K) =>
 		commonValue(strokes.map((s) => s?.[k]));
+	// A width per side, for rects and frames. Sides set apart in the file start
+	// unlinked; linked, they show as mixed until a width is typed. Linking or
+	// unlinking alone leaves the file as it is.
+	const sided = ins.layers.every((l) => SIDED.has(l.type));
+	const selection = ins.keys.join("\n");
+	const [choice, setChoice] = useState<{ at: string; linked: boolean }>();
+	const widths = strokes.map((s) => s?.width ?? 0);
+	const linked =
+		!sided ||
+		(choice?.at === selection
+			? choice.linked
+			: widths.every((w) => typeof w === "number"));
+	const setWidth = (field: string, fn: (w: Width) => Width) =>
+		ins.setProps(field, (el) => {
+			const s = strokeOf(el);
+			return s ? { stroke: clean({ ...s, width: fn(s.width) }) } : null;
+		});
 	const color = pick("color") ?? undefined;
 	const gradient = isGradient(color) ? color : null;
 	const kind = commonValue(strokes.map((s) => (s ? fillKind(s.color) : null)));
@@ -145,15 +195,54 @@ export function StrokeSection({
 								onChange={(c) => set("stroke-color", { color: c })}
 							/>
 						)}
-						<NumberField
-							label="W"
-							aria-label="Stroke width"
-							className="w-[68px] shrink-0"
-							min={0}
-							value={pick("width") as number | null}
-							onChange={(v) => set("stroke-width", { width: v })}
-						/>
+						{linked && (
+							<LengthField
+								label="W"
+								aria-label={STROKE_WIDTH.label}
+								bare
+								className="w-[68px] shrink-0"
+								min={0}
+								value={commonValue(
+									widths.map((w) => (typeof w === "number" ? w : null)),
+								)}
+								onChange={(v) => set("stroke-width", { width: v })}
+							/>
+						)}
+						{sided && (
+							<ToggleButton
+								aria-label="Link stroke sides"
+								tooltip={linked ? STROKE_WIDTH.unlink : STROKE_WIDTH.link}
+								isSelected={linked}
+								onChange={(on) => setChoice({ at: selection, linked: on })}
+							>
+								{linked ? <LinkIcon /> : <UnlinkIcon />}
+							</ToggleButton>
+						)}
 					</div>
+					{!linked && (
+						<Row label={STROKE_WIDTH.sidesLabel}>
+							<div
+								className="grid min-w-0 flex-1 grid-cols-2 gap-1"
+								data-testid="stroke-sides"
+							>
+								{SIDES.map((side) => (
+									<LengthField
+										key={side}
+										label={INSETS.sides[side]}
+										aria-label={`${STROKE_WIDTH.label} ${INSETS.sideNames[side]}`}
+										className="min-w-0"
+										min={0}
+										value={commonValue(widths.map((w) => sidesOf(w)[side]))}
+										onChange={(n) =>
+											setWidth(`stroke-width.${side}`, (w) =>
+												compactWidth({ ...sidesOf(w), [side]: n }),
+											)
+										}
+									/>
+								))}
+							</div>
+						</Row>
+					)}
 					{gradient && (
 						<GradientEditor
 							g={gradient}

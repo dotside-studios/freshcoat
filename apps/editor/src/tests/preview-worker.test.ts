@@ -50,6 +50,18 @@ describe("preview sync", () => {
 		expect(bled.template).toBe(receiver.apply(sender.encode(plain)).template);
 	});
 
+	test("carries the image resolution check", () => {
+		const sender = createPreviewSender();
+		const receiver = createPreviewReceiver();
+		const plain = request();
+		expect(receiver.apply(sender.encode(plain)).imageDpi).toBeUndefined();
+		const checked = { ...plain, imageDpi: { dpi: 300, min: 300 } };
+		expect(receiver.apply(sender.encode(checked)).imageDpi).toEqual({
+			dpi: 300,
+			min: 300,
+		});
+	});
+
 	test("sends the template on a new identity, and assets, fonts and photos once", () => {
 		const sender = createPreviewSender();
 		const receiver = createPreviewReceiver();
@@ -344,6 +356,57 @@ describe("main-thread fallback", () => {
 		expect(combine).toHaveBeenCalled();
 		expect(out.geometry.get("0/7/1")?.parentKey).toBe("0/7");
 		combine.mockRestore();
+		session.dispose();
+	});
+
+	test("warns for a field's photo below the minimum DPI, not the template's own", async () => {
+		const base = doc();
+		const front = base.template_data[0];
+		if (!front) throw new Error("no front");
+		const template: Template = {
+			...base,
+			fields: {
+				...base.fields,
+				properties: {
+					...base.fields.properties,
+					photo: { type: "string", format: "image" },
+				},
+			},
+			template_data: [
+				{
+					...front,
+					elements: [
+						...front.elements,
+						{
+							id: "bound",
+							type: "image",
+							pos: { x: 0, y: 0 },
+							size: { width: 300, height: 300 },
+							properties: { src: "{{photo}}", fit: "fill" },
+						},
+					],
+				},
+			],
+		};
+		const session = createRenderSession(
+			ck,
+			(width, height) => ({ width, height }) as OffscreenCanvas,
+		);
+		const checked = request({
+			template,
+			values: { ...sampleValues(template), photo: "ws:p" },
+			photos: new Map([["ws:p", PNG_BYTES]]),
+			imageDpi: { dpi: 300, min: 300 },
+		});
+		const out = await renderLiveFrame(session, checked);
+		expect(out.warnings.filter((w) => w.includes("DPI"))).toEqual([
+			"Image prints at 1 DPI, under 300: bound",
+		]);
+		const unchecked = await renderLiveFrame(session, {
+			...checked,
+			imageDpi: undefined,
+		});
+		expect(unchecked.warnings.some((w) => w.includes("DPI"))).toBe(false);
 		session.dispose();
 	});
 

@@ -2584,13 +2584,22 @@ describe("transpile (shape warnings)", () => {
 		return out.warnings.map((w) => w.code);
 	}
 
-	it("warns when per-side stroke weights drop the stroke", async () => {
+	it("warns when per-side stroke weights it cannot read drop the stroke", async () => {
 		expect(
 			await warningsFor({
 				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
 				strokeWeightMixed: true,
 			}),
 		).toContain("stroke_weight_mixed_unsupported");
+	});
+
+	it("keeps per-side stroke weights on a rect without a warning", async () => {
+		expect(
+			await warningsFor({
+				strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+				strokeWeights: { top: 1, right: 0, bottom: 2, left: 0 },
+			}),
+		).toEqual([]);
 	});
 
 	it("does not warn about corner smoothing on per-corner radii", async () => {

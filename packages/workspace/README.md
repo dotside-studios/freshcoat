@@ -212,7 +212,9 @@ the encoder refuses fails its item, since a placeholder would print as if it
 scanned. Other render warnings, such as an image or font that failed to
 load, leave the item rendered and are listed in its `warnings`, described by
 coatfile's `describeWarning` and joined with `; ` in the report. An image
-field left empty is not reported.
+field left empty is not reported. An image that prints below the preset's
+`minImageDpi` (default 300, 0 for no check) at its `dpi` is listed too, as
+"Image prints at 200 DPI, under 300: photo".
 
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own

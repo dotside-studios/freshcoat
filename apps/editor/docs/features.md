@@ -13,7 +13,8 @@ the records, and **Export** turns templates and records into files.
 - **Workspaces:**
   - Start from a starter, a preset size (CR80 card, A4, square, poster,
     badge, US and EU business card, 4 × 6 in and A6 postcard, 4 × 6 in
-    shipping label) or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
+    shipping label), a custom size in px, mm or in (mm and in are rounded
+    up to whole px at 300 DPI), or a bundled sample, or open a `.coatworkspace`, `.coat`, `.coat.json` or
     template `.json` with **Open file…** (Ctrl/Cmd+O). Files saved before the rename, `.tkit` and `.tkit.json`,
     still open. A template opened on its own becomes a one-template workspace.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
@@ -70,6 +71,31 @@ the records, and **Export** turns templates and records into files.
   inside the template, so a resize that would take that room away is
   refused. The format is described in the
   [coatfile guide](../../../packages/coatfile/README.md#bleed-and-safe-area).
+- **Image resolution:** an image that prints below 300 DPI is listed under
+  "Print hints" in the Issues list, as "Prints at 200 DPI, under 300", with a
+  link to the layer. The resolution is the image's pixels over the inches the
+  layer covers, after its crop and fit, on the axis with fewer: a 600 px wide
+  image placed 3 in wide at 300 DPI prints at 200. The template is measured at
+  the lowest DPI of its export presets, 300 without one, and checked against
+  their highest minimum; a preset's `minImageDpi` sets it, and 0 turns the
+  check off. An image bound to a field is checked as the record renders, and
+  shows under "Last render" as "Image prints at 200 DPI, under 300: photo".
+  An export lists the same warning for each item it applies to, in its
+  `export-report.csv`.
+- **Print checks:** the Issues list's "Print hints" also name layers that
+  may not print as they look, each with a link that selects the layer:
+  text below 6 pt at print size (7 pt for a light weight or a Thin or Light
+  family), as "Text is 4.8 pt at print size, below 6 pt"; strokes thinner than
+  0.25 pt; text under 12 pt in a near-black mixed from unequal channels, which
+  may print as rich black and blur if the plates are out of register (advice
+  only, since the colours are sRGB); and, with a bleed, a rect, image or frame
+  that runs to the trim but not into the bleed. Sizes are read at the lowest
+  DPI of the template's export presets, 300 without one. Text whose content or
+  colour comes from a field, or that shrinks to fit, is checked as the record
+  renders and shows under "Last render"; an export lists the same warnings in
+  its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
+  `rich_black_text` and `short_of_bleed`, described in the
+  [coatfile guide](../../../packages/coatfile/README.md#print-checks).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
   under the template size re-places layers by them, and an export sized
@@ -203,14 +229,28 @@ the records, and **Export** turns templates and records into files.
   - The side's name above the artboard and in the status bar is a menu of
     the sides, so they switch with the panels closed; Alt+, and Alt+. step
     through them.
-  - Rulers: View > Rulers or Shift+R shows top and left rulers in design px.
-    They follow the pan and zoom, and mark the selection's extent with its
-    edges' positions.
+  - Rulers: View > Rulers or Shift+R shows top and left rulers in the
+    display unit. They follow the pan and zoom, and mark the selection's
+    extent with its edges' positions.
+  - Units: View > Units, or the menu in the rulers' corner, shows lengths in
+    pixels, millimeters, inches or points. The choice is remembered in this
+    browser. Designs stay in design px; mm, in and pt convert at the active
+    template's export preset DPI (300 by default), not at 72, so a CR80 card
+    reads 85.68 × 54.02 mm. Rulers step 1, 2, 5 or 10 mm and halve inches
+    down to 1/16. The inspector's position, size, corner radius, stroke
+    width and font size, the side's size, bleed and safe area, guides, the
+    canvas size label and the status bar follow the unit. A field also
+    takes a typed suffix in any unit, such as `3mm`, `0.125in`, `12pt`,
+    `40px` or `1cm`, within an expression (`10mm + 2`). Shown values are
+    rounded (2 places, 3 for inches), and a field that is left as shown
+    keeps its px value, so switching units never moves anything.
   - Guides: drag from a ruler onto the canvas to add a guide, and drag it
     back onto the ruler to remove it. Moving and resizing snap to guides as
     they do to layers. A guide is a slider for the keyboard: focus a ruler
     and press Enter to add one at the middle of the view, then arrow keys
-    move it (Shift for 10) and Delete removes it. View > Remove guides clears
+    move it by one unit (1 px, 1 mm, 1/16 in or 1 pt; Shift for 10) and
+    Delete removes it. A dragged guide snaps to 1 px, 0.1 mm, 1/32 in or
+    0.5 pt. View > Remove guides clears
     the side. Each side keeps its own guides, and adding, moving and removing
     them are undo steps. Guides are saved in the `.coatworkspace`, not the
     template, so a `.coat` and every export are unchanged.

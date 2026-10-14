@@ -187,6 +187,14 @@ export const INSETS = {
 	safeAreaTooLarge: "The safe area must fit inside the template",
 } as const;
 
+/** A rect or frame stroke's width, one for every side or one per side. */
+export const STROKE_WIDTH = {
+	label: "Stroke width",
+	sidesLabel: "Width",
+	link: "Same width on every side",
+	unlink: "Set each side",
+} as const;
+
 /** The variant choice of a binding and an export, and how the export
  *  preview names a variant. */
 export const VARIANT_EXPORT = {

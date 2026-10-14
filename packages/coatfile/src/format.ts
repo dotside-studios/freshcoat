@@ -23,7 +23,8 @@ import type { Template } from "./types";
 //        gradient stroke `color`; variant `size`; vector `boolean`
 //   1.7  rect and vector `slice`; element `hidden`; text `stroke`; frame
 //        `cornerSmoothing`; per-corner image `cornerRadius` and image
-//        `cornerSmoothing`; element `effects`
+//        `cornerSmoothing`; rect and frame stroke `width` per side; element
+//        `effects`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -83,6 +84,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "barcode") need(3);
 			if (o.type === "text") textIds.add(o.id);
 			if (usesSlice(o.properties)) need(7);
+			if (usesSideStroke(o.properties)) need(7);
 			if (
 				o.type === "barcode" &&
 				(o.properties as Record<string, unknown> | undefined)?.bearerBars !==
@@ -139,6 +141,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (usesSlice(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
 					need(7);
+				if (usesSideStroke(delta.properties)) need(7);
 			}
 		}
 	}
@@ -198,6 +201,14 @@ function usesTextStroke(properties: unknown): boolean {
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).stroke !== undefined
 	);
+}
+
+function usesSideStroke(properties: unknown): boolean {
+	if (properties === null || typeof properties !== "object") return false;
+	const stroke = (properties as Record<string, unknown>).stroke;
+	if (stroke === null || typeof stroke !== "object") return false;
+	const width = (stroke as Record<string, unknown>).width;
+	return width !== null && typeof width === "object";
 }
 
 function usesIsolate(properties: unknown): boolean {

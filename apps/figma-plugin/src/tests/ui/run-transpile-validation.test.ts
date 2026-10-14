@@ -72,8 +72,8 @@ describe("runTranspileToTemplate (validation)", () => {
 		expect(blocked.canProceed).toBe(false);
 		expect(blocked.message).toMatch(/^The template is not valid: /);
 
-		// coatfile reports a bad element at the element, whichever of its keys
-		// broke it. This one is display_name, read from layer 6:3 on the front.
+		// coatfile reports a bad element at the key that broke it. This one is
+		// display_name, read from layer 6:3 on the front.
 		const size = blocked.issues.find((i) =>
 			i.path?.startsWith("/template_data/0/elements/2"),
 		);
@@ -83,7 +83,9 @@ describe("runTranspileToTemplate (validation)", () => {
 			nodeId: "6:3",
 			slot: "front",
 		});
-		expect(size?.message).toContain("(at /template_data/0/elements/2)");
+		expect(size?.message).toContain(
+			"(at /template_data/0/elements/2/size/width)",
+		);
 
 		const background = blocked.issues.find((i) =>
 			i.path?.startsWith("/template_data/1/background"),

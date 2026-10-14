@@ -44,6 +44,7 @@ import {
 import { isDeclared, verifyGoogleFamily, WEIGHTS } from "./fonts";
 import { InsertFieldMenu, spliceToken } from "./InsertFieldMenu";
 import { InspectorSection } from "./InspectorSection";
+import { LengthField } from "./LengthField";
 
 type Font = TextProperties["font"];
 
@@ -155,9 +156,10 @@ export function TextSection({ ins }: { ins: Inspect }) {
 						</SelectItem>
 					))}
 				</Select>
-				<NumberField
+				<LengthField
 					label="Size"
 					aria-label="Font size"
+					bare
 					className="w-[76px] shrink-0"
 					min={1}
 					value={pickFont((f) => f.size)}

@@ -3,7 +3,10 @@ import {
 	compile,
 	type FrameWarning,
 	hasInsets,
+	imageDpiWarnings,
 	NO_BLEED,
+	type PrintCheckOptions,
+	printCheckWarnings,
 	type Sides,
 	type Template,
 	templateBleed,
@@ -30,6 +33,11 @@ export type RenderInput<G> = {
 	bleed?: boolean;
 	/** Reads layer boxes off the laid-out scene. */
 	collect: (prepared: Node) => G;
+	/** Warns for images in `images` that print below `min` at `dpi` design
+	 *  units to the inch, but for those `skip` names. */
+	imageDpi?: { dpi: number; min: number; skip?: (src: string) => boolean };
+	/** Runs the print checks on the laid-out side. */
+	printChecks?: PrintCheckOptions;
 };
 
 export type RenderTimings = {
@@ -131,6 +139,16 @@ export function createRenderSession(
 				images: input.images,
 				output: { canvas: true },
 			});
+			const dpiWarnings = input.imageDpi
+				? await imageDpiWarnings(
+						commands,
+						async (src) => input.images.get(src),
+						input.imageDpi,
+					)
+				: [];
+			const printWarnings = input.printChecks
+				? printCheckWarnings(commands, input.printChecks)
+				: [];
 			const t4 = performance.now();
 
 			return {
@@ -138,7 +156,12 @@ export function createRenderSession(
 				geometry,
 				// The scene is compiled here rather than through renderCompiled, so
 				// the compile warnings are read off the frame.
-				warnings: [...(frame.warnings ?? []), ...result.warnings],
+				warnings: [
+					...(frame.warnings ?? []),
+					...result.warnings,
+					...dpiWarnings,
+					...printWarnings,
+				],
 				scale,
 				bleed,
 				timings: {
