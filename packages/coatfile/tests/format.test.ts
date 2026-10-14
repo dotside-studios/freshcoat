@@ -345,6 +345,7 @@ describe("minimumFormatVersion", () => {
 		expect(
 			need({ stroke: { color: "#000", width: 2, align: "outside" } }),
 		).toBe("1.7");
+		expect(need({ pdfText: "outline" })).toBe("1.7");
 
 		const t = withElements(base(), text({}));
 		t.variants = [

@@ -30,20 +30,24 @@ const KEPT = [
 
 const ENDCHAR = Uint8Array.of(14);
 
-export function readTables(bytes: Uint8Array): {
+// `at` is where the table directory starts: past the header of a collection.
+export function readTables(
+	bytes: Uint8Array,
+	at = 0,
+): {
 	version: string;
 	tables: Tables;
 } {
 	const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	const tables: Tables = new Map();
-	for (let i = 0; i < dv.getUint16(4); i++) {
-		const o = 12 + i * 16;
-		const at = dv.getUint32(o + 8);
-		const end = at + dv.getUint32(o + 12);
+	for (let i = 0; i < dv.getUint16(at + 4); i++) {
+		const o = at + 12 + i * 16;
+		const start = dv.getUint32(o + 8);
+		const end = start + dv.getUint32(o + 12);
 		if (end > bytes.length) throw new Error("table past the end");
-		tables.set(tagAt(bytes, o), bytes.subarray(at, end));
+		tables.set(tagAt(bytes, o), bytes.subarray(start, end));
 	}
-	return { version: tagAt(bytes, 0), tables };
+	return { version: tagAt(bytes, at), tables };
 }
 
 export function concat(parts: ArrayLike<number>[]): Uint8Array {
@@ -98,7 +102,7 @@ export function mergeFontSubsets(files: Uint8Array[]): Uint8Array | null {
 		const [first, ...rest] = files;
 		if (!first) return null;
 		if (rest.length === 0) return first;
-		const all = files.map(readTables);
+		const all = files.map((f) => readTables(f));
 		const [lead] = all as [ReturnType<typeof readTables>];
 		const cff = lead.version === "OTTO";
 		const own = cff ? ["CFF "] : ["glyf", "loca"];

@@ -1,10 +1,11 @@
 // A Painter for print: lowers a compiled scene to one PDF page. Shapes,
 // gradients, strokes, clips, blend modes and images map onto PDF's own model,
 // and text is drawn with its embedded font file, along its curve when it has
-// one. A layer PDF has no operator for (a shadow, a blur, an adjustment, text
-// in a font a PDF cannot carry) is painted by the CanvasKit painter into a
-// transparent image at `rasterDpi` and placed where it belongs, and reported
-// as `vector_rasterized`.
+// one, or as the outlines of its glyphs: when asked for, or when a PDF cannot
+// carry the font. A layer PDF has no operator for (a shadow, a blur, an
+// adjustment, text in a font whose outlines do not read) is painted by the
+// CanvasKit painter into a transparent image at `rasterDpi` and placed where
+// it belongs, and reported as `vector_rasterized`.
 
 import type {
 	CanvasKit,
@@ -71,8 +72,9 @@ import type {
 	Stroke,
 	TextLine,
 } from "../types";
-import { FontEmbedder, type FontFile } from "./fonts";
+import { type FaceMatch, FontEmbedder, type FontFile } from "./fonts";
 import { cm, type Matrix, outlineOps, pathOps, rotateAbout } from "./geometry";
+import type { GlyphOutlines, GlyphPath } from "./outlines";
 import {
 	name,
 	num,
@@ -88,6 +90,9 @@ export type PdfPaintOptions = {
 	dpi?: number;
 	/** Pixels per inch of a layer drawn as an image. Default 600. */
 	rasterDpi?: number;
+	/** "embed" draws text with its font embedded, "outline" as the outlines
+	 *  of its glyphs, with no font in the file. Default "embed". */
+	text?: PdfTextMode;
 	title?: string;
 	/** Creation date; fixing it makes the bytes repeatable. */
 	date?: Date;
@@ -96,6 +101,8 @@ export type PdfPaintOptions = {
 	 *  false for none. While one is declared, RGB content is tagged sRGB. */
 	outputIntent?: OutputIntent | false;
 };
+
+export type PdfTextMode = "embed" | "outline";
 
 export type PdfPaintResult = {
 	bytes: Uint8Array;
@@ -169,8 +176,15 @@ type Frame = {
 type Area = { x: number; y: number; width: number; height: number };
 // A layer painted as pixels, placed in design units.
 type Patch = { ref: PdfRef; x: number; y: number; w: number; h: number } | null;
-// `xforms` places each glyph of a run on a curve.
-type TextRun = { run: GlyphRun; file: FontFile; xforms?: Float32Array };
+// `xforms` places each glyph of a run on a curve. A run has its embedded
+// `file`, or its `outlines` when the text is drawn as outlines.
+type TextRun = {
+	run: GlyphRun;
+	match: FaceMatch;
+	file?: FontFile;
+	outlines?: GlyphOutlines;
+	xforms?: Float32Array;
+};
 type TextPlan = {
 	lines: Array<{
 		spans: TextLine["spans"];
@@ -182,6 +196,7 @@ type TextPlan = {
 		runs: TextRun[];
 	}>;
 	bands: PlacedTextBand[];
+	outline: boolean;
 	reason?: string;
 };
 
@@ -351,6 +366,7 @@ export async function paintPdf(
 		svgScenes,
 		warnings,
 		intent,
+		options.text ?? "embed",
 	);
 	try {
 		const drawables = commands.filter(isDrawable);
@@ -540,6 +556,7 @@ class PageBuilder {
 		private svgScenes: Map<string, SvgScene>,
 		private warnings: PaintWarning[],
 		private intent: ResolvedOutputIntent | null,
+		private textMode: PdfTextMode,
 	) {
 		this.resources = w.reserve();
 	}
@@ -603,10 +620,22 @@ class PageBuilder {
 						? strokeReason(cmd.stroke, cmd.strokeD ? null : undefined)
 						: null)
 				);
-			case "drawText":
-				if (cmd.fill && cmd.fill.kind !== "solid") return "gradient text";
-				if (cmd.stroke?.gradient) return "gradient text stroke";
-				return this.textPlan(cmd).reason ?? null;
+			case "drawText": {
+				const plan = this.textPlan(cmd);
+				if (!plan.outline) {
+					if (cmd.fill && cmd.fill.kind !== "solid") return "gradient text";
+					if (cmd.stroke?.gradient) return "gradient text stroke";
+					return plan.reason ?? null;
+				}
+				if (plan.reason) return plan.reason;
+				if (cmd.fill && cmd.fill.kind !== "solid") {
+					const fill = fillReason(cmd.fill);
+					if (fill) return `${fill} text`;
+					if (plan.bands.length) return "gradient text";
+				}
+				const stroke = cmd.stroke?.gradient && fillReason(cmd.stroke.gradient);
+				return stroke ? `${stroke} text stroke` : null;
+			}
 			case "drawImage": {
 				if (cmd.fit === "tile") return "tiled image";
 				const svg = this.svgScenes.get(cmd.src);
@@ -638,7 +667,9 @@ class PageBuilder {
 		);
 	}
 
-	// The text shaped, each run matched to the font file it embeds.
+	// The text shaped, each run matched to the font file it embeds, or to the
+	// outlines of its glyphs when the text is drawn as outlines: when asked for,
+	// or when a run's font cannot be embedded.
 	private textPlan(cmd: DrawTextCommand): TextPlan {
 		const hit = this.texts.get(cmd);
 		if (hit) return hit;
@@ -652,7 +683,13 @@ class PageBuilder {
 					...l,
 					xforms: [] as Float32Array[],
 				}));
-		const plan: TextPlan = { lines: [], bands: placed?.bands ?? [] };
+		const forced = this.textMode === "outline" || cmd.pdfText === "outline";
+		const plan: TextPlan = {
+			lines: [],
+			bands: placed?.bands ?? [],
+			outline: forced,
+		};
+		const why = new Map<TextRun, string>();
 		for (const line of lines) {
 			const spans = line.line.spans;
 			const clusters = lineClusters(
@@ -665,7 +702,7 @@ class PageBuilder {
 				const span = spans[line.spanAt[run.offsets[0] ?? 0] ?? 0];
 				if (!span) continue;
 				if (run.fakeBold) plan.reason ??= "synthetic bold";
-				const file = this.fonts.file(
+				const match = this.fonts.match(
 					run,
 					{
 						weight: span.font.weight,
@@ -674,12 +711,21 @@ class PageBuilder {
 					},
 					clusters,
 				);
-				if ("reason" in file) plan.reason ??= file.reason;
-				else if (curved) {
-					const xforms = line.xforms[r] ?? new Float32Array();
-					runs.push({ run, file, xforms });
+				if ("reason" in match) {
+					plan.reason ??= match.reason;
+					continue;
 				}
-				else runs.push({ run, file });
+				const entry: TextRun = curved
+					? { run, match, xforms: line.xforms[r] ?? new Float32Array() }
+					: { run, match };
+				if (!forced) {
+					const file = this.fonts.embeddable(match);
+					if ("reason" in file) {
+						plan.outline = true;
+						why.set(entry, file.reason);
+					} else entry.file = file;
+				}
+				runs.push(entry);
 			}
 			plan.lines.push({
 				spans,
@@ -691,6 +737,16 @@ class PageBuilder {
 				runs,
 			});
 		}
+		if (plan.outline)
+			for (const { runs } of plan.lines)
+				for (const entry of runs) {
+					const outlines = this.fonts.outlines(entry.match);
+					if (outlines && entry.run.glyphs.every((g) => outlines.glyph(g)))
+						entry.outlines = outlines;
+					else
+						plan.reason ??=
+							why.get(entry) ?? `outlines of font ${entry.match.file.family}`;
+				}
 		this.texts.set(cmd, plan);
 		return plan;
 	}
@@ -751,13 +807,14 @@ class PageBuilder {
 			Group: { S: name("Transparency"), CS: this.rgbSpace() },
 		});
 		w.set(pages, { Type: name("Pages"), Kids: [pageRef], Count: 1 });
+		const fonts = this.fonts.write();
 		const ext: PdfDict = {};
 		for (const [key, dict] of Object.entries(this.gsDicts)) ext[key] = dict;
 		w.set(this.resources, {
 			ExtGState: ext,
 			XObject: { ...this.xobjects },
 			Shading: { ...this.shadings },
-			Font: this.fonts.write(),
+			...(Object.keys(fonts).length ? { Font: fonts } : {}),
 			...(this.intent
 				? { ColorSpace: { DefaultRGB: this.rgbSpace() } }
 				: {}),
@@ -1281,13 +1338,14 @@ class PageBuilder {
 	// on a curve gets a text matrix of its own.
 	private text(cmd: DrawTextCommand): string {
 		const plan = this.textPlan(cmd);
+		if (plan.outline) return this.outlinedText(cmd, plan);
 		const segments: Segment[] = [];
 		let decorations = "";
 		for (const line of plan.lines) {
 			const { spans, clusters, runs } = line;
 			const texts = glyphTexts(runs.map((r) => r.run), clusters);
 			for (const [r, { run, file, xforms }] of runs.entries()) {
-				const face = this.fonts.embed(file);
+				const face = this.fonts.embed(file as FontFile);
 				const { info } = face;
 				const sx = (run as { scaleX?: number }).scaleX ?? 1;
 				const scale = run.size * sx;
@@ -1366,6 +1424,108 @@ class PageBuilder {
 		if (align === "outside") return stroked + filled;
 		if (align === "center") return filled + stroked;
 		return `${filled}q\nBT\n7 Tr\n${glyphs}ET\n${stroked}Q\n`;
+	}
+
+	// Each glyph as its outline, placed as the embedded font would place it,
+	// filled in its span's colour or the text's gradient and stroked as
+	// embedded text is.
+	private outlinedText(cmd: DrawTextCommand, plan: TextPlan): string {
+		const gradient = cmd.fill && cmd.fill.kind !== "solid" ? cmd.fill : null;
+		const box = {
+			x: cmd.pos.x,
+			y: cmd.pos.y,
+			w: cmd.size.width,
+			h: cmd.size.height,
+		};
+		const groups: Array<{ color: string; run: GlyphRun; path: GlyphPath }> = [];
+		const all: GlyphPath = [];
+		let decorations = "";
+		for (const line of plan.lines) {
+			const { spans } = line;
+			for (const { run, outlines, xforms } of line.runs) {
+				const font = outlines as GlyphOutlines;
+				const sx = (run as { scaleX?: number }).scaleX ?? 1;
+				const scale = run.size * sx;
+				const skew = run.fakeItalic ? 0.25 * run.size : 0;
+				for (let i = 0; i < run.glyphs.length; i++) {
+					if (xforms && (xforms.length < 4 * i + 4 || isHidden(xforms, i)))
+						continue;
+					const glyph = font.glyph(run.glyphs[i] as number);
+					if (!glyph?.length) continue;
+					let m: Matrix;
+					if (xforms) {
+						const [sc, ss, tx, ty] = xforms.subarray(4 * i, 4 * i + 4);
+						m = [
+							scale * (sc as number),
+							scale * (ss as number),
+							skew * (sc as number) + run.size * (ss as number),
+							skew * (ss as number) - run.size * (sc as number),
+							tx as number,
+							ty as number,
+						];
+					} else
+						m = [
+							scale,
+							0,
+							skew,
+							-run.size,
+							line.x + (run.positions[i * 2] as number),
+							line.y + (run.positions[i * 2 + 1] as number),
+						];
+					const placed = placeGlyph(glyph, m, 1 / font.unitsPerEm);
+					const owner = spans[line.spanAt[run.offsets[i] ?? 0] ?? 0] ?? spans[0];
+					const c = rgba(owner?.color ?? cmd.color);
+					const color = `${this.alpha(c[3])}${rgb(c)} rg\n`;
+					const last = groups.at(-1);
+					if (last && last.color === color && last.run === run)
+						for (const v of placed) last.path.push(v);
+					else groups.push({ color, run, path: placed });
+					for (const v of placed) all.push(v);
+				}
+			}
+			for (const d of line.decorations) {
+				const rect = `${num(d.x0)} ${num(d.top)} ${num(d.x1 - d.x0)} ${num(d.thickness)} re\n`;
+				if (gradient)
+					decorations += `q\n${rect}W n\n${this.gradient(gradient, box)}Q\n`;
+				else {
+					const c = rgba(d.color);
+					decorations += `q\n${this.alpha(c[3])}${rgb(c)} rg\n${rect}f\nQ\n`;
+				}
+			}
+		}
+		for (const band of plan.bands) decorations += this.band(band);
+		const glyphs = glyphPathOps(all);
+		const filled =
+			(gradient
+				? glyphs
+					? `q\n${glyphs}W n\n${this.gradient(gradient, box)}Q\n`
+					: ""
+				: groups
+						.map((g) => `q\n${g.color}${glyphPathOps(g.path)}f\nQ\n`)
+						.join("")) + decorations;
+		const stroke = cmd.stroke;
+		if (!stroke || !(stroke.width > 0) || !glyphs) return filled;
+		// As with embedded text: an aligned stroke is twice as wide, under the
+		// fill or clipped to the glyphs.
+		const align = stroke.align ?? "center";
+		const wide = {
+			...stroke,
+			width: align === "center" ? stroke.width : stroke.width * 2,
+		};
+		let stroked = "";
+		if (stroke.gradient) {
+			const path = glyphSkPath(this.ck, all);
+			if (path)
+				try {
+					stroked = this.gradientStroke(wide, stroke.gradient, path, box);
+				} finally {
+					path.delete();
+				}
+		} else stroked = this.stroke(wide, glyphs);
+		if (!stroked) return filled;
+		if (align === "outside") return stroked + filled;
+		if (align === "center") return filled + stroked;
+		return `${filled}q\n${glyphs}W n\n${stroked}Q\n`;
 	}
 
 	// An arc text decoration, stroked along its circle.
@@ -1584,6 +1744,50 @@ class PageBuilder {
 		const ref = this.rgbaImage(pixels, pw, ph, false);
 		return `q\n${cm([size.width, 0, 0, -size.height, pos.x, pos.y + size.height])}/${this.xobject(ref)} Do\nQ\n`;
 	}
+}
+
+// `glyph`, in font units, placed by `m` once scaled by `k` to the em.
+function placeGlyph(glyph: GlyphPath, m: Matrix, k: number): GlyphPath {
+	const out: GlyphPath = [];
+	for (let i = 0; i < glyph.length; ) {
+		const op = glyph[i++] as number;
+		out.push(op);
+		const points = op === 2 ? 3 : op === 3 ? 0 : 1;
+		for (let p = 0; p < points; p++) {
+			const x = (glyph[i++] as number) * k;
+			const y = (glyph[i++] as number) * k;
+			out.push(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]);
+		}
+	}
+	return out;
+}
+
+function glyphPathOps(path: GlyphPath): string {
+	let out = "";
+	for (let i = 0; i < path.length; ) {
+		const op = path[i++] as number;
+		if (op === 3) {
+			out += "h\n";
+			continue;
+		}
+		const n = op === 2 ? 6 : 2;
+		const args = path.slice(i, i + n).map(num);
+		i += n;
+		out += `${args.join(" ")} ${op === 0 ? "m" : op === 1 ? "l" : "c"}\n`;
+	}
+	return out;
+}
+
+function glyphSkPath(ck: CanvasKit, path: GlyphPath): Path | null {
+	const verbs = [ck.MOVE_VERB, ck.LINE_VERB, ck.CUBIC_VERB, ck.CLOSE_VERB];
+	const cmds: number[] = [];
+	for (let i = 0; i < path.length; ) {
+		const op = path[i++] as number;
+		const n = op === 2 ? 6 : op === 3 ? 0 : 2;
+		cmds.push(verbs[op] as number);
+		for (let k = 0; k < n; k++) cmds.push(path[i++] as number);
+	}
+	return ck.Path.MakeFromCmds(cmds);
 }
 
 // Fills drawn as vectors: solid, and linear and radial gradients that pad.

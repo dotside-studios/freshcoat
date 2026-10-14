@@ -226,6 +226,7 @@ export {
 	type PdfFrame,
 	type SurfaceCanvas,
 } from "./renderer";
+export type { PdfTextMode } from "./pdf/paint";
 export { squircleSvg } from "./squircle";
 export {
 	type ApplyCaseOptions,

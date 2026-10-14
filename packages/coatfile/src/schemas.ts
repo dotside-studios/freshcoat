@@ -293,6 +293,9 @@ export const TextPropertiesSchema = z.object({
 	// Figma "Truncate text": cap the wrapped text at N lines, ellipsizing the
 	// last line if content overflows.
 	maxLines: z.number().int().positive().optional(),
+	// "outline" draws the text in a PDF as the outlines of its glyphs, with no
+	// font, whatever the export asks for.
+	pdfText: z.literal("outline").optional(),
 	// Sets the text along a circle centered on the box, for seals and badges.
 	// Each hard line is one ring and nothing wraps. Angles are degrees clockwise
 	// from 12 o'clock.

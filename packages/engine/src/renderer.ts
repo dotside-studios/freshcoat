@@ -15,6 +15,7 @@ import {
 } from "./font-collection";
 import { deriveFontMetrics } from "./font-metrics";
 import type { OutputIntent } from "./icc";
+import type { PdfTextMode } from "./pdf/paint";
 import { type ByteLoader, fetchLoader, mapLoader } from "./loader";
 import type { Node } from "./node";
 import {
@@ -120,6 +121,9 @@ export type PaintPdfOptions = {
 	dpi?: number;
 	/** Pixels per inch of a layer painted as an image. Default 600. */
 	rasterDpi?: number;
+	/** "embed" draws text with its font embedded, "outline" as the outlines
+	 *  of its glyphs, with no font in the file. Default "embed". */
+	text?: PdfTextMode;
 	title?: string;
 	date?: Date;
 	/** Default the sRGB intent; a profile of the press's condition instead;

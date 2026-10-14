@@ -147,6 +147,24 @@ describe("createItemRenderer vector pages", () => {
 		expect(untagged).not.toContain("ICCBased");
 		expect(untagged).not.toContain("OutputIntents");
 	});
+
+	it("draws text as outlines when asked, with no font", async () => {
+		const page = async (text?: "outline") => {
+			const out = await items.render({
+				template,
+				values: { name: "Ana" },
+				side: "front",
+				scale: 1,
+				images: [],
+				format: "png",
+				vector: { dpi: 300, ...(text ? { text } : {}) },
+			});
+			expect(out.warnings).toBeUndefined();
+			return new TextDecoder("latin1").decode(out.bytes);
+		};
+		expect(await page()).toContain("/FontFile2");
+		expect(await page("outline")).not.toContain("/Font");
+	});
 });
 
 describe("runExportJob on this thread", () => {
@@ -326,6 +344,31 @@ describe("runExportJob on this thread", () => {
 				},
 			);
 			expect(untagged).toEqual([undefined, undefined]);
+		});
+
+		it("asks for outlined text on vector pages when the preset does", async () => {
+			const asked: unknown[] = [];
+			const run = (p: ExportPreset) =>
+				runExportJob(workspace, p, {
+					pool: inlinePool({
+						render: (r) => {
+							asked.push(r.vector?.text);
+							return items.render(r);
+						},
+					}),
+					assemblePdf: async () => new Uint8Array(),
+				});
+			await run({ ...pdf, pdfPageImage: "vector", pdfText: "outline" });
+			await run({ ...pdf, pdfPageImage: "vector" });
+			await run({ ...pdf, pdfText: "outline" });
+			expect(asked).toEqual([
+				"outline",
+				"outline",
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+			]);
 		});
 	});
 });
