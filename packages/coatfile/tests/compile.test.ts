@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
+import { effectsOf } from "../src/effects";
 import { validate } from "../src/validate";
 import type {
 	Command,
@@ -1421,6 +1422,88 @@ describe("compile (shadow)", () => {
 			dy: 2,
 			blur: 4,
 		});
+	});
+});
+
+describe("compile (effects)", () => {
+	const sh = (dx: number, extra: object = {}) => ({
+		type: "shadow" as const,
+		color: "#000",
+		dx,
+		dy: 1,
+		blur: 2,
+		...extra,
+	});
+
+	test("lowers to the engine's shadow, blur and backdropBlur, scaled", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			{ type: "backdropBlur", radius: 3 },
+			sh(1),
+			{ type: "blur", radius: 4 },
+			sh(2, { spread: 1, inset: true }),
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.blur).toBe(8);
+		expect(draw.backdropBlur).toBe(6);
+		expect(draw.shadow).toEqual([
+			{ color: "#000", dx: 2, dy: 2, blur: 4 },
+			{ color: "#000", dx: 4, dy: 2, blur: 4, spread: 2, inset: true },
+		]);
+	});
+
+	test("hidden effects are not drawn", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			sh(1, { hidden: true }),
+			{ type: "blur", radius: 4, hidden: true },
+			{ type: "backdropBlur", radius: 3, hidden: true },
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.shadow).toBeUndefined();
+		expect(draw.blur).toBeUndefined();
+		expect(draw.backdropBlur).toBeUndefined();
+	});
+
+	test("legacy fields compile as they did, and as the same effects", () => {
+		const legacy = structuredClone(baseTemplate);
+		const modern = structuredClone(baseTemplate);
+		legacy.template_data[0].elements[0].shadow = {
+			color: "#000",
+			dx: 1,
+			dy: 1,
+			blur: 2,
+		};
+		legacy.template_data[0].elements[0].blur = 4;
+		modern.template_data[0].elements[0].effects = [
+			effectsOf(legacy.template_data[0].elements[0])[0]!,
+			{ type: "blur", radius: 4 },
+		];
+		const a = getCommands(legacy, {}, { width: 200, height: 120 });
+		expect(findDraw(a, "drawText")!.shadow).toEqual({
+			color: "#000",
+			dx: 2,
+			dy: 2,
+			blur: 4,
+		});
+		const b = getCommands(modern, {}, { width: 200, height: 120 });
+		expect(findDraw(b, "drawText")!.blur).toBe(
+			findDraw(a, "drawText")!.blur,
+		);
+	});
+
+	test("a background's effects flow through unscaled", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].background.effects = [sh(2), { type: "blur", radius: 3 }];
+		const draw = topDraws(getCommands(tpl, {}, { width: 200, height: 120 }))[0]!;
+		expect(draw.shadow).toEqual([{ color: "#000", dx: 2, dy: 1, blur: 2 }]);
+		expect(draw.blur).toBe(3);
 	});
 });
 

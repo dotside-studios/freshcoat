@@ -296,9 +296,7 @@ function compileBackground(
 		rotation: bg.rotation,
 		opacity: bg.opacity,
 		blendMode: bg.blendMode,
-		shadow: scaleShadow(bg.shadow, 1),
-		blur: bg.blur,
-		backdropBlur: bg.backdropBlur,
+		...lowerEffects(bg, 1),
 		adjust: resolveAdjust(bg.adjust),
 	};
 	if (bg.type === "rect") {
@@ -342,12 +340,7 @@ function compileElement(
 		rotation: el.rotation,
 		opacity: el.opacity,
 		blendMode: el.blendMode,
-		shadow: scaleShadow(el.shadow, ratio),
-		blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
-		backdropBlur:
-			typeof el.backdropBlur === "number"
-				? el.backdropBlur * ratio
-				: undefined,
+		...lowerEffects(el, ratio),
 		adjust: resolveAdjust(el.adjust),
 		layoutChild: mapLayoutChild(el.layoutChild, ratio),
 	};
@@ -1270,6 +1263,39 @@ function resolveStroke(
 		join: stroke.join,
 		align: stroke.align,
 		...resolveStrokeTrim(stroke),
+	};
+}
+
+// The engine's `shadow`, `blur` and `backdropBlur` for an element's effects,
+// hidden ones left out. The engine fixes where each kind applies, so only the
+// shadows keep their array order.
+function lowerEffects(
+	el: Pick<Element, "effects" | "shadow" | "blur" | "backdropBlur">,
+	ratio: number,
+): Pick<Base, "shadow" | "blur" | "backdropBlur"> {
+	if (!el.effects) {
+		return {
+			shadow: scaleShadow(el.shadow, ratio),
+			blur: typeof el.blur === "number" ? el.blur * ratio : undefined,
+			backdropBlur:
+				typeof el.backdropBlur === "number"
+					? el.backdropBlur * ratio
+					: undefined,
+		};
+	}
+	const shown = el.effects.filter((e) => !e.hidden);
+	const shadows: Shadow[] = [];
+	for (const e of shown) {
+		if (e.type !== "shadow") continue;
+		const { type: _type, hidden: _hidden, ...shadow } = e;
+		shadows.push(shadow);
+	}
+	const blur = shown.find((e) => e.type === "blur");
+	const backdropBlur = shown.find((e) => e.type === "backdropBlur");
+	return {
+		shadow: shadows.length > 0 ? scaleShadow(shadows, ratio) : undefined,
+		blur: blur ? blur.radius * ratio : undefined,
+		backdropBlur: backdropBlur ? backdropBlur.radius * ratio : undefined,
 	};
 }
 

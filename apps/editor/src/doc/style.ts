@@ -1,9 +1,11 @@
-import type {
-	Background,
-	Element,
-	Fill,
-	Template,
-	TextProperties,
+import {
+	type Background,
+	type Effect,
+	type Element,
+	effectsOf,
+	type Fill,
+	type Template,
+	type TextProperties,
 } from "@freshcoat-js/coatfile";
 import { type ElementPatch, updateElement } from "./ops";
 import { getElement } from "./path";
@@ -38,11 +40,7 @@ export type LayerStyle = {
 		cornerRadius: CornerRadius | undefined;
 		cornerSmoothing: number | undefined;
 	};
-	effects: {
-		shadow: Element["shadow"];
-		blur: number | undefined;
-		backdropBlur: number | undefined;
-	};
+	effects: { effects: Effect[] | undefined };
 	text?: TextStyle;
 };
 
@@ -72,12 +70,9 @@ function textStroke(stroke: Stroke | undefined): Stroke | undefined {
 
 export function readStyle(el: Layer): LayerStyle {
 	const p = el.properties as Record<string, unknown>;
+	const effects = effectsOf(el);
 	const style: LayerStyle = {
-		effects: {
-			shadow: el.shadow,
-			blur: el.blur,
-			backdropBlur: el.backdropBlur,
-		},
+		effects: { effects: effects.length > 0 ? effects : undefined },
 	};
 	if (el.type === "text") {
 		const fill = el.properties.fill ?? el.properties.color;
@@ -125,7 +120,13 @@ export function stylePatch(el: Layer, style: LayerStyle): ElementPatch {
 		if (el.properties.spans)
 			props.spans = el.properties.spans.map((s) => ({ text: s.text }));
 	}
-	return { ...style.effects, properties: props };
+	return {
+		...style.effects,
+		shadow: undefined,
+		blur: undefined,
+		backdropBlur: undefined,
+		properties: props,
+	};
 }
 
 /** Gives every layer in `keys` the parts of `style` it can take. */

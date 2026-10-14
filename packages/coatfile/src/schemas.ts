@@ -553,6 +553,33 @@ export const ShadowSchema = z.object({
  *  same one-or-many shape a fill takes. */
 export const ShadowsSchema = z.union([ShadowSchema, z.array(ShadowSchema)]);
 
+// One entry of an element's `effects`. `hidden` keeps an effect in the file
+// without drawing it. Shadows paint in array order. A blur and a backdrop blur
+// apply at the engine's fixed positions in the layer effect order wherever they
+// sit in the array, and an element takes at most one of each.
+export const ShadowEffectSchema = ShadowSchema.extend({
+	type: z.literal("shadow"),
+	hidden: z.boolean().optional(),
+});
+
+export const BlurEffectSchema = z.object({
+	type: z.literal("blur"),
+	radius: z.number().min(0),
+	hidden: z.boolean().optional(),
+});
+
+export const BackdropBlurEffectSchema = z.object({
+	type: z.literal("backdropBlur"),
+	radius: z.number().min(0),
+	hidden: z.boolean().optional(),
+});
+
+export const EffectSchema = z.discriminatedUnion("type", [
+	ShadowEffectSchema,
+	BlurEffectSchema,
+	BackdropBlurEffectSchema,
+]);
+
 const LayoutPaddingSchema = z.object({
 	top: z.number().optional(),
 	right: z.number().optional(),
@@ -674,6 +701,9 @@ const elementShellShape = {
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
 	backdropBlur: z.number().min(0).optional(),
+	// Replaces `shadow`, `blur` and `backdropBlur`; an element sets one form or
+	// the other.
+	effects: z.array(EffectSchema).optional(),
 	adjust: AdjustSchema.optional(),
 	layoutChild: LayoutChildSchema.optional(),
 	constraints: ConstraintsSchema.optional(),
@@ -906,6 +936,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceImageFraming(tpl, ctx);
 	enforceBooleanOperands(tpl, ctx);
 	enforceSlices(tpl, ctx);
+	enforceEffects(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1538,6 +1569,37 @@ function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
 		frame.elements.forEach((el, ei) => {
 			walk(el, ["template_data", fi, "elements", ei], null);
 		});
+	});
+}
+
+// `effects` stands in for the legacy `shadow`, `blur` and `backdropBlur`, so an
+// element sets one form or the other, and takes at most one blur of each kind.
+function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		const effects = (el as { effects?: { type: string }[] }).effects;
+		if (effects === undefined) return;
+		for (const key of ["shadow", "blur", "backdropBlur"] as const) {
+			if ((el as Record<string, unknown>)[key] === undefined) continue;
+			addKitIssue(
+				ctx,
+				"effects_with_legacy_field",
+				`an element with effects must not also set ${key}`,
+				[...path, key],
+			);
+		}
+		for (const type of ["blur", "backdropBlur"]) {
+			const second = effects.findIndex(
+				(e, i) =>
+					e.type === type && effects.findIndex((o) => o.type === type) < i,
+			);
+			if (second < 0) continue;
+			addKitIssue(
+				ctx,
+				"duplicate_effect",
+				`an element takes at most one ${type} effect`,
+				[...path, "effects", second],
+			);
+		}
 	});
 }
 

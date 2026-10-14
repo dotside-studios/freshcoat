@@ -2980,7 +2980,7 @@ describe("transpile (a group that carries an effect)", () => {
 							type: string;
 							pos: { x: number; y: number };
 							size: { width: number; height: number };
-							shadow?: unknown;
+							effects?: unknown;
 							properties: { children?: Array<{ id: string; pos: unknown }> };
 						}>;
 					};
@@ -3003,16 +3003,19 @@ describe("transpile (a group that carries an effect)", () => {
 
 	it("hangs the effect on that layer, not on each child", async () => {
 		const { group } = await run();
-		expect(group.shadow).toEqual({
-			color: "#ffffff",
-			dx: 0,
-			dy: 2,
-			blur: 3,
-			spread: 1,
-			inset: true,
-		});
+		expect(group.effects).toEqual([
+			{
+				type: "shadow",
+				color: "#ffffff",
+				dx: 0,
+				dy: 2,
+				blur: 3,
+				spread: 1,
+				inset: true,
+			},
+		]);
 		for (const child of group.properties.children ?? [])
-			expect((child as { shadow?: unknown }).shadow).toBeUndefined();
+			expect((child as { effects?: unknown }).effects).toBeUndefined();
 	});
 
 	it("shifts the frame-positioned children onto the group's box", async () => {

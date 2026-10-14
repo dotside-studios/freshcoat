@@ -476,6 +476,90 @@
 										"type": "number",
 										"minimum": 0
 									},
+									"effects": {
+										"type": "array",
+										"items": {
+											"oneOf": [
+												{
+													"type": "object",
+													"properties": {
+														"color": {
+															"type": "string"
+														},
+														"dx": {
+															"type": "number"
+														},
+														"dy": {
+															"type": "number"
+														},
+														"blur": {
+															"type": "number"
+														},
+														"spread": {
+															"type": "number"
+														},
+														"inset": {
+															"type": "boolean"
+														},
+														"type": {
+															"type": "string",
+															"const": "shadow"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"color",
+														"dx",
+														"dy",
+														"blur",
+														"type"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "blur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "backdropBlur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												}
+											]
+										}
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -1765,6 +1849,90 @@
 										"type": "number",
 										"minimum": 0
 									},
+									"effects": {
+										"type": "array",
+										"items": {
+											"oneOf": [
+												{
+													"type": "object",
+													"properties": {
+														"color": {
+															"type": "string"
+														},
+														"dx": {
+															"type": "number"
+														},
+														"dy": {
+															"type": "number"
+														},
+														"blur": {
+															"type": "number"
+														},
+														"spread": {
+															"type": "number"
+														},
+														"inset": {
+															"type": "boolean"
+														},
+														"type": {
+															"type": "string",
+															"const": "shadow"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"color",
+														"dx",
+														"dy",
+														"blur",
+														"type"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "blur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "backdropBlur"
+														},
+														"radius": {
+															"type": "number",
+															"minimum": 0
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"radius"
+													]
+												}
+											]
+										}
+									},
 									"adjust": {
 										"type": "object",
 										"properties": {
@@ -2641,6 +2809,90 @@
 												"backdropBlur": {
 													"type": "number",
 													"minimum": 0
+												},
+												"effects": {
+													"type": "array",
+													"items": {
+														"oneOf": [
+															{
+																"type": "object",
+																"properties": {
+																	"color": {
+																		"type": "string"
+																	},
+																	"dx": {
+																		"type": "number"
+																	},
+																	"dy": {
+																		"type": "number"
+																	},
+																	"blur": {
+																		"type": "number"
+																	},
+																	"spread": {
+																		"type": "number"
+																	},
+																	"inset": {
+																		"type": "boolean"
+																	},
+																	"type": {
+																		"type": "string",
+																		"const": "shadow"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"color",
+																	"dx",
+																	"dy",
+																	"blur",
+																	"type"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "blur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "backdropBlur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															}
+														]
+													}
 												},
 												"adjust": {
 													"type": "object",
@@ -3931,6 +4183,90 @@
 													"type": "number",
 													"minimum": 0
 												},
+												"effects": {
+													"type": "array",
+													"items": {
+														"oneOf": [
+															{
+																"type": "object",
+																"properties": {
+																	"color": {
+																		"type": "string"
+																	},
+																	"dx": {
+																		"type": "number"
+																	},
+																	"dy": {
+																		"type": "number"
+																	},
+																	"blur": {
+																		"type": "number"
+																	},
+																	"spread": {
+																		"type": "number"
+																	},
+																	"inset": {
+																		"type": "boolean"
+																	},
+																	"type": {
+																		"type": "string",
+																		"const": "shadow"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"color",
+																	"dx",
+																	"dy",
+																	"blur",
+																	"type"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "blur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "backdropBlur"
+																	},
+																	"radius": {
+																		"type": "number",
+																		"minimum": 0
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"radius"
+																]
+															}
+														]
+													}
+												},
 												"adjust": {
 													"type": "object",
 													"properties": {
@@ -4913,6 +5249,90 @@
 								"backdropBlur": {
 									"type": "number",
 									"minimum": 0
+								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
 								},
 								"adjust": {
 									"type": "object",
@@ -6159,6 +6579,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -6981,6 +7485,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -7375,6 +7963,90 @@
 								"backdropBlur": {
 									"type": "number",
 									"minimum": 0
+								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
 								},
 								"adjust": {
 									"type": "object",
@@ -7796,6 +8468,90 @@
 								"backdropBlur": {
 									"type": "number",
 									"minimum": 0
+								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
 								},
 								"adjust": {
 									"type": "object",
@@ -9086,6 +9842,90 @@
 									"type": "number",
 									"minimum": 0
 								},
+								"effects": {
+									"type": "array",
+									"items": {
+										"oneOf": [
+											{
+												"type": "object",
+												"properties": {
+													"color": {
+														"type": "string"
+													},
+													"dx": {
+														"type": "number"
+													},
+													"dy": {
+														"type": "number"
+													},
+													"blur": {
+														"type": "number"
+													},
+													"spread": {
+														"type": "number"
+													},
+													"inset": {
+														"type": "boolean"
+													},
+													"type": {
+														"type": "string",
+														"const": "shadow"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"color",
+													"dx",
+													"dy",
+													"blur",
+													"type"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "blur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "backdropBlur"
+													},
+													"radius": {
+														"type": "number",
+														"minimum": 0
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"radius"
+												]
+											}
+										]
+									}
+								},
 								"adjust": {
 									"type": "object",
 									"properties": {
@@ -10360,6 +11200,90 @@
 						"backdropBlur": {
 							"type": "number",
 							"minimum": 0
+						},
+						"effects": {
+							"type": "array",
+							"items": {
+								"oneOf": [
+									{
+										"type": "object",
+										"properties": {
+											"color": {
+												"type": "string"
+											},
+											"dx": {
+												"type": "number"
+											},
+											"dy": {
+												"type": "number"
+											},
+											"blur": {
+												"type": "number"
+											},
+											"spread": {
+												"type": "number"
+											},
+											"inset": {
+												"type": "boolean"
+											},
+											"type": {
+												"type": "string",
+												"const": "shadow"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"color",
+											"dx",
+											"dy",
+											"blur",
+											"type"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "blur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "backdropBlur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									}
+								]
+							}
 						},
 						"adjust": {
 							"type": "object",
@@ -11764,6 +12688,90 @@
 						"backdropBlur": {
 							"type": "number",
 							"minimum": 0
+						},
+						"effects": {
+							"type": "array",
+							"items": {
+								"oneOf": [
+									{
+										"type": "object",
+										"properties": {
+											"color": {
+												"type": "string"
+											},
+											"dx": {
+												"type": "number"
+											},
+											"dy": {
+												"type": "number"
+											},
+											"blur": {
+												"type": "number"
+											},
+											"spread": {
+												"type": "number"
+											},
+											"inset": {
+												"type": "boolean"
+											},
+											"type": {
+												"type": "string",
+												"const": "shadow"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"color",
+											"dx",
+											"dy",
+											"blur",
+											"type"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "blur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "backdropBlur"
+											},
+											"radius": {
+												"type": "number",
+												"minimum": 0
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"radius"
+										]
+									}
+								]
+							}
 						},
 						"adjust": {
 							"type": "object",

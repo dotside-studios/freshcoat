@@ -213,7 +213,7 @@ describe("override markers", () => {
 			0,
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
-		expect((getElement(base(c), "0/5") as Element).shadow).toBeTruthy();
+		expect((getElement(base(c), "0/5") as Element).effects).toBeTruthy();
 		expect(delta(c, "rot")).toBeUndefined();
 	});
 });

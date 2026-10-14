@@ -277,8 +277,10 @@ describe("transpile (relaxations e2e)", () => {
 		// 3. Shadow + blur
 		const shadowed = element("shadowed_card");
 		expect(shadowed.type).toBe("rect");
-		expect(shadowed.shadow).toMatchObject({ dy: 4, blur: 8 });
-		expect(shadowed.blur).toBe(2);
+		expect(shadowed.effects).toMatchObject([
+			{ type: "shadow", dy: 4, blur: 8 },
+			{ type: "blur", radius: 2 },
+		]);
 
 		// 4. Vector
 		const icon = element("icon");

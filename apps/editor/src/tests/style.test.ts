@@ -32,8 +32,12 @@ describe("pasteStyle", () => {
 			pasteStyle(t, ["0/1", "0/5"], readStyle(el(t, "0/0"))),
 		).template;
 		const frame = el(out, "0/1");
-		expect(frame.shadow).toEqual({ color: "#000000", dx: 1, dy: 2, blur: 3 });
-		expect(frame.blur).toBe(4);
+		expect(frame.effects).toEqual([
+			{ type: "shadow", color: "#000000", dx: 1, dy: 2, blur: 3 },
+			{ type: "blur", radius: 4 },
+		]);
+		expect(frame.shadow).toBeUndefined();
+		expect(frame.blur).toBeUndefined();
 		expect(frame.type === "frame" && frame.properties).toMatchObject({
 			fill: ["#ff0000", "#00ff00"],
 			stroke: { color: "#0000ff", width: 2 },
@@ -64,6 +68,7 @@ describe("pasteStyle", () => {
 			pasteStyle(t, ["0/0"], readStyle(el(t, "0/5"))),
 		).template;
 		const rect = el(out, "0/0");
+		expect(rect.effects).toBeUndefined();
 		expect(rect.shadow).toBeUndefined();
 		expect(rect.blur).toBeUndefined();
 		expect(rect.type === "rect" && rect.properties).toEqual({});
@@ -136,7 +141,7 @@ describe("pasteStyle", () => {
 		c.select(["0/1", "0/5"]);
 		const before = c.template;
 		c.pasteStyle();
-		expect(el(c.template as Template, "0/5").blur).toBe(4);
+		expect(el(c.template as Template, "0/5").effects).toHaveLength(2);
 		c.undo();
 		expect(c.template).toEqual(before);
 	});
