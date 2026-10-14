@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "minDpi", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "cutSpot", "minDpi", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
@@ -31,6 +31,7 @@ const PDF_OPTIONS = [
 	"noOutputIntent",
 	"outputIntentId",
 	"cutLines",
+	"cutSpot",
 ];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks", "marks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
@@ -63,6 +64,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.pieces ? { pieces: rest.pieces } : {}),
 				...(rest.cut ? { cut: rest.cut } : {}),
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
+				...(rest.cutSpot ? { cutSpot: rest.cutSpot } : {}),
 				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
 				out,
 				quiet: input.quiet,
@@ -77,7 +79,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	const exporting = rest.pieces || rest.cut || rest.cutLines;
+	const exporting = rest.pieces || rest.cut || rest.cutLines || rest.cutSpot;
 	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)

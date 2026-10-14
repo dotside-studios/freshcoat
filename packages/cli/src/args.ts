@@ -1,4 +1,7 @@
 import {
+	CUT_KINDS,
+	type CutKind,
+	type CutSpots,
 	PAPER_SIZES_MM,
 	type PaperName,
 	parseFilter,
@@ -23,6 +26,16 @@ export function collectSetting(
 	const at = entry.indexOf("=");
 	if (at <= 0) throw new ArgumentError("Expected key=value.");
 	return { ...previous, [entry.slice(0, at)]: entry.slice(at + 1) };
+}
+
+export function collectCutSpot(entry: string, previous: CutSpots = {}): CutSpots {
+	const at = entry.indexOf("=");
+	const kind = at < 0 ? "through" : entry.slice(0, at).trim();
+	const name = (at < 0 ? entry : entry.slice(at + 1)).trim();
+	if (!CUT_KINDS.includes(kind as CutKind))
+		throw new ArgumentError(`Expected through, kiss, score or perforate before =, got "${kind}".`);
+	if (!name) throw new ArgumentError("Expected a spot colour name.");
+	return { ...previous, [kind]: name };
 }
 
 export function collectFilter(entry: string, previous: ViewFilter[] = []): ViewFilter[] {

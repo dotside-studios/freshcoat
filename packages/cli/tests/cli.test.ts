@@ -1896,10 +1896,34 @@ describe("render cut files", () => {
 		expect(pdf.catalog.has(PDFName.of("OCProperties"))).toBe(true);
 	});
 
+	test("names the cut lines' spot colours, and implies --cut-lines", async () => {
+		const spots = async (file: string) => {
+			const pdf = await PDFDocument.load(await readFile(box.path(file)));
+			return pdf.context
+				.enumerateIndirectObjects()
+				.map(([, obj]) => obj)
+				.filter((obj): obj is PDFArray => obj instanceof PDFArray && obj.get(0) === PDFName.of("Separation"))
+				.map((obj) => obj.lookup(1, PDFName).decodeText())
+				.sort();
+		};
+		const plain = await box.run("render", "edged.json", "--frame", "front", "--cut-lines", "--dpi", "72", "--out", "spots.pdf", "-q");
+		expect(plain.code).toBe(0);
+		expect(await spots("spots.pdf")).toEqual(["Crease", "CutContour", "KissCut"]);
+		const named = await box.run("render", "edged.json", "--frame", "front", "--cut-spot", "Thru", "--cut-spot", "kiss=Half Cut", "--dpi", "72", "--out", "named.pdf", "-q");
+		expect(named.code).toBe(0);
+		expect(await spots("named.pdf")).toEqual(["Crease", "Half Cut", "Thru"]);
+		const ws = await box.run("render", "edged.coatworkspace", "--preset", "p_pdf", "--cut-spot", "score=Fold", "--out", "ws-spots.pdf", "-q");
+		expect(ws.code).toBe(0);
+		expect(await spots("ws-spots.pdf")).toContain("Fold");
+	});
+
 	test("refuses a cut option the preset's format does not take", async () => {
 		const png = await box.run("render", "edged.coatworkspace", "--preset", "p_png", "--cut-lines", "--out", "x.zip", "-q");
 		expect(png.code).toBe(1);
 		expect(png.stderr).toContain("--cut-lines applies only to a PDF preset");
+		const spot = await box.run("render", "edged.coatworkspace", "--preset", "p_png", "--cut-spot", "X", "--out", "x.zip", "-q");
+		expect(spot.code).toBe(1);
+		expect(spot.stderr).toContain("--cut-spot applies only to a PDF preset");
 		const pdf = await box.run("render", "edged.coatworkspace", "--preset", "p_pdf", "--cut", "svg", "--out", "x.pdf", "-q");
 		expect(pdf.code).toBe(1);
 		expect(pdf.stderr).toContain("--cut applies only to an image preset");
