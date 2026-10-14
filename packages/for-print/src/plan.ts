@@ -48,7 +48,7 @@ export type LayerIntent = "photo" | "graphic" | "text" | "code" | "container";
 export type LayerIntentResolver = (node: Node) => LayerIntent | undefined;
 
 // Classify a node by kind. Images are photographic (need dye-sub compensation);
-// text and QR/pixel bitmaps are crisp intent that must stay untouched; rect/
+// text and barcode/pixel bitmaps are crisp intent that must stay untouched; rect/
 // ellipse/path are flat vector graphics whose colors were chosen deliberately;
 // group/mask are containers we only recurse into.
 export function classifyIntent(node: Node): LayerIntent {
@@ -233,18 +233,28 @@ function withAdjust(node: Node, opts: PrintOptimizeOptions | null): Node {
 // Walk a tree, mapping every node through `leaf` (for drawables) while recursing
 // into group/mask containers. Containers themselves are never adjusted — only
 // their leaves — so corrections apply per drawable, not to a composited subtree.
-function mapTree(node: Node, leaf: (n: Node) => Node): Node {
+// A snapped group is a code drawn as vectors (a QR code), so `code` is set for
+// everything in it.
+function mapTree(
+	node: Node,
+	leaf: (n: Node, code: boolean) => Node,
+	code = false,
+): Node {
 	if (node.kind === "group") {
-		return { ...node, children: node.children.map((c) => mapTree(c, leaf)) };
+		const inCode = code || node.snap !== undefined;
+		return {
+			...node,
+			children: node.children.map((c) => mapTree(c, leaf, inCode)),
+		};
 	}
 	if (node.kind === "mask") {
 		return {
 			...node,
-			mask: mapTree(node.mask, leaf),
-			children: node.children.map((c) => mapTree(c, leaf)),
+			mask: mapTree(node.mask, leaf, code),
+			children: node.children.map((c) => mapTree(c, leaf, code)),
 		};
 	}
-	return leaf(node);
+	return leaf(node, code);
 }
 
 // Sync planner: attach a policy-driven Adjust per layer, no image I/O. Photos get
@@ -261,8 +271,8 @@ export function planScene(
 		...merged,
 		photo: merged.photo === undefined ? target.preset : merged.photo,
 	};
-	return mapTree(root, (node) =>
-		withAdjust(node, policyFor(intentFor(node, p), p)),
+	return mapTree(root, (node, code) =>
+		withAdjust(node, policyFor(code ? "code" : intentFor(node, p), p)),
 	);
 }
 
@@ -441,18 +451,22 @@ export async function analyzeScene(
 		return analysis.then((a) => a.recommendation);
 	}
 
-	async function walk(node: Node): Promise<Node> {
+	async function walk(node: Node, code = false): Promise<Node> {
 		if (node.kind === "group") {
-			return { ...node, children: await Promise.all(node.children.map(walk)) };
+			const inCode = code || node.snap !== undefined;
+			return {
+				...node,
+				children: await Promise.all(node.children.map((c) => walk(c, inCode))),
+			};
 		}
 		if (node.kind === "mask") {
 			const [mask, children] = await Promise.all([
-				walk(node.mask),
-				Promise.all(node.children.map(walk)),
+				walk(node.mask, code),
+				Promise.all(node.children.map((c) => walk(c, code))),
 			]);
 			return { ...node, mask, children };
 		}
-		const intent = intentFor(node, policy);
+		const intent = code ? "code" : intentFor(node, policy);
 		if (node.kind === "image" && intent === "photo") {
 			return withAdjust(node, await photoOptions(node));
 		}
