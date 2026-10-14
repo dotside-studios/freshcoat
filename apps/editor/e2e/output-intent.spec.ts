@@ -27,6 +27,7 @@ async function openPdfPreset(page: Page, theme: string) {
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	const settings = page.getByTestId("export-settings");
 	await settingsTab(page, "Output");
 	await settings

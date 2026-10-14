@@ -677,6 +677,7 @@ for (const size of SIZES) {
 					.getByRole("button", { name: "New preset" })
 					.first()
 					.click();
+				await page.getByRole("menuitem", { name: "Blank preset" }).click();
 				await closeSettingsSheet(page);
 				await reveal(page, "export-settings", "Settings");
 				const settings = page.getByTestId("export-settings");
