@@ -15,6 +15,26 @@ Studio is deployed separately. The UI package remains internal.
 
 Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md).
 
+## Unreleased changes
+
+These land in the next release's notes.
+
+- **Cut lines in spot colours.** A PDF with cut lines (`cutLines`,
+  `--cut-lines`, Studio's Cut lines) now strokes each edge kind in a
+  `/Separation` spot colour that overprints: `CutContour` for through,
+  `KissCut` for kiss, `Crease` for score and `Perfcut` for perforate, so
+  print-and-cut RIPs find the paths by name. The lines look the same as
+  before: each separation's alternate is the kind's old RGB colour, and they
+  stay in the Cut optional content group at 0.25 pt. Only their colour space
+  changed, from DeviceRGB to the separations, plus the overprint ExtGState.
+  Presets take `cutSpots`, the CLI `--cut-spot`, and Studio's Output tab a
+  name per kind to rename them. PDFs without cut lines are unchanged, and so
+  are SVG and DXF cut files.
+- **Template spot colours (format 1.7).** A `rect` or `vector` can print its
+  fill or stroke in a named spot ink with `spot`, for white ink, foil or
+  varnish. A vector PDF paints it as a Separation, overprinting on request;
+  raster outputs paint its alternate colour.
+
 ## Prepare and check a release
 
 Update the version in these six manifests together:

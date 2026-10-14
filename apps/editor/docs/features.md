@@ -180,6 +180,13 @@ the records, and **Export** turns templates and records into files.
     text. Text in a font collection or a CFF2 variable font is outlined
     either way. A layer a PDF cannot express, such as a shadow, is drawn as a
     600 dpi image in place.
+  - For a template whose slices have an edge, the Output tab's Slices group
+    has Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
+    Cut lines strokes each edge kind in an overprinting spot colour, in an
+    optional content group named Cut, and shows a spot name field for each
+    kind the template cuts: Through spot (CutContour), Kiss spot (KissCut),
+    Score spot (Crease) and Perforate spot (Perfcut). An empty field keeps
+    the default, the name print-and-cut RIPs look for.
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
   value, or a pattern. One binding serves every preset that exports the
   template. Choosing a dataset matches fields to columns by key or title,
@@ -320,7 +327,7 @@ the records, and **Export** turns templates and records into files.
     holds the same commands under Boolean, Arrange and Align and distribute.
   - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
     linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    Fill, Stroke, Spot colour, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
     as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
@@ -330,6 +337,14 @@ the records, and **Export** turns templates and records into files.
     or a linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only. A text
     stroke takes a position and a join but no dash, trim or cap.
+  - A rectangle's or vector's Spot colour section prints its fill, its
+    stroke or both in a named spot ink, for white ink, foil or varnish:
+    "Fill as spot" or "Stroke as spot", then the ink's name as the printer
+    knows it (White by default; All and None are refused), a tint, an
+    alternate colour (the layer's own when empty) and Overprint, on by
+    default. A vector PDF prints the paint as a Separation of that name; the
+    canvas, images and other pages show the alternate. There is no colour
+    library: type the printer's name.
   - Rectangles, frames and images can set each corner's radius on its own
     and smooth their corners. A frame applies its corners to its fill, its
     stroke and its clip; an image to its clip and its stroke.
