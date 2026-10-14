@@ -77,6 +77,11 @@ describe("planRender", () => {
 			kind: "workspace",
 			options: { preset: "All", cutLines: true, out: "x.pdf", quiet: false },
 		});
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.pdf", cutSpot: { kiss: "K" } }))).toEqual({
+			kind: "workspace",
+			options: { preset: "All", cutSpot: { kiss: "K" }, out: "x.pdf", quiet: false },
+		});
+		expect(planRender("card.coat", input({ cutSpot: { through: "T" }, out: "x.pdf" })).kind).toBe("batch");
 	});
 
 	test("runs a workspace preset with only the workspace options", () => {
@@ -125,6 +130,7 @@ describe("planRender", () => {
 			["card.coat", { cut: "svg", out: "x.pdf" }, "--cut applies only to images; a PDF takes --cut-lines"],
 			["card.coat", { cutLines: true, out: "x.zip" }, "--cut-lines applies only to a .pdf"],
 			["card.coat", { cutLines: true, out: "cards", data: "people.csv" }, "--cut-lines applies only to a .pdf"],
+			["card.coat", { cutSpot: { through: "T" }, out: "x.zip" }, "--cut-spot applies only to a .pdf"],
 			["card.coat", { out: "x.zip", where: [{ column: "name", op: "empty" }] }, "--where needs --data or a .coatworkspace file"],
 			["card.coat", { out: "x.zip", outputIntent: "fogra.icc" }, "--output-intent applies only to a .pdf"],
 			["card.coat", { out: "x.zip", outputIntent: false }, "--no-output-intent applies only to a .pdf"],

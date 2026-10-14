@@ -209,12 +209,14 @@ Every paint path applies one drawable's effects in this order:
    per-channel `lut`, then the 3D `lut3d`. Colors are adjusted unpremultiplied,
    so alpha is untouched unless the matrix has alpha terms.
 4. **Sharpen**: the unsharp mask, on the adjusted colors.
-5. **Layer blur**.
-6. **Shadows**: each cast from the silhouette steps 1 to 5 leave, never from
+5. **Halftone**: the layer redrawn as dots or lines (see below).
+6. **Grain**.
+7. **Layer blur**.
+8. **Shadows**: each cast from the silhouette steps 1 to 7 leave, never from
    another shadow. Drop shadows go under the content and inner shadows over it,
    each in its own `color`.
-7. **Opacity**, on the whole layer, shadows included.
-8. **Blend**: the layer composites onto its parent with `blendMode`.
+9. **Opacity**, on the whole layer, shadows included.
+10. **Blend**: the layer composites onto its parent with `blendMode`.
 
 Adjust does not recolor shadows. A shadow's color is set on the shadow, so a
 LUT or matrix that also recolored it would make that color depend on the
@@ -224,6 +226,40 @@ Figma treats them the same way. Sharpen runs before blur, so a blurred layer is
 never re-sharpened. Shadows follow the blur, so a blurred layer casts a soft
 shadow; for drop shadows without spread this is the same as blurring the
 shadow with the layer.
+
+### Grain and halftone
+
+`grain` and `halftone` on a node are texture effects, painted by an offscreen
+SkSL pass over the layer's own pixels. Both are measured in design units in
+the layer's own space, after its `rotation` and any parent transform, so a 2×
+export draws the same grains and dots on four times the pixels, and the
+pattern moves with the layer.
+
+```ts
+createRect({
+  // ...
+  grain: { amount: 0.3, size: 1, monochrome: true, blendMode: "overlay", seed: 7 },
+  halftone: { mode: "mono", shape: "round", cellSize: 6, angle: 45, invert: false, color: "#000" },
+});
+```
+
+- **Grain** adds one hashed value per `size`-unit square, blended into the
+  layer's colors by `blendMode` (`normal`, `overlay`, `soft-light`,
+  `multiply` or `screen`) at `amount` (0 to 1). The hash is integer arithmetic
+  in floats, not `Math.random` or a `sin` hash, so a `seed` paints the same
+  pixels in every run, worker and backend. Seeds repeat every 83,521.
+- **Halftone** averages the layer over each `cellSize` cell of a screen turned
+  by `angle` and draws a `round`, `square` or `line` dot whose area is the
+  cell's darkness (its lightness with `invert`), in `color` over an optional
+  `background`. Dot edges are box-filtered, so the tone holds at any density.
+  `mode: "cmyk"` draws four screens at C 15°, M 75°, Y 0° and K 45° (each plus
+  `angle`) in process-ink colors, multiplied together. It is a look, not
+  colour separations. Dots stay inside the layer's own coverage.
+
+Both need runtime effects (`RuntimeEffect.Make`), which the default CanvasKit
+build has; the `full` build is not required. A build without them, or a
+shader that fails to compile, paints the layer without the effect and reports
+an `effect_unsupported` warning. In a PDF they are rasterized at `rasterDpi`.
 
 An image node's `crop` selects a region of its source, in fractions of the
 source's width and height, before `fit` places it. `focus` is the point of that
@@ -274,7 +310,7 @@ embedded.
 
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
-preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
+preview: shadows, blurs, `adjust`, grain, halftones, masks, pattern and angular fills, gradients
 with a spread, strokes aligned to a path, embedded gradient-filled or
 gradient-stroked text, synthetic bold, the `plus` and `linear-burn` blend
 modes, text whose outlines do not read, and SVG images holding text or
@@ -417,6 +453,15 @@ underlying model.
   [Output intent](#output-intent)). A caller's CMYK intent changes what the
   PDF says it was prepared for, not its content: no colour is converted to
   CMYK here, and there is no soft-proof.
+- **Spot colours.** A solid fill or a solid stroke can carry a `spot`
+  (`{ name, tint, overprint }`). A vector PDF paints it in a `/Separation`
+  colour space of that name, whose tint transform runs from white to the
+  fill's or stroke's own `color` in `DeviceRGB`, so a viewer without the ink
+  shows that alternate. With `overprint`, an ExtGState sets `/OP true /op true
+  /OPM 1` so the ink prints over what lies beneath it rather than knocking it
+  out. Every other output ignores `spot` and paints the alternate. A layer the
+  PDF painter has to rasterize loses its spot colour. Names are the caller's
+  own: there is no Pantone or other library.
 
 ## Conformance
 

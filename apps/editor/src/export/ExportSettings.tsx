@@ -22,6 +22,8 @@ import { Slider } from "@freshcoat-js/ui/slider";
 import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type {
+	CutKind,
+	CutSpots,
 	ExportCutFile,
 	ExportDestination,
 	ExportItem,
@@ -33,6 +35,7 @@ import type {
 } from "@freshcoat-js/workspace";
 import {
 	boundDataset,
+	DEFAULT_CUT_SPOTS,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_QUALITY,
 	exportCutFile,
@@ -179,6 +182,44 @@ const CUT_FILES: [ExportCutFile, string][] = [
 	["svg", "SVG"],
 	["dxf", "DXF"],
 ];
+
+const CUT_SPOT_LABEL: Record<CutKind, string> = {
+	through: "Through spot",
+	kiss: "Kiss spot",
+	score: "Score spot",
+	perforate: "Perforate spot",
+};
+
+/** The spot colour each edge kind the template cuts is drawn in. A field
+ *  left empty keeps the default name. */
+function CutSpotFields({
+	edges,
+	spots,
+	onChange,
+}: {
+	edges: readonly CutKind[];
+	spots: CutSpots | undefined;
+	onChange: (spots: CutSpots) => void;
+}) {
+	return (
+		<>
+			{edges.map((kind) => (
+				<TextField
+					key={kind}
+					label={CUT_SPOT_LABEL[kind]}
+					labelPosition="side"
+					value={spots?.[kind] ?? ""}
+					placeholder={DEFAULT_CUT_SPOTS[kind]}
+					onChange={(name) => {
+						const { [kind]: _, ...rest } = spots ?? {};
+						onChange(name.trim() ? { ...rest, [kind]: name } : rest);
+					}}
+				/>
+			))}
+			<Hint>Separation names your cutter's RIP looks for</Hint>
+		</>
+	);
+}
 
 const segmentedFull = "flex w-full";
 const segmentedItemFull =
@@ -660,6 +701,13 @@ export function ExportSettings({
 								>
 									Cut lines
 								</Checkbox>
+							) : null}
+							{use.cuts && pdf && preset.cutLines === true ? (
+								<CutSpotFields
+									edges={use.edges}
+									spots={preset.cutSpots}
+									onChange={(cutSpots) => set({ cutSpots })}
+								/>
 							) : null}
 						</PanelSection>
 					) : null}

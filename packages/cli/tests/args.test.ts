@@ -3,6 +3,7 @@ import {
 	ArgumentError,
 	collectFilter,
 	collectScale,
+	collectCutSpot,
 	collectSetting,
 	parseJobs,
 	parseCopies,
@@ -31,6 +32,8 @@ describe("argument parsers", () => {
 		expect(parsePaper("297x210")).toEqual({ widthMm: 210, heightMm: 297 });
 		expect(parseMarks("Crop, registration,slug,crop")).toEqual(["crop", "registration", "slug"]);
 		expect(parseMarks("none")).toEqual([]);
+		expect(collectCutSpot(" Thru Cut ")).toEqual({ through: "Thru Cut" });
+		expect(collectCutSpot("kiss=Kiss", { through: "A" })).toEqual({ through: "A", kiss: "Kiss" });
 	});
 
 	test("refuse the rest with an ArgumentError", () => {
@@ -45,6 +48,8 @@ describe("argument parsers", () => {
 			[() => parseMarks(""), "Expected none, or a list of crop, registration, colorbar, slug."],
 			[() => parseCopies("0"), "Expected a whole number, 1 or more, or fill."],
 			[() => parseCopies("2.5"), "Expected a whole number, 1 or more, or fill."],
+			[() => collectCutSpot("fold=Fold"), 'Expected through, kiss, score or perforate before =, got "fold".'],
+			[() => collectCutSpot("score= "), "Expected a spot colour name."],
 			[() => parsePaper("b5"), "Expected a4, a5, a6, letter, legal, a3, tabloid or <width>x<height> in millimetres."],
 		];
 		for (const [parse, message] of refusals) {

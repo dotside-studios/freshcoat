@@ -38,13 +38,24 @@ export function num(n: number): string {
 	return Object.is(r, -0) ? "0" : String(r);
 }
 
+// Bytes outside printable ASCII, and the delimiters, as #xx (ISO 32000 7.3.5).
+export function pdfName(n: string): string {
+	let out = "/";
+	for (const b of new TextEncoder().encode(n))
+		out +=
+			b < 0x21 || b > 0x7e || "()<>[]{}/%#".includes(String.fromCharCode(b))
+				? `#${b.toString(16).padStart(2, "0")}`
+				: String.fromCharCode(b);
+	return out;
+}
+
 function serialize(v: PdfValue): string {
 	if (typeof v === "number") return num(v);
 	if (typeof v === "boolean") return v ? "true" : "false";
 	if (v === null) return "null";
 	if (typeof v === "string")
 		return `(${v.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, "?")})`;
-	if (v instanceof PdfName) return `/${v.name}`;
+	if (v instanceof PdfName) return pdfName(v.name);
 	if (v instanceof PdfRef) return `${v.id} 0 R`;
 	if (Array.isArray(v)) return `[${v.map(serialize).join(" ")}]`;
 	const entries = Object.entries(v).filter(([, e]) => e !== undefined);

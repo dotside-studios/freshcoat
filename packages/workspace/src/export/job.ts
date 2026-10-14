@@ -9,6 +9,7 @@ import {
 	type OutputIntent,
 	resolveOutputIntent,
 } from "@freshcoat-js/engine/icc";
+import type { CutSpots } from "../cut";
 import { cutDxf } from "../cut-dxf";
 import { cutSvg } from "../cut-svg";
 import { slug } from "../ids";
@@ -134,6 +135,7 @@ export type AssemblePdf = (
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
 		outputIntent?: OutputIntent | false;
+		cutSpots?: CutSpots;
 	},
 	extras?: AssembleExtras,
 ) => Promise<Uint8Array>;
@@ -499,6 +501,9 @@ export function runExportJob(
 							...(sheet ? { layout: sheet, cardMm } : {}),
 							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
 							...(outputIntent !== undefined ? { outputIntent } : {}),
+							...(exportCutLines(preset) && preset.cutSpots
+								? { cutSpots: preset.cutSpots }
+								: {}),
 						},
 						{
 							signal: assembly.signal,

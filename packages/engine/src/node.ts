@@ -3,6 +3,8 @@
 // walks.
 import type {
 	Adjust,
+	Grain,
+	Halftone,
 	BitmapRole,
 	BakedTextLayout,
 	BlendMode,
@@ -94,6 +96,8 @@ export type Transform = {
 	// Per-layer color/tone adjustment (see Adjust). On a group/mask it adjusts the
 	// whole subtree's composited result.
 	adjust?: Adjust;
+	halftone?: Halftone;
+	grain?: Grain;
 	layoutChild?: ChildLayout;
 };
 

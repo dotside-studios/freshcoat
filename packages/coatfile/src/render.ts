@@ -547,6 +547,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Drawn as an image in the PDF: ${w.feature}${w.layer ? ` (${w.layer})` : ""}`;
 		case "pattern_unsupported":
 			return `Pattern shader failed, painted solid: ${w.pattern}`;
+		case "effect_unsupported":
+			return `${w.effect === "grain" ? "Grain" : "Halftone"} skipped: ${w.error}${w.layer ? ` (${w.layer})` : ""}`;
 		case "barcode_invalid":
 			return `Barcode: ${w.message}`;
 		case "print_check":
