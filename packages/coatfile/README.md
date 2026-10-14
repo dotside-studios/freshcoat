@@ -453,7 +453,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`; rect and vector `spot` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -896,6 +896,39 @@ largest side sets that growth. The frame's `piece` gives the box's place in the
 pixels, as `trim` does for a bleed render. `piece` takes the place of `bleed`,
 and a slice with `output: "none"` can be rendered by name. An unknown name
 throws.
+
+## Spot colours
+
+From 1.7 a `rect` or `vector` can print its fill or its stroke in a named spot
+ink, as a white ink, foil or varnish layer does:
+
+```jsonc
+"properties": {
+  "fill": "#ffffff",
+  "spot": {
+    "fill": { "spot": "White", "tint": 1, "alt": "#ffffff", "overprint": true },
+    "stroke": { "spot": "Gold Foil" }
+  }
+}
+```
+
+`spot` names the ink, exactly as the press or RIP expects it. `tint` is in
+`[0, 1]` and defaults to 1. `alt` is the colour every output but a vector PDF
+paints, and a viewer without the ink shows; it defaults to the layer's own
+colour, the lead colour of its first fill or its stroke colour. `overprint`
+defaults to false; set it for a finishing layer so the ink prints over the
+artwork beneath rather than knocking it out.
+
+A spot fill replaces every fill of the layer with one solid in `alt`, and a
+spot stroke drops a gradient for a solid. A spot stroke on a layer without a
+stroke draws nothing. A vector PDF paints each spot in a `/Separation` colour
+space whose alternate is `alt` in RGB, with an overprinting ExtGState when
+asked; raster outputs paint `alt`. A layer the PDF has to draw as an image,
+such as one with a shadow, loses its spot.
+
+Validation reports `invalid_spot` for an empty name, the names `All` and
+`None` (which PDF reserves), and an `alt` that is not a colour. There is no
+colour library: type the name your printer uses.
 
 ## Grid layout
 

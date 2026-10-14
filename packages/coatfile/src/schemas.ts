@@ -1,3 +1,4 @@
+import { parseColor } from "@freshcoat-js/engine";
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
@@ -492,6 +493,22 @@ export const SliceModifierSchema = z.object({
 	order: z.number().optional(),
 });
 
+// A named spot ink: white, foil, varnish or a press's own colour. A vector PDF
+// paints in a Separation of that name; every other output paints `alt`,
+// which defaults to the layer's own colour.
+export const SpotColorSchema = z.object({
+	spot: z.string(),
+	tint: z.number().min(0).max(1).optional(),
+	alt: z.string().optional(),
+	overprint: z.boolean().optional(),
+});
+
+// Which of a rect's or vector's paints print as a spot ink.
+export const LayerSpotSchema = z.object({
+	fill: SpotColorSchema.optional(),
+	stroke: SpotColorSchema.optional(),
+});
+
 export const RectPropertiesSchema = z.object({
 	fill: FillsSchema.optional(),
 	stroke: BoxStrokeSchema.optional(),
@@ -499,6 +516,7 @@ export const RectPropertiesSchema = z.object({
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
 	slice: SliceModifierSchema.optional(),
+	spot: LayerSpotSchema.optional(),
 });
 
 export const BooleanOpSchema = z.enum([
@@ -519,6 +537,7 @@ export const VectorBasePropertiesSchema = z.object({
 	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
+	spot: LayerSpotSchema.optional(),
 });
 
 // A live boolean operation: `operands`, rects or vectors positioned relative
@@ -937,6 +956,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceBooleanOperands(tpl, ctx);
 	enforceSlices(tpl, ctx);
 	enforceEffects(tpl, ctx);
+	enforceSpots(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1413,6 +1433,7 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	}
 
 	walkObjects(tpl, (obj, path) => {
+		if (path[path.length - 1] === "spot") return;
 		const fill = obj.fill;
 		if (typeof fill !== "string" && fill != null) check(fill, [...path, "fill"]);
 		const stroke = obj.stroke as { color?: unknown } | null | undefined;
@@ -1599,6 +1620,47 @@ function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				`an element takes at most one ${type} effect`,
 				[...path, "effects", second],
 			);
+		}
+	});
+}
+
+// PDF reserves the colorant names All and None, and a spot is named.
+const RESERVED_SPOTS = new Set(["All", "None"]);
+
+function enforceSpots(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		const spot = (
+			el.properties as
+				| { spot?: Partial<Record<string, { spot: string; alt?: string }>> }
+				| undefined
+		)?.spot;
+		if (spot === undefined) return;
+		for (const paint of ["fill", "stroke"] as const) {
+			const ink = spot[paint];
+			if (!ink) continue;
+			const at = [...path, "properties", "spot", paint];
+			if (ink.spot.trim().length === 0)
+				addKitIssue(ctx, "invalid_spot", "a spot needs a name", [
+					...at,
+					"spot",
+				]);
+			else if (RESERVED_SPOTS.has(ink.spot))
+				addKitIssue(
+					ctx,
+					"invalid_spot",
+					`"${ink.spot}" is reserved by PDF and cannot name a spot`,
+					[...at, "spot"],
+				);
+			if (ink.alt !== undefined) {
+				const c = parseColor(ink.alt);
+				if (!c || c === "none")
+					addKitIssue(
+						ctx,
+						"invalid_spot",
+						`spot alt "${ink.alt}" is not a colour`,
+						[...at, "alt"],
+					);
+			}
 		}
 	});
 }
