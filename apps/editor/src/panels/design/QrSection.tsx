@@ -281,7 +281,7 @@ export function QrSection({ ins }: { ins: Inspect }) {
 					onChange={(c) => set("qr-bg", { background: c })}
 				/>
 			</Row>
-			<Row label="Quiet zone" keys={["quietZone"]}>
+			<Row label="Quiet" keys={["quietZone"]}>
 				<NumberField
 					aria-label="QR quiet zone"
 					className="min-w-0 flex-1"
@@ -352,7 +352,7 @@ export function QrSection({ ins }: { ins: Inspect }) {
 							}
 						/>
 					</Row>
-					<Row label="Logo padding" keys={["logo"]}>
+					<Row label="Padding" keys={["logo"]}>
 						<NumberField
 							aria-label="QR logo padding"
 							className="min-w-0 flex-1"

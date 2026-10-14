@@ -585,7 +585,7 @@ recovery level, and the style:
 - **Colour:** the module colour, or with **Gradient** on a linear gradient
   from that colour to a **To** colour at an **Angle**; and the colour
   **Behind** the code.
-- **Quiet zone** in modules, and **Margin** in design units, both inside the
+- **Quiet** (the quiet zone) in modules, and **Margin** in design units, both inside the
   box.
 - **Logo:** an image from a file, a URL or an image field, with its size (5 to
   30% of the code) and padding in modules. A logo clears the modules behind
