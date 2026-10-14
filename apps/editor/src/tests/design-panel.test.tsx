@@ -97,17 +97,18 @@ describe("DesignPanel", () => {
 
 	it("justifies text and then offers the last line's alignment", () => {
 		const c = setup(["0/1/1"]);
-		expect(screen.queryByLabelText("Last line alignment")).toBeNull();
 		fireEvent.click(screen.getByRole("radio", { name: "Justify" }));
 		expect((el(c, "0/1/1").properties as { align?: string }).align).toBe(
 			"justify",
 		);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
 		expect(validate(c.template).ok).toBe(true);
 	});
 
 	it("sets the text direction", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		await chooseOption(
 			fastUser(),
 			screen.getByRole("button", { name: /Text direction/ }),
@@ -119,8 +120,10 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("writes OpenType features from the features field", () => {
+	it("writes OpenType features from the features field", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
+		await fastUser().click(screen.getByRole("tab", { name: "Details" }));
 		typeInto(screen.getByLabelText("OpenType features"), "tnum, -liga");
 		const font = (el(c, "0/1/1").properties as { font: { features?: unknown } })
 			.font;
@@ -130,6 +133,7 @@ describe("DesignPanel", () => {
 
 	it("writes paragraph spacing, and clears it at zero", () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		const field = spinbutton("Paragraph spacing");
 		typeInto(field, "12");
 		const spacing = () =>
