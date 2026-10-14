@@ -73,6 +73,10 @@ describe("planRender", () => {
 			kind: "batch",
 			options: { printTarget: "ymcko", printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
 		});
+		expect(planRender("card.coat", input({ printProfile: "printer.json" }))).toEqual({
+			kind: "batch",
+			options: { printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
+		});
 		expect(planRender("card.coat", input({ printTarget: "none", out: "x.zip" })).kind).toBe("batch");
 		expect(planRender("card.coat", input({ printTarget: "ymcko", out: "x.pdf" })).kind).toBe("batch");
 	});
@@ -151,8 +155,7 @@ describe("planRender", () => {
 			["card.coat", { out: "x.zip", backOffset: { x: 1, y: 0 } }, "--back-offset applies only to a .pdf"],
 			["card.coat", { out: "x.pdf", blankBacks: true }, "--blank-backs needs --sheets"],
 			["card.coat", { out: "x.pdf", sheets: "a4", backOffset: { x: 1, y: 0 }, blankBacks: true }, "--back-offset, --blank-backs need --duplex"],
-			["card.coat", { printProfile: "printer.json", out: "x.zip" }, "--print-profile needs --print-target ymcko"],
-			["card.coat", { printTarget: "none", printProfile: "printer.json" }, "--print-profile needs --print-target ymcko"],
+			["card.coat", { printTarget: "none", printProfile: "printer.json" }, "--print-profile does not go with --print-target none"],
 			["club.coatworkspace", { out: "x.zip", printTarget: "ymcko" }, "--print-target applies only to templates"],
 			["club.coatworkspace", { out: "x.pdf", backOffset: { x: 1, y: 0 } }, "--back-offset applies only to templates"],
 		];

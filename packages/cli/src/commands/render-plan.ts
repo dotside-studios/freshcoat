@@ -80,9 +80,14 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	if (rest.printProfile !== undefined && (rest.printTarget ?? "none") === "none")
-		throw new UsageError("--print-profile needs --print-target ymcko");
-	const exporting = rest.pieces || rest.cut || rest.cutLines || rest.printTarget !== undefined;
+	if (rest.printProfile !== undefined && rest.printTarget === "none")
+		throw new UsageError("--print-profile does not go with --print-target none");
+	const exporting =
+		rest.pieces ||
+		rest.cut ||
+		rest.cutLines ||
+		rest.printTarget !== undefined ||
+		rest.printProfile !== undefined;
 	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)

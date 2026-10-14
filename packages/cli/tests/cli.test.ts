@@ -1770,6 +1770,19 @@ describe("the command line", () => {
 		expect(version()).toMatch(/^\d+\.\d+\.\d+/);
 	});
 
+	test("lists the less common render options only with --help-all", async () => {
+		const short = await box.run("render", "--help");
+		const all = await box.run("render", "--help-all");
+		expect([short.code, all.code]).toEqual([0, 0]);
+		for (const flag of ["--png-alpha", "--pdf-text", "--output-intent-id", "--no-crop-marks", "--back-offset", "--blank-backs"]) {
+			expect(short.stdout).not.toContain(flag);
+			expect(all.stdout).toContain(flag);
+		}
+		expect(short.stdout).toContain("Run freshcoat render --help-all");
+		expect(all.stdout).not.toContain("--help-all");
+		expect(all.stdout).toContain("Sheet options, with --sheets:");
+	});
+
 	test("prints help for the tool and each command", async () => {
 		const overview = await box.run("--help");
 		expect(overview.code).toBe(0);
@@ -2120,6 +2133,22 @@ describe("render print options", () => {
 		expect(await pages("fronts.pdf")).toHaveLength(1);
 	});
 
+	test("takes the target from the profile when --print-target is left out", async () => {
+		const run = await box.run(...template, "--print-profile", "printer.json", "--out", "profile-only.zip");
+		expect(run.code).toBe(0);
+		const [printed, implied] = [await images("print.zip"), await images("profile-only.zip")];
+		for (const [name, bytes] of Object.entries(printed)) expect(implied[name]).toEqual(bytes);
+	});
+
+	test("refuses a profile alone whose target this build does not know", async () => {
+		await box.write("thermal.json", JSON.stringify({ ...profile, target: "thermal" }));
+		const run = await box.run("render", "badge.json", "--print-profile", "thermal.json", "--out", "thermal.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain(
+			"--print-profile thermal.json was measured on thermal, which this build cannot print to; add --print-target to use it anyway",
+		);
+	});
+
 	test("warns about a profile measured on another target", async () => {
 		await box.write("other.json", JSON.stringify({ ...profile, target: "thermal" }));
 		const run = await box.run("render", "badge.json", "--print-target", "ymcko", "--print-profile", "other.json", "--out", "other.zip");
@@ -2143,8 +2172,7 @@ describe("render print options", () => {
 			[["badge.json", "--back-offset", "1,2", "--blank-backs", "--sheets", "a4", "--out", "x.pdf"], "--back-offset, --blank-backs need --duplex"],
 			[["badge.json", "--back-offset", "1", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf"], "Expected <x>,<y> in millimetres, such as 0.5,-1"],
 			[["badge.json", "--blank-backs"], "--blank-backs needs --data or a .zip or .pdf --out"],
-			[["badge.json", "--print-profile", "printer.json", "--out", "x.zip"], "--print-profile needs --print-target ymcko"],
-			[["badge.json", "--print-target", "none", "--print-profile", "printer.json"], "--print-profile needs --print-target ymcko"],
+			[["badge.json", "--print-target", "none", "--print-profile", "printer.json"], "--print-profile does not go with --print-target none"],
 			[["badge.json", "--print-target", "cmyk"], "Allowed choices are none, ymcko"],
 			[["printing.coatworkspace", "--preset", "p_print", "--print-target", "ymcko", "--out", "x.zip"], "--print-target applies only to templates"],
 		];

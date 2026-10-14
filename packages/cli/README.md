@@ -17,7 +17,8 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `0` done, `1` the work failed (an invalid template, a failed export item) and
 `2` the command line was wrong. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every
-command.
+command. `render --help` leaves out its less common options; `render --help-all`
+lists them too.
 
 A template is read the way Studio opens it: duplicate element ids are renamed
 rather than refused. `render`, `inspect`, `validate` and `pack` warn, naming the
@@ -168,11 +169,11 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--margin <mm>`, `--gap <mm>` | with `--sheets`: the paper's margin, default 10, and the space between cards, default 0 |
 | `--copies <n\|fill>` | with `--sheets`: repeat each card `n` times before the next, or `fill` a sheet with each; default 1 |
 | `--marks <list>` | with `--sheets`: the printer's marks, `none` or any of `crop`, `registration`, `colorbar` and `slug`, such as `crop,registration,slug`; default `crop`. See [Printer's marks](../workspace/README.md#printers-marks) |
-| `--no-crop-marks` | with `--sheets`: leave out the crop marks, whatever `--marks` says |
+| `--no-crop-marks` | with `--sheets`: leave out the crop marks, whatever `--marks` says; kept for older scripts, `--marks` without `crop` does the same |
 | `--back-offset <x,y>` | with `--sheets` and `--duplex`: move every back page this many millimetres, for a printer that drifts; `y` is measured down the page, so `0.5,-1` moves the backs right and up |
 | `--blank-backs` | with `--sheets` and `--duplex`: give a one-sided template empty back pages, so every front lands on a front side |
-| `--print-target <none\|ymcko>` | correct the cards for a YMCKO dye-sublimation card printer, as an export preset's print target does in Studio; default `none` |
-| `--print-profile <file>` | with `--print-target ymcko`: a measured printer profile, the JSON Studio saves from Measure |
+| `--print-target <none\|ymcko>` | correct the cards for a YMCKO dye-sublimation card printer, as an export preset's print target does in Studio; default the `--print-profile`'s target, or `none` |
+| `--print-profile <file>` | a measured printer profile, the JSON Studio saves from Measure; on its own it prints to the target it was measured on |
 | `--output-intent <file>` | PDF only: declare this ICC profile, such as the print shop's FOGRA39 or GRACoL CMYK profile, as the PDF's output intent in place of sRGB. The cards stay RGB, tagged sRGB; the intent tells the printer what to convert them to |
 | `--output-intent-id <name>` | with `--output-intent`: the condition's identifier, such as `FOGRA39`; default the profile's description |
 | `--no-output-intent` | PDF only: declare no output intent and leave RGB untagged |
@@ -197,14 +198,15 @@ freshcoat render card.coat --dpi 300 --pdf-pages vector --pdf-text outline --out
 [for-print](../for-print/README.md), as a preset with that print target does:
 each photo is corrected from its own analysis, near-black and near-white snap to
 the ribbon's black and white, and a `--print-profile` adds the cast its
-measurement found. A card the path fails on is written uncorrected, and the
-report's `print` column says `fallback`. A profile measured on another target
-warns. On its own, `--print-target` exports into the `--out` directory, the
-current one by default, with a report.
+measurement found. `--print-profile` on its own uses the target the profile
+was measured on, and is refused when this build does not know that target;
+with `--print-target` too, a profile measured on another target warns. A card
+the path fails on is written uncorrected, and the report's `print` column says
+`fallback`. On their own, the print options export into the `--out` directory,
+the current one by default, with a report.
 
 ```sh
-freshcoat render member.coat --data members.csv --print-target ymcko \
-  --print-profile shop-printer.json --out cards
+freshcoat render member.coat --data members.csv --print-profile shop-printer.json --out cards
 freshcoat render member.coat --data members.csv --sheets letter --duplex long \
   --back-offset 0.5,-1 --out duplex.pdf
 ```

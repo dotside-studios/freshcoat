@@ -6,6 +6,7 @@ import {
 	type PrintProfile,
 	parsePrintProfile,
 	printTarget,
+	profileTarget,
 	YMCKO_DYE_SUB,
 } from "@freshcoat-js/for-print";
 import {
@@ -236,12 +237,17 @@ async function readPrint(
 	target: BatchOptions["printTarget"],
 	file: string | undefined,
 ): Promise<PresetPrint | undefined> {
-	if (target === undefined || target === "none") return undefined;
-	const id = PRINT_TARGETS[target];
+	if (target === "none" || (target === undefined && file === undefined)) return undefined;
+	const profile = file !== undefined ? await readPrintProfile(io, file) : undefined;
+	const id = target !== undefined ? PRINT_TARGETS[target] : profileTarget(profile as PrintProfile);
+	if (!printTarget(id))
+		throw new CliError(
+			`--print-profile ${file} was measured on ${id}, which this build cannot print to; add --print-target to use it anyway`,
+		);
 	const print: PresetPrint = {
 		enabled: true,
 		...(id !== DEFAULT_PRINT_TARGET.id ? { target: id } : {}),
-		...(file !== undefined ? { profile: await readPrintProfile(io, file) } : {}),
+		...(profile ? { profile } : {}),
 	};
 	const mismatch = printProfileMismatch(print);
 	if (mismatch)
