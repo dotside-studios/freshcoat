@@ -2492,7 +2492,7 @@ function drawMasked(
 		children: cmd.children,
 	};
 	const ctm = (canvas.getTotalMatrix() as number[]).slice(0, 6) as Affine;
-	const bounds = originInvariant(cmd.mask, ctm)
+	const bounds = originInvariant(cmd.mask, ctm, frame.grid ?? 1)
 		? layerBounds(ck, canvas, provider, images, bin, content, frame)
 		: null;
 	// A backdrop child blurs what lies beneath the mask, as Figma's does, so the
@@ -4617,7 +4617,7 @@ function layerBounds(
 	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
 	if (!(matrix[0] > 0 && matrix[4] > 0)) return null;
 	const ctm = matrix.slice(0, 6) as Affine;
-	if (!originInvariant(inner, ctm)) return null;
+	if (!originInvariant(inner, ctm, frame.grid ?? 1)) return null;
 	const device = exportPixelSize(frame, frame.scale);
 	const b = predictedBounds(
 		ck,
@@ -4697,9 +4697,11 @@ function layerPaintBoundable(cmd: DrawCommand): boolean {
 // rotations, gradients and sampled images can shift by an edge pixel or a whole
 // column. Rounded corners are accepted: their antialiased edge pixels can move
 // by up to 1/8 coverage (32 levels), which a blur or shadow carries to nearby
-// pixels. layer-bounds.test.ts holds them to that. `m` is the layer's scale and
+// pixels. A snapped grid of square modules is accepted too: its edges sit on
+// pixel boundaries, where float error adds at most a sliver of coverage.
+// layer-bounds.test.ts holds them to that. `m` is the layer's scale and
 // translate.
-function originInvariant(cmd: DrawCommand, m: Affine): boolean {
+function originInvariant(cmd: DrawCommand, m: Affine, grid = 1): boolean {
 	if (cmd.rotation || cmd.clip || needsShaderAdjust(cmd) || hasTexture(cmd))
 		return false;
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
@@ -4717,9 +4719,50 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 			!cmd.stroke?.gradient
 		);
 	if (cmd.op === "drawGroup")
-		return !cmd.snap && cmd.children.every((c) => originInvariant(c, m));
+		return cmd.snap
+			? pixelGridEdges(cmd, m, grid)
+			: cmd.children.every((c) => originInvariant(c, m, grid));
 	if (cmd.op === "drawBitmap") return nearestEdgesClear(cmd, m);
 	return cmd.op === "drawQr";
+}
+
+// Whether a snapped group lands every edge on a device pixel boundary: its grid
+// snaps to whole pixels, and it holds only solid paths of straight edges on
+// whole modules, such as a QR code's square modules.
+function pixelGridEdges(
+	cmd: DrawGroupCommand,
+	m: Affine,
+	grid: number,
+): boolean {
+	const snap = cmd.snap;
+	if (!snap) return false;
+	const r = snapModules(m, cmd.pos, cmd.size, snap.columns, snap.rows, grid);
+	if (!r) return false;
+	const whole = (v: number) => Number.isInteger(v / grid);
+	if (
+		![r.x, r.y, r.width / snap.columns, r.height / snap.rows].every(whole)
+	)
+		return false;
+	return cmd.children.every(
+		(c) =>
+			c.op === "drawPath" &&
+			!c.rotation &&
+			!c.clip &&
+			!c.adjust &&
+			!c.shadow &&
+			!c.blur &&
+			!c.stroke &&
+			(c.fills ?? []).every((f) => f.kind === "solid") &&
+			c.pos.x === cmd.pos.x &&
+			c.pos.y === cmd.pos.y &&
+			c.size.width === cmd.size.width &&
+			c.size.height === cmd.size.height &&
+			!c.viewBox?.x &&
+			!c.viewBox?.y &&
+			c.viewBox?.width === snap.columns &&
+			c.viewBox?.height === snap.rows &&
+			/^[MHVZ\d ]*$/.test(c.d),
+	);
 }
 
 // Whether every pixel edge of a nearest-sampled bitmap lands clear of device
