@@ -1,20 +1,20 @@
 import {
-	describePrintIssue,
 	imageDpiHints as coatImageDpiHints,
 	printHints as coatPrintHints,
-	type PrintIssueCode,
 	safeAreaHints as coatSafeAreaHints,
 	DEFAULT_MIN_IMAGE_DPI,
+	describePrintIssue,
 	hasInsets,
 	isPrintedCard,
+	type PrintIssueCode,
 	type Template,
 	templateBleed,
 	templateSafeArea,
 } from "@freshcoat-js/coatfile";
 import { DEFAULT_DPI, presetImageDpi } from "@freshcoat-js/workspace";
 import { keyOf, walkLayers } from "~/doc/path";
-import { useEditor } from "~/state/hooks";
 import { createExternalStore } from "~/state/external-store";
+import { useEditor } from "~/state/hooks";
 import { type EditorState, present } from "~/state/store";
 
 export {

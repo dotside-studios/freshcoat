@@ -264,14 +264,18 @@ describe("export from a workspace file in Node", () => {
 		const { result } = await exportFrom(file, preset, fileOutput(out));
 		expect(result.items[0]?.warnings).toBeUndefined();
 		expect(result.items[1]?.warnings).toEqual([
-			expect.stringMatching(/^Text is [\d.]+ pt at print size, below 6 pt: name$/),
+			expect.stringMatching(
+				/^Text is [\d.]+ pt at print size, below 6 pt: name$/,
+			),
 		]);
 		const zip = unzipSync(new Uint8Array(await readFile(out)));
 		const rows = new TextDecoder()
 			.decode(zip[REPORT_FILE_NAME])
 			.trim()
 			.split("\r\n");
-		expect(rows[2]).toMatch(/,"Text is [\d.]+ pt at print size, below 6 pt: name"$/);
+		expect(rows[2]).toMatch(
+			/,"Text is [\d.]+ pt at print size, below 6 pt: name"$/,
+		);
 	});
 
 	it("streams a zip to disk with a relative image source", async () => {

@@ -182,8 +182,8 @@ export {
 	imageFormat,
 	pdfLayout,
 	pdfRenderScale,
-	presetImageDpi,
 	planExport,
+	presetImageDpi,
 	unknownFileNameTokens,
 } from "./plan";
 export { duplicatePreset, newPreset } from "./presets";

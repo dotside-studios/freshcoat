@@ -189,9 +189,20 @@ function templateTextRuns(el: TextElement): TextRun[] {
 	});
 }
 
+type SideWidths = Partial<Record<"top" | "right" | "bottom" | "left", number>>;
+
+/** The thinnest side a stroke draws: its width, or with a width per side, the
+ *  narrowest side that has one. */
+function thinnestStroke(width: number | SideWidths | undefined): number | undefined {
+	if (width === undefined || typeof width === "number") return width;
+	const drawn = Object.values(width).filter((w): w is number => (w ?? 0) > 0);
+	return drawn.length > 0 ? Math.min(...drawn) : undefined;
+}
+
 function elementStrokeWidth(el: Element): number | undefined {
-	const stroke = (el.properties as { stroke?: { width: number } }).stroke;
-	return stroke?.width;
+	const stroke = (el.properties as { stroke?: { width: number | SideWidths } })
+		.stroke;
+	return thinnestStroke(stroke?.width);
 }
 
 function layerIssues(el: Element, o: Required<PrintCheckOptions>): PrintIssue[] {
@@ -315,8 +326,11 @@ export function printCheckWarnings(
 			for (const issue of textIssues(all, o)) add(layer, issue);
 		}
 		const stroke = (cmd as { stroke?: Stroke | TextStroke }).stroke;
+		const width = thinnestStroke(
+			stroke && "sides" in stroke && stroke.sides ? stroke.sides : stroke?.width,
+		);
 		const issue = strokeIssue(
-			stroke ? stroke.width * commandStrokeScale(cmd) : undefined,
+			width === undefined ? undefined : width * commandStrokeScale(cmd),
 			o,
 		);
 		if (issue) add(layer, issue);
