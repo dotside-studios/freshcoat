@@ -1052,17 +1052,20 @@ test("Data keeps its search, filters, sort and selection per dataset, and Export
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await page
 		.getByTestId("binding-editor")
 		.getByRole("button", { name: /Dataset/ })
 		.click();
 	await page.getByRole("option", { name: "People" }).click();
-	await page.getByRole("tab", { name: "Records" }).click();
+	await page.getByRole("radio", { name: "Records" }).click();
 	const use = page.getByTestId("use-data-selection");
 	await expect(use).toHaveText("Use 2 selected");
 	await use.click();
 	await expect(use).toBeHidden();
-	await expect(page.getByTestId("export-selection")).toHaveText("2 selected");
+	await expect(page.getByTestId("selection-bar")).toContainText(
+		"2 records selected",
+	);
 	await expect(
 		page
 			.getByTestId("export-records")

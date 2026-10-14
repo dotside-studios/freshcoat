@@ -14,12 +14,13 @@ import { Checkbox, Switch } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { ChevronRightIcon } from "@freshcoat-js/ui/icons";
+import { Menu, MenuItem, MenuSection } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { PanelSection } from "@freshcoat-js/ui/panel";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { Slider } from "@freshcoat-js/ui/slider";
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type {
 	CutKind,
@@ -47,7 +48,6 @@ import {
 	pdfLayout,
 	readOutputProfile,
 	sheetSummary,
-	unfilledRequired,
 	unknownFileNameTokens,
 } from "@freshcoat-js/workspace";
 import {
@@ -57,27 +57,35 @@ import {
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 } from "@freshcoat-js/workspace/export";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useRef, useState } from "react";
 import {
 	Disclosure,
 	DisclosurePanel,
 	FileTrigger,
 	Focusable,
+	MenuTrigger,
 	Button as RACButton,
 } from "react-aria-components";
 import { useController } from "~/app/context";
-import { BINDING, plural, VARIANT_EXPORT } from "~/app/copy";
+import { plural, VARIANT_EXPORT } from "~/app/copy";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
-import WarningIcon from "~icons/mingcute/warning-line";
 import { CalibrateDialog } from "./CalibrateDialog";
+import { ChecksList } from "./Checks";
+import { type Check, type CheckTarget, checksSummary } from "./checks";
+import type { ExportCollapsed, SettingsSectionId } from "./collapsed";
 import {
 	DESTINATION_LABEL,
 	fileNameExample,
+	fileNameTokenGroups,
+	filesSummary,
 	formatPageSize,
+	formatSummary,
+	printSummary,
 	RECORD_FILTERS,
 	settingsSummary,
+	sizeSummary,
 	sliceUse,
 } from "./export-ui";
 import { profileLabel } from "./print";
@@ -90,8 +98,6 @@ import {
 	withCopies,
 } from "./sheets";
 import { destinationSupport } from "./sinks";
-
-export type SettingsTab = "content" | "output" | "print" | "files";
 
 const DESTINATIONS: ExportDestination[] = ["download", "zip-file", "folder"];
 /** the coat engine's largest export side */
@@ -232,8 +238,9 @@ export function ExportSettings({
 	listSelection,
 	outputSize,
 	sheets = null,
-	tab,
-	onTabChange,
+	collapsed,
+	checks,
+	onCheckTarget,
 }: {
 	preset: ExportPreset;
 	template: Template | undefined;
@@ -244,8 +251,9 @@ export function ExportSettings({
 	outputSize?: { width: number; height: number } | null;
 	/** how the export lands on sheets, when it is laid out on them */
 	sheets?: SheetPlan | null;
-	tab: SettingsTab;
-	onTabChange: (tab: SettingsTab) => void;
+	collapsed: ExportCollapsed;
+	checks: readonly Check[];
+	onCheckTarget: (target: CheckTarget) => void;
 }) {
 	const controller = useController();
 	const templates = useEditor((s) => s.workspace?.templates);
@@ -282,13 +290,27 @@ export function ExportSettings({
 		useEditor((s) => s.workspace?.presets)?.filter(
 			(p) => p.templateId === preset.templateId,
 		).length ?? 0;
-	const unfilled =
-		template && datasets
-			? unfilledRequired(template, bindingOf, datasets).length
-			: 0;
+	const fileNameBox = useRef<HTMLDivElement>(null);
+	const tokenGroups = template ? fileNameTokenGroups(template, viewed) : [];
+	const insertToken = (token: string) => {
+		const input = fileNameBox.current?.querySelector("input");
+		const value = preset.fileName;
+		const start = input?.selectionStart ?? value.length;
+		const end = input?.selectionEnd ?? start;
+		const text = `{{${token}}}`;
+		set({ fileName: value.slice(0, start) + text + value.slice(end) });
+		requestAnimationFrame(() => {
+			input?.focus();
+			input?.setSelectionRange(start + text.length, start + text.length);
+		});
+	};
+	const recordCount = new Set(plan.map((item) => item.recordId)).size;
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col" data-testid="export-settings">
+		<div
+			className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+			data-testid="export-settings"
+		>
 			<PanelSection title="Preset">
 				<TextField
 					label="Name"
@@ -318,506 +340,565 @@ export function ExportSettings({
 					{settingsSummary(preset)}
 				</p>
 			</PanelSection>
-			<Tabs
-				selectedKey={tab}
-				onSelectionChange={(key) => onTabChange(key as SettingsTab)}
-				className="min-h-0 flex-1"
+			<SettingsSection
+				id="records"
+				title="Records"
+				summary={boundTo ? plural(recordCount, "record") : "Not bound"}
+				collapsed={collapsed}
 			>
-				<TabList aria-label="Export settings">
-					<Tab id="content">Content</Tab>
-					<Tab id="output">Output</Tab>
-					<Tab id="print">Print</Tab>
-					<Tab id="files">Files</Tab>
-				</TabList>
-				<TabPanel id="content">
-					<PanelSection
-						title={
-							<>
-								Template binding
-								{sharedBy > 1 ? (
-									<span
-										className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal"
-										data-testid="binding-shared"
-									>
-										{`used by ${plural(sharedBy, "preset")}`}
-									</span>
-								) : null}
-								{boundTo ? (
-									<span className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal">
-										{sharedBy > 1 ? `· ${boundTo}` : boundTo}
-									</span>
-								) : null}
-							</>
-						}
-						actions={
-							unfilled > 0 ? (
-								<span
-									className="flex items-center gap-1 whitespace-nowrap text-fc-sm text-fc-warning"
-									data-testid="binding-unfilled"
-								>
-									<WarningIcon className="size-3.5 shrink-0" />
-									{BINDING.unfilled(unfilled)}
-								</span>
-							) : null
-						}
-						// Folded once bound: the settings below are what an export changes.
-						defaultExpanded={!boundTo}
+				<Disclosure
+					className="group/more"
+					isExpanded={!collapsed.has("binding", !!boundTo)}
+					onExpandedChange={(open) => collapsed.set("binding", !open)}
+				>
+					<RACButton
+						slot="trigger"
+						className="flex h-fc-control w-full min-w-0 cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
 					>
+						<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
+						<span className="truncate">
+							Template binding
+							{sharedBy > 1 ? (
+								<span
+									className="ml-1.5 text-fc-faint"
+									data-testid="binding-shared"
+								>
+									{`used by ${plural(sharedBy, "preset")}`}
+								</span>
+							) : null}
+							{boundTo ? (
+								<span className="ml-1.5 text-fc-faint">
+									{sharedBy > 1 ? `· ${boundTo}` : boundTo}
+								</span>
+							) : null}
+						</span>
+					</RACButton>
+					<DisclosurePanel>
 						<TemplateBindingEditor templateId={preset.templateId} />
-					</PanelSection>
-					<PanelSection title="What">
+					</DisclosurePanel>
+				</Disclosure>
+				<Select
+					label="Records"
+					labelPosition="side"
+					value={preset.records}
+					onChange={(key) => {
+						const records = key as ExportPreset["records"];
+						if (records === preset.records) return;
+						if (records === "selected")
+							set({
+								records,
+								selected:
+									preset.selected && preset.selected.length > 0
+										? preset.selected
+										: listSelection,
+							});
+						else set({ records });
+					}}
+				>
+					{RECORD_FILTERS.map((f) => (
+						<SelectItem key={f.id} id={f.id} textValue={f.label}>
+							{f.label}
+						</SelectItem>
+					))}
+				</Select>
+				{preset.records === "selected" ? (
+					<Hint>
+						{`${plural(preset.selected?.length ?? 0, "record")} selected in the filmstrip or records list`}
+					</Hint>
+				) : null}
+				<fieldset className="m-0 flex min-w-0 items-start gap-2 border-0 p-0">
+					<legend className="float-left w-16 shrink-0 pt-1 text-fc-muted text-fc-sm">
+						Sides
+					</legend>
+					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
+						{sideNames.length > 1 ? (
+							<Checkbox
+								isSelected={preset.sides === "all"}
+								isIndeterminate={
+									preset.sides !== "all" && preset.sides.length > 0
+								}
+								onChange={(on) => set({ sides: on ? "all" : [] })}
+							>
+								All
+							</Checkbox>
+						) : null}
+						{sideNames.map((name) => (
+							<Checkbox
+								key={name}
+								isSelected={chosen.includes(name)}
+								onChange={(on) => toggleSide(name, on)}
+							>
+								{name}
+							</Checkbox>
+						))}
+					</div>
+				</fieldset>
+			</SettingsSection>
+			<SettingsSection
+				id="format"
+				title="Format"
+				summary={formatSummary(preset)}
+				collapsed={collapsed}
+			>
+				<SegmentedControl
+					aria-label="Format"
+					className={segmentedFull}
+					selectedKey={preset.format}
+					onSelectionChange={(key) =>
+						set({ format: key as ExportPreset["format"] })
+					}
+				>
+					<SegmentedItem id="png-zip" className={segmentedItemFull}>
+						PNG
+					</SegmentedItem>
+					<SegmentedItem id="jpeg-zip" className={segmentedItemFull}>
+						JPEG
+					</SegmentedItem>
+					<SegmentedItem id="webp-zip" className={segmentedItemFull}>
+						WebP
+					</SegmentedItem>
+					<SegmentedItem id="pdf" className={segmentedItemFull}>
+						PDF
+					</SegmentedItem>
+				</SegmentedControl>
+				{preset.format === "png-zip" ? (
+					<>
+						<Checkbox
+							isSelected={preset.pngAlpha === "keep"}
+							onChange={(keep) => set({ pngAlpha: keep ? "keep" : "auto" })}
+						>
+							Keep alpha channel
+						</Checkbox>
+						<Hint>32-bit even when opaque</Hint>
+					</>
+				) : null}
+				{pdf ? (
+					<Row label="Pages">
+						<SegmentedControl
+							aria-label="PDF page image"
+							className={segmentedFull}
+							selectedKey={preset.pdfPageImage ?? "png"}
+							onSelectionChange={(key) =>
+								set({
+									pdfPageImage:
+										key === "jpeg" || key === "vector" ? key : "png",
+								})
+							}
+						>
+							<SegmentedItem id="png" className={segmentedItemFull}>
+								PNG
+							</SegmentedItem>
+							<SegmentedItem id="jpeg" className={segmentedItemFull}>
+								JPEG
+							</SegmentedItem>
+							<SegmentedItem id="vector" className={segmentedItemFull}>
+								Vector
+							</SegmentedItem>
+						</SegmentedControl>
+					</Row>
+				) : null}
+				{pdf && preset.pdfPageImage === "vector" ? (
+					<>
+						<Row label="Text">
+							<SegmentedControl
+								aria-label="PDF text"
+								className={segmentedFull}
+								selectedKey={preset.pdfText ?? "embed"}
+								onSelectionChange={(key) =>
+									set({ pdfText: key === "outline" ? "outline" : "embed" })
+								}
+							>
+								<SegmentedItem id="embed" className={segmentedItemFull}>
+									Embed fonts
+								</SegmentedItem>
+								<SegmentedItem id="outline" className={segmentedItemFull}>
+									Outline
+								</SegmentedItem>
+							</SegmentedControl>
+						</Row>
+						{preset.pdfText === "outline" ? (
+							<Hint>Glyphs as shapes, no fonts in the PDF</Hint>
+						) : null}
+					</>
+				) : null}
+				{lossy ? (
+					<Row label="Quality">
+						<Slider
+							aria-label="Quality"
+							value={preset.quality ?? DEFAULT_QUALITY}
+							minValue={1}
+							maxValue={100}
+							step={1}
+							onChange={(quality) => set({ quality })}
+						/>
+					</Row>
+				) : null}
+				{pdf ? (
+					<>
+						<Row label="DPI">
+							<NumberField
+								aria-label="DPI"
+								value={preset.dpi}
+								min={36}
+								max={2400}
+								step={1}
+								precision={0}
+								onChange={(dpi) => set({ dpi })}
+							/>
+						</Row>
+						{template ? (
+							<Hint tone="muted" testId="export-page-size">
+								{`${sheets ? "Card" : "Page"} ${formatPageSize(sheets ? template : pageSize(template, preset), preset.dpi)}`
+									.split(" · ")
+									.map((part, i) => (
+										<Fragment key={part}>
+											{i > 0 ? " · " : null}
+											<span className="whitespace-nowrap">{part}</span>
+										</Fragment>
+									))}
+							</Hint>
+						) : null}
+						<Hint>
+							{sheets
+								? "Card size is the template size at this DPI"
+								: "Page size is the template size at this DPI"}
+						</Hint>
+					</>
+				) : null}
+			</SettingsSection>
+			<SettingsSection
+				id="size"
+				title="Size"
+				summary={sizeSummary(preset, outputSize)}
+				collapsed={collapsed}
+			>
+				<SegmentedControl
+					aria-label="Size"
+					className={segmentedFull}
+					selectedKey={size.kind}
+					onSelectionChange={(key) => {
+						if (key === size.kind) return;
+						if (key === "image" && photoFields[0])
+							set({
+								size: { kind: "image", field: photoFields[0].key },
+							});
+						else if (key === "template") set({ size: { kind: "template" } });
+					}}
+				>
+					<SegmentedItem id="template" className={segmentedItemFull}>
+						Template size
+					</SegmentedItem>
+					{photoFields.length === 0 ? (
+						<Unavailable reason="No image field in the template">
+							<SegmentedItem
+								id="image"
+								isDisabled
+								className={segmentedItemFull}
+							>
+								Match image
+							</SegmentedItem>
+						</Unavailable>
+					) : (
+						<SegmentedItem id="image" className={segmentedItemFull}>
+							Match image
+						</SegmentedItem>
+					)}
+				</SegmentedControl>
+				{size.kind === "image" ? (
+					<>
 						<Select
-							label="Records"
+							label="Image"
 							labelPosition="side"
-							value={preset.records}
+							value={size.field}
 							onChange={(key) => {
-								const records = key as ExportPreset["records"];
-								if (records === preset.records) return;
-								if (records === "selected")
-									set({
-										records,
-										selected:
-											preset.selected && preset.selected.length > 0
-												? preset.selected
-												: listSelection,
-									});
-								else set({ records });
+								if (typeof key === "string")
+									set({ size: { ...size, field: key } });
 							}}
 						>
-							{RECORD_FILTERS.map((f) => (
-								<SelectItem key={f.id} id={f.id} textValue={f.label}>
-									{f.label}
+							{photoFields.map(({ key }) => (
+								<SelectItem key={key} id={key} textValue={key}>
+									{key}
 								</SelectItem>
 							))}
 						</Select>
-						{preset.records === "selected" ? (
-							<Hint>
-								{`${plural(preset.selected?.length ?? 0, "record")} selected in the filmstrip or Records tab`}
-							</Hint>
-						) : null}
-						<fieldset className="m-0 flex min-w-0 items-start gap-2 border-0 p-0">
-							<legend className="float-left w-16 shrink-0 pt-1 text-fc-muted text-fc-sm">
-								Sides
-							</legend>
-							<div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
-								{sideNames.length > 1 ? (
-									<Checkbox
-										isSelected={preset.sides === "all"}
-										isIndeterminate={
-											preset.sides !== "all" && preset.sides.length > 0
-										}
-										onChange={(on) => set({ sides: on ? "all" : [] })}
-									>
-										All
-									</Checkbox>
-								) : null}
-								{sideNames.map((name) => (
-									<Checkbox
-										key={name}
-										isSelected={chosen.includes(name)}
-										onChange={(on) => toggleSide(name, on)}
-									>
-										{name}
-									</Checkbox>
-								))}
-							</div>
-						</fieldset>
-					</PanelSection>
-				</TabPanel>
-				<TabPanel id="output">
-					<PanelSection title="Size">
-						<SegmentedControl
-							aria-label="Size"
-							className={segmentedFull}
-							selectedKey={size.kind}
-							onSelectionChange={(key) => {
-								if (key === size.kind) return;
-								if (key === "image" && photoFields[0])
+						<div className="flex min-w-0 items-center gap-2">
+							<Checkbox
+								className="w-auto shrink-0"
+								isSelected={size.maxEdge !== undefined}
+								onChange={(on) => {
+									const { maxEdge: _drop, ...rest } = size;
 									set({
-										size: { kind: "image", field: photoFields[0].key },
+										size: on ? { ...rest, maxEdge: DEFAULT_LONG_EDGE } : rest,
 									});
-								else if (key === "template")
-									set({ size: { kind: "template" } });
-							}}
+								}}
+							>
+								Limit long edge
+							</Checkbox>
+							<div className="min-w-0 flex-1">
+								<NumberField
+									aria-label="Limit long edge to"
+									value={size.maxEdge ?? null}
+									placeholder="Full size"
+									isDisabled={size.maxEdge === undefined}
+									min={16}
+									max={MAX_EXPORT_EDGE}
+									step={100}
+									precision={0}
+									unit="px"
+									onChange={(edge) => set({ size: { ...size, maxEdge: edge } })}
+								/>
+							</div>
+						</div>
+					</>
+				) : (
+					<Row label="Scale">
+						<NumberField
+							aria-label="Scale"
+							value={preset.scale}
+							min={1}
+							max={4}
+							step={1}
+							precision={2}
+							unit="×"
+							onChange={(scale) => set({ scale })}
+						/>
+					</Row>
+				)}
+				{template && hasInsets(templateBleed(template)) ? (
+					<>
+						<Checkbox
+							isSelected={preset.bleed === true && size.kind === "template"}
+							isDisabled={size.kind === "image"}
+							onChange={(bleed) => set({ bleed })}
 						>
-							<SegmentedItem id="template" className={segmentedItemFull}>
-								Template size
-							</SegmentedItem>
-							{photoFields.length === 0 ? (
-								<Unavailable reason="No image field in the template">
+							Include bleed
+						</Checkbox>
+						{size.kind === "image" ? (
+							<Hint>{BLEED_NEEDS_TEMPLATE_SIZE}</Hint>
+						) : null}
+					</>
+				) : null}
+				{outputSize ? (
+					<Hint tone="muted" testId="export-output-size">
+						{size.kind === "image"
+							? `This photo: ${outputSize.width} × ${outputSize.height} px`
+							: `${outputSize.width} × ${outputSize.height} px`}
+					</Hint>
+				) : null}
+				{use.slices ? (
+					<>
+						<Checkbox
+							isSelected={exportSplit(preset) === "pieces"}
+							onChange={(on) => set({ split: on ? "pieces" : "none" })}
+						>
+							Split into slice pieces
+						</Checkbox>
+						{use.cuts && !pdf ? (
+							<Select
+								label="Cut file"
+								labelPosition="side"
+								value={exportCutFile(preset)}
+								onChange={(key) => set({ cutFile: key as ExportCutFile })}
+							>
+								{CUT_FILES.map(([id, label]) => (
+									<SelectItem key={id} id={id} textValue={label}>
+										{label}
+									</SelectItem>
+								))}
+							</Select>
+						) : null}
+						{use.cuts && pdf ? (
+							<Checkbox
+								isSelected={preset.cutLines === true}
+								onChange={(cutLines) => set({ cutLines })}
+							>
+								Cut lines
+							</Checkbox>
+						) : null}
+						{use.cuts && pdf && preset.cutLines === true ? (
+							<CutSpotFields
+								edges={use.edges}
+								spots={preset.cutSpots}
+								onChange={(cutSpots) => set({ cutSpots })}
+							/>
+						) : null}
+					</>
+				) : null}
+			</SettingsSection>
+			<SettingsSection
+				id="print"
+				title="Print"
+				summary={printSummary(preset)}
+				collapsed={collapsed}
+			>
+				{pdf ? (
+					<LayoutGroup
+						preset={preset}
+						sheets={sheets}
+						sided={sideNames.length > 1}
+						onChange={(layout) => set({ layout })}
+					/>
+				) : null}
+				{pdf ? (
+					<OutputIntentGroup
+						preset={preset}
+						onChange={(outputIntent, profile) => set({ outputIntent }, profile)}
+					/>
+				) : null}
+				<PrintGroup preset={preset} onChange={(print) => set({ print })} />
+			</SettingsSection>
+			<SettingsSection
+				id="files"
+				title="Files"
+				summary={filesSummary(preset)}
+				collapsed={collapsed}
+			>
+				{pdf ? (
+					<p className="m-0 text-fc-faint text-fc-sm">
+						A PDF is built in memory, then downloaded
+					</p>
+				) : (
+					<>
+						<SegmentedControl
+							aria-label="Destination"
+							className={segmentedFull}
+							selectedKey={destination}
+							onSelectionChange={(key) =>
+								set({ destination: key as ExportDestination })
+							}
+						>
+							{DESTINATIONS.map((d) => {
+								const reason = support[d];
+								const item = (
 									<SegmentedItem
-										id="image"
-										isDisabled
+										key={d}
+										id={d}
+										isDisabled={!!reason}
 										className={segmentedItemFull}
 									>
-										Match image
+										{DESTINATION_LABEL[d]}
 									</SegmentedItem>
-								</Unavailable>
-							) : (
-								<SegmentedItem id="image" className={segmentedItemFull}>
-									Match image
-								</SegmentedItem>
-							)}
-						</SegmentedControl>
-						{size.kind === "image" ? (
-							<>
-								<Select
-									label="Image"
-									labelPosition="side"
-									value={size.field}
-									onChange={(key) => {
-										if (typeof key === "string")
-											set({ size: { ...size, field: key } });
-									}}
-								>
-									{photoFields.map(({ key }) => (
-										<SelectItem key={key} id={key} textValue={key}>
-											{key}
-										</SelectItem>
-									))}
-								</Select>
-								<div className="flex min-w-0 items-center gap-2">
-									<Checkbox
-										className="w-auto shrink-0"
-										isSelected={size.maxEdge !== undefined}
-										onChange={(on) => {
-											const { maxEdge: _drop, ...rest } = size;
-											set({
-												size: on
-													? { ...rest, maxEdge: DEFAULT_LONG_EDGE }
-													: rest,
-											});
-										}}
-									>
-										Limit long edge
-									</Checkbox>
-									<div className="min-w-0 flex-1">
-										<NumberField
-											aria-label="Limit long edge to"
-											value={size.maxEdge ?? null}
-											placeholder="Full size"
-											isDisabled={size.maxEdge === undefined}
-											min={16}
-											max={MAX_EXPORT_EDGE}
-											step={100}
-											precision={0}
-											unit="px"
-											onChange={(edge) =>
-												set({ size: { ...size, maxEdge: edge } })
-											}
-										/>
-									</div>
-								</div>
-							</>
-						) : (
-							<Row label="Scale">
-								<NumberField
-									aria-label="Scale"
-									value={preset.scale}
-									min={1}
-									max={4}
-									step={1}
-									precision={2}
-									unit="×"
-									onChange={(scale) => set({ scale })}
-								/>
-							</Row>
-						)}
-						{template && hasInsets(templateBleed(template)) ? (
-							<>
-								<Checkbox
-									isSelected={preset.bleed === true && size.kind === "template"}
-									isDisabled={size.kind === "image"}
-									onChange={(bleed) => set({ bleed })}
-								>
-									Include bleed
-								</Checkbox>
-								{size.kind === "image" ? (
-									<Hint>{BLEED_NEEDS_TEMPLATE_SIZE}</Hint>
-								) : null}
-							</>
-						) : null}
-						{outputSize ? (
-							<Hint tone="muted" testId="export-output-size">
-								{size.kind === "image"
-									? `This photo: ${outputSize.width} × ${outputSize.height} px`
-									: `${outputSize.width} × ${outputSize.height} px`}
-							</Hint>
-						) : null}
-					</PanelSection>
-					<PanelSection title="Format">
-						<SegmentedControl
-							aria-label="Format"
-							className={segmentedFull}
-							selectedKey={preset.format}
-							onSelectionChange={(key) =>
-								set({ format: key as ExportPreset["format"] })
-							}
-						>
-							<SegmentedItem id="png-zip" className={segmentedItemFull}>
-								PNG
-							</SegmentedItem>
-							<SegmentedItem id="jpeg-zip" className={segmentedItemFull}>
-								JPEG
-							</SegmentedItem>
-							<SegmentedItem id="webp-zip" className={segmentedItemFull}>
-								WebP
-							</SegmentedItem>
-							<SegmentedItem id="pdf" className={segmentedItemFull}>
-								PDF
-							</SegmentedItem>
-						</SegmentedControl>
-						{preset.format === "png-zip" ? (
-							<>
-								<Checkbox
-									isSelected={preset.pngAlpha === "keep"}
-									onChange={(keep) => set({ pngAlpha: keep ? "keep" : "auto" })}
-								>
-									Keep alpha channel
-								</Checkbox>
-								<Hint>32-bit even when opaque</Hint>
-							</>
-						) : null}
-						{pdf ? (
-							<Row label="Pages">
-								<SegmentedControl
-									aria-label="PDF page image"
-									className={segmentedFull}
-									selectedKey={preset.pdfPageImage ?? "png"}
-									onSelectionChange={(key) =>
-										set({
-											pdfPageImage:
-												key === "jpeg" || key === "vector" ? key : "png",
-										})
-									}
-								>
-									<SegmentedItem id="png" className={segmentedItemFull}>
-										PNG
-									</SegmentedItem>
-									<SegmentedItem id="jpeg" className={segmentedItemFull}>
-										JPEG
-									</SegmentedItem>
-									<SegmentedItem id="vector" className={segmentedItemFull}>
-										Vector
-									</SegmentedItem>
-								</SegmentedControl>
-							</Row>
-						) : null}
-						{pdf && preset.pdfPageImage === "vector" ? (
-							<>
-								<Row label="Text">
-									<SegmentedControl
-										aria-label="PDF text"
-										className={segmentedFull}
-										selectedKey={preset.pdfText ?? "embed"}
-										onSelectionChange={(key) =>
-											set({ pdfText: key === "outline" ? "outline" : "embed" })
-										}
-									>
-										<SegmentedItem id="embed" className={segmentedItemFull}>
-											Embed fonts
-										</SegmentedItem>
-										<SegmentedItem id="outline" className={segmentedItemFull}>
-											Outline
-										</SegmentedItem>
-									</SegmentedControl>
-								</Row>
-								{preset.pdfText === "outline" ? (
-									<Hint>Glyphs as shapes, no fonts in the PDF</Hint>
-								) : null}
-							</>
-						) : null}
-						{lossy ? (
-							<Row label="Quality">
-								<Slider
-									aria-label="Quality"
-									value={preset.quality ?? DEFAULT_QUALITY}
-									minValue={1}
-									maxValue={100}
-									step={1}
-									onChange={(quality) => set({ quality })}
-								/>
-							</Row>
-						) : null}
-						{pdf ? (
-							<>
-								<Row label="DPI">
-									<NumberField
-										aria-label="DPI"
-										value={preset.dpi}
-										min={36}
-										max={2400}
-										step={1}
-										precision={0}
-										onChange={(dpi) => set({ dpi })}
-									/>
-								</Row>
-								{template ? (
-									<Hint tone="muted" testId="export-page-size">
-										{`${sheets ? "Card" : "Page"} ${formatPageSize(sheets ? template : pageSize(template, preset), preset.dpi)}`
-											.split(" · ")
-											.map((part, i) => (
-												<Fragment key={part}>
-													{i > 0 ? " · " : null}
-													<span className="whitespace-nowrap">{part}</span>
-												</Fragment>
-											))}
-									</Hint>
-								) : null}
-								<Hint>
-									{sheets
-										? "Card size is the template size at this DPI"
-										: "Page size is the template size at this DPI"}
-								</Hint>
-							</>
-						) : null}
-					</PanelSection>
-					{use.slices ? (
-						<PanelSection title="Slices">
-							<Checkbox
-								isSelected={exportSplit(preset) === "pieces"}
-								onChange={(on) => set({ split: on ? "pieces" : "none" })}
-							>
-								Split into slice pieces
-							</Checkbox>
-							{use.cuts && !pdf ? (
-								<Select
-									label="Cut file"
-									labelPosition="side"
-									value={exportCutFile(preset)}
-									onChange={(key) => set({ cutFile: key as ExportCutFile })}
-								>
-									{CUT_FILES.map(([id, label]) => (
-										<SelectItem key={id} id={id} textValue={label}>
-											{label}
-										</SelectItem>
-									))}
-								</Select>
-							) : null}
-							{use.cuts && pdf ? (
-								<Checkbox
-									isSelected={preset.cutLines === true}
-									onChange={(cutLines) => set({ cutLines })}
-								>
-									Cut lines
-								</Checkbox>
-							) : null}
-							{use.cuts && pdf && preset.cutLines === true ? (
-								<CutSpotFields
-									edges={use.edges}
-									spots={preset.cutSpots}
-									onChange={(cutSpots) => set({ cutSpots })}
-								/>
-							) : null}
-						</PanelSection>
-					) : null}
-				</TabPanel>
-				<TabPanel id="print">
-					{pdf ? (
-						<LayoutGroup
-							preset={preset}
-							sheets={sheets}
-							sided={sideNames.length > 1}
-							onChange={(layout) => set({ layout })}
-						/>
-					) : null}
-					{pdf ? (
-						<OutputIntentGroup
-							preset={preset}
-							onChange={(outputIntent, profile) =>
-								set({ outputIntent }, profile)
-							}
-						/>
-					) : null}
-					<PrintGroup preset={preset} onChange={(print) => set({ print })} />
-				</TabPanel>
-				<TabPanel id="files">
-					<PanelSection title="Destination">
-						{pdf ? (
-							<p className="m-0 text-fc-faint text-fc-sm">
-								A PDF is built in memory, then downloaded
-							</p>
-						) : (
-							<>
-								<SegmentedControl
-									aria-label="Destination"
-									className={segmentedFull}
-									selectedKey={destination}
-									onSelectionChange={(key) =>
-										set({ destination: key as ExportDestination })
-									}
-								>
-									{DESTINATIONS.map((d) => {
-										const reason = support[d];
-										const item = (
-											<SegmentedItem
-												key={d}
-												id={d}
-												isDisabled={!!reason}
-												className={segmentedItemFull}
-											>
-												{DESTINATION_LABEL[d]}
-											</SegmentedItem>
-										);
-										return reason ? (
-											<Unavailable key={d} reason={reason}>
-												{item}
-											</Unavailable>
-										) : (
-											item
-										);
-									})}
-								</SegmentedControl>
-								{support[destination] ? (
-									<Hint tone="warning">{support[destination]}</Hint>
+								);
+								return reason ? (
+									<Unavailable key={d} reason={reason}>
+										{item}
+									</Unavailable>
 								) : (
-									<p className="m-0 text-fc-faint text-fc-sm">
-										{DESTINATION_HINT[destination]}
-									</p>
-								)}
-							</>
-						)}
-					</PanelSection>
-					<PanelSection title="File names">
-						<TextField
-							aria-label="File name pattern"
-							value={preset.fileName}
-							placeholder={DEFAULT_FILE_NAME_PATTERN}
-							onChange={(fileName) => set({ fileName })}
-							inputClassName="font-fc-mono"
-						/>
-						<p
-							className="m-0 truncate text-fc-muted text-fc-sm"
-							data-testid="export-file-example"
-							title={example}
-						>
-							<span className="text-fc-faint">e.g. </span>
-							<span className="font-fc-mono">{example}</span>
-						</p>
-						{unknownTokens.length > 0 ? (
-							<p
-								className="m-0 text-fc-sm text-fc-warning"
-								data-testid="export-file-name-unknown"
-							>
-								{VARIANT_EXPORT.unknownTokens(unknownTokens)}
+									item
+								);
+							})}
+						</SegmentedControl>
+						{support[destination] ? (
+							<Hint tone="warning">{support[destination]}</Hint>
+						) : (
+							<p className="m-0 text-fc-faint text-fc-sm">
+								{DESTINATION_HINT[destination]}
 							</p>
-						) : null}
-						<p
-							className="m-0 text-fc-faint text-fc-sm"
-							data-testid="export-file-tokens"
-						>
-							{VARIANT_EXPORT.fileNameTokens(use.slices)}
-						</p>
-						<Checkbox
-							isSelected={preset.markExported}
-							onChange={(markExported) => set({ markExported })}
-						>
-							Mark exported records
-						</Checkbox>
-					</PanelSection>
-				</TabPanel>
-			</Tabs>
+						)}
+					</>
+				)}
+				<div ref={fileNameBox} className="flex min-w-0 items-center gap-1">
+					<TextField
+						aria-label="File name pattern"
+						className="flex-1"
+						value={preset.fileName}
+						placeholder={DEFAULT_FILE_NAME_PATTERN}
+						onChange={(fileName) => set({ fileName })}
+						inputClassName="font-fc-mono"
+					/>
+					<MenuTrigger>
+						<Button>Insert field</Button>
+						<Popover placement="bottom end">
+							<Menu
+								aria-label="Insert field"
+								onAction={(token) => insertToken(String(token))}
+							>
+								{tokenGroups.map((group) => (
+									<MenuSection key={group.title} title={group.title}>
+										{group.tokens.map((token) => (
+											<MenuItem key={token} id={token}>
+												{token}
+											</MenuItem>
+										))}
+									</MenuSection>
+								))}
+							</Menu>
+						</Popover>
+					</MenuTrigger>
+				</div>
+				<p
+					className="m-0 truncate text-fc-muted text-fc-sm"
+					data-testid="export-file-example"
+					title={example}
+				>
+					<span className="text-fc-faint">e.g. </span>
+					<span className="font-fc-mono">{example}</span>
+				</p>
+				{unknownTokens.length > 0 ? (
+					<p
+						className="m-0 text-fc-sm text-fc-warning"
+						data-testid="export-file-name-unknown"
+					>
+						{VARIANT_EXPORT.unknownTokens(unknownTokens)}
+					</p>
+				) : null}
+				<p
+					className="m-0 text-fc-faint text-fc-sm"
+					data-testid="export-file-tokens"
+				>
+					{VARIANT_EXPORT.fileNameTokens(use.slices)}
+				</p>
+				<Checkbox
+					isSelected={preset.markExported}
+					onChange={(markExported) => set({ markExported })}
+				>
+					Mark exported records
+				</Checkbox>
+			</SettingsSection>
+			<SettingsSection
+				id="checks"
+				title="Checks"
+				summary={checksSummary(checks)}
+				collapsed={collapsed}
+			>
+				<ChecksList checks={checks} onTarget={onCheckTarget} />
+			</SettingsSection>
 		</div>
+	);
+}
+
+function SettingsSection({
+	id,
+	title,
+	summary,
+	collapsed,
+	children,
+}: {
+	id: SettingsSectionId;
+	title: string;
+	summary: string;
+	collapsed: ExportCollapsed;
+	children: ReactNode;
+}) {
+	return (
+		<PanelSection
+			data-section={id}
+			title={
+				<>
+					{title}
+					<span
+						className="ml-1.5 font-normal text-fc-faint normal-case tracking-normal group-data-expanded/section:hidden"
+						data-testid={`export-summary-${id}`}
+					>
+						{summary}
+					</span>
+				</>
+			}
+			isExpanded={!collapsed.has(id)}
+			onExpandedChange={(open) => collapsed.set(id, !open)}
+		>
+			{children}
+		</PanelSection>
 	);
 }
 
@@ -870,124 +951,120 @@ function PrintGroup({
 		onChange(rest);
 	};
 	return (
-		<PanelSection title="Print">
-			<div data-testid="export-print" className="contents">
-				<Select
-					label="Print target"
-					labelPosition="side"
-					value={
-						print.enabled
-							? (print.target ?? DEFAULT_PRINT_TARGET.id)
-							: NO_TARGET
-					}
-					triggerValue={
-						print.enabled ? printTarget(print.target)?.shortName : undefined
-					}
-					onChange={(key) => onChange(withTarget(print, String(key)))}
-				>
-					<SelectItem id={NO_TARGET} textValue="None">
-						None
+		<div data-testid="export-print" className="contents">
+			<Select
+				label="Print target"
+				labelPosition="side"
+				value={
+					print.enabled ? (print.target ?? DEFAULT_PRINT_TARGET.id) : NO_TARGET
+				}
+				triggerValue={
+					print.enabled ? printTarget(print.target)?.shortName : undefined
+				}
+				onChange={(key) => onChange(withTarget(print, String(key)))}
+			>
+				<SelectItem id={NO_TARGET} textValue="None">
+					None
+				</SelectItem>
+				{PRINT_TARGETS.map((t) => (
+					<SelectItem key={t.id} id={t.id} textValue={t.name}>
+						{t.name}
 					</SelectItem>
-					{PRINT_TARGETS.map((t) => (
-						<SelectItem key={t.id} id={t.id} textValue={t.name}>
-							{t.name}
-						</SelectItem>
-					))}
-				</Select>
-				{print.enabled ? (
-					<>
-						<Row label="Profile">
-							<div
-								className="flex min-h-fc-control min-w-0 items-center gap-1"
-								data-testid="export-print-profile"
-							>
-								{label ? (
-									<>
-										<span
-											className="min-w-0 flex-1 truncate text-fc-base text-fc-text"
-											title={label.name}
-										>
-											{label.name}
+				))}
+			</Select>
+			{print.enabled ? (
+				<>
+					<Row label="Profile">
+						<div
+							className="flex min-h-fc-control min-w-0 items-center gap-1"
+							data-testid="export-print-profile"
+						>
+							{label ? (
+								<>
+									<span
+										className="min-w-0 flex-1 truncate text-fc-base text-fc-text"
+										title={label.name}
+									>
+										{label.name}
+									</span>
+									{label.date ? (
+										<span className="shrink-0 text-fc-faint text-fc-sm tabular-nums">
+											{label.date}
 										</span>
-										{label.date ? (
-											<span className="shrink-0 text-fc-faint text-fc-sm tabular-nums">
-												{label.date}
-											</span>
-										) : null}
-										<IconButton
-											aria-label="Remove profile"
-											tooltip="Remove profile"
-											onPress={removeProfile}
-										>
-											<CloseIcon />
-										</IconButton>
-									</>
-								) : (
-									<>
-										<span className="min-w-0 flex-1 text-fc-muted text-fc-sm">
-											None
-										</span>
-										<Button onPress={() => setMeasuring(true)}>Measure…</Button>
-										<FileTrigger
-											acceptedFileTypes={["application/json", ".json"]}
-											onSelect={(files) => void importProfile(files)}
-										>
-											<Button>Import…</Button>
-										</FileTrigger>
-									</>
-								)}
-							</div>
-						</Row>
-						{mismatch ? (
-							<Hint tone="warning" testId="export-print-profile-mismatch">
-								Profile was measured on {targetName(mismatch.profileTarget)},
-								not {targetName(mismatch.presetTarget)}
-							</Hint>
-						) : null}
-						<CalibrateDialog
-							isOpen={measuring}
-							onOpenChange={setMeasuring}
-							onSave={(measured) => {
-								setError(null);
-								onChange({
-									...print,
-									profile: {
-										...measured,
-										target: print.target ?? DEFAULT_PRINT_TARGET.id,
-									},
-								});
-							}}
-						/>
-						{error ? (
-							<p
-								role="alert"
-								className="m-0 pl-18 text-fc-danger-text text-fc-sm"
-								data-testid="export-print-profile-error"
+									) : null}
+									<IconButton
+										aria-label="Remove profile"
+										tooltip="Remove profile"
+										onPress={removeProfile}
+									>
+										<CloseIcon />
+									</IconButton>
+								</>
+							) : (
+								<>
+									<span className="min-w-0 flex-1 text-fc-muted text-fc-sm">
+										None
+									</span>
+									<Button onPress={() => setMeasuring(true)}>Measure…</Button>
+									<FileTrigger
+										acceptedFileTypes={["application/json", ".json"]}
+										onSelect={(files) => void importProfile(files)}
+									>
+										<Button>Import…</Button>
+									</FileTrigger>
+								</>
+							)}
+						</div>
+					</Row>
+					{mismatch ? (
+						<Hint tone="warning" testId="export-print-profile-mismatch">
+							Profile was measured on {targetName(mismatch.profileTarget)}, not{" "}
+							{targetName(mismatch.presetTarget)}
+						</Hint>
+					) : null}
+					<CalibrateDialog
+						isOpen={measuring}
+						onOpenChange={setMeasuring}
+						onSave={(measured) => {
+							setError(null);
+							onChange({
+								...print,
+								profile: {
+									...measured,
+									target: print.target ?? DEFAULT_PRINT_TARGET.id,
+								},
+							});
+						}}
+					/>
+					{error ? (
+						<p
+							role="alert"
+							className="m-0 pl-18 text-fc-danger-text text-fc-sm"
+							data-testid="export-print-profile-error"
+						>
+							{error}
+						</p>
+					) : null}
+					<Disclosure className="group/more">
+						<RACButton
+							slot="trigger"
+							className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
+						>
+							<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
+							More
+						</RACButton>
+						<DisclosurePanel>
+							<Switch
+								isSelected={print.analyze ?? true}
+								onChange={(analyze) => onChange({ ...print, analyze })}
 							>
-								{error}
-							</p>
-						) : null}
-						<Disclosure className="group/more">
-							<RACButton
-								slot="trigger"
-								className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
-							>
-								<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
-								More
-							</RACButton>
-							<DisclosurePanel>
-								<Switch
-									isSelected={print.analyze ?? true}
-									onChange={(analyze) => onChange({ ...print, analyze })}
-								>
-									Analyze photos
-								</Switch>
-							</DisclosurePanel>
-						</Disclosure>
-					</>
-				) : null}
-			</div>
-		</PanelSection>
+								Analyze photos
+							</Switch>
+						</DisclosurePanel>
+					</Disclosure>
+				</>
+			) : null}
+		</div>
 	);
 }
 
@@ -1028,61 +1105,59 @@ function OutputIntentGroup({
 		onChange({ kind: "profile", sha256: read.profile.sha256 }, read.profile);
 	};
 	return (
-		<PanelSection title="Color">
-			<div data-testid="export-output-intent" className="contents">
-				<Row label="Intent">
-					<Select
-						aria-label="Output intent"
-						value={intent.kind}
-						onChange={(key) => {
-							setError(null);
-							if (key === "srgb" || key === "none") onChange({ kind: key });
-						}}
-					>
-						<SelectItem id="srgb" textValue="sRGB">
-							sRGB
+		<div data-testid="export-output-intent" className="contents">
+			<Row label="Intent">
+				<Select
+					aria-label="Output intent"
+					value={intent.kind}
+					onChange={(key) => {
+						setError(null);
+						if (key === "srgb" || key === "none") onChange({ kind: key });
+					}}
+				>
+					<SelectItem id="srgb" textValue="sRGB">
+						sRGB
+					</SelectItem>
+					{intent.kind === "profile" ? (
+						<SelectItem id="profile" textValue={profileName}>
+							{profileName}
 						</SelectItem>
-						{intent.kind === "profile" ? (
-							<SelectItem id="profile" textValue={profileName}>
-								{profileName}
-							</SelectItem>
-						) : null}
-						<SelectItem id="none" textValue="None">
-							None
-						</SelectItem>
-					</Select>
-				</Row>
-				<div className="pl-18">
-					<FileTrigger
-						acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
-						onSelect={(files) => void choose(files)}
-					>
-						<Button>Custom profile…</Button>
-					</FileTrigger>
-				</div>
-				{error ? (
-					<p
-						role="alert"
-						className="m-0 pl-18 text-fc-danger-text text-fc-sm"
-						data-testid="export-output-intent-error"
-					>
-						{error}
-					</p>
-				) : intent.kind === "profile" && !profile ? (
-					<Hint tone="warning" testId="export-output-intent-hint">
-						The profile is not in this workspace; choose it again
-					</Hint>
-				) : (
-					<Hint testId="export-output-intent-hint">
-						{intent.kind === "profile"
-							? "Cards stay sRGB; the printer converts them to this profile"
-							: intent.kind === "none"
-								? "No intent: each printer reads the colors its own way"
-								: "Declares sRGB, the space cards are drawn in"}
-					</Hint>
-				)}
+					) : null}
+					<SelectItem id="none" textValue="None">
+						None
+					</SelectItem>
+				</Select>
+			</Row>
+			<div className="pl-18">
+				<FileTrigger
+					acceptedFileTypes={[".icc", ".icm", "application/vnd.iccprofile"]}
+					onSelect={(files) => void choose(files)}
+				>
+					<Button>Custom profile…</Button>
+				</FileTrigger>
 			</div>
-		</PanelSection>
+			{error ? (
+				<p
+					role="alert"
+					className="m-0 pl-18 text-fc-danger-text text-fc-sm"
+					data-testid="export-output-intent-error"
+				>
+					{error}
+				</p>
+			) : intent.kind === "profile" && !profile ? (
+				<Hint tone="warning" testId="export-output-intent-hint">
+					The profile is not in this workspace; choose it again
+				</Hint>
+			) : (
+				<Hint testId="export-output-intent-hint">
+					{intent.kind === "profile"
+						? "Cards stay sRGB; the printer converts them to this profile"
+						: intent.kind === "none"
+							? "No intent: each printer reads the colors its own way"
+							: "Declares sRGB, the space cards are drawn in"}
+				</Hint>
+			)}
+		</div>
 	);
 }
 
@@ -1141,284 +1216,293 @@ function LayoutGroup({
 	const paper = sheet ? paperChoice(sheet) : "a4";
 	const custom = sheet && typeof sheet.paper !== "string" ? sheet.paper : null;
 	const offset = sheet?.backOffsetMm ?? { x: 0, y: 0 };
+	const marksOn = !!sheet && (sheet.cropMarks || !!sheet.registrationMarks);
 	return (
-		<PanelSection title="Layout">
-			<div data-testid="export-layout" className="contents">
-				<SegmentedControl
-					aria-label="Layout"
-					className={segmentedFull}
-					selectedKey={layout.kind}
-					onSelectionChange={(key) => {
-						if (key === layout.kind) return;
-						onChange(key === "sheet" ? sheetsFor(preset) : { kind: "single" });
-					}}
-				>
-					<SegmentedItem id="single" className={segmentedItemFull}>
-						One per page
-					</SegmentedItem>
-					{photoSized && !sheet ? (
-						<Unavailable reason={SHEETS_NEED_TEMPLATE_SIZE}>
-							<SegmentedItem
-								id="sheet"
-								isDisabled
-								className={segmentedItemFull}
-							>
-								Sheets
-							</SegmentedItem>
-						</Unavailable>
-					) : (
-						<SegmentedItem id="sheet" className={segmentedItemFull}>
+		<div data-testid="export-layout" className="contents">
+			<SegmentedControl
+				aria-label="Layout"
+				className={segmentedFull}
+				selectedKey={layout.kind}
+				onSelectionChange={(key) => {
+					if (key === layout.kind) return;
+					onChange(key === "sheet" ? sheetsFor(preset) : { kind: "single" });
+				}}
+			>
+				<SegmentedItem id="single" className={segmentedItemFull}>
+					One per page
+				</SegmentedItem>
+				{photoSized && !sheet ? (
+					<Unavailable reason={SHEETS_NEED_TEMPLATE_SIZE}>
+						<SegmentedItem id="sheet" isDisabled className={segmentedItemFull}>
 							Sheets
 						</SegmentedItem>
-					)}
-				</SegmentedControl>
-				{sheet ? (
-					<>
-						<Select
-							label="Paper"
-							labelPosition="side"
-							value={paper}
-							onChange={(key) => {
-								const next = key as PaperChoice;
-								if (next === paper) return;
-								patch({
-									paper: next === "custom" ? paperSize(sheet) : next,
-								});
-							}}
-						>
-							{PAPER_CHOICES.map((id) => (
-								<SelectItem key={id} id={id} textValue={PAPER_LABEL[id]}>
-									{PAPER_LABEL[id]}
-								</SelectItem>
-							))}
-						</Select>
-						{custom ? (
-							<Row label="Size">
-								<div className="flex min-w-0 gap-1">
-									<NumberField
-										label="W"
-										aria-label="Paper width"
-										value={custom.widthMm}
-										min={10}
-										max={2000}
-										step={1}
-										precision={1}
-										unit="mm"
-										onChange={(widthMm) =>
-											patch({ paper: { ...custom, widthMm } })
-										}
-									/>
-									<NumberField
-										label="H"
-										aria-label="Paper height"
-										value={custom.heightMm}
-										min={10}
-										max={2000}
-										step={1}
-										precision={1}
-										unit="mm"
-										onChange={(heightMm) =>
-											patch({ paper: { ...custom, heightMm } })
-										}
-									/>
-								</div>
-							</Row>
-						) : null}
-						<Row label="Orientation">
-							<SegmentedControl
-								aria-label="Orientation"
-								className={segmentedFull}
-								selectedKey={sheet.orientation}
-								onSelectionChange={(key) =>
-									patch({
-										orientation: key as SheetLayout["orientation"],
-									})
-								}
-							>
-								{ORIENTATIONS.map((o) => (
-									<SegmentedItem
-										key={o.id}
-										id={o.id}
-										className={segmentedItemFull}
-									>
-										{o.label}
-									</SegmentedItem>
-								))}
-							</SegmentedControl>
-						</Row>
-						<Row label="Margin">
-							<MmField
-								label="Margin"
-								value={sheet.marginMm}
-								onChange={(marginMm) => patch({ marginMm })}
-							/>
-						</Row>
-						<Row label="Gap">
-							<MmField
-								label="Gap"
-								value={sheet.gapMm}
-								onChange={(gapMm) => patch({ gapMm })}
-							/>
-						</Row>
-						{sheets?.imposition?.bleedMm &&
-						sheets.imposition.gapMm > sheet.gapMm ? (
-							<Hint testId="export-bleed-gap">
-								{`Gap widened to ${Math.round(sheets.imposition.gapMm * 10) / 10} mm for bleed`}
-							</Hint>
-						) : null}
-						<Row label="Copies">
-							<div className="flex min-w-0 items-center gap-2">
+					</Unavailable>
+				) : (
+					<SegmentedItem id="sheet" className={segmentedItemFull}>
+						Sheets
+					</SegmentedItem>
+				)}
+			</SegmentedControl>
+			{sheet ? (
+				<>
+					<Select
+						label="Paper"
+						labelPosition="side"
+						value={paper}
+						onChange={(key) => {
+							const next = key as PaperChoice;
+							if (next === paper) return;
+							patch({
+								paper: next === "custom" ? paperSize(sheet) : next,
+							});
+						}}
+					>
+						{PAPER_CHOICES.map((id) => (
+							<SelectItem key={id} id={id} textValue={PAPER_LABEL[id]}>
+								{PAPER_LABEL[id]}
+							</SelectItem>
+						))}
+					</Select>
+					{custom ? (
+						<Row label="Size">
+							<div className="flex min-w-0 gap-1">
 								<NumberField
-									aria-label="Copies"
-									value={
-										sheet.copies === "fill"
-											? (sheets?.imposition?.copies ?? 1)
-											: (sheet.copies ?? 1)
-									}
-									min={1}
-									max={999}
+									label="W"
+									aria-label="Paper width"
+									value={custom.widthMm}
+									min={10}
+									max={2000}
 									step={1}
-									precision={0}
-									isDisabled={sheet.copies === "fill"}
-									onChange={(copies) =>
-										onChange(withCopies(sheet, Math.max(1, Math.round(copies))))
+									precision={1}
+									unit="mm"
+									onChange={(widthMm) =>
+										patch({ paper: { ...custom, widthMm } })
 									}
 								/>
-								<Checkbox
-									isSelected={sheet.copies === "fill"}
-									onChange={(fill) =>
-										onChange(withCopies(sheet, fill ? "fill" : 1))
+								<NumberField
+									label="H"
+									aria-label="Paper height"
+									value={custom.heightMm}
+									min={10}
+									max={2000}
+									step={1}
+									precision={1}
+									unit="mm"
+									onChange={(heightMm) =>
+										patch({ paper: { ...custom, heightMm } })
 									}
-								>
-									Fill sheet
-								</Checkbox>
+								/>
 							</div>
 						</Row>
-						<Checkbox
-							isSelected={sheet.cropMarks}
-							onChange={(cropMarks) => patch({ cropMarks })}
+					) : null}
+					<Row label="Orientation">
+						<SegmentedControl
+							aria-label="Orientation"
+							className={segmentedFull}
+							selectedKey={sheet.orientation}
+							onSelectionChange={(key) =>
+								patch({
+									orientation: key as SheetLayout["orientation"],
+								})
+							}
 						>
-							Crop marks
-						</Checkbox>
-						<Checkbox
-							isSelected={sheet.registrationMarks ?? false}
-							onChange={(registrationMarks) => patch({ registrationMarks })}
+							{ORIENTATIONS.map((o) => (
+								<SegmentedItem
+									key={o.id}
+									id={o.id}
+									className={segmentedItemFull}
+								>
+									{o.label}
+								</SegmentedItem>
+							))}
+						</SegmentedControl>
+					</Row>
+					<Row label="Margin">
+						<MmField
+							label="Margin"
+							value={sheet.marginMm}
+							onChange={(marginMm) => patch({ marginMm })}
+						/>
+					</Row>
+					<Row label="Gap">
+						<MmField
+							label="Gap"
+							value={sheet.gapMm}
+							onChange={(gapMm) => patch({ gapMm })}
+						/>
+					</Row>
+					{sheets?.imposition?.bleedMm &&
+					sheets.imposition.gapMm > sheet.gapMm ? (
+						<Hint testId="export-bleed-gap">
+							{`Gap widened to ${Math.round(sheets.imposition.gapMm * 10) / 10} mm for bleed`}
+						</Hint>
+					) : null}
+					<Row label="Copies">
+						<div className="flex min-w-0 items-center gap-2">
+							<NumberField
+								aria-label="Copies"
+								value={
+									sheet.copies === "fill"
+										? (sheets?.imposition?.copies ?? 1)
+										: (sheet.copies ?? 1)
+								}
+								min={1}
+								max={999}
+								step={1}
+								precision={0}
+								isDisabled={sheet.copies === "fill"}
+								onChange={(copies) =>
+									onChange(withCopies(sheet, Math.max(1, Math.round(copies))))
+								}
+							/>
+							<Checkbox
+								isSelected={sheet.copies === "fill"}
+								onChange={(fill) =>
+									onChange(withCopies(sheet, fill ? "fill" : 1))
+								}
+							>
+								Fill sheet
+							</Checkbox>
+						</div>
+					</Row>
+					<Switch
+						isSelected={marksOn}
+						onChange={(on) => patch({ cropMarks: on, registrationMarks: on })}
+					>
+						Printer marks
+					</Switch>
+					<Disclosure className="group/more">
+						<RACButton
+							slot="trigger"
+							className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
 						>
-							Registration marks
-						</Checkbox>
-						<Checkbox
-							isSelected={sheet.colorBar ?? false}
-							onChange={(colorBar) => patch({ colorBar })}
-						>
-							Color bar
-						</Checkbox>
-						<Checkbox
-							isSelected={sheet.slug ?? false}
-							onChange={(slug) => patch({ slug })}
-						>
-							Slug
-						</Checkbox>
-						<Checkbox
-							isSelected={sheet.duplex !== "none"}
-							onChange={(on) => patch({ duplex: on ? "long-edge" : "none" })}
-						>
-							Double-sided
-						</Checkbox>
-						{sheet.duplex !== "none" ? (
-							<>
-								<Row label="Flip on">
-									<SegmentedControl
-										aria-label="Flip on"
-										className={segmentedFull}
-										selectedKey={sheet.duplex}
-										onSelectionChange={(key) =>
-											patch({ duplex: key as SheetLayout["duplex"] })
-										}
-									>
-										<SegmentedItem id="long-edge" className={segmentedItemFull}>
-											Long edge
-										</SegmentedItem>
-										<SegmentedItem
-											id="short-edge"
-											className={segmentedItemFull}
+							<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
+							Marks
+						</RACButton>
+						<DisclosurePanel className="flex flex-col gap-2">
+							<Checkbox
+								isSelected={sheet.cropMarks}
+								onChange={(cropMarks) => patch({ cropMarks })}
+							>
+								Crop marks
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.registrationMarks ?? false}
+								onChange={(registrationMarks) => patch({ registrationMarks })}
+							>
+								Registration marks
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.colorBar ?? false}
+								onChange={(colorBar) => patch({ colorBar })}
+							>
+								Color bar
+							</Checkbox>
+							<Checkbox
+								isSelected={sheet.slug ?? false}
+								onChange={(slug) => patch({ slug })}
+							>
+								Slug
+							</Checkbox>
+						</DisclosurePanel>
+					</Disclosure>
+					<Checkbox
+						isSelected={sheet.duplex !== "none"}
+						onChange={(on) => patch({ duplex: on ? "long-edge" : "none" })}
+					>
+						Double-sided
+					</Checkbox>
+					{sheet.duplex !== "none" ? (
+						<>
+							<Row label="Flip on">
+								<SegmentedControl
+									aria-label="Flip on"
+									className={segmentedFull}
+									selectedKey={sheet.duplex}
+									onSelectionChange={(key) =>
+										patch({ duplex: key as SheetLayout["duplex"] })
+									}
+								>
+									<SegmentedItem id="long-edge" className={segmentedItemFull}>
+										Long edge
+									</SegmentedItem>
+									<SegmentedItem id="short-edge" className={segmentedItemFull}>
+										Short edge
+									</SegmentedItem>
+								</SegmentedControl>
+							</Row>
+							<Hint>Match the printer's flip setting</Hint>
+							<Disclosure className="group/more">
+								<RACButton
+									slot="trigger"
+									className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
+								>
+									<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
+									More
+								</RACButton>
+								<DisclosurePanel className="flex flex-col gap-2">
+									<Row label="Offset">
+										<div className="flex min-w-0 gap-1">
+											<NumberField
+												label="X"
+												aria-label="Back offset X"
+												value={offset.x}
+												min={-50}
+												max={50}
+												step={0.5}
+												precision={1}
+												unit="mm"
+												onChange={(x) =>
+													patch({ backOffsetMm: { ...offset, x } })
+												}
+											/>
+											<NumberField
+												label="Y"
+												aria-label="Back offset Y"
+												value={offset.y}
+												min={-50}
+												max={50}
+												step={0.5}
+												precision={1}
+												unit="mm"
+												onChange={(y) =>
+													patch({ backOffsetMm: { ...offset, y } })
+												}
+											/>
+										</div>
+									</Row>
+									<Hint>Moves every back, for a printer that drifts</Hint>
+									{sided ? null : (
+										<Checkbox
+											isSelected={sheet.blankBacks ?? false}
+											onChange={(blankBacks) => patch({ blankBacks })}
 										>
-											Short edge
-										</SegmentedItem>
-									</SegmentedControl>
-								</Row>
-								<Hint>Match the printer's flip setting</Hint>
-								<Disclosure className="group/more">
-									<RACButton
-										slot="trigger"
-										className="flex h-fc-control cursor-default items-center gap-1 text-fc-muted text-fc-sm outline-none data-hovered:text-fc-text data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-solid"
-									>
-										<ChevronRightIcon className="size-3 shrink-0 transition-transform duration-100 group-data-expanded/more:rotate-90" />
-										More
-									</RACButton>
-									<DisclosurePanel className="flex flex-col gap-2">
-										<Row label="Offset">
-											<div className="flex min-w-0 gap-1">
-												<NumberField
-													label="X"
-													aria-label="Back offset X"
-													value={offset.x}
-													min={-50}
-													max={50}
-													step={0.5}
-													precision={1}
-													unit="mm"
-													onChange={(x) =>
-														patch({ backOffsetMm: { ...offset, x } })
-													}
-												/>
-												<NumberField
-													label="Y"
-													aria-label="Back offset Y"
-													value={offset.y}
-													min={-50}
-													max={50}
-													step={0.5}
-													precision={1}
-													unit="mm"
-													onChange={(y) =>
-														patch({ backOffsetMm: { ...offset, y } })
-													}
-												/>
-											</div>
-										</Row>
-										<Hint>Moves every back, for a printer that drifts</Hint>
-										{sided ? null : (
-											<Checkbox
-												isSelected={sheet.blankBacks ?? false}
-												onChange={(blankBacks) => patch({ blankBacks })}
-											>
-												Blank backs
-											</Checkbox>
-										)}
-									</DisclosurePanel>
-								</Disclosure>
-							</>
-						) : null}
-						{sheets?.imposition ? (
-							<p
-								className="m-0 text-fc-muted text-fc-sm tabular-nums"
-								data-testid="export-sheet-summary"
-							>
-								{sheetSummary(sheets.imposition)}
-							</p>
-						) : null}
-						{sheets?.error ? (
-							<p
-								role="alert"
-								className="m-0 text-fc-danger-text text-fc-sm"
-								data-testid="export-sheet-error"
-							>
-								{sheets.error}
-							</p>
-						) : null}
-					</>
-				) : null}
-			</div>
-		</PanelSection>
+											Blank backs
+										</Checkbox>
+									)}
+								</DisclosurePanel>
+							</Disclosure>
+						</>
+					) : null}
+					{sheets?.imposition ? (
+						<p
+							className="m-0 text-fc-muted text-fc-sm tabular-nums"
+							data-testid="export-sheet-summary"
+						>
+							{sheetSummary(sheets.imposition)}
+						</p>
+					) : null}
+					{sheets?.error ? (
+						<p
+							role="alert"
+							className="m-0 text-fc-danger-text text-fc-sm"
+							data-testid="export-sheet-error"
+						>
+							{sheets.error}
+						</p>
+					) : null}
+				</>
+			) : null}
+		</div>
 	);
 }

@@ -119,6 +119,7 @@ test("the export records list shows a 100k-record dataset without a long freeze"
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await page
 		.getByTestId("binding-editor")
 		.getByRole("button", { name: /Dataset/ })

@@ -240,13 +240,9 @@ function setup(preset: Partial<ExportPreset> = {}) {
 }
 
 const layoutGroup = () => screen.getByTestId("export-layout");
-const openTab = (user: ReturnType<typeof fastUser>, name: string) =>
-	user.click(screen.getByRole("tab", { name }));
-
 describe("the Layout group", { timeout: 20_000 }, () => {
 	test("is offered for a PDF, one per page by default", async () => {
-		const { user } = setup();
-		await openTab(user, "Print");
+		setup();
 		const group = within(layoutGroup());
 		expect(
 			group
@@ -259,7 +255,6 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("Sheets takes the defaults and sums up the sheets", async () => {
 		const { current, user } = setup();
-		await openTab(user, "Print");
 		await user.click(
 			within(layoutGroup()).getByRole("radio", { name: "Sheets" }),
 		);
@@ -268,18 +263,22 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-sheet-summary").textContent).toBe(
 			"10 per sheet · 5 sheets",
 		);
-		await openTab(user, "Output");
 		expect(screen.getByTestId("export-page-size").textContent).toMatch(
 			/^Card /,
 		);
-		await openTab(user, "Print");
 		expect(
-			within(layoutGroup()).getByRole("checkbox", { name: "Crop marks" }),
+			within(layoutGroup()).getByRole("switch", { name: "Printer marks" }),
 		).toBeTruthy();
 		await user.click(
-			within(layoutGroup()).getByRole("checkbox", { name: "Crop marks" }),
+			within(layoutGroup()).getByRole("switch", { name: "Printer marks" }),
 		);
-		expect(current().layout).toMatchObject({ cropMarks: false });
+		expect(current().layout).toMatchObject({
+			cropMarks: false,
+			registrationMarks: false,
+		});
+		await user.click(
+			within(layoutGroup()).getByRole("button", { name: "Marks" }),
+		);
 		for (const [name, key] of [
 			["Registration marks", "registrationMarks"],
 			["Color bar", "colorBar"],
@@ -292,7 +291,6 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("double-sided pairs sheets, with the offset under More", async () => {
 		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		await openTab(user, "Print");
 		expect(screen.queryByText("More", { selector: "button" })).toBeNull();
 		await user.click(
 			within(layoutGroup()).getByRole("checkbox", { name: "Double-sided" }),
@@ -316,7 +314,6 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("Copies repeats each card, or fills a sheet with it", async () => {
 		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		await openTab(user, "Print");
 		const copies = within(layoutGroup()).getByRole("spinbutton", {
 			name: "Copies",
 		});
@@ -343,8 +340,7 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 	});
 
 	test("a card that doesn't fit shows inline and blocks Export", async () => {
-		const { update, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		await openTab(user, "Print");
+		const { update } = setup({ layout: DEFAULT_SHEET_LAYOUT });
 		expect(button("Export 42 files")).toHaveProperty("disabled", false);
 		update({ layout: { ...DEFAULT_SHEET_LAYOUT, marginMm: 100 } });
 		const error = screen.getByTestId("export-sheet-error");
@@ -352,15 +348,14 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		expect(error.textContent).toMatch(/too wide/);
 		expect(button("Export 42 files")).toHaveProperty("disabled", true);
 		expect(screen.queryByTestId("export-sheet-summary")).toBeNull();
-		// The job bar says it in a few words, with the whole of it on hover.
-		const bar = screen.getByTestId("export-blocked");
-		expect(bar.textContent).toBe(SHEETS_DONT_FIT);
-		expect(bar.getAttribute("title")).toBe(error.textContent);
+		// The checks say it in a few words, with the whole of it on hover.
+		const check = screen.getByTestId("export-check-blocked");
+		expect(check.textContent).toContain(SHEETS_DONT_FIT);
+		expect(within(check).getByTitle(error.textContent ?? "")).toBeTruthy();
 	});
 
 	test("Sheets is unavailable for a size from each photo", async () => {
-		const { user } = setup({ size: { kind: "image", field: "photo" } });
-		await openTab(user, "Print");
+		setup({ size: { kind: "image", field: "photo" } });
 		const option = within(layoutGroup()).getByRole("radio", { name: "Sheets" });
 		expect(option).toHaveProperty("disabled", true);
 	});

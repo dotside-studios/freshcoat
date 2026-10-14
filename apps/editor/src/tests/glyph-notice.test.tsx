@@ -12,7 +12,8 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { GlyphNotice } from "~/export/GlyphNotice";
+import { ChecksList } from "~/export/Checks";
+import { exportChecks } from "~/export/checks";
 import { type GlyphWorker, useGlyphPreflight } from "~/export/glyph-client";
 import type { GlyphWorkerRequest } from "~/export/protocol";
 
@@ -92,7 +93,7 @@ describe("useGlyphPreflight", () => {
 	});
 });
 
-describe("GlyphNotice", () => {
+describe("glyph checks", () => {
 	const issues: GlyphIssue[] = [
 		{
 			recordId: "r2",
@@ -102,30 +103,57 @@ describe("GlyphNotice", () => {
 			codepoints: [0xae40],
 		},
 	];
+	const input = {
+		blocked: null,
+		unbound: false,
+		unfilled: 0,
+		glyphs: issues,
+		failed: 0,
+		labelFor: (id: string) => (id === "r2" ? "Minjun" : id),
+		showSide: false,
+		canPick: true,
+	};
 
-	test("summarizes, then lists records and previews one when picked", () => {
-		const onPick = vi.fn();
-		render(
-			<GlyphNotice
-				issues={issues}
-				labelFor={(id) => (id === "r2" ? "Minjun" : id)}
-				onPick={onPick}
-			/>,
-		);
-		const notice = screen.getByTestId("export-missing-glyphs");
-		expect(notice.textContent).toContain(
+	test("summarizes, lists records and picks one", () => {
+		const onTarget = vi.fn();
+		render(<ChecksList checks={exportChecks(input)} onTarget={onTarget} />);
+		const check = screen.getByTestId("export-check-glyphs");
+		expect(check.textContent).toContain(
 			"1 record has characters the fonts can't draw: 김",
 		);
-		fireEvent.click(screen.getByRole("button", { expanded: false }));
-		const list = screen.getByTestId("export-missing-glyphs-list");
+		const list = screen.getByTestId("export-check-glyphs-list");
 		expect(list.textContent).toContain("name");
 		expect(list.textContent).toContain("김 U+AE40");
 		fireEvent.click(screen.getByRole("button", { name: "Minjun" }));
-		expect(onPick).toHaveBeenCalledWith("r2");
+		expect(onTarget).toHaveBeenCalledWith({ kind: "record", recordId: "r2" });
 	});
 
-	test("renders nothing without issues", () => {
-		render(<GlyphNotice issues={[]} labelFor={(id) => id} />);
-		expect(screen.queryByTestId("export-missing-glyphs")).toBeNull();
+	test("shows all clear without issues", () => {
+		render(
+			<ChecksList
+				checks={exportChecks({ ...input, glyphs: [] })}
+				onTarget={() => {}}
+			/>,
+		);
+		expect(screen.queryByTestId("export-check-glyphs")).toBeNull();
+		expect(screen.getByTestId("export-checks-clear")).toBeTruthy();
+	});
+
+	test("orders what blocks the export first", () => {
+		const checks = exportChecks({
+			...input,
+			blocked: { reason: "nothing", message: "Nothing to export" },
+			unbound: true,
+			unfilled: 2,
+			failed: 1,
+		});
+		expect(checks.map((c) => c.id)).toEqual([
+			"blocked",
+			"unbound",
+			"unfilled",
+			"glyphs",
+			"failed",
+		]);
+		expect(checks[0]?.severity).toBe("error");
 	});
 });

@@ -2,12 +2,11 @@ import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
-import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
+import { SelectionBar } from "@freshcoat-js/ui/selection-bar";
 import {
 	type DataRecord,
 	type ExportItem,
 	type ExportPreset,
-	newPreset,
 	parseAssetRef,
 	planExport,
 	resolveValues,
@@ -28,7 +27,7 @@ import {
 } from "@freshcoat-js/workspace/export";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useController } from "~/app/context";
-import { BINDING, EMPTY } from "~/app/copy";
+import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { selectedInView } from "~/data/gallery-model";
@@ -42,10 +41,14 @@ import PresetsIcon from "~icons/mingcute/layout-left-line";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import SettingsIcon from "~icons/mingcute/settings-3-line";
+import { ChecksBadge } from "./Checks";
+import { type CheckTarget, exportChecks } from "./checks";
+import { useExportCollapsed } from "./collapsed";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
-import { ExportSettings, type SettingsTab } from "./ExportSettings";
+import { ExportSettings } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
+	exportEstimate,
 	labelColumn,
 	recordLabel,
 	type StatusFilter,
@@ -60,9 +63,9 @@ import {
 	variantToken,
 	withVariantEntries,
 } from "./filmstrip-model";
-import { GlyphNotice } from "./GlyphNotice";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
+import { NewPresetMenu } from "./NewPresetMenu";
 import { PresetList } from "./PresetList";
 import {
 	effectiveMode,
@@ -178,11 +181,11 @@ export function ExportSection() {
 	const narrow = useNarrow();
 	const [rail, setRail] = useRail();
 	const [overlay, setOverlay] = useState<"presets" | "settings" | null>(null);
+	const collapsed = useExportCollapsed();
 	const {
 		filter,
 		scope,
 		tab,
-		settingsTab,
 		selection: listSelection,
 	} = useEditor((s) => s.exportView);
 	const setView = (view: Partial<ExportView>) =>
@@ -190,7 +193,6 @@ export function ExportSection() {
 	const setFilter = (filter: StatusFilter) => setView({ filter });
 	const setScope = (scope: FilmstripScope) => setView({ scope });
 	const setTab = (tab: ExportView["tab"]) => setView({ tab });
-	const setSettingsTab = (settingsTab: SettingsTab) => setView({ settingsTab });
 	const setListSelection = (selection: string[]) => setView({ selection });
 	const [chosenMode, setChosenMode] = useState<PreviewMode>("output");
 	const [split, setSplit] = useState(0.5);
@@ -520,12 +522,6 @@ export function ExportSection() {
 
 	if (!wsState) return <div className="flex-1" data-testid="section-export" />;
 
-	const addPreset = () =>
-		controller.dispatch({
-			type: "setPreset",
-			preset: newPreset(wsState.activeTemplateId, presets),
-		});
-
 	const presetsPanel = (
 		<PresetList
 			activeId={preset?.id ?? null}
@@ -535,6 +531,36 @@ export function ExportSection() {
 			onCollapsedChange={narrow ? undefined : setRail}
 		/>
 	);
+	const label = labelColumn(dataset);
+	const currentRecord = dataset?.records.find((r) => r.id === currentId);
+	const labelFor = (record: DataRecord) => recordLabel(record, label);
+	const showBinding = () => {
+		collapsed.set("records", false);
+		collapsed.set("binding", false);
+		if (narrow) setOverlay("settings");
+	};
+	const checks = exportChecks({
+		blocked,
+		unbound,
+		unfilled,
+		glyphs: glyphIssues,
+		failed: scopeCounts.failed,
+		labelFor: (id) => {
+			const record = dataset?.records.find((r) => r.id === id);
+			return record ? labelFor(record) : id;
+		},
+		showSide: sides.length > 1,
+		canPick: !!dataset,
+	});
+	const onCheckTarget = (target: CheckTarget) => {
+		if (target.kind === "binding") showBinding();
+		else if (target.kind === "record") pickRecord(target.recordId);
+		else if (target.kind === "failed") showFailed();
+		else {
+			collapsed.set(target.id, false);
+			if (narrow) setOverlay("settings");
+		}
+	};
 	const settingsPanel = preset ? (
 		<ExportSettings
 			preset={preset}
@@ -543,13 +569,11 @@ export function ExportSection() {
 			listSelection={listSelection}
 			outputSize={outputSize}
 			sheets={sheets}
-			tab={settingsTab}
-			onTabChange={setSettingsTab}
+			collapsed={collapsed}
+			checks={checks}
+			onCheckTarget={onCheckTarget}
 		/>
 	) : null;
-	const label = labelColumn(dataset);
-	const currentRecord = dataset?.records.find((r) => r.id === currentId);
-	const labelFor = (record: DataRecord) => recordLabel(record, label);
 	const aspect = previewTemplate
 		? previewTemplate.width / previewTemplate.height
 		: 1.5;
@@ -744,41 +768,54 @@ export function ExportSection() {
 		</div>
 	);
 
-	const showBinding = () => {
-		setSettingsTab("content");
-		if (narrow) setOverlay("settings");
-	};
 	const bottom = preset ? (
-		<Tabs
-			selectedKey={tab}
-			onSelectionChange={(key) => setTab(key as typeof tab)}
+		<div
 			className={cn(
-				"shrink-0 border-fc-border border-t bg-fc-panel",
+				"flex shrink-0 flex-col border-fc-border border-t bg-fc-panel",
 				tab === "records" ? "h-[42%] min-h-[220px]" : "h-[132px]",
 			)}
 			data-testid="export-bottom"
 		>
-			<div className="flex shrink-0 items-center gap-2 border-fc-border border-b pr-2">
-				<TabList aria-label="Records view" className="border-b-0">
-					<Tab id="filmstrip">Filmstrip</Tab>
-					<Tab id="records">Records</Tab>
-				</TabList>
-				<div className="flex-1" />
-				{chosen.length > 0 ? (
-					<span
-						className="flex shrink-0 items-center gap-0.5 text-fc-muted text-fc-sm tabular-nums"
-						data-testid="export-selection"
+			<div className="flex shrink-0 items-center gap-2 border-fc-border border-b px-2 py-1">
+				<SegmentedControl
+					aria-label="Records view"
+					selectedKey={tab}
+					onSelectionChange={(key) => setTab(key as typeof tab)}
+				>
+					<SegmentedItem
+						id="filmstrip"
+						className="min-w-0 px-2.5 pointer-coarse:min-w-0"
 					>
-						{`${chosen.length} selected`}
-						<IconButton
-							aria-label="Clear selection"
-							tooltip="Clear selection"
-							onPress={() => setListSelection([])}
-						>
-							<CloseIcon />
-						</IconButton>
-					</span>
-				) : null}
+						Filmstrip
+					</SegmentedItem>
+					<SegmentedItem
+						id="records"
+						className="min-w-0 px-2.5 pointer-coarse:min-w-0"
+					>
+						Records
+					</SegmentedItem>
+				</SegmentedControl>
+				<div className="flex-1" />
+				<SelectionBar
+					label={
+						chosen.length > 0
+							? `${plural(chosen.length, "record")} selected`
+							: null
+					}
+					onClear={() => setListSelection([])}
+				>
+					<Button
+						size="sm"
+						onPress={() =>
+							controller.dispatch({
+								type: "setPreset",
+								preset: { ...preset, records: "selected", selected: chosen },
+							})
+						}
+					>
+						Save to preset
+					</Button>
+				</SelectionBar>
 				{tab === "filmstrip" && dataset ? (
 					<SegmentedControl
 						aria-label="Filmstrip shows"
@@ -801,47 +838,50 @@ export function ExportSection() {
 					</SegmentedControl>
 				) : null}
 			</div>
-			<TabPanel id="filmstrip" className="flex overflow-hidden">
-				{dataset ? (
-					<Filmstrip
-						entries={entries}
-						currentId={currentKey ?? null}
-						onPick={pickRecord}
-						assetFor={assetFor}
-						labelFor={labelFor}
-						aspect={aspect}
-						selection={selection}
-						onSelectionChange={onStripSelection}
-						emptyText={
-							scope === "failed"
-								? "No failed records"
-								: scope === "export"
-									? "No records match this preset"
-									: EMPTY.records
-						}
-					/>
-				) : (
-					<UnboundHint onBind={showBinding} />
-				)}
-			</TabPanel>
-			<TabPanel id="records" className="flex flex-col overflow-hidden">
-				{dataset ? (
-					<RecordsList
-						dataset={dataset}
-						filter={filter}
-						onFilterChange={setFilter}
-						selection={selection}
-						onSelectionChange={onSelectionChange}
-						previewId={currentId ?? null}
-						onPreview={pickRecord}
-						selectionIsPreset={preset.records === "selected"}
-						dataSelection={dataSelection}
-					/>
-				) : (
-					<UnboundHint onBind={showBinding} />
-				)}
-			</TabPanel>
-		</Tabs>
+			{tab === "filmstrip" ? (
+				<div className="flex min-h-0 flex-1 overflow-hidden">
+					{dataset ? (
+						<Filmstrip
+							entries={entries}
+							currentId={currentKey ?? null}
+							onPick={pickRecord}
+							assetFor={assetFor}
+							labelFor={labelFor}
+							aspect={aspect}
+							selection={selection}
+							onSelectionChange={onStripSelection}
+							emptyText={
+								scope === "failed"
+									? "No failed records"
+									: scope === "export"
+										? "No records match this preset"
+										: EMPTY.records
+							}
+						/>
+					) : (
+						<UnboundHint onBind={showBinding} />
+					)}
+				</div>
+			) : (
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+					{dataset ? (
+						<RecordsList
+							dataset={dataset}
+							filter={filter}
+							onFilterChange={setFilter}
+							selection={selection}
+							onSelectionChange={onSelectionChange}
+							previewId={currentId ?? null}
+							onPreview={pickRecord}
+							selectionIsPreset={preset.records === "selected"}
+							dataSelection={dataSelection}
+						/>
+					) : (
+						<UnboundHint onBind={showBinding} />
+					)}
+				</div>
+			)}
+		</div>
 	) : null;
 
 	return (
@@ -878,39 +918,17 @@ export function ExportSection() {
 						<div className="grid flex-1 place-items-center p-6">
 							<div className="flex max-w-xs flex-col items-center gap-3 text-center">
 								<p className="m-0 text-fc-muted">{EMPTY.presets}</p>
-								<Button variant="primary" onPress={addPreset}>
-									<AddIcon />
-									New preset
-								</Button>
+								<NewPresetMenu>
+									<Button variant="primary">
+										<AddIcon />
+										New preset
+									</Button>
+								</NewPresetMenu>
 							</div>
 						</div>
 					) : (
 						<>
 							<div className="relative flex min-h-[160px] flex-1 flex-col">
-								{unbound ? (
-									<Notice testId="export-unbound">
-										Not bound to a dataset, exporting defaults
-										<Button
-											variant="ghost"
-											size="sm"
-											className="ml-1 text-fc-warning underline"
-											onPress={showBinding}
-										>
-											Bind a dataset
-										</Button>
-									</Notice>
-								) : null}
-								{glyphIssues ? (
-									<GlyphNotice
-										issues={glyphIssues}
-										labelFor={(id) => {
-											const record = dataset?.records.find((r) => r.id === id);
-											return record ? labelFor(record) : id;
-										}}
-										onPick={dataset ? (id) => pickRecord(id) : undefined}
-										showSide={sides.length > 1}
-									/>
-								) : null}
 								{sheetMode && template && imposition ? (
 									<SheetPreview
 										className="flex-1"
@@ -985,8 +1003,17 @@ export function ExportSection() {
 				preset={preset}
 				count={runCount}
 				blocked={blocked?.message ?? null}
+				estimate={
+					preset && runCount > 0
+						? exportEstimate(preset, runPlan, imposition?.sheets)
+						: undefined
+				}
+				checks={
+					preset ? (
+						<ChecksBadge checks={checks} onTarget={onCheckTarget} />
+					) : undefined
+				}
 				blockedDetail={blocked?.detail}
-				warning={unfilled > 0 ? BINDING.unfilled(unfilled) : null}
 				onShowFailed={dataset ? showFailed : undefined}
 				recordIds={chosen}
 			/>
@@ -1022,17 +1049,6 @@ function UnboundHint({ onBind }: { onBind: () => void }) {
 				Bind a dataset
 			</Button>
 		</div>
-	);
-}
-
-function Notice({ children, testId }: { children: ReactNode; testId: string }) {
-	return (
-		<p
-			className="m-0 shrink-0 border-fc-border border-b bg-fc-warning/10 px-3 py-1 text-fc-sm text-fc-warning"
-			data-testid={testId}
-		>
-			{children}
-		</p>
 	);
 }
 
