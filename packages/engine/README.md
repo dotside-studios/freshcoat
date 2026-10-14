@@ -417,6 +417,15 @@ underlying model.
   [Output intent](#output-intent)). A caller's CMYK intent changes what the
   PDF says it was prepared for, not its content: no colour is converted to
   CMYK here, and there is no soft-proof.
+- **Spot colours.** A solid fill or a solid stroke can carry a `spot`
+  (`{ name, tint, overprint }`). A vector PDF paints it in a `/Separation`
+  colour space of that name, whose tint transform runs from white to the
+  fill's or stroke's own `color` in `DeviceRGB`, so a viewer without the ink
+  shows that alternate. With `overprint`, an ExtGState sets `/OP true /op true
+  /OPM 1` so the ink prints over what lies beneath it rather than knocking it
+  out. Every other output ignores `spot` and paints the alternate. A layer the
+  PDF painter has to rasterize loses its spot colour. Names are the caller's
+  own: there is no Pantone or other library.
 
 ## Conformance
 

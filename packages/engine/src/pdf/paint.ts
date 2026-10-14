@@ -69,6 +69,7 @@ import type {
 	PaintWarning,
 	ResolvedFill,
 	ShapeMask,
+	SpotInk,
 	Stroke,
 	TextLine,
 } from "../types";
@@ -538,6 +539,8 @@ class PageBuilder {
 	private xobjects: Record<string, PdfRef> = {};
 	private xobjectIds = new Map<number, string>();
 	private shadings: Record<string, PdfRef> = {};
+	private colorSpaces: Record<string, PdfValue> = {};
+	private spotIds = new Map<string, string>();
 	private images = new Map<string, ImageEntry>();
 	private iccProfiles = new Map<
 		number,
@@ -815,8 +818,13 @@ class PageBuilder {
 			XObject: { ...this.xobjects },
 			Shading: { ...this.shadings },
 			...(Object.keys(fonts).length ? { Font: fonts } : {}),
-			...(this.intent
-				? { ColorSpace: { DefaultRGB: this.rgbSpace() } }
+			...(this.intent || this.spotIds.size
+				? {
+						ColorSpace: {
+							...(this.intent ? { DefaultRGB: this.rgbSpace() } : {}),
+							...this.colorSpaces,
+						},
+					}
 				: {}),
 		});
 		const { intent } = this;
@@ -898,6 +906,31 @@ class PageBuilder {
 			content,
 		);
 		return this.xobject(ref);
+	}
+
+	// Selects `ink` for filling or stroking: a Separation whose tint runs from
+	// white to `alt`, overprinting when the ink asks.
+	private spot(ink: SpotInk, alt: Rgba, stroking: boolean): string {
+		const c = [alt[0] / 255, alt[1] / 255, alt[2] / 255];
+		const key = keyOf([ink.name, ...c]);
+		let id = this.spotIds.get(key);
+		if (!id) {
+			id = `CS${this.spotIds.size}`;
+			this.spotIds.set(key, id);
+			this.colorSpaces[id] = [
+				name("Separation"),
+				name(ink.name),
+				name("DeviceRGB"),
+				{ FunctionType: 2, Domain: [0, 1], C0: [1, 1, 1], C1: c, N: 1 },
+			];
+		}
+		const tint = Math.max(0, Math.min(1, ink.tint));
+		const overprint = ink.overprint
+			? this.gs({ OP: true, op: true, OPM: 1 })
+			: "";
+		return stroking
+			? `${overprint}/${id} CS ${num(tint)} SCN\n`
+			: `${overprint}/${id} cs ${num(tint)} scn\n`;
 	}
 
 	private alpha(fill: number, stroke = fill): string {
@@ -1001,7 +1034,10 @@ class PageBuilder {
 		if (fill.kind === "solid") {
 			const c = rgba(fill.color);
 			if (c[3] <= 0) return "";
-			return `q\n${this.alpha(c[3])}${rgb(c)} rg\n${ops}f${star}\nQ\n`;
+			const color = fill.spot
+				? this.spot(fill.spot, c, false)
+				: `${rgb(c)} rg\n`;
+			return `q\n${this.alpha(c[3])}${color}${ops}f${star}\nQ\n`;
 		}
 		const sh = this.gradient(fill, box);
 		return sh ? `q\n${ops}W${star} n\n${sh}Q\n` : "";
@@ -1157,7 +1193,10 @@ class PageBuilder {
 	private stroke(stroke: Stroke, ops: string): string {
 		const c = rgba(stroke.color);
 		if (!ops || c[3] <= 0 || stroke.width <= 0) return "";
-		return `q\n${this.alpha(1, c[3])}${rgb(c)} RG\n${this.strokeParams(stroke)}${ops}S\nQ\n`;
+		const color = stroke.spot
+			? this.spot(stroke.spot, c, true)
+			: `${rgb(c)} RG\n`;
+		return `q\n${this.alpha(1, c[3])}${color}${this.strokeParams(stroke)}${ops}S\nQ\n`;
 	}
 
 	// The stroke along `path`, cut to its trim, in its colour or its gradient
@@ -1267,7 +1306,11 @@ class PageBuilder {
 			const ops = pathOps(ck, band);
 			if (!normalizeDash(stroke.dash) && !strokeTrim(stroke))
 				return this.fill(
-					stroke.gradient ?? { kind: "solid", color: stroke.color },
+					stroke.gradient ?? {
+						kind: "solid",
+						color: stroke.color,
+						...(stroke.spot ? { spot: stroke.spot } : {}),
+					},
 					ops,
 					true,
 					box,
