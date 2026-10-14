@@ -1,6 +1,8 @@
 import { templateStem } from "@freshcoat-js/coatfile/coat";
 import { Button } from "@freshcoat-js/ui/button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { Tab, TabList, TabPanel, Tabs } from "@freshcoat-js/ui/tabs";
 import { toast } from "@freshcoat-js/ui/toast";
 import {
@@ -32,7 +34,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { Selection } from "react-aria-components";
+import { MenuTrigger, type Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { SidePanel } from "~/app/SidePanel";
@@ -60,10 +62,11 @@ import {
 import { ColumnFilters } from "./ColumnFilters";
 import { ColumnsPanel } from "./ColumnsPanel";
 import { type Confirm, useConfirm } from "./ConfirmDialog";
+import { DataSelectionBar, type SelectionActions } from "./DataSelectionBar";
 import { type DatasetCreators, DatasetsList } from "./DatasetsList";
-import { DataToolbar, FOLD_DATA_BELOW } from "./DataToolbar";
+import { DataToolbar } from "./DataToolbar";
 import { type DataViewState, DEFAULT_DATA_VIEW } from "./data-view";
-import { DataJobBar, ExportSelected } from "./ExportSelected";
+import { DataJobBar } from "./ExportSelected";
 import { FindReplace } from "./FindReplace";
 import {
 	type CardSize,
@@ -86,6 +89,8 @@ import { dataViewFor, selectActiveDataset } from "./status-state";
 
 // The same breakpoint as Edit: below it the side panels cover the grid.
 const OVERLAY_BELOW = 960;
+// Below it the Record and Columns panel is a sheet over the records.
+const SHEET_BELOW = 1100;
 // Tablet portrait and below: the gallery takes a fixed number of columns.
 const NARROW_GALLERY_BELOW = 821;
 
@@ -99,8 +104,7 @@ export function DataSection() {
 	const count = useEditor((s) => s.workspace?.datasets.length ?? 0);
 	const dataset = useEditor(selectActiveDataset);
 	const narrow = useBelow(OVERLAY_BELOW);
-	// Below the fold width the right panel is a sheet over the records.
-	const tablet = useBelow(FOLD_DATA_BELOW);
+	const tablet = useBelow(SHEET_BELOW);
 	const narrowGallery = useBelow(NARROW_GALLERY_BELOW);
 	const [panels, setPanels] = useState<Panels>(() => ({
 		left: !narrow,
@@ -274,7 +278,6 @@ export function DataSection() {
 						panels={panels}
 						onPanels={onPanels}
 						rightOverlay={tablet}
-						foldData={tablet}
 						narrowGallery={narrowGallery}
 						inspector={inspector}
 						column={column}
@@ -436,27 +439,45 @@ function EmptyState({
 				onTable={onTable}
 				actions={
 					<>
-						<Button variant="primary" onPress={create.fromPhotos}>
-							<PhotoIcon />
-							From photos…
-						</Button>
-						<Button
-							onPress={() => void newDatasetFromPhotos(controller, "folder")}
-						>
-							<FolderIcon />
-							From a folder…
-						</Button>
+						<MenuTrigger>
+							<Button variant="primary" data-testid="new-dataset">
+								<AddIcon />
+								New dataset
+							</Button>
+							<Popover placement="bottom start">
+								<Menu aria-label="New dataset">
+									<MenuItem
+										id="template"
+										icon={<TemplateIcon />}
+										onAction={create.fromTemplate}
+									>
+										From template fields
+									</MenuItem>
+									<MenuItem
+										id="photos"
+										icon={<PhotoIcon />}
+										onAction={create.fromPhotos}
+									>
+										From photos…
+									</MenuItem>
+									<MenuItem
+										id="folder"
+										icon={<FolderIcon />}
+										onAction={() =>
+											void newDatasetFromPhotos(controller, "folder")
+										}
+									>
+										From a folder…
+									</MenuItem>
+									<MenuItem id="new" onAction={create.newDataset}>
+										Empty dataset
+									</MenuItem>
+								</Menu>
+							</Popover>
+						</MenuTrigger>
 						<Button onPress={create.importFile}>
 							<ImportIcon />
-							Import file…
-						</Button>
-						<Button onPress={create.fromTemplate}>
-							<TemplateIcon />
-							From template fields
-						</Button>
-						<Button variant="ghost" onPress={create.newDataset}>
-							<AddIcon />
-							New dataset
+							Import…
 						</Button>
 					</>
 				}
@@ -489,7 +510,6 @@ function RecordsPane({
 	panels,
 	onPanels,
 	rightOverlay,
-	foldData,
 	narrowGallery,
 	inspector,
 	column,
@@ -502,7 +522,6 @@ function RecordsPane({
 	panels: Panels;
 	onPanels: (p: Partial<Panels>) => void;
 	rightOverlay: boolean;
-	foldData: boolean;
 	narrowGallery: boolean;
 	inspector: Inspector;
 	column: string | null;
@@ -705,24 +724,26 @@ function RecordsPane({
 	const onEmptyPhotos = (source: PickedFile[] | "files" | "folder") =>
 		void photosIntoEmptyDataset(controller, datasetId, source);
 
-	const actions = {
-		addRow: () => {
-			patchView({ query: "", statusFilter: "all", columnFilters: [] });
-			let added: string[] = [];
-			editDataset(controller, datasetId, (d) => {
-				const out = addRecords(d);
-				added = out.ids;
-				return out.dataset;
-			});
-			const id = added[0];
-			if (!id) return;
-			if (view === "table")
-				requestAnimationFrame(() => grid.current?.reveal(id, undefined, true));
-			else {
-				setSelection(new Set([id]));
-				onOpen(id);
-			}
-		},
+	const addRow = () => {
+		patchView({ query: "", statusFilter: "all", columnFilters: [] });
+		let added: string[] = [];
+		editDataset(controller, datasetId, (d) => {
+			const out = addRecords(d);
+			added = out.ids;
+			return out.dataset;
+		});
+		const id = added[0];
+		if (!id) return;
+		if (view === "table")
+			requestAnimationFrame(() => grid.current?.reveal(id, undefined, true));
+		else {
+			setSelection(new Set([id]));
+			onOpen(id);
+		}
+	};
+
+	const selectionActions: SelectionActions = {
+		clear: () => setSelection(new Set()),
 		duplicate: () => {
 			const ids = selectedIds.length
 				? selectedIds
@@ -745,6 +766,10 @@ function RecordsPane({
 				ids: [...selectedIds],
 				status,
 			}),
+	};
+
+	const actions = {
+		addRow,
 		importFile: () => onImport(),
 		importPhotos: empty ? () => onEmptyPhotos("files") : onImportPhotos,
 		importPhotoFolder: () =>
@@ -838,12 +863,10 @@ function RecordsPane({
 					importIssues={dataView.imported !== undefined}
 					query={query}
 					onQuery={setQuery}
-					selected={selectedIds.length}
 					hasColumns={dataset.columns.length > 0}
 					actions={actions}
 					panels={panels}
 					onPanels={onPanels}
-					foldData={foldData}
 					columnFilters={
 						dataset.columns.length > 0 ? (
 							<ColumnFilters
@@ -862,77 +885,69 @@ function RecordsPane({
 							/>
 						) : null
 					}
-					exportSelected={
-						selectedIds.length > 0 ? (
-							<ExportSelected datasetId={datasetId} ids={selectedIds} />
-						) : null
-					}
 				/>
-				{empty ? (
-					<DropZone
-						testId="dataset-drop-zone"
-						title={EMPTY.records}
-						onPhotos={onEmptyPhotos}
-						onTable={(file) => onImport(file)}
-						actions={
-							<>
-								<Button
-									variant="primary"
-									onPress={() => onEmptyPhotos("files")}
-								>
-									<PhotoIcon />
-									Add photos…
-								</Button>
-								<Button onPress={() => onEmptyPhotos("folder")}>
-									<FolderIcon />
-									Add a folder…
-								</Button>
-								<Button onPress={() => onImport()}>
-									<ImportIcon />
-									Import file…
-								</Button>
-								{dataset.columns.length ? (
-									<Button variant="ghost" onPress={actions.addRow}>
-										<AddIcon />
-										Add a record
+				<div className="relative flex min-h-0 flex-1 flex-col">
+					{empty ? (
+						<DropZone
+							testId="dataset-drop-zone"
+							title={EMPTY.records}
+							onPhotos={onEmptyPhotos}
+							onTable={(file) => onImport(file)}
+							actions={
+								<>
+									<Button
+										variant="primary"
+										onPress={() => onEmptyPhotos("files")}
+									>
+										<PhotoIcon />
+										Add photos…
 									</Button>
-								) : null}
-							</>
-						}
-					>
-						Drop photos, a folder or a spreadsheet
-					</DropZone>
-				) : view === "gallery" ? (
-					<RecordsGallery
-						dataset={dataset}
-						rows={rows}
-						selection={selection}
-						onSelectionChange={setSelection}
-						selectedIds={selectedIds}
-						ui={ui}
-						size={cardSize}
-						narrow={narrowGallery}
-						onOpen={onOpen}
-						onDeleteRows={deleteRows}
-						emptyState={emptyState}
+									<Button onPress={() => onImport()}>
+										<ImportIcon />
+										Import…
+									</Button>
+								</>
+							}
+						>
+							Drop photos, a folder or a spreadsheet
+						</DropZone>
+					) : view === "gallery" ? (
+						<RecordsGallery
+							dataset={dataset}
+							rows={rows}
+							selection={selection}
+							onSelectionChange={setSelection}
+							selectedIds={selectedIds}
+							ui={ui}
+							size={cardSize}
+							narrow={narrowGallery}
+							onOpen={onOpen}
+							onDeleteRows={deleteRows}
+							emptyState={emptyState}
+						/>
+					) : (
+						<RecordsGrid
+							ref={grid}
+							dataset={dataset}
+							rows={rows}
+							sort={sort}
+							onSortChange={setSort}
+							selection={selection}
+							onSelectionChange={setSelection}
+							selectedIds={selectedIds}
+							ui={ui}
+							onColumnFocus={onColumn}
+							onDeleteRows={deleteRows}
+							onImportPhotos={onImportPhotos}
+							emptyState={emptyState}
+						/>
+					)}
+					<DataSelectionBar
+						datasetId={datasetId}
+						ids={selectedIds}
+						actions={selectionActions}
 					/>
-				) : (
-					<RecordsGrid
-						ref={grid}
-						dataset={dataset}
-						rows={rows}
-						sort={sort}
-						onSortChange={setSort}
-						selection={selection}
-						onSelectionChange={setSelection}
-						selectedIds={selectedIds}
-						ui={ui}
-						onColumnFocus={onColumn}
-						onDeleteRows={deleteRows}
-						onImportPhotos={onImportPhotos}
-						emptyState={emptyState}
-					/>
-				)}
+				</div>
 				<DataJobBar onShowFailed={() => setStatusFilter("failed")} />
 			</div>
 			<SidePanel

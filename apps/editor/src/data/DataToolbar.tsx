@@ -17,30 +17,26 @@ import {
 	ToggleGroupItem,
 } from "@freshcoat-js/ui/toggle";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
-import type { RecordStatus, TableFormat } from "@freshcoat-js/workspace";
-import type { ReactNode } from "react";
+import type { TableFormat } from "@freshcoat-js/workspace";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { MenuTrigger } from "react-aria-components";
 import AddIcon from "~icons/mingcute/add-line";
 import SchemaIcon from "~icons/mingcute/braces-line";
 import CloseIcon from "~icons/mingcute/close-line";
-import CopyIcon from "~icons/mingcute/copy-2-line";
-import DeleteIcon from "~icons/mingcute/delete-2-line";
 import DownIcon from "~icons/mingcute/down-line";
 import ExportIcon from "~icons/mingcute/download-2-line";
 import ImportIcon from "~icons/mingcute/file-import-line";
+import DataIcon from "~icons/mingcute/file-more-line";
 import FilterIcon from "~icons/mingcute/filter-line";
 import FolderIcon from "~icons/mingcute/folder-open-line";
 import GalleryIcon from "~icons/mingcute/grid-line";
 import LeftPanelIcon from "~icons/mingcute/layout-leftbar-open-line";
 import RightPanelIcon from "~icons/mingcute/layout-rightbar-open-line";
-import StatusIcon from "~icons/mingcute/list-check-line";
-import MoreIcon from "~icons/mingcute/more-1-line";
 import PhotoIcon from "~icons/mingcute/pic-line";
 import RowIcon from "~icons/mingcute/rows-2-line";
 import SearchIcon from "~icons/mingcute/search-line";
 import TableIcon from "~icons/mingcute/table-2-line";
 import { EXPORT_FORMATS } from "./actions";
-import { STATUSES } from "./cells";
 import {
 	CARD_SIZES,
 	type CardSize,
@@ -52,9 +48,6 @@ import {
 
 export type ToolbarActions = {
 	addRow: () => void;
-	duplicate: () => void;
-	remove: () => void;
-	setStatus: (status: RecordStatus) => void;
 	importFile: () => void;
 	importPhotos: () => void;
 	importPhotoFolder: () => void;
@@ -63,9 +56,6 @@ export type ToolbarActions = {
 	importSchema: () => void;
 	exportSchema: () => void;
 };
-
-/** Below this window width the data group folds into a More menu. */
-export const FOLD_DATA_BELOW = 1100;
 
 export function ToolButton({
 	icon,
@@ -143,9 +133,9 @@ function Divider() {
 }
 
 /**
- * The records toolbar, in three groups: how the records are viewed, what is
- * done to them, and moving data in and out. The last folds into a More menu
- * on a narrower window.
+ * The records toolbar: how the records are viewed, adding records, and the
+ * Data menu for moving data in and out. What is done to selected records is
+ * in the selection bar. On a narrow toolbar the search folds into an icon.
  */
 export function DataToolbar({
 	view,
@@ -157,13 +147,10 @@ export function DataToolbar({
 	importIssues,
 	query,
 	onQuery,
-	selected,
 	hasColumns,
 	actions,
 	panels,
 	onPanels,
-	foldData,
-	exportSelected,
 	findReplace,
 	columnFilters,
 }: {
@@ -177,14 +164,10 @@ export function DataToolbar({
 	importIssues: boolean;
 	query: string;
 	onQuery: (q: string) => void;
-	selected: number;
 	hasColumns: boolean;
 	actions: ToolbarActions;
 	panels: { left: boolean; right: boolean };
 	onPanels: (p: Partial<{ left: boolean; right: boolean }>) => void;
-	foldData: boolean;
-	/** "Export selected", shown while records are selected */
-	exportSelected?: ReactNode;
 	findReplace?: ReactNode;
 	columnFilters?: ReactNode;
 }) {
@@ -194,6 +177,7 @@ export function DataToolbar({
 	const filtering = statusFilter !== "all";
 	const filterLabel =
 		filters.find((f) => f.id === statusFilter)?.label ?? "All records";
+	const buttonLabel = filtering ? `Show: ${filterLabel}` : filterLabel;
 	return (
 		<div
 			className="@container flex h-9 shrink-0 items-center gap-0.5 border-fc-border border-b bg-fc-panel px-1.5 pointer-coarse:h-11"
@@ -225,37 +209,11 @@ export function DataToolbar({
 						<GalleryIcon />
 					</ToggleGroupItem>
 				</ToggleGroup>
-				<div className="relative ml-1 flex w-36 min-w-20 shrink items-center @min-[680px]:w-48">
-					<SearchIcon className="pointer-events-none absolute left-1.5 size-3.5 text-fc-faint" />
-					<input
-						type="search"
-						aria-label="Search records"
-						placeholder="Search"
-						value={query}
-						onChange={(e) => onQuery(e.target.value)}
-						onKeyDown={(e) => {
-							e.stopPropagation();
-							if (e.key === "Escape") onQuery("");
-						}}
-						className={cn(
-							inputBase,
-							"h-fc-control pr-6 pl-6 hover:border-fc-border-strong focus:border-fc-accent [&::-webkit-search-cancel-button]:hidden",
-						)}
-					/>
-					{query ? (
-						<IconButton
-							aria-label="Clear search"
-							onPress={() => onQuery("")}
-							className="absolute right-0 size-5 [&_svg]:size-3"
-						>
-							<CloseIcon />
-						</IconButton>
-					) : null}
-				</div>
+				<SearchField query={query} onQuery={onQuery} />
 				<MenuTrigger>
 					<Button
 						variant="ghost"
-						aria-label={`Show: ${filterLabel}`}
+						aria-label={buttonLabel}
 						data-testid="status-filter"
 						className={cn(
 							"gap-1 px-1.5 font-normal",
@@ -265,9 +223,7 @@ export function DataToolbar({
 						)}
 					>
 						<FilterIcon className={filtering ? "text-fc-accent" : undefined} />
-						<span className={cn(!filtering && "hidden @min-[1000px]:inline")}>
-							{filtering ? filterLabel : "Filter"}
-						</span>
+						<span className="hidden @min-[760px]:inline">{buttonLabel}</span>
 						<DownIcon className="-ml-0.5 size-3! opacity-60" />
 					</Button>
 					<Popover placement="bottom start">
@@ -338,82 +294,38 @@ export function DataToolbar({
 						</Menu>
 					</Popover>
 				</MenuTrigger>
-				<ToolButton
-					icon={<CopyIcon />}
-					label="Duplicate"
-					testId="duplicate-rows"
-					showLabel="never"
-					isDisabled={selected === 0}
-					onPress={actions.duplicate}
-				/>
-				<ToolButton
-					icon={<DeleteIcon />}
-					label="Delete"
-					testId="delete-rows"
-					showLabel="never"
-					shortcut="Mod+Backspace"
-					isDisabled={selected === 0}
-					onPress={actions.remove}
-				/>
-				<MenuTrigger>
-					<ToolButton
-						icon={<StatusIcon />}
-						label="Mark"
-						testId="status-menu"
-						showLabel="wider"
-						isDisabled={selected === 0}
-						menu
-					/>
-					<Popover placement="bottom start">
-						<Menu
-							aria-label="Set status"
-							onAction={(k) => actions.setStatus(k as RecordStatus)}
-						>
-							{STATUSES.map((s) => (
-								<MenuItem key={s.id} id={s.id}>
-									{`Mark ${s.label.toLowerCase()}`}
-								</MenuItem>
-							))}
-						</Menu>
-					</Popover>
-				</MenuTrigger>
-				{exportSelected}
 			</Group>
-			{foldData ? null : (
-				<>
-					<Divider />
-					<Group label="Data">
-						<ToolButton
+			<Divider />
+			<MenuTrigger>
+				<ToolButton icon={<DataIcon />} label="Data" testId="data-menu" menu />
+				<Popover placement="bottom start">
+					<Menu aria-label="Data">
+						<MenuItem
+							id="import"
 							icon={<ImportIcon />}
-							label="Import…"
-							testId="import-records"
-							onPress={actions.importFile}
-						/>
-						<MenuTrigger>
-							<ToolButton
-								icon={<ExportIcon />}
-								label="Download data"
-								testId="download-menu"
-								menu
-							/>
-							<Popover placement="bottom start">
+							onAction={actions.importFile}
+						>
+							Import…
+						</MenuItem>
+						<SubmenuTrigger>
+							<MenuItem id="download" icon={<ExportIcon />}>
+								Download data
+							</MenuItem>
+							<Popover placement="end top">
 								<ExportMenu actions={actions} />
 							</Popover>
-						</MenuTrigger>
-						<MenuTrigger>
-							<ToolButton
-								icon={<SchemaIcon />}
-								label="Schema"
-								testId="schema-menu"
-								menu
-							/>
-							<Popover placement="bottom start">
+						</SubmenuTrigger>
+						<SubmenuTrigger>
+							<MenuItem id="schema" icon={<SchemaIcon />}>
+								Schema
+							</MenuItem>
+							<Popover placement="end top">
 								<SchemaMenu actions={actions} />
 							</Popover>
-						</MenuTrigger>
-					</Group>
-				</>
-			)}
+						</SubmenuTrigger>
+					</Menu>
+				</Popover>
+			</MenuTrigger>
 			<span className="min-w-0 flex-1" />
 			{view === "gallery" ? (
 				<ToggleGroup
@@ -439,44 +351,6 @@ export function DataToolbar({
 					))}
 				</ToggleGroup>
 			) : null}
-			{foldData ? (
-				<MenuTrigger>
-					<IconButton
-						aria-label="More"
-						tooltip="Import, download and schema"
-						data-testid="data-more"
-					>
-						<MoreIcon />
-					</IconButton>
-					<Popover placement="bottom end">
-						<Menu aria-label="More">
-							<MenuItem
-								id="import"
-								icon={<ImportIcon />}
-								onAction={actions.importFile}
-							>
-								Import…
-							</MenuItem>
-							<SubmenuTrigger>
-								<MenuItem id="download" icon={<ExportIcon />}>
-									Download data
-								</MenuItem>
-								<Popover placement="end top">
-									<ExportMenu actions={actions} />
-								</Popover>
-							</SubmenuTrigger>
-							<SubmenuTrigger>
-								<MenuItem id="schema" icon={<SchemaIcon />}>
-									Schema
-								</MenuItem>
-								<Popover placement="end top">
-									<SchemaMenu actions={actions} />
-								</Popover>
-							</SubmenuTrigger>
-						</Menu>
-					</Popover>
-				</MenuTrigger>
-			) : null}
 			<ToggleButton
 				aria-label="Record and columns panel"
 				tooltip="Record and columns panel"
@@ -486,6 +360,72 @@ export function DataToolbar({
 				<RightPanelIcon />
 			</ToggleButton>
 		</div>
+	);
+}
+
+function SearchField({
+	query,
+	onQuery,
+}: {
+	query: string;
+	onQuery: (q: string) => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const input = useRef<HTMLInputElement>(null);
+	const shown = open || query !== "";
+	useEffect(() => {
+		if (open) input.current?.focus();
+	}, [open]);
+	return (
+		<>
+			{shown ? null : (
+				<IconButton
+					aria-label="Search records"
+					tooltip="Search"
+					onPress={() => setOpen(true)}
+					className="ml-1 @min-[560px]:hidden"
+				>
+					<SearchIcon />
+				</IconButton>
+			)}
+			<div
+				className={cn(
+					"relative ml-1 w-36 min-w-20 shrink items-center @min-[680px]:w-48",
+					shown ? "flex" : "hidden @min-[560px]:flex",
+				)}
+			>
+				<SearchIcon className="pointer-events-none absolute left-1.5 size-3.5 text-fc-faint" />
+				<input
+					ref={input}
+					type="search"
+					aria-label="Search records"
+					placeholder="Search"
+					value={query}
+					onChange={(e) => onQuery(e.target.value)}
+					onBlur={() => setOpen(false)}
+					onKeyDown={(e) => {
+						e.stopPropagation();
+						if (e.key === "Escape") {
+							onQuery("");
+							setOpen(false);
+						}
+					}}
+					className={cn(
+						inputBase,
+						"h-fc-control pr-6 pl-6 hover:border-fc-border-strong focus:border-fc-accent [&::-webkit-search-cancel-button]:hidden",
+					)}
+				/>
+				{query ? (
+					<IconButton
+						aria-label="Clear search"
+						onPress={() => onQuery("")}
+						className="absolute right-0 size-5 [&_svg]:size-3"
+					>
+						<CloseIcon />
+					</IconButton>
+				) : null}
+			</div>
+		</>
 	);
 }
 
