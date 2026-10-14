@@ -48,7 +48,9 @@ describe("spot colour section", () => {
 	it("marks a fill as an overprinting spot and edits it", async () => {
 		const c = setup(doc());
 		const user = fastUser();
-		expect(screen.queryByRole("textbox", { name: "Fill spot name" })).toBeNull();
+		expect(
+			screen.queryByRole("textbox", { name: "Fill spot name" }),
+		).toBeNull();
 		await user.click(screen.getByRole("checkbox", { name: "Fill as spot" }));
 		expect(spot(c)).toEqual({ fill: { spot: "White", overprint: true } });
 		expect(validate(c.template).ok).toBe(true);
