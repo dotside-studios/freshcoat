@@ -331,13 +331,17 @@ the records, and **Export** turns templates and records into files.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
+    Each fill is one row; a gradient or pattern fill opens its settings in a
+    popover from its swatch.
   - A stroke sits inside, centered on or outside the edge of any stroked
     layer: rectangle, frame, image, vector or text. Its paint is a solid colour
     or a linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only. A text
-    stroke takes a position and a join but no dash, trim or cap.
-  - A rectangle's or vector's Spot color section, in the Print tab, prints its fill, its
-    stroke or both in a named spot ink, for white ink, foil or varnish:
+    stroke takes a position and a join but no dash, trim or cap. Dash, trim,
+    cap and join open from the stroke's settings button.
+  - A rectangle's or vector's Spot color section, in the Print tab, prints its
+    fill, its stroke or both in a named spot ink, for white ink, foil or
+    varnish:
     "Fill as spot" or "Stroke as spot", then the ink's name as the printer
     knows it (White by default; All and None are refused), a tint, an
     alternate colour (the layer's own when empty) and an Overprint row, on by
@@ -350,7 +354,8 @@ the records, and **Export** turns templates and records into files.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Effects are one list: shadows, a layer blur, a background blur, grain and
-    a halftone, each with its own visibility toggle. Grain sets an amount,
+    a halftone. Each is one row with a visibility toggle, a settings button
+    that opens its controls in a popover, and remove. Grain sets an amount,
     grain size, seed, blend mode and mono or colour; a seed always paints the
     same grain, in the canvas and in every export. A halftone sets a mode
     (mono, or a CMYK look of four screens at 15°, 75°, 0° and 45° that is not
@@ -361,6 +366,9 @@ the records, and **Export** turns templates and records into files.
   - Text content, image source, QR value and barcode value have an Insert
     field menu; an image source lists image and URL fields first. Its last
     item, "New field…", creates a field and inserts it.
+  - Type settings opens a popover with Basics (case, style, max lines,
+    paragraph spacing, direction, last line, vertical trim), Details
+    (OpenType features) and Arc (text on a circle or vector).
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to
     left, or taken from the text. OpenType features are typed as tags

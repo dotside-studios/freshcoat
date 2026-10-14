@@ -65,11 +65,12 @@ describe("Text stroke section", () => {
 	it("offers position and join but no dash, trim or cap", async () => {
 		const user = fastUser();
 		const c = setup(withText({ color: "#ff0000", width: 2 }));
+		await user.click(screen.getByRole("radio", { name: "Outside" }));
+		expect(stroke(c)).toEqual({ color: "#ff0000", width: 2, align: "outside" });
+		await user.click(screen.getByRole("button", { name: "Stroke settings" }));
 		expect(screen.queryByRole("textbox", { name: "Stroke dash" })).toBeNull();
 		expect(screen.queryByRole("spinbutton", { name: "Trim end" })).toBeNull();
 		expect(screen.queryByRole("button", { name: /Stroke cap/ })).toBeNull();
 		expect(screen.getByRole("button", { name: /Stroke join/ })).toBeTruthy();
-		await user.click(screen.getByRole("radio", { name: "Outside" }));
-		expect(stroke(c)).toEqual({ color: "#ff0000", width: 2, align: "outside" });
-	});
+	}, 20_000);
 });

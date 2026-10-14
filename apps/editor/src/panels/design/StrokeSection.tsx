@@ -28,6 +28,7 @@ import {
 	Pair,
 	RemoveButton,
 	Row,
+	SettingsPopover,
 	sectionActions,
 } from "./controls";
 import { GradientEditor, KINDS, useBox } from "./FillSection";
@@ -267,83 +268,89 @@ export function StrokeSection({
 							<ToggleGroupItem id="center">Center</ToggleGroupItem>
 							<ToggleGroupItem id="outside">Outside</ToggleGroupItem>
 						</ToggleGroup>
+						<SettingsPopover label="Stroke settings" title="Stroke">
+							{!text && (
+								<DashField
+									value={commonValue(strokes.map((s) => s?.dash ?? []))}
+									onCommit={(dash) => set("stroke-dash", { dash })}
+								/>
+							)}
+							{!text && (
+								<Row label="Trim">
+									{TRIMS.map(({ key, label, fallback }) => {
+										const v = commonValue(
+											strokes.map((s) => s?.[key] ?? fallback),
+										);
+										return (
+											<NumberField
+												key={key}
+												aria-label={label}
+												className="min-w-0 flex-1"
+												unit="%"
+												precision={0}
+												min={key === "trimOffset" ? undefined : 0}
+												max={key === "trimOffset" ? undefined : 100}
+												value={
+													typeof v === "number" ? Math.round(v * 100) : null
+												}
+												placeholder={typeof v === "string" ? v : "Mixed"}
+												onChange={(pct) => {
+													const f = pct / 100;
+													set(`stroke-${key}`, {
+														[key]: f === fallback ? undefined : f,
+													});
+												}}
+											/>
+										);
+									})}
+								</Row>
+							)}
+							<Pair>
+								{!text && (
+									<Select
+										aria-label="Stroke cap"
+										value={cap}
+										placeholder="Mixed"
+										onChange={(v) =>
+											set("stroke-cap", {
+												cap: v === "butt" ? undefined : (v as Stroke["cap"]),
+											})
+										}
+									>
+										<SelectItem id="butt" textValue="Butt cap">
+											Butt cap
+										</SelectItem>
+										<SelectItem id="round" textValue="Round cap">
+											Round cap
+										</SelectItem>
+										<SelectItem id="square" textValue="Square cap">
+											Square cap
+										</SelectItem>
+									</Select>
+								)}
+								<Select
+									aria-label="Stroke join"
+									value={join}
+									placeholder="Mixed"
+									onChange={(v) =>
+										set("stroke-join", {
+											join: v === "miter" ? undefined : (v as Stroke["join"]),
+										})
+									}
+								>
+									<SelectItem id="miter" textValue="Miter join">
+										Miter join
+									</SelectItem>
+									<SelectItem id="round" textValue="Round join">
+										Round join
+									</SelectItem>
+									<SelectItem id="bevel" textValue="Bevel join">
+										Bevel join
+									</SelectItem>
+								</Select>
+							</Pair>
+						</SettingsPopover>
 					</Row>
-					{!text && (
-						<DashField
-							value={commonValue(strokes.map((s) => s?.dash ?? []))}
-							onCommit={(dash) => set("stroke-dash", { dash })}
-						/>
-					)}
-					{!text && (
-						<Row label="Trim">
-							{TRIMS.map(({ key, label, fallback }) => {
-								const v = commonValue(strokes.map((s) => s?.[key] ?? fallback));
-								return (
-									<NumberField
-										key={key}
-										aria-label={label}
-										className="min-w-0 flex-1"
-										unit="%"
-										precision={0}
-										min={key === "trimOffset" ? undefined : 0}
-										max={key === "trimOffset" ? undefined : 100}
-										value={typeof v === "number" ? Math.round(v * 100) : null}
-										placeholder={typeof v === "string" ? v : "Mixed"}
-										onChange={(pct) => {
-											const f = pct / 100;
-											set(`stroke-${key}`, {
-												[key]: f === fallback ? undefined : f,
-											});
-										}}
-									/>
-								);
-							})}
-						</Row>
-					)}
-					<Pair>
-						{!text && (
-							<Select
-								aria-label="Stroke cap"
-								value={cap}
-								placeholder="Mixed"
-								onChange={(v) =>
-									set("stroke-cap", {
-										cap: v === "butt" ? undefined : (v as Stroke["cap"]),
-									})
-								}
-							>
-								<SelectItem id="butt" textValue="Butt cap">
-									Butt cap
-								</SelectItem>
-								<SelectItem id="round" textValue="Round cap">
-									Round cap
-								</SelectItem>
-								<SelectItem id="square" textValue="Square cap">
-									Square cap
-								</SelectItem>
-							</Select>
-						)}
-						<Select
-							aria-label="Stroke join"
-							value={join}
-							placeholder="Mixed"
-							onChange={(v) =>
-								set("stroke-join", {
-									join: v === "miter" ? undefined : (v as Stroke["join"]),
-								})
-							}
-						>
-							<SelectItem id="miter" textValue="Miter join">
-								Miter join
-							</SelectItem>
-							<SelectItem id="round" textValue="Round join">
-								Round join
-							</SelectItem>
-							<SelectItem id="bevel" textValue="Bevel join">
-								Bevel join
-							</SelectItem>
-						</Select>
-					</Pair>
 				</>
 			)}
 		</InspectorSection>

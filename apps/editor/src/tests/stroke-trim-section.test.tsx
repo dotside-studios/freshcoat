@@ -1,5 +1,5 @@
 import type { RectElement, Template } from "@freshcoat-js/coatfile";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
@@ -58,6 +58,7 @@ afterEach(cleanup);
 describe("Stroke trim fields", () => {
 	it("shows the trim as percentages, defaulting to the whole stroke", () => {
 		setup(withRect({ color: "#000000", width: 2, trimEnd: 0.25 }));
+		fireEvent.click(screen.getByRole("button", { name: "Stroke settings" }));
 		expect(field("Trim start")).toHaveProperty("value", "0%");
 		expect(field("Trim end")).toHaveProperty("value", "25%");
 		expect(field("Trim offset")).toHaveProperty("value", "0%");
@@ -66,6 +67,7 @@ describe("Stroke trim fields", () => {
 	it("writes fractions and clears a value set back to its default", async () => {
 		const user = fastUser();
 		const c = setup(withRect({ color: "#000000", width: 2 }));
+		fireEvent.click(screen.getByRole("button", { name: "Stroke settings" }));
 		await user.clear(field("Trim end"));
 		await user.type(field("Trim end"), "40{Enter}");
 		expect(stroke(c)?.trimEnd).toBe(0.4);
@@ -79,6 +81,7 @@ describe("Stroke trim fields", () => {
 
 	it("shows a bound trim's token", () => {
 		setup(withRect({ color: "#000000", width: 2, trimEnd: "{{progress}}" }));
+		fireEvent.click(screen.getByRole("button", { name: "Stroke settings" }));
 		expect(field("Trim end")).toHaveProperty("value", "");
 		expect(field("Trim end").getAttribute("placeholder")).toBe("{{progress}}");
 	});

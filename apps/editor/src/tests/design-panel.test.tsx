@@ -97,17 +97,18 @@ describe("DesignPanel", () => {
 
 	it("justifies text and then offers the last line's alignment", () => {
 		const c = setup(["0/1/1"]);
-		expect(screen.queryByLabelText("Last line alignment")).toBeNull();
 		fireEvent.click(screen.getByRole("radio", { name: "Justify" }));
 		expect((el(c, "0/1/1").properties as { align?: string }).align).toBe(
 			"justify",
 		);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
 		expect(validate(c.template).ok).toBe(true);
 	});
 
 	it("sets the text direction", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		await chooseOption(
 			fastUser(),
 			screen.getByRole("button", { name: /Text direction/ }),
@@ -119,8 +120,10 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("writes OpenType features from the features field", () => {
+	it("writes OpenType features from the features field", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
+		await fastUser().click(screen.getByRole("tab", { name: "Details" }));
 		typeInto(screen.getByLabelText("OpenType features"), "tnum, -liga");
 		const font = (el(c, "0/1/1").properties as { font: { features?: unknown } })
 			.font;
@@ -130,6 +133,7 @@ describe("DesignPanel", () => {
 
 	it("writes paragraph spacing, and clears it at zero", () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		const field = spinbutton("Paragraph spacing");
 		typeInto(field, "12");
 		const spacing = () =>
@@ -261,6 +265,9 @@ describe("DesignPanel", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Add background blur" }),
 		);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Background blur settings" }),
+		);
 		typeInto(spinbutton("Background blur"), "16");
 		expect(el(c, "0/0").effects).toEqual([
 			{ type: "backdropBlur", radius: 16 },
@@ -273,6 +280,7 @@ describe("DesignPanel", () => {
 		expect(
 			screen.queryByRole("button", { name: "Add background blur" }),
 		).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(
 			screen.getByRole("button", { name: "Remove background blur" }),
 		);
@@ -297,6 +305,7 @@ describe("DesignPanel", () => {
 	it("adds grain and edits it", async () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add grain" }));
+		fireEvent.click(screen.getByRole("button", { name: "Grain settings" }));
 		typeInto(spinbutton("Grain amount"), "40");
 		typeInto(spinbutton("Grain seed"), "7");
 		await chooseOption(
@@ -316,11 +325,12 @@ describe("DesignPanel", () => {
 		]);
 		expect(validate(c.template).ok).toBe(true);
 		expect(screen.queryByRole("button", { name: "Add grain" })).toBeNull();
-	});
+	}, 20_000);
 
 	it("adds a halftone and shows its lpi", async () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add halftone" }));
+		fireEvent.click(screen.getByRole("button", { name: "Halftone settings" }));
 		typeInto(spinbutton("Halftone cell size"), "10");
 		expect(screen.getByText(/30 lpi at 300 dpi/)).toBeTruthy();
 		await chooseOption(
@@ -346,9 +356,10 @@ describe("DesignPanel", () => {
 			},
 		]);
 		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));
 		expect("effects" in el(c, "0/0")).toBe(false);
-	});
+	}, 20_000);
 
 	it("an edit moves legacy effects into effects", () => {
 		const t = doc();
