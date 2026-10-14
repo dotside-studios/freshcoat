@@ -11,8 +11,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
-import { DesignPanel } from "~/panels/design/DesignPanel";
 import { LeftPanel } from "~/panels/LeftPanel";
+import { PrintPanel } from "~/panels/print/PrintPanel";
 import { chooseOption, fastUser, spinbutton } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
@@ -34,7 +34,7 @@ function setup(selection: string[], t?: Template) {
 	const c = open(selection, t);
 	render(
 		<ControllerProvider controller={c}>
-			<DesignPanel />
+			<PrintPanel />
 		</ControllerProvider>,
 	);
 	return c;

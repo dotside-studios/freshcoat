@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
-import { DesignPanel } from "~/panels/design/DesignPanel";
+import { PrintPanel } from "~/panels/print/PrintPanel";
 import { fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
@@ -24,7 +24,7 @@ function setup(t: Template, key = RECT) {
 	c.select([key]);
 	render(
 		<ControllerProvider controller={c}>
-			<DesignPanel />
+			<PrintPanel />
 		</ControllerProvider>,
 	);
 	return c;
