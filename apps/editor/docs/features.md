@@ -327,7 +327,7 @@ the records, and **Export** turns templates and records into files.
     holds the same commands under Boolean, Arrange and Align and distribute.
   - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
     linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Spot colour, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    Fill, Stroke, Spot color, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
     as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
@@ -337,7 +337,7 @@ the records, and **Export** turns templates and records into files.
     or a linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only. A text
     stroke takes a position and a join but no dash, trim or cap.
-  - A rectangle's or vector's Spot colour section prints its fill, its
+  - A rectangle's or vector's Spot color section prints its fill, its
     stroke or both in a named spot ink, for white ink, foil or varnish:
     "Fill as spot" or "Stroke as spot", then the ink's name as the printer
     knows it (White by default; All and None are refused), a tint, an

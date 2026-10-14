@@ -46,7 +46,7 @@ export function SpotSection({ ins }: { ins: Inspect }) {
 		});
 
 	return (
-		<InspectorSection title="Spot colour">
+		<InspectorSection title="Spot color">
 			{(["fill", "stroke"] as const).map((paint) => {
 				const inks = spots.map((s) => s?.[paint]);
 				const on = commonValue(inks.map((ink) => ink !== undefined));
@@ -109,7 +109,7 @@ export function SpotSection({ ins }: { ins: Inspect }) {
 									<CommitField
 										aria-label={`${LABEL[paint]} spot alternate`}
 										value={alt}
-										placeholder="Layer colour"
+										placeholder="Layer color"
 										onCommit={(text) => {
 											const color = text.trim();
 											if (!color) {

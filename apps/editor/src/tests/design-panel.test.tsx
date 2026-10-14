@@ -152,7 +152,7 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("orders a rect's sections Layer, Slice, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
+	it("orders a rect's sections Layer, Slice, Fill, Stroke, Spot color, Effects, Constraints, Adjust, Visibility", () => {
 		setup(["0/0"]);
 		const titles = screen
 			.getAllByRole("heading", { level: 3 })
@@ -162,6 +162,7 @@ describe("DesignPanel", () => {
 			"Slice",
 			"Fill",
 			"Stroke",
+			"Spot color",
 			"Effects",
 			"Constraints",
 			"Adjust",
