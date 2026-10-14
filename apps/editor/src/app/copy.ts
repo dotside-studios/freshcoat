@@ -237,8 +237,6 @@ export const VARIANT_EXPORT = {
 			? "Default only, no variant changes anything"
 			: `Default and ${plural(variants, "variant")}`,
 	unbound: "Not bound. Fields use their defaults.",
-	fileNameTokens: (slices: boolean) =>
-		`Tokens: {{template}} {{side}} {{index}} {{record}} {{variant}}${slices ? " {{slice}}" : ""} and any column key`,
 	/** under the file name pattern, for tokens that export as empty text */
 	unknownTokens: (tokens: readonly string[]) => {
 		const list = tokens.map((t) => `{{${t}}}`).join(", ");

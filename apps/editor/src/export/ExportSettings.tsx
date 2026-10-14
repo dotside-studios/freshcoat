@@ -291,7 +291,12 @@ export function ExportSettings({
 			(p) => p.templateId === preset.templateId,
 		).length ?? 0;
 	const fileNameBox = useRef<HTMLDivElement>(null);
-	const tokenGroups = template ? fileNameTokenGroups(template, viewed) : [];
+	const tokenGroups = (
+		template ? fileNameTokenGroups(template, viewed) : []
+	).map((group) => ({
+		...group,
+		tokens: group.tokens.filter((t) => use.slices || t !== "slice"),
+	}));
 	const insertToken = (token: string) => {
 		const input = fileNameBox.current?.querySelector("input");
 		const value = preset.fileName;
@@ -842,12 +847,6 @@ export function ExportSettings({
 						{VARIANT_EXPORT.unknownTokens(unknownTokens)}
 					</p>
 				) : null}
-				<p
-					className="m-0 text-fc-faint text-fc-sm"
-					data-testid="export-file-tokens"
-				>
-					{VARIANT_EXPORT.fileNameTokens(use.slices)}
-				</p>
 				<Checkbox
 					isSelected={preset.markExported}
 					onChange={(markExported) => set({ markExported })}

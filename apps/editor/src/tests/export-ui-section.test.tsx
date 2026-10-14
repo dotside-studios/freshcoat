@@ -543,7 +543,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		const stored = (c: EditorController) => c.state.workspace?.presets[0];
 
 		test("offers nothing about slices to a template without any", async () => {
-			const { controller, templateId } = setup();
+			const { controller, user, templateId } = setup();
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
@@ -551,9 +551,8 @@ describe("export section", { timeout: 20_000 }, () => {
 				screen.queryByRole("checkbox", { name: /slice pieces/ }),
 			).toBeNull();
 			expect(screen.queryByRole("button", { name: /Cut file/ })).toBeNull();
-			expect(
-				screen.getByTestId("export-file-tokens").textContent,
-			).not.toContain("{{slice}}");
+			await user.click(screen.getByRole("button", { name: "Insert field" }));
+			expect(screen.queryByRole("menuitem", { name: "slice" })).toBeNull();
 		});
 
 		test("splits into pieces, which the plan, the count and the file names follow", async () => {
@@ -570,9 +569,9 @@ describe("export section", { timeout: 20_000 }, () => {
 			expect(stored(controller)?.split).toBe("pieces");
 			// 3 records x (2 pieces on the front + the whole back).
 			expect(button("Export 9 files")).toBeTruthy();
-			expect(screen.getByTestId("export-file-tokens").textContent).toContain(
-				"{{slice}}",
-			);
+			await user.click(screen.getByRole("button", { name: "Insert field" }));
+			expect(screen.getByRole("menuitem", { name: "slice" })).toBeTruthy();
+			await user.keyboard("{Escape}");
 			expect(screen.getByTestId("export-file-example").textContent).toBe(
 				"e.g. r1-front-left.png",
 			);
@@ -1079,7 +1078,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 		expect(button("Export 1 file")).toBeTruthy();
 		const settings = screen.getByTestId("export-settings");
-		expect(within(settings).getByText(/\{\{variant\}\}/)).toBeTruthy();
 		await chooseOption(
 			user,
 			within(settings).getByLabelText(/Variant source/, { selector: "button" }),
