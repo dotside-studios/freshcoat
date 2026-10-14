@@ -198,13 +198,16 @@ describe("override markers", () => {
 		expect(screen.queryAllByTestId("override-marker")).toHaveLength(0);
 	});
 
-	it("hides a layer in the variant from the Visibility section", async () => {
+	it("shows a hidden layer's line in Show when, with a way back", async () => {
 		const { c, user } = inspect(["0/5"]);
-		await user.click(screen.getByRole("button", { name: "Hide in Dark" }));
+		expect(screen.queryByText("Hidden in Dark")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Hide in Dark" })).toBeNull();
+		act(() => c.setHiddenInVariant(["0/5"], true));
 		expect(delta(c, "rot")?.hidden).toBe(true);
-		expect(base(c).template_data[0]?.elements[5]).toBeTruthy();
-		await user.click(screen.getByRole("button", { name: "Show in Dark" }));
+		expect(screen.getByText("Hidden in Dark")).toBeTruthy();
+		await user.click(screen.getByRole("button", { name: "Show" }));
 		expect(delta(c, "rot")).toBeUndefined();
+		expect(screen.queryByText("Hidden in Dark")).toBeNull();
 	});
 
 	it("an effect edited in a variant applies to every variant", () => {
@@ -241,8 +244,9 @@ describe("the layers tree", () => {
 		await user.click(
 			within(menu).getByRole("menuitem", { name: "Hide in Dark" }),
 		);
-		const hidden = within(row("0/5")).getByTestId("layer-variant-hidden");
+		const hidden = within(row("0/5")).getByTestId("layer-conditional");
 		expect(hidden.getAttribute("aria-label")).toBe("Hidden in Dark");
+		expect(hidden.getAttribute("title")).toBe("Hidden in Dark");
 		expect(
 			within(row("0/5")).getByText("rot").className.includes("opacity-45"),
 		).toBe(true);
@@ -263,31 +267,78 @@ describe("a layer hidden in Default", () => {
 			</>,
 		);
 		const row = () => screen.getByTestId("layer-row-0/5");
-		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
-		await user.click(screen.getByRole("button", { name: "Hide in Default" }));
+		const marker = () => within(row()).queryByTestId("layer-conditional");
+		expect(marker()).toBeNull();
+		act(() => c.setHiddenInVariant(["0/5"], true));
 		expect((getElement(base(c), "0/5") as Element).hidden).toBe(true);
-		expect(
-			within(row())
-				.getByTestId("layer-variant-hidden")
-				.getAttribute("aria-label"),
-		).toBe("Hidden in Default");
+		expect(marker()?.getAttribute("aria-label")).toBe("Hidden in Default");
+		expect(screen.getByText("Hidden in Default")).toBeTruthy();
 		expect(c.state.hidden.has("0/5")).toBe(false);
 
 		act(() => c.setVariant("dark"));
-		expect(
-			within(row())
-				.getByTestId("layer-variant-hidden")
-				.getAttribute("aria-label"),
-		).toBe("Hidden in Dark");
-		await user.click(screen.getByRole("button", { name: "Show in Dark" }));
-		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
+		expect(marker()?.getAttribute("aria-label")).toBe("Hidden in Dark");
+		act(() => c.setHiddenInVariant(["0/5"], false));
+		expect(marker()).toBeNull();
 		expect(within(row()).getByTestId("layer-variant-changed")).toBeTruthy();
 		expect((getElement(base(c), "0/5") as Element).hidden).toBe(true);
 
 		act(() => c.setVariant(undefined));
-		await user.click(screen.getByRole("button", { name: "Show in Default" }));
+		await user.click(screen.getByRole("button", { name: "Show" }));
 		expect("hidden" in (getElement(base(c), "0/5") as Element)).toBe(false);
-		expect(within(row()).queryByTestId("layer-variant-hidden")).toBeNull();
+		expect(marker()).toBeNull();
+	});
+});
+
+describe("the layer menu", () => {
+	async function menuFor(c: EditorController, key: string) {
+		const user = mount(c, <LayersTree />);
+		act(() => c.select([key]));
+		const name = (getElement(c.template as Template, key) as Element).id;
+		fireEvent.contextMenu(
+			within(screen.getByTestId(`layer-row-${key}`)).getByText(name),
+		);
+		return { user, menu: await screen.findByRole("menu") };
+	}
+
+	it("offers Hide in Default with no active variant", async () => {
+		const { menu } = await menuFor(open(), "0/5");
+		expect(
+			within(menu).getByRole("menuitem", { name: "Hide in Default" }),
+		).toBeTruthy();
+	});
+
+	it("offers Hide in and Show in for the active variant", async () => {
+		const c = open();
+		act(() => c.setVariant("dark"));
+		const { user, menu } = await menuFor(c, "0/5");
+		await user.click(
+			within(menu).getByRole("menuitem", { name: "Hide in Dark" }),
+		);
+		expect(c.variantVisibility(["0/5"])[0]?.hidden).toBe(true);
+		fireEvent.contextMenu(
+			within(screen.getByTestId("layer-row-0/5")).getByText("rot"),
+		);
+		const again = await screen.findByRole("menu");
+		await user.click(
+			within(again).getByRole("menuitem", { name: "Show in Dark" }),
+		);
+		expect(c.variantVisibility(["0/5"])[0]?.hidden).toBe(false);
+	});
+});
+
+describe("the layers tree marker", () => {
+	it("marks a layer with conditions, and no other", () => {
+		const c = open();
+		mount(c, <LayersTree />);
+		const marker = within(screen.getByTestId("layer-row-0/4")).getByTestId(
+			"layer-conditional",
+		);
+		expect(marker.getAttribute("title")).toBe("Shown when show is set");
+		expect(
+			within(screen.getByTestId("layer-row-0/5")).queryByTestId(
+				"layer-conditional",
+			),
+		).toBeNull();
 	});
 });
 

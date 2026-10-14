@@ -1,4 +1,8 @@
-import { hiddenElementIds, type Template } from "@freshcoat-js/coatfile";
+import {
+	type Element as CoatElement,
+	hiddenElementIds,
+	type Template,
+} from "@freshcoat-js/coatfile";
 import { inputBase } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -25,7 +29,7 @@ import {
 	useDragAndDrop,
 } from "react-aria-components";
 import { useController } from "~/app/context";
-import { CONTENT, VARIANT_UI } from "~/app/copy";
+import { CONTENT, SHOW_WHEN, VARIANT_UI } from "~/app/copy";
 import { layerIcon } from "~/app/icons";
 import { LayerMenuItems } from "~/app/LayerMenu";
 import { moveElements, renameElement } from "~/doc/ops";
@@ -36,11 +40,16 @@ import {
 	overrideBackground,
 	workingTemplate,
 } from "~/doc/variant-edit";
+import {
+	conditionsOf,
+	describeCondition,
+} from "~/panels/design/VisibilitySection";
 import { useEditor, useStore } from "~/state/hooks";
 import { type EditorStore, present } from "~/state/store";
 import CloseIcon from "~icons/mingcute/close-line";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
+import FilterIcon from "~icons/mingcute/filter-line";
 import LockIcon from "~icons/mingcute/lock-line";
 import SliceIcon from "~icons/mingcute/scissors-line";
 import SearchIcon from "~icons/mingcute/search-line";
@@ -487,12 +496,27 @@ function RowIcon({ row }: { row: LayerRow }) {
 	return <Icon className={cn(dim && "opacity-45")} />;
 }
 
+/** The tooltip for a layer shown only sometimes: by its conditions, or hidden
+ *  in the active variant. Null for a layer that always shows. */
+function conditionalMarker(
+	row: LayerRow,
+	hiddenIn: VariantMarks,
+): string | null {
+	const when = conditionsOf(row.element as CoatElement);
+	const parts = [
+		hiddenIn ? VARIANT_UI.hiddenIn(hiddenIn.label) : null,
+		when.length > 0 ? SHOW_WHEN.shownWhen(when.map(describeCondition)) : null,
+	].filter((p) => p !== null);
+	return parts.length > 0 ? parts.join(". ") : null;
+}
+
 function RowLabel({ row }: { row: LayerRow }) {
 	const controller = useController();
 	const renaming = useContext(RenamingContext);
 	const marks = useContext(VariantMarksContext);
 	const hiddenInVariant = marks?.hidden.has(row.key) ?? false;
 	const dim = useHiddenInTree(row.key) || hiddenInVariant;
+	const marker = conditionalMarker(row, hiddenInVariant ? marks : null);
 
 	if (renaming.key === row.key)
 		return (
@@ -551,13 +575,17 @@ function RowLabel({ row }: { row: LayerRow }) {
 					className="size-1.5 shrink-0 rounded-full bg-fc-accent"
 				/>
 			) : null}
-			{hiddenInVariant && marks ? (
-				<EyeOffIcon
+			{marker ? (
+				<span
 					role="img"
-					aria-label={VARIANT_UI.hiddenIn(marks.label)}
-					data-testid="layer-variant-hidden"
-					className="size-3.5 shrink-0 text-fc-accent-hover"
-				/>
+					aria-label={marker}
+					title={marker}
+					data-testid="layer-conditional"
+					data-hidden-in-variant={hiddenInVariant || undefined}
+					className="shrink-0 text-fc-faint"
+				>
+					<FilterIcon className="size-3.5" />
+				</span>
 			) : null}
 			{row.bound && (
 				<RACButton

@@ -113,6 +113,22 @@ export const VARIANT_UI = {
 		`${label} has a change to ${layer} that changes nothing`,
 } as const;
 
+export const SHOW_WHEN = {
+	title: "Show when",
+	always: "Always",
+	add: "Add condition",
+	show: "Show",
+	needField: "Add a field in Content to show this layer conditionally",
+	mixed: "Mixed conditions. Adding one replaces them.",
+	ops: {
+		set: "is set",
+		unset: "is not set",
+		equals: "equals",
+		differs: "does not equal",
+	},
+	shownWhen: (conditions: string[]) => `Shown when ${conditions.join(" and ")}`,
+} as const;
+
 /** The left panel's sections. */
 export const LEFT_PANEL = {
 	templates: "Templates",
