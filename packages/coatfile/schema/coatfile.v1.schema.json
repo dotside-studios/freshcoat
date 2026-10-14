@@ -7814,6 +7814,123 @@
 										},
 										"margin": {
 											"type": "number"
+										},
+										"quietZone": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 20
+										},
+										"moduleShape": {
+											"type": "string",
+											"enum": [
+												"square",
+												"dot",
+												"rounded",
+												"classy"
+											]
+										},
+										"finderOuter": {
+											"type": "string",
+											"enum": [
+												"square",
+												"rounded",
+												"circle"
+											]
+										},
+										"finderInner": {
+											"type": "string",
+											"enum": [
+												"square",
+												"rounded",
+												"dot"
+											]
+										},
+										"gradient": {
+											"type": "object",
+											"properties": {
+												"kind": {
+													"type": "string",
+													"const": "linear"
+												},
+												"angle": {
+													"type": "number"
+												},
+												"from": {
+													"type": "array",
+													"prefixItems": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "number"
+														}
+													],
+													"items": false,
+													"minItems": 2,
+													"maxItems": 2
+												},
+												"to": {
+													"type": "array",
+													"prefixItems": [
+														{
+															"type": "number"
+														},
+														{
+															"type": "number"
+														}
+													],
+													"items": false,
+													"minItems": 2,
+													"maxItems": 2
+												},
+												"stops": {
+													"minItems": 2,
+													"type": "array",
+													"items": {
+														"type": "object",
+														"properties": {
+															"offset": {
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															"color": {
+																"type": "string"
+															}
+														},
+														"required": [
+															"offset",
+															"color"
+														]
+													}
+												}
+											},
+											"required": [
+												"kind",
+												"angle",
+												"stops"
+											]
+										},
+										"logo": {
+											"type": "object",
+											"properties": {
+												"src": {
+													"type": "string"
+												},
+												"size": {
+													"type": "number",
+													"exclusiveMinimum": 0,
+													"maximum": 1
+												},
+												"padding": {
+													"type": "number",
+													"minimum": 0,
+													"maximum": 10
+												}
+											},
+											"required": [
+												"src"
+											]
 										}
 									},
 									"required": [

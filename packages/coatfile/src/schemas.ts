@@ -428,12 +428,50 @@ export const ImagePropertiesSchema = z.object({
 	stroke: StrokeSchema.optional(),
 });
 
+export const QrModuleShapeSchema = z.enum(["square", "dot", "rounded", "classy"]);
+export const QrFinderOuterSchema = z.enum(["square", "rounded", "circle"]);
+export const QrFinderInnerSchema = z.enum(["square", "rounded", "dot"]);
+
+export const QrLogoSchema = z.object({
+	// An image src, as an image element's.
+	src: z.string(),
+	// The logo's side as a fraction of the symbol's, quiet zone excluded.
+	// Default 0.2. Drawn at most 0.3.
+	size: z.number().gt(0).max(1).optional(),
+	// Modules cleared around the logo. Default 1.
+	padding: z.number().min(0).max(10).optional(),
+});
+
 export const QrCodePropertiesSchema = z.object({
 	value: z.string(),
+	// Raised to Q with a logo, and to H for a large one.
 	errorCorrection: z.enum(["L", "M", "Q", "H"]).optional(),
 	foreground: z.string().optional(),
 	background: z.string().optional(),
+	// Design px inside the box, around the quiet zone.
 	margin: z.number().optional(),
+	// Modules each side, inside the margin. Default 0.
+	quietZone: z.number().int().min(0).max(20).optional(),
+	// Default "square".
+	moduleShape: QrModuleShapeSchema.optional(),
+	// The finder patterns' ring and centre. Default "square".
+	finderOuter: QrFinderOuterSchema.optional(),
+	finderInner: QrFinderInnerSchema.optional(),
+	// Paints the modules in place of `foreground`.
+	gradient: z
+		.object({
+			kind: z.literal("linear"),
+			angle: z.number(),
+			from: z.tuple([z.number(), z.number()]).optional(),
+			to: z.tuple([z.number(), z.number()]).optional(),
+			stops: z
+				.array(
+					z.object({ offset: z.number().min(0).max(1), color: z.string() }),
+				)
+				.min(2),
+		})
+		.optional(),
+	logo: QrLogoSchema.optional(),
 });
 
 export const SymbologySchema = z.enum([

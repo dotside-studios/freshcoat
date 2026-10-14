@@ -45,7 +45,7 @@ import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
 import { fieldContext, prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
-import { generatePixels } from "./qr";
+import { DEFAULT_QR_STYLE, type QrStyle, qrSymbol } from "./qr";
 import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { strokeSides, widestStroke } from "./stroke-width";
@@ -65,6 +65,10 @@ import type {
 	FrameFlexLayout,
 	Gradient,
 	GradientFill,
+	QrFinderInner,
+	QrFinderOuter,
+	QrLogo,
+	QrModuleShape,
 	GridTrack,
 	ImageCrop,
 	Layout,
@@ -238,6 +242,10 @@ function compileFrame(
 		}
 		if (el.type === "image") {
 			const src = String(substitute(el.properties.src, ctx) ?? "");
+			if (src) images.add(src);
+		}
+		if (el.type === "qr_code" && el.properties.logo) {
+			const src = String(substitute(el.properties.logo.src, ctx) ?? "");
 			if (src) images.add(src);
 		}
 	};
@@ -755,9 +763,9 @@ function compileFrameElement(
 	};
 }
 
-// QR → group holding an optional background rect + a bitmap of the module
-// matrix (foreground where a module is set, transparent elsewhere), placed
-// inside the quiet-zone margin. The painter scales it nearest-neighbor.
+// QR → group holding an optional background rect, then the symbol as one
+// even-odd path in module units (and the logo over the modules cleared for it),
+// in a group whose grid snaps each module to whole output pixels.
 function compileQr(
 	base: Base,
 	props: Record<string, unknown>,
@@ -770,6 +778,8 @@ function compileQr(
 	const foreground = String(props.foreground ?? "#000");
 	const background = props.background as string | undefined;
 	const size = base.size;
+	const logo = qrLogo(props.logo);
+	const style = qrStyle(props, logo);
 
 	const children: Node[] = [];
 	if (background) {
@@ -780,19 +790,48 @@ function compileQr(
 			fills: [{ kind: "solid", color: background }],
 		});
 	}
-	const { size: n, pixels } = generatePixels(
-		value,
-		ec,
-		foregroundRgb(foreground),
-	);
-	children.push({
-		kind: "bitmap",
-		pos: { x: margin, y: margin },
-		size: { width: size.width - 2 * margin, height: size.height - 2 * margin },
-		pixels,
-		pixelWidth: n,
-		pixelHeight: n,
-	});
+	const symbol = qrSymbol(value, ec, style);
+	const side = Math.max(0, Math.min(size.width, size.height) - 2 * margin);
+	if (symbol.size > 0 && side > 0) {
+		const box = {
+			pos: { x: (size.width - side) / 2, y: (size.height - side) / 2 },
+			size: { width: side, height: side },
+		};
+		const unit = side / symbol.grid;
+		const gradient = props.gradient as Fill | undefined;
+		const fill = gradient
+			? resolveFill(gradient, ratio)
+			: ({ kind: "solid", color: foreground } as const);
+		const grid: Node[] = [
+			{
+				kind: "path",
+				pos: { x: 0, y: 0 },
+				size: box.size,
+				d: symbol.d,
+				viewBox: { x: 0, y: 0, width: symbol.grid, height: symbol.grid },
+				fillRule: "evenodd",
+				fills: fill ? [fill] : [],
+			} satisfies PathNode,
+		];
+		if (logo && symbol.logo) {
+			grid.push({
+				kind: "image",
+				pos: { x: symbol.logo.x * unit, y: symbol.logo.y * unit },
+				size: {
+					width: symbol.logo.side * unit,
+					height: symbol.logo.side * unit,
+				},
+				src: logo.src,
+				fit: "contain",
+			} satisfies ImageNode);
+		}
+		children.push({
+			kind: "group",
+			...box,
+			snap: { columns: symbol.grid, rows: symbol.grid },
+			children: grid,
+		});
+	}
 
 	return {
 		id: base.id,
@@ -808,6 +847,50 @@ function compileQr(
 		adjust: base.adjust,
 		layoutChild: base.layoutChild,
 		children,
+	};
+}
+
+const DEFAULT_QR_LOGO_SIZE = 0.2;
+
+function qrLogo(
+	raw: unknown,
+): { src: string; size: number; padding: number } | null {
+	if (typeof raw !== "object" || raw === null) return null;
+	const logo = raw as QrLogo;
+	const src = typeof logo.src === "string" ? logo.src : "";
+	if (!src) return null;
+	const size =
+		typeof logo.size === "number" && logo.size > 0
+			? logo.size
+			: DEFAULT_QR_LOGO_SIZE;
+	const padding =
+		typeof logo.padding === "number" && logo.padding >= 0
+			? logo.padding
+			: DEFAULT_QR_STYLE.logoPadding;
+	return { src, size, padding };
+}
+
+function qrStyle(
+	props: Record<string, unknown>,
+	logo: { size: number; padding: number } | null,
+): QrStyle {
+	const quietZone =
+		typeof props.quietZone === "number" && props.quietZone >= 0
+			? Math.round(props.quietZone)
+			: DEFAULT_QR_STYLE.quietZone;
+	return {
+		moduleShape:
+			(props.moduleShape as QrModuleShape | undefined) ??
+			DEFAULT_QR_STYLE.moduleShape,
+		finderOuter:
+			(props.finderOuter as QrFinderOuter | undefined) ??
+			DEFAULT_QR_STYLE.finderOuter,
+		finderInner:
+			(props.finderInner as QrFinderInner | undefined) ??
+			DEFAULT_QR_STYLE.finderInner,
+		quietZone,
+		logoSize: logo?.size ?? 0,
+		logoPadding: logo?.padding ?? DEFAULT_QR_STYLE.logoPadding,
 	};
 }
 
