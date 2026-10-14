@@ -164,6 +164,22 @@ describe("printHints", () => {
 		expect(codes(printHints(t, { dpi: 600 }))).toEqual(["t:small_text"]);
 	});
 
+	test("read the thinnest side of a stroke with a width per side", () => {
+		const sided = (width: Record<string, number>) =>
+			card({ format_version: "1.7" }, [
+				box("edge", 100, 100, 200, 100, {
+					fill: "#fff",
+					stroke: { color: "#000", width },
+				}),
+			]);
+		expect(printHints(sided({ top: 4, bottom: 0.5 }))[0]?.issue).toEqual({
+			code: "hairline_stroke",
+			widthPt: 0.12,
+			minPt: 0.25,
+		});
+		expect(printHints(sided({ top: 4, left: 0, bottom: 2 }))).toEqual([]);
+	});
+
 	test("read spans, nested layers and text strokes, and skip hidden ones", () => {
 		const frame = {
 			id: "group",
@@ -307,6 +323,25 @@ describe("printCheckWarnings", () => {
 			commandsOf(t, { name: "A much longer name than the box can hold at size" }),
 		);
 		expect(long.map((w) => w.issue.code)).toEqual(["small_text"]);
+	});
+
+	test("read a rect's thinnest drawn side", () => {
+		const rect = {
+			op: "drawRect",
+			id: "box",
+			pos: { x: 0, y: 0 },
+			size: { width: 10, height: 10 },
+			stroke: {
+				color: "#000",
+				width: 4,
+				sides: { top: 4, right: 0, bottom: 0.5, left: 4 },
+			},
+		};
+		expect(printCheckWarnings([rect])[0]?.issue).toEqual({
+			code: "hairline_stroke",
+			widthPt: 0.12,
+			minPt: 0.25,
+		});
 	});
 
 	test("scale a stroke by its path's viewBox", () => {
