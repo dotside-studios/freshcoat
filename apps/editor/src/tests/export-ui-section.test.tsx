@@ -668,6 +668,29 @@ describe("export section", { timeout: 20_000 }, () => {
 			expect(stored(controller)?.cutLines).toBe(false);
 		});
 
+		test("names the spot colour of each edge kind the template cuts", async () => {
+			const { controller, user, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, { format: "pdf" }),
+				}),
+			);
+			await user.click(screen.getByRole("tab", { name: "Output" }));
+			expect(screen.queryByLabelText("Through spot")).toBeNull();
+			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
+			const through = screen.getByLabelText("Through spot") as HTMLInputElement;
+			expect(through.placeholder).toBe("CutContour");
+			expect(
+				(screen.getByLabelText("Kiss spot") as HTMLInputElement).placeholder,
+			).toBe("KissCut");
+			expect(screen.queryByLabelText("Score spot")).toBeNull();
+			await user.type(through, "Thru");
+			expect(stored(controller)?.cutSpots).toEqual({ through: "Thru" });
+			await user.clear(screen.getByLabelText("Through spot"));
+			expect(stored(controller)?.cutSpots).toEqual({});
+		});
+
 		test("says why pieces of vector pages can't run", async () => {
 			const { controller, templateId } = setup(withSlices());
 			act(() =>

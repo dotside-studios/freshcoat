@@ -1,5 +1,6 @@
 import { cardSizeMm, type Template } from "@freshcoat-js/coatfile";
 import type {
+	CutKind,
 	DataRecord,
 	Dataset,
 	ExportDestination,
@@ -8,6 +9,7 @@ import type {
 	RecordStatus,
 } from "@freshcoat-js/workspace";
 import {
+	CUT_KINDS,
 	exportSize,
 	exportSplit,
 	fileExtension,
@@ -85,18 +87,20 @@ export const SETTABLE_STATUSES: RecordStatus[] = [
 export function sliceUse(template: Template | undefined): {
 	slices: boolean;
 	cuts: boolean;
+	edges: CutKind[];
 } {
 	let slices = false;
-	let cuts = false;
+	const used = new Set<string>();
 	for (const side of template?.template_data ?? [])
 		for (const el of side.elements) {
 			const slice = (el.properties as { slice?: { edge?: string } } | undefined)
 				?.slice;
 			if (!slice) continue;
 			slices = true;
-			if (slice.edge !== undefined && slice.edge !== "none") cuts = true;
+			if (slice.edge !== undefined) used.add(slice.edge);
 		}
-	return { slices, cuts };
+	const edges = CUT_KINDS.filter((kind) => used.has(kind));
+	return { slices, cuts: edges.length > 0, edges };
 }
 
 /** What the preset's first file will be called. With nothing planned, the

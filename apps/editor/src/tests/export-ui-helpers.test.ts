@@ -128,8 +128,12 @@ describe("readouts", () => {
 	});
 
 	test("what a template's slices offer an export", () => {
-		expect(sliceUse(undefined)).toEqual({ slices: false, cuts: false });
-		expect(sliceUse(doc())).toEqual({ slices: false, cuts: false });
+		expect(sliceUse(undefined)).toEqual({
+			slices: false,
+			cuts: false,
+			edges: [],
+		});
+		expect(sliceUse(doc())).toEqual({ slices: false, cuts: false, edges: [] });
 		const sliced = (slice: object): Template => {
 			const t = doc();
 			const front = t.template_data[0];
@@ -149,14 +153,20 @@ describe("readouts", () => {
 				],
 			};
 		};
-		expect(sliceUse(sliced({}))).toEqual({ slices: true, cuts: false });
+		expect(sliceUse(sliced({}))).toEqual({
+			slices: true,
+			cuts: false,
+			edges: [],
+		});
 		expect(sliceUse(sliced({ edge: "none" }))).toEqual({
 			slices: true,
 			cuts: false,
+			edges: [],
 		});
 		expect(sliceUse(sliced({ edge: "kiss" }))).toEqual({
 			slices: true,
 			cuts: true,
+			edges: ["kiss"],
 		});
 	});
 
