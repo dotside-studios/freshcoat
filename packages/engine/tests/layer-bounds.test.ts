@@ -227,6 +227,25 @@ describe("bounded effect layers", () => {
 			expect(r.maxDiff).toBe(0);
 		});
 
+	test("a per-side stroke stays unbounded", async () => {
+		const sides = { top: 3, right: 12, bottom: 20, left: 0 };
+		const r = await compare([
+			createRect({
+				...box(30.5, 25.25, 110, 70),
+				fills: solid("#2f6fed"),
+				stroke: { color: "#111111", width: 20, sides, align: "outside" },
+				shadow: shadow(-20, 25, 8),
+			}),
+			createRect({
+				...box(150, 40, 60, 100),
+				stroke: { color: "#e33333", width: 20, sides, dash: [6, 4] },
+				opacity: 0.6,
+			}),
+		]);
+		expect(r.boundedLayers).toBe(0);
+		expect(r.maxDiff).toBe(0);
+	});
+
 	const modules = (n: number) =>
 		new Uint8Array(n * n * 4).map((_, i) =>
 			i % 4 === 3 ? 255 : ((i >> 2) * 7919) % 3 ? 0 : 255,

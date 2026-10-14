@@ -5,6 +5,7 @@ import type {
 	FigmaEffect,
 	FigmaNode,
 	FigmaPaint,
+	FigmaStrokeWeights,
 	FigmaTextNode,
 	FigmaVectorNode,
 } from "../types";
@@ -191,9 +192,19 @@ function fillsFlattenReason(
 // A coatfile stroke takes one paint: solids composited into one colour, or a
 // single gradient.
 function strokeFlattens(
-	n: FigmaNode & { strokes?: FigmaPaint[]; strokeWeight?: number },
+	n: FigmaNode & {
+		strokes?: FigmaPaint[];
+		strokeWeight?: number;
+		strokeWeights?: FigmaStrokeWeights;
+	},
 ): boolean {
-	if (!(n.strokeWeight !== undefined && n.strokeWeight > 0)) return false;
+	const weights = n.strokeWeights;
+	const weight =
+		n.strokeWeight ??
+		(weights
+			? Math.max(weights.top, weights.right, weights.bottom, weights.left)
+			: undefined);
+	if (!(weight !== undefined && weight > 0)) return false;
 	const visible = (n.strokes ?? []).filter((p) => p.visible !== false);
 	if (visible.length === 0 || compositeSolids(visible) !== null) return false;
 	return !(

@@ -128,6 +128,7 @@ import {
 	outlineGeometry,
 	outlineIsPath,
 	rectShape,
+	sideStrokeGeometry,
 } from "./outline";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
 import type {
@@ -148,6 +149,7 @@ import type {
 	DrawImageCommand,
 	DrawMaskedCommand,
 	DrawPathCommand,
+	DrawRectCommand,
 	DrawTextCommand,
 	FontRequest,
 	FrameFinish,
@@ -652,6 +654,48 @@ function drawOutlineStroke(
 	}
 	const whole = outlineOf(ck, bin, shape, x, y, w, h, 0, fromTop) as Outline;
 	drawClippedStroke(ck, canvas, bin, whole, stroke, box);
+}
+
+// A rect's per-side stroke: its band filled, or for a dash or a trim, the
+// stroke along the band's middle cut to the band.
+function drawSideStroke(
+	ck: CanvasKit,
+	canvas: Canvas,
+	bin: Bin,
+	cmd: DrawRectCommand,
+	stroke: Stroke,
+) {
+	if (!stroke.sides) return;
+	const { width: w, height: h } = cmd.size;
+	const g = sideStrokeGeometry(0, 0, w, h, cmd.cornerRadius, cmd.cornerSmoothing, {
+		align: stroke.align,
+		sides: stroke.sides,
+	});
+	if (!g) return;
+	const box = { x: 0, y: 0, w, h };
+	const band = bin.path(ck, g.band, true) as Path;
+	canvas.save();
+	canvas.translate(cmd.pos.x, cmd.pos.y);
+	if (normalizeDash(stroke.dash) || strokeTrim(stroke)) {
+		canvas.clipPath(band, ck.ClipOp.Intersect, true);
+		const mid = bin.path(ck, g.mid) as Path;
+		drawStroke(
+			ck,
+			canvas,
+			bin,
+			{ kind: "path", path: mid },
+			{ ...stroke, width: g.midWidth },
+			box,
+		);
+	} else {
+		const paint = bin.track(new ck.Paint());
+		paint.setAntiAlias(true);
+		if (stroke.gradient)
+			paint.setShader(shaderFor(ck, bin, stroke.gradient, 0, 0, w, h));
+		else paint.setColor(toColor(ck, stroke.color));
+		canvas.drawPath(band, paint);
+	}
+	canvas.restore();
 }
 
 function textStyleOf(
@@ -2300,7 +2344,8 @@ function drawShape(
 				);
 			drawOutline(canvas, outline, paint);
 		}
-		if (cmd.stroke)
+		if (cmd.stroke?.sides) drawSideStroke(ck, canvas, bin, cmd, cmd.stroke);
+		else if (cmd.stroke)
 			drawOutlineStroke(ck, canvas, bin, shape, cmd.pos, cmd.size, cmd.stroke);
 	} else if (cmd.op === "drawText") {
 		drawText(ck, canvas, provider, bin, cmd, issues);
@@ -2833,6 +2878,34 @@ function predictedBounds(
 			[...within, { ctm: m }],
 		);
 	};
+	// drawSideStroke's translate makes its save real.
+	const addSideStroke = (
+		c: DrawRectCommand,
+		stroke: Stroke,
+		m: Affine,
+		within: RecordedSave[],
+	) => {
+		if (!stroke.sides) return;
+		const { width: w, height: h } = c.size;
+		const g = sideStrokeGeometry(0, 0, w, h, c.cornerRadius, c.cornerSmoothing, {
+			align: stroke.align,
+			sides: stroke.sides,
+		});
+		if (!g) return;
+		const pm = translateAffine(m, c.pos.x, c.pos.y);
+		const saves = [...within, { ctm: m }];
+		if (normalizeDash(stroke.dash) || strokeTrim(stroke)) {
+			const [l, t, r, b] = (bin.path(ck, g.mid) as Path).getBounds();
+			add(
+				strokeBounds([l, t, r, b] as Bounds, { ...stroke, width: g.midWidth }),
+				pm,
+				saves,
+			);
+			return;
+		}
+		const [l, t, r, b] = (bin.path(ck, g.band, true) as Path).getBounds();
+		add([l, t, r, b] as Bounds, pm, saves);
+	};
 	const visitShape = (
 		c: DrawCommand,
 		m: Affine,
@@ -2847,7 +2920,8 @@ function predictedBounds(
 				const fill = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 				add(outlineBounds(fill), outlineMatrix(fill, m), within);
 			}
-			if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
+			if (c.stroke?.sides) addSideStroke(c, c.stroke, m, within);
+			else if (c.stroke) addStroke(shape, c.stroke, x, y, w, h, m, within);
 			return true;
 		}
 		if (c.op === "drawText") {
@@ -4344,6 +4418,7 @@ function originInvariant(cmd: DrawCommand, m: Affine): boolean {
 	if (shadowList(cmd.shadow).some((s) => s.inset)) return false;
 	if (cmd.op === "drawRect")
 		return (
+			!cmd.stroke?.sides &&
 			!outlineIsPath(rectShape(cmd.cornerRadius, cmd.cornerSmoothing)) &&
 			(cmd.fills ?? []).every((f) => f.kind === "solid")
 		);

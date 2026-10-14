@@ -112,7 +112,7 @@ const EDGE_EPSILON = 0.5;
 // Only a plain fill can be stretched without changing what it shows: a stroke
 // would move off the card, text and codes would move, and a vector would
 // distort.
-function extendable(el: Element): boolean {
+export function extendable(el: Element): boolean {
 	if ((el.rotation ?? 0) % 360 !== 0 || !el.size) return false;
 	if (el.type === "rect" || el.type === "image")
 		return el.properties.stroke === undefined;
@@ -139,12 +139,11 @@ export function extendIntoBleed(
 		const x = el.pos?.x ?? 0;
 		const y = el.pos?.y ?? 0;
 		const { width, height } = el.size;
-		const left = Math.abs(x) <= EDGE_EPSILON ? bleed.left : 0;
-		const top = Math.abs(y) <= EDGE_EPSILON ? bleed.top : 0;
-		const right =
-			Math.abs(x + width - trim.width) <= EDGE_EPSILON ? bleed.right : 0;
-		const bottom =
-			Math.abs(y + height - trim.height) <= EDGE_EPSILON ? bleed.bottom : 0;
+		const at = trimEdgesTouched([x, y, x + width, y + height], trim);
+		const left = at.includes("left") ? bleed.left : 0;
+		const top = at.includes("top") ? bleed.top : 0;
+		const right = at.includes("right") ? bleed.right : 0;
+		const bottom = at.includes("bottom") ? bleed.bottom : 0;
 		if (left === 0 && top === 0 && right === 0 && bottom === 0) return el;
 		const grown = {
 			...el,
@@ -192,7 +191,17 @@ export type SafeAreaIssue = {
 
 const SAFE_EDGES: SafeAreaEdge[] = ["left", "top", "right", "bottom"];
 
-function rotatedBox(el: Element): [number, number, number, number] | null {
+/** The trim edges a box of `[left, top, right, bottom]` runs to. */
+export function trimEdgesTouched(
+	box: readonly [number, number, number, number],
+	trim: { width: number; height: number },
+): SafeAreaEdge[] {
+	const gaps = [box[0], box[1], trim.width - box[2], trim.height - box[3]];
+	return SAFE_EDGES.filter((_, i) => Math.abs(gaps[i] as number) <= EDGE_EPSILON);
+}
+
+/** A layer's box after its rotation, as `[left, top, right, bottom]`. */
+export function rotatedBox(el: Element): [number, number, number, number] | null {
 	if (!el.size) return null;
 	const { width, height } = rotatedFootprint(el.size, el.rotation);
 	const cx = (el.pos?.x ?? 0) + el.size.width / 2;

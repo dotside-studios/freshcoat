@@ -1,6 +1,13 @@
-import { type Template, templateHints, validate } from "@freshcoat-js/coatfile";
+import {
+	describePrintIssue,
+	type ImageDpiOptions,
+	type Template,
+	templateHints,
+	validate,
+} from "@freshcoat-js/coatfile";
 import {
 	bindingView,
+	presetImageDpi,
 	readsDataset,
 	unfilledRequired,
 	type Workspace,
@@ -10,8 +17,12 @@ import { formatIssue, newerFormatWarning } from "./template-file";
 
 export type Findings = { errors: string[]; warnings: string[] };
 
-export function templateWarnings(template: Template): string[] {
-	return templateHints(template).map((hint) => {
+/** The resolution check `validate` runs: `dpi` design units to the inch,
+ *  flagging images under `min`. */
+export type DpiCheck = { dpi?: number; min?: number };
+
+export function templateWarnings(template: Template, images: ImageDpiOptions = {}): string[] {
+	return templateHints(template, images).map((hint) => {
 		switch (hint.kind) {
 			case "variant":
 				return `${hint.issue.message} (${hint.issue.code})`;
@@ -19,6 +30,10 @@ export function templateWarnings(template: Template): string[] {
 				const { sideName, id, edges } = hint;
 				return `${sideName}: "${id}" has its ${andList(edges)} ${edges.length === 1 ? "edge" : "edges"} inside the safe area`;
 			}
+			case "image_dpi":
+				return `${hint.sideName}: "${hint.id}" prints at ${hint.dpi} DPI, under ${hint.min}`;
+			case "print":
+				return `${hint.sideName}: "${hint.id}": ${describePrintIssue(hint.issue)}`;
 			case "format_newer":
 				return newerFormatWarning(hint.declared);
 			case "format_low":
@@ -35,14 +50,15 @@ function andList(items: readonly string[]): string {
 		: `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-export function workspaceFindings(workspace: Workspace): Findings {
+export function workspaceFindings(workspace: Workspace, dpi: DpiCheck = {}): Findings {
 	const errors: string[] = [];
 	const warnings: string[] = [];
 	for (const entry of workspace.templates) {
 		const checked = validate(entry.template);
 		if (!checked.ok)
 			errors.push(...checked.errors.map((issue) => `${entry.fileName}: ${formatIssue(issue)}`));
-		warnings.push(...templateWarnings(entry.template).map((w) => `${entry.fileName}: ${w}`));
+		const images = { ...presetImageDpi(workspace.presets, entry.id), ...dpi };
+		warnings.push(...templateWarnings(entry.template, images).map((w) => `${entry.fileName}: ${w}`));
 		const binding = entry.binding;
 		if (!readsDataset(binding)) continue;
 		if (!workspace.datasets.some((dataset) => dataset.id === binding.datasetId)) {

@@ -310,6 +310,9 @@ export type ExportPreset = {
 	scale: number;
 	/** PDF physical size: widthPx / dpi inches (default 300) */
 	dpi: number;
+	/** warn for an image that prints below this many pixels to the inch at
+	 *  `dpi`; default 300, 0 for no check */
+	minImageDpi?: number;
 	/** file name pattern */
 	fileName: string;
 	/** default true */

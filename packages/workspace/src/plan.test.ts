@@ -13,6 +13,7 @@ import {
 	imageFormat,
 	pdfRenderScale,
 	planExport,
+	presetImageDpi,
 	unknownFileNameTokens,
 	vectorPages,
 } from "./plan";
@@ -987,5 +988,18 @@ describe("cut options", () => {
 			true,
 		);
 		expect(exportCutLines({ ...preset, cutLines: true })).toBe(false);
+	});
+});
+
+describe("presetImageDpi", () => {
+	it("takes the presets' lowest dpi and highest minimum", () => {
+		const presets = [
+			{ templateId: "a", dpi: 300 },
+			{ templateId: "a", dpi: 150, minImageDpi: 200 },
+			{ templateId: "b", dpi: 72, minImageDpi: 600 },
+		];
+		expect(presetImageDpi(presets, "a")).toEqual({ dpi: 150, min: 300 });
+		expect(presetImageDpi(presets, "b")).toEqual({ dpi: 72, min: 600 });
+		expect(presetImageDpi(presets, "c")).toEqual({ dpi: 300, min: 300 });
 	});
 });

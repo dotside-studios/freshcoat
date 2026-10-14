@@ -58,6 +58,13 @@ export function parsePositive(entry: string): number {
 	return value;
 }
 
+export function parseMinDpi(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isFinite(value) || value < 0)
+		throw new ArgumentError("Expected pixels per inch, 0 or more.");
+	return value;
+}
+
 export function parseLength(entry: string): number {
 	const value = Number(entry);
 	if (!Number.isFinite(value) || value < 0)

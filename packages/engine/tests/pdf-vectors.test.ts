@@ -319,6 +319,55 @@ describe("smoothed corners", () => {
 	});
 });
 
+describe("per-side strokes", () => {
+	const sides = { top: 2, right: 8, bottom: 14, left: 0 };
+	const banded = frame([
+		createRect({
+			pos: { x: 10, y: 10 },
+			size: { width: 80, height: 40 },
+			stroke: { color: "#1d3557", width: 14, sides, align: "inside" },
+		}),
+		createRect({
+			pos: { x: 110, y: 10 },
+			size: { width: 80, height: 40 },
+			cornerRadius: 12,
+			stroke: {
+				color: "#000",
+				width: 14,
+				sides,
+				gradient: { kind: "linear", from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, stops: stops("#e63946", "#457b9d") },
+			},
+		}),
+		createRect({
+			pos: { x: 10, y: 70 },
+			size: { width: 80, height: 40 },
+			cornerRadius: 10,
+			cornerSmoothing: 0.6,
+			stroke: { color: "#2a9d8f", width: 14, sides, align: "outside" },
+		}),
+		createRect({
+			pos: { x: 110, y: 70 },
+			size: { width: 80, height: 40 },
+			stroke: { color: "#e76f51", width: 14, sides, dash: [8, 4], align: "inside" },
+		}),
+	]);
+
+	test("fills the band as one even-odd path", async () => {
+		const { page } = await vectors(banded);
+		expect(page).toContain("0.1137 0.2078 0.3412 rg\n10 10 m\n90 10 l\n90 50 l\n10 50 l\n10 10 l\nh\n10 12 m\n82 12 l\n82 36 l\n10 36 l\n10 12 l\nh\nf*");
+		expect(page).toMatch(/W\* n\n(?:[^\n]* cm\n)*\/S\d+ sh/);
+	});
+
+	test("dashes along the band, clipped to it", async () => {
+		const { page } = await vectors(banded);
+		expect(page).toMatch(/h\nW\* n\nq\n[^\n]* RG\n28 w 0 J 0 j 4 M\n\[8 4\] 0 d\n/);
+	});
+
+	test.skipIf(!pdftoppm)("matches the raster render", async () => {
+		expect(await difference(banded)).toBeLessThan(2);
+	});
+});
+
 describe("text in WOFF and variable fonts", () => {
 	const line = (family: string, weight: 300 | 400 | 700, value: string, y: number) =>
 		createText({

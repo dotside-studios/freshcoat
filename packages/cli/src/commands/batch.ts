@@ -76,6 +76,7 @@ export type BatchOptions = {
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
+	minDpi?: number;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
 	outputIntentId?: string;
@@ -158,6 +159,7 @@ export async function renderBatch(
 		...(options.cut ? { cutFile: options.cut } : {}),
 		...(options.cutLines ? { cutLines: true } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
+		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),
 		...(profile
 			? { outputIntent: { kind: "profile", sha256: profile.sha256 } }

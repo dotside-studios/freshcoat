@@ -167,12 +167,44 @@ export {
 	raiseFormatVersion,
 } from "./format";
 export {
+	type ImageDpiHint,
+	imageDpiHints,
 	type SafeAreaHint,
 	safeAreaHints,
 	type TemplateHint,
 	templateHints,
 } from "./hints";
+export {
+	DEFAULT_IMAGE_DPI_UNITS,
+	DEFAULT_MIN_IMAGE_DPI,
+	effectiveImageDpi,
+	type ImageDpiIssue,
+	type ImageDpiOptions,
+	type ImageDpiWarning,
+	type ImageFraming,
+	type ImageSizeMemo,
+	imageDpiIssues,
+	imageDpiWarnings,
+	imagePixelSize,
+	inlineImageSize,
+} from "./image-dpi";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
+export {
+	describePrintIssue,
+	isLightFace,
+	isRichBlack,
+	POINTS_PER_INCH,
+	PRINT_CHECK_DEFAULTS,
+	type PrintCheckOptions,
+	type PrintCheckWarning,
+	type PrintHint,
+	type PrintIssue,
+	type PrintIssueCode,
+	printCheckWarnings,
+	printHints,
+	unitsToMm,
+	unitsToPt,
+} from "./print-checks";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
 	FIELD_FORMATS,
@@ -215,6 +247,7 @@ export {
 	resolveStrokeTrim,
 	type StrokeTrimInput,
 } from "./stroke-trim";
+export { strokeSides, widestStroke } from "./stroke-width";
 export {
 	compiledPattern,
 	PATTERN_CACHE_MAX,
@@ -233,6 +266,7 @@ export type {
 	BlendMode,
 	BooleanOp,
 	BooleanOperandElement,
+	BoxStroke,
 	Command,
 	CompiledFrame,
 	CompiledTemplate,
@@ -299,6 +333,7 @@ export type {
 	Size,
 	SliceModifier,
 	Stroke,
+	StrokeSideWidths,
 	Symbology,
 	Template,
 	TemplateFrame,
