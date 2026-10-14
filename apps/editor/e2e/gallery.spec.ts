@@ -41,7 +41,8 @@ async function photoDataset(page: Page, count: number) {
 	await page.keyboard.press(`${mod}+2`);
 	const files = await makeJpegs(page, count);
 	const chooser = page.waitForEvent("filechooser");
-	await page.getByRole("button", { name: "From photos…" }).click();
+	await page.getByRole("button", { name: "New dataset" }).click();
+	await page.getByRole("menuitem", { name: "From photos…" }).click();
 	await (await chooser).setFiles(files);
 	await expect
 		.poll(() => state<number>(page, "s.workspace?.datasets[0]?.records.length"))
@@ -277,15 +278,14 @@ test("an empty dataset takes a dropped spreadsheet, and no dataset takes dropped
 	await expect(wizard).toContainText("more.csv · 1 record");
 });
 
-test("on a tablet the data group folds into More and the inspector is a sheet", async ({
+test("on a tablet the inspector is a sheet and the toolbar keeps the Data menu", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 1024, height: 768 });
 	const recs = await photoDataset(page, 8);
-	await expect(page.getByTestId("data-more")).toBeVisible();
-	await expect(page.getByTestId("import-records")).toHaveCount(0);
+	await expect(page.getByTestId("data-menu")).toBeVisible();
 	await expect(page.getByTestId("data-panel-right")).toHaveCount(0);
-	await page.getByTestId("data-more").click();
+	await page.getByTestId("data-menu").click();
 	await expect(page.getByRole("menuitem", { name: "Import…" })).toBeVisible();
 	await expect(
 		page.getByRole("menuitem", { name: "Download data" }),

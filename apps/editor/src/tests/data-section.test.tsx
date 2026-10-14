@@ -124,8 +124,9 @@ describe("Data section", { timeout: 15_000 }, () => {
 	it("offers the ways to start when there are no datasets", async () => {
 		const user = setup(false);
 		expect(screen.getByTestId("data-empty")).toBeTruthy();
+		await user.click(screen.getByRole("button", { name: "New dataset" }));
 		await user.click(
-			screen.getByRole("button", { name: "From template fields" }),
+			screen.getByRole("menuitem", { name: "From template fields" }),
 		);
 		const [d] = ws().datasets;
 		expect(d?.name).toBe("doc");
@@ -209,6 +210,76 @@ describe("Data section", { timeout: 15_000 }, () => {
 		expect(ws().datasets[0]?.columns[1]?.type).toBe("text");
 		await user.click(panel.getByRole("button", { name: "Change type" }));
 		expect(ws().datasets[0]?.columns[1]?.type).toBe("integer");
+	});
+});
+
+describe("Data toolbar and selection bar", { timeout: 15_000 }, () => {
+	const toolbar = () => within(screen.getByTestId("data-toolbar"));
+	const select = (id: string) =>
+		act(() =>
+			controller.dispatch({
+				type: "setDataView",
+				datasetId: "d_people",
+				patch: { selection: new Set([id]) },
+			}),
+		);
+
+	it("keeps record actions out of the toolbar", () => {
+		setup();
+		expect(toolbar().queryByRole("button", { name: "Duplicate" })).toBeNull();
+		expect(toolbar().queryByRole("button", { name: "Delete" })).toBeNull();
+		expect(toolbar().queryByRole("button", { name: "Mark" })).toBeNull();
+		expect(toolbar().queryByRole("button", { name: "More" })).toBeNull();
+		expect(screen.queryByTestId("selection-bar")).toBeNull();
+	});
+
+	it("holds import, download and schema in one Data menu", async () => {
+		const user = setup();
+		await user.click(toolbar().getByRole("button", { name: "Data" }));
+		const menu = screen.getByRole("menu", { name: "Data" });
+		expect(
+			within(menu)
+				.getAllByRole("menuitem")
+				.map((i) => i.textContent),
+		).toEqual(["Import…", "Download data", "Schema"]);
+	});
+
+	it("shows the status filter state in its button", async () => {
+		const user = setup();
+		const filter = screen.getByTestId("status-filter");
+		expect(filter.textContent).toContain("All records");
+		await user.click(filter);
+		await user.click(screen.getByRole("menuitemradio", { name: "Exported" }));
+		expect(screen.getByTestId("status-filter").textContent).toContain(
+			"Show: Exported",
+		);
+	});
+
+	it("offers actions on the selected records in a bar", async () => {
+		const user = setup();
+		select("r_1");
+		const bar = within(screen.getByTestId("selection-bar"));
+		expect(bar.getByText("1 record")).toBeTruthy();
+
+		await user.click(bar.getByRole("button", { name: "Duplicate" }));
+		expect(ws().datasets[0]?.records).toHaveLength(4);
+
+		await user.click(bar.getByRole("button", { name: "Mark" }));
+		await user.click(screen.getByRole("menuitem", { name: "Mark failed" }));
+		expect(
+			ws().datasets[0]?.records.filter((r) => r.status === "failed"),
+		).toHaveLength(1);
+
+		await user.click(bar.getByRole("button", { name: "Delete" }));
+		expect(ws().datasets[0]?.records).toHaveLength(3);
+		expect(screen.queryByTestId("selection-bar")).toBeNull();
+	});
+
+	it("clears the selection from the bar", async () => {
+		const user = setup();
+		select("r_1");
+		await user.click(screen.getByRole("button", { name: "Clear selection" }));
+		expect(screen.queryByTestId("selection-bar")).toBeNull();
 	});
 });
 
