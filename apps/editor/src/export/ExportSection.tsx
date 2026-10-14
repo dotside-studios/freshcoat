@@ -42,8 +42,9 @@ import PresetsIcon from "~icons/mingcute/layout-left-line";
 import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import SettingsIcon from "~icons/mingcute/settings-3-line";
+import { useExportCollapsed } from "./collapsed";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
-import { ExportSettings, type SettingsTab } from "./ExportSettings";
+import { ExportSettings } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
 	labelColumn,
@@ -178,11 +179,11 @@ export function ExportSection() {
 	const narrow = useNarrow();
 	const [rail, setRail] = useRail();
 	const [overlay, setOverlay] = useState<"presets" | "settings" | null>(null);
+	const collapsed = useExportCollapsed();
 	const {
 		filter,
 		scope,
 		tab,
-		settingsTab,
 		selection: listSelection,
 	} = useEditor((s) => s.exportView);
 	const setView = (view: Partial<ExportView>) =>
@@ -190,7 +191,6 @@ export function ExportSection() {
 	const setFilter = (filter: StatusFilter) => setView({ filter });
 	const setScope = (scope: FilmstripScope) => setView({ scope });
 	const setTab = (tab: ExportView["tab"]) => setView({ tab });
-	const setSettingsTab = (settingsTab: SettingsTab) => setView({ settingsTab });
 	const setListSelection = (selection: string[]) => setView({ selection });
 	const [chosenMode, setChosenMode] = useState<PreviewMode>("output");
 	const [split, setSplit] = useState(0.5);
@@ -543,8 +543,7 @@ export function ExportSection() {
 			listSelection={listSelection}
 			outputSize={outputSize}
 			sheets={sheets}
-			tab={settingsTab}
-			onTabChange={setSettingsTab}
+			collapsed={collapsed}
 		/>
 	) : null;
 	const label = labelColumn(dataset);
@@ -745,7 +744,8 @@ export function ExportSection() {
 	);
 
 	const showBinding = () => {
-		setSettingsTab("content");
+		collapsed.set("records", false);
+		collapsed.set("binding", false);
 		if (narrow) setOverlay("settings");
 	};
 	const bottom = preset ? (

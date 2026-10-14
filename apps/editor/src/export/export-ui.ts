@@ -10,6 +10,7 @@ import type {
 } from "@freshcoat-js/workspace";
 import {
 	CUT_KINDS,
+	DEFAULT_QUALITY,
 	exportSize,
 	exportSplit,
 	fileExtension,
@@ -20,6 +21,7 @@ import { type JobResult, recordOutcome } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
 import { formatDate } from "~/app/format";
 import type { Action } from "~/state/store";
+import { PAPER_LABEL, paperChoice } from "./sheets";
 
 export const RECORD_FILTERS: { id: ExportPreset["records"]; label: string }[] =
 	[
@@ -64,6 +66,66 @@ export function settingsSummary(preset: ExportPreset): string {
 		pdf ? "Download" : DESTINATION_LABEL[preset.destination ?? "download"],
 	);
 	return parts.join(" · ");
+}
+
+/** A collapsed Format section's value: "PDF · 300 dpi", "JPEG · 90%". */
+export function formatSummary(preset: ExportPreset): string {
+	if (preset.format === "pdf")
+		return [
+			"PDF",
+			preset.pdfPageImage === "vector" ? "vector" : null,
+			`${preset.dpi} dpi`,
+		]
+			.filter(Boolean)
+			.join(" · ");
+	const lossy = preset.format !== "png-zip";
+	return [
+		FORMAT_NAME[preset.format],
+		lossy ? `${preset.quality ?? DEFAULT_QUALITY}%` : null,
+	]
+		.filter(Boolean)
+		.join(" · ");
+}
+
+/** A collapsed Size section's value: "1050 × 600 px", "2× · bleed". */
+export function sizeSummary(
+	preset: ExportPreset,
+	outputSize?: { width: number; height: number } | null,
+): string {
+	const image = exportSize(preset).kind === "image";
+	const parts = [
+		image
+			? "Match image"
+			: outputSize
+				? `${outputSize.width} × ${outputSize.height} px`
+				: `${preset.scale}×`,
+	];
+	if (preset.bleed && !image) parts.push("bleed");
+	return parts.join(" · ");
+}
+
+/** A collapsed Print section's value: "Sheets · A4 · crop marks". */
+export function printSummary(preset: ExportPreset): string {
+	const parts: string[] = [];
+	if (preset.format === "pdf") {
+		const layout = pdfLayout(preset);
+		if (layout.kind === "sheet") {
+			parts.push(`Sheets · ${PAPER_LABEL[paperChoice(layout)]}`);
+			if (layout.cropMarks) parts.push("crop marks");
+			if (layout.duplex !== "none") parts.push("double-sided");
+		} else parts.push("One per page");
+	}
+	if (preset.print?.enabled) parts.push("card printer");
+	return parts.length > 0 ? parts.join(" · ") : "Off";
+}
+
+/** A collapsed Files section's value: where it goes and what it is named. */
+export function filesSummary(preset: ExportPreset): string {
+	const where =
+		preset.format === "pdf"
+			? "Download"
+			: DESTINATION_LABEL[preset.destination ?? "download"];
+	return `${where} · ${preset.fileName}`;
 }
 
 export type StatusFilter = "all" | RecordStatus;
