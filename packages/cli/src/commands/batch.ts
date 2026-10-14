@@ -2,6 +2,14 @@ import { readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { type Template, templateBleed } from "@freshcoat-js/coatfile";
 import {
+	DEFAULT_PRINT_TARGET,
+	type PrintProfile,
+	parsePrintProfile,
+	printTarget,
+	profileTarget,
+	YMCKO_DYE_SUB,
+} from "@freshcoat-js/for-print";
+import {
 	type AssetFile,
 	applyMapping,
 	autoBinding,
@@ -19,6 +27,7 @@ import {
 	type IccProfileAsset,
 	newPreset,
 	type PaperName,
+	type PresetPrint,
 	prepareAssets,
 	readOutputProfile,
 	unfilledRequired,
@@ -30,6 +39,7 @@ import {
 	type Workspace,
 } from "@freshcoat-js/workspace";
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
+import { printProfileMismatch } from "@freshcoat-js/workspace/export";
 import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
 import type { SheetMark } from "../args";
 import { CliError, createLog, type Io, type Log } from "../io";
@@ -49,6 +59,8 @@ const ZIP_FORMATS = {
 	jpg: "jpeg-zip",
 	webp: "webp-zip",
 } as const;
+
+const PRINT_TARGETS = { ymcko: YMCKO_DYE_SUB.id } as const;
 
 const MAX_ISSUES = 10;
 
@@ -74,6 +86,10 @@ export type BatchOptions = {
 	gap?: number;
 	copies?: number | "fill";
 	cropMarks?: boolean;
+	backOffset?: { x: number; y: number };
+	blankBacks?: true;
+	printTarget?: "none" | keyof typeof PRINT_TARGETS;
+	printProfile?: string;
 	marks?: SheetMark[];
 	pieces?: true;
 	cut?: "svg" | "dxf";
@@ -128,6 +144,8 @@ export async function renderBatch(
 			? await readProfile(io, options.outputIntent, options.outputIntentId)
 			: undefined;
 
+	const print = await readPrint(io, log, options.printTarget, options.printProfile);
+
 	const templateId = "t_template";
 	const workspace: Workspace = {
 		formatVersion: "1.0",
@@ -158,6 +176,7 @@ export async function renderBatch(
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
+		...(print ? { print } : {}),
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
 		...(options.cutLines || options.cutSpot ? { cutLines: true } : {}),
@@ -184,6 +203,8 @@ export async function renderBatch(
 						duplex: options.duplex ? `${options.duplex}-edge` : "none",
 						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
 						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
+						...(options.backOffset ? { backOffsetMm: options.backOffset } : {}),
+						...(options.blankBacks ? { blankBacks: true } : {}),
 						...(options.copies !== undefined ? { copies: options.copies } : {}),
 					},
 				}
@@ -211,6 +232,42 @@ async function readProfile(
 	const read = await readOutputProfile(await readBytes(io, file), basename(file), identifier);
 	if (!read.ok) throw new CliError(`--output-intent ${file}: ${read.message}`);
 	return read.profile;
+}
+
+async function readPrint(
+	io: Io,
+	log: Log,
+	target: BatchOptions["printTarget"],
+	file: string | undefined,
+): Promise<PresetPrint | undefined> {
+	if (target === "none" || (target === undefined && file === undefined)) return undefined;
+	const profile = file !== undefined ? await readPrintProfile(io, file) : undefined;
+	const id = target !== undefined ? PRINT_TARGETS[target] : profileTarget(profile as PrintProfile);
+	if (!printTarget(id))
+		throw new CliError(
+			`--print-profile ${file} was measured on ${id}, which this build cannot print to; add --print-target to use it anyway`,
+		);
+	const print: PresetPrint = {
+		enabled: true,
+		...(id !== DEFAULT_PRINT_TARGET.id ? { target: id } : {}),
+		...(profile ? { profile } : {}),
+	};
+	const mismatch = printProfileMismatch(print);
+	if (mismatch)
+		log.warn(
+			`--print-profile ${file} was measured on ${targetName(mismatch.profileTarget)}, not ${targetName(mismatch.presetTarget)}`,
+		);
+	return print;
+}
+
+async function readPrintProfile(io: Io, file: string): Promise<PrintProfile> {
+	const parsed = parsePrintProfile(new TextDecoder().decode(await readBytes(io, file)));
+	if (!parsed.ok) throw new CliError(`--print-profile ${file}: ${parsed.message}`);
+	return parsed.profile;
+}
+
+function targetName(id: string): string {
+	return printTarget(id)?.name ?? id;
 }
 
 function checkName(template: Template, pattern: string): void {

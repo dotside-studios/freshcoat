@@ -107,6 +107,14 @@ export function parsePaper(
 	return { widthMm: Math.min(width, height), heightMm: Math.max(width, height) };
 }
 
+export function parseOffset(entry: string): { x: number; y: number } {
+	const parts = entry.split(",").map((part) => part.trim());
+	const [x, y] = parts.map((part) => (part === "" ? Number.NaN : Number(part)));
+	if (parts.length !== 2 || !Number.isFinite(x) || !Number.isFinite(y))
+		throw new ArgumentError("Expected <x>,<y> in millimetres, such as 0.5,-1.");
+	return { x: x as number, y: y as number };
+}
+
 export const SHEET_MARKS = ["crop", "registration", "colorbar", "slug"] as const;
 export type SheetMark = (typeof SHEET_MARKS)[number];
 
