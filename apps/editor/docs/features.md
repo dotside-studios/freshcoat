@@ -57,8 +57,7 @@ the records, and **Export** turns templates and records into files.
   templates, scales with the template's size, and never reaches an export.
   A layer whose edge falls between the trim and the safe line is listed
   under "Print hints" in the status bar's Issues list.
-- **Bleed and safe area:** Template setup's Size group, and Design with
-  nothing selected, set a Bleed and a Safe area in template units. Each is
+- **Bleed and safe area:** Template setup's Size group sets a Bleed and a Safe area in template units. Each is
   one value for every side while linked; the link button beside it switches
   to a top, right, bottom and left field. A file with sides set apart opens
   unlinked, and linking it shows Mixed until a value is typed. Linking or
@@ -327,8 +326,8 @@ the records, and **Export** turns templates and records into files.
     holds the same commands under Boolean, Arrange and Align and distribute.
   - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
     linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Spot color, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
-    as the selection changes.
+    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    as the selection changes. Slice and Spot color are in the Print tab.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
@@ -337,11 +336,11 @@ the records, and **Export** turns templates and records into files.
     or a linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only. A text
     stroke takes a position and a join but no dash, trim or cap.
-  - A rectangle's or vector's Spot color section prints its fill, its
+  - A rectangle's or vector's Spot color section, in the Print tab, prints its fill, its
     stroke or both in a named spot ink, for white ink, foil or varnish:
     "Fill as spot" or "Stroke as spot", then the ink's name as the printer
     knows it (White by default; All and None are refused), a tint, an
-    alternate colour (the layer's own when empty) and Overprint, on by
+    alternate colour (the layer's own when empty) and an Overprint row, on by
     default. A vector PDF prints the paint as a Separation of that name; the
     canvas, images and other pages show the alternate. There is no colour
     library: type the printer's name.
@@ -388,7 +387,12 @@ the records, and **Export** turns templates and records into files.
   - When several layers are selected and a value differs between them, it shows
     `Mixed`.
   - With nothing selected, the side section edits the template's width and
-    height, which every side shares.
+    height, which every side shares. Bleed and safe area are in Template
+    setup.
+- **Print:** the inspector's third tab. A rectangle or vector shows its
+  Slice section, and a painted one its Spot color section. Layers with
+  neither read "No print settings"; with nothing selected, a "Template
+  setup…" button opens the dialog.
 - **Content:** the inspector's second tab, what fills the design.
   - "Try with <dataset>" steps the canvas through the bound dataset's records,
     with the binding folded below it. An unbound template picks a dataset
