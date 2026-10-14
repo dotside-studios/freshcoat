@@ -20,7 +20,8 @@ the records, and **Export** turns templates and records into files.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
   - Templates are exported on their own, as with VS Code's workspaces: the
     active one as `.coat` or `.coat.json`, or all of them as a zip of `.coat`
-    files. The current side still exports as a PNG at 1×, 2× or 3×.
+    files. The current side still exports as a PNG at 1×, 2× or 3×, and File > Export
+    with preset opens Export with a chosen preset and the current record.
   - Saving, exporting or sending back a template raises its
     `format_version` to the lowest minor that covers the fields it uses, so
     a 1.2 file that gains a barcode is saved as 1.3 and an older kit refuses
@@ -155,15 +156,32 @@ the records, and **Export** turns templates and records into files.
     (or, for PNG, whether to keep the alpha channel of an opaque card),
     where the files go, and a file name pattern such as
     `{{member_id}}-{{side}}`.
+  - The settings are one column of collapsible sections: Records, Format,
+    Size, Print, Files and Checks. Each header shows its value once
+    collapsed ("PDF · 300 dpi", "Sheets · A4 · crop marks"), and the choice
+    is kept. Checks lists what stops or spoils an export: a block (which
+    disables Export), an unbound template, unfilled required fields,
+    characters the fonts can't draw and records that failed last time, each
+    with a link to the record or the setting. A count beside the Export
+    button opens the same list, and an estimate beside it says what the
+    export will produce ("120 records · PDF · 1 file", "240 files · PNG
+    zip"). Sizes are not estimated.
+  - New preset opens a menu: Blank preset, or a starter under Print (Press
+    PDF, Proof PDF, Sheets) or Digital (PNG for web). A preset row reads
+    format, DPI (or scale) and record count. On sheets, one Printer marks
+    switch turns the crop and registration marks on and off together, with
+    the individual marks under it. The file name pattern has an Insert field
+    menu for the built-in tokens, the template's fields and the dataset's
+    columns.
   - The preview comes first, with a filmstrip of the records the preset
     will export (or all of them) under it: click a thumbnail or use the
     arrow keys. A template that binds a photo also shows the source, or
     both either side of a draggable divider.
-  - A Records tab beside the filmstrip lists each record's status (pending,
+  - A Filmstrip or Records toggle under the preview switches to a list of each record's status (pending,
     exported, failed, skipped), which can be set by hand; an export marks
-    what it made.
+    what it made. Selected records show a bar with Clear and Save to preset.
   - The filmstrip or Records tab, the status filter, what the filmstrip
-    shows, the list's selection and the settings tab stay as they were while
+    shows, the list's selection and the collapsed sections stay as they were while
     another section shows.
   - Rendering runs in a pool of module workers, each with its own CanvasKit.
     The job bar shows progress, items per second, the time left, bytes
@@ -180,8 +198,8 @@ the records, and **Export** turns templates and records into files.
     text. Text in a font collection or a CFF2 variable font is outlined
     either way. A layer a PDF cannot express, such as a shadow, is drawn as a
     600 dpi image in place.
-  - For a template whose slices have an edge, the Output tab's Slices group
-    has Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
+  - For a template whose slices have an edge, the Size section's slice
+    options have Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
     Cut lines strokes each edge kind in an overprinting spot colour, in an
     optional content group named Cut, and shows a spot name field for each
     kind the template cuts: Through spot (CutContour), Kiss spot (KissCut),
@@ -640,7 +658,7 @@ for PDF417 and Aztec, the error correction.
 
 ## Sheets
 
-A PDF preset's Layout group chooses **One per page** (the default) or
+A PDF preset's Print section chooses **One per page** (the default) or
 **Sheets**, which lays cards out on paper at their trim size with crop marks.
 
 - **Bleed:** a template with a bleed gets an "Include bleed" checkbox under
@@ -823,7 +841,7 @@ refreshes it.
 
 ## Print output
 
-A preset's Print group has a **Print target** select: None, or "Card printer
+A preset's Print section has a **Print target** select: None, or "Card printer
 (YMCKO dye-sub)" (shown as "Card printer" once chosen), which renders through
 for-print's card-printer path (photo analysis, gray balance and the whole-frame
 finish), as Davi's card shop does.

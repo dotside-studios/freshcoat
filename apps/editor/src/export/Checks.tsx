@@ -1,10 +1,10 @@
 import { Button } from "@freshcoat-js/ui/button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
+import { PopoverPanel } from "@freshcoat-js/ui/popover-panel";
 import { Button as RACButton } from "react-aria-components";
 import CheckIcon from "~icons/mingcute/check-circle-line";
 import WarningIcon from "~icons/mingcute/warning-line";
 import type { Check, CheckTarget } from "./checks";
-import { PopoverPanel } from "./PopoverPanel";
 
 const tone = (check: Check) =>
 	check.severity === "error" ? "text-fc-danger-text" : "text-fc-warning";
@@ -87,7 +87,6 @@ export function ChecksList({
 	);
 }
 
-/** A count next to the Export button that opens the checks. */
 export function ChecksBadge({
 	checks,
 	onTarget,
@@ -100,6 +99,9 @@ export function ChecksBadge({
 	return (
 		<PopoverPanel
 			title="Checks"
+			placement="top end"
+			className="w-80"
+			bodyClassName="max-h-80"
 			trigger={
 				<Button
 					size="sm"
@@ -114,7 +116,6 @@ export function ChecksBadge({
 		>
 			{(close) => (
 				<ChecksList
-					className="max-h-80 overflow-auto p-2"
 					checks={checks}
 					onTarget={(target) => {
 						close();

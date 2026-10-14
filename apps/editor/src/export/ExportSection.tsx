@@ -2,6 +2,7 @@ import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
+import { SelectionBar } from "@freshcoat-js/ui/selection-bar";
 import {
 	type DataRecord,
 	type ExportItem,
@@ -74,7 +75,6 @@ import {
 	sourceField,
 } from "./preview-mode";
 import { RecordsList } from "./RecordsList";
-import { SelectionBar } from "./SelectionBar";
 import { SheetPreview } from "./SheetPreview";
 
 /** A place the preview steps to: a record, and under All variants one of

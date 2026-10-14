@@ -510,7 +510,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			...patch,
 		});
 		act(() => controller.dispatch({ type: "setPreset", preset: preset({}) }));
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.queryByRole("radio", { name: "Outline" })).toBeNull();
 		act(() =>
 			controller.dispatch({
@@ -544,16 +543,14 @@ describe("export section", { timeout: 20_000 }, () => {
 		const stored = (c: EditorController) => c.state.workspace?.presets[0];
 
 		test("offers nothing about slices to a template without any", async () => {
-			const { controller, user, templateId } = setup();
+			const { controller, templateId } = setup();
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(
 				screen.queryByRole("checkbox", { name: /slice pieces/ }),
 			).toBeNull();
 			expect(screen.queryByRole("button", { name: /Cut file/ })).toBeNull();
-			await user.click(screen.getByRole("tab", { name: "Files" }));
 			expect(
 				screen.getByTestId("export-file-tokens").textContent,
 			).not.toContain("{{slice}}");
@@ -565,7 +562,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
 			expect(button("Export 6 files")).toBeTruthy();
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			const split = screen.getByRole("checkbox", {
 				name: "Split into slice pieces",
 			});
@@ -574,14 +570,12 @@ describe("export section", { timeout: 20_000 }, () => {
 			expect(stored(controller)?.split).toBe("pieces");
 			// 3 records x (2 pieces on the front + the whole back).
 			expect(button("Export 9 files")).toBeTruthy();
-			await user.click(screen.getByRole("tab", { name: "Files" }));
 			expect(screen.getByTestId("export-file-tokens").textContent).toContain(
 				"{{slice}}",
 			);
 			expect(screen.getByTestId("export-file-example").textContent).toBe(
 				"e.g. r1-front-left.png",
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			await user.click(
 				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
 			);
@@ -609,7 +603,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			const select = screen.getByLabelText("Cut file");
 			await chooseOption(user, select, "SVG");
 			expect(stored(controller)?.cutFile).toBe("svg");
@@ -621,13 +614,10 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 
 		test("hides the cut choices when no slice has an edge", async () => {
-			const { controller, user, templateId } = setup(
-				withSlices(["none", "none"]),
-			);
+			const { controller, templateId } = setup(withSlices(["none", "none"]));
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(
 				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
 			).toBeTruthy();
@@ -649,7 +639,6 @@ describe("export section", { timeout: 20_000 }, () => {
 					preset: preset(templateId, { format: "pdf" }),
 				}),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(screen.queryByLabelText("Cut file")).toBeNull();
 			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
 			expect(stored(controller)?.cutLines).toBe(true);
@@ -665,7 +654,6 @@ describe("export section", { timeout: 20_000 }, () => {
 					preset: preset(templateId, { format: "pdf" }),
 				}),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(screen.queryByLabelText("Through spot")).toBeNull();
 			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
 			const through = screen.getByLabelText("Through spot") as HTMLInputElement;
@@ -692,7 +680,7 @@ describe("export section", { timeout: 20_000 }, () => {
 					}),
 				}),
 			);
-			expect(screen.getByTestId("export-blocked").textContent).toBe(
+			expect(screen.getByTestId("export-check-blocked").textContent).toContain(
 				"Pieces need PNG or JPEG pages, not vector",
 			);
 		});
@@ -717,7 +705,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			}),
 		);
-		await user.click(screen.getByRole("tab", { name: "Print" }));
 		const group = screen.getByTestId("export-output-intent");
 		const hint = () =>
 			screen.getByTestId("export-output-intent-hint").textContent;

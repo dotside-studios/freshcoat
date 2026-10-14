@@ -69,7 +69,6 @@ export function settingsSummary(preset: ExportPreset): string {
 	return parts.join(" · ");
 }
 
-/** A collapsed Format section's value: "PDF · 300 dpi", "JPEG · 90%". */
 export function formatSummary(preset: ExportPreset): string {
 	if (preset.format === "pdf")
 		return [
@@ -88,7 +87,6 @@ export function formatSummary(preset: ExportPreset): string {
 		.join(" · ");
 }
 
-/** A collapsed Size section's value: "1050 × 600 px", "2× · bleed". */
 export function sizeSummary(
 	preset: ExportPreset,
 	outputSize?: { width: number; height: number } | null,
@@ -105,7 +103,6 @@ export function sizeSummary(
 	return parts.join(" · ");
 }
 
-/** A collapsed Print section's value: "Sheets · A4 · crop marks". */
 export function printSummary(preset: ExportPreset): string {
 	const parts: string[] = [];
 	if (preset.format === "pdf") {
@@ -120,7 +117,6 @@ export function printSummary(preset: ExportPreset): string {
 	return parts.length > 0 ? parts.join(" · ") : "Off";
 }
 
-/** A collapsed Files section's value: where it goes and what it is named. */
 export function filesSummary(preset: ExportPreset): string {
 	const where =
 		preset.format === "pdf"
@@ -176,7 +172,6 @@ export function presetRecordCount(
 	}).length;
 }
 
-/** A preset row's line: "PDF · 300 dpi · 120 records". */
 export function presetLine(
 	preset: ExportPreset,
 	records: number | null,

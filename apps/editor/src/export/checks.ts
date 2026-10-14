@@ -10,7 +10,6 @@ import type { SettingsSectionId } from "./collapsed";
 const SHOWN_CHARS = 12;
 const SHOWN_ITEMS = 50;
 
-/** Where a check sends a person: the handler for each already exists. */
 export type CheckTarget =
 	| { kind: "binding" }
 	| { kind: "record"; recordId: string }
@@ -48,7 +47,6 @@ export function exportChecks(input: {
 	failed: number;
 	labelFor: (recordId: string) => string;
 	showSide: boolean;
-	/** the records can be shown, so a check can point at one */
 	canPick: boolean;
 }): Check[] {
 	const checks: Check[] = [];
@@ -117,7 +115,6 @@ export function exportChecks(input: {
 	return checks;
 }
 
-/** The Checks header's value. */
 export function checksSummary(checks: readonly Check[]): string {
 	if (checks.length === 0) return "All clear";
 	return plural(checks.length, "issue");

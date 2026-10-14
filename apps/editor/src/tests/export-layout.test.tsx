@@ -272,7 +272,13 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 		await user.click(
 			within(layoutGroup()).getByRole("switch", { name: "Printer marks" }),
 		);
-		expect(current().layout).toMatchObject({ cropMarks: false });
+		expect(current().layout).toMatchObject({
+			cropMarks: false,
+			registrationMarks: false,
+		});
+		await user.click(
+			within(layoutGroup()).getByRole("button", { name: "Marks" }),
+		);
 		for (const [name, key] of [
 			["Registration marks", "registrationMarks"],
 			["Color bar", "colorBar"],
@@ -308,7 +314,6 @@ describe("the Layout group", { timeout: 20_000 }, () => {
 
 	test("Copies repeats each card, or fills a sheet with it", async () => {
 		const { current, user } = setup({ layout: DEFAULT_SHEET_LAYOUT });
-		await openTab(user, "Print");
 		const copies = within(layoutGroup()).getByRole("spinbutton", {
 			name: "Copies",
 		});

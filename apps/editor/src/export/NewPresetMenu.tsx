@@ -16,7 +16,6 @@ const GROUPS = [
 	{ id: "digital", title: "Digital" },
 ] as const;
 
-/** Opens a menu of starter presets from `children`, a button. */
 export function NewPresetMenu({ children }: { children: ReactNode }) {
 	const controller = useController();
 	const presets = useEditor((s) => s.workspace?.presets);

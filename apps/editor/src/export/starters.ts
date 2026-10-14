@@ -58,7 +58,6 @@ function uniqueName(base: string, existing: readonly ExportPreset[]): string {
 	return `${base} ${n}`;
 }
 
-/** A new preset for a template: blank, or shaped by a starter. */
 export function presetFromStarter(
 	starter: PresetStarter | undefined,
 	templateId: string,

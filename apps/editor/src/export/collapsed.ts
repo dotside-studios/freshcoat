@@ -11,7 +11,6 @@ export type SettingsSectionId =
 	| "files"
 	| "checks";
 
-/** The settings sections a person has opened or collapsed, by id. */
 export type ExportCollapsed = {
 	has(section: SettingsSectionId, fallback?: boolean): boolean;
 	set(section: SettingsSectionId, collapsed: boolean): void;

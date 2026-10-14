@@ -291,9 +291,7 @@ export function ExportSettings({
 			(p) => p.templateId === preset.templateId,
 		).length ?? 0;
 	const fileNameBox = useRef<HTMLDivElement>(null);
-	const tokenGroups = template
-		? fileNameTokenGroups(template, boundDataset)
-		: [];
+	const tokenGroups = template ? fileNameTokenGroups(template, viewed) : [];
 	const insertToken = (token: string) => {
 		const input = fileNameBox.current?.querySelector("input");
 		const value = preset.fileName;
@@ -869,8 +867,6 @@ export function ExportSettings({
 	);
 }
 
-/** A collapsible group of settings, whose value shows in the header once it
- *  is collapsed. */
 function SettingsSection({
 	id,
 	title,
