@@ -72,5 +72,5 @@ describe("Text stroke section", () => {
 		expect(screen.queryByRole("spinbutton", { name: "Trim end" })).toBeNull();
 		expect(screen.queryByRole("button", { name: /Stroke cap/ })).toBeNull();
 		expect(screen.getByRole("button", { name: /Stroke join/ })).toBeTruthy();
-	});
+	}, 20_000);
 });

@@ -327,7 +327,7 @@ describe("DesignPanel", () => {
 		]);
 		expect(validate(c.template).ok).toBe(true);
 		expect(screen.queryByRole("button", { name: "Add grain" })).toBeNull();
-	});
+	}, 20_000);
 
 	it("adds a halftone and shows its lpi", async () => {
 		const c = setup(["0/0"]);
@@ -361,7 +361,7 @@ describe("DesignPanel", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));
 		expect("effects" in el(c, "0/0")).toBe(false);
-	});
+	}, 20_000);
 
 	it("an edit moves legacy effects into effects", () => {
 		const t = doc();

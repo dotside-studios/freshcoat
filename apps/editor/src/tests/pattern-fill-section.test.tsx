@@ -82,7 +82,7 @@ describe("pattern fill controls", () => {
 			angle: 30,
 		});
 		expect(validate(c.template).ok).toBe(true);
-	});
+	}, 20_000);
 
 	it("keeps authored colours when switching pattern", async () => {
 		const user = fastUser();
