@@ -297,275 +297,238 @@ export function TextSection({ ins }: { ins: Inspect }) {
 					))}
 				</Select>
 			</Row>
-			<SettingsPopover
-				label="Type settings"
-				title="Type settings"
-				keys={TYPE_KEYS}
-			>
-				<Tabs className="-m-2">
-					<TabList aria-label="Type settings">
-						<Tab id="basics">Basics</Tab>
-						<Tab id="details">Details</Tab>
-						<Tab id="arc">Arc</Tab>
-					</TabList>
-					<TabPanel id="basics" className="flex flex-col gap-1.5 p-2">
-						<Row label="Case" keys={["case"]}>
-							<Select
-								aria-label="Case"
-								className="min-w-0 flex-1"
-								placeholder="Mixed"
-								value={pick((p) => p.case ?? "original")}
-								onChange={(v) =>
-									setText("case", () => ({
-										case:
-											v === "original"
-												? undefined
-												: (v as TextProperties["case"]),
-									}))
-								}
-							>
-								{CASES.map(([id, name]) => (
-									<SelectItem key={id} id={id}>
-										{name}
-									</SelectItem>
-								))}
-							</Select>
-						</Row>
-						<Row label="Style" keys={FONT}>
-							<ToggleButton
-								aria-label="Italic"
-								tooltip="Italic"
-								isSelected={pickFont((f) => f.style === "italic") === true}
-								onChange={(on) =>
-									setFont("font-style", { style: on ? "italic" : undefined })
-								}
-							>
-								<ItalicIcon />
-							</ToggleButton>
-							<ToggleButton
-								aria-label="Underline"
-								tooltip="Underline"
-								isSelected={decoration === "underline"}
-								onChange={(on) =>
-									setFont("decoration", {
-										decoration: on ? "underline" : undefined,
-									})
-								}
-							>
-								<UnderlineIcon />
-							</ToggleButton>
-							<ToggleButton
-								aria-label="Strikethrough"
-								tooltip="Strikethrough"
-								isSelected={decoration === "line-through"}
-								onChange={(on) =>
-									setFont("decoration", {
-										decoration: on ? "line-through" : undefined,
-									})
-								}
-							>
-								<StrikeIcon />
-							</ToggleButton>
-						</Row>
-						<Row label="Lines" keys={["maxLines"]}>
-							<NumberField
-								aria-label="Max lines"
-								className="min-w-0 flex-1"
-								min={0}
-								precision={0}
-								value={pick((p) => p.maxLines ?? null)}
-								placeholder={
-									pick((p) => p.maxLines ?? 0) === null ? "Mixed" : "Any"
-								}
-								onChange={(v) =>
-									setText("max-lines", () => ({
-										maxLines: v >= 1 ? Math.round(v) : undefined,
-									}))
-								}
-							/>
-						</Row>
-						<Row label="Paragraph" keys={["paragraphSpacing"]}>
-							<NumberField
-								label="Space after"
-								aria-label="Paragraph spacing"
-								className="min-w-0 flex-1"
-								min={0}
-								value={pick((p) => p.paragraphSpacing ?? 0)}
-								onChange={(v) =>
-									setText("paragraph-spacing", () => ({
-										paragraphSpacing: v > 0 ? v : undefined,
-									}))
-								}
-							/>
-						</Row>
-						<Row label="Direction" keys={["direction"]}>
-							<Select
-								aria-label="Text direction"
-								className="min-w-0 flex-1"
-								placeholder="Mixed"
-								value={pick((p) => p.direction ?? "ltr")}
-								onChange={(v) =>
-									setText("direction", () => ({
-										direction:
-											v === "ltr"
-												? undefined
-												: (v as TextProperties["direction"]),
-									}))
-								}
-							>
-								{DIRECTIONS.map(([id, name]) => (
-									<SelectItem key={id} id={id}>
-										{name}
-									</SelectItem>
-								))}
-							</Select>
-						</Row>
-						{pick((p) => p.align) === "justify" && (
-							<Row label="Last line" keys={["alignLast"]}>
+			<Row label="">
+				<SettingsPopover
+					label="Type settings"
+					title="Type settings"
+					keys={TYPE_KEYS}
+					showLabel
+				>
+					<Tabs className="-m-2">
+						<TabList aria-label="Type settings">
+							<Tab id="basics">Basics</Tab>
+							<Tab id="details">Details</Tab>
+							<Tab id="arc">Arc</Tab>
+						</TabList>
+						<TabPanel id="basics" className="flex flex-col gap-1.5 p-2">
+							<Row label="Case" keys={["case"]}>
 								<Select
-									aria-label="Last line alignment"
+									aria-label="Case"
 									className="min-w-0 flex-1"
 									placeholder="Mixed"
-									value={pick((p) => p.alignLast ?? "start")}
+									value={pick((p) => p.case ?? "original")}
 									onChange={(v) =>
-										setText("align-last", () => ({
-											alignLast:
-												v === "start"
+										setText("case", () => ({
+											case:
+												v === "original"
 													? undefined
-													: (v as TextProperties["alignLast"]),
+													: (v as TextProperties["case"]),
 										}))
 									}
 								>
-									{LAST_LINE.map(([id, name]) => (
+									{CASES.map(([id, name]) => (
 										<SelectItem key={id} id={id}>
 											{name}
 										</SelectItem>
 									))}
 								</Select>
 							</Row>
-						)}
-						<Row label="" keys={["leadingTrim"]}>
-							<Checkbox
-								isSelected={pick((p) => p.leadingTrim === true) === true}
-								isIndeterminate={pick((p) => p.leadingTrim === true) === null}
-								onChange={(on) =>
-									setText("trim", () => ({
-										leadingTrim: on ? true : undefined,
-									}))
-								}
-							>
-								Vertical trim
-							</Checkbox>
-						</Row>
-					</TabPanel>
-					<TabPanel id="details" className="flex flex-col gap-1.5 p-2">
-						<Row label="Features" keys={FONT}>
-							<FeaturesField
-								value={pickFont((f) => formatFeatures(f.features ?? {}))}
-								onCommit={(features) => setFont("font-features", { features })}
-							/>
-						</Row>
-					</TabPanel>
-					<TabPanel id="arc" className="flex flex-col gap-1.5 p-2">
-						<Row label="Path" keys={["arc", "path"]}>
-							<Select
-								aria-label="Text path"
-								className="min-w-0 flex-1"
-								placeholder="Mixed"
-								value={arcPath}
-								onChange={(v) => {
-									if (v === "path") return;
-									if (v === "none")
-										setText("arc", () => ({ arc: undefined, path: undefined }));
-									else
-										setText("arc", (p) => ({
-											path: undefined,
-											arc: clean({
-												...p.arc,
-												direction: v === "inside" ? "inside" : undefined,
-											}),
-										}));
-								}}
-							>
-								{(onPath ? [...ARC_PATHS, ON_PATH] : ARC_PATHS).map(
-									([id, name]) => (
-										<SelectItem key={id} id={id}>
-											{name}
-										</SelectItem>
-									),
-								)}
-							</Select>
-						</Row>
-						{arcPath === "path" && (
-							<Row label="Along" keys={["path"]}>
-								<NumberField
-									label="Offset"
-									aria-label="Path start offset"
-									className="min-w-0 flex-1"
-									value={pick((p) =>
-										typeof p.path?.startOffset === "number"
-											? p.path.startOffset
-											: 0,
-									)}
-									onChange={(v) =>
-										setPath("path-offset", {
-											startOffset: v === 0 ? undefined : v,
-										})
-									}
-								/>
-								<Select
-									aria-label="Path alignment"
-									className="min-w-0 flex-1"
-									placeholder="Mixed"
-									value={pick((p) => p.path?.align ?? "start")}
-									onChange={(v) =>
-										setPath("path-align", {
-											align:
-												v === "start" ? undefined : (v as TextPath["align"]),
-										})
-									}
-								>
-									{ARC_ALIGNS.map(([id, name]) => (
-										<SelectItem key={id} id={id}>
-											{name}
-										</SelectItem>
-									))}
-								</Select>
+							<Row label="Style" keys={FONT}>
 								<ToggleButton
-									aria-label="Flip to the other side"
-									tooltip="Flip side"
-									isSelected={pick((p) => p.path?.side === "right") === true}
+									aria-label="Italic"
+									tooltip="Italic"
+									isSelected={pickFont((f) => f.style === "italic") === true}
 									onChange={(on) =>
-										setPath("path-side", { side: on ? "right" : undefined })
+										setFont("font-style", { style: on ? "italic" : undefined })
 									}
 								>
-									<FlipIcon />
+									<ItalicIcon />
+								</ToggleButton>
+								<ToggleButton
+									aria-label="Underline"
+									tooltip="Underline"
+									isSelected={decoration === "underline"}
+									onChange={(on) =>
+										setFont("decoration", {
+											decoration: on ? "underline" : undefined,
+										})
+									}
+								>
+									<UnderlineIcon />
+								</ToggleButton>
+								<ToggleButton
+									aria-label="Strikethrough"
+									tooltip="Strikethrough"
+									isSelected={decoration === "line-through"}
+									onChange={(on) =>
+										setFont("decoration", {
+											decoration: on ? "line-through" : undefined,
+										})
+									}
+								>
+									<StrikeIcon />
 								</ToggleButton>
 							</Row>
-						)}
-						{arcPath !== "none" && arcPath !== "path" && arcPath !== null && (
-							<>
-								<Row label="Arc" keys={["arc"]}>
-									<NumberField
-										label="Angle"
-										aria-label="Arc start angle"
+							<Row label="Lines" keys={["maxLines"]}>
+								<NumberField
+									aria-label="Max lines"
+									className="min-w-0 flex-1"
+									min={0}
+									precision={0}
+									value={pick((p) => p.maxLines ?? null)}
+									placeholder={
+										pick((p) => p.maxLines ?? 0) === null ? "Mixed" : "Any"
+									}
+									onChange={(v) =>
+										setText("max-lines", () => ({
+											maxLines: v >= 1 ? Math.round(v) : undefined,
+										}))
+									}
+								/>
+							</Row>
+							<Row label="Paragraph" keys={["paragraphSpacing"]}>
+								<NumberField
+									label="Space after"
+									aria-label="Paragraph spacing"
+									className="min-w-0 flex-1"
+									min={0}
+									value={pick((p) => p.paragraphSpacing ?? 0)}
+									onChange={(v) =>
+										setText("paragraph-spacing", () => ({
+											paragraphSpacing: v > 0 ? v : undefined,
+										}))
+									}
+								/>
+							</Row>
+							<Row label="Direction" keys={["direction"]}>
+								<Select
+									aria-label="Text direction"
+									className="min-w-0 flex-1"
+									placeholder="Mixed"
+									value={pick((p) => p.direction ?? "ltr")}
+									onChange={(v) =>
+										setText("direction", () => ({
+											direction:
+												v === "ltr"
+													? undefined
+													: (v as TextProperties["direction"]),
+										}))
+									}
+								>
+									{DIRECTIONS.map(([id, name]) => (
+										<SelectItem key={id} id={id}>
+											{name}
+										</SelectItem>
+									))}
+								</Select>
+							</Row>
+							{pick((p) => p.align) === "justify" && (
+								<Row label="Last line" keys={["alignLast"]}>
+									<Select
+										aria-label="Last line alignment"
 										className="min-w-0 flex-1"
-										unit="°"
-										value={pick((p) => p.arc?.startAngle ?? 0)}
+										placeholder="Mixed"
+										value={pick((p) => p.alignLast ?? "start")}
 										onChange={(v) =>
-											setArc("arc-angle", {
-												startAngle: v === 0 ? undefined : v,
+											setText("align-last", () => ({
+												alignLast:
+													v === "start"
+														? undefined
+														: (v as TextProperties["alignLast"]),
+											}))
+										}
+									>
+										{LAST_LINE.map(([id, name]) => (
+											<SelectItem key={id} id={id}>
+												{name}
+											</SelectItem>
+										))}
+									</Select>
+								</Row>
+							)}
+							<Row label="" keys={["leadingTrim"]}>
+								<Checkbox
+									isSelected={pick((p) => p.leadingTrim === true) === true}
+									isIndeterminate={pick((p) => p.leadingTrim === true) === null}
+									onChange={(on) =>
+										setText("trim", () => ({
+											leadingTrim: on ? true : undefined,
+										}))
+									}
+								>
+									Vertical trim
+								</Checkbox>
+							</Row>
+						</TabPanel>
+						<TabPanel id="details" className="flex flex-col gap-1.5 p-2">
+							<Row label="Features" keys={FONT}>
+								<FeaturesField
+									value={pickFont((f) => formatFeatures(f.features ?? {}))}
+									onCommit={(features) =>
+										setFont("font-features", { features })
+									}
+								/>
+							</Row>
+						</TabPanel>
+						<TabPanel id="arc" className="flex flex-col gap-1.5 p-2">
+							<Row label="Path" keys={["arc", "path"]}>
+								<Select
+									aria-label="Text path"
+									className="min-w-0 flex-1"
+									placeholder="Mixed"
+									value={arcPath}
+									onChange={(v) => {
+										if (v === "path") return;
+										if (v === "none")
+											setText("arc", () => ({
+												arc: undefined,
+												path: undefined,
+											}));
+										else
+											setText("arc", (p) => ({
+												path: undefined,
+												arc: clean({
+													...p.arc,
+													direction: v === "inside" ? "inside" : undefined,
+												}),
+											}));
+									}}
+								>
+									{(onPath ? [...ARC_PATHS, ON_PATH] : ARC_PATHS).map(
+										([id, name]) => (
+											<SelectItem key={id} id={id}>
+												{name}
+											</SelectItem>
+										),
+									)}
+								</Select>
+							</Row>
+							{arcPath === "path" && (
+								<Row label="Along" keys={["path"]}>
+									<NumberField
+										label="Offset"
+										aria-label="Path start offset"
+										className="min-w-0 flex-1"
+										value={pick((p) =>
+											typeof p.path?.startOffset === "number"
+												? p.path.startOffset
+												: 0,
+										)}
+										onChange={(v) =>
+											setPath("path-offset", {
+												startOffset: v === 0 ? undefined : v,
 											})
 										}
 									/>
 									<Select
-										aria-label="Arc alignment"
+										aria-label="Path alignment"
 										className="min-w-0 flex-1"
 										placeholder="Mixed"
-										value={pick((p) => p.arc?.align ?? "center")}
+										value={pick((p) => p.path?.align ?? "start")}
 										onChange={(v) =>
-											setArc("arc-align", {
-												align: v === "center" ? undefined : (v as Arc["align"]),
+											setPath("path-align", {
+												align:
+													v === "start" ? undefined : (v as TextPath["align"]),
 											})
 										}
 									>
@@ -575,44 +538,92 @@ export function TextSection({ ins }: { ins: Inspect }) {
 											</SelectItem>
 										))}
 									</Select>
+									<ToggleButton
+										aria-label="Flip to the other side"
+										tooltip="Flip side"
+										isSelected={pick((p) => p.path?.side === "right") === true}
+										onChange={(on) =>
+											setPath("path-side", { side: on ? "right" : undefined })
+										}
+									>
+										<FlipIcon />
+									</ToggleButton>
 								</Row>
-								<Row label="" keys={["arc"]}>
-									<NumberField
-										label="R"
-										aria-label="Arc radius"
-										className="min-w-0 flex-1"
-										min={0}
-										value={pick((p) => p.arc?.radius ?? null)}
-										placeholder={
-											pick((p) => p.arc?.radius ?? 0) === null
-												? "Mixed"
-												: "Auto"
-										}
-										onChange={(v) =>
-											setArc("arc-radius", { radius: v > 0 ? v : undefined })
-										}
-									/>
-									<NumberField
-										label="Sweep"
-										aria-label="Arc sweep"
-										className="min-w-0 flex-1"
-										unit="°"
-										min={0}
-										max={360}
-										value={pick((p) => p.arc?.sweep ?? null)}
-										placeholder={
-											pick((p) => p.arc?.sweep ?? 0) === null ? "Mixed" : "Auto"
-										}
-										onChange={(v) =>
-											setArc("arc-sweep", { sweep: v > 0 ? v : undefined })
-										}
-									/>
-								</Row>
-							</>
-						)}
-					</TabPanel>
-				</Tabs>
-			</SettingsPopover>
+							)}
+							{arcPath !== "none" && arcPath !== "path" && arcPath !== null && (
+								<>
+									<Row label="Arc" keys={["arc"]}>
+										<NumberField
+											label="Angle"
+											aria-label="Arc start angle"
+											className="min-w-0 flex-1"
+											unit="°"
+											value={pick((p) => p.arc?.startAngle ?? 0)}
+											onChange={(v) =>
+												setArc("arc-angle", {
+													startAngle: v === 0 ? undefined : v,
+												})
+											}
+										/>
+										<Select
+											aria-label="Arc alignment"
+											className="min-w-0 flex-1"
+											placeholder="Mixed"
+											value={pick((p) => p.arc?.align ?? "center")}
+											onChange={(v) =>
+												setArc("arc-align", {
+													align:
+														v === "center" ? undefined : (v as Arc["align"]),
+												})
+											}
+										>
+											{ARC_ALIGNS.map(([id, name]) => (
+												<SelectItem key={id} id={id}>
+													{name}
+												</SelectItem>
+											))}
+										</Select>
+									</Row>
+									<Row label="" keys={["arc"]}>
+										<NumberField
+											label="R"
+											aria-label="Arc radius"
+											className="min-w-0 flex-1"
+											min={0}
+											value={pick((p) => p.arc?.radius ?? null)}
+											placeholder={
+												pick((p) => p.arc?.radius ?? 0) === null
+													? "Mixed"
+													: "Auto"
+											}
+											onChange={(v) =>
+												setArc("arc-radius", { radius: v > 0 ? v : undefined })
+											}
+										/>
+										<NumberField
+											label="Sweep"
+											aria-label="Arc sweep"
+											className="min-w-0 flex-1"
+											unit="°"
+											min={0}
+											max={360}
+											value={pick((p) => p.arc?.sweep ?? null)}
+											placeholder={
+												pick((p) => p.arc?.sweep ?? 0) === null
+													? "Mixed"
+													: "Auto"
+											}
+											onChange={(v) =>
+												setArc("arc-sweep", { sweep: v > 0 ? v : undefined })
+											}
+										/>
+									</Row>
+								</>
+							)}
+						</TabPanel>
+					</Tabs>
+				</SettingsPopover>
+			</Row>
 		</InspectorSection>
 	);
 }

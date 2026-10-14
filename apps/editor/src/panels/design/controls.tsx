@@ -1,3 +1,4 @@
+import { Button } from "@freshcoat-js/ui/button";
 import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
@@ -218,11 +219,13 @@ export function SettingsPopover({
 	label,
 	title,
 	keys,
+	showLabel,
 	children,
 }: {
 	label: string;
 	title: ReactNode;
 	keys?: readonly string[];
+	showLabel?: boolean;
 	children: ReactNode;
 }) {
 	return (
@@ -231,13 +234,20 @@ export function SettingsPopover({
 			<PopoverPanel
 				title={title}
 				trigger={
-					<IconButton
-						aria-label={label}
-						tooltip={label}
-						className="size-5 pointer-coarse:size-8"
-					>
-						<SettingsIcon />
-					</IconButton>
+					showLabel ? (
+						<Button size="md" className="flex-1">
+							<SettingsIcon />
+							{label}
+						</Button>
+					) : (
+						<IconButton
+							aria-label={label}
+							tooltip={label}
+							className="size-5 pointer-coarse:size-8"
+						>
+							<SettingsIcon />
+						</IconButton>
+					)
 				}
 			>
 				{children}
