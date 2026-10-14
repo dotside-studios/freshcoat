@@ -3,9 +3,9 @@
 // and text is drawn with its embedded font file, along its curve when it has
 // one, or as the outlines of its glyphs: when asked for, or when a PDF cannot
 // carry the font. A layer PDF has no operator for (a shadow, a blur, an
-// adjustment, text in a font whose outlines do not read) is painted by the
-// CanvasKit painter into a transparent image at `rasterDpi` and placed where
-// it belongs, and reported as `vector_rasterized`.
+// adjustment, grain, a halftone, text in a font whose outlines do not read) is
+// painted by the CanvasKit painter into a transparent image at `rasterDpi` and
+// placed where it belongs, and reported as `vector_rasterized`.
 
 import type {
 	CanvasKit,
@@ -27,6 +27,7 @@ import {
 	shapeTextLines,
 } from "../canvaskit";
 import { parseColor } from "../color";
+import { isGrainActive, isHalftoneActive } from "../texture";
 import { compileScene } from "../compile-scene";
 import { normalizeDash } from "../dash";
 import { fontBytes } from "../font-bytes";
@@ -598,6 +599,8 @@ class PageBuilder {
 		if (cmd.shadow && (!Array.isArray(cmd.shadow) || cmd.shadow.length > 0))
 			return "shadow";
 		if ((cmd.blur ?? 0) > 0) return "layer blur";
+		if (isHalftoneActive(cmd.halftone)) return "halftone";
+		if (isGrainActive(cmd.grain)) return "grain";
 		const a = cmd.adjust;
 		if (a && (a.colorMatrix || a.lut || a.lut3d || (a.sharpen ?? 0) > 0))
 			return "adjust";

@@ -350,6 +350,15 @@ the records, and **Export** turns templates and records into files.
     stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
+  - Effects are one list: shadows, a layer blur, a background blur, grain and
+    a halftone, each with its own visibility toggle. Grain sets an amount,
+    grain size, seed, blend mode and mono or colour; a seed always paints the
+    same grain, in the canvas and in every export. A halftone sets a mode
+    (mono, or a CMYK look of four screens at 15°, 75°, 0° and 45° that is not
+    real separations), a round, line or square dot, a cell size with its lines
+    per inch at the template's export DPI, an angle, invert, an ink colour
+    and an optional paper colour. Both preview live on the canvas and keep
+    their look at 2× export, only sharper.
   - Text content, image source, QR value and barcode value have an Insert
     field menu; an image source lists image and URL fields first. Its last
     item, "New field…", creates a field and inserts it.

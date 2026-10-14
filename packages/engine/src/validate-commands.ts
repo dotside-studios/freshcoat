@@ -17,6 +17,8 @@ import type {
 	CornerRadius,
 	DrawCommand,
 	FrameFinish,
+	Grain,
+	Halftone,
 	ResolvedFill,
 	ShapeMask,
 	SpotInk,
@@ -272,6 +274,9 @@ function validateDrawable(cmd: DrawCommand, path: Path, add: Add): void {
 	}
 
 	if (cmd.adjust) validateAdjust(cmd.adjust, sub(path, ".adjust"), add, id);
+	if (cmd.grain) validateGrain(cmd.grain, sub(path, ".grain"), add, id);
+	if (cmd.halftone)
+		validateHalftone(cmd.halftone, sub(path, ".halftone"), add, id);
 	if (cmd.op !== "drawGroup" && "isolate" in cmd)
 		add(
 			"isolate_not_group",
@@ -465,6 +470,71 @@ function validateDrawable(cmd: DrawCommand, path: Path, add: Add): void {
 			});
 			break;
 	}
+}
+
+const GRAIN_BLENDS = new Set<Grain["blendMode"]>([
+	"normal",
+	"overlay",
+	"soft-light",
+	"multiply",
+	"screen",
+]);
+
+function validateGrain(grain: Grain, path: Path, add: Add, id?: string): void {
+	if (!finite(grain.amount) || grain.amount < 0 || grain.amount > 1)
+		add(
+			"bad_grain",
+			`amount must be within 0..1, got ${grain.amount}`,
+			`${path}.amount`,
+			id,
+		);
+	if (!finite(grain.size) || grain.size <= 0)
+		add("bad_grain", `size must be > 0, got ${grain.size}`, `${path}.size`, id);
+	if (!Number.isInteger(grain.seed))
+		add(
+			"bad_grain",
+			`seed must be an integer, got ${grain.seed}`,
+			`${path}.seed`,
+			id,
+		);
+	if (!GRAIN_BLENDS.has(grain.blendMode))
+		add(
+			"bad_grain",
+			`unknown grain blend mode "${grain.blendMode}"`,
+			`${path}.blendMode`,
+			id,
+		);
+}
+
+function validateHalftone(
+	halftone: Halftone,
+	path: Path,
+	add: Add,
+	id?: string,
+): void {
+	if (halftone.mode !== "mono" && halftone.mode !== "cmyk")
+		add(
+			"bad_halftone",
+			`unknown halftone mode "${halftone.mode}"`,
+			`${path}.mode`,
+			id,
+		);
+	if (!["round", "line", "square"].includes(halftone.shape))
+		add(
+			"bad_halftone",
+			`unknown halftone shape "${halftone.shape}"`,
+			`${path}.shape`,
+			id,
+		);
+	if (!finite(halftone.cellSize) || halftone.cellSize <= 0)
+		add(
+			"bad_halftone",
+			`cellSize must be > 0, got ${halftone.cellSize}`,
+			`${path}.cellSize`,
+			id,
+		);
+	if (!finite(halftone.angle))
+		add("bad_halftone", "angle must be finite", `${path}.angle`, id);
 }
 
 function validateAdjust(
