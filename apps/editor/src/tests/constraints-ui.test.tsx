@@ -6,10 +6,10 @@ import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { IssuesList } from "~/app/IssuesPopover";
 import {
-	printGuideMetrics,
-	printGuidesFor,
 	imageDpiHints,
 	printCheckHints,
+	printGuideMetrics,
+	printGuidesFor,
 	printGuidesOn,
 	safeAreaHints,
 	setPrintGuides,
@@ -425,9 +425,7 @@ describe("print guides", () => {
 	});
 	test("list layers that may not print as they look, and select them", async () => {
 		const t = fixtures.printPreflightCard;
-		expect(
-			printCheckHints(t, 300).map((h) => `${h.key} ${h.code}`),
-		).toEqual([
+		expect(printCheckHints(t, 300).map((h) => `${h.key} ${h.code}`)).toEqual([
 			"0/0 short_of_bleed",
 			"0/1 small_text",
 			"0/2 small_text",

@@ -394,13 +394,7 @@ function ValidationRow({
 	);
 }
 
-function HintRow({
-	template,
-	hint,
-}: {
-	template: Template;
-	hint: PrintHint;
-}) {
+function HintRow({ template, hint }: { template: Template; hint: PrintHint }) {
 	const controller = useController();
 	const layer = referenceLabel(template, hint.key);
 	return (
