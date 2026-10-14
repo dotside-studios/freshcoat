@@ -124,7 +124,8 @@ is lowered to fit, and the `scale` on the result is the one actually used.
 so the main entry stays free of the painter. `renderCompiledPdf(renderer,
 compiled, { dpi })` paints each side as one PDF page of vectors instead; a layer
 a PDF cannot express is drawn as an image, with a `vector_rasterized` warning
-(see the engine's [PDF output](../engine/README.md#pdf-output)). `describeWarning(w)` there turns
+(see the engine's [PDF output](../engine/README.md#pdf-output)), and
+`text: "outline"` draws text as glyph outlines with no font in the file. `describeWarning(w)` there turns
 one of a result's `warnings` into a line of readable text, such as
 `Couldn't load image: logo.png`.
 
@@ -452,7 +453,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -1460,7 +1461,16 @@ The stroke is the element's, so every span shares it. It follows straight,
 arc and path text, ellipsized and shrink-fitted lines alike. Decorations are
 not stroked. A PDF draws it as vector text (`Tr` 1, with `Tr` 7 clipping an
 `inside` stroke); a gradient stroke is rasterized with a `vector_rasterized`
-warning.
+warning, unless the text is drawn as outlines.
+
+### Outlined text in a PDF
+
+`pdfText: "outline"` (1.7) on a text element draws it in a vector PDF as the
+outlines of its glyphs, with no font, whatever the export asks for: for a
+logotype or a licensed face that must not travel in the file. It looks the
+same but cannot be selected. A whole export does the same with
+`renderCompiledPdf`'s `text: "outline"`. See the engine's
+[Text as outlines](../engine/README.md#text-as-outlines).
 
 ### Per-span line height
 

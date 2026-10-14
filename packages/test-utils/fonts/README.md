@@ -55,3 +55,20 @@ Vendored because a VARIABLE face is the only way to test weight instancing: a
 family delivered this way registers at its default instance, so a 700 span
 silently gets 400 + synthetic bold unless the `wght` axis is set. See
 `packages/engine/tests/font-weight.test.ts`.
+
+## VendSans-Regular-CFF.otf and VendSans-Variable-CFF2.otf
+
+- **Family:** Vend Sans CFF and Vend Sans CFF2, built from
+  `VendSans-Variable-latin.woff2` above
+- **Copyright:** © 2025 The Vend Sans Project Authors
+- **License:** SIL Open Font License 1.1, see
+  [`VendSans-OFL.txt`](./VendSans-OFL.txt)
+
+Modified versions of Vend Sans with the same glyphs in PostScript outlines:
+a static CFF font at `wght` 400, and a CFF2 variable font (`wght` 300–700)
+from masters at 300 and 700. Both are cut to printable ASCII, Å and É.
+[`scripts/cff-fonts.py`](../scripts/cff-fonts.py) builds them with fontTools.
+
+Vendored because no other font here has CFF or CFF2 outlines: the PDF
+writer embeds the first and draws the second as glyph outlines. See
+`packages/engine/tests/pdf-outlines.test.ts`.

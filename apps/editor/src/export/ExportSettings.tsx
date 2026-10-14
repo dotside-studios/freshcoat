@@ -562,6 +562,30 @@ export function ExportSettings({
 								</SegmentedControl>
 							</Row>
 						) : null}
+						{pdf && preset.pdfPageImage === "vector" ? (
+							<>
+								<Row label="Text">
+									<SegmentedControl
+										aria-label="PDF text"
+										className={segmentedFull}
+										selectedKey={preset.pdfText ?? "embed"}
+										onSelectionChange={(key) =>
+											set({ pdfText: key === "outline" ? "outline" : "embed" })
+										}
+									>
+										<SegmentedItem id="embed" className={segmentedItemFull}>
+											Embed fonts
+										</SegmentedItem>
+										<SegmentedItem id="outline" className={segmentedItemFull}>
+											Outline
+										</SegmentedItem>
+									</SegmentedControl>
+								</Row>
+								{preset.pdfText === "outline" ? (
+									<Hint>Glyphs as shapes, no fonts in the PDF</Hint>
+								) : null}
+							</>
+						) : null}
 						{lossy ? (
 							<Row label="Quality">
 								<Slider

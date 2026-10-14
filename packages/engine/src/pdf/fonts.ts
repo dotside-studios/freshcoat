@@ -3,15 +3,16 @@
 // TrueType or OpenType file the run used, so the glyphs stay vector and the
 // text selectable. A WOFF or WOFF2 file is unwrapped first, and a variable
 // TrueType font is fixed at the instance the run was drawn at. A file that
-// cannot be cut down is embedded whole. A run whose file a PDF cannot carry
-// has no face here and is drawn as pixels.
+// cannot be cut down is embedded whole. A face a PDF cannot carry, in a
+// collection or with CFF2 outlines, is drawn with its glyph outlines instead.
 
 import type { CanvasKit, GlyphRun, Typeface } from "canvaskit-wasm";
 import { fontArrayBuffer } from "../font-bytes";
 import type { FontVariations } from "../types";
 import { sfntBytes } from "../woff";
 import { instanceFont } from "./instance";
-import { readSfnt, type SfntInfo } from "./sfnt";
+import { type GlyphOutlines, readOutlines } from "./outlines";
+import { embeddable, readSfnt, type SfntInfo } from "./sfnt";
 import { subsetFont } from "./subset";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 
@@ -39,10 +40,21 @@ export type FaceRequest = {
 	variations?: FontVariations;
 };
 
+// The file a run was shaped with, and the axis values it was drawn at where
+// they are not the font's defaults.
+export type FaceMatch = { file: FontFile; coords: Record<string, number> };
+
+const coordsKey = (coords: Record<string, number>) =>
+	Object.entries(coords)
+		.sort(([a], [b]) => (a < b ? -1 : 1))
+		.map(([t, v]) => `${t}=${v}`)
+		.join(",");
+
 export class FontEmbedder {
 	private files = new Map<string, FontFile[]>();
 	private faces = new Map<FontFile, EmbeddedFace>();
 	private instances = new Map<FontFile, Map<string, FontFile | null>>();
+	private outlineSets = new Map<FontFile, Map<string, GlyphOutlines | null>>();
 
 	constructor(
 		private ck: CanvasKit,
@@ -57,6 +69,16 @@ export class FontEmbedder {
 		req: FaceRequest,
 		clusters: Map<number, string>,
 	): FontFile | { reason: string } {
+		const m = this.match(run, req, clusters);
+		return "reason" in m ? m : this.embeddable(m);
+	}
+
+	// The file CanvasKit shaped `run` with, or why it is not known.
+	match(
+		run: GlyphRun,
+		req: FaceRequest,
+		clusters: Map<number, string>,
+	): FaceMatch | { reason: string } {
 		const family = run.typeface?.getFamilyName() ?? "";
 		const named = [...this.open(family)];
 		if (named.length === 0)
@@ -93,8 +115,34 @@ export class FontEmbedder {
 			const c = Math.min(a.max, Math.max(a.min, v));
 			if (c !== a.default) coords[a.tag] = c;
 		}
+		return { file, coords };
+	}
+
+	// The file a PDF embeds for `m`, fixed at its instance.
+	embeddable({ file, coords }: FaceMatch): FontFile | { reason: string } {
+		const info = file.info as SfntInfo;
+		if (!embeddable(info))
+			return {
+				reason: info.collection
+					? `font ${file.family} is in a collection`
+					: `font ${file.family} has CFF2 outlines`,
+			};
 		if (Object.keys(coords).length === 0) return file;
-		return this.instance(file, coords) ?? { reason: `variable font ${family}` };
+		return (
+			this.instance(file, coords) ?? { reason: `variable font ${file.family}` }
+		);
+	}
+
+	// The glyph outlines of `m` at its instance, read once per instance.
+	outlines({ file, coords }: FaceMatch): GlyphOutlines | null {
+		let byKey = this.outlineSets.get(file);
+		if (!byKey) {
+			byKey = new Map();
+			this.outlineSets.set(file, byKey);
+		}
+		const key = coordsKey(coords);
+		if (!byKey.has(key)) byKey.set(key, readOutlines(file.bytes, coords));
+		return byKey.get(key) ?? null;
 	}
 
 	// `file` fixed at `coords`, made once per instance.
@@ -107,10 +155,7 @@ export class FontEmbedder {
 			byKey = new Map();
 			this.instances.set(file, byKey);
 		}
-		const key = Object.entries(coords)
-			.sort(([a], [b]) => (a < b ? -1 : 1))
-			.map(([t, v]) => `${t}=${v}`)
-			.join(",");
+		const key = coordsKey(coords);
 		if (byKey.has(key)) return byKey.get(key) ?? null;
 		const bytes = instanceFont(file.bytes, coords);
 		const info = bytes ? readSfnt(bytes) : null;

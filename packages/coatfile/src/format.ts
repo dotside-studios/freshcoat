@@ -21,9 +21,9 @@ import type { Template } from "./types";
 //        `bearerBars`
 //   1.6  frame `isolate`; text `arc` and `path`; element `backdropBlur`;
 //        gradient stroke `color`; variant `size`; vector `boolean`
-//   1.7  rect and vector `slice`; element `hidden`; text `stroke`; frame
-//        `cornerSmoothing`; per-corner image `cornerRadius` and image
-//        `cornerSmoothing`; rect and frame stroke `width` per side
+//   1.7  rect and vector `slice`; element `hidden`; text `stroke` and
+//        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
+//        and image `cornerSmoothing`; rect and frame stroke `width` per side
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -93,6 +93,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "text" && usesArc(o.properties)) need(6);
 			if (o.type === "text" && usesTextPath(o.properties)) need(6);
 			if (o.type === "text" && usesTextStroke(o.properties)) need(7);
+			if (o.type === "text" && usesPdfText(o.properties)) need(7);
 			if (o.type === "vector" && usesBoolean(o.properties)) need(6);
 			if (o.type === "frame") {
 				frameIds.add(o.id);
@@ -139,6 +140,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (usesSlice(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
 					need(7);
+				if (textIds.has(delta.id) && usesPdfText(delta.properties)) need(7);
 				if (usesSideStroke(delta.properties)) need(7);
 			}
 		}
@@ -198,6 +200,14 @@ function usesTextStroke(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).stroke !== undefined
+	);
+}
+
+function usesPdfText(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).pdfText !== undefined
 	);
 }
 

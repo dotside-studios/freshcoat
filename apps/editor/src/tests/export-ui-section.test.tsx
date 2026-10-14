@@ -505,6 +505,36 @@ describe("export section", { timeout: 20_000 }, () => {
 		).toBeNull();
 	});
 
+	test("draws a vector PDF's text with its fonts or as outlines", async () => {
+		const { controller, user, templateId } = setup();
+		const preset = (patch: Partial<ExportPreset>): ExportPreset => ({
+			id: "p_1",
+			name: "Print",
+			templateId,
+			records: "all",
+			sides: "all",
+			format: "pdf",
+			scale: 1,
+			dpi: 300,
+			fileName: "{{name}}-{{side}}",
+			markExported: true,
+			...patch,
+		});
+		act(() => controller.dispatch({ type: "setPreset", preset: preset({}) }));
+		await user.click(screen.getByRole("tab", { name: "Output" }));
+		expect(screen.queryByRole("radio", { name: "Outline" })).toBeNull();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: preset({ pdfPageImage: "vector" }),
+			}),
+		);
+		await user.click(screen.getByRole("radio", { name: "Outline" }));
+		expect(controller.state.workspace?.presets[0]?.pdfText).toBe("outline");
+		await user.click(screen.getByRole("radio", { name: "Embed fonts" }));
+		expect(controller.state.workspace?.presets[0]?.pdfText).toBe("embed");
+	});
+
 	describe("slices", () => {
 		const preset = (
 			templateId: string,

@@ -275,11 +275,31 @@ embedded.
 Any other layer is drawn by the CanvasKit painter into a transparent image at
 `rasterDpi` (600 by default) and placed where it belongs, so it matches the
 preview: shadows, blurs, `adjust`, masks, pattern and angular fills, gradients
-with a spread, strokes aligned to a path, gradient-filled or gradient-stroked text, the `plus` and
-`linear-burn` blend modes, text in a font collection or a variable CFF2 font,
-and SVG images holding text or filters. Bitmaps are drawn without smoothing.
+with a spread, strokes aligned to a path, embedded gradient-filled or
+gradient-stroked text, synthetic bold, the `plus` and `linear-burn` blend
+modes, text whose outlines do not read, and SVG images holding text or
+filters. Bitmaps are drawn without smoothing.
 Everything beneath a backdrop blur, or the whole page under a frame finish, is
 one image. Each image layer is reported once as a `vector_rasterized` warning.
+
+### Text as outlines
+
+`text: "outline"` on `renderPdf` and `paintPdf` draws every glyph as a filled
+path instead, so the file holds no font at all, as print shops that ask for
+outlined text want. A text node's `pdfText: "outline"` does the same for that
+layer alone, whatever the option says. The outlines are read from the font
+file the text was shaped with (CanvasKit's wasm build exposes no glyph paths):
+TrueType outlines, a variable font's fixed at its instance first, and CFF and
+CFF2 charstrings, a CFF2 font's blended at its instance. Each glyph is placed
+exactly where the embedded font would put it, along a curve too. Span
+colours, decorations, opacity and blend modes are drawn as for embedded text,
+and a solid or gradient stroke along the outlines, under the fill for
+`outside` and clipped to it for `inside`. A gradient fill, which embedded text
+draws as an image, is painted through the glyphs as a clip and stays vector.
+Outlined text cannot be selected or searched.
+
+Text in a font a PDF cannot embed, the first face of a font collection or a
+CFF2 variable font, is drawn as outlines without asking.
 
 ### Output intent
 

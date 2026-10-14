@@ -345,7 +345,11 @@ JPEG at the chosen density, or `vector`, which draws each card as PDF vectors
 through the engine's [PDF output](../engine/README.md#pdf-output): text in its
 embedded font, and any layer a PDF cannot express, such as a shadow, as an
 image. A card printed with correction is rendered as a PNG. Each font file is
-stored once in the assembled PDF, however many cards use it. A gray or RGB
+stored once in the assembled PDF, however many cards use it. A preset's
+`pdfText: "outline"` draws the text of vector pages as the outlines of its
+glyphs instead, so the PDF holds no font (see the engine's
+[Text as outlines](../engine/README.md#text-as-outlines)); a sheet's slug,
+when asked for, is still set in Helvetica. A gray or RGB
 JPEG carrying an ICC profile, as the engine's JPEGs carry sRGB, is drawn in an
 `ICCBased` space holding that profile, each distinct profile stored once.
 

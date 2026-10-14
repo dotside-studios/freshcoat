@@ -81,8 +81,9 @@ export type RenderRequest = {
 	print?: RenderPrint;
 	/** draw a one-page PDF of vectors, `dpi` design units to the inch, in
 	 *  place of `format`; `untagged` leaves its RGB DeviceRGB, for a PDF that
-	 *  declares no output intent */
-	vector?: { dpi: number; untagged?: true };
+	 *  declares no output intent; `text` "outline" draws text as glyph
+	 *  outlines, with no font */
+	vector?: { dpi: number; untagged?: true; text?: "outline" };
 	/** also work out the item's cut lines */
 	cut?: true;
 	/** warn for images that print below `min` at `dpi` design units to the
@@ -321,6 +322,9 @@ export function itemRequest(
 							...(preset.outputIntent?.kind === "none"
 								? { untagged: true as const }
 								: {}),
+							...(preset.pdfText === "outline"
+								? { text: "outline" as const }
+								: {}),
 						},
 					}
 				: {}),
@@ -484,6 +488,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					images,
 					dpi: req.vector.dpi,
 					...(req.vector.untagged ? { outputIntent: false as const } : {}),
+					...(req.vector.text ? { text: req.vector.text } : {}),
 					...(req.imageDpi ? { imageDpi: req.imageDpi } : {}),
 					...(req.printChecks ? { printChecks: req.printChecks } : {}),
 				});

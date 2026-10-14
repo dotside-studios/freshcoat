@@ -434,6 +434,8 @@ export type DrawTextCommand = DrawCommandBase & {
 	stroke?: TextStroke;
 	arc?: TextArc;
 	path?: TextPath;
+	// See TextNode.
+	pdfText?: "outline";
 };
 
 export type DrawImageCommand = DrawCommandBase & {

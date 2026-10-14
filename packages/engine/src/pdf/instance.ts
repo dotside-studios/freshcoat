@@ -59,7 +59,7 @@ export function instanceFont(
 }
 
 // Each axis's normalized coordinate, after avar.
-function normalize(tables: Tables, settings: Record<string, number>): number[] {
+export function normalize(tables: Tables, settings: Record<string, number>): number[] {
 	const fvar = tables.get("fvar");
 	if (!fvar) return [];
 	const dv = view(fvar);
@@ -111,7 +111,7 @@ function segmentMap(v: number, map: Array<[number, number]>): number {
 }
 
 // How much a region at `peak`, from `start` to `end`, applies at `coords`.
-function regionScalar(
+export function regionScalar(
 	coords: number[],
 	peak: number[],
 	start?: number[],

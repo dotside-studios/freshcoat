@@ -541,6 +541,7 @@ function compileText(
 		// standard — measured against Figma's own absoluteRenderBounds, which
 		// otherwise sits ~0.39em below where this renders in Vend Sans.
 		leadingTrim: props.leadingTrim === true,
+		...(props.pdfText === "outline" ? { pdfText: "outline" as const } : {}),
 		...(props.arc ? { arc: compileArc(props.arc as TextArcInput, ratio) } : {}),
 		...(props.path
 			? { path: compileTextPath(props.path as TextPathInput, ratio) }

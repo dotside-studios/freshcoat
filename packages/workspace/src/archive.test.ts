@@ -654,6 +654,23 @@ describe("packWorkspace", () => {
 		expect(kept).toEqual(cut);
 	});
 
+	it("keeps how a preset draws PDF text and reads an older preset as embedding it", async () => {
+		const outlined: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_outlined",
+			format: "pdf",
+			pdfPageImage: "vector",
+			pdfText: "outline",
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [...ws.presets, outlined] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		const [older, kept] = result.workspace.presets;
+		expect(older?.pdfText).toBeUndefined();
+		expect(kept).toEqual(outlined);
+	});
+
 	it("refuses a preset with an unknown cut file", async () => {
 		const bad = {
 			...(ws.presets[0] as ExportPreset),

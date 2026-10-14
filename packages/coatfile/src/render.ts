@@ -22,6 +22,7 @@ import {
 	type Output,
 	type OutputIntent,
 	type PdfFrame,
+	type PdfTextMode,
 	type Renderer,
 	resolveExportScale,
 	resolveSupersample,
@@ -397,6 +398,9 @@ export type RenderCompiledPdfOptions = {
 	images?: Map<string, Uint8Array>;
 	/** Design units per inch, which sets the page size. Default 72. */
 	dpi?: number;
+	/** "outline" draws text as the outlines of its glyphs, with no font in the
+	 *  file. Default "embed". */
+	text?: PdfTextMode;
 	title?: string;
 	date?: Date;
 	/** Default sRGB; false for none. See the engine's "PDF output". */
@@ -447,7 +451,7 @@ export async function renderCompiledPdf(
 		(f) => !options.frameNames || options.frameNames.includes(f.name),
 	);
 	await renderer.loadFonts(frames.flatMap((f) => f.assets.fonts));
-	const { images, dpi, title, date, outputIntent, printChecks } = options;
+	const { images, dpi, text, title, date, outputIntent, printChecks } = options;
 	const results: TemplatePdfFrame[] = [];
 	for (const f of frames) {
 		const commands = renderer.compile(f.root as Node, {
@@ -465,6 +469,7 @@ export async function renderCompiledPdf(
 		const page = await renderer.paintPdf(commands, {
 			images,
 			dpi,
+			...(text ? { text } : {}),
 			title,
 			date,
 			...(outputIntent !== undefined ? { outputIntent } : {}),
