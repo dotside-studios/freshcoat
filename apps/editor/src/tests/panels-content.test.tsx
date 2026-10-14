@@ -46,11 +46,12 @@ const textOf = (t: Template, key: string) => {
 };
 
 describe("the Content tab", () => {
-	test("the inspector reads Design, Content, and old tab ids map over", async () => {
+	test("the inspector reads Design, Content, Print, and old tab ids map over", async () => {
 		const { controller, user } = setup(doc(), <RightPanel />);
 		expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
 			"Design",
 			"Content",
+			"Print",
 		]);
 		await user.click(screen.getByRole("tab", { name: "Content" }));
 		expect(controller.state.rightTab).toBe("content");
