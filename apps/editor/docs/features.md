@@ -94,7 +94,8 @@ the records, and **Export** turns templates and records into files.
   colour comes from a field, or that shrinks to fit, is checked as the record
   renders and shows under "Last render"; an export lists the same warnings in
   its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
-  `rich_black_text` and `short_of_bleed`, described in the
+  `rich_black_text` and `short_of_bleed`, and for QR codes `qr_low_contrast`,
+  `qr_inverted`, `qr_quiet_zone` and `qr_logo_large`, described in the
   [coatfile guide](../../../packages/coatfile/README.md#print-checks).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
@@ -571,6 +572,31 @@ to fill cards with records.
     time, and autosave stores each photo once, apart from the templates and data. When
     the browser's storage is full it keeps the templates and data and says
     that it could not keep the photos.
+
+## QR codes
+
+The QR inspector section sets the value (with the field-insert menu), the
+recovery level, and the style:
+
+- **Modules:** square, dots, rounded (corners round where no neighbour
+  touches) or classy (top-left and bottom-right corners only).
+- **Eyes:** the finder patterns' frame (square, rounded or circle) and center
+  (square, rounded or dot).
+- **Colour:** the module colour, or with **Gradient** on a linear gradient
+  from that colour to a **To** colour at an **Angle**; and the colour
+  **Behind** the code.
+- **Quiet zone** in modules, and **Margin** in design units, both inside the
+  box.
+- **Logo:** an image from a file, a URL or an image field, with its size (5 to
+  30% of the code) and padding in modules. A logo clears the modules behind
+  it and raises recovery to Q, or to H for a large one, whatever the
+  Recovery buttons say.
+
+The Issues list's Print hints name a QR code whose colours have too little
+contrast or are inverted (light on dark), whose quiet zone is under 2
+modules when it draws its own background, or whose logo is over 30%. QR
+modules snap to whole output pixels like a barcode's, a PDF keeps them as
+vector paths, and for-print leaves them and the logo alone.
 
 ## Barcodes
 
