@@ -319,15 +319,22 @@ the records, and **Export** turns templates and records into files.
   - A layer that reads a field shows `{}`, which names those fields and opens
     them in Content.
 - **Inspector:**
-  - Align and boolean toolbars at the top (the boolean one for two or more
-    shapes, or one boolean layer). Align left, horizontal centers
+  - Position first: the align buttons, X and Y, rotation and the
+    constraints, as in Figma. Align left, horizontal centers
     and right are Alt+A, H and D; top, vertical centers and bottom are
     Alt+W, V and S; Alt+Shift+H and Alt+Shift+V distribute. The Object menu
     holds the same commands under Boolean, Arrange and Align and distribute.
-  - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
-    linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
-    as the selection changes. Slice and Spot color are in the Print tab.
+    A boolean toolbar follows for two or more shapes, or one boolean layer.
+  - Then Layout (width, height, resizing and grid cell) and Appearance
+    (opacity, blend mode with every Figma layer mode, linear burn included,
+    and corner radius), the layer type's own section, Fill, Stroke,
+    Effects, Adjust and Show when. A collapsed section stays collapsed as
+    the selection changes. Slice and Spot color are in the Print tab.
+  - Show when lists the field conditions that decide whether a layer
+    appears, read as "field is set", "field equals value" and so on. It
+    reads "Always" until a condition is added. The layers tree marks such a
+    layer with a small filter icon whose tooltip says when it shows. The
+    eye in the tree stays a session-only editing aid.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
@@ -756,10 +763,11 @@ reaches every variant at once.
   dot before its label ("Changed in Speaker"); clicking it offers **Reset
   to Default**. A section with changed values marks its header, and its
   reset drops them all. The layer tree marks each layer the variant changes,
-  and dims one it hides, with a crossed eye.
-- **Hiding:** **Hide in Staff** in a layer's context menu or its Visibility
-  section leaves the layer out of that variant only. The layer tree's eye
-  stays an editing aid that is never saved.
+  and dims one it hides, with a filter icon.
+- **Hiding:** **Hide in Staff** in a layer's context menu leaves the layer
+  out of that variant only; Show when then says "Hidden in Staff" with a
+  **Show** button. The layer tree's eye stays an editing aid that is never
+  saved.
 - **Ids:** a variant's id is made from its first name and does not follow a
   rename, because files, bindings and card shop orders store it. **Change
   id…** changes it deliberately, warns that anything saved with the old id

@@ -16,9 +16,9 @@ import { doc, geometryOf } from "./doc-fixture";
 import { countRenders, trackRenders } from "./render-count";
 
 const SECTIONS = [
-	"AlignSection",
-	"LayerSection",
-	"ConstraintsSection",
+	"PositionSection",
+	"LayoutSection",
+	"AppearanceSection",
 	"FillSection",
 	"StrokeSection",
 	"CornersSection",
@@ -139,7 +139,8 @@ describe("Design panel renders", () => {
 			act(() => rendered(c));
 		});
 		fireEvent.pointerUp(handle, { pointerId: 1, clientX: 11 });
-		expect(counts.get("GeometryFields")).toBe(1);
+		expect(counts.get("PositionFields")).toBe(1);
+		expect(counts.get("SizeFields")).toBe(1);
 		for (const name of SECTIONS) expect(counts.get(name) ?? 0).toBe(0);
 		expect(screen.getByRole("spinbutton", { name: "X" })).toHaveProperty(
 			"value",
@@ -165,7 +166,7 @@ describe("Design panel renders", () => {
 			);
 		});
 		expect(c.state.geometry).toBe(geometry);
-		for (const name of [...SECTIONS, "GeometryFields"])
+		for (const name of [...SECTIONS, "PositionFields", "SizeFields"])
 			expect(counts.get(name) ?? 0).toBe(0);
 	});
 
@@ -177,7 +178,7 @@ describe("Design panel renders", () => {
 				c.edit((t) => updateElement(t, "0/0", { opacity: 0.5 }));
 			});
 		});
-		expect(counts.get("LayerSection")).toBe(1);
+		expect(counts.get("AppearanceSection")).toBe(1);
 		expect(
 			(screen.getByRole("spinbutton", { name: "Opacity" }) as HTMLInputElement)
 				.value,

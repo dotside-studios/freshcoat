@@ -156,21 +156,33 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("orders a rect's sections Layer, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
+	it("orders a rect's sections Position, Layout, Appearance, Fill, Stroke, Effects, Adjust, Show when", () => {
 		setup(["0/0"]);
 		const titles = screen
 			.getAllByRole("heading", { level: 3 })
 			.map((h) => h.textContent);
 		expect(titles).toEqual([
-			"Layer",
+			"Position",
+			"Layout",
+			"Appearance",
 			"Fill",
 			"Stroke",
 			"Effects",
-			"Constraints",
 			"Adjust",
-			"Visibility",
+			"Show when",
 		]);
 		expect(spinbutton("Corner radius")).toBeTruthy();
+	});
+
+	it("Show when starts as Always with one Add condition button", () => {
+		const c = setup(["0/0"]);
+		expect(screen.getByText("Always")).toBeTruthy();
+		const buttons = screen.getAllByRole("button", { name: "Add condition" });
+		expect(buttons).toHaveLength(1);
+		fireEvent.click(buttons[0] as HTMLElement);
+		expect(el(c, "0/0").visibleWhen).toEqual({ field: "name" });
+		expect(screen.queryByText("Always")).toBeNull();
+		expect(screen.getByLabelText("Condition 1 test")).toBeTruthy();
 	});
 
 	it("gives a boolean layer its operation, and its operands only the shape", () => {
@@ -181,7 +193,7 @@ describe("DesignPanel", () => {
 		expect(titles()).toContain("Fill");
 		cleanup();
 		setup(["0/7/0"], booleanDoc());
-		expect(titles()).toEqual(["Layer", "Visibility"]);
+		expect(titles()).toEqual(["Position", "Layout", "Appearance", "Show when"]);
 	});
 
 	it("remembers a collapsed section across selections", async () => {
