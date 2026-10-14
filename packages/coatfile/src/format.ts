@@ -24,7 +24,9 @@ import type { Template } from "./types";
 //   1.7  rect and vector `slice`; element `hidden`; text `stroke` and
 //        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
 //        and image `cornerSmoothing`; rect and frame stroke `width` per side;
-//        element `effects`
+//        element `effects`, with `grain` and `halftone`; rect and vector `spot`;
+//        QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`,
+//        `gradient` and `logo`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -68,6 +70,7 @@ export function minimumFormatVersion(template: Template): string {
 	const frameIds = new Set<string>();
 	const imageIds = new Set<string>();
 	const textIds = new Set<string>();
+	const qrIds = new Set<string>();
 	const visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
 			for (const item of node) visit(item);
@@ -83,7 +86,12 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.effects !== undefined) need(7);
 			if (o.type === "barcode") need(3);
 			if (o.type === "text") textIds.add(o.id);
+			if (o.type === "qr_code") {
+				qrIds.add(o.id);
+				if (usesQrStyle(o.properties)) need(7);
+			}
 			if (usesSlice(o.properties)) need(7);
+			if (usesSpot(o.properties)) need(7);
 			if (usesSideStroke(o.properties)) need(7);
 			if (
 				o.type === "barcode" &&
@@ -140,10 +148,12 @@ export function minimumFormatVersion(template: Template): string {
 					need(7);
 				if (usesBoolean(delta.properties)) need(6);
 				if (usesSlice(delta.properties)) need(7);
+				if (usesSpot(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
 					need(7);
 				if (textIds.has(delta.id) && usesPdfText(delta.properties)) need(7);
 				if (usesSideStroke(delta.properties)) need(7);
+				if (qrIds.has(delta.id) && usesQrStyle(delta.properties)) need(7);
 			}
 		}
 	}
@@ -197,6 +207,14 @@ function usesSlice(properties: unknown): boolean {
 	);
 }
 
+function usesSpot(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).spot !== undefined
+	);
+}
+
 function usesTextStroke(properties: unknown): boolean {
 	return (
 		properties !== null &&
@@ -219,6 +237,21 @@ function usesSideStroke(properties: unknown): boolean {
 	if (stroke === null || typeof stroke !== "object") return false;
 	const width = (stroke as Record<string, unknown>).width;
 	return width !== null && typeof width === "object";
+}
+
+const QR_STYLE_1_7 = [
+	"quietZone",
+	"moduleShape",
+	"finderOuter",
+	"finderInner",
+	"gradient",
+	"logo",
+];
+
+function usesQrStyle(properties: unknown): boolean {
+	if (properties === null || typeof properties !== "object") return false;
+	const p = properties as Record<string, unknown>;
+	return QR_STYLE_1_7.some((key) => p[key] !== undefined);
 }
 
 function usesIsolate(properties: unknown): boolean {

@@ -41,6 +41,7 @@ import { MaskSection } from "./MaskSection";
 import { QrSection } from "./QrSection";
 import { SideSection } from "./SideSection";
 import { SliceSection, takesSlice } from "./SliceSection";
+import { SpotSection, takesSpot } from "./SpotSection";
 import { StrokeSection } from "./StrokeSection";
 import { TextSection } from "./TextSection";
 import { VectorSection } from "./VectorSection";
@@ -276,6 +277,7 @@ function sections(ins: Inspect) {
 			{painted && every((t) => STROKED.has(t)) && (
 				<StrokeSection ins={ins} text={types.has("text")} />
 			)}
+			{painted && takesSpot(ins) && <SpotSection ins={ins} />}
 			{painted && <EffectsSection ins={ins} />}
 			{takesConstraints(ins) && <ConstraintsSection ins={ins} />}
 			{painted && <AdjustSection ins={ins} />}

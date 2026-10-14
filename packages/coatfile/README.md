@@ -252,6 +252,10 @@ indices from the frame's `elements` down to the layer and `issue.code` is one of
 | `hairline_stroke` | A stroke on a rect, image, vector, frame or text is thinner than the minimum at print size. Carries `widthPt` and `minPt`. | `minStrokePt`, 0.25 pt |
 | `rich_black_text` | Text under the size limit is filled with a near-black mixed from unequal channels. Carries `color`, `sizePt` and `maxPt`. | `richBlackTextPt`, 12 pt |
 | `short_of_bleed` | With a `bleed`, a top-level rect, image or frame runs to a trim edge but stops short of the bleed line, and is not one the render grows into it (see `extendIntoBleed`). Carries `edges`. | the template's `bleed` |
+| `qr_low_contrast` | A QR code's foreground, or a stop of its gradient, has a contrast ratio with its own `background` under the minimum. Carries `ratio` and `min`. | `MIN_QR_CONTRAST`, 3:1 |
+| `qr_inverted` | A QR code's modules are lighter than its own `background`. | none |
+| `qr_quiet_zone` | A QR code with a `background` keeps fewer light modules than the minimum between the symbol and the background's edge, counting `quietZone` and `margin`. Carries `modules` and `min`. | `MIN_QR_QUIET_ZONE`, 2 modules |
+| `qr_logo_large` | A QR logo's `size` is over the cap; it is drawn at the cap. Carries `size` and `max`. | `MAX_QR_LOGO_SIZE`, 0.3 |
 
 Sizes are read at `dpi` design units to the inch (default 300, so a 25-unit
 font is 6 pt); `unitsToPt` and `unitsToMm` convert. `templateHints(t, images,
@@ -453,7 +457,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone`; rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`, `gradient` and `logo` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -739,6 +743,61 @@ anyway, so `isolate` changes nothing there. Files written before 1.6 have no
 }
 ```
 
+## QR codes
+
+A `qr_code` element draws a QR code of a mustache `value`, encoded with
+lean-qr. From 1.7 it takes style options, all optional:
+
+```jsonc
+{
+  "id": "link", "type": "qr_code",
+  "pos": { "x": 40, "y": 40 }, "size": { "width": 200, "height": 200 },
+  "properties": {
+    "value": "{{profile_url}}",
+    "errorCorrection": "M",      // L, M, Q or H; default M
+    "foreground": "#000000",     // default; "background" is none unless set
+    "background": "#ffffff",
+    "margin": 0,                 // design units inside the box
+    "quietZone": 4,              // modules each side, inside the margin; default 0
+    "moduleShape": "rounded",    // square (default), dot, rounded or classy
+    "finderOuter": "rounded",    // the eyes' ring: square (default), rounded or circle
+    "finderInner": "dot",        // the eyes' centre: square (default), rounded or dot
+    "gradient": {                // paints the modules in place of foreground
+      "kind": "linear", "angle": 45,
+      "stops": [{ "offset": 0, "color": "#111827" }, { "offset": 1, "color": "#1d4ed8" }]
+    },
+    "logo": {
+      "src": "asset:…",          // any image src, a {{field}} included
+      "size": 0.2,               // side as a fraction of the symbol's; default 0.2
+      "padding": 1               // modules cleared around it; default 1
+    }
+  }
+}
+```
+
+`rounded` modules round each corner that no neighbour touches, so runs join
+into blobs; `classy` rounds only the top-left and bottom-right corners. The
+gradient is linear, with `from` and `to` as a fill's, and at least two stops.
+
+A logo clears whole modules behind it, centred, and is drawn `contain` over
+them. Scannability guards:
+
+- With a logo the error correction is raised to at least Q, and to H once the
+  cleared square covers more than 15% of the symbol (`QR_LOGO_H_COVERAGE`).
+- A logo is drawn at most `MAX_QR_LOGO_SIZE` (0.3) of the symbol's side, and
+  never over the finder patterns, their separators or the timing patterns;
+  on a small symbol it gets smaller to fit, and a symbol with no room draws
+  none.
+- `qrIssues(el)` lists low contrast, inverted colours, a small quiet zone and
+  an oversized logo; they are print checks, so `printHints` and
+  `templateHints` include them (see [Print checks](#print-checks)).
+
+The symbol compiles to one even-odd path in module units, with the logo as an
+image over it, inside a group whose `snap` grid is the symbol plus its quiet
+zone. A raster paint scales that group so every module covers whole output
+pixels when the code is upright, as a barcode's are; a vector PDF draws the
+modules as paths. `generateMatrix(value, ec)` gives the module matrix alone.
+
 ## Barcodes
 
 A `barcode` element draws one of eight symbologies from a mustache `value`,
@@ -897,6 +956,39 @@ pixels, as `trim` does for a bleed render. `piece` takes the place of `bleed`,
 and a slice with `output: "none"` can be rendered by name. An unknown name
 throws.
 
+## Spot colours
+
+From 1.7 a `rect` or `vector` can print its fill or its stroke in a named spot
+ink, as a white ink, foil or varnish layer does:
+
+```jsonc
+"properties": {
+  "fill": "#ffffff",
+  "spot": {
+    "fill": { "spot": "White", "tint": 1, "alt": "#ffffff", "overprint": true },
+    "stroke": { "spot": "Gold Foil" }
+  }
+}
+```
+
+`spot` names the ink, exactly as the press or RIP expects it. `tint` is in
+`[0, 1]` and defaults to 1. `alt` is the colour every output but a vector PDF
+paints, and a viewer without the ink shows; it defaults to the layer's own
+colour, the lead colour of its first fill or its stroke colour. `overprint`
+defaults to false; set it for a finishing layer so the ink prints over the
+artwork beneath rather than knocking it out.
+
+A spot fill replaces every fill of the layer with one solid in `alt`, and a
+spot stroke drops a gradient for a solid. A spot stroke on a layer without a
+stroke draws nothing. A vector PDF paints each spot in a `/Separation` colour
+space whose alternate is `alt` in RGB, with an overprinting ExtGState when
+asked; raster outputs paint `alt`. A layer the PDF has to draw as an image,
+such as one with a shadow, loses its spot.
+
+Validation reports `invalid_spot` for an empty name, the names `All` and
+`None` (which PDF reserves), and an `alt` that is not a colour. There is no
+colour library: type the name your printer uses.
+
 ## Grid layout
 
 A frame's `layout` is a flex layout (`direction`, as before) or a grid:
@@ -954,6 +1046,39 @@ drawn into: inside a frame with `isolate`, `opacity` below 1, `blendMode`,
 { "id": "glass", "type": "rect", "backdropBlur": 24,
   "properties": { "fill": "#ffffff40", "cornerRadius": 16 } /* … */ }
 ```
+
+## Grain and halftone
+
+Two entries of an element's `effects` (1.7) texture its pixels, after
+`adjust` and before blur, shadows and opacity. Sizes are design px and scale
+with the element, so a 2× export looks the same, only sharper. An element
+takes at most one of each.
+
+```jsonc
+"effects": [
+  { "type": "grain", "amount": 0.3,      // 0 to 1
+    "size": 1,                           // one grain's side; default 1
+    "monochrome": true,                  // default true; false for colour grain
+    "blendMode": "overlay",              // normal, overlay, soft-light, multiply, screen
+    "seed": 7 },                         // 0 to 65535; default 0
+  { "type": "halftone", "cellSize": 6,   // one cell's side
+    "shape": "round",                    // round (default), line, square
+    "angle": 45,                         // default 45, or 0 for cmyk
+    "mode": "mono",                      // mono (default) or cmyk
+    "invert": false,                     // dots for light instead of dark
+    "color": "#000000",                  // the ink, mono only
+    "background": "#ffffff" }            // paper under the dots; default none
+]
+```
+
+Grain is seeded, never random: one seed paints the same pixels in Studio, the
+CLI and every worker. `"cmyk"` draws four screens at C 15°, M 75°, Y 0° and
+K 45°, each turned by `angle`, multiplied together. It is a visual effect, not
+colour separations. A screen printed at a DPI, one design px per dot, has
+`dpi / cellSize` lines per inch. Both draw as an image in a vector PDF, with a
+`vector_rasterized` warning, and need a CanvasKit build with runtime effects
+(the default build has them); without them the element paints unchanged with
+an `effect_unsupported` warning.
 
 ## Image focus and crop
 

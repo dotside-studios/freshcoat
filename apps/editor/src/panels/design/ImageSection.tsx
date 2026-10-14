@@ -40,6 +40,8 @@ import {
 	commonValue,
 	focusFieldOf,
 	type Inspect,
+	type Layer,
+	type PatchFn,
 	patchLayers,
 } from "./field-helpers";
 import {
@@ -152,6 +154,36 @@ export function fieldSummary(t: Template, src: string): string | null {
 	return field ? `Field · ${field.title ?? id}` : `Field · ${id} (missing)`;
 }
 
+export async function attachImageFile(
+	ins: Inspect,
+	file: File,
+	patch: (src: string, el: Layer) => ReturnType<PatchFn>,
+) {
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	const current = ins.controller.template;
+	if (!current) return;
+	const attached = await attachImageAsset(
+		current,
+		bytes,
+		file.type || "image/png",
+	);
+	const sha = parseAssetUri(attached.src);
+	const asset = attached.template.assets?.find((a) => a.sha256 === sha);
+	const r = ins.controller.edit((t) => {
+		const base =
+			asset && !t.assets?.some((a) => a.sha256 === sha)
+				? { ...t, assets: [...(t.assets ?? []), asset] }
+				: t;
+		return patchLayers(
+			base,
+			ins.keys,
+			(el) => patch(attached.src, el),
+			getElement,
+		);
+	});
+	if (!r?.ok) toast("Couldn't add that image", { tone: "danger" });
+}
+
 export function ImageSection({
 	ins,
 	background = false,
@@ -173,31 +205,8 @@ export function ImageSection({
 	const setImage = (field: string, patch: Partial<ImageProperties>) =>
 		ins.setProps(field, () => patch as Record<string, unknown>);
 
-	const replace = async (file: File) => {
-		const bytes = new Uint8Array(await file.arrayBuffer());
-		const current = ins.controller.template;
-		if (!current) return;
-		const attached = await attachImageAsset(
-			current,
-			bytes,
-			file.type || "image/png",
-		);
-		const sha = parseAssetUri(attached.src);
-		const asset = attached.template.assets?.find((a) => a.sha256 === sha);
-		const r = ins.controller.edit((t) => {
-			const base =
-				asset && !t.assets?.some((a) => a.sha256 === sha)
-					? { ...t, assets: [...(t.assets ?? []), asset] }
-					: t;
-			return patchLayers(
-				base,
-				ins.keys,
-				() => ({ properties: { src: attached.src } }),
-				getElement,
-			);
-		});
-		if (!r?.ok) toast("Couldn't add that image", { tone: "danger" });
-	};
+	const replace = (file: File) =>
+		attachImageFile(ins, file, (src) => ({ properties: { src } }));
 
 	return (
 		<InspectorSection
@@ -447,7 +456,7 @@ function MaskParams({
 const IMAGE_FORMATS = ["image", "url"] as const;
 const IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/gif";
 
-function ReplaceMenu({
+export function ReplaceMenu({
 	template,
 	src,
 	onFile,

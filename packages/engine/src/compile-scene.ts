@@ -241,6 +241,8 @@ function lower(node: Node, ctx: BakeCtx, siblings: Node[] = []): DrawCommand {
 		blur: node.blur,
 		backdropBlur: node.backdropBlur,
 		adjust: node.adjust,
+		halftone: node.halftone,
+		grain: node.grain,
 	};
 	switch (node.kind) {
 		case "rect":
@@ -289,6 +291,7 @@ function lower(node: Node, ctx: BakeCtx, siblings: Node[] = []): DrawCommand {
 				clip: groupClip(node),
 				...backdropClip(node),
 				...(node.isolate ? { isolate: true } : {}),
+				...(node.snap ? { snap: node.snap } : {}),
 				children: [
 					...groupBackground(node, base),
 					...node.children.map((c) => lower(c, ctx, node.children)),
@@ -537,7 +540,9 @@ function fastClip(mask: Node): ShapeMask | null {
 		mask.backdropBlur ||
 		(mask.blendMode && mask.blendMode !== "normal") ||
 		mask.shadow ||
-		mask.adjust
+		mask.adjust ||
+		mask.halftone ||
+		mask.grain
 	)
 		return null;
 	if (mask.kind !== "rect" && mask.kind !== "ellipse") return null;

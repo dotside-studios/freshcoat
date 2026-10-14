@@ -14,7 +14,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "minDpi", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "cutSpot", "minDpi", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"dpi",
@@ -33,6 +33,7 @@ const PDF_OPTIONS = [
 	"noOutputIntent",
 	"outputIntentId",
 	"cutLines",
+	"cutSpot",
 ];
 const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks", "marks", "backOffset", "blankBacks"];
 const DUPLEX_OPTIONS = ["backOffset", "blankBacks"];
@@ -66,6 +67,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.pieces ? { pieces: rest.pieces } : {}),
 				...(rest.cut ? { cut: rest.cut } : {}),
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
+				...(rest.cutSpot ? { cutSpot: rest.cutSpot } : {}),
 				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
 				out,
 				quiet: input.quiet,
@@ -86,6 +88,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		rest.pieces ||
 		rest.cut ||
 		rest.cutLines ||
+		rest.cutSpot ||
 		rest.printTarget !== undefined ||
 		rest.printProfile !== undefined;
 	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {

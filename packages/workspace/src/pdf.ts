@@ -20,7 +20,14 @@ import {
 import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
 import { normalizePath } from "@freshcoat-js/engine/svg";
 import { crc32 } from "./crc";
-import { CUT_KINDS, CUT_STYLES, type ItemCuts } from "./cut";
+import {
+	CUT_KINDS,
+	CUT_STYLES,
+	type CutKind,
+	type CutSpots,
+	cutSpotNames,
+	type ItemCuts,
+} from "./cut";
 import {
 	imposeSheets,
 	REGISTRATION_MARK_RADIUS_MM,
@@ -68,11 +75,17 @@ export type AssemblePdfOptions = {
 	 *  of the press's condition instead, false for none. While one is
 	 *  declared, every page reads its RGB as sRGB */
 	outputIntent?: OutputIntent | false;
+	/** the spot colour each kind of cut line is stroked in; a kind left out
+	 *  takes its `DEFAULT_CUT_SPOTS` name */
+	cutSpots?: CutSpots;
 };
 
 const CROP_MARK_WIDTH_PT = 0.25;
 const CUT_LINE_WIDTH_PT = 0.25;
 const CUT_GROUP_NAME = "Cut";
+const CUT_OVERPRINT = "CutOverprint";
+const cutSpace = (kind: CutKind) =>
+	`Cut${kind[0]?.toUpperCase()}${kind.slice(1)}`;
 
 const POINTS_PER_INCH = 72;
 const PT_PER_MM = POINTS_PER_INCH / MM_PER_INCH;
@@ -96,7 +109,9 @@ export function pageSizePt(
  *  backs. A page given as a one-page PDF is drawn as its vectors, sized as an
  *  image of `widthPx` by `heightPx` would be. A page with `cut` lines gets
  *  them stroked over its image, in an optional content group named Cut that a
- *  viewer can hide. */
+ *  viewer can hide. Each kind of line is stroked in a Separation named by
+ *  `cutSpots`, whose alternate is the kind's `CUT_STYLES` colour, and
+ *  overprints so the cut never knocks out the art. */
 export async function assemblePdf(
 	pages: readonly PdfPage[],
 	options: AssemblePdfOptions,
@@ -105,7 +120,7 @@ export async function assemblePdf(
 		throw new Error(`dpi must be positive: ${options.dpi}`);
 	const intent = resolveOutputIntent(options.outputIntent);
 	const lib = await import("pdf-lib");
-	const { PDFDocument, rgb } = lib;
+	const { PDFDocument } = lib;
 	// Left to itself, pdf-lib names itself the producer and stamps the time.
 	const doc = await PDFDocument.create({ updateMetadata: false });
 	const date = options.date ?? new Date();
@@ -139,6 +154,31 @@ export async function assemblePdf(
 		return ref;
 	};
 	let cutGroup: PDFRef | undefined;
+	let cutOverprint: PDFRef | undefined;
+	const spotNames = cutSpotNames(options.cutSpots);
+	const cutSpaces = new Map<CutKind, PDFRef>();
+	const cutSpaceOf = (kind: CutKind): PDFRef => {
+		let ref = cutSpaces.get(kind);
+		if (!ref) {
+			const { PDFName } = lib;
+			ref = doc.context.register(
+				doc.context.obj([
+					PDFName.of("Separation"),
+					PDFName.of(spotNames[kind]),
+					PDFName.of("DeviceRGB"),
+					{
+						FunctionType: 2,
+						Domain: [0, 1],
+						C0: [1, 1, 1],
+						C1: CUT_STYLES[kind].rgb,
+						N: 1,
+					},
+				]),
+			);
+			cutSpaces.set(kind, ref);
+		}
+		return ref;
+	};
 	const drawCut = (
 		out: PDFPage,
 		cut: ItemCuts,
@@ -163,15 +203,16 @@ export async function assemblePdf(
 		}
 		const resources = out.node.Resources();
 		if (!resources) return;
-		let properties = resources.lookupMaybe(
-			PDFName.of("Properties"),
-			lib.PDFDict,
-		);
-		if (!properties) {
-			properties = doc.context.obj({});
-			resources.set(PDFName.of("Properties"), properties);
-		}
+		const properties = resourceDict(lib, doc, resources, "Properties");
 		properties.set(PDFName.of(CUT_GROUP_NAME), cutGroup);
+		cutOverprint ??= doc.context.register(
+			doc.context.obj({ Type: "ExtGState", OP: true, op: true, OPM: 1 }),
+		);
+		resourceDict(lib, doc, resources, "ExtGState").set(
+			PDFName.of(CUT_OVERPRINT),
+			cutOverprint,
+		);
+		const spaces = resourceDict(lib, doc, resources, "ColorSpace");
 		const sx = rect.width / cut.width;
 		const sy = rect.height / cut.height;
 		const at = (x: number, y: number) => ({
@@ -184,14 +225,22 @@ export async function assemblePdf(
 				PDFName.of(CUT_GROUP_NAME),
 			]),
 			lib.pushGraphicsState(),
+			PDFOperator.of(PDFOperatorNames.SetGraphicsStateParams, [
+				PDFName.of(CUT_OVERPRINT),
+			]),
 			lib.setLineWidth(CUT_LINE_WIDTH_PT),
 		];
 		for (const kind of CUT_KINDS) {
-			const [r, g, b] = CUT_STYLES[kind].rgb;
-			const color = lib.setStrokingColor(rgb(r, g, b));
-			for (const line of cut.lines) {
-				if (line.kind !== kind) continue;
-				ops.push(color);
+			const lines = cut.lines.filter((l) => l.kind === kind);
+			if (lines.length === 0) continue;
+			spaces.set(PDFName.of(cutSpace(kind)), cutSpaceOf(kind));
+			ops.push(
+				PDFOperator.of(PDFOperatorNames.StrokingColorspace, [
+					PDFName.of(cutSpace(kind)),
+				]),
+				PDFOperator.of(PDFOperatorNames.StrokingColorN, [lib.PDFNumber.of(1)]),
+			);
+			for (const line of lines) {
 				for (const s of normalizePath(line.path)) {
 					if (s.op === "M") {
 						const p = at(s.x, s.y);
@@ -299,6 +348,22 @@ export async function assemblePdf(
 	}
 	await finishDocument(lib, doc, intent, profiles);
 	return doc.save();
+}
+
+/** The page's resource subdictionary under `key`, made when it has none. */
+function resourceDict(
+	lib: PdfLib,
+	doc: PDFDocument,
+	resources: PDFDict,
+	key: string,
+): PDFDict {
+	const name = lib.PDFName.of(key);
+	let dict = resources.lookupMaybe(name, lib.PDFDict);
+	if (!dict) {
+		dict = doc.context.obj({});
+		resources.set(name, dict);
+	}
+	return dict;
 }
 
 /** Marks are drawn in pure black, as the RGB pipeline has no registration
@@ -428,9 +493,9 @@ function declareOutputIntent(
 	const srgb = embedIccProfile(doc, SRGB_PROFILE, 3, profiles);
 	for (const page of doc.getPages()) {
 		const { Resources } = page.node.normalizedEntries();
-		Resources.set(
-			PDFName.of("ColorSpace"),
-			context.obj({ DefaultRGB: [PDFName.of("ICCBased"), srgb] }),
+		resourceDict(lib, doc, Resources, "ColorSpace").set(
+			PDFName.of("DefaultRGB"),
+			context.obj([PDFName.of("ICCBased"), srgb]),
 		);
 	}
 }

@@ -161,6 +161,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--pieces` | write each slice of a frame as its own file instead of the whole frame; see below |
 | `--cut <svg\|dxf>` | images only: write the cut lines of each image beside it, as `<name>.svg` or `<name>.dxf`; see below |
 | `--cut-lines` | PDF only: draw the cut lines over each page's art; see below |
+| `--cut-spot <[kind=]name>` | PDF only: the spot colour a kind of cut line is drawn in, `through` when no kind is named; repeatable, implies `--cut-lines` |
 | `--dpi <n>` | PDF only: pixels per inch, which sets the page or card size; default 300 |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
 | `--pdf-text <embed\|outline>` | with `--pdf-pages vector`: `embed` sets text in its fonts, selectable; `outline` draws each glyph as a shape, so the PDF holds no font, as print shops that want outlined text ask. Default `embed`. See [Text as outlines](../engine/README.md#text-as-outlines) |
@@ -238,7 +239,11 @@ millimetres with a layer per kind. An image with no cut line gets no file, and
 a template with no edge warns. A piece has its own outline and the lines of
 `output: "none"` slices that lie wholly inside its box; one that only crosses it
 is left out. With `--cut-lines`, a PDF draws the same lines as 0.25 pt strokes
-over each page or card, in an optional content group named Cut. The
+over each page or card, in an optional content group named Cut. Each kind is
+stroked in an overprinting spot colour, the `/Separation` a print-and-cut RIP
+looks for: `CutContour` for through, `KissCut` for kiss, `Crease` for score
+and `Perfcut` for perforate. `--cut-spot` renames one, as `--cut-spot Thru-cut`
+for through cuts or `--cut-spot perforate=PerfCutContour`. The
 [workspace README](../workspace/README.md#cut-files) has the details, and how
 to open the files in Cricut Design Space and Silhouette Studio. `--cut` on
 its own exports into the `--out` directory, the current one by default.
@@ -246,6 +251,7 @@ its own exports into the `--out` directory, the current one by default.
 ```sh
 freshcoat render sticker.coat --pieces --cut svg --out pieces
 freshcoat render sheet.coat --cut-lines --out sheet.pdf
+freshcoat render sheet.coat --cut-spot CutContour --cut-spot kiss=KissCut --out sheet.pdf
 ```
 
 #### Workspaces
@@ -269,8 +275,10 @@ freshcoat render club.coatworkspace --preset "All cards" --records failed --save
 ```
 
 `--pieces` exports the preset as one file per slice, as for a template above.
-`--cut` and `--cut-lines` set the preset's cut options, and are refused on a
-preset of the other kind: `--cut` needs an image preset, `--cut-lines` a PDF one.
+`--cut`, `--cut-lines` and `--cut-spot` set the preset's cut options, and are
+refused on a preset of the other kind: `--cut` needs an image preset,
+`--cut-lines` and `--cut-spot` a PDF one. `--cut-spot` renames only the kinds
+it names, over the preset's own names.
 
 `--where <filter>` exports only the records that match, over the records view
 saved with the template's binding, if any; repeat it and every filter must

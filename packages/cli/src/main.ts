@@ -8,6 +8,7 @@ import {
 import {
 	ArgumentError,
 	collect,
+	collectCutSpot,
 	collectFilter,
 	collectScale,
 	collectSetting,
@@ -178,6 +179,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
+		.option(
+			"--cut-spot <[kind=]name>",
+			"the spot colour of a kind of cut line, through when none is named; repeatable, implies --cut-lines; default CutContour, kiss=KissCut, score=Crease, perforate=Perfcut",
+			arg(collectCutSpot),
+		)
 		.option(
 			"--sheets <paper>",
 			"lay the cards out on a4, a5, a6, letter, legal, a3, tabloid or <w>x<h> mm paper",

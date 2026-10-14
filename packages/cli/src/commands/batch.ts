@@ -15,6 +15,7 @@ import {
 	autoBinding,
 	type Column,
 	type ColumnMapping,
+	type CutSpots,
 	DEFAULT_FILE_NAME_PATTERN,
 	DEFAULT_SHEET_LAYOUT,
 	type Dataset,
@@ -93,6 +94,7 @@ export type BatchOptions = {
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
+	cutSpot?: CutSpots;
 	minDpi?: number;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
@@ -177,7 +179,8 @@ export async function renderBatch(
 		...(print ? { print } : {}),
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
-		...(options.cutLines ? { cutLines: true } : {}),
+		...(options.cutLines || options.cutSpot ? { cutLines: true } : {}),
+		...(options.cutSpot ? { cutSpots: options.cutSpot } : {}),
 		...(options.dpi !== undefined ? { dpi: options.dpi } : {}),
 		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 		...(options.pdfPages ? { pdfPageImage: options.pdfPages } : {}),

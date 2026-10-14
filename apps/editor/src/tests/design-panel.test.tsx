@@ -152,7 +152,7 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("orders a rect's sections Layer, Slice, Fill, Stroke, Effects, Constraints, Adjust, Visibility", () => {
+	it("orders a rect's sections Layer, Slice, Fill, Stroke, Spot color, Effects, Constraints, Adjust, Visibility", () => {
 		setup(["0/0"]);
 		const titles = screen
 			.getAllByRole("heading", { level: 3 })
@@ -162,6 +162,7 @@ describe("DesignPanel", () => {
 			"Slice",
 			"Fill",
 			"Stroke",
+			"Spot color",
 			"Effects",
 			"Constraints",
 			"Adjust",
@@ -293,6 +294,62 @@ describe("DesignPanel", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Shadow 1 visible" }));
 		expect(el(c, "0/0").effects?.[0]).not.toHaveProperty("hidden");
 		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("adds grain and edits it", async () => {
+		const c = setup(["0/0"]);
+		fireEvent.click(screen.getByRole("button", { name: "Add grain" }));
+		typeInto(spinbutton("Grain amount"), "40");
+		typeInto(spinbutton("Grain seed"), "7");
+		await chooseOption(
+			fastUser(),
+			screen.getByRole("button", { name: /Grain blend mode/ }),
+			"Soft light",
+		);
+		fireEvent.click(screen.getByRole("checkbox", { name: "Mono" }));
+		expect(el(c, "0/0").effects).toEqual([
+			{
+				type: "grain",
+				amount: 0.4,
+				seed: 7,
+				blendMode: "soft-light",
+				monochrome: false,
+			},
+		]);
+		expect(validate(c.template).ok).toBe(true);
+		expect(screen.queryByRole("button", { name: "Add grain" })).toBeNull();
+	});
+
+	it("adds a halftone and shows its lpi", async () => {
+		const c = setup(["0/0"]);
+		fireEvent.click(screen.getByRole("button", { name: "Add halftone" }));
+		typeInto(spinbutton("Halftone cell size"), "10");
+		expect(screen.getByText(/30 lpi at 300 dpi/)).toBeTruthy();
+		await chooseOption(
+			fastUser(),
+			screen.getByRole("button", { name: /Halftone dot shape/ }),
+			"Line",
+		);
+		await chooseOption(
+			fastUser(),
+			screen.getByRole("button", { name: /Halftone mode/ }),
+			"CMYK look",
+		);
+		fireEvent.click(screen.getByRole("checkbox", { name: "Invert" }));
+		fireEvent.click(screen.getByRole("checkbox", { name: "Paper" }));
+		expect(el(c, "0/0").effects).toEqual([
+			{
+				type: "halftone",
+				cellSize: 10,
+				shape: "line",
+				mode: "cmyk",
+				invert: true,
+				background: "#ffffff",
+			},
+		]);
+		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));
+		expect("effects" in el(c, "0/0")).toBe(false);
 	});
 
 	it("an edit moves legacy effects into effects", () => {

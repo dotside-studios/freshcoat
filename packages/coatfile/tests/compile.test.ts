@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { effectsOf } from "../src/effects";
+import { generateMatrix } from "../src/qr";
 import { validate } from "../src/validate";
 import type {
 	Command,
@@ -1505,6 +1506,70 @@ describe("compile (effects)", () => {
 		expect(draw.shadow).toEqual([{ color: "#000", dx: 2, dy: 1, blur: 2 }]);
 		expect(draw.blur).toBe(3);
 	});
+
+	test("lowers grain and halftone with defaults, sizes scaled", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			{ type: "grain", amount: 0.4 },
+			{ type: "halftone", cellSize: 6 },
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.grain).toEqual({
+			amount: 0.4,
+			size: 2,
+			monochrome: true,
+			blendMode: "overlay",
+			seed: 0,
+		});
+		expect(draw.halftone).toEqual({
+			mode: "mono",
+			shape: "round",
+			cellSize: 12,
+			angle: 45,
+			invert: false,
+			color: "#000000",
+		});
+	});
+
+	test("a cmyk halftone keeps its settings and starts at 0°", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			{
+				type: "halftone",
+				mode: "cmyk",
+				shape: "square",
+				cellSize: 4,
+				invert: true,
+				background: "#fff",
+			},
+			{
+				type: "grain",
+				amount: 1,
+				size: 3,
+				monochrome: false,
+				blendMode: "soft-light",
+				seed: 12,
+				hidden: true,
+			},
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.halftone).toEqual({
+			mode: "cmyk",
+			shape: "square",
+			cellSize: 8,
+			angle: 0,
+			invert: true,
+			color: "#000000",
+			background: "#fff",
+		});
+		expect(draw.grain).toBeUndefined();
+	});
 });
 
 describe("compile assets (fonts + images)", () => {
@@ -1698,12 +1763,13 @@ describe("compile assets (fonts + images)", () => {
 			],
 		};
 		const cmds = getCommands(tpl, {}, { width: 100, height: 60 });
-		// A QR element lowers to a drawGroup containing a drawBitmap whose pixel
-		// dimensions are the module-matrix size (square, > 0 for a filled value).
-		const bmp = findDraw(cmds, "drawBitmap")!;
-		expect(bmp.op).toBe("drawBitmap");
-		expect(bmp.pixelWidth).toBeGreaterThan(0);
-		expect(bmp.pixelHeight).toBe(bmp.pixelWidth);
+		// A QR element lowers to a snapped drawGroup holding a drawPath whose
+		// viewBox is the module-matrix size.
+		const group = findDraws(cmds, "drawGroup").find((c) => c.snap)!;
+		const n = generateMatrix("https://example.com/alex").length;
+		expect(group.snap).toEqual({ columns: n, rows: n });
+		const path = findDraw(cmds, "drawPath")!;
+		expect(path.viewBox).toEqual({ x: 0, y: 0, width: n, height: n });
 	});
 });
 

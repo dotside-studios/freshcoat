@@ -139,6 +139,33 @@ export type Adjust = {
 	gamut?: "clip" | "preserve-hue";
 };
 
+// Seeded film grain: a seed paints the same pixels in every run and backend.
+export type Grain = {
+	amount: number; // 0..1
+	size: number; // design units
+	monochrome: boolean;
+	blendMode: GrainBlend;
+	seed: number;
+};
+
+export type GrainBlend = "normal" | "overlay" | "soft-light" | "multiply" | "screen";
+
+// "cmyk" multiplies four screens at C 15°, M 75°, Y 0° and K 45°, each plus
+// `angle`: a look, not separations.
+export type Halftone = {
+	mode: "mono" | "cmyk";
+	shape: HalftoneShape;
+	cellSize: number; // design units
+	angle: number; // degrees
+	invert: boolean;
+	// "mono" only.
+	color: string;
+	// Under the dots, inside the layer's coverage.
+	background?: string;
+};
+
+export type HalftoneShape = "round" | "line" | "square";
+
 export type ShapeMask =
 	| { kind: "rect"; outset?: ClipOutset }
 	| { kind: "rounded-rect"; radius: CornerRadius; smoothing?: number }
@@ -187,6 +214,17 @@ export type Stroke = {
 	trimStart?: number;
 	trimEnd?: number;
 	trimOffset?: number;
+	// A vector PDF strokes a solid stroke in this spot colour; `color` is its
+	// alternate, which raster outputs paint.
+	spot?: SpotInk;
+};
+
+// A named spot colour (a PDF Separation). `tint` is in [0, 1]; `overprint`
+// keeps the ink from knocking out what lies beneath it.
+export type SpotInk = {
+	name: string;
+	tint: number;
+	overprint: boolean;
 };
 
 // A text stroke: no dash, cap or trim. `outside` draws a double-width stroke
@@ -213,7 +251,8 @@ export type GradientFill = Extract<
 // Gradient endpoints are in [0, 1] of the drawable's bbox. `spread` is what
 // paints past the last stop; omitted means pad.
 export type ResolvedFill =
-	| { kind: "solid"; color: string }
+	// `spot`: a vector PDF paints it in that spot colour, `color` its alternate.
+	| { kind: "solid"; color: string; spot?: SpotInk }
 	| {
 			kind: "linear";
 			stops: GradientStop[];
@@ -394,6 +433,9 @@ export type DrawCommandBase = {
 	// composites (see Adjust). On a group/mask it adjusts the whole subtree's
 	// composited result, like a Figma adjustment layer.
 	adjust?: Adjust;
+	// Applied after `adjust`, halftone first, before shadows, blur and opacity.
+	halftone?: Halftone;
+	grain?: Grain;
 };
 
 // Text set along a circle centered on the element box. Angles are degrees
@@ -498,7 +540,11 @@ export type DrawGroupCommand = DrawCommandBase & {
 	children: DrawCommand[];
 	// See GroupNode.isolate.
 	isolate?: boolean;
+	// See GroupNode.snap.
+	snap?: SnapGrid;
 };
+
+export type SnapGrid = { columns: number; rows: number };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then
 // composite `mask`'s coverage onto it (alpha or luminance channel, optionally
@@ -566,6 +612,13 @@ export type PaintWarning =
 	| { kind: "vector_rasterized"; feature: string; layer?: string }
 	// A pattern fill's shader failed to compile, so it painted its first colour.
 	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
+	// No runtime effects or offscreen surface: the layer painted without it.
+	| {
+			kind: "effect_unsupported";
+			effect: "grain" | "halftone";
+			error: string;
+			layer?: string;
+	  }
 	// An `adjust` component the painter fell back on instead of applying — e.g. the
 	// offscreen surface or SkSL effect for `lut`/`sharpen` couldn't be created. The
 	// layer still paints (matrix-only); the component is skipped, not silent.

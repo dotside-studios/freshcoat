@@ -1,3 +1,4 @@
+import { parseColor } from "@freshcoat-js/engine";
 import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
@@ -428,12 +429,46 @@ export const ImagePropertiesSchema = z.object({
 	stroke: StrokeSchema.optional(),
 });
 
+export const QrModuleShapeSchema = z.enum(["square", "dot", "rounded", "classy"]);
+export const QrFinderOuterSchema = z.enum(["square", "rounded", "circle"]);
+export const QrFinderInnerSchema = z.enum(["square", "rounded", "dot"]);
+
+export const QrLogoSchema = z.object({
+	src: z.string(),
+	// The logo's side as a fraction of the symbol's, quiet zone excluded.
+	// Default 0.2. Drawn at most 0.3.
+	size: z.number().gt(0).max(1).optional(),
+	// Modules cleared around the logo. Default 1.
+	padding: z.number().min(0).max(10).optional(),
+});
+
 export const QrCodePropertiesSchema = z.object({
 	value: z.string(),
+	// Raised to Q with a logo, and to H for a large one.
 	errorCorrection: z.enum(["L", "M", "Q", "H"]).optional(),
 	foreground: z.string().optional(),
 	background: z.string().optional(),
+	// Design px inside the box, around the quiet zone.
 	margin: z.number().optional(),
+	// Modules each side, inside the margin. Default 0.
+	quietZone: z.number().int().min(0).max(20).optional(),
+	moduleShape: QrModuleShapeSchema.optional(),
+	finderOuter: QrFinderOuterSchema.optional(),
+	finderInner: QrFinderInnerSchema.optional(),
+	gradient: z
+		.object({
+			kind: z.literal("linear"),
+			angle: z.number(),
+			from: z.tuple([z.number(), z.number()]).optional(),
+			to: z.tuple([z.number(), z.number()]).optional(),
+			stops: z
+				.array(
+					z.object({ offset: z.number().min(0).max(1), color: z.string() }),
+				)
+				.min(2),
+		})
+		.optional(),
+	logo: QrLogoSchema.optional(),
 });
 
 export const SymbologySchema = z.enum([
@@ -492,6 +527,22 @@ export const SliceModifierSchema = z.object({
 	order: z.number().optional(),
 });
 
+// A named spot ink: white, foil, varnish or a press's own colour. A vector PDF
+// paints in a Separation of that name; every other output paints `alt`,
+// which defaults to the layer's own colour.
+export const SpotColorSchema = z.object({
+	spot: z.string(),
+	tint: z.number().min(0).max(1).optional(),
+	alt: z.string().optional(),
+	overprint: z.boolean().optional(),
+});
+
+// Which of a rect's or vector's paints print as a spot ink.
+export const LayerSpotSchema = z.object({
+	fill: SpotColorSchema.optional(),
+	stroke: SpotColorSchema.optional(),
+});
+
 export const RectPropertiesSchema = z.object({
 	fill: FillsSchema.optional(),
 	stroke: BoxStrokeSchema.optional(),
@@ -499,6 +550,7 @@ export const RectPropertiesSchema = z.object({
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
 	slice: SliceModifierSchema.optional(),
+	spot: LayerSpotSchema.optional(),
 });
 
 export const BooleanOpSchema = z.enum([
@@ -519,6 +571,7 @@ export const VectorBasePropertiesSchema = z.object({
 	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
+	spot: LayerSpotSchema.optional(),
 });
 
 // A live boolean operation: `operands`, rects or vectors positioned relative
@@ -554,9 +607,10 @@ export const ShadowSchema = z.object({
 export const ShadowsSchema = z.union([ShadowSchema, z.array(ShadowSchema)]);
 
 // One entry of an element's `effects`. `hidden` keeps an effect in the file
-// without drawing it. Shadows paint in array order. A blur and a backdrop blur
-// apply at the engine's fixed positions in the layer effect order wherever they
-// sit in the array, and an element takes at most one of each.
+// without drawing it. Shadows paint in array order. A blur, a backdrop blur,
+// grain and a halftone apply at the engine's fixed positions in the layer
+// effect order wherever they sit in the array, and an element takes at most one
+// of each.
 export const ShadowEffectSchema = ShadowSchema.extend({
 	type: z.literal("shadow"),
 	hidden: z.boolean().optional(),
@@ -574,10 +628,41 @@ export const BackdropBlurEffectSchema = z.object({
 	hidden: z.boolean().optional(),
 });
 
+// Film grain from a seeded hash: one seed paints the same pixels everywhere.
+// `size` is one grain's side in design px.
+export const GrainEffectSchema = z.object({
+	type: z.literal("grain"),
+	amount: z.number().min(0).max(1),
+	size: z.number().positive().optional(),
+	monochrome: z.boolean().optional(),
+	blendMode: z
+		.enum(["normal", "overlay", "soft-light", "multiply", "screen"])
+		.optional(),
+	seed: z.number().int().min(0).max(65535).optional(),
+	hidden: z.boolean().optional(),
+});
+
+// The layer redrawn as a halftone screen with `cellSize` design px cells. "cmyk"
+// overlays four multiplied screens at C 15°, M 75°, Y 0° and K 45°, turned by
+// `angle`: a look, not colour separations.
+export const HalftoneEffectSchema = z.object({
+	type: z.literal("halftone"),
+	mode: z.enum(["mono", "cmyk"]).optional(),
+	shape: z.enum(["round", "line", "square"]).optional(),
+	cellSize: z.number().positive(),
+	angle: z.number().optional(),
+	invert: z.boolean().optional(),
+	color: z.string().optional(),
+	background: z.string().optional(),
+	hidden: z.boolean().optional(),
+});
+
 export const EffectSchema = z.discriminatedUnion("type", [
 	ShadowEffectSchema,
 	BlurEffectSchema,
 	BackdropBlurEffectSchema,
+	GrainEffectSchema,
+	HalftoneEffectSchema,
 ]);
 
 const LayoutPaddingSchema = z.object({
@@ -937,6 +1022,7 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceBooleanOperands(tpl, ctx);
 	enforceSlices(tpl, ctx);
 	enforceEffects(tpl, ctx);
+	enforceSpots(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
 }
 
@@ -1413,6 +1499,7 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	}
 
 	walkObjects(tpl, (obj, path) => {
+		if (path[path.length - 1] === "spot") return;
 		const fill = obj.fill;
 		if (typeof fill !== "string" && fill != null) check(fill, [...path, "fill"]);
 		const stroke = obj.stroke as { color?: unknown } | null | undefined;
@@ -1573,7 +1660,8 @@ function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
 }
 
 // `effects` stands in for the legacy `shadow`, `blur` and `backdropBlur`, so an
-// element sets one form or the other, and takes at most one blur of each kind.
+// element sets one form or the other, and takes at most one of each effect but
+// shadows.
 function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	walkElements(tpl, (el, path) => {
 		const effects = (el as { effects?: { type: string }[] }).effects;
@@ -1587,7 +1675,7 @@ function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				[...path, key],
 			);
 		}
-		for (const type of ["blur", "backdropBlur"]) {
+		for (const type of ["blur", "backdropBlur", "grain", "halftone"]) {
 			const second = effects.findIndex(
 				(e, i) =>
 					e.type === type && effects.findIndex((o) => o.type === type) < i,
@@ -1599,6 +1687,47 @@ function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				`an element takes at most one ${type} effect`,
 				[...path, "effects", second],
 			);
+		}
+	});
+}
+
+// PDF reserves the colorant names All and None, and a spot is named.
+const RESERVED_SPOTS = new Set(["All", "None"]);
+
+function enforceSpots(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	walkElements(tpl, (el, path) => {
+		const spot = (
+			el.properties as
+				| { spot?: Partial<Record<string, { spot: string; alt?: string }>> }
+				| undefined
+		)?.spot;
+		if (spot === undefined) return;
+		for (const paint of ["fill", "stroke"] as const) {
+			const ink = spot[paint];
+			if (!ink) continue;
+			const at = [...path, "properties", "spot", paint];
+			if (ink.spot.trim().length === 0)
+				addKitIssue(ctx, "invalid_spot", "a spot needs a name", [
+					...at,
+					"spot",
+				]);
+			else if (RESERVED_SPOTS.has(ink.spot))
+				addKitIssue(
+					ctx,
+					"invalid_spot",
+					`"${ink.spot}" is reserved by PDF and cannot name a spot`,
+					[...at, "spot"],
+				);
+			if (ink.alt !== undefined) {
+				const c = parseColor(ink.alt);
+				if (!c || c === "none")
+					addKitIssue(
+						ctx,
+						"invalid_spot",
+						`spot alt "${ink.alt}" is not a colour`,
+						[...at, "alt"],
+					);
+			}
 		}
 	});
 }

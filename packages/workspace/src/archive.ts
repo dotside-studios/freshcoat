@@ -229,6 +229,14 @@ const PresetSchema = z.object({
 	split: z.enum(["none", "pieces"]).optional(),
 	cutFile: z.enum(["none", "svg", "dxf"]).optional(),
 	cutLines: z.boolean().optional(),
+	cutSpots: z
+		.object({
+			through: z.string().optional(),
+			kiss: z.string().optional(),
+			score: z.string().optional(),
+			perforate: z.string().optional(),
+		})
+		.optional(),
 	outputIntent: z
 		.discriminatedUnion("kind", [
 			z.object({ kind: z.literal("srgb") }),

@@ -94,7 +94,8 @@ the records, and **Export** turns templates and records into files.
   colour comes from a field, or that shrinks to fit, is checked as the record
   renders and shows under "Last render"; an export lists the same warnings in
   its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
-  `rich_black_text` and `short_of_bleed`, described in the
+  `rich_black_text` and `short_of_bleed`, and for QR codes `qr_low_contrast`,
+  `qr_inverted`, `qr_quiet_zone` and `qr_logo_large`, described in the
   [coatfile guide](../../../packages/coatfile/README.md#print-checks).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
@@ -180,6 +181,13 @@ the records, and **Export** turns templates and records into files.
     text. Text in a font collection or a CFF2 variable font is outlined
     either way. A layer a PDF cannot express, such as a shadow, is drawn as a
     600 dpi image in place.
+  - For a template whose slices have an edge, the Output tab's Slices group
+    has Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
+    Cut lines strokes each edge kind in an overprinting spot colour, in an
+    optional content group named Cut, and shows a spot name field for each
+    kind the template cuts: Through spot (CutContour), Kiss spot (KissCut),
+    Score spot (Crease) and Perforate spot (Perfcut). An empty field keeps
+    the default, the name print-and-cut RIPs look for.
 - **Binding:** each template binds its fields to a dataset's columns, a fixed
   value, or a pattern. One binding serves every preset that exports the
   template. Choosing a dataset matches fields to columns by key or title,
@@ -320,7 +328,7 @@ the records, and **Export** turns templates and records into files.
     holds the same commands under Boolean, Arrange and Align and distribute.
   - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
     linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
+    Fill, Stroke, Spot color, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
     as the selection changes.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
@@ -330,11 +338,28 @@ the records, and **Export** turns templates and records into files.
     or a linear, radial or angular gradient, edited with the same controls as a
     gradient fill. The canvas gradient handles follow fills only. A text
     stroke takes a position and a join but no dash, trim or cap.
+  - A rectangle's or vector's Spot color section prints its fill, its
+    stroke or both in a named spot ink, for white ink, foil or varnish:
+    "Fill as spot" or "Stroke as spot", then the ink's name as the printer
+    knows it (White by default; All and None are refused), a tint, an
+    alternate colour (the layer's own when empty) and Overprint, on by
+    default. A vector PDF prints the paint as a Separation of that name; the
+    canvas, images and other pages show the alternate. There is no colour
+    library: type the printer's name.
   - Rectangles, frames and images can set each corner's radius on its own
     and smooth their corners. A frame applies its corners to its fill, its
     stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
+  - Effects are one list: shadows, a layer blur, a background blur, grain and
+    a halftone, each with its own visibility toggle. Grain sets an amount,
+    grain size, seed, blend mode and mono or colour; a seed always paints the
+    same grain, in the canvas and in every export. A halftone sets a mode
+    (mono, or a CMYK look of four screens at 15°, 75°, 0° and 45° that is not
+    real separations), a round, line or square dot, a cell size with its lines
+    per inch at the template's export DPI, an angle, invert, an ink colour
+    and an optional paper colour. Both preview live on the canvas and keep
+    their look at 2× export, only sharper.
   - Text content, image source, QR value and barcode value have an Insert
     field menu; an image source lists image and URL fields first. Its last
     item, "New field…", creates a field and inserts it.
@@ -571,6 +596,31 @@ to fill cards with records.
     time, and autosave stores each photo once, apart from the templates and data. When
     the browser's storage is full it keeps the templates and data and says
     that it could not keep the photos.
+
+## QR codes
+
+The QR inspector section sets the value (with the field-insert menu), the
+recovery level, and the style:
+
+- **Modules:** square, dots, rounded (corners round where no neighbour
+  touches) or classy (top-left and bottom-right corners only).
+- **Eyes:** the finder patterns' frame (square, rounded or circle) and center
+  (square, rounded or dot).
+- **Colour:** the module colour, or with **Gradient** on a linear gradient
+  from that colour to a **To** colour at an **Angle**; and the colour
+  **Behind** the code.
+- **Quiet** (the quiet zone) in modules, and **Margin** in design units, both inside the
+  box.
+- **Logo:** an image from a file, a URL or an image field, with its size (5 to
+  30% of the code) and padding in modules. A logo clears the modules behind
+  it and raises recovery to Q, or to H for a large one, whatever the
+  Recovery buttons say.
+
+The Issues list's Print hints name a QR code whose colours have too little
+contrast or are inverted (light on dark), whose quiet zone is under 2
+modules when it draws its own background, or whose logo is over 30%. QR
+modules snap to whole output pixels like a barcode's, a PDF keeps them as
+vector paths, and for-print leaves them and the logo alone.
 
 ## Barcodes
 

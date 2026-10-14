@@ -957,6 +957,59 @@ describe("validate (effects)", () => {
 		}
 	});
 
+	test("accepts grain and halftone effects", () => {
+		const r = validate(
+			withEffects({
+				effects: [
+					{ type: "grain", amount: 0.3 },
+					{
+						type: "halftone",
+						mode: "cmyk",
+						shape: "line",
+						cellSize: 4,
+						angle: 10,
+						invert: true,
+						color: "#112233",
+						background: "#fff",
+						hidden: true,
+					},
+				],
+			}),
+		);
+		expect(r.ok).toBe(true);
+	});
+
+	test.each([
+		["grain amount above 1", { type: "grain", amount: 1.5 }],
+		["grain size of 0", { type: "grain", amount: 0.5, size: 0 }],
+		["fractional seed", { type: "grain", amount: 0.5, seed: 1.5 }],
+		["seed above 65535", { type: "grain", amount: 0.5, seed: 65536 }],
+		["unknown grain blend", { type: "grain", amount: 0.5, blendMode: "darken" }],
+		["halftone without a cell size", { type: "halftone" }],
+		["negative cell size", { type: "halftone", cellSize: -2 }],
+		["unknown shape", { type: "halftone", cellSize: 4, shape: "star" }],
+		["unknown mode", { type: "halftone", cellSize: 4, mode: "rgb" }],
+	])("rejects %s", (_, effect) => {
+		const r = validate(withEffects({ effects: [effect] }));
+		expect(r.ok).toBe(false);
+	});
+
+	test.each(["grain", "halftone"])("rejects a second %s effect", (type) => {
+		const effect =
+			type === "grain"
+				? { type, amount: 0.5 }
+				: { type, cellSize: 4 };
+		const r = validate(withEffects({ effects: [effect, effect] }));
+		expect(r.ok).toBe(false);
+		if (!r.ok)
+			expect(r.errors).toEqual([
+				expect.objectContaining({
+					code: "duplicate_effect",
+					path: expect.stringContaining("effects/1"),
+				}),
+			]);
+	});
+
 	test("rejects a negative radius", () => {
 		const r = validate(
 			withEffects({ effects: [{ type: "blur", radius: -1 }] }),
