@@ -258,6 +258,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				name: "New preset",
 			}),
 		);
+		await user.click(screen.getByRole("menuitem", { name: "Blank preset" }));
 		const presets = controller.state.workspace?.presets ?? [];
 		expect(presets).toHaveLength(1);
 		expect(presets[0]).toMatchObject({

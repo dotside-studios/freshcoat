@@ -4,7 +4,7 @@ import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import type { ExportPreset } from "@freshcoat-js/workspace";
-import { duplicatePreset, newPreset } from "@freshcoat-js/workspace";
+import { duplicatePreset } from "@freshcoat-js/workspace";
 import { useState } from "react";
 import { Button, Input, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
@@ -17,7 +17,8 @@ import DeleteIcon from "~icons/mingcute/delete-2-line";
 import EditIcon from "~icons/mingcute/edit-2-line";
 import CollapseIcon from "~icons/mingcute/layout-left-line";
 import MoreIcon from "~icons/mingcute/more-2-line";
-import { FORMAT_LABEL } from "./export-ui";
+import { FORMAT_LABEL, presetLine, presetRecordCount } from "./export-ui";
+import { NewPresetMenu } from "./NewPresetMenu";
 
 const RECORDS_LABEL = {
 	all: "all records",
@@ -59,17 +60,10 @@ export function PresetList({
 }) {
 	const controller = useController();
 	const presets = useEditor((s) => s.workspace?.presets);
-	const activeTemplateId = useEditor((s) => s.workspace?.activeTemplateId);
+	const datasets = useEditor((s) => s.workspace?.datasets);
 	const templates = useEditor((s) => s.workspace?.templates);
 	const [renaming, setRenaming] = useState<string | null>(null);
 
-	const add = () => {
-		if (!activeTemplateId || !presets) return;
-		controller.dispatch({
-			type: "setPreset",
-			preset: newPreset(activeTemplateId, presets),
-		});
-	};
 	const rename = (preset: ExportPreset, name: string) => {
 		setRenaming(null);
 		const trimmed = name.trim();
@@ -94,9 +88,11 @@ export function PresetList({
 				>
 					<CollapseIcon />
 				</IconButton>
-				<IconButton aria-label="New preset" tooltip="New preset" onPress={add}>
-					<AddIcon />
-				</IconButton>
+				<NewPresetMenu>
+					<IconButton aria-label="New preset" tooltip="New preset">
+						<AddIcon />
+					</IconButton>
+				</NewPresetMenu>
 				<div className="my-0.5 h-px w-5 shrink-0 bg-fc-border" />
 				<ul className="m-0 flex min-h-0 flex-1 list-none flex-col items-center gap-1 overflow-auto p-0">
 					{(presets ?? []).map((preset) => {
@@ -143,9 +139,11 @@ export function PresetList({
 				<h2 className="m-0 flex-1 font-semibold text-[10px] text-fc-muted uppercase tracking-[0.06em]">
 					Presets
 				</h2>
-				<IconButton aria-label="New preset" tooltip="New preset" onPress={add}>
-					<AddIcon />
-				</IconButton>
+				<NewPresetMenu>
+					<IconButton aria-label="New preset" tooltip="New preset">
+						<AddIcon />
+					</IconButton>
+				</NewPresetMenu>
 				{onCollapsedChange ? (
 					<IconButton
 						aria-label="Hide presets"
@@ -212,9 +210,18 @@ export function PresetList({
 									<span className="max-w-full truncate text-fc-base text-fc-text">
 										{preset.name}
 									</span>
-									<span className="max-w-full truncate text-fc-faint text-fc-sm">
-										{presetSummary(preset)}
-										{template ? ` · ${template.fileName}` : ""}
+									<span
+										className="max-w-full truncate text-fc-faint text-fc-sm"
+										title={template?.fileName}
+									>
+										{presetLine(
+											preset,
+											presetRecordCount(
+												preset,
+												templates ?? [],
+												datasets ?? [],
+											),
+										)}
 									</span>
 								</button>
 							)}

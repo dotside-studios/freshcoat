@@ -1045,6 +1045,7 @@ test("Data keeps its search, filters, sort and selection per dataset, and Export
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await page
 		.getByTestId("binding-editor")
 		.getByRole("button", { name: /Dataset/ })

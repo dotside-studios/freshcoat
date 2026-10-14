@@ -7,7 +7,6 @@ import {
 	type DataRecord,
 	type ExportItem,
 	type ExportPreset,
-	newPreset,
 	parseAssetRef,
 	planExport,
 	resolveValues,
@@ -66,6 +65,7 @@ import {
 } from "./filmstrip-model";
 import { useGlyphPreflight } from "./glyph-client";
 import { JobBar } from "./JobBar";
+import { NewPresetMenu } from "./NewPresetMenu";
 import { PresetList } from "./PresetList";
 import {
 	effectiveMode,
@@ -522,12 +522,6 @@ export function ExportSection() {
 
 	if (!wsState) return <div className="flex-1" data-testid="section-export" />;
 
-	const addPreset = () =>
-		controller.dispatch({
-			type: "setPreset",
-			preset: newPreset(wsState.activeTemplateId, presets),
-		});
-
 	const presetsPanel = (
 		<PresetList
 			activeId={preset?.id ?? null}
@@ -904,10 +898,12 @@ export function ExportSection() {
 						<div className="grid flex-1 place-items-center p-6">
 							<div className="flex max-w-xs flex-col items-center gap-3 text-center">
 								<p className="m-0 text-fc-muted">{EMPTY.presets}</p>
-								<Button variant="primary" onPress={addPreset}>
-									<AddIcon />
-									New preset
-								</Button>
+								<NewPresetMenu>
+									<Button variant="primary">
+										<AddIcon />
+										New preset
+									</Button>
+								</NewPresetMenu>
 							</div>
 						</div>
 					) : (

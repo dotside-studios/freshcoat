@@ -121,6 +121,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await expect(page.getByTestId("export-preset")).toHaveCount(1);
 	await expect(page.getByTestId("export-check-unbound")).toBeVisible();
 
@@ -320,6 +321,7 @@ test("warns about characters the fonts can't draw, without blocking", async ({
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await chooseDataset(page, "Intl");
 
 	const notice = page.getByTestId("export-check-glyphs");
@@ -454,6 +456,7 @@ test.describe("at tablet width", () => {
 		await openSample(page);
 		await page.keyboard.press(`${mod}+3`);
 		await page.getByRole("button", { name: "New preset" }).first().click();
+		await page.getByRole("menuitem", { name: "Blank preset" }).click();
 		await page.getByRole("button", { name: "Settings" }).first().click();
 		await settingsTab(page, "Print");
 		await choosePrintTarget(page);

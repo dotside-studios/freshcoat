@@ -152,6 +152,42 @@ export function exportEstimate(
 	return [plural(plan.length, "file"), `${label} ${where}`.trim()].join(" · ");
 }
 
+/** How many records a preset exports from its template's dataset, or null
+ *  when the template is not bound. */
+export function presetRecordCount(
+	preset: ExportPreset,
+	templates: readonly { id: string; binding?: { datasetId: string } }[],
+	datasets: readonly Dataset[],
+): number | null {
+	const bound = templates.find((t) => t.id === preset.templateId)?.binding;
+	const dataset = datasets.find((d) => d.id === bound?.datasetId);
+	if (!dataset) return null;
+	const wanted = new Set(preset.selected ?? []);
+	return dataset.records.filter((r) => {
+		switch (preset.records) {
+			case "all":
+				return r.status !== "skipped";
+			case "selected":
+				return wanted.has(r.id);
+			default:
+				return r.status === preset.records;
+		}
+	}).length;
+}
+
+/** A preset row's line: "PDF · 300 dpi · 120 records". */
+export function presetLine(
+	preset: ExportPreset,
+	records: number | null,
+): string {
+	const pdf = preset.format === "pdf";
+	return [
+		FORMAT_NAME[preset.format],
+		pdf ? `${preset.dpi} dpi` : `${preset.scale}×`,
+		records === null ? "not bound" : plural(records, "record"),
+	].join(" · ");
+}
+
 export type StatusFilter = "all" | RecordStatus;
 
 export const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
