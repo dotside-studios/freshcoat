@@ -241,6 +241,8 @@ function lower(node: Node, ctx: BakeCtx, siblings: Node[] = []): DrawCommand {
 		blur: node.blur,
 		backdropBlur: node.backdropBlur,
 		adjust: node.adjust,
+		halftone: node.halftone,
+		grain: node.grain,
 	};
 	switch (node.kind) {
 		case "rect":
@@ -537,7 +539,9 @@ function fastClip(mask: Node): ShapeMask | null {
 		mask.backdropBlur ||
 		(mask.blendMode && mask.blendMode !== "normal") ||
 		mask.shadow ||
-		mask.adjust
+		mask.adjust ||
+		mask.halftone ||
+		mask.grain
 	)
 		return null;
 	if (mask.kind !== "rect" && mask.kind !== "ellipse") return null;

@@ -556,6 +556,96 @@
 														"type",
 														"radius"
 													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "grain"
+														},
+														"amount": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"size": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"monochrome": {
+															"type": "boolean"
+														},
+														"blendMode": {
+															"type": "string",
+															"enum": [
+																"normal",
+																"overlay",
+																"soft-light",
+																"multiply",
+																"screen"
+															]
+														},
+														"seed": {
+															"type": "integer",
+															"minimum": 0,
+															"maximum": 65535
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"amount"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "halftone"
+														},
+														"mode": {
+															"type": "string",
+															"enum": [
+																"mono",
+																"cmyk"
+															]
+														},
+														"shape": {
+															"type": "string",
+															"enum": [
+																"round",
+																"line",
+																"square"
+															]
+														},
+														"cellSize": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"angle": {
+															"type": "number"
+														},
+														"invert": {
+															"type": "boolean"
+														},
+														"color": {
+															"type": "string"
+														},
+														"background": {
+															"type": "string"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"cellSize"
+													]
 												}
 											]
 										}
@@ -1929,6 +2019,96 @@
 														"type",
 														"radius"
 													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "grain"
+														},
+														"amount": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"size": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"monochrome": {
+															"type": "boolean"
+														},
+														"blendMode": {
+															"type": "string",
+															"enum": [
+																"normal",
+																"overlay",
+																"soft-light",
+																"multiply",
+																"screen"
+															]
+														},
+														"seed": {
+															"type": "integer",
+															"minimum": 0,
+															"maximum": 65535
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"amount"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"const": "halftone"
+														},
+														"mode": {
+															"type": "string",
+															"enum": [
+																"mono",
+																"cmyk"
+															]
+														},
+														"shape": {
+															"type": "string",
+															"enum": [
+																"round",
+																"line",
+																"square"
+															]
+														},
+														"cellSize": {
+															"type": "number",
+															"exclusiveMinimum": 0
+														},
+														"angle": {
+															"type": "number"
+														},
+														"invert": {
+															"type": "boolean"
+														},
+														"color": {
+															"type": "string"
+														},
+														"background": {
+															"type": "string"
+														},
+														"hidden": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"type",
+														"cellSize"
+													]
 												}
 											]
 										}
@@ -2889,6 +3069,96 @@
 																"required": [
 																	"type",
 																	"radius"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "grain"
+																	},
+																	"amount": {
+																		"type": "number",
+																		"minimum": 0,
+																		"maximum": 1
+																	},
+																	"size": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"monochrome": {
+																		"type": "boolean"
+																	},
+																	"blendMode": {
+																		"type": "string",
+																		"enum": [
+																			"normal",
+																			"overlay",
+																			"soft-light",
+																			"multiply",
+																			"screen"
+																		]
+																	},
+																	"seed": {
+																		"type": "integer",
+																		"minimum": 0,
+																		"maximum": 65535
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"amount"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "halftone"
+																	},
+																	"mode": {
+																		"type": "string",
+																		"enum": [
+																			"mono",
+																			"cmyk"
+																		]
+																	},
+																	"shape": {
+																		"type": "string",
+																		"enum": [
+																			"round",
+																			"line",
+																			"square"
+																		]
+																	},
+																	"cellSize": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"angle": {
+																		"type": "number"
+																	},
+																	"invert": {
+																		"type": "boolean"
+																	},
+																	"color": {
+																		"type": "string"
+																	},
+																	"background": {
+																		"type": "string"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"cellSize"
 																]
 															}
 														]
@@ -4263,6 +4533,96 @@
 																	"type",
 																	"radius"
 																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "grain"
+																	},
+																	"amount": {
+																		"type": "number",
+																		"minimum": 0,
+																		"maximum": 1
+																	},
+																	"size": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"monochrome": {
+																		"type": "boolean"
+																	},
+																	"blendMode": {
+																		"type": "string",
+																		"enum": [
+																			"normal",
+																			"overlay",
+																			"soft-light",
+																			"multiply",
+																			"screen"
+																		]
+																	},
+																	"seed": {
+																		"type": "integer",
+																		"minimum": 0,
+																		"maximum": 65535
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"amount"
+																]
+															},
+															{
+																"type": "object",
+																"properties": {
+																	"type": {
+																		"type": "string",
+																		"const": "halftone"
+																	},
+																	"mode": {
+																		"type": "string",
+																		"enum": [
+																			"mono",
+																			"cmyk"
+																		]
+																	},
+																	"shape": {
+																		"type": "string",
+																		"enum": [
+																			"round",
+																			"line",
+																			"square"
+																		]
+																	},
+																	"cellSize": {
+																		"type": "number",
+																		"exclusiveMinimum": 0
+																	},
+																	"angle": {
+																		"type": "number"
+																	},
+																	"invert": {
+																		"type": "boolean"
+																	},
+																	"color": {
+																		"type": "string"
+																	},
+																	"background": {
+																		"type": "string"
+																	},
+																	"hidden": {
+																		"type": "boolean"
+																	}
+																},
+																"required": [
+																	"type",
+																	"cellSize"
+																]
 															}
 														]
 													}
@@ -5329,6 +5689,96 @@
 												"required": [
 													"type",
 													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
 												]
 											}
 										]
@@ -6659,6 +7109,96 @@
 													"type",
 													"radius"
 												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
+												]
 											}
 										]
 									}
@@ -7565,6 +8105,96 @@
 													"type",
 													"radius"
 												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
+												]
 											}
 										]
 									}
@@ -8043,6 +8673,96 @@
 												"required": [
 													"type",
 													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
 												]
 											}
 										]
@@ -8548,6 +9268,96 @@
 												"required": [
 													"type",
 													"radius"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
 												]
 											}
 										]
@@ -9922,6 +10732,96 @@
 													"type",
 													"radius"
 												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "grain"
+													},
+													"amount": {
+														"type": "number",
+														"minimum": 0,
+														"maximum": 1
+													},
+													"size": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"monochrome": {
+														"type": "boolean"
+													},
+													"blendMode": {
+														"type": "string",
+														"enum": [
+															"normal",
+															"overlay",
+															"soft-light",
+															"multiply",
+															"screen"
+														]
+													},
+													"seed": {
+														"type": "integer",
+														"minimum": 0,
+														"maximum": 65535
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"amount"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"const": "halftone"
+													},
+													"mode": {
+														"type": "string",
+														"enum": [
+															"mono",
+															"cmyk"
+														]
+													},
+													"shape": {
+														"type": "string",
+														"enum": [
+															"round",
+															"line",
+															"square"
+														]
+													},
+													"cellSize": {
+														"type": "number",
+														"exclusiveMinimum": 0
+													},
+													"angle": {
+														"type": "number"
+													},
+													"invert": {
+														"type": "boolean"
+													},
+													"color": {
+														"type": "string"
+													},
+													"background": {
+														"type": "string"
+													},
+													"hidden": {
+														"type": "boolean"
+													}
+												},
+												"required": [
+													"type",
+													"cellSize"
+												]
 											}
 										]
 									}
@@ -11280,6 +12180,96 @@
 										"required": [
 											"type",
 											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "grain"
+											},
+											"amount": {
+												"type": "number",
+												"minimum": 0,
+												"maximum": 1
+											},
+											"size": {
+												"type": "number",
+												"exclusiveMinimum": 0
+											},
+											"monochrome": {
+												"type": "boolean"
+											},
+											"blendMode": {
+												"type": "string",
+												"enum": [
+													"normal",
+													"overlay",
+													"soft-light",
+													"multiply",
+													"screen"
+												]
+											},
+											"seed": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 65535
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"amount"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "halftone"
+											},
+											"mode": {
+												"type": "string",
+												"enum": [
+													"mono",
+													"cmyk"
+												]
+											},
+											"shape": {
+												"type": "string",
+												"enum": [
+													"round",
+													"line",
+													"square"
+												]
+											},
+											"cellSize": {
+												"type": "number",
+												"exclusiveMinimum": 0
+											},
+											"angle": {
+												"type": "number"
+											},
+											"invert": {
+												"type": "boolean"
+											},
+											"color": {
+												"type": "string"
+											},
+											"background": {
+												"type": "string"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"cellSize"
 										]
 									}
 								]
@@ -12768,6 +13758,96 @@
 										"required": [
 											"type",
 											"radius"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "grain"
+											},
+											"amount": {
+												"type": "number",
+												"minimum": 0,
+												"maximum": 1
+											},
+											"size": {
+												"type": "number",
+												"exclusiveMinimum": 0
+											},
+											"monochrome": {
+												"type": "boolean"
+											},
+											"blendMode": {
+												"type": "string",
+												"enum": [
+													"normal",
+													"overlay",
+													"soft-light",
+													"multiply",
+													"screen"
+												]
+											},
+											"seed": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 65535
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"amount"
+										]
+									},
+									{
+										"type": "object",
+										"properties": {
+											"type": {
+												"type": "string",
+												"const": "halftone"
+											},
+											"mode": {
+												"type": "string",
+												"enum": [
+													"mono",
+													"cmyk"
+												]
+											},
+											"shape": {
+												"type": "string",
+												"enum": [
+													"round",
+													"line",
+													"square"
+												]
+											},
+											"cellSize": {
+												"type": "number",
+												"exclusiveMinimum": 0
+											},
+											"angle": {
+												"type": "number"
+											},
+											"invert": {
+												"type": "boolean"
+											},
+											"color": {
+												"type": "string"
+											},
+											"background": {
+												"type": "string"
+											},
+											"hidden": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"type",
+											"cellSize"
 										]
 									}
 								]

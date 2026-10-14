@@ -554,9 +554,10 @@ export const ShadowSchema = z.object({
 export const ShadowsSchema = z.union([ShadowSchema, z.array(ShadowSchema)]);
 
 // One entry of an element's `effects`. `hidden` keeps an effect in the file
-// without drawing it. Shadows paint in array order. A blur and a backdrop blur
-// apply at the engine's fixed positions in the layer effect order wherever they
-// sit in the array, and an element takes at most one of each.
+// without drawing it. Shadows paint in array order. A blur, a backdrop blur,
+// grain and a halftone apply at the engine's fixed positions in the layer
+// effect order wherever they sit in the array, and an element takes at most one
+// of each.
 export const ShadowEffectSchema = ShadowSchema.extend({
 	type: z.literal("shadow"),
 	hidden: z.boolean().optional(),
@@ -574,10 +575,41 @@ export const BackdropBlurEffectSchema = z.object({
 	hidden: z.boolean().optional(),
 });
 
+// Film grain from a seeded hash: one seed paints the same pixels everywhere.
+// `size` is one grain's side in design px.
+export const GrainEffectSchema = z.object({
+	type: z.literal("grain"),
+	amount: z.number().min(0).max(1),
+	size: z.number().positive().optional(),
+	monochrome: z.boolean().optional(),
+	blendMode: z
+		.enum(["normal", "overlay", "soft-light", "multiply", "screen"])
+		.optional(),
+	seed: z.number().int().min(0).max(65535).optional(),
+	hidden: z.boolean().optional(),
+});
+
+// The layer redrawn as a halftone screen with `cellSize` design px cells. "cmyk"
+// overlays four multiplied screens at C 15°, M 75°, Y 0° and K 45°, turned by
+// `angle`: a look, not colour separations.
+export const HalftoneEffectSchema = z.object({
+	type: z.literal("halftone"),
+	mode: z.enum(["mono", "cmyk"]).optional(),
+	shape: z.enum(["round", "line", "square"]).optional(),
+	cellSize: z.number().positive(),
+	angle: z.number().optional(),
+	invert: z.boolean().optional(),
+	color: z.string().optional(),
+	background: z.string().optional(),
+	hidden: z.boolean().optional(),
+});
+
 export const EffectSchema = z.discriminatedUnion("type", [
 	ShadowEffectSchema,
 	BlurEffectSchema,
 	BackdropBlurEffectSchema,
+	GrainEffectSchema,
+	HalftoneEffectSchema,
 ]);
 
 const LayoutPaddingSchema = z.object({
@@ -1573,7 +1605,8 @@ function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
 }
 
 // `effects` stands in for the legacy `shadow`, `blur` and `backdropBlur`, so an
-// element sets one form or the other, and takes at most one blur of each kind.
+// element sets one form or the other, and takes at most one of each effect but
+// shadows.
 function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	walkElements(tpl, (el, path) => {
 		const effects = (el as { effects?: { type: string }[] }).effects;
@@ -1587,7 +1620,7 @@ function enforceEffects(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 				[...path, key],
 			);
 		}
-		for (const type of ["blur", "backdropBlur"]) {
+		for (const type of ["blur", "backdropBlur", "grain", "halftone"]) {
 			const second = effects.findIndex(
 				(e, i) =>
 					e.type === type && effects.findIndex((o) => o.type === type) < i,
