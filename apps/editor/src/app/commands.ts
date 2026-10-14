@@ -1,3 +1,4 @@
+import { LENGTH_UNITS, type LengthUnit } from "@freshcoat-js/coatfile";
 import { boundDataset } from "@freshcoat-js/workspace";
 import { toggleBleed } from "~/canvas/bleed-view";
 import { togglePrintGuides } from "~/canvas/print-guides";
@@ -13,6 +14,7 @@ import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
 import { toggleStatusItem } from "./status/visibility";
 import { setThemePreference, type ThemePreference } from "./theme";
+import { setDisplayUnit, UNIT_LABELS } from "./units";
 
 export type CommandContext = {
 	controller: EditorController;
@@ -82,6 +84,13 @@ const themeCommand = (pref: ThemePreference, label: string): Command => ({
 	group: "View",
 	sections: ["edit", "data", "export"],
 	run: () => setThemePreference(pref),
+});
+const unitCommand = (unit: LengthUnit): Command => ({
+	id: `view.units.${unit}`,
+	label: UNIT_LABELS[unit],
+	group: "View",
+	sections: ["edit"],
+	run: () => setDisplayUnit(unit),
 });
 const alignCommand = (mode: AlignMode, label: string, key?: string) => ({
 	id: `align.${mode}`,
@@ -647,6 +656,7 @@ export const COMMANDS: Command[] = [
 	themeCommand("light", "Light"),
 	themeCommand("dark", "Dark"),
 	themeCommand("system", "System"),
+	...LENGTH_UNITS.map(unitCommand),
 	{
 		id: "help.shortcuts",
 		label: "Keyboard shortcuts",

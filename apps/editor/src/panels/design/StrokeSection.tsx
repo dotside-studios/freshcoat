@@ -34,6 +34,7 @@ import { GradientEditor, KINDS, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
+import { LengthField } from "./LengthField";
 
 export type Stroke = NonNullable<RectProperties["stroke"]>;
 
@@ -195,9 +196,10 @@ export function StrokeSection({
 							/>
 						)}
 						{linked && (
-							<NumberField
+							<LengthField
 								label="W"
 								aria-label={STROKE_WIDTH.label}
+								bare
 								className="w-[68px] shrink-0"
 								min={0}
 								value={commonValue(
@@ -224,7 +226,7 @@ export function StrokeSection({
 								data-testid="stroke-sides"
 							>
 								{SIDES.map((side) => (
-									<NumberField
+									<LengthField
 										key={side}
 										label={INSETS.sides[side]}
 										aria-label={`${STROKE_WIDTH.label} ${INSETS.sideNames[side]}`}

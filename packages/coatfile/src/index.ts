@@ -95,6 +95,19 @@ export {
 	templateSafeArea,
 } from "./bleed";
 export {
+	formatLength,
+	isLengthUnit,
+	LENGTH_UNITS,
+	type LengthUnit,
+	parseLength,
+	pxPerUnit,
+	pxToUnit,
+	resolveUnitSuffixes,
+	roundForUnit,
+	unitPrecision,
+	unitToPx,
+} from "./units";
+export {
 	applyBooleans,
 	cachePathOp,
 	canvasKitPathOp,

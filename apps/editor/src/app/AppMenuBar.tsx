@@ -1,3 +1,4 @@
+import { LENGTH_UNITS } from "@freshcoat-js/coatfile";
 import { Button } from "@freshcoat-js/ui/button";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { formatShortcut } from "@freshcoat-js/ui/kbd";
@@ -32,6 +33,7 @@ import { FreshcoatMark } from "./Logo";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
 import { useHiddenStatusItems } from "./status/visibility";
 import { useThemePreference } from "./theme";
+import { useDisplayUnit } from "./units";
 
 type Submenu = { label: string; items: (string | "-")[] };
 type Entry = string | "-" | Submenu;
@@ -143,6 +145,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 			"view.bleed",
 			"view.slices",
 			"view.renderStats",
+			"units",
 			"theme",
 		],
 	},
@@ -155,6 +158,7 @@ const idsOf = (items: Entry[]): string[] =>
 	);
 const MENU_IDS = MENUS.flatMap((m) => idsOf(m.items));
 const THEME_IDS = ["view.theme.light", "view.theme.dark", "view.theme.system"];
+const UNIT_IDS = LENGTH_UNITS.map((u) => `view.units.${u}`);
 
 export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const name = useEditor((s) => s.workspace?.name);
@@ -171,6 +175,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	const disabled = useMemo(() => disabledSig.split(","), [disabledSig]);
 	const panels = useEditor((s) => s.panels);
 	const theme = useThemePreference();
+	const unit = useDisplayUnit();
 	const renderStats = !useHiddenStatusItems().has("render");
 	const rulers = useEditor((s) => s.rulers);
 	usePrintGuidesVersion();
@@ -279,6 +284,31 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 													{SAMPLES.map((s) => (
 														<MenuItem key={s.id} id={s.id}>
 															{s.name}
+														</MenuItem>
+													))}
+												</Menu>
+											</Popover>
+										</SubmenuTrigger>
+									);
+								if (id === "units")
+									return (
+										<SubmenuTrigger key="units">
+											<MenuItem id="units">Units</MenuItem>
+											<Popover>
+												<Menu
+													aria-label="Units"
+													selectionMode="single"
+													selectedKeys={[`view.units.${unit}`]}
+													disallowEmptySelection
+													onSelectionChange={(keys) => {
+														if (keys === "all") return;
+														const [unitId] = keys;
+														void COMMAND_BY_ID.get(String(unitId))?.run(ctx);
+													}}
+												>
+													{UNIT_IDS.map((unitId) => (
+														<MenuItem key={unitId} id={unitId}>
+															{COMMAND_BY_ID.get(unitId)?.label}
 														</MenuItem>
 													))}
 												</Menu>
