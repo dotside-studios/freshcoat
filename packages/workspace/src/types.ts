@@ -1,6 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import type { PrintProfile } from "@freshcoat-js/for-print";
-import type { ItemCuts } from "./cut";
+import type { CutSpots, ItemCuts } from "./cut";
 
 export type ColumnType =
 	| "text"
@@ -335,6 +335,9 @@ export type ExportPreset = {
 	cutFile?: ExportCutFile;
 	/** PDF only: draw the cut lines over the art. Default false. */
 	cutLines?: boolean;
+	/** PDF with `cutLines`: the spot colour each kind of cut line is drawn
+	 *  in. A kind left out takes its `DEFAULT_CUT_SPOTS` name. */
+	cutSpots?: CutSpots;
 	/** PDF only; default srgb */
 	outputIntent?: PdfOutputIntent;
 };

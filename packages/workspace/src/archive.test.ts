@@ -643,6 +643,7 @@ describe("packWorkspace", () => {
 			id: "p_cut",
 			cutFile: "dxf",
 			cutLines: true,
+			cutSpots: { through: "Thru-cut", score: "Crease" },
 		};
 		const result = await unpackWorkspace(
 			await packWorkspace({ ...ws, presets: [...ws.presets, cut] }),
@@ -651,6 +652,7 @@ describe("packWorkspace", () => {
 		const [older, kept] = result.workspace.presets;
 		expect(older?.cutFile).toBeUndefined();
 		expect(older?.cutLines).toBeUndefined();
+		expect(older?.cutSpots).toBeUndefined();
 		expect(kept).toEqual(cut);
 	});
 

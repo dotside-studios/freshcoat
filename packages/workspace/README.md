@@ -454,7 +454,12 @@ with its images.
   page's art, 0.25 pt wide, in an optional content group named Cut that a
   viewer can switch off. On sheets each card's lines sit on its art, bleed
   and all, and are drawn on backs too. `assemblePdf()` draws the lines of any
-  `PdfPage.cut`.
+  `PdfPage.cut`. Each kind is stroked in its own spot colour, a `/Separation`
+  that overprints, as print-and-cut RIPs expect (see
+  [Spot colours for cutters](#spot-colours-for-cutters)).
+- `cutSpots` (PDF with `cutLines`): the spot colour name of each kind, as
+  `{ through: "CutContour", kiss: "KissCut" }`. A kind left out, or named
+  with only spaces, takes its default.
 
 `itemCuts(template, item, { bleed, resize, pathOp })` works out the lines of
 one item, in the item image's own design units with the origin at its top-left
@@ -476,14 +481,15 @@ closed, so a thin rect would be cut along both long edges.
 Lines keep their kind and the slice's name. Slices are resolved with the
 record's values and variant, so a slice a value hides has no line.
 
-| Edge | SVG group, PDF stroke | DXF layer (ACI colour) |
-|---|---|---|
-| `through` | `through`, red `#FF0000` | `THROUGH` (1) |
-| `kiss` | `kiss`, magenta `#FF00FF` | `KISS` (6) |
-| `score` | `score`, blue `#0000FF` | `SCORE` (5) |
-| `perforate` | `perforate`, green `#00A000` | `PERFORATE` (3) |
+| Edge | SVG group, PDF stroke | PDF spot (default) | DXF layer (ACI colour) |
+|---|---|---|---|
+| `through` | `through`, red `#FF0000` | `CutContour` | `THROUGH` (1) |
+| `kiss` | `kiss`, magenta `#FF00FF` | `KissCut` | `KISS` (6) |
+| `score` | `score`, blue `#0000FF` | `Crease` | `SCORE` (5) |
+| `perforate` | `perforate`, green `#00A000` | `Perfcut` | `PERFORATE` (3) |
 
-`CUT_STYLES` holds the table. `cutSvg(cuts, dpi)` writes an SVG sized in
+`CUT_STYLES` holds the colours and layers, `DEFAULT_CUT_SPOTS` the spot
+names, and `cutSpotNames(cutSpots)` the names a PDF uses. `cutSvg(cuts, dpi)` writes an SVG sized in
 millimetres (design units / `dpi` x 25.4) with a viewBox in the item's design
 units, so it lies exactly over the item's image; it has a group per kind
 present and unfilled hairline paths, curves kept. `cutDxf(cuts, dpi)` writes
@@ -508,6 +514,29 @@ The files share the image's size and origin, whatever its pixel density.
 
 To register the art and the lines, place both at the same top-left corner:
 they share size and origin.
+
+#### Spot colours for cutters
+
+Print-and-cut RIPs such as Roland VersaWorks, Mimaki RasterLink and Summa
+GoSign find the cut path by its spot colour name, usually `CutContour`. In
+the PDF each kind of line is stroked in a `/Separation` colour space of its
+spot name, tint 1, whose alternate is the kind's colour from the table in
+`DeviceRGB`, so a viewer without the ink still shows red, magenta, blue or
+green. An ExtGState with `/OP true /op true /OPM 1` makes the lines overprint:
+the cut never knocks a hairline out of the art, and a RIP that prints the
+separation does not leave a white line. The lines stay in the Cut optional
+content group.
+
+Name the spots as your RIP's cut settings do. Common names:
+
+| RIP | Through cut | Other |
+|---|---|---|
+| Roland VersaWorks | `CutContour` | `PerfCutContour` for perforations |
+| Mimaki RasterLink / FineCut | `CutContour` | |
+| Summa GoSign | `CutContour` | `Crease`, `KissCut` |
+
+In Acrobat, Output Preview lists each name under Separations, and Overprint
+Preview shows the art beneath the lines.
 
 Card-printer correction options use [`@freshcoat-js/for-print`](../for-print).
 A preset's `print.target` names the for-print print target; absent reads as
