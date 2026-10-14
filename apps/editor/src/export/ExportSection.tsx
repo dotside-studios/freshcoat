@@ -49,6 +49,7 @@ import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
 import { ExportSettings } from "./ExportSettings";
 import { useExportJobs } from "./export-jobs";
 import {
+	exportEstimate,
 	labelColumn,
 	recordLabel,
 	type StatusFilter,
@@ -986,6 +987,11 @@ export function ExportSection() {
 				preset={preset}
 				count={runCount}
 				blocked={blocked?.message ?? null}
+				estimate={
+					preset && runCount > 0
+						? exportEstimate(preset, runPlan, imposition?.sheets)
+						: undefined
+				}
 				checks={
 					preset ? (
 						<ChecksBadge checks={checks} onTarget={onCheckTarget} />

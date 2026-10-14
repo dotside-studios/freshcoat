@@ -128,6 +128,30 @@ export function filesSummary(preset: ExportPreset): string {
 	return `${where} · ${preset.fileName}`;
 }
 
+/** What an export will produce, from the plan alone: "120 records · PDF ·
+ *  1 file", "240 files · PNG zip". Sizes are left out, as nothing before
+ *  the render says them. */
+export function exportEstimate(
+	preset: ExportPreset,
+	plan: readonly ExportItem[],
+	sheets?: number,
+): string {
+	if (preset.format === "pdf") {
+		const records = new Set(plan.map((item) => item.recordId)).size;
+		return [
+			plural(records, "record"),
+			"PDF",
+			sheets ? plural(sheets, "sheet") : "1 file",
+		].join(" · ");
+	}
+	const where = preset.destination === "folder" ? "in a folder" : "";
+	const label =
+		preset.destination === "folder"
+			? FORMAT_NAME[preset.format]
+			: FORMAT_LABEL[preset.format];
+	return [plural(plan.length, "file"), `${label} ${where}`.trim()].join(" · ");
+}
+
 export type StatusFilter = "all" | RecordStatus;
 
 export const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
