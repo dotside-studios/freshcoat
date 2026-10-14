@@ -1,0 +1,140 @@
+{
+	"id": "stroke-sides-center",
+	"title": "a centred per-side stroke straddles each edge by half its width",
+	"profile": "core",
+	"requires": [
+		"draw.stroke",
+		"stroke.sides"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 16,
+					"sides": {
+						"top": 0,
+						"right": 0,
+						"bottom": 16,
+						"left": 0
+					}
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				84
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "inside the bottom edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				96
+			],
+			"expect": [
+				0,
+				0,
+				0,
+				255
+			],
+			"why": "beyond the bottom edge"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				79
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "above the band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				100
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "below the band"
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				41,
+				60
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "the left side, with no width"
+		}
+	]
+}

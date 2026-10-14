@@ -199,6 +199,8 @@ export {
 	outlinePath,
 	outlineSvg,
 	rectShape,
+	type SideStrokeGeometry,
+	sideStrokeGeometry,
 } from "./outline";
 export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export {

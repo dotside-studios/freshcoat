@@ -630,6 +630,16 @@ function validateStroke(
 			`${path}.width`,
 			id,
 		);
+	for (const side of ["top", "right", "bottom", "left"] as const) {
+		const v = stroke.sides?.[side];
+		if (stroke.sides && (!finite(v) || (v as number) < 0))
+			add(
+				"bad_stroke_width",
+				`stroke ${side} width must be >= 0, got ${v}`,
+				`${path}.sides.${side}`,
+				id,
+			);
+	}
 	if (stroke.dash && !stroke.dash.every((d) => finite(d) && d >= 0))
 		add(
 			"bad_dash",

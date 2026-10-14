@@ -362,7 +362,12 @@ export const ImageMaskSchema = z.union([
 export const StrokeSchema = z.object({
 	// A solid colour, or a gradient placed in the element's box as a fill is.
 	color: z.union([z.string(), ...GradientSchema.options]),
-	width: z.number(),
+	width: z.number({
+		error: (issue) =>
+			issue.input !== null && typeof issue.input === "object"
+				? "a width per side is only for a rect or frame stroke; use one number"
+				: undefined,
+	}),
 	dash: z.array(z.number()).optional(),
 	cap: z.enum(["butt", "round", "square"]).optional(),
 	join: z.enum(["round", "bevel", "miter"]).optional(),
@@ -373,6 +378,19 @@ export const StrokeSchema = z.object({
 	trimStart: z.union([z.number().min(0).max(1), z.string()]).optional(),
 	trimEnd: z.union([z.number().min(0).max(1), z.string()]).optional(),
 	trimOffset: z.union([z.number(), z.string()]).optional(),
+});
+
+// Each side's own stroke width. A side left out has none.
+export const StrokeSideWidthsSchema = z.object({
+	top: z.number().min(0).optional(),
+	right: z.number().min(0).optional(),
+	bottom: z.number().min(0).optional(),
+	left: z.number().min(0).optional(),
+});
+
+// A rect or frame stroke, whose width can differ per side.
+export const BoxStrokeSchema = StrokeSchema.extend({
+	width: z.union([z.number(), StrokeSideWidthsSchema]),
 });
 
 // Fractions of the source image's width and height.
@@ -476,7 +494,7 @@ export const SliceModifierSchema = z.object({
 
 export const RectPropertiesSchema = z.object({
 	fill: FillsSchema.optional(),
-	stroke: StrokeSchema.optional(),
+	stroke: BoxStrokeSchema.optional(),
 	cornerRadius: CornerRadiusSchema.optional(),
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
@@ -725,7 +743,7 @@ export const FrameElementSchema: z.ZodType<FrameElement> = z.lazy(() =>
 export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 	z.object({
 		fill: FillsSchema.optional(),
-		stroke: StrokeSchema.optional(),
+		stroke: BoxStrokeSchema.optional(),
 		cornerRadius: CornerRadiusSchema.optional(),
 		cornerSmoothing: z.number().min(0).max(1).optional(),
 		// Figma's `clipsContent`. When true, children are clipped to the frame,

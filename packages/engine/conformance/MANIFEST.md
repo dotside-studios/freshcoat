@@ -145,7 +145,7 @@ in full.
 | Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `blend-linear-burn`, `opacity` |
 | Clipping and masking | `clip-circle`, `clip-per-corner`, `clip-per-corner-smoothed`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape`, `mask-luminance-alpha` |
 | Shapes | `ellipse`, `path-viewbox`, `path-fill-rule`, `corner-radius`, `corner-radius-per-corner` |
-| Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask` |
+| Strokes | `stroke-centered`, `stroke-inside`, `stroke-outside-ellipse`, `stroke-inside-path`, `stroke-outside-path-evenodd`, `stroke-inside-image-mask`, `stroke-sides-inside`, `stroke-sides-outside`, `stroke-sides-center`, `stroke-sides-rounded`, `stroke-sides-dashed`, `stroke-sides-gradient` |
 | Shadows | `shadow-spread`, `shadow-inset`, `shadow-stacked` |
 | Raster primitives | `bitmap-nearest`, `image-cover`, `image-contain`, `image-missing`, `image-per-corner-smoothed` |
 | Containers | `group-fills`, `group-isolate`, `group-pass-through` |

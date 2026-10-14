@@ -70,6 +70,31 @@ the records, and **Export** turns templates and records into files.
   inside the template, so a resize that would take that room away is
   refused. The format is described in the
   [coatfile guide](../../../packages/coatfile/README.md#bleed-and-safe-area).
+- **Image resolution:** an image that prints below 300 DPI is listed under
+  "Print hints" in the Issues list, as "Prints at 200 DPI, under 300", with a
+  link to the layer. The resolution is the image's pixels over the inches the
+  layer covers, after its crop and fit, on the axis with fewer: a 600 px wide
+  image placed 3 in wide at 300 DPI prints at 200. The template is measured at
+  the lowest DPI of its export presets, 300 without one, and checked against
+  their highest minimum; a preset's `minImageDpi` sets it, and 0 turns the
+  check off. An image bound to a field is checked as the record renders, and
+  shows under "Last render" as "Image prints at 200 DPI, under 300: photo".
+  An export lists the same warning for each item it applies to, in its
+  `export-report.csv`.
+- **Print checks:** the Issues list's "Print hints" also name layers that
+  may not print as they look, each with a link that selects the layer:
+  text below 6 pt at print size (7 pt for a light weight or a Thin or Light
+  family), as "Text is 4.8 pt at print size, below 6 pt"; strokes thinner than
+  0.25 pt; text under 12 pt in a near-black mixed from unequal channels, which
+  may print as rich black and blur if the plates are out of register (advice
+  only, since the colours are sRGB); and, with a bleed, a rect, image or frame
+  that runs to the trim but not into the bleed. Sizes are read at the lowest
+  DPI of the template's export presets, 300 without one. Text whose content or
+  colour comes from a field, or that shrinks to fit, is checked as the record
+  renders and shows under "Last render"; an export lists the same warnings in
+  its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
+  `rich_black_text` and `short_of_bleed`, described in the
+  [coatfile guide](../../../packages/coatfile/README.md#print-checks).
 - **Constraints:** each layer pins its horizontal and vertical edges (left,
   right, both, center or scale), as in Figma. "Resize with constraints"
   under the template size re-places layers by them, and an export sized

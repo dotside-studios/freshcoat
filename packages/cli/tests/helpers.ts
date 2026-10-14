@@ -66,7 +66,7 @@ export function card(overrides: Partial<Template> = {}): Template {
 					size: { width: 180, height: 30 },
 					properties: {
 						value: "{{name}}",
-						font: { family: "Inter", size: 20 },
+						font: { family: "Inter", size: 26 },
 						color: "#111111",
 					},
 				},
@@ -118,7 +118,7 @@ export type Sandbox = {
 export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbox> {
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-cli-"));
 	const fetch = fontFetch();
-	await writeFile(join(dir, "logo.png"), await solidPng(4, 4, [20, 160, 60]));
+	await writeFile(join(dir, "logo.png"), await solidPng(40, 40, [20, 160, 60]));
 	const write = async (name: string, content: string | Uint8Array) => {
 		await writeFile(join(dir, name), content);
 		return join(dir, name);

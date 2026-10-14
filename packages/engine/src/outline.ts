@@ -5,7 +5,7 @@ import type { CanvasKit, Path } from "canvaskit-wasm";
 import { insetCorner } from "./paint-helpers";
 import { roundCorners } from "./round-corners";
 import { squircleSvg } from "./squircle";
-import type { CornerRadius, ShapeMask } from "./types";
+import type { CornerRadius, ShapeMask, Stroke, StrokeSides } from "./types";
 
 // What draws or clips the outline: a plain rect, a Skia RRect (exact for
 // circular corners, radii [topLeft, topRight, bottomRight, bottomLeft]), or an
@@ -280,5 +280,125 @@ export function outlineSvg(g: OutlineGeometry): string {
 		` V ${b - br}${arc(br, r - br, b)}` +
 		` H ${l + bl}${arc(bl, l, b - bl)}` +
 		` V ${t + tl}${arc(tl, l + tl, t)} Z`
+	);
+}
+
+type Insets = [left: number, top: number, right: number, bottom: number];
+
+/** A per-side stroke on a rect: `band` is the painted area as two contours,
+ *  filled even-odd; `mid` runs down the middle of the band, where a dashed or
+ *  trimmed stroke is drawn `midWidth` wide and cut to the band; `ltrb` is the
+ *  band's outer edge. Null when no side has a width. */
+export type SideStrokeGeometry = {
+	band: string;
+	mid: string;
+	midWidth: number;
+	ltrb: [number, number, number, number];
+};
+
+// The band between the outline moved out and the outline moved in, by each
+// side's width as `align` places it (inside: all in, outside: all out, center:
+// half each way). A corner's radius shrinks or grows by its two adjacent
+// widths, so an unsmoothed corner is elliptical where they differ; a smoothed
+// one keeps a circular radius moved by their mean. A sharp corner stays sharp.
+export function sideStrokeGeometry(
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	cornerRadius: CornerRadius | undefined,
+	cornerSmoothing: number | undefined,
+	stroke: Pick<Stroke, "align"> & { sides: StrokeSides },
+): SideStrokeGeometry | null {
+	const { top, right, bottom, left } = stroke.sides;
+	const widths: Insets = [left, top, right, bottom].map((v) =>
+		Number.isFinite(v) ? Math.max(0, v) : 0,
+	) as Insets;
+	const widest = Math.max(...widths);
+	if (!(widest > 0) || !(w > 0) || !(h > 0)) return null;
+	const k = stroke.align === "inside" ? 0 : stroke.align === "outside" ? 1 : 0.5;
+	const outer = widths.map((v) => -v * k) as Insets;
+	const inner = widths.map((v, i) => outer[i] + v) as Insets;
+	const mid = widths.map((v, i) => outer[i] + v / 2) as Insets;
+	const cr = cornerRadius ?? 0;
+	const base = fitRadii(
+		[x, y, x + w, y + h],
+		typeof cr === "number" ? [cr, cr, cr, cr] : cr,
+	);
+	const smoothing = cornerSmoothing ?? 0;
+	const contour = (d: Insets) => insetContour(x, y, w, h, base, smoothing, d);
+	const outerD = contour(outer) as string;
+	const innerD = contour(inner);
+	return {
+		band: innerD ? `${outerD} ${innerD}` : outerD,
+		mid: contour(mid) ?? outerD,
+		midWidth: widest * 2,
+		ltrb: [x + outer[0], y + outer[1], x + w - outer[2], y + h - outer[3]],
+	};
+}
+
+// The rect outline moved in by `d` per side (out where negative), or null
+// when nothing is left of it.
+function insetContour(
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	radii: [number, number, number, number],
+	smoothing: number,
+	[dl, dt, dr, db]: Insets,
+): string | null {
+	const l = x + dl;
+	const t = y + dt;
+	const r = x + w - dr;
+	const b = y + h - db;
+	if (!(r - l > 0) || !(b - t > 0)) return null;
+	const move = (base: number, by: number) =>
+		base > 0 ? Math.max(0, base - by) : 0;
+	const [tl, tr, br, bl] = radii;
+	if (smoothing > 0)
+		return squircleSvg(
+			l,
+			t,
+			r - l,
+			b - t,
+			[
+				move(tl, (dl + dt) / 2),
+				move(tr, (dr + dt) / 2),
+				move(br, (dr + db) / 2),
+				move(bl, (dl + db) / 2),
+			],
+			smoothing,
+		);
+	const ellipse = (base: number, dx: number, dy: number): [number, number] =>
+		base > 0 ? [Math.max(0, base - dx), Math.max(0, base - dy)] : [0, 0];
+	const c = [
+		ellipse(tl, dl, dt),
+		ellipse(tr, dr, dt),
+		ellipse(br, dr, db),
+		ellipse(bl, dl, db),
+	];
+	const [cw, ch] = [r - l, b - t];
+	const fit = Math.min(
+		1,
+		cw / (c[0][0] + c[1][0]) || 1,
+		ch / (c[1][1] + c[2][1]) || 1,
+		cw / (c[2][0] + c[3][0]) || 1,
+		ch / (c[3][1] + c[0][1]) || 1,
+	);
+	const [[tlx, tly], [trx, try_], [brx, bry], [blx, bly]] = c.map(
+		([rx, ry]) => [rx * fit, ry * fit],
+	) as [number, number][];
+	const arc = (rx: number, ry: number, ex: number, ey: number) =>
+		rx > 0 && ry > 0
+			? ` A ${rx} ${ry} 0 0 1 ${ex} ${ey}`
+			: rx > 0 || ry > 0
+				? ` L ${ex} ${ey}`
+				: "";
+	return (
+		`M ${l + tlx} ${t} H ${r - trx}${arc(trx, try_, r, t + try_)}` +
+		` V ${b - bry}${arc(brx, bry, r - brx, b)}` +
+		` H ${l + blx}${arc(blx, bly, l, b - bly)}` +
+		` V ${t + tly}${arc(tlx, tly, l + tlx, t)} Z`
 	);
 }

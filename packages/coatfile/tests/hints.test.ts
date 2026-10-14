@@ -5,7 +5,8 @@ import {
 	printGuideMetrics,
 	printGuidesFor,
 } from "../src/bleed";
-import { safeAreaHints, templateHints } from "../src/hints";
+import { imageDpiHints, safeAreaHints, templateHints } from "../src/hints";
+import { effectiveImageDpi } from "../src/image-dpi";
 import type { Element, Template } from "../src/types";
 
 function card(extra: Partial<Template> = {}, elements: Element[] = []): Template {
@@ -131,5 +132,151 @@ describe("templateHints", () => {
 		expect(low).toEqual([
 			{ kind: "format_low", declared: "1.0", needed: expect.any(String) },
 		]);
+	});
+});
+
+function pngHeader(width: number, height: number): string {
+	const b = new Uint8Array(33);
+	b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+	b.set([0x49, 0x48, 0x44, 0x52], 12);
+	const v = new DataView(b.buffer);
+	v.setUint32(16, width);
+	v.setUint32(20, height);
+	b.set([8, 2, 0, 0, 0], 24);
+	return Buffer.from(b).toString("base64");
+}
+
+const image = (
+	id: string,
+	src: string,
+	w: number,
+	h: number,
+	props: Record<string, unknown> = {},
+) =>
+	({
+		id,
+		type: "image",
+		pos: { x: 0, y: 0 },
+		size: { width: w, height: h },
+		properties: { src, fit: "fill", ...props },
+	}) as Element;
+
+describe("effectiveImageDpi", () => {
+	test("is source pixels over the inches they cover", () => {
+		const dpi = effectiveImageDpi(
+			{ width: 600, height: 400 },
+			{ width: 900, height: 600 },
+			300,
+			{ fit: "fill" },
+		);
+		expect(dpi).toBeCloseTo(200);
+	});
+
+	test("takes the axis with fewer pixels to the inch", () => {
+		expect(
+			effectiveImageDpi(
+				{ width: 600, height: 1200 },
+				{ width: 900, height: 600 },
+				300,
+				{ fit: "fill" },
+			),
+		).toBeCloseTo(200);
+	});
+
+	test("counts only the source a crop or a cover keeps", () => {
+		const placed = { width: 300, height: 300 };
+		const pixels = { width: 1200, height: 600 };
+		expect(effectiveImageDpi(pixels, placed, 300, { fit: "cover" })).toBeCloseTo(
+			600,
+		);
+		expect(
+			effectiveImageDpi(pixels, placed, 300, { fit: "contain" }),
+		).toBeCloseTo(1200);
+		expect(
+			effectiveImageDpi(pixels, placed, 300, {
+				fit: "fill",
+				crop: { x: 0, y: 0, width: 0.25, height: 0.5 },
+			}),
+		).toBeCloseTo(300);
+	});
+
+	test("draws a tile one pixel to the unit", () => {
+		expect(
+			effectiveImageDpi(
+				{ width: 10, height: 10 },
+				{ width: 900, height: 600 },
+				300,
+				{ fit: "tile" },
+			),
+		).toBe(300);
+	});
+});
+
+describe("imageDpiHints", () => {
+	const sha = "a".repeat(64);
+	const withAsset = (elements: Element[]) =>
+		card(
+			{
+				assets: [
+					{ sha256: sha, base64: pngHeader(600, 400), contentType: "image/png" },
+				],
+			},
+			elements,
+		);
+
+	test("flags a 600 px image placed 3 in wide at 300 DPI as about 200", () => {
+		const t = withAsset([image("photo", `asset:${sha}`, 900, 600)]);
+		expect(templateHints(t)).toEqual([
+			{
+				kind: "image_dpi",
+				side: 0,
+				sideName: "front",
+				id: "photo",
+				src: `asset:${sha}`,
+				dpi: 200,
+				min: 300,
+			},
+		]);
+	});
+
+	test("follows the export DPI and the threshold", () => {
+		const t = withAsset([image("photo", `asset:${sha}`, 900, 600)]);
+		expect(imageDpiHints(t, { min: 150 })).toEqual([]);
+		expect(imageDpiHints(t, { dpi: 600 })).toEqual([]);
+		expect(imageDpiHints(t, { min: 0 })).toEqual([]);
+		expect(imageDpiHints(t, { dpi: 150 })[0]?.dpi).toBe(100);
+	});
+
+	test("reads data URIs, nested layers and sizes the caller gives", () => {
+		const t = card({}, [
+			{
+				id: "group",
+				type: "frame",
+				pos: { x: 0, y: 0 },
+				size: { width: 1012, height: 638 },
+				properties: {
+					children: [
+						image("inline", `data:image/png;base64,${pngHeader(100, 100)}`, 300, 300),
+						image("file", "photo.jpg", 300, 300),
+						image("unknown", "other.jpg", 300, 300),
+					],
+				},
+			} as Element,
+		]);
+		const hints = imageDpiHints(t, {
+			pixelSize: (src) =>
+				src === "photo.jpg" ? { width: 200, height: 200 } : undefined,
+		});
+		expect(hints.map((h) => [h.id, h.dpi])).toEqual([
+			["inline", 100],
+			["file", 200],
+		]);
+	});
+
+	test("leaves images bound to a field to the render", () => {
+		const t = card({}, [image("photo", "{{photo}}", 900, 600)]);
+		expect(
+			imageDpiHints(t, { pixelSize: () => ({ width: 1, height: 1 }) }),
+		).toEqual([]);
 	});
 });

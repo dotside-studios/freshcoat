@@ -1,10 +1,18 @@
-import type { Sides, Template } from "@freshcoat-js/coatfile";
+import {
+	type FrameWarning,
+	hasToken,
+	printHints,
+	type Sides,
+	type Template,
+	walkElements,
+} from "@freshcoat-js/coatfile";
 import type { Node, PaintCacheStats } from "@freshcoat-js/engine";
 import {
 	collectGeometry,
 	type LayerGeometry,
 	trimGeometry,
 } from "~/doc/geometry";
+import { getElement, keyOf } from "~/doc/path";
 import { buildPreview } from "~/doc/preview";
 import type { BarcodeIssue } from "~/state/store";
 import type { RenderSession, RenderTimings } from "./session";
@@ -24,6 +32,11 @@ export type LiveRequest = {
 	density: number;
 	/** Paints the template's bleed around the trim. */
 	bleed?: boolean;
+	/** Warns for a field's image that prints below `min` at `dpi`. */
+	imageDpi?: { dpi: number; min: number };
+	/** Runs the print checks at `dpi`, for what only the record's values
+	 *  show. */
+	printChecks?: { dpi: number };
 };
 
 export type LiveResult = {
@@ -70,6 +83,15 @@ export async function renderLiveFrame(
 		fonts: request.fonts,
 		scale: request.density,
 		...(request.bleed ? { bleed: true } : {}),
+		...(request.imageDpi
+			? {
+					imageDpi: {
+						...request.imageDpi,
+						skip: (src: string) => fixedSrcs(preview.template).has(src),
+					},
+				}
+			: {}),
+		...(request.printChecks ? { printChecks: request.printChecks } : {}),
 		collect: (root: Node) =>
 			collectGeometry(root, preview.pathIds, template, side),
 	});
@@ -86,8 +108,66 @@ export async function renderLiveFrame(
 		timings: out.timings,
 		scale: out.scale,
 		bleed: out.bleed,
-		...splitWarnings(out.warnings, preview.pathIds),
+		...splitWarnings(
+			out.warnings.flatMap((w): FrameWarning[] => {
+				if (w.kind !== "image_low_dpi" && w.kind !== "print_check") return [w];
+				const key = w.layer ? preview.pathIds.get(w.layer) : undefined;
+				if (
+					w.kind === "print_check" &&
+					key &&
+					request.printChecks &&
+					staticPrintIssues(template, request.printChecks.dpi).has(
+						`${key}|${w.issue.code}`,
+					)
+				)
+					return [];
+				const id = key ? getElement(template, key)?.id : undefined;
+				return [id ? { ...w, layer: id } : w];
+			}),
+			preview.pathIds,
+		),
 	};
+}
+
+const staticPrintCache = new WeakMap<Template, Map<number, Set<string>>>();
+
+/** The layers and checks the Issues list's print hints already report, as
+ *  `key|code`. */
+function staticPrintIssues(t: Template, dpi: number): Set<string> {
+	let byDpi = staticPrintCache.get(t);
+	if (!byDpi) {
+		byDpi = new Map();
+		staticPrintCache.set(t, byDpi);
+	}
+	let found = byDpi.get(dpi);
+	if (!found) {
+		found = new Set(
+			printHints(t, { dpi }).map(
+				(h) => `${keyOf({ side: h.side, path: h.path })}|${h.issue.code}`,
+			),
+		);
+		byDpi.set(dpi, found);
+	}
+	return found;
+}
+
+const fixedSrcCache = new WeakMap<Template, Set<string>>();
+
+/** The image srcs a template names itself, which the Issues list's print
+ *  hints already check. */
+function fixedSrcs(t: Template): Set<string> {
+	let srcs = fixedSrcCache.get(t);
+	if (!srcs) {
+		const found = new Set<string>();
+		for (const frame of t.template_data)
+			walkElements([frame.background, ...frame.elements], (el) => {
+				if (el.type === "image" && !hasToken(el.properties.src))
+					found.add(el.properties.src);
+			});
+		srcs = found;
+		fixedSrcCache.set(t, srcs);
+	}
+	return srcs;
 }
 
 /** The current path: CanvasKit on the main thread, a new canvas element

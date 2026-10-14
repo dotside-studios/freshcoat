@@ -15,6 +15,7 @@ import {
 	parseJobs,
 	parseLength,
 	parseMarks,
+	parseMinDpi,
 	parsePaper,
 	parsePositive,
 	parseQuality,
@@ -102,6 +103,11 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"--jobs <n>",
 			"render an export on this many threads; default from the cores and memory",
 			arg(parseJobs),
+		)
+		.option(
+			"--min-dpi <n>",
+			"warn for an image that prints below this many pixels per inch; default 300, 0 for none",
+			arg(parseMinDpi),
 		)
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
@@ -220,10 +226,20 @@ function program(io: Io, onCommand: (name: string) => void) {
 	command("validate")
 		.summary("check a template or workspace")
 		.description(
-			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, and a format\nversion that does not match the fields in use; for a workspace also required\nfields no column fills. --quiet prints nothing when it is valid.",
+			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, images that\nprint below --min-dpi, and a format version that does not match the fields\nin use; for a workspace also required fields no column fills. An image bound\nto a field is checked when it renders. --quiet prints nothing when it is\nvalid.",
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
 		.option("--strict", "exit 1 on warnings too")
+		.option(
+			"--dpi <n>",
+			"design units per inch the images are checked at; default 300, or a workspace preset's",
+			arg(parsePositive),
+		)
+		.option(
+			"--min-dpi <n>",
+			"warn for an image that prints below this many pixels per inch; default 300, or a workspace preset's; 0 for none",
+			arg(parseMinDpi),
+		)
 		.action((file, options, cmd) =>
 			validateCommand(file, { ...options, quiet: quiet(cmd) }, io),
 		);

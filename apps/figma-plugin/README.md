@@ -145,8 +145,10 @@ layers were kept, flattened or skipped.
   gradient `color`, placed in the layer's box as a gradient fill is. A dashed
   stroke keeps its pattern as `dash`. A rectangle, vector or frame with a
   visible image stroke, or a stack mixing a gradient with other paints, is
-  rasterized (`stroke_flattened`). A stroke with a different weight per side is dropped
-  (`stroke_weight_mixed_unsupported`), and one whose scaled weight rounds to
+  rasterized (`stroke_flattened`). A rectangle or frame with a different
+  stroke weight per side keeps each side's weight as a per-side `width`; on an
+  image, or where Figma does not report the sides, the stroke is dropped
+  (`stroke_weight_mixed_unsupported`). A stroke whose scaled weight rounds to
   zero is left out.
 - **Corners.** Rectangles, frames and bound images keep corner smoothing as
   `cornerSmoothing`, with one radius or a different radius per corner.

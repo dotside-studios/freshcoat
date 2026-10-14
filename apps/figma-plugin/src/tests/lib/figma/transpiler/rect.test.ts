@@ -125,6 +125,25 @@ describe("transpileRect", () => {
 		expect(el.properties.stroke).toEqual({ color: "#000000", width: 2 });
 	});
 
+	it("emits a width per side, scaled, and one width when they agree", () => {
+		const stroked = (strokeWeights: FigmaRectangleNode["strokeWeights"]) =>
+			transpileRect(
+				baseRect({
+					strokes: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+					strokeWeights,
+					strokeAlign: "INSIDE",
+				}),
+				{ frame: FRAME, scale: 2 },
+			).properties.stroke;
+		expect(stroked({ top: 1, right: 0, bottom: 2.2, left: 0 })).toEqual({
+			color: "#000000",
+			width: { top: 2, right: 0, bottom: 4.5, left: 0 },
+			align: "inside",
+		});
+		expect(stroked({ top: 1, right: 1, bottom: 1, left: 1 })?.width).toBe(2);
+		expect(stroked({ top: 0, right: 0, bottom: 0.1, left: 0 })).toBeUndefined();
+	});
+
 	it("omits a stroke whose scaled width rounds to zero", () => {
 		for (const [strokeWeight, scale] of [
 			[0, 1],
