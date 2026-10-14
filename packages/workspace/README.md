@@ -517,8 +517,8 @@ they share size and origin.
 
 #### Spot colours for cutters
 
-Print-and-cut RIPs such as Roland VersaWorks, Mimaki and Summa find the cut path by its spot colour name, usually `CutContour`. In
-the PDF each kind of line is stroked in a `/Separation` colour space of its
+Print-and-cut RIPs such as Roland VersaWorks, Mimaki and Summa find the cut
+path by its spot colour name, usually `CutContour`. In the PDF each kind of line is stroked in a `/Separation` colour space of its
 spot name, tint 1, whose alternate is the kind's colour from the table in
 `DeviceRGB`, so a viewer without the ink still shows red, magenta, blue or
 green. An ExtGState with `/OP true /op true /OPM 1` makes the lines overprint:
