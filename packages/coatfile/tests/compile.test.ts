@@ -1505,6 +1505,70 @@ describe("compile (effects)", () => {
 		expect(draw.shadow).toEqual([{ color: "#000", dx: 2, dy: 1, blur: 2 }]);
 		expect(draw.blur).toBe(3);
 	});
+
+	test("lowers grain and halftone with defaults, sizes scaled", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			{ type: "grain", amount: 0.4 },
+			{ type: "halftone", cellSize: 6 },
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.grain).toEqual({
+			amount: 0.4,
+			size: 2,
+			monochrome: true,
+			blendMode: "overlay",
+			seed: 0,
+		});
+		expect(draw.halftone).toEqual({
+			mode: "mono",
+			shape: "round",
+			cellSize: 12,
+			angle: 45,
+			invert: false,
+			color: "#000000",
+		});
+	});
+
+	test("a cmyk halftone keeps its settings and starts at 0°", () => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.template_data[0].elements[0].effects = [
+			{
+				type: "halftone",
+				mode: "cmyk",
+				shape: "square",
+				cellSize: 4,
+				invert: true,
+				background: "#fff",
+			},
+			{
+				type: "grain",
+				amount: 1,
+				size: 3,
+				monochrome: false,
+				blendMode: "soft-light",
+				seed: 12,
+				hidden: true,
+			},
+		];
+		const draw = findDraw(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+			"drawText",
+		)!;
+		expect(draw.halftone).toEqual({
+			mode: "cmyk",
+			shape: "square",
+			cellSize: 8,
+			angle: 0,
+			invert: true,
+			color: "#000000",
+			background: "#fff",
+		});
+		expect(draw.grain).toBeUndefined();
+	});
 });
 
 describe("compile assets (fonts + images)", () => {

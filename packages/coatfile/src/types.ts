@@ -25,6 +25,8 @@ import type {
 	ConstraintsSchema,
 	CornerRadiusSchema,
 	EffectSchema,
+	GrainEffectSchema,
+	HalftoneEffectSchema,
 	FieldDefinitionSchema,
 	FieldsSchemaSchema,
 	FillSchema,
@@ -102,6 +104,8 @@ export type Constraints = z.infer<typeof ConstraintsSchema>;
 export type ShadowEffect = z.infer<typeof ShadowEffectSchema>;
 export type BlurEffect = z.infer<typeof BlurEffectSchema>;
 export type BackdropBlurEffect = z.infer<typeof BackdropBlurEffectSchema>;
+export type GrainEffect = z.infer<typeof GrainEffectSchema>;
+export type HalftoneEffect = z.infer<typeof HalftoneEffectSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
 export type LeafElement = z.infer<typeof LeafElementSchema>;
 

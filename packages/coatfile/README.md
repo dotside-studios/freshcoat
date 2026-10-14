@@ -453,7 +453,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -954,6 +954,39 @@ drawn into: inside a frame with `isolate`, `opacity` below 1, `blendMode`,
 { "id": "glass", "type": "rect", "backdropBlur": 24,
   "properties": { "fill": "#ffffff40", "cornerRadius": 16 } /* … */ }
 ```
+
+## Grain and halftone
+
+Two entries of an element's `effects` (1.7) texture its pixels, after
+`adjust` and before blur, shadows and opacity. Sizes are design px and scale
+with the element, so a 2× export looks the same, only sharper. An element
+takes at most one of each.
+
+```jsonc
+"effects": [
+  { "type": "grain", "amount": 0.3,      // 0 to 1
+    "size": 1,                           // one grain's side; default 1
+    "monochrome": true,                  // default true; false for colour grain
+    "blendMode": "overlay",              // normal, overlay, soft-light, multiply, screen
+    "seed": 7 },                         // 0 to 65535; default 0
+  { "type": "halftone", "cellSize": 6,   // one cell's side
+    "shape": "round",                    // round (default), line, square
+    "angle": 45,                         // default 45, or 0 for cmyk
+    "mode": "mono",                      // mono (default) or cmyk
+    "invert": false,                     // dots for light instead of dark
+    "color": "#000000",                  // the ink, mono only
+    "background": "#ffffff" }            // paper under the dots; default none
+]
+```
+
+Grain is seeded, never random: one seed paints the same pixels in Studio, the
+CLI and every worker. `"cmyk"` draws four screens at C 15°, M 75°, Y 0° and
+K 45°, each turned by `angle`, multiplied together. It is a visual effect, not
+colour separations. A screen printed at a DPI, one design px per dot, has
+`dpi / cellSize` lines per inch. Both draw as an image in a vector PDF, with a
+`vector_rasterized` warning, and need a CanvasKit build with runtime effects
+(the default build has them); without them the element paints unchanged with
+an `effect_unsupported` warning.
 
 ## Image focus and crop
 

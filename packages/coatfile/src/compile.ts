@@ -5,6 +5,8 @@ import {
 	buildAdjust,
 	type ChildLayout,
 	type EllipseNode,
+	type Grain,
+	type Halftone,
 	FALLBACK_LINE_HEIGHT,
 	type GroupNode,
 	type ImageNode,
@@ -466,6 +468,8 @@ type Base = {
 	blur?: number;
 	backdropBlur?: number;
 	adjust?: Adjust;
+	halftone?: Halftone;
+	grain?: Grain;
 	layoutChild?: ChildLayout;
 };
 
@@ -690,6 +694,8 @@ function compileFrameElement(
 		blur: base.blur,
 		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
+		halftone: base.halftone,
+		grain: base.grain,
 		layoutChild: base.layoutChild,
 		clip,
 		...corners,
@@ -730,6 +736,8 @@ function compileFrameElement(
 		blur,
 		backdropBlur,
 		adjust,
+		halftone,
+		grain,
 		layoutChild,
 		isolate,
 		...content
@@ -744,6 +752,8 @@ function compileFrameElement(
 		shadow,
 		blur,
 		adjust,
+		halftone,
+		grain,
 		layoutChild,
 		...(isolate ? { isolate } : {}),
 		...(backdropBlur ? { backdropBlur, ...corners } : {}),
@@ -806,6 +816,8 @@ function compileQr(
 		blur: base.blur,
 		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
+		halftone: base.halftone,
+		grain: base.grain,
 		layoutChild: base.layoutChild,
 		children,
 	};
@@ -868,6 +880,8 @@ function compileBarcode(
 		blur: base.blur,
 		backdropBlur: base.backdropBlur,
 		adjust: base.adjust,
+		halftone: base.halftone,
+		grain: base.grain,
 		layoutChild: base.layoutChild,
 		children,
 	});
@@ -1266,13 +1280,13 @@ function resolveStroke(
 	};
 }
 
-// The engine's `shadow`, `blur` and `backdropBlur` for an element's effects,
-// hidden ones left out. The engine fixes where each kind applies, so only the
-// shadows keep their array order.
+// The engine's layer effects for an element's effects, hidden ones left out.
+// The engine fixes where each kind applies, so only the shadows keep their
+// array order. Grain and halftone sizes are design px, scaled like a blur.
 function lowerEffects(
 	el: Pick<Element, "effects" | "shadow" | "blur" | "backdropBlur">,
 	ratio: number,
-): Pick<Base, "shadow" | "blur" | "backdropBlur"> {
+): Pick<Base, "shadow" | "blur" | "backdropBlur" | "grain" | "halftone"> {
 	if (!el.effects) {
 		return {
 			shadow: scaleShadow(el.shadow, ratio),
@@ -1292,10 +1306,34 @@ function lowerEffects(
 	}
 	const blur = shown.find((e) => e.type === "blur");
 	const backdropBlur = shown.find((e) => e.type === "backdropBlur");
+	const grain = shown.find((e) => e.type === "grain");
+	const halftone = shown.find((e) => e.type === "halftone");
 	return {
 		shadow: shadows.length > 0 ? scaleShadow(shadows, ratio) : undefined,
 		blur: blur ? blur.radius * ratio : undefined,
 		backdropBlur: backdropBlur ? backdropBlur.radius * ratio : undefined,
+		grain: grain
+			? {
+					amount: grain.amount,
+					size: (grain.size ?? 1) * ratio,
+					monochrome: grain.monochrome ?? true,
+					blendMode: grain.blendMode ?? "overlay",
+					seed: grain.seed ?? 0,
+				}
+			: undefined,
+		halftone: halftone
+			? {
+					mode: halftone.mode ?? "mono",
+					shape: halftone.shape ?? "round",
+					cellSize: halftone.cellSize * ratio,
+					angle: halftone.angle ?? (halftone.mode === "cmyk" ? 0 : 45),
+					invert: halftone.invert ?? false,
+					color: halftone.color ?? "#000000",
+					...(halftone.background
+						? { background: halftone.background }
+						: {}),
+				}
+			: undefined,
 	};
 }
 
