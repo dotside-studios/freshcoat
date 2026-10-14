@@ -1,16 +1,20 @@
 import { type Effect, type Element, effectsOf } from "@freshcoat-js/coatfile";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { ColorInput } from "@freshcoat-js/ui/color";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
 import type { ReactNode } from "react";
+import { MenuTrigger } from "react-aria-components";
 import { documentDpi } from "~/app/units";
 import { useEditor } from "~/state/hooks";
+import AddIcon from "~icons/mingcute/add-line";
 import EyeIcon from "~icons/mingcute/eye-2-line";
 import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import {
-	AddButton,
 	ItemGroup,
 	Notice,
 	Pair,
@@ -62,13 +66,19 @@ export function halftoneLpi(cellSize: number, dpi: number): number {
 }
 
 const BLUR_UI = {
-	blur: { row: "Blur", label: "Layer blur", add: "Add layer blur" },
-	backdropBlur: {
-		row: "Background",
-		label: "Background blur",
-		add: "Add background blur",
-	},
+	blur: { row: "Blur", label: "Layer blur" },
+	backdropBlur: { row: "Background", label: "Background blur" },
 } as const;
+
+const SINGLE = ["blur", "backdropBlur", "grain", "halftone"] as const;
+type AddType = "shadow" | (typeof SINGLE)[number];
+
+function newEffect(type: AddType): Effect {
+	if (type === "shadow") return DEFAULT_SHADOW;
+	if (type === "grain") return DEFAULT_GRAIN;
+	if (type === "halftone") return DEFAULT_HALFTONE;
+	return { type, radius: type === "blur" ? 4 : 8 };
+}
 
 function clean<T extends Effect>(e: T): T {
 	const out = { ...e } as Record<string, unknown>;
@@ -127,36 +137,30 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 		<InspectorSection
 			title="Effects"
 			actions={
-				<>
-					<AddButton
-						label="Add shadow"
-						onPress={() => add("effect-add", DEFAULT_SHADOW)}
-					/>
-					{(["blur", "backdropBlur"] as const).map(
-						(type) =>
-							!has(type) && (
-								<AddButton
-									key={type}
-									label={BLUR_UI[type].add}
-									onPress={() =>
-										add("effect-add", { type, radius: type === "blur" ? 4 : 8 })
-									}
-								/>
-							),
-					)}
-					{!has("grain") && (
-						<AddButton
-							label="Add grain"
-							onPress={() => add("effect-add", DEFAULT_GRAIN)}
-						/>
-					)}
-					{!has("halftone") && (
-						<AddButton
-							label="Add halftone"
-							onPress={() => add("effect-add", DEFAULT_HALFTONE)}
-						/>
-					)}
-				</>
+				<MenuTrigger>
+					<IconButton
+						aria-label="Add effect"
+						tooltip="Add effect"
+						className="size-5 pointer-coarse:size-8"
+					>
+						<AddIcon />
+					</IconButton>
+					<Popover placement="bottom end">
+						<Menu
+							aria-label="Add effect"
+							disabledKeys={SINGLE.filter(has)}
+							onAction={(k) => add("effect-add", newEffect(k as AddType))}
+						>
+							<MenuItem id="shadow">Shadow</MenuItem>
+							<MenuItem id="blur">{BLUR_UI.blur.label}</MenuItem>
+							<MenuItem id="backdropBlur">
+								{BLUR_UI.backdropBlur.label}
+							</MenuItem>
+							<MenuItem id="grain">Grain</MenuItem>
+							<MenuItem id="halftone">Halftone</MenuItem>
+						</Menu>
+					</Popover>
+				</MenuTrigger>
 			}
 		>
 			<SharedNotice />

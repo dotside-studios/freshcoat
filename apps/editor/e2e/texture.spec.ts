@@ -68,7 +68,8 @@ test("the canvas previews grain and a halftone as they are edited", async ({
 	const before = await regionSum(page, box);
 
 	// The name is white, which a halftone screens to no dots until inverted.
-	await inspector.getByRole("button", { name: "Add halftone" }).click();
+	await inspector.getByRole("button", { name: "Add effect" }).click();
+	await page.getByRole("menuitem", { name: "Halftone" }).click();
 	await inspector.getByRole("button", { name: "Halftone settings" }).click();
 	await page.getByRole("checkbox", { name: "Invert" }).check({ force: true });
 	await settle(page);
@@ -92,7 +93,8 @@ test("the canvas previews grain and a halftone as they are edited", async ({
 	expect(await regionSum(page, box)).toBe(before);
 
 	// Overlay leaves white as it is, so the white name takes multiply.
-	await inspector.getByRole("button", { name: "Add grain" }).click();
+	await inspector.getByRole("button", { name: "Add effect" }).click();
+	await page.getByRole("menuitem", { name: "Grain" }).click();
 	await inspector.getByRole("button", { name: "Grain settings" }).click();
 	await page.getByRole("button", { name: /Grain blend mode/ }).click();
 	await page.getByRole("option", { name: "Multiply" }).click();

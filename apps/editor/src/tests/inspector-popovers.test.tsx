@@ -8,6 +8,11 @@ import { DesignPanel } from "~/panels/design/DesignPanel";
 import { button, fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
+function addEffect(name: string) {
+	fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+	fireEvent.click(screen.getByRole("menuitem", { name }));
+}
+
 const RECT = "0/0";
 const TEXT = "0/1/1";
 
@@ -61,7 +66,7 @@ describe("inspector popovers", () => {
 
 	it("opens an effect's settings in a popover", () => {
 		setup(RECT);
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
+		addEffect("Shadow");
 		expect(screen.queryByLabelText("Shadow 1 x")).toBeNull();
 		fireEvent.click(button("Shadow 1 settings"));
 		const dialog = screen.getByRole("dialog", { name: "Shadow 1" });

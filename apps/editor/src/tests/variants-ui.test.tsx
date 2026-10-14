@@ -19,6 +19,11 @@ import { useEditor } from "~/state/hooks";
 import { fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
+function addEffect(name: string) {
+	fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+	fireEvent.click(screen.getByRole("menuitem", { name }));
+}
+
 beforeEach(() => {
 	Element.prototype.scrollIntoView ??= () => {};
 	const g = globalThis as { CSS?: { escape?: (s: string) => string } };
@@ -215,7 +220,7 @@ describe("override markers", () => {
 		expect(screen.getAllByText("Same in every variant").length).toBeGreaterThan(
 			0,
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
+		addEffect("Shadow");
 		expect((getElement(base(c), "0/5") as Element).effects).toBeTruthy();
 		expect(delta(c, "rot")).toBeUndefined();
 	});

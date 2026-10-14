@@ -22,6 +22,11 @@ import { DesignPanel } from "~/panels/design/DesignPanel";
 import { chooseOption, fastUser, spinbutton } from "./aria";
 import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
+function addEffect(name: string) {
+	fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+	fireEvent.click(screen.getByRole("menuitem", { name }));
+}
+
 function setup(selection: string[], t: Template = doc()) {
 	const c = new EditorController();
 	c.open(t, "doc.coat");
@@ -262,7 +267,7 @@ describe("DesignPanel", () => {
 	it("adds a stroke and a shadow that validate", () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add stroke" }));
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
+		addEffect("Shadow");
 		const e = el(c, "0/0");
 		expect((e.properties as { stroke?: unknown }).stroke).toEqual({
 			color: "#000000",
@@ -274,9 +279,7 @@ describe("DesignPanel", () => {
 
 	it("adds a background blur as one shared effect", () => {
 		const c = setup(["0/0", "0/1"]);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Add background blur" }),
-		);
+		addEffect("Background blur");
 		fireEvent.click(
 			screen.getByRole("button", { name: "Background blur settings" }),
 		);
@@ -288,11 +291,14 @@ describe("DesignPanel", () => {
 			{ type: "backdropBlur", radius: 16 },
 		]);
 		expect(validate(c.template).ok).toBe(true);
-		// Only one of each blur: the add button is gone until it is removed.
-		expect(
-			screen.queryByRole("button", { name: "Add background blur" }),
-		).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+		expect(
+			screen
+				.getByRole("menuitem", { name: "Background blur" })
+				.getAttribute("aria-disabled"),
+		).toBe("true");
+		fireEvent.click(screen.getAllByRole("button", { name: "Dismiss" })[0]);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Remove background blur" }),
 		);
@@ -301,8 +307,8 @@ describe("DesignPanel", () => {
 
 	it("keeps one list of effects and hides one without dropping it", () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
-		fireEvent.click(screen.getByRole("button", { name: "Add layer blur" }));
+		addEffect("Shadow");
+		addEffect("Layer blur");
 		fireEvent.click(screen.getByRole("button", { name: "Shadow 1 visible" }));
 		const e = el(c, "0/0");
 		expect(e.effects).toMatchObject([
@@ -316,7 +322,7 @@ describe("DesignPanel", () => {
 
 	it("adds grain and edits it", async () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add grain" }));
+		addEffect("Grain");
 		fireEvent.click(screen.getByRole("button", { name: "Grain settings" }));
 		typeInto(spinbutton("Grain amount"), "40");
 		typeInto(spinbutton("Grain seed"), "7");
@@ -336,12 +342,18 @@ describe("DesignPanel", () => {
 			},
 		]);
 		expect(validate(c.template).ok).toBe(true);
-		expect(screen.queryByRole("button", { name: "Add grain" })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+		expect(
+			screen
+				.getByRole("menuitem", { name: "Grain" })
+				.getAttribute("aria-disabled"),
+		).toBe("true");
 	}, 20_000);
 
 	it("adds a halftone and shows its lpi", async () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add halftone" }));
+		addEffect("Halftone");
 		fireEvent.click(screen.getByRole("button", { name: "Halftone settings" }));
 		typeInto(spinbutton("Halftone cell size"), "10");
 		expect(screen.getByText(/30 lpi at 300 dpi/)).toBeTruthy();
