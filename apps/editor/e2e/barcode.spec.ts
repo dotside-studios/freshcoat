@@ -68,7 +68,9 @@ test("draw a barcode, bind it to a field, and step records", async ({
 	]);
 
 	// White behind the bars, so spaces read against the card's dark art.
-	await page.getByRole("button", { name: "Add background", exact: true }).click();
+	await page
+		.getByRole("button", { name: "Add background", exact: true })
+		.click();
 	await page.getByLabel("Barcode value").fill("");
 	await page.getByRole("button", { name: "Insert field" }).click();
 	await page.getByRole("menuitem", { name: /display_name/ }).click();
