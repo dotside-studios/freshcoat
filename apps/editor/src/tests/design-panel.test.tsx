@@ -263,6 +263,9 @@ describe("DesignPanel", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Add background blur" }),
 		);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Background blur settings" }),
+		);
 		typeInto(spinbutton("Background blur"), "16");
 		expect(el(c, "0/0").effects).toEqual([
 			{ type: "backdropBlur", radius: 16 },
@@ -275,6 +278,7 @@ describe("DesignPanel", () => {
 		expect(
 			screen.queryByRole("button", { name: "Add background blur" }),
 		).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(
 			screen.getByRole("button", { name: "Remove background blur" }),
 		);
@@ -299,6 +303,7 @@ describe("DesignPanel", () => {
 	it("adds grain and edits it", async () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add grain" }));
+		fireEvent.click(screen.getByRole("button", { name: "Grain settings" }));
 		typeInto(spinbutton("Grain amount"), "40");
 		typeInto(spinbutton("Grain seed"), "7");
 		await chooseOption(
@@ -323,6 +328,7 @@ describe("DesignPanel", () => {
 	it("adds a halftone and shows its lpi", async () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add halftone" }));
+		fireEvent.click(screen.getByRole("button", { name: "Halftone settings" }));
 		typeInto(spinbutton("Halftone cell size"), "10");
 		expect(screen.getByText(/30 lpi at 300 dpi/)).toBeTruthy();
 		await chooseOption(
@@ -348,6 +354,7 @@ describe("DesignPanel", () => {
 			},
 		]);
 		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));
 		expect("effects" in el(c, "0/0")).toBe(false);
 	});

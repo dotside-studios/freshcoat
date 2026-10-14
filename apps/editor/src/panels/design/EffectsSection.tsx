@@ -4,6 +4,7 @@ import { ColorInput } from "@freshcoat-js/ui/color";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import type { ReactNode } from "react";
 import { documentDpi } from "~/app/units";
 import { useEditor } from "~/state/hooks";
 import EyeIcon from "~icons/mingcute/eye-2-line";
@@ -15,6 +16,7 @@ import {
 	Pair,
 	RemoveButton,
 	Row,
+	SettingsPopover,
 	SharedNotice,
 } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
@@ -163,38 +165,57 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 			)}
 			{list.map((e, i) => {
 				const remove = () => update("effect-remove", (l) => removeAt(l, i));
-				const visible = (label: string) => (
-					<VisibleToggle
-						label={`${label} visible`}
-						hidden={e.hidden === true}
-						onChange={(h) =>
-							patchAt(`effect:${i}:hidden`, i, {
-								hidden: h ? true : undefined,
-							})
-						}
-					/>
+				const field = (k: string) => `effect:${i}:${k}`;
+				const row = (
+					name: string,
+					summary: string | null,
+					removeLabel: string,
+					body: ReactNode,
+				) => (
+					<ItemGroup
+						// biome-ignore lint/suspicious/noArrayIndexKey: effects have no identity
+						key={i}
+					>
+						<div className="flex min-h-fc-control min-w-0 items-center gap-1">
+							<span className="min-w-0 flex-1 truncate text-fc-base">
+								{name}
+							</span>
+							{summary ? (
+								<span className="shrink-0 text-fc-faint text-fc-sm">
+									{summary}
+								</span>
+							) : null}
+							<VisibleToggle
+								label={`${name} visible`}
+								hidden={e.hidden === true}
+								onChange={(h) =>
+									patchAt(field("hidden"), i, { hidden: h ? true : undefined })
+								}
+							/>
+							<SettingsPopover label={`${name} settings`} title={name}>
+								{body}
+							</SettingsPopover>
+							<RemoveButton label={removeLabel} onPress={remove} />
+						</div>
+					</ItemGroup>
 				);
 				if (e.type === "grain")
-					return (
-						<ItemGroup
-							// biome-ignore lint/suspicious/noArrayIndexKey: effects have no identity
-							key={i}
-						>
-							<Row label="Grain">
-								<NumberField
-									aria-label="Grain amount"
-									className="min-w-0 flex-1"
-									unit="%"
-									min={0}
-									max={100}
-									value={Math.round(e.amount * 100)}
-									onChange={(v) =>
-										patchAt(`effect:${i}:amount`, i, { amount: v / 100 })
-									}
-								/>
-								{visible("Grain")}
-								<RemoveButton label="Remove grain" onPress={remove} />
-							</Row>
+					return row(
+						"Grain",
+						`${Math.round(e.amount * 100)}%`,
+						"Remove grain",
+						<>
+							<NumberField
+								label="A"
+								aria-label="Grain amount"
+								unit="%"
+								min={0}
+								max={100}
+								value={Math.round(e.amount * 100)}
+								onChange={(v) =>
+									patchAt(field("amount"), i, { amount: v / 100 })
+								}
+							/>
 							<Pair>
 								<NumberField
 									label="S"
@@ -203,7 +224,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									step={0.5}
 									value={e.size ?? 1}
 									onChange={(v) =>
-										patchAt(`effect:${i}:size`, i, {
+										patchAt(field("size"), i, {
 											size: v === 1 ? undefined : v,
 										})
 									}
@@ -216,7 +237,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									precision={0}
 									value={e.seed ?? 0}
 									onChange={(v) =>
-										patchAt(`effect:${i}:seed`, i, {
+										patchAt(field("seed"), i, {
 											seed: v === 0 ? undefined : Math.round(v),
 										})
 									}
@@ -228,7 +249,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									className="min-w-0 flex-1"
 									value={e.blendMode ?? "overlay"}
 									onChange={(v) =>
-										patchAt(`effect:${i}:blendMode`, i, {
+										patchAt(field("blendMode"), i, {
 											blendMode:
 												v === "overlay" ? undefined : (v as Grain["blendMode"]),
 										})
@@ -240,33 +261,33 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 										</SelectItem>
 									))}
 								</Select>
-								<Checkbox
-									isSelected={e.monochrome !== false}
-									onChange={(on) =>
-										patchAt(`effect:${i}:monochrome`, i, {
-											monochrome: on ? undefined : false,
-										})
-									}
-								>
-									Mono
-								</Checkbox>
 							</Row>
-						</ItemGroup>
+							<Checkbox
+								isSelected={e.monochrome !== false}
+								onChange={(on) =>
+									patchAt(field("monochrome"), i, {
+										monochrome: on ? undefined : false,
+									})
+								}
+							>
+								Mono
+							</Checkbox>
+						</>,
 					);
 				if (e.type === "halftone") {
 					const cmyk = e.mode === "cmyk";
-					return (
-						<ItemGroup
-							// biome-ignore lint/suspicious/noArrayIndexKey: effects have no identity
-							key={i}
-						>
-							<Row label="Halftone">
+					return row(
+						"Halftone",
+						cmyk ? "CMYK look" : null,
+						"Remove halftone",
+						<>
+							<Row label="Mode">
 								<Select
 									aria-label="Halftone mode"
 									className="min-w-0 flex-1"
 									value={e.mode ?? "mono"}
 									onChange={(v) =>
-										patchAt(`effect:${i}:mode`, i, {
+										patchAt(field("mode"), i, {
 											mode: v === "cmyk" ? "cmyk" : undefined,
 										})
 									}
@@ -274,8 +295,6 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									<SelectItem id="mono">Mono</SelectItem>
 									<SelectItem id="cmyk">CMYK look</SelectItem>
 								</Select>
-								{visible("Halftone")}
-								<RemoveButton label="Remove halftone" onPress={remove} />
 							</Row>
 							<Row label="Shape">
 								<Select
@@ -283,7 +302,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									className="min-w-0 flex-1"
 									value={e.shape ?? "round"}
 									onChange={(v) =>
-										patchAt(`effect:${i}:shape`, i, {
+										patchAt(field("shape"), i, {
 											shape:
 												v === "round" ? undefined : (v as Halftone["shape"]),
 										})
@@ -295,17 +314,15 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 										</SelectItem>
 									))}
 								</Select>
-								<Checkbox
-									isSelected={e.invert === true}
-									onChange={(on) =>
-										patchAt(`effect:${i}:invert`, i, {
-											invert: on ? true : undefined,
-										})
-									}
-								>
-									Invert
-								</Checkbox>
 							</Row>
+							<Checkbox
+								isSelected={e.invert === true}
+								onChange={(on) =>
+									patchAt(field("invert"), i, { invert: on ? true : undefined })
+								}
+							>
+								Invert
+							</Checkbox>
 							<Pair>
 								<NumberField
 									label="C"
@@ -314,7 +331,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									step={0.5}
 									value={e.cellSize}
 									onChange={(v) =>
-										patchAt(`effect:${i}:cellSize`, i, { cellSize: v })
+										patchAt(field("cellSize"), i, { cellSize: v })
 									}
 								/>
 								<NumberField
@@ -323,7 +340,7 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									unit="°"
 									value={e.angle ?? (cmyk ? 0 : 45)}
 									onChange={(v) =>
-										patchAt(`effect:${i}:angle`, i, {
+										patchAt(field("angle"), i, {
 											angle: v === (cmyk ? 0 : 45) ? undefined : v,
 										})
 									}
@@ -335,24 +352,24 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									: null}
 								{cmyk ? ". A visual effect, not color separations." : null}
 							</Notice>
+							{!cmyk && (
+								<ColorInput
+									aria-label="Halftone ink color"
+									className="min-w-0 flex-1"
+									value={e.color ?? "#000000"}
+									swatches={ins.swatches}
+									onChange={(c) =>
+										patchAt(field("color"), i, {
+											color: c === "#000000" ? undefined : c,
+										})
+									}
+								/>
+							)}
 							<div className="flex min-w-0 items-center gap-1.5">
-								{!cmyk && (
-									<ColorInput
-										aria-label="Halftone ink color"
-										className="min-w-0 flex-1"
-										value={e.color ?? "#000000"}
-										swatches={ins.swatches}
-										onChange={(c) =>
-											patchAt(`effect:${i}:color`, i, {
-												color: c === "#000000" ? undefined : c,
-											})
-										}
-									/>
-								)}
 								<Checkbox
 									isSelected={e.background !== undefined}
 									onChange={(on) =>
-										patchAt(`effect:${i}:background`, i, {
+										patchAt(field("background"), i, {
 											background: on ? "#ffffff" : undefined,
 										})
 									}
@@ -366,87 +383,51 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 										value={e.background}
 										swatches={ins.swatches}
 										onChange={(c) =>
-											patchAt(`effect:${i}:background`, i, { background: c })
+											patchAt(field("background"), i, { background: c })
 										}
 									/>
 								)}
 							</div>
-						</ItemGroup>
+						</>,
 					);
 				}
 				if (e.type !== "shadow") {
 					const ui = BLUR_UI[e.type];
-					return (
-						<ItemGroup
-							// biome-ignore lint/suspicious/noArrayIndexKey: effects have no identity
-							key={i}
-						>
-							<Row label={ui.row}>
-								<NumberField
-									aria-label={ui.label}
-									className="min-w-0 flex-1"
-									min={0}
-									value={e.radius}
-									onChange={(v) =>
-										patchAt(`effect:${i}:radius`, i, { radius: v })
-									}
-								/>
-								<VisibleToggle
-									label={`${ui.label} visible`}
-									hidden={e.hidden === true}
-									onChange={(h) =>
-										patchAt(`effect:${i}:hidden`, i, {
-											hidden: h ? true : undefined,
-										})
-									}
-								/>
-								<RemoveButton
-									label={`Remove ${ui.label.toLowerCase()}`}
-									onPress={() => update("effect-remove", (l) => removeAt(l, i))}
-								/>
-							</Row>
-						</ItemGroup>
+					return row(
+						ui.label,
+						`${e.radius}`,
+						`Remove ${ui.label.toLowerCase()}`,
+						<NumberField
+							label="R"
+							aria-label={ui.label}
+							min={0}
+							value={e.radius}
+							onChange={(v) => patchAt(field("radius"), i, { radius: v })}
+						/>,
 					);
 				}
 				const n = ++shadowNo;
-				return (
-					<ItemGroup
-						// biome-ignore lint/suspicious/noArrayIndexKey: effects have no identity
-						key={i}
-					>
-						<div className="flex min-w-0 items-center gap-1.5">
-							<ColorInput
-								aria-label={`Shadow ${n} color`}
-								className="min-w-0 flex-1"
-								value={e.color}
-								swatches={ins.swatches}
-								onChange={(c) => patchAt(`effect:${i}:color`, i, { color: c })}
-							/>
-							<Checkbox
-								isSelected={e.inset === true}
-								onChange={(on) =>
-									patchAt(`effect:${i}:inset`, i, {
-										inset: on ? true : undefined,
-									})
-								}
-							>
-								Inner
-							</Checkbox>
-							<VisibleToggle
-								label={`Shadow ${n} visible`}
-								hidden={e.hidden === true}
-								onChange={(h) =>
-									patchAt(`effect:${i}:hidden`, i, {
-										hidden: h ? true : undefined,
-									})
-								}
-							/>
-							<RemoveButton
-								label={`Remove shadow ${n}`}
-								onPress={() => update("effect-remove", (l) => removeAt(l, i))}
-							/>
-						</div>
-						<Pair cols={4}>
+				return row(
+					`Shadow ${n}`,
+					`${e.inset === true ? "Inner " : ""}${e.dx ?? 0}, ${e.dy ?? 0}, ${e.blur ?? 0}`,
+					`Remove shadow ${n}`,
+					<>
+						<ColorInput
+							aria-label={`Shadow ${n} color`}
+							className="min-w-0 flex-1"
+							value={e.color}
+							swatches={ins.swatches}
+							onChange={(c) => patchAt(field("color"), i, { color: c })}
+						/>
+						<Checkbox
+							isSelected={e.inset === true}
+							onChange={(on) =>
+								patchAt(field("inset"), i, { inset: on ? true : undefined })
+							}
+						>
+							Inner
+						</Checkbox>
+						<Pair>
 							{(
 								[
 									["dx", "X"],
@@ -462,14 +443,14 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									min={k === "blur" ? 0 : undefined}
 									value={e[k] ?? 0}
 									onChange={(v) =>
-										patchAt(`effect:${i}:${k}`, i, {
+										patchAt(field(k), i, {
 											[k]: k === "spread" && v === 0 ? undefined : v,
 										})
 									}
 								/>
 							))}
 						</Pair>
-					</ItemGroup>
+					</>,
 				);
 			})}
 		</InspectorSection>
