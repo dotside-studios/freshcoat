@@ -636,7 +636,7 @@ const cut: ItemCuts = {
 };
 
 describe("assemblePdf with cut lines", () => {
-	it("strokes each line over the art in its kind's colour at a quarter point", async () => {
+	it("strokes each line over the art in its kind's spot at a quarter point", async () => {
 		const bytes = await assemblePdf(
 			[
 				{
@@ -652,11 +652,12 @@ describe("assemblePdf with cut lines", () => {
 		const doc = await PDFDocument.load(bytes);
 		const [page] = doc.getPages() as [PDFPage];
 		const ops = content(page);
-		expect(ops).toContain("1 0 0 RG");
-		expect(ops).toContain("0 0.627 0 RG");
+		expect(ops).toContain("/CutThrough CS\n1 SCN\n");
+		expect(ops).toContain("/CutPerforate CS\n1 SCN\n");
+		expect(ops).not.toMatch(/ RG\n/);
 		expect(ops).toContain("0.25 w");
 		expect(ops).toContain("c\n");
-		expect(ops.indexOf(" Do")).toBeLessThan(ops.indexOf(" RG"));
+		expect(ops.indexOf(" Do")).toBeLessThan(ops.indexOf(" CS"));
 		expect(strokes(page)).toBe(2);
 		// one point to a design unit at 72 dpi, measured up from the bottom
 		expect(moves(page)).toEqual([
@@ -784,6 +785,106 @@ describe("assemblePdf with cut lines", () => {
 		expect(await assemblePdf(pages, { dpi: 72, date })).toEqual(
 			await assemblePdf(pages, { dpi: 72, date }),
 		);
+	});
+
+	describe("as spot colours", () => {
+		const one = (options: Partial<Parameters<typeof assemblePdf>[1]> = {}) =>
+			assemblePdf(
+				[
+					{
+						bytes: makePng(4, 3),
+						format: png,
+						widthPx: 856,
+						heightPx: 540,
+						cut,
+					},
+				],
+				{ dpi: 72, ...options },
+			);
+		const separation = (page: PDFPage, key: string) => {
+			const spaces = page.node
+				.Resources()
+				?.lookup(PDFName.of("ColorSpace"), PDFDict);
+			const space = spaces?.lookup(PDFName.of(key), PDFArray);
+			if (!space) throw new Error(`no ${key}`);
+			const tint = space.lookup(3, PDFDict);
+			return {
+				family: space.lookup(0, PDFName).decodeText(),
+				name: space.lookup(1, PDFName).decodeText(),
+				alternate: space.lookup(2, PDFName).decodeText(),
+				c0: tint.lookup(PDFName.of("C0"), PDFArray).asArray().map(String),
+				c1: tint.lookup(PDFName.of("C1"), PDFArray).asArray().map(String),
+			};
+		};
+
+		it("names each kind's Separation after the RIP defaults, its alternate the kind's colour", async () => {
+			const doc = await PDFDocument.load(await one());
+			const [page] = doc.getPages() as [PDFPage];
+			expect(separation(page, "CutThrough")).toEqual({
+				family: "Separation",
+				name: "CutContour",
+				alternate: "DeviceRGB",
+				c0: ["1", "1", "1"],
+				c1: ["1", "0", "0"],
+			});
+			expect(separation(page, "CutPerforate").name).toBe("Perfcut");
+			const spaces = page.node
+				.Resources()
+				?.lookup(PDFName.of("ColorSpace"), PDFDict);
+			expect(spaces?.has(PDFName.of("CutKiss"))).toBe(false);
+			expect(spaces?.has(PDFName.of("DefaultRGB"))).toBe(true);
+		});
+
+		it("overprints through an ExtGState set inside the Cut group", async () => {
+			const doc = await PDFDocument.load(await one());
+			const [page] = doc.getPages() as [PDFPage];
+			const gs = page.node
+				.Resources()
+				?.lookup(PDFName.of("ExtGState"), PDFDict)
+				.lookup(PDFName.of("CutOverprint"), PDFDict);
+			expect(String(gs?.get(PDFName.of("OP")))).toBe("true");
+			expect(String(gs?.get(PDFName.of("op")))).toBe("true");
+			expect(String(gs?.get(PDFName.of("OPM")))).toBe("1");
+			expect(content(page)).toMatch(
+				/\/OC \/Cut BDC\nq\n\/CutOverprint gs\n0\.25 w\n\/CutThrough CS\n1 SCN\n[\s\S]*S\n[\s\S]*Q\nEMC/,
+			);
+		});
+
+		it("takes the names a caller gives, escaping what a name cannot hold", async () => {
+			const bytes = await one({
+				cutSpots: { through: "Thru Cut", perforate: "  " },
+			});
+			const doc = await PDFDocument.load(bytes);
+			const [page] = doc.getPages() as [PDFPage];
+			expect(separation(page, "CutThrough").name).toBe("Thru Cut");
+			expect(separation(page, "CutPerforate").name).toBe("Perfcut");
+			const plain = await doc.save({ useObjectStreams: false });
+			expect(new TextDecoder("latin1").decode(plain)).toContain("/Thru#20Cut");
+		});
+
+		it("writes one Separation per kind for the whole document", async () => {
+			const page = {
+				bytes: makePng(4, 3),
+				format: png,
+				widthPx: 856,
+				heightPx: 540,
+				cut,
+			};
+			const bytes = await assemblePdf(
+				[page, { ...page, bytes: makePng(5, 3) }],
+				{
+					dpi: 72,
+				},
+			);
+			const doc = await PDFDocument.load(bytes);
+			const separations = doc.context
+				.enumerateIndirectObjects()
+				.filter(
+					([, obj]) =>
+						obj instanceof PDFArray && obj.get(0) === PDFName.of("Separation"),
+				);
+			expect(separations.length).toBe(2);
+		});
 	});
 
 	describe("on sheets", () => {

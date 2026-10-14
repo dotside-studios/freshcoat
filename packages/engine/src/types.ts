@@ -214,6 +214,17 @@ export type Stroke = {
 	trimStart?: number;
 	trimEnd?: number;
 	trimOffset?: number;
+	// A vector PDF strokes a solid stroke in this spot colour; `color` is its
+	// alternate, which raster outputs paint.
+	spot?: SpotInk;
+};
+
+// A named spot colour (a PDF Separation). `tint` is in [0, 1]; `overprint`
+// keeps the ink from knocking out what lies beneath it.
+export type SpotInk = {
+	name: string;
+	tint: number;
+	overprint: boolean;
 };
 
 // A text stroke: no dash, cap or trim. `outside` draws a double-width stroke
@@ -240,7 +251,8 @@ export type GradientFill = Extract<
 // Gradient endpoints are in [0, 1] of the drawable's bbox. `spread` is what
 // paints past the last stop; omitted means pad.
 export type ResolvedFill =
-	| { kind: "solid"; color: string }
+	// `spot`: a vector PDF paints it in that spot colour, `color` its alternate.
+	| { kind: "solid"; color: string; spot?: SpotInk }
 	| {
 			kind: "linear";
 			stops: GradientStop[];

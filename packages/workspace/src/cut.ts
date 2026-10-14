@@ -42,6 +42,29 @@ export const CUT_STYLES: Record<
 	},
 };
 
+/** The spot colour each kind of cut line is drawn in when a PDF names none:
+ *  the names print-and-cut RIPs look for. */
+export const DEFAULT_CUT_SPOTS: Readonly<Record<CutKind, string>> = {
+	through: "CutContour",
+	kiss: "KissCut",
+	score: "Crease",
+	perforate: "Perfcut",
+};
+
+/** A spot colour name per kind of cut line; a kind left out, or named with
+ *  only spaces, takes its `DEFAULT_CUT_SPOTS` name. */
+export type CutSpots = Partial<Record<CutKind, string>>;
+
+/** Every kind's spot colour name, `spots` over the defaults. */
+export function cutSpotNames(spots?: CutSpots): Record<CutKind, string> {
+	const out = { ...DEFAULT_CUT_SPOTS };
+	for (const kind of CUT_KINDS) {
+		const name = spots?.[kind]?.trim();
+		if (name) out[kind] = name;
+	}
+	return out;
+}
+
 export type CutLine = {
 	kind: CutKind;
 	/** the slice's name */

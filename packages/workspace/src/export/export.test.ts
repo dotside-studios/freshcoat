@@ -9,7 +9,9 @@ import { unzipSync } from "fflate";
 import {
 	decodePDFRawStream,
 	PDFArray,
+	PDFDict,
 	PDFDocument,
+	PDFName,
 	type PDFPage,
 	PDFRawStream,
 } from "pdf-lib";
@@ -788,7 +790,7 @@ describe("runExportJob with cut files", () => {
 			format: "pdf",
 			...changes,
 		});
-		const red = (page: PDFPage) => {
+		const cuts = (page: PDFPage) => {
 			const contents = page.node.Contents();
 			const streams =
 				contents instanceof PDFArray
@@ -799,7 +801,7 @@ describe("runExportJob with cut files", () => {
 					stream instanceof PDFRawStream &&
 					new TextDecoder("latin1")
 						.decode(decodePDFRawStream(stream).decode())
-						.includes("1 0 0 RG"),
+						.includes("/CutThrough CS"),
 			);
 		};
 
@@ -812,14 +814,14 @@ describe("runExportJob with cut files", () => {
 				["left", "cut"],
 				undefined,
 			]);
-			const flags = doc.getPages().map(red);
+			const flags = doc.getPages().map(cuts);
 			expect(flags).toEqual([true, false, false, true, false]);
 		});
 
 		it("draws none by default", async () => {
 			const { pages, doc } = await pdfOf(edged(), pdf());
 			expect(pages.every((p) => p.cut === undefined)).toBe(true);
-			expect(doc.getPages().some(red)).toBe(false);
+			expect(doc.getPages().some(cuts)).toBe(false);
 		});
 
 		it("draws the lines of vector pages", async () => {
@@ -853,7 +855,20 @@ describe("runExportJob with cut files", () => {
 				}),
 			);
 			expect(doc.getPageCount()).toBe(1);
-			expect(red(doc.getPages()[0] as PDFPage)).toBe(true);
+			expect(cuts(doc.getPages()[0] as PDFPage)).toBe(true);
+		});
+
+		it("names the lines' spot colours as the preset says", async () => {
+			const { doc } = await pdfOf(
+				edged(),
+				pdf({ cutLines: true, cutSpots: { through: "Thru-cut" } }),
+			);
+			const space = doc
+				.getPages()[0]
+				?.node.Resources()
+				?.lookup(PDFName.of("ColorSpace"), PDFDict)
+				.lookup(PDFName.of("CutThrough"), PDFArray);
+			expect(space?.lookup(1, PDFName).decodeText()).toBe("Thru-cut");
 		});
 	});
 

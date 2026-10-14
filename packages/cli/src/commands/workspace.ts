@@ -2,6 +2,7 @@ import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Template } from "@freshcoat-js/coatfile";
 import {
+	type CutSpots,
 	type ExportPreset,
 	exportCutFile,
 	exportCutLines,
@@ -41,6 +42,7 @@ export type WorkspaceOptions = {
 	pieces?: true;
 	cut?: "svg" | "dxf";
 	cutLines?: true;
+	cutSpot?: CutSpots;
 	minDpi?: number;
 	quiet: boolean;
 };
@@ -69,13 +71,16 @@ export async function renderWorkspace(
 		markExported: options.save === true,
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
-		...(options.cutLines ? { cutLines: true } : {}),
+		...(options.cutLines || options.cutSpot ? { cutLines: true } : {}),
+		...(options.cutSpot ? { cutSpots: { ...preset.cutSpots, ...options.cutSpot } } : {}),
 		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 	};
 	if (options.cut && preset.format === "pdf")
 		throw new CliError(`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`);
 	if (options.cutLines && preset.format !== "pdf")
 		throw new CliError(`--cut-lines applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
+	if (options.cutSpot && preset.format !== "pdf")
+		throw new CliError(`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,

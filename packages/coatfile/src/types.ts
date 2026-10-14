@@ -38,6 +38,7 @@ import type {
 	ImagePropertiesSchema,
 	InlineAssetSchema,
 	InsetsSchema,
+	LayerSpotSchema,
 	LayoutChildSchema,
 	LayoutSchema,
 	LeafElementSchema,
@@ -47,6 +48,7 @@ import type {
 	RectPropertiesSchema,
 	ShadowEffectSchema,
 	SliceModifierSchema,
+	SpotColorSchema,
 	SymbologySchema,
 	StrokeSideWidthsSchema,
 	TemplateFrameSchema,
@@ -188,6 +190,10 @@ export type InlineAsset = z.infer<typeof InlineAssetSchema>;
 export type Insets = z.infer<typeof InsetsSchema>;
 /** A rect or frame stroke, whose width may be one per side. */
 export type BoxStroke = z.infer<typeof BoxStrokeSchema>;
+/** A named spot ink a layer's fill or stroke prints in. */
+export type SpotColor = z.infer<typeof SpotColorSchema>;
+/** Which of a rect's or vector's paints print as a spot ink. */
+export type LayerSpot = z.infer<typeof LayerSpotSchema>;
 /** A stroke width for each side, as authored; a side left out is 0. */
 export type StrokeSideWidths = z.infer<typeof StrokeSideWidthsSchema>;
 /** An inset resolved to each side. */

@@ -24,7 +24,7 @@ import type { Template } from "./types";
 //   1.7  rect and vector `slice`; element `hidden`; text `stroke` and
 //        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
 //        and image `cornerSmoothing`; rect and frame stroke `width` per side;
-//        element `effects`, with `grain` and `halftone`
+//        element `effects`, with `grain` and `halftone`; rect and vector `spot`
 
 export const FORMAT_MAJOR = 1;
 export const FORMAT_MINOR = 7;
@@ -84,6 +84,7 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "barcode") need(3);
 			if (o.type === "text") textIds.add(o.id);
 			if (usesSlice(o.properties)) need(7);
+			if (usesSpot(o.properties)) need(7);
 			if (usesSideStroke(o.properties)) need(7);
 			if (
 				o.type === "barcode" &&
@@ -140,6 +141,7 @@ export function minimumFormatVersion(template: Template): string {
 					need(7);
 				if (usesBoolean(delta.properties)) need(6);
 				if (usesSlice(delta.properties)) need(7);
+				if (usesSpot(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
 					need(7);
 				if (textIds.has(delta.id) && usesPdfText(delta.properties)) need(7);
@@ -194,6 +196,14 @@ function usesSlice(properties: unknown): boolean {
 		properties !== null &&
 		typeof properties === "object" &&
 		(properties as Record<string, unknown>).slice !== undefined
+	);
+}
+
+function usesSpot(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).spot !== undefined
 	);
 }
 

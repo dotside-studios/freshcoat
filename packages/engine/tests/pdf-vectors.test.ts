@@ -274,6 +274,65 @@ describe("strokes", () => {
 	});
 });
 
+describe("spot colours", () => {
+	const inked = frame([
+		createRect({
+			pos: { x: 10, y: 10 },
+			size: { width: 80, height: 40 },
+			fills: [
+				{
+					kind: "solid",
+					color: "#d4af37",
+					spot: { name: "Gold Foil", tint: 1, overprint: true },
+				},
+			],
+		}),
+		createPath({
+			pos: { x: 110, y: 10 },
+			size: { width: 80, height: 80 },
+			d: "M0 0 L80 80",
+			stroke: {
+				color: "#ffffff",
+				width: 2,
+				spot: { name: "White", tint: 0.5, overprint: false },
+			},
+		}),
+		createRect({
+			pos: { x: 10, y: 70 },
+			size: { width: 60, height: 40 },
+			stroke: {
+				color: "#d4af37",
+				width: 4,
+				sides: { top: 4, right: 0, bottom: 4, left: 0 },
+				spot: { name: "Gold Foil", tint: 1, overprint: true },
+			},
+		}),
+	]);
+
+	test("writes a Separation per ink, its name escaped, with an RGB alternate", async () => {
+		const { body } = await vectors(inked);
+		expect(body).toContain(
+			"/CS0 [/Separation /Gold#20Foil /DeviceRGB <</FunctionType 2 /Domain [0 1] /C0 [1 1 1] /C1 [0.8314 0.6863 0.2157] /N 1>>]",
+		);
+		expect(body).toContain("/CS1 [/Separation /White /DeviceRGB");
+		expect(body.match(/\/Separation /g)?.length).toBe(2);
+		expect(body).toMatch(/\/ColorSpace <<\/DefaultRGB \[\/ICCBased \d+ 0 R\] \/CS0/);
+		expect(body).toMatch(/\/G\d+ <<\/OP true \/op true \/OPM 1>>/);
+	});
+
+	test("fills and strokes in the spot, overprinting only where asked", async () => {
+		const { page } = await vectors(inked);
+		expect(page).toMatch(/\/G\d+ gs\n\/CS0 cs 1 scn\n10 10 80 40 re\nf\n/);
+		expect(page).toContain("q\n/CS1 CS 0.5 SCN\n2 w");
+		expect(page).toMatch(/\/G\d+ gs\n\/CS0 cs 1 scn\n(?:[^\n]* [ml]\n|h\n)+f\*\n/);
+		expect(page).not.toContain("0.8314 0.6863 0.2157 rg");
+	});
+
+	test.skipIf(!pdftoppm)("matches the raster render in the alternate", async () => {
+		expect(await difference(inked)).toBeLessThan(2);
+	});
+});
+
 describe("smoothed corners", () => {
 	const logo = new TextEncoder().encode(
 		'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" viewBox="0 0 20 10"><rect width="20" height="10" fill="#e63946"/></svg>',

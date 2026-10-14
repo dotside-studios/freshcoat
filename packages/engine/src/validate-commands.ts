@@ -21,6 +21,7 @@ import type {
 	Halftone,
 	ResolvedFill,
 	ShapeMask,
+	SpotInk,
 	Stroke,
 } from "./types";
 
@@ -648,7 +649,10 @@ function validateFill(
 	add: Add,
 	id?: string,
 ): void {
-	if (fill.kind === "solid") return;
+	if (fill.kind === "solid") {
+		if (fill.spot) validateSpot(fill.spot, `${path}.spot`, add, id);
+		return;
+	}
 	if (fill.kind === "pattern") {
 		validatePattern(fill, path, add, id);
 		return;
@@ -687,12 +691,30 @@ function validateFill(
 		);
 }
 
+function validateSpot(
+	spot: SpotInk,
+	path: Path | string,
+	add: Add,
+	id?: string,
+): void {
+	if (typeof spot.name !== "string" || spot.name.length === 0)
+		add("bad_spot", "spot name must not be empty", `${path}.name`, id);
+	if (!finite(spot.tint) || spot.tint < 0 || spot.tint > 1)
+		add(
+			"bad_spot",
+			`spot tint must be in [0, 1], got ${spot.tint}`,
+			`${path}.tint`,
+			id,
+		);
+}
+
 function validateStroke(
 	stroke: Stroke,
 	path: Path,
 	add: Add,
 	id?: string,
 ): void {
+	if (stroke.spot) validateSpot(stroke.spot, `${path}.spot`, add, id);
 	if (!finite(stroke.width) || stroke.width < 0)
 		add(
 			"bad_stroke_width",

@@ -42,7 +42,7 @@ import {
 	templateBleed,
 } from "./bleed";
 import { applyBooleans } from "./boolean";
-import { linearPoints } from "./fills";
+import { leadColor, linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
 import { fieldContext, prepareTemplate } from "./prepare";
@@ -69,6 +69,7 @@ import type {
 	GradientFill,
 	GridTrack,
 	ImageCrop,
+	LayerSpot,
 	Layout,
 	LayoutChild,
 	ResolvedFill,
@@ -305,8 +306,11 @@ function compileBackground(
 		return {
 			...transform,
 			kind: "rect",
-			fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
-			stroke: resolveStroke(props.stroke as StrokeInput | undefined, 1),
+			...applySpot(
+				props,
+				resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
+				resolveStroke(props.stroke as StrokeInput | undefined, 1),
+			),
 			cornerRadius: scaleCorner(props.cornerRadius, 1),
 			cornerSmoothing:
 				typeof props.cornerSmoothing === "number"
@@ -352,8 +356,11 @@ function compileElement(
 			return {
 				...transform,
 				kind: "rect",
-				fills: resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
-				stroke: resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				...applySpot(
+					props,
+					resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
+					resolveStroke(props.stroke as StrokeInput | undefined, ratio),
+				),
 				cornerRadius: scaleCorner(props.cornerRadius, ratio),
 				cornerSmoothing:
 					typeof props.cornerSmoothing === "number"
@@ -371,15 +378,12 @@ function compileElement(
 				mask: resolveImageClip(props, ratio),
 			} satisfies ImageNode;
 		case "vector": {
-			const stroke = resolveStroke(
-				props.stroke as StrokeInput | undefined,
-				ratio,
+			const { fills, stroke } = applySpot(
+				props,
+				resolveFills(props.fill as Fill | Fill[] | undefined, ratio),
+				resolveStroke(props.stroke as StrokeInput | undefined, ratio),
 			);
 			const d = String(props.d ?? "");
-			const fills = resolveFills(
-				props.fill as Fill | Fill[] | undefined,
-				ratio,
-			);
 			// A trimmed ellipse runs from its top, as a progress ring does.
 			if (
 				stroke &&
@@ -1278,6 +1282,39 @@ function resolveStroke(
 		align: stroke.align,
 		...resolveStrokeTrim(stroke),
 	};
+}
+
+// A rect's or vector's `spot`: a spot fill paints one solid of its `alt`, or
+// of the layer's lead colour, and a spot stroke paints its `alt` in place of
+// a gradient. Raster outputs draw that colour; a vector PDF the spot.
+function applySpot(
+	props: Record<string, unknown>,
+	fills: ResolvedFill[] | undefined,
+	stroke: Stroke | undefined,
+): { fills: ResolvedFill[] | undefined; stroke: Stroke | undefined } {
+	const spot = props.spot as LayerSpot | undefined;
+	if (!spot) return { fills, stroke };
+	const ink = (s: NonNullable<LayerSpot["fill"]>) => ({
+		name: s.spot,
+		tint: s.tint ?? 1,
+		overprint: s.overprint ?? false,
+	});
+	if (spot.fill) {
+		const raw = props.fill as Fill | Fill[] | undefined;
+		const lead = Array.isArray(raw) ? raw[0] : raw;
+		const color = spot.fill.alt ?? (lead !== undefined ? leadColor(lead) : "");
+		if (color)
+			fills = [{ kind: "solid", color, spot: ink(spot.fill) }];
+	}
+	if (spot.stroke && stroke) {
+		const { gradient: _, ...solid } = stroke;
+		stroke = {
+			...solid,
+			color: spot.stroke.alt ?? stroke.color,
+			spot: ink(spot.stroke),
+		};
+	}
+	return { fills, stroke };
 }
 
 // The engine's layer effects for an element's effects, hidden ones left out.

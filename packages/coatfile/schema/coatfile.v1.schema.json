@@ -1792,6 +1792,55 @@
 														"type": "number"
 													}
 												}
+											},
+											"spot": {
+												"type": "object",
+												"properties": {
+													"fill": {
+														"type": "object",
+														"properties": {
+															"spot": {
+																"type": "string"
+															},
+															"tint": {
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															"alt": {
+																"type": "string"
+															},
+															"overprint": {
+																"type": "boolean"
+															}
+														},
+														"required": [
+															"spot"
+														]
+													},
+													"stroke": {
+														"type": "object",
+														"properties": {
+															"spot": {
+																"type": "string"
+															},
+															"tint": {
+																"type": "number",
+																"minimum": 0,
+																"maximum": 1
+															},
+															"alt": {
+																"type": "string"
+															},
+															"overprint": {
+																"type": "boolean"
+															}
+														},
+														"required": [
+															"spot"
+														]
+													}
+												}
 											}
 										}
 									}
@@ -4304,6 +4353,55 @@
 																},
 																"order": {
 																	"type": "number"
+																}
+															}
+														},
+														"spot": {
+															"type": "object",
+															"properties": {
+																"fill": {
+																	"type": "object",
+																	"properties": {
+																		"spot": {
+																			"type": "string"
+																		},
+																		"tint": {
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		"alt": {
+																			"type": "string"
+																		},
+																		"overprint": {
+																			"type": "boolean"
+																		}
+																	},
+																	"required": [
+																		"spot"
+																	]
+																},
+																"stroke": {
+																	"type": "object",
+																	"properties": {
+																		"spot": {
+																			"type": "string"
+																		},
+																		"tint": {
+																			"type": "number",
+																			"minimum": 0,
+																			"maximum": 1
+																		},
+																		"alt": {
+																			"type": "string"
+																		},
+																		"overprint": {
+																			"type": "boolean"
+																		}
+																	},
+																	"required": [
+																		"spot"
+																	]
 																}
 															}
 														}
@@ -10505,6 +10603,55 @@
 													"type": "number"
 												}
 											}
+										},
+										"spot": {
+											"type": "object",
+											"properties": {
+												"fill": {
+													"type": "object",
+													"properties": {
+														"spot": {
+															"type": "string"
+														},
+														"tint": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"alt": {
+															"type": "string"
+														},
+														"overprint": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"spot"
+													]
+												},
+												"stroke": {
+													"type": "object",
+													"properties": {
+														"spot": {
+															"type": "string"
+														},
+														"tint": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"alt": {
+															"type": "string"
+														},
+														"overprint": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"spot"
+													]
+												}
+											}
 										}
 									}
 								}
@@ -11867,6 +12014,55 @@
 												"color",
 												"width"
 											]
+										},
+										"spot": {
+											"type": "object",
+											"properties": {
+												"fill": {
+													"type": "object",
+													"properties": {
+														"spot": {
+															"type": "string"
+														},
+														"tint": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"alt": {
+															"type": "string"
+														},
+														"overprint": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"spot"
+													]
+												},
+												"stroke": {
+													"type": "object",
+													"properties": {
+														"spot": {
+															"type": "string"
+														},
+														"tint": {
+															"type": "number",
+															"minimum": 0,
+															"maximum": 1
+														},
+														"alt": {
+															"type": "string"
+														},
+														"overprint": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"spot"
+													]
+												}
+											}
 										},
 										"boolean": {
 											"type": "object",
