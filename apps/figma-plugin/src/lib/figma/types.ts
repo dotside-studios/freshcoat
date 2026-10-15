@@ -91,7 +91,13 @@ export type FigmaGridTrack = { type: "FLEX" | "FIXED" | "HUG"; value?: number };
 export type FigmaPaint = FigmaSolidPaint | FigmaGradientPaint | FigmaImagePaint;
 
 export type FigmaEffect = {
-	type: "DROP_SHADOW" | "INNER_SHADOW" | "LAYER_BLUR" | "BACKGROUND_BLUR";
+	type:
+		| "DROP_SHADOW"
+		| "INNER_SHADOW"
+		| "LAYER_BLUR"
+		| "BACKGROUND_BLUR"
+		| "NOISE"
+		| "TEXTURE";
 	visible?: boolean;
 	color?: { r: number; g: number; b: number; a: number };
 	offset?: { x: number; y: number };
@@ -100,6 +106,11 @@ export type FigmaEffect = {
 	blendMode?: FigmaBlendMode;
 	// A PROGRESSIVE layer blur ramps its radius across the layer.
 	blurType?: "NORMAL" | "PROGRESSIVE";
+	noiseType?: "MONOTONE" | "DUOTONE" | "MULTITONE";
+	noiseSize?: number;
+	noiseSizeVector?: { x: number; y: number };
+	// Fraction of noise cells drawn, 0 to 1.
+	density?: number;
 };
 
 export type FigmaTextStyle = {

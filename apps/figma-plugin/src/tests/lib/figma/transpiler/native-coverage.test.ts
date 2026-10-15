@@ -9,6 +9,7 @@ import { transpileText } from "~/lib/figma/transpiler/text";
 import { transpileVector } from "~/lib/figma/transpiler/vector";
 import type {
 	FigmaContainerNode,
+	FigmaEffect,
 	FigmaGradientPaint,
 	FigmaNode,
 	FigmaPaint,
@@ -406,6 +407,71 @@ describe("effects", () => {
 		).toBe("effect_flattened");
 	});
 
+	const noise = (
+		overrides: Partial<FigmaEffect> = {},
+	): FigmaEffect => ({
+		type: "NOISE",
+		noiseType: "MONOTONE",
+		visible: true,
+		color: { r: 0, g: 0, b: 0, a: 0.25 },
+		noiseSize: 2,
+		density: 0.5,
+		...overrides,
+	});
+
+	it("keeps a monotone neutral noise native, as grain", () => {
+		expect(classify(rect({ effects: [noise()] })).kind).toBe("native-rect");
+		expect(
+			classify(
+				rect({
+					effects: [
+						noise({
+							color: { r: 0.5, g: 0.5, b: 0.5, a: 1 },
+							blendMode: "OVERLAY",
+							noiseSizeVector: { x: 2, y: 2 },
+						}),
+					],
+				}),
+			).kind,
+		).toBe("native-rect");
+		expect(classify(text({ effects: [noise()] })).kind).toBe("native-text");
+	});
+
+	it.each<[string, FigmaEffect[]]>([
+		["a coloured noise", [noise({ color: { r: 1, g: 0, b: 0, a: 0.5 } })]],
+		[
+			"a duotone noise",
+			[
+				noise({
+					noiseType: "DUOTONE",
+				}),
+			],
+		],
+		["a multitone noise", [noise({ noiseType: "MULTITONE" })]],
+		["a noise with non-square cells", [noise({ noiseSizeVector: { x: 2, y: 4 } })]],
+		["a noise blended in a mode grain lacks", [noise({ blendMode: "DARKEN" })]],
+		["two noises", [noise(), noise({ blendMode: "SCREEN" })]],
+		[
+			"a texture",
+			[{ type: "TEXTURE", visible: true, noiseSize: 2, radius: 4 }],
+		],
+	])("rasterizes %s", (_, effects) => {
+		expect(flattenReason(rect({ effects }))).toBe("effect_flattened");
+	});
+
+	it("ignores a hidden noise it could not map", () => {
+		expect(
+			classify(
+				rect({
+					effects: [
+						noise({ visible: false, noiseType: "DUOTONE" }),
+						noise(),
+					],
+				}),
+			).kind,
+		).toBe("native-rect");
+	});
+
 	it("keeps stacked shadows and a layer blur native", () => {
 		expect(
 			classify(
@@ -430,9 +496,7 @@ const PRODUCT: ProductRegistryEntry = {
 };
 const META = { id: "t", name: "T", version: "1.0.0", formatVersion: "1.0" };
 
-async function elementsOf(
-	children: FigmaNode[],
-): Promise<Array<Record<string, unknown>>> {
+async function transpileCard(children: FigmaNode[]) {
 	const side = frame(children, {
 		id: "1:1",
 		name: "front",
@@ -457,10 +521,67 @@ async function elementsOf(
 	const t = result.template as {
 		template_data: Array<{ elements: Array<Record<string, unknown>> }>;
 	};
-	return t.template_data[0].elements;
+	return { elements: t.template_data[0].elements, warnings: result.warnings };
+}
+
+async function elementsOf(
+	children: FigmaNode[],
+): Promise<Array<Record<string, unknown>>> {
+	return (await transpileCard(children)).elements;
 }
 
 describe("in a transpiled card", () => {
+	it("draws a monotone noise as grain and says it is approximated", async () => {
+		const { elements, warnings } = await transpileCard([
+			rect({
+				effects: [
+					{
+						type: "NOISE",
+						noiseType: "MONOTONE",
+						visible: true,
+						color: { r: 1, g: 1, b: 1, a: 1 },
+						blendMode: "SCREEN",
+						noiseSize: 1.5,
+						density: 0.25,
+					},
+				],
+			}),
+		]);
+		expect(elements[0].effects).toEqual([
+			{ type: "grain", amount: 0.866, size: 1.5, blendMode: "screen" },
+		]);
+		expect(warnings).toContainEqual(
+			expect.objectContaining({
+				severity: "info",
+				code: "noise_approximated",
+				nodeId: "1:3",
+			}),
+		);
+	});
+
+	it("gives a group with noise a layer of its own, carrying the grain", async () => {
+		const group = frame([rect()], {
+			type: "GROUP",
+			name: "grainy",
+			effects: [
+				{
+					type: "NOISE",
+					noiseType: "MONOTONE",
+					visible: true,
+					color: { r: 0, g: 0, b: 0, a: 1 },
+					noiseSize: 1,
+					density: 1,
+				},
+			],
+		});
+		const { elements, warnings } = await transpileCard([group]);
+		expect(elements[0]).toMatchObject({
+			type: "frame",
+			effects: [{ type: "grain", amount: 1, size: 1, blendMode: "normal" }],
+		});
+		expect(warnings.map((w) => w.code)).toContain("noise_approximated");
+	});
+
 	it("gives a blended group a layer of its own", async () => {
 		const group = frame([rect()], {
 			type: "GROUP",

@@ -134,6 +134,34 @@ describe("readBaseFields", () => {
 			color: { r: 0, g: 0, b: 0, a: 0.5 },
 		});
 	});
+
+	it("reads a noise effect's type, size and density", () => {
+		const base = readBaseFields({
+			id: "1:6",
+			name: "Grainy",
+			absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+			effects: [
+				{
+					type: "NOISE",
+					noiseType: "MONOTONE",
+					visible: true,
+					color: { r: 0, g: 0, b: 0, a: 0.25 },
+					blendMode: "OVERLAY",
+					noiseSize: 2,
+					noiseSizeVector: { x: 2, y: 3 },
+					density: 0.5,
+				},
+			],
+		});
+		expect(base.effects?.[0]).toMatchObject({
+			type: "NOISE",
+			noiseType: "MONOTONE",
+			blendMode: "OVERLAY",
+			noiseSize: 2,
+			noiseSizeVector: { x: 2, y: 3 },
+			density: 0.5,
+		});
+	});
 });
 
 function textNode(overrides: Record<string, unknown>) {

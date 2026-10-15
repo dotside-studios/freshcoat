@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractEffects } from "~/lib/figma/transpiler/effects";
+import { extractEffects, noiseAmount } from "~/lib/figma/transpiler/effects";
+import type { FigmaEffect } from "~/lib/figma/types";
 
 describe("extractEffects", () => {
 	it("returns empty when effects is undefined", () => {
@@ -225,5 +226,86 @@ describe("extractEffects (rotated elements)", () => {
 		expect(extractEffects(shadow, 2, 90).effects).toMatchObject([
 			{ dx: 8, dy: 0, blur: 16 },
 		]);
+	});
+});
+
+describe("extractEffects (noise)", () => {
+	const noise = (overrides: Partial<FigmaEffect> = {}): FigmaEffect => ({
+		type: "NOISE",
+		noiseType: "MONOTONE",
+		visible: true,
+		color: { r: 0, g: 0, b: 0, a: 1 },
+		noiseSize: 2,
+		density: 1,
+		...overrides,
+	});
+
+	it("maps a monotone noise to grain, its size scaled", () => {
+		expect(extractEffects([noise()], 2).effects).toEqual([
+			{ type: "grain", amount: 1, size: 4, blendMode: "normal" },
+		]);
+	});
+
+	it.each([
+		["NORMAL", "normal"],
+		["OVERLAY", "overlay"],
+		["SOFT_LIGHT", "soft-light"],
+		["MULTIPLY", "multiply"],
+		["SCREEN", "screen"],
+	] as const)("carries the %s blend mode", (figma, grain) => {
+		const [e] = extractEffects(
+			[noise({ blendMode: figma, color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } })],
+			1,
+		).effects ?? [];
+		expect(e).toMatchObject({ type: "grain", blendMode: grain });
+	});
+
+	it("scales the amount by alpha times the root of the density", () => {
+		const [full] = extractEffects([noise()], 1).effects ?? [];
+		const [faint] =
+			extractEffects(
+				[noise({ color: { r: 0, g: 0, b: 0, a: 0.5 }, density: 0.25 })],
+				1,
+			).effects ?? [];
+		expect(full).toMatchObject({ amount: 1 });
+		expect(faint).toMatchObject({ amount: 0.363 });
+	});
+
+	it("leaves out a noise it cannot map, and a hidden one", () => {
+		expect(
+			extractEffects(
+				[
+					noise({ color: { r: 1, g: 0, b: 0, a: 1 } }),
+					noise({ noiseType: "DUOTONE" }),
+					noise({ noiseSizeVector: { x: 2, y: 3 } }),
+					noise({ blendMode: "COLOR_BURN" }),
+					noise({ visible: false }),
+				],
+				1,
+			),
+		).toEqual({});
+	});
+
+	it("keeps only the first grain", () => {
+		const fx = extractEffects([noise(), noise({ blendMode: "SCREEN" })], 1);
+		expect(fx.effects).toHaveLength(1);
+	});
+});
+
+describe("noiseAmount", () => {
+	it("is 0 where Figma's noise leaves every tone alone", () => {
+		expect(noiseAmount(1, 1, 1, "multiply")).toBeCloseTo(0, 9);
+		expect(noiseAmount(0, 1, 1, "screen")).toBeCloseTo(0, 9);
+		expect(noiseAmount(0.5, 1, 1, "overlay")).toBeCloseTo(0, 9);
+		expect(noiseAmount(0.5, 1, 1, "soft-light")).toBeCloseTo(0, 9);
+	});
+
+	it("weakens a mid-grey normal noise against a black one", () => {
+		expect(noiseAmount(0.5, 1, 1, "normal")).toBeCloseTo(0.667, 3);
+		expect(noiseAmount(0, 1, 1, "normal")).toBe(1);
+	});
+
+	it("never passes 1", () => {
+		expect(noiseAmount(0, 1, 4, "overlay")).toBe(1);
 	});
 });

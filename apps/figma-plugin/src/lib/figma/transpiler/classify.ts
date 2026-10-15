@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import { isContainerNode, isVectorNode } from "../types";
 import { isBarcodeLayerName } from "./barcode-name";
+import { isMappableNoise } from "./effects";
 import { canHoldImage } from "./image-shape";
 import { compositeSolids, isMappablePaint, type PaintBox } from "./paint";
 import { decomposeTransform, nodeExtent } from "./transform";
@@ -125,7 +126,8 @@ export function vectorFillRule(
 // for a group is a box Figma never draws, so those two keep flattening. A
 // progressive blur ramps its radius and a shadow with its own blend mode
 // composites apart from its layer, neither of which the element's blur and
-// shadow can say. Newer kinds (noise, texture, glass) have no equivalent.
+// shadow can say. A monotone, neutral noise becomes grain; other noise and the
+// newer kinds (texture, glass) have no equivalent.
 function isUnsupportedEffect(n: FigmaNode, e: FigmaEffect): boolean {
 	if (e.visible === false) return false;
 	if (e.type === "LAYER_BLUR") return e.blurType === "PROGRESSIVE";
@@ -135,12 +137,17 @@ function isUnsupportedEffect(n: FigmaNode, e: FigmaEffect): boolean {
 		);
 	if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW")
 		return e.blendMode !== undefined && e.blendMode !== "NORMAL";
+	if (e.type === "NOISE") return !isMappableNoise(e);
 	return true;
 }
 
+// An element takes one grain, so a second visible noise rasterizes the layer.
 function hasUnsupportedEffects(n: FigmaNode): boolean {
 	if (!Array.isArray(n.effects)) return false;
-	return n.effects.some((e) => isUnsupportedEffect(n, e));
+	const noises = n.effects.filter(
+		(e) => e.type === "NOISE" && e.visible !== false,
+	);
+	return noises.length > 1 || n.effects.some((e) => isUnsupportedEffect(n, e));
 }
 
 // A node whose transform can't be decomposed into rotation + translation
