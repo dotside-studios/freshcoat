@@ -27,6 +27,50 @@ export type TranspileQrContext = {
 };
 
 const EC_VALUES = new Set(["L", "M", "Q", "H"]);
+const MODULE_SHAPES = new Set(["square", "dot", "rounded", "classy"]);
+const FINDER_OUTER = new Set(["square", "rounded", "circle"]);
+const FINDER_INNER = new Set(["square", "rounded", "dot"]);
+
+const finite = (raw: string | undefined): number | undefined => {
+	if (raw === undefined || raw === "") return undefined;
+	const n = Number(raw);
+	return Number.isFinite(n) ? n : undefined;
+};
+
+function parseGradient(raw: string | undefined) {
+	if (!raw) return undefined;
+	const [from, to, angle] = raw.split(",").map((p) => p.trim());
+	if (!from || !to) return undefined;
+	return {
+		kind: "linear" as const,
+		angle: finite(angle) ?? 0,
+		stops: [
+			{ offset: 0, color: from },
+			{ offset: 1, color: to },
+		],
+	};
+}
+
+function styleOptions(opts: Record<string, string>): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	if (opts.shape && MODULE_SHAPES.has(opts.shape)) out.moduleShape = opts.shape;
+	if (opts.eye && FINDER_OUTER.has(opts.eye)) out.finderOuter = opts.eye;
+	if (opts.pupil && FINDER_INNER.has(opts.pupil)) out.finderInner = opts.pupil;
+	const quiet = finite(opts.quiet);
+	if (quiet !== undefined && quiet >= 0) out.quietZone = Math.round(quiet);
+	const gradient = parseGradient(opts.gradient);
+	if (gradient) out.gradient = gradient;
+	if (opts.logo && !opts.logo.includes("{{")) {
+		const size = finite(opts.logosize);
+		const padding = finite(opts.logopad);
+		out.logo = {
+			src: opts.logo,
+			...(size !== undefined && size > 0 && size <= 1 ? { size } : {}),
+			...(padding !== undefined && padding >= 0 ? { padding } : {}),
+		};
+	}
+	return out;
+}
 
 // Any node named `qr:…` is a placeholder — only its name + bbox are read, so
 // this accepts any FigmaNode, not just rectangles.
@@ -64,6 +108,7 @@ export function transpileQr(node: FigmaNode, ctx: TranspileQrContext) {
 		const m = Number(parsed.options.margin);
 		if (Number.isFinite(m)) properties.margin = m;
 	}
+	Object.assign(properties, styleOptions(parsed.options));
 
 	return {
 		id: token ?? node.id.replace(":", "_"),

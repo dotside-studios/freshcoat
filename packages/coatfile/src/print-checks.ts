@@ -15,6 +15,7 @@ import {
 } from "./bleed";
 import { DEFAULT_IMAGE_DPI_UNITS } from "./image-dpi";
 import { hasToken } from "./mustache";
+import { describeQrIssue, type QrIssue, qrIssues } from "./qr-checks";
 import type { Element, Template, TextElement } from "./types";
 
 export const POINTS_PER_INCH = 72;
@@ -44,6 +45,7 @@ export const PRINT_CHECK_DEFAULTS: Required<PrintCheckOptions> = {
 };
 
 export type PrintIssue =
+	| QrIssue
 	| { code: "small_text"; sizePt: number; minPt: number; light: boolean }
 	| { code: "hairline_stroke"; widthPt: number; minPt: number }
 	| { code: "rich_black_text"; color: string; sizePt: number; maxPt: number }
@@ -208,6 +210,7 @@ function elementStrokeWidth(el: Element): number | undefined {
 function layerIssues(el: Element, o: Required<PrintCheckOptions>): PrintIssue[] {
 	const out: PrintIssue[] = [];
 	if (el.type === "text") out.push(...textIssues(templateTextRuns(el), o));
+	if (el.type === "qr_code") out.push(...qrIssues(el));
 	const stroke = strokeIssue(elementStrokeWidth(el), o);
 	if (stroke) out.push(stroke);
 	return out;
@@ -349,6 +352,8 @@ function measure(issue: PrintIssue): number {
 			return issue.widthPt;
 		case "short_of_bleed":
 			return -issue.edges.length;
+		default:
+			return 0;
 	}
 }
 
@@ -361,6 +366,11 @@ function andList(items: readonly string[]): string {
 /** A print issue as one line of readable text. */
 export function describePrintIssue(issue: PrintIssue): string {
 	switch (issue.code) {
+		case "qr_low_contrast":
+		case "qr_inverted":
+		case "qr_quiet_zone":
+		case "qr_logo_large":
+			return describeQrIssue(issue);
 		case "small_text":
 			return `Text is ${issue.sizePt} pt at print size, below ${issue.minPt} pt${issue.light ? " for a light face" : ""}`;
 		case "hairline_stroke":

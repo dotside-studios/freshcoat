@@ -1,6 +1,10 @@
-import { modulePixels } from "@freshcoat-js/engine";
 import { correction, generate, mode } from "lean-qr";
-import type { ECLevel } from "./types";
+import type {
+	ECLevel,
+	QrFinderInner,
+	QrFinderOuter,
+	QrModuleShape,
+} from "./types";
 
 // ISO-8859-1 is left out so Latin-1 text is sent as UTF-8, as before.
 const MODES = [mode.numeric, mode.alphaNumeric, mode.ascii, mode.utf8];
@@ -8,7 +12,7 @@ const MODES = [mode.numeric, mode.alphaNumeric, mode.ascii, mode.utf8];
 // Byte budgets, so a run of version-40 symbols (177 modules a side) can't
 // grow the memo past a few MB.
 export const MATRIX_CACHE_BYTES = 2 * 1024 * 1024;
-export const PIXEL_CACHE_BYTES = 8 * 1024 * 1024;
+export const PATH_CACHE_BYTES = 16 * 1024 * 1024;
 
 // A symbol's modules, one byte each (1 set, 0 clear), row-major.
 interface Modules {
@@ -47,13 +51,10 @@ class ByteLru<T> {
 }
 
 const matrices = new ByteLru<Modules>(MATRIX_CACHE_BYTES, (m) => m.bits.length);
-const pixelBuffers = new ByteLru<Uint8Array>(
-	PIXEL_CACHE_BYTES,
-	(p) => p.length,
-);
+const paths = new ByteLru<string>(PATH_CACHE_BYTES, (d) => d.length * 2);
 
-export function qrCacheBytes(): { matrices: number; pixels: number } {
-	return { matrices: matrices.bytes, pixels: pixelBuffers.bytes };
+export function qrCacheBytes(): { matrices: number; paths: number } {
+	return { matrices: matrices.bytes, paths: paths.bytes };
 }
 
 export function generateMatrix(value: string, ec: ECLevel = "M"): boolean[][] {
@@ -67,21 +68,229 @@ export function generateMatrix(value: string, ec: ECLevel = "M"): boolean[][] {
 	return matrix;
 }
 
-// The symbol as RGBA: the colour where a module is set, transparent elsewhere.
-// The buffer is shared between calls with the same input, so callers must not
-// mutate or transfer it.
-export function generatePixels(
+export type QrStyle = {
+	moduleShape: QrModuleShape;
+	finderOuter: QrFinderOuter;
+	finderInner: QrFinderInner;
+	quietZone: number;
+	// Requested logo side as a fraction of the symbol's, 0 for none.
+	logoSize: number;
+	// Modules cleared around the logo.
+	logoPadding: number;
+};
+
+export const DEFAULT_QR_STYLE: QrStyle = {
+	moduleShape: "square",
+	finderOuter: "square",
+	finderInner: "square",
+	quietZone: 0,
+	logoSize: 0,
+	logoPadding: 1,
+};
+
+export const MAX_QR_LOGO_SIZE = 0.3;
+export const QR_LOGO_H_COVERAGE = 0.15;
+
+const LEVELS: ECLevel[] = ["L", "M", "Q", "H"];
+const atLeast = (ec: ECLevel, min: ECLevel): ECLevel =>
+	LEVELS.indexOf(ec) >= LEVELS.indexOf(min) ? ec : min;
+
+export type QrSymbol = {
+	// Modules a side, without the quiet zone. 0 for an empty value.
+	size: number;
+	ec: ECLevel;
+	// Modules a side, quiet zone included: the path's coordinate box.
+	grid: number;
+	d: string;
+	logo?: { x: number; y: number; side: number };
+	coverage: number;
+};
+
+export function qrSymbol(
 	value: string,
 	ec: ECLevel,
-	[r, g, b]: readonly [number, number, number],
-): { size: number; pixels: Uint8Array } {
-	const { size, bits } = modules(value, ec);
-	const key = `${ec}:${r},${g},${b}:${value}`;
-	const hit = pixelBuffers.get(key);
-	if (hit) return { size, pixels: hit };
-	const pixels = modulePixels(bits, [r, g, b]);
-	pixelBuffers.set(key, pixels);
-	return { size, pixels };
+	style: QrStyle = DEFAULT_QR_STYLE,
+): QrSymbol {
+	const q = style.quietZone;
+	const hasLogo = style.logoSize > 0;
+	let level = hasLogo ? atLeast(ec, "Q") : ec;
+	let m = modules(value, level);
+	let clear = clearing(m.size, style);
+	if (clear && clear.coverage > QR_LOGO_H_COVERAGE && level !== "H") {
+		level = "H";
+		m = modules(value, level);
+		clear = clearing(m.size, style);
+	}
+	const grid = m.size + 2 * q;
+	const key = [
+		level,
+		style.moduleShape,
+		style.finderOuter,
+		style.finderInner,
+		q,
+		clear ? `${clear.start},${clear.side}` : "",
+		value,
+	].join("\u0000");
+	let d = paths.get(key);
+	if (d === undefined) {
+		d = symbolPath(m, q, style, clear);
+		paths.set(key, d);
+	}
+	return {
+		size: m.size,
+		ec: level,
+		grid,
+		d,
+		...(clear
+			? { logo: { x: q + clear.logoAt, y: q + clear.logoAt, side: clear.logo } }
+			: {}),
+		coverage: clear?.coverage ?? 0,
+	};
+}
+
+type Clearing = {
+	start: number;
+	side: number;
+	logo: number;
+	logoAt: number;
+	coverage: number;
+};
+
+// The square of modules behind the logo: centred, whole modules, and clear of
+// the finder patterns, their separators and the timing patterns.
+function clearing(n: number, style: QrStyle): Clearing | null {
+	if (n === 0 || style.logoSize <= 0) return null;
+	const pad = Math.max(0, style.logoPadding);
+	const room = n - 16;
+	let logo = Math.min(style.logoSize, MAX_QR_LOGO_SIZE) * n;
+	logo = Math.min(logo, room - 2 * pad);
+	if (logo <= 0) return null;
+	let side = Math.ceil(logo + 2 * pad - 1e-9);
+	if ((n - side) % 2 !== 0) side++;
+	if (side > room) side -= 2;
+	if (side <= 0) return null;
+	logo = Math.min(logo, side - 2 * pad);
+	if (logo <= 0) return null;
+	return {
+		start: (n - side) / 2,
+		side,
+		logo,
+		logoAt: (n - logo) / 2,
+		coverage: (side * side) / (n * n),
+	};
+}
+
+const K = 0.5522847498;
+
+const num = (v: number) => String(Math.round(v * 1000) / 1000);
+
+function roundRect(
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	[tl, tr, br, bl]: readonly [number, number, number, number],
+): string {
+	let d = `M${num(x + tl)} ${num(y)}H${num(x + w - tr)}`;
+	if (tr)
+		d += `C${num(x + w - tr + tr * K)} ${num(y)} ${num(x + w)} ${num(y + tr - tr * K)} ${num(x + w)} ${num(y + tr)}`;
+	d += `V${num(y + h - br)}`;
+	if (br)
+		d += `C${num(x + w)} ${num(y + h - br + br * K)} ${num(x + w - br + br * K)} ${num(y + h)} ${num(x + w - br)} ${num(y + h)}`;
+	d += `H${num(x + bl)}`;
+	if (bl)
+		d += `C${num(x + bl - bl * K)} ${num(y + h)} ${num(x)} ${num(y + h - bl + bl * K)} ${num(x)} ${num(y + h - bl)}`;
+	d += `V${num(y + tl)}`;
+	if (tl)
+		d += `C${num(x)} ${num(y + tl - tl * K)} ${num(x + tl - tl * K)} ${num(y)} ${num(x + tl)} ${num(y)}`;
+	return `${d}Z`;
+}
+
+function circle(cx: number, cy: number, r: number): string {
+	return roundRect(cx - r, cy - r, 2 * r, 2 * r, [r, r, r, r]);
+}
+
+function symbolPath(
+	{ size: n, bits }: Modules,
+	q: number,
+	style: QrStyle,
+	clear: Clearing | null,
+): string {
+	if (n === 0) return "";
+	const finder = (x: number, y: number) =>
+		(x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+	const cleared = (x: number, y: number) =>
+		clear !== null &&
+		x >= clear.start &&
+		x < clear.start + clear.side &&
+		y >= clear.start &&
+		y < clear.start + clear.side;
+	const on = (x: number, y: number) =>
+		x >= 0 &&
+		y >= 0 &&
+		x < n &&
+		y < n &&
+		bits[y * n + x] === 1 &&
+		!finder(x, y) &&
+		!cleared(x, y);
+
+	const parts: string[] = [];
+	for (let y = 0; y < n; y++) {
+		for (let x = 0; x < n; x++) {
+			if (!on(x, y)) continue;
+			const px = x + q;
+			const py = y + q;
+			if (style.moduleShape === "square") {
+				const from = x;
+				while (on(x + 1, y)) x++;
+				parts.push(`M${from + q} ${py}H${x + 1 + q}V${py + 1}H${from + q}Z`);
+				continue;
+			}
+			if (style.moduleShape === "dot") {
+				parts.push(circle(px + 0.5, py + 0.5, 0.5));
+				continue;
+			}
+			const top = on(x, y - 1);
+			const right = on(x + 1, y);
+			const bottom = on(x, y + 1);
+			const left = on(x - 1, y);
+			const r = 0.5;
+			const tl = !top && !left ? r : 0;
+			const br = !bottom && !right ? r : 0;
+			const corners: [number, number, number, number] =
+				style.moduleShape === "rounded"
+					? [tl, !top && !right ? r : 0, br, !bottom && !left ? r : 0]
+					: [tl, 0, br, 0];
+			parts.push(roundRect(px, py, 1, 1, corners));
+		}
+	}
+	for (const [fx, fy] of [
+		[0, 0],
+		[n - 7, 0],
+		[0, n - 7],
+	] as const) {
+		const x = fx + q;
+		const y = fy + q;
+		parts.push(finderOuter(x, y, style.finderOuter));
+		parts.push(finderInner(x + 2, y + 2, style.finderInner));
+	}
+	return parts.join("");
+}
+
+function finderOuter(x: number, y: number, shape: QrFinderOuter): string {
+	if (shape === "circle")
+		return circle(x + 3.5, y + 3.5, 3.5) + circle(x + 3.5, y + 3.5, 2.5);
+	const [r, h] = shape === "rounded" ? [2, 1] : [0, 0];
+	return (
+		roundRect(x, y, 7, 7, [r, r, r, r]) +
+		roundRect(x + 1, y + 1, 5, 5, [h, h, h, h])
+	);
+}
+
+function finderInner(x: number, y: number, shape: QrFinderInner): string {
+	if (shape === "dot") return circle(x + 1.5, y + 1.5, 1.5);
+	const r = shape === "rounded" ? 1 : 0;
+	return roundRect(x, y, 3, 3, [r, r, r, r]);
 }
 
 function modules(value: string, ec: ECLevel): Modules {

@@ -26,6 +26,8 @@ const PDF_OPTIONS = [
 	"gap",
 	"copies",
 	"cropMarks",
+	"backOffset",
+	"blankBacks",
 	"marks",
 	"outputIntent",
 	"noOutputIntent",
@@ -33,7 +35,8 @@ const PDF_OPTIONS = [
 	"cutLines",
 	"cutSpot",
 ];
-const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks", "marks"];
+const SHEET_OPTIONS = ["duplex", "margin", "gap", "copies", "cropMarks", "marks", "backOffset", "blankBacks"];
+const DUPLEX_OPTIONS = ["backOffset", "blankBacks"];
 const EXPORT_OPTIONS = ["name", "quality", "bleed", "jobs", "cut", ...PDF_OPTIONS];
 
 /** What `render` runs for `file` and these options, or the UsageError that
@@ -79,7 +82,15 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		throw new UsageError("--png-alpha needs --format png");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
-	const exporting = rest.pieces || rest.cut || rest.cutLines || rest.cutSpot;
+	if (rest.printProfile !== undefined && rest.printTarget === "none")
+		throw new UsageError("--print-profile does not go with --print-target none");
+	const exporting =
+		rest.pieces ||
+		rest.cut ||
+		rest.cutLines ||
+		rest.cutSpot ||
+		rest.printTarget !== undefined ||
+		rest.printProfile !== undefined;
 	if (rest.data === undefined && !exporting && (out === undefined || !writesFile(out))) {
 		const exportOnly = given.filter((key) => EXPORT_OPTIONS.includes(key));
 		if (exportOnly.length > 0)
@@ -149,6 +160,9 @@ function exportProblem(
 	const sheetOnly = given.filter((key) => SHEET_OPTIONS.includes(key));
 	if (sheetOnly.length > 0 && !given.includes("sheets"))
 		return listed(sheetOnly, "needs --sheets", "need --sheets");
+	const duplexOnly = given.filter((key) => DUPLEX_OPTIONS.includes(key));
+	if (duplexOnly.length > 0 && !given.includes("duplex"))
+		return listed(duplexOnly, "needs --duplex", "need --duplex");
 	if (options.quality !== undefined) {
 		if (pdf && options.pdfPages !== "jpeg") return "--quality needs --pdf-pages jpeg";
 		if (!pdf && (options.format === undefined || options.format === "png"))

@@ -6,17 +6,18 @@ import {
 } from "@zxing/library";
 import { describe, expect, test } from "vitest";
 import {
+	DEFAULT_QR_STYLE,
 	generateMatrix,
-	generatePixels,
 	MATRIX_CACHE_BYTES,
-	PIXEL_CACHE_BYTES,
+	PATH_CACHE_BYTES,
 	qrCacheBytes,
+	qrSymbol,
 } from "../src/qr";
 import type { Command, DrawCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
-// Recursively find the first draw command matching `op` (QR lowers to a bitmap
-// nested in a group).
+// Recursively find the first draw command matching `op` (QR lowers to a path
+// nested in groups).
 function findDraw(commands: Command[], op: string): DrawCommand | undefined {
 	for (const c of commands) {
 		if ("op" in c && c.op === op) return c as DrawCommand;
@@ -76,16 +77,13 @@ const qrTemplate: Template = {
 } as unknown as Template;
 
 describe("compile with an empty QR value", () => {
-	test("does not throw and emits a QR bitmap with no modules", () => {
+	test("does not throw and draws no modules", () => {
 		const [front] = compileToCommands(
 			qrTemplate,
 			{},
 			{ width: 100, height: 100 },
 		);
-		const bmp = findDraw(front.commands, "drawBitmap");
-		expect(bmp).toBeDefined();
-		// empty matrix → 0×0 bitmap
-		expect((bmp as { pixelWidth: number }).pixelWidth).toBe(0);
+		expect(findDraw(front.commands, "drawPath")).toBeUndefined();
 	});
 
 	test("emits real modules once the value is filled", () => {
@@ -94,9 +92,16 @@ describe("compile with an empty QR value", () => {
 			{ card_url: "https://example.com/c/abc123" },
 			{ width: 100, height: 100 },
 		);
-		const bmp = findDraw(front.commands, "drawBitmap");
-		expect(bmp).toBeDefined();
-		expect((bmp as { pixelWidth: number }).pixelWidth).toBeGreaterThan(0);
+		const path = findDraw(front.commands, "drawPath") as {
+			d: string;
+			viewBox: { width: number };
+			fillRule: string;
+		};
+		expect(path.d.length).toBeGreaterThan(0);
+		expect(path.viewBox.width).toBe(
+			generateMatrix("https://example.com/c/abc123").length,
+		);
+		expect(path.fillRule).toBe("evenodd");
 	});
 });
 
@@ -124,58 +129,26 @@ describe("QR memo", () => {
 	const v40 = (i: number) => `${i}:${"x".repeat(2900)}`;
 
 	test("stays within its byte budgets across many version-40 symbols", () => {
-		for (let i = 0; i < 200; i++) {
-			const { size } = generatePixels(v40(i), "L", [0, 0, 0]);
+		for (let i = 0; i < 80; i++) {
+			const { size } = qrSymbol(v40(i), "L");
 			expect(size).toBe(177);
-			const { matrices, pixels } = qrCacheBytes();
+			const { matrices, paths } = qrCacheBytes();
 			expect(matrices).toBeLessThanOrEqual(MATRIX_CACHE_BYTES);
-			expect(pixels).toBeLessThanOrEqual(PIXEL_CACHE_BYTES);
+			expect(paths).toBeLessThanOrEqual(PATH_CACHE_BYTES);
 		}
-		expect(qrCacheBytes().pixels).toBeGreaterThan(PIXEL_CACHE_BYTES / 2);
+		expect(qrCacheBytes().paths).toBeGreaterThan(PATH_CACHE_BYTES / 2);
 	});
 
-	test("keys pixel buffers by value, level and colour", () => {
-		const a = generatePixels("https://example.com/memo", "Q", [0, 0, 0]);
+	test("keys paths by value, level and style", () => {
+		const a = qrSymbol("https://example.com/memo", "Q");
+		expect(qrSymbol("https://example.com/memo", "Q").d).toBe(a.d);
+		expect(qrSymbol("https://example.com/memo", "L").d).not.toBe(a.d);
 		expect(
-			generatePixels("https://example.com/memo", "Q", [0, 0, 0]).pixels,
-		).toBe(a.pixels);
-		expect(
-			generatePixels("https://example.com/memo", "L", [0, 0, 0]).pixels,
-		).not.toBe(a.pixels);
-		expect(
-			generatePixels("https://example.com/memo", "Q", [255, 0, 0]).pixels,
-		).not.toBe(a.pixels);
-	});
-
-	test("reuses the pixel buffer on repeated compiles", () => {
-		const pixelsOf = () => {
-			const [front] = compileToCommands(
-				qrTemplate,
-				{ card_url: "https://example.com/c/reuse" },
-				{ width: 100, height: 100 },
-			);
-			return (findDraw(front.commands, "drawBitmap") as { pixels: Uint8Array })
-				.pixels;
-		};
-		const first = pixelsOf();
-		const copy = first.slice();
-		const second = pixelsOf();
-		expect(second).toBe(first);
-		expect(second).toEqual(copy);
-	});
-
-	test("matches the boolean matrix", () => {
-		const value = "https://example.com/c/abc123";
-		const m = generateMatrix(value, "M");
-		const { size, pixels } = generatePixels(value, "M", [1, 2, 3]);
-		expect(size).toBe(m.length);
-		for (let y = 0; y < size; y++)
-			for (let x = 0; x < size; x++) {
-				const i = (y * size + x) * 4;
-				expect([...pixels.subarray(i, i + 4)]).toEqual(
-					m[y][x] ? [1, 2, 3, 255] : [0, 0, 0, 0],
-				);
-			}
+			qrSymbol("https://example.com/memo", "Q", {
+				...DEFAULT_QR_STYLE,
+				moduleShape: "dot",
+			}).d,
+		).not.toBe(a.d);
 	});
 });
 

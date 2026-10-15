@@ -68,6 +68,27 @@ describe("planRender", () => {
 		});
 	});
 
+	test("exports a template through a print target into a directory, a zip or a PDF", () => {
+		expect(planRender("card.coat", input({ printTarget: "ymcko", printProfile: "printer.json" }))).toEqual({
+			kind: "batch",
+			options: { printTarget: "ymcko", printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
+		});
+		expect(planRender("card.coat", input({ printProfile: "printer.json" }))).toEqual({
+			kind: "batch",
+			options: { printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
+		});
+		expect(planRender("card.coat", input({ printTarget: "none", out: "x.zip" })).kind).toBe("batch");
+		expect(planRender("card.coat", input({ printTarget: "ymcko", out: "x.pdf" })).kind).toBe("batch");
+	});
+
+	test("takes a back offset and blank backs with --sheets and --duplex", () => {
+		const sheets = { out: "x.pdf", sheets: "a4" as const, duplex: "long" as const };
+		expect(planRender("card.coat", input({ ...sheets, backOffset: { x: 1, y: -2 }, blankBacks: true }))).toEqual({
+			kind: "batch",
+			options: { ...sheets, backOffset: { x: 1, y: -2 }, blankBacks: true, cropMarks: true, quiet: false },
+		});
+	});
+
 	test("passes --cut and --cut-lines to a workspace preset", () => {
 		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", cut: "dxf" }))).toEqual({
 			kind: "workspace",
@@ -137,6 +158,12 @@ describe("planRender", () => {
 			["card.coat", { outputIntent: false }, "--no-output-intent needs --data or a .zip or .pdf --out"],
 			["card.coat", { out: "x.pdf", outputIntentId: "FOGRA39" }, "--output-intent-id needs --output-intent <file>"],
 			["club.coatworkspace", { out: "x.pdf", outputIntent: "fogra.icc" }, "--output-intent applies only to templates"],
+			["card.coat", { out: "x.zip", backOffset: { x: 1, y: 0 } }, "--back-offset applies only to a .pdf"],
+			["card.coat", { out: "x.pdf", blankBacks: true }, "--blank-backs needs --sheets"],
+			["card.coat", { out: "x.pdf", sheets: "a4", backOffset: { x: 1, y: 0 }, blankBacks: true }, "--back-offset, --blank-backs need --duplex"],
+			["card.coat", { printTarget: "none", printProfile: "printer.json" }, "--print-profile does not go with --print-target none"],
+			["club.coatworkspace", { out: "x.zip", printTarget: "ymcko" }, "--print-target applies only to templates"],
+			["club.coatworkspace", { out: "x.pdf", backOffset: { x: 1, y: 0 } }, "--back-offset applies only to templates"],
 		];
 		for (const [file, options, message] of cases)
 			expect({ file, options, message: refusal(file, options) }).toEqual({ file, options, message });

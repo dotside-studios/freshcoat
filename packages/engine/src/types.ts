@@ -540,7 +540,11 @@ export type DrawGroupCommand = DrawCommandBase & {
 	children: DrawCommand[];
 	// See GroupNode.isolate.
 	isolate?: boolean;
+	// See GroupNode.snap.
+	snap?: SnapGrid;
 };
+
+export type SnapGrid = { columns: number; rows: number };
 
 // The general mask (non-fast-path): draw `children` to an offscreen layer, then
 // composite `mask`'s coverage onto it (alpha or luminance channel, optionally

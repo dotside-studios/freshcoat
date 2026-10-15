@@ -17,6 +17,7 @@ import {
 	parseLength,
 	parseMarks,
 	parseMinDpi,
+	parseOffset,
 	parsePaper,
 	parsePositive,
 	parseQuality,
@@ -39,10 +40,17 @@ export async function main(
 	io: Io = processIo(),
 ): Promise<number> {
 	let running: string | undefined;
+	const all = argv.includes("--help-all");
 	try {
-		await program(io, (name) => {
-			running = name;
-		}).parseAsync(argv, { from: "user" });
+		await program(
+			io,
+			(name) => {
+				running = name;
+			},
+			all,
+		).parseAsync(all ? argv.map((a) => (a === "--help-all" ? "--help" : a)) : argv, {
+			from: "user",
+		});
 		return 0;
 	} catch (error) {
 		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
@@ -54,7 +62,7 @@ export async function main(
 	}
 }
 
-function program(io: Io, onCommand: (name: string) => void) {
+function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 	const root = new Command("freshcoat")
 		.usage("<command> [options]")
 		.description("Render, check, inspect and package Freshcoat templates and workspaces.")
@@ -81,6 +89,8 @@ function program(io: Io, onCommand: (name: string) => void) {
 			.command(name)
 			.helpOption("-h, --help", "show help")
 			.showHelpAfterError(`Run freshcoat ${name} --help for usage.`);
+	const advanced = <O extends { hideHelp(hide?: boolean): O }>(option: O): O =>
+		option.hideHelp(!all);
 	const quiet = (cmd: { optsWithGlobals(): { quiet?: true } }) =>
 		cmd.optsWithGlobals().quiet === true;
 	const ioFor = (cmd: { optsWithGlobals(): { cache?: boolean } }): Io => {
@@ -130,10 +140,12 @@ function program(io: Io, onCommand: (name: string) => void) {
 			] as const),
 		)
 		.addOption(
-			new Option(
-				"--png-alpha <mode>",
-				"keep writes RGBA even for an opaque frame; default auto",
-			).choices(["auto", "keep"] as const),
+			advanced(
+				new Option(
+					"--png-alpha <mode>",
+					"keep writes RGBA even for an opaque frame; default auto",
+				).choices(["auto", "keep"] as const),
+			),
 		)
 		.optionsGroup("Export options, with --data or a .zip or .pdf:")
 		.option(
@@ -159,10 +171,12 @@ function program(io: Io, onCommand: (name: string) => void) {
 			] as const),
 		)
 		.addOption(
-			new Option(
-				"--pdf-text <mode>",
-				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
-			).choices(["embed", "outline"] as const),
+			advanced(
+				new Option(
+					"--pdf-text <mode>",
+					"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
+				).choices(["embed", "outline"] as const),
+			),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
@@ -175,6 +189,20 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"lay the cards out on a4, a5, a6, letter, legal, a3, tabloid or <w>x<h> mm paper",
 			arg(parsePaper),
 		)
+		.option(
+			"--output-intent <file>",
+			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
+		)
+		.option("--no-output-intent", "declare no output intent")
+		.addOption(
+			advanced(
+				new Option(
+					"--output-intent-id <name>",
+					"the condition --output-intent describes, such as FOGRA39; default the profile's description",
+				),
+			),
+		)
+		.optionsGroup("Sheet options, with --sheets:")
 		.addOption(
 			new Option("--duplex <edge>", "print backs behind fronts, flipped on this edge").choices([
 				"long",
@@ -193,15 +221,35 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"printer's marks on sheets: none, or any of crop, registration, colorbar, slug; default crop",
 			arg(parseMarks),
 		)
-		.option("--no-crop-marks", "leave out the crop marks")
-		.option(
-			"--output-intent <file>",
-			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
+		.addOption(
+			advanced(new Option("--no-crop-marks", "the same as leaving crop out of --marks")),
 		)
-		.option("--no-output-intent", "declare no output intent")
+		.addOption(
+			advanced(
+				new Option(
+					"--back-offset <x,y>",
+					"with --duplex, move every back page this many mm, for a printer that drifts; y is down",
+				).argParser(arg(parseOffset)),
+			),
+		)
+		.addOption(
+			advanced(
+				new Option(
+					"--blank-backs",
+					"with --duplex, give a one-sided template empty back pages",
+				),
+			),
+		)
+		.optionsGroup("Print options:")
+		.addOption(
+			new Option(
+				"--print-target <target>",
+				"correct the cards for this printer, as a preset's print target does; default the profile's, or none",
+			).choices(["none", "ymcko"] as const),
+		)
 		.option(
-			"--output-intent-id <name>",
-			"the condition --output-intent describes, such as FOGRA39; default the profile's description",
+			"--print-profile <file>",
+			"a measured printer profile, as Studio saves it; implies the target it was measured on",
 		)
 		.optionsGroup("Workspace options:")
 		.option(
@@ -225,6 +273,7 @@ function program(io: Io, onCommand: (name: string) => void) {
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
 		)
+		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.")
 		.action((file, options, cmd) =>
 			runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd)),
 		);
