@@ -1,8 +1,13 @@
 import type { LayerSpot, SpotColor } from "@freshcoat-js/coatfile";
 import { parseColor } from "@freshcoat-js/engine";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
+import { IconButton } from "@freshcoat-js/ui/icon-button";
+import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { NumberField } from "@freshcoat-js/ui/number-field";
-import { CommitField, Row } from "./controls";
+import { Popover } from "@freshcoat-js/ui/popover";
+import { MenuTrigger } from "react-aria-components";
+import AddIcon from "~icons/mingcute/add-line";
+import { CommitField, ItemGroup, Notice, RemoveButton, Row } from "./controls";
 import {
 	commonValue,
 	type Inspect,
@@ -45,12 +50,47 @@ export function SpotSection({ ins }: { ins: Inspect }) {
 			return { spot: { ...current, [paint]: next } };
 		});
 
+	const state = (["fill", "stroke"] as const).map((paint) => {
+		const inks = spots.map((s) => s?.[paint]);
+		return {
+			paint,
+			inks,
+			on: commonValue(inks.map((ink) => ink !== undefined)),
+			all: inks.every((ink) => ink !== undefined),
+		};
+	});
+	const addable = state.filter((p) => !p.all).map((p) => p.paint);
+
 	return (
-		<InspectorSection title="Spot color">
-			{(["fill", "stroke"] as const).map((paint) => {
-				const inks = spots.map((s) => s?.[paint]);
-				const on = commonValue(inks.map((ink) => ink !== undefined));
-				const all = inks.every((ink) => ink !== undefined);
+		<InspectorSection
+			title="Spot color"
+			actions={
+				addable.length > 0 ? (
+					<MenuTrigger>
+						<IconButton
+							aria-label="Add spot ink"
+							tooltip="Add spot ink"
+							className="size-5 pointer-coarse:size-8"
+						>
+							<AddIcon />
+						</IconButton>
+						<Popover placement="bottom end">
+							<Menu
+								aria-label="Add spot ink"
+								disabledKeys={state.filter((p) => p.all).map((p) => p.paint)}
+								onAction={(k) =>
+									setInk(k as Paint, { spot: "White", overprint: true })
+								}
+							>
+								<MenuItem id="fill">Fill</MenuItem>
+								<MenuItem id="stroke">Stroke</MenuItem>
+							</Menu>
+						</Popover>
+					</MenuTrigger>
+				) : null
+			}
+		>
+			{state.map(({ paint, inks, on, all }) => {
 				const some = <T,>(read: (ink: SpotColor) => T) =>
 					commonValue(
 						inks.map((ink) => (ink ? read(ink) : undefined)),
@@ -59,85 +99,78 @@ export function SpotSection({ ins }: { ins: Inspect }) {
 				const tint = some((ink) => ink.tint ?? 1);
 				const alt = some((ink) => ink.alt ?? "");
 				const overprint = some((ink) => ink.overprint ?? false);
+				if (on === false) return null;
+				if (!all)
+					return (
+						<Notice key={paint}>{`Some layers use a ${paint} spot`}</Notice>
+					);
 				return (
-					<div key={paint} className="flex flex-col gap-1">
-						<Row label="">
+					<ItemGroup key={paint}>
+						<div className="flex min-h-fc-control items-center justify-between">
+							<span className="text-fc-base">{LABEL[paint]}</span>
+							<RemoveButton
+								label={`Remove ${paint} spot`}
+								onPress={() => setInk(paint, undefined)}
+							/>
+						</div>
+						<Row label="Name">
+							<CommitField
+								aria-label={`${LABEL[paint]} spot name`}
+								value={name}
+								onCommit={(text) => {
+									const spot = text.trim();
+									if (!spot || spot === "All" || spot === "None") return false;
+									editInk(paint, { spot });
+									return true;
+								}}
+							/>
+						</Row>
+						<Row label="Tint">
+							<NumberField
+								aria-label={`${LABEL[paint]} spot tint`}
+								className="min-w-0 flex-1"
+								min={0}
+								max={100}
+								step={1}
+								precision={0}
+								value={typeof tint === "number" ? tint * 100 : null}
+								placeholder={tint === null ? "Mixed" : undefined}
+								onChange={(v) =>
+									editInk(paint, { tint: v === 100 ? undefined : v / 100 })
+								}
+							/>
+						</Row>
+						<Row label="Alternate">
+							<CommitField
+								aria-label={`${LABEL[paint]} spot alternate`}
+								value={alt}
+								placeholder="Layer color"
+								onCommit={(text) => {
+									const color = text.trim();
+									if (!color) {
+										editInk(paint, { alt: undefined });
+										return true;
+									}
+									const parsed = parseColor(color);
+									if (!parsed || parsed === "none") return false;
+									editInk(paint, { alt: color });
+									return true;
+								}}
+							/>
+						</Row>
+						<Row label="Overprint">
 							<Checkbox
-								isSelected={on === true}
-								isIndeterminate={on === null}
+								aria-label="Overprint"
+								isSelected={overprint === true}
+								isIndeterminate={overprint === null}
 								onChange={(next) =>
-									setInk(
-										paint,
-										next ? { spot: "White", overprint: true } : undefined,
-									)
+									editInk(paint, { overprint: next || undefined })
 								}
 							>
-								{`${LABEL[paint]} as spot`}
+								On
 							</Checkbox>
 						</Row>
-						{all && (
-							<>
-								<Row label="Name">
-									<CommitField
-										aria-label={`${LABEL[paint]} spot name`}
-										value={name}
-										onCommit={(text) => {
-											const spot = text.trim();
-											if (!spot || spot === "All" || spot === "None")
-												return false;
-											editInk(paint, { spot });
-											return true;
-										}}
-									/>
-								</Row>
-								<Row label="Tint">
-									<NumberField
-										aria-label={`${LABEL[paint]} spot tint`}
-										className="min-w-0 flex-1"
-										min={0}
-										max={100}
-										step={1}
-										precision={0}
-										value={typeof tint === "number" ? tint * 100 : null}
-										placeholder={tint === null ? "Mixed" : undefined}
-										onChange={(v) =>
-											editInk(paint, { tint: v === 100 ? undefined : v / 100 })
-										}
-									/>
-								</Row>
-								<Row label="Alternate">
-									<CommitField
-										aria-label={`${LABEL[paint]} spot alternate`}
-										value={alt}
-										placeholder="Layer color"
-										onCommit={(text) => {
-											const color = text.trim();
-											if (!color) {
-												editInk(paint, { alt: undefined });
-												return true;
-											}
-											const parsed = parseColor(color);
-											if (!parsed || parsed === "none") return false;
-											editInk(paint, { alt: color });
-											return true;
-										}}
-									/>
-								</Row>
-								<Row label="Overprint">
-									<Checkbox
-										aria-label="Overprint"
-										isSelected={overprint === true}
-										isIndeterminate={overprint === null}
-										onChange={(next) =>
-											editInk(paint, { overprint: next || undefined })
-										}
-									>
-										On
-									</Checkbox>
-								</Row>
-							</>
-						)}
-					</div>
+					</ItemGroup>
 				);
 			})}
 		</InspectorSection>

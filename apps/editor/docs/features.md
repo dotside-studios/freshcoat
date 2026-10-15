@@ -366,9 +366,8 @@ the records, and **Export** turns templates and records into files.
     cap and join open from the stroke's settings button.
   - A rectangle's or vector's Spot color section, in the Print tab, prints its
     fill, its stroke or both in a named spot ink, for white ink, foil or
-    varnish:
-    "Fill as spot" or "Stroke as spot", then the ink's name as the printer
-    knows it (White by default; All and None are refused), a tint, an
+    varnish. Its add button picks Fill or Stroke, then the ink's name as the
+    printer knows it (White by default; All and None are refused), a tint, an
     alternate colour (the layer's own when empty) and an Overprint row, on by
     default. A vector PDF prints the paint as a Separation of that name; the
     canvas, images and other pages show the alternate. There is no colour

@@ -88,9 +88,9 @@ describe("the Print tab", () => {
 	it("labels overprint as its own row", async () => {
 		const c = open(["0/0"]);
 		show(c, <PrintPanel />);
-		await fastUser().click(
-			screen.getByRole("checkbox", { name: "Fill as spot" }),
-		);
+		const user = fastUser();
+		await user.click(screen.getByRole("button", { name: "Add spot ink" }));
+		await user.click(screen.getByRole("menuitem", { name: "Fill" }));
 		expect(screen.getByText("Overprint")).toBeTruthy();
 		expect(
 			(screen.getByRole("checkbox", { name: "Overprint" }) as HTMLInputElement)
