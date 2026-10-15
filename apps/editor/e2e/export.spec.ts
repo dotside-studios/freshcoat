@@ -136,6 +136,10 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	await expect(page.getByTestId("export-check-unfilled")).toHaveCount(0);
 
 	// A required field left to its default is flagged, and the export still runs.
+	await page
+		.getByTestId("export-settings")
+		.getByRole("button", { name: /^Template binding/ })
+		.click();
 	const editor = page.getByTestId("binding-editor");
 	await editor.getByRole("button", { name: /Source for display_name/ }).click();
 	await page.getByRole("option", { name: "Default" }).click();
@@ -223,7 +227,7 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 	]);
 	await expect(strip.locator('[data-status="exported"]')).toHaveCount(3);
 	await expect(page.getByTestId("export-summary")).toContainText("6 ok");
-	await page.getByRole("tab", { name: "Records" }).click();
+	await page.getByRole("radio", { name: "Records" }).click();
 	await expect(
 		page.getByTestId("export-records").locator('[data-status="exported"]'),
 	).toHaveCount(3);

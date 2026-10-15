@@ -126,7 +126,7 @@ test("the export records list shows a 100k-record dataset without a long freeze"
 		.click();
 	await page.getByRole("option", { name: "Big" }).click();
 	const report = await watchLongTasks(page);
-	await page.getByRole("tab", { name: "Records" }).click();
+	await page.getByRole("radio", { name: "Records" }).click();
 	const list = page.getByTestId("export-records");
 	await expect(list.locator('[role=row][data-row="r0"]')).toBeVisible();
 	const rows = await list.locator("[role=row][data-row]").count();
