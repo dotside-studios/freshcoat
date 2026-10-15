@@ -31,6 +31,7 @@ import SendIconFill from "~icons/mingcute/send-fill";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
 import { useController } from "./context";
 import { FreshcoatMark } from "./Logo";
+import { useSectionPanels } from "./section-panels";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
 import { useHiddenStatusItems } from "./status/visibility";
 import { useThemePreference } from "./theme";
@@ -177,7 +178,9 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 		}).join(","),
 	);
 	const disabled = useMemo(() => disabledSig.split(","), [disabledSig]);
-	const panels = useEditor((s) => s.panels);
+	const editPanels = useEditor((s) => s.panels);
+	const section = useSectionPanels();
+	const panels = section ?? editPanels;
 	const presets = useEditor((s) => s.workspace?.presets) ?? NO_PRESETS;
 	const theme = useThemePreference();
 	const unit = useDisplayUnit();
@@ -220,10 +223,12 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 		);
 	};
 	const togglePanel = (side: "left" | "right") =>
-		ctx.controller.dispatch({
-			type: "setPanels",
-			panels: { [side]: !panels[side] },
-		});
+		section
+			? section.set({ [side]: !section[side] })
+			: ctx.controller.dispatch({
+					type: "setPanels",
+					panels: { [side]: !panels[side] },
+				});
 
 	return (
 		<header className="flex h-8 shrink-0 items-stretch border-fc-border border-b bg-fc-app pointer-coarse:h-10">

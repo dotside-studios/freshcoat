@@ -12,6 +12,7 @@ import { type EditorState, type Tool, working } from "~/state/store";
 import { activeSlot, type Section } from "~/state/workspace";
 import type { EditorController } from "./controller";
 import { BOOLEAN, TEMPLATE_SETUP } from "./copy";
+import { sectionPanels } from "./section-panels";
 import { toggleStatusItem } from "./status/visibility";
 import { setThemePreference, type ThemePreference } from "./theme";
 import { setDisplayUnit, UNIT_LABELS } from "./units";
@@ -100,6 +101,20 @@ const alignCommand = (mode: AlignMode, label: string, key?: string) => ({
 	enabled: hasSelection,
 	run: ({ controller }: CommandContext) => controller.alignSelection(mode),
 });
+
+/** The panels the menu bar toggles: the section's own, or the editor's. */
+function panelsOf(controller: EditorController) {
+	return sectionPanels() ?? controller.state.panels;
+}
+
+function setPanelsOf(
+	controller: EditorController,
+	panels: Partial<EditorState["panels"]>,
+) {
+	const section = sectionPanels();
+	if (section) section.set(panels);
+	else controller.dispatch({ type: "setPanels", panels });
+}
 
 export const COMMANDS: Command[] = [
 	{
@@ -572,12 +587,9 @@ export const COMMANDS: Command[] = [
 		group: "View",
 		global: true,
 		run: ({ controller }) => {
-			const { left, right } = controller.state.panels;
+			const { left, right } = panelsOf(controller);
 			const open = !(left || right);
-			controller.dispatch({
-				type: "setPanels",
-				panels: { left: open, right: open },
-			});
+			setPanelsOf(controller, { left: open, right: open });
 		},
 	},
 	{
@@ -585,20 +597,14 @@ export const COMMANDS: Command[] = [
 		label: "Layers panel",
 		group: "View",
 		run: ({ controller }) =>
-			controller.dispatch({
-				type: "setPanels",
-				panels: { left: !controller.state.panels.left },
-			}),
+			setPanelsOf(controller, { left: !panelsOf(controller).left }),
 	},
 	{
 		id: "view.inspector",
 		label: "Inspector panel",
 		group: "View",
 		run: ({ controller }) =>
-			controller.dispatch({
-				type: "setPanels",
-				panels: { right: !controller.state.panels.right },
-			}),
+			setPanelsOf(controller, { right: !panelsOf(controller).right }),
 	},
 	{
 		id: "view.rulers",

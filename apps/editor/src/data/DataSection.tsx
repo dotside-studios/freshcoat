@@ -38,6 +38,7 @@ import { MenuTrigger, type Selection } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { SidePanel } from "~/app/SidePanel";
+import { useProvideSectionPanels } from "~/app/section-panels";
 import { useEditor } from "~/state/hooks";
 import AddIcon from "~icons/mingcute/add-line";
 import ImportIcon from "~icons/mingcute/file-import-line";
@@ -133,6 +134,7 @@ export function DataSection() {
 			}),
 		[narrow],
 	);
+	useProvideSectionPanels({ ...panels, set: onPanels });
 
 	const inspector = useMemo(
 		() => ({

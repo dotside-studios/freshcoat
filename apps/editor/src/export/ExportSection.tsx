@@ -25,10 +25,18 @@ import {
 	assetsByRef as toAssetsByRef,
 	withRecordIds,
 } from "@freshcoat-js/workspace/export";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useController } from "~/app/context";
 import { EMPTY, plural } from "~/app/copy";
 import { formatNumber } from "~/app/format";
+import { useProvideSectionPanels } from "~/app/section-panels";
 import { VariantSwatch } from "~/app/VariantSwatch";
 import { selectedInView } from "~/data/gallery-model";
 import { useDocumentFonts } from "~/render/use-document-fonts";
@@ -117,7 +125,7 @@ function useRail(): [boolean, (on: boolean) => void] {
 			return false;
 		}
 	});
-	const set = (on: boolean) => {
+	const set = useCallback((on: boolean) => {
 		setRail(on);
 		try {
 			if (on) localStorage.setItem(RAIL_KEY, "1");
@@ -125,7 +133,7 @@ function useRail(): [boolean, (on: boolean) => void] {
 		} catch {
 			// Storage can be off; the choice then lasts the session.
 		}
-	};
+	}, []);
 	return [rail, set];
 }
 
@@ -181,6 +189,24 @@ export function ExportSection() {
 	const narrow = useNarrow();
 	const [rail, setRail] = useRail();
 	const [overlay, setOverlay] = useState<"presets" | "settings" | null>(null);
+	const [settingsShown, setSettingsShown] = useState(true);
+	const setPanels = useCallback(
+		(p: Partial<Record<"left" | "right", boolean>>) => {
+			if (narrow) {
+				if (p.left !== undefined) setOverlay(p.left ? "presets" : null);
+				if (p.right !== undefined) setOverlay(p.right ? "settings" : null);
+				return;
+			}
+			if (p.left !== undefined) setRail(!p.left);
+			if (p.right !== undefined) setSettingsShown(p.right);
+		},
+		[narrow, setRail],
+	);
+	useProvideSectionPanels({
+		left: narrow ? overlay === "presets" : !rail,
+		right: narrow ? overlay === "settings" : settingsShown,
+		set: setPanels,
+	});
 	const collapsed = useExportCollapsed();
 	const {
 		filter,
@@ -991,7 +1017,7 @@ export function ExportSection() {
 					)}
 				</main>
 
-				{!narrow && settingsPanel ? (
+				{!narrow && settingsShown && settingsPanel ? (
 					<aside className="flex w-72 shrink-0 flex-col border-fc-border border-l bg-fc-panel">
 						{settingsPanel}
 					</aside>
