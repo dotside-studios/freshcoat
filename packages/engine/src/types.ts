@@ -158,6 +158,13 @@ export type Halftone = {
 	cellSize: number; // design units
 	angle: number; // degrees
 	invert: boolean;
+	// "page" (default) lays one screen over the scene, so neighbouring layers
+	// share a grid and a rotated layer keeps the screen angle. "element" starts
+	// the grid at the layer's own origin and turns it with the layer.
+	anchor?: HalftoneAnchor;
+	// Where the page's top-left lies in scene units, for "page": a scene that
+	// carries bleed or is one piece of a larger page sets it. Defaults to 0, 0.
+	origin?: Vec2;
 	// "mono" only.
 	color: string;
 	// Under the dots, inside the layer's coverage.
@@ -165,6 +172,8 @@ export type Halftone = {
 };
 
 export type HalftoneShape = "round" | "line" | "square";
+
+export type HalftoneAnchor = "page" | "element";
 
 export type ShapeMask =
 	| { kind: "rect"; outset?: ClipOutset }

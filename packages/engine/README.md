@@ -230,16 +230,27 @@ shadow with the layer.
 ### Grain and halftone
 
 `grain` and `halftone` on a node are texture effects, painted by an offscreen
-SkSL pass over the layer's own pixels. Both are measured in design units in
-the layer's own space, after its `rotation` and any parent transform, so a 2×
-export draws the same grains and dots on four times the pixels, and the
-pattern moves with the layer.
+SkSL pass over the layer's own pixels. Both are measured in design units, so a
+2× export draws the same grains and dots on four times the pixels. Grain is in
+the layer's own space, after its `rotation` and any parent transform, and
+moves with the layer. A halftone's `anchor` picks its space:
+
+- `"page"` (the default) lays one screen over the whole scene, in scene units
+  from `origin` (default `0, 0`), as a printed page has one screen at fixed
+  angles. Neighbouring layers share a grid, so two halftoned shapes that meet
+  show no seam, and neither a layer's `rotation` nor a parent's turns the
+  screen. A scene that adds bleed around the page, or is one piece cut from
+  it, sets `origin` to where the page's top-left lands, so every such render
+  draws the same screen. The painter's own `origin` (a PDF raster tile, a
+  panned view) does not move it.
+- `"element"` starts the grid at the layer's `pos` and turns it with the
+  layer.
 
 ```ts
 createRect({
   // ...
   grain: { amount: 0.3, size: 1, monochrome: true, blendMode: "overlay", seed: 7 },
-  halftone: { mode: "mono", shape: "round", cellSize: 6, angle: 45, invert: false, color: "#000" },
+  halftone: { mode: "mono", shape: "round", cellSize: 6, angle: 45, invert: false, anchor: "page", color: "#000" },
 });
 ```
 
@@ -248,13 +259,22 @@ createRect({
   `multiply` or `screen`) at `amount` (0 to 1). The hash is integer arithmetic
   in floats, not `Math.random` or a `sin` hash, so a `seed` paints the same
   pixels in every run, worker and backend. Seeds repeat every 83,521.
-- **Halftone** averages the layer over each `cellSize` cell of a screen turned
+- **Halftone** samples the layer over each `cellSize` cell of a screen turned
   by `angle` and draws a `round`, `square` or `line` dot whose area is the
   cell's darkness (its lightness with `invert`), in `color` over an optional
   `background`. Dot edges are box-filtered, so the tone holds at any density.
   `mode: "cmyk"` draws four screens at C 15°, M 75°, Y 0° and K 45° (each plus
   `angle`) in process-ink colors, multiplied together. It is a look, not
   colour separations. Dots stay inside the layer's own coverage.
+
+  A cell's colour is the alpha-weighted mean of its samples, so the
+  transparent part of a cell on a shape's edge doesn't lighten it: a solid
+  fill or bold text keeps full dots up to its outline, which clips them.
+  Alpha that jumps across one device pixel is read as that outline. Any other
+  alpha (a fade to transparent, a blur) is translucency: the dot's area is the
+  cell's tone times its most opaque sample's alpha, and the dot is drawn
+  unfaded, so soft content breaks into smaller dots in proportion to its
+  alpha.
 
 Both need runtime effects (`RuntimeEffect.Make`), which the default CanvasKit
 build has; the `full` build is not required. A build without them, or a
