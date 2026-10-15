@@ -1,7 +1,10 @@
 import { Button } from "@freshcoat-js/ui/button";
-import { useMemo } from "react";
+import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import { type ReactNode, useMemo } from "react";
 import { EMPTY, TEMPLATE_SETUP } from "~/app/copy";
+import { setSeparationsShown, useSeparationsShown } from "~/canvas/separations";
 import { isOperand } from "~/doc/path";
+import DropIcon from "~icons/mingcute/drop-line";
 import { OverridesContext } from "../design/controls";
 import type { Inspect } from "../design/field-helpers";
 import {
@@ -47,6 +50,24 @@ function Empty({
 	);
 }
 
+function SeparationsToggle() {
+	const on = useSeparationsShown();
+	return (
+		<div className="flex p-2 pb-0">
+			<ToggleButton
+				shape="text"
+				isSelected={on}
+				onChange={setSeparationsShown}
+				className="gap-1.5 text-fc-sm"
+				data-testid="separations-toggle"
+			>
+				<DropIcon className="size-4" />
+				Separations
+			</ToggleButton>
+		</div>
+	);
+}
+
 /** Print settings for the selection: slices and spot inks. With nothing
  *  selected it points to Template setup, where bleed and safe area live. */
 export function PrintPanel({
@@ -59,16 +80,24 @@ export function PrintPanel({
 	const collapsed = useInspectorCollapsed();
 
 	if (!template) return null;
+	let content: ReactNode;
 	if (ins?.keys[0]?.endsWith("/bg") ?? true)
-		return (
+		content = (
 			<Empty title={EMPTY.noSideSelection} onTemplateSetup={onTemplateSetup} />
 		);
-	if (!body) return <Empty title={EMPTY.noPrintSettings} />;
+	else if (!body) content = <Empty title={EMPTY.noPrintSettings} />;
+	else
+		content = (
+			<InspectorCollapsedProvider value={collapsed}>
+				<OverridesContext.Provider value={overrides}>
+					{body}
+				</OverridesContext.Provider>
+			</InspectorCollapsedProvider>
+		);
 	return (
-		<InspectorCollapsedProvider value={collapsed}>
-			<OverridesContext.Provider value={overrides}>
-				{body}
-			</OverridesContext.Provider>
-		</InspectorCollapsedProvider>
+		<>
+			<SeparationsToggle />
+			{content}
+		</>
 	);
 }

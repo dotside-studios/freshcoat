@@ -17,6 +17,7 @@ import type { ExportPreset } from "@freshcoat-js/workspace";
 import { type ReactNode, useMemo } from "react";
 import { useBleedShown } from "~/canvas/bleed-view";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
+import { useSeparationsShown } from "~/canvas/separations";
 import { useSlicesShown } from "~/canvas/slice-guides";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
@@ -147,6 +148,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 			"view.printGuides",
 			"view.bleed",
 			"view.slices",
+			"view.separations",
 			"view.renderStats",
 			"units",
 			"theme",
@@ -192,6 +194,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	);
 	const bleed = useBleedShown();
 	const slices = useSlicesShown();
+	const separations = useSeparationsShown();
 	const sendTarget = useSendBackTarget(
 		useEditor((s) => s.workspace?.activeTemplateId),
 	);
@@ -213,6 +216,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 					(id === "view.printGuides" && guides) ||
 					(id === "view.bleed" && bleed) ||
 					(id === "view.slices" && slices) ||
+					(id === "view.separations" && separations) ||
 					(id === "view.renderStats" && renderStats) ? (
 						<CheckIcon />
 					) : undefined

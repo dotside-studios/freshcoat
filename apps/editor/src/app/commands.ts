@@ -2,6 +2,7 @@ import { LENGTH_UNITS, type LengthUnit } from "@freshcoat-js/coatfile";
 import { boundDataset } from "@freshcoat-js/workspace";
 import { toggleBleed } from "~/canvas/bleed-view";
 import { togglePrintGuides } from "~/canvas/print-guides";
+import { toggleSeparations } from "~/canvas/separations";
 import { toggleSlices } from "~/canvas/slice-guides";
 import { openExportSelected } from "~/data/export-selected";
 import { openFindReplace } from "~/data/find-replace";
@@ -651,6 +652,13 @@ export const COMMANDS: Command[] = [
 		group: "View",
 		enabled: hasDoc,
 		run: () => toggleSlices(),
+	},
+	{
+		id: "view.separations",
+		label: "Separations",
+		group: "View",
+		enabled: hasDoc,
+		run: () => toggleSeparations(),
 	},
 	{
 		id: "view.renderStats",

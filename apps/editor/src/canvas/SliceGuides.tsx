@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { activeVariantId } from "~/doc/variant-edit";
 import { useEditor } from "~/state/hooks";
 import { present, type View } from "~/state/store";
+import { useSeparationsShown } from "./separations";
 import { SLICE_EDGE, useSlicesShown } from "./slice-guides";
 
 const LABEL_SIZE = 10;
@@ -10,11 +11,12 @@ const LABEL_SIZE = 10;
 /**
  * Every slice of the active side outlined on the overlay, as an export would
  * resolve them for the current record and variant: the painted side never sees
- * them, so exports, the snapshot hook and thumbnails stay clean. Pieces carry
+ * them (also while the separations preview is on), so exports, the snapshot hook and thumbnails stay clean. Pieces carry
  * their name above the top-left corner of their box.
  */
 export function SliceGuides({ view }: { view: View }) {
-	const shown = useSlicesShown();
+	const slicesOn = useSlicesShown();
+	const shown = useSeparationsShown() || slicesOn;
 	const template = useEditor((s) => (shown ? present(s) : null));
 	const side = useEditor((s) => s.side);
 	const variantId = useEditor((s) => s.variantId);
