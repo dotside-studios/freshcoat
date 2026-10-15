@@ -44,7 +44,7 @@ export function Slider({
 							className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-fc-accent"
 							style={{ width: `${state.getThumbPercent(0) * 100}%` }}
 						/>
-						<SliderThumb className="top-1/2 size-3 -translate-y-1/2 rounded-full bg-white shadow-(--shadow-fc-handle) outline-none data-focus-visible:outline-2 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1 pointer-coarse:size-5" />
+						<SliderThumb className="top-1/2 size-3 rounded-full bg-white shadow-(--shadow-fc-handle) outline-none data-focus-visible:outline-2 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1 pointer-coarse:size-5" />
 					</>
 				)}
 			</SliderTrack>
