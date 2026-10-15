@@ -70,6 +70,8 @@ describe("gradient stroke controls", () => {
 		expect(screen.getByTestId("gradient-swatch").dataset.kind).toBe("linear");
 		expect(screen.queryByLabelText("Stroke color")).toBeNull();
 
+		expect(screen.queryByLabelText("Gradient angle")).toBeNull();
+		await user.click(button("Edit stroke gradient"));
 		typeInto(spinbutton("Gradient angle"), "45");
 		fireEvent.click(button("Reverse stroke stops"));
 		expect(stroke(c)?.color).toEqual({
@@ -80,9 +82,24 @@ describe("gradient stroke controls", () => {
 				{ offset: 1, color: "#000000" },
 			],
 		});
+		await user.keyboard("{Escape}");
 		typeInto(spinbutton("Stroke width"), "4");
 		expect(stroke(c)?.width).toBe(4);
 		expect(validate(c.template).ok).toBe(true);
+	});
+
+	it("keeps the gradient editor out of the row until the swatch is pressed", async () => {
+		const user = fastUser();
+		setup();
+		fireEvent.click(screen.getByRole("button", { name: "Add stroke" }));
+		await chooseOption(user, button("Stroke kind"), "Linear");
+		expect(screen.queryByLabelText("Gradient angle")).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Reverse stroke stops" }),
+		).toBeNull();
+		await user.click(button("Edit stroke gradient"));
+		expect(screen.getByRole("dialog", { name: "Gradient" })).toBeTruthy();
+		expect(spinbutton("Gradient angle")).toBeTruthy();
 	});
 
 	it("switches between gradient kinds and back to a solid colour", async () => {

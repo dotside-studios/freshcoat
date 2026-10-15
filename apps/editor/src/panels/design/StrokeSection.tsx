@@ -31,7 +31,7 @@ import {
 	SettingsPopover,
 	sectionActions,
 } from "./controls";
-import { GradientEditor, KINDS, useBox } from "./FillSection";
+import { GradientEditor, KINDS, SwatchPopover, useBox } from "./FillSection";
 import { commonValue, type Inspect, parseDash, propsOf } from "./field-helpers";
 import { GradientSwatch } from "./GradientSwatch";
 import { InspectorSection } from "./InspectorSection";
@@ -182,11 +182,24 @@ export function StrokeSection({
 							))}
 						</Select>
 						{gradient ? (
-							<GradientSwatch
-								g={gradient}
-								box={box}
-								className="h-fc-control min-w-0 flex-1 rounded-[3px]"
-							/>
+							<SwatchPopover
+								title="Gradient"
+								label="Edit stroke gradient"
+								swatch={
+									<GradientSwatch
+										g={gradient}
+										box={box}
+										className="block h-fc-control w-full rounded-[3px]"
+									/>
+								}
+							>
+								<GradientEditor
+									g={gradient}
+									name="stroke"
+									swatches={ins.swatches}
+									onChange={(field, g) => set(`stroke-${field}`, { color: g })}
+								/>
+							</SwatchPopover>
 						) : (
 							<ColorInput
 								aria-label="Stroke color"
@@ -243,14 +256,6 @@ export function StrokeSection({
 								))}
 							</div>
 						</Row>
-					)}
-					{gradient && (
-						<GradientEditor
-							g={gradient}
-							name="stroke"
-							swatches={ins.swatches}
-							onChange={(field, g) => set(`stroke-${field}`, { color: g })}
-						/>
 					)}
 					<Row label="Position">
 						<ToggleGroup

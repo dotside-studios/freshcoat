@@ -361,8 +361,8 @@ the records, and **Export** turns templates and records into files.
     popover from its swatch.
   - A stroke sits inside, centered on or outside the edge of any stroked
     layer: rectangle, frame, image, vector or text. Its paint is a solid colour
-    or a linear, radial or angular gradient, edited with the same controls as a
-    gradient fill. The canvas gradient handles follow fills only. A text
+    or a linear, radial or angular gradient, which opens in a popover from the
+    stroke's swatch with the same controls as a gradient fill. The canvas gradient handles follow fills only. A text
     stroke takes a position and a join but no dash, trim or cap. Dash, trim,
     cap and join open from the stroke's settings button.
   - A rectangle's or vector's Spot color section, in the Print tab, prints its
