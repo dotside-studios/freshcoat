@@ -969,6 +969,7 @@ describe("validate (effects)", () => {
 						cellSize: 4,
 						angle: 10,
 						invert: true,
+						anchor: "element",
 						color: "#112233",
 						background: "#fff",
 						hidden: true,
@@ -989,6 +990,7 @@ describe("validate (effects)", () => {
 		["negative cell size", { type: "halftone", cellSize: -2 }],
 		["unknown shape", { type: "halftone", cellSize: 4, shape: "star" }],
 		["unknown mode", { type: "halftone", cellSize: 4, mode: "rgb" }],
+		["unknown anchor", { type: "halftone", cellSize: 4, anchor: "sheet" }],
 	])("rejects %s", (_, effect) => {
 		const r = validate(withEffects({ effects: [effect] }));
 		expect(r.ok).toBe(false);

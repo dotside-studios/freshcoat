@@ -629,6 +629,13 @@
 														"angle": {
 															"type": "number"
 														},
+														"anchor": {
+															"type": "string",
+															"enum": [
+																"page",
+																"element"
+															]
+														},
 														"invert": {
 															"type": "boolean"
 														},
@@ -2141,6 +2148,13 @@
 														"angle": {
 															"type": "number"
 														},
+														"anchor": {
+															"type": "string",
+															"enum": [
+																"page",
+																"element"
+															]
+														},
 														"invert": {
 															"type": "boolean"
 														},
@@ -3191,6 +3205,13 @@
 																	},
 																	"angle": {
 																		"type": "number"
+																	},
+																	"anchor": {
+																		"type": "string",
+																		"enum": [
+																			"page",
+																			"element"
+																		]
 																	},
 																	"invert": {
 																		"type": "boolean"
@@ -4704,6 +4725,13 @@
 																	"angle": {
 																		"type": "number"
 																	},
+																	"anchor": {
+																		"type": "string",
+																		"enum": [
+																			"page",
+																			"element"
+																		]
+																	},
 																	"invert": {
 																		"type": "boolean"
 																	},
@@ -5860,6 +5888,13 @@
 													},
 													"angle": {
 														"type": "number"
+													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
 													},
 													"invert": {
 														"type": "boolean"
@@ -7280,6 +7315,13 @@
 													"angle": {
 														"type": "number"
 													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
+													},
 													"invert": {
 														"type": "boolean"
 													},
@@ -8276,6 +8318,13 @@
 													"angle": {
 														"type": "number"
 													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
+													},
 													"invert": {
 														"type": "boolean"
 													},
@@ -8962,6 +9011,13 @@
 													"angle": {
 														"type": "number"
 													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
+													},
 													"invert": {
 														"type": "boolean"
 													},
@@ -9556,6 +9612,13 @@
 													},
 													"angle": {
 														"type": "number"
+													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
 													},
 													"invert": {
 														"type": "boolean"
@@ -11069,6 +11132,13 @@
 													"angle": {
 														"type": "number"
 													},
+													"anchor": {
+														"type": "string",
+														"enum": [
+															"page",
+															"element"
+														]
+													},
 													"invert": {
 														"type": "boolean"
 													},
@@ -12566,6 +12636,13 @@
 											},
 											"angle": {
 												"type": "number"
+											},
+											"anchor": {
+												"type": "string",
+												"enum": [
+													"page",
+													"element"
+												]
 											},
 											"invert": {
 												"type": "boolean"
@@ -14144,6 +14221,13 @@
 											},
 											"angle": {
 												"type": "number"
+											},
+											"anchor": {
+												"type": "string",
+												"enum": [
+													"page",
+													"element"
+												]
 											},
 											"invert": {
 												"type": "boolean"

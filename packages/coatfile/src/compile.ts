@@ -160,6 +160,14 @@ export function compile(
 		? pieceScene.height * ratio
 		: opts.height + (bleed.top + bleed.bottom) * ratio;
 	const trim = { width: template.width, height: template.height };
+	// Where the side's own top-left lands in the scene, so a "page" halftone's
+	// screen sits on the side whether the scene adds bleed or cuts out a piece.
+	const page = piece
+		? {
+				x: (piece.bleed.left - piece.box.x) * ratio,
+				y: (piece.bleed.top - piece.box.y) * ratio,
+			}
+		: { x: bleed.left * ratio, y: bleed.top * ratio };
 
 	const frameData = opts.frameNames
 		? template.template_data.filter((f) => opts.frameNames?.includes(f.name))
@@ -189,6 +197,7 @@ export function compile(
 			ratio,
 			width,
 			height,
+			page,
 		);
 	});
 
@@ -229,6 +238,7 @@ function compileFrame(
 	ratio: number,
 	targetWidth: number,
 	targetHeight: number,
+	page: Vec2,
 ): CompiledFrame {
 	const declaredFontByFamily = new Map(
 		(template.fonts ?? []).map((f) => [f.family, f] as const),
@@ -264,9 +274,17 @@ function compileFrame(
 	const scope: CompileScope = {
 		fontFamily: fallbackFamily ?? "sans-serif",
 		warnings: [],
+		page,
 	};
 	const children: Node[] = [
-		compileBackground(frame.background, ctx, targetWidth, targetHeight, ratio),
+		compileBackground(
+			frame.background,
+			ctx,
+			targetWidth,
+			targetHeight,
+			ratio,
+			page,
+		),
 		...frame.elements.map((el) => compileElement(el, ctx, ratio, scope)),
 	];
 	const root: GroupNode = {
@@ -285,10 +303,12 @@ function compileFrame(
 }
 
 // What compiling one frame's elements shares: the family a barcode's text falls
-// back to, and the problems found along the way, which the frame carries out.
+// back to, the problems found along the way, which the frame carries out, and
+// where the side's top-left lies in the scene.
 type CompileScope = {
 	fontFamily: string;
 	warnings: CompileWarning[];
+	page: Vec2;
 };
 
 function compileBackground(
@@ -297,6 +317,7 @@ function compileBackground(
 	targetWidth: number,
 	targetHeight: number,
 	ratio: number,
+	page: Vec2,
 ): Node {
 	const props = substitute(bg.properties, ctx) as Record<string, unknown>;
 	const pos: Vec2 = { x: 0, y: 0 };
@@ -307,7 +328,7 @@ function compileBackground(
 		rotation: bg.rotation,
 		opacity: bg.opacity,
 		blendMode: bg.blendMode,
-		...lowerEffects(bg, 1),
+		...lowerEffects(bg, 1, page),
 		adjust: resolveAdjust(bg.adjust),
 	};
 	if (bg.type === "rect") {
@@ -354,7 +375,7 @@ function compileElement(
 		rotation: el.rotation,
 		opacity: el.opacity,
 		blendMode: el.blendMode,
-		...lowerEffects(el, ratio),
+		...lowerEffects(el, ratio, scope.page),
 		adjust: resolveAdjust(el.adjust),
 		layoutChild: mapLayoutChild(el.layoutChild, ratio),
 	};
@@ -1402,10 +1423,12 @@ function applySpot(
 
 // The engine's layer effects for an element's effects, hidden ones left out.
 // The engine fixes where each kind applies, so only the shadows keep their
-// array order. Grain and halftone sizes are design px, scaled like a blur.
+// array order. Grain and halftone sizes are design px, scaled like a blur. A
+// "page" halftone carries the side's origin in the scene.
 function lowerEffects(
 	el: Pick<Element, "effects" | "shadow" | "blur" | "backdropBlur">,
 	ratio: number,
+	page: Vec2,
 ): Pick<Base, "shadow" | "blur" | "backdropBlur" | "grain" | "halftone"> {
 	if (!el.effects) {
 		return {
@@ -1448,6 +1471,10 @@ function lowerEffects(
 					cellSize: halftone.cellSize * ratio,
 					angle: halftone.angle ?? (halftone.mode === "cmyk" ? 0 : 45),
 					invert: halftone.invert ?? false,
+					anchor: halftone.anchor ?? "page",
+					...(halftone.anchor !== "element" && (page.x !== 0 || page.y !== 0)
+						? { origin: page }
+						: {}),
 					color: halftone.color ?? "#000000",
 					...(halftone.background
 						? { background: halftone.background }

@@ -644,13 +644,17 @@ export const GrainEffectSchema = z.object({
 
 // The layer redrawn as a halftone screen with `cellSize` design px cells. "cmyk"
 // overlays four multiplied screens at C 15°, M 75°, Y 0° and K 45°, turned by
-// `angle`: a look, not colour separations.
+// `angle`: a look, not colour separations. `anchor` "page" (default) lays one
+// screen over the whole side, so neighbouring elements share a grid and a
+// rotated element keeps the screen angle; "element" starts the grid at the
+// element's own origin and turns it with the element.
 export const HalftoneEffectSchema = z.object({
 	type: z.literal("halftone"),
 	mode: z.enum(["mono", "cmyk"]).optional(),
 	shape: z.enum(["round", "line", "square"]).optional(),
 	cellSize: z.number().positive(),
 	angle: z.number().optional(),
+	anchor: z.enum(["page", "element"]).optional(),
 	invert: z.boolean().optional(),
 	color: z.string().optional(),
 	background: z.string().optional(),
