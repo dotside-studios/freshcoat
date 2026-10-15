@@ -397,9 +397,13 @@ the records, and **Export** turns templates and records into files.
     same grain, in the canvas and in every export. A halftone sets a mode
     (mono, or a CMYK look of four screens at 15°, 75°, 0° and 45° that is not
     real separations), a round, line or square dot, a cell size with its lines
-    per inch at the template's export DPI, an angle, invert, an ink colour
-    and an optional paper colour. Both preview live on the canvas and keep
-    their look at 2× export, only sharper.
+    per inch at the template's export DPI, an angle, an anchor, invert, an
+    ink colour and an optional paper colour. Anchor Page (the default) lays
+    one screen over the whole side, so elements that meet share a grid and a
+    rotated element keeps the screen angle; Layer starts the grid at the
+    element and turns it with the element. Solid fills and bold text stay
+    solid to their edges. Both preview live on the canvas and keep their look
+    at 2× export, only sharper.
   - Text content, image source, QR value and barcode value have an Insert
     field menu; an image source lists image and URL fields first. Its last
     item, "New field…", creates a field and inserts it.
