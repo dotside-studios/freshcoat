@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
+import { separationsShown, setSeparationsShown } from "~/canvas/separations";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
 import { PrintPanel } from "~/panels/print/PrintPanel";
@@ -33,7 +34,10 @@ beforeAll(() => {
 	g.CSS ??= {};
 	g.CSS.escape ??= (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 });
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	setSeparationsShown(false);
+});
 
 describe("the Print tab", () => {
 	it("is the third inspector tab", async () => {
@@ -72,7 +76,9 @@ describe("the Print tab", () => {
 		expect(getElement(t, "0/1/1")?.type).toBe("text");
 		show(c, <PrintPanel />);
 		expect(screen.getByText("No print settings")).toBeTruthy();
-		expect(screen.queryByRole("button")).toBeNull();
+		expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+			"Separations",
+		]);
 	});
 
 	it("opens Template setup from the empty state with nothing selected", async () => {
@@ -111,5 +117,24 @@ describe("the side section in Design", () => {
 		expect(
 			screen.queryByRole("spinbutton", { name: "Template bleed" }),
 		).toBeNull();
+	});
+});
+
+describe("the Separations toggle", () => {
+	it("flips the canvas preview, with or without a selection", async () => {
+		const user = fastUser();
+		for (const selection of [["0/0"], []]) {
+			const c = open(selection);
+			show(c, <PrintPanel />);
+			const toggle = screen.getByRole("button", { name: "Separations" });
+			expect(separationsShown()).toBe(false);
+			expect(toggle.getAttribute("aria-pressed")).toBe("false");
+			await user.click(toggle);
+			expect(separationsShown()).toBe(true);
+			expect(toggle.getAttribute("aria-pressed")).toBe("true");
+			await user.click(toggle);
+			expect(separationsShown()).toBe(false);
+			cleanup();
+		}
 	});
 });

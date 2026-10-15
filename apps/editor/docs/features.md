@@ -373,6 +373,18 @@ the records, and **Export** turns templates and records into files.
     default. A vector PDF prints the paint as a Separation of that name; the
     canvas, images and other pages show the alternate. There is no colour
     library: type the printer's name.
+  - Separations: View > Separations, or the Separations button at the top of
+    the Print tab, previews which areas print as which spot ink. It is off by
+    default and lasts for the session. On the overlay, each top-level
+    rectangle or vector on the current side that has a spot ink is outlined
+    along its shape: a fill ink tints the area, a stroke ink traces the edge.
+    Every ink name keeps one color. A legend in the top right corner lists the
+    inks, with "Overprint" beside those that overprint, and clicking an ink
+    hides or shows it to check one plate at a time. A side with no spot inks
+    reads "No spot inks". Hidden layers and layers a variant or a Show when
+    condition leaves out are skipped, and slice cut lines show while the
+    preview is on. Layers inside frames are not marked yet. The preview never
+    reaches an export.
   - Rectangles, frames and images can set each corner's radius on its own
     and smooth their corners. A frame applies its corners to its fill, its
     stroke and its clip; an image to its clip and its stroke.
