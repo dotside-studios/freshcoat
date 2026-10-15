@@ -10,9 +10,10 @@ const LABEL_SIZE = 10;
 
 /**
  * Every slice of the active side outlined on the overlay, as an export would
- * resolve them for the current record and variant: the painted side never sees
- * them (also while the separations preview is on), so exports, the snapshot hook and thumbnails stay clean. Pieces carry
- * their name above the top-left corner of their box.
+ * resolve them for the current record and variant, also while the separations
+ * preview is on. The painted side never sees them, so exports, the snapshot
+ * hook and thumbnails stay clean. Pieces carry their name above the top-left
+ * corner of their box.
  */
 export function SliceGuides({ view }: { view: View }) {
 	const slicesOn = useSlicesShown();

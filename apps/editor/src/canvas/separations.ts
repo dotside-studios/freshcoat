@@ -56,7 +56,6 @@ export function inkColor(name: string): string {
 }
 
 export type SeparationShape = {
-	/** The layer's id. */
 	id: string;
 	ink: string;
 	paint: keyof LayerSpot;
