@@ -8,7 +8,15 @@ const GOLDENS = join(
 	"../../../packages/engine/tests/fixtures/texture",
 );
 
-for (const name of ["grain", "halftone", "halftone-cmyk"])
+for (const name of [
+	"grain",
+	"halftone",
+	"halftone-cmyk",
+	"halftone-adjacent-page",
+	"halftone-adjacent-element",
+	"halftone-rotated-page",
+	"halftone-rotated-element",
+])
 	for (const scale of [1, 2])
 		test(`${name} at ${scale}x paints the pixels Node paints`, async ({
 			page,

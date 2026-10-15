@@ -2,7 +2,9 @@ import {
 	createGroup,
 	createRect,
 	createRenderer,
+	type Halftone,
 	type Node,
+	type ResolvedFill,
 } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/browser";
 
@@ -42,7 +44,62 @@ const LAYERS: Record<string, Partial<Node>> = {
 	},
 };
 
+const white = {
+	pos: { x: 0, y: 0 },
+	size: { width: W, height: H },
+	fills: [{ kind: "solid", color: "#ffffff" }] as ResolvedFill[],
+};
+const grey: ResolvedFill[] = [{ kind: "solid", color: "#808080" }];
+
+const halftone = (anchor: Halftone["anchor"]): Halftone => ({
+	mode: "mono",
+	shape: "round",
+	cellSize: 7,
+	angle: 45,
+	invert: false,
+	anchor,
+	color: "#000000",
+});
+
+function pair(anchor: Halftone["anchor"]): Node {
+	return createGroup(
+		[10, 60].map((x) =>
+			createRect({
+				pos: { x, y: 10 },
+				size: { width: 50, height: 60 },
+				fills: grey,
+				halftone: halftone(anchor),
+			}),
+		),
+		white,
+	);
+}
+
+function rotated(anchor: Halftone["anchor"]): Node {
+	return createGroup(
+		[
+			createRect({
+				pos: { x: 25, y: 10 },
+				size: { width: 70, height: 60 },
+				rotation: 30,
+				fills: grey,
+				halftone: halftone(anchor),
+			}),
+		],
+		white,
+	);
+}
+
+const SCENES: Record<string, () => Node> = {
+	"halftone-adjacent-page": () => pair("page"),
+	"halftone-adjacent-element": () => pair("element"),
+	"halftone-rotated-page": () => rotated("page"),
+	"halftone-rotated-element": () => rotated("element"),
+};
+
 function scene(name: string): Node {
+	const custom = SCENES[name];
+	if (custom) return custom();
 	return createGroup(
 		[
 			createRect({
