@@ -19,6 +19,8 @@ export const OPEN_HINT = "Open the .coat file you downloaded from Figma";
 
 /** Empty-state titles used in more than one place. */
 export const EMPTY = {
+	noPrintSettings: "No print settings",
+	noSideSelection: "Nothing selected",
 	datasets: "No datasets",
 	records: "No records",
 	fields: "No fields",
@@ -113,6 +115,22 @@ export const VARIANT_UI = {
 		`${label} has a change to ${layer} that changes nothing`,
 } as const;
 
+export const SHOW_WHEN = {
+	title: "Show when",
+	always: "Always",
+	add: "Add condition",
+	show: "Show",
+	needField: "Add a field in Content to show this layer conditionally",
+	mixed: "Mixed conditions. Adding one replaces them.",
+	ops: {
+		set: "is set",
+		unset: "is not set",
+		equals: "equals",
+		differs: "does not equal",
+	},
+	shownWhen: (conditions: string[]) => `Shown when ${conditions.join(" and ")}`,
+} as const;
+
 /** The left panel's sections. */
 export const LEFT_PANEL = {
 	templates: "Templates",
@@ -131,6 +149,7 @@ export const BINDING = {
 export const CONTENT = {
 	design: "Design",
 	content: "Content",
+	print: "Print",
 	/** The record stepper's heading, before the dataset's name. */
 	tryWith: "Try with",
 	chooseDataset: "Choose a dataset",
@@ -218,8 +237,6 @@ export const VARIANT_EXPORT = {
 			? "Default only, no variant changes anything"
 			: `Default and ${plural(variants, "variant")}`,
 	unbound: "Not bound. Fields use their defaults.",
-	fileNameTokens: (slices: boolean) =>
-		`Tokens: {{template}} {{side}} {{index}} {{record}} {{variant}}${slices ? " {{slice}}" : ""} and any column key`,
 	/** under the file name pattern, for tokens that export as empty text */
 	unknownTokens: (tokens: readonly string[]) => {
 		const list = tokens.map((t) => `{{${t}}}`).join(", ");

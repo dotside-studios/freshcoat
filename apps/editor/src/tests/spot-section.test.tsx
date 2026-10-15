@@ -5,9 +5,14 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
-import { DesignPanel } from "~/panels/design/DesignPanel";
+import { PrintPanel } from "~/panels/print/PrintPanel";
 import { fastUser } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
+
+async function addInk(user: ReturnType<typeof fastUser>, paint: string) {
+	await user.click(screen.getByRole("button", { name: "Add spot ink" }));
+	await user.click(screen.getByRole("menuitem", { name: paint }));
+}
 
 const RECT = "0/0";
 
@@ -24,7 +29,7 @@ function setup(t: Template, key = RECT) {
 	c.select([key]);
 	render(
 		<ControllerProvider controller={c}>
-			<DesignPanel />
+			<PrintPanel />
 		</ControllerProvider>,
 	);
 	return c;
@@ -51,7 +56,7 @@ describe("spot colour section", () => {
 		expect(
 			screen.queryByRole("textbox", { name: "Fill spot name" }),
 		).toBeNull();
-		await user.click(screen.getByRole("checkbox", { name: "Fill as spot" }));
+		await addInk(user, "Fill");
 		expect(spot(c)).toEqual({ fill: { spot: "White", overprint: true } });
 		expect(validate(c.template).ok).toBe(true);
 
@@ -73,7 +78,7 @@ describe("spot colour section", () => {
 	it("refuses a reserved name or an alternate that is not a colour", async () => {
 		const c = setup(doc());
 		const user = fastUser();
-		await user.click(screen.getByRole("checkbox", { name: "Stroke as spot" }));
+		await addInk(user, "Stroke");
 		const name = screen.getByRole("textbox", { name: "Stroke spot name" });
 		await user.clear(name);
 		await user.type(name, "All{Enter}");
@@ -87,14 +92,13 @@ describe("spot colour section", () => {
 	it("drops the spot when neither paint uses one", async () => {
 		const c = setup(doc());
 		const user = fastUser();
-		const fill = screen.getByRole("checkbox", { name: "Fill as spot" });
-		await user.click(fill);
-		await user.click(fill);
+		await addInk(user, "Fill");
+		await user.click(screen.getByRole("button", { name: "Remove fill spot" }));
 		expect(spot(c)).toBeUndefined();
 	});
 
 	it("is only offered for rects and vectors", () => {
 		setup(doc(), "0/1");
-		expect(screen.queryByRole("checkbox", { name: "Fill as spot" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Add spot ink" })).toBeNull();
 	});
 });

@@ -11,8 +11,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
-import { DesignPanel } from "~/panels/design/DesignPanel";
 import { LeftPanel } from "~/panels/LeftPanel";
+import { PrintPanel } from "~/panels/print/PrintPanel";
 import { chooseOption, fastUser, spinbutton } from "./aria";
 import { doc, geometryOf } from "./doc-fixture";
 
@@ -34,7 +34,7 @@ function setup(selection: string[], t?: Template) {
 	const c = open(selection, t);
 	render(
 		<ControllerProvider controller={c}>
-			<DesignPanel />
+			<PrintPanel />
 		</ControllerProvider>,
 	);
 	return c;
@@ -64,7 +64,10 @@ function withSlice(slice: object = {}): Template {
 const slice = (c: EditorController, key = "0/0") =>
 	(getElement(c.template as Template, key)?.properties as { slice?: object })
 		.slice;
-const checkbox = () => screen.getByRole("checkbox", { name: "Use as slice" });
+const addSlice = () =>
+	fireEvent.click(screen.getByRole("button", { name: "Add slice" }));
+const removeSlice = () =>
+	fireEvent.click(screen.getByRole("button", { name: "Remove slice" }));
 
 beforeAll(() => {
 	Element.prototype.scrollIntoView ??= () => {};
@@ -96,19 +99,19 @@ describe("Slice section", () => {
 	it("adds and removes the modifier as undo steps", () => {
 		const c = setup(["0/0"]);
 		expect(screen.queryByLabelText("Slice name")).toBeNull();
-		fireEvent.click(checkbox());
+		addSlice();
 		expect(slice(c)).toEqual({});
 		expect(screen.getByLabelText("Slice name")).toHaveProperty(
 			"placeholder",
 			"a",
 		);
-		fireEvent.click(checkbox());
+		removeSlice();
 		expect(slice(c)).toBeUndefined();
 		expect(
 			"slice" in (getElement(c.template as Template, "0/0")?.properties ?? {}),
 		).toBe(false);
 		act(() => c.undo());
-		expect(slice(c)).toBeUndefined();
+		expect(slice(c)).toEqual({});
 		act(() => c.redo());
 		expect(slice(c)).toBeUndefined();
 	});
@@ -151,14 +154,14 @@ describe("Slice section", () => {
 		expect(slice(c)).toEqual({ edge: "score" });
 	});
 
-	it("shows a mixed selection as indeterminate and sets all of it", () => {
+	it("notes a mixed selection and adds a slice to the rest", () => {
 		const t = withSlice({ edge: "through" });
 		const c = setup(["0/0", "0/5"], t);
-		expect((checkbox() as HTMLInputElement).indeterminate).toBe(true);
-		fireEvent.click(checkbox());
+		expect(screen.getByText("Some layers are slices")).toBeTruthy();
+		addSlice();
 		expect(slice(c, "0/0")).toEqual({ edge: "through" });
 		expect(slice(c, "0/5")).toEqual({});
-		expect(checkbox()).toHaveProperty("checked", true);
+		expect(screen.getByRole("button", { name: "Remove slice" })).toBeTruthy();
 	});
 });
 
@@ -238,7 +241,7 @@ describe("Slice section for open paths", () => {
 
 	it("turns on as a score line with no piece", () => {
 		const c = setup([KEY()], withFold());
-		fireEvent.click(checkbox());
+		addSlice();
 		expect(slice(c, KEY())).toEqual({ output: "none", edge: "score" });
 	});
 

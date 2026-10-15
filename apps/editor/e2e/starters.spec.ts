@@ -233,17 +233,21 @@ test("the portrait card is a variant of the Davi card", async ({ page }) => {
 	await shot(page, "davi-card-portrait-back");
 });
 
-test("a bleed and a safe area set in Design draw as guides", async ({
+test("a bleed and a safe area set in Template setup draw as guides", async ({
 	page,
 }) => {
 	await openStarter(page, "davi-card");
 	await expect(page.getByTestId("print-guides-bleed")).toHaveCount(0);
-	const bleed = page.getByRole("spinbutton", { name: "Template bleed" });
+	await page.getByRole("tab", { name: "Print" }).click();
+	await page.getByRole("button", { name: "Template setup…" }).click();
+	const setup = page.getByTestId("template-setup");
+	const bleed = setup.getByRole("spinbutton", { name: "Template bleed" });
 	await bleed.fill("36");
 	await bleed.press("Enter");
 	const safe = page.getByRole("spinbutton", { name: "Template safe area" });
 	await safe.fill("60");
 	await safe.press("Enter");
+	await setup.getByRole("button", { name: "Done" }).click();
 	expect(await state<unknown[]>(page, "[t.bleed, t.safeArea]")).toEqual([
 		36, 60,
 	]);

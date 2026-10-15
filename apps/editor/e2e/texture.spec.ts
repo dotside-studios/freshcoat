@@ -68,10 +68,10 @@ test("the canvas previews grain and a halftone as they are edited", async ({
 	const before = await regionSum(page, box);
 
 	// The name is white, which a halftone screens to no dots until inverted.
-	await inspector.getByRole("button", { name: "Add halftone" }).click();
-	await inspector
-		.getByRole("checkbox", { name: "Invert" })
-		.check({ force: true });
+	await inspector.getByRole("button", { name: "Add effect" }).click();
+	await page.getByRole("menuitem", { name: "Halftone" }).click();
+	await inspector.getByRole("button", { name: "Halftone settings" }).click();
+	await page.getByRole("checkbox", { name: "Invert" }).check({ force: true });
 	await settle(page);
 	const screened = await regionSum(page, box);
 	expect(screened).not.toBe(before);
@@ -79,7 +79,7 @@ test("the canvas previews grain and a halftone as they are edited", async ({
 		await state(page, "c.template.template_data[0].elements[6].effects"),
 	).toEqual([{ type: "halftone", cellSize: 6, invert: true }]);
 
-	const cell = inspector.getByRole("spinbutton", {
+	const cell = page.getByRole("spinbutton", {
 		name: "Halftone cell size",
 	});
 	await cell.fill("12");
@@ -87,13 +87,16 @@ test("the canvas previews grain and a halftone as they are edited", async ({
 	await settle(page);
 	expect(await regionSum(page, box)).not.toBe(screened);
 
+	await page.getByRole("button", { name: "Close" }).click();
 	await inspector.getByRole("button", { name: "Halftone visible" }).click();
 	await settle(page);
 	expect(await regionSum(page, box)).toBe(before);
 
 	// Overlay leaves white as it is, so the white name takes multiply.
-	await inspector.getByRole("button", { name: "Add grain" }).click();
-	await inspector.getByRole("button", { name: /Grain blend mode/ }).click();
+	await inspector.getByRole("button", { name: "Add effect" }).click();
+	await page.getByRole("menuitem", { name: "Grain" }).click();
+	await inspector.getByRole("button", { name: "Grain settings" }).click();
+	await page.getByRole("button", { name: /Grain blend mode/ }).click();
 	await page.getByRole("option", { name: "Multiply" }).click();
 	await settle(page);
 	expect(await regionSum(page, box)).not.toBe(before);

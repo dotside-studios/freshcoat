@@ -67,7 +67,7 @@ export type Tool =
 	| "qr"
 	| "barcode";
 
-export type RightTab = "design" | "content";
+export type RightTab = "design" | "content" | "print";
 
 /** Tab ids an older build stored or dispatched, mapped to where their
  *  contents live now. */
@@ -123,7 +123,6 @@ export type ExportView = {
 	scope: "export" | "all" | "failed";
 	/** Records chosen in the list, when the preset does not keep its own. */
 	selection: string[];
-	settingsTab: "content" | "output" | "print" | "files";
 };
 
 const EXPORT_VIEW: ExportView = {
@@ -131,7 +130,6 @@ const EXPORT_VIEW: ExportView = {
 	filter: "all",
 	scope: "export",
 	selection: [],
-	settingsTab: "content",
 };
 
 export type EditorState = {

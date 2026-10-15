@@ -75,6 +75,7 @@ import {
 	usePrintGuidesVersion,
 } from "./print-guides";
 import { Rulers } from "./Rulers";
+import { SeparationsLegend } from "./SeparationsPreview";
 import { SideMenu } from "./SideVariantMenus";
 import { TextEditor } from "./TextEditor";
 import { useLiveRender } from "./use-live-render";
@@ -1055,6 +1056,7 @@ export function Viewport() {
 						<TextEditor />
 						<Guides />
 						<Rulers />
+						<SeparationsLegend />
 					</>
 				) : null}
 			</div>

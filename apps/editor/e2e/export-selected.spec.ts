@@ -178,11 +178,11 @@ test("Export: the filmstrip selects with Shift, Mod and Mod+A, and exports only 
 		"r1",
 	);
 	// The Records tab shares the selection.
-	await page.getByRole("tab", { name: "Records" }).click();
+	await page.getByRole("radio", { name: "Records" }).click();
 	await expect(page.getByTestId("export-records-selection")).toHaveText(
 		"3 selected",
 	);
-	await page.getByRole("tab", { name: "Filmstrip" }).click();
+	await page.getByRole("radio", { name: "Filmstrip" }).click();
 
 	await strip.focus();
 	await page.keyboard.press("Escape");

@@ -6,6 +6,8 @@ import { inputBase } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { fieldLabel } from "@freshcoat-js/ui/lib/styles";
+import { Menu, MenuItem, MenuSeparator } from "@freshcoat-js/ui/menu";
+import { Popover } from "@freshcoat-js/ui/popover";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { treeRow } from "@freshcoat-js/ui/tree";
 import {
@@ -33,7 +35,7 @@ import {
 	updateColumn,
 } from "@freshcoat-js/workspace/dataset";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
-import { ListBox, ListBoxItem } from "react-aria-components";
+import { ListBox, ListBoxItem, MenuTrigger } from "react-aria-components";
 import { useController } from "~/app/context";
 import { EMPTY, KEY_RULE, plural } from "~/app/copy";
 import { useEditor } from "~/state/hooks";
@@ -41,6 +43,8 @@ import AddIcon from "~icons/mingcute/add-line";
 import DownIcon from "~icons/mingcute/arrow-down-line";
 import UpIcon from "~icons/mingcute/arrow-up-line";
 import DeleteIcon from "~icons/mingcute/delete-2-line";
+import MoreIcon from "~icons/mingcute/more-1-line";
+import RightIcon from "~icons/mingcute/right-line";
 import { editDataset, renameColumnEverywhere } from "./actions";
 import type { Confirm } from "./ConfirmDialog";
 import { useTemplateSlots } from "./column-options";
@@ -173,49 +177,45 @@ export function ColumnsPanel({
 		onSelect(next?.key ?? null);
 	};
 
+	const move = (c: Column, by: -1 | 1) =>
+		editDataset(controller, dataset.id, (d) => moveColumn(d, c.key, by));
+
+	const rowMenu = (c: Column) => (
+		<>
+			<MenuItem
+				id="up"
+				icon={<UpIcon />}
+				isDisabled={dataset.columns[0] === c}
+				onAction={() => move(c, -1)}
+			>
+				Move up
+			</MenuItem>
+			<MenuItem
+				id="down"
+				icon={<DownIcon />}
+				isDisabled={dataset.columns.at(-1) === c}
+				onAction={() => move(c, 1)}
+			>
+				Move down
+			</MenuItem>
+			<MenuSeparator />
+			<MenuItem
+				id="delete"
+				icon={<DeleteIcon />}
+				destructive
+				onAction={() => void remove(c)}
+			>
+				Delete
+			</MenuItem>
+		</>
+	);
+
 	return (
 		<div className="flex min-h-0 flex-1 flex-col" data-testid="columns-panel">
 			<div className="flex h-7 shrink-0 items-center border-fc-border border-b pr-1 pl-2.5 pointer-coarse:h-9">
 				<h2 className="min-w-0 flex-1 truncate font-semibold text-[10px] text-fc-muted uppercase tracking-[0.06em]">
 					Columns
 				</h2>
-				<IconButton
-					aria-label="Move column up"
-					tooltip="Move up"
-					isDisabled={!column || dataset.columns[0] === column}
-					onPress={() =>
-						column &&
-						editDataset(controller, dataset.id, (d) =>
-							moveColumn(d, column.key, -1),
-						)
-					}
-					className="size-5 pointer-coarse:size-7 [&_svg]:size-3.5"
-				>
-					<UpIcon />
-				</IconButton>
-				<IconButton
-					aria-label="Move column down"
-					tooltip="Move down"
-					isDisabled={!column || dataset.columns.at(-1) === column}
-					onPress={() =>
-						column &&
-						editDataset(controller, dataset.id, (d) =>
-							moveColumn(d, column.key, 1),
-						)
-					}
-					className="size-5 pointer-coarse:size-7 [&_svg]:size-3.5"
-				>
-					<DownIcon />
-				</IconButton>
-				<IconButton
-					aria-label="Delete column"
-					tooltip="Delete column"
-					isDisabled={!column}
-					onPress={() => column && void remove(column)}
-					className="size-5 pointer-coarse:size-7 [&_svg]:size-3.5"
-				>
-					<DeleteIcon />
-				</IconButton>
 				<IconButton
 					aria-label="Add column"
 					tooltip="Add column"
@@ -259,6 +259,18 @@ export function ColumnsPanel({
 						<span className="shrink-0 text-fc-faint text-fc-sm">
 							{TYPE_LABELS[c.type]}
 						</span>
+						<MenuTrigger>
+							<IconButton
+								aria-label={`Actions for ${c.key}`}
+								tooltip="Column actions"
+								className="-mr-1 size-5 shrink-0 pointer-coarse:size-7 [&_svg]:size-3.5"
+							>
+								<MoreIcon />
+							</IconButton>
+							<Popover placement="bottom end">
+								<Menu aria-label={`Actions for ${c.key}`}>{rowMenu(c)}</Menu>
+							</Popover>
+						</MenuTrigger>
 					</ListBoxItem>
 				)}
 			</ListBox>
@@ -271,13 +283,7 @@ export function ColumnsPanel({
 						onRenamed={onSelect}
 					/>
 				) : (
-					<div className="flex flex-col items-start gap-2 p-3 text-fc-muted">
-						<p>No column selected</p>
-						<Button onPress={add}>
-							<AddIcon />
-							Add column
-						</Button>
-					</div>
+					<p className="p-3 text-fc-muted">No column selected</p>
 				)}
 			</div>
 		</div>
@@ -493,6 +499,7 @@ function Constraints({
 	column: Column;
 	patch: (p: Partial<Omit<Column, "key" | "type">>) => void;
 }) {
+	const [open, setOpen] = useState(false);
 	const numeric = NUMERIC_TYPES.has(column.type);
 	const textual = TEXTUAL_TYPES.has(column.type);
 	if (!numeric && !textual) return null;
@@ -511,10 +518,16 @@ function Constraints({
 	return (
 		<fieldset className="flex flex-col gap-2.5 border-fc-border border-t pt-2.5">
 			<legend className="sr-only">Constraints</legend>
-			<p className="font-semibold text-[10px] text-fc-muted uppercase tracking-[0.06em]">
+			<Button
+				variant="ghost"
+				aria-expanded={open}
+				onPress={() => setOpen(!open)}
+				className="-ml-1.5 gap-1 self-start px-1.5 font-semibold text-[10px] text-fc-muted uppercase tracking-[0.06em]"
+			>
+				<RightIcon className={cn("size-3!", open && "rotate-90")} />
 				Constraints
-			</p>
-			{numeric ? (
+			</Button>
+			{open && numeric ? (
 				<div className="grid grid-cols-2 gap-2">
 					<CommitField
 						label="Minimum"
@@ -530,7 +543,7 @@ function Constraints({
 					/>
 				</div>
 			) : null}
-			{column.type === "text" && !column.options ? (
+			{open && column.type === "text" && !column.options ? (
 				<CommitField
 					label="Allowed values"
 					value={column.enum?.join(", ") ?? ""}
@@ -544,7 +557,7 @@ function Constraints({
 					}}
 				/>
 			) : null}
-			{textual ? (
+			{open && textual ? (
 				<>
 					<div className="grid grid-cols-2 gap-2">
 						<CommitField

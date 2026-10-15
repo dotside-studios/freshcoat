@@ -1,8 +1,10 @@
+import { Button } from "@freshcoat-js/ui/button";
 import { TextField } from "@freshcoat-js/ui/field";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";
 import { Popover } from "@freshcoat-js/ui/popover";
+import { PopoverPanel } from "@freshcoat-js/ui/popover-panel";
 import { Tooltip, TooltipTrigger } from "@freshcoat-js/ui/tooltip";
 import {
 	createContext,
@@ -15,6 +17,7 @@ import { MenuTrigger, Button as RACButton } from "react-aria-components";
 import { VARIANT_UI } from "~/app/copy";
 import AddIcon from "~icons/mingcute/add-line";
 import MinusIcon from "~icons/mingcute/minimize-line";
+import SettingsIcon from "~icons/mingcute/settings-3-line";
 
 /**
  * What the active variant changes on the selected layers. A control names
@@ -207,6 +210,49 @@ export function RemoveButton({
 		>
 			<MinusIcon />
 		</IconButton>
+	);
+}
+
+/** A settings button that opens its details in a panel anchored to it. `keys`
+ *  mark the button when the active variant changes a value the panel hides. */
+export function SettingsPopover({
+	label,
+	title,
+	keys,
+	showLabel,
+	children,
+}: {
+	label: string;
+	title: ReactNode;
+	keys?: readonly string[];
+	showLabel?: boolean;
+	children: ReactNode;
+}) {
+	return (
+		<>
+			{keys ? <OverrideMarker keys={keys} /> : null}
+			<PopoverPanel
+				title={title}
+				trigger={
+					showLabel ? (
+						<Button size="md" className="flex-1">
+							<SettingsIcon />
+							{label}
+						</Button>
+					) : (
+						<IconButton
+							aria-label={label}
+							tooltip={label}
+							className="size-5 pointer-coarse:size-8"
+						>
+							<SettingsIcon />
+						</IconButton>
+					)
+				}
+			>
+				{children}
+			</PopoverPanel>
+		</>
 	);
 }
 

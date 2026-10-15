@@ -20,7 +20,8 @@ the records, and **Export** turns templates and records into files.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
   - Templates are exported on their own, as with VS Code's workspaces: the
     active one as `.coat` or `.coat.json`, or all of them as a zip of `.coat`
-    files. The current side still exports as a PNG at 1×, 2× or 3×.
+    files. The current side still exports as a PNG at 1×, 2× or 3×, and File > Export
+    with preset opens Export with a chosen preset and the current record.
   - Saving, exporting or sending back a template raises its
     `format_version` to the lowest minor that covers the fields it uses, so
     a 1.2 file that gains a barcode is saved as 1.3 and an older kit refuses
@@ -57,8 +58,7 @@ the records, and **Export** turns templates and records into files.
   templates, scales with the template's size, and never reaches an export.
   A layer whose edge falls between the trim and the safe line is listed
   under "Print hints" in the status bar's Issues list.
-- **Bleed and safe area:** Template setup's Size group, and Design with
-  nothing selected, set a Bleed and a Safe area in template units. Each is
+- **Bleed and safe area:** Template setup's Size group sets a Bleed and a Safe area in template units. Each is
   one value for every side while linked; the link button beside it switches
   to a top, right, bottom and left field. A file with sides set apart opens
   unlinked, and linking it shows Mixed until a value is typed. Linking or
@@ -156,15 +156,32 @@ the records, and **Export** turns templates and records into files.
     (or, for PNG, whether to keep the alpha channel of an opaque card),
     where the files go, and a file name pattern such as
     `{{member_id}}-{{side}}`.
+  - The settings are one column of collapsible sections: Records, Format,
+    Size, Print, Files and Checks. Each header shows its value once
+    collapsed ("PDF · 300 dpi", "Sheets · A4 · crop marks"), and the choice
+    is kept. Checks lists what stops or spoils an export: a block (which
+    disables Export), an unbound template, unfilled required fields,
+    characters the fonts can't draw and records that failed last time, each
+    with a link to the record or the setting. A count beside the Export
+    button opens the same list, and an estimate beside it says what the
+    export will produce ("120 records · PDF · 1 file", "240 files · PNG
+    zip"). Sizes are not estimated.
+  - New preset opens a menu: Blank preset, or a starter under Print (Press
+    PDF, Proof PDF, Sheets) or Digital (PNG for web). A preset row reads
+    format, DPI (or scale) and record count. On sheets, one Printer marks
+    switch turns the crop and registration marks on and off together, with
+    the individual marks under it. The file name pattern has an Insert field
+    menu for the built-in tokens, the template's fields and the dataset's
+    columns.
   - The preview comes first, with a filmstrip of the records the preset
     will export (or all of them) under it: click a thumbnail or use the
     arrow keys. A template that binds a photo also shows the source, or
     both either side of a draggable divider.
-  - A Records tab beside the filmstrip lists each record's status (pending,
+  - A Filmstrip or Records toggle under the preview switches to a list of each record's status (pending,
     exported, failed, skipped), which can be set by hand; an export marks
-    what it made.
+    what it made. Selected records show a bar with Clear and Save to preset.
   - The filmstrip or Records tab, the status filter, what the filmstrip
-    shows, the list's selection and the settings tab stay as they were while
+    shows, the list's selection and the collapsed sections stay as they were while
     another section shows.
   - Rendering runs in a pool of module workers, each with its own CanvasKit.
     The job bar shows progress, items per second, the time left, bytes
@@ -181,8 +198,8 @@ the records, and **Export** turns templates and records into files.
     text. Text in a font collection or a CFF2 variable font is outlined
     either way. A layer a PDF cannot express, such as a shadow, is drawn as a
     600 dpi image in place.
-  - For a template whose slices have an edge, the Output tab's Slices group
-    has Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
+  - For a template whose slices have an edge, the Size section's slice
+    options have Cut file (None, SVG or DXF) for image zips and Cut lines for a PDF.
     Cut lines strokes each edge kind in an overprinting spot colour, in an
     optional content group named Cut, and shows a spot name field for each
     kind the template cuts: Through spot (CutContour), Kiss spot (KissCut),
@@ -321,38 +338,61 @@ the records, and **Export** turns templates and records into files.
   - A layer that reads a field shows `{}`, which names those fields and opens
     them in Content.
 - **Inspector:**
-  - Align and boolean toolbars at the top (the boolean one for two or more
-    shapes, or one boolean layer). Align left, horizontal centers
+  - Position first: the align buttons, X and Y, rotation and the
+    constraints, as in Figma. Align left, horizontal centers
     and right are Alt+A, H and D; top, vertical centers and bottom are
     Alt+W, V and S; Alt+Shift+H and Alt+Shift+V distribute. The Object menu
     holds the same commands under Boolean, Arrange and Align and distribute.
-  - Then Layer (geometry, opacity, blend mode with every Figma layer mode,
-    linear burn included, and corner radius), the layer type's own section,
-    Fill, Stroke, Spot color, Effects, Constraints, Adjust and Visibility. A collapsed section stays collapsed
-    as the selection changes.
+    A boolean toolbar follows for two or more shapes, or one boolean layer.
+  - Then Layout (width, height, resizing and grid cell) and Appearance
+    (opacity, blend mode with every Figma layer mode, linear burn included,
+    and corner radius), the layer type's own section, Fill, Stroke,
+    Effects, Adjust and Show when. A collapsed section stays collapsed as
+    the selection changes. Slice and Spot color are in the Print tab.
+  - Show when lists the field conditions that decide whether a layer
+    appears, read as "field is set", "field equals value" and so on. It
+    reads "Always" until a condition is added. The layers tree marks such a
+    layer with a small filter icon whose tooltip says when it shows. The
+    eye in the tree stays a session-only editing aid.
   - Fills (solid, linear, radial and angular) and strokes. A gradient's stops
     are edited on a bar: drag, click to add, drag off or Delete to remove,
     and arrow keys to nudge. Reverse and rotate 90 degrees are one click.
+    Each fill is one row; a gradient or pattern fill opens its settings in a
+    popover from its swatch.
   - A stroke sits inside, centered on or outside the edge of any stroked
     layer: rectangle, frame, image, vector or text. Its paint is a solid colour
-    or a linear, radial or angular gradient, edited with the same controls as a
-    gradient fill. The canvas gradient handles follow fills only. A text
-    stroke takes a position and a join but no dash, trim or cap.
-  - A rectangle's or vector's Spot color section prints its fill, its
-    stroke or both in a named spot ink, for white ink, foil or varnish:
-    "Fill as spot" or "Stroke as spot", then the ink's name as the printer
-    knows it (White by default; All and None are refused), a tint, an
-    alternate colour (the layer's own when empty) and Overprint, on by
+    or a linear, radial or angular gradient, which opens in a popover from the
+    stroke's swatch with the same controls as a gradient fill. The canvas gradient handles follow fills only. A text
+    stroke takes a position and a join but no dash, trim or cap. Dash, trim,
+    cap and join open from the stroke's settings button.
+  - A rectangle's or vector's Spot color section, in the Print tab, prints its
+    fill, its stroke or both in a named spot ink, for white ink, foil or
+    varnish. Its add button picks Fill or Stroke, then the ink's name as the
+    printer knows it (White by default; All and None are refused), a tint, an
+    alternate colour (the layer's own when empty) and an Overprint row, on by
     default. A vector PDF prints the paint as a Separation of that name; the
     canvas, images and other pages show the alternate. There is no colour
     library: type the printer's name.
+  - Separations: View > Separations, or the Separations button at the top of
+    the Print tab, previews which areas print as which spot ink. It is off by
+    default and lasts for the session. On the overlay, each top-level
+    rectangle or vector on the current side that has a spot ink is outlined
+    along its shape: a fill ink tints the area, a stroke ink traces the edge.
+    Every ink name keeps one color. A legend in the top right corner lists the
+    inks, with "Overprint" beside those that overprint, and clicking an ink
+    hides or shows it to check one plate at a time. A side with no spot inks
+    reads "No spot inks". Hidden layers and layers a variant or a Show when
+    condition leaves out are skipped, and slice cut lines show while the
+    preview is on. Layers inside frames are not marked yet. The preview never
+    reaches an export.
   - Rectangles, frames and images can set each corner's radius on its own
     and smooth their corners. A frame applies its corners to its fill, its
     stroke and its clip; an image to its clip and its stroke.
   - Text, image, QR, barcode, vector path, frame and auto layout, mask,
     effects, adjustments and conditional visibility.
   - Effects are one list: shadows, a layer blur, a background blur, grain and
-    a halftone, each with its own visibility toggle. Grain sets an amount,
+    a halftone. Each is one row with a visibility toggle, a settings button
+    that opens its controls in a popover, and remove. Grain sets an amount,
     grain size, seed, blend mode and mono or colour; a seed always paints the
     same grain, in the canvas and in every export. A halftone sets a mode
     (mono, or a CMYK look of four screens at 15°, 75°, 0° and 45° that is not
@@ -363,6 +403,9 @@ the records, and **Export** turns templates and records into files.
   - Text content, image source, QR value and barcode value have an Insert
     field menu; an image source lists image and URL fields first. Its last
     item, "New field…", creates a field and inserts it.
+  - Type settings opens a popover with Basics (case, style, max lines,
+    paragraph spacing, direction, last line, vertical trim), Details
+    (OpenType features) and Arc (text on a circle or vector).
   - Text aligns left, center, right or justified; a justified layer also
     sets its last line's alignment. Direction is left to right, right to
     left, or taken from the text. OpenType features are typed as tags
@@ -389,7 +432,12 @@ the records, and **Export** turns templates and records into files.
   - When several layers are selected and a value differs between them, it shows
     `Mixed`.
   - With nothing selected, the side section edits the template's width and
-    height, which every side shares.
+    height, which every side shares. Bleed and safe area are in Template
+    setup.
+- **Print:** the inspector's third tab. A rectangle or vector shows its
+  Slice section, and a painted one its Spot color section. Layers with
+  neither read "No print settings"; with nothing selected, a "Template
+  setup…" button opens the dialog.
 - **Content:** the inspector's second tab, what fills the design.
   - "Try with <dataset>" steps the canvas through the bound dataset's records,
     with the binding folded below it. An unbound template picks a dataset
@@ -666,7 +714,7 @@ for PDF417 and Aztec, the error correction.
 
 ## Sheets
 
-A PDF preset's Layout group chooses **One per page** (the default) or
+A PDF preset's Print section chooses **One per page** (the default) or
 **Sheets**, which lays cards out on paper at their trim size with crop marks.
 
 - **Bleed:** a template with a bleed gets an "Include bleed" checkbox under
@@ -770,10 +818,11 @@ reaches every variant at once.
   dot before its label ("Changed in Speaker"); clicking it offers **Reset
   to Default**. A section with changed values marks its header, and its
   reset drops them all. The layer tree marks each layer the variant changes,
-  and dims one it hides, with a crossed eye.
-- **Hiding:** **Hide in Staff** in a layer's context menu or its Visibility
-  section leaves the layer out of that variant only. The layer tree's eye
-  stays an editing aid that is never saved.
+  and dims one it hides, with a filter icon.
+- **Hiding:** **Hide in Staff** in a layer's context menu leaves the layer
+  out of that variant only; Show when then says "Hidden in Staff" with a
+  **Show** button. The layer tree's eye stays an editing aid that is never
+  saved.
 - **Ids:** a variant's id is made from its first name and does not follow a
   rename, because files, bindings and card shop orders store it. **Change
   id…** changes it deliberately, warns that anything saved with the old id
@@ -849,7 +898,7 @@ refreshes it.
 
 ## Print output
 
-A preset's Print group has a **Print target** select: None, or "Card printer
+A preset's Print section has a **Print target** select: None, or "Card printer
 (YMCKO dye-sub)" (shown as "Card printer" once chosen), which renders through
 for-print's card-printer path (photo analysis, gray balance and the whole-frame
 finish), as Davi's card shop does.

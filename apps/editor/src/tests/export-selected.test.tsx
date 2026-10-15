@@ -429,8 +429,8 @@ describe("the filmstrip's selection in Export", { timeout: 20_000 }, () => {
 				cell(id).getAttribute("aria-checked"),
 			),
 		).toEqual(["false", "true", "true", "true"]);
-		expect(screen.getByTestId("export-selection").textContent).toContain(
-			"3 selected",
+		expect(screen.getByTestId("selection-bar").textContent).toContain(
+			"3 records selected",
 		);
 		await act(async () => {
 			fireEvent.click(button("Export 3 selected"));

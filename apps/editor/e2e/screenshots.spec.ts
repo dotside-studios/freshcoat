@@ -592,6 +592,7 @@ for (const size of SIZES) {
 				await openFromWelcome(page, "sample-membership-card", theme);
 				await page.keyboard.press(`${mod}+3`);
 				await page.getByRole("button", { name: "New preset" }).first().click();
+				await page.getByRole("menuitem", { name: "Blank preset" }).click();
 				await reveal(page, "export-settings", "Settings");
 				await settingsTab(page, "Print");
 				await choosePrintTarget(page);
@@ -676,6 +677,7 @@ for (const size of SIZES) {
 					.getByRole("button", { name: "New preset" })
 					.first()
 					.click();
+				await page.getByRole("menuitem", { name: "Blank preset" }).click();
 				await closeSettingsSheet(page);
 				await reveal(page, "export-settings", "Settings");
 				const settings = page.getByTestId("export-settings");

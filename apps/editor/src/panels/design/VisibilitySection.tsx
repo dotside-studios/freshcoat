@@ -3,10 +3,8 @@ import { Button } from "@freshcoat-js/ui/button";
 import { TextField } from "@freshcoat-js/ui/field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { useContext, useMemo } from "react";
-import { VARIANT_UI } from "~/app/copy";
+import { SHOW_WHEN, VARIANT_UI } from "~/app/copy";
 import { listFields } from "~/doc/values";
-import EyeIcon from "~icons/mingcute/eye-2-line";
-import EyeOffIcon from "~icons/mingcute/eye-close-line";
 import {
 	AddButton,
 	ItemGroup,
@@ -21,10 +19,10 @@ import { InspectorSection } from "./InspectorSection";
 export type ConditionOp = "set" | "unset" | "equals" | "differs";
 
 const OPS: [ConditionOp, string][] = [
-	["set", "is set"],
-	["unset", "is not set"],
-	["equals", "equals"],
-	["differs", "does not equal"],
+	["set", SHOW_WHEN.ops.set],
+	["unset", SHOW_WHEN.ops.unset],
+	["equals", SHOW_WHEN.ops.equals],
+	["differs", SHOW_WHEN.ops.differs],
 ];
 
 export function conditionsOf(el: Element): VisibilityCondition[] {
@@ -47,31 +45,37 @@ export function withOp(
 	return out;
 }
 
+export function describeCondition(c: VisibilityCondition): string {
+	const op = opOf(c);
+	const test = SHOW_WHEN.ops[op];
+	return op === "equals" || op === "differs"
+		? `${c.field} ${test} ${c.equals}`
+		: `${c.field} ${test}`;
+}
+
 function whenPatch(list: VisibilityCondition[]): Element["visibleWhen"] {
 	return list.length === 0 ? undefined : list.length === 1 ? list[0] : list;
 }
 
-/** Hide in <variant> / Show in <variant>, or in Default with no active
- *  variant. It is saved, unlike the eye in the layers tree. The conditions
- *  below are the same in every variant. */
-function HideInVariant({ ins }: { ins: Inspect }) {
+/** The line for a layer hidden in the active variant, or in Default with no
+ *  variant, with the way back. The action to hide is in the layer menu. */
+function HiddenInVariant({ ins }: { ins: Inspect }) {
 	const overrides = useContext(OverridesContext);
 	const layers = ins.controller.variantVisibility(ins.keys);
-	if (layers.length === 0) return null;
+	if (layers.length === 0 || !layers.every((l) => l.hidden)) return null;
 	const label = overrides?.label ?? VARIANT_UI.default;
-	const hidden = layers.every((l) => l.hidden);
 	return (
-		<div className="flex flex-col gap-1.5 border-fc-border border-b pb-2">
+		<div className="flex items-center justify-between gap-2">
+			<span className="text-fc-muted text-fc-sm">
+				{VARIANT_UI.hiddenIn(label)}
+			</span>
 			<Button
 				size="sm"
-				data-testid="hide-in-variant"
-				className="self-start"
-				onPress={() => ins.controller.setHiddenInVariant(ins.keys, !hidden)}
+				data-testid="show-in-variant"
+				onPress={() => ins.controller.setHiddenInVariant(ins.keys, false)}
 			>
-				{hidden ? <EyeIcon /> : <EyeOffIcon />}
-				{hidden ? VARIANT_UI.showIn(label) : VARIANT_UI.hideIn(label)}
+				{SHOW_WHEN.show}
 			</Button>
-			{overrides ? <Notice>{VARIANT_UI.sharedConditions}</Notice> : null}
 		</div>
 	);
 }
@@ -90,32 +94,34 @@ export function VisibilitySection({ ins }: { ins: Inspect }) {
 		}));
 
 	const first = fields[0]?.id;
+	const add = () =>
+		first &&
+		update("when-add", (l) =>
+			common === null ? [{ field: first }] : [...l, { field: first }],
+		);
+	const empty = common?.length === 0;
+	const overrides = useContext(OverridesContext);
 	return (
 		<InspectorSection
-			title="Visibility"
+			title={SHOW_WHEN.title}
 			actions={
-				<AddButton
-					label="Add condition"
-					isDisabled={!first}
-					onPress={() =>
-						first &&
-						update("when-add", (l) =>
-							common === null ? [{ field: first }] : [...l, { field: first }],
-						)
-					}
-				/>
+				empty ? undefined : (
+					<AddButton label={SHOW_WHEN.add} isDisabled={!first} onPress={add} />
+				)
 			}
 		>
-			<HideInVariant ins={ins} />
-			{fields.length === 0 && (
-				<Notice>Add a field in Content to show this layer conditionally</Notice>
+			<HiddenInVariant ins={ins} />
+			{empty && (
+				<div className="flex items-center justify-between gap-2">
+					<span className="text-fc-muted text-fc-sm">{SHOW_WHEN.always}</span>
+					<Button size="sm" isDisabled={!first} onPress={add}>
+						{SHOW_WHEN.add}
+					</Button>
+				</div>
 			)}
-			{common === null && (
-				<Notice>Mixed conditions. Adding one replaces them.</Notice>
-			)}
-			{common?.length === 0 && fields.length > 0 && (
-				<Notice>Always visible</Notice>
-			)}
+			{fields.length === 0 && <Notice>{SHOW_WHEN.needField}</Notice>}
+			{common === null && <Notice>{SHOW_WHEN.mixed}</Notice>}
+			{overrides && !empty && <Notice>{VARIANT_UI.sharedConditions}</Notice>}
 			{(common ?? []).map((c, i) => {
 				const op = opOf(c);
 				const set = (field: string, next: VisibilityCondition) =>

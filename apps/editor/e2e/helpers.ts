@@ -4,8 +4,23 @@ import { expect, type Page } from "@playwright/test";
 
 type Box = { x: number; y: number; width: number; height: number };
 
+const SETTINGS_SECTIONS: Record<string, string[]> = {
+	Content: ["Records"],
+	Output: ["Format", "Size"],
+	Print: ["Print"],
+	Files: ["Files"],
+};
+
+/** Opens the export settings sections a former tab held. */
 export async function settingsTab(page: Page, name: string) {
-	await page.getByTestId("export-settings").getByRole("tab", { name }).click();
+	for (const title of SETTINGS_SECTIONS[name] ?? [name]) {
+		const header = page
+			.getByTestId("export-settings")
+			.getByRole("button", { name: new RegExp(`^${title}`) })
+			.first();
+		if ((await header.getAttribute("aria-expanded")) === "false")
+			await header.click();
+	}
 }
 
 export const CARD_PRINTER = "Card printer (YMCKO dye-sub)";

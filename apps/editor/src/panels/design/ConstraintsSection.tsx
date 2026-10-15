@@ -5,7 +5,6 @@ import { isAutoLayoutChild } from "~/doc/geometry";
 import { isOperand } from "~/doc/path";
 import { Row, SharedNotice } from "./controls";
 import { commonValue, type Inspect } from "./field-helpers";
-import { InspectorSection } from "./InspectorSection";
 
 type Axis = "horizontal" | "vertical";
 
@@ -26,7 +25,7 @@ export const CONSTRAINT_LABELS: Record<Axis, [Constraint, string][]> = {
 	],
 };
 
-/** Whether the Constraints section applies: every layer is placed by its own
+/** Whether the constraints apply: every layer is placed by its own
  *  box, not by an auto layout. */
 export function takesConstraints(ins: Pick<Inspect, "template" | "keys">) {
 	return ins.keys.every(
@@ -48,7 +47,7 @@ export function withConstraint(
 	return Object.keys(next).length > 0 ? next : undefined;
 }
 
-export function ConstraintsSection({ ins }: { ins: Inspect }) {
+export function ConstraintsFields({ ins }: { ins: Inspect }) {
 	const els = ins.layers as Element[];
 	const value = (axis: Axis) =>
 		commonValue(els.map((e) => e.constraints?.[axis] ?? "start"));
@@ -82,7 +81,7 @@ export function ConstraintsSection({ ins }: { ins: Inspect }) {
 	);
 
 	return (
-		<InspectorSection title="Constraints">
+		<>
 			<SharedNotice />
 			<div className="flex items-center gap-2">
 				<PinDiagram horizontal={h} vertical={v} />
@@ -91,7 +90,7 @@ export function ConstraintsSection({ ins }: { ins: Inspect }) {
 					<Row label="V">{select("vertical", v)}</Row>
 				</div>
 			</div>
-		</InspectorSection>
+		</>
 	);
 }
 

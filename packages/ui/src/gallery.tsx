@@ -44,9 +44,11 @@ import {
 import { NumberField } from "./number-field";
 import { PanelSection } from "./panel";
 import { DialogTrigger, Popover } from "./popover";
+import { PopoverPanel } from "./popover-panel";
 import { ProgressBar } from "./progress";
 import { SegmentedControl, SegmentedItem } from "./segmented";
 import { Select, SelectItem } from "./select";
+import { SelectionBar } from "./selection-bar";
 import { Slider } from "./slider";
 import { Tab, TabList, TabPanel, Tabs } from "./tabs";
 import { ToastRegion, toast } from "./toast";
@@ -447,6 +449,19 @@ function DesignPanel() {
 					value={semi}
 					onChange={setSemi}
 				/>
+			</PanelSection>
+			<PanelSection title="Popover panel">
+				<PopoverPanel
+					trigger={<Button size="sm">Settings</Button>}
+					title="Shadow"
+				>
+					<Slider aria-label="Blur" defaultValue={4} />
+				</PopoverPanel>
+				<SelectionBar label="3 records" onClear={() => {}}>
+					<Button size="sm" variant="ghost">
+						Duplicate
+					</Button>
+				</SelectionBar>
 			</PanelSection>
 			<PanelSection title="Text">
 				<ComboBox

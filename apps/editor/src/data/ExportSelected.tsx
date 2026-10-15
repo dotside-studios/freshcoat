@@ -24,7 +24,7 @@ import { ToolButton } from "./DataToolbar";
 import { registerExportSelected } from "./export-selected";
 
 /**
- * "Export selected" in the Data toolbar: a popover that picks a preset, the
+ * "Export" in the selection bar: a popover that picks a preset, the
  * active one by default, and runs it over the selected records. The job
  * shows in Data's job bar and the section stays Data. Mod+E opens it.
  */
@@ -85,14 +85,11 @@ export function ExportSelected({
 		<DialogTrigger isOpen={open} onOpenChange={setOpen}>
 			<ToolButton
 				icon={<ExportIcon />}
-				label="Export selected"
+				label="Export"
 				testId="export-selected"
-				showLabel="wider"
+				showLabel="always"
 			/>
-			<Popover
-				placement="bottom start"
-				className="w-72 max-w-[calc(100vw-24px)]"
-			>
+			<Popover placement="top" className="w-72 max-w-[calc(100vw-24px)]">
 				<RACDialog
 					aria-label="Export selected"
 					className="flex flex-col gap-2.5 p-3 outline-none"

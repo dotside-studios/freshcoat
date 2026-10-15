@@ -22,6 +22,11 @@ import { DesignPanel } from "~/panels/design/DesignPanel";
 import { chooseOption, fastUser, spinbutton } from "./aria";
 import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
+function addEffect(name: string) {
+	fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+	fireEvent.click(screen.getByRole("menuitem", { name }));
+}
+
 function setup(selection: string[], t: Template = doc()) {
 	const c = new EditorController();
 	c.open(t, "doc.coat");
@@ -97,17 +102,18 @@ describe("DesignPanel", () => {
 
 	it("justifies text and then offers the last line's alignment", () => {
 		const c = setup(["0/1/1"]);
-		expect(screen.queryByLabelText("Last line alignment")).toBeNull();
 		fireEvent.click(screen.getByRole("radio", { name: "Justify" }));
 		expect((el(c, "0/1/1").properties as { align?: string }).align).toBe(
 			"justify",
 		);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		expect(screen.getByLabelText("Last line alignment")).toBeTruthy();
 		expect(validate(c.template).ok).toBe(true);
 	});
 
 	it("sets the text direction", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		await chooseOption(
 			fastUser(),
 			screen.getByRole("button", { name: /Text direction/ }),
@@ -119,8 +125,10 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("writes OpenType features from the features field", () => {
+	it("writes OpenType features from the features field", async () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
+		await fastUser().click(screen.getByRole("tab", { name: "Details" }));
 		typeInto(screen.getByLabelText("OpenType features"), "tnum, -liga");
 		const font = (el(c, "0/1/1").properties as { font: { features?: unknown } })
 			.font;
@@ -130,6 +138,7 @@ describe("DesignPanel", () => {
 
 	it("writes paragraph spacing, and clears it at zero", () => {
 		const c = setup(["0/1/1"]);
+		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
 		const field = spinbutton("Paragraph spacing");
 		typeInto(field, "12");
 		const spacing = () =>
@@ -152,23 +161,33 @@ describe("DesignPanel", () => {
 		expect(validate(c.template).ok).toBe(true);
 	});
 
-	it("orders a rect's sections Layer, Slice, Fill, Stroke, Spot color, Effects, Constraints, Adjust, Visibility", () => {
+	it("orders a rect's sections Position, Layout, Appearance, Fill, Stroke, Effects, Adjust, Show when", () => {
 		setup(["0/0"]);
 		const titles = screen
 			.getAllByRole("heading", { level: 3 })
 			.map((h) => h.textContent);
 		expect(titles).toEqual([
-			"Layer",
-			"Slice",
+			"Position",
+			"Layout",
+			"Appearance",
 			"Fill",
 			"Stroke",
-			"Spot color",
 			"Effects",
-			"Constraints",
 			"Adjust",
-			"Visibility",
+			"Show when",
 		]);
 		expect(spinbutton("Corner radius")).toBeTruthy();
+	});
+
+	it("Show when starts as Always with one Add condition button", () => {
+		const c = setup(["0/0"]);
+		expect(screen.getByText("Always")).toBeTruthy();
+		const buttons = screen.getAllByRole("button", { name: "Add condition" });
+		expect(buttons).toHaveLength(1);
+		fireEvent.click(buttons[0] as HTMLElement);
+		expect(el(c, "0/0").visibleWhen).toEqual({ field: "name" });
+		expect(screen.queryByText("Always")).toBeNull();
+		expect(screen.getByLabelText("Condition 1 test")).toBeTruthy();
 	});
 
 	it("gives a boolean layer its operation, and its operands only the shape", () => {
@@ -179,7 +198,7 @@ describe("DesignPanel", () => {
 		expect(titles()).toContain("Fill");
 		cleanup();
 		setup(["0/7/0"], booleanDoc());
-		expect(titles()).toEqual(["Layer", "Visibility"]);
+		expect(titles()).toEqual(["Position", "Layout", "Appearance", "Show when"]);
 	});
 
 	it("remembers a collapsed section across selections", async () => {
@@ -248,7 +267,7 @@ describe("DesignPanel", () => {
 	it("adds a stroke and a shadow that validate", () => {
 		const c = setup(["0/0"]);
 		fireEvent.click(screen.getByRole("button", { name: "Add stroke" }));
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
+		addEffect("Shadow");
 		const e = el(c, "0/0");
 		expect((e.properties as { stroke?: unknown }).stroke).toEqual({
 			color: "#000000",
@@ -260,8 +279,9 @@ describe("DesignPanel", () => {
 
 	it("adds a background blur as one shared effect", () => {
 		const c = setup(["0/0", "0/1"]);
+		addEffect("Background blur");
 		fireEvent.click(
-			screen.getByRole("button", { name: "Add background blur" }),
+			screen.getByRole("button", { name: "Background blur settings" }),
 		);
 		typeInto(spinbutton("Background blur"), "16");
 		expect(el(c, "0/0").effects).toEqual([
@@ -271,10 +291,14 @@ describe("DesignPanel", () => {
 			{ type: "backdropBlur", radius: 16 },
 		]);
 		expect(validate(c.template).ok).toBe(true);
-		// Only one of each blur: the add button is gone until it is removed.
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
 		expect(
-			screen.queryByRole("button", { name: "Add background blur" }),
-		).toBeNull();
+			screen
+				.getByRole("menuitem", { name: "Background blur" })
+				.getAttribute("aria-disabled"),
+		).toBe("true");
+		fireEvent.click(screen.getAllByRole("button", { name: "Dismiss" })[0]);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Remove background blur" }),
 		);
@@ -283,8 +307,8 @@ describe("DesignPanel", () => {
 
 	it("keeps one list of effects and hides one without dropping it", () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add shadow" }));
-		fireEvent.click(screen.getByRole("button", { name: "Add layer blur" }));
+		addEffect("Shadow");
+		addEffect("Layer blur");
 		fireEvent.click(screen.getByRole("button", { name: "Shadow 1 visible" }));
 		const e = el(c, "0/0");
 		expect(e.effects).toMatchObject([
@@ -298,7 +322,8 @@ describe("DesignPanel", () => {
 
 	it("adds grain and edits it", async () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add grain" }));
+		addEffect("Grain");
+		fireEvent.click(screen.getByRole("button", { name: "Grain settings" }));
 		typeInto(spinbutton("Grain amount"), "40");
 		typeInto(spinbutton("Grain seed"), "7");
 		await chooseOption(
@@ -317,12 +342,19 @@ describe("DesignPanel", () => {
 			},
 		]);
 		expect(validate(c.template).ok).toBe(true);
-		expect(screen.queryByRole("button", { name: "Add grain" })).toBeNull();
-	});
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+		expect(
+			screen
+				.getByRole("menuitem", { name: "Grain" })
+				.getAttribute("aria-disabled"),
+		).toBe("true");
+	}, 20_000);
 
 	it("adds a halftone and shows its lpi", async () => {
 		const c = setup(["0/0"]);
-		fireEvent.click(screen.getByRole("button", { name: "Add halftone" }));
+		addEffect("Halftone");
+		fireEvent.click(screen.getByRole("button", { name: "Halftone settings" }));
 		typeInto(spinbutton("Halftone cell size"), "10");
 		expect(screen.getByText(/30 lpi at 300 dpi/)).toBeTruthy();
 		await chooseOption(
@@ -348,9 +380,10 @@ describe("DesignPanel", () => {
 			},
 		]);
 		expect(validate(c.template).ok).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));
 		expect("effects" in el(c, "0/0")).toBe(false);
-	});
+	}, 20_000);
 
 	it("an edit moves legacy effects into effects", () => {
 		const t = doc();

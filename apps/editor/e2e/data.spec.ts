@@ -74,8 +74,18 @@ async function chooseFile(
 	await (await chooser).setFiles(file);
 }
 
-async function download(page: Page, menu: string, item: string | RegExp) {
-	await page.getByTestId(menu).click();
+async function openDataMenu(page: Page, submenu?: string) {
+	await page.getByTestId("data-menu").click();
+	if (submenu) await page.getByRole("menuitem", { name: submenu }).click();
+}
+
+async function newDataset(page: Page, item: string) {
+	await page.getByRole("button", { name: "New dataset" }).click();
+	await page.getByRole("menuitem", { name: item }).click();
+}
+
+async function download(page: Page, submenu: string, item: string | RegExp) {
+	await openDataMenu(page, submenu);
 	const pending = page.waitForEvent("download");
 	await page.getByRole("menuitem", { name: item }).click();
 	const file = await pending;
@@ -89,14 +99,15 @@ async function openDataFromTemplate(page: Page) {
 	await openSample(page);
 	await page.keyboard.press(`${mod}+2`);
 	await expect(page.getByTestId("data-empty")).toBeVisible();
-	await page.getByRole("button", { name: "From template fields" }).click();
+	await newDataset(page, "From template fields");
 	await expect(page.getByTestId("datasets-list")).toContainText(
 		"membership-card",
 	);
 }
 
 async function importCsv(page: Page) {
-	await page.getByTestId("import-records").click();
+	await openDataMenu(page);
+	await page.getByRole("menuitem", { name: "Import…" }).click();
 	const wizard = page.getByTestId("import-wizard");
 	await chooseFile(
 		page,
@@ -307,7 +318,7 @@ test("records export to CSV and XLSX, and the schema round-trips through JSON Sc
 	await openDataFromTemplate(page);
 	await importCsv(page);
 
-	const csv = await download(page, "download-menu", "CSV");
+	const csv = await download(page, "Download data", "CSV");
 	expect(csv.name).toBe("membership-card.csv");
 	const text = csv.bytes.toString("utf8").replace(/^﻿/, "");
 	const lines = text.trim().split(/\r?\n/);
@@ -317,7 +328,7 @@ test("records export to CSV and XLSX, and the schema round-trips through JSON Sc
 	expect(lines).toHaveLength(4);
 	expect(lines[1]).toContain("Ada Lovelace,Gold");
 
-	const xlsx = await download(page, "download-menu", /Excel/);
+	const xlsx = await download(page, "Download data", /Excel/);
 	expect(xlsx.name).toBe("membership-card.xlsx");
 	const rows = await xlsxRows(xlsx.bytes);
 	expect(rows).toHaveLength(3);
@@ -328,11 +339,7 @@ test("records export to CSV and XLSX, and the schema round-trips through JSON Sc
 		verified: true,
 	});
 
-	const schemaFile = await download(
-		page,
-		"schema-menu",
-		"Download JSON schema",
-	);
+	const schemaFile = await download(page, "Schema", "Download JSON schema");
 	expect(schemaFile.name).toBe("membership-card.schema.json");
 	const schema = JSON.parse(schemaFile.bytes.toString("utf8"));
 	expect(schema.title).toBe("membership-card");
@@ -348,7 +355,7 @@ test("records export to CSV and XLSX, and the schema round-trips through JSON Sc
 		"x-freshcoat-type": "longText",
 		title: "Notes",
 	};
-	await page.getByTestId("schema-menu").click();
+	await openDataMenu(page, "Schema");
 	await chooseFile(
 		page,
 		() => page.getByRole("menuitem", { name: "Import JSON schema…" }).click(),
@@ -386,7 +393,7 @@ test("a file imports as a new dataset, and photos match image cells", async ({
 		{ name: "Ada", photo: "ada.png" },
 		{ name: "Grace", photo: "grace.jpg" },
 	]);
-	await page.getByRole("button", { name: "Import file…" }).click();
+	await page.getByRole("button", { name: "Import…" }).click();
 	const wizard = page.getByTestId("import-wizard");
 	await chooseFile(
 		page,
@@ -457,7 +464,7 @@ test("a new dataset imported for a bound template is offered from the toast", as
 		await wizard.getByRole("button", { name: "Import" }).click();
 		await expect(wizard).toBeHidden();
 	};
-	await page.getByRole("button", { name: "Import file…" }).click();
+	await page.getByRole("button", { name: "Import…" }).click();
 	await importJson("first.json");
 	const binding = () =>
 		state<{ datasetId: string; fields: Record<string, unknown> }>(
@@ -642,7 +649,7 @@ test("a new dataset from photos has their names, sizes as seen and dates", async
 	await openSample(page);
 	await page.keyboard.press(`${mod}+2`);
 	const chooser = page.waitForEvent("filechooser");
-	await page.getByRole("button", { name: "From photos…" }).click();
+	await newDataset(page, "From photos…");
 	await (await chooser).setFiles([
 		{
 			name: "IMG_2.jpg",
@@ -743,7 +750,7 @@ test("autosave keeps photos apart from the document and restores them", async ({
 	await openSample(page);
 	await page.keyboard.press(`${mod}+2`);
 	const chooser = page.waitForEvent("filechooser");
-	await page.getByRole("button", { name: "From photos…" }).click();
+	await newDataset(page, "From photos…");
 	await (await chooser).setFiles([
 		{ name: "ada.png", mimeType: "image/png", buffer: PNG },
 	]);
@@ -1045,17 +1052,20 @@ test("Data keeps its search, filters, sort and selection per dataset, and Export
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await page
 		.getByTestId("binding-editor")
 		.getByRole("button", { name: /Dataset/ })
 		.click();
 	await page.getByRole("option", { name: "People" }).click();
-	await page.getByRole("tab", { name: "Records" }).click();
+	await page.getByRole("radio", { name: "Records" }).click();
 	const use = page.getByTestId("use-data-selection");
 	await expect(use).toHaveText("Use 2 selected");
 	await use.click();
 	await expect(use).toBeHidden();
-	await expect(page.getByTestId("export-selection")).toHaveText("2 selected");
+	await expect(page.getByTestId("selection-bar")).toContainText(
+		"2 records selected",
+	);
 	await expect(
 		page
 			.getByTestId("export-records")

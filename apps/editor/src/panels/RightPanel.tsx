@@ -5,8 +5,13 @@ import { useEditor } from "~/state/hooks";
 import type { RightTab } from "~/state/store";
 import { ContentPanel } from "./ContentPanel";
 import { DesignPanel } from "./design/DesignPanel";
+import { PrintPanel } from "./print/PrintPanel";
 
-export function RightPanel() {
+export function RightPanel({
+	onTemplateSetup,
+}: {
+	onTemplateSetup?: () => void;
+}) {
 	const controller = useController();
 	const tab = useEditor((s) => s.rightTab);
 	return (
@@ -20,12 +25,16 @@ export function RightPanel() {
 			<TabList aria-label="Inspector">
 				<Tab id="design">{CONTENT.design}</Tab>
 				<Tab id="content">{CONTENT.content}</Tab>
+				<Tab id="print">{CONTENT.print}</Tab>
 			</TabList>
 			<TabPanel id="design" data-testid="design-panel">
 				<DesignPanel />
 			</TabPanel>
 			<TabPanel id="content" data-testid="content-panel">
 				<ContentPanel />
+			</TabPanel>
+			<TabPanel id="print" data-testid="print-panel">
+				<PrintPanel onTemplateSetup={onTemplateSetup} />
 			</TabPanel>
 		</Tabs>
 	);

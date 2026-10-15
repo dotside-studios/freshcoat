@@ -1,10 +1,9 @@
 import type { Element, SliceModifier } from "@freshcoat-js/coatfile";
-import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@freshcoat-js/ui/toggle";
 import { hasOpenPath, isSliceable, newSlice } from "~/doc/slice";
-import { CommitField, Row } from "./controls";
+import { AddButton, CommitField, Notice, RemoveButton, Row } from "./controls";
 import { commonValue, type Inspect, propsOf } from "./field-helpers";
 import { InspectorSection } from "./InspectorSection";
 
@@ -53,23 +52,31 @@ export function SliceSection({ ins }: { ins: Inspect }) {
 	const open = ins.keys.some((k) => hasOpenPath(ins.template, k));
 
 	return (
-		<InspectorSection title="Slice">
-			<Row label="">
-				<Checkbox
-					isSelected={on === true}
-					isIndeterminate={on === null}
-					onChange={(next) =>
-						ins.setProps("slice-on", (el, key) => {
-							const has = sliceOf(el as Element) !== undefined;
-							return has === next
-								? null
-								: { slice: next ? newSlice(ins.template, key) : undefined };
-						})
-					}
-				>
-					Use as slice
-				</Checkbox>
-			</Row>
+		<InspectorSection
+			title="Slice"
+			actions={
+				all ? (
+					<RemoveButton
+						label="Remove slice"
+						onPress={() =>
+							ins.setProps("slice-remove", () => ({ slice: undefined }))
+						}
+					/>
+				) : (
+					<AddButton
+						label="Add slice"
+						onPress={() =>
+							ins.setProps("slice-add", (el, key) =>
+								sliceOf(el as Element)
+									? null
+									: { slice: newSlice(ins.template, key) },
+							)
+						}
+					/>
+				)
+			}
+		>
+			{on === null && <Notice>Some layers are slices</Notice>}
 			{all && (
 				<>
 					<Row label="Name">

@@ -13,9 +13,11 @@ import {
 import { Popover } from "@freshcoat-js/ui/popover";
 import { SegmentedControl, SegmentedItem } from "@freshcoat-js/ui/segmented";
 import { ToggleButton } from "@freshcoat-js/ui/toggle";
+import type { ExportPreset } from "@freshcoat-js/workspace";
 import { type ReactNode, useMemo } from "react";
 import { useBleedShown } from "~/canvas/bleed-view";
 import { printGuidesOn, usePrintGuidesVersion } from "~/canvas/print-guides";
+import { useSeparationsShown } from "~/canvas/separations";
 import { useSlicesShown } from "~/canvas/slice-guides";
 import { SAMPLES } from "~/samples";
 import { useEditor } from "~/state/hooks";
@@ -30,6 +32,7 @@ import SendIconFill from "~icons/mingcute/send-fill";
 import { COMMAND_BY_ID, type CommandContext } from "./commands";
 import { useController } from "./context";
 import { FreshcoatMark } from "./Logo";
+import { useSectionPanels } from "./section-panels";
 import { hostOf, sendBack, useSendBackTarget } from "./send-back";
 import { useHiddenStatusItems } from "./status/visibility";
 import { useThemePreference } from "./theme";
@@ -57,6 +60,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 			"file.export1x",
 			"file.export2x",
 			"file.export3x",
+			"exportPreset",
 			"-",
 			"file.close",
 		],
@@ -144,6 +148,7 @@ const MENUS: { label: string; items: Entry[] }[] = [
 			"view.printGuides",
 			"view.bleed",
 			"view.slices",
+			"view.separations",
 			"view.renderStats",
 			"units",
 			"theme",
@@ -151,6 +156,8 @@ const MENUS: { label: string; items: Entry[] }[] = [
 	},
 	{ label: "Help", items: ["help.shortcuts"] },
 ];
+
+const NO_PRESETS: readonly ExportPreset[] = [];
 
 const idsOf = (items: Entry[]): string[] =>
 	items.flatMap((e) =>
@@ -173,7 +180,10 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 		}).join(","),
 	);
 	const disabled = useMemo(() => disabledSig.split(","), [disabledSig]);
-	const panels = useEditor((s) => s.panels);
+	const editPanels = useEditor((s) => s.panels);
+	const section = useSectionPanels();
+	const panels = section ?? editPanels;
+	const presets = useEditor((s) => s.workspace?.presets) ?? NO_PRESETS;
 	const theme = useThemePreference();
 	const unit = useDisplayUnit();
 	const renderStats = !useHiddenStatusItems().has("render");
@@ -184,6 +194,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 	);
 	const bleed = useBleedShown();
 	const slices = useSlicesShown();
+	const separations = useSeparationsShown();
 	const sendTarget = useSendBackTarget(
 		useEditor((s) => s.workspace?.activeTemplateId),
 	);
@@ -205,6 +216,7 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 					(id === "view.printGuides" && guides) ||
 					(id === "view.bleed" && bleed) ||
 					(id === "view.slices" && slices) ||
+					(id === "view.separations" && separations) ||
 					(id === "view.renderStats" && renderStats) ? (
 						<CheckIcon />
 					) : undefined
@@ -215,10 +227,12 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 		);
 	};
 	const togglePanel = (side: "left" | "right") =>
-		ctx.controller.dispatch({
-			type: "setPanels",
-			panels: { [side]: !panels[side] },
-		});
+		section
+			? section.set({ [side]: !section[side] })
+			: ctx.controller.dispatch({
+					type: "setPanels",
+					panels: { [side]: !panels[side] },
+				});
 
 	return (
 		<header className="flex h-8 shrink-0 items-stretch border-fc-border border-b bg-fc-app pointer-coarse:h-10">
@@ -262,6 +276,38 @@ export function AppMenuBar({ ctx }: { ctx: CommandContext }) {
 															commandItem(item)
 														),
 													)}
+												</Menu>
+											</Popover>
+										</SubmenuTrigger>
+									);
+								if (id === "exportPreset")
+									return (
+										<SubmenuTrigger key="exportPreset">
+											<MenuItem
+												id="exportPreset"
+												isDisabled={presets.length === 0}
+											>
+												Export with preset
+											</MenuItem>
+											<Popover>
+												<Menu
+													aria-label="Export with preset"
+													onAction={(presetId) => {
+														ctx.controller.dispatch({
+															type: "setActivePreset",
+															id: String(presetId),
+														});
+														ctx.controller.dispatch({
+															type: "setSection",
+															section: "export",
+														});
+													}}
+												>
+													{presets.map((p) => (
+														<MenuItem key={p.id} id={p.id}>
+															{p.name}
+														</MenuItem>
+													))}
 												</Menu>
 											</Popover>
 										</SubmenuTrigger>

@@ -258,6 +258,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				name: "New preset",
 			}),
 		);
+		await user.click(screen.getByRole("menuitem", { name: "Blank preset" }));
 		const presets = controller.state.workspace?.presets ?? [];
 		expect(presets).toHaveLength(1);
 		expect(presets[0]).toMatchObject({
@@ -274,7 +275,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(controller.state.workspace?.activePresetId).toBe(presets[0]?.id);
 		// 3 records (the skipped one is left out) × 2 sides.
 		expect(button("Export 6 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-1-front.png",
 		);
@@ -303,7 +303,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		await ctx.user.click(screen.getByRole("tab", { name: "Records" }));
+		await ctx.user.click(screen.getByRole("radio", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Ada")).toBeTruthy());
 		return { ...ctx, list };
@@ -338,7 +338,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(button("Export 2 selected")).toBeTruthy();
 		await user.click(button("Clear selection"));
 		expect(button("Export 2 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Bo-front.png",
 		);
@@ -349,7 +348,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		const rowOf = (name: string) =>
 			within(list).getByText(name).closest('[role="row"]') as HTMLElement;
 		await user.click(within(rowOf("Ada")).getByRole("checkbox"));
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		cleanup();
 		act(() => controller.dispatch({ type: "setSection", section: "edit" }));
 		act(() => controller.dispatch({ type: "setSection", section: "export" }));
@@ -359,11 +357,10 @@ describe("export section", { timeout: 20_000 }, () => {
 			</ControllerProvider>,
 		);
 		expect(
-			screen.getByRole("tab", { name: "Records", selected: true }),
-		).toBeTruthy();
-		expect(
-			screen.getByRole("tab", { name: "Files", selected: true }),
-		).toBeTruthy();
+			screen
+				.getByRole("radio", { name: "Records" })
+				.getAttribute("aria-checked"),
+		).toBe("true");
 		expect(button("Export 1 selected")).toBeTruthy();
 	});
 
@@ -389,7 +386,7 @@ describe("export section", { timeout: 20_000 }, () => {
 			});
 		});
 		expect(button("Export 0 files")).toHaveProperty("disabled", true);
-		await user.click(screen.getByRole("tab", { name: "Records" }));
+		await user.click(screen.getByRole("radio", { name: "Records" }));
 		const list = screen.getByTestId("export-records");
 		await waitFor(() => expect(within(list).getByText("Bo")).toBeTruthy());
 		const row = within(list)
@@ -398,7 +395,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		await user.click(within(row).getByRole("checkbox"));
 		expect(controller.state.workspace?.presets[0]?.selected).toEqual(["r2"]);
 		expect(button("Export 1 file")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.getByTestId("export-page-size").textContent).toBe(
 			"Page 3.33 × 2.00 in · 84.7 × 50.8 mm",
 		);
@@ -454,23 +450,17 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			});
 		});
-		const notice = screen.getByTestId("export-unbound");
+		const notice = screen.getByTestId("export-check-unbound");
 		expect(notice.textContent).toContain(
 			"Not bound to a dataset, exporting defaults",
 		);
 		expect(button("Export 2 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. doc-front@2x.png",
 		);
 		await user.click(
 			within(notice).getByRole("button", { name: "Bind a dataset" }),
 		);
-		expect(
-			screen
-				.getByRole("tab", { name: "Content" })
-				.getAttribute("aria-selected"),
-		).toBe("true");
 		expect(screen.getByTestId("binding-editor")).toBeTruthy();
 	});
 
@@ -491,7 +481,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		act(() =>
 			controller.dispatch({ type: "setPreset", preset: preset("png-zip") }),
 		);
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		const keep = screen.getByRole("checkbox", { name: "Keep alpha channel" });
 		await user.click(keep);
 		expect(controller.state.workspace?.presets[0]?.pngAlpha).toBe("keep");
@@ -521,7 +510,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			...patch,
 		});
 		act(() => controller.dispatch({ type: "setPreset", preset: preset({}) }));
-		await user.click(screen.getByRole("tab", { name: "Output" }));
 		expect(screen.queryByRole("radio", { name: "Outline" })).toBeNull();
 		act(() =>
 			controller.dispatch({
@@ -559,15 +547,12 @@ describe("export section", { timeout: 20_000 }, () => {
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(
 				screen.queryByRole("checkbox", { name: /slice pieces/ }),
 			).toBeNull();
 			expect(screen.queryByRole("button", { name: /Cut file/ })).toBeNull();
-			await user.click(screen.getByRole("tab", { name: "Files" }));
-			expect(
-				screen.getByTestId("export-file-tokens").textContent,
-			).not.toContain("{{slice}}");
+			await user.click(screen.getByRole("button", { name: "Insert field" }));
+			expect(screen.queryByRole("menuitem", { name: "slice" })).toBeNull();
 		});
 
 		test("splits into pieces, which the plan, the count and the file names follow", async () => {
@@ -576,7 +561,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
 			expect(button("Export 6 files")).toBeTruthy();
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			const split = screen.getByRole("checkbox", {
 				name: "Split into slice pieces",
 			});
@@ -585,14 +569,12 @@ describe("export section", { timeout: 20_000 }, () => {
 			expect(stored(controller)?.split).toBe("pieces");
 			// 3 records x (2 pieces on the front + the whole back).
 			expect(button("Export 9 files")).toBeTruthy();
-			await user.click(screen.getByRole("tab", { name: "Files" }));
-			expect(screen.getByTestId("export-file-tokens").textContent).toContain(
-				"{{slice}}",
-			);
+			await user.click(screen.getByRole("button", { name: "Insert field" }));
+			expect(screen.getByRole("menuitem", { name: "slice" })).toBeTruthy();
+			await user.keyboard("{Escape}");
 			expect(screen.getByTestId("export-file-example").textContent).toBe(
 				"e.g. r1-front-left.png",
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			await user.click(
 				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
 			);
@@ -620,7 +602,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			const select = screen.getByLabelText("Cut file");
 			await chooseOption(user, select, "SVG");
 			expect(stored(controller)?.cutFile).toBe("svg");
@@ -632,13 +613,10 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 
 		test("hides the cut choices when no slice has an edge", async () => {
-			const { controller, user, templateId } = setup(
-				withSlices(["none", "none"]),
-			);
+			const { controller, templateId } = setup(withSlices(["none", "none"]));
 			act(() =>
 				controller.dispatch({ type: "setPreset", preset: preset(templateId) }),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(
 				screen.getByRole("checkbox", { name: "Split into slice pieces" }),
 			).toBeTruthy();
@@ -660,7 +638,6 @@ describe("export section", { timeout: 20_000 }, () => {
 					preset: preset(templateId, { format: "pdf" }),
 				}),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(screen.queryByLabelText("Cut file")).toBeNull();
 			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
 			expect(stored(controller)?.cutLines).toBe(true);
@@ -676,7 +653,6 @@ describe("export section", { timeout: 20_000 }, () => {
 					preset: preset(templateId, { format: "pdf" }),
 				}),
 			);
-			await user.click(screen.getByRole("tab", { name: "Output" }));
 			expect(screen.queryByLabelText("Through spot")).toBeNull();
 			await user.click(screen.getByRole("checkbox", { name: "Cut lines" }));
 			const through = screen.getByLabelText("Through spot") as HTMLInputElement;
@@ -703,7 +679,7 @@ describe("export section", { timeout: 20_000 }, () => {
 					}),
 				}),
 			);
-			expect(screen.getByTestId("export-blocked").textContent).toBe(
+			expect(screen.getByTestId("export-check-blocked").textContent).toContain(
 				"Pieces need PNG or JPEG pages, not vector",
 			);
 		});
@@ -728,7 +704,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				},
 			}),
 		);
-		await user.click(screen.getByRole("tab", { name: "Print" }));
 		const group = screen.getByTestId("export-output-intent");
 		const hint = () =>
 			screen.getByTestId("export-output-intent-hint").textContent;
@@ -791,7 +766,7 @@ describe("export section", { timeout: 20_000 }, () => {
 	});
 
 	test("warns under the file name pattern about tokens that name nothing", async () => {
-		const { controller, user, templateId } = setup();
+		const { controller, templateId } = setup();
 		const preset = (fileName: string): ExportPreset => ({
 			id: "p_1",
 			name: "Names",
@@ -810,7 +785,6 @@ describe("export section", { timeout: 20_000 }, () => {
 				preset: preset("{{name}}-{{side}}"),
 			}),
 		);
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.queryByTestId("export-file-name-unknown")).toBeNull();
 		act(() =>
 			controller.dispatch({
@@ -1044,7 +1018,6 @@ describe("export section", { timeout: 20_000 }, () => {
 			"r3:dark",
 		]);
 		expect(button("Export 6 files")).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Files" }));
 		expect(screen.getByTestId("export-file-example").textContent).toBe(
 			"e.g. Ada-default.png",
 		);
@@ -1105,9 +1078,6 @@ describe("export section", { timeout: 20_000 }, () => {
 		});
 		expect(button("Export 1 file")).toBeTruthy();
 		const settings = screen.getByTestId("export-settings");
-		await user.click(screen.getByRole("tab", { name: "Files" }));
-		expect(within(settings).getByText(/\{\{variant\}\}/)).toBeTruthy();
-		await user.click(screen.getByRole("tab", { name: "Content" }));
 		await chooseOption(
 			user,
 			within(settings).getByLabelText(/Variant source/, { selector: "button" }),
@@ -1116,7 +1086,7 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(
 			controller.state.workspace?.templates.find((t) => t.id === id)?.binding,
 		).toEqual({ datasetId: "", fields: {}, variant: { kind: "all" } });
-		expect(screen.getByTestId("export-unbound")).toBeTruthy();
+		expect(screen.getByTestId("export-check-unbound")).toBeTruthy();
 		expect(button("Export 2 files")).toBeTruthy();
 		expect(screen.getByTestId("export-stepper-position").textContent).toBe(
 			"1 / 2",
@@ -1180,7 +1150,7 @@ describe("export section", { timeout: 20_000 }, () => {
 				.getByRole("radio", { name: /^Failed/ })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		await user.click(screen.getByRole("tab", { name: "Records" }));
+		await user.click(screen.getByRole("radio", { name: "Records" }));
 		expect(
 			screen
 				.getByRole("radio", { name: /^Failed/ })

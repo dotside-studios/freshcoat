@@ -16,6 +16,8 @@ import { getElement, isAncestor, parentKeyOf } from "~/doc/path";
 import { useEditor } from "~/state/hooks";
 import { working } from "~/state/store";
 import RotateIcon from "~icons/mingcute/anticlockwise-line";
+import { AlignRow } from "./AlignSection";
+import { ConstraintsFields, takesConstraints } from "./ConstraintsSection";
 import { CornerFields, takesCorners } from "./CornerFields";
 import { CommitField, Marked, Pair, Row } from "./controls";
 import { isGridLayout } from "./FrameSection";
@@ -148,16 +150,22 @@ function DisabledHint({
 	);
 }
 
-export function LayerSection({ ins }: { ins: Inspect }) {
-	const t = ins.template;
-	const keys = ins.keys;
-	const els = ins.layers as Element[];
-	const autoAll = keys.every((k) => isAutoLayoutChild(t, k));
-	const opacity = commonValue(
-		els.map((e) => Math.round((e.opacity ?? 1) * 100)),
+export function PositionSection({ ins }: { ins: Inspect }) {
+	const autoAll = ins.keys.every((k) => isAutoLayoutChild(ins.template, k));
+	return (
+		<InspectorSection title="Position">
+			<AlignRow ins={ins} />
+			<Pair>
+				<PositionFields ins={ins} autoAll={autoAll} />
+			</Pair>
+			{takesConstraints(ins) && <ConstraintsFields ins={ins} />}
+		</InspectorSection>
 	);
-	const blend = commonValue(els.map((e) => e.blendMode ?? "normal"));
-	const parentLayouts = keys.map((k) => {
+}
+
+export function LayoutSection({ ins }: { ins: Inspect }) {
+	const t = ins.template;
+	const parentLayouts = ins.keys.map((k) => {
 		const p = parentKeyOf(k);
 		const pe = p ? getElement(t, p) : undefined;
 		return pe?.type === "frame" ? pe.properties.layout : undefined;
@@ -166,9 +174,25 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 	const inGrid = inLayout && parentLayouts.every(isGridLayout);
 
 	return (
-		<InspectorSection title="Layer">
+		<InspectorSection title="Layout">
 			<Pair>
-				<GeometryFields ins={ins} autoAll={autoAll} />
+				<SizeFields ins={ins} />
+			</Pair>
+			{inLayout && <ResizingRows ins={ins} grid={inGrid} />}
+		</InspectorSection>
+	);
+}
+
+export function AppearanceSection({ ins }: { ins: Inspect }) {
+	const els = ins.layers as Element[];
+	const opacity = commonValue(
+		els.map((e) => Math.round((e.opacity ?? 1) * 100)),
+	);
+	const blend = commonValue(els.map((e) => e.blendMode ?? "normal"));
+
+	return (
+		<InspectorSection title="Appearance">
+			<Pair>
 				<Marked keys={["opacity"]}>
 					<NumberField
 						label="O"
@@ -209,15 +233,14 @@ export function LayerSection({ ins }: { ins: Inspect }) {
 				</Select>
 			</Row>
 			{takesCorners(ins) && <CornerFields ins={ins} />}
-			{inLayout && <ResizingRows ins={ins} grid={inGrid} />}
 		</InspectorSection>
 	);
 }
 
-/** Position, size and rotation follow the document live, even while the rest
- *  of the inspector holds still during a drag. */
-function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
-	const { keys, controller } = ins;
+/** The boxes of the selection, following the document live, even while the
+ *  rest of the inspector holds still during a drag. */
+function useRects(ins: Inspect) {
+	const { keys } = ins;
 	// Subscribed as a string of the numbers shown, so a render result that
 	// leaves them unchanged does not re-render the fields.
 	const shown = useEditor((s) => {
@@ -228,17 +251,21 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 		() => JSON.parse(shown) as ReturnType<typeof liveRect>[],
 		[shown],
 	);
-	const geometry = () => controller.state.geometry;
 	const axis = (a: Axis | "rotation") =>
 		commonValue(rects.map((r) => (r ? round(r[a]) : 0)));
-
+	const { controller } = ins;
 	// A layer inside another selected one moves with it, not on its own.
 	const boxes = keys.filter((k) => !keys.some((o) => isAncestor(o, k)));
 	const write = (a: Axis) => (v: number) =>
-		controller.edit((doc) => setAxis(doc, boxes, a, v, geometry()), {
-			mergeKey: mergeKeyOf(a, keys),
-		});
+		controller.edit(
+			(doc) => setAxis(doc, boxes, a, v, controller.state.geometry),
+			{ mergeKey: mergeKeyOf(a, keys) },
+		);
+	return { axis, write };
+}
 
+function PositionFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
+	const { axis, write } = useRects(ins);
 	return (
 		<>
 			<Marked keys={POS}>
@@ -261,6 +288,29 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 					/>
 				</DisabledHint>
 			</Marked>
+			<Marked keys={["rotation"]}>
+				<NumberField
+					label={<RotateIcon />}
+					aria-label="Rotation"
+					unit="°"
+					value={axis("rotation")}
+					min={-360}
+					max={360}
+					onChange={(v) =>
+						ins.set("rotation", (el) => ({
+							rotation: v === 0 && el.rotation === undefined ? undefined : v,
+						}))
+					}
+				/>
+			</Marked>
+		</>
+	);
+}
+
+function SizeFields({ ins }: { ins: Inspect }) {
+	const { axis, write } = useRects(ins);
+	return (
+		<>
 			<Marked keys={SIZE}>
 				<LengthField
 					label="W"
@@ -275,21 +325,6 @@ function GeometryFields({ ins, autoAll }: { ins: Inspect; autoAll: boolean }) {
 					value={axis("height")}
 					min={1}
 					onChange={write("height")}
-				/>
-			</Marked>
-			<Marked keys={["rotation"]}>
-				<NumberField
-					label={<RotateIcon />}
-					aria-label="Rotation"
-					unit="°"
-					value={axis("rotation")}
-					min={-360}
-					max={360}
-					onChange={(v) =>
-						ins.set("rotation", (el) => ({
-							rotation: v === 0 && el.rotation === undefined ? undefined : v,
-						}))
-					}
 				/>
 			</Marked>
 		</>

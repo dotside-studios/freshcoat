@@ -276,6 +276,7 @@ test.describe("screenshots", () => {
 						height: handles.height + 80,
 					},
 				});
+				await page.getByRole("button", { name: "Edit fill 1" }).click();
 				const section = (await page
 					.getByTestId("stop-bar")
 					.locator("xpath=../..")

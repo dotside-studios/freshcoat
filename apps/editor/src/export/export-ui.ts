@@ -10,16 +10,19 @@ import type {
 } from "@freshcoat-js/workspace";
 import {
 	CUT_KINDS,
+	DEFAULT_QUALITY,
 	exportSize,
 	exportSplit,
 	fileExtension,
 	fileNameFor,
+	fileNameTokens,
 	pdfLayout,
 } from "@freshcoat-js/workspace";
 import { type JobResult, recordOutcome } from "@freshcoat-js/workspace/export";
 import { plural, STATUS_LABEL } from "~/app/copy";
 import { formatDate } from "~/app/format";
 import type { Action } from "~/state/store";
+import { PAPER_LABEL, paperChoice } from "./sheets";
 
 export const RECORD_FILTERS: { id: ExportPreset["records"]; label: string }[] =
 	[
@@ -64,6 +67,142 @@ export function settingsSummary(preset: ExportPreset): string {
 		pdf ? "Download" : DESTINATION_LABEL[preset.destination ?? "download"],
 	);
 	return parts.join(" · ");
+}
+
+export function formatSummary(preset: ExportPreset): string {
+	if (preset.format === "pdf")
+		return [
+			"PDF",
+			preset.pdfPageImage === "vector" ? "vector" : null,
+			`${preset.dpi} dpi`,
+		]
+			.filter(Boolean)
+			.join(" · ");
+	const lossy = preset.format !== "png-zip";
+	return [
+		FORMAT_NAME[preset.format],
+		lossy ? `${preset.quality ?? DEFAULT_QUALITY}%` : null,
+	]
+		.filter(Boolean)
+		.join(" · ");
+}
+
+export function sizeSummary(
+	preset: ExportPreset,
+	outputSize?: { width: number; height: number } | null,
+): string {
+	const image = exportSize(preset).kind === "image";
+	const parts = [
+		image
+			? "Match image"
+			: outputSize
+				? `${outputSize.width} × ${outputSize.height} px`
+				: `${preset.scale}×`,
+	];
+	if (preset.bleed && !image) parts.push("bleed");
+	return parts.join(" · ");
+}
+
+export function printSummary(preset: ExportPreset): string {
+	const parts: string[] = [];
+	if (preset.format === "pdf") {
+		const layout = pdfLayout(preset);
+		if (layout.kind === "sheet") {
+			parts.push(`Sheets · ${PAPER_LABEL[paperChoice(layout)]}`);
+			if (layout.cropMarks) parts.push("crop marks");
+			if (layout.duplex !== "none") parts.push("double-sided");
+		} else parts.push("One per page");
+	}
+	if (preset.print?.enabled) parts.push("card printer");
+	return parts.length > 0 ? parts.join(" · ") : "Off";
+}
+
+export function filesSummary(preset: ExportPreset): string {
+	const where =
+		preset.format === "pdf"
+			? "Download"
+			: DESTINATION_LABEL[preset.destination ?? "download"];
+	return `${where} · ${preset.fileName}`;
+}
+
+/** What an export will produce, from the plan alone: "120 records · PDF ·
+ *  1 file", "240 files · PNG zip". Sizes are left out, as nothing before
+ *  the render says them. */
+export function exportEstimate(
+	preset: ExportPreset,
+	plan: readonly ExportItem[],
+	sheets?: number,
+): string {
+	if (preset.format === "pdf") {
+		const records = new Set(plan.map((item) => item.recordId)).size;
+		return [
+			plural(records, "record"),
+			"PDF",
+			sheets ? plural(sheets, "sheet") : "1 file",
+		].join(" · ");
+	}
+	const where = preset.destination === "folder" ? "in a folder" : "";
+	const label =
+		preset.destination === "folder"
+			? FORMAT_NAME[preset.format]
+			: FORMAT_LABEL[preset.format];
+	return [plural(plan.length, "file"), `${label} ${where}`.trim()].join(" · ");
+}
+
+/** How many records a preset exports from its template's dataset, or null
+ *  when the template is not bound. */
+export function presetRecordCount(
+	preset: ExportPreset,
+	templates: readonly { id: string; binding?: { datasetId: string } }[],
+	datasets: readonly Dataset[],
+): number | null {
+	const bound = templates.find((t) => t.id === preset.templateId)?.binding;
+	const dataset = datasets.find((d) => d.id === bound?.datasetId);
+	if (!dataset) return null;
+	const wanted = new Set(preset.selected ?? []);
+	return dataset.records.filter((r) => {
+		switch (preset.records) {
+			case "all":
+				return r.status !== "skipped";
+			case "selected":
+				return wanted.has(r.id);
+			default:
+				return r.status === preset.records;
+		}
+	}).length;
+}
+
+export function presetLine(
+	preset: ExportPreset,
+	records: number | null,
+): string {
+	const pdf = preset.format === "pdf";
+	return [
+		FORMAT_NAME[preset.format],
+		pdf ? `${preset.dpi} dpi` : `${preset.scale}×`,
+		records === null ? "not bound" : plural(records, "record"),
+	].join(" · ");
+}
+
+/** The tokens a file name pattern may name, in the groups the insert menu
+ *  shows. */
+export function fileNameTokenGroups(
+	template: Pick<Template, "fields">,
+	dataset?: Pick<Dataset, "columns">,
+): { title: string; tokens: string[] }[] {
+	const fields = Object.keys(template.fields.properties);
+	const columns = (dataset?.columns.map((c) => c.key) ?? []).filter(
+		(key) => !fields.includes(key),
+	);
+	const known = new Set([...fields, ...columns]);
+	return [
+		{
+			title: "Built in",
+			tokens: fileNameTokens(template, dataset).filter((t) => !known.has(t)),
+		},
+		{ title: "Fields", tokens: fields },
+		{ title: "Columns", tokens: columns },
+	].filter((group) => group.tokens.length > 0);
 }
 
 export type StatusFilter = "all" | RecordStatus;

@@ -91,6 +91,7 @@ async function openExportWithPreset(page: Page) {
 		.getByTestId("export-presets")
 		.getByRole("button", { name: "New preset" })
 		.click();
+	await page.getByRole("menuitem", { name: "Blank preset" }).click();
 	await expect(page.getByTestId("export-preset")).toHaveCount(1);
 	await settingsTab(page, "Print");
 }

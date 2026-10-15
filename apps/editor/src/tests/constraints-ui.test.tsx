@@ -67,19 +67,37 @@ function design(selection: string[], t?: Template) {
 const el = (c: EditorController, key: string) =>
 	getElement(c.template as Template, key) as Element;
 
-describe("Constraints section", () => {
+describe("Constraints in Position", () => {
 	test("shows for a free layer and an absolute auto-layout child, not a flow child", () => {
 		design(["0/0"]);
-		expect(screen.getByText("Constraints")).toBeTruthy();
+		expect(screen.getByTestId("constraints-diagram")).toBeTruthy();
 		cleanup();
 		design(["0/3/2"]);
-		expect(screen.getByText("Constraints")).toBeTruthy();
+		expect(screen.getByTestId("constraints-diagram")).toBeTruthy();
 		cleanup();
 		design(["0/3/0"]);
-		expect(screen.queryByText("Constraints")).toBeNull();
+		expect(screen.queryByTestId("constraints-diagram")).toBeNull();
 		cleanup();
 		design([]);
-		expect(screen.queryByText("Constraints")).toBeNull();
+		expect(screen.queryByTestId("constraints-diagram")).toBeNull();
+	});
+
+	test("sits inside Position with the align buttons, without sections of their own", () => {
+		design(["0/0"]);
+		const position = document.querySelector("[data-section='Position']");
+		if (!(position instanceof HTMLElement)) throw new Error("no Position");
+		expect(
+			within(position).getByRole("toolbar", { name: "Align" }),
+		).toBeTruthy();
+		expect(within(position).getByTestId("constraints-diagram")).toBeTruthy();
+		expect(
+			within(position).getByRole("spinbutton", { name: "Rotation" }),
+		).toBeTruthy();
+		const titles = screen
+			.getAllByRole("heading", { level: 3 })
+			.map((h) => h.textContent);
+		expect(titles).not.toContain("Align");
+		expect(titles).not.toContain("Constraints");
 	});
 
 	test("choosing sides writes the constraints as one undo step each, and the diagram follows", async () => {

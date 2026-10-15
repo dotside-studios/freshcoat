@@ -20,8 +20,10 @@ import {
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";
+import { PopoverPanel } from "@freshcoat-js/ui/popover-panel";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
+import { Button } from "react-aria-components";
 import { useEditor } from "~/state/hooks";
 import ClockwiseIcon from "~icons/mingcute/clockwise-line";
 import ReverseIcon from "~icons/mingcute/transfer-horizontal-line";
@@ -170,65 +172,104 @@ export function FillRow({
 }) {
 	const kind = fillKind(fill);
 	return (
-		<>
-			<div className="flex min-w-0 items-center gap-1.5">
-				<Select
-					aria-label={`Fill ${index + 1} kind`}
-					className="w-[76px] shrink-0"
-					value={kind}
-					onChange={(v) => onChange("kind", convertFill(fill, v as FillKind))}
-				>
-					{KINDS.map(([id, name]) => (
-						<SelectItem key={id} id={id}>
-							{name}
-						</SelectItem>
-					))}
-				</Select>
-				{typeof fill === "string" ? (
-					<ColorInput
-						aria-label={`Fill ${index + 1} color`}
-						className="min-w-0 flex-1"
-						value={fill}
-						swatches={swatches}
-						onChange={(c) => onChange("color", c)}
-					/>
-				) : fill.kind === "pattern" ? (
-					<PatternSwatch
-						p={fill}
-						className="h-fc-control min-w-0 flex-1 rounded-[3px]"
-					/>
-				) : (
-					<GradientSwatch
-						g={fill}
-						box={box}
-						className="h-fc-control min-w-0 flex-1 rounded-[3px]"
-					/>
-				)}
-				<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
-			</div>
-			{typeof fill !== "string" && fill.kind === "pattern" && (
-				<PatternEditor
-					p={fill}
-					index={index}
+		<div className="flex min-w-0 items-center gap-1.5">
+			<Select
+				aria-label={`Fill ${index + 1} kind`}
+				className="w-[76px] shrink-0"
+				value={kind}
+				onChange={(v) => onChange("kind", convertFill(fill, v as FillKind))}
+			>
+				{KINDS.map(([id, name]) => (
+					<SelectItem key={id} id={id}>
+						{name}
+					</SelectItem>
+				))}
+			</Select>
+			{typeof fill === "string" ? (
+				<ColorInput
+					aria-label={`Fill ${index + 1} color`}
+					className="min-w-0 flex-1"
+					value={fill}
 					swatches={swatches}
-					onChange={onChange}
+					onChange={(c) => onChange("color", c)}
 				/>
-			)}
-			{isGradient(fill) && (
-				<div
-					className="contents"
-					onFocusCapture={onActivate}
-					onPointerDownCapture={onActivate}
+			) : (
+				<SwatchPopover
+					title={fill.kind === "pattern" ? "Pattern" : "Gradient"}
+					label={`Edit fill ${index + 1}`}
+					onActivate={onActivate}
+					swatch={
+						fill.kind === "pattern" ? (
+							<PatternSwatch
+								p={fill}
+								className="block h-fc-control w-full rounded-[3px]"
+							/>
+						) : (
+							<GradientSwatch
+								g={fill}
+								box={box}
+								className="block h-fc-control w-full rounded-[3px]"
+							/>
+						)
+					}
 				>
-					<GradientEditor
-						g={fill}
-						name={`fill ${index + 1}`}
-						swatches={swatches}
-						onChange={(field, g) => onChange(field, g)}
-					/>
-				</div>
+					{fill.kind === "pattern" ? (
+						<PatternEditor
+							p={fill}
+							index={index}
+							swatches={swatches}
+							onChange={onChange}
+						/>
+					) : (
+						<GradientEditor
+							g={fill}
+							name={`fill ${index + 1}`}
+							swatches={swatches}
+							onChange={(field, g) => onChange(field, g)}
+						/>
+					)}
+				</SwatchPopover>
 			)}
-		</>
+			<RemoveButton label={`Remove fill ${index + 1}`} onPress={onRemove} />
+		</div>
+	);
+}
+
+/** A paint swatch that opens its editor in a popover. */
+export function SwatchPopover({
+	title,
+	label,
+	swatch,
+	onActivate,
+	children,
+}: {
+	title: string;
+	label: string;
+	swatch: ReactNode;
+	onActivate?: () => void;
+	children: ReactNode;
+}) {
+	return (
+		<PopoverPanel
+			title={title}
+			trigger={
+				<Button
+					aria-label={label}
+					onPress={onActivate}
+					className="min-w-0 flex-1 cursor-default rounded-[3px] outline-none data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent data-focus-visible:outline-offset-1"
+				>
+					{swatch}
+				</Button>
+			}
+		>
+			<div
+				className="contents"
+				onFocusCapture={onActivate}
+				onPointerDownCapture={onActivate}
+			>
+				{children}
+			</div>
+		</PopoverPanel>
 	);
 }
 
