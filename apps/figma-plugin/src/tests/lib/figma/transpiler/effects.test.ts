@@ -253,10 +253,11 @@ describe("extractEffects (noise)", () => {
 		["MULTIPLY", "multiply"],
 		["SCREEN", "screen"],
 	] as const)("carries the %s blend mode", (figma, grain) => {
-		const [e] = extractEffects(
-			[noise({ blendMode: figma, color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } })],
-			1,
-		).effects ?? [];
+		const [e] =
+			extractEffects(
+				[noise({ blendMode: figma, color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } })],
+				1,
+			).effects ?? [];
 		expect(e).toMatchObject({ type: "grain", blendMode: grain });
 	});
 

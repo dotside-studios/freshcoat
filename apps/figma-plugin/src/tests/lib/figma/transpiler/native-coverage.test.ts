@@ -407,9 +407,7 @@ describe("effects", () => {
 		).toBe("effect_flattened");
 	});
 
-	const noise = (
-		overrides: Partial<FigmaEffect> = {},
-	): FigmaEffect => ({
+	const noise = (overrides: Partial<FigmaEffect> = {}): FigmaEffect => ({
 		type: "NOISE",
 		noiseType: "MONOTONE",
 		visible: true,
@@ -448,7 +446,10 @@ describe("effects", () => {
 			],
 		],
 		["a multitone noise", [noise({ noiseType: "MULTITONE" })]],
-		["a noise with non-square cells", [noise({ noiseSizeVector: { x: 2, y: 4 } })]],
+		[
+			"a noise with non-square cells",
+			[noise({ noiseSizeVector: { x: 2, y: 4 } })],
+		],
 		["a noise blended in a mode grain lacks", [noise({ blendMode: "DARKEN" })]],
 		["two noises", [noise(), noise({ blendMode: "SCREEN" })]],
 		[
@@ -463,10 +464,7 @@ describe("effects", () => {
 		expect(
 			classify(
 				rect({
-					effects: [
-						noise({ visible: false, noiseType: "DUOTONE" }),
-						noise(),
-					],
+					effects: [noise({ visible: false, noiseType: "DUOTONE" }), noise()],
 				}),
 			).kind,
 		).toBe("native-rect");
