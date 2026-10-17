@@ -2808,6 +2808,31 @@ function adjustEffect(
 // a nested offscreen, which a recording canvas can't provide.
 const measuring = new WeakSet<object>();
 
+// Each canvas's scene-to-device matrix, before any layer's transform, so a
+// "page" halftone can find the page from inside nested groups and offscreens.
+const sceneSpace = new WeakMap<object, number[]>();
+
+function sceneMatrix(ck: CanvasKit, canvas: Canvas, frame: Frame): number[] {
+	return sceneSpace.get(canvas) ?? ck.Matrix.scaled(frame.scale, frame.scale);
+}
+
+// An offscreen drawn at `rect` of `canvas` sees the scene where it does.
+function inheritSceneSpace(
+	ck: CanvasKit,
+	off: Canvas,
+	canvas: Canvas,
+	frame: Frame,
+	rect: { x: number; y: number },
+) {
+	sceneSpace.set(
+		off,
+		ck.Matrix.multiply(
+			ck.Matrix.translated(-rect.x, -rect.y),
+			sceneMatrix(ck, canvas, frame),
+		),
+	);
+}
+
 type Bounds = [number, number, number, number];
 
 // An affine SkMatrix as [scaleX, skewX, transX, skewY, scaleY, transY].
@@ -3776,6 +3801,7 @@ function paintAdjustedOffscreen(
 	// pixel it would be on the main surface.
 	off.translate(-rect.x, -rect.y);
 	off.concat(matrix);
+	inheritSceneSpace(ck, off, canvas, frame, rect);
 	paintDrawable(ck, off, provider, images, bin, inner, issues, frame);
 	const img = bin.track(surface.makeImageSnapshot());
 
@@ -3984,6 +4010,7 @@ function paintTexturedOffscreen(
 	off.clear(ck.TRANSPARENT);
 	off.translate(-rect.x, -rect.y);
 	off.concat(matrix);
+	inheritSceneSpace(ck, off, canvas, frame, rect);
 	paintDrawable(ck, off, provider, images, bin, inner, issues, frame);
 	const img = bin.track(surface.makeImageSnapshot());
 	let shader = bin.track(
@@ -4011,9 +4038,23 @@ function paintTexturedOffscreen(
 	const lx = [inverse[0], inverse[1], inverse[2] - px];
 	const ly = [inverse[3], inverse[4], inverse[5] - py];
 	if (halftone && ht?.eff) {
-		const dx = [local[0], local[1], local[0] * px + local[1] * py + local[2]];
-		const dy = [local[3], local[4], local[3] * px + local[4] * py + local[5]];
-		const unit = Math.sqrt(Math.abs(local[0] * local[4] - local[1] * local[3]));
+		const origin =
+			halftone.anchor === "element" ? cmd.pos : (halftone.origin ?? { x: 0, y: 0 });
+		const space =
+			halftone.anchor === "element" ? local : sceneMatrix(ck, canvas, frame);
+		const toDevice = ck.Matrix.multiply(
+			space,
+			ck.Matrix.translated(origin.x, origin.y),
+		);
+		const fromDevice = ck.Matrix.invert(toDevice);
+		if (!fromDevice) throw new Error("texture: non-invertible page transform");
+		const hx = fromDevice.slice(0, 3);
+		const hy = fromDevice.slice(3, 6);
+		const dx = toDevice.slice(0, 3);
+		const dy = toDevice.slice(3, 6);
+		const unit = Math.sqrt(
+			Math.abs(toDevice[0] * toDevice[4] - toDevice[1] * toDevice[3]),
+		);
 		const cell = Math.max(halftone.cellSize, 1e-3);
 		const screens =
 			halftone.mode === "cmyk"
@@ -4023,8 +4064,8 @@ function paintTexturedOffscreen(
 			? [...toColor(ck, halftone.background)]
 			: [0, 0, 0, 0];
 		const uniforms = [
-			...lx,
-			...ly,
+			...hx,
+			...hy,
 			...dx,
 			...dy,
 			cell,
@@ -5616,6 +5657,17 @@ async function paintSceneIn(
 			if (origin) skCanvas.translate(-origin.x, -origin.y);
 			skCanvas.scale(frame.scale, frame.scale);
 		}
+		sceneSpace.set(skCanvas, [
+			frame.scale,
+			0,
+			-(origin?.x ?? 0),
+			0,
+			frame.scale,
+			-(origin?.y ?? 0),
+			0,
+			0,
+			1,
+		]);
 		// The families this scene loaded, in order, are the per-glyph fallback
 		// chain its text styles append (drawText → textStyleOf). Without listing
 		// them in fontFamilies, CanvasKit renders any glyph the span's font lacks

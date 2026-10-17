@@ -1,7 +1,9 @@
 import type { Grain, GrainBlend, Halftone, HalftoneShape } from "./types";
 
-// `lx`/`ly` are the rows of the device-to-layer matrix with the layer origin
-// folded in, so cells and grains are fixed in design units at any export scale.
+// `lx`/`ly` are the rows of the device-to-pattern matrix: the layer's own
+// space with its origin folded in for grain and an "element" halftone, the
+// page's for a "page" halftone. Cells and grains stay fixed in design units at
+// any export scale.
 
 // Integer arithmetic in floats, exact below 2^24, so CPU and GPU agree. The
 // half-unit offset keeps a division error from crossing an integer.
@@ -87,7 +89,15 @@ const SPAN_SKSL = `
 		return clamp((inner + outer) / aaw, 0.0, 1.0);
 	}`;
 
-// A dot is the mean of `taps` x `taps` reads over its cell.
+// A dot reads `taps` x `taps` samples over its cell. Its colour is their
+// alpha-weighted mean, so samples outside the shape don't count; a cell whose
+// samples all miss the shape, a sliver along its edge, takes the pixel's own.
+// Alpha means one of two things. Where it jumps across a device pixel, `edge`,
+// it is the shape's antialiased outline: the dot's value is the colour's tone
+// alone and the pixel's alpha, `cover`, clips it, so a solid fill stays solid
+// to its edge. Elsewhere it is translucency (a fade, a blur): the value is the
+// tone times the most opaque of the samples and the pixel, `peak`, and the dot
+// is not clipped, so soft content breaks into dots in proportion to its alpha.
 export function halftoneSksl(
 	mode: Halftone["mode"],
 	shape: HalftoneShape,
@@ -97,21 +107,20 @@ export function halftoneSksl(
 	const value =
 		mode === "cmyk"
 			? `
-		half3 rgb = a.a > 0.0 ? a.rgb / a.a : half3(1.0);
 		if (invert > 0.5) rgb = 1.0 - rgb;
 		half k = 1.0 - max(rgb.r, max(rgb.g, rgb.b));
 		half3 cmy = k < 1.0 ? (1.0 - rgb - k) / (1.0 - k) : half3(0.0);
-		return dot(float4(cmy, k), channel) * a.a;`
+		return dot(float4(cmy, k), channel) * float(strength);`
 			: `
-		half l = dot(a.rgb, half3(0.299, 0.587, 0.114));
-		return float(invert > 0.5 ? l : a.a - l);`;
+		half l = dot(rgb, half3(0.299, 0.587, 0.114));
+		return float((invert > 0.5 ? l : 1.0 - l) * strength);`;
 	const loop = Array.from(
 		{ length: screens },
 		(_, i) => `
 		{
-			float d = clamp(screenValue(q, rot[${i}], float4(${[0,1,2,3].map((c) => (c === i ? 1 : 0)).join(", ")})), 0.0, 1.0);
+			float d = clamp(screenValue(q, own, edge, rot[${i}], float4(${[0,1,2,3].map((c) => (c === i ? 1 : 0)).join(", ")})), 0.0, 1.0);
 			float2 s = rotate(q, float2(rot[${i}].x, -rot[${i}].y)) / cellSize;
-			float m = d > 0.0 ? dotMask(d, fract(s) - 0.5) : 0.0;
+			float m = d > 0.0 ? dotMask(d, fract(s) - 0.5) * clip : 0.0;
 			half3 sc = half3(inks[${i}]) * half(m);
 			acc = half4(sc * (1.0 - acc.a) + acc.rgb * (1.0 - half(m)) + sc * acc.rgb, half(m) + acc.a * (1.0 - half(m)));
 		}`,
@@ -129,28 +138,40 @@ export function halftoneSksl(
 	uniform float3 inks[${screens}];
 	float2 rotate(float2 v, float2 cs) { return float2(cs.x * v.x - cs.y * v.y, cs.y * v.x + cs.x * v.y); }
 	float2 toDevice(float2 q) { return float2(dot(dx, float3(q, 1.0)), dot(dy, float3(q, 1.0))); }
-	float screenValue(float2 q, float2 cs, float4 channel) {
+	float screenValue(float2 q, half4 own, half edge, float2 cs, float4 channel) {
 		float2 s = floor(rotate(q, float2(cs.x, -cs.y)) / cellSize);
 		half4 a = half4(0.0);
+		half peak = own.a;
 		for (int y = 0; y < ${taps}; y++) {
 			for (int x = 0; x < ${taps}; x++) {
 				float2 t = (s + (float2(float(x), float(y)) + 0.5) / ${taps}.0) * cellSize;
-				a += src.eval(toDevice(rotate(t, cs)));
+				half4 c = src.eval(toDevice(rotate(t, cs)));
+				a += c;
+				peak = max(peak, c.a);
 			}
 		}
-		a /= ${taps * taps}.0;
+		if (a.a <= 0.0) a = own;
+		half3 rgb = clamp(a.rgb / a.a, 0.0, 1.0);
+		half strength = mix(peak, 1.0, edge);
 		${value}
 	}
 	${SPAN_SKSL}
-	float dotMask(float d, float2 f) {${DOT_SKSL[shape]}
+	float dotMask(float d, float2 f) {
+		if (d >= 1.0) return 1.0;${DOT_SKSL[shape]}
 	}
 	half4 main(float2 xy) {
-		half cover = src.eval(xy).a;
+		half4 own = src.eval(xy);
+		half cover = own.a;
 		if (cover <= 0.0) return half4(0.0);
+		half spread = max(
+			abs(src.eval(xy + float2(1.0, 0.0)).a - src.eval(xy - float2(1.0, 0.0)).a),
+			abs(src.eval(xy + float2(0.0, 1.0)).a - src.eval(xy - float2(0.0, 1.0)).a));
+		half edge = smoothstep(0.25, 0.5, spread);
+		float clip = float(mix(1.0, cover, edge));
 		float2 q = float2(dot(lx, float3(xy, 1.0)), dot(ly, float3(xy, 1.0)));
-		half4 acc = half4(half3(background.rgb) * half(background.a), half(background.a));
+		half4 acc = half4(half3(background.rgb), 1.0) * half(background.a) * cover;
 		${loop}
-		return acc * cover;
+		return acc;
 	}`;
 }
 

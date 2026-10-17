@@ -367,6 +367,14 @@ describe("DesignPanel", () => {
 			screen.getByRole("button", { name: /Halftone mode/ }),
 			"CMYK look",
 		);
+		expect(
+			screen.getByRole("button", { name: /Halftone anchor/ }).textContent,
+		).toContain("Page");
+		await chooseOption(
+			fastUser(),
+			screen.getByRole("button", { name: /Halftone anchor/ }),
+			"Layer",
+		);
 		fireEvent.click(screen.getByRole("checkbox", { name: "Invert" }));
 		fireEvent.click(screen.getByRole("checkbox", { name: "Paper" }));
 		expect(el(c, "0/0").effects).toEqual([
@@ -375,10 +383,17 @@ describe("DesignPanel", () => {
 				cellSize: 10,
 				shape: "line",
 				mode: "cmyk",
+				anchor: "element",
 				invert: true,
 				background: "#ffffff",
 			},
 		]);
+		await chooseOption(
+			fastUser(),
+			screen.getByRole("button", { name: /Halftone anchor/ }),
+			"Page",
+		);
+		expect(el(c, "0/0").effects?.[0]).not.toHaveProperty("anchor");
 		expect(validate(c.template).ok).toBe(true);
 		fireEvent.click(screen.getByRole("button", { name: "Close" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove halftone" }));

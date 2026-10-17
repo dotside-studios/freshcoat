@@ -457,7 +457,7 @@ what that minor added.
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
 | 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
-| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone`; rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`, `gradient` and `logo` |
+| 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone` (and its `anchor`); rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`, `gradient` and `logo` |
 
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
@@ -1065,6 +1065,7 @@ takes at most one of each.
     "shape": "round",                    // round (default), line, square
     "angle": 45,                         // default 45, or 0 for cmyk
     "mode": "mono",                      // mono (default) or cmyk
+    "anchor": "page",                    // page (default) or element
     "invert": false,                     // dots for light instead of dark
     "color": "#000000",                  // the ink, mono only
     "background": "#ffffff" }            // paper under the dots; default none
@@ -1075,7 +1076,18 @@ Grain is seeded, never random: one seed paints the same pixels in Studio, the
 CLI and every worker. `"cmyk"` draws four screens at C 15°, M 75°, Y 0° and
 K 45°, each turned by `angle`, multiplied together. It is a visual effect, not
 colour separations. A screen printed at a DPI, one design px per dot, has
-`dpi / cellSize` lines per inch. Both draw as an image in a vector PDF, with a
+`dpi / cellSize` lines per inch.
+
+`anchor` says where the screen sits. `"page"` lays one screen over the whole
+side from its top-left, in design px, as print does: elements that meet share
+one grid with no seam, and a rotated element keeps the screen's angle. The
+screen stays on the side in every render: with or without bleed, trimmed, cut
+into slice pieces, imposed on a sheet and in Studio at any zoom. `"element"`
+starts the grid at the element's own corner and turns it with the element.
+
+A solid fill keeps full dots right up to its edge, which clips them, so bold
+text stays crisp. Soft alpha, such as a gradient to transparent or a blurred
+image, breaks into dots that shrink with the alpha. Both draw as an image in a vector PDF, with a
 `vector_rasterized` warning, and need a CanvasKit build with runtime effects
 (the default build has them); without them the element paints unchanged with
 an `effect_unsupported` warning.

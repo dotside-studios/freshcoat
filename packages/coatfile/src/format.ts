@@ -24,7 +24,8 @@ import type { Template } from "./types";
 //   1.7  rect and vector `slice`; element `hidden`; text `stroke` and
 //        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
 //        and image `cornerSmoothing`; rect and frame stroke `width` per side;
-//        element `effects`, with `grain` and `halftone`; rect and vector `spot`;
+//        element `effects`, with `grain` and `halftone` (and its `anchor`);
+//        rect and vector `spot`;
 //        QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`,
 //        `gradient` and `logo`
 

@@ -1,9 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createGroup, createRect, type Node } from "../src/node";
+import { gammaLut } from "../src/adjust";
+import { createGroup, createRect, createText, type Node } from "../src/node";
 import { createRenderer } from "../src/renderer";
 import type { Grain, Halftone, ResolvedFill } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
@@ -55,8 +56,18 @@ function scene(layer: Partial<Node>, fills: ResolvedFill[] = [gradient]): Node {
 	);
 }
 
+const fonts = new Map([
+	["Vend Sans", [testFontBytes("VendSans-Variable-latin.woff2")]],
+]);
+
 async function png(node: Node, scale = 1, testCk = ck) {
-	return renderSceneToPng(node, { width: W, height: H, ck: testCk, scale });
+	return renderSceneToPng(node, {
+		width: W,
+		height: H,
+		ck: testCk,
+		scale,
+		fonts,
+	});
 }
 
 function decode(bytes: Uint8Array): Pixels {
@@ -289,7 +300,7 @@ describe("halftone", () => {
 	test("cmyk screens multiply process inks", async () => {
 		const p = await pixels(
 			scene({ halftone: halftone({ mode: "cmyk", cellSize: 6 }) }, [
-				{ kind: "solid", color: "#ff0000" },
+				{ kind: "solid", color: "#ff4040" },
 			]),
 		);
 		let magenta = false;
@@ -318,14 +329,347 @@ describe("halftone", () => {
 	});
 });
 
+const white = {
+	pos: { x: 0, y: 0 },
+	size: { width: W, height: H },
+	fills: [{ kind: "solid", color: "#ffffff" }] as ResolvedFill[],
+};
+const grey: ResolvedFill[] = [{ kind: "solid", color: "#808080" }];
+
+function pair(anchor: Halftone["anchor"]): Node {
+	const ht = halftone({ anchor, cellSize: 7 });
+	return createGroup(
+		[
+			createRect({
+				pos: { x: 10, y: 10 },
+				size: { width: 50, height: 60 },
+				fills: grey,
+				halftone: ht,
+			}),
+			createRect({
+				pos: { x: 60, y: 10 },
+				size: { width: 50, height: 60 },
+				fills: grey,
+				halftone: ht,
+			}),
+		],
+		white,
+	);
+}
+
+function rotated(anchor: Halftone["anchor"]): Node {
+	return createGroup(
+		[
+			createRect({
+				pos: { x: 25, y: 10 },
+				size: { width: 70, height: 60 },
+				rotation: 30,
+				fills: grey,
+				halftone: halftone({ anchor, cellSize: 7 }),
+			}),
+		],
+		white,
+	);
+}
+
+function boldText(over: Partial<Halftone> = {}): Node {
+	return createGroup(
+		[
+			createText({
+				id: "layer",
+				pos: { x: 0, y: 0 },
+				size: { width: W, height: H },
+				font: {
+					family: "Vend Sans",
+					weight: 800,
+					style: "normal",
+					size: 64,
+					lineHeight: 1,
+				},
+				color: "#000000",
+				align: "center",
+				verticalAlign: "middle",
+				text: "HIE",
+				halftone: halftone({ cellSize: 6, ...over }),
+			}),
+		],
+		white,
+	);
+}
+
+describe("halftone anchor", () => {
+	const at = (x: number, y: number) => (y * W + x) * 4;
+	const region = (p: Pixels, x0: number, x1: number) => {
+		const out: number[] = [];
+		for (let y = 14; y < 66; y++)
+			for (let x = x0; x < x1; x++) out.push(p.px[at(x, y)]);
+		return out;
+	};
+	const whole = (anchor: Halftone["anchor"]) =>
+		createGroup(
+			[
+				createRect({
+					pos: { x: 10, y: 10 },
+					size: { width: 100, height: 60 },
+					fills: grey,
+					halftone: halftone({ anchor, cellSize: 7 }),
+				}),
+			],
+			white,
+		);
+
+	test("page: neighbouring layers share one screen", async () => {
+		const split = await pixels(pair("page"));
+		const one = await pixels(whole("page"));
+		expect(region(split, 14, 106)).toEqual(region(one, 14, 106));
+	});
+
+	test("element: each layer starts its own screen", async () => {
+		const split = await pixels(pair("element"));
+		const one = await pixels(whole("element"));
+		expect(region(split, 14, 56)).toEqual(region(one, 14, 56));
+		expect(region(split, 60, 106)).not.toEqual(region(one, 60, 106));
+	});
+
+	test("the default anchor is page", async () => {
+		const a = await png(pair(undefined));
+		const b = await png(pair("page"));
+		expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true);
+	});
+
+	// Points well inside the rotated 70 x 60 box, clear of its antialiased edge.
+	const inside = () => {
+		const pts: [number, number][] = [];
+		const a = (30 * Math.PI) / 180;
+		for (let v = -22; v <= 22; v++)
+			for (let u = -27; u <= 27; u++)
+				pts.push([
+					Math.round(60 + u * Math.cos(a) - v * Math.sin(a)),
+					Math.round(40 + u * Math.sin(a) + v * Math.cos(a)),
+				]);
+		return pts;
+	};
+
+	test("page: a rotated layer keeps the screen angle", async () => {
+		const turned = await pixels(rotated("page"));
+		const flat = await pixels(
+			createGroup(
+				[
+					createRect({
+						pos: { x: 0, y: 0 },
+						size: { width: W, height: H },
+						fills: grey,
+						halftone: halftone({ cellSize: 7 }),
+					}),
+				],
+				white,
+			),
+		);
+		let same = 0;
+		const pts = inside();
+		for (const [x, y] of pts)
+			if (Math.abs(turned.px[at(x, y)] - flat.px[at(x, y)]) <= 2) same++;
+		expect(same / pts.length).toBeGreaterThan(0.99);
+	});
+
+	test("element: a rotated layer turns its screen", async () => {
+		const page = await pixels(rotated("page"));
+		const element = await pixels(rotated("element"));
+		expect(meanDiff(page, element)).toBeGreaterThan(5);
+	});
+
+	test("page: the screen ignores a rotated group", async () => {
+		const inGroup = await pixels(
+			createGroup(
+				[
+					createGroup(
+						[
+							createRect({
+								pos: { x: 0, y: 0 },
+								size: { width: 70, height: 60 },
+								fills: grey,
+								halftone: halftone({ cellSize: 7 }),
+							}),
+						],
+						{
+							pos: { x: 25, y: 10 },
+							size: { width: 70, height: 60 },
+							rotation: 30,
+						},
+					),
+				],
+				white,
+			),
+		);
+		const own = await pixels(rotated("page"));
+		expect(meanDiff(inGroup, own)).toBeLessThan(0.5);
+	});
+
+	test("page: an offscreen ancestor keeps the page grid", async () => {
+		const adjusted = await pixels(
+			createGroup(
+				[
+					createGroup(
+						[
+							createRect({
+								pos: { x: 0, y: 0 },
+								size: { width: 90, height: 55 },
+								fills: grey,
+								halftone: halftone({ cellSize: 7 }),
+							}),
+						],
+						{
+							pos: { x: 13, y: 11 },
+							size: { width: 90, height: 55 },
+							adjust: { lut: gammaLut(1) },
+						},
+					),
+				],
+				white,
+			),
+		);
+		const one = await pixels(whole("page"));
+		expect(region(adjusted, 17, 99)).toEqual(region(one, 17, 99));
+	});
+
+	test("origin moves the page under the scene", async () => {
+		const shifted = (dx: number, dy: number) =>
+			createGroup(
+				[
+					createRect({
+						pos: { x: 10 + dx, y: 5 + dy },
+						size: { width: 90, height: 60 },
+						fills: grey,
+						halftone: halftone({ cellSize: 7, origin: { x: dx, y: dy } }),
+					}),
+				],
+				white,
+			);
+		const a = await pixels(shifted(0, 0));
+		const b = await pixels(shifted(9, 6));
+		for (let y = 8; y < 62; y++)
+			for (let x = 14; x < 96; x++)
+				expect(b.px[at(x + 9, y + 6)]).toBe(a.px[at(x, y)]);
+	});
+
+	test("page: a 2x export keeps the 1x tone", async () => {
+		const one = await pixels(pair("page"), 1);
+		const two = await pixels(pair("page"), 2);
+		expect(meanDiff(one, halve(two))).toBeLessThan(4);
+	});
+});
+
+describe("halftone edges", () => {
+	// Pixels the plain text covers fully that come out light once halftoned.
+	const holes = async (over: Partial<Halftone> = {}) => {
+		const plain = await pixels(boldText({ cellSize: 0 }));
+		const screened = await pixels(boldText(over));
+		let count = 0;
+		let solid = 0;
+		for (let i = 0; i < plain.px.length; i += 4) {
+			if (plain.px[i] !== 0) continue;
+			solid++;
+			if (screened.px[i] > 64) count++;
+		}
+		expect(solid).toBeGreaterThan(500);
+		return count;
+	};
+
+	test("bold black text stays solid to its edges", async () => {
+		expect(await holes()).toBe(0);
+		expect(await holes({ shape: "square" })).toBe(0);
+	});
+
+	test("cmyk keeps black text solid to its edges", async () => {
+		expect(await holes({ mode: "cmyk", angle: 0 })).toBe(0);
+	});
+
+	test("invert keeps white-on-transparent solid to its edges", async () => {
+		const node = (cellSize: number) =>
+			createGroup(
+				[
+					createText({
+						pos: { x: 0, y: 0 },
+						size: { width: W, height: H },
+						font: {
+							family: "Vend Sans",
+							weight: 800,
+							style: "normal",
+							size: 64,
+							lineHeight: 1,
+						},
+						color: "#ffffff",
+						align: "center",
+						verticalAlign: "middle",
+						text: "HIE",
+						halftone: halftone({ cellSize, invert: true }),
+					}),
+				],
+				white,
+			);
+		const plain = await pixels(
+			createGroup(
+				[
+					createText({
+						...(node(6).children[0] as Parameters<typeof createText>[0]),
+						color: "#000000",
+						halftone: undefined,
+					}),
+				],
+				white,
+			),
+		);
+		const screened = await pixels(node(6));
+		let count = 0;
+		for (let i = 0; i < plain.px.length; i += 4)
+			if (plain.px[i] === 0 && screened.px[i] > 64) count++;
+		expect(count).toBe(0);
+	});
+
+	test("a soft edge breaks into dots in proportion to its alpha", async () => {
+		const fade: ResolvedFill[] = [
+			{
+				kind: "linear",
+				from: { x: 0, y: 0 },
+				to: { x: 1, y: 0 },
+				stops: [
+					{ offset: 0, color: "#000000" },
+					{ offset: 1, color: "#00000000" },
+				],
+			},
+		];
+		const p = await pixels(scene({ halftone: halftone({ cellSize: 6 }) }, fade));
+		const ink = (x0: number, x1: number) => {
+			let dark = 0;
+			for (let y = 10; y < 70; y++)
+				for (let x = x0; x < x1; x++) dark += 255 - p.px[(y * W + x) * 4];
+			return dark / ((x1 - x0) * 60 * 255);
+		};
+		const left = ink(10, 40);
+		const middle = ink(45, 75);
+		const right = ink(80, 110);
+		expect(left).toBeGreaterThan(0.75);
+		expect(middle).toBeGreaterThan(0.3);
+		expect(middle).toBeLessThan(0.7);
+		expect(right).toBeLessThan(0.3);
+		expect(right).toBeGreaterThan(0.02);
+	});
+});
+
 // Regenerate with UPDATE_GOLDENS=1 after an intended change to an effect.
 describe.each([
-	["grain", { grain: grain({ seed: 7, size: 2, monochrome: false }) }],
-	["halftone", { halftone: halftone() }],
-	["halftone-cmyk", { halftone: halftone({ mode: "cmyk", cellSize: 6 }) }],
-] as const)("%s golden", (name, layer) => {
+	["grain", scene({ grain: grain({ seed: 7, size: 2, monochrome: false }) })],
+	["halftone", scene({ halftone: halftone() })],
+	["halftone-cmyk", scene({ halftone: halftone({ mode: "cmyk", cellSize: 6 }) })],
+	["halftone-adjacent-page", pair("page")],
+	["halftone-adjacent-element", pair("element")],
+	["halftone-rotated-page", rotated("page")],
+	["halftone-rotated-element", rotated("element")],
+	["halftone-bold-text", boldText()],
+	["halftone-bold-text-cmyk", boldText({ mode: "cmyk", angle: 0 })],
+] as const)("%s golden", (name, node) => {
 	test.each([1, 2])("matches at %dx", async (scale) => {
-		const out = await png(scene(layer), scale);
+		const out = await png(node, scale);
 		const file = join(GOLDENS, `${name}@${scale}x.png`);
 		if (UPDATE) {
 			mkdirSync(GOLDENS, { recursive: true });

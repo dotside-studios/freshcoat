@@ -9,6 +9,7 @@ import type {
 	DrawCommand,
 	DrawRectCommand,
 	FrameElement,
+	GroupNode,
 	Node,
 	RectElement,
 	Template,
@@ -1530,6 +1531,7 @@ describe("compile (effects)", () => {
 			cellSize: 12,
 			angle: 45,
 			invert: false,
+			anchor: "page",
 			color: "#000000",
 		});
 	});
@@ -1565,10 +1567,56 @@ describe("compile (effects)", () => {
 			cellSize: 8,
 			angle: 0,
 			invert: true,
+			anchor: "page",
 			color: "#000000",
 			background: "#fff",
 		});
 		expect(draw.grain).toBeUndefined();
+	});
+
+	const halftoneOf = (
+		anchor: "page" | "element" | undefined,
+		opts: Partial<CompileOptions> = {},
+	) => {
+		const tpl = structuredClone(baseTemplate);
+		tpl.bleed = 3;
+		tpl.template_data[0].elements[0].effects = [
+			{ type: "halftone", cellSize: 6, ...(anchor ? { anchor } : {}) },
+		];
+		const root = compile(tpl, {}, { width: 200, height: 120, ...opts })
+			.frames[0]!.root as GroupNode;
+		return root.children.find((n) => n.id === "title")!;
+	};
+
+	test("a halftone anchors to the page unless told otherwise", () => {
+		expect(halftoneOf(undefined).halftone?.anchor).toBe("page");
+		expect(halftoneOf("page").halftone?.anchor).toBe("page");
+		expect(halftoneOf("element").halftone?.anchor).toBe("element");
+		expect(halftoneOf(undefined).halftone?.origin).toBeUndefined();
+	});
+
+	test("a page halftone finds the trim inside a bleed render", () => {
+		const trimmed = halftoneOf("page");
+		const bled = halftoneOf("page", { bleed: true });
+		expect(bled.halftone?.origin).toEqual({ x: 6, y: 6 });
+		expect(bled.pos!.x - 6).toBe(trimmed.pos!.x);
+		expect(bled.pos!.y - 6).toBe(trimmed.pos!.y);
+		expect(
+			halftoneOf("element", { bleed: true }).halftone?.origin,
+		).toBeUndefined();
+	});
+
+	test("a page halftone finds the side's origin in a piece", () => {
+		const piece = {
+			box: { x: 40, y: 10, width: 30, height: 20 },
+			bleed: { top: 2, right: 2, bottom: 2, left: 2 },
+		};
+		const trimmed = halftoneOf("page");
+		const cut = halftoneOf("page", { piece });
+		const origin = cut.halftone!.origin!;
+		expect(origin).toEqual({ x: (2 - 40) * 2, y: (2 - 10) * 2 });
+		expect(cut.pos!.x - origin.x).toBe(trimmed.pos!.x);
+		expect(cut.pos!.y - origin.y).toBe(trimmed.pos!.y);
 	});
 });
 

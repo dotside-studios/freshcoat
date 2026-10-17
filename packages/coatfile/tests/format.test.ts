@@ -501,6 +501,16 @@ describe("minimumFormatVersion", () => {
 		expect(minimumFormatVersion(t)).toBe("1.7");
 	});
 
+	test("1.7: halftone anchor", () => {
+		const t = withElements(
+			base(),
+			rect("a", {
+				effects: [{ type: "halftone", cellSize: 4, anchor: "element" }],
+			}),
+		);
+		expect(minimumFormatVersion(t)).toBe("1.7");
+	});
+
 	test("never exceeds what this kit writes", () => {
 		expect(
 			minimumFormatVersion(fixtures.fullFeatureCard) <= FORMAT_VERSION,

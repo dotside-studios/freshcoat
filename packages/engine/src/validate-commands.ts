@@ -550,6 +550,22 @@ function validateHalftone(
 		);
 	if (!finite(halftone.angle))
 		add("bad_halftone", "angle must be finite", `${path}.angle`, id);
+	if (
+		halftone.anchor !== undefined &&
+		halftone.anchor !== "page" &&
+		halftone.anchor !== "element"
+	)
+		add(
+			"bad_halftone",
+			`unknown halftone anchor "${halftone.anchor}"`,
+			`${path}.anchor`,
+			id,
+		);
+	if (
+		halftone.origin !== undefined &&
+		!(finite(halftone.origin.x) && finite(halftone.origin.y))
+	)
+		add("bad_halftone", "origin must be finite", `${path}.origin`, id);
 }
 
 function validateAdjust(

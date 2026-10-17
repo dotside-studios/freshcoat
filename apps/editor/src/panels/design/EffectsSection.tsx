@@ -319,6 +319,21 @@ export function EffectsSection({ ins }: { ins: Inspect }) {
 									))}
 								</Select>
 							</Row>
+							<Row label="Anchor">
+								<Select
+									aria-label="Halftone anchor"
+									className="min-w-0 flex-1"
+									value={e.anchor ?? "page"}
+									onChange={(v) =>
+										patchAt(field("anchor"), i, {
+											anchor: v === "element" ? "element" : undefined,
+										})
+									}
+								>
+									<SelectItem id="page">Page</SelectItem>
+									<SelectItem id="element">Layer</SelectItem>
+								</Select>
+							</Row>
 							<Checkbox
 								isSelected={e.invert === true}
 								onChange={(on) =>
