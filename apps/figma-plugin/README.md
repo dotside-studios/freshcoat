@@ -173,9 +173,17 @@ layers were kept, flattened or skipped.
   background blur are native. Background blur becomes the element's
   `backdropBlur`, so it keeps blurring whatever is placed beneath it. On text
   and groups it is rasterized, because the backdrop would cover their box
-  rather than their outline. Progressive blur, a shadow with its own blend
-  mode, and noise, texture or glass effects are rasterized
-  (`effect_flattened`).
+  rather than their outline. A monotone noise in black, white or grey becomes
+  `grain`: its size scales like a blur, its blend mode carries across
+  (normal, overlay, soft light, multiply or screen) and its density and
+  colour alpha set the amount. Figma draws a share of cells in the noise
+  colour where grain moves every cell toward a random grey, so the amount
+  matches how much each changes the layer on average, and the export says so
+  (`noise_approximated`). Grain sits in design units on the element, moving
+  and scaling with it. Progressive blur, a shadow with its own blend mode, a
+  coloured noise, a noise with non-square cells or another blend mode, more
+  than one noise, duotone and multitone noise, and texture or glass effects
+  are rasterized (`effect_flattened`).
 - **Auto layout.** Baseline alignment is not supported by the renderer's
   layout, so it is written as `start`.
 - **Linear gradients.** A gradient's start and end come from Figma's handles,

@@ -1,4 +1,5 @@
-import type { FigmaEffect } from "../types";
+import type { GrainEffect } from "@freshcoat-js/coatfile";
+import type { FigmaBlendMode, FigmaEffect } from "../types";
 import { figmaColorToHex } from "./colors";
 
 function shadowColor(c: {
@@ -25,7 +26,94 @@ export type ExtractedEffect =
 			inset?: boolean;
 			hidden?: true;
 	  }
-	| { type: "blur" | "backdropBlur"; radius: number; hidden?: true };
+	| { type: "blur" | "backdropBlur"; radius: number; hidden?: true }
+	| {
+			type: "grain";
+			amount: number;
+			size: number;
+			blendMode: GrainBlend;
+			hidden?: true;
+	  };
+
+type GrainBlend = NonNullable<GrainEffect["blendMode"]>;
+
+const NOISE_BLENDS: Partial<Record<FigmaBlendMode, GrainBlend>> = {
+	NORMAL: "normal",
+	OVERLAY: "overlay",
+	SOFT_LIGHT: "soft-light",
+	MULTIPLY: "multiply",
+	SCREEN: "screen",
+};
+
+// Grain has no colour, so only a black, white or grey noise maps.
+function isNeutral(c: { r: number; g: number; b: number }): boolean {
+	const r = Math.round(c.r * 255);
+	return Math.round(c.g * 255) === r && Math.round(c.b * 255) === r;
+}
+
+/** Whether a visible Figma noise can be drawn as grain: monotone, neutral,
+ *  square cells and a blend mode grain has. */
+export function isMappableNoise(e: FigmaEffect): boolean {
+	if (e.type !== "NOISE" || e.noiseType !== "MONOTONE") return false;
+	if (!NOISE_BLENDS[e.blendMode ?? "NORMAL"]) return false;
+	if (!(e.noiseSize !== undefined && e.noiseSize > 0)) return false;
+	const v = e.noiseSizeVector;
+	if (v && v.x !== v.y) return false;
+	return e.color === undefined || isNeutral(e.color);
+}
+
+// Figma paints a fraction `density` of cells in the noise colour at its alpha
+// and leaves the rest alone; grain moves every cell toward a random grey. The
+// amount is matched on the RMS change each makes to the layer, averaged over
+// base tones 0.1 to 0.9: Figma's is alpha · |blend(c, colour) − c| · √density,
+// grain's amount · √E[(blend(c, g) − c)²] for g uniform on [0, 1]. A noise that
+// leaves every tone alone (white multiplied, grey overlaid) maps to 0.
+const BASES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+
+const BLEND: Record<GrainBlend, (c: number, g: number) => number> = {
+	normal: (_c, g) => g,
+	overlay: (c, g) => (c < 0.5 ? 2 * c * g : 1 - 2 * (1 - c) * (1 - g)),
+	"soft-light": (c, g) => (1 - 2 * g) * c * c + 2 * g * c,
+	multiply: (c, g) => c * g,
+	screen: (c, g) => 1 - (1 - c) * (1 - g),
+};
+
+// E[(blend(c, g) − c)²] for g uniform on [0, 1].
+const GRAIN_VARIANCE: Record<GrainBlend, (c: number) => number> = {
+	normal: (c) => 1 / 3 - c + c * c,
+	overlay: (c) => (c < 0.5 ? c * c : (1 - c) ** 2) / 3,
+	"soft-light": (c) => (c * (1 - c)) ** 2 / 3,
+	multiply: (c) => (c * c) / 3,
+	screen: (c) => (1 - c) ** 2 / 3,
+};
+
+export function noiseAmount(
+	tone: number,
+	alpha: number,
+	density: number,
+	blend: GrainBlend,
+): number {
+	let figma = 0;
+	let grain = 0;
+	for (const c of BASES) {
+		figma += (BLEND[blend](c, tone) - c) ** 2;
+		grain += GRAIN_VARIANCE[blend](c);
+	}
+	const d = Math.min(1, Math.max(0, density));
+	const a = Math.min(1, Math.max(0, alpha));
+	return Math.min(1, a * Math.sqrt(d) * Math.sqrt(figma / grain));
+}
+
+function noiseGrain(e: FigmaEffect, scale: number): ExtractedEffect {
+	const blendMode = NOISE_BLENDS[e.blendMode ?? "NORMAL"] ?? "normal";
+	const color = e.color ?? { r: 0, g: 0, b: 0, a: 1 };
+	return {
+		type: "grain",
+		amount: round3(noiseAmount(color.r, color.a, e.density ?? 0, blendMode)),
+		size: round3((e.noiseSize ?? 1) * scale),
+		blendMode,
+	};
+}
 
 export type ExtractedEffects = {
 	/** The node's effects in Figma's order; absent when it has none. */
@@ -39,7 +127,8 @@ export function hasVisibleEffect(fx: ExtractedEffects): boolean {
 
 // Extract DROP_SHADOW / INNER_SHADOW / LAYER_BLUR / BACKGROUND_BLUR effects from
 // a Figma node into coatfile's element-shell `effects` list. Figma's background
-// blur radius maps like its layer blur radius.
+// blur radius maps like its layer blur radius. A visible noise classify let
+// through becomes grain.
 //
 // Figma stacks effects the way it stacks fills, first entry bottom-most, and
 // coatfile's shadows paint in that same order, so the list is carried across in
@@ -66,6 +155,7 @@ export function extractEffects(
 	const out: ExtractedEffect[] = [];
 	let blurSeen = false;
 	let backdropSeen = false;
+	let grainSeen = false;
 	for (const e of effects) {
 		const hidden = e.visible === false ? { hidden: true as const } : {};
 		if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
@@ -94,6 +184,15 @@ export function extractEffects(
 				radius: (e.radius ?? 0) * scale,
 				...hidden,
 			});
+		}
+		if (
+			e.type === "NOISE" &&
+			e.visible !== false &&
+			!grainSeen &&
+			isMappableNoise(e)
+		) {
+			grainSeen = true;
+			out.push(noiseGrain(e, scale));
 		}
 	}
 	return out.length > 0 ? { effects: out } : {};

@@ -605,6 +605,7 @@ function walkNode(
 			localFrame.rotation + ((el.rotation as number | undefined) ?? 0);
 		const fx = extractEffects(n.effects, scale, worldRotation);
 		if (fx.effects) el.effects = fx.effects;
+		noiseWarning(n, fx, w.sink.warnings);
 		// classify() declines to rasterize a layer set to Multiply/Screen/…
 		// precisely because the element can carry the mode itself. Dropping it
 		// here would composite that layer as Normal with nothing to say so —
@@ -627,6 +628,20 @@ function walkNode(
 		entry.el = el;
 		target.push(el);
 	}
+}
+
+function noiseWarning(
+	n: FigmaNode,
+	fx: ReturnType<typeof extractEffects>,
+	warnings: TemplateWarning[],
+): void {
+	if (!fx.effects?.some((e) => e.type === "grain")) return;
+	warnings.push({
+		severity: "info",
+		code: "noise_approximated",
+		message: `Noise on layer "${n.name}" is drawn as grain, which is close to Figma's but not the same pattern.`,
+		nodeId: n.id,
+	});
 }
 
 // Per-side weights Figma reported but could not be read.
@@ -695,6 +710,7 @@ function groupLayer(
 		properties: { children: [] as unknown[] },
 	};
 	if (fx.effects) el.effects = fx.effects;
+	noiseWarning(n, fx, w.sink.warnings);
 	const blend = elementBlendMode(n);
 	if (blend) el.blendMode = blend;
 	if (n.blendMode === "NORMAL")

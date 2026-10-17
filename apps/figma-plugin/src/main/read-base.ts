@@ -16,6 +16,10 @@ type AnyEffect = {
 	color?: { r: number; g: number; b: number; a: number };
 	blendMode?: string;
 	blurType?: string;
+	noiseType?: string;
+	noiseSize?: number;
+	noiseSizeVector?: { x: number; y: number };
+	density?: number;
 };
 
 export type AnySceneNode = {
@@ -97,6 +101,14 @@ function readEffects(
 			: {}),
 		...(e.blurType === "PROGRESSIVE"
 			? { blurType: "PROGRESSIVE" as const }
+			: {}),
+		...(e.type === "NOISE"
+			? {
+					noiseType: e.noiseType as FigmaEffect["noiseType"],
+					noiseSize: e.noiseSize,
+					...(e.noiseSizeVector ? { noiseSizeVector: e.noiseSizeVector } : {}),
+					density: e.density,
+				}
 			: {}),
 	}));
 }
