@@ -113,12 +113,23 @@ export type RenderOutput = {
 	gamut?: GamutNote[];
 	/** the render's other warnings, described, each once */
 	warnings?: string[];
+	/** the layers a vector page drew as images, each once */
+	rasterized?: RasterizedLayer[];
+};
+
+/** A layer a vector PDF page drew as an image, why, and the spot ink it
+ *  lost by it. */
+export type RasterizedLayer = {
+	layer?: string;
+	feature: string;
+	spot?: string;
 };
 
 /** The warnings an item reports but still renders with: all but a refused
  *  barcode, which fails it, gamut notes, which `gamut` carries, a PDF layer
- *  drawn as an image, which prints as rendered, and an image with no source,
- *  which is an unfilled field. */
+ *  drawn as an image without a spot, which `rasterized` carries, and an
+ *  image with no source, which is an unfilled field. A layer that loses its
+ *  spot is warned, as the ink does not print. */
 function noted(warnings: readonly FrameWarning[]): string[] {
 	const out = new Set<string>();
 	for (const w of warnings)
@@ -496,6 +507,17 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 				for (const w of page.warnings)
 					if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
 				const warnings = noted(page.warnings);
+				const rasterized = page.warnings.flatMap((w): RasterizedLayer[] =>
+					w.kind === "vector_rasterized" || w.kind === "spot_rasterized"
+						? [
+								{
+									...(w.layer ? { layer: w.layer } : {}),
+									feature: w.feature,
+									...(w.kind === "spot_rasterized" ? { spot: w.spot } : {}),
+								},
+							]
+						: [],
+				);
 				return {
 					bytes: page.bytes,
 					crc: crc32(page.bytes),
@@ -504,6 +526,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 					...exportPixelSize(compiled, req.scale),
 					ms: performance.now() - started,
 					...(warnings.length > 0 ? { warnings } : {}),
+					...(rasterized.length > 0 ? { rasterized } : {}),
 				};
 			}
 			const painted = await withPrintFallback(req.print, async (print) => {
