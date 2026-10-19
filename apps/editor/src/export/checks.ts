@@ -1,7 +1,9 @@
 import {
 	codepointLabel,
+	describeRasterized,
 	type GlyphIssue,
 	type PresetBlock,
+	type RasterizedSide,
 	summarizeGlyphs,
 } from "@freshcoat-js/workspace/export";
 import { BINDING, plural } from "~/app/copy";
@@ -17,9 +19,16 @@ export type CheckTarget =
 	| { kind: "section"; id: SettingsSectionId };
 
 export type Check = {
-	id: "blocked" | "unbound" | "unfilled" | "glyphs" | "failed";
-	/** an error stops the export; a warning lets it run */
-	severity: "error" | "warning";
+	id:
+		| "blocked"
+		| "unbound"
+		| "unfilled"
+		| "glyphs"
+		| "failed"
+		| "spots"
+		| "rasterized";
+	/** an error stops the export; a warning lets it run; info only tells */
+	severity: "error" | "warning" | "info";
 	message: string;
 	/** the whole of a short message, for its hover */
 	detail?: string;
@@ -45,6 +54,8 @@ export function exportChecks(input: {
 	unfilled: number;
 	glyphs: readonly GlyphIssue[] | null;
 	failed: number;
+	/** what the last export's vector pages drew as images */
+	rasterized?: readonly RasterizedSide[];
 	labelFor: (recordId: string) => string;
 	showSide: boolean;
 	canPick: boolean;
@@ -112,10 +123,35 @@ export function exportChecks(input: {
 			message: `${plural(input.failed, "record")} failed in the last export`,
 			action: { label: "Show failed", target: { kind: "failed" } },
 		});
+	const rasterized = input.rasterized ?? [];
+	const lost = rasterized.flatMap((side) =>
+		side.layers.flatMap((l) =>
+			l.spots.map((spot) => ({ side: side.side, layer: l.layer, spot })),
+		),
+	);
+	if (lost.length > 0)
+		checks.push({
+			id: "spots",
+			severity: "warning",
+			message: `Spot colors lost in the last PDF, drawn as images: ${lost.map((l) => `${l.spot} (${l.layer ?? "a layer"})`).join(", ")}`,
+			detail:
+				"A shadow, blur, grain or other effect on a spot layer draws it as an image, which prints without the separation",
+		});
+	const lines = rasterized.flatMap((side) => {
+		const line = describeRasterized(side);
+		return line ? [input.showSide ? `${side.side}: ${line}` : line] : [];
+	});
+	if (lines.length > 0)
+		checks.push({
+			id: "rasterized",
+			severity: "info",
+			message: lines.join(" · "),
+		});
 	return checks;
 }
 
 export function checksSummary(checks: readonly Check[]): string {
-	if (checks.length === 0) return "All clear";
-	return plural(checks.length, "issue");
+	const issues = checks.filter((c) => c.severity !== "info").length;
+	if (issues === 0) return "All clear";
+	return plural(issues, "issue");
 }
