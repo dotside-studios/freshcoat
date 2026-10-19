@@ -411,7 +411,7 @@ describe("assemblePdf on sheets", () => {
 		}
 	});
 
-	it("draws crop and registration marks and the slug in a Separation /All", async () => {
+	it("draws every mark but the colour patches in a Separation /All", async () => {
 		const bytes = await assemblePdf(cards(1), {
 			dpi: 300,
 			title: "Members",
@@ -432,6 +432,7 @@ describe("assemblePdf on sheets", () => {
 		expect(text).toMatch(/\/Registration CS\n1 SCN\n/);
 		expect(text).toMatch(/BT\n\/Registration cs\n1 scn\n[\s\S]*Tj\nET/);
 		expect(text).toMatch(/^1 0 0 rg$/m);
+		expect(text).not.toMatch(/ RG$/m);
 	});
 
 	it("cuts a long slug to its margin", async () => {

@@ -380,9 +380,9 @@ const REGISTRATION_ALTERNATE = [0, 0, 0] as const;
 const REGISTRATION_SPACE = "Registration";
 const KAPPA = (4 * (Math.SQRT2 - 1)) / 3;
 
-/** Crop marks, registration targets and the slug are drawn in a
- *  Separation /All, so they print on every plate; the colour bar keeps its
- *  process colours. */
+/** Crop marks, registration targets, the colour bar's outline and the slug
+ *  are drawn in a Separation /All, so they print on every plate; the colour
+ *  bar's patches keep their process colours. */
 function drawMarks(
 	lib: PdfLib,
 	doc: PDFDocument,
@@ -436,13 +436,16 @@ function drawMarks(
 		}
 		const first = marks.colorBar[0] as SheetMarks["colorBar"][number];
 		const last = marks.colorBar[marks.colorBar.length - 1] as typeof first;
-		out.drawRectangle({
-			...at(first.x, first.y + first.sizeMm),
-			width: (last.x + last.sizeMm - first.x) * PT_PER_MM,
-			height: first.sizeMm * PT_PER_MM,
-			borderColor: lib.rgb(...REGISTRATION_ALTERNATE),
-			borderWidth: CROP_MARK_WIDTH_PT,
-		});
+		const corner = at(first.x, first.y + first.sizeMm);
+		ops.push(
+			lib.rectangle(
+				corner.x,
+				corner.y,
+				(last.x + last.sizeMm - first.x) * PT_PER_MM,
+				first.sizeMm * PT_PER_MM,
+			),
+			lib.stroke(),
+		);
 	}
 	if (marks.slug && font && slug) {
 		const { x, y, heightMm } = marks.slug;

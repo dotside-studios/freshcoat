@@ -411,9 +411,10 @@ The colour bar and slug sit outside the crop marks and stop short of a
 target. `sheetMarks(imposition, layout, side)` gives every mark of a page in
 millimetres, as `assemblePdf()` draws them and Studio previews them, and
 `slugText(imposition, page, { job, date })` the slug's words. Crop marks,
-registration targets and the slug are drawn in registration colour, a
-`/Separation /All` space named `Registration` whose alternate is RGB black,
-so they print on every plate. The colour bar keeps its process colours.
+registration targets, the colour bar's outline and the slug are drawn in
+registration colour, a `/Separation /All` space named `Registration` whose
+alternate is RGB black, so they print on every plate. The colour bar's
+patches keep their process colours.
 
 ### Slice pieces
 

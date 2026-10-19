@@ -749,9 +749,9 @@ A PDF preset's Print section chooses **One per page** (the default) or
   patches in the bottom margin; and a line in the top margin with the
   preset's name, "Sheet 2 of 5", the side when double-sided, and the date.
   Each is drawn only where its margin has room, the color bar and slug
-  outside the crop marks and clear of a target. Crop marks, targets and the slug
-  are drawn in registration color, so they print on every plate; the color
-  bar keeps its process colors. See
+  outside the crop marks and clear of a target. Crop marks, targets, the color
+  bar's outline and the slug are drawn in registration color, so they print
+  on every plate; the color patches keep their process colors. See
   [Printer's marks](../../../packages/workspace/README.md#printers-marks).
 - **Double-sided:** when it is on, "Flip on" picks Long edge or Short edge,
   to match the printer's setting. Each record's back goes on the next page
