@@ -381,7 +381,12 @@ export async function paintPdf(
 		let under = finish ? drawables.length : 0;
 		for (let i = under; i < drawables.length; i++)
 			if (hasBackdrop(drawables[i] as DrawCommand)) under = i + 1;
-		if (under > 0) page.rasterized(finish ? "frame finish" : "backdrop blur");
+		if (under > 0)
+			page.rasterized(
+				finish ? "frame finish" : "backdrop blur",
+				undefined,
+				drawables.slice(0, under) as DrawCommand[],
+			);
 		const rest = drawables.slice(under);
 		const scale = Math.min(
 			(options.rasterDpi ?? 600) / dpi,
@@ -532,6 +537,26 @@ async function rasterize(
 	}
 }
 
+// The spot inks `cmd` and what it holds paint, each with the layer it is on.
+function spotsIn(
+	cmd: DrawCommand,
+	outer?: string,
+): { layer?: string; spot: string; paint: "fill" | "stroke" }[] {
+	const layer = cmd.id ?? outer;
+	const on = layer ? { layer } : {};
+	const out: { layer?: string; spot: string; paint: "fill" | "stroke" }[] = [];
+	if (cmd.op === "drawRect" || cmd.op === "drawPath") {
+		for (const f of cmd.fills ?? [])
+			if (f.kind === "solid" && f.spot)
+				out.push({ ...on, spot: f.spot.name, paint: "fill" });
+		if (cmd.stroke?.spot)
+			out.push({ ...on, spot: cmd.stroke.spot.name, paint: "stroke" });
+	}
+	if (cmd.op === "drawGroup")
+		for (const c of cmd.children) out.push(...spotsIn(c, layer));
+	return out;
+}
+
 class PageBuilder {
 	readonly patches = new Map<DrawCommand, Patch>();
 	private resources: PdfRef;
@@ -565,15 +590,29 @@ class PageBuilder {
 		this.resources = w.reserve();
 	}
 
-	rasterized(feature: string, layer?: string) {
-		const key = `${feature}\u0000${layer ?? ""}`;
+	// Reports `cmds` drawn as an image: each spot they carry as lost, and the
+	// layer as rasterized when it carries none.
+	rasterized(
+		feature: string,
+		layer: string | undefined,
+		cmds: DrawCommand[],
+	) {
+		const spots = cmds.flatMap((c) => spotsIn(c, layer));
+		for (const s of spots)
+			this.report({ kind: "spot_rasterized", feature, ...s });
+		if (spots.length === 0)
+			this.report({
+				kind: "vector_rasterized",
+				feature,
+				...(layer ? { layer } : {}),
+			});
+	}
+
+	private report(w: PaintWarning) {
+		const key = JSON.stringify(w);
 		if (this.reported.has(key)) return;
 		this.reported.add(key);
-		this.warnings.push({
-			kind: "vector_rasterized",
-			feature,
-			...(layer ? { layer } : {}),
-		});
+		this.warnings.push(w);
 	}
 
 	// The layers to paint as images: each one whose own drawing PDF cannot
@@ -584,7 +623,7 @@ class PageBuilder {
 			const layer = cmd.id ?? (cmd.op === "drawImage" ? cmd.src : outer);
 			const reason = this.reason(cmd);
 			if (reason) {
-				this.rasterized(reason, layer);
+				this.rasterized(reason, layer, [cmd]);
 				out.push(cmd);
 				return;
 			}
