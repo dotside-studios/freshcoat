@@ -395,7 +395,18 @@ describe("assemblePdf on sheets", () => {
 		});
 		const doc = await PDFDocument.load(bytes);
 		const construct = new Set(["m", "l", "c", "v", "y", "h", "re"]);
-		const paint = new Set(["S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "n"]);
+		const paint = new Set([
+			"S",
+			"s",
+			"f",
+			"F",
+			"f*",
+			"B",
+			"B*",
+			"b",
+			"b*",
+			"n",
+		]);
 		for (const page of doc.getPages()) {
 			const ops = content(page)
 				.split(/\s+/)
