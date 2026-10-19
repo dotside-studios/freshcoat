@@ -391,4 +391,40 @@ describe("printCheckWarnings", () => {
 			"Text is 4.8 pt at print size, below 6 pt: fine",
 		);
 	});
+
+	test("come out of a render for QR codes, with their values", async () => {
+		const ck = await loadCanvasKit();
+		const renderer = await createRenderer({ ck: ck as never, cache: false });
+		const qr = {
+			id: "qr",
+			type: "qr_code",
+			pos: { x: 10, y: 10 },
+			size: { width: 300, height: 300 },
+			properties: {
+				value: "https://example.com",
+				foreground: "{{name}}",
+				background: "#ffffff",
+				quietZone: 4,
+				logo: { src: "logo.png", size: 0.4 },
+			},
+		} as Element;
+		const t = card({}, [qr]);
+		const codes = async (values: Record<string, string>, asked = true) => {
+			const [frame] = await renderTemplate(
+				renderer,
+				t,
+				values,
+				asked ? { printChecks: {} } : {},
+			);
+			return (frame?.warnings ?? []).flatMap((w) =>
+				w.kind === "print_check" ? [`${w.layer} ${w.issue.code}`] : [],
+			);
+		};
+		expect(await codes({ name: "#000000" })).toEqual(["qr qr_logo_large"]);
+		expect(await codes({ name: "#dddddd" })).toEqual([
+			"qr qr_low_contrast",
+			"qr qr_logo_large",
+		]);
+		expect(await codes({ name: "#dddddd" }, false)).toEqual([]);
+	});
 });

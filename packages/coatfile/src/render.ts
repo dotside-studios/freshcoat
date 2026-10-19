@@ -351,7 +351,10 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 			options.imageDpi,
 		);
 		const checks = options.printChecks
-			? printCheckWarnings(commands, options.printChecks)
+			? [
+					...printCheckWarnings(commands, options.printChecks),
+					...(f.printChecks ?? []),
+				]
 			: [];
 		// One bake, one paint per density: the command stream is identical across
 		// export settings apart from the density on its createCanvas, so each
@@ -475,10 +478,13 @@ export async function renderCompiledPdf(
 			...(outputIntent !== undefined ? { outputIntent } : {}),
 		});
 		const checks = printChecks
-			? printCheckWarnings(commands, {
-					...(dpi !== undefined ? { dpi } : {}),
-					...printChecks,
-				})
+			? [
+					...printCheckWarnings(commands, {
+						...(dpi !== undefined ? { dpi } : {}),
+						...printChecks,
+					}),
+					...(f.printChecks ?? []),
+				]
 			: [];
 		results.push({
 			...page,

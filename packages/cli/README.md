@@ -128,7 +128,9 @@ Text and strokes get the print checks at the same DPI, with the record's
 values: text below 6 pt (7 pt for a light face), strokes under 0.25 pt, and
 text under 12 pt in a rich black, as `warning: front: Text is 4.8 pt at print
 size, below 6 pt: fine_print`, and in an export's `warnings` and
-`export-report.csv`.
+`export-report.csv`. A QR code gets the checks `validate` makes, with its
+values: colours under 3:1 contrast, modules lighter than their background, a
+quiet zone under 2 modules, and a logo past the largest size drawn.
 
 #### Spreadsheets
 

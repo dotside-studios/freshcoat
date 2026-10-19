@@ -1359,6 +1359,31 @@ describe("print checks", () => {
 		const plain = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#000000", "--out", "print-out");
 		expect(plain.stderr).not.toContain("rich black");
 	});
+
+	test("render reports the QR checks validate does, in its report too", async () => {
+		const t = card();
+		t.template_data[0]!.elements = [
+			{
+				id: "code",
+				type: "qr_code",
+				pos: { x: 10, y: 10 },
+				size: { width: 80, height: 80 },
+				properties: { value: "https://example.com", foreground: "{{motto}}", background: "#ffffff" },
+			},
+		] as never;
+		await box.write("qr.json", JSON.stringify(t));
+		const message = "QR colours have a contrast of 1.36:1, under 3:1; scanners may not read it: code";
+		const dir = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#dddddd", "--out", "qr-out");
+		expect(dir.code).toBe(0);
+		expect(dir.stderr).toContain(`warning: front: ${message}`);
+		const dark = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#000000", "--out", "qr-out");
+		expect(dark.stderr).not.toContain("QR colours");
+		const zip = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#dddddd", "--out", "qr.zip");
+		expect(zip.code).toBe(0);
+		expect(zip.stderr).toContain(`warning: front.png: ${message}`);
+		const report = new TextDecoder().decode(unzipSync(new Uint8Array(await readFile(box.path("qr.zip"))))[REPORT_FILE_NAME]);
+		expect(report).toContain(message);
+	});
 });
 
 describe("validate warnings for slices", () => {
