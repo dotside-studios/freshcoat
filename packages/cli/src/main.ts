@@ -171,12 +171,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			] as const),
 		)
 		.addOption(
-			advanced(
-				new Option(
-					"--pdf-text <mode>",
-					"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
-				).choices(["embed", "outline"] as const),
-			),
+			new Option(
+				"--pdf-text <mode>",
+				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
+			).choices(["embed", "outline"] as const),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
@@ -194,13 +192,9 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
 		)
 		.option("--no-output-intent", "declare no output intent")
-		.addOption(
-			advanced(
-				new Option(
-					"--output-intent-id <name>",
-					"the condition --output-intent describes, such as FOGRA39; default the profile's description",
-				),
-			),
+		.option(
+			"--output-intent-id <name>",
+			"the condition --output-intent describes, such as FOGRA39; default the profile's description",
 		)
 		.optionsGroup("Sheet options, with --sheets:")
 		.addOption(
@@ -224,22 +218,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.addOption(
 			advanced(new Option("--no-crop-marks", "the same as leaving crop out of --marks")),
 		)
-		.addOption(
-			advanced(
-				new Option(
-					"--back-offset <x,y>",
-					"with --duplex, move every back page this many mm, for a printer that drifts; y is down",
-				).argParser(arg(parseOffset)),
-			),
+		.option(
+			"--back-offset <x,y>",
+			"with --duplex, move every back page this many mm, up to 50 each way, for a printer that drifts; y is down",
+			arg(parseOffset),
 		)
-		.addOption(
-			advanced(
-				new Option(
-					"--blank-backs",
-					"with --duplex, give a one-sided template empty back pages",
-				),
-			),
-		)
+		.option("--blank-backs", "with --duplex, give a one-sided template empty back pages")
 		.optionsGroup("Print options:")
 		.addOption(
 			new Option(

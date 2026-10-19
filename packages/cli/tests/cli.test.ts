@@ -1791,10 +1791,12 @@ describe("the command line", () => {
 		const short = await box.run("render", "--help");
 		const all = await box.run("render", "--help-all");
 		expect([short.code, all.code]).toEqual([0, 0]);
-		for (const flag of ["--png-alpha", "--pdf-text", "--output-intent-id", "--no-crop-marks", "--back-offset", "--blank-backs"]) {
+		for (const flag of ["--png-alpha", "--no-crop-marks"]) {
 			expect(short.stdout).not.toContain(flag);
 			expect(all.stdout).toContain(flag);
 		}
+		for (const flag of ["--pdf-text", "--output-intent-id", "--back-offset", "--blank-backs"])
+			expect(short.stdout).toContain(flag);
 		expect(short.stdout).toContain("Run freshcoat render --help-all");
 		expect(all.stdout).not.toContain("--help-all");
 		expect(all.stdout).toContain("Sheet options, with --sheets:");

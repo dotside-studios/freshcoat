@@ -17,8 +17,12 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `0` done, `1` the work failed (an invalid template, a failed export item) and
 `2` the command line was wrong. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every
-command. `render --help` leaves out its less common options; `render --help-all`
-lists them too.
+command. `render --help` leaves out `--png-alpha` and `--no-crop-marks`;
+`render --help-all` lists them too. An option given twice with different
+values, or options that undo each other, such as `--output-intent` with
+`--no-output-intent` or `--no-crop-marks` with `--marks crop`, are refused
+rather than letting the last one win; the repeatable options are `--set`,
+`--frame`, `--scale`, `--cut-spot` and `--where`.
 
 A template is read the way Studio opens it: duplicate element ids are renamed
 rather than refused. `render`, `inspect`, `validate` and `pack` warn, naming the
