@@ -50,7 +50,7 @@ import PrevIcon from "~icons/mingcute/left-line";
 import NextIcon from "~icons/mingcute/right-line";
 import SettingsIcon from "~icons/mingcute/settings-3-line";
 import { ChecksBadge } from "./Checks";
-import { type CheckTarget, exportChecks } from "./checks";
+import { type CheckTarget, exportChecks, warningGroups } from "./checks";
 import { useExportCollapsed } from "./collapsed";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
 import { ExportSettings } from "./ExportSettings";
@@ -334,6 +334,10 @@ export function ExportSection() {
 		() => new Set(lastResult ? recordOutcome(lastResult).failed : []),
 		[lastResult],
 	);
+	const lastWarnings = useMemo(
+		() => (lastResult ? warningGroups(lastResult.items) : []),
+		[lastResult],
+	);
 	const entries = useMemo(() => {
 		const records = filmstripEntries(dataset, planned.set, scope, failedIds);
 		return everyVariant && template
@@ -571,6 +575,8 @@ export function ExportSection() {
 		unfilled,
 		glyphs: glyphIssues,
 		failed: scopeCounts.failed,
+		warnings: lastWarnings,
+		notices: readiness?.notices ?? [],
 		labelFor: (id) => {
 			const record = dataset?.records.find((r) => r.id === id);
 			return record ? labelFor(record) : id;

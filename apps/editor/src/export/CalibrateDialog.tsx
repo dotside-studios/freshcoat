@@ -1,4 +1,4 @@
-import type { PrintProfile } from "@freshcoat-js/for-print";
+import { type PrintProfile, parsePrintProfile } from "@freshcoat-js/for-print";
 import {
 	type Point,
 	profileFromPhoto,
@@ -15,6 +15,7 @@ import {
 	CORNERS,
 	calibrationError,
 	decodePhoto,
+	printProfileFile,
 	renderChartPng,
 } from "./calibrate";
 
@@ -32,15 +33,19 @@ type Failure = { title: string; details: string[] };
 export function CalibrateDialog({
 	isOpen,
 	onOpenChange,
+	target,
 	onSave,
 }: {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
+	/** the print target a measured profile is for */
+	target: string;
 	onSave: (profile: PrintProfile) => void;
 }) {
 	return (
 		<Modal isOpen={isOpen} onOpenChange={onOpenChange} width="max-w-2xl">
 			<CalibrateBody
+				target={target}
 				onSave={(profile) => {
 					onSave(profile);
 					onOpenChange(false);
@@ -51,8 +56,10 @@ export function CalibrateDialog({
 }
 
 function CalibrateBody({
+	target,
 	onSave,
 }: {
+	target: string;
 	onSave: (profile: PrintProfile) => void;
 }) {
 	const [photo, setPhoto] = useState<Photo | null>(null);
@@ -104,8 +111,8 @@ function CalibrateBody({
 
 	const ready = !!photo && corners.length === 4 && name.trim() !== "";
 
-	const save = () => {
-		if (!photo || corners.length !== 4) return;
+	const measure = (): PrintProfile | null => {
+		if (!photo || corners.length !== 4) return null;
 		const conditions = {
 			...(printer.trim() ? { printer: printer.trim() } : {}),
 			...(ribbon.trim() ? { media: ribbon.trim() } : {}),
@@ -116,13 +123,39 @@ function CalibrateBody({
 			corners as [Point, Point, Point, Point],
 			{
 				name,
+				target,
 				measuredAt: new Date().toISOString(),
 				...(Object.keys(conditions).length ? { conditions } : {}),
 			},
 			CHART,
 		);
-		if (result.ok) onSave(result.profile);
-		else setFailure(calibrationError(result));
+		if (result.ok) return result.profile;
+		setFailure(calibrationError(result));
+		return null;
+	};
+
+	const save = () => {
+		const profile = measure();
+		if (profile) onSave(profile);
+	};
+
+	const exportProfile = async () => {
+		const profile = measure();
+		if (!profile) return;
+		const file = printProfileFile(profile);
+		await downloadBytes(file.text, file.name, "application/json");
+	};
+
+	const importProfile = async (files: FileList | null) => {
+		const file = files?.[0];
+		if (!file) return;
+		const parsed = parsePrintProfile(await file.text());
+		if (parsed.ok) onSave(parsed.profile);
+		else
+			setFailure({
+				title: `Couldn't import ${file.name}`,
+				details: [parsed.message],
+			});
 	};
 
 	const next = CORNERS[corners.length];
@@ -133,8 +166,18 @@ function CalibrateBody({
 			bodyClassName="flex flex-col gap-4"
 			footer={({ close }) => (
 				<>
+					<FileTrigger
+						acceptedFileTypes={["application/json", ".json"]}
+						onSelect={(files) => void importProfile(files)}
+					>
+						<Button variant="ghost">Import profile…</Button>
+					</FileTrigger>
+					<span className="flex-1" />
 					<Button variant="ghost" onPress={close}>
 						Cancel
+					</Button>
+					<Button isDisabled={!ready} onPress={() => void exportProfile()}>
+						Export profile…
 					</Button>
 					<Button variant="primary" isDisabled={!ready} onPress={save}>
 						Save profile

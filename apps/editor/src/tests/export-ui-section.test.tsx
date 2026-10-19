@@ -1256,3 +1256,220 @@ describe("export section", { timeout: 20_000 }, () => {
 		expect(screen.getByTestId("export-preview-size").textContent).toBe("1 × 1");
 	});
 });
+
+describe("export settings parity with the CLI", { timeout: 20_000 }, () => {
+	const base = (templateId: string, patch: Partial<ExportPreset> = {}) =>
+		({
+			id: "p_1",
+			name: "Print",
+			templateId,
+			records: "all",
+			sides: ["front"],
+			format: "pdf",
+			scale: 1,
+			dpi: 300,
+			fileName: "{{name}}-{{side}}",
+			markExported: false,
+			...patch,
+		}) satisfies ExportPreset;
+
+	test("sets the min image DPI, 300 unless set, 0 for no check", async () => {
+		const { controller, user, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, { format: "png-zip" }),
+			}),
+		);
+		const field = screen.getByRole("spinbutton", { name: "Min image DPI" });
+		expect((field as HTMLInputElement).value).toBe("300");
+		await user.clear(field);
+		await user.type(field, "150{Enter}");
+		expect(controller.state.workspace?.presets[0]?.minImageDpi).toBe(150);
+		await user.clear(field);
+		await user.type(field, "0{Enter}");
+		expect(controller.state.workspace?.presets[0]?.minImageDpi).toBe(0);
+		expect(screen.getByTestId("export-min-dpi-hint").textContent).toBe(
+			"No image resolution check",
+		);
+	});
+
+	test("takes the whole 0 to 100 quality range", () => {
+		const { controller, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, { format: "jpeg-zip" }),
+			}),
+		);
+		const slider = screen.getByRole("slider", { name: "Quality" });
+		expect(slider.getAttribute("min")).toBe("0");
+		expect(slider.getAttribute("max")).toBe("100");
+	});
+
+	test("keeps custom paper portrait, swapping a short edge given as height", async () => {
+		const { controller, user, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, {
+					layout: {
+						kind: "sheet",
+						paper: { widthMm: 100, heightMm: 150 },
+						orientation: "auto",
+						marginMm: 5,
+						gapMm: 0,
+						cropMarks: true,
+						duplex: "none",
+					},
+				}),
+			}),
+		);
+		const height = screen.getByRole("spinbutton", { name: "Paper height" });
+		await user.clear(height);
+		await user.type(height, "60{Enter}");
+		const layout = controller.state.workspace?.presets[0]?.layout;
+		expect(layout?.kind === "sheet" && layout.paper).toEqual({
+			widthMm: 60,
+			heightMm: 100,
+		});
+	});
+
+	test("names the output condition, defaulting to the profile's description", async () => {
+		const { controller, user, templateId } = setup();
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: base(templateId) }),
+		);
+		const group = screen.getByTestId("export-output-intent");
+		expect(
+			within(group).queryByRole("textbox", {
+				name: "Output condition identifier",
+			}),
+		).toBeNull();
+		const input = group.querySelector("input[type=file]") as HTMLInputElement;
+		const fogra = iccProfile({ description: "Coated FOGRA39" });
+		await user.upload(input, new File([fogra as BlobPart], "fogra.icc"));
+		const id = await within(group).findByRole("textbox", {
+			name: "Output condition identifier",
+		});
+		expect(id.getAttribute("placeholder")).toBe("Coated FOGRA39");
+		await user.type(id, "FOGRA39");
+		const intent = () => controller.state.workspace?.presets[0]?.outputIntent;
+		expect(intent()).toMatchObject({ kind: "profile", identifier: "FOGRA39" });
+		await user.clear(id);
+		expect(intent()).not.toHaveProperty("identifier");
+	});
+
+	test("says when a print target draws vector pages as PNG", () => {
+		const { controller, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, { pdfPageImage: "vector" }),
+			}),
+		);
+		expect(screen.queryByTestId("export-check-print_raster")).toBeNull();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, {
+					pdfPageImage: "vector",
+					print: { enabled: true },
+				}),
+			}),
+		);
+		expect(
+			screen.getByTestId("export-check-print_raster").textContent,
+		).toContain("Print target draws PDF pages as PNG, not vector");
+	});
+
+	test("says when spot inks print as plain color", () => {
+		const t = doc();
+		const front = t.template_data[0];
+		if (!front) throw new Error("fixture");
+		const spotted: Template = {
+			...t,
+			template_data: [
+				{
+					...front,
+					elements: front.elements.map((e) =>
+						e.id === "a"
+							? ({
+									...e,
+									properties: {
+										...e.properties,
+										spot: { fill: { spot: "White" } },
+									},
+								} as Element)
+							: e,
+					),
+				},
+				...t.template_data.slice(1),
+			],
+		};
+		const { controller, templateId } = setup(spotted);
+		act(() =>
+			controller.dispatch({ type: "setPreset", preset: base(templateId) }),
+		);
+		expect(
+			screen.getByTestId("export-check-spot_raster").textContent,
+		).toContain("Spot ink White prints as plain color");
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, { pdfPageImage: "vector" }),
+			}),
+		);
+		expect(screen.queryByTestId("export-check-spot_raster")).toBeNull();
+	});
+
+	test("after a job, Warnings groups render warnings by code and links each record", async () => {
+		const { controller, user, fake, templateId } = setup();
+		act(() =>
+			controller.dispatch({
+				type: "setPreset",
+				preset: base(templateId, { format: "png-zip" }),
+			}),
+		);
+		expect(screen.queryByTestId("export-check-warnings")).toBeNull();
+		await user.click(button("Export 3 files"));
+		const low = {
+			code: "image_low_dpi",
+			message: "Image prints at 120 DPI, under 300: photo",
+		};
+		const small = {
+			code: "small_text",
+			message: "Text is 4.2 pt at print size, below 6 pt: name",
+		};
+		const item = (
+			recordId: string,
+			warnings: { code: string; message: string }[],
+		) => ({
+			key: `${recordId}:front`,
+			recordId,
+			side: "front",
+			fileName: recordId,
+			ok: true,
+			...(warnings.length > 0 ? { warnings } : {}),
+		});
+		await act(async () => {
+			fake.finish({
+				cancelled: false,
+				ms: 1000,
+				items: [item("r1", [low, small]), item("r2", [low]), item("r3", [])],
+			});
+		});
+		const check = screen.getByTestId("export-check-warnings");
+		expect(check.textContent).toContain(
+			"Warnings in the last export: Low resolution image ×2, Small text ×1",
+		);
+		const list = screen.getByTestId("export-check-warnings-list");
+		expect(
+			within(list)
+				.getAllByRole("button")
+				.map((b) => b.textContent),
+		).toEqual(["Ada", "Bo", "Ada"]);
+		await user.click(within(list).getAllByRole("button")[1] as HTMLElement);
+		expect(controller.state.recordId).toBe("r2");
+	});
+});

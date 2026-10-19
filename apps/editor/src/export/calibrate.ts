@@ -1,11 +1,12 @@
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
-import type { PixelData } from "@freshcoat-js/for-print";
+import type { PixelData, PrintProfile } from "@freshcoat-js/for-print";
 import {
 	type CalibrationBlocker,
 	chartScene,
 	grayBalanceChart,
 	type PhotoCalibration,
 } from "@freshcoat-js/for-print/calibration";
+import { slug } from "@freshcoat-js/workspace";
 import { getCanvasKit } from "~/render/canvaskit";
 
 export const CHART = grayBalanceChart();
@@ -13,6 +14,18 @@ export const CHART = grayBalanceChart();
 export const CHART_FILE = "gray-balance-chart.png";
 
 const PHOTO_MAX = 2400;
+
+/** A profile as the JSON file for-print reads back with `parsePrintProfile`,
+ *  as the CLI's `--print-profile` takes it. */
+export function printProfileFile(profile: PrintProfile): {
+	text: string;
+	name: string;
+} {
+	return {
+		text: `${JSON.stringify({ version: 1, ...profile }, null, 2)}\n`,
+		name: `${slug(profile.name)}.json`,
+	};
+}
 
 export async function renderChartPng(): Promise<Uint8Array> {
 	const renderer = await createRenderer({
