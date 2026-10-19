@@ -5,6 +5,7 @@ import {
 	MAX_BACK_OFFSET_MM,
 	PAPER_SIZES_MM,
 	type PaperName,
+	PRESET_SCALE,
 	parseFilter,
 	portraitPaper,
 	type ViewFilter,
@@ -49,7 +50,21 @@ export function collectFilter(entry: string, previous: ViewFilter[] = []): ViewF
 }
 
 export function collectScale(entry: string, previous: number[] = []): number[] {
-	return [...previous, parsePositive(entry)];
+	return [...previous, parseScale(entry)];
+}
+
+export function parseScale(entry: string): number {
+	const value = Number(entry);
+	if (!(value >= PRESET_SCALE.min && value <= PRESET_SCALE.max))
+		throw new ArgumentError(`Expected a number from ${PRESET_SCALE.min} to ${PRESET_SCALE.max}.`);
+	return value;
+}
+
+export function parseMaxEdge(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 1)
+		throw new ArgumentError("Expected a whole number of pixels, 1 or more.");
+	return value;
 }
 
 export function parseQuality(entry: string): number {

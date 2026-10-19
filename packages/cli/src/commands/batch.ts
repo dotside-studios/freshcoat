@@ -7,7 +7,6 @@ import {
 	parsePrintProfile,
 	printTarget,
 	profileTarget,
-	YMCKO_DYE_SUB,
 } from "@freshcoat-js/for-print";
 import {
 	type AssetFile,
@@ -23,12 +22,14 @@ import {
 	type ExportPreset,
 	fileNameTokens,
 	headersOf,
+	imageFields,
 	importDefaults,
 	type IccProfileAsset,
 	newPreset,
 	type PaperName,
 	type PresetPrint,
 	prepareAssets,
+	type SheetLayout,
 	readOutputProfile,
 	unfilledRequired,
 	unknownFileNameTokens,
@@ -60,8 +61,6 @@ const ZIP_FORMATS = {
 	webp: "webp-zip",
 } as const;
 
-const PRINT_TARGETS = { ymcko: YMCKO_DYE_SUB.id } as const;
-
 const MAX_ISSUES = 10;
 
 export type BatchOptions = {
@@ -77,10 +76,13 @@ export type BatchOptions = {
 	name?: string;
 	quality?: number;
 	bleed?: true;
+	sizeFrom?: string;
+	maxEdge?: number;
 	dpi?: number;
 	pdfPages?: "png" | "jpeg" | "vector";
 	pdfText?: "embed" | "outline";
 	sheets?: PaperName | { widthMm: number; heightMm: number };
+	orientation?: SheetLayout["orientation"];
 	duplex?: "long" | "short";
 	margin?: number;
 	gap?: number;
@@ -88,8 +90,10 @@ export type BatchOptions = {
 	cropMarks?: boolean;
 	backOffset?: { x: number; y: number };
 	blankBacks?: true;
-	printTarget?: "none" | keyof typeof PRINT_TARGETS;
+	printTarget?: string;
 	printProfile?: string;
+	/** false for --no-analyze */
+	analyze?: boolean;
 	marks?: SheetMark[];
 	pieces?: true;
 	cut?: "svg" | "dxf";
@@ -111,6 +115,30 @@ export async function renderBatch(
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
+	const { workspace, preset, directory } = await batchPreset(file, options, io, log);
+	await runPreset(
+		workspace,
+		preset,
+		{
+			root: directory,
+			out: options.out,
+			...(options.dryRun ? { dryRun: true } : {}),
+			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.sheets ? { layoutFlags: true } : {}),
+		},
+		log,
+		io,
+	);
+}
+
+/** The one-template workspace and the export preset `render` runs for a
+ *  template and these options, as Studio would save them. */
+export async function batchPreset(
+	file: string,
+	options: BatchOptions,
+	io: Io,
+	log: Log = createLog(io, options.quiet),
+): Promise<{ workspace: Workspace; preset: ExportPreset; directory: string }> {
 	const loaded = await readTemplate(io, file);
 	warnLoad(log, file, loaded);
 	const { template, directory } = loaded;
@@ -119,6 +147,7 @@ export async function renderBatch(
 	if (options.name !== undefined) checkName(template, options.name);
 	if (options.bleed && !Object.values(templateBleed(template)).some((side) => side > 0))
 		throw new CliError("--bleed needs a template with a bleed");
+	if (options.sizeFrom !== undefined) checkSizeField(template, options.sizeFrom);
 	const constants = await readValues(io, template, options.values, options.set ?? {});
 	const read =
 		options.data === undefined
@@ -144,7 +173,8 @@ export async function renderBatch(
 			? await readProfile(io, options.outputIntent, options.outputIntentId)
 			: undefined;
 
-	const print = await readPrint(io, log, options.printTarget, options.printProfile);
+	const chosen = await readPrint(io, log, options.printTarget, options.printProfile);
+	const print = chosen && options.analyze === false ? { ...chosen, analyze: false } : chosen;
 
 	const templateId = "t_template";
 	const workspace: Workspace = {
@@ -177,6 +207,15 @@ export async function renderBatch(
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
 		...(options.bleed ? { bleed: true } : {}),
+		...(options.sizeFrom !== undefined
+			? {
+					size: {
+						kind: "image" as const,
+						field: options.sizeFrom,
+						...(options.maxEdge !== undefined ? { maxEdge: options.maxEdge } : {}),
+					},
+				}
+			: {}),
 		...(print ? { print } : {}),
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
@@ -196,6 +235,7 @@ export async function renderBatch(
 					layout: {
 						...DEFAULT_SHEET_LAYOUT,
 						paper: options.sheets,
+						...(options.orientation ? { orientation: options.orientation } : {}),
 						cropMarks:
 							options.cropMarks !== false && (options.marks?.includes("crop") ?? true),
 						...(options.marks?.includes("registration") ? { registrationMarks: true } : {}),
@@ -211,19 +251,7 @@ export async function renderBatch(
 				}
 			: {}),
 	};
-	await runPreset(
-		workspace,
-		preset,
-		{
-			root: directory,
-			out: options.out,
-			...(options.dryRun ? { dryRun: true } : {}),
-			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.sheets ? { layoutFlags: true } : {}),
-		},
-		log,
-		io,
-	);
+	return { workspace, preset, directory };
 }
 
 async function readProfile(
@@ -244,7 +272,7 @@ async function readPrint(
 ): Promise<PresetPrint | undefined> {
 	if (target === "none" || (target === undefined && file === undefined)) return undefined;
 	const profile = file !== undefined ? await readPrintProfile(io, file) : undefined;
-	const id = target !== undefined ? PRINT_TARGETS[target] : profileTarget(profile as PrintProfile);
+	const id = target ?? profileTarget(profile as PrintProfile);
 	if (!printTarget(id))
 		throw new CliError(
 			`--print-profile ${file} was measured on ${id}, which this build cannot print to; add --print-target to use it anyway`,
@@ -270,6 +298,14 @@ async function readPrintProfile(io: Io, file: string): Promise<PrintProfile> {
 
 function targetName(id: string): string {
 	return printTarget(id)?.name ?? id;
+}
+
+function checkSizeField(template: Template, field: string): void {
+	const photos = imageFields(template).map(({ key }) => key);
+	if (!photos.includes(field))
+		throw new CliError(
+			`--size-from needs an image field; the template's are ${photos.length > 0 ? photos.join(", ") : "none"}`,
+		);
 }
 
 function checkName(template: Template, pattern: string): void {

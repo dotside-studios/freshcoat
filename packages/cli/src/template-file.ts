@@ -7,6 +7,7 @@ import {
 	type ValidationError,
 	verifyAssets,
 } from "@freshcoat-js/coatfile";
+import { unpackTemplates, WorkspaceReadError } from "@freshcoat-js/workspace/archive";
 import { CliError, type Io, type Log } from "./io";
 import { evaluateTemplateModule, isTemplateModule } from "./template-module";
 
@@ -60,6 +61,41 @@ export async function readTemplate(io: Io, path: string): Promise<TemplateFile> 
 	const input = isTemplateModule(path)
 		? await evaluateTemplateModule(io, path)
 		: await readBytes(io, path);
+	return openTemplate(path, input, dirname(resolve(io.cwd, path)));
+}
+
+export function isTemplateArchive(path: string): boolean {
+	return /\.zip$/i.test(path);
+}
+
+/** Each template of a zip that `pack` or Studio's Export all templates wrote,
+ *  by its file name in the zip, read as `readTemplate` reads one. */
+export async function readTemplateArchive(
+	io: Io,
+	path: string,
+): Promise<{ name: string; file: TemplateFile }[]> {
+	let entries: Awaited<ReturnType<typeof unpackTemplates>>;
+	try {
+		entries = await unpackTemplates(await readBytes(io, path));
+	} catch (error) {
+		if (error instanceof WorkspaceReadError) throw new CliError(`${path}: ${error.message}`);
+		throw error;
+	}
+	const directory = dirname(resolve(io.cwd, path));
+	const read: { name: string; file: TemplateFile }[] = [];
+	for (const { fileName, bytes } of entries)
+		read.push({
+			name: fileName,
+			file: await openTemplate(`${path}: ${fileName}`, bytes, directory),
+		});
+	return read;
+}
+
+async function openTemplate(
+	path: string,
+	input: Parameters<typeof loadTemplate>[0],
+	directory: string,
+): Promise<TemplateFile> {
 	const loaded = await loadTemplate(input);
 	if (!loaded.ok) {
 		if (loaded.reason === "unreadable") throw new CliError(`${path}: ${loaded.message}`);
@@ -77,7 +113,7 @@ export async function readTemplate(io: Io, path: string): Promise<TemplateFile> 
 			`${misKeyed.length === 1 ? "asset" : "assets"} ${misKeyed.map((m) => m.declared).join(", ")} ${misKeyed.length === 1 ? "is" : "are"} not keyed by the hash of ${misKeyed.length === 1 ? "its" : "their"} bytes`,
 		);
 	return {
-		directory: dirname(resolve(io.cwd, path)),
+		directory,
 		template,
 		notes,
 		newerFormat: formatVersionStatus(template.format_version) === "newer",
