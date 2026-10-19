@@ -12,9 +12,9 @@ import type { Template } from "./types";
 //   1.0  the original format
 //   1.1  `product` and `version` optional; `$schema` recognised
 //   1.2  linear fill `from` / `to`; element `constraints`
-//   1.3  barcode element
-//   1.4  variant deltas: pos, size, rotation, opacity, hidden
-//   1.5  grid layout; element `adjust`; image `focus` and `crop`; template
+//   1.3  `barcode` element
+//   1.4  variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden`
+//   1.5  `grid` layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
 //        `alignLast`, `direction`, `paragraphSpacing` and font `features`;
 //        per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode
@@ -67,7 +67,10 @@ export function minimumFormatVersion(template: Template): string {
 		template.version === undefined
 	)
 		need(1);
+	if (template.bleed !== undefined || template.safeArea !== undefined)
+		need(5);
 
+	const barcodeIds = new Set<string>();
 	const frameIds = new Set<string>();
 	const imageIds = new Set<string>();
 	const textIds = new Set<string>();
@@ -83,9 +86,15 @@ export function minimumFormatVersion(template: Template): string {
 			need(2);
 		if (typeof o.id === "string" && typeof o.type === "string") {
 			if (o.constraints !== undefined) need(2);
+			if (o.adjust !== undefined) need(5);
+			if (usesGridPlacement(o.layoutChild)) need(5);
 			if (o.hidden !== undefined) need(7);
 			if (o.effects !== undefined) need(7);
-			if (o.type === "barcode") need(3);
+			if (o.type === "barcode") {
+				barcodeIds.add(o.id);
+				need(3);
+				if (usesBearerBars(o.properties)) need(5);
+			}
 			if (o.type === "text") textIds.add(o.id);
 			if (o.type === "qr_code") {
 				qrIds.add(o.id);
@@ -94,12 +103,6 @@ export function minimumFormatVersion(template: Template): string {
 			if (usesSlice(o.properties)) need(7);
 			if (usesSpot(o.properties)) need(7);
 			if (usesSideStroke(o.properties)) need(7);
-			if (
-				o.type === "barcode" &&
-				(o.properties as Record<string, unknown> | undefined)?.bearerBars !==
-					undefined
-			)
-				need(5);
 			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
 			if (o.type === "text" && usesArc(o.properties)) need(6);
 			if (o.type === "text" && usesTextPath(o.properties)) need(6);
@@ -109,11 +112,13 @@ export function minimumFormatVersion(template: Template): string {
 			if (o.type === "frame") {
 				frameIds.add(o.id);
 				if (usesPerCornerRadius(o.properties)) need(5);
+				if (usesGridLayout(o.properties)) need(5);
 				if (usesIsolate(o.properties)) need(6);
 				if (usesCornerSmoothing(o.properties)) need(7);
 			}
 			if (o.type === "image") {
 				imageIds.add(o.id);
+				if (usesImageFraming(o.properties)) need(5);
 				if (usesImageCorners(o.properties)) need(7);
 			}
 		}
@@ -137,10 +142,17 @@ export function minimumFormatVersion(template: Template): string {
 					delta.hidden !== undefined
 				)
 					need(4);
-				if (usesTextLayout(delta.properties)) need(5);
+				if (textIds.has(delta.id) && usesTextLayout(delta.properties))
+					need(5);
 				if (usesArc(delta.properties)) need(6);
 				if (usesTextPath(delta.properties)) need(6);
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
+					need(5);
+				if (frameIds.has(delta.id) && usesGridLayout(delta.properties))
+					need(5);
+				if (imageIds.has(delta.id) && usesImageFraming(delta.properties))
+					need(5);
+				if (barcodeIds.has(delta.id) && usesBearerBars(delta.properties))
 					need(5);
 				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
 				if (frameIds.has(delta.id) && usesCornerSmoothing(delta.properties))
@@ -169,6 +181,36 @@ function usesGradientStroke(o: Record<string, unknown>): boolean {
 		typeof stroke === "object" &&
 		stroke.color !== null &&
 		typeof stroke.color === "object"
+	);
+}
+
+function usesGridLayout(properties: unknown): boolean {
+	if (properties === null || typeof properties !== "object") return false;
+	const layout = (properties as Record<string, unknown>).layout;
+	return (
+		layout !== null &&
+		typeof layout === "object" &&
+		(layout as Record<string, unknown>).type === "grid"
+	);
+}
+
+function usesGridPlacement(layoutChild: unknown): boolean {
+	if (layoutChild === null || typeof layoutChild !== "object") return false;
+	const lc = layoutChild as Record<string, unknown>;
+	return lc.column !== undefined || lc.row !== undefined;
+}
+
+function usesImageFraming(properties: unknown): boolean {
+	if (properties === null || typeof properties !== "object") return false;
+	const p = properties as Record<string, unknown>;
+	return p.focus !== undefined || p.crop !== undefined;
+}
+
+function usesBearerBars(properties: unknown): boolean {
+	return (
+		properties !== null &&
+		typeof properties === "object" &&
+		(properties as Record<string, unknown>).bearerBars !== undefined
 	);
 }
 
