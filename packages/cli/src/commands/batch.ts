@@ -218,6 +218,7 @@ export async function renderBatch(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.sheets ? { layoutFlags: true } : {}),
 		},
 		log,
 		io,

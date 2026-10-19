@@ -80,6 +80,7 @@ export {
 	markExported,
 } from "./run";
 export {
+	BACK_OFFSET_OUT_OF_RANGE,
 	BLEED_NEEDS_TEMPLATE_SIZE,
 	pagesPerSheet,
 	planSheets,

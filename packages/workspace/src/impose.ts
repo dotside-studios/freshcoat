@@ -93,14 +93,24 @@ export type Imposition<T> = {
 
 export type SheetLayoutAxis = "width" | "height" | "both";
 
+/** The furthest the back offset moves the backs each way, as Studio's
+ *  fields allow. */
+export const MAX_BACK_OFFSET_MM = 50;
+
 /** A layout that can't be imposed. `axis` names the side that doesn't fit,
- *  when that is the reason. */
+ *  when that is the reason; `field` names the setting that is out of range. */
 export class SheetLayoutError extends Error {
 	readonly axis?: SheetLayoutAxis;
-	constructor(message: string, axis?: SheetLayoutAxis) {
+	readonly field?: "backOffset";
+	constructor(
+		message: string,
+		axis?: SheetLayoutAxis,
+		field?: "backOffset",
+	) {
 		super(message);
 		this.name = "SheetLayoutError";
 		if (axis !== undefined) this.axis = axis;
+		if (field !== undefined) this.field = field;
 	}
 }
 
@@ -192,7 +202,21 @@ function checkNumbers(card: CardSizeMm, layout: SheetLayout, bleed: BleedMm) {
 		throw new SheetLayoutError("The bleed can't be negative");
 	const offset = layout.backOffsetMm;
 	if (offset && !(Number.isFinite(offset.x) && Number.isFinite(offset.y)))
-		throw new SheetLayoutError("The back offset needs two numbers");
+		throw new SheetLayoutError(
+			"The back offset needs two numbers",
+			undefined,
+			"backOffset",
+		);
+	if (
+		offset &&
+		(Math.abs(offset.x) > MAX_BACK_OFFSET_MM ||
+			Math.abs(offset.y) > MAX_BACK_OFFSET_MM)
+	)
+		throw new SheetLayoutError(
+			`The back offset can move the backs at most ${MAX_BACK_OFFSET_MM} mm each way`,
+			undefined,
+			"backOffset",
+		);
 	const copies = layout.copies;
 	if (
 		copies !== undefined &&
@@ -356,6 +380,14 @@ export function imposeSheets<T extends ImposeItem>(
 			if (backs) pages.push({ side: "back", slots: back });
 			sheets++;
 		}
+		const placed = pages.some(
+			(page) => page.side === "back" && page.slots.length > 0,
+		);
+		if (placed && (dx !== 0 || dy !== 0))
+			checkBackOffset(g, card, { x: originX, y: originY }, pitchX, pitchY, {
+				x: dx,
+				y: dy,
+			});
 	}
 
 	return {
@@ -375,6 +407,32 @@ export function imposeSheets<T extends ImposeItem>(
 		sheets,
 		pages,
 	};
+}
+
+/** Refuses a back offset that moves the grid of backs past the paper's edge,
+ *  naming the range that keeps them on it. */
+function checkBackOffset(
+	g: Grid,
+	card: CardSizeMm,
+	origin: { x: number; y: number },
+	pitchX: number,
+	pitchY: number,
+	offset: { x: number; y: number },
+) {
+	const right = origin.x + (g.columns - 1) * pitchX + card.widthMm;
+	const bottom = origin.y + (g.rows - 1) * pitchY + card.heightMm;
+	const x = { min: -origin.x, max: g.widthMm - right };
+	const y = { min: -origin.y, max: g.heightMm - bottom };
+	const within = (n: number, range: { min: number; max: number }) =>
+		n >= range.min - 1e-6 && n <= range.max + 1e-6;
+	if (within(offset.x, x) && within(offset.y, y)) return;
+	const range = (r: { min: number; max: number }) =>
+		`${Math.round(r.min * 10) / 10} to ${mm(r.max)}`;
+	throw new SheetLayoutError(
+		`The back offset (${mm(offset.x)}, ${mm(offset.y)}) moves the backs off the paper; it keeps them on with x from ${range(x)} and y from ${range(y)}`,
+		undefined,
+		"backOffset",
+	);
 }
 
 /** A line segment in millimetres from the page's top-left corner. */

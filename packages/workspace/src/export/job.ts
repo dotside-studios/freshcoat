@@ -411,7 +411,9 @@ export function runExportJob(
 		// Refused before anything renders, rather than after every page has.
 		const sheets = planSheets(plan, template, preset);
 		if (sheets?.error !== undefined)
-			return Promise.reject(new SheetLayoutError(sheets.error));
+			return Promise.reject(
+				new SheetLayoutError(sheets.error, undefined, sheets.field),
+			);
 		if (pieced) pieceSheets = sheets?.imposition;
 	}
 	const cardMm =

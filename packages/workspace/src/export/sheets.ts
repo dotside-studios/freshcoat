@@ -90,6 +90,7 @@ export type SheetPlan =
 			imposition: Imposition<SheetItem>;
 			error?: never;
 			shortError?: never;
+			field?: never;
 	  }
 	| {
 			layout: SheetLayout;
@@ -98,13 +99,30 @@ export type SheetPlan =
 			error: string;
 			/** a few words for the job bar, with `error` on hover */
 			shortError: string;
+			/** the setting that is out of range, when that is the reason */
+			field?: "backOffset";
 	  };
+
+/** What the job bar says for a back offset past its limit or off the paper. */
+export const BACK_OFFSET_OUT_OF_RANGE = "Back offset out of range";
 
 /** A few words for a layout error, for a bar with no room for the whole
  *  message. */
 export function shortSheetError(e: SheetLayoutError): string {
 	if (e.axis) return SHEETS_DONT_FIT;
-	return e.message.length <= 32 ? e.message : "Can't lay out the sheets";
+	if (e.message.length <= 32) return e.message;
+	return e.field === "backOffset"
+		? BACK_OFFSET_OUT_OF_RANGE
+		: "Can't lay out the sheets";
+}
+
+function sheetError(layout: SheetLayout, e: SheetLayoutError): SheetPlan {
+	return {
+		layout,
+		error: e.message,
+		shortError: shortSheetError(e),
+		...(e.field ? { field: e.field } : {}),
+	};
 }
 
 /** How the planned items land on sheets, or why they can't. Null when the
@@ -145,8 +163,7 @@ export function planSheets(
 		);
 		return { layout, imposition };
 	} catch (e) {
-		if (e instanceof SheetLayoutError)
-			return { layout, error: e.message, shortError: shortSheetError(e) };
+		if (e instanceof SheetLayoutError) return sheetError(layout, e);
 		throw e;
 	}
 }
@@ -191,8 +208,7 @@ function planPieceSheets(
 		);
 		return { layout, imposition };
 	} catch (e) {
-		if (e instanceof SheetLayoutError)
-			return { layout, error: e.message, shortError: shortSheetError(e) };
+		if (e instanceof SheetLayoutError) return sheetError(layout, e);
 		throw e;
 	}
 }

@@ -301,6 +301,42 @@ describe("imposeSheets", () => {
 			expect(placed(out.pages[1] as never)).toEqual([["1b", 106, 13]]);
 		});
 
+		it("refuses a back offset that moves the backs off the paper", () => {
+			const duplex = (x: number, y: number) =>
+				imposeSheets(
+					items(1, 2),
+					CR80,
+					layout({ duplex: "long-edge", backOffsetMm: { x, y } }),
+				);
+			expect(duplex(19.4, -13.5).pages[1]?.slots[0]?.xMm).toBeCloseTo(124.4, 9);
+			let off: unknown;
+			try {
+				duplex(20, 0);
+			} catch (e) {
+				off = e;
+			}
+			expect(off).toBeInstanceOf(SheetLayoutError);
+			expect((off as SheetLayoutError).field).toBe("backOffset");
+			expect((off as SheetLayoutError).message).toBe(
+				"The back offset (20 mm, 0 mm) moves the backs off the paper; it keeps them on with x from -19.4 to 19.4 mm and y from -13.5 to 13.5 mm",
+			);
+			expect(() => duplex(0, -14)).toThrow(/off the paper/);
+			expect(() => duplex(0, 51)).toThrow(
+				"The back offset can move the backs at most 50 mm each way",
+			);
+			expect(() =>
+				imposeSheets(
+					items(1),
+					CR80,
+					layout({
+						duplex: "long-edge",
+						blankBacks: true,
+						backOffsetMm: { x: 30, y: 0 },
+					}),
+				),
+			).not.toThrow();
+		});
+
 		it("alternates front and back across sheets", () => {
 			const out = imposeSheets(
 				items(11, 2),

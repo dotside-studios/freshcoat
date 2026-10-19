@@ -21,6 +21,7 @@ import {
 	largestImagePixels,
 	type PresetReadiness,
 	presetReadiness,
+	type SheetPlan,
 	sheetLayout,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
@@ -149,13 +150,17 @@ export async function runPreset(
 		dryRun?: true;
 		jobs?: number;
 		save?: (workspace: Workspace) => Promise<void>;
+		/** the sheet layout came from the command line */
+		layoutFlags?: true;
 	},
 	log: Log,
 	io: Io,
 ): Promise<void> {
-	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
+	if (options.dryRun)
+		return planPreset(workspace, preset, options.out, log, options.layoutFlags);
 	const readiness = presetReadiness(workspace, preset);
 	checkView(readiness.viewProblems);
+	checkSheets(readiness.sheets, options.layoutFlags);
 	checkPieces(preset, readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
@@ -217,18 +222,28 @@ function planPreset(
 	preset: ExportPreset,
 	out: string,
 	log: Log,
+	layoutFlags?: true,
 ): void {
 	const readiness = presetReadiness(workspace, preset);
 	const { plan, sheets, viewProblems } = readiness;
 	checkView(viewProblems);
+	checkSheets(sheets, layoutFlags);
 	checkPieces(preset, readiness, log);
-	if (sheets?.error !== undefined)
-		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
 	const layout = sheets?.imposition ? `, ${sheetSummary(sheets.imposition)}` : "";
 	log.out(
 		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
 	);
+}
+
+/** Refuses sheets that can't be laid out; a back offset given on the command
+ *  line is a usage error. */
+function checkSheets(sheets: SheetPlan | null, layoutFlags?: true): void {
+	if (sheets?.error === undefined) return;
+	const message = `cannot lay out the sheets: ${sheets.error}`;
+	throw layoutFlags && sheets.field === "backOffset"
+		? new UsageError(message)
+		: new CliError(message);
 }
 
 /** Refuses pieces on vector pages, and warns when a split finds no slice. */

@@ -2176,6 +2176,30 @@ describe("render print options", () => {
 		expect(still[1]).not.toEqual(offset[1]);
 	});
 
+	test("refuses a back offset past Studio's range or off the paper", async () => {
+		const sheets = ["--sheets", "a4", "--duplex", "long", "--out", "drift.pdf"];
+		const far = await box.run(...template, ...sheets, "--back-offset", "500,0");
+		expect(far.code).toBe(2);
+		expect(far.stderr).toContain("Expected <x>,<y> each from -50 to 50 millimetres.");
+		const off = await box.run(...template, ...sheets, "--back-offset", "0,30");
+		expect(off.code).toBe(2);
+		expect(off.stderr).toMatch(
+			/cannot lay out the sheets: The back offset \(0 mm, 30 mm\) moves the backs off the paper; it keeps them on with x from -[\d.]+ to [\d.]+ mm and y from -[\d.]+ to [\d.]+ mm\n/,
+		);
+		expect(off.stderr).toContain("Run freshcoat render --help for usage.");
+		expect((await box.run(...template, ...sheets, "--back-offset", "0,30", "--dry-run")).code).toBe(2);
+	});
+
+	test("fails a workspace preset whose back offset is off the paper", async () => {
+		const workspace = workspaceOf(card());
+		const base = workspace.presets[0] as Workspace["presets"][number];
+		workspace.presets = [{ ...base, id: "p_drift", format: "pdf", layout: { ...layout, backOffsetMm: { x: 0, y: 40 } } }];
+		await box.write("drift.coatworkspace", await workspaceBytes(workspace));
+		const run = await box.run("render", "drift.coatworkspace", "--preset", "p_drift", "--out", "drift-preset.pdf");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("moves the backs off the paper");
+	});
+
 	test("gives a one-sided template blank backs as a preset does", async () => {
 		const sheets = ["--frame", "front", "--sheets", "a4", "--duplex", "long", "--out"];
 		const runs = [
