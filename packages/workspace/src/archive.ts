@@ -28,6 +28,7 @@ import { assetExtension } from "./assets";
 import { portraitPaper } from "./impose";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import { readOutputProfile, usedProfiles } from "./output-intent";
+import { PRESET_SCALE } from "./presets";
 import type {
 	Dataset,
 	DatasetAsset,
@@ -202,7 +203,7 @@ const PresetSchema = z.object({
 	pdfPageImage: z.enum(["png", "jpeg", "vector"]).optional(),
 	pdfText: z.enum(["embed", "outline"]).optional(),
 	destination: z.enum(["download", "zip-file", "folder"]).optional(),
-	scale: z.number().min(1).max(4),
+	scale: z.number().min(PRESET_SCALE.min).max(PRESET_SCALE.max),
 	dpi: z.number().positive(),
 	minImageDpi: z.number().min(0).optional(),
 	fileName: z.string(),
@@ -829,4 +830,29 @@ export async function packTemplates(ws: Workspace): Promise<Uint8Array> {
 		];
 	}
 	return zipSync(entries, { mtime: ZIP_EPOCH });
+}
+
+/** The templates `packTemplates` wrote, as `.coat` bytes by file name, in zip
+ *  order. Throws a `WorkspaceReadError` for a file that is not such a zip. */
+export async function unpackTemplates(
+	file: Blob | Uint8Array,
+): Promise<{ fileName: string; bytes: Uint8Array }[]> {
+	let read: ReadEntries;
+	try {
+		read = await readEntries(
+			file instanceof Blob ? file : new Blob([file as BlobPart]),
+		);
+	} catch (err) {
+		if (err instanceof UnpackError) throw new WorkspaceReadError(err.code, err.message);
+		throw err;
+	}
+	const templates = [...read.files]
+		.filter(([path]) => /^templates\/[^/]+\.coat$/i.test(path))
+		.map(([path, bytes]) => ({ fileName: path.slice("templates/".length), bytes }));
+	if (templates.length === 0)
+		throw new WorkspaceReadError(
+			"missing_entry",
+			"not a templates zip: no templates/<name>.coat entries",
+		);
+	return templates;
 }

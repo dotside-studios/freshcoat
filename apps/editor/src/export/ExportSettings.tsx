@@ -49,6 +49,7 @@ import {
 	paperSize,
 	pdfLayout,
 	portraitPaper,
+	PRESET_SCALE,
 	readOutputProfile,
 	sheetSummary,
 	unknownFileNameTokens,
@@ -681,8 +682,8 @@ export function ExportSettings({
 						<NumberField
 							aria-label="Scale"
 							value={preset.scale}
-							min={1}
-							max={4}
+							min={PRESET_SCALE.min}
+							max={PRESET_SCALE.max}
 							step={1}
 							precision={2}
 							unit="×"
