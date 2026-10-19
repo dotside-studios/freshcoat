@@ -11,6 +11,7 @@ import type {
 import { parseColor } from "./color";
 import { fontFeatureList, fontVariationList } from "./paint-helpers";
 import type { SpanFont } from "./text-engine";
+import type { SpotInk } from "./types";
 
 export type FontWeightName = Exclude<keyof FontWeightEnumValues, "values">;
 
@@ -42,6 +43,21 @@ export function fontWeight(
 export function toColor(ck: CanvasKit, input: string): Color {
 	const c = parseColor(input);
 	return c && c !== "none" ? ck.Color(c[0], c[1], c[2], c[3]) : ck.BLACK;
+}
+
+// A solid's raster colour. A spot paints its alternate at the tint, mixed
+// with white as the PDF's Separation tint transform does.
+export function solidColor(
+	ck: CanvasKit,
+	input: string,
+	spot?: SpotInk,
+): Color {
+	const c = toColor(ck, input);
+	if (!spot || !(spot.tint < 1)) return c;
+	const t = Math.max(0, spot.tint);
+	const out = Float32Array.from(c);
+	for (let i = 0; i < 3; i++) out[i] = 1 - (1 - c[i]) * t;
+	return out;
 }
 
 // The CanvasKit TextStyle for a span, without its color. CanvasKit adds

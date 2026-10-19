@@ -137,11 +137,11 @@ in full.
 
 ## Coverage
 
-80 cases.
+87 cases.
 
 | Covered | Cases |
 |---|---|
-| Fills | `fill-solid`, `fill-linear`, `fill-radial`, `fill-angular` |
+| Fills | `fill-solid`, `fill-spot-tint`, `fill-linear`, `fill-radial`, `fill-angular` |
 | Compositing | `blend-multiply`, `blend-screen`, `blend-darken`, `blend-lighten`, `blend-overlay`, `blend-difference`, `blend-plus`, `blend-linear-burn`, `opacity` |
 | Clipping and masking | `clip-circle`, `clip-per-corner`, `clip-per-corner-smoothed`, `mask-alpha`, `mask-invert`, `mask-luminance`, `mask-luminance-opaque-shape`, `mask-luminance-alpha` |
 | Shapes | `ellipse`, `path-viewbox`, `path-fill-rule`, `corner-radius`, `corner-radius-per-corner` |
