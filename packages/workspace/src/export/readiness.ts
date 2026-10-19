@@ -1,4 +1,4 @@
-import { validate } from "@freshcoat-js/coatfile";
+import { type Template, validate } from "@freshcoat-js/coatfile";
 import { unfilledRequired } from "../binding";
 import { planExport, vectorPages } from "../plan";
 import type {
@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { bindingView } from "../view";
 import { PIECES_NEED_RASTER_PAGES } from "./item";
+import { printRequest } from "./print";
 import { planSheets, type SheetPlan } from "./sheets";
 
 /** Why a preset can't run, as data: the caller words it. */
@@ -26,6 +27,13 @@ export type PresetBlock = {
 	detail?: string;
 };
 
+/** What the export will do that its settings don't show: it still runs. */
+export type PresetNotice = {
+	reason: "print_raster" | "spot_raster";
+	message: string;
+	detail?: string;
+};
+
 export type PresetReadiness = {
 	/** The template the preset exports; absent when the workspace lacks it. */
 	entry: TemplateEntry | undefined;
@@ -40,6 +48,7 @@ export type PresetReadiness = {
 	viewProblems: string[];
 	/** Why the export can't run, or null when it can. */
 	blocked: PresetBlock | null;
+	notices: PresetNotice[];
 };
 
 /**
@@ -71,7 +80,54 @@ export function presetReadiness(
 		unfilled,
 		viewProblems,
 		blocked: blockOf(entry, issues, viewProblems, sheets, plan, preset),
+		notices: noticesOf(entry?.template, preset),
 	};
+}
+
+/** The spot inks a template's layers print in, each once, in layer order. */
+export function templateSpotInks(template: Template): string[] {
+	const inks = new Set<string>();
+	const visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (node === null || typeof node !== "object") return;
+		const o = node as Record<string, unknown>;
+		const spot = (o.properties as Record<string, unknown> | undefined)?.spot as
+			| { fill?: { spot?: unknown }; stroke?: { spot?: unknown } }
+			| undefined;
+		for (const ink of [spot?.fill?.spot, spot?.stroke?.spot])
+			if (typeof ink === "string" && ink !== "") inks.add(ink);
+		for (const value of Object.values(o)) visit(value);
+	};
+	visit(template.template_data);
+	visit(template.variants);
+	return [...inks];
+}
+
+function noticesOf(
+	template: Template | undefined,
+	preset: ExportPreset,
+): PresetNotice[] {
+	const notices: PresetNotice[] = [];
+	const print = printRequest(preset.print) !== undefined;
+	if (vectorPages(preset) && print)
+		notices.push({
+			reason: "print_raster",
+			message: "Print target draws PDF pages as PNG, not vector",
+			detail:
+				"The printer's color correction works on pixels, so each page is rendered as an image. Set the print target to None for vector pages.",
+		});
+	const inks = template ? templateSpotInks(template) : [];
+	if (inks.length > 0 && !(vectorPages(preset) && !print))
+		notices.push({
+			reason: "spot_raster",
+			message: `Spot ${inks.length === 1 ? "ink" : "inks"} ${inks.join(", ")} ${inks.length === 1 ? "prints" : "print"} as plain color`,
+			detail:
+				"Spot inks are written only on vector PDF pages; PNG, JPEG and WebP output draws each in its alternate color.",
+		});
+	return notices;
 }
 
 function blockOf(

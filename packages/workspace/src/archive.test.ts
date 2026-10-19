@@ -343,11 +343,12 @@ describe("packWorkspace", () => {
 			const fogra = await profile("Coated FOGRA39");
 			const unused = await profile("Unused");
 			const intent = { kind: "profile", sha256: fogra.sha256 } as const;
+			const named = { ...intent, identifier: "FOGRA51" };
 			const w: Workspace = {
 				...ws,
 				presets: [
 					pdfPreset("p_a", intent),
-					pdfPreset("p_b", intent),
+					pdfPreset("p_b", named),
 					pdfPreset("p_c", { kind: "none" }),
 					pdfPreset("p_d", { kind: "srgb" }),
 					pdfPreset("p_e", undefined),
@@ -369,7 +370,7 @@ describe("packWorkspace", () => {
 				Object.keys(files).filter((name) => name.startsWith("profiles/")),
 			).toEqual([`profiles/${fogra.sha256}.icc`]);
 			expect(manifest.presets.map((p: ExportPreset) => p.outputIntent)).toEqual(
-				[intent, intent, { kind: "none" }, { kind: "srgb" }, undefined],
+				[intent, named, { kind: "none" }, { kind: "srgb" }, undefined],
 			);
 
 			const result = await unpackWorkspace(zipSync(files));
@@ -468,6 +469,23 @@ describe("packWorkspace", () => {
 			f["workspace.json"] = strToU8(JSON.stringify(manifest));
 		});
 		expect(codeOf(result)).toBe("invalid_manifest");
+	});
+
+	it("refuses a quality that is not a whole number from 0 to 100", async () => {
+		for (const quality of [50.5, -1, 101]) {
+			const result = await repack((f) => {
+				const manifest = manifestOf(f);
+				manifest.presets[0].quality = quality;
+				f["workspace.json"] = strToU8(JSON.stringify(manifest));
+			});
+			expect(codeOf(result)).toBe("invalid_manifest");
+		}
+		const edge = await repack((f) => {
+			const manifest = manifestOf(f);
+			manifest.presets[0].quality = 0;
+			f["workspace.json"] = strToU8(JSON.stringify(manifest));
+		});
+		expect(edge.ok && edge.workspace.presets[0]?.quality).toBe(0);
 	});
 
 	it("refuses a variant source of an unknown kind", async () => {
@@ -589,7 +607,10 @@ describe("packWorkspace", () => {
 		const [phase4, imposed] = result.workspace.presets;
 		expect(phase4?.layout).toBeUndefined();
 		expect(pdfLayout(phase4 as ExportPreset)).toEqual({ kind: "single" });
-		expect(imposed).toEqual(sheets);
+		expect(imposed).toEqual({
+			...sheets,
+			layout: { ...sheets.layout, paper: { widthMm: 200, heightMm: 300 } },
+		});
 	});
 
 	it("keeps a preset on A5 and A6 paper", async () => {

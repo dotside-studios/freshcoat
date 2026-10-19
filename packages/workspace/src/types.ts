@@ -227,8 +227,8 @@ export type PaperName =
 /** Cards imposed on sheets of paper, for a PDF. */
 export type SheetLayout = {
 	kind: "sheet";
-	/** a named size, or a custom one; custom sizes are read short edge as
-	 *  width, like the named ones */
+	/** a named size, or a custom one, kept portrait: a workspace read with
+	 *  the short edge as height has its edges swapped */
 	paper: PaperName | { widthMm: number; heightMm: number };
 	/** auto: whichever fits more cards, portrait on a tie */
 	orientation: "portrait" | "landscape" | "auto";
@@ -263,11 +263,12 @@ export type PdfLayout = { kind: "single" } | SheetLayout;
 
 /** What a PDF declares it was prepared for. `srgb`, the default, is the
  *  space Freshcoat draws in; `profile` names one of the workspace's
- *  `profiles`, such as a print shop's CMYK condition; `none` declares
- *  nothing. */
+ *  `profiles`, such as a print shop's CMYK condition, and `identifier` the
+ *  OutputConditionIdentifier this preset writes in place of the profile's
+ *  own; `none` declares nothing. */
 export type PdfOutputIntent =
 	| { kind: "srgb" }
-	| { kind: "profile"; sha256: string }
+	| { kind: "profile"; sha256: string; identifier?: string }
 	| { kind: "none" };
 
 /** An ICC profile a preset's output intent names, held once in the
@@ -296,7 +297,7 @@ export type ExportPreset = {
 	format: ExportFormat;
 	/** default template */
 	size?: ExportSize;
-	/** JPEG and WebP quality, 0..100, default 90 */
+	/** JPEG and WebP quality, a whole number 0..100, default 90 */
 	quality?: number;
 	/** png-zip only: "keep" writes RGBA even for an opaque card, for a
 	 *  consumer that requires a 32-bit PNG; default auto */

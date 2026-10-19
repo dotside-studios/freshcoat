@@ -22,12 +22,14 @@ export {
 	imagesOf,
 	itemRequest,
 	itemSize,
+	type ItemWarning,
 	itemTemplate,
 	type OutputFormat,
 	PIECES_NEED_RASTER_PAGES,
 	type RenderOutput,
 	type RenderRequest,
 	referencedAssets,
+	warningCode,
 } from "./item";
 export {
 	type AssembleExtras,
@@ -67,8 +69,10 @@ export {
 } from "./print";
 export {
 	type PresetBlock,
+	type PresetNotice,
 	type PresetReadiness,
 	presetReadiness,
+	templateSpotInks,
 } from "./readiness";
 export { serveRenders, type WorkerScope } from "./render-worker";
 export {

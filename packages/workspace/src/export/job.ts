@@ -34,6 +34,7 @@ import {
 	assetsByRef,
 	type ItemRenderer,
 	type ItemSize,
+	type ItemWarning,
 	itemRequest,
 	PIECES_NEED_RASTER_PAGES,
 	type RenderOutput,
@@ -84,7 +85,7 @@ export type JobItemResult = {
 	/** required fields rendered with their defaults, as `ExportItem` says */
 	unfilled?: string[];
 	/** what the render warned about without failing */
-	warnings?: string[];
+	warnings?: ItemWarning[];
 };
 
 export type JobStats = {
@@ -235,7 +236,7 @@ export function reportCsv(items: JobItemResult[]): string {
 			item.print ?? "",
 			item.gamut ? `${item.gamut}%` : "",
 			item.unfilled?.join(" ") ?? "",
-			(item.warnings ?? []).join("; "),
+			(item.warnings ?? []).map((w) => w.message).join("; "),
 		]);
 	return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }

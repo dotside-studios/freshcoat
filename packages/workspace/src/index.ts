@@ -122,6 +122,7 @@ export {
 	minGapMm,
 	PAPER_SIZES_MM,
 	paperSize,
+	portraitPaper,
 	REGISTRATION_MARK_RADIUS_MM,
 	REGISTRATION_MARK_SIZE_MM,
 	type RegistrationMark,

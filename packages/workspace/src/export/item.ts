@@ -112,24 +112,34 @@ export type RenderOutput = {
 	/** photo layers the print path pulled into the printer's range */
 	gamut?: GamutNote[];
 	/** the render's other warnings, described, each once */
-	warnings?: string[];
+	warnings?: ItemWarning[];
 };
+
+/** A render warning an item came out with: `code` is the warning's kind, or
+ *  the print check's own code, such as `small_text`. */
+export type ItemWarning = { code: string; message: string };
+
+export function warningCode(w: FrameWarning): string {
+	return w.kind === "print_check" ? w.issue.code : w.kind;
+}
 
 /** The warnings an item reports but still renders with: all but a refused
  *  barcode, which fails it, gamut notes, which `gamut` carries, a PDF layer
  *  drawn as an image, which prints as rendered, and an image with no source,
  *  which is an unfilled field. */
-function noted(warnings: readonly FrameWarning[]): string[] {
-	const out = new Set<string>();
+function noted(warnings: readonly FrameWarning[]): ItemWarning[] {
+	const out = new Map<string, ItemWarning>();
 	for (const w of warnings)
 		if (
 			w.kind !== "barcode_invalid" &&
 			w.kind !== "gamut_compressed" &&
 			w.kind !== "vector_rasterized" &&
 			!(w.kind === "image_load_failed" && w.src === "")
-		)
-			out.add(describeWarning(w));
-	return [...out];
+		) {
+			const message = describeWarning(w);
+			out.set(message, { code: warningCode(w), message });
+		}
+	return [...out.values()];
 }
 
 export type ItemSize = {

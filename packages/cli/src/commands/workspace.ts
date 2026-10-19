@@ -151,6 +151,7 @@ export async function runPreset(
 	const readiness = presetReadiness(workspace, preset);
 	checkView(readiness.viewProblems);
 	checkPieces(preset, readiness, log);
+	warnNotices(readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
 	checkCuts(preset, entry.template, log);
@@ -187,7 +188,7 @@ export async function runPreset(
 		if (result.cancelled) throw new CliError("the export was cancelled");
 		await options.save?.(result.workspace);
 		for (const item of result.items)
-			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning}`);
+			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning.message}`);
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);
@@ -216,6 +217,7 @@ function planPreset(
 	const { plan, sheets, viewProblems } = readiness;
 	checkView(viewProblems);
 	checkPieces(preset, readiness, log);
+	warnNotices(readiness, log);
 	if (sheets?.error !== undefined)
 		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
@@ -238,6 +240,11 @@ function checkPieces(
 		!readiness.plan.some((item) => item.piece !== undefined)
 	)
 		log.warn("no slices to split; exporting whole sides");
+}
+
+function warnNotices(readiness: Pick<PresetReadiness, "notices">, log: Log): void {
+	for (const { message } of readiness.notices)
+		log.warn(`${message.charAt(0).toLowerCase()}${message.slice(1)}`);
 }
 
 /** Warns when cut files are asked of a template whose slices have no edge. */
