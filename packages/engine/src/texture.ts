@@ -5,20 +5,43 @@ import type { Grain, GrainBlend, Halftone, HalftoneShape } from "./types";
 // page's for a "page" halftone. Cells and grains stay fixed in design units at
 // any export scale.
 
-// Integer arithmetic in floats, exact below 2^24, so CPU and GPU agree. The
-// half-unit offset keeps a division error from crossing an integer.
+// Runtime-effect SkSL is strict ES2, with no uint and no `^`, `>>` or `%` on
+// ints, so the hash is integer arithmetic in floats kept below 2^24, exact on
+// CPU and GPU alike. It is an 8-round Feistel network on pairs mod the prime
+// 4093, whose square still fits. Being a bijection, it gives every cell of a
+// 4093 x 4093 block a different value. `modp` corrects a quotient a GPU
+// division leaves one off; the half-unit offset keeps an exact multiple of
+// 4093 from flooring low.
+const P = 4093;
+const ROUNDS = [
+	[1013, 1979],
+	[2027, 3203],
+	[307, 2591],
+	[3571, 1361],
+	[457, 3877],
+	[2909, 2213],
+	[1597, 1709],
+	[3331, 3011],
+];
 const HASH_SKSL = `
-	float mod289(float x) { return x - floor((x + 0.5) / 289.0) * 289.0; }
-	float permute(float x) { return mod289((x * 34.0 + 1.0) * x); }
+	float modp(float x) {
+		float r = x - floor(x / ${P}.0) * ${P}.0;
+		r += r < 0.0 ? ${P}.0 : 0.0;
+		return r >= ${P}.0 ? r - ${P}.0 : r;
+	}
 	float hash(float2 cell, float k) {
-		float h = permute(mod289(cell.x));
-		h = permute(mod289(h + cell.y));
-		h = permute(mod289(h + floor((cell.x + 0.5) / 289.0)));
-		h = permute(mod289(h + floor((cell.y + 0.5) / 289.0)));
-		h = permute(mod289(h + seedLo));
-		h = permute(mod289(h + seedHi));
-		h = permute(mod289(h + k));
-		return h / 288.0;
+		float l = modp(cell.x);
+		float r = modp(cell.y);
+		float4 key = float4(seedLo, modp(floor((cell.x + 0.5) / ${P}.0)), seedHi * 3.0 + k, modp(floor((cell.y + 0.5) / ${P}.0)));
+		float t;${ROUNDS.map(
+			([add, mul], i) => `
+		t = modp(r + key[${i % 4}] + ${add}.0);
+		t = modp(modp(t * t) * ${mul}.0);
+		t = modp(l + t);
+		l = r;
+		r = t;`,
+		).join("")}
+		return (l * ${P}.0 + r) / ${P * P - 1}.0;
 	}`;
 
 const GRAIN_BLEND_SKSL: Record<GrainBlend, string> = {
@@ -175,11 +198,10 @@ export function halftoneSksl(
 	}`;
 }
 
-// Seeds reduce to the 289 x 289 values the hash separates.
 export function grainSeed(seed: number): [number, number] {
-	const n = 83521;
+	const n = 65536;
 	const s = Number.isFinite(seed) ? ((Math.trunc(seed) % n) + n) % n : 0;
-	return [s % 289, Math.floor(s / 289)];
+	return [s % P, Math.floor(s / P)];
 }
 
 export function isGrainActive(grain: Grain | undefined): grain is Grain {

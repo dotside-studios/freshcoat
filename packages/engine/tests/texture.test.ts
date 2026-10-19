@@ -232,6 +232,102 @@ describe("grain", () => {
 	});
 });
 
+describe("grain structure", () => {
+	const N = 400;
+	async function patch(seed: number, size: number, monochrome = true) {
+		const node = createGroup(
+			[
+				createRect({
+					pos: { x: 0, y: 0 },
+					size: { width: N, height: N },
+					fills: [{ kind: "solid", color: "#808080" }],
+					grain: grain({ amount: 1, size, blendMode: "normal", seed, monochrome }),
+				}),
+			],
+			{ pos: { x: 0, y: 0 }, size: { width: N, height: N } },
+		);
+		const out = await renderSceneToPng(node, { width: N, height: N, ck, fonts });
+		expect(out.warnings ?? []).toEqual([]);
+		const p = decode(out.bytes);
+		const cells = Math.floor(N / size);
+		const ch = (c: number) => {
+			const v = new Float64Array(cells * cells);
+			for (let y = 0; y < cells; y++)
+				for (let x = 0; x < cells; x++)
+					v[y * cells + x] = p.px[(y * size * N + x * size) * 4 + c];
+			return v;
+		};
+		return { cells, r: ch(0), g: ch(1), b: ch(2) };
+	}
+
+	function correlation(
+		a: Float64Array,
+		b: Float64Array,
+		cells: number,
+		dx: number,
+		dy: number,
+	): number {
+		const m = 6;
+		let ma = 0;
+		let mb = 0;
+		let n = 0;
+		for (let y = m; y < cells - m; y++)
+			for (let x = m; x < cells - m; x++) {
+				ma += a[y * cells + x];
+				mb += b[(y + dy) * cells + x + dx];
+				n++;
+			}
+		ma /= n;
+		mb /= n;
+		let ab = 0;
+		let aa = 0;
+		let bb = 0;
+		for (let y = m; y < cells - m; y++)
+			for (let x = m; x < cells - m; x++) {
+				const u = a[y * cells + x] - ma;
+				const v = b[(y + dy) * cells + x + dx] - mb;
+				ab += u * v;
+				aa += u * u;
+				bb += v * v;
+			}
+		return ab / Math.sqrt(aa * bb);
+	}
+
+	test.each([
+		[7, 1],
+		[7, 3],
+		[0, 1],
+		[65535, 1],
+	])("seed %i at size %i has no correlation between nearby cells", async (seed, size) => {
+		const { cells, r } = await patch(seed, size);
+		let worst = 0;
+		for (let dy = 0; dy <= 6; dy++)
+			for (let dx = -6; dx <= 6; dx++) {
+				if (dy === 0 && dx <= 0) continue;
+				worst = Math.max(worst, Math.abs(correlation(r, r, cells, dx, dy)));
+			}
+		expect(worst).toBeLessThan(size === 1 ? 0.015 : 0.04);
+	}, 30_000);
+
+	test("its histogram is flat", async () => {
+		const { r } = await patch(7, 1);
+		const bins = new Array(16).fill(0);
+		for (const v of r) bins[v >> 4]++;
+		const expected = r.length / 16;
+		for (const c of bins) expect(Math.abs(c / expected - 1)).toBeLessThan(0.05);
+	}, 30_000);
+
+	test("colour grain draws its channels independently", async () => {
+		const { cells, r, g, b } = await patch(7, 1, false);
+		for (const [u, v] of [
+			[r, g],
+			[g, b],
+			[r, b],
+		])
+			expect(Math.abs(correlation(u, v, cells, 0, 0))).toBeLessThan(0.015);
+	}, 30_000);
+});
+
 describe("halftone", () => {
 	const grey: ResolvedFill[] = [{ kind: "solid", color: "#808080" }];
 	const grid = (shape: Halftone["shape"], scale = 1) =>
