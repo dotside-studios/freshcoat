@@ -131,6 +131,7 @@ export type AssemblePdf = (
 	options: {
 		dpi: number;
 		title?: string;
+		creator?: string;
 		layout?: SheetLayout;
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
@@ -153,6 +154,8 @@ export type ExportJobOptions = {
 	/** Asked once three PDF pages are made, when the whole PDF would pass
 	 *  PDF_CONFIRM_BYTES; false cancels the job. */
 	confirmLargePdf?: (estimatedBytes: number) => Promise<boolean>;
+	/** what a PDF names as its creator; default Freshcoat Studio */
+	pdfCreator?: string;
 	now?: () => number;
 };
 
@@ -500,6 +503,7 @@ export function runExportJob(
 						{
 							dpi: preset.dpi,
 							title: preset.name || workspace.name,
+							...(options.pdfCreator ? { creator: options.pdfCreator } : {}),
 							...(sheet ? { layout: sheet, cardMm } : {}),
 							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
 							...(outputIntent !== undefined ? { outputIntent } : {}),

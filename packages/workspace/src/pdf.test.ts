@@ -49,6 +49,19 @@ describe("assemblePdf", () => {
 		expect(doc.getProducer()).toMatch(/Freshcoat/);
 	});
 
+	it("names the surface that made it as its creator and producer", async () => {
+		const pages = [
+			{ bytes: makePng(2, 2), format: png, widthPx: 96, heightPx: 96 },
+		];
+		const bytes = await assemblePdf(pages, {
+			dpi: 96,
+			creator: "Freshcoat CLI 0.5.0",
+		});
+		const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+		expect(doc.getCreator()).toBe("Freshcoat CLI 0.5.0");
+		expect(doc.getProducer()).toBe("Freshcoat CLI 0.5.0 (pdf-lib)");
+	});
+
 	it("is repeatable with a fixed date", async () => {
 		const pages = [
 			{ bytes: makePng(2, 2), format: png, widthPx: 96, heightPx: 96 },

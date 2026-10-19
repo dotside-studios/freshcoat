@@ -58,6 +58,9 @@ export type AssemblePdfOptions = {
 	/** pixels per inch: a page is `widthPx / dpi` inches wide */
 	dpi: number;
 	title?: string;
+	/** what made the file, such as "Freshcoat CLI 0.5.0"; default Freshcoat
+	 *  Studio */
+	creator?: string;
 	/** creation and modification date; fixing it makes the bytes repeatable */
 	date?: Date;
 	/** default one image per page */
@@ -79,6 +82,8 @@ export type AssemblePdfOptions = {
 	 *  takes its `DEFAULT_CUT_SPOTS` name */
 	cutSpots?: CutSpots;
 };
+
+const DEFAULT_PDF_CREATOR = "Freshcoat Studio";
 
 const CROP_MARK_WIDTH_PT = 0.25;
 const CUT_LINE_WIDTH_PT = 0.25;
@@ -125,8 +130,9 @@ export async function assemblePdf(
 	const doc = await PDFDocument.create({ updateMetadata: false });
 	const date = options.date ?? new Date();
 	if (options.title !== undefined) doc.setTitle(options.title);
-	doc.setCreator("Freshcoat Studio");
-	doc.setProducer("Freshcoat Studio (pdf-lib)");
+	const creator = options.creator ?? DEFAULT_PDF_CREATOR;
+	doc.setCreator(creator);
+	doc.setProducer(`${creator} (pdf-lib)`);
 	doc.setCreationDate(date);
 	doc.setModificationDate(date);
 	const bleed = resolveBleedMm(options.bleedMm);

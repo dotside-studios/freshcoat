@@ -29,6 +29,7 @@ import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { createLoader, openRenderer } from "../renderer";
+import { version } from "../version";
 import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
@@ -188,6 +189,7 @@ export async function runPreset(
 			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
+			pdfCreator: `Freshcoat CLI ${version()}`,
 		}).catch((error: unknown) => {
 			if (error instanceof SheetLayoutError)
 				throw new CliError(`cannot lay out the sheets: ${error.message}`);

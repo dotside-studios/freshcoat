@@ -190,6 +190,11 @@ token the template does not have, sheets the cards do not fit, and an
 profile. Every PDF declares sRGB unless told otherwise; a workspace preset
 carries its own output intent, set in Studio.
 
+A PDF's title, and the job in its slug, is the template's name, or the
+`--out` file's name without `.pdf` when the template has none; a workspace
+preset's PDF takes the preset's name, as in Studio. Its creator and producer
+name `Freshcoat CLI` and its version.
+
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \
   --output-intent PSOcoated_v3.icc --output-intent-id FOGRA51 --out print.pdf

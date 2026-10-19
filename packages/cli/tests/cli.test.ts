@@ -1002,6 +1002,35 @@ describe("render export options", () => {
 		]);
 	});
 
+	test("names the template and the CLI in a PDF's metadata and slug", async () => {
+		const run = await box.run("render", "badge.json", "--sheets", "a4", "--marks", "slug", "--out", "named.pdf", "-q");
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("named.pdf")), { updateMetadata: false });
+		expect(pdf.getTitle()).toBe("Badge");
+		expect(pdf.getCreator()).toBe(`Freshcoat CLI ${version()}`);
+		expect(pdf.getProducer()).toBe(`Freshcoat CLI ${version()} (pdf-lib)`);
+		const page = pdf.getPage(0);
+		const contents = page.node.Contents();
+		const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => pdf.context.lookup(ref)) : [contents];
+		const content = streams
+			.map((stream) => (stream instanceof PDFRawStream ? new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode()) : ""))
+			.join("\n");
+		const hex = [...new TextEncoder().encode("Badge · Sheet 1 of 1")]
+			.map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
+			.join("");
+		expect(content.replace(/ /g, "")).toContain(hex.replace("C2B7", "B7"));
+
+		await box.write("unnamed.json", JSON.stringify(card({ name: " " })));
+		expect((await box.run("render", "unnamed.json", "--out", "spring-run.pdf", "-q")).code).toBe(0);
+		const unnamed = await PDFDocument.load(await readFile(box.path("spring-run.pdf")), { updateMetadata: false });
+		expect(unnamed.getTitle()).toBe("spring-run");
+
+		await box.write("titled.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		expect((await box.run("render", "titled.coatworkspace", "--preset", "p_pdf", "--out", "titled.pdf", "-q")).code).toBe(0);
+		const preset = await PDFDocument.load(await readFile(box.path("titled.pdf")), { updateMetadata: false });
+		expect([preset.getTitle(), preset.getCreator()]).toEqual(["Proof", `Freshcoat CLI ${version()}`]);
+	});
+
 	test("refuses options given twice, or that undo each other", async () => {
 		const cases: [string[], string][] = [
 			[["--output-intent", "p.icc", "--no-output-intent", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],

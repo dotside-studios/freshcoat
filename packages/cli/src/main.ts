@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import {
 	Command,
 	CommanderError,
@@ -27,13 +26,9 @@ import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
 import { CliError, type Io, processIo, UsageError } from "./io";
+import { version } from "./version";
 
-export function version(): string {
-	const manifest = JSON.parse(
-		readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-	) as { version: string };
-	return manifest.version;
-}
+export { version };
 
 export async function main(
 	argv: string[],
