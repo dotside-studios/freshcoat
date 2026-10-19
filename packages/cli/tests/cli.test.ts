@@ -2095,6 +2095,25 @@ describe("render slice pieces", () => {
 		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual(["back.png", REPORT_FILE_NAME, "front.png"]);
 	});
 
+	test("lists only the warnings of the layers inside each piece", async () => {
+		const t = sliced();
+		t.template_data[0]!.elements.push({
+			id: "tiny",
+			type: "text",
+			pos: { x: 110, y: 60 },
+			size: { width: 50, height: 10 },
+			properties: { value: "x", font: { family: "Inter", size: 4 }, color: "#000000" },
+		} as never);
+		await box.write("tiny.json", JSON.stringify(t));
+		const run = await box.run("render", "tiny.json", "--pieces", "--frame", "front", "--out", "tiny-pieces");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front-right.png: Text is 0.96 pt at print size, below 6 pt: tiny");
+		expect(run.stderr).not.toContain("front-left.png");
+		const report = (await readFile(box.path("tiny-pieces", REPORT_FILE_NAME), "utf8")).trim().split("\r\n");
+		expect(report.find((row) => row.startsWith("front-left.png"))).toEndWith(",");
+		expect(report.find((row) => row.startsWith("front-right.png"))).toEndWith('"Text is 0.96 pt at print size, below 6 pt: tiny"');
+	});
+
 	test("refuses pieces on double-sided sheets", async () => {
 		const flags = await box.run("render", "sliced.json", "--pieces", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf");
 		expect(flags.code).toBe(2);

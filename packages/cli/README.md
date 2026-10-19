@@ -231,8 +231,11 @@ replaces `--bleed`. On its own, `--pieces` exports into the `--out` directory,
 the current one by default, with a report. A PDF has a page per piece, sized by
 its pixels at `--dpi`; with `--sheets` the pieces are imposed as cards when all
 the files share one size, and refused when they do not. `--pdf-pages vector` is
-refused with `--pieces`, as pieces are raster only. `--pieces` also takes a
-workspace preset (below), over the preset's own `split`.
+refused with `--pieces`, as pieces are raster only, and so is `--duplex`, as a
+piece is not a side of a card. Each piece reports the warnings of the layers
+inside its slice and its bleed, and those of no one layer, such as a font
+that failed to load. `--pieces` also takes a workspace preset (below), over
+the preset's own `split`, and is refused on one that prints duplex.
 
 ```sh
 freshcoat render sticker.coat --pieces --out pieces
