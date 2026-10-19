@@ -216,6 +216,16 @@ field left empty is not reported. An image that prints below the preset's
 `minImageDpi` (default 300, 0 for no check) at its `dpi` is listed too, as
 "Image prints at 200 DPI, under 300: photo".
 
+A vector PDF page draws a layer it cannot express, such as one with a
+shadow, grain or halftone, as an image. A layer that loses a spot ink by it
+is warned in its item's `warnings`, naming the layer and the ink, as
+"Spot colour Pink lost: the fill of pink is drawn as an image in the PDF
+(shadow)", since the separation does not print. The others go in the item's
+`rasterized`, and `result.rasterized` gathers them once per side, each layer
+with every reason (`rasterizedSides` does it for a list of items). The
+report ends with an `info` row per such side, as "Drawn as images in the
+PDF: soft (shadow, grain); backdrop blur" (`describeRasterized`).
+
 `runExportJob` is the layer below, for a host with its own pool: Studio
 passes a pool of workers, each holding a `createItemRenderer` over its own
 renderer, and an `OutputSink` such as `createStreamZipSink` over a writable

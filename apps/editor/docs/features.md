@@ -162,7 +162,10 @@ the records, and **Export** turns templates and records into files.
     is kept. Checks lists what stops or spoils an export: a block (which
     disables Export), an unbound template, unfilled required fields,
     characters the fonts can't draw and records that failed last time, each
-    with a link to the record or the setting. A count beside the Export
+    with a link to the record or the setting. After a vector PDF, it warns
+    for each spot ink drawn as an image ("Spot colors lost in the last PDF,
+    drawn as images: Pink (pink)"), and notes once, without counting it as
+    an issue, the other layers drawn as images and why. A count beside the Export
     button opens the same list, and an estimate beside it says what the
     export will produce ("120 records · PDF · 1 file", "240 files · PNG
     zip"). Sizes are not estimated.
@@ -371,13 +374,15 @@ the records, and **Export** turns templates and records into files.
     printer knows it (White by default; All and None are refused), a tint, an
     alternate colour (the layer's own when empty) and an Overprint row, on by
     default. A vector PDF prints the paint as a Separation of that name; the
-    canvas, images and other pages show the alternate. There is no colour
+    canvas, images and other pages show the alternate at the tint, mixed
+    with white as the PDF's tint transform does. There is no colour
     library: type the printer's name.
   - Separations: View > Separations, or the Separations button at the top of
     the Print tab, previews which areas print as which spot ink. It is off by
     default and lasts for the session. On the overlay, each top-level
     rectangle or vector on the current side that has a spot ink is outlined
-    along its shape: a fill ink tints the area, a stroke ink traces the edge.
+    along its shape: a fill ink tints the area, a stroke ink traces the edge,
+    each lighter by the ink's tint.
     Every ink name keeps one color. A legend in the top right corner lists the
     inks, with "Overprint" beside those that overprint, and clicking an ink
     hides or shows it to check one plate at a time. A side with no spot inks

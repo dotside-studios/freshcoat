@@ -59,6 +59,8 @@ export type SeparationShape = {
 	id: string;
 	ink: string;
 	paint: keyof LayerSpot;
+	/** How much of the ink the paint lays down, in [0, 1]. */
+	tint: number;
 	/** The outline in trim coordinates. */
 	path: string;
 	fillRule: "nonzero" | "evenodd";
@@ -148,6 +150,7 @@ export function collectSeparations(
 				id: el.id,
 				ink: ink.spot,
 				paint,
+				tint: ink.tint ?? 1,
 				path: outline.path,
 				fillRule: outline.fillRule,
 			});
