@@ -900,7 +900,7 @@ describe("render export options", () => {
 			fills: 12,
 			slug: true,
 		});
-		const all = await marked("--marks", "crop,registration,colorbar,slug", "--no-crop-marks");
+		const all = await marked("--marks", "registration,colorbar,slug");
 		expect(all).toEqual({ strokes: 4 * 3 + 1, fills: 12, slug: true });
 	});
 
@@ -1000,6 +1000,23 @@ describe("render export options", () => {
 			"2-front.png",
 			"export-report.csv",
 		]);
+	});
+
+	test("refuses options given twice, or that undo each other", async () => {
+		const cases: [string[], string][] = [
+			[["--output-intent", "p.icc", "--no-output-intent", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],
+			[["--no-output-intent", "--output-intent", "p.icc", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],
+			[["--sheets", "a4", "--marks", "crop,slug", "--no-crop-marks", "--out", "x.pdf"], "--no-crop-marks does not go with --marks crop"],
+			[["--dpi", "72", "--dpi", "96", "--out", "x.pdf"], "--dpi is given twice; give it once"],
+			[["--format", "png", "--format", "jpeg", "--out", "x.zip"], "--format is given twice; give it once"],
+		];
+		for (const [argv, message] of cases) {
+			const run = await box.run("render", "badge.json", ...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code: 2 });
+			expect(run.stderr).toContain(message);
+		}
+		const same = await box.run("render", "badge.json", "--dpi", "72", "--dpi", "72", "--frame", "front", "--frame", "back", "--out", "twice.pdf", "-q");
+		expect(same.code).toBe(0);
 	});
 
 	test("refuses export options that do not fit", async () => {
@@ -2045,6 +2062,22 @@ describe("render slice pieces", () => {
 		expect(run.code).toBe(0);
 		expect(run.stderr).toContain("warning: no slices to split; exporting whole sides");
 		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual(["back.png", REPORT_FILE_NAME, "front.png"]);
+	});
+
+	test("refuses pieces on double-sided sheets", async () => {
+		const flags = await box.run("render", "sliced.json", "--pieces", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf");
+		expect(flags.code).toBe(2);
+		expect(flags.stderr).toContain("--pieces does not go with --duplex; a piece is not a side of a card");
+		const duplex: Workspace = {
+			...workspace,
+			presets: workspace.presets.map((p) =>
+				p.id === "p_pdf" ? { ...p, layout: { ...DEFAULT_SHEET_LAYOUT, duplex: "long-edge" as const } } : p,
+			),
+		};
+		await box.write("duplex.coatworkspace", await workspaceBytes(duplex));
+		const preset = await box.run("render", "duplex.coatworkspace", "--preset", "p_pdf", "--pieces", "--out", "x.pdf");
+		expect(preset.code).toBe(2);
+		expect(preset.stderr).toContain('--pieces does not go with double-sided sheets; "Proof" prints duplex');
 	});
 
 	test("refuses vector PDF pages for a workspace preset", async () => {

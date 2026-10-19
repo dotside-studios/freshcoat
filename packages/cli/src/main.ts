@@ -99,7 +99,7 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		return uncached;
 	};
 
-	command("render")
+	const render = command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
 		.description(
 			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
@@ -273,10 +273,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
 		)
-		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.")
-		.action((file, options, cmd) =>
-			runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd)),
-		);
+		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.");
+	const given = track(render, REPEATABLE);
+	render.action((file, options, cmd) => {
+		checkGiven(given);
+		return runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd));
+	});
 
 	command("validate")
 		.summary("check a template or workspace")
@@ -321,6 +323,44 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.action((file, options, cmd) => pack(file, { ...options, quiet: quiet(cmd) }, io));
 
 	return root;
+}
+
+/** The render options that take more than one value. */
+const REPEATABLE = ["--set", "--frame", "--scale", "--cut-spot", "--where"];
+
+/** Each option of `command` as the command line gives it, in order, with the
+ *  value as typed, for the options that may be given once. */
+function track(
+	command: {
+		options: readonly { long?: string; name(): string }[];
+		on(event: string, listener: (value: unknown) => void): unknown;
+	},
+	repeatable: readonly string[],
+) {
+	const given: { flag: string; value: unknown }[] = [];
+	for (const option of command.options) {
+		const flag = option.long;
+		if (!flag || repeatable.includes(flag)) continue;
+		command.on(`option:${option.name()}`, (value: unknown) => given.push({ flag, value }));
+	}
+	return given;
+}
+
+/** Refuses an option given twice with different values, and options that undo
+ *  each other, rather than let the last one win. */
+function checkGiven(given: readonly { flag: string; value: unknown }[]): void {
+	const flags = new Set(given.map((entry) => entry.flag));
+	for (const [a, b] of [["--output-intent", "--no-output-intent"]] as const)
+		if (flags.has(a) && flags.has(b)) throw new UsageError(`${a} and ${b} do not go together`);
+	const marks = given.find((entry) => entry.flag === "--marks");
+	if (flags.has("--no-crop-marks") && marks && parseMarks(String(marks.value)).includes("crop"))
+		throw new UsageError("--no-crop-marks does not go with --marks crop");
+	const seen = new Map<string, unknown>();
+	for (const { flag, value } of given) {
+		if (seen.has(flag) && JSON.stringify(seen.get(flag)) !== JSON.stringify(value))
+			throw new UsageError(`${flag} is given twice; give it once`);
+		seen.set(flag, value);
+	}
 }
 
 /** A value parser for commander, which reports an ArgumentError as its own. */

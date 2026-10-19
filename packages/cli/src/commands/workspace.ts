@@ -21,6 +21,7 @@ import {
 	largestImagePixels,
 	type PresetReadiness,
 	presetReadiness,
+	sheetLayout,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
@@ -75,6 +76,11 @@ export async function renderWorkspace(
 		...(options.cutSpot ? { cutSpots: { ...preset.cutSpots, ...options.cutSpot } } : {}),
 		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 	};
+	const sheets = sheetLayout(preset);
+	if (options.pieces && sheets && sheets.duplex !== "none")
+		throw new UsageError(
+			`--pieces does not go with double-sided sheets; "${preset.name}" prints duplex`,
+		);
 	if (options.cut && preset.format === "pdf")
 		throw new CliError(`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`);
 	if (options.cutLines && preset.format !== "pdf")
