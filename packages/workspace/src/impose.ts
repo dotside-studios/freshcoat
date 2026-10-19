@@ -170,9 +170,23 @@ function grid(
 
 const mm = (n: number) => `${Math.round(n * 10) / 10} mm`;
 
+function paperName(layout: SheetLayout, paper: CardSizeMm): string {
+	if (typeof layout.paper !== "string")
+		return `${mm(paper.widthMm)} × ${mm(paper.heightMm)} paper`;
+	return layout.paper.length <= 2
+		? layout.paper.toUpperCase()
+		: `${layout.paper[0]?.toUpperCase()}${layout.paper.slice(1)}`;
+}
+
 function noFit(g: Grid, card: CardSizeMm, layout: SheetLayout, auto: boolean) {
 	const across = g.widthMm - 2 * layout.marginMm;
 	const down = g.heightMm - 2 * layout.marginMm;
+	const paper = paperSize(layout);
+	if (paper.widthMm - 2 * layout.marginMm <= 0)
+		return new SheetLayoutError(
+			`The margins (${mm(layout.marginMm)}) leave no room on ${paperName(layout, paper)}: ${mm(paper.widthMm)} wide needs margins under ${mm(paper.widthMm / 2)}`,
+			"both",
+		);
 	const axis: SheetLayoutAxis =
 		g.columns === 0 && g.rows === 0
 			? "both"

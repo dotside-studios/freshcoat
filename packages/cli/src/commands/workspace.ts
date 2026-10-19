@@ -180,7 +180,7 @@ export async function runPreset(
 			? await startWorkerPool(threads, options.root, fonts)
 			: undefined;
 	const renderer = await openRenderer(io, { root: options.root, build: "full" });
-	const progress = progressReporter(log);
+	const progress = progressReporter(log, sheetLayout(preset) !== null);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
@@ -293,11 +293,11 @@ function presetList(presets: readonly { id: string; name: string }[]): string {
 	return `\nPresets:\n${presets.map((p) => `  ${p.name}  (${p.id})`).join("\n")}`;
 }
 
-function progressReporter(log: Log): (progress: JobProgress) => void {
+function progressReporter(log: Log, sheets: boolean): (progress: JobProgress) => void {
 	let lastTenth = -1;
 	return ({ done, failed, total, assembling }) => {
 		const text = assembling
-			? `assembling PDF: ${assembling.done}/${assembling.total} pages`
+			? `assembling PDF: ${assembling.done}/${assembling.total} ${sheets ? "cards" : "pages"}`
 			: `rendered ${done}/${total}${failed > 0 ? `, ${failed} failed` : ""}`;
 		const tenth = total === 0 ? 10 : Math.floor((done * 10) / total);
 		if (log.tty || tenth !== lastTenth || done === total) {

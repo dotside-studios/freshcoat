@@ -195,7 +195,8 @@ carries its own output intent, set in Studio.
 A PDF's title, and the job in its slug, is the template's name, or the
 `--out` file's name without `.pdf` when the template has none; a workspace
 preset's PDF takes the preset's name, as in Studio. Its creator and producer
-name `Freshcoat CLI` and its version.
+name `Freshcoat CLI` and its version. While a PDF on sheets is assembled, the
+progress counts cards, each embedded once, rather than pages.
 
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \

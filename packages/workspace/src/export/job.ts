@@ -64,7 +64,8 @@ export type JobProgress = {
 	etaMs: number;
 	/** bytes handed to the destination so far */
 	bytes?: number;
-	/** set while a PDF is assembled: pages embedded of all */
+	/** set while a PDF is assembled: images embedded of all, one per card on
+	 *  sheets */
 	assembling?: { done: number; total: number };
 };
 

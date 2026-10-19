@@ -1031,6 +1031,23 @@ describe("render export options", () => {
 		expect([preset.getTitle(), preset.getCreator()]).toEqual(["Proof", `Freshcoat CLI ${version()}`]);
 	});
 
+	test("says what the margins leave no room for", async () => {
+		const run = await box.run("render", "badge.json", "--sheets", "a5", "--margin", "80", "--out", "wide.pdf");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain(
+			"cannot lay out the sheets: The margins (80 mm) leave no room on A5: 148 mm wide needs margins under 74 mm",
+		);
+	});
+
+	test("counts cards, not pages, while assembling sheets", async () => {
+		const sheets = await box.run("render", "badge.json", "--data", "crew.csv", "--sheets", "a4", "--out", "counted.pdf");
+		expect(sheets.code).toBe(0);
+		expect(sheets.stderr).toContain("assembling PDF: 4/4 cards");
+		expect(sheets.stderr).not.toContain("pages");
+		const single = await box.run("render", "badge.json", "--out", "counted-pages.pdf");
+		expect(single.stderr).toContain("assembling PDF: 2/2 pages");
+	});
+
 	test("refuses options given twice, or that undo each other", async () => {
 		const cases: [string[], string][] = [
 			[["--output-intent", "p.icc", "--no-output-intent", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],
@@ -1359,7 +1376,6 @@ describe("print checks", () => {
 		const plain = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#000000", "--out", "print-out");
 		expect(plain.stderr).not.toContain("rich black");
 	});
-
 	test("render reports the QR checks validate does, in its report too", async () => {
 		const t = card();
 		t.template_data[0]!.elements = [

@@ -597,6 +597,37 @@ describe("imposeSheets", () => {
 			expect(e.axis).toBe("width");
 		});
 
+		it("says when the margins leave no room on the paper", () => {
+			const e = error(() =>
+				imposeSheets(
+					items(1),
+					CR80,
+					layout({ paper: "a5", marginMm: 80, orientation: "auto" }),
+				),
+			);
+			expect(e.message).toBe(
+				"The margins (80 mm) leave no room on A5: 148 mm wide needs margins under 74 mm",
+			);
+			expect(
+				error(() =>
+					imposeSheets(
+						items(1),
+						CR80,
+						layout({ paper: "letter", marginMm: 120 }),
+					),
+				).message,
+			).toMatch(/^The margins \(120 mm\) leave no room on Letter: 215.9 mm wide/);
+			expect(
+				error(() =>
+					imposeSheets(
+						items(1),
+						CR80,
+						layout({ paper: { widthMm: 100, heightMm: 50 }, marginMm: 30 }),
+					),
+				).message,
+			).toMatch(/^The margins \(30 mm\) leave no room on 50 mm × 100 mm paper/);
+		});
+
 		it("refuses negative margins and gaps, and an empty card", () => {
 			expect(() =>
 				imposeSheets(items(1), CR80, layout({ marginMm: -1 })),
