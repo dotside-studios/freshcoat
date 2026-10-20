@@ -15,7 +15,7 @@ export type RenderPlan =
 	| { kind: "template"; options: RenderOptions }
 	| { kind: "batch"; options: BatchOptions };
 
-const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "cutSpot", "minDpi", "quiet"];
+const WORKSPACE_KEYS = ["preset", "out", "records", "save", "where", "dryRun", "jobs", "pieces", "cut", "cutLines", "cutSpot", "minDpi", "maxPdfPages", "quiet"];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
 const PDF_OPTIONS = [
 	"pdfPages",
@@ -35,6 +35,7 @@ const PDF_OPTIONS = [
 	"outputIntentId",
 	"cutLines",
 	"cutSpot",
+	"maxPdfPages",
 ];
 const SHEET_OPTIONS = ["orientation", "duplex", "margin", "gap", "copies", "cropMarks", "marks", "backOffset", "blankBacks"];
 const NEGATED = ["cropMarks", "analyze"];
@@ -71,6 +72,7 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
 				...(rest.cutSpot ? { cutSpot: rest.cutSpot } : {}),
 				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
+				...(rest.maxPdfPages !== undefined ? { maxPdfPages: rest.maxPdfPages } : {}),
 				out,
 				quiet: input.quiet,
 			},

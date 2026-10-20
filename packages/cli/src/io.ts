@@ -9,6 +9,8 @@ export type Io = {
 	tty?: boolean;
 	cacheDir?: string;
 	env?: Record<string, string | undefined>;
+	/** aborted when the command is cancelled */
+	signal?: AbortSignal;
 };
 
 export function processIo(): Io {

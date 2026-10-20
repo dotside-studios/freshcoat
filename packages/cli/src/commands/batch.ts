@@ -105,6 +105,7 @@ export type BatchOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
+	maxPdfPages?: number;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
 	outputIntentId?: string;
@@ -129,6 +130,7 @@ export async function renderBatch(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.maxPdfPages !== undefined ? { maxPdfPages: options.maxPdfPages } : {}),
 			...(options.sheets ? { layoutFlags: true } : {}),
 		},
 		log,

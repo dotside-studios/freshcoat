@@ -111,6 +111,8 @@ export type Sandbox = {
 	fetch: ReturnType<typeof fontFetch>;
 	path(...parts: string[]): string;
 	run(...argv: string[]): Promise<Run>;
+	/** runs with a signal that aborts when stderr first matches `when` */
+	runCancelled(when: RegExp, ...argv: string[]): Promise<Run>;
 	write(name: string, content: string | Uint8Array): Promise<string>;
 	cleanup(): Promise<void>;
 };
@@ -123,23 +125,40 @@ export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbo
 		await writeFile(join(dir, name), content);
 		return join(dir, name);
 	};
+	const execute = async (
+		argv: string[],
+		signal?: AbortSignal,
+		watch?: (stderr: string) => void,
+	): Promise<Run> => {
+		let stdout = "";
+		let stderr = "";
+		const io: Io = {
+			stdout: (text) => void (stdout += text),
+			stderr: (text) => {
+				stderr += text;
+				watch?.(stderr);
+			},
+			cwd: dir,
+			fetch,
+			...(signal ? { signal } : {}),
+			...(options.cache ? { cacheDir: join(dir, ".cache") } : {}),
+		};
+		const code = await main(argv, io);
+		return { code, stdout, stderr };
+	};
 	return {
 		dir,
 		fetch,
 		path: (...parts) => join(dir, ...parts),
 		write,
 		async run(...argv) {
-			let stdout = "";
-			let stderr = "";
-			const io: Io = {
-				stdout: (text) => void (stdout += text),
-				stderr: (text) => void (stderr += text),
-				cwd: dir,
-				fetch,
-				...(options.cache ? { cacheDir: join(dir, ".cache") } : {}),
-			};
-			const code = await main(argv, io);
-			return { code, stdout, stderr };
+			return execute(argv);
+		},
+		async runCancelled(when, ...argv) {
+			const controller = new AbortController();
+			return execute(argv, controller.signal, (text) => {
+				if (when.test(text)) controller.abort();
+			});
 		},
 		cleanup: () => rm(dir, { recursive: true, force: true }),
 	};

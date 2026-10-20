@@ -1,5 +1,7 @@
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { Writable } from "node:stream";
 import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type CutSpots,
@@ -35,6 +37,9 @@ import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
+/** A PDF holds every rendered page in memory until it is assembled. */
+export const DEFAULT_MAX_PDF_PAGES = 2000;
+
 export type WorkspaceOptions = {
 	preset?: string;
 	out: string;
@@ -48,6 +53,7 @@ export type WorkspaceOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
+	maxPdfPages?: number;
 	quiet: boolean;
 };
 
@@ -90,6 +96,8 @@ export async function renderWorkspace(
 		throw new CliError(`--cut-lines applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
 	if (options.cutSpot && preset.format !== "pdf")
 		throw new CliError(`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
+	if (options.maxPdfPages !== undefined && preset.format !== "pdf")
+		throw new CliError(`--max-pdf-pages applies only to a PDF preset; "${preset.name}" writes images`);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,
@@ -98,6 +106,7 @@ export async function renderWorkspace(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.maxPdfPages !== undefined ? { maxPdfPages: options.maxPdfPages } : {}),
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
@@ -131,12 +140,18 @@ function withFilters(
 	};
 }
 
-async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
-	const blob = await packWorkspace(workspace);
-	if (!blob) throw new CliError("could not write the workspace");
+export async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
 	const temporary = `${path}.${process.pid}.tmp`;
-	await writeFile(temporary, new Uint8Array(await blob.arrayBuffer()));
-	await rename(temporary, path);
+	try {
+		await packWorkspace(
+			workspace,
+			Writable.toWeb(createWriteStream(temporary)) as WritableStream<Uint8Array>,
+		);
+		await rename(temporary, path);
+	} catch (err) {
+		await rm(temporary, { force: true });
+		throw err;
+	}
 }
 
 export function writesFile(out: string): boolean {
@@ -151,6 +166,8 @@ export async function runPreset(
 		out: string;
 		dryRun?: true;
 		jobs?: number;
+		/** the most pages a PDF may hold, default DEFAULT_MAX_PDF_PAGES; 0 for no limit */
+		maxPdfPages?: number;
 		save?: (workspace: Workspace) => Promise<void>;
 		/** the sheet layout came from the command line */
 		layoutFlags?: true;
@@ -167,27 +184,38 @@ export async function runPreset(
 	warnNotices(readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
+	checkPdfPages(preset, plan.length, options.maxPdfPages ?? DEFAULT_MAX_PDF_PAGES);
 	checkCuts(preset, entry.template, log);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
 		load: createLoader(io, options.root),
 	});
 	warnAboutFonts(log, report);
+	const { signal } = io;
+	signal?.throwIfAborted();
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
 	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
 	const pool =
 		threads > 1
-			? await startWorkerPool(threads, options.root, fonts)
+			? await startWorkerPool(threads, options.root, fonts, signal)
 			: undefined;
-	const renderer = await openRenderer(io, { root: options.root, build: "full" });
+	let renderer: Awaited<ReturnType<typeof openRenderer>>;
+	try {
+		signal?.throwIfAborted();
+		renderer = await openRenderer(io, { root: options.root, build: "full" });
+	} catch (error) {
+		pool?.dispose();
+		throw error;
+	}
 	const progress = progressReporter(log, sheetLayout(preset) !== null);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
 			fonts,
 			...(pool ? { pool } : {}),
+			...(signal ? { signal } : {}),
 			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
@@ -199,7 +227,10 @@ export async function runPreset(
 		});
 		log.endProgress();
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
-		if (result.cancelled) throw new CliError("the export was cancelled");
+		if (result.cancelled || signal?.aborted) {
+			if (file) await rm(out, { force: true });
+			throw new CliError("the export was cancelled");
+		}
 		await options.save?.(result.workspace);
 		for (const item of result.items)
 			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning.message}`);
@@ -223,6 +254,15 @@ export async function runPreset(
 		pool?.dispose();
 		renderer.dispose();
 	}
+}
+
+/** Refuses a PDF with more pages than the limit, before anything is rendered
+ *  or written, since every page is held in memory until the PDF is built. */
+function checkPdfPages(preset: ExportPreset, pages: number, max: number): void {
+	if (preset.format !== "pdf" || max === 0 || pages <= max) return;
+	throw new CliError(
+		`the PDF would have ${pages} pages, over the limit of ${max}; every page is held in memory until the PDF is built. Export fewer records with --where, or raise the limit with --max-pdf-pages <n> (0 for none)`,
+	);
 }
 
 function planPreset(
