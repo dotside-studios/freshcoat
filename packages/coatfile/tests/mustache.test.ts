@@ -9,6 +9,8 @@ import {
 	tokenIds,
 	wholeToken,
 } from "../src/mustache";
+import { fieldContext } from "../src/prepare";
+import type { Template } from "../src/types";
 
 describe("substitute", () => {
 	test("replaces a simple {{id}} token", () => {
@@ -267,5 +269,32 @@ describe("fieldKeyFrom", () => {
 	test("always gives a key FIELD_ID accepts", () => {
 		for (const s of ["", "2nd", "firstName", "Año", "日本", "_x_", "a.b", "9"])
 			expect(FIELD_ID.test(fieldKeyFrom(s))).toBe(true);
+	});
+});
+
+describe("inherited properties", () => {
+	const poisoned = (): Record<string, unknown> =>
+		JSON.parse('{"__proto__": {"name": "x"}, "title": "Hi"}');
+	const tpl = {
+		fields: { type: "object", properties: { name: { type: "string" } } },
+	} as unknown as Template;
+
+	test("a token never reads from the prototype chain", () => {
+		for (const id of ["constructor", "toString", "__proto__", "hasOwnProperty"])
+			expect(substitute(`[{{${id}}}]`, {})).toBe("[]");
+	});
+
+	test("fieldContext has no prototype and ignores an own __proto__ key", () => {
+		const ctx = fieldContext(tpl, poisoned());
+		expect(Object.getPrototypeOf(ctx)).toBeNull();
+		expect(ctx.title).toBe("Hi");
+		expect(ctx.name).toBeUndefined();
+		expect(substitute("{{name}}{{constructor}}", ctx)).toBe("");
+		expect(({} as Record<string, unknown>).name).toBeUndefined();
+	});
+
+	test("a caller's own context is read by own properties only", () => {
+		const ctx = Object.create({ name: "inherited" }) as Record<string, unknown>;
+		expect(substitute("{{name}}", ctx)).toBe("");
 	});
 });

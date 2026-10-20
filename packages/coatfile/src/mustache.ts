@@ -1,3 +1,5 @@
+import { ownValue } from "./own";
+
 export const FIELD_ID = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 /** The values a field's `format` may take. A field without one is plain text. */
@@ -162,7 +164,7 @@ export function substitute(
 
 function substituteString(s: string, ctx: Record<string, unknown>): string {
 	return mapRefs(s, (ref) => {
-		const v = ctx[ref.id];
+		const v = ownValue(ctx, ref.id);
 		return v == null ? "" : String(v);
 	});
 }

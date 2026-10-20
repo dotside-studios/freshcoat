@@ -631,6 +631,20 @@ describe("validateValues", () => {
 		required: ["name"],
 	};
 
+	test("inherited properties are not fields or values", () => {
+		const poisoned = JSON.parse('{"__proto__": {"name": "x"}, "bio": "ok"}');
+		const r = validateValues(poisoned, fields);
+		expect(r.ok).toBe(false);
+		expect(r.ok === false && r.errors.map((e) => e.code)).toEqual([
+			"missing_required_value",
+		]);
+		const asked = { ...fields, required: ["constructor"] };
+		const missing = validateValues({}, asked);
+		expect(missing.ok).toBe(false);
+		const extra = { name: "a", constructor: 1, toString: 2 };
+		expect(validateValues(extra, fields).ok).toBe(true);
+	});
+
 	test("accepts values matching the schema", () => {
 		const r = validateValues({ name: "Alex", bio: "..." }, fields);
 		expect(r.ok).toBe(true);

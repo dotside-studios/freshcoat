@@ -3,6 +3,7 @@
 // auto-layout frame closes the gap it leaves exactly as a hidden layer does in
 // Figma.
 
+import { ownValue } from "./own";
 import type {
 	BooleanOperandElement,
 	Element,
@@ -27,11 +28,11 @@ function conditionHolds(
 	values: Record<string, unknown>,
 	fields: Record<string, FieldDefinition>,
 ): boolean {
-	const value = values[cond.field];
+	const value = ownValue(values, cond.field);
 	const match =
 		cond.equals !== undefined
 			? String(value ?? "") === cond.equals
-			: fieldIsSet(value, fields[cond.field]);
+			: fieldIsSet(value, ownValue(fields, cond.field));
 	return cond.not ? !match : match;
 }
 
