@@ -2,6 +2,7 @@
 // one page of graphics, its resources and a cross-reference table.
 
 import { deflate } from "../png";
+import { md5 } from "./md5";
 
 export class PdfName {
 	constructor(readonly name: string) {}
@@ -18,6 +19,10 @@ export class PdfStream {
 	) {}
 }
 
+export class PdfBytes {
+	constructor(readonly bytes: Uint8Array) {}
+}
+
 export type PdfValue =
 	| number
 	| boolean
@@ -25,6 +30,7 @@ export type PdfValue =
 	| string
 	| PdfName
 	| PdfRef
+	| PdfBytes
 	| PdfValue[]
 	| PdfDict;
 
@@ -34,8 +40,10 @@ export const name = (n: string): PdfName => new PdfName(n);
 
 export function num(n: number): string {
 	if (!Number.isFinite(n)) return "0";
-	const r = Math.round(n * 10000) / 10000;
-	return Object.is(r, -0) ? "0" : String(r);
+	if (Math.abs(n) >= 1e15) return BigInt(Math.round(n)).toString();
+	const fixed = (Math.round(n * 10000) / 10000).toFixed(4);
+	const trimmed = fixed.replace(/\.?0+$/, "");
+	return trimmed === "-0" ? "0" : trimmed;
 }
 
 // Bytes outside printable ASCII, and the delimiters, as #xx (ISO 32000 7.3.5).
@@ -49,12 +57,35 @@ export function pdfName(n: string): string {
 	return out;
 }
 
+const hex = (bytes: Uint8Array): string =>
+	Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+// Printable ASCII stays literal; anything else is UTF-16BE with a BOM (ISO 32000 7.9.2.2).
+function textString(s: string): string {
+	if (/^[\x20-\x7e]*$/.test(s))
+		return `(${s.replace(/[\\()]/g, (c) => `\\${c}`)})`;
+	let out = "<FEFF";
+	for (let i = 0; i < s.length; i++) {
+		let unit = s.charCodeAt(i);
+		if (unit >= 0xd800 && unit < 0xdc00) {
+			const next = s.charCodeAt(i + 1);
+			if (next >= 0xdc00 && next < 0xe000) {
+				out += unit.toString(16).toUpperCase();
+				unit = next;
+				i++;
+			} else unit = 0xfffd;
+		} else if (unit >= 0xdc00 && unit < 0xe000) unit = 0xfffd;
+		out += unit.toString(16).toUpperCase().padStart(4, "0");
+	}
+	return `${out}>`;
+}
+
 function serialize(v: PdfValue): string {
 	if (typeof v === "number") return num(v);
 	if (typeof v === "boolean") return v ? "true" : "false";
 	if (v === null) return "null";
-	if (typeof v === "string")
-		return `(${v.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, "?")})`;
+	if (typeof v === "string") return textString(v);
+	if (v instanceof PdfBytes) return `<${hex(v.bytes)}>`;
 	if (v instanceof PdfName) return pdfName(v.name);
 	if (v instanceof PdfRef) return `${v.id} 0 R`;
 	if (Array.isArray(v)) return `[${v.map(serialize).join(" ")}]`;
@@ -65,6 +96,16 @@ function serialize(v: PdfValue): string {
 const latin1 = (s: string): Uint8Array => {
 	const out = new Uint8Array(s.length);
 	for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+	return out;
+};
+
+const join = (parts: Uint8Array[], length: number): Uint8Array => {
+	const out = new Uint8Array(length);
+	let at = 0;
+	for (const p of parts) {
+		out.set(p, at);
+		at += p.length;
+	}
 	return out;
 };
 
@@ -133,22 +174,17 @@ export class PdfWriter {
 			} else push(latin1(`${i + 1} 0 obj\n${serialize(obj)}\nendobj\n`));
 		});
 		const xref = length;
+		const id = new PdfBytes(md5(join(parts, length)));
 		const rows = offsets.map(
 			(o) => `${String(o).padStart(10, "0")} 00000 n \n`,
 		);
 		push(
 			latin1(
 				`xref\n0 ${offsets.length + 1}\n0000000000 65535 f \n${rows.join("")}` +
-					`trailer\n${serialize({ Size: offsets.length + 1, Root: root, Info: info })}\n` +
+					`trailer\n${serialize({ Size: offsets.length + 1, Root: root, Info: info, ID: [id, id] })}\n` +
 					`startxref\n${xref}\n%%EOF\n`,
 			),
 		);
-		const out = new Uint8Array(length);
-		let at = 0;
-		for (const p of parts) {
-			out.set(p, at);
-			at += p.length;
-		}
-		return out;
+		return join(parts, length);
 	}
 }
