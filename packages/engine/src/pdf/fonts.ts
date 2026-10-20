@@ -12,7 +12,7 @@ import type { FontVariations } from "../types";
 import { sfntBytes } from "../woff";
 import { instanceFont } from "./instance";
 import { type GlyphOutlines, readOutlines } from "./outlines";
-import { embeddable, readSfnt, type SfntInfo } from "./sfnt";
+import { embeddable, embeddingRestricted, readSfnt, type SfntInfo } from "./sfnt";
 import { subsetFont } from "./subset";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 
@@ -39,6 +39,10 @@ export type FaceRequest = {
 	italic: boolean;
 	variations?: FontVariations;
 };
+
+// Why a font is not embedded, and the family whose license forbids it when
+// that is the reason.
+export type Unembeddable = { reason: string; restricted?: string };
 
 // The file a run was shaped with, and the axis values it was drawn at where
 // they are not the font's defaults.
@@ -68,7 +72,7 @@ export class FontEmbedder {
 		run: GlyphRun,
 		req: FaceRequest,
 		clusters: Map<number, string>,
-	): FontFile | { reason: string } {
+	): FontFile | Unembeddable {
 		const m = this.match(run, req, clusters);
 		return "reason" in m ? m : this.embeddable(m);
 	}
@@ -119,8 +123,13 @@ export class FontEmbedder {
 	}
 
 	// The file a PDF embeds for `m`, fixed at its instance.
-	embeddable({ file, coords }: FaceMatch): FontFile | { reason: string } {
+	embeddable({ file, coords }: FaceMatch): FontFile | Unembeddable {
 		const info = file.info as SfntInfo;
+		if (embeddingRestricted(info))
+			return {
+				reason: `font ${file.family} does not allow embedding`,
+				restricted: file.family,
+			};
 		if (!embeddable(info))
 			return {
 				reason: info.collection
