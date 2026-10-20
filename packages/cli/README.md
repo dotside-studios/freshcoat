@@ -17,8 +17,12 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `0` done, `1` the work failed (an invalid template, a failed export item) and
 `2` the command line was wrong. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every
-command. `render --help` leaves out its less common options; `render --help-all`
-lists them too.
+command. `render --help` leaves out `--png-alpha` and `--no-crop-marks`;
+`render --help-all` lists them too. An option given twice with different
+values, or options that undo each other, such as `--output-intent` with
+`--no-output-intent` or `--no-crop-marks` with `--marks crop`, are refused
+rather than letting the last one win; the repeatable options are `--set`,
+`--frame`, `--scale`, `--cut-spot` and `--where`.
 
 A template is read the way Studio opens it: duplicate element ids are renamed
 rather than refused. `render`, `inspect`, `validate` and `pack` warn, naming the
@@ -124,7 +128,9 @@ Text and strokes get the print checks at the same DPI, with the record's
 values: text below 6 pt (7 pt for a light face), strokes under 0.25 pt, and
 text under 12 pt in a rich black, as `warning: front: Text is 4.8 pt at print
 size, below 6 pt: fine_print`, and in an export's `warnings` and
-`export-report.csv`.
+`export-report.csv`. A QR code gets the checks `validate` makes, with its
+values: colours under 3:1 contrast, modules lighter than their background, a
+quiet zone under 2 modules, and a logo past the largest size drawn.
 
 With `--pdf-pages vector`, a layer the PDF draws as an image (a shadow, a
 blur, grain, a halftone, a gradient text stroke) and that carries a spot ink
@@ -179,7 +185,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--copies <n\|fill>` | with `--sheets`: repeat each card `n` times before the next, or `fill` a sheet with each; default 1 |
 | `--marks <list>` | with `--sheets`: the printer's marks, `none` or any of `crop`, `registration`, `colorbar` and `slug`, such as `crop,registration,slug`; default `crop`. See [Printer's marks](../workspace/README.md#printers-marks) |
 | `--no-crop-marks` | with `--sheets`: leave out the crop marks, whatever `--marks` says; kept for older scripts, `--marks` without `crop` does the same |
-| `--back-offset <x,y>` | with `--sheets` and `--duplex`: move every back page this many millimetres, for a printer that drifts; `y` is measured down the page, so `0.5,-1` moves the backs right and up |
+| `--back-offset <x,y>` | with `--sheets` and `--duplex`: move every back page this many millimetres, for a printer that drifts; `y` is measured down the page, so `0.5,-1` moves the backs right and up. Each is from -50 to 50, as in Studio, and an offset that moves a back off the paper is refused with exit code 2, naming the range that keeps them on |
 | `--blank-backs` | with `--sheets` and `--duplex`: give a one-sided template empty back pages, so every front lands on a front side |
 | `--print-target <none\|ymcko>` | correct the cards for a YMCKO dye-sublimation card printer, as an export preset's print target does in Studio; default the `--print-profile`'s target, or `none` |
 | `--print-profile <file>` | a measured printer profile, the JSON Studio saves from Measure; on its own it prints to the target it was measured on |
@@ -193,6 +199,12 @@ token the template does not have, sheets the cards do not fit, and an
 `--output-intent` file that is not a gray, RGB or CMYK printer or display
 profile. Every PDF declares sRGB unless told otherwise; a workspace preset
 carries its own output intent, set in Studio.
+
+A PDF's title, and the job in its slug, is the template's name, or the
+`--out` file's name without `.pdf` when the template has none; a workspace
+preset's PDF takes the preset's name, as in Studio. Its creator and producer
+name `Freshcoat CLI` and its version. While a PDF on sheets is assembled, the
+progress counts cards, each embedded once, rather than pages.
 
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \
@@ -230,8 +242,11 @@ replaces `--bleed`. On its own, `--pieces` exports into the `--out` directory,
 the current one by default, with a report. A PDF has a page per piece, sized by
 its pixels at `--dpi`; with `--sheets` the pieces are imposed as cards when all
 the files share one size, and refused when they do not. `--pdf-pages vector` is
-refused with `--pieces`, as pieces are raster only. `--pieces` also takes a
-workspace preset (below), over the preset's own `split`.
+refused with `--pieces`, as pieces are raster only, and so is `--duplex`, as a
+piece is not a side of a card. Each piece reports the warnings of the layers
+inside its slice and its bleed, and those of no one layer, such as a font
+that failed to load. `--pieces` also takes a workspace preset (below), over
+the preset's own `split`, and is refused on one that prints duplex.
 
 ```sh
 freshcoat render sticker.coat --pieces --out pieces

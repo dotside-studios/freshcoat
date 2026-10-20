@@ -22,12 +22,15 @@ import {
 	largestImagePixels,
 	type PresetReadiness,
 	presetReadiness,
+	type SheetPlan,
+	sheetLayout,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
 import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { createLoader, openRenderer } from "../renderer";
+import { version } from "../version";
 import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
@@ -76,6 +79,11 @@ export async function renderWorkspace(
 		...(options.cutSpot ? { cutSpots: { ...preset.cutSpots, ...options.cutSpot } } : {}),
 		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 	};
+	const sheets = sheetLayout(preset);
+	if (options.pieces && sheets && sheets.duplex !== "none")
+		throw new UsageError(
+			`--pieces does not go with double-sided sheets; "${preset.name}" prints duplex`,
+		);
 	if (options.cut && preset.format === "pdf")
 		throw new CliError(`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`);
 	if (options.cutLines && preset.format !== "pdf")
@@ -144,13 +152,17 @@ export async function runPreset(
 		dryRun?: true;
 		jobs?: number;
 		save?: (workspace: Workspace) => Promise<void>;
+		/** the sheet layout came from the command line */
+		layoutFlags?: true;
 	},
 	log: Log,
 	io: Io,
 ): Promise<void> {
-	if (options.dryRun) return planPreset(workspace, preset, options.out, log);
+	if (options.dryRun)
+		return planPreset(workspace, preset, options.out, log, options.layoutFlags);
 	const readiness = presetReadiness(workspace, preset);
 	checkView(readiness.viewProblems);
+	checkSheets(readiness.sheets, options.layoutFlags);
 	checkPieces(preset, readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
@@ -169,7 +181,7 @@ export async function runPreset(
 			? await startWorkerPool(threads, options.root, fonts)
 			: undefined;
 	const renderer = await openRenderer(io, { root: options.root, build: "full" });
-	const progress = progressReporter(log);
+	const progress = progressReporter(log, sheetLayout(preset) !== null);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
@@ -178,6 +190,7 @@ export async function runPreset(
 			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
+			pdfCreator: `Freshcoat CLI ${version()}`,
 		}).catch((error: unknown) => {
 			if (error instanceof SheetLayoutError)
 				throw new CliError(`cannot lay out the sheets: ${error.message}`);
@@ -216,18 +229,28 @@ function planPreset(
 	preset: ExportPreset,
 	out: string,
 	log: Log,
+	layoutFlags?: true,
 ): void {
 	const readiness = presetReadiness(workspace, preset);
 	const { plan, sheets, viewProblems } = readiness;
 	checkView(viewProblems);
+	checkSheets(sheets, layoutFlags);
 	checkPieces(preset, readiness, log);
-	if (sheets?.error !== undefined)
-		throw new CliError(`cannot lay out the sheets: ${sheets.error}`);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
 	const layout = sheets?.imposition ? `, ${sheetSummary(sheets.imposition)}` : "";
 	log.out(
 		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
 	);
+}
+
+/** Refuses sheets that can't be laid out; a back offset given on the command
+ *  line is a usage error. */
+function checkSheets(sheets: SheetPlan | null, layoutFlags?: true): void {
+	if (sheets?.error === undefined) return;
+	const message = `cannot lay out the sheets: ${sheets.error}`;
+	throw layoutFlags && sheets.field === "backOffset"
+		? new UsageError(message)
+		: new CliError(message);
 }
 
 /** Refuses pieces on vector pages, and warns when a split finds no slice. */
@@ -275,11 +298,11 @@ function presetList(presets: readonly { id: string; name: string }[]): string {
 	return `\nPresets:\n${presets.map((p) => `  ${p.name}  (${p.id})`).join("\n")}`;
 }
 
-function progressReporter(log: Log): (progress: JobProgress) => void {
+function progressReporter(log: Log, sheets: boolean): (progress: JobProgress) => void {
 	let lastTenth = -1;
 	return ({ done, failed, total, assembling }) => {
 		const text = assembling
-			? `assembling PDF: ${assembling.done}/${assembling.total} pages`
+			? `assembling PDF: ${assembling.done}/${assembling.total} ${sheets ? "cards" : "pages"}`
 			: `rendered ${done}/${total}${failed > 0 ? `, ${failed} failed` : ""}`;
 		const tenth = total === 0 ? 10 : Math.floor((done * 10) / total);
 		if (log.tty || tenth !== lastTenth || done === total) {

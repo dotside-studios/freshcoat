@@ -245,6 +245,10 @@ export type CompiledFrame = {
 	// What compile found wrong while building the scene. render() passes these
 	// on with the painter's own.
 	warnings?: CompileWarning[];
+	// The print checks that read a layer as authored, with its values filled:
+	// a QR code's colours, quiet zone and logo. render() passes these on when
+	// it runs the print checks.
+	printChecks?: PrintCheckWarning[];
 };
 
 // The encoder refused a barcode's value; `message` says why, in its words.

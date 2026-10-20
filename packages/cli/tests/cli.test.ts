@@ -942,7 +942,7 @@ describe("render export options", () => {
 			fills: 12,
 			slug: true,
 		});
-		const all = await marked("--marks", "crop,registration,colorbar,slug", "--no-crop-marks");
+		const all = await marked("--marks", "registration,colorbar,slug");
 		expect(all).toEqual({ strokes: 4 * 3 + 1, fills: 12, slug: true });
 	});
 
@@ -1042,6 +1042,69 @@ describe("render export options", () => {
 			"2-front.png",
 			"export-report.csv",
 		]);
+	});
+
+	test("names the template and the CLI in a PDF's metadata and slug", async () => {
+		const run = await box.run("render", "badge.json", "--sheets", "a4", "--marks", "slug", "--out", "named.pdf", "-q");
+		expect(run.code).toBe(0);
+		const pdf = await PDFDocument.load(await readFile(box.path("named.pdf")), { updateMetadata: false });
+		expect(pdf.getTitle()).toBe("Badge");
+		expect(pdf.getCreator()).toBe(`Freshcoat CLI ${version()}`);
+		expect(pdf.getProducer()).toBe(`Freshcoat CLI ${version()} (pdf-lib)`);
+		const page = pdf.getPage(0);
+		const contents = page.node.Contents();
+		const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => pdf.context.lookup(ref)) : [contents];
+		const content = streams
+			.map((stream) => (stream instanceof PDFRawStream ? new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode()) : ""))
+			.join("\n");
+		const hex = [...new TextEncoder().encode("Badge · Sheet 1 of 1")]
+			.map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
+			.join("");
+		expect(content.replace(/ /g, "")).toContain(hex.replace("C2B7", "B7"));
+
+		await box.write("unnamed.json", JSON.stringify(card({ name: " " })));
+		expect((await box.run("render", "unnamed.json", "--out", "spring-run.pdf", "-q")).code).toBe(0);
+		const unnamed = await PDFDocument.load(await readFile(box.path("spring-run.pdf")), { updateMetadata: false });
+		expect(unnamed.getTitle()).toBe("spring-run");
+
+		await box.write("titled.coatworkspace", await workspaceBytes(workspaceOf(card())));
+		expect((await box.run("render", "titled.coatworkspace", "--preset", "p_pdf", "--out", "titled.pdf", "-q")).code).toBe(0);
+		const preset = await PDFDocument.load(await readFile(box.path("titled.pdf")), { updateMetadata: false });
+		expect([preset.getTitle(), preset.getCreator()]).toEqual(["Proof", `Freshcoat CLI ${version()}`]);
+	});
+
+	test("says what the margins leave no room for", async () => {
+		const run = await box.run("render", "badge.json", "--sheets", "a5", "--margin", "80", "--out", "wide.pdf");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain(
+			"cannot lay out the sheets: The margins (80 mm) leave no room on A5: 148 mm wide needs margins under 74 mm",
+		);
+	});
+
+	test("counts cards, not pages, while assembling sheets", async () => {
+		const sheets = await box.run("render", "badge.json", "--data", "crew.csv", "--sheets", "a4", "--out", "counted.pdf");
+		expect(sheets.code).toBe(0);
+		expect(sheets.stderr).toContain("assembling PDF: 4/4 cards");
+		expect(sheets.stderr).not.toContain("pages");
+		const single = await box.run("render", "badge.json", "--out", "counted-pages.pdf");
+		expect(single.stderr).toContain("assembling PDF: 2/2 pages");
+	});
+
+	test("refuses options given twice, or that undo each other", async () => {
+		const cases: [string[], string][] = [
+			[["--output-intent", "p.icc", "--no-output-intent", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],
+			[["--no-output-intent", "--output-intent", "p.icc", "--out", "x.pdf"], "--output-intent and --no-output-intent do not go together"],
+			[["--sheets", "a4", "--marks", "crop,slug", "--no-crop-marks", "--out", "x.pdf"], "--no-crop-marks does not go with --marks crop"],
+			[["--dpi", "72", "--dpi", "96", "--out", "x.pdf"], "--dpi is given twice; give it once"],
+			[["--format", "png", "--format", "jpeg", "--out", "x.zip"], "--format is given twice; give it once"],
+		];
+		for (const [argv, message] of cases) {
+			const run = await box.run("render", "badge.json", ...argv);
+			expect({ argv, code: run.code }).toEqual({ argv, code: 2 });
+			expect(run.stderr).toContain(message);
+		}
+		const same = await box.run("render", "badge.json", "--dpi", "72", "--dpi", "72", "--frame", "front", "--frame", "back", "--out", "twice.pdf", "-q");
+		expect(same.code).toBe(0);
 	});
 
 	test("refuses export options that do not fit", async () => {
@@ -1354,6 +1417,30 @@ describe("print checks", () => {
 		expect(run.stderr).toContain("warning: front: Text is 2.88 pt at print size, below 6 pt: fine");
 		const plain = await box.run("render", "print.json", "--frame", "front", "--set", "motto=#000000", "--out", "print-out");
 		expect(plain.stderr).not.toContain("rich black");
+	});
+	test("render reports the QR checks validate does, in its report too", async () => {
+		const t = card();
+		t.template_data[0]!.elements = [
+			{
+				id: "code",
+				type: "qr_code",
+				pos: { x: 10, y: 10 },
+				size: { width: 80, height: 80 },
+				properties: { value: "https://example.com", foreground: "{{motto}}", background: "#ffffff" },
+			},
+		] as never;
+		await box.write("qr.json", JSON.stringify(t));
+		const message = "QR colours have a contrast of 1.36:1, under 3:1; scanners may not read it: code";
+		const dir = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#dddddd", "--out", "qr-out");
+		expect(dir.code).toBe(0);
+		expect(dir.stderr).toContain(`warning: front: ${message}`);
+		const dark = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#000000", "--out", "qr-out");
+		expect(dark.stderr).not.toContain("QR colours");
+		const zip = await box.run("render", "qr.json", "--frame", "front", "--set", "motto=#dddddd", "--out", "qr.zip");
+		expect(zip.code).toBe(0);
+		expect(zip.stderr).toContain(`warning: front.png: ${message}`);
+		const report = new TextDecoder().decode(unzipSync(new Uint8Array(await readFile(box.path("qr.zip"))))[REPORT_FILE_NAME]);
+		expect(report).toContain(message);
 	});
 });
 
@@ -1816,10 +1903,12 @@ describe("the command line", () => {
 		const short = await box.run("render", "--help");
 		const all = await box.run("render", "--help-all");
 		expect([short.code, all.code]).toEqual([0, 0]);
-		for (const flag of ["--png-alpha", "--pdf-text", "--output-intent-id", "--no-crop-marks", "--back-offset", "--blank-backs"]) {
+		for (const flag of ["--png-alpha", "--no-crop-marks"]) {
 			expect(short.stdout).not.toContain(flag);
 			expect(all.stdout).toContain(flag);
 		}
+		for (const flag of ["--pdf-text", "--output-intent-id", "--back-offset", "--blank-backs"])
+			expect(short.stdout).toContain(flag);
 		expect(short.stdout).toContain("Run freshcoat render --help-all");
 		expect(all.stdout).not.toContain("--help-all");
 		expect(all.stdout).toContain("Sheet options, with --sheets:");
@@ -2089,6 +2178,41 @@ describe("render slice pieces", () => {
 		expect(Object.keys(await zipOf("no-slices.zip")).sort()).toEqual(["back.png", REPORT_FILE_NAME, "front.png"]);
 	});
 
+	test("lists only the warnings of the layers inside each piece", async () => {
+		const t = sliced();
+		t.template_data[0]!.elements.push({
+			id: "tiny",
+			type: "text",
+			pos: { x: 110, y: 60 },
+			size: { width: 50, height: 10 },
+			properties: { value: "x", font: { family: "Inter", size: 4 }, color: "#000000" },
+		} as never);
+		await box.write("tiny.json", JSON.stringify(t));
+		const run = await box.run("render", "tiny.json", "--pieces", "--frame", "front", "--out", "tiny-pieces");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: front-right.png: Text is 0.96 pt at print size, below 6 pt: tiny");
+		expect(run.stderr).not.toContain("front-left.png");
+		const report = (await readFile(box.path("tiny-pieces", REPORT_FILE_NAME), "utf8")).trim().split("\r\n");
+		expect(report.find((row) => row.startsWith("front-left.png"))).toEndWith(",");
+		expect(report.find((row) => row.startsWith("front-right.png"))).toEndWith('"Text is 0.96 pt at print size, below 6 pt: tiny"');
+	});
+
+	test("refuses pieces on double-sided sheets", async () => {
+		const flags = await box.run("render", "sliced.json", "--pieces", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf");
+		expect(flags.code).toBe(2);
+		expect(flags.stderr).toContain("--pieces does not go with --duplex; a piece is not a side of a card");
+		const duplex: Workspace = {
+			...workspace,
+			presets: workspace.presets.map((p) =>
+				p.id === "p_pdf" ? { ...p, layout: { ...DEFAULT_SHEET_LAYOUT, duplex: "long-edge" as const } } : p,
+			),
+		};
+		await box.write("duplex.coatworkspace", await workspaceBytes(duplex));
+		const preset = await box.run("render", "duplex.coatworkspace", "--preset", "p_pdf", "--pieces", "--out", "x.pdf");
+		expect(preset.code).toBe(2);
+		expect(preset.stderr).toContain('--pieces does not go with double-sided sheets; "Proof" prints duplex');
+	});
+
 	test("refuses vector PDF pages for a workspace preset", async () => {
 		const vector: Workspace = {
 			...workspace,
@@ -2183,6 +2307,30 @@ describe("render print options", () => {
 		const still = await pages("no-offset.pdf");
 		expect(still[0]).toEqual(offset[0]);
 		expect(still[1]).not.toEqual(offset[1]);
+	});
+
+	test("refuses a back offset past Studio's range or off the paper", async () => {
+		const sheets = ["--sheets", "a4", "--duplex", "long", "--out", "drift.pdf"];
+		const far = await box.run(...template, ...sheets, "--back-offset", "500,0");
+		expect(far.code).toBe(2);
+		expect(far.stderr).toContain("Expected <x>,<y> each from -50 to 50 millimetres.");
+		const off = await box.run(...template, ...sheets, "--back-offset", "0,30");
+		expect(off.code).toBe(2);
+		expect(off.stderr).toMatch(
+			/cannot lay out the sheets: The back offset \(0 mm, 30 mm\) moves the backs off the paper; it keeps them on with x from -[\d.]+ to [\d.]+ mm and y from -[\d.]+ to [\d.]+ mm\n/,
+		);
+		expect(off.stderr).toContain("Run freshcoat render --help for usage.");
+		expect((await box.run(...template, ...sheets, "--back-offset", "0,30", "--dry-run")).code).toBe(2);
+	});
+
+	test("fails a workspace preset whose back offset is off the paper", async () => {
+		const workspace = workspaceOf(card());
+		const base = workspace.presets[0] as Workspace["presets"][number];
+		workspace.presets = [{ ...base, id: "p_drift", format: "pdf", layout: { ...layout, backOffsetMm: { x: 0, y: 40 } } }];
+		await box.write("drift.coatworkspace", await workspaceBytes(workspace));
+		const run = await box.run("render", "drift.coatworkspace", "--preset", "p_drift", "--out", "drift-preset.pdf");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain("moves the backs off the paper");
 	});
 
 	test("gives a one-sided template blank backs as a preset does", async () => {

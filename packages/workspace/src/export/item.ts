@@ -16,6 +16,7 @@ import {
 	resolveExportScale,
 	resolveSlices,
 	type Sides,
+	sliceLayers,
 	type Template,
 	templateBleed,
 	variantSize,
@@ -129,11 +130,16 @@ export type RasterizedLayer = {
  *  barcode, which fails it, gamut notes, which `gamut` carries, a PDF layer
  *  drawn as an image without a spot, which `rasterized` carries, and an
  *  image with no source, which is an unfilled field. A layer that loses its
- *  spot is warned, as the ink does not print. */
-function noted(warnings: readonly FrameWarning[]): string[] {
+ *  spot is warned, as the ink does not print. A piece reports the layers it
+ *  shows, and those of no one layer. */
+function noted(
+	warnings: readonly FrameWarning[],
+	layers?: ReadonlySet<string>,
+): string[] {
 	const out = new Set<string>();
 	for (const w of warnings)
 		if (
+			!outside(w, layers) &&
 			w.kind !== "barcode_invalid" &&
 			w.kind !== "gamut_compressed" &&
 			w.kind !== "vector_rasterized" &&
@@ -141,6 +147,11 @@ function noted(warnings: readonly FrameWarning[]): string[] {
 		)
 			out.add(describeWarning(w));
 	return [...out];
+}
+
+function outside(w: FrameWarning, layers?: ReadonlySet<string>): boolean {
+	const layer = "layer" in w ? w.layer : undefined;
+	return layers !== undefined && layer !== undefined && !layers.has(layer);
 }
 
 export type ItemSize = {
@@ -449,19 +460,22 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			const design = req.resize ?? variantSize(template, variantId);
 			const pathOp = canvasKitPathOp(renderer.ck);
 			let piece: ReturnType<typeof pieceSpec> | undefined;
+			let pieceLayers: Set<string> | undefined;
 			if (req.piece !== undefined) {
 				if (req.vector) throw new Error(PIECES_NEED_RASTER_PAGES);
-				const slices = resolveSlices(template, {
+				const sliceOptions = {
 					frameName: req.side,
 					values: req.values,
 					variantId,
 					pathOp,
 					...(req.resize ? { resize: req.resize } : {}),
-				});
+				};
+				const slices = resolveSlices(template, sliceOptions);
 				const slice = slices.find((s) => s.name === req.piece);
 				if (!slice)
 					throw new Error(`no slice "${req.piece}" on side "${req.side}"`);
 				piece = pieceSpec(renderer.ck, slice);
+				pieceLayers = sliceLayers(template, req.piece, sliceOptions);
 			}
 			let cut: ItemCuts | undefined;
 			if (req.cut) {
@@ -560,7 +574,7 @@ export function createItemRenderer(options: ItemRendererOptions): ItemRenderer {
 			for (const w of result.warnings)
 				if (w.kind === "barcode_invalid") throw new Error(describeWarning(w));
 			const gamut = painted.print === "on" ? gamutNotes(result.warnings) : [];
-			const warnings = noted(result.warnings);
+			const warnings = noted(result.warnings, pieceLayers);
 			return {
 				bytes: result.bytes,
 				crc: crc32(result.bytes),

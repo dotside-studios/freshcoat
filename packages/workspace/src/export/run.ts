@@ -46,6 +46,8 @@ export type ExportWorkspaceOptions = {
 	checkGlyphs?: boolean;
 	/** the time written to exported records; default now */
 	now?: Date;
+	/** what a PDF names as its creator; default Freshcoat Studio */
+	pdfCreator?: string;
 };
 
 export type ExportWorkspaceResult = JobResult & {
@@ -117,6 +119,7 @@ export async function exportWorkspace(
 			...(sink ? { sink } : {}),
 			...(signal ? { signal } : {}),
 			...(onProgress ? { onProgress } : {}),
+			...(options.pdfCreator ? { pdfCreator: options.pdfCreator } : {}),
 		});
 		const result: ExportWorkspaceResult = {
 			...job,

@@ -167,6 +167,7 @@ export async function renderBatch(
 	const pdf = writesFile(options.out) && options.out.toLowerCase().endsWith(".pdf");
 	const preset: ExportPreset = {
 		...newPreset(templateId, []),
+		name: template.name.trim() || basename(options.out).replace(/\.[^.]*$/, ""),
 		format: pdf ? "pdf" : ZIP_FORMATS[options.format ?? "png"],
 		scale: options.scale?.[0] ?? 1,
 		markExported: false,
@@ -218,6 +219,7 @@ export async function renderBatch(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.sheets ? { layoutFlags: true } : {}),
 		},
 		log,
 		io,

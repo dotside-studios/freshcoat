@@ -301,6 +301,42 @@ describe("imposeSheets", () => {
 			expect(placed(out.pages[1] as never)).toEqual([["1b", 106, 13]]);
 		});
 
+		it("refuses a back offset that moves the backs off the paper", () => {
+			const duplex = (x: number, y: number) =>
+				imposeSheets(
+					items(1, 2),
+					CR80,
+					layout({ duplex: "long-edge", backOffsetMm: { x, y } }),
+				);
+			expect(duplex(19.4, -13.5).pages[1]?.slots[0]?.xMm).toBeCloseTo(124.4, 9);
+			let off: unknown;
+			try {
+				duplex(20, 0);
+			} catch (e) {
+				off = e;
+			}
+			expect(off).toBeInstanceOf(SheetLayoutError);
+			expect((off as SheetLayoutError).field).toBe("backOffset");
+			expect((off as SheetLayoutError).message).toBe(
+				"The back offset (20 mm, 0 mm) moves the backs off the paper; it keeps them on with x from -19.4 to 19.4 mm and y from -13.5 to 13.5 mm",
+			);
+			expect(() => duplex(0, -14)).toThrow(/off the paper/);
+			expect(() => duplex(0, 51)).toThrow(
+				"The back offset can move the backs at most 50 mm each way",
+			);
+			expect(() =>
+				imposeSheets(
+					items(1),
+					CR80,
+					layout({
+						duplex: "long-edge",
+						blankBacks: true,
+						backOffsetMm: { x: 30, y: 0 },
+					}),
+				),
+			).not.toThrow();
+		});
+
 		it("alternates front and back across sheets", () => {
 			const out = imposeSheets(
 				items(11, 2),
@@ -559,6 +595,39 @@ describe("imposeSheets", () => {
 				imposeSheets(items(1), CR80, layout({ marginMm: 70 })),
 			);
 			expect(e.axis).toBe("width");
+		});
+
+		it("says when the margins leave no room on the paper", () => {
+			const e = error(() =>
+				imposeSheets(
+					items(1),
+					CR80,
+					layout({ paper: "a5", marginMm: 80, orientation: "auto" }),
+				),
+			);
+			expect(e.message).toBe(
+				"The margins (80 mm) leave no room on A5: 148 mm wide needs margins under 74 mm",
+			);
+			expect(
+				error(() =>
+					imposeSheets(
+						items(1),
+						CR80,
+						layout({ paper: "letter", marginMm: 120 }),
+					),
+				).message,
+			).toMatch(
+				/^The margins \(120 mm\) leave no room on Letter: 215.9 mm wide/,
+			);
+			expect(
+				error(() =>
+					imposeSheets(
+						items(1),
+						CR80,
+						layout({ paper: { widthMm: 100, heightMm: 50 }, marginMm: 30 }),
+					),
+				).message,
+			).toMatch(/^The margins \(30 mm\) leave no room on 50 mm × 100 mm paper/);
 		});
 
 		it("refuses negative margins and gaps, and an empty card", () => {

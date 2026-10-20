@@ -48,9 +48,11 @@ import { parseImageFocus } from "./image-focus";
 import { fieldContext, prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
 import { DEFAULT_QR_STYLE, type QrStyle, qrSymbol } from "./qr";
+import { qrIssues } from "./qr-checks";
 import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { strokeSides, widestStroke } from "./stroke-width";
+import type { PrintCheckWarning } from "./print-checks";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -274,6 +276,7 @@ function compileFrame(
 	const scope: CompileScope = {
 		fontFamily: fallbackFamily ?? "sans-serif",
 		warnings: [],
+		printChecks: [],
 		page,
 	};
 	const children: Node[] = [
@@ -299,6 +302,9 @@ function compileFrame(
 		assets: { fonts, images: [...images] },
 		root,
 		...(scope.warnings.length > 0 ? { warnings: scope.warnings } : {}),
+		...(scope.printChecks.length > 0
+			? { printChecks: scope.printChecks }
+			: {}),
 	};
 }
 
@@ -308,6 +314,7 @@ function compileFrame(
 type CompileScope = {
 	fontFamily: string;
 	warnings: CompileWarning[];
+	printChecks: PrintCheckWarning[];
 	page: Vec2;
 };
 
@@ -443,6 +450,8 @@ function compileElement(
 		case "text":
 			return compileText(transform, props, ratio);
 		case "qr_code":
+			for (const issue of qrIssues({ ...el, properties: props } as typeof el))
+				scope.printChecks.push({ kind: "print_check", layer: el.id, issue });
 			return compileQr(transform, props, ratio);
 		case "barcode":
 			return compileBarcode(transform, props, ratio, scope);

@@ -132,6 +132,23 @@ describe("presetReadiness", () => {
 		});
 	});
 
+	it("is blocked, naming the field, when the back offset is off the paper", () => {
+		const drifting: ExportPreset = {
+			...sheetsPreset,
+			layout: {
+				...(sheetsPreset.layout as SheetLayout),
+				duplex: "long-edge",
+				backOffsetMm: { x: 50, y: 0 },
+			},
+		};
+		const r = presetReadiness(workspace, drifting);
+		expect(r.sheets?.field).toBe("backOffset");
+		expect(r.sheets?.error).toMatch(
+			/^The back offset \(50 mm, 0 mm\) moves the backs off the paper/,
+		);
+		expect(r.blocked?.message).toBe("Back offset out of range");
+	});
+
 	it("is blocked when there is nothing to export", () => {
 		const none: ExportPreset = {
 			...preset,

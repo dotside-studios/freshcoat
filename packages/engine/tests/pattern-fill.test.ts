@@ -289,6 +289,10 @@ describe.each(["noise", "paper"] as const)("%s seed", (pattern) => {
 	});
 });
 
+// The zoom 1 reference is a 1280 px render, which can pass 5 s under a full
+// parallel run.
+const TONE_TIMEOUT_MS = 30_000;
+
 describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
 	const AREA = 320;
 	const fill = kindFill(pattern);
@@ -329,6 +333,7 @@ describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
 			expect(deviation(at)).toBeGreaterThan(deviation(reference) * 0.8);
 			expect(deviation(at)).toBeLessThan(deviation(reference) * 1.2);
 		},
+		TONE_TIMEOUT_MS,
 	);
 
 	test("holds its mean once faded out at zoom 1/8", async () => {
@@ -343,7 +348,7 @@ describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
 		expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
 		expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
 		expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
-	});
+	}, TONE_TIMEOUT_MS);
 });
 
 describe("pattern compile failure", () => {

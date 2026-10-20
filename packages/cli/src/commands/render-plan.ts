@@ -144,6 +144,8 @@ function exportProblem(
 	if ((options.scale?.length ?? 0) > 1) return "an export takes one --scale";
 	if (options.pieces && options.pdfPages === "vector")
 		return "--pieces does not go with --pdf-pages vector";
+	if (options.pieces && given.includes("duplex"))
+		return "--pieces does not go with --duplex; a piece is not a side of a card";
 	if (pdf && options.format !== undefined)
 		return "--format applies only to images; a PDF takes --pdf-pages";
 	if (pdf && options.pngAlpha !== undefined)

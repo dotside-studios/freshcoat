@@ -240,6 +240,7 @@ export {
 	type ResolvedSlice,
 	type ResolveSlicesOptions,
 	resolveSlices,
+	sliceLayers,
 } from "./slices";
 export { generateMatrix, MAX_QR_LOGO_SIZE, QR_LOGO_H_COVERAGE } from "./qr";
 export {

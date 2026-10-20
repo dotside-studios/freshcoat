@@ -44,6 +44,7 @@ import {
 	exportSplit,
 	imageFields,
 	imageFormat,
+	MAX_BACK_OFFSET_MM,
 	paperSize,
 	pdfLayout,
 	readOutputProfile,
@@ -1446,8 +1447,8 @@ function LayoutGroup({
 												label="X"
 												aria-label="Back offset X"
 												value={offset.x}
-												min={-50}
-												max={50}
+												min={-MAX_BACK_OFFSET_MM}
+												max={MAX_BACK_OFFSET_MM}
 												step={0.5}
 												precision={1}
 												unit="mm"
@@ -1459,8 +1460,8 @@ function LayoutGroup({
 												label="Y"
 												aria-label="Back offset Y"
 												value={offset.y}
-												min={-50}
-												max={50}
+												min={-MAX_BACK_OFFSET_MM}
+												max={MAX_BACK_OFFSET_MM}
 												step={0.5}
 												precision={1}
 												unit="mm"

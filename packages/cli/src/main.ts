@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import {
 	Command,
 	CommanderError,
@@ -27,13 +26,9 @@ import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
 import { CliError, type Io, processIo, UsageError } from "./io";
+import { version } from "./version";
 
-export function version(): string {
-	const manifest = JSON.parse(
-		readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-	) as { version: string };
-	return manifest.version;
-}
+export { version };
 
 export async function main(
 	argv: string[],
@@ -99,7 +94,7 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		return uncached;
 	};
 
-	command("render")
+	const render = command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
 		.description(
 			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
@@ -171,12 +166,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			] as const),
 		)
 		.addOption(
-			advanced(
-				new Option(
-					"--pdf-text <mode>",
-					"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
-				).choices(["embed", "outline"] as const),
-			),
+			new Option(
+				"--pdf-text <mode>",
+				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
+			).choices(["embed", "outline"] as const),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(
@@ -194,13 +187,9 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"declare this ICC profile, such as the print shop's CMYK condition, as the output intent; default sRGB",
 		)
 		.option("--no-output-intent", "declare no output intent")
-		.addOption(
-			advanced(
-				new Option(
-					"--output-intent-id <name>",
-					"the condition --output-intent describes, such as FOGRA39; default the profile's description",
-				),
-			),
+		.option(
+			"--output-intent-id <name>",
+			"the condition --output-intent describes, such as FOGRA39; default the profile's description",
 		)
 		.optionsGroup("Sheet options, with --sheets:")
 		.addOption(
@@ -224,22 +213,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.addOption(
 			advanced(new Option("--no-crop-marks", "the same as leaving crop out of --marks")),
 		)
-		.addOption(
-			advanced(
-				new Option(
-					"--back-offset <x,y>",
-					"with --duplex, move every back page this many mm, for a printer that drifts; y is down",
-				).argParser(arg(parseOffset)),
-			),
+		.option(
+			"--back-offset <x,y>",
+			"with --duplex, move every back page this many mm, up to 50 each way, for a printer that drifts; y is down",
+			arg(parseOffset),
 		)
-		.addOption(
-			advanced(
-				new Option(
-					"--blank-backs",
-					"with --duplex, give a one-sided template empty back pages",
-				),
-			),
-		)
+		.option("--blank-backs", "with --duplex, give a one-sided template empty back pages")
 		.optionsGroup("Print options:")
 		.addOption(
 			new Option(
@@ -273,10 +252,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
 		)
-		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.")
-		.action((file, options, cmd) =>
-			runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd)),
-		);
+		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.");
+	const given = track(render, REPEATABLE);
+	render.action((file, options, cmd) => {
+		checkGiven(given);
+		return runRender(file, { ...options, quiet: quiet(cmd) }, ioFor(cmd));
+	});
 
 	command("validate")
 		.summary("check a template or workspace")
@@ -321,6 +302,44 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.action((file, options, cmd) => pack(file, { ...options, quiet: quiet(cmd) }, io));
 
 	return root;
+}
+
+/** The render options that take more than one value. */
+const REPEATABLE = ["--set", "--frame", "--scale", "--cut-spot", "--where"];
+
+/** Each option of `command` as the command line gives it, in order, with the
+ *  value as typed, for the options that may be given once. */
+function track(
+	command: {
+		options: readonly { long?: string; name(): string }[];
+		on(event: string, listener: (value: unknown) => void): unknown;
+	},
+	repeatable: readonly string[],
+) {
+	const given: { flag: string; value: unknown }[] = [];
+	for (const option of command.options) {
+		const flag = option.long;
+		if (!flag || repeatable.includes(flag)) continue;
+		command.on(`option:${option.name()}`, (value: unknown) => given.push({ flag, value }));
+	}
+	return given;
+}
+
+/** Refuses an option given twice with different values, and options that undo
+ *  each other, rather than let the last one win. */
+function checkGiven(given: readonly { flag: string; value: unknown }[]): void {
+	const flags = new Set(given.map((entry) => entry.flag));
+	for (const [a, b] of [["--output-intent", "--no-output-intent"]] as const)
+		if (flags.has(a) && flags.has(b)) throw new UsageError(`${a} and ${b} do not go together`);
+	const marks = given.find((entry) => entry.flag === "--marks");
+	if (flags.has("--no-crop-marks") && marks && parseMarks(String(marks.value)).includes("crop"))
+		throw new UsageError("--no-crop-marks does not go with --marks crop");
+	const seen = new Map<string, unknown>();
+	for (const { flag, value } of given) {
+		if (seen.has(flag) && JSON.stringify(seen.get(flag)) !== JSON.stringify(value))
+			throw new UsageError(`${flag} is given twice; give it once`);
+		seen.set(flag, value);
+	}
 }
 
 /** A value parser for commander, which reports an ArgumentError as its own. */
