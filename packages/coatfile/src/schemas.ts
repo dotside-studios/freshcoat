@@ -3,6 +3,7 @@ import { z } from "zod";
 import { FORMAT_MAJOR, formatVersionStatus } from "./format";
 import { parseImageFocus } from "./image-focus";
 import { FIELD_FORMATS, tokenIds } from "./mustache";
+import { UNSAFE_PATTERN_MESSAGES, unsafePatternReason } from "./safe-regex";
 import type {
 	Element,
 	FieldReferenceRole,
@@ -112,7 +113,7 @@ export const FieldDefinitionSchema = z.object({
 	pattern: z
 		.string()
 		.describe(
-			"JavaScript regular expression. Compiled with the u flag, or without flags when it only parses that way. A pattern invalid in both modes imposes no constraint.",
+			"JavaScript regular expression. Compiled with the u flag, or without flags when it only parses that way. A pattern invalid in both modes imposes no constraint. Patterns over 512 characters, with nested quantifiers or with backreferences are refused.",
 		)
 		.optional(),
 	readOnly: z.boolean().optional(),
@@ -1027,7 +1028,23 @@ function refineTemplate(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	enforceSlices(tpl, ctx);
 	enforceEffects(tpl, ctx);
 	enforceSpots(tpl, ctx);
+	enforceFieldPatterns(tpl, ctx);
 	// Font references are lax: a partial fonts block is allowed; undeclared families fall back at render.
+}
+
+function enforceFieldPatterns(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
+	for (const [key, def] of Object.entries(tpl.fields.properties)) {
+		if (def.pattern === undefined) continue;
+		const reason = unsafePatternReason(def.pattern);
+		if (reason) {
+			addKitIssue(
+				ctx,
+				"unsafe_field_pattern",
+				`${key} pattern is unsafe: ${UNSAFE_PATTERN_MESSAGES[reason].toLowerCase()}`,
+				["fields", "properties", key, "pattern"],
+			);
+		}
+	}
 }
 
 function addKitIssue(

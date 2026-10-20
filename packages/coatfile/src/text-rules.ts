@@ -1,3 +1,9 @@
+import {
+	PATTERN_INPUT_MAX_LENGTH,
+	UNSAFE_PATTERN_MESSAGES,
+	unsafePatternReason,
+} from "./safe-regex";
+
 export type TextRules = {
 	minLength?: number;
 	maxLength?: number;
@@ -12,9 +18,10 @@ const UNICODE_ESCAPE = /\\[pPu]\{/;
 
 /** Field patterns compile with the `u` flag, falling back to no flags for
  *  patterns that only parse without it, such as `^\#\d+$`. A pattern
- *  invalid in both modes, or one using `\p{`, `\P{` or `\u{` that fails
- *  under `u`, is `null` and imposes no constraint. */
+ *  invalid in both modes, one using `\p{`, `\P{` or `\u{` that fails
+ *  under `u`, or one refused as unsafe is `null` and imposes no constraint. */
 export function compiledPattern(pattern: string): RegExp | null {
+	if (unsafePatternReason(pattern) !== null) return null;
 	let re = patterns.get(pattern);
 	if (re !== undefined) {
 		patterns.delete(pattern);
@@ -28,6 +35,16 @@ export function compiledPattern(pattern: string): RegExp | null {
 	if (patterns.size > PATTERN_CACHE_MAX)
 		patterns.delete(patterns.keys().next().value as string);
 	return re;
+}
+
+/** What is wrong with a field pattern, or null when it compiles and is safe. */
+export function patternProblem(pattern: string): string | null {
+	const unsafe = unsafePatternReason(pattern);
+	if (unsafe)
+		return `Unsafe regular expression: ${UNSAFE_PATTERN_MESSAGES[unsafe]}`;
+	return compiledPattern(pattern) === null
+		? "Not a valid regular expression"
+		: null;
 }
 
 function compile(pattern: string, flags: string): RegExp | null {
@@ -48,7 +65,10 @@ export function textRuleBreaks(rules: TextRules, value: string): TextRuleBreak[]
 	}
 	if (rules.pattern !== undefined) {
 		const re = compiledPattern(rules.pattern);
-		if (re !== null && !re.test(value)) breaks.push("pattern_mismatch");
+		if (re !== null) {
+			if (value.length > PATTERN_INPUT_MAX_LENGTH || !re.test(value))
+				breaks.push("pattern_mismatch");
+		}
 	}
 	return breaks;
 }

@@ -1212,6 +1212,21 @@ and workspace column checks enforce. It compiles with the `u` flag, so
 pattern invalid in both modes imposes no constraint, and the editor flags it as
 not a valid regular expression.
 
+Patterns are checked before they compile, so a pattern cannot stall validation:
+
+- A pattern over 512 characters (`PATTERN_MAX_LENGTH`) is refused.
+- A pattern that repeats a group which itself repeats, such as `(a+)+`,
+  `(a*)*` or `(a|aa)+`, is refused.
+- A pattern with a backreference (`\1`, `\k<name>`) is refused.
+- A value over 10,000 characters (`PATTERN_INPUT_MAX_LENGTH`) never matches a
+  pattern.
+
+`validate` reports a refused pattern as `unsafe_field_pattern` on
+`/fields/properties/<key>/pattern`. In `validateValues` and workspace column
+checks a refused pattern imposes no constraint, like an invalid one, and
+`patternProblem(pattern)` returns the message the editor shows. Compiled
+patterns are cached in an LRU of 256 entries (`PATTERN_CACHE_MAX`).
+
 ## Fields a template reads
 
 `./fields` (also on the main entry) answers which fields a design uses, with

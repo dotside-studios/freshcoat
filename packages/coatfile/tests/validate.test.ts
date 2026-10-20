@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
-import { compiledPattern, PATTERN_CACHE_MAX } from "../src/text-rules";
+import {
+	PATTERN_INPUT_MAX_LENGTH,
+	PATTERN_MAX_LENGTH,
+	unsafePatternReason,
+} from "../src/safe-regex";
+import {
+	compiledPattern,
+	PATTERN_CACHE_MAX,
+	patternProblem,
+} from "../src/text-rules";
 import { validate, validateValues } from "../src/validate";
 
 const minimalValid: Template = {
@@ -1030,4 +1039,77 @@ test("mistyped unicode patterns are invalid instead of literal", () => {
 		expect(compiledPattern(pattern)).toBeNull();
 		expect(validateValues({ f: "anything" }, field(pattern)).ok).toBe(true);
 	}
+});
+
+describe("unsafe field patterns", () => {
+	const field = (pattern: string) => ({
+		type: "object" as const,
+		properties: { f: { type: "string" as const, pattern } },
+	});
+
+	test("nested quantifiers, backreferences and long patterns are refused", () => {
+		const unsafe: [string, string][] = [
+			["^(a+)+$", "nested_quantifier"],
+			["^(a*)*$", "nested_quantifier"],
+			["^(a|aa)+$", "nested_quantifier"],
+			["^(?:\\d+\\s?)*$", "nested_quantifier"],
+			["^(a{2,})+$", "nested_quantifier"],
+			["^(a)\\1$", "backreference"],
+			["^(?<x>a)\\k<x>$", "backreference"],
+			["a".repeat(PATTERN_MAX_LENGTH + 1), "too_long"],
+		];
+		for (const [pattern, reason] of unsafe) {
+			expect(unsafePatternReason(pattern)).toBe(reason);
+			expect(compiledPattern(pattern)).toBeNull();
+			expect(patternProblem(pattern)).toContain("Unsafe");
+		}
+	});
+
+	test("a catastrophic pattern completes quickly and constrains nothing", () => {
+		const started = performance.now();
+		const result = validateValues(
+			{ f: `${"a".repeat(40)}!` },
+			field("^(a+)+$"),
+		);
+		expect(result.ok).toBe(true);
+		expect(performance.now() - started).toBeLessThan(200);
+	});
+
+	test("common legitimate patterns are kept", () => {
+		const safe = [
+			"^[A-Z]{2}\\d{4}$",
+			"^\\p{L}+$",
+			"^(\\d{1,3}\\.){3}\\d{1,3}$",
+			"^(png|jpg|gif)$",
+			"^(a|b)+$",
+			"^[\\w-.]+@[\\w-]+\\.[a-z]{2,}$",
+			"^\\#\\d+$",
+			"^(?:foo|bar)?baz$",
+		];
+		for (const pattern of safe) {
+			expect(unsafePatternReason(pattern)).toBeNull();
+			expect(patternProblem(pattern)).toBeNull();
+		}
+	});
+
+	test("values past the input cap never match a pattern", () => {
+		const long = "a".repeat(PATTERN_INPUT_MAX_LENGTH + 1);
+		expect(validateValues({ f: long }, field("^a+$")).ok).toBe(false);
+		expect(validateValues({ f: "aaa" }, field("^a+$")).ok).toBe(true);
+	});
+
+	test("validate reports an unsafe field pattern with a code", () => {
+		const r = validate({ ...minimalValid, fields: field("^(a+)+$") });
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.errors[0]?.code).toBe("unsafe_field_pattern");
+			expect(r.errors[0]?.path).toBe("/fields/properties/f/pattern");
+		}
+	});
+
+	test("the cache stays bounded under many distinct patterns", () => {
+		const first = compiledPattern("^bounded-first");
+		for (let i = 0; i < PATTERN_CACHE_MAX * 3; i++) compiledPattern(`^b${i}$`);
+		expect(compiledPattern("^bounded-first")).not.toBe(first);
+	});
 });
