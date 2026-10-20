@@ -33,6 +33,22 @@ export default defineConfig({
 				},
 			},
 		},
+		{
+			name: "firefox",
+			grep: /@smoke/,
+			use: {
+				...devices["Desktop Firefox"],
+				viewport: { width: 1440, height: 900 },
+			},
+		},
+		{
+			name: "webkit",
+			grep: /@smoke/,
+			use: {
+				...devices["Desktop Safari"],
+				viewport: { width: 1440, height: 900 },
+			},
+		},
 	],
 	webServer: {
 		command: preview
