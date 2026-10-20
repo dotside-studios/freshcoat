@@ -63,7 +63,9 @@ test("save as .coat.json writes template JSON", async ({ page }) => {
 	expect(json.template_data.length).toBe(1);
 });
 
-test("export writes a PNG at the chosen density", async ({ page }) => {
+test("export writes a PNG at the chosen density", { tag: "@smoke" }, async ({
+	page,
+}) => {
 	await openSample(page);
 	const download = page.waitForEvent("download");
 	await page.keyboard.press(`${mod}+Shift+e`);
@@ -299,7 +301,9 @@ test("pasting SVG markup can keep it as text", async ({ page, context }) => {
 	).toBe(svg);
 });
 
-test("autosave offers to restore unsaved work", async ({ page }) => {
+test("autosave offers to restore unsaved work", { tag: "@smoke" }, async ({
+	page,
+}) => {
 	await openSample(page);
 	await run(page, `c.select(["0/6"]); c.nudge(5, 0)`);
 	const edited = await state<unknown>(page, "t");
