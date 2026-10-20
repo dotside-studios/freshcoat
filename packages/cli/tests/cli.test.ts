@@ -846,6 +846,48 @@ describe("render export options", () => {
 		expect(await fonts("outlined.pdf")).toBe(0);
 	});
 
+	test("warns when a vector page loses a spot, and lists the other rasterized layers once", async () => {
+		const shadow = { type: "shadow", color: "#0008", dx: 2, dy: 3, blur: 4 };
+		const base = card();
+		await box.write(
+			"spotted.json",
+			JSON.stringify({
+				...base,
+				format_version: "1.7",
+				template_data: base.template_data.map((frame) => ({
+					...frame,
+					elements: [
+						...frame.elements,
+						{
+							id: `${frame.name}_pink`,
+							type: "rect",
+							pos: { x: 10, y: 50 },
+							size: { width: 40, height: 40 },
+							properties: { fill: "#ff3399", spot: { fill: { spot: "Pink", overprint: true } } },
+							effects: [shadow],
+						},
+						{
+							id: `${frame.name}_soft`,
+							type: "rect",
+							pos: { x: 60, y: 50 },
+							size: { width: 40, height: 40 },
+							properties: { fill: "#333333" },
+							effects: [{ type: "grain", amount: 0.4 }],
+						},
+					],
+				})),
+			}),
+		);
+		const run = await box.run("render", "spotted.json", "--frame", "front", "--pdf-pages", "vector", "--out", "spotted.pdf");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain(
+			"warning: front.png: Spot colour Pink lost: the fill of front_pink is drawn as an image in the PDF (shadow)",
+		);
+		expect(run.stderr.split("\n").filter((l) => l.includes("Drawn as images"))).toEqual([
+			"front: Drawn as images in the PDF: front_soft (grain)",
+		]);
+	});
+
 	test("lays cards out on sheets", async () => {
 		const run = await box.run(
 			"render",

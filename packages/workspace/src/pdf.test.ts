@@ -392,6 +392,73 @@ describe("assemblePdf on sheets", () => {
 		}
 	});
 
+	it("builds and paints every mark's path inside one graphics state", async () => {
+		const bytes = await assemblePdf(cards(3, 2), {
+			dpi: 300,
+			title: "Members",
+			bleedMm: 3,
+			layout: sheet({
+				duplex: "long-edge",
+				gapMm: 10,
+				registrationMarks: true,
+				colorBar: true,
+				slug: true,
+			}),
+			cardMm: card,
+		});
+		const doc = await PDFDocument.load(bytes);
+		const construct = new Set(["m", "l", "c", "v", "y", "h", "re"]);
+		const paint = new Set([
+			"S",
+			"s",
+			"f",
+			"F",
+			"f*",
+			"B",
+			"B*",
+			"b",
+			"b*",
+			"n",
+		]);
+		for (const page of doc.getPages()) {
+			const ops = content(page)
+				.split(/\s+/)
+				.filter((t) => /^[A-Za-z*']+$/.test(t));
+			let open = false;
+			for (const op of ops) {
+				if (construct.has(op)) open = true;
+				else if (paint.has(op)) open = false;
+				else if (op === "q" || op === "Q") expect(open).toBe(false);
+			}
+			expect(ops).toContain("c");
+			expect(ops).toContain("Tj");
+		}
+	});
+
+	it("draws every mark but the colour patches in a Separation /All", async () => {
+		const bytes = await assemblePdf(cards(1), {
+			dpi: 300,
+			title: "Members",
+			layout: sheet({ registrationMarks: true, colorBar: true, slug: true }),
+			cardMm: card,
+		});
+		const doc = await PDFDocument.load(bytes);
+		const page = doc.getPage(0);
+		const spaces = page.node
+			.Resources()
+			?.lookup(PDFName.of("ColorSpace"), PDFDict);
+		const space = spaces?.lookup(PDFName.of("Registration"), PDFArray);
+		expect(space?.lookup(0, PDFName).decodeText()).toBe("Separation");
+		expect(space?.lookup(1, PDFName).decodeText()).toBe("All");
+		expect(space?.lookup(2, PDFName).decodeText()).toBe("DeviceRGB");
+		expect(spaces?.has(PDFName.of("DefaultRGB"))).toBe(true);
+		const text = content(page);
+		expect(text).toMatch(/\/Registration CS\n1 SCN\n/);
+		expect(text).toMatch(/BT\n\/Registration cs\n1 scn\n[\s\S]*Tj\nET/);
+		expect(text).toMatch(/^1 0 0 rg$/m);
+		expect(text).not.toMatch(/ RG$/m);
+	});
+
 	it("cuts a long slug to its margin", async () => {
 		const bytes = await assemblePdf(cards(1), {
 			dpi: 300,

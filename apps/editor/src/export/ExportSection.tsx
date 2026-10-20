@@ -571,6 +571,7 @@ export function ExportSection() {
 		unfilled,
 		glyphs: glyphIssues,
 		failed: scopeCounts.failed,
+		...(lastResult?.rasterized ? { rasterized: lastResult.rasterized } : {}),
 		labelFor: (id) => {
 			const record = dataset?.records.find((r) => r.id === id);
 			return record ? labelFor(record) : id;

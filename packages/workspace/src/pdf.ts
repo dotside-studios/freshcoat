@@ -162,26 +162,30 @@ export async function assemblePdf(
 	let cutGroup: PDFRef | undefined;
 	let cutOverprint: PDFRef | undefined;
 	const spotNames = cutSpotNames(options.cutSpots);
-	const cutSpaces = new Map<CutKind, PDFRef>();
-	const cutSpaceOf = (kind: CutKind): PDFRef => {
-		let ref = cutSpaces.get(kind);
+	const separations = new Map<string, PDFRef>();
+	const separationOf = (
+		ink: string,
+		alternate: readonly [number, number, number],
+	): PDFRef => {
+		const key = JSON.stringify([ink, ...alternate]);
+		let ref = separations.get(key);
 		if (!ref) {
 			const { PDFName } = lib;
 			ref = doc.context.register(
 				doc.context.obj([
 					PDFName.of("Separation"),
-					PDFName.of(spotNames[kind]),
+					PDFName.of(ink),
 					PDFName.of("DeviceRGB"),
 					{
 						FunctionType: 2,
 						Domain: [0, 1],
 						C0: [1, 1, 1],
-						C1: CUT_STYLES[kind].rgb,
+						C1: [...alternate],
 						N: 1,
 					},
 				]),
 			);
-			cutSpaces.set(kind, ref);
+			separations.set(key, ref);
 		}
 		return ref;
 	};
@@ -239,7 +243,10 @@ export async function assemblePdf(
 		for (const kind of CUT_KINDS) {
 			const lines = cut.lines.filter((l) => l.kind === kind);
 			if (lines.length === 0) continue;
-			spaces.set(PDFName.of(cutSpace(kind)), cutSpaceOf(kind));
+			spaces.set(
+				PDFName.of(cutSpace(kind)),
+				separationOf(spotNames[kind], CUT_STYLES[kind].rgb),
+			);
 			ops.push(
 				PDFOperator.of(PDFOperatorNames.StrokingColorspace, [
 					PDFName.of(cutSpace(kind)),
@@ -327,7 +334,9 @@ export async function assemblePdf(
 							marks.slug.widthMm * PT_PER_MM,
 						)
 					: "";
-			drawMarks(lib, out, marks, slug, font);
+			drawMarks(lib, doc, out, marks, slug, font, () =>
+				separationOf(REGISTRATION_INK, REGISTRATION_ALTERNATE),
+			);
 		}
 		await finishDocument(lib, doc, intent, profiles);
 		return doc.save();
@@ -372,42 +381,52 @@ function resourceDict(
 	return dict;
 }
 
-/** Marks are drawn in pure black, as the RGB pipeline has no registration
- *  colour. Once a Separation /All space exists, registration targets and
- *  crop marks belong in it so they print on every plate. */
-const REGISTRATION_BLACK = [0, 0, 0] as const;
+const REGISTRATION_INK = "All";
+const REGISTRATION_ALTERNATE = [0, 0, 0] as const;
+const REGISTRATION_SPACE = "Registration";
+const KAPPA = (4 * (Math.SQRT2 - 1)) / 3;
 
+/** Crop marks, registration targets, the colour bar's outline and the slug
+ *  are drawn in a Separation /All, so they print on every plate; the colour
+ *  bar's patches keep their process colours. */
 function drawMarks(
 	lib: PdfLib,
+	doc: PDFDocument,
 	out: PDFPage,
 	marks: SheetMarks,
 	slug: string,
 	font: import("pdf-lib").PDFFont | undefined,
+	registration: () => PDFRef,
 ) {
+	const { PDFName, PDFNumber, PDFOperator, PDFOperatorNames } = lib;
 	const height = out.getHeight();
-	const color = lib.rgb(...REGISTRATION_BLACK);
 	const at = (x: number, y: number) => ({
 		x: x * PT_PER_MM,
 		y: height - y * PT_PER_MM,
 	});
-	const line = (x1: number, y1: number, x2: number, y2: number) =>
-		out.drawLine({
-			start: at(x1, y1),
-			end: at(x2, y2),
-			thickness: CROP_MARK_WIDTH_PT,
-			color,
-		});
+	const ops: import("pdf-lib").PDFOperator[] = [];
+	const line = (x1: number, y1: number, x2: number, y2: number) => {
+		const a = at(x1, y1);
+		const b = at(x2, y2);
+		ops.push(lib.moveTo(a.x, a.y), lib.lineTo(b.x, b.y), lib.stroke());
+	};
+	const circle = (x: number, y: number, r: number) => {
+		const c = at(x, y);
+		const k = r * KAPPA;
+		ops.push(
+			lib.moveTo(c.x + r, c.y),
+			lib.appendBezierCurve(c.x + r, c.y + k, c.x + k, c.y + r, c.x, c.y + r),
+			lib.appendBezierCurve(c.x - k, c.y + r, c.x - r, c.y + k, c.x - r, c.y),
+			lib.appendBezierCurve(c.x - r, c.y - k, c.x - k, c.y - r, c.x, c.y - r),
+			lib.appendBezierCurve(c.x + k, c.y - r, c.x + r, c.y - k, c.x + r, c.y),
+			lib.closePath(),
+			lib.stroke(),
+		);
+	};
 	for (const mark of marks.crop) line(mark.x1, mark.y1, mark.x2, mark.y2);
 	const half = REGISTRATION_MARK_SIZE_MM / 2;
 	for (const { x, y } of marks.registration) {
-		const radius = REGISTRATION_MARK_RADIUS_MM * PT_PER_MM;
-		out.drawEllipse({
-			...at(x, y),
-			xScale: radius,
-			yScale: radius,
-			borderColor: color,
-			borderWidth: CROP_MARK_WIDTH_PT,
-		});
+		circle(x, y, REGISTRATION_MARK_RADIUS_MM * PT_PER_MM);
 		line(x - half, y, x + half, y);
 		line(x, y - half, x, y + half);
 	}
@@ -423,23 +442,50 @@ function drawMarks(
 		}
 		const first = marks.colorBar[0] as SheetMarks["colorBar"][number];
 		const last = marks.colorBar[marks.colorBar.length - 1] as typeof first;
-		out.drawRectangle({
-			...at(first.x, first.y + first.sizeMm),
-			width: (last.x + last.sizeMm - first.x) * PT_PER_MM,
-			height: first.sizeMm * PT_PER_MM,
-			borderColor: color,
-			borderWidth: CROP_MARK_WIDTH_PT,
-		});
+		const corner = at(first.x, first.y + first.sizeMm);
+		ops.push(
+			lib.rectangle(
+				corner.x,
+				corner.y,
+				(last.x + last.sizeMm - first.x) * PT_PER_MM,
+				first.sizeMm * PT_PER_MM,
+			),
+			lib.stroke(),
+		);
 	}
 	if (marks.slug && font && slug) {
 		const { x, y, heightMm } = marks.slug;
-		out.drawText(slug, {
-			...at(x, y + heightMm * 0.8),
-			font,
-			size: SLUG_FONT_PT,
-			color,
-		});
+		const p = at(x, y + heightMm * 0.8);
+		const key = out.node.newFontDictionary(font.name, font.ref);
+		ops.push(
+			lib.beginText(),
+			PDFOperator.of(PDFOperatorNames.NonStrokingColorspace, [
+				PDFName.of(REGISTRATION_SPACE),
+			]),
+			PDFOperator.of(PDFOperatorNames.NonStrokingColorN, [PDFNumber.of(1)]),
+			lib.setFontAndSize(key, SLUG_FONT_PT),
+			lib.moveText(p.x, p.y),
+			lib.showText(font.encodeText(slug)),
+			lib.endText(),
+		);
 	}
+	if (ops.length === 0) return;
+	const resources = out.node.Resources();
+	if (!resources) return;
+	resourceDict(lib, doc, resources, "ColorSpace").set(
+		PDFName.of(REGISTRATION_SPACE),
+		registration(),
+	);
+	out.pushOperators(
+		lib.pushGraphicsState(),
+		PDFOperator.of(PDFOperatorNames.StrokingColorspace, [
+			PDFName.of(REGISTRATION_SPACE),
+		]),
+		PDFOperator.of(PDFOperatorNames.StrokingColorN, [PDFNumber.of(1)]),
+		lib.setLineWidth(CROP_MARK_WIDTH_PT),
+		...ops,
+		lib.popGraphicsState(),
+	);
 }
 
 /** `text` in the font's character set, cut with an ellipsis to `width`

@@ -551,6 +551,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Curved text radius raised to its font size${w.layer ? `: ${w.layer}` : ""}`;
 		case "vector_rasterized":
 			return `Drawn as an image in the PDF: ${w.feature}${w.layer ? ` (${w.layer})` : ""}`;
+		case "spot_rasterized":
+			return `Spot colour ${w.spot} lost: the ${w.paint} of ${w.layer ?? "a layer"} is drawn as an image in the PDF (${w.feature})`;
 		case "pattern_unsupported":
 			return `Pattern shader failed, painted solid: ${w.pattern}`;
 		case "effect_unsupported":

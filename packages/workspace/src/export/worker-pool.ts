@@ -96,6 +96,7 @@ export function createWorkerPool(
 					...(msg.printError ? { printError: msg.printError } : {}),
 					...(msg.gamut ? { gamut: msg.gamut } : {}),
 					...(msg.warnings ? { warnings: msg.warnings } : {}),
+					...(msg.rasterized ? { rasterized: msg.rasterized } : {}),
 				});
 			else task.reject(new Error(msg.error));
 			pump();

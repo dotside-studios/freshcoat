@@ -57,6 +57,7 @@ import {
 	fontWeight,
 	fontWeightName,
 	spanTextStyle,
+	solidColor,
 	toColor,
 } from "./text-style";
 import { withPathMeasure } from "./path-measure";
@@ -475,7 +476,7 @@ function strokePaint(
 		p.setShader(
 			shaderFor(ck, bin, stroke.gradient, box.x, box.y, box.w, box.h),
 		);
-	else p.setColor(toColor(ck, stroke.color));
+	else p.setColor(solidColor(ck, stroke.color, stroke.spot));
 	p.setStrokeWidth(stroke.width);
 	p.setStrokeCap(ck.StrokeCap[STROKE_CAP[stroke.cap ?? "butt"]]);
 	p.setStrokeJoin(ck.StrokeJoin[STROKE_JOIN[stroke.join ?? "miter"]]);
@@ -701,7 +702,7 @@ function drawSideStroke(
 		paint.setAntiAlias(true);
 		if (stroke.gradient)
 			paint.setShader(shaderFor(ck, bin, stroke.gradient, 0, 0, w, h));
-		else paint.setColor(toColor(ck, stroke.color));
+		else paint.setColor(solidColor(ck, stroke.color, stroke.spot));
 		canvas.drawPath(band, paint);
 	}
 	canvas.restore();
@@ -2272,7 +2273,8 @@ function drawPath(
 	for (const fill of cmd.fills ?? []) {
 		const paint = bin.track(new ck.Paint());
 		paint.setAntiAlias(true);
-		if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
+		if (fill.kind === "solid")
+			paint.setColor(solidColor(ck, fill.color, fill.spot));
 		else if (fill.kind === "pattern")
 			paint.setShader(patternShader(ck, bin, fill, ox, oy, space, issues));
 		else paint.setShader(shaderFor(ck, bin, fill, 0, 0, boxW, boxH));
@@ -2389,7 +2391,8 @@ function drawShape(
 		for (const fill of cmd.fills ?? []) {
 			const paint = bin.track(new ck.Paint());
 			paint.setAntiAlias(true);
-			if (fill.kind === "solid") paint.setColor(toColor(ck, fill.color));
+			if (fill.kind === "solid")
+				paint.setColor(solidColor(ck, fill.color, fill.spot));
 			else
 				paint.setShader(
 					shaderFor(

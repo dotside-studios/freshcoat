@@ -32,7 +32,8 @@ function useSeparations() {
 
 /**
  * Each fill and stroke the active side prints in a spot ink, outlined and
- * tinted in the ink's preview color on the overlay. The painted side never
+ * tinted in the ink's preview color on the overlay, lighter by the ink's
+ * tint as the PDF prints it. The painted side never
  * sees it, so exports and thumbnails stay clean.
  */
 export function SeparationsPreview({ view }: { view: View }) {
@@ -54,7 +55,7 @@ export function SeparationsPreview({ view }: { view: View }) {
 						key={`${s.id}-fill`}
 						d={s.path}
 						fill={color}
-						fillOpacity={0.4}
+						fillOpacity={0.4 * s.tint}
 						fillRule={s.fillRule}
 						stroke={color}
 						strokeWidth={1}
@@ -70,7 +71,7 @@ export function SeparationsPreview({ view }: { view: View }) {
 						fill="none"
 						stroke={color}
 						strokeWidth={3}
-						strokeOpacity={0.8}
+						strokeOpacity={0.8 * s.tint}
 						vectorEffect="non-scaling-stroke"
 						data-ink={s.ink}
 						data-paint="stroke"

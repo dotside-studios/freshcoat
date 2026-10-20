@@ -36,6 +36,7 @@ import {
 	type ItemSize,
 	itemRequest,
 	PIECES_NEED_RASTER_PAGES,
+	type RasterizedLayer,
 	type RenderOutput,
 	type RenderRequest,
 	withBleed,
@@ -86,6 +87,15 @@ export type JobItemResult = {
 	unfilled?: string[];
 	/** what the render warned about without failing */
 	warnings?: string[];
+	/** the layers its vector page drew as images */
+	rasterized?: RasterizedLayer[];
+};
+
+/** The layers a side's vector pages drew as images, across a job, each once
+ *  with every reason and every spot ink it lost. */
+export type RasterizedSide = {
+	side: string;
+	layers: { layer?: string; features: string[]; spots: string[] }[];
 };
 
 export type JobStats = {
@@ -106,6 +116,8 @@ export type JobResult = {
 	sink?: SinkResult;
 	/** set by every job that ran */
 	stats?: JobStats;
+	/** set when a vector page drew a layer as an image */
+	rasterized?: RasterizedSide[];
 };
 
 /** Where a job's items render: a pool of workers, or `inlinePool` on this
@@ -215,6 +227,55 @@ function csvCell(value: string): string {
 	return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
+/** Each side's rasterized layers across `items`, in plan order. */
+export function rasterizedSides(
+	items: readonly JobItemResult[],
+): RasterizedSide[] {
+	const sides = new Map<
+		string,
+		Map<string, RasterizedSide["layers"][number]>
+	>();
+	for (const item of items)
+		for (const r of item.rasterized ?? []) {
+			let layers = sides.get(item.side);
+			if (!layers) {
+				layers = new Map();
+				sides.set(item.side, layers);
+			}
+			const key = r.layer ?? "";
+			let entry = layers.get(key);
+			if (!entry) {
+				entry = {
+					...(r.layer ? { layer: r.layer } : {}),
+					features: [],
+					spots: [],
+				};
+				layers.set(key, entry);
+			}
+			if (!entry.features.includes(r.feature)) entry.features.push(r.feature);
+			if (r.spot && !entry.spots.includes(r.spot)) entry.spots.push(r.spot);
+		}
+	return [...sides].map(([side, layers]) => ({
+		side,
+		layers: [...layers.values()],
+	}));
+}
+
+/** A side's rasterized layers that lost no spot, as one line, or null when
+ *  there are none. */
+export function describeRasterized(side: RasterizedSide): string | null {
+	const shown = side.layers
+		.filter((l) => l.spots.length === 0)
+		.map((l) =>
+			l.layer ? `${l.layer} (${l.features.join(", ")})` : l.features.join(", "),
+		);
+	return shown.length > 0
+		? `Drawn as images in the PDF: ${shown.join("; ")}`
+		: null;
+}
+
+/** The report: a row per item, then an info row per side whose vector pages
+ *  drew layers as images. */
 export function reportCsv(items: JobItemResult[]): string {
 	const rows = [
 		[
@@ -241,19 +302,27 @@ export function reportCsv(items: JobItemResult[]): string {
 			item.unfilled?.join(" ") ?? "",
 			(item.warnings ?? []).join("; "),
 		]);
+	for (const side of rasterizedSides(items)) {
+		const line = describeRasterized(side);
+		if (line) rows.push(["", "", side.side, "info", "", "", "", "", line]);
+	}
 	return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
 }
 
 /** What a rendered item's report says about printing. */
 function printResult(
 	out: RenderOutput,
-): Pick<JobItemResult, "print" | "printError" | "gamut" | "warnings"> {
+): Pick<
+	JobItemResult,
+	"print" | "printError" | "gamut" | "warnings" | "rasterized"
+> {
 	const gamut = gamutPercent(out.gamut);
 	return {
 		print: out.print ?? "off",
 		...(out.printError ? { printError: out.printError } : {}),
 		...(gamut > 0 ? { gamut } : {}),
 		...(out.warnings?.length ? { warnings: out.warnings } : {}),
+		...(out.rasterized?.length ? { rasterized: out.rasterized } : {}),
 	};
 }
 
@@ -456,7 +525,13 @@ export function runExportJob(
 			settled = true;
 			signal?.removeEventListener("abort", abort);
 			assembly.abort();
-			resolve({ ...result, ms: now() - started, stats });
+			const rasterized = rasterizedSides(result.items);
+			resolve({
+				...result,
+				ms: now() - started,
+				stats,
+				...(rasterized.length > 0 ? { rasterized } : {}),
+			});
 		};
 
 		const fail = (e: unknown) => {

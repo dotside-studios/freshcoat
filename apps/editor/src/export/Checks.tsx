@@ -3,11 +3,16 @@ import { cn } from "@freshcoat-js/ui/lib/cn";
 import { PopoverPanel } from "@freshcoat-js/ui/popover-panel";
 import { Button as RACButton } from "react-aria-components";
 import CheckIcon from "~icons/mingcute/check-circle-line";
+import InfoIcon from "~icons/mingcute/information-line";
 import WarningIcon from "~icons/mingcute/warning-line";
 import type { Check, CheckTarget } from "./checks";
 
 const tone = (check: Check) =>
-	check.severity === "error" ? "text-fc-danger-text" : "text-fc-warning";
+	check.severity === "error"
+		? "text-fc-danger-text"
+		: check.severity === "warning"
+			? "text-fc-warning"
+			: "text-fc-muted";
 
 export function ChecksList({
 	checks,
@@ -41,7 +46,11 @@ export function ChecksList({
 					data-severity={check.severity}
 				>
 					<div className={cn("flex min-w-0 items-start gap-1", tone(check))}>
-						<WarningIcon className="mt-0.5 size-3.5 shrink-0" />
+						{check.severity === "info" ? (
+							<InfoIcon className="mt-0.5 size-3.5 shrink-0" />
+						) : (
+							<WarningIcon className="mt-0.5 size-3.5 shrink-0" />
+						)}
 						<span className="min-w-0 flex-1" title={check.detail}>
 							{check.message}
 						</span>
@@ -94,7 +103,8 @@ export function ChecksBadge({
 	checks: readonly Check[];
 	onTarget: (target: CheckTarget) => void;
 }) {
-	if (checks.length === 0) return null;
+	const issues = checks.filter((c) => c.severity !== "info");
+	if (issues.length === 0) return null;
 	const blocking = checks.some((c) => c.severity === "error");
 	return (
 		<PopoverPanel
@@ -105,12 +115,12 @@ export function ChecksBadge({
 			trigger={
 				<Button
 					size="sm"
-					aria-label={`Checks, ${checks.length}`}
+					aria-label={`Checks, ${issues.length}`}
 					className={blocking ? "text-fc-danger-text" : "text-fc-warning"}
 					data-testid="export-checks-badge"
 				>
 					<WarningIcon />
-					<span className="tabular-nums">{checks.length}</span>
+					<span className="tabular-nums">{issues.length}</span>
 				</Button>
 			}
 		>

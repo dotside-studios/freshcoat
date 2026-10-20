@@ -132,6 +132,14 @@ size, below 6 pt: fine_print`, and in an export's `warnings` and
 values: colours under 3:1 contrast, modules lighter than their background, a
 quiet zone under 2 modules, and a logo past the largest size drawn.
 
+With `--pdf-pages vector`, a layer the PDF draws as an image (a shadow, a
+blur, grain, a halftone, a gradient text stroke) and that carries a spot ink
+is warned for each item, as `warning: front.png: Spot colour Pink lost: the
+fill of pink is drawn as an image in the PDF (shadow)`, since the separation
+does not print. The other layers drawn as images are listed once per side
+after the export, as `front: Drawn as images in the PDF: soft (grain)`, and
+as an `info` row per side in `export-report.csv`.
+
 #### Spreadsheets
 
 With `--data <file>`, the template renders once per row of a CSV, TSV, Excel,
