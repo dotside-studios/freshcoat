@@ -1,7 +1,7 @@
 import { clearFontBytesCache, type FontFetch } from "@freshcoat-js/engine";
 import { afterEach, describe, expect, test } from "vitest";
 import { fontUsage } from "../src/font-usage";
-import { resolveTemplateFonts } from "../src/fonts";
+import { type FontFallback, resolveTemplateFonts } from "../src/fonts";
 import type { Template } from "../src/types";
 
 afterEach(() => clearFontBytesCache());
@@ -119,14 +119,62 @@ describe("resolveTemplateFonts", () => {
 		expect(report.missing).toEqual(["Nowhere Sans", "Roboto"]);
 	});
 
-	test("with guessGoogle off, an undeclared family is missing and not fetched", async () => {
+	test("looks an undeclared family up on Google by default", async () => {
+		const { fetch, urls } = fakeFetch((url) =>
+			url.startsWith("https://fonts.googleapis.com/")
+				? css("https://f/inter.ttf")
+				: { ok: true, body: [7] },
+		);
+		const report = await resolveTemplateFonts(template([text("Inter")]), {
+			fetch,
+		});
+		expect(report.guessed).toEqual(["Inter"]);
+		expect(urls[0]).toContain("https://fonts.googleapis.com/");
+	});
+
+	test("with fallback null, an undeclared family is missing and not fetched", async () => {
 		const { fetch, urls } = fakeFetch(() => css("https://f/x.ttf"));
 		const report = await resolveTemplateFonts(template([text("Inter")]), {
 			fetch,
-			guessGoogle: false,
+			fallback: null,
 		});
 		expect(report.missing).toEqual(["Inter"]);
+		expect(report.guessed).toEqual([]);
 		expect(urls).toEqual([]);
+	});
+
+	test("uses a custom fallback and reports its result as guessed", async () => {
+		const { fetch, urls } = fakeFetch(() => ({ ok: false }));
+		const calls: [string, number[]][] = [];
+		const fallback: FontFallback = {
+			id: "mine",
+			load: async (family, weights) => {
+				calls.push([family, weights]);
+				return [new Uint8Array([1])];
+			},
+		};
+		const report = await resolveTemplateFonts(
+			template([text("Inter", 700), text("Inter")]),
+			{ fetch, fallback },
+		);
+		expect(calls).toEqual([["Inter", [400, 700]]]);
+		expect(report.guessed).toEqual(["Inter"]);
+		expect(report.fonts.get("Inter")).toEqual([new Uint8Array([1])]);
+		expect(urls).toEqual([]);
+	});
+
+	test("fallbacks with different ids do not share cache entries", async () => {
+		const cache = new Map<string, Promise<Uint8Array[]>>();
+		const make = (id: string, byte: number): FontFallback => ({
+			id,
+			load: async () => [new Uint8Array([byte])],
+		});
+		const t = template([text("Inter")]);
+		const a = await resolveTemplateFonts(t, { cache, fallback: make("a", 1) });
+		const b = await resolveTemplateFonts(t, { cache, fallback: make("b", 2) });
+		expect(a.fonts.get("Inter")).toEqual([new Uint8Array([1])]);
+		expect(b.fonts.get("Inter")).toEqual([new Uint8Array([2])]);
+		expect(cache.size).toBe(2);
 	});
 
 	test("an empty result leaves the cache, so the next call retries", async () => {
@@ -168,7 +216,7 @@ describe("resolveTemplateFonts", () => {
 		stale.catch(() => {});
 		const cache = new Map<string, Promise<Uint8Array[]>>();
 		const t = template([text("Inter")]);
-		cache.set("g:Inter:400", stale);
+		cache.set("g:google:Inter:400", stale);
 
 		const [first, second] = await Promise.all([
 			resolveTemplateFonts(t, { fetch: down.fetch, cache }),

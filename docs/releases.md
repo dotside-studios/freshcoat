@@ -13,11 +13,25 @@ Freshcoat releases use one version for the core SDK and the Figma plugin.
 
 Studio is deployed separately. The UI package remains internal.
 
-Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md).
+Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md). Rendering
+untrusted templates? See [safer defaults](security-defaults.md).
 
 ## Unreleased changes
 
 These land in the next release's notes.
+
+- **Safer defaults for untrusted templates.** The engine's default loader
+  accepts only `data:`, `blob:` and `https:`. See
+  [safer defaults](security-defaults.md).
+
+- **Pluggable font fallback.** `resolveTemplateFonts` takes a `fallback`
+  option, a `FontFallback` (`{ id, load(family, weights) }`), for families the
+  `fonts` block does not declare. The Google Fonts lookup stays on by default
+  (`googleFonts()`, now exported). `fallback: null` turns it off. Migration:
+  `guessGoogle: false` becomes `fallback: null`; `guessGoogle: true` can be
+  dropped. Server hosts that do not want outbound requests to Google should
+  pass `fallback: null` or their own fallback. See
+  [safer defaults](security-defaults.md).
 
 - **Cut lines in spot colours.** A PDF with cut lines (`cutLines`,
   `--cut-lines`, Studio's Cut lines) now strokes each edge kind in a

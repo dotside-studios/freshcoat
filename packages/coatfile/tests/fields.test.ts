@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import {
+	defaultFieldValues,
 	elementFieldRefs,
 	fieldTitle,
 	isSystemField,
@@ -226,6 +227,27 @@ describe("isSystemField", () => {
 		expect(isSystemField("$$a", { type: "string" })).toBe(true);
 		expect(isSystemField("a", { type: "string", "x-source": "user" })).toBe(
 			false,
+		);
+	});
+});
+
+describe("__proto__ keys in a template", () => {
+	const tpl = JSON.parse(
+		'{"template_data": [], "fields": {"type": "object", "properties": {"__proto__": {"type": "string", "default": "d"}, "a": {"type": "string"}}}}',
+	) as Template;
+
+	test("defaultFieldValues and sampleValues keep it as an own key", () => {
+		const defaults = defaultFieldValues(tpl);
+		expect(Object.getPrototypeOf(defaults)).toBe(Object.prototype);
+		expect(Object.keys(defaults)).toEqual(["__proto__"]);
+		expect(Object.getOwnPropertyDescriptor(defaults, "__proto__")?.value).toBe(
+			"d",
+		);
+		const samples = sampleValues(tpl);
+		expect(Object.getPrototypeOf(samples)).toBe(Object.prototype);
+		expect(Object.keys(samples).sort()).toEqual(["__proto__", "a"]);
+		expect(Object.getOwnPropertyDescriptor(samples, "__proto__")?.value).toBe(
+			"d",
 		);
 	});
 });

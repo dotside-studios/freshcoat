@@ -73,7 +73,7 @@ export function fieldContext(
 	template: Template,
 	values: Record<string, unknown>,
 ): Record<string, unknown> {
-	const ctx: Record<string, unknown> = {};
+	const ctx: Record<string, unknown> = Object.create(null);
 	for (const [k, def] of Object.entries(template.fields.properties)) {
 		if (def.default !== undefined) ctx[k] = def.default;
 	}

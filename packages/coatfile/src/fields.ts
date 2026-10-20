@@ -3,6 +3,7 @@
 // can import it.
 
 import { tokenIds } from "./mustache";
+import { ownValue, setOwn } from "./own";
 import { childElements } from "./tree";
 import type {
 	Background,
@@ -131,7 +132,7 @@ export function visibilityFieldRefs(template: Template): string[] {
 export function defaultFieldValues(template: Template): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const [id, field] of Object.entries(template.fields.properties)) {
-		if (field.default !== undefined) out[id] = field.default;
+		if (field.default !== undefined) setOwn(out, id, field.default);
 	}
 	return out;
 }
@@ -164,9 +165,9 @@ export function sampleValues(template: Template): Record<string, string> {
 	const out = defaultFieldValues(template);
 	const gates = new Set(visibilityFieldRefs(template));
 	for (const [id, field] of Object.entries(template.fields.properties)) {
-		if (out[id]) continue;
+		if (ownValue(out, id)) continue;
 		if (field.default === "" && gates.has(id)) continue;
-		out[id] = sampleFor(id, field);
+		setOwn(out, id, sampleFor(id, field));
 	}
 	return out;
 }

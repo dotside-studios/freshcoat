@@ -1,3 +1,4 @@
+import { ownValue } from "./own";
 import { TemplateSchema } from "./schemas";
 import { type TextRuleBreak, textRuleBreaks } from "./text-rules";
 import type {
@@ -135,8 +136,8 @@ export function validateValues(
 
 	for (const req of fields.required ?? []) {
 		// A boolean left unset is its default, which is an answer.
-		if (fields.properties[req]?.format === "boolean") continue;
-		const got = v[req];
+		if (ownValue(fields.properties, req)?.format === "boolean") continue;
+		const got = ownValue(v, req);
 		if (got === undefined || got === null || got === "") {
 			errors.push({
 				path: `/${req}`,
@@ -147,7 +148,7 @@ export function validateValues(
 	}
 
 	for (const [key, raw] of Object.entries(v)) {
-		const def = fields.properties[key];
+		const def = ownValue(fields.properties, key);
 		if (!def) continue;
 		if (typeof raw !== "string") {
 			errors.push({

@@ -98,7 +98,20 @@ context, once any paint in flight finishes.
 read the laid-out scene or the command list in between.
 
 Images and local font files are read through the renderer's byte loader.
-`fetchLoader` (the default) decodes `data:` URLs and fetches the rest;
+`fetchLoader` (the default) decodes `data:` URLs and fetches `blob:` and
+`https:` URLs. It refuses every other scheme, `http:` and `file:` included, with
+an error that names it, because a template chooses these URLs. A relative URL
+resolves against `location` in a browser and is refused where there is none.
+Pass your own `load` to allow more. Font URLs follow the same policy unless you
+pass your own `fetch` to `fontBytes`.
+
+`createFetchLoader({ unsafeAllowHttp: true })` also allows `http:`. It is
+unsafe: http is plaintext, and a template can aim it at internal services such
+as `http://localhost:6379/` or a cloud metadata address. Use it only when you
+trust every template you render. It never allows `file:`, `ftp:` or other
+schemes, and fonts loaded through that loader get the same allowance. Its
+`fetch` option swaps the global `fetch`. See
+[safer defaults](../../docs/security-defaults.md).
 `mapLoader(bytes, next)` serves bytes you hold first. In Node or Bun,
 `fileLoader` from `@freshcoat-js/engine/node` reads relative paths and `file:`
 URLs under a root directory and refuses anything outside it, passing other
