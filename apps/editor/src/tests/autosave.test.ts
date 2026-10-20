@@ -7,6 +7,7 @@ import {
 	createAutosaveStore,
 	restoreNotices,
 } from "~/app/autosave";
+import { readSaved } from "./autosave-read";
 import { doc as docFixture } from "./doc-fixture";
 
 let dbCount = 0;
@@ -96,7 +97,7 @@ describe("autosave", () => {
 			size: 3,
 		});
 
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.fileName).toBe("a.coatworkspace");
 		const back = read?.workspace.datasets[0]?.assets ?? [];
 		expect(back.map((a) => a.sha256)).toEqual(["sha1", "sha2"]);
@@ -108,13 +109,13 @@ describe("autosave", () => {
 		const store = createAutosaveStore(freshDb());
 		const ws = workspace([]);
 		await store.write({ workspace: ws, fileName: "a.coatworkspace" });
-		expect((await store.read())?.recentId).toBeUndefined();
+		expect((await readSaved(store))?.recentId).toBeUndefined();
 		await store.write({
 			workspace: ws,
 			fileName: "a.coatworkspace",
 			recentId: "recent_1",
 		});
-		expect((await store.read())?.recentId).toBe("recent_1");
+		expect((await readSaved(store))?.recentId).toBe("recent_1");
 	});
 
 	it("keeps the output intent profiles, and writes again when they change", async () => {
@@ -132,7 +133,7 @@ describe("autosave", () => {
 			workspace: { ...ws, profiles: [profile] },
 			fileName: "a",
 		});
-		expect((await store.read())?.workspace.profiles).toEqual([profile]);
+		expect((await readSaved(store))?.workspace.profiles).toEqual([profile]);
 	});
 
 	it("hands back one stored photo by its sha", async () => {
@@ -169,7 +170,7 @@ describe("autosave", () => {
 		expect(await rawGet(db, "assets")).toEqual(["sha2"]);
 		await store.clear();
 		expect(await rawGet(db, "assets")).toEqual([]);
-		expect(await store.read()).toBeNull();
+		expect(await readSaved(store)).toBeNull();
 	});
 
 	it("keeps the document when storage is full, says so once, and retries", async () => {
@@ -195,7 +196,7 @@ describe("autosave", () => {
 			fileName: "a",
 		});
 		expect(onStorageFull).toHaveBeenCalledTimes(1);
-		const read = await store.read();
+		const read = await readSaved(store);
 		expect(read?.workspace.templates).toHaveLength(1);
 		expect(read?.workspace.datasets[0]?.records).toHaveLength(3);
 		expect(read?.missingAssets).toBe(3);
@@ -208,7 +209,7 @@ describe("autosave", () => {
 			"sha2",
 			"sha3",
 		]);
-		expect((await store.read())?.missingAssets).toBeUndefined();
+		expect((await readSaved(store))?.missingAssets).toBeUndefined();
 
 		full = true;
 		await store.write({ workspace: workspace([asset(4)]), fileName: "a" });
@@ -256,7 +257,7 @@ describe("autosave", () => {
 		});
 
 		const store = createAutosaveStore(db);
-		const read = await store.read();
+		const read = await readSaved(store);
 		const old = read?.workspace.datasets[0]?.assets[0];
 		expect(old).toMatchObject({ sha256: "old", size: 2, name: "old.png" });
 		expect(await bytes(old?.blob as Blob)).toEqual([7, 7]);
@@ -297,7 +298,7 @@ describe("autosave", () => {
 				};
 			};
 		});
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.workspace.templates[0]?.fileName).toBe("x.coat");
 	});
 
@@ -315,7 +316,7 @@ describe("autosave", () => {
 		await store.write({ workspace: edited, fileName: "a" });
 		expect(put.mock.calls.map((c) => c[1])).toEqual(["current"]);
 		expect(getAllKeys).not.toHaveBeenCalled();
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
 		expect(read?.workspace.templates[0]?.template).toEqual(
 			edited.templates[0]?.template,
@@ -350,7 +351,7 @@ describe("autosave", () => {
 			"dataset:d_2",
 		]);
 		expect(await rawGet(db, "assets")).toEqual([]);
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_2"]);
 	});
 
@@ -389,7 +390,7 @@ describe("autosave", () => {
 			};
 		});
 
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.fileName).toBe("old.coatworkspace");
 		expect(read?.savedAt).toBe(5);
 		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
@@ -403,7 +404,7 @@ describe("autosave", () => {
 		};
 		expect(doc).toMatchObject({ version: 3, savedAt: 5 });
 		expect(doc.workspace.datasets).toEqual(["d_1"]);
-		const again = await createAutosaveStore(db).read();
+		const again = await readSaved(createAutosaveStore(db));
 		expect(again?.workspace).toEqual(read?.workspace);
 	});
 
@@ -433,7 +434,7 @@ describe("autosave", () => {
 			"dataset:d_1",
 		]);
 
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.fileName).toBe("a");
 		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_1"]);
 		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
@@ -482,7 +483,7 @@ describe("autosave", () => {
 		expect(tabBWrote).not.toBeNull();
 		expect(await rawGet(db, "assets", "sha3")).toBeInstanceOf(Blob);
 
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.fileName).toBe("a");
 		expect(
 			read?.workspace.datasets[0]?.assets.map((a) => a.sha256).sort(),
@@ -512,7 +513,7 @@ describe("autosave", () => {
 		});
 		raw.close();
 
-		const read = await createAutosaveStore(db).read();
+		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.workspace.datasets.map((d) => d.id)).toEqual(["d_2"]);
 		expect(read?.missingDatasets).toBe(1);
 		expect(restoreNotices(read as Autosave)).toEqual([
@@ -530,9 +531,102 @@ describe("autosave", () => {
 			req.onerror = () => reject(req.error);
 		});
 		await store.write({ workspace: workspace([asset(1)]), fileName: "b" });
-		const read = await store.read();
+		const read = await readSaved(store);
 		expect(read?.fileName).toBe("b");
 		expect(read?.workspace.datasets[0]?.records).toHaveLength(1);
 		expect(read?.missingAssets).toBeUndefined();
+	});
+
+	it("reports a failed write once, then recovers and retries", async () => {
+		const db = freshDb();
+		const onWriteFailed = vi.fn();
+		const onWriteRecovered = vi.fn();
+		const store = createAutosaveStore(db, { onWriteFailed, onWriteRecovered });
+		const realPut = IDBObjectStore.prototype.put;
+		let broken = true;
+		vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+			this: IDBObjectStore,
+			value: unknown,
+			key?: IDBValidKey,
+		) {
+			if (broken && this.name === "autosave")
+				throw new DOMException("broken", "DataError");
+			return realPut.call(this, value, key);
+		});
+
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		await store.write({ workspace: workspace([asset(2)]), fileName: "b" });
+		expect(onWriteFailed).toHaveBeenCalledTimes(1);
+		expect(onWriteRecovered).not.toHaveBeenCalled();
+
+		broken = false;
+		await store.retry();
+		expect(onWriteRecovered).toHaveBeenCalledTimes(1);
+		expect((await readSaved(store))?.fileName).toBe("b");
+
+		broken = true;
+		await store.write({ workspace: workspace([asset(3)]), fileName: "c" });
+		expect(onWriteFailed).toHaveBeenCalledTimes(2);
+	});
+
+	it("tells a failed read from an empty one and writes nothing over it", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		expect((await store.read()).status).toBe("empty");
+		await store.write({ workspace: workspace([asset(1)]), fileName: "kept" });
+
+		const realGet = IDBObjectStore.prototype.get;
+		const get = vi
+			.spyOn(IDBObjectStore.prototype, "get")
+			.mockImplementation(() => {
+				throw new DOMException("broken", "UnknownError");
+			});
+		expect((await store.read()).status).toBe("failed");
+		get.mockImplementation(function (
+			this: IDBObjectStore,
+			key: IDBValidKey | IDBKeyRange,
+		) {
+			return realGet.call(this, key);
+		});
+
+		await store.write({ workspace: workspace([asset(2)]), fileName: "other" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("kept");
+
+		expect((await store.read()).status).toBe("found");
+		await store.write({ workspace: workspace([asset(2)]), fileName: "other" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("other");
+	});
+
+	it("refuses an autosave from a newer version and leaves it alone", async () => {
+		const db = freshDb();
+		const seed = createAutosaveStore(db);
+		await seed.write({ workspace: workspace([asset(1)]), fileName: "old" });
+		const handle = await openRaw(db);
+		const newer = { version: 4, workspace: {}, fileName: "future", savedAt: 1 };
+		await new Promise<void>((resolve, reject) => {
+			const tx = handle.transaction("autosave", "readwrite");
+			tx.objectStore("autosave").put(newer, "current");
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+		handle.close();
+
+		const store = createAutosaveStore(db);
+		expect((await store.read()).status).toBe("newer");
+		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
+		await store.clear();
+		expect(await rawGet(db, "autosave", "current")).toEqual(newer);
+	});
+
+	it("starts a flushed write before anything is awaited", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		const transaction = vi.spyOn(IDBDatabase.prototype, "transaction");
+		store.flush({ workspace: workspace([asset(1), asset(2)]), fileName: "b" });
+		expect(transaction).toHaveBeenCalledWith("autosave", "readwrite");
+		await vi.waitFor(async () =>
+			expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("b"),
+		);
 	});
 });

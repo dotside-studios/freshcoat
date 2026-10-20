@@ -75,7 +75,8 @@ export async function runAutosave(probe: AutosaveProbe) {
 		},
 	];
 	await store.write({ workspace: ws, fileName: "w.coatworkspace" });
-	const read = await store.read();
+	const result = await store.read();
+	const read = result.status === "found" ? result.autosave : null;
 	return {
 		saved: read !== null,
 		assets: read?.workspace.datasets[0]?.assets.map((a) => a.name) ?? [],

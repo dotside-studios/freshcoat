@@ -140,11 +140,13 @@ import {
 	type Autosave,
 	clearAutosave,
 	configureAutosave,
+	flushAutosave,
 	keepAutosaveAsset,
+	retryAutosave,
 	writeAutosave,
 } from "./autosave";
 import { readClipboard, writeClipboard } from "./clipboard";
-import { BOOLEAN, plural } from "./copy";
+import { AUTOSAVE_COPY, BOOLEAN, plural } from "./copy";
 import { downloadBytes } from "./download";
 import { loadFor, once } from "./lazy";
 import { type RecentSource, recentStore } from "./recent";
@@ -158,7 +160,29 @@ import {
 import { loadSvgImport } from "./svg";
 import type { SvgElements, svgToElements } from "./svg-import";
 
+let closeWriteFailed: (() => void) | undefined;
+
 configureAutosave({
+	onWriteFailed: () => {
+		closeWriteFailed?.();
+		closeWriteFailed = toast(AUTOSAVE_COPY.writeFailed, {
+			tone: "danger",
+			timeout: 0,
+			action: {
+				label: AUTOSAVE_COPY.retry,
+				onAction: () => void retryAutosave(),
+			},
+		});
+	},
+	onWriteRecovered: () => {
+		closeWriteFailed?.();
+		closeWriteFailed = undefined;
+	},
+	onReadProblem: (problem) =>
+		toast(
+			problem === "newer" ? AUTOSAVE_COPY.newer : AUTOSAVE_COPY.readFailed,
+			{ tone: problem === "newer" ? "warning" : "danger", timeout: 10000 },
+		),
 	onStorageFull: () =>
 		toast("Storage full. Photos aren't autosaved.", {
 			tone: "warning",
@@ -1946,19 +1970,32 @@ export class EditorController {
 		if (!workspace) return;
 		clearTimeout(this.autosaveTimer);
 		this.autosaveTimer = setTimeout(() => {
-			const write = () => {
-				const ws = workspaceSnapshot(this.state);
-				const fileName = this.state.workspace?.fileName;
-				if (ws && fileName && isDirty(this.state))
-					void writeAutosave({
-						workspace: ws,
-						fileName,
-						...(this.recentId ? { recentId: this.recentId } : {}),
-					});
-			};
-			if (this.isUnsettled()) void this.settled().then(write);
-			else write();
+			this.autosaveTimer = undefined;
+			if (this.isUnsettled()) void this.settled().then(() => this.saveNow());
+			else this.saveNow();
 		}, 1000);
+	}
+
+	private saveNow(flush = false): void {
+		const ws = workspaceSnapshot(this.state);
+		const fileName = this.state.workspace?.fileName;
+		if (!ws || !fileName || !isDirty(this.state)) return;
+		const entry = {
+			workspace: ws,
+			fileName,
+			...(this.recentId ? { recentId: this.recentId } : {}),
+		};
+		if (flush) flushAutosave(entry);
+		else void writeAutosave(entry);
+	}
+
+	/** Starts the pending autosave now, for a page that is being hidden or
+	 *  closed. */
+	flushAutosave(): void {
+		if (this.autosaveTimer === undefined) return;
+		clearTimeout(this.autosaveTimer);
+		this.autosaveTimer = undefined;
+		this.saveNow(true);
 	}
 
 	private scheduleValidation(): void {

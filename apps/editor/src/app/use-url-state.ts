@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
 import { findSample } from "~/samples";
-import { readAutosave, restoreNotices } from "./autosave";
+import { loadAutosave, restoreNotices } from "./autosave";
 import type { CommandContext } from "./commands";
 import type { EditorController } from "./controller";
 import { OPEN_HINT } from "./copy";
@@ -66,7 +66,7 @@ export function useUrlState(
 		void (async () => {
 			// Read before opening: once the opened document is edited, autosave
 			// writes over what was there.
-			const saved = await readAutosave();
+			const saved = await loadAutosave();
 			const opened = await runIntent(intent, intentTarget(controller), (id) =>
 				Boolean(findSample(id)),
 			);
@@ -121,7 +121,7 @@ async function openHandoff(
 ): Promise<void> {
 	// Read before opening: once the opened document is edited, autosave
 	// writes over what was there.
-	const saved = controller.state.workspace ? null : await readAutosave();
+	const saved = controller.state.workspace ? null : await loadAutosave();
 	const result = await readHandoff(data);
 	if (!result.ok) {
 		const from = returnTo ? hostOf(returnTo) : "Figma";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { writeAutosave } from "~/app/autosave";
+import { flushAutosave, writeAutosave } from "~/app/autosave";
 import { EditorController } from "~/app/controller";
 import type { Action } from "~/state/store";
 import { doc } from "./doc-fixture";
@@ -7,6 +7,7 @@ import { doc } from "./doc-fixture";
 vi.mock("~/app/autosave", async (importOriginal) => ({
 	...(await importOriginal<typeof import("~/app/autosave")>()),
 	writeAutosave: vi.fn(async () => {}),
+	flushAutosave: vi.fn(),
 }));
 
 const rendered: Action = {
@@ -28,6 +29,7 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
 	vi.useRealTimers();
 	vi.mocked(writeAutosave).mockClear();
+	vi.mocked(flushAutosave).mockClear();
 });
 
 describe("autosave scheduling", () => {
@@ -49,6 +51,22 @@ describe("autosave scheduling", () => {
 		c.dispatch({ type: "hover", key: "0/2" });
 		vi.advanceTimersByTime(2000);
 		expect(writeAutosave).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("autosave flush", () => {
+	it("starts the pending save at once and drops the timer", () => {
+		const c = new EditorController();
+		c.open(doc(), "doc.coat");
+		vi.advanceTimersByTime(2000);
+		c.select(["0/0"]);
+		c.deleteSelection();
+		c.flushAutosave();
+		expect(flushAutosave).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(2000);
+		expect(writeAutosave).not.toHaveBeenCalled();
+		c.flushAutosave();
+		expect(flushAutosave).toHaveBeenCalledTimes(1);
 	});
 });
 

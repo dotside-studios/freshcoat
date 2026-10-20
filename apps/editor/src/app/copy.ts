@@ -297,3 +297,10 @@ export const ISSUE_COPY = {
 	unknownSetting: (name: string) => `Unknown setting ${name}`,
 	invalid: (what: string) => `${what} isn't valid`,
 } as const;
+
+export const AUTOSAVE_COPY = {
+	writeFailed: "Couldn't autosave",
+	retry: "Retry",
+	readFailed: "Couldn't read autosave",
+	newer: "Autosave is from a newer version of Studio",
+} as const;

@@ -23,7 +23,7 @@ import RestoreIcon from "~icons/mingcute/history-line";
 import {
 	type Autosave,
 	clearAutosave,
-	readAutosave,
+	loadAutosave,
 	restoreNotices,
 } from "./autosave";
 import type { CommandContext } from "./commands";
@@ -188,7 +188,7 @@ export function Welcome({
 	useEffect(() => {
 		let live = true;
 		void (async () => {
-			const a = await readAutosave();
+			const a = await loadAutosave();
 			const entries = await recentStore().list();
 			if (!live) return;
 			setAutosave(a);

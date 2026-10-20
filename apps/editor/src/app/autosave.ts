@@ -22,6 +22,14 @@ export type Autosave = {
 	recentId?: string;
 };
 
+/** What reading the stored autosave found. A failed or newer one is not an
+ *  empty one: the store writes nothing over either until a read succeeds. */
+export type AutosaveRead =
+	| { status: "found"; autosave: Autosave }
+	| { status: "empty" }
+	| { status: "failed" }
+	| { status: "newer" };
+
 /** What restoring `saved` has to tell the user. */
 export function restoreNotices(saved: Autosave): string[] {
 	const notices: string[] = [];
@@ -115,11 +123,24 @@ export type AutosaveOptions = {
 	/** Who this store writes as; another tab's writes make what this one
 	 *  remembers writing unreliable. Defaults to an id made per tab. */
 	tabId?: string;
+	/** Called when `loadAutosave` could not use what is stored. */
+	onReadProblem?: (problem: "failed" | "newer") => void;
+	/** Called once when a write fails, and not again until a write has
+	 *  succeeded or `retry` has run. */
+	onWriteFailed?: (err: unknown) => void;
+	/** Called when a write succeeds after `onWriteFailed`. */
+	onWriteRecovered?: () => void;
 };
 
 export type AutosaveStore = {
 	write(entry: Omit<Autosave, "savedAt">): Promise<void>;
-	read(): Promise<Autosave | null>;
+	/** Starts writing `entry` at once, without waiting on anything, for a
+	 *  page that is going away. Photos not stored yet are left for a later
+	 *  write. */
+	flush(entry: Omit<Autosave, "savedAt">): void;
+	/** Writes again the entry whose write failed. */
+	retry(): Promise<void>;
+	read(): Promise<AutosaveRead>;
 	/** The stored copy of one photo, or null. */
 	asset(sha256: string): Promise<Blob | null>;
 	/** Stores `asset` unless storage holds it already and hands back the
@@ -276,6 +297,10 @@ export function createAutosaveStore(
 	/** the generation of this store's last shell write */
 	let generation = 0;
 	let conn: Promise<IDBDatabase> | null = null;
+	let open: IDBDatabase | null = null;
+	let blocked: "failed" | "newer" | null = null;
+	let failedEntry: Omit<Autosave, "savedAt"> | null = null;
+	let flushes = 0;
 	let running: Promise<void> = Promise.resolve();
 	let waiting: Omit<Autosave, "savedAt"> | null = null;
 
@@ -307,12 +332,14 @@ export function createAutosaveStore(
 		const p: Promise<IDBDatabase> = openDb().then((db) => {
 			const drop = () => {
 				if (conn === p) conn = null;
+				if (open === db) open = null;
 			};
 			db.onversionchange = () => {
 				drop();
 				db.close();
 			};
 			db.onclose = drop;
+			open = db;
 			return db;
 		});
 		conn = p;
@@ -325,6 +352,7 @@ export function createAutosaveStore(
 	async function disconnect(): Promise<void> {
 		const p = conn;
 		conn = null;
+		open = null;
 		(await p?.catch(() => null))?.close();
 	}
 
@@ -435,6 +463,26 @@ export function createAutosaveStore(
 		);
 	}
 
+	let failing = false;
+	let retrying = false;
+
+	function failed(err: unknown, entry: Omit<Autosave, "savedAt">): void {
+		failedEntry = entry;
+		const again = retrying;
+		retrying = false;
+		if (failing && !again) return;
+		failing = true;
+		opts.onWriteFailed?.(err);
+	}
+
+	function succeeded(): void {
+		failedEntry = null;
+		retrying = false;
+		if (!failing) return;
+		failing = false;
+		opts.onWriteRecovered?.();
+	}
+
 	function forget(): void {
 		written = null;
 		stored = null;
@@ -453,6 +501,7 @@ export function createAutosaveStore(
 		)
 			return;
 		const db = await connect();
+		const startedAt = flushes;
 		let raced = false;
 		try {
 			const seen = stamp(
@@ -474,6 +523,7 @@ export function createAutosaveStore(
 					full = true;
 				}
 			}
+			if (flushes !== startedAt) return;
 			const tx = db.transaction(DOC_STORE, "readwrite");
 			const docs = tx.objectStore(DOC_STORE);
 			// Another tab wrote since the check above, and may have collected
@@ -545,20 +595,105 @@ export function createAutosaveStore(
 		written = null;
 	}
 
-	return {
+	const api: AutosaveStore = {
 		write(entry) {
+			if (blocked) return Promise.resolve();
 			const first = waiting === null;
 			waiting = entry;
 			if (!first) return running;
 			running = running.then(async () => {
 				const next = waiting;
 				waiting = null;
-				if (next) await writeNow(next).catch(() => {});
+				if (!next || blocked) return;
+				try {
+					await writeNow(next);
+					succeeded();
+				} catch (err) {
+					failed(err, next);
+				}
 			});
 			return running;
 		},
 
-		async read() {
+		flush(entry) {
+			if (blocked) return;
+			const db = open;
+			if (!db) {
+				void api.write(entry);
+				return;
+			}
+			const ws = entry.workspace;
+			if (
+				last !== null &&
+				sameWorkspace(last, ws) &&
+				lastRecent === entry.recentId
+			)
+				return;
+			flushes += 1;
+			waiting = null;
+			generation += 1;
+			const gen = generation;
+			try {
+				const tx = db.transaction(DOC_STORE, "readwrite");
+				const docs = tx.objectStore(DOC_STORE);
+				tx.oncomplete = () => {
+					last = null;
+					lastRecent = entry.recentId;
+					savedAssets = null;
+					succeeded();
+				};
+				tx.onabort = () => {
+					forget();
+					failed(tx.error ?? new DOMException("aborted", "AbortError"), entry);
+				};
+				const seen = docs.get(KEY);
+				seen.onsuccess = () => {
+					if (written !== null && !isMine(stamp(seen.result))) forget();
+					const put = (before: Map<string, Dataset | null>) => {
+						const now = new Map<string, Dataset>();
+						for (const d of ws.datasets) {
+							const key = datasetKey(d.id);
+							now.set(key, d);
+							if (before.get(key) !== d) docs.put(stripAssets(d), key);
+						}
+						for (const key of before.keys())
+							if (!now.has(key)) docs.delete(key);
+						const doc: StoredAutosave = {
+							version: 3,
+							workspace: shell(ws),
+							fileName: entry.fileName,
+							savedAt: Date.now(),
+							writer: { tabId, generation: gen },
+							...(entry.recentId ? { recentId: entry.recentId } : {}),
+						};
+						docs.put(doc, KEY);
+						written = now;
+					};
+					if (written !== null) return put(written);
+					const keys = docs.getAllKeys();
+					keys.onsuccess = () =>
+						put(
+							new Map(
+								keys.result
+									.map(String)
+									.filter((k) => k.startsWith(DATASET_PREFIX))
+									.map((k) => [k, null]),
+							),
+						);
+				};
+			} catch (err) {
+				failed(err, entry);
+			}
+		},
+
+		async retry() {
+			const entry = failedEntry;
+			if (!entry) return;
+			retrying = true;
+			await api.write(entry);
+		},
+
+		async read(): Promise<AutosaveRead> {
 			try {
 				const db = await connect();
 				const tx = db.transaction([DOC_STORE, ASSET_STORE]);
@@ -569,15 +704,32 @@ export function createAutosaveStore(
 					| InlineAutosave
 					| LegacyTemplateAutosave
 					| undefined;
-				if (!v) return null;
+				if (!v) {
+					blocked = null;
+					return { status: "empty" };
+				}
 				if (!("workspace" in v)) {
+					blocked = null;
 					return {
-						workspace: singleTemplateWorkspace(v.template, v.fileName),
-						fileName: "Untitled.coatworkspace",
-						savedAt: v.savedAt,
+						status: "found",
+						autosave: {
+							workspace: singleTemplateWorkspace(v.template, v.fileName),
+							fileName: "Untitled.coatworkspace",
+							savedAt: v.savedAt,
+						},
 					};
 				}
-				if (!("version" in v)) return fromInline(v);
+				if (!("version" in v)) {
+					const autosave = fromInline(v);
+					blocked = null;
+					return { status: "found", autosave };
+				}
+				const version: unknown = v.version;
+				if (version !== 2 && version !== 3) {
+					blocked =
+						typeof version === "number" && version > 3 ? "newer" : "failed";
+					return { status: blocked };
+				}
 				let saved: StoredDataset[];
 				let missingDatasets = 0;
 				if (v.version === 2) {
@@ -615,10 +767,12 @@ export function createAutosaveStore(
 				if (missing) out.missingAssets = missing;
 				if (missingDatasets) out.missingDatasets = missingDatasets;
 				if (v.version === 3 && v.recentId) out.recentId = v.recentId;
-				return out;
+				blocked = null;
+				return { status: "found", autosave: out };
 			} catch {
+				blocked = "failed";
 				await disconnect();
-				return null;
+				return { status: "failed" };
 			}
 		},
 
@@ -647,6 +801,7 @@ export function createAutosaveStore(
 		},
 
 		async clear() {
+			if (blocked === "newer") return;
 			last = null;
 			savedAssets = null;
 			written = null;
@@ -658,11 +813,13 @@ export function createAutosaveStore(
 				await done(tx);
 				stored = new Set();
 				written = new Map();
+				blocked = null;
 			} catch {
 				await disconnect();
 			}
 		},
 	};
+	return api;
 }
 
 let shared: AutosaveStore | null = null;
@@ -677,6 +834,8 @@ function store(): AutosaveStore {
 	shared ??= createAutosaveStore("freshcoat", {
 		onStorageFull: () => sharedOptions.onStorageFull?.(),
 		onUnreadable: (asset) => sharedOptions.onUnreadable?.(asset),
+		onWriteFailed: (err) => sharedOptions.onWriteFailed?.(err),
+		onWriteRecovered: () => sharedOptions.onWriteRecovered?.(),
 	});
 	return shared;
 }
@@ -685,8 +844,26 @@ export function writeAutosave(entry: Omit<Autosave, "savedAt">): Promise<void> {
 	return store().write(entry);
 }
 
-export function readAutosave(): Promise<Autosave | null> {
+export function flushAutosave(entry: Omit<Autosave, "savedAt">): void {
+	store().flush(entry);
+}
+
+export function retryAutosave(): Promise<void> {
+	return store().retry();
+}
+
+export function readAutosave(): Promise<AutosaveRead> {
 	return store().read();
+}
+
+/** The stored autosave, or null when there is none to offer; says why when
+ *  it could not be read or came from a newer version. */
+export async function loadAutosave(): Promise<Autosave | null> {
+	const read = await readAutosave();
+	if (read.status === "found") return read.autosave;
+	if (read.status === "failed" || read.status === "newer")
+		sharedOptions.onReadProblem?.(read.status);
+	return null;
 }
 
 export function keepAutosaveAsset(asset: DatasetAsset): Promise<Blob | null> {
