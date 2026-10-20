@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ByteLoader, fetchLoader } from "../loader";
+import { type ByteLoader, fetchLoader, inheritLoaderPolicy } from "../loader";
 
 export type FileLoaderOptions = {
 	// Directory relative paths resolve against, and outside of which nothing is
@@ -17,11 +17,11 @@ const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
 export function fileLoader(opts?: FileLoaderOptions): ByteLoader {
 	const root = resolve(opts?.root ?? process.cwd());
 	const next = opts?.next ?? fetchLoader;
-	return async (src) => {
+	return inheritLoaderPolicy(next, async (src) => {
 		if (src.startsWith("file:")) return read(root, fileURLToPath(src));
 		if (URL_SCHEME.test(src)) return next(src);
 		return read(root, resolve(root, src));
-	};
+	});
 }
 
 async function read(root: string, path: string): Promise<Uint8Array> {

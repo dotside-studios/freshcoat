@@ -1,10 +1,12 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
 import { createHeadlessEnv, renderSceneToPng } from "./helpers/headless";
 import {
 	base64ToBytes,
 	bytesToBase64,
+	assertLoadableUrl,
+	createFetchLoader,
 	dataUrlToBytes,
 	fetchLoader,
 	mapLoader,
@@ -22,12 +24,216 @@ const local = (src: string): FontResolution => ({
 	},
 });
 
+// `bun test`'s vitest shim has no vi.stubGlobal; swap the globals by hand.
+const realFetch = globalThis.fetch;
+const realLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+
+function stubFetch() {
+	const urls: string[] = [];
+	globalThis.fetch = (async (url: string) => {
+		urls.push(url);
+		return {
+			ok: true,
+			status: 200,
+			arrayBuffer: async () => new Uint8Array([9]).buffer,
+		};
+	}) as unknown as typeof globalThis.fetch;
+	return urls;
+}
+
+function stubLocation(href: string | undefined) {
+	Object.defineProperty(globalThis, "location", {
+		value: href === undefined ? undefined : { href },
+		configurable: true,
+		writable: true,
+	});
+}
+
+afterEach(() => {
+	globalThis.fetch = realFetch;
+	if (realLocation) Object.defineProperty(globalThis, "location", realLocation);
+	else delete (globalThis as { location?: unknown }).location;
+	clearFontBytesCache();
+});
+
 describe("fetchLoader", () => {
 	test("decodes data: URLs without fetching", async () => {
+		const fetch = stubFetch();
 		expect([...(await fetchLoader("data:text/plain;base64,AQID"))]).toEqual([
 			1, 2, 3,
 		]);
 		expect(dataUrlToBytes("data:,hi")).toEqual(new TextEncoder().encode("hi"));
+		expect(fetch).toEqual([]);
+	});
+
+	test.each([
+		["http:", "http://169.254.169.254/latest/meta-data"],
+		["file:", "file:///etc/passwd"],
+		["ftp:", "ftp://example.com/a.png"],
+		["javascript:", "javascript:alert(1)"],
+		["gopher:", "gopher://127.0.0.1:6379/_PING"],
+		["ws:", "ws://localhost/socket"],
+		["http:", "HTTP://localhost:8080/a.png"],
+		["file:", "  file:///etc/passwd"],
+	])("rejects %s without fetching", async (scheme, src) => {
+		const fetch = stubFetch();
+		await expect(fetchLoader(src)).rejects.toThrow(
+			new RegExp(`"${scheme}".*your own loader`),
+		);
+		expect(fetch).toEqual([]);
+	});
+
+	test("fetches https: and blob: URLs", async () => {
+		const fetch = stubFetch();
+		expect([...(await fetchLoader("https://example.com/a.png"))]).toEqual([9]);
+		expect([...(await fetchLoader("blob:https://example.com/uuid"))]).toEqual([
+			9,
+		]);
+		expect(fetch).toEqual([
+			"https://example.com/a.png",
+			"blob:https://example.com/uuid",
+		]);
+	});
+
+	test("rejects a relative URL when there is no page to resolve it against", async () => {
+		const fetch = stubFetch();
+		stubLocation(undefined);
+		for (const src of ["/assets/x.png", "fonts/a.ttf", "//host/a.png"]) {
+			await expect(fetchLoader(src)).rejects.toThrow(/relative URL/);
+		}
+		expect(fetch).toEqual([]);
+	});
+
+	test("resolves a relative URL against the page", async () => {
+		const fetch = stubFetch();
+		stubLocation("https://studio.test/app/index.html");
+		await fetchLoader("/assets/x.png");
+		await fetchLoader("fonts/a.ttf");
+		expect(fetch).toEqual([
+			"https://studio.test/assets/x.png",
+			"https://studio.test/app/fonts/a.ttf",
+		]);
+	});
+
+	test("lets a page served over http load its own relative URLs", () => {
+		stubLocation("http://localhost:5173/");
+		expect(assertLoadableUrl("/a.png")).toBe("http://localhost:5173/a.png");
+		expect(() => assertLoadableUrl("http://localhost:5173/a.png")).toThrow(
+			/"http:"/,
+		);
+	});
+
+	test("allows http: only with unsafeAllowHttp", async () => {
+		const fetch = stubFetch();
+		await expect(fetchLoader("http://example.com/a.png")).rejects.toThrow(
+			/"http:"/,
+		);
+		expect(fetch).toEqual([]);
+		const unsafe = createFetchLoader({ unsafeAllowHttp: true });
+		expect([...(await unsafe("http://example.com/a.png"))]).toEqual([9]);
+		expect(fetch).toEqual([
+			"http://example.com/a.png",
+		]);
+	});
+
+	test("unsafeAllowHttp does not open other schemes", async () => {
+		const fetch = stubFetch();
+		const unsafe = createFetchLoader({ unsafeAllowHttp: true });
+		for (const src of ["file:///etc/passwd", "ftp://h/a", "gopher://h/_x"]) {
+			await expect(unsafe(src)).rejects.toThrow(/cannot load/);
+		}
+		expect(fetch).toEqual([]);
+	});
+
+	test("a custom fetch replaces the global one", async () => {
+		const fetch = stubFetch();
+		const own = createFetchLoader({
+			fetch: async () => ({
+				ok: true,
+				status: 200,
+				arrayBuffer: async () => new Uint8Array([3]).buffer,
+			}),
+		});
+		expect([...(await own("https://example.com/a"))]).toEqual([3]);
+		expect(fetch).toEqual([]);
+	});
+
+	test("an explicit loader keeps its own policy", async () => {
+		const fetch = stubFetch();
+		const loader = mapLoader(
+			new Map([["file:///x", new Uint8Array([4])]]),
+			async () => new Uint8Array(),
+		);
+		expect([...(await loader("file:///x"))]).toEqual([4]);
+		expect(fetch).toEqual([]);
+	});
+});
+
+describe("default font fetch", () => {
+	test("does not fetch a declared font with a file: url", async () => {
+		const fetch = stubFetch();
+		await expect(fontBytes(local("file:///etc/passwd"))).rejects.toThrow(
+			/"file:"/,
+		);
+		expect(fetch).toEqual([]);
+	});
+
+	test("does not fetch an http: font url or stylesheet", async () => {
+		const fetch = stubFetch();
+		await expect(fontBytes(local("http://localhost/a.ttf"))).rejects.toThrow(
+			/"http:"/,
+		);
+		await expect(
+			fontBytes({
+				kind: "descriptor",
+				descriptor: {
+					kind: "google",
+					family: "X",
+					url: "http://localhost/css",
+				},
+			}),
+		).rejects.toThrow(/"http:"/);
+		expect(fetch).toEqual([]);
+	});
+
+	test("fetches an https: font url", async () => {
+		const fetch = stubFetch();
+		const [bytes] = await fontBytes(local("https://fonts.test/a.ttf"));
+		expect([...(bytes as Uint8Array)]).toEqual([9]);
+		expect(fetch).toHaveLength(1);
+	});
+
+	test("follows the loader's unsafeAllowHttp for http: fonts", async () => {
+		const fetch = stubFetch();
+		const load = mapLoader(undefined, createFetchLoader({ unsafeAllowHttp: true }));
+		const [bytes] = await fontBytes(local("http://fonts.local/a.ttf"), load);
+		expect([...(bytes as Uint8Array)]).toEqual([9]);
+		expect(fetch).toEqual([
+			"http://fonts.local/a.ttf",
+		]);
+		await expect(
+			fontBytes(local("http://fonts.local/a.ttf")),
+		).rejects.toThrow(/"http:"/);
+		await expect(fontBytes(local("file:///x"), load)).rejects.toThrow(
+			/"file:"/,
+		);
+	});
+
+	test("a fetcher passed by the host is not restricted", async () => {
+		const fetch = stubFetch();
+		const seen: string[] = [];
+		const [bytes] = await fontBytes(local("http://mirror.local/a.ttf"), undefined, async (url) => {
+			seen.push(url);
+			return {
+				ok: true,
+				status: 200,
+				text: async () => "",
+				arrayBuffer: async () => new Uint8Array([5]).buffer,
+			};
+		});
+		expect([...(bytes as Uint8Array)]).toEqual([5]);
+		expect(seen).toEqual(["http://mirror.local/a.ttf"]);
+		expect(fetch).toEqual([]);
 	});
 });
 

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { FontFetch } from "@freshcoat-js/engine";
+import { type FontFetch, policyFetch } from "@freshcoat-js/engine";
 import type { Io } from "./io";
 
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -16,9 +16,10 @@ export function defaultCacheDir(env: NodeJS.ProcessEnv = process.env): string {
 	return join(env.XDG_CACHE_HOME || join(homedir(), ".cache"), "freshcoat");
 }
 
-export function fontFetch(io: Io): FontFetch | undefined {
-	if (io.cacheDir === undefined) return io.fetch;
-	const base: FontFetch = io.fetch ?? ((url, init) => fetch(url, init));
+// The CLI runs on inputs its user chose, so it opts in to http.
+export function fontFetch(io: Io): FontFetch {
+	const base: FontFetch = io.fetch ?? policyFetch({ unsafeAllowHttp: true });
+	if (io.cacheDir === undefined) return base;
 	return cachedFetch(base, join(io.cacheDir, "fonts"));
 }
 

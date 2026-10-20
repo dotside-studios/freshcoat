@@ -79,6 +79,7 @@ export {
 	fontRequestKey,
 	googleCss2Url,
 	googleFamilyParam,
+	policyFetch,
 	resolveFontRequest,
 } from "./font-bytes";
 export {
@@ -95,9 +96,14 @@ export {
 export {
 	base64ToBytes,
 	type ByteLoader,
+	assertLoadableUrl,
 	bytesToBase64,
+	createFetchLoader,
 	dataUrlToBytes,
 	fetchLoader,
+	inheritLoaderPolicy,
+	type LoaderFetch,
+	type LoaderPolicy,
 	mapLoader,
 } from "./loader";
 export {

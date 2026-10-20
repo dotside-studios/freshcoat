@@ -1,11 +1,87 @@
 export type ByteLoader = (src: string) => Promise<Uint8Array>;
 
-export const fetchLoader: ByteLoader = async (src) => {
-	if (src.startsWith("data:")) return dataUrlToBytes(src);
-	const res = await fetch(src);
-	if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
-	return new Uint8Array(await res.arrayBuffer());
+export type LoaderPolicy = {
+	/**
+	 * Also allow `http:`. Unsafe: plaintext, and a template can aim it at
+	 * internal services. Only for hosts that trust every template they render.
+	 */
+	unsafeAllowHttp?: boolean;
 };
+
+/** The subset of `fetch` a loader needs; the global `fetch` fits. */
+export type LoaderFetch = (
+	url: string,
+) => Promise<Pick<Response, "ok" | "status" | "arrayBuffer">>;
+
+const BASE_SCHEMES = ["data:", "blob:", "https:"];
+const SCHEME = /^([a-z][a-z\d+.-]*:)/i;
+const policies = new WeakMap<ByteLoader, LoaderPolicy>();
+
+/**
+ * The URL a default loader may fetch for `src`: `data:`, `blob:` and `https:`,
+ * plus `http:` under `unsafeAllowHttp`. A relative src resolves against the
+ * page (`globalThis.location`) and is refused where there is none. Anything
+ * else throws, since a template controls these URLs.
+ */
+export function assertLoadableUrl(
+	src: string,
+	policy: LoaderPolicy = {},
+): string {
+	const allowed = policy.unsafeAllowHttp
+		? [...BASE_SCHEMES, "http:"]
+		: BASE_SCHEMES;
+	const trimmed = src.replace(/^[\u0000-\u0020]+/, "");
+	const scheme = SCHEME.exec(trimmed)?.[1]?.toLowerCase();
+	if (scheme) {
+		if (allowed.includes(scheme)) return trimmed;
+		throw new Error(
+			`cannot load a "${scheme}" URL: the default loader allows only ${allowed.join(", ")}; pass your own loader to allow more`,
+		);
+	}
+	const base = globalThis.location?.href;
+	if (!base) {
+		throw new Error(
+			"cannot load a relative URL without a page to resolve it against; pass your own loader to read it",
+		);
+	}
+	const url = new URL(trimmed, base);
+	// A page served over http (a dev server) resolves its own relative URLs to http.
+	if (url.protocol !== "http:") assertLoadableUrl(url.href, policy);
+	return url.href;
+}
+
+/** A loader that decodes `data:` URLs and fetches the rest under `policy`. */
+export function createFetchLoader(
+	policy: LoaderPolicy & { fetch?: LoaderFetch } = {},
+): ByteLoader {
+	const { fetch: fetcher, ...rest } = policy;
+	const loader: ByteLoader = async (src) => {
+		const url = assertLoadableUrl(src, rest);
+		if (url.slice(0, 5).toLowerCase() === "data:") return dataUrlToBytes(url);
+		const res = await (fetcher ?? fetch)(url);
+		if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
+		return new Uint8Array(await res.arrayBuffer());
+	};
+	policies.set(loader, rest);
+	return loader;
+}
+
+export const fetchLoader: ByteLoader = createFetchLoader();
+
+/** The policy a loader made by `createFetchLoader` enforces; none for others. */
+export function loaderPolicy(loader: ByteLoader): LoaderPolicy {
+	return policies.get(loader) ?? {};
+}
+
+/** Marks `to`, a loader that delegates to `from`, as enforcing `from`'s policy. */
+export function inheritLoaderPolicy<T extends ByteLoader>(
+	from: ByteLoader,
+	to: T,
+): T {
+	const policy = policies.get(from);
+	if (policy) policies.set(to, policy);
+	return to;
+}
 
 /** Serves a src from `bytes` when present, else from `next`. */
 export function mapLoader(
@@ -13,10 +89,10 @@ export function mapLoader(
 	next: ByteLoader = fetchLoader,
 ): ByteLoader {
 	if (!bytes) return next;
-	return (src) => {
+	return inheritLoaderPolicy(next, (src) => {
 		const hit = bytes.get(src);
 		return hit ? Promise.resolve(hit) : next(src);
-	};
+	});
 }
 
 export function dataUrlToBytes(src: string): Uint8Array {

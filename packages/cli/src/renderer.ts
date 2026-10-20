@@ -1,7 +1,8 @@
 import {
 	type ByteLoader,
+	createFetchLoader,
 	createRenderer,
-	fetchLoader,
+	inheritLoaderPolicy,
 	type Renderer,
 } from "@freshcoat-js/engine";
 import {
@@ -17,13 +18,13 @@ export function createLoader(
 	root: string,
 	assets: readonly DatasetAsset[] = [],
 ): ByteLoader {
-	const files = fileLoader({ root, ...(io.fetch ? { next: remoteLoader(io) } : {}) });
+	const files = fileLoader({ root, next: remoteLoader(io) });
 	if (assets.length === 0) return files;
 	const refs = new Map(assets.map((asset) => [assetRef(asset.sha256), asset.blob]));
-	return async (src) => {
+	return inheritLoaderPolicy(files, async (src) => {
 		const blob = refs.get(src);
 		return blob ? new Uint8Array(await blob.arrayBuffer()) : files(src);
-	};
+	});
 }
 
 export async function openRenderer(
@@ -42,15 +43,15 @@ export async function openRenderer(
 	});
 }
 
-function remoteLoader(io: Io): ByteLoader {
-	return async (src) => {
-		if (src.startsWith("data:")) return fetchLoader(src);
-		if (!io.fetch) throw new Error(`cannot fetch ${src}`);
-		const response = await io.fetch(src, {
-			headers: {},
-			signal: AbortSignal.timeout(30_000),
-		});
-		if (!response.ok) throw new Error(`fetch ${src} -> ${response.status}`);
-		return new Uint8Array(await response.arrayBuffer());
-	};
+// The CLI runs on inputs its user chose, so it opts in to http.
+function remoteLoader({ fetch }: Io): ByteLoader {
+	return createFetchLoader({
+		unsafeAllowHttp: true,
+		...(fetch
+			? {
+					fetch: (url) =>
+						fetch(url, { headers: {}, signal: AbortSignal.timeout(30_000) }),
+				}
+			: {}),
+	});
 }

@@ -1,4 +1,11 @@
-import { type ByteLoader, dataUrlToBytes, fetchLoader } from "./loader";
+import {
+	assertLoadableUrl,
+	type ByteLoader,
+	dataUrlToBytes,
+	fetchLoader,
+	type LoaderPolicy,
+	loaderPolicy,
+} from "./loader";
 import type { FontDescriptor, FontRequest, FontResolution } from "./types";
 
 // Resolve a request against the env's pre-supplied bytes, else its descriptor.
@@ -29,7 +36,9 @@ export type FontFetch = (
 
 // Turn a resolution into raw font-file bytes. data: and http(s) sources are
 // handled here; any other local file src goes through `load`. http(s) requests
-// go through `fetcher`, the global fetch when it is omitted.
+// go through `fetcher`. The global fetch it falls back to follows the policy of
+// `load` (https only, unless it was made with `unsafeAllowHttp`); a fetcher the
+// host passes is not restricted.
 export async function fontBytes(
 	res: FontResolution,
 	load: ByteLoader = fetchLoader,
@@ -37,7 +46,11 @@ export async function fontBytes(
 ): Promise<Uint8Array[]> {
 	if (res.kind === "bytes") return res.bytes;
 	if (res.kind === "none") return [];
-	return descriptorBytes(res.descriptor, load, httpFor(fetcher));
+	return descriptorBytes(
+		res.descriptor,
+		load,
+		httpFor(fetcher, loaderPolicy(load)),
+	);
 }
 
 type Http = {
@@ -205,7 +218,19 @@ async function loadBytes(url: string, fetcher: FontFetch): Promise<Uint8Array> {
 // failed load is retried by the next paint. Each memo is a small LRU.
 const fileMemo = new Map<string, Promise<Uint8Array>>();
 const stylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
+const unsafeFileMemo = new Map<string, Promise<Uint8Array>>();
+const unsafeStylesheetMemo = new Map<string, Promise<Uint8Array[]>>();
 const dataMemo = new Map<string, Uint8Array>();
+const safeHttp: Http = {
+	fetch: policyFetch({}),
+	file: fileMemo,
+	stylesheet: stylesheetMemo,
+};
+const unsafeHttp: Http = {
+	fetch: policyFetch({ unsafeAllowHttp: true }),
+	file: unsafeFileMemo,
+	stylesheet: unsafeStylesheetMemo,
+};
 let loaderMemos = new WeakMap<ByteLoader, Map<string, Promise<Uint8Array>>>();
 let fetchMemos = new WeakMap<FontFetch, Http>();
 export const FONT_MEMO_MAX = 64;
@@ -226,15 +251,15 @@ function memoize<T>(
 	return p;
 }
 
+/** The global fetch, limited to the schemes `policy` allows. */
+export function policyFetch(policy: LoaderPolicy): FontFetch {
+	return (url, init) => fetch(assertLoadableUrl(url, policy), init);
+}
+
 // The global fetch is read per call so a host or test can replace it; a fetcher
 // given explicitly gets memos of its own, so its answers never leak to another.
-function httpFor(fetcher: FontFetch | undefined): Http {
-	if (!fetcher)
-		return {
-			fetch: (url, init) => fetch(url, init),
-			file: fileMemo,
-			stylesheet: stylesheetMemo,
-		};
+function httpFor(fetcher: FontFetch | undefined, policy: LoaderPolicy): Http {
+	if (!fetcher) return policy.unsafeAllowHttp ? unsafeHttp : safeHttp;
 	let http = fetchMemos.get(fetcher);
 	if (!http) {
 		http = { fetch: fetcher, file: new Map(), stylesheet: new Map() };
@@ -282,6 +307,8 @@ function remember<T>(
 export function clearFontBytesCache(): void {
 	fileMemo.clear();
 	stylesheetMemo.clear();
+	unsafeFileMemo.clear();
+	unsafeStylesheetMemo.clear();
 	dataMemo.clear();
 	loaderMemos = new WeakMap();
 	fetchMemos = new WeakMap();
