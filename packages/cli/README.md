@@ -15,7 +15,9 @@ freshcoat --help
 
 Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `0` done, `1` the work failed (an invalid template, a failed export item) and
-`2` the command line was wrong. `-q` or `--quiet` hides warnings and progress;
+`2` the command line was wrong. Ctrl-C (SIGINT) or SIGTERM cancels a running
+export, removes a partly written `.zip` or `.pdf`, and exits `130` or `143`;
+a second signal exits at once. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every
 command. `render --help` leaves out `--png-alpha` and `--no-crop-marks`;
 `render --help-all` lists them too. An option given twice with different

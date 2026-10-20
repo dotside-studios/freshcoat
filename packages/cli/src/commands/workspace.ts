@@ -1,4 +1,4 @@
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Template } from "@freshcoat-js/coatfile";
 import {
@@ -173,21 +173,31 @@ export async function runPreset(
 		load: createLoader(io, options.root),
 	});
 	warnAboutFonts(log, report);
+	const { signal } = io;
+	signal?.throwIfAborted();
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
 	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
 	const pool =
 		threads > 1
-			? await startWorkerPool(threads, options.root, fonts)
+			? await startWorkerPool(threads, options.root, fonts, signal)
 			: undefined;
-	const renderer = await openRenderer(io, { root: options.root, build: "full" });
+	let renderer: Awaited<ReturnType<typeof openRenderer>>;
+	try {
+		signal?.throwIfAborted();
+		renderer = await openRenderer(io, { root: options.root, build: "full" });
+	} catch (error) {
+		pool?.dispose();
+		throw error;
+	}
 	const progress = progressReporter(log, sheetLayout(preset) !== null);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
 			fonts,
 			...(pool ? { pool } : {}),
+			...(signal ? { signal } : {}),
 			output: file ? fileOutput(out) : folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
@@ -199,7 +209,10 @@ export async function runPreset(
 		});
 		log.endProgress();
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
-		if (result.cancelled) throw new CliError("the export was cancelled");
+		if (result.cancelled || signal?.aborted) {
+			if (file) await rm(out, { force: true });
+			throw new CliError("the export was cancelled");
+		}
 		await options.save?.(result.workspace);
 		for (const item of result.items)
 			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning.message}`);

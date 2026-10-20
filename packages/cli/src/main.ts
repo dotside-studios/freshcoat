@@ -25,6 +25,7 @@ import {
 import { PRINT_TARGETS } from "@freshcoat-js/for-print";
 import { PRESET_SCALE } from "@freshcoat-js/workspace";
 import { inspect } from "./commands/inspect";
+import { listenForCancel } from "./cancel";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
@@ -42,9 +43,11 @@ export async function main(
 ): Promise<number> {
 	let running: string | undefined;
 	const all = argv.includes("--help-all");
+	const cancel = listenForCancel(io.signal);
+	const cancellable: Io = { ...io, signal: cancel.signal };
 	try {
 		await program(
-			io,
+			cancellable,
 			(name) => {
 				running = name;
 			},
@@ -54,12 +57,18 @@ export async function main(
 		});
 		return 0;
 	} catch (error) {
+		if (cancel.signal.aborted) {
+			io.stderr("freshcoat: cancelled\n");
+			return cancel.code;
+		}
 		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
 		const message = error instanceof Error ? error.message : String(error);
 		io.stderr(`freshcoat: ${message}\n`);
 		if (error instanceof UsageError && running)
 			io.stderr(`Run freshcoat ${running} --help for usage.\n`);
 		return error instanceof CliError ? error.exitCode : 1;
+	} finally {
+		cancel.dispose();
 	}
 }
 
@@ -279,7 +288,7 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.addHelpText(
 			"after",
-			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when an export is cancelled or\nany item fails.",
+			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when any item fails, and\n130 on Ctrl-C or 143 on SIGTERM, which cancels the export and removes a\npartly written .zip or .pdf; a second signal exits at once.",
 		)
 		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.");
 	const given = track(render, REPEATABLE);

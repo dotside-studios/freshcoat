@@ -61,13 +61,25 @@ export async function startWorkerPool(
 	size: number,
 	root: string,
 	fonts: Map<string, Uint8Array[]>,
+	signal?: AbortSignal,
 ): Promise<WorkerPool> {
 	const pool = createWorkerPool(size, () => renderThread(root));
 	try {
-		await pool.init(fonts);
+		await abortable(pool.init(fonts), signal);
 	} catch (error) {
 		pool.dispose();
 		throw error;
 	}
 	return pool;
+}
+
+/** `promise`, or a rejection as soon as `signal` aborts. */
+function abortable<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+	if (!signal) return promise;
+	return new Promise<T>((resolve, reject) => {
+		const stop = () => reject(signal.reason);
+		if (signal.aborted) return stop();
+		signal.addEventListener("abort", stop, { once: true });
+		promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
+	});
 }

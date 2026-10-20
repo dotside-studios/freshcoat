@@ -105,6 +105,7 @@ async function renderFrames(
 	});
 	warnAboutFonts(log, report);
 
+	io.signal?.throwIfAborted();
 	const renderer = await openRenderer(io, {
 		root: directory,
 		build: output.format === "png" ? "default" : "full",
@@ -114,6 +115,7 @@ async function renderFrames(
 	const minDpi = options.minDpi ?? DEFAULT_MIN_IMAGE_DPI;
 	const dpi = options.dpi ?? DEFAULT_IMAGE_DPI_UNITS;
 	try {
+		io.signal?.throwIfAborted();
 		const frames = await renderTemplate(renderer, template, values, {
 			...(minDpi > 0 ? { imageDpi: { dpi, min: minDpi } } : {}),
 			printChecks: { dpi },
@@ -130,9 +132,11 @@ async function renderFrames(
 				},
 			},
 		});
+		io.signal?.throwIfAborted();
 		await mkdir(resolve(io.cwd, directoryOut), { recursive: true });
 		const written = new Set<string>();
 		for (const frame of frames) {
+			io.signal?.throwIfAborted();
 			const name = outputName(frame.name, frame.suffix ?? "", output.extension, written);
 			for (const warning of frame.warnings)
 				if (!(warning.kind === "image_load_failed" && warning.src === ""))
