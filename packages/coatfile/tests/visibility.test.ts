@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
-import type { Element, GroupNode, Template } from "../src/types";
 import { fieldContext } from "../src/prepare";
+import type { Element, GroupNode, Template } from "../src/types";
 import { validate, validateValues } from "../src/validate";
 import { fieldIsSet, isElementVisible } from "../src/visibility";
 
@@ -87,7 +87,9 @@ describe("isElementVisible", () => {
 	});
 
 	test("conditions do not read inherited properties", () => {
-		const poisoned = JSON.parse('{"__proto__": {"tier": "gold"}, "title": "Hi"}');
+		const poisoned = JSON.parse(
+			'{"__proto__": {"tier": "gold"}, "title": "Hi"}',
+		);
 		const ctx = fieldContext(template([]), poisoned);
 		const gold = { visibleWhen: { field: "tier", equals: "gold" } };
 		expect(isElementVisible(gold, ctx, fields)).toBe(false);
@@ -97,9 +99,9 @@ describe("isElementVisible", () => {
 			if (field !== "__proto__")
 				expect(isElementVisible(el, ctx, fields)).toBe(false);
 		}
-		expect(isElementVisible({ visibleWhen: { field: "title" } }, ctx, fields)).toBe(
-			true,
-		);
+		expect(
+			isElementVisible({ visibleWhen: { field: "title" } }, ctx, fields),
+		).toBe(true);
 		expect(({} as Record<string, unknown>).tier).toBeUndefined();
 	});
 

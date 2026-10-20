@@ -7,8 +7,8 @@ import {
 import {
 	bindingView,
 	formatFilter,
-	readsDataset,
 	type RecordStatus,
+	readsDataset,
 	sheetSummary,
 	unfilledRequired,
 	type Workspace,
@@ -88,7 +88,13 @@ export type WorkspaceInspection = {
 		dataset?: string;
 		view?: {
 			filters: string[];
-			join?: { dataset: string; on: string; key: string; prefix: string; inner: boolean };
+			join?: {
+				dataset: string;
+				on: string;
+				key: string;
+				prefix: string;
+				inner: boolean;
+			};
 			records: number;
 			unmatched: number;
 			duplicateKeys: string[];
@@ -116,7 +122,10 @@ export type WorkspaceInspection = {
 	}[];
 };
 
-export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceInspection {
+export function inspectWorkspace(
+	file: string,
+	workspace: Workspace,
+): WorkspaceInspection {
 	return {
 		file,
 		name: workspace.name,
@@ -124,9 +133,15 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 		templates: workspace.templates.map((entry) => ({
 			id: entry.id,
 			fileName: entry.fileName,
-			...(readsDataset(entry.binding) ? { dataset: entry.binding.datasetId } : {}),
+			...(readsDataset(entry.binding)
+				? { dataset: entry.binding.datasetId }
+				: {}),
 			...viewOf(entry.binding, workspace),
-			unfilled: unfilledRequired(entry.template, entry.binding, workspace.datasets),
+			unfilled: unfilledRequired(
+				entry.template,
+				entry.binding,
+				workspace.datasets,
+			),
 			template: inspectTemplate(entry.fileName, entry.template),
 		})),
 		datasets: workspace.datasets.map((dataset) => {
@@ -138,7 +153,10 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 				name: dataset.name,
 				records: dataset.records.length,
 				statuses,
-				columns: dataset.columns.map((column) => ({ key: column.key, type: column.type })),
+				columns: dataset.columns.map((column) => ({
+					key: column.key,
+					type: column.type,
+				})),
 			};
 		}),
 		presets: workspace.presets.map((preset) => {
@@ -150,7 +168,9 @@ export function inspectWorkspace(file: string, workspace: Workspace): WorkspaceI
 				format: preset.format,
 				records: preset.records,
 				items: plan.length,
-				...(sheets?.imposition ? { sheets: sheetSummary(sheets.imposition) } : {}),
+				...(sheets?.imposition
+					? { sheets: sheetSummary(sheets.imposition) }
+					: {}),
 				...(sheets?.error !== undefined ? { error: sheets.error } : {}),
 				...(!entry ? { error: "its template is not in the workspace" } : {}),
 			};
@@ -212,7 +232,8 @@ export async function inspect(
 function describeWorkspace(info: WorkspaceInspection): string {
 	const datasetName = (id: string) =>
 		info.datasets.find((dataset) => dataset.id === id)?.name ?? id;
-	const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+	const plural = (n: number, noun: string) =>
+		`${n} ${noun}${n === 1 ? "" : "s"}`;
 	const lines = [
 		`${info.name} (${info.file})`,
 		`  format ${info.formatVersion}`,
@@ -289,7 +310,9 @@ function describe(info: Inspection): string {
 					const notes = [
 						f.format ?? f.type,
 						f.required ? "required" : undefined,
-						f.default !== undefined ? `default ${JSON.stringify(f.default)}` : undefined,
+						f.default !== undefined
+							? `default ${JSON.stringify(f.default)}`
+							: undefined,
 					].filter(Boolean);
 					return `  ${f.key}  ${notes.join(", ")}`;
 				})),

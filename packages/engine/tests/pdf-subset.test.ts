@@ -590,13 +590,16 @@ describe("mergeFontSubsets", () => {
 		expect(mergeFontSubsets([a, other])).toBeNull();
 	});
 
-	test.skipIf(!existsSync(inter))("joins subsets of an installed OpenType font", () => {
-		const bytes = new Uint8Array(readFileSync(inter));
-		const { glyphs, union, out } = merged(bytes, "Fresh é", "coat Åx");
-		expect(out).toEqual(union);
-		checked(out as Uint8Array);
-		expect(render(out as Uint8Array, glyphs)).toEqual(render(bytes, glyphs));
-	});
+	test.skipIf(!existsSync(inter))(
+		"joins subsets of an installed OpenType font",
+		() => {
+			const bytes = new Uint8Array(readFileSync(inter));
+			const { glyphs, union, out } = merged(bytes, "Fresh é", "coat Åx");
+			expect(out).toEqual(union);
+			checked(out as Uint8Array);
+			expect(render(out as Uint8Array, glyphs)).toEqual(render(bytes, glyphs));
+		},
+	);
 });
 
 describe("subsets in a PDF", () => {

@@ -5,7 +5,11 @@ import {
 	minimumFormatVersion,
 } from "./format";
 import { type ImageDpiOptions, imageDpiIssues } from "./image-dpi";
-import { type PrintCheckOptions, type PrintHint, printHints } from "./print-checks";
+import {
+	type PrintCheckOptions,
+	type PrintHint,
+	printHints,
+} from "./print-checks";
 import { isOpenVector } from "./slices";
 import type { Sides, Template } from "./types";
 import { checkVariants, type VariantIssue } from "./variants";

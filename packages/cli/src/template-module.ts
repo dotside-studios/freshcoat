@@ -26,26 +26,39 @@ writeFileSync(env.FRESHCOAT_MODULE_OUT, JSON.stringify(value));
 
 type Runtime = { command: string; args: string[] };
 
-export function moduleRuntime(env: Record<string, string | undefined> = process.env): Runtime {
+export function moduleRuntime(
+	env: Record<string, string | undefined> = process.env,
+): Runtime {
 	const command = env.FRESHCOAT_RUNTIME || process.execPath;
-	const name = basename(command).toLowerCase().replace(/\.exe$/, "");
+	const name = basename(command)
+		.toLowerCase()
+		.replace(/\.exe$/, "");
 	if (name.startsWith("deno")) return { command, args: ["eval", BOOTSTRAP] };
 	if (name.startsWith("bun")) return { command, args: ["-e", BOOTSTRAP] };
 	return { command, args: ["--input-type=module", "-e", BOOTSTRAP] };
 }
 
-export async function evaluateTemplateModule(io: Io, path: string): Promise<string> {
+export async function evaluateTemplateModule(
+	io: Io,
+	path: string,
+): Promise<string> {
 	const runtime = moduleRuntime(io.env);
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-module-"));
 	const out = join(dir, "template.json");
 	try {
-		const { code, error, output } = await run(runtime, {
-			...(io.env ?? process.env),
-			FRESHCOAT_MODULE: pathToFileURL(resolve(io.cwd, path)).href,
-			FRESHCOAT_MODULE_OUT: out,
-		}, io.cwd);
+		const { code, error, output } = await run(
+			runtime,
+			{
+				...(io.env ?? process.env),
+				FRESHCOAT_MODULE: pathToFileURL(resolve(io.cwd, path)).href,
+				FRESHCOAT_MODULE_OUT: out,
+			},
+			io.cwd,
+		);
 		if (error)
-			throw new CliError(`${path}: cannot start ${runtime.command}: ${error.message}`);
+			throw new CliError(
+				`${path}: cannot start ${runtime.command}: ${error.message}`,
+			);
 		if (code === 3) throw new CliError(`${path}: ${output.trim()}`);
 		if (code !== 0)
 			throw new CliError(

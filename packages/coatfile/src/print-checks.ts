@@ -90,7 +90,10 @@ const THIN_FAMILY = /\b(thin|hairline|extra ?light|ultra ?light|light)\b/i;
 
 /** Whether a face is drawn with thin strokes: weight 300 or less, or a family
  *  named as thin or light. */
-export function isLightFace(family: string, weight: number | undefined): boolean {
+export function isLightFace(
+	family: string,
+	weight: number | undefined,
+): boolean {
 	return (weight ?? 400) <= 300 || THIN_FAMILY.test(family);
 }
 
@@ -114,7 +117,12 @@ export function isRichBlack(color: string): boolean {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-type TextRun = { size: number; family: string; weight?: number; color?: string };
+type TextRun = {
+	size: number;
+	family: string;
+	weight?: number;
+	color?: string;
+};
 
 function textIssues(
 	runs: readonly TextRun[],
@@ -195,7 +203,9 @@ type SideWidths = Partial<Record<"top" | "right" | "bottom" | "left", number>>;
 
 /** The thinnest side a stroke draws: its width, or with a width per side, the
  *  narrowest side that has one. */
-function thinnestStroke(width: number | SideWidths | undefined): number | undefined {
+function thinnestStroke(
+	width: number | SideWidths | undefined,
+): number | undefined {
 	if (width === undefined || typeof width === "number") return width;
 	const drawn = Object.values(width).filter((w): w is number => (w ?? 0) > 0);
 	return drawn.length > 0 ? Math.min(...drawn) : undefined;
@@ -207,7 +217,10 @@ function elementStrokeWidth(el: Element): number | undefined {
 	return thinnestStroke(stroke?.width);
 }
 
-function layerIssues(el: Element, o: Required<PrintCheckOptions>): PrintIssue[] {
+function layerIssues(
+	el: Element,
+	o: Required<PrintCheckOptions>,
+): PrintIssue[] {
 	const out: PrintIssue[] = [];
 	if (el.type === "text") out.push(...textIssues(templateTextRuns(el), o));
 	if (el.type === "qr_code") out.push(...qrIssues(el));
@@ -269,7 +282,14 @@ export function printHints(
 		const visit = (el: Element, path: number[]) => {
 			if (el.hidden) return;
 			const push = (issue: PrintIssue) =>
-				out.push({ kind: "print", side, sideName: frame.name, path, id: el.id, issue });
+				out.push({
+					kind: "print",
+					side,
+					sideName: frame.name,
+					path,
+					id: el.id,
+					issue,
+				});
 			for (const issue of layerIssues(el, o)) push(issue);
 			if (path.length === 1) {
 				const edges = shortOfBleed(t, el);
@@ -330,7 +350,9 @@ export function printCheckWarnings(
 		}
 		const stroke = (cmd as { stroke?: Stroke | TextStroke }).stroke;
 		const width = thinnestStroke(
-			stroke && "sides" in stroke && stroke.sides ? stroke.sides : stroke?.width,
+			stroke && "sides" in stroke && stroke.sides
+				? stroke.sides
+				: stroke?.width,
 		);
 		const issue = strokeIssue(
 			width === undefined ? undefined : width * commandStrokeScale(cmd),

@@ -241,12 +241,23 @@ describe("grain structure", () => {
 					pos: { x: 0, y: 0 },
 					size: { width: N, height: N },
 					fills: [{ kind: "solid", color: "#808080" }],
-					grain: grain({ amount: 1, size, blendMode: "normal", seed, monochrome }),
+					grain: grain({
+						amount: 1,
+						size,
+						blendMode: "normal",
+						seed,
+						monochrome,
+					}),
 				}),
 			],
 			{ pos: { x: 0, y: 0 }, size: { width: N, height: N } },
 		);
-		const out = await renderSceneToPng(node, { width: N, height: N, ck, fonts });
+		const out = await renderSceneToPng(node, {
+			width: N,
+			height: N,
+			ck,
+			fonts,
+		});
 		expect(out.warnings ?? []).toEqual([]);
 		const p = decode(out.bytes);
 		const cells = Math.floor(N / size);
@@ -298,16 +309,20 @@ describe("grain structure", () => {
 		[7, 3],
 		[0, 1],
 		[65535, 1],
-	])("seed %i at size %i has no correlation between nearby cells", async (seed, size) => {
-		const { cells, r } = await patch(seed, size);
-		let worst = 0;
-		for (let dy = 0; dy <= 6; dy++)
-			for (let dx = -6; dx <= 6; dx++) {
-				if (dy === 0 && dx <= 0) continue;
-				worst = Math.max(worst, Math.abs(correlation(r, r, cells, dx, dy)));
-			}
-		expect(worst).toBeLessThan(size === 1 ? 0.015 : 0.04);
-	}, 30_000);
+	])(
+		"seed %i at size %i has no correlation between nearby cells",
+		async (seed, size) => {
+			const { cells, r } = await patch(seed, size);
+			let worst = 0;
+			for (let dy = 0; dy <= 6; dy++)
+				for (let dx = -6; dx <= 6; dx++) {
+					if (dy === 0 && dx <= 0) continue;
+					worst = Math.max(worst, Math.abs(correlation(r, r, cells, dx, dy)));
+				}
+			expect(worst).toBeLessThan(size === 1 ? 0.015 : 0.04);
+		},
+		30_000,
+	);
 
 	test("its histogram is flat", async () => {
 		const { r } = await patch(7, 1);
@@ -350,13 +365,13 @@ describe("halftone", () => {
 			scale,
 		);
 
-	test.each(["round", "square"] as const)(
-		"draws one %s dot per cell",
-		async (shape) => {
-			expect(blobs(await grid(shape))).toBe(10 * 6);
-			expect(blobs(await grid(shape, 2))).toBe(10 * 6);
-		},
-	);
+	test.each([
+		"round",
+		"square",
+	] as const)("draws one %s dot per cell", async (shape) => {
+		expect(blobs(await grid(shape))).toBe(10 * 6);
+		expect(blobs(await grid(shape, 2))).toBe(10 * 6);
+	});
 
 	test("draws one line per row of cells", async () => {
 		expect(blobs(await grid("line"))).toBe(6);
@@ -366,25 +381,19 @@ describe("halftone", () => {
 		["round", 45],
 		["square", 30],
 		["line", 15],
-	] as const)(
-		"a 2x export keeps the 1x tone (%s at %i°)",
-		async (shape, angle) => {
-			const node = scene({ halftone: halftone({ shape, angle }) });
-			const one = await pixels(node, 1);
-			const two = await pixels(node, 2);
-			expect(meanDiff(one, halve(two))).toBeLessThan(4);
-			expect(Math.abs(mean(one) - mean(halve(two)))).toBeLessThan(2);
-		},
-	);
+	] as const)("a 2x export keeps the 1x tone (%s at %i°)", async (shape, angle) => {
+		const node = scene({ halftone: halftone({ shape, angle }) });
+		const one = await pixels(node, 1);
+		const two = await pixels(node, 2);
+		expect(meanDiff(one, halve(two))).toBeLessThan(4);
+		expect(Math.abs(mean(one) - mean(halve(two)))).toBeLessThan(2);
+	});
 
 	test("dot area follows the tone", async () => {
 		const tone = async (color: string, invert = false) =>
 			mean(
 				await pixels(
-					scene(
-						{ halftone: halftone({ invert }) },
-						[{ kind: "solid", color }],
-					),
+					scene({ halftone: halftone({ invert }) }, [{ kind: "solid", color }]),
 				),
 			);
 		expect(await tone("#404040")).toBeLessThan(await tone("#c0c0c0"));
@@ -734,7 +743,9 @@ describe("halftone edges", () => {
 				],
 			},
 		];
-		const p = await pixels(scene({ halftone: halftone({ cellSize: 6 }) }, fade));
+		const p = await pixels(
+			scene({ halftone: halftone({ cellSize: 6 }) }, fade),
+		);
 		const ink = (x0: number, x1: number) => {
 			let dark = 0;
 			for (let y = 10; y < 70; y++)
@@ -756,7 +767,10 @@ describe("halftone edges", () => {
 describe.each([
 	["grain", scene({ grain: grain({ seed: 7, size: 2, monochrome: false }) })],
 	["halftone", scene({ halftone: halftone() })],
-	["halftone-cmyk", scene({ halftone: halftone({ mode: "cmyk", cellSize: 6 }) })],
+	[
+		"halftone-cmyk",
+		scene({ halftone: halftone({ mode: "cmyk", cellSize: 6 }) }),
+	],
 	["halftone-adjacent-page", pair("page")],
 	["halftone-adjacent-element", pair("element")],
 	["halftone-rotated-page", rotated("page")],

@@ -137,7 +137,13 @@ describe("gradient helpers", () => {
 
 	it("places a linear gradient by its points, else its angle", () => {
 		expect(
-			linearPoints({ kind: "linear", angle: 0, from: [0, 0], to: [1, 1], stops }),
+			linearPoints({
+				kind: "linear",
+				angle: 0,
+				from: [0, 0],
+				to: [1, 1],
+				stops,
+			}),
 		).toEqual({ from: [0, 0], to: [1, 1] });
 		const { from, to } = linearPoints({ kind: "linear", angle: 0, stops });
 		expect(from).toEqual([0, 0.5]);

@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { effectsOf } from "../src/effects";
 import { generateMatrix } from "../src/qr";
-import { validate } from "../src/validate";
 import type {
 	Command,
 	CompileOptions,
@@ -16,6 +15,7 @@ import type {
 	TextElement,
 	TextNode,
 } from "../src/types";
+import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";
 
 // ─────────────── Command-IR helpers ───────────────
@@ -654,9 +654,7 @@ describe("compile (frame → group)", () => {
 		);
 		const group = findDraw(cmds, "drawGroup")!;
 		expect(group.clip).toEqual({ kind: "rect" });
-		expect((group.children[0] as DrawRectCommand).stroke?.align).toBe(
-			"inside",
-		);
+		expect((group.children[0] as DrawRectCommand).stroke?.align).toBe("inside");
 	});
 
 	test("no fill + no stroke = no synthetic bg child", () => {
@@ -739,7 +737,11 @@ describe("compile (frame → group)", () => {
 		expect(findDraw(isolated, "drawGroup")!.isolate).toBe(true);
 
 		for (const props of [{ children: [] }, { isolate: false, children: [] }]) {
-			const plain = getCommands(withFrame(props), {}, { width: 100, height: 60 });
+			const plain = getCommands(
+				withFrame(props),
+				{},
+				{ width: 100, height: 60 },
+			);
 			expect("isolate" in findDraw(plain, "drawGroup")!).toBe(false);
 		}
 	});
@@ -1495,15 +1497,18 @@ describe("compile (effects)", () => {
 			blur: 4,
 		});
 		const b = getCommands(modern, {}, { width: 200, height: 120 });
-		expect(findDraw(b, "drawText")!.blur).toBe(
-			findDraw(a, "drawText")!.blur,
-		);
+		expect(findDraw(b, "drawText")!.blur).toBe(findDraw(a, "drawText")!.blur);
 	});
 
 	test("a background's effects flow through unscaled", () => {
 		const tpl = structuredClone(baseTemplate);
-		tpl.template_data[0].background.effects = [sh(2), { type: "blur", radius: 3 }];
-		const draw = topDraws(getCommands(tpl, {}, { width: 200, height: 120 }))[0]!;
+		tpl.template_data[0].background.effects = [
+			sh(2),
+			{ type: "blur", radius: 3 },
+		];
+		const draw = topDraws(
+			getCommands(tpl, {}, { width: 200, height: 120 }),
+		)[0]!;
 		expect(draw.shadow).toEqual([{ color: "#000", dx: 2, dy: 1, blur: 2 }]);
 		expect(draw.blur).toBe(3);
 	});

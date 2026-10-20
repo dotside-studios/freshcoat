@@ -1,8 +1,9 @@
 // An analysis cache on renderTemplate: a print-analyzed batch samples and
 // analyzes each distinct image once, and paints what an uncached render does.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
 import { createRenderer, mapLoader } from "@freshcoat-js/engine";
 import { createAnalysisCache } from "@freshcoat-js/for-print";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { type RenderTemplateOptions, renderTemplate } from "../src/render";
 import type { Template } from "../src/types";

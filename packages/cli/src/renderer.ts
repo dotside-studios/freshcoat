@@ -20,7 +20,9 @@ export function createLoader(
 ): ByteLoader {
 	const files = fileLoader({ root, next: remoteLoader(io) });
 	if (assets.length === 0) return files;
-	const refs = new Map(assets.map((asset) => [assetRef(asset.sha256), asset.blob]));
+	const refs = new Map(
+		assets.map((asset) => [assetRef(asset.sha256), asset.blob]),
+	);
 	return inheritLoaderPolicy(files, async (src) => {
 		const blob = refs.get(src);
 		return blob ? new Uint8Array(await blob.arrayBuffer()) : files(src);

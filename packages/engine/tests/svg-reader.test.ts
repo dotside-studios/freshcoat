@@ -129,7 +129,9 @@ describe("parseTransform", () => {
 	test("a list applies right to left", () => {
 		const m = parseTransform("translate(10,0) scale(2)");
 		expect(applyMatrix(m, 1, 1)).toEqual([12, 2]);
-		expect(multiply(parseTransform("translate(10)"), parseTransform("scale(2)"))).toEqual(m);
+		expect(
+			multiply(parseTransform("translate(10)"), parseTransform("scale(2)")),
+		).toEqual(m);
 	});
 	test("empty or unreadable is the identity", () => {
 		expect(parseTransform("")).toEqual([1, 0, 0, 1, 0, 0]);
@@ -144,9 +146,9 @@ describe("normalizePath", () => {
 		);
 	});
 	test("relative commands, implicit repeats and compact numbers", () => {
-		expect(serializePath(normalizePath("m1 1 2 0 0 2h-2z m5 5l1-1.5.5.5"))).toBe(
-			"M1 1L3 1L3 3L1 3ZM6 6L7 4.5L7.5 5",
-		);
+		expect(
+			serializePath(normalizePath("m1 1 2 0 0 2h-2z m5 5l1-1.5.5.5")),
+		).toBe("M1 1L3 1L3 3L1 3ZM6 6L7 4.5L7.5 5");
 	});
 	test("close returns the pen to the subpath start", () => {
 		expect(serializePath(normalizePath("M10 10 h5 z l5 5"))).toBe(
@@ -268,6 +270,8 @@ describe("styles", () => {
 			"stroke-width": "a1",
 		});
 		const keys = Object.keys(matchRules(index, "path", undefined, ["a", "b"]));
-		expect(keys).toEqual(Object.keys(scan(rules, "path", undefined, ["a", "b"])));
+		expect(keys).toEqual(
+			Object.keys(scan(rules, "path", undefined, ["a", "b"])),
+		);
 	});
 });

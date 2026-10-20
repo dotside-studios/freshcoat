@@ -6,9 +6,9 @@ import { describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { createGroup, createRect, createText } from "../src/node";
 import type { DrawGroupCommand, DrawRectCommand } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const BOX = { pos: { x: 0, y: 0 }, size: { width: 40, height: 20 } };
 

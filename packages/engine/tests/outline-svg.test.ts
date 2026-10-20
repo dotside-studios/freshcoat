@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { normalizePath, pathBounds } from "../src/svg/path";
 import { outlineGeometry, outlineSvg, rectShape } from "../src/outline";
+import { normalizePath, pathBounds } from "../src/svg/path";
 
 const svg = (
 	cornerRadius: Parameters<typeof rectShape>[0],
 	smoothing: number | undefined,
 	w = 40,
 	h = 30,
-) => outlineSvg(outlineGeometry(rectShape(cornerRadius, smoothing), 0, 0, w, h)!);
+) =>
+	outlineSvg(outlineGeometry(rectShape(cornerRadius, smoothing), 0, 0, w, h)!);
 
 describe("outlineSvg", () => {
 	test("a plain rect is its four sides", () => {

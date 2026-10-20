@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { bakeText } from "../src/bake-text";
-import { deleteFontProvider, makeParagraphBuilder } from "../src/font-collection";
+import {
+	deleteFontProvider,
+	makeParagraphBuilder,
+} from "../src/font-collection";
 import { createText, type TextNode } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { ResolvedFont } from "../src/types";

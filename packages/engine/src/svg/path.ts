@@ -18,7 +18,16 @@ export type Segment =
 export type Box = { x: number; y: number; width: number; height: number };
 
 const ARITY: Record<string, number> = {
-	M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0,
+	M: 2,
+	L: 2,
+	H: 1,
+	V: 1,
+	C: 6,
+	S: 4,
+	Q: 4,
+	T: 2,
+	A: 7,
+	Z: 0,
 };
 
 const NUMBER = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/y;
@@ -58,7 +67,14 @@ export function normalizePath(d: string): Segment[] {
 		skip();
 		return ch === "1" ? 1 : 0;
 	};
-	const cubic = (x1: number, y1: number, x2: number, y2: number, ex: number, ey: number) => {
+	const cubic = (
+		x1: number,
+		y1: number,
+		x2: number,
+		y2: number,
+		ex: number,
+		ey: number,
+	) => {
 		out.push({ op: "C", x1, y1, x2, y2, x: ex, y: ey });
 		x = ex;
 		y = ey;
@@ -84,7 +100,8 @@ export function normalizePath(d: string): Segment[] {
 		}
 		const args: number[] = [];
 		for (let k = 0; k < (ARITY[upper] ?? 0); k++) {
-			const v = upper === "A" && (k === 3 || k === 4) ? readFlag() : readNumber();
+			const v =
+				upper === "A" && (k === 3 || k === 4) ? readFlag() : readNumber();
 			if (v === null) return out;
 			args.push(v);
 		}
@@ -164,8 +181,15 @@ export function normalizePath(d: string): Segment[] {
 // SVG arc implementation notes, appendix B.2.4: endpoint to centre
 // parameterization, then one cubic per quarter turn at most.
 function arcToCubics(
-	x1: number, y1: number, rx: number, ry: number, angle: number,
-	largeArc: number, sweep: number, x2: number, y2: number,
+	x1: number,
+	y1: number,
+	rx: number,
+	ry: number,
+	angle: number,
+	largeArc: number,
+	sweep: number,
+	x2: number,
+	y2: number,
 ): Segment[] {
 	if (x1 === x2 && y1 === y2) return [];
 	rx = Math.abs(rx);
@@ -196,7 +220,12 @@ function arcToCubics(
 		return a;
 	};
 	const theta = vecAngle(1, 0, (px - cxp) / rx, (py - cyp) / ry);
-	let delta = vecAngle((px - cxp) / rx, (py - cyp) / ry, (-px - cxp) / rx, (-py - cyp) / ry);
+	let delta = vecAngle(
+		(px - cxp) / rx,
+		(py - cyp) / ry,
+		(-px - cxp) / rx,
+		(-py - cyp) / ry,
+	);
 	if (!sweep && delta > 0) delta -= 2 * Math.PI;
 	if (sweep && delta < 0) delta += 2 * Math.PI;
 	const n = Math.max(1, Math.ceil(Math.abs(delta) / (Math.PI / 2) - 1e-9));
@@ -263,7 +292,9 @@ function extrema(p0: number, p1: number, p2: number, p3: number): number[] {
 
 const bezier = (p0: number, p1: number, p2: number, p3: number, t: number) => {
 	const u = 1 - t;
-	return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+	return (
+		u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
+	);
 };
 
 /** The exact bounds of the geometry, or null when there is none. */
@@ -333,7 +364,13 @@ export function roundPath(segs: Segment[]): Segment[] {
 			};
 		return { op: s.op, x: round4(s.x), y: round4(s.y) };
 	});
-	return out.every((s) => s.op === "Z" || Object.values(s).every((v) => typeof v === "string" || Number.isFinite(v)))
+	return out.every(
+		(s) =>
+			s.op === "Z" ||
+			Object.values(s).every(
+				(v) => typeof v === "string" || Number.isFinite(v),
+			),
+	)
 		? out
 		: normalizePath(serializePath(segs));
 }

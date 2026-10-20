@@ -183,9 +183,7 @@ describe("minimumFormatVersion", () => {
 				overrides: [
 					{
 						name: "front",
-						elements: [
-							{ id: "f", properties: { cornerRadius: [8, 0, 8, 0] } },
-						],
+						elements: [{ id: "f", properties: { cornerRadius: [8, 0, 8, 0] } }],
 					},
 				],
 			},
@@ -279,7 +277,11 @@ describe("minimumFormatVersion", () => {
 				type: "text",
 				pos: { x: 0, y: 0 },
 				size: { width: 100, height: 100 },
-				properties: { value: "Seal", font: { family: "A", size: 10 }, ...properties },
+				properties: {
+					value: "Seal",
+					font: { family: "A", size: 10 },
+					...properties,
+				},
 			}) as Element;
 		const need = (properties: Record<string, unknown>) =>
 			minimumFormatVersion(withElements(base(), text(properties)));
@@ -294,7 +296,9 @@ describe("minimumFormatVersion", () => {
 				overrides: [
 					{
 						name: "front",
-						elements: [{ id: "t", properties: { arc: { direction: "inside" } } }],
+						elements: [
+							{ id: "t", properties: { arc: { direction: "inside" } } },
+						],
 					},
 				],
 			},
@@ -309,7 +313,11 @@ describe("minimumFormatVersion", () => {
 				type: "text",
 				pos: { x: 0, y: 0 },
 				size: { width: 100, height: 100 },
-				properties: { value: "Swoosh", font: { family: "A", size: 10 }, ...properties },
+				properties: {
+					value: "Swoosh",
+					font: { family: "A", size: 10 },
+					...properties,
+				},
 			}) as Element;
 		const need = (properties: Record<string, unknown>) =>
 			minimumFormatVersion(withElements(base(), text(properties)));
@@ -338,7 +346,11 @@ describe("minimumFormatVersion", () => {
 				type: "text",
 				pos: { x: 0, y: 0 },
 				size: { width: 100, height: 100 },
-				properties: { value: "Ink", font: { family: "A", size: 10 }, ...properties },
+				properties: {
+					value: "Ink",
+					font: { family: "A", size: 10 },
+					...properties,
+				},
 			}) as Element;
 		const need = (properties: Record<string, unknown>) =>
 			minimumFormatVersion(withElements(base(), text(properties)));
@@ -402,7 +414,10 @@ describe("minimumFormatVersion", () => {
 					{
 						name: "front",
 						elements: [
-							{ id: "r", properties: { stroke: { color: gradient, width: 2 } } },
+							{
+								id: "r",
+								properties: { stroke: { color: gradient, width: 2 } },
+							},
 						],
 					},
 				],

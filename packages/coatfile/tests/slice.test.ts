@@ -187,9 +187,7 @@ describe("slice validation", () => {
 	});
 
 	test("a shape without the modifier takes no part", () => {
-		expect(codes(template(shape("a", null), shape("a2", null)))).toEqual(
-			[],
-		);
+		expect(codes(template(shape("a", null), shape("a2", null)))).toEqual([]);
 	});
 
 	test("bleed must not be negative", () => {
@@ -198,7 +196,9 @@ describe("slice validation", () => {
 		);
 		expect(
 			codes(
-				template(shape("s", { bleed: { top: 1, right: -2, bottom: 0, left: 0 } })),
+				template(
+					shape("s", { bleed: { top: 1, right: -2, bottom: 0, left: 0 } }),
+				),
 			),
 		).toContain("invalid_inset");
 	});
@@ -256,7 +256,11 @@ describe("slice compile", () => {
 	test("an unpainted shape draws nothing", () => {
 		const c = compile(template(shape("s")), {}, { width: 100, height: 80 });
 		const [node] = c.frames[0].root.children.slice(-1);
-		expect(node).toMatchObject({ kind: "rect", fills: undefined, stroke: undefined });
+		expect(node).toMatchObject({
+			kind: "rect",
+			fills: undefined,
+			stroke: undefined,
+		});
 	});
 });
 
@@ -272,9 +276,9 @@ describe("resolveSlices", () => {
 			path: "M10 21L50 21",
 		});
 		expect(open({})?.output).toBe("none");
-		expect(open({ output: "piece" }, "M0 0 L10 0 L10 10 Z M20 0 L30 0")?.output).toBe(
-			"none",
-		);
+		expect(
+			open({ output: "piece" }, "M0 0 L10 0 L10 10 Z M20 0 L30 0")?.output,
+		).toBe("none");
 		expect(open({ output: "piece" }, "M0 0 L9 0 L9 9 Z")?.output).toBe("piece");
 	});
 
@@ -303,7 +307,10 @@ describe("resolveSlices", () => {
 	});
 
 	test("a rect keeps its corner radius, clamped as it paints", () => {
-		const [s] = resolveSlices(template(shape("s", {}, {}, { cornerRadius: 5 })), {});
+		const [s] = resolveSlices(
+			template(shape("s", {}, {}, { cornerRadius: 5 })),
+			{},
+		);
 		expect(s.path.startsWith("M15 20")).toBe(true);
 		expect(s.path.endsWith("Z")).toBe(true);
 		expect(s.box).toEqual({ x: 10, y: 20, width: 40, height: 30 });
@@ -320,7 +327,9 @@ describe("resolveSlices", () => {
 	});
 
 	test("a smoothed rect follows the squircle", () => {
-		const round = resolveSlices(template(shape("s", {}, {}, { cornerRadius: 10 })))[0];
+		const round = resolveSlices(
+			template(shape("s", {}, {}, { cornerRadius: 10 })),
+		)[0];
 		const smooth = resolveSlices(
 			template(shape("s", {}, {}, { cornerRadius: 10, cornerSmoothing: 0.8 })),
 		)[0];
@@ -349,7 +358,9 @@ describe("resolveSlices", () => {
 
 	test("an open path stays open, and a closed one stays closed", () => {
 		const [line] = resolveSlices(
-			template(vector("l", { output: "none", edge: "score" }, { d: "M0 1 L40 1" })),
+			template(
+				vector("l", { output: "none", edge: "score" }, { d: "M0 1 L40 1" }),
+			),
 		);
 		expect(line?.path).toBe("M10 21L50 21");
 		expect(line?.box).toEqual({ x: 10, y: 21, width: 40, height: 0 });
@@ -379,10 +390,7 @@ describe("resolveSlices", () => {
 	});
 
 	test("a rotated shape turns about its centre", () => {
-		const [s] = resolveSlices(
-			template(shape("s", {}, { rotation: 90 })),
-			{},
-		);
+		const [s] = resolveSlices(template(shape("s", {}, { rotation: 90 })), {});
 		expect(s.box.x).toBeCloseTo(15);
 		expect(s.box.y).toBeCloseTo(15);
 		expect(s.box.width).toBeCloseTo(30);
@@ -408,7 +416,14 @@ describe("resolveSlices", () => {
 
 	test("resolves name, output, edge and bleed", () => {
 		const [s] = resolveSlices(
-			template(shape("s", { name: "panel", output: "none", edge: "through", bleed: 3 })),
+			template(
+				shape("s", {
+					name: "panel",
+					output: "none",
+					edge: "through",
+					bleed: 3,
+				}),
+			),
 			{},
 		);
 		expect(s).toMatchObject({
@@ -420,9 +435,9 @@ describe("resolveSlices", () => {
 	});
 
 	test("shapes without the modifier are ignored", () => {
-		expect(ids(resolveSlices(template(rect("r"), shape("s"), vector("v", null))))).toEqual(
-			["s"],
-		);
+		expect(
+			ids(resolveSlices(template(rect("r"), shape("s"), vector("v", null)))),
+		).toEqual(["s"]);
 	});
 
 	test("sorts by order, then document order", () => {
@@ -501,9 +516,7 @@ describe("resolveSlices", () => {
 	});
 
 	test("follows constraints when resized", () => {
-		const t = template(
-			shape("s", {}, { constraints: { horizontal: "end" } }),
-		);
+		const t = template(shape("s", {}, { constraints: { horizontal: "end" } }));
 		const [s] = resolveSlices(t, { resize: { width: 200, height: 80 } });
 		expect(s.box.x).toBe(110);
 	});

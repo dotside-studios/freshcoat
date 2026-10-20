@@ -1,5 +1,7 @@
 import type { CanvasKit } from "canvaskit-wasm";
 import { collectAssets, paintScene } from "./canvaskit";
+import type { Precision } from "./color-policy";
+import type { CompileSceneOptions } from "./compile-scene";
 import { compileScene, prepareScene } from "./compile-scene";
 import type { DecodedPixels } from "./decode";
 import {
@@ -15,7 +17,6 @@ import {
 } from "./font-collection";
 import { deriveFontMetrics } from "./font-metrics";
 import type { OutputIntent } from "./icc";
-import type { PdfTextMode } from "./pdf/paint";
 import { type ByteLoader, fetchLoader, mapLoader } from "./loader";
 import type { Node } from "./node";
 import {
@@ -26,14 +27,15 @@ import {
 } from "./paint-cache";
 import { forgetImage, paintCacheState } from "./paint-cache-state";
 import { createParagraphEngine } from "./paragraph-layout";
+import type { PdfTextMode } from "./pdf/paint";
 import type { EncodeFormat, EncodeOptions } from "./png";
+import type { CanvasLike, PaintOutput } from "./runtime-types";
 import {
 	type CachedTextEngine,
 	memoizeTextEngine,
 	type TextEngineCacheStats,
 } from "./text-cache";
 import type { TextEngine } from "./text-engine";
-import type { CanvasLike, PaintOutput } from "./runtime-types";
 import type {
 	Command,
 	FontRequest,
@@ -41,8 +43,6 @@ import type {
 	FrameFinish,
 	PaintWarning,
 } from "./types";
-import type { Precision } from "./color-policy";
-import type { CompileSceneOptions } from "./compile-scene";
 
 /** Font bytes, or srcs read through the renderer's loader, by family. */
 export type FontSources = Record<string, Array<Uint8Array | string>>;
@@ -70,7 +70,10 @@ export type RendererOptions = {
 	maxImageDecodePixels?: number;
 };
 
-export type Output = { encode: EncodeOptions } | { pixels: true } | { canvas: true };
+export type Output =
+	| { encode: EncodeOptions }
+	| { pixels: true }
+	| { canvas: true };
 export type DefaultOutput = { encode: EncodeOptions };
 
 export type FrameInfo = {
@@ -81,13 +84,19 @@ export type FrameInfo = {
 	scale: number;
 	supersample: number;
 };
-export type EncodedFrame = FrameInfo & { bytes: Uint8Array; format: EncodeFormat };
+export type EncodedFrame = FrameInfo & {
+	bytes: Uint8Array;
+	format: EncodeFormat;
+};
 export type PixelsFrame = FrameInfo & { pixels: DecodedPixels };
 /**
  * A live canvas. With a cache the renderer reuses it on the next paint, so read
  * it before painting again; without one, `release()` frees it.
  */
-export type CanvasFrame = FrameInfo & { canvas: SurfaceCanvas; release(): void };
+export type CanvasFrame = FrameInfo & {
+	canvas: SurfaceCanvas;
+	release(): void;
+};
 export type FrameFor<O extends Output> = O extends { canvas: true }
 	? CanvasFrame
 	: O extends { pixels: true }
@@ -105,20 +114,21 @@ export type PaintOptions<O extends Output = DefaultOutput> = {
 	output?: O;
 };
 
-export type RenderOptions<O extends Output = DefaultOutput> = PaintOptions<O> & {
-	/** The design size: layout and text shaping happen here. */
-	width: number;
-	height: number;
-	/** Pixel density of the result. Default 1. */
-	scale?: number;
-	supersample?: number;
-	/** A Figma-style export setting, in place of `scale` and `supersample`. */
-	export?: ExportSetting;
-	finish?: FrameFinish;
-	leadingTrim?: boolean;
-	/** Working precision of the surface and its layers. Default "u8". */
-	precision?: Precision;
-};
+export type RenderOptions<O extends Output = DefaultOutput> =
+	PaintOptions<O> & {
+		/** The design size: layout and text shaping happen here. */
+		width: number;
+		height: number;
+		/** Pixel density of the result. Default 1. */
+		scale?: number;
+		supersample?: number;
+		/** A Figma-style export setting, in place of `scale` and `supersample`. */
+		export?: ExportSetting;
+		finish?: FrameFinish;
+		leadingTrim?: boolean;
+		/** Working precision of the surface and its layers. Default "u8". */
+		precision?: Precision;
+	};
 
 export type PaintPdfOptions = {
 	/** Bytes for this paint only, by src. */
@@ -209,10 +219,13 @@ type Text = {
 	metrics: Record<string, FontVMetrics>;
 };
 
-export async function createRenderer(options: RendererOptions): Promise<Renderer> {
+export async function createRenderer(
+	options: RendererOptions,
+): Promise<Renderer> {
 	const { ck } = options;
 	const load = options.load ?? fetchLoader;
-	const factory = typeof options.surface === "function" ? options.surface : null;
+	const factory =
+		typeof options.surface === "function" ? options.surface : null;
 	const cache: PaintCache | null =
 		options.cache === false ? null : createPaintCache(options.cache);
 
@@ -275,7 +288,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 			),
 		);
 
-	const setFonts = (entries: ReadonlyArray<readonly [string, Uint8Array[]]>) => {
+	const setFonts = (
+		entries: ReadonlyArray<readonly [string, Uint8Array[]]>,
+	) => {
 		if (entries.length === 0) return;
 		fonts = new Map([...fonts, ...entries]);
 	};
@@ -288,7 +303,10 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 	): Promise<FontLoadReport> => {
 		const failed: FontLoadReport["failed"] = [];
 		const loaded: Array<readonly [string, Uint8Array[]]> = [];
-		const byFamily = new Map<string, Extract<FontRequest, { descriptor: unknown }>>();
+		const byFamily = new Map<
+			string,
+			Extract<FontRequest, { descriptor: unknown }>
+		>();
 		for (const req of requests)
 			if ("descriptor" in req && !byFamily.has(req.family))
 				byFamily.set(req.family, req);
@@ -299,9 +317,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 				if (fonts.has(req.family) && (fontKeys.get(req.family) ?? key) === key)
 					return;
 				try {
-					const bytes = (await fontBytes(resolveFontRequest(req), loader)).filter(
-						(b) => b.length > 0,
-					);
+					const bytes = (
+						await fontBytes(resolveFontRequest(req), loader)
+					).filter((b) => b.length > 0);
 					if (bytes.length === 0) throw new Error("no font files");
 					fontKeys.set(req.family, key);
 					loaded.push([req.family, bytes]);
@@ -402,7 +420,8 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		try {
 			if ("pixels" in output) {
 				const pixels = result.readPixels?.();
-				if (!pixels) throw new Error("the painted surface could not be read back");
+				if (!pixels)
+					throw new Error("the painted surface could not be read back");
 				return { ...info, pixels } as FrameFor<O>;
 			}
 			const encoded = await result.encode(output.encode);
@@ -447,13 +466,20 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 		},
 		render(scene, renderOptions) {
 			alive();
-			const design = { width: renderOptions.width, height: renderOptions.height };
+			const design = {
+				width: renderOptions.width,
+				height: renderOptions.height,
+			};
 			const setting: ExportSetting = renderOptions.export ?? {
 				constraint: { kind: "scale", value: renderOptions.scale ?? 1 },
 				supersample: renderOptions.supersample,
 			};
 			const scale = resolveExportScale(setting.constraint, design);
-			const supersample = resolveSupersample(setting.supersample, design, scale);
+			const supersample = resolveSupersample(
+				setting.supersample,
+				design,
+				scale,
+			);
 			return serial(() => {
 				const commands = compileNow(scene, {
 					...design,

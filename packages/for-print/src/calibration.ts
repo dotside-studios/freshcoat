@@ -1,17 +1,17 @@
 // @freshcoat-js/for-print/calibration: print a chart, read it back from a
 // photo, and turn the reading into a profile's balance.
 
-export { type PhotoCalibration, profileFromPhoto } from "./calibrate";
-export {
-	type FitChannelBalanceOptions,
-	fitChannelBalance,
-	isBalanceMeaningful,
-} from "./balance";
 export {
 	assessCalibration,
 	type CalibrationAssessment,
 	type CalibrationBlocker,
 } from "./assess";
+export {
+	type FitChannelBalanceOptions,
+	fitChannelBalance,
+	isBalanceMeaningful,
+} from "./balance";
+export { type PhotoCalibration, profileFromPhoto } from "./calibrate";
 export {
 	type Box,
 	type ChartPatch,
@@ -30,6 +30,14 @@ export {
 	toneWedgeChart,
 } from "./chart";
 export {
+	type FitTargetPresetFailure,
+	type FitTargetPresetOptions,
+	type FitTargetPresetReading,
+	type FitTargetPresetResult,
+	type FittedKnob,
+	fitTargetPreset,
+} from "./fit-preset";
+export {
 	applyHomography,
 	type ChartReading,
 	grayCast,
@@ -40,14 +48,6 @@ export {
 	readingToCsv,
 	repeatSpread,
 } from "./measure";
-export {
-	type FitTargetPresetFailure,
-	type FitTargetPresetOptions,
-	type FitTargetPresetReading,
-	type FitTargetPresetResult,
-	type FittedKnob,
-	fitTargetPreset,
-} from "./fit-preset";
 export {
 	createPrintProfile,
 	type PrintProfileCreation,

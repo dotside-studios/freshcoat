@@ -2,7 +2,6 @@
 // Skia as a real mode rather than falling back to normal compositing.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createFrame,
@@ -11,6 +10,7 @@ import {
 	type Node,
 } from "../src/index";
 import type { BlendMode } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 

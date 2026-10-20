@@ -48,9 +48,17 @@ describe("combineShapes", () => {
 	});
 
 	test("rotation turns a shape about its centre", () => {
-		const shape = combineShapes(ck, [{ ...square(0, 0), rotation: 90 }], "union");
+		const shape = combineShapes(
+			ck,
+			[{ ...square(0, 0), rotation: 90 }],
+			"union",
+		);
 		expect(shape?.box).toEqual({ x: 0, y: 0, width: 100, height: 100 });
-		const tilted = combineShapes(ck, [{ ...square(0, 0), rotation: 45 }], "union");
+		const tilted = combineShapes(
+			ck,
+			[{ ...square(0, 0), rotation: 45 }],
+			"union",
+		);
 		expect(tilted?.box.width).toBeCloseTo(141.42, 1);
 	});
 
@@ -99,8 +107,7 @@ describe("combineShapes", () => {
 				"union",
 			);
 			expect(smooth?.d).not.toBe(
-				combineShapes(ck, [rect({ cornerRadius: [20, 0, 40, 0] })], "union")
-					?.d,
+				combineShapes(ck, [rect({ cornerRadius: [20, 0, 40, 0] })], "union")?.d,
 			);
 			const outline: BooleanOperand = {
 				kind: "path",
@@ -108,9 +115,9 @@ describe("combineShapes", () => {
 				d: squircleSvg(0, 0, 100, 100, [20, 0, 40, 0], 0.6),
 			};
 			expect(smooth).toEqual(combineShapes(ck, [outline], "union"));
-			expect(combineShapes(ck, [rect({ cornerSmoothing: 0.6 })], "union")).toEqual(
-				combineShapes(ck, [rect({})], "union"),
-			);
+			expect(
+				combineShapes(ck, [rect({ cornerSmoothing: 0.6 })], "union"),
+			).toEqual(combineShapes(ck, [rect({})], "union"));
 		});
 
 		test("is placed and turned like any rect", () => {

@@ -430,7 +430,12 @@ export const ImagePropertiesSchema = z.object({
 	stroke: StrokeSchema.optional(),
 });
 
-export const QrModuleShapeSchema = z.enum(["square", "dot", "rounded", "classy"]);
+export const QrModuleShapeSchema = z.enum([
+	"square",
+	"dot",
+	"rounded",
+	"classy",
+]);
 export const QrFinderOuterSchema = z.enum(["square", "rounded", "circle"]);
 export const QrFinderInnerSchema = z.enum(["square", "rounded", "dot"]);
 
@@ -1268,12 +1273,10 @@ function enforceOperandIdUniqueness(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 		const ids = taken[path[1] as number] as Set<string>;
 		const id = idOf(el);
 		if (ids.has(id)) {
-			addKitIssue(
-				ctx,
-				"duplicate_element_id",
-				`duplicate element id "${id}"`,
-				[...path, "id"],
-			);
+			addKitIssue(ctx, "duplicate_element_id", `duplicate element id "${id}"`, [
+				...path,
+				"id",
+			]);
 		} else {
 			ids.add(id);
 		}
@@ -1522,7 +1525,8 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	walkObjects(tpl, (obj, path) => {
 		if (path[path.length - 1] === "spot") return;
 		const fill = obj.fill;
-		if (typeof fill !== "string" && fill != null) check(fill, [...path, "fill"]);
+		if (typeof fill !== "string" && fill != null)
+			check(fill, [...path, "fill"]);
 		const stroke = obj.stroke as { color?: unknown } | null | undefined;
 		if (stroke && typeof stroke === "object")
 			check(stroke.color, [...path, "stroke", "color"], true);
@@ -1647,7 +1651,11 @@ type ElementVisitor = (
 ) => void;
 
 function walkElements(tpl: ParsedTemplate, visit: ElementVisitor) {
-	function walk(raw: unknown, path: (string | number)[], parentLayout: unknown) {
+	function walk(
+		raw: unknown,
+		path: (string | number)[],
+		parentLayout: unknown,
+	) {
 		const el = raw as Parameters<ElementVisitor>[0] & {
 			properties?: {
 				children?: unknown[];

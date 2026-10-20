@@ -7,7 +7,10 @@ import {
 	type ValidationError,
 	verifyAssets,
 } from "@freshcoat-js/coatfile";
-import { unpackTemplates, WorkspaceReadError } from "@freshcoat-js/workspace/archive";
+import {
+	unpackTemplates,
+	WorkspaceReadError,
+} from "@freshcoat-js/workspace/archive";
 import { CliError, type Io, type Log } from "./io";
 import { evaluateTemplateModule, isTemplateModule } from "./template-module";
 
@@ -57,7 +60,10 @@ export function newerFormatWarning(version: string): string {
 
 /** Reads a template as Studio opens it: duplicate element ids are healed
  *  rather than refused. */
-export async function readTemplate(io: Io, path: string): Promise<TemplateFile> {
+export async function readTemplate(
+	io: Io,
+	path: string,
+): Promise<TemplateFile> {
 	const input = isTemplateModule(path)
 		? await evaluateTemplateModule(io, path)
 		: await readBytes(io, path);
@@ -78,7 +84,8 @@ export async function readTemplateArchive(
 	try {
 		entries = await unpackTemplates(await readBytes(io, path));
 	} catch (error) {
-		if (error instanceof WorkspaceReadError) throw new CliError(`${path}: ${error.message}`);
+		if (error instanceof WorkspaceReadError)
+			throw new CliError(`${path}: ${error.message}`);
 		throw error;
 	}
 	const directory = dirname(resolve(io.cwd, path));
@@ -98,7 +105,8 @@ async function openTemplate(
 ): Promise<TemplateFile> {
 	const loaded = await loadTemplate(input);
 	if (!loaded.ok) {
-		if (loaded.reason === "unreadable") throw new CliError(`${path}: ${loaded.message}`);
+		if (loaded.reason === "unreadable")
+			throw new CliError(`${path}: ${loaded.message}`);
 		throw new CliError(issueSummary(path, loaded.errors));
 	}
 	const { template } = loaded;

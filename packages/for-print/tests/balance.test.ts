@@ -5,8 +5,8 @@
 // printer with that balance applied and check the neutrals came back neutral.
 // A fit that merely returns plausible numbers would pass everything above it.
 import { describe, expect, test } from "vitest";
-import { fitChannelBalance, isBalanceMeaningful } from "../src/balance";
 import { assessCalibration } from "../src/assess";
+import { fitChannelBalance, isBalanceMeaningful } from "../src/balance";
 import { grayBalanceChart, type RGB } from "../src/chart";
 import type { ChartReading, PatchReading } from "../src/measure";
 import type { ChannelBalance } from "../src/types";

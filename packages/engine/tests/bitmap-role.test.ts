@@ -2,7 +2,6 @@
 // for a barcode, snapped to whole output pixels by the painter.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	approxEngine,
 	type BitmapRole,
@@ -13,6 +12,7 @@ import {
 	decodePixels,
 	validateCommands,
 } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
 // biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;

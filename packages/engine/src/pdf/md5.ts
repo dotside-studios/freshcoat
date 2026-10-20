@@ -1,12 +1,10 @@
-const S = [
-	7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21,
-];
+const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
 const K = Array.from({ length: 64 }, (_, i) =>
 	Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32),
 );
 
 export function md5(data: Uint8Array): Uint8Array {
-	const padded = new Uint8Array(((data.length + 8) >> 6 << 6) + 64);
+	const padded = new Uint8Array((((data.length + 8) >> 6) << 6) + 64);
 	padded.set(data);
 	padded[data.length] = 0x80;
 	const view = new DataView(padded.buffer);

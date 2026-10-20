@@ -11,7 +11,10 @@ import {
 } from "@freshcoat-js/coatfile";
 import { saveTemplate } from "@freshcoat-js/coatfile/coat";
 import { fileLoader } from "@freshcoat-js/engine/node";
-import { packTemplates, WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
+import {
+	packTemplates,
+	WORKSPACE_EXTENSION,
+} from "@freshcoat-js/workspace/archive";
 import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { formatIssue, readTemplate, warnLoad } from "../template-file";
 import { readWorkspace } from "../workspace-file";
@@ -19,7 +22,11 @@ import { isLocalImage } from "./render";
 
 export type PackOptions = { out: string; template?: string; quiet: boolean };
 
-export async function pack(file: string, options: PackOptions, io: Io): Promise<void> {
+export async function pack(
+	file: string,
+	options: PackOptions,
+	io: Io,
+): Promise<void> {
 	const log = createLog(io, options.quiet);
 	const out = options.out;
 	let bytes: Uint8Array | string;
@@ -27,12 +34,15 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 		const { workspace } = await readWorkspace(io, file);
 		if (options.template === undefined) {
 			if (!/\.zip$/i.test(out))
-				throw new UsageError("a workspace packs into a .zip, or one template with --template");
+				throw new UsageError(
+					"a workspace packs into a .zip, or one template with --template",
+				);
 			bytes = await packTemplates(workspace);
 		} else {
 			const wanted = options.template;
 			const entry = workspace.templates.find(
-				(t) => t.id === wanted || t.fileName === wanted || t.template.id === wanted,
+				(t) =>
+					t.id === wanted || t.fileName === wanted || t.template.id === wanted,
 			);
 			if (!entry)
 				throw new CliError(
@@ -54,11 +64,16 @@ export async function pack(file: string, options: PackOptions, io: Io): Promise<
 	log.out(out);
 }
 
-async function encode(template: Template, out: string): Promise<Uint8Array | string> {
+async function encode(
+	template: Template,
+	out: string,
+): Promise<Uint8Array | string> {
 	const json = /\.json$/i.test(out);
 	if (!json && extname(out).toLowerCase() !== ".coat")
 		throw new UsageError("--out names a .coat or .coat.json file");
-	const saved = json ? saveTemplate(template, "json") : await saveTemplate(template, "coat");
+	const saved = json
+		? saveTemplate(template, "json")
+		: await saveTemplate(template, "coat");
 	if (saved.ok) return saved.data;
 	throw new CliError(
 		[
@@ -75,7 +90,12 @@ async function embedImages(
 ): Promise<Template> {
 	const sources = new Set<string>();
 	mapAssetSrcs(template, new Map(), (src) => {
-		if (typeof src === "string" && isLocalImage(src) && !src.startsWith("asset:") && !src.includes("{{"))
+		if (
+			typeof src === "string" &&
+			isLocalImage(src) &&
+			!src.startsWith("asset:") &&
+			!src.includes("{{")
+		)
 			sources.add(src);
 		return src;
 	});

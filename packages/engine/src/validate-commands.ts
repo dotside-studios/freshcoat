@@ -134,8 +134,7 @@ class Path {
 
 	toString(): string {
 		const parts: string[] = [];
-		for (let p: Path | undefined = this; p; p = p.parent)
-			parts.push(p.segment);
+		for (let p: Path | undefined = this; p; p = p.parent) parts.push(p.segment);
 		return parts.reverse().join("");
 	}
 }

@@ -166,9 +166,8 @@ export async function collectFontBytes(
 	template: Template,
 	options: Omit<ResolveTemplateFontsOptions, "fallback"> = {},
 ): Promise<Map<string, Uint8Array[]>> {
-	return (
-		await resolveTemplateFonts(template, { ...options, fallback: null })
-	).fonts;
+	return (await resolveTemplateFonts(template, { ...options, fallback: null }))
+		.fonts;
 }
 
 async function cached(

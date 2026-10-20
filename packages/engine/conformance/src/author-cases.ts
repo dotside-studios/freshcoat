@@ -717,7 +717,12 @@ add(
 		),
 	]),
 	[
-		px([80, 60], [191, 191, 191, 255], "half the blurred edge over the white", 22),
+		px(
+			[80, 60],
+			[191, 191, 191, 255],
+			"half the blurred edge over the white",
+			22,
+		),
 		px([78, 10], [0, 0, 0, 255], "above the shape the edge stays sharp"),
 		px([82, 10], [255, 255, 255, 255], "above the shape the edge stays sharp"),
 	],

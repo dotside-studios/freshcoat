@@ -86,7 +86,13 @@ function textScene(family: string, label = "Membership"): Node {
 				pos: { x: 4, y: 4 },
 				size: { width: SIZE.width - 8, height: 24 },
 				text: label,
-				font: { family, weight: 400, style: "normal", size: 16, lineHeight: 1.2 },
+				font: {
+					family,
+					weight: 400,
+					style: "normal",
+					size: 16,
+					lineHeight: 1.2,
+				},
 				color: "#101828",
 			}),
 		],
@@ -138,8 +144,14 @@ describe("one font provider per renderer", () => {
 		const scene = textScene("Vend");
 		await added.render(scene, SIZE);
 		await added.addFonts({ Vend: [VEND] });
-		const want = await upFront.render(scene, { ...SIZE, output: { pixels: true } });
-		const got = await added.render(scene, { ...SIZE, output: { pixels: true } });
+		const want = await upFront.render(scene, {
+			...SIZE,
+			output: { pixels: true },
+		});
+		const got = await added.render(scene, {
+			...SIZE,
+			output: { pixels: true },
+		});
 		expect(got.pixels).toEqual(want.pixels);
 		upFront.dispose();
 		added.dispose();
@@ -215,7 +227,13 @@ describe("shared provider disposal", () => {
 	const layout = (engine: ReturnType<typeof createParagraphEngine>) =>
 		engine.measureText(
 			"Membership",
-			{ family: "Geist", weight: 400, style: "normal", size: 16, lineHeight: 1.2 },
+			{
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 16,
+				lineHeight: 1.2,
+			},
 			null,
 		);
 
@@ -272,7 +290,9 @@ describe("shared provider disposal", () => {
 		engine.dispose();
 		engine.dispose();
 		expect(made[0]!.deleted).toBe(0);
-		expect(layout(createParagraphEngine(ck, fonts, shared)).width).toBeGreaterThan(0);
+		expect(
+			layout(createParagraphEngine(ck, fonts, shared)).width,
+		).toBeGreaterThan(0);
 		shared.release();
 	});
 });
@@ -291,15 +311,25 @@ describe("shaped lines and the paint cache", () => {
 			});
 		try {
 			await (
-				await paintScene(ck, compile("Cached"), createHeadlessEnv({ fonts, cache }), {
-					fontProvider: shared,
-				})
+				await paintScene(
+					ck,
+					compile("Cached"),
+					createHeadlessEnv({ fonts, cache }),
+					{
+						fontProvider: shared,
+					},
+				)
 			).dispose();
 			const built = cache.stats().paragraphBuilds;
 			await (
-				await paintScene(ck, compile("Uncached"), createHeadlessEnv({ fonts }), {
-					fontProvider: shared,
-				})
+				await paintScene(
+					ck,
+					compile("Uncached"),
+					createHeadlessEnv({ fonts }),
+					{
+						fontProvider: shared,
+					},
+				)
 			).dispose();
 			expect(cache.stats().paragraphBuilds).toBe(built);
 		} finally {

@@ -10,8 +10,8 @@ import {
 	type PathOp,
 } from "../src/boolean";
 import { compile } from "../src/compile";
-import { renderTemplate } from "../src/render";
 import { resizeElements } from "../src/relayout";
+import { renderTemplate } from "../src/render";
 import { childElements } from "../src/tree";
 import type {
 	BooleanOp,
@@ -111,7 +111,10 @@ beforeAll(async () => {
 const spy = (): PathOp & ReturnType<typeof vi.fn> =>
 	vi.fn((_op, operands: BooleanOperand[]) =>
 		operands.length
-			? { d: `M0 0H${operands.length}`, box: { x: 0, y: 0, width: 1, height: 1 } }
+			? {
+					d: `M0 0H${operands.length}`,
+					box: { x: 0, y: 0, width: 1, height: 1 },
+				}
 			: null,
 	);
 
@@ -131,7 +134,9 @@ describe("validation", () => {
 			size: { width: 10, height: 10 },
 			properties: { value: "x", font: { family: "Inter", size: 8 } },
 		} as Element;
-		const result = validate(template(shape("union", [rect("a", 0, 0, 5), text])));
+		const result = validate(
+			template(shape("union", [rect("a", 0, 0, 5), text])),
+		);
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		expect(result.errors).toContainEqual(
@@ -157,11 +162,17 @@ describe("validation", () => {
 				duplicate(template(shape("union", [rect("a", 0, 0, 5)]), other)),
 			).toEqual([]);
 			expect(
-				duplicate(template(shape("union", [rect("a", 0, 0, 5)]), rect("a", 0, 0, 5))),
-			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/0/id"]);
+				duplicate(
+					template(shape("union", [rect("a", 0, 0, 5)]), rect("a", 0, 0, 5)),
+				),
+			).toEqual([
+				"/template_data/0/elements/0/properties/boolean/operands/0/id",
+			]);
 			expect(
 				duplicate(template(shape("union", [rect("shape", 0, 0, 5)]))),
-			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/0/id"]);
+			).toEqual([
+				"/template_data/0/elements/0/properties/boolean/operands/0/id",
+			]);
 		});
 
 		test("may not repeat another operand, nested ones included", () => {
@@ -177,7 +188,9 @@ describe("validation", () => {
 				duplicate(
 					template(shape("union", [rect("a", 0, 0, 5), rect("a", 9, 9, 5)])),
 				),
-			).toEqual(["/template_data/0/elements/0/properties/boolean/operands/1/id"]);
+			).toEqual([
+				"/template_data/0/elements/0/properties/boolean/operands/1/id",
+			]);
 		});
 
 		test("may repeat an id on another side", () => {
@@ -235,8 +248,11 @@ describe("compile", () => {
 				},
 			});
 		const rebuilt = (el: Element) =>
-			pathOf(template(shape("union", [el])), {}, { pathOp: canvasKitPathOp(ck) })
-				.d;
+			pathOf(
+				template(shape("union", [el])),
+				{},
+				{ pathOp: canvasKitPathOp(ck) },
+			).d;
 		expect(rebuilt(rounded(0.6))).not.toBe(rebuilt(rounded()));
 		expect(rebuilt(rounded(0))).toBe(rebuilt(rounded()));
 	});
@@ -251,8 +267,11 @@ describe("compile", () => {
 				},
 			});
 		const rebuilt = (el: Element) =>
-			pathOf(template(shape("union", [el])), {}, { pathOp: canvasKitPathOp(ck) })
-				.d;
+			pathOf(
+				template(shape("union", [el])),
+				{},
+				{ pathOp: canvasKitPathOp(ck) },
+			).d;
 		expect(rebuilt(rounded(0.6))).not.toBe(rebuilt(rounded()));
 		expect(rebuilt(rounded(0))).toBe(rebuilt(rounded()));
 	});
@@ -353,7 +372,11 @@ describe("compile", () => {
 		const vector = shape("union", operands(), {
 			constraints: { horizontal: "scale", vertical: "scale" },
 		});
-		pathOf(template(vector), {}, { pathOp, resize: { width: 400, height: 400 } });
+		pathOf(
+			template(vector),
+			{},
+			{ pathOp, resize: { width: 400, height: 400 } },
+		);
 		const seen = pathOp.mock.calls[0][1] as BooleanOperand[];
 		expect(seen[1].pos).toEqual({ x: 60, y: 60 });
 		expect(seen[1].size).toEqual({ width: 120, height: 120 });

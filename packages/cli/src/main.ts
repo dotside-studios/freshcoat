@@ -4,6 +4,8 @@ import {
 	InvalidArgumentError,
 	Option,
 } from "@commander-js/extra-typings";
+import { PRINT_TARGETS } from "@freshcoat-js/for-print";
+import { PRESET_SCALE } from "@freshcoat-js/workspace";
 import {
 	ArgumentError,
 	collect,
@@ -23,10 +25,8 @@ import {
 	parsePositive,
 	parseQuality,
 } from "./args";
-import { PRINT_TARGETS } from "@freshcoat-js/for-print";
-import { PRESET_SCALE } from "@freshcoat-js/workspace";
-import { inspect } from "./commands/inspect";
 import { listenForCancel } from "./cancel";
+import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
@@ -54,9 +54,12 @@ export async function main(
 				running = name;
 			},
 			all,
-		).parseAsync(all ? argv.map((a) => (a === "--help-all" ? "--help" : a)) : argv, {
-			from: "user",
-		});
+		).parseAsync(
+			all ? argv.map((a) => (a === "--help-all" ? "--help" : a)) : argv,
+			{
+				from: "user",
+			},
+		);
 		return 0;
 	} catch (error) {
 		if (cancel.signal.aborted) {
@@ -77,17 +80,23 @@ export async function main(
 function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 	const root = new Command("freshcoat")
 		.usage("<command> [options]")
-		.description("Render, check, inspect and package Freshcoat templates and workspaces.")
+		.description(
+			"Render, check, inspect and package Freshcoat templates and workspaces.",
+		)
 		.version(version(), "-v, --version", "print the version")
 		.helpOption("-h, --help", "show help")
 		.helpCommand("help [command]", "show help for a command")
 		.option("-q, --quiet", "hide warnings and progress")
-		.option("--no-cache", "download fonts again instead of using the font cache")
+		.option(
+			"--no-cache",
+			"download fonts again instead of using the font cache",
+		)
 		.configureHelp({ showGlobalOptions: true })
 		.configureOutput({
 			writeOut: io.stdout,
 			writeErr: io.stderr,
-			outputError: (text, write) => write(text.replace(/^error: /, "freshcoat: ")),
+			outputError: (text, write) =>
+				write(text.replace(/^error: /, "freshcoat: ")),
 		})
 		.exitOverride()
 		.hook("preAction", (_root, action) => onCommand(action.name()))
@@ -112,11 +121,16 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 	};
 
 	const render = command("render")
-		.summary("render a template, a template per spreadsheet row, or a workspace preset")
+		.summary(
+			"render a template, a template per spreadsheet row, or a workspace preset",
+		)
 		.description(
 			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON, a .coatworkspace or a\ntemplates .zip from pack, whose templates each render into a directory.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
 		)
-		.argument("<file>", "a .coat file, template JSON, a .coatworkspace or a templates .zip")
+		.argument(
+			"<file>",
+			"a .coat file, template JSON, a .coatworkspace or a templates .zip",
+		)
 		.option(
 			"--out <path>",
 			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need one",
@@ -134,7 +148,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.option("--dpi <n>", `${DPI_HELP}; not for a workspace`, arg(parsePositive))
 		.optionsGroup("Template options:")
-		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
+		.option(
+			"--data <file>",
+			"CSV, TSV, Excel, .ods or JSON; the first row names the fields",
+		)
 		.option("--values <file>", "JSON file of field values")
 		.option(
 			"--set <key=value>",
@@ -142,7 +159,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			arg(collectSetting),
 		)
 		.option("--variant <id>", "render a variant of the template")
-		.option("--frame <name>", "render only this frame; repeatable", arg(collect))
+		.option(
+			"--frame <name>",
+			"render only this frame; repeatable",
+			arg(collect),
+		)
 		.option(
 			"--scale <n>",
 			`pixel density, ${PRESET_SCALE.min} to ${PRESET_SCALE.max}, default 1; repeatable into a directory`,
@@ -169,7 +190,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"--name <pattern>",
 			"file names, such as {{member_id}}-{{side}}; default {{template}}-{{index}}-{{side}}",
 		)
-		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", arg(parseQuality))
+		.option(
+			"--quality <n>",
+			"JPEG and WebP quality, 0 to 100, default 90",
+			arg(parseQuality),
+		)
 		.option("--bleed", "include the template's bleed around each card")
 		.option(
 			"--size-from <field>",
@@ -180,7 +205,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"with --size-from, cap each file's long edge at this many pixels",
 			arg(parseMaxEdge),
 		)
-		.option("--pieces", "write each slice of a frame as its own file; a frame with none is written whole")
+		.option(
+			"--pieces",
+			"write each slice of a frame as its own file; a frame with none is written whole",
+		)
 		.addOption(
 			new Option(
 				"--cut <format>",
@@ -189,11 +217,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.optionsGroup("PDF options:")
 		.addOption(
-			new Option("--pdf-pages <kind>", "what each page holds, default png").choices([
-				"png",
-				"jpeg",
-				"vector",
-			] as const),
+			new Option(
+				"--pdf-pages <kind>",
+				"what each page holds, default png",
+			).choices(["png", "jpeg", "vector"] as const),
 		)
 		.addOption(
 			new Option(
@@ -234,10 +261,10 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			).choices(["auto", "portrait", "landscape"] as const),
 		)
 		.addOption(
-			new Option("--duplex <edge>", "print backs behind fronts, flipped on this edge").choices([
-				"long",
-				"short",
-			] as const),
+			new Option(
+				"--duplex <edge>",
+				"print backs behind fronts, flipped on this edge",
+			).choices(["long", "short"] as const),
 		)
 		.option("--margin <mm>", "sheet margin, default 10", arg(parseLength))
 		.option("--gap <mm>", "space between cards, default 0", arg(parseLength))
@@ -252,14 +279,22 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			arg(parseMarks),
 		)
 		.addOption(
-			advanced(new Option("--no-crop-marks", "the same as leaving crop out of --marks")),
+			advanced(
+				new Option(
+					"--no-crop-marks",
+					"the same as leaving crop out of --marks",
+				),
+			),
 		)
 		.option(
 			"--back-offset <x,y>",
 			"with --duplex, move every back page this many mm, up to 50 each way, for a printer that drifts; y is down",
 			arg(parseOffset),
 		)
-		.option("--blank-backs", "with --duplex, give a one-sided template empty back pages")
+		.option(
+			"--blank-backs",
+			"with --duplex, give a one-sided template empty back pages",
+		)
 		.optionsGroup("Print options:")
 		.addOption(
 			new Option(
@@ -281,13 +316,15 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"the preset to run, by id or by a name only it has",
 		)
 		.addOption(
-			new Option("--records <which>", "the records to export, over the preset's choice").choices([
-				"all",
-				"pending",
-				"failed",
-			] as const),
+			new Option(
+				"--records <which>",
+				"the records to export, over the preset's choice",
+			).choices(["all", "pending", "failed"] as const),
 		)
-		.option("--save", "write each record's export status back into the workspace")
+		.option(
+			"--save",
+			"write each record's export status back into the workspace",
+		)
 		.option(
 			"--where <filter>",
 			"export only records that match, such as tier=gold or points>=100; repeatable, with --data too",
@@ -297,7 +334,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"after",
 			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when any item fails, and\n130 on Ctrl-C or 143 on SIGTERM, which cancels the export and removes a\npartly written .zip or .pdf; a second signal exits at once.",
 		)
-		.addHelpText("after", all ? "" : "\nRun freshcoat render --help-all to list the less common options too.");
+		.addHelpText(
+			"after",
+			all
+				? ""
+				: "\nRun freshcoat render --help-all to list the less common options too.",
+		);
 	const given = track(render, REPEATABLE);
 	render.action((file, options, cmd) => {
 		checkGiven(given);
@@ -309,9 +351,16 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.description(
 			"Check a template against the format, each template of a templates .zip, or a\nworkspace's templates, bindings and presets. Exits 0 when it is valid and 1\nwhen it is not, listing each issue. Warnings name what Studio's Issues list\ndoes, each with its code: variant changes that change nothing or name a\nmissing layer, layers inside the safe area, images that print below\n--min-dpi, print hints, and a format version that does not match the fields\nin use; for a workspace also required fields no column fills. An image bound\nto a field is checked when it renders. --quiet prints nothing when it is\nvalid.",
 		)
-		.argument("<file>", "a .coat file, template JSON, a .coatworkspace or a templates .zip")
+		.argument(
+			"<file>",
+			"a .coat file, template JSON, a .coatworkspace or a templates .zip",
+		)
 		.option("--strict", "exit 1 on warnings too")
-		.option("--dpi <n>", `${DPI_HELP}, or a workspace preset's lowest`, arg(parsePositive))
+		.option(
+			"--dpi <n>",
+			`${DPI_HELP}, or a workspace preset's lowest`,
+			arg(parsePositive),
+		)
 		.option(
 			"--min-dpi <n>",
 			"warn for an image that prints below this many pixels per inch; default 300, or a workspace preset's; 0 for none",
@@ -338,9 +387,17 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"Package a template as Studio saves it: the format version raised to cover the\nfields it uses, unused assets left out, and images it names by a relative path\nembedded. From a .coatworkspace, --template packs one of its templates, or\nevery template goes into a .zip.",
 		)
 		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
-		.requiredOption("--out <file>", "a .coat or .coat.json file, or a .zip for a whole workspace")
-		.option("--template <name|id>", "the workspace template to pack, by file name or id")
-		.action((file, options, cmd) => pack(file, { ...options, quiet: quiet(cmd) }, io));
+		.requiredOption(
+			"--out <file>",
+			"a .coat or .coat.json file, or a .zip for a whole workspace",
+		)
+		.option(
+			"--template <name|id>",
+			"the workspace template to pack, by file name or id",
+		)
+		.action((file, options, cmd) =>
+			pack(file, { ...options, quiet: quiet(cmd) }, io),
+		);
 
 	return root;
 }
@@ -361,7 +418,9 @@ function track(
 	for (const option of command.options) {
 		const flag = option.long;
 		if (!flag || repeatable.includes(flag)) continue;
-		command.on(`option:${option.name()}`, (value: unknown) => given.push({ flag, value }));
+		command.on(`option:${option.name()}`, (value: unknown) =>
+			given.push({ flag, value }),
+		);
 	}
 	return given;
 }
@@ -371,13 +430,21 @@ function track(
 function checkGiven(given: readonly { flag: string; value: unknown }[]): void {
 	const flags = new Set(given.map((entry) => entry.flag));
 	for (const [a, b] of [["--output-intent", "--no-output-intent"]] as const)
-		if (flags.has(a) && flags.has(b)) throw new UsageError(`${a} and ${b} do not go together`);
+		if (flags.has(a) && flags.has(b))
+			throw new UsageError(`${a} and ${b} do not go together`);
 	const marks = given.find((entry) => entry.flag === "--marks");
-	if (flags.has("--no-crop-marks") && marks && parseMarks(String(marks.value)).includes("crop"))
+	if (
+		flags.has("--no-crop-marks") &&
+		marks &&
+		parseMarks(String(marks.value)).includes("crop")
+	)
 		throw new UsageError("--no-crop-marks does not go with --marks crop");
 	const seen = new Map<string, unknown>();
 	for (const { flag, value } of given) {
-		if (seen.has(flag) && JSON.stringify(seen.get(flag)) !== JSON.stringify(value))
+		if (
+			seen.has(flag) &&
+			JSON.stringify(seen.get(flag)) !== JSON.stringify(value)
+		)
 			throw new UsageError(`${flag} is given twice; give it once`);
 		seen.set(flag, value);
 	}
@@ -391,7 +458,8 @@ function arg<T, P extends unknown[]>(
 		try {
 			return parse(value, ...rest);
 		} catch (error) {
-			if (error instanceof ArgumentError) throw new InvalidArgumentError(error.message);
+			if (error instanceof ArgumentError)
+				throw new InvalidArgumentError(error.message);
 			throw error;
 		}
 	};

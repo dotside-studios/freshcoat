@@ -1,10 +1,10 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { bakeText, resolveDirection } from "../src/bake-text";
+import { compileScene } from "../src/compile-scene";
 import { createText, type TextNode } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import { makeRuntime, paintCanvasKit } from "../src/runtime";
-import { compileScene } from "../src/compile-scene";
 import type { ResolvedFont } from "../src/types";
 
 const base: ResolvedFont = {

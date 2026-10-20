@@ -27,10 +27,7 @@ describe("length units", () => {
 	test("px to unit and back keeps the px value", () => {
 		for (const unit of ["px", "mm", "in", "pt"] as const)
 			for (const px of [0, 1, 37.5, 1012, 1234.567])
-				expect(unitToPx(pxToUnit(px, unit, 300), unit, 300)).toBeCloseTo(
-					px,
-					9,
-				);
+				expect(unitToPx(pxToUnit(px, unit, 300), unit, 300)).toBeCloseTo(px, 9);
 	});
 
 	test("px stays exact", () => {

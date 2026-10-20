@@ -3,13 +3,12 @@
 // clipped to that shape too — not left as a bare square.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
 let ck: any;
 async function initCk() {
-	if (!ck)
-		ck = await loadCanvasKit();
+	if (!ck) ck = await loadCanvasKit();
 	return ck;
 }
 

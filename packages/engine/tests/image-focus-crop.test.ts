@@ -1,6 +1,5 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createImage,
@@ -8,12 +7,12 @@ import {
 	type ImageNode,
 	validateCommands,
 } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 async function initCk() {
-	if (!ck)
-		ck = await loadCanvasKit();
+	if (!ck) ck = await loadCanvasKit();
 	return ck;
 }
 

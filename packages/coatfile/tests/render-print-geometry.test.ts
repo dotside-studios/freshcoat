@@ -6,8 +6,9 @@
 // second pass inside compileScene folded every nested frame's own pos into its
 // children again, sliding a QR out of the box drawn for it. This pins that a
 // layer nested in a positioned frame lands in the same place either way.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
 import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";

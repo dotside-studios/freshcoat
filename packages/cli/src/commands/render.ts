@@ -18,8 +18,8 @@ import {
 	prepareAssets,
 } from "@freshcoat-js/workspace";
 import { checkGlyphs } from "@freshcoat-js/workspace/export";
-import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
+import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import {
@@ -63,7 +63,13 @@ export async function render(
 	if (isTemplateArchive(file)) {
 		for (const { name, file: loaded } of await readTemplateArchive(io, file)) {
 			warnLoad(log, `${file}: ${name}`, loaded);
-			await renderFrames(loaded, options, io, log, join(out, templateStem(name)));
+			await renderFrames(
+				loaded,
+				options,
+				io,
+				log,
+				join(out, templateStem(name)),
+			);
 		}
 		return;
 	}
@@ -84,7 +90,12 @@ async function renderFrames(
 	const { template, directory } = loaded;
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
-	const read = await readValues(io, template, options.values, options.set ?? {});
+	const read = await readValues(
+		io,
+		template,
+		options.values,
+		options.set ?? {},
+	);
 	const values = checkValues(template, read.values);
 
 	if (options.dryRun) {
@@ -92,7 +103,12 @@ async function renderFrames(
 		for (const frame of template.template_data) {
 			if (frameNames && !frameNames.includes(frame.name)) continue;
 			for (const scale of scales) {
-				const name = outputName(frame.name, scale === 1 ? "" : `@${scale}x`, output.extension, names);
+				const name = outputName(
+					frame.name,
+					scale === 1 ? "" : `@${scale}x`,
+					output.extension,
+					names,
+				);
 				log.out(join(directoryOut, name));
 			}
 		}
@@ -137,7 +153,12 @@ async function renderFrames(
 		const written = new Set<string>();
 		for (const frame of frames) {
 			io.signal?.throwIfAborted();
-			const name = outputName(frame.name, frame.suffix ?? "", output.extension, written);
+			const name = outputName(
+				frame.name,
+				frame.suffix ?? "",
+				output.extension,
+				written,
+			);
 			for (const warning of frame.warnings)
 				if (!(warning.kind === "image_load_failed" && warning.src === ""))
 					log.warn(`${frame.name}: ${describeWarning(warning)}`);
@@ -282,7 +303,8 @@ function outputName(
 	taken: Set<string>,
 ): string {
 	const name = `${safeName(frame)}${suffix}.${extension}`;
-	if (taken.has(name)) throw new CliError(`two frames would both be written as ${name}`);
+	if (taken.has(name))
+		throw new CliError(`two frames would both be written as ${name}`);
 	taken.add(name);
 	return name;
 }

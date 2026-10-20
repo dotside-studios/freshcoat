@@ -2,6 +2,7 @@
 // outlines, HVAR (or the phantom points) to the advances, and the variation
 // tables dropped, so a PDF can embed the glyphs as they were drawn.
 
+import { assemble, type Tables } from "../sfnt-write";
 import {
 	ARGS_XY,
 	type Bbox,
@@ -14,11 +15,19 @@ import {
 	writeComposite,
 	writeSimple,
 } from "./glyf";
-import { assemble, type Tables } from "../sfnt-write";
 import { tagAt } from "./sfnt";
 import { get, glyfReader, layoutGlyf, readTables } from "./subset";
 
-const DROPPED = ["fvar", "gvar", "avar", "HVAR", "VVAR", "MVAR", "STAT", "cvar"];
+const DROPPED = [
+	"fvar",
+	"gvar",
+	"avar",
+	"HVAR",
+	"VVAR",
+	"MVAR",
+	"STAT",
+	"cvar",
+];
 
 const view = (b: Uint8Array) =>
 	new DataView(b.buffer, b.byteOffset, b.byteLength);
@@ -59,7 +68,10 @@ export function instanceFont(
 }
 
 // Each axis's normalized coordinate, after avar.
-export function normalize(tables: Tables, settings: Record<string, number>): number[] {
+export function normalize(
+	tables: Tables,
+	settings: Record<string, number>,
+): number[] {
 	const fvar = tables.get("fvar");
 	if (!fvar) return [];
 	const dv = view(fvar);
@@ -75,9 +87,15 @@ export function normalize(tables: Tables, settings: Record<string, number>): num
 		const max = dv.getInt32(o + 12) / 65536;
 		const v = Math.min(max, Math.max(min, settings[tag] ?? def));
 		coords.push(
-			v < def ? (def > min ? (v - def) / (def - min) : 0)
-			: v > def ? (max > def ? (v - def) / (max - def) : 0)
-			: 0,
+			v < def
+				? def > min
+					? (v - def) / (def - min)
+					: 0
+				: v > def
+					? max > def
+						? (v - def) / (max - def)
+						: 0
+					: 0,
 		);
 	}
 	const avar = tables.get("avar");
@@ -185,7 +203,7 @@ function applyGvar(tables: Tables, count: number, coords: number[]): Glyph[] {
 		const glyph: Glyph = {
 			data,
 			bbox: data.length
-				? [0, 1, 2, 3].map((k) => view(data).getInt16(2 + 2 * k)) as Bbox
+				? ([0, 1, 2, 3].map((k) => view(data).getInt16(2 + 2 * k)) as Bbox)
 				: [0, 0, 0, 0],
 			left: dx[n] as number,
 			right: dx[n + 1] as number,
@@ -313,7 +331,10 @@ function addDeltas(
 	}
 }
 
-function readPoints(b: Uint8Array, o: number): { points: number[]; end: number } {
+function readPoints(
+	b: Uint8Array,
+	o: number,
+): { points: number[]; end: number } {
 	let count = b[o++] as number;
 	if (count & 0x80) count = ((count & 0x7f) << 8) | (b[o++] as number);
 	const points: number[] = [];
@@ -426,12 +447,15 @@ function hvarDeltas(hvar: Uint8Array, coords: number[]): (g: number) => number {
 	for (let r = 0; r < dv.getUint16(regionsAt + 2); r++) {
 		const o = regionsAt + 4 + r * axisCount * 6;
 		const lane = (k: number) =>
-			Array.from({ length: axisCount }, (_, a) => f2dot14(dv, o + a * 6 + 2 * k));
+			Array.from({ length: axisCount }, (_, a) =>
+				f2dot14(dv, o + a * 6 + 2 * k),
+			);
 		scalars.push(regionScalar(coords, lane(1), lane(0), lane(2)));
 	}
 	const dataCount = dv.getUint16(store + 6);
-	const datas = Array.from({ length: dataCount }, (_, i) =>
-		store + dv.getUint32(store + 8 + 4 * i),
+	const datas = Array.from(
+		{ length: dataCount },
+		(_, i) => store + dv.getUint32(store + 8 + 4 * i),
 	);
 	const map = (g: number): [number, number] => {
 		if (!mapAt) return [0, g];
@@ -482,7 +506,9 @@ function writeMetrics(out: Tables, glyphs: Glyph[], advances: number[]) {
 	const old = view(get(out, "hmtx"));
 	const metrics = view(get(out, "hhea")).getUint16(34);
 	const lsbOf = (g: number) =>
-		g < metrics ? old.getInt16(4 * g + 2) : old.getInt16(4 * metrics + 2 * (g - metrics));
+		g < metrics
+			? old.getInt16(4 * g + 2)
+			: old.getInt16(4 * metrics + 2 * (g - metrics));
 	const hmtx = new Uint8Array(4 * glyphs.length);
 	const hv = new DataView(hmtx.buffer);
 	const box: Bbox = [0x7fff, 0x7fff, -0x8000, -0x8000];

@@ -461,8 +461,14 @@ describe("analyzeScene (sampler)", () => {
 		const report = (_a: unknown, node: { src: string }) =>
 			reports.push(node.src);
 		const tree = createGroup([imageNode("a.png"), imageNode("b.png")]);
-		const first = await analyzeScene(sample, tree, { onAnalysis: report, cache });
-		const second = await analyzeScene(sample, tree, { onAnalysis: report, cache });
+		const first = await analyzeScene(sample, tree, {
+			onAnalysis: report,
+			cache,
+		});
+		const second = await analyzeScene(sample, tree, {
+			onAnalysis: report,
+			cache,
+		});
 		expect(calls).toBe(2);
 		expect(cache.size).toBe(2);
 		expect(second).toEqual(first);
@@ -486,9 +492,9 @@ describe("analyzeScene (sampler)", () => {
 		};
 		const cache: AnalysisCache = new Map();
 		const tree = createGroup([imageNode("x.png")]);
-		await expect(
-			analyzeScene(sample, tree, { cache }),
-		).rejects.toThrow("decode failed");
+		await expect(analyzeScene(sample, tree, { cache })).rejects.toThrow(
+			"decode failed",
+		);
 		await Promise.resolve();
 		expect(cache.size).toBe(0);
 		await analyzeScene(sample, tree, { cache });
@@ -518,14 +524,10 @@ describe("analyzeScene (sampler)", () => {
 
 	test("no analysis, no report: an explicit photo policy never calls back", async () => {
 		const seen: string[] = [];
-		await analyzeScene(
-			async () => brightBuffer(),
-			createGroup([imageNode()]),
-			{
-				policy: { photo: null },
-				onAnalysis: (_a, node) => seen.push(node.src),
-			},
-		);
+		await analyzeScene(async () => brightBuffer(), createGroup([imageNode()]), {
+			policy: { photo: null },
+			onAnalysis: (_a, node) => seen.push(node.src),
+		});
 		expect(seen).toEqual([]);
 	});
 

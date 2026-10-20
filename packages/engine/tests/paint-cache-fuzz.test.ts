@@ -6,17 +6,13 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
 import { beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "./helpers/headless";
-import {
-	compileScene,
-	createPaintCache,
-	type PaintCache,
-} from "../src/index";
 import { deriveFontMetrics } from "../src/font-metrics";
+import { compileScene, createPaintCache, type PaintCache } from "../src/index";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { TextEngine } from "../src/text-engine";
 import type { PaintWarning } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 import {
 	type Config,
 	config,

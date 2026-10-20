@@ -79,7 +79,10 @@ async function collected(ref: WeakRef<object>): Promise<boolean> {
 describe("createRenderer", () => {
 	test("renders PNG bytes by default", async () => {
 		const renderer = await createRenderer({ ck });
-		const frame = await renderer.render(rect("#ff0000"), { width: 8, height: 8 });
+		const frame = await renderer.render(rect("#ff0000"), {
+			width: 8,
+			height: 8,
+		});
 		expect(frame.format).toBe("png");
 		expect(firstPixel(frame.bytes)).toEqual([0x89, 0x50, 0x4e, 0x47]);
 		expect([frame.width, frame.height, frame.scale]).toEqual([8, 8, 1]);
@@ -94,7 +97,9 @@ describe("createRenderer", () => {
 			scale: 2,
 			output: { pixels: true },
 		});
-		expect([scaled.pixels.width, scaled.width, scaled.scale]).toEqual([16, 16, 2]);
+		expect([scaled.pixels.width, scaled.width, scaled.scale]).toEqual([
+			16, 16, 2,
+		]);
 		expect(firstPixel(scaled.pixels.data)).toEqual([0, 255, 0, 255]);
 		const wide = await renderer.render(rect("#00ff00"), {
 			width: 8,
@@ -140,8 +145,12 @@ describe("createRenderer", () => {
 
 	test("decodes a per-call image again when its bytes change", async () => {
 		const renderer = await createRenderer({ ck });
-		const red = (await renderer.render(rect("#ff0000"), { width: 8, height: 8 })).bytes;
-		const blue = (await renderer.render(rect("#0000ff"), { width: 8, height: 8 })).bytes;
+		const red = (
+			await renderer.render(rect("#ff0000"), { width: 8, height: 8 })
+		).bytes;
+		const blue = (
+			await renderer.render(rect("#0000ff"), { width: 8, height: 8 })
+		).bytes;
 		const at = async (bytes: Uint8Array) => {
 			const frame = await renderer.render(image("logo.png"), {
 				width: 8,
@@ -170,7 +179,11 @@ describe("createRenderer", () => {
 		const colors = ["#ff0000", "#00ff00", "#0000ff", "#ffffff"];
 		const frames = await Promise.all(
 			colors.map((c) =>
-				renderer.render(rect(c), { width: 8, height: 8, output: { pixels: true } }),
+				renderer.render(rect(c), {
+					width: 8,
+					height: 8,
+					output: { pixels: true },
+				}),
 			),
 		);
 		expect(frames.map((f) => firstPixel(f.pixels.data))).toEqual([
@@ -189,7 +202,10 @@ describe("createRenderer", () => {
 			fonts: { Geist: ["Geist-Regular.ttf"] },
 		});
 		expect([...renderer.fonts.keys()]).toEqual(["Geist"]);
-		const frame = await renderer.render(text("Geist"), { width: 120, height: 40 });
+		const frame = await renderer.render(text("Geist"), {
+			width: 120,
+			height: 40,
+		});
 		expect(frame.warnings).toEqual([]);
 		const decoded = decodePixels(ck, frame.bytes);
 		expect(decoded?.data.some((v, i) => i % 4 === 3 && v > 0)).toBe(true);
@@ -221,7 +237,9 @@ describe("createRenderer", () => {
 				files: [{ src, weight: 400, style: "normal" }],
 			},
 		});
-		expect(await renderer.loadFonts([local("Body", "a.ttf")])).toEqual({ failed: [] });
+		expect(await renderer.loadFonts([local("Body", "a.ttf")])).toEqual({
+			failed: [],
+		});
 		await renderer.loadFonts([local("Body", "a.ttf"), { family: "ByName" }]);
 		expect(reads).toEqual(["a.ttf"]);
 		await renderer.loadFonts([local("Body", "b.ttf")]);
@@ -330,8 +348,16 @@ describe("createRenderer", () => {
 			fonts: { Geist: [testFontBytes("Geist-Regular.ttf")] },
 		});
 		const prepared = renderer.prepare(text("Geist"));
-		const commands = renderer.compile(prepared, { width: 120, height: 40, prepared: true });
-		expect(commands[0]).toMatchObject({ op: "createCanvas", width: 120, height: 40 });
+		const commands = renderer.compile(prepared, {
+			width: 120,
+			height: 40,
+			prepared: true,
+		});
+		expect(commands[0]).toMatchObject({
+			op: "createCanvas",
+			width: 120,
+			height: 40,
+		});
 		const frame = await renderer.paint(commands, { output: { pixels: true } });
 		expect(frame.pixels.width).toBe(120);
 		renderer.dispose();
@@ -380,17 +406,17 @@ describe("createRenderer", () => {
 		renderer.dispose();
 		expect(() => renderer.stats()).not.toThrow();
 		expect(firstPixel((await pending).pixels.data)).toEqual([255, 0, 0, 255]);
-		expect(() => renderer.render(rect("#000000"), { width: 8, height: 8 })).toThrow(
-			/disposed/,
-		);
+		expect(() =>
+			renderer.render(rect("#000000"), { width: 8, height: 8 }),
+		).toThrow(/disposed/);
 		renderer.dispose();
 	});
 
 	test("refuses work after dispose", async () => {
 		const renderer = await createRenderer({ ck });
 		renderer.dispose();
-		expect(() => renderer.render(rect("#000000"), { width: 8, height: 8 })).toThrow(
-			/disposed/,
-		);
+		expect(() =>
+			renderer.render(rect("#000000"), { width: 8, height: 8 }),
+		).toThrow(/disposed/);
 	});
 });

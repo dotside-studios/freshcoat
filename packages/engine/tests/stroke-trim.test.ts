@@ -1,6 +1,7 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
 import { beforeAll, describe, expect, test } from "vitest";
+import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import {
 	createEllipse,
@@ -12,7 +13,6 @@ import {
 import { strokeTrim, trimPath } from "../src/trim";
 import type { Stroke } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
-import { compileScene } from "../src/compile-scene";
 import { renderSceneToPng } from "./helpers/headless";
 
 const W = 100;
@@ -52,10 +52,7 @@ async function paint(node: Node) {
 // from the top.
 function onRing(turns: number): [number, number] {
 	const a = turns * 2 * Math.PI;
-	return [
-		Math.floor(50 + 40 * Math.sin(a)),
-		Math.floor(50 - 40 * Math.cos(a)),
-	];
+	return [Math.floor(50 + 40 * Math.sin(a)), Math.floor(50 - 40 * Math.cos(a))];
 }
 
 describe("strokeTrim", () => {
@@ -107,7 +104,9 @@ describe("trimPath", () => {
 
 describe("trimmed stroke rendering", () => {
 	test("a 25% ring runs clockwise from the top", async () => {
-		const at = await paint(createEllipse({ ...ring, stroke: black({ trimEnd: 0.25 }) }));
+		const at = await paint(
+			createEllipse({ ...ring, stroke: black({ trimEnd: 0.25 }) }),
+		);
 		expect(at(...onRing(0.02))).toBe("ink");
 		expect(at(...onRing(0.125))).toBe("ink");
 		expect(at(...onRing(0.23))).toBe("ink");
@@ -200,16 +199,22 @@ describe("trimmed stroke rendering", () => {
 
 	test("an empty trim draws nothing", async () => {
 		const at = await paint(
-			createEllipse({ ...ring, stroke: black({ trimStart: 0.4, trimEnd: 0.4 }) }),
+			createEllipse({
+				...ring,
+				stroke: black({ trimStart: 0.4, trimEnd: 0.4 }),
+			}),
 		);
-		for (const t of [0, 0.25, 0.4, 0.5, 0.75]) expect(at(...onRing(t))).toBe("paper");
+		for (const t of [0, 0.25, 0.4, 0.5, 0.75])
+			expect(at(...onRing(t))).toBe("paper");
 	});
 });
 
 describe("trim validation", () => {
 	test("rejects a trim outside [0, 1]", () => {
 		const scene = createEllipse({ ...ring, stroke: black({ trimEnd: 1.5 }) });
-		const errors = validateCommands(compileScene(scene, { width: W, height: H }));
+		const errors = validateCommands(
+			compileScene(scene, { width: W, height: H }),
+		);
 		expect(errors.map((e) => e.code)).toContain("bad_trim");
 	});
 });

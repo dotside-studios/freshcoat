@@ -89,7 +89,9 @@ describe("spot validation", () => {
 			["invalid_spot", "/template_data/0/elements/0/properties/spot/fill/alt"],
 		]);
 		expect(
-			codes(withLayers(rect({ spot: { fill: { spot: "W", tint: 2 } } })))[0]?.[0],
+			codes(
+				withLayers(rect({ spot: { fill: { spot: "W", tint: 2 } } })),
+			)[0]?.[0],
 		).toBe("invalid_shape");
 	});
 

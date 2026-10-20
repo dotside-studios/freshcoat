@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
 import { clearFontBytesCache } from "../src/font-bytes";
-import { createHeadlessEnv } from "./helpers/headless";
+import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	compileScene,
 	createBitmap,
@@ -19,7 +19,6 @@ import {
 	encodePng,
 	type PaintCache,
 } from "../src/index";
-import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -35,13 +34,13 @@ import {
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { PaintRuntime } from "../src/runtime-types";
 import type { Adjust, Command, ResolvedFill, ResolvedFont } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const FONT = testFontBytes("Geist-Regular.ttf");
 
 let ck: any;
 async function initCk() {
-	if (!ck)
-		ck = await loadCanvasKit();
+	if (!ck) ck = await loadCanvasKit();
 	return ck;
 }
 
@@ -451,9 +450,9 @@ describe("PaintCache", () => {
 			const work = [...(paintCacheState(cache).surface?.work.values() ?? [])];
 			expect(work.length).toBe(extra.supersample === 4 ? 2 : 1);
 			expect(await pixels(commands, rt)).toEqual(plain);
-			expect([...(paintCacheState(cache).surface?.work.values() ?? [])]).toEqual(
-				work,
-			);
+			expect([
+				...(paintCacheState(cache).surface?.work.values() ?? []),
+			]).toEqual(work);
 			const disposed = work.map((w) => vi.spyOn(w, "dispose"));
 			cache.clear();
 			for (const spy of disposed) expect(spy).toHaveBeenCalledTimes(1);
@@ -958,7 +957,7 @@ function mulberry32(seed: number): () => number {
 function randomPair(rand: () => number, depth: number): [Spec[], Spec[]] {
 	const colors = ["#ef4444", "#3b82f6", "#22c55e", "#a855f7"];
 	const names = ["Ada", "Grace", "Hedy", "Joan"];
-	const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)] as T;
+	const pick = <T>(xs: T[]) => xs[Math.floor(rand() * xs.length)] as T;
 	const level = (d: number): [Spec[], Spec[]] => {
 		const a: Spec[] = [];
 		const b: Spec[] = [];
@@ -1208,11 +1207,21 @@ describe("PaintCache background", () => {
 				{ group: [{ rect: "#22c55e" }] },
 			],
 			(_, src) => [
-				{ group: [{ group: [{ rect: "#ef4444" }, { image: src }] }, { rect: "#a855f7" }] },
+				{
+					group: [
+						{ group: [{ rect: "#ef4444" }, { image: src }] },
+						{ rect: "#a855f7" },
+					],
+				},
 				{ rect: "#22c55e" },
 			],
 			(v) => [
-				{ group: [{ group: [{ rect: "#ef4444" }] }, { group: [{ text: v }, { rect: "#3b82f6" }] }] },
+				{
+					group: [
+						{ group: [{ rect: "#ef4444" }] },
+						{ group: [{ text: v }, { rect: "#3b82f6" }] },
+					],
+				},
 				{ rect: "#22c55e" },
 			],
 		];
@@ -1407,7 +1416,6 @@ describe("PaintCache background", () => {
 		});
 		cache.dispose();
 	});
-
 
 	// So the frame's group is entered, each leading rect keyed on its own.
 	const label = () =>

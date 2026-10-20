@@ -20,7 +20,11 @@ import {
 import { FontEmbedder } from "../src/pdf/fonts";
 import { glyphTexts, lineClusters, paintPdf } from "../src/pdf/paint";
 import { PdfWriter } from "../src/pdf/writer";
-import { createRenderer, type RenderPdfOptions, type Renderer } from "../src/renderer";
+import {
+	createRenderer,
+	type Renderer,
+	type RenderPdfOptions,
+} from "../src/renderer";
 
 // Geist alone in a font collection, which a PDF cannot embed.
 function collection(sfnt: Uint8Array): Uint8Array {
@@ -68,7 +72,12 @@ const frame = (children: Node[]) =>
 		children,
 	});
 
-const label = (family: string, weight: 300 | 400 | 700, value: string, y: number) =>
+const label = (
+	family: string,
+	weight: 300 | 400 | 700,
+	value: string,
+	y: number,
+) =>
 	createText({
 		pos: { x: 8, y },
 		size: { width: 184, height: 30 },
@@ -174,18 +183,25 @@ function rasterize(bytes: Uint8Array): Uint8Array {
 }
 
 // Mean absolute channel difference, and the largest one at each probe.
-function compare(a: Uint8Array, b: Uint8Array, probes: Array<[number, number]>) {
+function compare(
+	a: Uint8Array,
+	b: Uint8Array,
+	probes: Array<[number, number]>,
+) {
 	const pa = decodePixels(ck, a);
 	const pb = decodePixels(ck, b);
 	if (!pa || !pb) throw new Error("decode failed");
 	expect([pa.width, pa.height]).toEqual([pb.width, pb.height]);
 	let sum = 0;
 	for (let i = 0; i < pa.data.length; i++)
-		if (i % 4 !== 3) sum += Math.abs((pa.data[i] as number) - (pb.data[i] as number));
+		if (i % 4 !== 3)
+			sum += Math.abs((pa.data[i] as number) - (pb.data[i] as number));
 	const at = probes.map(([x, y]) => {
 		const i = (y * pa.width + x) * 4;
 		return Math.max(
-			...[0, 1, 2].map((c) => Math.abs((pa.data[i + c] as number) - (pb.data[i + c] as number))),
+			...[0, 1, 2].map((c) =>
+				Math.abs((pa.data[i + c] as number) - (pb.data[i + c] as number)),
+			),
 		);
 	});
 	return { mean: sum / ((pa.data.length / 4) * 3), at };
@@ -240,10 +256,13 @@ describe("renderPdf", () => {
 	});
 
 	test("embeds text set in a WOFF2 file", async () => {
-		const pdf = await renderer.renderPdf(frame([label("Vend", 300, "Light", 8)]), {
-			width: W,
-			height: H,
-		});
+		const pdf = await renderer.renderPdf(
+			frame([label("Vend", 300, "Light", 8)]),
+			{
+				width: W,
+				height: H,
+			},
+		);
 		expect(pdf.warnings).toEqual([]);
 		const body = source(pdf.bytes);
 		expect(body).toContain("/FontFile2");
@@ -271,8 +290,18 @@ describe("renderPdf", () => {
 
 	test("sizes the page by dpi and repeats with a fixed date", async () => {
 		const date = new Date("2026-01-01T00:00:00Z");
-		const a = await renderer.renderPdf(scene, { width: W, height: H, dpi: 300, date });
-		const b = await renderer.renderPdf(scene, { width: W, height: H, dpi: 300, date });
+		const a = await renderer.renderPdf(scene, {
+			width: W,
+			height: H,
+			dpi: 300,
+			date,
+		});
+		const b = await renderer.renderPdf(scene, {
+			width: W,
+			height: H,
+			dpi: 300,
+			date,
+		});
 		expect(b.bytes).toEqual(a.bytes);
 		expect(a.width).toBeCloseTo((W / 300) * 72, 6);
 		expect(source(a.bytes)).toContain("/CreationDate (D:20260101000000Z)");
@@ -349,11 +378,23 @@ describe("renderPdf", () => {
 		image.delete();
 		paint.delete();
 		surface.delete();
-		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/stripes.jpg")));
+		const jpeg = new Uint8Array(
+			readFileSync(join(__dirname, "fixtures/pdf/stripes.jpg")),
+		);
 		const pdf = await renderer.renderPdf(
 			frame([
-				createImage({ pos: { x: 0, y: 0 }, size: { width: 40, height: 40 }, src: "a.png", fit: "cover" }),
-				createImage({ pos: { x: 50, y: 0 }, size: { width: 40, height: 40 }, src: "b.jpg", fit: "contain" }),
+				createImage({
+					pos: { x: 0, y: 0 },
+					size: { width: 40, height: 40 },
+					src: "a.png",
+					fit: "cover",
+				}),
+				createImage({
+					pos: { x: 50, y: 0 },
+					size: { width: 40, height: 40 },
+					src: "b.jpg",
+					fit: "contain",
+				}),
 			]),
 			{
 				width: W,
@@ -372,24 +413,44 @@ describe("renderPdf", () => {
 	});
 
 	test("tags a JPEG carrying an ICC profile with that profile", async () => {
-		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")));
+		const jpeg = new Uint8Array(
+			readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")),
+		);
 		const scene = frame([
-			createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 80 }, src: "a.jpg", fit: "fill" }),
-			createImage({ pos: { x: 100, y: 0 }, size: { width: 80, height: 80 }, src: "b.jpg", fit: "fill" }),
+			createImage({
+				pos: { x: 0, y: 0 },
+				size: { width: 80, height: 80 },
+				src: "a.jpg",
+				fit: "fill",
+			}),
+			createImage({
+				pos: { x: 100, y: 0 },
+				size: { width: 80, height: 80 },
+				src: "b.jpg",
+				fit: "fill",
+			}),
 		]);
 		const images = new Map([
 			["a.jpg", jpeg],
 			["b.jpg", jpeg.slice()],
 		]);
-		const pdf = await renderer.renderPdf(scene, { width: W, height: H, images });
+		const pdf = await renderer.renderPdf(scene, {
+			width: W,
+			height: H,
+			images,
+		});
 		expect(pdf.warnings).toEqual([]);
 		const body = source(pdf.bytes);
 		expect(body.includes(source(jpeg))).toBe(true);
 		expect(body).not.toMatch(/\/Subtype \/Image[^>]*\/DeviceRGB/);
-		const profiles = [...body.matchAll(/\/ColorSpace \[\/ICCBased (\d+) 0 R\]/g)];
+		const profiles = [
+			...body.matchAll(/\/ColorSpace \[\/ICCBased (\d+) 0 R\]/g),
+		];
 		expect(profiles.length).toBe(2);
 		expect(new Set(profiles.map((m) => m[1])).size).toBe(1);
-		expect(body).toMatch(new RegExp(`${profiles[0]?.[1]} 0 obj\\s*<<[^>]*/N 3`));
+		expect(body).toMatch(
+			new RegExp(`${profiles[0]?.[1]} 0 obj\\s*<<[^>]*/N 3`),
+		);
 		if (pdftoppm) {
 			const png = await renderer.render(scene, { width: W, height: H, images });
 			const { at } = compare(png.bytes, rasterize(pdf.bytes), [
@@ -401,7 +462,9 @@ describe("renderPdf", () => {
 	});
 
 	test("decodes a JPEG whose ICC profile does not fit it", async () => {
-		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")));
+		const jpeg = new Uint8Array(
+			readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")),
+		);
 		const at = source(jpeg).indexOf("ICC_PROFILE\0") + 14;
 		const gray = jpeg.slice();
 		gray.set(new TextEncoder().encode("GRAY"), at + 16);
@@ -409,7 +472,14 @@ describe("renderPdf", () => {
 		split[at - 1] = 2;
 		for (const bytes of [gray, split]) {
 			const pdf = await renderer.renderPdf(
-				frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 80 }, src: "a.jpg", fit: "fill" })]),
+				frame([
+					createImage({
+						pos: { x: 0, y: 0 },
+						size: { width: 80, height: 80 },
+						src: "a.jpg",
+						fit: "fill",
+					}),
+				]),
 				{ width: W, height: H, images: new Map([["a.jpg", bytes]]) },
 			);
 			expect(pdf.warnings).toEqual([]);
@@ -445,18 +515,14 @@ describe("renderPdf", () => {
 			{ kind: "vector_rasterized", feature: "mask", layer: "masked" },
 		]);
 		if (pdftoppm) {
-			const png = await renderer.render(
-				frame([
-					masked(),
-				]),
-				{ width: W, height: H },
-			);
-			const vec = await renderer.renderPdf(
-				frame([
-					masked(),
-				]),
-				{ width: W, height: H },
-			);
+			const png = await renderer.render(frame([masked()]), {
+				width: W,
+				height: H,
+			});
+			const vec = await renderer.renderPdf(frame([masked()]), {
+				width: W,
+				height: H,
+			});
 			const { at } = compare(png.bytes, rasterize(vec.bytes), [
 				[40, 40],
 				[3, 3],
@@ -474,9 +540,25 @@ describe("renderPdf", () => {
 		);
 		const pdf = await renderer.renderPdf(
 			frame([
-				createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "contain" }),
-				createImage({ pos: { x: 100, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "cover" }),
-				createImage({ id: "titled", pos: { x: 0, y: 50 }, size: { width: 80, height: 40 }, src: "titled.svg", fit: "fill" }),
+				createImage({
+					pos: { x: 0, y: 0 },
+					size: { width: 80, height: 40 },
+					src: "logo.svg",
+					fit: "contain",
+				}),
+				createImage({
+					pos: { x: 100, y: 0 },
+					size: { width: 80, height: 40 },
+					src: "logo.svg",
+					fit: "cover",
+				}),
+				createImage({
+					id: "titled",
+					pos: { x: 0, y: 50 },
+					size: { width: 80, height: 40 },
+					src: "titled.svg",
+					fit: "fill",
+				}),
 			]),
 			{
 				width: W,
@@ -491,17 +573,38 @@ describe("renderPdf", () => {
 			{ kind: "vector_rasterized", feature: "SVG text", layer: "titled" },
 		]);
 		const only = await renderer.renderPdf(
-			frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "cover" })]),
+			frame([
+				createImage({
+					pos: { x: 0, y: 0 },
+					size: { width: 80, height: 40 },
+					src: "logo.svg",
+					fit: "cover",
+				}),
+			]),
 			{ width: W, height: H, images: new Map([["logo.svg", logo]]) },
 		);
 		expect(source(only.bytes)).not.toContain("/Subtype /Image");
 		if (pdftoppm) {
 			const png = await renderer.render(
-				frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "contain" })]),
+				frame([
+					createImage({
+						pos: { x: 0, y: 0 },
+						size: { width: 80, height: 40 },
+						src: "logo.svg",
+						fit: "contain",
+					}),
+				]),
 				{ width: W, height: H, images: new Map([["logo.svg", logo]]) },
 			);
 			const vec = await renderer.renderPdf(
-				frame([createImage({ pos: { x: 0, y: 0 }, size: { width: 80, height: 40 }, src: "logo.svg", fit: "contain" })]),
+				frame([
+					createImage({
+						pos: { x: 0, y: 0 },
+						size: { width: 80, height: 40 },
+						src: "logo.svg",
+						fit: "contain",
+					}),
+				]),
 				{ width: W, height: H, images: new Map([["logo.svg", logo]]) },
 			);
 			const { at } = compare(png.bytes, rasterize(vec.bytes), [
@@ -539,9 +642,15 @@ describe("renderPdf", () => {
 			]),
 			new PdfWriter(),
 		);
-		const probe = ck.Typeface.MakeTypefaceFromData(geist.buffer.slice(geist.byteOffset, geist.byteOffset + geist.byteLength));
+		const probe = ck.Typeface.MakeTypefaceFromData(
+			geist.buffer.slice(geist.byteOffset, geist.byteOffset + geist.byteLength),
+		);
 		const run = { typeface: probe, glyphs: [], offsets: [] };
-		const file = embedder.file(run as never, { weight: 400, italic: false }, new Map());
+		const file = embedder.file(
+			run as never,
+			{ weight: 400, italic: false },
+			new Map(),
+		);
 		probe.delete();
 		expect("reason" in file).toBe(false);
 		expect(made).toHaveLength(1);
@@ -623,7 +732,9 @@ describe("renderPdf", () => {
 					return bytes.get(src) as Uint8Array;
 				},
 			});
-			expect(pdf.warnings.filter((w) => w.kind !== "vector_rasterized")).toEqual([]);
+			expect(
+				pdf.warnings.filter((w) => w.kind !== "vector_rasterized"),
+			).toEqual([]);
 			// Once to embed it, once to decode it for every layer that draws it.
 			expect(loads.filter((src) => src === "a.png")).toHaveLength(2);
 			expect(loads.filter((src) => src === "b.png")).toHaveLength(2);
@@ -633,7 +744,12 @@ describe("renderPdf", () => {
 
 describe("text as outlines", () => {
 	const outlined = (scene: Node, extra: Partial<RenderPdfOptions> = {}) =>
-		renderer.renderPdf(scene, { width: W, height: H, text: "outline", ...extra });
+		renderer.renderPdf(scene, {
+			width: W,
+			height: H,
+			text: "outline",
+			...extra,
+		});
 
 	test("draws every glyph as a path, with no font in the file", async () => {
 		const pdf = await outlined(scene);
@@ -646,7 +762,9 @@ describe("text as outlines", () => {
 	});
 
 	test.skipIf(!pdftoppm)("looks as the embedded text does", async () => {
-		const embedded = rasterize((await renderer.renderPdf(scene, { width: W, height: H })).bytes);
+		const embedded = rasterize(
+			(await renderer.renderPdf(scene, { width: W, height: H })).bytes,
+		);
 		const outlines = rasterize((await outlined(scene)).bytes);
 		const png = await renderer.render(scene, { width: W, height: H });
 		// Poppler hints glyphs drawn from a font and not paths, so the two differ
@@ -667,9 +785,18 @@ describe("text as outlines", () => {
 				Vend: [testFontBytes("VendSans-Variable-latin.woff2")],
 			},
 		});
-		const page = frame([label("CFF", 400, "Set in CFF", 8), label("Vend", 300, "Light", 40)]);
-		expect(source((await cff.renderPdf(page, { width: W, height: H })).bytes)).toContain("/FontFile3");
-		const pdf = await cff.renderPdf(page, { width: W, height: H, text: "outline" });
+		const page = frame([
+			label("CFF", 400, "Set in CFF", 8),
+			label("Vend", 300, "Light", 40),
+		]);
+		expect(
+			source((await cff.renderPdf(page, { width: W, height: H })).bytes),
+		).toContain("/FontFile3");
+		const pdf = await cff.renderPdf(page, {
+			width: W,
+			height: H,
+			text: "outline",
+		});
 		expect(pdf.warnings).toEqual([]);
 		expect(source(pdf.bytes)).not.toContain("/Font");
 		if (pdftoppm) {
@@ -699,7 +826,13 @@ describe("text as outlines", () => {
 			pos: { x: 8, y: 4 },
 			size: { width: 184, height: 40 },
 			text: "Gradient",
-			font: { family: "Vend", weight: 700, style: "normal", size: 32, lineHeight: 1.2 },
+			font: {
+				family: "Vend",
+				weight: 700,
+				style: "normal",
+				size: 32,
+				lineHeight: 1.2,
+			},
 			color: "#000000",
 			fill: {
 				kind: "linear",
@@ -716,7 +849,13 @@ describe("text as outlines", () => {
 			pos: { x: 8, y: 44 },
 			size: { width: 184, height: 30 },
 			text: "Outside",
-			font: { family: "Geist", weight: 400, style: "normal", size: 24, lineHeight: 1.2 },
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 24,
+				lineHeight: 1.2,
+			},
 			color: "#1d3557",
 			stroke: { color: "#e63946", width: 2, align: "outside" },
 			opacity: 0.7,
@@ -726,7 +865,13 @@ describe("text as outlines", () => {
 			pos: { x: 100, y: 40 },
 			size: { width: 90, height: 80 },
 			text: "Around the ring",
-			font: { family: "Geist", weight: 400, style: "normal", size: 12, lineHeight: 1.2 },
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 12,
+				lineHeight: 1.2,
+			},
 			color: "#2a9d8f",
 			arc: { startAngle: 0 },
 		}),
@@ -734,7 +879,9 @@ describe("text as outlines", () => {
 
 	test("paints gradients, strokes, opacity, blends and curves as vectors", async () => {
 		const embedded = await renderer.renderPdf(styled, { width: W, height: H });
-		expect(embedded.warnings).toEqual([{ kind: "vector_rasterized", feature: "gradient text" }]);
+		expect(embedded.warnings).toEqual([
+			{ kind: "vector_rasterized", feature: "gradient text" },
+		]);
 		const pdf = await outlined(styled);
 		expect(pdf.warnings).toEqual([]);
 		const body = source(pdf.bytes);
@@ -755,7 +902,13 @@ describe("text as outlines", () => {
 					pos: { x: 8, y: 8 },
 					size: { width: 184, height: 40 },
 					text: "Stroked",
-					font: { family: "Geist", weight: 400, style: "normal", size: 32, lineHeight: 1.2 },
+					font: {
+						family: "Geist",
+						weight: 400,
+						style: "normal",
+						size: 32,
+						lineHeight: 1.2,
+					},
 					color: "#ffffff",
 					stroke: {
 						color: "#000000",
@@ -796,14 +949,22 @@ describe("text as outlines", () => {
 			]),
 		);
 		expect(pdf.warnings).toEqual([
-			{ kind: "vector_rasterized", feature: "angular gradient text", layer: "angular" },
+			{
+				kind: "vector_rasterized",
+				feature: "angular gradient text",
+				layer: "angular",
+			},
 		]);
 	});
 });
 
 describe("text a PDF reader can extract", () => {
 	// A run with glyphs at UTF-8 offsets, in the order CanvasKit placed them.
-	const run = (glyphs: number[], offsets: number[], ids: Record<string, number> = {}) =>
+	const run = (
+		glyphs: number[],
+		offsets: number[],
+		ids: Record<string, number> = {},
+	) =>
 		({
 			glyphs: Uint16Array.from(glyphs),
 			offsets: Uint32Array.from(offsets),
@@ -827,10 +988,15 @@ describe("text a PDF reader can extract", () => {
 	test("splits a cluster drawn with several glyphs by the font's own map", () => {
 		const text = "שָׁ";
 		const clusters = lineClusters(text, [run([96, 79, 100], [0, 2, 2])]);
-		const marks = run([96, 100, 79], [0, 2, 2], { "\u05b8": 79, "\u05c1": 100 });
+		const marks = run([96, 100, 79], [0, 2, 2], {
+			"\u05b8": 79,
+			"\u05c1": 100,
+		});
 		expect(glyphTexts([marks], clusters)).toEqual([["ש", "\u05c1", "\u05b8"]]);
 		const unmapped = run([96, 100, 79], [0, 2, 2]);
-		expect(glyphTexts([unmapped], clusters)).toEqual([["ש", "\u05b8", "\u05c1"]]);
+		expect(glyphTexts([unmapped], clusters)).toEqual([
+			["ש", "\u05b8", "\u05c1"],
+		]);
 	});
 
 	test("gives glyph 0 no text", () => {
@@ -866,7 +1032,8 @@ describe("text a PDF reader can extract", () => {
 
 		test("reads Hebrew set among Latin", async () => {
 			const text = await extract("Geist", "Hello שלום world");
-			for (const word of ["Hello", "שלום", "world"]) expect(text).toContain(word);
+			for (const word of ["Hello", "שלום", "world"])
+				expect(text).toContain(word);
 		});
 	});
 });

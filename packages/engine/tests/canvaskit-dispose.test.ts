@@ -121,8 +121,12 @@ describe("paintScene frees what it made when the paint throws", () => {
 			},
 		});
 		const providerDelete = vi.fn();
-		(ck as { TypefaceFontProvider: { Make: unknown } }).TypefaceFontProvider.Make =
-			() => ({ registerFont: vi.fn(), delete: providerDelete });
+		(
+			ck as { TypefaceFontProvider: { Make: unknown } }
+		).TypefaceFontProvider.Make = () => ({
+			registerFont: vi.fn(),
+			delete: providerDelete,
+		});
 		const imageDelete = vi.fn();
 		(ck as { MakeImageFromEncoded: unknown }).MakeImageFromEncoded = () => ({
 			delete: imageDelete,

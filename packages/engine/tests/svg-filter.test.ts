@@ -1,8 +1,8 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage } from "../src/index";
 import type { ImageNode } from "../src/node";
+import { createHeadlessEnv } from "./helpers/headless";
 
 // biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
@@ -10,7 +10,12 @@ beforeAll(async () => {
 	ck = await loadCanvasKit();
 });
 
-async function paint(markup: string, size: number, node: Partial<ImageNode> = {}, scale?: number) {
+async function paint(
+	markup: string,
+	size: number,
+	node: Partial<ImageNode> = {},
+	scale?: number,
+) {
 	const env = createHeadlessEnv({
 		images: new Map([["art.svg", new TextEncoder().encode(markup)]]),
 	});
@@ -22,7 +27,11 @@ async function paint(markup: string, size: number, node: Partial<ImageNode> = {}
 		...node,
 	});
 	const result = (await env.paint(
-		compileScene(scene, { width: size, height: size, ...(scale ? { scale } : {}) }),
+		compileScene(scene, {
+			width: size,
+			height: size,
+			...(scale ? { scale } : {}),
+		}),
 		ck,
 	)) as { bytes: Uint8Array; warnings: unknown[] };
 	const img = ck.MakeImageFromEncoded(result.bytes);
@@ -35,7 +44,9 @@ async function paint(markup: string, size: number, node: Partial<ImageNode> = {}
 		colorSpace: ck.ColorSpace.SRGB,
 	}) as Uint8Array;
 	img.delete();
-	const at = (x: number, y: number) => [...px.slice((y * w + x) * 4, (y * w + x) * 4 + 4)];
+	const at = (x: number, y: number) => [
+		...px.slice((y * w + x) * 4, (y * w + x) * 4 + 4),
+	];
 	return { at, warnings: result.warnings };
 }
 
@@ -44,7 +55,9 @@ const svg = (body: string, attrs = 'width="40" height="40"') =>
 
 const close = (got: number[], want: number[], tolerance = 3) => {
 	expect(got).toHaveLength(want.length);
-	got.forEach((v, i) => expect(Math.abs(v - (want[i] as number))).toBeLessThanOrEqual(tolerance));
+	got.forEach((v, i) =>
+		expect(Math.abs(v - (want[i] as number))).toBeLessThanOrEqual(tolerance),
+	);
 };
 
 const FIGMA_SHADOW = `<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -79,7 +92,8 @@ const edge = (d: number, sigma: number) => {
 		const t = 1 / (1 + 0.3275911 * Math.abs(x));
 		const y =
 			1 -
-			((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+			((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) *
+				t +
 				0.254829592) *
 				t *
 				Math.exp(-x * x);
@@ -160,7 +174,12 @@ describe("SVG filters", () => {
 			40,
 		);
 		const c = (x: number) => Math.round(255 * Math.min(1, Math.max(0, x)));
-		close(at(20, 20), [c(0.213 - 0.787), c(0.213 + 0.213), c(0.213 + 0.213), 255]);
+		close(at(20, 20), [
+			c(0.213 - 0.787),
+			c(0.213 + 0.213),
+			c(0.213 + 0.213),
+			255,
+		]);
 	});
 
 	test("an unsupported primitive draws the element without its filter and names the primitive", async () => {
@@ -174,7 +193,11 @@ describe("SVG filters", () => {
 		close(at(10, 20), [255, 0, 0, 255]);
 		expect(at(9, 20)[3]).toBe(0);
 		expect(warnings).toEqual([
-			{ kind: "svg_unsupported", src: "art.svg", feature: "filter-feTurbulence" },
+			{
+				kind: "svg_unsupported",
+				src: "art.svg",
+				feature: "filter-feTurbulence",
+			},
 		]);
 	});
 
@@ -182,7 +205,14 @@ describe("SVG filters", () => {
 		const live = new Set<object>();
 		let created = 0;
 		const factory = ck.ImageFilter;
-		const names = ["MakeBlur", "MakeOffset", "MakeColorFilter", "MakeBlend", "MakeShader", "MakeDropShadow"];
+		const names = [
+			"MakeBlur",
+			"MakeOffset",
+			"MakeColorFilter",
+			"MakeBlend",
+			"MakeShader",
+			"MakeDropShadow",
+		];
 		const saved = names.map((n) => factory[n]);
 		names.forEach((n, i) => {
 			factory[n] = (...args: unknown[]) => {
@@ -213,7 +243,10 @@ describe("SVG filters", () => {
 		const live = new Set<object>();
 		const proto = ck.PictureRecorder.prototype;
 		const finish = proto.finishRecordingAsPicture;
-		proto.finishRecordingAsPicture = function (this: unknown, ...args: unknown[]) {
+		proto.finishRecordingAsPicture = function (
+			this: unknown,
+			...args: unknown[]
+		) {
 			const picture = finish.apply(this, args);
 			live.add(picture);
 			const del = picture.delete.bind(picture);

@@ -219,5 +219,12 @@ export function iccProfile({
 	header.set(text(space), 16);
 	header.set(text("Lab "), 20);
 	header.set(text("acsp"), 36);
-	return concat([header, be32(1), text("desc"), be32(144), be32(desc.length), desc]);
+	return concat([
+		header,
+		be32(1),
+		text("desc"),
+		be32(144),
+		be32(desc.length),
+		desc,
+	]);
 }

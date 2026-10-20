@@ -199,7 +199,9 @@ export function writeComposite(g: CompositeGlyph, bbox: Bbox): Uint8Array {
 }
 
 // A component's 2x2 transform as [xx, yx, xy, yy].
-export function componentMatrix(c: Component): [number, number, number, number] {
+export function componentMatrix(
+	c: Component,
+): [number, number, number, number] {
 	const dv = view(c.transform);
 	const f = (o: number) => dv.getInt16(o) / 16384;
 	if (c.flags & 0x8) return [f(0), 0, 0, f(0)];

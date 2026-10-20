@@ -11,16 +11,16 @@
 // NOT override saturation, contrast or gamma — those are chosen per image from
 // the art itself, and a profile that pinned them would throw that away.
 
-import { fitChannelBalance } from "./balance";
+import { z } from "zod";
 import {
 	assessCalibration,
 	type CalibrationAssessment,
 	type CalibrationBlocker,
 } from "./assess";
+import { fitChannelBalance } from "./balance";
 import type { ChartReading } from "./measure";
 import { DEFAULT_PRINT_TARGET } from "./target";
 import type { ChannelBalance } from "./types";
-import { z } from "zod";
 
 export interface PrintProfileConditions {
 	printer?: string;
@@ -194,9 +194,12 @@ const assessmentSchema = z
 	.object(
 		{
 			usable: z.boolean({ error: "assessment.usable must be a boolean" }),
-			blockers: z.array(z.enum(CALIBRATION_BLOCKERS, { error: blockersError }), {
-				error: blockersError,
-			}),
+			blockers: z.array(
+				z.enum(CALIBRATION_BLOCKERS, { error: blockersError }),
+				{
+					error: blockersError,
+				},
+			),
 			metrics: z.object(
 				{
 					graySteps: metric("graySteps"),
@@ -217,7 +220,9 @@ const profileSchema = z.object(
 	{
 		version: z.literal(1, { error: "profile version must be 1" }).optional(),
 		name: z
-			.string({ error: "profile needs a name saying which printer it describes" })
+			.string({
+				error: "profile needs a name saying which printer it describes",
+			})
 			.trim()
 			.min(1, {
 				error: "profile needs a name saying which printer it describes",

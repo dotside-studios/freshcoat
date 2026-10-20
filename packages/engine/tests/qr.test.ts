@@ -1,13 +1,12 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "./helpers/headless";
 import type { Command, DrawQrCommand } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 let ck: any;
 async function initCk() {
-	if (!ck)
-		ck = await loadCanvasKit();
+	if (!ck) ck = await loadCanvasKit();
 	return ck;
 }
 
@@ -40,7 +39,8 @@ function reference(qr: DrawQrCommand, scale: number) {
 		canvas.translate(-cx, -cy);
 	}
 	const { pos, size, margin = 0 } = qr;
-	const m = (Math.min(size.width, size.height) - margin * 2) / qr.modules.length;
+	const m =
+		(Math.min(size.width, size.height) - margin * 2) / qr.modules.length;
 	const bg = new ck.Paint();
 	bg.setColor(ck.parseColorString(qr.background ?? "#ffffff"));
 	canvas.drawRect(ck.XYWHRect(pos.x, pos.y, size.width, size.height), bg);

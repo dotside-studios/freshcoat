@@ -117,7 +117,9 @@ export type Sandbox = {
 	cleanup(): Promise<void>;
 };
 
-export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbox> {
+export async function sandbox(
+	options: { cache?: boolean } = {},
+): Promise<Sandbox> {
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-cli-"));
 	const fetch = fontFetch();
 	await writeFile(join(dir, "logo.png"), await solidPng(40, 40, [20, 160, 60]));
@@ -221,7 +223,9 @@ export function workspaceOf(template: Template): Workspace {
 	};
 }
 
-export async function workspaceBytes(workspace: Workspace): Promise<Uint8Array> {
+export async function workspaceBytes(
+	workspace: Workspace,
+): Promise<Uint8Array> {
 	const blob = await packWorkspace(workspace);
 	if (!blob) throw new Error("no workspace bytes");
 	return new Uint8Array(await blob.arrayBuffer());

@@ -192,13 +192,17 @@ export function mergeFontSubsets(files: Uint8Array[]): Uint8Array | null {
 				for (const reader of readers) {
 					const piece = reader.piece(g);
 					if (piece.length === 0) continue;
-					if (found.length > 0 && !same(found, piece))
-						throw new Error("clash");
+					if (found.length > 0 && !same(found, piece)) throw new Error("clash");
 					found = piece;
 				}
 				return found;
 			});
-			layoutGlyf(lead.tables, pieces, readers.every((r) => r.long), out);
+			layoutGlyf(
+				lead.tables,
+				pieces,
+				readers.every((r) => r.long),
+				out,
+			);
 		}
 		return assemble(lead.version, out);
 	} catch {
