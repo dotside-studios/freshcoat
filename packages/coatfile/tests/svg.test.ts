@@ -423,7 +423,6 @@ function template(element: Element, extra: Element[] = []): Template {
 	};
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

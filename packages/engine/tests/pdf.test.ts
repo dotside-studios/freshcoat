@@ -42,7 +42,6 @@ function collection(sfnt: Uint8Array): Uint8Array {
 	return out;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
 beforeAll(async () => {

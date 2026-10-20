@@ -5,7 +5,6 @@ import type { ImageNode, MaskNode, PathNode } from "../src/node";
 import { parseSvg, svgToNode } from "../src/svg";
 import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

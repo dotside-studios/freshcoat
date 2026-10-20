@@ -5,7 +5,6 @@ import { describe, expect, test } from "vitest";
 import { compileScene, createImage } from "../src/index";
 import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 async function initCk() {
 	if (!ck) ck = await loadCanvasKit();

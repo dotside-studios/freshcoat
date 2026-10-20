@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createRect, createText, type Node } from "../src/node";
 import { createRenderer } from "../src/renderer";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

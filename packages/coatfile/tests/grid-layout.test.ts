@@ -210,7 +210,6 @@ describe("grid layout", () => {
 });
 
 describe("grid layout paint", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 	let ck: any;
 	beforeAll(async () => {
 		ck = await loadCanvasKit();

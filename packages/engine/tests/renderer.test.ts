@@ -11,7 +11,6 @@ import { fileLoader } from "../src/platform/file-loader";
 import { createRenderer } from "../src/renderer";
 import type { FontRequest } from "../src/types";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

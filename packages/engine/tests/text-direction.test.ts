@@ -16,7 +16,6 @@ const base: ResolvedFont = {
 };
 const SHALOM = "שלום עולם";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;

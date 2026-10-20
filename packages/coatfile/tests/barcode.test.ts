@@ -36,7 +36,6 @@ import type {
 } from "../src/types";
 import { validate } from "../src/validate";
 
-// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

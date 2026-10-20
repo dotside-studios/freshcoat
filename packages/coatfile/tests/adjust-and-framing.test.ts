@@ -158,7 +158,6 @@ describe("image focus and crop", () => {
 });
 
 describe("adjust and framing paint", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 	let ck: any;
 	let bands: string;
 	beforeAll(async () => {

@@ -21,7 +21,6 @@ const font: ResolvedFont = {
 };
 const CUBIC = "M10 150 C 60 20 140 20 190 150";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;

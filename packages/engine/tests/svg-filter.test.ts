@@ -4,7 +4,6 @@ import { compileScene, createImage } from "../src/index";
 import type { ImageNode } from "../src/node";
 import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

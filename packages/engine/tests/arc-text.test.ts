@@ -19,7 +19,6 @@ const font: ResolvedFont = {
 	lineHeight: 1.2,
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;

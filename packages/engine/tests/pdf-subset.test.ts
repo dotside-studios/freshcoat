@@ -15,7 +15,6 @@ import { readSfnt } from "../src/pdf/sfnt";
 import { mergeFontSubsets, subsetFont } from "../src/pdf/subset";
 import { createRenderer, type Renderer } from "../src/renderer";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 const geist = testFontBytes("Geist-Regular.ttf");
 const hebrew = testFontBytes("NotoSansHebrew-Regular.ttf");

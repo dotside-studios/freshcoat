@@ -10,7 +10,6 @@ import type { Grain, Halftone, ResolvedFill } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
 import { renderSceneToPng } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

@@ -7,11 +7,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { type GlyphPath, readOutlines } from "../src/pdf/outlines";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit surface
 let surface: any;
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit paint
 let paint: any;
 const SIZE = 64;
 const EDGE = 128;
@@ -29,7 +26,6 @@ afterAll(() => {
 	surface.delete();
 });
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit canvas
 function pixels(draw: (canvas: any) => void): Uint8Array {
 	const canvas = surface.getCanvas();
 	canvas.clear(ck.WHITE);

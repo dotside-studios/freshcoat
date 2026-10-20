@@ -22,7 +22,6 @@ import { createRenderer, type Renderer } from "../src/renderer";
 import type { GradientFill } from "../src/types";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
 const geist = testFontBytes("Geist-Regular.ttf");

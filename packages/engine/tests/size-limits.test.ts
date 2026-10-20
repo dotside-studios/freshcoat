@@ -13,7 +13,6 @@ import { createFrame, createImage } from "../src/node";
 import { createRenderer } from "../src/renderer";
 import { MAX_UNPACKED_FONT_BYTES, sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

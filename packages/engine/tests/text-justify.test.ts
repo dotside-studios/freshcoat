@@ -22,7 +22,6 @@ const font: ResolvedFont = {
 const PARAGRAPH =
 	"The quick brown fox jumps over the lazy dog and keeps running far away";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 

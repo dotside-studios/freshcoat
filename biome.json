@@ -54,6 +54,25 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"packages/cli/tests/**",
+				"packages/coatfile/tests/**",
+				"packages/engine/tests/**",
+				"packages/for-print/tests/**",
+				"scripts/**/*.test.ts"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noNonNullAssertion": "off"
+					},
+					"suspicious": {
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		},
+		{
 			"includes": ["packages/ui/**", "apps/editor/**"],
 			"css": {
 				"parser": {

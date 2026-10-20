@@ -28,7 +28,6 @@ import { createHeadlessEnv } from "./helpers/headless";
 const W = 240;
 const H = 200;
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
 const fonts = new Map([

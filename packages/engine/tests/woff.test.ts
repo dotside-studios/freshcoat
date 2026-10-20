@@ -5,7 +5,6 @@ import { readFontMetrics } from "../src/font-metrics";
 import { readSfnt, tagAt } from "../src/pdf/sfnt";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

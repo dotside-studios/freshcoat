@@ -6,7 +6,6 @@ import { compile } from "../src/compile";
 import { renderCompiledPdf, renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit's test handle
 let ck: any;
 let logoSrc: string;
 
