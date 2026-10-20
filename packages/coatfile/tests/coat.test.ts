@@ -73,8 +73,8 @@ async function withAssets(key = "deadbeef"): Promise<Template> {
 }
 
 describe("formatVersionStatus", () => {
-	test("reads every 1.x the way the old major check did", () => {
-		for (const v of ["1", "1.0", "1.0.0", "1.1", " 1.0", "1.x"]) {
+	test("reads every MAJOR or MAJOR.MINOR 1.x", () => {
+		for (const v of ["1", "1.0", "1.1", " 1.0"]) {
 			expect(formatVersionStatus(v)).not.toBe("unsupported");
 		}
 		expect(formatVersionStatus("1.0")).toBe("current");
@@ -85,6 +85,8 @@ describe("formatVersionStatus", () => {
 		expect(formatVersionStatus("1.99")).toBe("newer");
 		expect(formatVersionStatus("2.0")).toBe("unsupported");
 		expect(formatVersionStatus("v1")).toBe("unsupported");
+		expect(formatVersionStatus("1.0.0")).toBe("unsupported");
+		expect(formatVersionStatus("1.x")).toBe("unsupported");
 		expect(formatVersionStatus(1)).toBe("unsupported");
 	});
 });

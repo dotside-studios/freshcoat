@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import {
 	FORMAT_VERSION,
+	formatMinor,
+	formatVersionStatus,
 	minimumFormatVersion,
 	raiseFormatVersion,
 } from "../src/format";
@@ -543,5 +545,38 @@ describe("raiseFormatVersion", () => {
 		expect(raiseFormatVersion(newer)).toBe(newer);
 		const other = { ...base(), $schema: "x", format_version: "2.0" };
 		expect(raiseFormatVersion(other)).toBe(other);
+	});
+});
+
+describe("formatVersionStatus", () => {
+	test("accepts MAJOR or MAJOR.MINOR, ignoring surrounding whitespace", () => {
+		expect(formatVersionStatus("1")).toBe("current");
+		expect(formatVersionStatus("1.7")).toBe("current");
+		expect(formatVersionStatus(" 1.7 ")).toBe("current");
+		expect(formatVersionStatus("1.99")).toBe("newer");
+	});
+
+	test.each([
+		"1.7garbage",
+		"1.7.3",
+		"1.7.3-beta",
+		"1 .7",
+		"v1.7",
+		"",
+	])("rejects %j as malformed", (value) => {
+		expect(formatVersionStatus(value)).toBe("unsupported");
+	});
+});
+
+describe("formatMinor", () => {
+	test("reads the minor of a MAJOR.MINOR version", () => {
+		expect(formatMinor("1.7")).toBe(7);
+		expect(formatMinor(" 1.4 ")).toBe(4);
+		expect(formatMinor("1")).toBe(0);
+	});
+
+	test("ignores anything that is not exactly MAJOR.MINOR", () => {
+		expect(formatMinor("1.7garbage")).toBe(0);
+		expect(formatMinor("1.7.3")).toBe(0);
 	});
 });
