@@ -229,6 +229,66 @@ describe("extractEffects (rotated elements)", () => {
 	});
 });
 
+describe("extractEffects (duplicate blurs)", () => {
+	const cases = [
+		["LAYER_BLUR", "blur"],
+		["BACKGROUND_BLUR", "backdropBlur"],
+	] as const;
+	describe.each(cases)("%s", (figma, kind) => {
+		const fx = (radius: number, visible = true): FigmaEffect => ({
+			type: figma,
+			visible,
+			radius,
+		});
+
+		it("exports the visible blur after a hidden one", () => {
+			const out = extractEffects([fx(2, false), fx(5)], 1);
+			expect(out.effects).toEqual([{ type: kind, radius: 5 }]);
+			expect(out.droppedBlurs).toEqual([kind]);
+		});
+
+		it("exports the visible blur before a hidden one", () => {
+			const out = extractEffects([fx(5), fx(2, false)], 1);
+			expect(out.effects).toEqual([{ type: kind, radius: 5 }]);
+			expect(out.droppedBlurs).toEqual([kind]);
+		});
+
+		it("exports the first of two visible blurs", () => {
+			const out = extractEffects([fx(5), fx(9)], 1);
+			expect(out.effects).toEqual([{ type: kind, radius: 5 }]);
+			expect(out.droppedBlurs).toEqual([kind]);
+		});
+
+		it("keeps the first hidden blur when none is visible", () => {
+			const out = extractEffects([fx(2, false), fx(9, false)], 1);
+			expect(out.effects).toEqual([{ type: kind, radius: 2, hidden: true }]);
+			expect(out.droppedBlurs).toEqual([kind]);
+		});
+
+		it("keeps the chosen blur where it sits among other effects", () => {
+			const shadow: FigmaEffect = { type: "DROP_SHADOW", radius: 1 };
+			const out = extractEffects([fx(2, false), shadow, fx(5)], 1);
+			expect(out.effects?.map((e) => e.type)).toEqual(["shadow", kind]);
+		});
+
+		it("reports nothing for a single blur", () => {
+			expect(extractEffects([fx(5)], 1).droppedBlurs).toBeUndefined();
+		});
+	});
+
+	it("keeps one blur of each kind", () => {
+		const out = extractEffects(
+			[
+				{ type: "LAYER_BLUR", radius: 1 },
+				{ type: "BACKGROUND_BLUR", radius: 2 },
+			],
+			1,
+		);
+		expect(out.effects).toHaveLength(2);
+		expect(out.droppedBlurs).toBeUndefined();
+	});
+});
+
 describe("extractEffects (noise)", () => {
 	const noise = (overrides: Partial<FigmaEffect> = {}): FigmaEffect => ({
 		type: "NOISE",

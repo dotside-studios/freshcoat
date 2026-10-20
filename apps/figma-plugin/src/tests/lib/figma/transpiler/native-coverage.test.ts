@@ -519,7 +519,11 @@ async function transpileCard(children: FigmaNode[]) {
 	const t = result.template as {
 		template_data: Array<{ elements: Array<Record<string, unknown>> }>;
 	};
-	return { elements: t.template_data[0].elements, warnings: result.warnings };
+	return {
+		elements: t.template_data[0].elements,
+		warnings: result.warnings,
+		trace: result.trace,
+	};
 }
 
 async function elementsOf(
@@ -555,6 +559,29 @@ describe("in a transpiled card", () => {
 				nodeId: "1:3",
 			}),
 		);
+	});
+
+	it("warns and traces a duplicate blur it dropped", async () => {
+		const { elements, warnings, trace } = await transpileCard([
+			rect({
+				effects: [
+					{ type: "LAYER_BLUR", visible: false, radius: 2 },
+					{ type: "LAYER_BLUR", visible: true, radius: 6 },
+				],
+			}),
+		]);
+		expect(elements[0].effects).toEqual([{ type: "blur", radius: 6 }]);
+		expect(warnings).toContainEqual(
+			expect.objectContaining({
+				severity: "warn",
+				code: "duplicate_blur_dropped",
+				nodeId: "1:3",
+			}),
+		);
+		expect(trace.find((t) => t.nodeId === "1:3")).toMatchObject({
+			decision: "native-rect",
+			dropped: "duplicate_blur_dropped",
+		});
 	});
 
 	it("gives a group with noise a layer of its own, carrying the grain", async () => {
