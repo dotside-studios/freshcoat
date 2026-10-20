@@ -16,6 +16,7 @@ import {
 	parseLength,
 	parseMarks,
 	parseMaxEdge,
+	parseMaxPdfPages,
 	parseMinDpi,
 	parseOffset,
 	parsePaper,
@@ -29,6 +30,7 @@ import { listenForCancel } from "./cancel";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
+import { DEFAULT_MAX_PDF_PAGES } from "./commands/workspace";
 import { CliError, type Io, processIo, UsageError } from "./io";
 import { version } from "./version";
 
@@ -198,6 +200,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 				"--pdf-text <mode>",
 				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
 			).choices(["embed", "outline"] as const),
+		)
+		.option(
+			"--max-pdf-pages <n>",
+			`refuse a PDF with more pages, which are all held in memory until it is built; default ${DEFAULT_MAX_PDF_PAGES}, 0 for no limit`,
+			arg(parseMaxPdfPages),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(

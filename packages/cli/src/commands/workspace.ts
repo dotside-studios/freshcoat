@@ -37,6 +37,9 @@ import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
+/** A PDF holds every rendered page in memory until it is assembled. */
+export const DEFAULT_MAX_PDF_PAGES = 2000;
+
 export type WorkspaceOptions = {
 	preset?: string;
 	out: string;
@@ -50,6 +53,7 @@ export type WorkspaceOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
+	maxPdfPages?: number;
 	quiet: boolean;
 };
 
@@ -92,6 +96,8 @@ export async function renderWorkspace(
 		throw new CliError(`--cut-lines applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
 	if (options.cutSpot && preset.format !== "pdf")
 		throw new CliError(`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
+	if (options.maxPdfPages !== undefined && preset.format !== "pdf")
+		throw new CliError(`--max-pdf-pages applies only to a PDF preset; "${preset.name}" writes images`);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,
@@ -100,6 +106,7 @@ export async function renderWorkspace(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
+			...(options.maxPdfPages !== undefined ? { maxPdfPages: options.maxPdfPages } : {}),
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
@@ -159,6 +166,8 @@ export async function runPreset(
 		out: string;
 		dryRun?: true;
 		jobs?: number;
+		/** the most pages a PDF may hold, default DEFAULT_MAX_PDF_PAGES; 0 for no limit */
+		maxPdfPages?: number;
 		save?: (workspace: Workspace) => Promise<void>;
 		/** the sheet layout came from the command line */
 		layoutFlags?: true;
@@ -175,6 +184,7 @@ export async function runPreset(
 	warnNotices(readiness, log);
 	const { entry, plan } = readiness;
 	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
+	checkPdfPages(preset, plan.length, options.maxPdfPages ?? DEFAULT_MAX_PDF_PAGES);
 	checkCuts(preset, entry.template, log);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
@@ -244,6 +254,15 @@ export async function runPreset(
 		pool?.dispose();
 		renderer.dispose();
 	}
+}
+
+/** Refuses a PDF with more pages than the limit, before anything is rendered
+ *  or written, since every page is held in memory until the PDF is built. */
+function checkPdfPages(preset: ExportPreset, pages: number, max: number): void {
+	if (preset.format !== "pdf" || max === 0 || pages <= max) return;
+	throw new CliError(
+		`the PDF would have ${pages} pages, over the limit of ${max}; every page is held in memory until the PDF is built. Export fewer records with --where, or raise the limit with --max-pdf-pages <n> (0 for none)`,
+	);
 }
 
 function planPreset(

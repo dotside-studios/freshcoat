@@ -81,6 +81,13 @@ export function parseJobs(entry: string): number {
 	return value;
 }
 
+export function parseMaxPdfPages(entry: string): number {
+	const value = Number(entry);
+	if (!Number.isInteger(value) || value < 0)
+		throw new ArgumentError("Expected a whole number of pages, 0 or more; 0 for no limit.");
+	return value;
+}
+
 export function parsePositive(entry: string): number {
 	const value = Number(entry);
 	if (!Number.isFinite(value) || value <= 0)

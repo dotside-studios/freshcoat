@@ -189,6 +189,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--cut-spot <[kind=]name>` | PDF only: the spot colour a kind of cut line is drawn in, `through` when no kind is named; repeatable, implies `--cut-lines` |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
 | `--pdf-text <embed\|outline>` | with `--pdf-pages vector`: `embed` sets text in its fonts, selectable; `outline` draws each glyph as a shape, so the PDF holds no font, as print shops that want outlined text ask. Default `embed`. See [Text as outlines](../engine/README.md#text-as-outlines) |
+| `--max-pdf-pages <n>` | PDF only: refuse a PDF with more than this many pages, default 2000, 0 for no limit. Every page is held in memory until the PDF is assembled, so a very large export can exhaust memory; the check runs before anything is rendered or written, exits 1 with no output file, and applies to `--data`, `--sheets` and workspace PDF presets alike. Pages are counted as rendered (one per card side), before sheets are laid out |
 | `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `a5`, `a6`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper |
 | `--orientation <auto\|portrait\|landscape>` | with `--sheets`: turn the paper this way; default `auto`, whichever fits more cards, portrait on a tie |
 | `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
