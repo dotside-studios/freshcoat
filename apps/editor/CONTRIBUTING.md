@@ -23,7 +23,8 @@ these commands from `apps/editor/`:
 | `bun run typecheck` | TypeScript checks |
 | `bun run check` | Biome lint and formatting checks |
 | `bun run e2e` | Browser end-to-end tests |
-| `bun run e2e:smoke` | The browser subset used by CI |
+| `bun run e2e:smoke` | The browser subset used by CI, including the Firefox and WebKit smoke tests |
+| `bun run e2e:cross-browser` | Only the Firefox and WebKit smoke tests |
 | `bun run fonts:update` | Refreshes `src/fonts/google-fonts.json` |
 
 The notices, boundaries and script-test aliases here run repository-wide
@@ -52,6 +53,22 @@ uses the production build with test probes rather than the development server.
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | Uses a supplied Chromium executable |
 | `FRESHCOAT_SHOTS=<dir>` | Also saves print-settings pictures |
 | `GRADIENT_SHOTS=<dir>` | Also saves gradient-handle pictures |
+
+### Firefox and WebKit
+
+The `firefox` and `webkit` projects run only tests tagged `@smoke`: loading
+the app, autosave restore, and PNG and zip exports through the download
+fallback. Firefox and Safari lack the File System Access pickers, so these
+tests exercise that fallback. Tag a test with `{ tag: "@smoke" }` to add it.
+
+```sh
+bunx playwright install firefox webkit
+bun run e2e:cross-browser
+bunx playwright test --project=webkit e2e/files.spec.ts
+```
+
+On a fresh Linux machine, add `--with-deps` to the browser installation.
+Every other test runs in Chromium only.
 
 The browser uses SwiftShader flags so WebGL works without a GPU. Prefer
 locator input methods such as `fill()` when replacing text; an emulated
