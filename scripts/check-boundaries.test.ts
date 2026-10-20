@@ -126,7 +126,10 @@ export default {
 }`,
 	);
 	write("lib/biome.json", { extends: ["../app/biome.json"] });
-	write("scripts/tool.ts", `import { join } from "node:path";\nimport ts from "typescript";\n`);
+	write(
+		"scripts/tool.ts",
+		`import { join } from "node:path";\nimport ts from "typescript";\n`,
+	);
 });
 
 afterAll(() => {
@@ -230,14 +233,16 @@ export type { T } from "types-only";
 
 	test("keeps its place after template substitutions and regexes", () => {
 		const refs = scriptRefs(
-			"const a = `x ${`y ${1}`} z`;\nconst r = /['\"]/g;\nimport q from \"after\";\n",
+			'const a = `x ${`y ${1}`} z`;\nconst r = /[\'"]/g;\nimport q from "after";\n',
 		);
 		expect(refs.map((r) => [r.spec, r.line])).toEqual([["after", 3]]);
 	});
 });
 
 test("packageName keeps the scope", () => {
-	expect(packageName("@freshcoat-js/coatfile/render")).toBe("@freshcoat-js/coatfile");
+	expect(packageName("@freshcoat-js/coatfile/render")).toBe(
+		"@freshcoat-js/coatfile",
+	);
 	expect(packageName("react-dom/client")).toBe("react-dom");
 });
 
