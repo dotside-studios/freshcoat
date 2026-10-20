@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { type Template, templateBleed } from "@freshcoat-js/coatfile";
 import {
@@ -41,7 +41,12 @@ import {
 } from "@freshcoat-js/workspace";
 import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
 import { printProfileMismatch } from "@freshcoat-js/workspace/export";
-import { readTable, TabularError } from "@freshcoat-js/workspace/tabular";
+import {
+	DEFAULT_TABLE_LIMITS,
+	readTable,
+	TableLimitError,
+	TabularError,
+} from "@freshcoat-js/workspace/tabular";
 import type { SheetMark } from "../args";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { readBytes, readTemplate, warnLoad } from "../template-file";
@@ -322,11 +327,14 @@ async function readDataset(
 	template: Template,
 	file: string,
 ): Promise<Dataset> {
-	const bytes = await readBytes(io, file);
 	let sheets: Awaited<ReturnType<typeof readTable>>["sheets"];
 	try {
-		({ sheets } = await readTable(bytes, file));
+		const { size } = await stat(resolve(io.cwd, file)).catch(() => ({ size: 0 }));
+		if (size > DEFAULT_TABLE_LIMITS.maxBytes)
+			throw new TableLimitError("bytes", size, DEFAULT_TABLE_LIMITS.maxBytes, file);
+		({ sheets } = await readTable(await readBytes(io, file), file));
 	} catch (error) {
+		if (error instanceof TableLimitError) throw new CliError(error.message);
 		if (error instanceof TabularError) throw new CliError(`${file}: ${error.message}`);
 		throw error;
 	}

@@ -618,6 +618,15 @@ describe("render a template with --data", () => {
 		]);
 	});
 
+	test("explains a data file with too many rows", async () => {
+		await box.write("huge.csv", `Name\n${"Ana\n".repeat(100_000)}`);
+		const run = await box.run("render", "badge.json", "--data", "huge.csv", "--out", "huge.zip");
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain(
+			"huge.csv is too large to import: 100,001 rows is over the limit of 100,000 rows",
+		);
+	});
+
 	test("takes frames, a variant, a scale, a format and constants", async () => {
 		const run = await box.run(
 			"render",
