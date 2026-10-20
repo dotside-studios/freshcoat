@@ -105,6 +105,12 @@ describe("paintScene dispose() releases the WebGL context", () => {
 	});
 });
 
+const pngHeader = new Uint8Array(24);
+pngHeader.set([0x89, 0x50, 0x4e, 0x47]);
+pngHeader.set([0x49, 0x48, 0x44, 0x52], 12);
+pngHeader[19] = 1;
+pngHeader[23] = 1;
+
 describe("paintScene frees what it made when the paint throws", () => {
 	test("the uncached surface, provider and images are freed", async () => {
 		const disposeSurface = vi.fn();
@@ -123,7 +129,7 @@ describe("paintScene frees what it made when the paint throws", () => {
 		});
 		const rt = {
 			resolveFont: () => ({ kind: "none" }),
-			loadBytes: async () => new Uint8Array(),
+			loadBytes: async () => pngHeader,
 		} as unknown as PaintRuntime;
 		const scene = [
 			...commands,

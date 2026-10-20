@@ -38,6 +38,25 @@ export function parseImageInfo(bytes: Uint8Array): ImageInfo | null {
 	return parsed === "more" ? null : parsed;
 }
 
+/** Default most pixels an image may declare before it is decoded: a square at
+ *  the export edge cap, 8192 by 8192. */
+export const DEFAULT_MAX_IMAGE_DECODE_PIXELS = 8192 * 8192;
+
+/** Throws unless the header of `bytes` names a PNG, JPEG, GIF or WebP of at
+ *  most `maxPixels` pixels (default DEFAULT_MAX_IMAGE_DECODE_PIXELS). Meant to
+ *  run before the bytes reach a decoder, which allocates what the header says. */
+export function assertDecodableImage(
+	bytes: Uint8Array,
+	maxPixels = DEFAULT_MAX_IMAGE_DECODE_PIXELS,
+): void {
+	const info = parseImageInfo(bytes);
+	if (!info) throw new Error("image size could not be read from its header");
+	if (info.width * info.height > maxPixels)
+		throw new Error(
+			`image is ${info.width}x${info.height}, over the limit of ${maxPixels} pixels`,
+		);
+}
+
 /** Width and height as the image is meant to be seen: EXIF orientations 5 to
  *  8 turn it a quarter, so they swap. */
 export function orientedSize(info: {

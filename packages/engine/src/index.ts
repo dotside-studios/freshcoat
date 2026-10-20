@@ -62,6 +62,7 @@ export {
 	type PixelRect,
 	sampleImageNode,
 } from "./decode";
+export { DEFAULT_MAX_IMAGE_DECODE_PIXELS } from "./image-info";
 export {
 	type ExportConstraint,
 	type ExportSetting,
