@@ -295,18 +295,21 @@ export function layoutGlyf(
 ) {
 	const head = get(tables, "head").slice();
 	const starts = [0];
-	pieces.forEach((piece, g) =>
-		starts.push((starts[g] as number) + ((piece.length + 3) & ~3)),
-	);
+	pieces.forEach((piece, g) => {
+		starts.push((starts[g] as number) + ((piece.length + 3) & ~3));
+	});
 	const size = starts[pieces.length] as number;
 	const wide = long || size > 0x1fffe;
 	const loca = new Uint8Array(starts.length * (wide ? 4 : 2));
 	const nv = new DataView(loca.buffer);
-	starts.forEach((s, i) =>
-		wide ? nv.setUint32(4 * i, s) : nv.setUint16(2 * i, s / 2),
-	);
+	starts.forEach((s, i) => {
+		if (wide) nv.setUint32(4 * i, s);
+		else nv.setUint16(2 * i, s / 2);
+	});
 	const glyf = new Uint8Array(size);
-	pieces.forEach((piece, g) => glyf.set(piece, starts[g]));
+	pieces.forEach((piece, g) => {
+		glyf.set(piece, starts[g]);
+	});
 	new DataView(head.buffer).setInt16(50, wide ? 1 : 0);
 	out.set("head", head);
 	out.set("loca", loca);

@@ -54,9 +54,9 @@ const svg = (body: string, attrs = 'width="40" height="40"') =>
 
 const close = (got: number[], want: number[], tolerance = 3) => {
 	expect(got).toHaveLength(want.length);
-	got.forEach((v, i) =>
-		expect(Math.abs(v - (want[i] as number))).toBeLessThanOrEqual(tolerance),
-	);
+	got.forEach((v, i) => {
+		expect(Math.abs(v - (want[i] as number))).toBeLessThanOrEqual(tolerance);
+	});
 };
 
 const FIGMA_SHADOW = `<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -1195,12 +1195,13 @@ function arcLines(
 		const sl = glyphLines(bin, shaped)[0];
 		const runs = sl?.runs ?? [];
 		const starts = spanByteStarts(line.spans.map((s) => s.text));
-		const spacing = (shaped.spacing ??= runs.map((run) =>
+		shaped.spacing ??= runs.map((run) =>
 			Float32Array.from(
 				run.offsets.subarray(0, run.glyphs.length),
 				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
 			),
-		));
+		);
+		const spacing = shaped.spacing;
 		out.push({
 			line,
 			arc: {
@@ -1239,7 +1240,8 @@ function glyphLines(
 	const lines = shaped.para.getShapedLines();
 	if (!shaped.cached)
 		for (const l of lines) for (const run of l.runs) bin.track(run.typeface);
-	return (shaped.glyphLines = lines);
+	shaped.glyphLines = lines;
+	return lines;
 }
 
 type ArcDecoration = {

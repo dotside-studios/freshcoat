@@ -293,12 +293,11 @@ describe("bounded effect layers", () => {
 			{ ...box(x, y, side + 16, side + 16), shadow: shadow(0, 14, 32) },
 		);
 	};
-	const squares =
-		Array.from({ length: 25 }, (_, y) =>
-			Array.from({ length: 25 }, (_, x) =>
-				(x * 31 + y * 17) % 3 ? "" : `M${x} ${y}H${x + 1}V${y + 1}H${x}Z`,
-			).join(""),
-		).join("") + "M0 0H7V7H0ZM1 1H6V6H1ZM2 2H5V5H2Z";
+	const squares = `${Array.from({ length: 25 }, (_, y) =>
+		Array.from({ length: 25 }, (_, x) =>
+			(x * 31 + y * 17) % 3 ? "" : `M${x} ${y}H${x + 1}V${y + 1}H${x}Z`,
+		).join(""),
+	).join("")}M0 0H7V7H0ZM1 1H6V6H1ZM2 2H5V5H2Z`;
 
 	for (const scale of [1, 2, 1.37, 3.1])
 		test(`snapped square QR modules at ${scale}x`, async () => {

@@ -172,9 +172,10 @@ function respaced(slot: (length: number) => number, long: boolean) {
 	new DataView(head.buffer).setInt16(50, long ? 1 : 0);
 	const newLoca = new Uint8Array(starts.length * (long ? 4 : 2));
 	const nv = new DataView(newLoca.buffer);
-	starts.forEach((s, i) =>
-		long ? nv.setUint32(4 * i, s) : nv.setUint16(2 * i, s / 2),
-	);
+	starts.forEach((s, i) => {
+		if (long) nv.setUint32(4 * i, s);
+		else nv.setUint16(2 * i, s / 2);
+	});
 	return sfnt("\0\x01\0\0", {
 		...Object.fromEntries(tables),
 		head,
@@ -302,7 +303,10 @@ function synthetic(): Uint8Array {
 					...u16(items.length),
 					1,
 					...items.reduce(
-						(o, i) => [...o, (o.at(-1) as number) + i.length],
+						(o, i) => {
+							o.push((o.at(-1) as number) + i.length);
+							return o;
+						},
 						[1],
 					),
 					...items.flat(),

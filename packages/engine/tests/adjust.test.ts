@@ -182,7 +182,9 @@ describe("composeAdjust", () => {
 		for (const c of samples) {
 			const want = applyAdjustColor(second, applyAdjustColor(first, c));
 			const got = applyAdjustColor(both, c);
-			got.forEach((v, i) => expect(Math.abs(v - want[i])).toBeLessThan(0.03));
+			got.forEach((v, i) => {
+				expect(Math.abs(v - want[i])).toBeLessThan(0.03);
+			});
 		}
 	});
 

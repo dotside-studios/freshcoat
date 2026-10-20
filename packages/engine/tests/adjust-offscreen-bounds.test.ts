@@ -102,6 +102,7 @@ describe("adjust offscreen sized to the layer", () => {
 	function countRecorders(ck: any) {
 		const Real = ck.PictureRecorder;
 		const made: { deleted: boolean }[] = [];
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.PictureRecorder = function () {
 			const recorder = new Real();
 			const entry = { deleted: false };

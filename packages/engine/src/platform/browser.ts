@@ -58,6 +58,7 @@ async function evalScript(src: string): Promise<CanvasKitInit> {
 	const res = await fetch(src);
 	if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
 	const code = await res.text();
+	// biome-ignore lint/security/noGlobalEval: indirect eval defines CanvasKitInit at global scope
 	const indirectEval = globalThis.eval;
 	indirectEval(code);
 	return initFromGlobal();

@@ -315,6 +315,7 @@ describe("text on a path", () => {
 	test("deletes every ContourMeasure and iterator", async () => {
 		const Iter = ck.ContourMeasureIter;
 		const made: { isDeleted(): boolean }[] = [];
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.ContourMeasureIter = function (...args: unknown[]) {
 			const iter = new Iter(...args);
 			const next = iter.next.bind(iter);

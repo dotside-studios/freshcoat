@@ -493,7 +493,8 @@ export function cachedTile(
 ): Shader | null {
 	const entry = state.images.get(src);
 	if (!entry || entry.image !== image) return null;
-	return (entry.tile ??= build());
+	entry.tile ??= build();
+	return entry.tile;
 }
 
 function freeImage(entry: CachedImage): void {

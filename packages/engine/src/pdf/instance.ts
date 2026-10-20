@@ -543,7 +543,9 @@ function writeMetrics(out: Tables, glyphs: Glyph[], advances: number[]) {
 	out.set("hhea", hhea);
 	if (box[0] <= box[2]) {
 		const head = get(out, "head").slice();
-		box.forEach((v, i) => view(head).setInt16(36 + 2 * i, v));
+		box.forEach((v, i) => {
+			view(head).setInt16(36 + 2 * i, v);
+		});
 		out.set("head", head);
 	}
 }

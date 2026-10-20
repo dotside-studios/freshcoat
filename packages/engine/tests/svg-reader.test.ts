@@ -18,7 +18,9 @@ import { parseXml, SvgError } from "../src/svg/xml";
 
 const close = (a: number[], b: number[], eps = 1e-6) => {
 	expect(a.length).toBe(b.length);
-	a.forEach((v, i) => expect(Math.abs(v - (b[i] ?? 0))).toBeLessThan(eps));
+	a.forEach((v, i) => {
+		expect(Math.abs(v - (b[i] ?? 0))).toBeLessThan(eps);
+	});
 };
 
 describe("parseXml", () => {

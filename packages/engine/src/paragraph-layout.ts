@@ -157,8 +157,9 @@ export function createParagraphEngine(
 		maxWidth: number,
 		direction?: "ltr" | "rtl",
 	): { lines: InlineShapedLine[]; missing?: number[] } {
-		if (spans.length === 0) return { lines: [] };
-		const pstyle = paragraphStyle(spans[0]!.font, direction);
+		const head = spans[0];
+		if (!head) return { lines: [] };
+		const pstyle = paragraphStyle(head.font, direction);
 		const builder = makeParagraphBuilder(ck, pstyle, provider);
 		let para: Paragraph | undefined;
 		try {
@@ -195,12 +196,14 @@ export function createParagraphEngine(
 						left: number;
 						isHardBreak: boolean;
 					}) => {
-						while (first < ranges.length && ranges[first]!.end <= lm.startIndex)
+						while (
+							(ranges[first]?.end ?? Number.POSITIVE_INFINITY) <= lm.startIndex
+						)
 							first++;
 						const fragments = [];
 						for (let k = first; k < ranges.length; k++) {
-							const r = ranges[k]!;
-							if (r.start >= lm.endExcludingWhitespaces) break;
+							const r = ranges[k];
+							if (!r || r.start >= lm.endExcludingWhitespaces) break;
 							const fs = Math.max(r.start, lm.startIndex);
 							const fe = Math.min(r.end, lm.endExcludingWhitespaces);
 							if (fe <= fs) continue; // span absent from this line (or only ws)

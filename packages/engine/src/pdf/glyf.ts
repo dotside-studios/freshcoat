@@ -132,7 +132,9 @@ function header(contours: number, bbox: Bbox): number[] {
 	const out = new Uint8Array(10);
 	const dv = new DataView(out.buffer);
 	dv.setInt16(0, contours);
-	bbox.forEach((v, i) => dv.setInt16(2 + 2 * i, v));
+	bbox.forEach((v, i) => {
+		dv.setInt16(2 + 2 * i, v);
+	});
 	return [...out];
 }
 

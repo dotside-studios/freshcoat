@@ -276,6 +276,7 @@ describe("shaping that throws", () => {
 			(c) => c.op === "drawGroup",
 		);
 		const Font = ck.Font;
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.Font = function () {
 			throw new Error("no font");
 		};

@@ -77,7 +77,9 @@ async function paint(
 }
 
 function expectNear(actual: number[], rgb: [number, number, number]) {
-	rgb.forEach((v, i) => expect(Math.abs(actual[i] - v)).toBeLessThan(12));
+	rgb.forEach((v, i) => {
+		expect(Math.abs(actual[i] - v)).toBeLessThan(12);
+	});
 }
 
 describe("fitRect focus and crop", () => {

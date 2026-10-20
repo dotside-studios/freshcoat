@@ -362,11 +362,14 @@ function reconstructGlyf(
 	const wide = indexFormat !== 0 || size > 0x1fffe;
 	const loca = new Uint8Array(starts.length * (wide ? 4 : 2));
 	const lv = new DataView(loca.buffer);
-	starts.forEach((s, i) =>
-		wide ? lv.setUint32(4 * i, s) : lv.setUint16(2 * i, s / 2),
-	);
+	starts.forEach((s, i) => {
+		if (wide) lv.setUint32(4 * i, s);
+		else lv.setUint16(2 * i, s / 2);
+	});
 	const glyf = new Uint8Array(size);
-	glyphs.forEach((glyph, g) => glyf.set(glyph, starts[g]));
+	glyphs.forEach((glyph, g) => {
+		glyf.set(glyph, starts[g]);
+	});
 	new DataView(head.buffer).setInt16(50, wide ? 1 : 0);
 	return { glyf, loca, head, xMins };
 }

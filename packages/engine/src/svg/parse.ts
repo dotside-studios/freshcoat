@@ -97,7 +97,8 @@ function makeShape(
 	const shape: SvgShape = {
 		kind: "shape",
 		get d() {
-			return (d ??= serializePath(segs));
+			d ??= serializePath(segs);
+			return d;
 		},
 		...fields,
 	};
@@ -107,7 +108,10 @@ function makeShape(
 
 function geometryOf(shape: SvgShape): ShapeGeometry {
 	let g = geometries.get(shape);
-	if (!g) geometries.set(shape, (g = { segs: normalizePath(shape.d) }));
+	if (!g) {
+		g = { segs: normalizePath(shape.d) };
+		geometries.set(shape, g);
+	}
 	return g;
 }
 

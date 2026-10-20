@@ -51,6 +51,8 @@ export function md5(data: Uint8Array): Uint8Array {
 	}
 	const out = new Uint8Array(16);
 	const ov = new DataView(out.buffer);
-	[a0, b0, c0, d0].forEach((w, i) => ov.setUint32(i * 4, w >>> 0, true));
+	[a0, b0, c0, d0].forEach((w, i) => {
+		ov.setUint32(i * 4, w >>> 0, true);
+	});
 	return out;
 }
