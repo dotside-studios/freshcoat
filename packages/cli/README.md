@@ -161,6 +161,12 @@ named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
 
+A data file over the workspace package's import limits is refused with a
+message naming the limit that was passed, for example `people.csv is too large
+to import: 100,001 rows is over the limit of 100,000 rows`. The defaults are 64
+MiB per file, and 100,000 rows, 500 columns and 5,000,000 cells per sheet; they
+are listed under Import limits in the `@freshcoat-js/workspace` README.
+
 `--where` keeps the rows that match, by field key, as for a workspace below.
 
 `--set` and `--values` fill a field the same way in every row, over its

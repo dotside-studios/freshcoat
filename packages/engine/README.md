@@ -57,6 +57,7 @@ const renderer = await createRenderer({
   fonts: { Geist: [geistBytes] },       // bytes, or srcs read through `load`
   load: fileLoader({ root: "./assets" }),
   cache: { maxImagePixels: 48_000_000 }, // or false
+  maxImageDecodePixels: 8192 * 8192,     // the default; see "Size limits"
 });
 ```
 
@@ -116,6 +117,33 @@ schemes, and fonts loaded through that loader get the same allowance. Its
 `fileLoader` from `@freshcoat-js/engine/node` reads relative paths and `file:`
 URLs under a root directory and refuses anything outside it, passing other
 URLs to `next`.
+
+### Size limits
+
+Untrusted bytes are checked before they are decoded, so a small file cannot
+make the decoder allocate a huge buffer.
+
+- **Image pixels.** The width and height in an image's header (PNG, JPEG, GIF,
+  WebP) are read first, and an image over `maxImageDecodePixels` is never handed
+  to CanvasKit. It paints as a placeholder and the frame carries an
+  `image_load_failed` warning. The default is 8192 * 8192 (about 67 million
+  pixels), a square at the 8192 export edge cap and about 268 MB of RGBA once
+  decoded; raise it for a renderer that needs larger sources. The same check
+  guards images nested in SVG and `decodePixels` / `sampleImageNode`
+  (`maxPixels`), which throw. `maxImagePixels` on `cache` is a different
+  setting: it only decides which decoded images stay cached.
+- **Unreadable headers.** An image whose header cannot be read is refused, the
+  same way: truncated or corrupt files, and formats the header reader does not
+  know (BMP, ICO, AVIF). Their dimensions cannot be checked, and a refused
+  format costs a warning where an unchecked one can cost the WASM heap.
+- **WOFF and WOFF2 fonts.** No more than 128 MiB may unpack from one font. A WOFF
+  table's `origLength` and the sum over its tables are checked against that cap
+  before anything is inflated, and each table inflates into a buffer of exactly
+  its declared length, so a stream that is longer or shorter than declared is
+  rejected. A WOFF2 file's declared table sizes are summed and checked against
+  the cap, the Brotli stream is decoded into a buffer of exactly that size, and
+  a stream that overflows or falls short is rejected. A rejected font reports
+  `font_load_failed`.
 
 ## Node IR
 

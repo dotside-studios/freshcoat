@@ -362,3 +362,26 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 		await waitFor(() => expect(onImported).toHaveBeenCalled());
 	});
 });
+
+describe("Import wizard: limits", () => {
+	it("says which limit a file is over", async () => {
+		const rows = `name\n${"P\n".repeat(100_000)}`;
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{
+						datasetId: "d_people",
+						file: new File([rows], "huge.csv", { type: "text/csv" }),
+					}}
+					onClose={() => {}}
+					onImported={() => {}}
+				/>
+			</ControllerProvider>,
+		);
+		expect(
+			await screen.findByText(
+				"huge.csv is too large to import: 100,001 rows is over the limit of 100,000 rows",
+			),
+		).toBeTruthy();
+	});
+});

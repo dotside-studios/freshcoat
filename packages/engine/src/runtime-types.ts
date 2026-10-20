@@ -55,6 +55,9 @@ export type PaintRuntime = {
 	fonts?: Map<string, Uint8Array[]>;
 	// Encoded bytes for an image src or a local font file src.
 	loadBytes: ByteLoader;
+	// Most pixels an image may declare in its header before it is decoded.
+	// Default DEFAULT_MAX_IMAGE_DECODE_PIXELS.
+	maxImageDecodePixels?: number;
 	// Decoded images the runtime owns. When present, paint asks it for each image
 	// instead of decoding loadBytes itself, and never frees what it returns:
 	// a caller that keeps its own bounded cache of decoded images (an export

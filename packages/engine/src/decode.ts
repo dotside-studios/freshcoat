@@ -6,6 +6,7 @@
 
 import type { Canvas, CanvasKit, Image } from "canvaskit-wasm";
 import { imageInfo } from "./color-policy";
+import { assertDecodableImage } from "./image-info";
 import type { ByteLoader } from "./loader";
 import type { ImageNode } from "./node";
 import { fitRect } from "./paint-helpers";
@@ -23,11 +24,16 @@ export type DecodeOptions = {
 	// statistics at a fraction of the pixels — the full-res buffer for a phone
 	// photo is millions of samples the histogram doesn't need. Omit = full size.
 	maxDim?: number;
+	// Most pixels the image's header may declare; a larger or unreadable one
+	// throws before any decoding. Default DEFAULT_MAX_IMAGE_DECODE_PIXELS.
+	maxPixels?: number;
 };
 
 export type ImageSampleOptions = {
 	// The longest side of the fitted image buffer. Omit for the node's full box.
 	maxDim?: number;
+	// As DecodeOptions.maxPixels.
+	maxPixels?: number;
 };
 
 // A rectangle in pixels; `w`/`h` are extents, not right/bottom.
@@ -101,7 +107,9 @@ export async function sampleImageNode(
 	opts?: ImageSampleOptions,
 ): Promise<DecodedPixels | null> {
 	const c = ck as CanvasKit;
-	const img = c.MakeImageFromEncoded(await loadBytes(node.src));
+	const bytes = await loadBytes(node.src);
+	assertDecodableImage(bytes, opts?.maxPixels);
+	const img = c.MakeImageFromEncoded(bytes);
 	if (!img) return null;
 	try {
 		const boxW = node.size?.width ?? img.width();
@@ -146,6 +154,7 @@ export function decodePixels(
 	opts?: DecodeOptions,
 ): DecodedPixels | null {
 	const c = ck as CanvasKit;
+	assertDecodableImage(bytes, opts?.maxPixels);
 	const img = c.MakeImageFromEncoded(bytes);
 	if (!img) return null;
 	try {

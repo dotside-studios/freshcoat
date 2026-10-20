@@ -73,6 +73,7 @@ import { normalizeDash } from "./dash";
 import { strokeTrim, trimPath } from "./trim";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontBytes } from "./font-bytes";
+import { assertDecodableImage } from "./image-info";
 import { dataUrlToBytes } from "./loader";
 import {
 	createSharedFontProvider,
@@ -1918,6 +1919,11 @@ function svgContents(
 
 const MAX_SVG_NESTING = 4;
 
+function decodeImage(ck: CanvasKit, bytes: Uint8Array, maxPixels?: number) {
+	assertDecodableImage(bytes, maxPixels);
+	return ck.MakeImageFromEncoded(bytes);
+}
+
 type SvgModule = typeof import("./svg/index");
 
 let svgModule: Promise<SvgModule> | undefined;
@@ -2154,6 +2160,7 @@ function makeSvgPicture(
 	bytes: Uint8Array,
 	svg: SvgModule,
 	nesting = 0,
+	maxImagePixels?: number,
 ): SvgPicture {
 	const drawing = svg.parseSvg(new TextDecoder().decode(bytes));
 	const { width, height } = drawing;
@@ -2169,9 +2176,9 @@ function makeSvgPicture(
 			const data = dataUrlToBytes(src);
 			const img = isSvg(data)
 				? nesting < MAX_SVG_NESTING
-					? makeSvgPicture(ck, provider, data, svg, nesting + 1)
+					? makeSvgPicture(ck, provider, data, svg, nesting + 1, maxImagePixels)
 					: null
-				: ck.MakeImageFromEncoded(data);
+				: decodeImage(ck, data, maxImagePixels);
 			if (img) images.set(src, img);
 			else if (!features.includes("image-decode")) features.push("image-decode");
 		} catch {
@@ -5521,8 +5528,15 @@ async function paintSceneIn(
 			const bytes = await rt.loadBytes(src);
 			if (cache) cache.stats.imageDecodes++;
 			const img = isSvg(bytes)
-				? makeSvgPicture(ck, provider, bytes, await loadSvg())
-				: ck.MakeImageFromEncoded(bytes);
+				? makeSvgPicture(
+						ck,
+						provider,
+						bytes,
+						await loadSvg(),
+						0,
+						rt.maxImageDecodePixels,
+					)
+				: decodeImage(ck, bytes, rt.maxImageDecodePixels);
 			if (img) {
 				imageMap.set(src, img);
 				if (cache) cache.images.set(src, { image: img, mipped: null, tile: null });

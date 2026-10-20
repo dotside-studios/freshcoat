@@ -7,13 +7,25 @@ export type WorkbookCell = string | number | boolean | Date | null;
 /** One sheet to write. A `Date` is written as a date shown `yyyy-mm-dd`. */
 export type WorkbookSheet = { name: string; rows: WorkbookCell[][] };
 
+/** Bounds a codec applies while reading, to the extent its library can. */
+export type WorkbookReadLimits = {
+	/** Most bytes any one zip entry may inflate to. */
+	maxDecompressedBytes?: number;
+	/** Most cells a sheet may hold, counting its bounding box. */
+	maxTotalCells?: number;
+};
+
 /**
  * One library's support for workbook files. `read` returns every sheet, empty
  * ones included, with cells turned to text by `cellText`, and throws on bytes
  * it cannot parse. A codec that only reads leaves out `write`.
  */
 export interface WorkbookCodec {
-	read(bytes: Uint8Array, extension: string): Promise<TableSheet[]>;
+	read(
+		bytes: Uint8Array,
+		extension: string,
+		limits?: WorkbookReadLimits,
+	): Promise<TableSheet[]>;
 	write?(sheet: WorkbookSheet, format: TableFormat): Promise<Uint8Array>;
 }
 

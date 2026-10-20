@@ -5,6 +5,7 @@ export {
 	cellText,
 	type WorkbookCell,
 	type WorkbookCodec,
+	type WorkbookReadLimits,
 	type WorkbookSheet,
 } from "./codec";
 

@@ -52,7 +52,17 @@ export function createTableStore() {
 	let nextId = 1;
 	return {
 		async open(file: Blob, name: string): Promise<OpenedTable> {
-			const { readTable } = await import("@freshcoat-js/workspace/tabular");
+			const { DEFAULT_TABLE_LIMITS, readTable, TableLimitError } = await import(
+				"@freshcoat-js/workspace/tabular"
+			);
+			if (file.size > DEFAULT_TABLE_LIMITS.maxBytes) {
+				throw new TableLimitError(
+					"bytes",
+					file.size,
+					DEFAULT_TABLE_LIMITS.maxBytes,
+					name,
+				);
+			}
 			const bytes = new Uint8Array(await file.arrayBuffer());
 			const { sheets } = await readTable(bytes, name);
 			const id = nextId++;

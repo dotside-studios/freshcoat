@@ -59,9 +59,21 @@ describe("decodePixels", () => {
 		expect(decoded!.height).toBe(4);
 	});
 
-	test("returns null for undecodable bytes", async () => {
+	test("returns null for undecodable bytes under a readable header", async () => {
 		const ck = await loadCanvasKit();
-		expect(decodePixels(ck, new Uint8Array([1, 2, 3, 4]))).toBeNull();
+		const header = new Uint8Array(24);
+		header.set([0x89, 0x50, 0x4e, 0x47]);
+		header.set([0x49, 0x48, 0x44, 0x52], 12);
+		header[19] = 1;
+		header[23] = 1;
+		expect(decodePixels(ck, header)).toBeNull();
+	});
+
+	test("throws for bytes with no readable image header", async () => {
+		const ck = await loadCanvasKit();
+		expect(() => decodePixels(ck, new Uint8Array([1, 2, 3, 4]))).toThrow(
+			/header/,
+		);
 	});
 
 	test("samples an image node at its rendered box rather than source dimensions", async () => {

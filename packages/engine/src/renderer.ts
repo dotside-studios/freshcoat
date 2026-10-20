@@ -62,6 +62,12 @@ export type RendererOptions = {
 	surface?: "offscreen" | ((width: number, height: number) => SurfaceCanvas);
 	/** Decoded images, SVG pictures, paths and the surface kept across paints. */
 	cache?: PaintCacheOptions | false;
+	/**
+	 * Most pixels an image may declare in its header; a larger image, or one whose
+	 * header cannot be read, is refused before it is decoded and painted as a
+	 * placeholder with an image_load_failed warning. Default 8192 * 8192.
+	 */
+	maxImageDecodePixels?: number;
 };
 
 export type Output = { encode: EncodeOptions } | { pixels: true } | { canvas: true };
@@ -366,6 +372,9 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
 					resolveFont: (req) => resolveFontRequest(req, fonts),
 					fonts,
 					loadBytes: mapLoader(images, load),
+					...(options.maxImageDecodePixels !== undefined
+						? { maxImageDecodePixels: options.maxImageDecodePixels }
+						: {}),
 					...(cache ? { cache } : {}),
 					...(factory
 						? {
