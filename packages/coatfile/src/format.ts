@@ -47,7 +47,7 @@ export function formatVersionStatus(
 	formatVersion: unknown,
 ): FormatVersionStatus {
 	if (typeof formatVersion !== "string") return "unsupported";
-	const match = /^(\d+)(?:\.(\d+))?/.exec(formatVersion.trim());
+	const match = /^(\d+)(?:\.(\d+))?$/.exec(formatVersion.trim());
 	if (!match) return "unsupported";
 	if (Number(match[1]) !== FORMAT_MAJOR) return "unsupported";
 	const minor = match[2] === undefined ? 0 : Number(match[2]);
@@ -358,6 +358,6 @@ export function raiseFormatVersion<T extends Template>(template: T): T {
 
 /** The minor of a `1.x` version; 0 when there is none. */
 export function formatMinor(formatVersion: string): number {
-	const minor = /^\d+\.(\d+)/.exec(formatVersion.trim())?.[1];
+	const minor = /^\d+\.(\d+)$/.exec(formatVersion.trim())?.[1];
 	return minor === undefined ? 0 : Number(minor);
 }
