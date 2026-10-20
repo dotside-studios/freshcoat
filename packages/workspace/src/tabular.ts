@@ -14,11 +14,13 @@ import {
 	WORKBOOK_WRITERS,
 	type WorkbookCell,
 } from "./workbook/index";
+import { readZipDirectory } from "./zip-directory";
 
 export type TabularErrorCode =
 	| "empty_file"
 	| "unsupported_format"
-	| "invalid_file";
+	| "invalid_file"
+	| "limit_exceeded";
 
 export class TabularError extends Error {
 	constructor(
@@ -27,6 +29,78 @@ export class TabularError extends Error {
 	) {
 		super(message);
 		this.name = "TabularError";
+	}
+}
+
+export type TableLimitKind =
+	| "bytes"
+	| "uncompressed_bytes"
+	| "zip_entries"
+	| "rows"
+	| "columns"
+	| "cells";
+
+export type TableLimits = {
+	/** Size of the file in bytes (characters, for text passed as a string). */
+	maxBytes: number;
+	/** Sum of the uncompressed sizes of a workbook zip's entries. */
+	maxUncompressedBytes: number;
+	/** Entries in a workbook zip. */
+	maxZipEntries: number;
+	/** Rows of one sheet, before empty trailing rows are trimmed. */
+	maxRows: number;
+	/** Columns of one sheet, before empty trailing columns are trimmed. */
+	maxColumns: number;
+	/** Cells of one sheet, rows times columns. */
+	maxCells: number;
+};
+
+export const DEFAULT_TABLE_LIMITS: Readonly<TableLimits> = {
+	maxBytes: 64 * 1024 * 1024,
+	maxUncompressedBytes: 512 * 1024 * 1024,
+	maxZipEntries: 10_000,
+	maxRows: 100_000,
+	maxColumns: 500,
+	maxCells: 5_000_000,
+};
+
+export type ReadTableOptions = { limits?: Partial<TableLimits> };
+
+const LIMIT_LABELS: Record<TableLimitKind, { label: string; size: boolean }> = {
+	bytes: { label: "bytes", size: true },
+	uncompressed_bytes: { label: "uncompressed bytes", size: true },
+	zip_entries: { label: "zip entries", size: false },
+	rows: { label: "rows", size: false },
+	columns: { label: "columns", size: false },
+	cells: { label: "cells", size: false },
+};
+
+function sizeText(bytes: number): string {
+	return bytes >= 1024 * 1024
+		? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+		: `${bytes.toLocaleString("en-US")} bytes`;
+}
+
+/**
+ * A file is past one of the `TableLimits`. `limit` names which, `actual` is
+ * the size found, or undefined when the reader stopped at the cap without
+ * measuring it, and `max` is the cap.
+ */
+export class TableLimitError extends TabularError {
+	constructor(
+		readonly limit: TableLimitKind,
+		readonly actual: number | undefined,
+		readonly max: number,
+		fileName: string,
+	) {
+		const { label, size } = LIMIT_LABELS[limit];
+		const show = (n: number) =>
+			size ? sizeText(n) : `${n.toLocaleString("en-US")} ${label}`;
+		super(
+			"limit_exceeded",
+			`${fileName} is too large to import: ${actual === undefined ? "it" : show(actual)} is over the limit of ${show(max)}`,
+		);
+		this.name = "TableLimitError";
 	}
 }
 
@@ -135,7 +209,12 @@ function guessSeparator(text: string): string {
  * opens a quoted span only at the start of a cell, and a cell that starts
  * and ends with a quote loses both and has `""` unescaped.
  */
-function splitDelimited(input: string, separator?: string): string[][] {
+function splitDelimited(
+	input: string,
+	separator: string | undefined,
+	limits: TableLimits,
+	fail: (limit: "rows" | "columns", actual: number) => never,
+): string[][] {
 	let text = input;
 	let sep: string;
 	if (text.startsWith("sep=")) {
@@ -160,10 +239,12 @@ function splitDelimited(input: string, separator?: string): string[][] {
 			cell = cell.slice(1, -1).replaceAll('""', '"');
 		}
 		row.push(cell);
+		if (row.length > limits.maxColumns) fail("columns", row.length);
 		start = end + 1;
 		startCode = text.charCodeAt(start);
 		if (code !== sepCode) {
 			rows.push(row);
+			if (rows.length > limits.maxRows) fail("rows", rows.length);
 			row = [];
 		}
 	};
@@ -220,7 +301,11 @@ function parseJson(text: string): unknown {
 	}
 }
 
-function readJson(text: string): string[][] {
+function readJson(
+	text: string,
+	limits: TableLimits,
+	fail: (limit: "rows", actual: number) => never,
+): string[][] {
 	if (text.trim() === "") return [];
 	const doc = parseJson(text);
 	let items: unknown = doc;
@@ -234,34 +319,59 @@ function readJson(text: string): string[][] {
 			"Expected an array, or an object with records, rows or data",
 		);
 	}
+	if (items.length > limits.maxRows) fail("rows", items.length);
 	return objectsToRows(items);
 }
 
-function readNdjson(text: string): string[][] {
-	const items = text
-		.split(/\r?\n/)
-		.filter((line) => line.trim() !== "")
-		.map(parseJson);
+function readNdjson(
+	text: string,
+	limits: TableLimits,
+	fail: (limit: "rows", actual: number) => never,
+): string[][] {
+	const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
+	if (lines.length > limits.maxRows) fail("rows", lines.length);
+	const items = lines.map(parseJson);
 	return items.length === 0 ? [] : objectsToRows(items);
 }
 
 /**
  * The sheets of a table file, each as a matrix of strings. The extension picks
  * the reader. Rejects with a `TabularError`: `empty_file` when there are no
- * cells, `unsupported_format` for an extension it does not read, and
- * `invalid_file` when the contents do not parse.
+ * cells, `unsupported_format` for an extension it does not read,
+ * `invalid_file` when the contents do not parse, and a `TableLimitError`
+ * (`limit_exceeded`) when the file is past `DEFAULT_TABLE_LIMITS` or the
+ * `options.limits` that override them. Size limits are checked before any
+ * untrusted bytes are decoded or inflated.
  */
 export async function readTable(
 	input: Uint8Array | string,
 	fileName: string,
+	options: ReadTableOptions = {},
 ): Promise<Sheets> {
+	const limits: TableLimits = { ...DEFAULT_TABLE_LIMITS, ...options.limits };
+	const fail = (
+		limit: TableLimitKind,
+		actual: number | undefined,
+		max: number,
+	): never => {
+		throw new TableLimitError(limit, actual, max, fileName);
+	};
+	const failShape = (limit: "rows" | "columns", actual: number): never =>
+		fail(limit, actual, limit === "rows" ? limits.maxRows : limits.maxColumns);
+	if (input.length > limits.maxBytes) {
+		fail("bytes", input.length, limits.maxBytes);
+	}
 	const ext = extensionOf(fileName);
 	const base = fileName.replace(/\.[^.]*$/, "") || "Sheet1";
 	let sheets: TableSheet[];
 	if (ext === "json") {
-		sheets = [{ name: base, rows: readJson(decodeText(input)) }];
+		sheets = [
+			{ name: base, rows: readJson(decodeText(input), limits, failShape) },
+		];
 	} else if (ext === "ndjson" || ext === "jsonl") {
-		sheets = [{ name: base, rows: readNdjson(decodeText(input)) }];
+		sheets = [
+			{ name: base, rows: readNdjson(decodeText(input), limits, failShape) },
+		];
 	} else if (TEXT_FORMATS.has(ext)) {
 		const text = decodeText(input);
 		sheets =
@@ -270,30 +380,72 @@ export async function readTable(
 				: [
 						{
 							name: base,
-							rows: splitDelimited(text, ext === "tsv" ? "\t" : undefined),
+							rows: splitDelimited(
+								text,
+								ext === "tsv" ? "\t" : undefined,
+								limits,
+								failShape,
+							),
 						},
 					];
 	} else if (WORKBOOK_READERS[ext]) {
 		if (typeof input === "string") {
 			throw new TabularError("invalid_file", `A .${ext} file is binary`);
 		}
-		if (ZIP_FORMATS.has(ext) && !(input[0] === 0x50 && input[1] === 0x4b)) {
-			throw new TabularError("invalid_file", `Not a .${ext} file`);
+		if (ZIP_FORMATS.has(ext)) {
+			if (!(input[0] === 0x50 && input[1] === 0x4b)) {
+				throw new TabularError("invalid_file", `Not a .${ext} file`);
+			}
+			const directory = readZipDirectory(input);
+			if (directory && directory.entries > limits.maxZipEntries) {
+				fail("zip_entries", directory.entries, limits.maxZipEntries);
+			}
+			if (
+				directory &&
+				directory.uncompressedBytes > limits.maxUncompressedBytes
+			) {
+				fail(
+					"uncompressed_bytes",
+					directory.uncompressedBytes,
+					limits.maxUncompressedBytes,
+				);
+			}
 		}
 		const codec = await WORKBOOK_READERS[ext]();
 		try {
-			sheets = await codec.read(input, ext);
+			sheets = await codec.read(input, ext, {
+				maxDecompressedBytes: limits.maxUncompressedBytes,
+				maxTotalCells: limits.maxCells,
+			});
 		} catch (err) {
-			throw new TabularError(
-				"invalid_file",
-				err instanceof Error ? err.message : String(err),
+			const name = (err as { name?: string }).name;
+			const message = err instanceof Error ? err.message : String(err);
+			if (name === "ZipError" && /zip bomb/.test(message)) {
+				fail("uncompressed_bytes", undefined, limits.maxUncompressedBytes);
+			}
+			const spans = /^Sheet .* spans \d+ rows x \d+ columns \((\d+) cells/.exec(
+				message,
 			);
+			if (name === "ParseError" && spans) {
+				fail("cells", Number(spans[1]), limits.maxCells);
+			}
+			throw new TabularError("invalid_file", message);
 		}
 	} else {
 		throw new TabularError(
 			"unsupported_format",
 			ext === "" ? `${fileName} has no extension` : `.${ext} is not a table`,
 		);
+	}
+	for (const sheet of sheets) {
+		const height = sheet.rows.length;
+		if (height > limits.maxRows) failShape("rows", height);
+		let width = 0;
+		for (const row of sheet.rows) width = Math.max(width, row.length);
+		if (width > limits.maxColumns) failShape("columns", width);
+		if (height * width > limits.maxCells) {
+			fail("cells", height * width, limits.maxCells);
+		}
 	}
 	const nonEmpty = sheets
 		.map((sheet) => ({ name: sheet.name, rows: trim(sheet.rows) }))

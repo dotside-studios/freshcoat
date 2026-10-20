@@ -64,6 +64,35 @@ new library can add a format, without touching `tabular`. Codecs turn cells
 into text with the shared `cellText()`, so every library reads dates, booleans
 and numbers alike.
 
+### Import limits
+
+`readTable()` refuses oversized files with a `TableLimitError`, exported from
+`@freshcoat-js/workspace/tabular` with the rest of `TabularError` (its `code`
+is `limit_exceeded`). It carries `limit` (which cap), `actual` (the size
+found, or `undefined` when a reader stopped at the cap without measuring) and
+`max`, and its `message` reads for a person. The input size and a workbook
+zip's central directory are checked before anything is decoded or inflated,
+and a zip is also capped as it inflates, since a directory can understate its
+sizes. Limits apply to every format and are overridden per call:
+
+```ts
+await readTable(bytes, "people.xlsx", { limits: { maxRows: 500_000 } });
+```
+
+| Option | `limit` | Default | Counts |
+| --- | --- | --- | --- |
+| `maxBytes` | `bytes` | 64 MiB | the file's bytes (characters, for a string) |
+| `maxUncompressedBytes` | `uncompressed_bytes` | 512 MiB | a workbook zip's declared uncompressed size, summed over entries, and the inflated size of any one entry |
+| `maxZipEntries` | `zip_entries` | 10,000 | entries in a workbook zip |
+| `maxRows` | `rows` | 100,000 | rows of one sheet, before empty trailing rows are trimmed |
+| `maxColumns` | `columns` | 500 | columns of one sheet, before empty trailing columns are trimmed |
+| `maxCells` | `cells` | 5,000,000 | rows times columns of one sheet |
+
+`DEFAULT_TABLE_LIMITS` holds the defaults. CSV and TSV stop at the row and
+column caps while parsing; JSON and NDJSON check the row count before building
+rows. Binary `.xls` has no zip, so only the byte, row, column and cell limits
+reach it.
+
 ## The shape of a workspace
 
 A `.coatworkspace` is a zip, so a workspace is one file and its images travel

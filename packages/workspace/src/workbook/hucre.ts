@@ -3,13 +3,21 @@ import { readOds } from "hucre/ods";
 import { readXls, readXlsx, writeXlsx } from "hucre/xlsx";
 import { serialToIso } from "../columns";
 import type { TableSheet } from "../types";
-import { cellText, type WorkbookCell, type WorkbookCodec } from "./codec";
+import {
+	cellText,
+	type WorkbookCell,
+	type WorkbookCodec,
+	type WorkbookReadLimits,
+} from "./codec";
 
 type Book = Awaited<ReturnType<typeof readXlsx>>;
 
 const READERS: Record<
 	string,
-	(bytes: Uint8Array, options: { readStyles: true }) => Promise<Book>
+	(
+		bytes: Uint8Array,
+		options: { readStyles: true } & WorkbookReadLimits,
+	) => Promise<Book>
 > = {
 	xlsx: readXlsx,
 	xlsm: readXlsx,
@@ -25,10 +33,10 @@ function formatted(cell: WorkbookCell, numFmt: string | undefined): string {
 }
 
 export const hucreCodec: WorkbookCodec = {
-	async read(bytes, extension) {
+	async read(bytes, extension, limits) {
 		const reader = READERS[extension];
 		if (!reader) throw new Error(`hucre does not read .${extension}`);
-		const book = await reader(bytes, { readStyles: true });
+		const book = await reader(bytes, { readStyles: true, ...limits });
 		return book.sheets.map(
 			(sheet): TableSheet => ({
 				name: sheet.name,
