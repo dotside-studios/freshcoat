@@ -16,7 +16,6 @@
 		"preview": "vite preview --port 3010",
 		"test": "vitest run && bun test ./server.test.ts",
 		"typecheck": "tsc --noEmit",
-		"check": "biome check",
 		"e2e": "playwright test",
 		"e2e:smoke": "playwright test e2e/smoke.spec.ts e2e/inspector.spec.ts e2e/workspace.spec.ts e2e/data.spec.ts e2e/export.spec.ts e2e/starters.spec.ts e2e/barcode.spec.ts e2e/sheets.spec.ts e2e/url.spec.ts e2e/handoff.spec.ts",
 		"fonts:update": "bun scripts/update-google-fonts.ts",
@@ -43,7 +42,6 @@
 		"react-dom": "^19.2.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.5",
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@iconify-json/mingcute": "^1.2.7",
 		"@playwright/test": "^1.56.1",

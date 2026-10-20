@@ -1,0 +1,81 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": true,
+		"includes": [
+			"**",
+			"!**/node_modules",
+			"!**/dist",
+			"!**/playwright-report",
+			"!**/test-results",
+			"!**/__snapshots__",
+			"!**/*.snap",
+			"!**/fixtures",
+			"!bun.lock",
+			"!THIRD_PARTY_NOTICES.md",
+			"!brand",
+			"!packages/coatfile/schema",
+			"!packages/engine/conformance/cases",
+			"!packages/engine/conformance/expected",
+			"!apps/editor/src/fonts/google-fonts.json",
+			"!apps/editor/scripts/bench-render.baseline.json",
+			"!apps/editor/bench-render.json"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noAlert": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["packages/ui/**", "apps/editor/**"],
+			"css": {
+				"parser": {
+					"tailwindDirectives": true
+				}
+			},
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"lucide-react": "Use ~icons/mingcute/<name>-line (or -fill on solid CTAs only). See CLAUDE.md icon rules.",
+									"react-icons/si": "Use ~icons/simple-icons/<name> via unplugin-icons. See CLAUDE.md icon rules.",
+									"react-icons": "Use ~icons/mingcute/<name>-line or ~icons/simple-icons/<name>. See CLAUDE.md icon rules."
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	]
+}
