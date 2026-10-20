@@ -1,5 +1,7 @@
-import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { Writable } from "node:stream";
 import type { Template } from "@freshcoat-js/coatfile";
 import {
 	type CutSpots,
@@ -131,12 +133,18 @@ function withFilters(
 	};
 }
 
-async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
-	const blob = await packWorkspace(workspace);
-	if (!blob) throw new CliError("could not write the workspace");
+export async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
 	const temporary = `${path}.${process.pid}.tmp`;
-	await writeFile(temporary, new Uint8Array(await blob.arrayBuffer()));
-	await rename(temporary, path);
+	try {
+		await packWorkspace(
+			workspace,
+			Writable.toWeb(createWriteStream(temporary)) as WritableStream<Uint8Array>,
+		);
+		await rename(temporary, path);
+	} catch (err) {
+		await rm(temporary, { force: true });
+		throw err;
+	}
 }
 
 export function writesFile(out: string): boolean {
