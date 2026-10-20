@@ -166,7 +166,9 @@ export function ImportWizard({
 					? `${chosen.name} is empty`
 					: code === "unsupported_format"
 						? `${chosen.name} isn't a supported file type`
-						: `Couldn't read ${chosen.name}: ${(err as Error).message ?? String(err)}`,
+						: code === "limit_exceeded"
+							? (err as Error).message
+							: `Couldn't read ${chosen.name}: ${(err as Error).message ?? String(err)}`,
 			);
 		} finally {
 			setLoading(false);
