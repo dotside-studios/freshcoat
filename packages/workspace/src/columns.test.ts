@@ -151,6 +151,23 @@ describe("validateRecord patterns", () => {
 	});
 });
 
+describe("validateRecord unsafe patterns", () => {
+	it("skips catastrophic patterns and refuses oversized cells", () => {
+		const columns: Column[] = [
+			{ key: "evil", type: "text", pattern: "^(a+)+$" },
+			{ key: "code", type: "text", pattern: "^a+$" },
+		];
+		const started = performance.now();
+		expect(
+			validateRecord(columns, { evil: `${"a".repeat(40)}!`, code: "aaa" }),
+		).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(200);
+		expect(
+			validateRecord(columns, { evil: "x", code: "a".repeat(10_001) }),
+		).toEqual([{ column: "code", message: "Does not match the pattern" }]);
+	});
+});
+
 describe("validateRecord", () => {
 	const columns: Column[] = [
 		{ key: "name", type: "text", required: true, minLength: 2, maxLength: 5 },

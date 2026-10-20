@@ -1,8 +1,8 @@
 import {
-	compiledPattern,
 	type FieldDefinition,
 	fieldTitle,
 	isSystemField,
+	patternProblem,
 	sampleValues,
 	type Template,
 	templateFieldRefs,
@@ -638,11 +638,7 @@ function FieldEditor({
 				value={field.pattern ?? ""}
 				placeholder="Regular expression"
 				inputClassName="font-fc-mono"
-				validate={(v) => {
-					return compiledPattern(v) === null
-						? "Not a valid regular expression"
-						: null;
-				}}
+				validate={(v) => patternProblem(v)}
 				onCommit={(v) => patch({ pattern: v || undefined }, "pattern")}
 			/>
 			<Checkbox

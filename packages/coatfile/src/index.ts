@@ -260,8 +260,15 @@ export {
 } from "./stroke-trim";
 export { strokeSides, widestStroke } from "./stroke-width";
 export {
+	PATTERN_INPUT_MAX_LENGTH,
+	PATTERN_MAX_LENGTH,
+	type UnsafePatternReason,
+	unsafePatternReason,
+} from "./safe-regex";
+export {
 	compiledPattern,
 	PATTERN_CACHE_MAX,
+	patternProblem,
 	type TextRuleBreak,
 	type TextRules,
 	textRuleBreaks,
