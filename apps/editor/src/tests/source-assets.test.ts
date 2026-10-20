@@ -15,6 +15,7 @@ import {
 	trackSourceAssets,
 } from "~/app/source-assets";
 import { singleTemplateWorkspace } from "~/state/workspace";
+import { readSaved } from "./autosave-read";
 import { doc } from "./doc-fixture";
 
 const toast = vi.hoisted(() => vi.fn());
@@ -440,7 +441,7 @@ describe("autosave with a photo that cannot be read", () => {
 		const ws = workspaceOf([a.asset, b.asset]);
 		await store.write({ workspace: ws, fileName: "w.coatworkspace" });
 		expect(await storedKeys(name)).toEqual([b.asset.sha256]);
-		let read = await store.read();
+		let read = await readSaved(store);
 		expect(read?.workspace.datasets[0]?.assets).toHaveLength(1);
 		expect(read?.missingAssets).toBe(1);
 
@@ -448,7 +449,7 @@ describe("autosave with a photo that cannot be read", () => {
 			workspace: { ...ws, name: "Renamed" },
 			fileName: "w.coatworkspace",
 		});
-		read = await store.read();
+		read = await readSaved(store);
 		expect(read?.workspace.name).toBe("Renamed");
 		expect(onUnreadable).toHaveBeenCalledOnce();
 		expect(onUnreadable).toHaveBeenCalledWith(a.asset);
@@ -468,7 +469,7 @@ describe("autosave with a photo that cannot be read", () => {
 		const ws = workspaceOf([a.asset, b.asset]);
 		await store.write({ workspace: ws, fileName: "w.coatworkspace" });
 		expect(await storedKeys(name)).toEqual([b.asset.sha256]);
-		const read = await store.read();
+		const read = await readSaved(store);
 		expect(read?.workspace.datasets[0]?.assets).toHaveLength(1);
 		expect(read?.missingAssets).toBe(1);
 
@@ -476,7 +477,7 @@ describe("autosave with a photo that cannot be read", () => {
 			workspace: { ...ws, name: "Renamed" },
 			fileName: "w.coatworkspace",
 		});
-		expect((await store.read())?.workspace.name).toBe("Renamed");
+		expect((await readSaved(store))?.workspace.name).toBe("Renamed");
 		expect(onUnreadable).toHaveBeenCalledOnce();
 		expect(onUnreadable).toHaveBeenCalledWith(a.asset);
 	});
@@ -494,7 +495,7 @@ describe("autosave with a photo that cannot be read", () => {
 			fileName: "w.coatworkspace",
 		});
 		vi.restoreAllMocks();
-		expect(await store.read()).toBeNull();
+		expect(await readSaved(store)).toBeNull();
 		expect(onUnreadable).not.toHaveBeenCalled();
 	});
 

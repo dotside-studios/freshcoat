@@ -147,6 +147,19 @@ function EditorRoot({
 		return () => window.removeEventListener("beforeunload", onBeforeUnload);
 	}, [controller]);
 
+	useEffect(() => {
+		const onHidden = () => {
+			if (document.visibilityState === "hidden") controller.flushAutosave();
+		};
+		const onPageHide = () => controller.flushAutosave();
+		document.addEventListener("visibilitychange", onHidden);
+		window.addEventListener("pagehide", onPageHide);
+		return () => {
+			document.removeEventListener("visibilitychange", onHidden);
+			window.removeEventListener("pagehide", onPageHide);
+		};
+	}, [controller]);
+
 	// Files are opened with Open file…, never by dropping them: an image
 	// dropped on an open template is placed in it, and any other file dropped
 	// anywhere the Data section does not take it is refused, rather than left

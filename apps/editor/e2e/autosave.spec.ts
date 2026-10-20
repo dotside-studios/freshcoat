@@ -183,3 +183,50 @@ test("Recent lists the autosaved workspace and the samples opened, and reopens t
 	await expect(page.getByTestId("starter-davi-card")).toBeVisible();
 	await expect(recent.getByText("Unsaved work", { exact: false })).toBeHidden();
 });
+
+for (const hide of ["visibilitychange", "pagehide"] as const) {
+	test(`autosave is written as soon as the page fires ${hide}`, async ({
+		page,
+	}) => {
+		await openSample(page);
+		const elapsed = await page.evaluate(async (event) => {
+			const c = (
+				window as unknown as {
+					__freshcoat: {
+						controller: {
+							select(keys: string[]): void;
+							deleteSelection(): void;
+						};
+					};
+				}
+			).__freshcoat.controller;
+			const started = performance.now();
+			c.select(["0/0"]);
+			c.deleteSelection();
+			if (event === "visibilitychange") {
+				Object.defineProperty(document, "visibilityState", {
+					configurable: true,
+					get: () => "hidden",
+				});
+				document.dispatchEvent(new Event("visibilitychange"));
+			} else window.dispatchEvent(new Event("pagehide"));
+			const db = await new Promise<IDBDatabase>((resolve, reject) => {
+				const req = indexedDB.open("freshcoat");
+				req.onsuccess = () => resolve(req.result);
+				req.onerror = () => reject(req.error);
+			});
+			for (;;) {
+				const found = await new Promise<unknown>((resolve) => {
+					const req = db
+						.transaction("autosave")
+						.objectStore("autosave")
+						.get("current");
+					req.onsuccess = () => resolve(req.result);
+				});
+				if (found) return performance.now() - started;
+				await new Promise((r) => setTimeout(r, 20));
+			}
+		}, hide);
+		expect(elapsed).toBeLessThan(900);
+	});
+}
