@@ -6,7 +6,7 @@ import { encodePng, type FontFetch } from "@freshcoat-js/engine";
 import { testFontBytes } from "@freshcoat-js/test-utils";
 import type { Workspace } from "@freshcoat-js/workspace";
 import { packWorkspace } from "@freshcoat-js/workspace/archive";
-import { type Io } from "../src/io";
+import type { Io } from "../src/io";
 import { main } from "../src/main";
 
 export const FONT_CSS = "https://fonts.example/css2?family=Inter";
@@ -135,7 +135,9 @@ export async function sandbox(
 		let stdout = "";
 		let stderr = "";
 		const io: Io = {
-			stdout: (text) => void (stdout += text),
+			stdout: (text) => {
+				stdout += text;
+			},
 			stderr: (text) => {
 				stderr += text;
 				watch?.(stderr);

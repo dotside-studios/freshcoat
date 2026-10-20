@@ -25,7 +25,7 @@ import {
 	PDFArray,
 	PDFDict,
 	PDFDocument,
-	PDFHexString,
+	type PDFHexString,
 	PDFName,
 	PDFRawStream,
 } from "pdf-lib";
