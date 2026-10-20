@@ -36,7 +36,7 @@ describe("length units", () => {
 	});
 
 	test("rounds display values per unit", () => {
-		expect(roundForUnit(3.14159, "mm")).toBe(3.14);
+		expect(roundForUnit(3.14259, "mm")).toBe(3.14);
 		expect(roundForUnit(0.12549, "in")).toBe(0.125);
 		expect(roundForUnit(-0.0001, "px")).toBe(0);
 		expect(formatLength(37.5, "in", 300, { suffix: false })).toBe("0.125");

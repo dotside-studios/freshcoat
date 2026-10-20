@@ -1472,7 +1472,9 @@ function enforceGradientStops(tpl: ParsedTemplate, ctx: z.RefinementCtx) {
 	function check(fill: unknown, path: (string | number)[], stroke = false) {
 		if (typeof fill === "string" || fill == null) return;
 		if (Array.isArray(fill) && !stroke) {
-			fill.forEach((f, i) => check(f, [...path, i]));
+			fill.forEach((f, i) => {
+				check(f, [...path, i]);
+			});
 			return;
 		}
 		const f = fill as { kind?: unknown; stops?: unknown };

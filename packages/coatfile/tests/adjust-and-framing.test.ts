@@ -197,7 +197,9 @@ describe("adjust and framing paint", () => {
 	}
 
 	const near = (actual: number[], want: number[]) =>
-		want.forEach((v, i) => expect(Math.abs(actual[i] - v)).toBeLessThan(12));
+		want.forEach((v, i) => {
+			expect(Math.abs(actual[i] - v)).toBeLessThan(12);
+		});
 
 	test("focus chooses which band a square cover shows", async () => {
 		near(await centre(photo({ src: bands, focus: [0, 0.5] })), [255, 0, 0]);

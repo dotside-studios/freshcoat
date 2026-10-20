@@ -295,9 +295,13 @@ export function printHints(
 				const edges = shortOfBleed(t, el);
 				if (edges.length > 0) push({ code: "short_of_bleed", edges });
 			}
-			children(el).forEach((c, i) => visit(c, [...path, i]));
+			children(el).forEach((c, i) => {
+				visit(c, [...path, i]);
+			});
 		};
-		frame.elements.forEach((el, i) => visit(el, [i]));
+		frame.elements.forEach((el, i) => {
+			visit(el, [i]);
+		});
 	});
 	return out;
 }
