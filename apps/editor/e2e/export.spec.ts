@@ -3,6 +3,8 @@ import { expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
 import {
+	addDataset,
+	chooseDataset,
 	choosePrintTarget,
 	mod,
 	openSample,
@@ -10,59 +12,6 @@ import {
 	settingsTab,
 	state,
 } from "./helpers";
-
-/** Adds a dataset of `count` members whose columns are the template's field keys. */
-async function addDataset(
-	page: Page,
-	id: string,
-	name: string,
-	count: number,
-	names: Record<number, string> = {},
-) {
-	await page.evaluate(
-		({ id, name, count, names }) => {
-			const c = (
-				window as unknown as {
-					__freshcoat: {
-						controller: {
-							template: { fields: { properties: Record<string, unknown> } };
-							state: { workspace: { datasets: unknown[] } };
-							dispatch(action: unknown): void;
-						};
-					};
-				}
-			).__freshcoat.controller;
-			const keys = Object.keys(c.template.fields.properties);
-			const tiers = ["Gold", "Silver", "Bronze"];
-			const values = (i: number): Record<string, string> => ({
-				display_name: names[i] ?? `Member ${i + 1}`,
-				tier: tiers[i % 3] as string,
-				profile_url: `https://example.com/u/${i + 1}`,
-				member_since: String(2000 + i),
-				member_id: `LC ${String(i + 1).padStart(4, "0")} 0000`,
-				verified: i % 2 === 0 ? "true" : "false",
-			});
-			const dataset = {
-				id,
-				name,
-				columns: keys.map((key) => ({ key, type: "text" })),
-				records: Array.from({ length: count }, (_, i) => ({
-					id: `${id}_r${i + 1}`,
-					status: "pending",
-					values: Object.fromEntries(
-						keys.map((k) => [k, values(i)[k] ?? `${k} ${i + 1}`]),
-					),
-				})),
-				assets: [],
-			};
-			c.dispatch({
-				type: "datasetEdit",
-				datasets: [...c.state.workspace.datasets, dataset],
-			});
-		},
-		{ id, name, count, names },
-	);
-}
 
 /** Whether leaving the page would warn, with the work counted as saved. */
 async function unloadWarns(page: Page): Promise<boolean> {
@@ -74,18 +23,6 @@ async function unloadWarns(page: Page): Promise<boolean> {
 		window.dispatchEvent(event);
 		return event.defaultPrevented;
 	});
-}
-
-async function chooseDataset(page: Page, name: string) {
-	await settingsTab(page, "Content");
-	const editor = page.getByTestId("binding-editor");
-	if (!(await editor.isVisible()))
-		await page
-			.getByTestId("export-settings")
-			.getByRole("button", { name: /^Template binding/ })
-			.click();
-	await editor.getByRole("button", { name: /Dataset/ }).click();
-	await page.getByRole("option", { name }).click();
 }
 
 function statuses(page: Page, datasetId: string) {
