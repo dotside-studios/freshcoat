@@ -1,4 +1,4 @@
-import { join, normalize } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 
 // Static file server for the built SPA. No framework and no node_modules: the
 // production image ships `dist/` plus this file, and Bun serves it directly.
@@ -14,7 +14,53 @@ const ENCODINGS = [
 	["gzip", ".gz"],
 ] as const;
 
-function resolveAsset(dist: string, pathname: string): string | null {
+const SECURITY_HEADERS = {
+	"x-content-type-options": "nosniff",
+	"referrer-policy": "strict-origin-when-cross-origin",
+	"x-frame-options": "DENY",
+	"cross-origin-opener-policy": "same-origin-allow-popups",
+} as const;
+
+// Script and connect sources are the app's own plus what it fetches at runtime:
+// Google Fonts stylesheets and files, and user-supplied https image URLs. Style
+// attributes come from React. Render workers load canvaskit.js through an
+// indirect eval, and a worker is governed by the policy of its own script
+// response, so only JavaScript responses allow 'unsafe-eval'; documents do not.
+function contentSecurityPolicy(unsafeEval: boolean, inlineScripts: string[]) {
+	const script = ["'self'", "'wasm-unsafe-eval'", ...inlineScripts];
+	if (unsafeEval) script.push("'unsafe-eval'");
+	return [
+		"default-src 'self'",
+		`script-src ${script.join(" ")}`,
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"img-src 'self' data: blob:",
+		"font-src 'self' data: blob: https://fonts.gstatic.com",
+		"connect-src 'self' data: blob: https:",
+		"worker-src 'self' blob:",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"form-action 'self'",
+		"frame-ancestors 'none'",
+	].join("; ");
+}
+
+async function inlineScriptHashes(dist: string): Promise<string[]> {
+	const file = Bun.file(join(dist, "index.html"));
+	if (!(await file.exists())) return [];
+	const html = await file.text();
+	const out: string[] = [];
+	for (const m of html.matchAll(
+		/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/gi,
+	)) {
+		const hash = new Bun.CryptoHasher("sha256")
+			.update(m[1] ?? "")
+			.digest("base64");
+		out.push(`'sha256-${hash}'`);
+	}
+	return out;
+}
+
+export function resolveAsset(dist: string, pathname: string): string | null {
 	let decoded: string;
 	try {
 		decoded = decodeURIComponent(pathname);
@@ -23,7 +69,7 @@ function resolveAsset(dist: string, pathname: string): string | null {
 	}
 	const full = normalize(join(dist, decoded));
 	// normalize() collapses `..`; anything that escaped dist/ is not ours to serve.
-	return full.startsWith(dist) ? full : null;
+	return (full + sep).startsWith(dist + sep) ? full : null;
 }
 
 function accepted(header: string | null): Set<string> {
@@ -59,8 +105,27 @@ async function serveFile(
 	return new Response(file, { headers: base });
 }
 
-export function createHandler(dist: string) {
-	return async (req: Request): Promise<Response> => {
+function notFound(): Response {
+	return new Response("not found", {
+		status: 404,
+		headers: { "content-type": "text/plain; charset=utf-8" },
+	});
+}
+
+export function createHandler(distDir: string) {
+	const dist = resolve(distDir);
+	let scripts: Promise<string[]> | undefined;
+
+	async function route(req: Request): Promise<Response> {
+		if (req.method !== "GET" && req.method !== "HEAD")
+			return new Response("method not allowed", {
+				status: 405,
+				headers: {
+					allow: "GET, HEAD",
+					"content-type": "text/plain; charset=utf-8",
+				},
+			});
+
 		const url = new URL(req.url);
 		if (url.pathname === "/healthz") {
 			return new Response("ok", {
@@ -69,7 +134,11 @@ export function createHandler(dist: string) {
 		}
 
 		const assetPath = resolveAsset(dist, url.pathname);
-		if (assetPath && (await Bun.file(assetPath).exists())) {
+		if (assetPath === null) return notFound();
+		const relative = assetPath.slice(dist.length + 1).split(sep);
+		if (relative.some((segment) => segment.startsWith("."))) return notFound();
+
+		if (await Bun.file(assetPath).exists()) {
 			return serveFile(req, assetPath, {
 				"cache-control": FINGERPRINTED.test(url.pathname)
 					? "public, max-age=31536000, immutable"
@@ -77,11 +146,29 @@ export function createHandler(dist: string) {
 			});
 		}
 
+		const last = url.pathname.slice(url.pathname.lastIndexOf("/") + 1);
+		if (url.pathname.startsWith("/assets/") || extname(last) !== "")
+			return notFound();
+
 		// SPA fallback: the router owns every path that isn't a file on disk.
 		return serveFile(req, join(dist, "index.html"), {
 			"content-type": "text/html; charset=utf-8",
 			"cache-control": "no-cache",
 		});
+	}
+
+	return async (req: Request): Promise<Response> => {
+		const res = await route(req);
+		const type = res.headers.get("content-type") ?? "";
+		scripts ??= inlineScriptHashes(dist);
+		const csp = contentSecurityPolicy(
+			type.includes("javascript"),
+			type.startsWith("text/html") ? await scripts : [],
+		);
+		for (const [name, value] of Object.entries(SECURITY_HEADERS))
+			res.headers.set(name, value);
+		res.headers.set("content-security-policy", csp);
+		return res;
 	};
 }
 
