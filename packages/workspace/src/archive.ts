@@ -843,12 +843,16 @@ export async function unpackTemplates(
 			file instanceof Blob ? file : new Blob([file as BlobPart]),
 		);
 	} catch (err) {
-		if (err instanceof UnpackError) throw new WorkspaceReadError(err.code, err.message);
+		if (err instanceof UnpackError)
+			throw new WorkspaceReadError(err.code, err.message);
 		throw err;
 	}
 	const templates = [...read.files]
 		.filter(([path]) => /^templates\/[^/]+\.coat$/i.test(path))
-		.map(([path, bytes]) => ({ fileName: path.slice("templates/".length), bytes }));
+		.map(([path, bytes]) => ({
+			fileName: path.slice("templates/".length),
+			bytes,
+		}));
 	if (templates.length === 0)
 		throw new WorkspaceReadError(
 			"missing_entry",
