@@ -1425,23 +1425,28 @@ server gets the same result:
 ```ts
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
-const { fonts, declared, guessed, missing } = await resolveTemplateFonts(template);
+const { fonts, declared, guessed, missing } = await resolveTemplateFonts(template, {
+  guessGoogle: true,
+});
 // fonts: Map<family, bytes[]>
 // declared: families the `fonts` block describes
 // guessed: undeclared families found on Google Fonts by name
 // missing: families nothing produced bytes for; their text uses a fallback face
 ```
 
-A family the `fonts` block does not describe is looked up on Google Fonts by
-name, at only the weights the template uses it at (text, spans, barcodes, in the
-base design and every variant). Pass `guessGoogle: false` to load declared fonts
-only. A family that fails to load is reported as missing and never takes the
-others with it.
+Without `guessGoogle`, only declared fonts load and an undeclared family is
+reported as missing. With `guessGoogle: true`, a family the `fonts` block does
+not describe is looked up on Google Fonts by name, at only the weights the
+template uses it at (text, spans, barcodes, in the base design and every
+variant). The lookup is off by default because it sends family names from the
+template to Google. A family that fails to load is reported as missing and never
+takes the others with it.
 
 The options leave network and storage to the host:
 
 - `fetch` carries every http(s) request. Use it to block the network, add a
-  proxy or redirect to a mirror. The global `fetch` is used when it is omitted.
+  proxy or redirect to a mirror. When it is omitted the global `fetch` is used,
+  limited to `https:` URLs; a `fetch` you pass is not limited.
 - `load` reads a `local` font file whose `src` is a path rather than a data: or
   http(s) URL, as the engine's loaders do.
 - `cache` keeps bytes across calls. A `Map<string, Promise<Uint8Array[]>>`

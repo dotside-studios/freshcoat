@@ -13,11 +13,17 @@ Freshcoat releases use one version for the core SDK and the Figma plugin.
 
 Studio is deployed separately. The UI package remains internal.
 
-Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md).
+Upgrading from 0.3? See [migrating to 0.4](migrating-to-0.4.md). Rendering
+untrusted templates? See [safer defaults](security-defaults.md).
 
 ## Unreleased changes
 
 These land in the next release's notes.
+
+- **Safer defaults for untrusted templates.** The engine's default loader
+  accepts only `data:`, `blob:` and `https:`, and `resolveTemplateFonts` looks
+  up undeclared families on Google Fonts only with `guessGoogle: true`. See
+  [safer defaults](security-defaults.md).
 
 - **Cut lines in spot colours.** A PDF with cut lines (`cutLines`,
   `--cut-lines`, Studio's Cut lines) now strokes each edge kind in a
