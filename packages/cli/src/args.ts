@@ -2,6 +2,7 @@ import {
 	CUT_KINDS,
 	type CutKind,
 	type CutSpots,
+	MAX_BACK_OFFSET_MM,
 	PAPER_SIZES_MM,
 	type PaperName,
 	parseFilter,
@@ -113,6 +114,10 @@ export function parseOffset(entry: string): { x: number; y: number } {
 	const [x, y] = parts.map((part) => (part === "" ? Number.NaN : Number(part)));
 	if (parts.length !== 2 || !Number.isFinite(x) || !Number.isFinite(y))
 		throw new ArgumentError("Expected <x>,<y> in millimetres, such as 0.5,-1.");
+	if (Math.abs(x as number) > MAX_BACK_OFFSET_MM || Math.abs(y as number) > MAX_BACK_OFFSET_MM)
+		throw new ArgumentError(
+			`Expected <x>,<y> each from -${MAX_BACK_OFFSET_MM} to ${MAX_BACK_OFFSET_MM} millimetres.`,
+		);
 	return { x: x as number, y: y as number };
 }
 

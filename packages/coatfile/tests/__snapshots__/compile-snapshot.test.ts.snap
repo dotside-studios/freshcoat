@@ -1329,6 +1329,17 @@ exports[`compile output is stable > kitchen-sink at 0.5x 1`] = `
         ],
       },
       "name": "front",
+      "printChecks": [
+        {
+          "issue": {
+            "code": "qr_quiet_zone",
+            "min": 2,
+            "modules": 1.1,
+          },
+          "kind": "print_check",
+          "layer": "qr",
+        },
+      ],
       "root": {
         "children": [
           {
@@ -1732,6 +1743,17 @@ exports[`compile output is stable > kitchen-sink at 1x 1`] = `
         ],
       },
       "name": "front",
+      "printChecks": [
+        {
+          "issue": {
+            "code": "qr_quiet_zone",
+            "min": 2,
+            "modules": 1.1,
+          },
+          "kind": "print_check",
+          "layer": "qr",
+        },
+      ],
       "root": {
         "children": [
           {
@@ -3597,6 +3619,17 @@ exports[`compile output is stable kitchen-sink at 0.5x 1`] = `
         ],
       },
       "name": "front",
+      "printChecks": [
+        {
+          "issue": {
+            "code": "qr_quiet_zone",
+            "min": 2,
+            "modules": 1.1,
+          },
+          "kind": "print_check",
+          "layer": "qr",
+        },
+      ],
       "root": {
         "children": [
           {
@@ -4000,6 +4033,17 @@ exports[`compile output is stable kitchen-sink at 1x 1`] = `
         ],
       },
       "name": "front",
+      "printChecks": [
+        {
+          "issue": {
+            "code": "qr_quiet_zone",
+            "min": 2,
+            "modules": 1.1,
+          },
+          "kind": "print_check",
+          "layer": "qr",
+        },
+      ],
       "root": {
         "children": [
           {

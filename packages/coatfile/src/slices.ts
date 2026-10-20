@@ -11,9 +11,10 @@ import {
 	serializePath,
 	transformPath,
 } from "@freshcoat-js/engine/svg";
-import { resolveInsets } from "./bleed";
+import { resolveInsets, rotatedBox } from "./bleed";
 import { applyBooleans, type PathOp } from "./boolean";
 import { fieldContext, prepareTemplate } from "./prepare";
+import { allElements } from "./tree";
 import type { Element, Sides, Template } from "./types";
 import { pruneHiddenElements } from "./visibility";
 
@@ -86,6 +87,44 @@ export function resolveSlices(
 	template: Template,
 	options: ResolveSlicesOptions = {},
 ): ResolvedSlice[] {
+	const { frame, elements } = shownElements(template, options);
+	const index = new Map(frame.elements.map((el, i) => [el.id, i]));
+	return elements
+		.filter(isSliced)
+		.map((el) => resolveSlice(el, index.get(el.id) ?? 0))
+		.sort((a, b) => a.order - b.order || a.index - b.index)
+		.map(({ index: _index, ...slice }) => slice);
+}
+
+/**
+ * The ids of the layers a slice's piece shows: each shown top-level layer
+ * whose box meets the slice's box grown by its bleed, with every layer inside
+ * it. A layer without a size is counted in. Undefined when the side has no
+ * such slice.
+ */
+export function sliceLayers(
+	template: Template,
+	name: string,
+	options: ResolveSlicesOptions = {},
+): Set<string> | undefined {
+	const slice = resolveSlices(template, options).find((s) => s.name === name);
+	if (!slice) return undefined;
+	const { box, bleed } = slice;
+	const left = box.x - bleed.left;
+	const top = box.y - bleed.top;
+	const right = box.x + box.width + bleed.right;
+	const bottom = box.y + box.height + bleed.bottom;
+	const out = new Set<string>();
+	for (const el of shownElements(template, options).elements) {
+		const b = rotatedBox(el);
+		if (b && (b[0] >= right || b[2] <= left || b[1] >= bottom || b[3] <= top))
+			continue;
+		for (const child of allElements([el])) out.add(child.id);
+	}
+	return out;
+}
+
+function shownElements(template: Template, options: ResolveSlicesOptions) {
 	const prepared = prepareTemplate(template, {
 		variantId: options.variantId,
 		resize: options.resize,
@@ -104,12 +143,7 @@ export function resolveSlices(
 	const elements = options.pathOp
 		? applyBooleans(shown, options.pathOp)
 		: shown;
-	const index = new Map(frame.elements.map((el, i) => [el.id, i]));
-	return elements
-		.filter(isSliced)
-		.map((el) => resolveSlice(el, index.get(el.id) ?? 0))
-		.sort((a, b) => a.order - b.order || a.index - b.index)
-		.map(({ index: _index, ...slice }) => slice);
+	return { frame, elements };
 }
 
 function resolveSlice(

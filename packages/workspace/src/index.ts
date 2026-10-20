@@ -119,6 +119,7 @@ export {
 	type Imposition,
 	imposeSheets,
 	MARK_CLEARANCE_MM,
+	MAX_BACK_OFFSET_MM,
 	minGapMm,
 	PAPER_SIZES_MM,
 	paperSize,

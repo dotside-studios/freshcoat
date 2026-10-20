@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { FORMAT_VERSION, minimumFormatVersion } from "../src/format";
-import { resolveSlices } from "../src/slices";
+import { resolveSlices, sliceLayers } from "../src/slices";
 import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
 
@@ -514,5 +514,48 @@ describe("resolveSlices", () => {
 		);
 		const [s] = resolveSlices(t, { resize: { width: 200, height: 80 } });
 		expect(s.box.width).toBeGreaterThan(40);
+	});
+});
+
+describe("sliceLayers", () => {
+	const at = (id: string, x: number, y: number, extra: object = {}) =>
+		({ ...rect(id), pos: { x, y }, ...extra }) as Element;
+	const group = {
+		id: "group",
+		type: "frame",
+		pos: { x: 45, y: 45 },
+		size: { width: 20, height: 20 },
+		properties: { children: [at("inner", 0, 0)] },
+	} as unknown as Element;
+	const ids = (layers: Set<string> | undefined) => [...(layers ?? [])].sort();
+
+	test("names the layers that meet the slice, with what they hold", () => {
+		const t = template(
+			shape("piece"),
+			at("inside", 20, 25),
+			at("far", 70, 60),
+			at("near", 55, 30),
+			group,
+		);
+		expect(ids(sliceLayers(t, "piece"))).toEqual([
+			"group",
+			"inner",
+			"inside",
+			"piece",
+		]);
+	});
+
+	test("counts the slice's bleed in", () => {
+		const bleed = { top: 0, right: 6, bottom: 0, left: 0 };
+		const t = template(shape("piece", { bleed }), at("near", 55, 30));
+		expect(ids(sliceLayers(t, "piece"))).toEqual(["near", "piece"]);
+	});
+
+	test("leaves out hidden layers, and knows no slice it lacks", () => {
+		const hidden = { visibleWhen: { field: "show", equals: "true" } };
+		const t = template(shape("piece"), at("gone", 20, 25, hidden));
+		const values = { show: "false" };
+		expect(ids(sliceLayers(t, "piece", { values }))).toEqual(["piece"]);
+		expect(sliceLayers(t, "nope")).toBeUndefined();
 	});
 });

@@ -26,6 +26,7 @@ describe("argument parsers", () => {
 		expect(parseJobs("3")).toBe(3);
 		expect(parseLength("0")).toBe(0);
 		expect(parseOffset("-1.5, 2")).toEqual({ x: -1.5, y: 2 });
+		expect(parseOffset("50,-50")).toEqual({ x: 50, y: -50 });
 		expect(parsePaper("A4")).toBe("a4");
 		expect(parsePaper("a5")).toBe("a5");
 		expect(parsePaper("A6")).toBe("a6");
@@ -49,6 +50,8 @@ describe("argument parsers", () => {
 			[() => parseOffset("1"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
 			[() => parseOffset("1,"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
 			[() => parseOffset("1,2,3"), "Expected <x>,<y> in millimetres, such as 0.5,-1."],
+			[() => parseOffset("500,0"), "Expected <x>,<y> each from -50 to 50 millimetres."],
+			[() => parseOffset("0,-50.5"), "Expected <x>,<y> each from -50 to 50 millimetres."],
 			[() => parseMarks("crop,bleed"), "Expected none, or a list of crop, registration, colorbar, slug."],
 			[() => parseMarks(""), "Expected none, or a list of crop, registration, colorbar, slug."],
 			[() => parseCopies("0"), "Expected a whole number, 1 or more, or fill."],

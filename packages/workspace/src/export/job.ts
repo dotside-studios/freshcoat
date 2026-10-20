@@ -66,7 +66,8 @@ export type JobProgress = {
 	etaMs: number;
 	/** bytes handed to the destination so far */
 	bytes?: number;
-	/** set while a PDF is assembled: pages embedded of all */
+	/** set while a PDF is assembled: images embedded of all, one per card on
+	 *  sheets */
 	assembling?: { done: number; total: number };
 };
 
@@ -144,6 +145,7 @@ export type AssemblePdf = (
 	options: {
 		dpi: number;
 		title?: string;
+		creator?: string;
 		layout?: SheetLayout;
 		cardMm?: CardSizeMm;
 		bleedMm?: BleedMm;
@@ -166,6 +168,8 @@ export type ExportJobOptions = {
 	/** Asked once three PDF pages are made, when the whole PDF would pass
 	 *  PDF_CONFIRM_BYTES; false cancels the job. */
 	confirmLargePdf?: (estimatedBytes: number) => Promise<boolean>;
+	/** what a PDF names as its creator; default Freshcoat Studio */
+	pdfCreator?: string;
 	now?: () => number;
 };
 
@@ -481,7 +485,9 @@ export function runExportJob(
 		// Refused before anything renders, rather than after every page has.
 		const sheets = planSheets(plan, template, preset);
 		if (sheets?.error !== undefined)
-			return Promise.reject(new SheetLayoutError(sheets.error));
+			return Promise.reject(
+				new SheetLayoutError(sheets.error, undefined, sheets.field),
+			);
 		if (pieced) pieceSheets = sheets?.imposition;
 	}
 	const cardMm =
@@ -574,6 +580,7 @@ export function runExportJob(
 						{
 							dpi: preset.dpi,
 							title: preset.name || workspace.name,
+							...(options.pdfCreator ? { creator: options.pdfCreator } : {}),
 							...(sheet ? { layout: sheet, cardMm } : {}),
 							...(pageBleedMm ? { bleedMm: pageBleedMm } : {}),
 							...(outputIntent !== undefined ? { outputIntent } : {}),
