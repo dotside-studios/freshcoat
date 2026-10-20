@@ -63,8 +63,8 @@ const scene = (src: string) =>
 	});
 
 describe("image pixel limit", () => {
-	test("the default is a square at the export edge cap", () => {
-		expect(DEFAULT_MAX_IMAGE_DECODE_PIXELS).toBe(8192 * 8192);
+	test("the default admits 100+ MP camera files", () => {
+		expect(DEFAULT_MAX_IMAGE_DECODE_PIXELS).toBe(200_000_000);
 	});
 
 	test("a tiny PNG declaring 30000x30000 is refused with a warning", async () => {

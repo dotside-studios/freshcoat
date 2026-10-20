@@ -65,7 +65,7 @@ export type RendererOptions = {
 	/**
 	 * Most pixels an image may declare in its header; a larger image, or one whose
 	 * header cannot be read, is refused before it is decoded and painted as a
-	 * placeholder with an image_load_failed warning. Default 8192 * 8192.
+	 * placeholder with an image_load_failed warning. Default 200_000_000.
 	 */
 	maxImageDecodePixels?: number;
 };

@@ -38,9 +38,10 @@ export function parseImageInfo(bytes: Uint8Array): ImageInfo | null {
 	return parsed === "more" ? null : parsed;
 }
 
-/** Default most pixels an image may declare before it is decoded: a square at
- *  the export edge cap, 8192 by 8192. */
-export const DEFAULT_MAX_IMAGE_DECODE_PIXELS = 8192 * 8192;
+/** Default most pixels an image may declare before it is decoded: 200 MP, so
+ *  100+ MP camera files pass. About 800 MB of RGBA against CanvasKit's 2 GiB
+ *  WASM heap, which also holds the encoded bytes and a working copy. */
+export const DEFAULT_MAX_IMAGE_DECODE_PIXELS = 200_000_000;
 
 /** Throws unless the header of `bytes` names a PNG, JPEG, GIF, WebP, BMP, ICO,
  *  WBMP or AVIF of at most `maxPixels` pixels (default DEFAULT_MAX_IMAGE_DECODE_PIXELS). Meant to

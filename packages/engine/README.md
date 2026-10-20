@@ -57,7 +57,7 @@ const renderer = await createRenderer({
   fonts: { Geist: [geistBytes] },       // bytes, or srcs read through `load`
   load: fileLoader({ root: "./assets" }),
   cache: { maxImagePixels: 48_000_000 }, // or false
-  maxImageDecodePixels: 8192 * 8192,     // the default; see "Size limits"
+  maxImageDecodePixels: 200_000_000,     // the default; see "Size limits"
 });
 ```
 
@@ -126,15 +126,17 @@ make the decoder allocate a huge buffer.
 - **Image pixels.** The width and height in an image's header (PNG, JPEG, GIF,
   WebP, BMP, ICO, WBMP, AVIF) are read first, and an image over
   `maxImageDecodePixels` is never handed to CanvasKit. It paints as a
-  placeholder and the frame carries an `image_load_failed` warning. The default is 8192 * 8192 (about 67 million
-  pixels), a square at the 8192 export edge cap and about 268 MB of RGBA once
-  decoded; raise it for a renderer that needs larger sources. The same check
+  placeholder and the frame carries an `image_load_failed` warning. The default is 200 million pixels, so 100+
+  MP camera files pass. That is about 800 MB of RGBA once decoded, and
+  CanvasKit's WASM heap tops out at 2 GiB in both the browser and Node builds
+  while also holding the encoded bytes and a working copy, so raise it with
+  care; lower it for memory-constrained hosts. The same check
   guards images nested in SVG and `decodePixels` / `sampleImageNode`
   (`maxPixels`), which throw. `maxImagePixels` on `cache` is a different
   setting: it only decides which decoded images stay cached.
 - **Unreadable headers.** An image whose header cannot be read is refused, the
   same way: truncated or corrupt files, and formats the header reader does not
-  know (BMP, ICO, AVIF). Their dimensions cannot be checked, and a refused
+  know. Their dimensions cannot be checked, and a refused
   format costs a warning where an unchecked one can cost the WASM heap.
 - **WOFF and WOFF2 fonts.** No more than 128 MiB may unpack from one font. A WOFF
   table's `origLength` and the sum over its tables are checked against that cap
