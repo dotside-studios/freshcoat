@@ -118,7 +118,30 @@ function noiseGrain(e: FigmaEffect, scale: number): ExtractedEffect {
 export type ExtractedEffects = {
 	/** The node's effects in Figma's order; absent when it has none. */
 	effects?: ExtractedEffect[];
+	/** The blur kinds that had a further blur of the same kind left out. */
+	droppedBlurs?: BlurKind[];
 };
+
+type BlurKind = "blur" | "backdropBlur";
+
+const BLUR_EFFECT_KIND: Partial<Record<FigmaEffect["type"], BlurKind>> = {
+	LAYER_BLUR: "blur",
+	BACKGROUND_BLUR: "backdropBlur",
+};
+
+// The blur of each kind an element carries: the first one drawn, or, when none
+// is, the first one switched off.
+function chosenBlurs(effects: FigmaEffect[]): Map<BlurKind, FigmaEffect> {
+	const chosen = new Map<BlurKind, FigmaEffect>();
+	for (const e of effects) {
+		const kind = BLUR_EFFECT_KIND[e.type];
+		if (!kind) continue;
+		const prev = chosen.get(kind);
+		if (!prev || (prev.visible === false && e.visible !== false))
+			chosen.set(kind, e);
+	}
+	return chosen;
+}
 
 /** Whether any of the effects is drawn. */
 export function hasVisibleEffect(fx: ExtractedEffects): boolean {
@@ -133,8 +156,9 @@ export function hasVisibleEffect(fx: ExtractedEffects): boolean {
 // Figma stacks effects the way it stacks fills, first entry bottom-most, and
 // coatfile's shadows paint in that same order, so the list is carried across in
 // Figma's order. An effect Figma has switched off stays in the list as
-// `hidden`, so the designer can turn it back on. Only the first layer blur and
-// the first background blur are kept, since an element takes one of each.
+// `hidden`, so the designer can turn it back on. Only one layer blur and one
+// background blur are kept, since an element takes one of each: the first drawn
+// one, else the first switched off. The rest are reported in `droppedBlurs`.
 //
 // `worldRotation` is the element's total rotation in degrees once every frame
 // above it has been composed. Figma measures a shadow's offset on the CANVAS —
@@ -153,8 +177,8 @@ export function extractEffects(
 	const cos = Math.cos(rad);
 	const sin = Math.sin(rad);
 	const out: ExtractedEffect[] = [];
-	let blurSeen = false;
-	let backdropSeen = false;
+	const blurs = chosenBlurs(effects);
+	const droppedBlurs: BlurKind[] = [];
 	let grainSeen = false;
 	for (const e of effects) {
 		const hidden = e.visible === false ? { hidden: true as const } : {};
@@ -173,17 +197,17 @@ export function extractEffects(
 				...hidden,
 			});
 		}
-		if (e.type === "LAYER_BLUR" && !blurSeen) {
-			blurSeen = true;
-			out.push({ type: "blur", radius: (e.radius ?? 0) * scale, ...hidden });
-		}
-		if (e.type === "BACKGROUND_BLUR" && !backdropSeen) {
-			backdropSeen = true;
-			out.push({
-				type: "backdropBlur",
-				radius: (e.radius ?? 0) * scale,
-				...hidden,
-			});
+		const blurKind = BLUR_EFFECT_KIND[e.type];
+		if (blurKind) {
+			if (blurs.get(blurKind) === e) {
+				out.push({
+					type: blurKind,
+					radius: (e.radius ?? 0) * scale,
+					...hidden,
+				});
+			} else if (!droppedBlurs.includes(blurKind)) {
+				droppedBlurs.push(blurKind);
+			}
 		}
 		if (
 			e.type === "NOISE" &&
@@ -195,7 +219,10 @@ export function extractEffects(
 			out.push(noiseGrain(e, scale));
 		}
 	}
-	return out.length > 0 ? { effects: out } : {};
+	return {
+		...(out.length > 0 ? { effects: out } : {}),
+		...(droppedBlurs.length > 0 ? { droppedBlurs } : {}),
+	};
 }
 
 // Un-rotating an offset by a right angle leaves floating-point dust
