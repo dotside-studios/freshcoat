@@ -1,0 +1,119 @@
+{
+	"id": "fill-spot-tint",
+	"title": "a spot fill and stroke paint their alternate at the tint",
+	"profile": "core",
+	"requires": [
+		"fill.solid",
+		"draw.stroke",
+		"spot.tint"
+	],
+	"width": 160,
+	"height": 120,
+	"scene": {
+		"kind": "group",
+		"children": [
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 0,
+					"y": 0
+				},
+				"size": {
+					"width": 160,
+					"height": 120
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#ffffff"
+					}
+				]
+			},
+			{
+				"kind": "rect",
+				"pos": {
+					"x": 40,
+					"y": 30
+				},
+				"size": {
+					"width": 80,
+					"height": 60
+				},
+				"fills": [
+					{
+						"kind": "solid",
+						"color": "#2f6fed",
+						"spot": {
+							"name": "Blue",
+							"tint": 0.5,
+							"overprint": false
+						}
+					}
+				],
+				"stroke": {
+					"color": "#000000",
+					"width": 8,
+					"spot": {
+						"name": "Foil",
+						"tint": 0.25,
+						"overprint": true
+					}
+				}
+			}
+		],
+		"pos": {
+			"x": 0,
+			"y": 0
+		},
+		"size": {
+			"width": 160,
+			"height": 120
+		}
+	},
+	"assertions": [
+		{
+			"kind": "pixel",
+			"at": [
+				80,
+				60
+			],
+			"expect": [
+				151,
+				183,
+				246,
+				255
+			],
+			"why": "inside, the alternate at half",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				40,
+				60
+			],
+			"expect": [
+				191,
+				191,
+				191,
+				255
+			],
+			"why": "on the edge, black at a quarter",
+			"tolerance": 2
+		},
+		{
+			"kind": "pixel",
+			"at": [
+				10,
+				10
+			],
+			"expect": [
+				255,
+				255,
+				255,
+				255
+			],
+			"why": "outside it, the untouched ground"
+		}
+	]
+}

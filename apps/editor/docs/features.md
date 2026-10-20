@@ -162,7 +162,10 @@ the records, and **Export** turns templates and records into files.
     is kept. Checks lists what stops or spoils an export: a block (which
     disables Export), an unbound template, unfilled required fields,
     characters the fonts can't draw and records that failed last time, each
-    with a link to the record or the setting. A count beside the Export
+    with a link to the record or the setting. After a vector PDF, it warns
+    for each spot ink drawn as an image ("Spot colors lost in the last PDF,
+    drawn as images: Pink (pink)"), and notes once, without counting it as
+    an issue, the other layers drawn as images and why. A count beside the Export
     button opens the same list, and an estimate beside it says what the
     export will produce ("120 records · PDF · 1 file", "240 files · PNG
     zip"). Sizes are not estimated.
@@ -371,13 +374,15 @@ the records, and **Export** turns templates and records into files.
     printer knows it (White by default; All and None are refused), a tint, an
     alternate colour (the layer's own when empty) and an Overprint row, on by
     default. A vector PDF prints the paint as a Separation of that name; the
-    canvas, images and other pages show the alternate. There is no colour
+    canvas, images and other pages show the alternate at the tint, mixed
+    with white as the PDF's tint transform does. There is no colour
     library: type the printer's name.
   - Separations: View > Separations, or the Separations button at the top of
     the Print tab, previews which areas print as which spot ink. It is off by
     default and lasts for the session. On the overlay, each top-level
     rectangle or vector on the current side that has a spot ink is outlined
-    along its shape: a fill ink tints the area, a stroke ink traces the edge.
+    along its shape: a fill ink tints the area, a stroke ink traces the edge,
+    each lighter by the ink's tint.
     Every ink name keeps one color. A legend in the top right corner lists the
     inks, with "Overprint" beside those that overprint, and clicking an ink
     hides or shows it to check one plate at a time. A side with no spot inks
@@ -739,7 +744,7 @@ A PDF preset's Print section chooses **One per page** (the default) or
   sheet" repeats each card once per slot, so every record gets a full sheet;
   the count then shows how many fit. Under Double-sided, each copy's back
   lands behind its own front.
-- **Crop marks** (on by default): 0.25 pt black lines 4 mm long, starting
+- **Crop marks** (on by default): 0.25 pt lines 4 mm long, starting
   1 mm outside each cut line, in the margin and in gaps wide enough to hold
   them (10 mm), never across a card. They are drawn on fronts only, since
   the cut is made from the front.
@@ -749,8 +754,9 @@ A PDF preset's Print section chooses **One per page** (the default) or
   patches in the bottom margin; and a line in the top margin with the
   preset's name, "Sheet 2 of 5", the side when double-sided, and the date.
   Each is drawn only where its margin has room, the color bar and slug
-  outside the crop marks and clear of a target. Marks are pure black until
-  PDFs gain a registration color. See
+  outside the crop marks and clear of a target. Crop marks, targets, the color
+  bar's outline and the slug are drawn in registration color, so they print
+  on every plate; the color patches keep their process colors. See
   [Printer's marks](../../../packages/workspace/README.md#printers-marks).
 - **Double-sided:** when it is on, "Flip on" picks Long edge or Short edge,
   to match the printer's setting. Each record's back goes on the next page

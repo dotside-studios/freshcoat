@@ -123,7 +123,8 @@ is lowered to fit, and the `scale` on the result is the one actually used.
 `@freshcoat-js/coatfile/render` holds `renderTemplate` and `renderCompiled`,
 so the main entry stays free of the painter. `renderCompiledPdf(renderer,
 compiled, { dpi })` paints each side as one PDF page of vectors instead; a layer
-a PDF cannot express is drawn as an image, with a `vector_rasterized` warning
+a PDF cannot express is drawn as an image, with a `vector_rasterized` warning,
+or `spot_rasterized` when the layer paints a spot ink, which the image loses
 (see the engine's [PDF output](../engine/README.md#pdf-output)), and
 `text: "outline"` draws text as glyph outlines with no font in the file. `describeWarning(w)` there turns
 one of a result's `warnings` into a line of readable text, such as
@@ -455,7 +456,7 @@ what that minor added.
 | 1.2 | linear fill `from` / `to`; element `constraints` |
 | 1.3 | the `barcode` element |
 | 1.4 | variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden` |
-| 1.5 | grid layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
+| 1.5 | `grid` layout; element `adjust`; image `focus` and `crop`; template `bleed` and `safeArea`; text `justify`, `start` and `end` alignment, `alignLast`, `direction`, `paragraphSpacing` and font `features`; per-corner frame `cornerRadius`; `linear-burn` blend mode; barcode `bearerBars` |
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
 | 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone` (and its `anchor`); rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`, `gradient` and `logo` |
 
@@ -973,7 +974,7 @@ ink, as a white ink, foil or varnish layer does:
 
 `spot` names the ink, exactly as the press or RIP expects it. `tint` is in
 `[0, 1]` and defaults to 1. `alt` is the colour every output but a vector PDF
-paints, and a viewer without the ink shows; it defaults to the layer's own
+paints, at the tint, and a viewer without the ink shows; it defaults to the layer's own
 colour, the lead colour of its first fill or its stroke colour. `overprint`
 defaults to false; set it for a finishing layer so the ink prints over the
 artwork beneath rather than knocking it out.
@@ -981,9 +982,13 @@ artwork beneath rather than knocking it out.
 A spot fill replaces every fill of the layer with one solid in `alt`, and a
 spot stroke drops a gradient for a solid. A spot stroke on a layer without a
 stroke draws nothing. A vector PDF paints each spot in a `/Separation` colour
-space whose alternate is `alt` in RGB, with an overprinting ExtGState when
-asked; raster outputs paint `alt`. A layer the PDF has to draw as an image,
-such as one with a shadow, loses its spot.
+space whose tint transform runs from white to `alt` in RGB, with an
+overprinting ExtGState when asked. Raster outputs, Studio's canvas among them,
+paint what that transform gives at the tint: `alt` mixed with white, each
+channel `255 - (255 - c) * tint`, so a 0.5 tint of `#d4af37` paints `#ead79b`,
+as the PDF prints it lighter. A layer the PDF has to draw as an image, such as
+one with a shadow, loses its spot, with a `spot_rasterized` warning naming the
+layer and the ink; an export reports it for each item.
 
 Validation reports `invalid_spot` for an empty name, the names `All` and
 `None` (which PDF reserves), and an `alt` that is not a colour. There is no
@@ -1088,7 +1093,8 @@ starts the grid at the element's own corner and turns it with the element.
 A solid fill keeps full dots right up to its edge, which clips them, so bold
 text stays crisp. Soft alpha, such as a gradient to transparent or a blurred
 image, breaks into dots that shrink with the alpha. Both draw as an image in a vector PDF, with a
-`vector_rasterized` warning, and need a CanvasKit build with runtime effects
+`vector_rasterized` warning (`spot_rasterized` on a layer with a spot ink), which an export
+lists once per side as an info line rather than per item, and need a CanvasKit build with runtime effects
 (the default build has them); without them the element paints unchanged with
 an `effect_unsupported` warning.
 
@@ -1598,7 +1604,8 @@ The stroke is the element's, so every span shares it. It follows straight,
 arc and path text, ellipsized and shrink-fitted lines alike. Decorations are
 not stroked. A PDF draws it as vector text (`Tr` 1, with `Tr` 7 clipping an
 `inside` stroke); a gradient stroke is rasterized with a `vector_rasterized`
-warning, unless the text is drawn as outlines.
+warning, which an export lists once per side as an info line, unless the text
+is drawn as outlines.
 
 ### Outlined text in a PDF
 
