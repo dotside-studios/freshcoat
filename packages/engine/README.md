@@ -124,9 +124,9 @@ Untrusted bytes are checked before they are decoded, so a small file cannot
 make the decoder allocate a huge buffer.
 
 - **Image pixels.** The width and height in an image's header (PNG, JPEG, GIF,
-  WebP) are read first, and an image over `maxImageDecodePixels` is never handed
-  to CanvasKit. It paints as a placeholder and the frame carries an
-  `image_load_failed` warning. The default is 8192 * 8192 (about 67 million
+  WebP, BMP, ICO, WBMP, AVIF) are read first, and an image over
+  `maxImageDecodePixels` is never handed to CanvasKit. It paints as a
+  placeholder and the frame carries an `image_load_failed` warning. The default is 8192 * 8192 (about 67 million
   pixels), a square at the 8192 export edge cap and about 268 MB of RGBA once
   decoded; raise it for a renderer that needs larger sources. The same check
   guards images nested in SVG and `decodePixels` / `sampleImageNode`
@@ -460,7 +460,7 @@ subpath.
 | `@freshcoat-js/engine/svg` | SVG documents read without a DOM: `parseSvg`, `svgToNode` |
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 | `@freshcoat-js/engine/icc` | `SRGB_PROFILE`, the bundled sRGB profile; `readIccProfile`, which checks a profile can be a PDF's destination output profile and reads its description; `SRGB_OUTPUT_INTENT` and `resolveOutputIntent` |
-| `@freshcoat-js/engine/image` | PNG, JPEG, GIF and WebP size, EXIF orientation and capture time read from the file header, image type sniffing, `rgbIdat` for passing an RGB PNG's data through as is, and `jpegFrame`, `jpegIccProfile` and `iccComponents` for passing a JPEG through with its ICC profile |
+| `@freshcoat-js/engine/image` | PNG, JPEG, GIF, WebP, BMP, ICO, WBMP and AVIF size, EXIF orientation and capture time read from the file header, image type sniffing, `rgbIdat` for passing an RGB PNG's data through as is, and `jpegFrame`, `jpegIccProfile` and `iccComponents` for passing a JPEG through with its ICC profile |
 
 ## Staying warm
 
