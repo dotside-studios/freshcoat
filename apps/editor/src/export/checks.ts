@@ -1,9 +1,11 @@
 import {
 	codepointLabel,
+	describeRasterized,
 	type GlyphIssue,
 	type JobItemResult,
 	type PresetBlock,
 	type PresetNotice,
+	type RasterizedSide,
 	summarizeGlyphs,
 } from "@freshcoat-js/workspace/export";
 import { BINDING, plural } from "~/app/copy";
@@ -26,9 +28,11 @@ export type Check = {
 		| "glyphs"
 		| "failed"
 		| "warnings"
+		| "spots"
+		| "rasterized"
 		| PresetNotice["reason"];
-	/** an error stops the export; a warning lets it run */
-	severity: "error" | "warning";
+	/** an error stops the export; a warning lets it run; info only tells */
+	severity: "error" | "warning" | "info";
 	message: string;
 	/** the whole of a short message, for its hover */
 	detail?: string;
@@ -80,7 +84,8 @@ export type WarningGroup = {
 	items: { recordId: string; side: string; message: string }[];
 };
 
-/** A job's render warnings by code, the most frequent first. */
+/** A job's render warnings by code, the most frequent first. A spot ink
+ *  drawn as an image is left to the spots check. */
 export function warningGroups(
 	items: readonly Pick<JobItemResult, "recordId" | "side" | "warnings">[],
 ): WarningGroup[] {
@@ -88,6 +93,7 @@ export function warningGroups(
 	for (const item of items) {
 		const counted = new Set<string>();
 		for (const w of item.warnings ?? []) {
+			if (w.code === "spot_rasterized") continue;
 			let group = groups.get(w.code);
 			if (!group) {
 				group = { code: w.code, count: 0, items: [] };
@@ -118,6 +124,8 @@ export function exportChecks(input: {
 	/** what the last export's items warned about */
 	warnings?: readonly WarningGroup[];
 	notices?: readonly PresetNotice[];
+	/** what the last export's vector pages drew as images */
+	rasterized?: readonly RasterizedSide[];
 	labelFor: (recordId: string) => string;
 	showSide: boolean;
 	canPick: boolean;
@@ -227,10 +235,35 @@ export function exportChecks(input: {
 				: {}),
 		});
 	}
+	const rasterized = input.rasterized ?? [];
+	const lost = rasterized.flatMap((side) =>
+		side.layers.flatMap((l) =>
+			l.spots.map((spot) => ({ side: side.side, layer: l.layer, spot })),
+		),
+	);
+	if (lost.length > 0)
+		checks.push({
+			id: "spots",
+			severity: "warning",
+			message: `Spot colors lost in the last PDF, drawn as images: ${lost.map((l) => `${l.spot} (${l.layer ?? "a layer"})`).join(", ")}`,
+			detail:
+				"A shadow, blur, grain or other effect on a spot layer draws it as an image, which prints without the separation",
+		});
+	const lines = rasterized.flatMap((side) => {
+		const line = describeRasterized(side);
+		return line ? [input.showSide ? `${side.side}: ${line}` : line] : [];
+	});
+	if (lines.length > 0)
+		checks.push({
+			id: "rasterized",
+			severity: "info",
+			message: lines.join(" · "),
+		});
 	return checks;
 }
 
 export function checksSummary(checks: readonly Check[]): string {
-	if (checks.length === 0) return "All clear";
-	return plural(checks.length, "issue");
+	const issues = checks.filter((c) => c.severity !== "info").length;
+	if (issues === 0) return "All clear";
+	return plural(issues, "issue");
 }

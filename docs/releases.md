@@ -33,7 +33,15 @@ These land in the next release's notes.
 - **Template spot colours (format 1.7).** A `rect` or `vector` can print its
   fill or stroke in a named spot ink with `spot`, for white ink, foil or
   varnish. A vector PDF paints it as a Separation, overprinting on request;
-  raster outputs paint its alternate colour.
+  raster outputs and Studio's canvas paint its alternate colour at the tint,
+  mixed with white as the Separation's tint transform does.
+- **Rasterized layers in vector PDFs are reported.** A layer a vector PDF
+  draws as an image (shadow, blur, grain, halftone, gradient text stroke and
+  the like) used to pass without a word in an export. One that paints a spot
+  ink now warns for each item with the engine's new `spot_rasterized`, naming
+  the layer and the ink, as the separation is lost. The rest are listed once
+  per side: in `JobResult.rasterized`, as an `info` row per side in
+  `export-report.csv`, after a CLI export, and in Studio's export checks.
 
 ## Prepare and check a release
 

@@ -34,9 +34,12 @@ import {
 	IMAGE_CACHE_PIXELS,
 	type ItemRenderer,
 	inlinePool,
+	type JobItemResult,
 	PIECES_NEED_RASTER_PAGES,
 	REPORT_FILE_NAME,
 	type RenderRequest,
+	rasterizedSides,
+	reportCsv,
 	runExportJob,
 } from "./index";
 
@@ -168,6 +171,123 @@ describe("createItemRenderer vector pages", () => {
 		};
 		expect(await page()).toContain("/FontFile2");
 		expect(await page("outline")).not.toContain("/Font");
+	});
+});
+
+describe("rasterized layers", () => {
+	const shadow = {
+		type: "shadow" as const,
+		color: "#0008",
+		dx: 2,
+		dy: 3,
+		blur: 4,
+	};
+	const rasterizing = {
+		...template,
+		format_version: "1.7",
+		template_data: template.template_data.map((f, i) =>
+			i > 0
+				? f
+				: {
+						...f,
+						elements: [
+							...f.elements,
+							{
+								id: "pink",
+								type: "rect",
+								pos: { x: 10, y: 10 },
+								size: { width: 100, height: 100 },
+								properties: {
+									fill: "#ff3399",
+									spot: { fill: { spot: "Pink", overprint: true } },
+								},
+								effects: [shadow],
+							},
+							{
+								id: "soft",
+								type: "rect",
+								pos: { x: 200, y: 10 },
+								size: { width: 100, height: 100 },
+								properties: { fill: "#333333" },
+								effects: [shadow, { type: "grain", amount: 0.4 }],
+							},
+						],
+					},
+		),
+	} as RenderRequest["template"];
+
+	it("warns for a lost spot and lists the other layers on a vector page", async () => {
+		const out = await items.render({
+			template: rasterizing,
+			values: { name: "Ana" },
+			side: "front",
+			scale: 1,
+			images: [],
+			format: "png",
+			vector: { dpi: 300 },
+		});
+		expect(out.warnings).toEqual([
+			{
+				code: "spot_rasterized",
+				message:
+					"Spot colour Pink lost: the fill of pink is drawn as an image in the PDF (shadow)",
+			},
+		]);
+		expect(out.rasterized).toEqual([
+			{ layer: "pink", feature: "shadow", spot: "Pink" },
+			{ layer: "soft", feature: "shadow" },
+		]);
+		expect(new TextDecoder("latin1").decode(out.bytes)).not.toContain(
+			"/Separation",
+		);
+		items.endJob();
+	});
+
+	const item = (
+		fileName: string,
+		side: string,
+		rasterized: JobItemResult["rasterized"],
+	): JobItemResult => ({
+		key: fileName,
+		recordId: fileName,
+		side,
+		fileName,
+		ok: true,
+		print: "off",
+		...(rasterized ? { rasterized } : {}),
+	});
+	const job = [
+		item("a.pdf", "front", [
+			{ layer: "soft", feature: "shadow" },
+			{ layer: "pink", feature: "shadow", spot: "Pink" },
+		]),
+		item("b.pdf", "front", [
+			{ layer: "soft", feature: "shadow" },
+			{ layer: "soft", feature: "grain" },
+			{ feature: "backdrop blur" },
+		]),
+		item("c.pdf", "back", undefined),
+	];
+
+	it("groups them by side, each layer once", () => {
+		expect(rasterizedSides(job)).toEqual([
+			{
+				side: "front",
+				layers: [
+					{ layer: "soft", features: ["shadow", "grain"], spots: [] },
+					{ layer: "pink", features: ["shadow"], spots: ["Pink"] },
+					{ features: ["backdrop blur"], spots: [] },
+				],
+			},
+		]);
+	});
+
+	it("adds an info row per side to the report", () => {
+		const rows = reportCsv(job).split("\r\n");
+		expect(rows).toContain(
+			',,front,info,,,,,"Drawn as images in the PDF: soft (shadow, grain); backdrop blur"',
+		);
+		expect(rows.filter((r) => r.includes(",info,"))).toHaveLength(1);
 	});
 });
 

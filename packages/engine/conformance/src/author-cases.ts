@@ -115,6 +115,37 @@ add(
 	],
 );
 
+// A spot solid paints its alternate at the tint, mixed with white as the PDF
+// Separation's tint transform runs: 255 - (255 - c) * tint per channel.
+add(
+	"fill-spot-tint",
+	"a spot fill and stroke paint their alternate at the tint",
+	"core",
+	["fill.solid", "draw.stroke", "spot.tint"],
+	frame([
+		createRect({
+			...box(40, 30, 80, 60),
+			fills: [
+				{
+					kind: "solid",
+					color: "#2f6fed",
+					spot: { name: "Blue", tint: 0.5, overprint: false },
+				},
+			],
+			stroke: {
+				color: "#000000",
+				width: 8,
+				spot: { name: "Foil", tint: 0.25, overprint: true },
+			},
+		}),
+	]),
+	[
+		px([80, 60], [151, 183, 246, 255], "inside, the alternate at half", 2),
+		px([40, 60], [191, 191, 191, 255], "on the edge, black at a quarter", 2),
+		px([10, 10], [255, 255, 255, 255], "outside it, the untouched ground"),
+	],
+);
+
 // Endpoints are in [0,1] of the box, so the stop colors land at known corners
 // whatever the backend's gradient implementation.
 add(

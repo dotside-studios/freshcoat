@@ -15,6 +15,7 @@ import {
 } from "@freshcoat-js/workspace";
 import { packWorkspace } from "@freshcoat-js/workspace/archive";
 import {
+	describeRasterized,
 	exportWorkspace,
 	findPreset,
 	type JobProgress,
@@ -189,6 +190,10 @@ export async function runPreset(
 		await options.save?.(result.workspace);
 		for (const item of result.items)
 			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning.message}`);
+		for (const side of result.rasterized ?? []) {
+			const line = describeRasterized(side);
+			if (line) log.info(`${side.side}: ${line}`);
+		}
 		const failed = result.items.filter((item) => !item.ok);
 		for (const item of failed)
 			log.info(`failed: ${item.fileName}: ${item.error ?? "unknown error"}`);

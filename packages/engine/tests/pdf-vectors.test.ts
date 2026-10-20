@@ -331,6 +331,118 @@ describe("spot colours", () => {
 	test.skipIf(!pdftoppm)("matches the raster render in the alternate", async () => {
 		expect(await difference(inked)).toBeLessThan(2);
 	});
+
+	test("a raster render paints the alternate at the tint", async () => {
+		const png = await renderer.render(
+			frame([
+				createRect({
+					pos: { x: 0, y: 0 },
+					size: { width: W, height: H },
+					fills: [
+						{
+							kind: "solid",
+							color: "#d4af37",
+							spot: { name: "Gold Foil", tint: 0.5, overprint: false },
+						},
+					],
+				}),
+			]),
+			{ width: W, height: H },
+		);
+		const pixels = decodePixels(ck, png.bytes);
+		if (!pixels) throw new Error("decode failed");
+		const at = ((H / 2) * W + W / 2) * 4;
+		const rgb = [...pixels.data.slice(at, at + 3)];
+		for (const [i, c] of [234, 215, 155].entries())
+			expect(Math.abs((rgb[i] as number) - c)).toBeLessThanOrEqual(1);
+	});
+
+	test.skipIf(!pdftoppm)("matches the raster render at a tint", async () => {
+		expect(
+			await difference(
+				frame([
+					createRect({
+						pos: { x: 20, y: 20 },
+						size: { width: 160, height: 80 },
+						fills: [
+							{
+								kind: "solid",
+								color: "#2f6fed",
+								spot: { name: "Blue", tint: 0.3, overprint: false },
+							},
+						],
+					}),
+				]),
+			),
+		).toBeLessThan(2);
+	});
+
+	test("a spot layer drawn as an image warns that its spot is lost", async () => {
+		const shadow = { color: "#0008", dx: 2, dy: 3, blur: 4 };
+		const pdf = await renderer.renderPdf(
+			frame([
+				createRect({
+					id: "pink",
+					pos: { x: 10, y: 10 },
+					size: { width: 40, height: 40 },
+					fills: [
+						{
+							kind: "solid",
+							color: "#ff3399",
+							spot: { name: "Pink", tint: 1, overprint: true },
+						},
+					],
+					shadow,
+				}),
+				createGroup(
+					[
+						createRect({
+							id: "foil",
+							pos: { x: 0, y: 0 },
+							size: { width: 60, height: 60 },
+							stroke: {
+								color: "#d4af37",
+								width: 2,
+								spot: { name: "Gold Foil", tint: 1, overprint: false },
+							},
+						}),
+					],
+					{
+						id: "badge",
+						pos: { x: 100, y: 10 },
+						size: { width: 60, height: 60 },
+						shadow,
+					},
+				),
+				createRect({
+					id: "plain",
+					pos: { x: 10, y: 70 },
+					size: { width: 40, height: 40 },
+					fills: [{ kind: "solid", color: "#000" }],
+					shadow,
+				}),
+			]),
+			{ width: W, height: H },
+		);
+		expect(pdf.warnings).toEqual([
+			{
+				kind: "spot_rasterized",
+				feature: "shadow",
+				layer: "pink",
+				spot: "Pink",
+				paint: "fill",
+			},
+			{
+				kind: "spot_rasterized",
+				feature: "shadow",
+				layer: "foil",
+				spot: "Gold Foil",
+				paint: "stroke",
+			},
+			{ kind: "vector_rasterized", feature: "shadow", layer: "plain" },
+		]);
+		expect(latin1(pdf.bytes)).not.toContain("/Separation");
+	});
 });
 
 describe("smoothed corners", () => {

@@ -336,7 +336,10 @@ gradient-stroked text, synthetic bold, the `plus` and `linear-burn` blend
 modes, text whose outlines do not read, and SVG images holding text or
 filters. Bitmaps are drawn without smoothing.
 Everything beneath a backdrop blur, or the whole page under a frame finish, is
-one image. Each image layer is reported once as a `vector_rasterized` warning.
+one image. Each image layer is reported once as a `vector_rasterized` warning,
+or, for each spot ink it or a layer it holds paints, as `spot_rasterized`
+(`{ feature, layer, spot, paint }`) in its place, as the image loses the
+Separation.
 
 ### Text as outlines
 
@@ -479,8 +482,10 @@ underlying model.
   fill's or stroke's own `color` in `DeviceRGB`, so a viewer without the ink
   shows that alternate. With `overprint`, an ExtGState sets `/OP true /op true
   /OPM 1` so the ink prints over what lies beneath it rather than knocking it
-  out. Every other output ignores `spot` and paints the alternate. A layer the
-  PDF painter has to rasterize loses its spot colour. Names are the caller's
+  out. Every other output paints the alternate at the tint, mixed with white
+  as the tint transform runs, so a raster render matches the PDF. A layer the
+  PDF painter has to rasterize loses its spot colour, with a `spot_rasterized`
+  warning. Names are the caller's
   own: there is no Pantone or other library.
 
 ## Conformance

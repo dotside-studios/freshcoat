@@ -224,7 +224,7 @@ export type Stroke = {
 	trimEnd?: number;
 	trimOffset?: number;
 	// A vector PDF strokes a solid stroke in this spot colour; `color` is its
-	// alternate, which raster outputs paint.
+	// alternate, which raster outputs paint at the spot's tint.
 	spot?: SpotInk;
 };
 
@@ -260,7 +260,8 @@ export type GradientFill = Extract<
 // Gradient endpoints are in [0, 1] of the drawable's bbox. `spread` is what
 // paints past the last stop; omitted means pad.
 export type ResolvedFill =
-	// `spot`: a vector PDF paints it in that spot colour, `color` its alternate.
+	// `spot`: a vector PDF paints it in that spot colour, `color` its alternate,
+	// which raster outputs paint at the spot's tint.
 	| { kind: "solid"; color: string; spot?: SpotInk }
 	| {
 			kind: "linear";
@@ -619,6 +620,15 @@ export type PaintWarning =
 	// A backend that writes vectors drew a layer as an image because it has no
 	// vector equivalent for part of it, such as a shadow in a PDF.
 	| { kind: "vector_rasterized"; feature: string; layer?: string }
+	// The same, for a layer that paints a spot ink: the image loses the
+	// Separation, so the ink does not print.
+	| {
+			kind: "spot_rasterized";
+			feature: string;
+			layer?: string;
+			spot: string;
+			paint: "fill" | "stroke";
+	  }
 	// A pattern fill's shader failed to compile, so it painted its first colour.
 	| { kind: "pattern_unsupported"; pattern: PatternKind; error: string }
 	// No runtime effects or offscreen surface: the layer painted without it.

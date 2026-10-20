@@ -1,0 +1,75 @@
+{
+	"caseId": "fill-spot-tint",
+	"canvasKitVersion": "0.41.1",
+	"commands": [
+		{
+			"op": "createCanvas",
+			"width": 160,
+			"height": 120
+		},
+		{
+			"pos": {
+				"x": 0,
+				"y": 0
+			},
+			"size": {
+				"width": 160,
+				"height": 120
+			},
+			"op": "drawGroup",
+			"children": [
+				{
+					"pos": {
+						"x": 0,
+						"y": 0
+					},
+					"size": {
+						"width": 160,
+						"height": 120
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#ffffff"
+						}
+					]
+				},
+				{
+					"pos": {
+						"x": 40,
+						"y": 30
+					},
+					"size": {
+						"width": 80,
+						"height": 60
+					},
+					"op": "drawRect",
+					"fills": [
+						{
+							"kind": "solid",
+							"color": "#2f6fed",
+							"spot": {
+								"name": "Blue",
+								"tint": 0.5,
+								"overprint": false
+							}
+						}
+					],
+					"stroke": {
+						"color": "#000000",
+						"width": 8,
+						"spot": {
+							"name": "Foil",
+							"tint": 0.25,
+							"overprint": true
+						}
+					}
+				}
+			]
+		}
+	],
+	"deviceWidth": 160,
+	"deviceHeight": 120,
+	"rgbaSha256": "540dece8bc278144af44ce130144a70b199048c42df1e78ab6469340a912613d"
+}

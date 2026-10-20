@@ -241,6 +241,24 @@ describe("the separations preview", () => {
 		expect(foil?.getAttribute("data-paint")).toBe("stroke");
 	});
 
+	test("lightens a plate by its tint", () => {
+		canvas(
+			withFront(spotted(), (e) =>
+				e.id === "a"
+					? ({
+							...e,
+							properties: {
+								...e.properties,
+								spot: { fill: { spot: "White", tint: 0.5 } },
+							},
+						} as Element)
+					: e,
+			),
+		);
+		expect(plate("White")[0]?.getAttribute("fill-opacity")).toBe("0.2");
+		expect(plate("Foil")[0]?.getAttribute("stroke-opacity")).toBe("0.8");
+	});
+
 	test("lists the inks, marking the ones that overprint", () => {
 		canvas(spotted());
 		const rows = screen.getAllByTestId("separations-ink");

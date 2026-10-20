@@ -577,6 +577,7 @@ export function ExportSection() {
 		failed: scopeCounts.failed,
 		warnings: lastWarnings,
 		notices: readiness?.notices ?? [],
+		...(lastResult?.rasterized ? { rasterized: lastResult.rasterized } : {}),
 		labelFor: (id) => {
 			const record = dataset?.records.find((r) => r.id === id);
 			return record ? labelFor(record) : id;
