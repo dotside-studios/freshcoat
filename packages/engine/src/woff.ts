@@ -9,6 +9,9 @@ import { assemble, type Tables } from "./sfnt-write";
 const tagAt = (b: Uint8Array, o: number) =>
 	String.fromCharCode(b[o] ?? 0, b[o + 1] ?? 0, b[o + 2] ?? 0, b[o + 3] ?? 0);
 
+/** Most bytes a WOFF or WOFF2 file may unpack to, in all its tables. */
+export const MAX_UNPACKED_FONT_BYTES = 128 * 1024 * 1024;
+
 const unpacked = new WeakMap<Uint8Array, Uint8Array>();
 
 // The sfnt inside a WOFF or WOFF2 file, or `bytes` as given when they are
@@ -27,14 +30,20 @@ export function sfntBytes(bytes: Uint8Array): Uint8Array {
 function unpackWoff(bytes: Uint8Array): Uint8Array {
 	const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	const tables: Tables = new Map();
+	let total = 0;
 	for (let i = 0; i < dv.getUint16(12); i++) {
 		const o = 44 + i * 20;
 		const at = dv.getUint32(o + 4);
 		const compLength = dv.getUint32(o + 8);
 		const origLength = dv.getUint32(o + 12);
 		if (at + compLength > bytes.length) throw new Error("table past the end");
+		total += origLength;
+		if (total > MAX_UNPACKED_FONT_BYTES) throw new Error("font too large");
 		const data = bytes.subarray(at, at + compLength);
-		const table = compLength < origLength ? unzlibSync(data) : data;
+		const table =
+			compLength < origLength
+				? unzlibSync(data, { out: new Uint8Array(origLength + 1) })
+				: data;
 		if (table.length !== origLength) throw new Error("table length mismatch");
 		tables.set(tagAt(bytes, o), table);
 	}
@@ -152,7 +161,12 @@ class Reader {
 	}
 }
 
-type Woff2Entry = { tag: string; length: number; transformed: boolean };
+type Woff2Entry = {
+	tag: string;
+	origLength: number;
+	length: number;
+	transformed: boolean;
+};
 
 function unpackWoff2(bytes: Uint8Array): Uint8Array {
 	const r = new Reader(bytes);
@@ -166,6 +180,8 @@ function unpackWoff2(bytes: Uint8Array): Uint8Array {
 	const compressedSize = r.u32();
 	r.o = 48;
 	const entries: Woff2Entry[] = [];
+	let original = 0;
+	let stream = 0;
 	for (let i = 0; i < numTables; i++) {
 		const flags = r.u8();
 		const tag =
@@ -175,13 +191,15 @@ function unpackWoff2(bytes: Uint8Array): Uint8Array {
 		const origLength = r.base128();
 		const transformed =
 			tag === "glyf" || tag === "loca" ? version !== 3 : version !== 0;
-		entries.push({
-			tag,
-			length: transformed ? r.base128() : origLength,
-			transformed,
-		});
+		const length = transformed ? r.base128() : origLength;
+		original += origLength;
+		stream += length;
+		if (original > MAX_UNPACKED_FONT_BYTES || stream > MAX_UNPACKED_FONT_BYTES)
+			throw new Error("font too large");
+		entries.push({ tag, origLength, length, transformed });
 	}
-	const data = decompress(r.bytes(compressedSize));
+	const data = decompress(r.bytes(compressedSize), stream);
+	if (data.length !== stream) throw new Error("table data length mismatch");
 
 	const raw = new Map<string, Uint8Array>();
 	let at = 0;
