@@ -233,6 +233,7 @@ export type { T } from "types-only";
 
 	test("keeps its place after template substitutions and regexes", () => {
 		const refs = scriptRefs(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: source text for the scanner, not a template
 			'const a = `x ${`y ${1}`} z`;\nconst r = /[\'"]/g;\nimport q from "after";\n',
 		);
 		expect(refs.map((r) => [r.spec, r.line])).toEqual([["after", 3]]);

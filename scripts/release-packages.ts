@@ -44,8 +44,9 @@ export function manifest(directory: string): Manifest {
 export function releaseVersion(tag?: string): string {
 	const versions = packages.map((name) => manifest(`packages/${name}`).version);
 	versions.push(manifest("apps/figma-plugin").version);
-	const version = versions[0]!;
+	const version = versions[0];
 	if (
+		!version ||
 		!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) ||
 		version === "0.0.0"
 	) {
