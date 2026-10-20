@@ -57,6 +57,8 @@ export type NodeTrace = {
 	nodeType: string;
 	decision: Classification["kind"];
 	reason?: FlattenReason;
+	/** Something the node's element lost on the way, though it came through. */
+	dropped?: "duplicate_blur_dropped";
 	/** The element this node produced. Absent when it produced none: a skipped
 	 *  layer, a pass-through group, or a raster whose bytes never arrived. Read
 	 *  AFTER ids are uniquified, so it matches the emitted template. */

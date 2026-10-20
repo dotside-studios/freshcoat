@@ -605,6 +605,7 @@ function walkNode(
 			localFrame.rotation + ((el.rotation as number | undefined) ?? 0);
 		const fx = extractEffects(n.effects, scale, worldRotation);
 		if (fx.effects) el.effects = fx.effects;
+		blurWarning(n, fx, entry, w.sink.warnings);
 		noiseWarning(n, fx, w.sink.warnings);
 		// classify() declines to rasterize a layer set to Multiply/Screen/…
 		// precisely because the element can carry the mode itself. Dropping it
@@ -628,6 +629,25 @@ function walkNode(
 		entry.el = el;
 		target.push(el);
 	}
+}
+
+function blurWarning(
+	n: FigmaNode,
+	fx: ReturnType<typeof extractEffects>,
+	entry: TraceEntry,
+	warnings: TemplateWarning[],
+): void {
+	if (!fx.droppedBlurs) return;
+	entry.dropped = "duplicate_blur_dropped";
+	const kinds = fx.droppedBlurs.map((k) =>
+		k === "blur" ? "layer blur" : "background blur",
+	);
+	warnings.push({
+		severity: "warn",
+		code: "duplicate_blur_dropped",
+		message: `Layer "${n.name}" has more than one ${kinds.join(" and ")}, but an element takes one of each, so the extra blur was dropped.`,
+		nodeId: n.id,
+	});
 }
 
 function noiseWarning(
