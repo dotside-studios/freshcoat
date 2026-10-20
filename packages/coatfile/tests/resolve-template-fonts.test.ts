@@ -98,7 +98,7 @@ describe("resolveTemplateFonts", () => {
 		);
 		const report = await resolveTemplateFonts(
 			template([text("Inter", 700), text("Inter")]),
-			{ fetch },
+			{ fetch, guessGoogle: true },
 		);
 		expect(report.declared).toEqual([]);
 		expect(report.guessed).toEqual(["Inter"]);
@@ -117,6 +117,16 @@ describe("resolveTemplateFonts", () => {
 		expect(report.fonts.size).toBe(0);
 		expect(report.declared).toEqual(["Roboto"]);
 		expect(report.missing).toEqual(["Nowhere Sans", "Roboto"]);
+	});
+
+	test("does not look an undeclared family up on Google by default", async () => {
+		const { fetch, urls } = fakeFetch(() => css("https://f/inter.ttf"));
+		const report = await resolveTemplateFonts(template([text("Inter")]), {
+			fetch,
+		});
+		expect(report.missing).toEqual(["Inter"]);
+		expect(report.guessed).toEqual([]);
+		expect(urls).toEqual([]);
 	});
 
 	test("with guessGoogle off, an undeclared family is missing and not fetched", async () => {
@@ -141,18 +151,18 @@ describe("resolveTemplateFonts", () => {
 		const cache = new Map<string, Promise<Uint8Array[]>>();
 		const t = template([text("Inter")]);
 
-		expect((await resolveTemplateFonts(t, { fetch, cache })).missing).toEqual([
+		expect((await resolveTemplateFonts(t, { fetch, cache, guessGoogle: true })).missing).toEqual([
 			"Inter",
 		]);
 		expect(cache.size).toBe(0);
 
 		up = true;
-		const second = await resolveTemplateFonts(t, { fetch, cache });
+		const second = await resolveTemplateFonts(t, { fetch, cache, guessGoogle: true });
 		expect(second.guessed).toEqual(["Inter"]);
 		expect(cache.size).toBe(1);
 
 		const fetched = urls.length;
-		const third = await resolveTemplateFonts(t, { fetch, cache });
+		const third = await resolveTemplateFonts(t, { fetch, cache, guessGoogle: true });
 		expect(third.fonts.get("Inter")).toBe(second.fonts.get("Inter"));
 		expect(urls.length).toBe(fetched);
 	});
@@ -171,15 +181,15 @@ describe("resolveTemplateFonts", () => {
 		cache.set("g:Inter:400", stale);
 
 		const [first, second] = await Promise.all([
-			resolveTemplateFonts(t, { fetch: down.fetch, cache }),
-			resolveTemplateFonts(t, { fetch, cache }),
+			resolveTemplateFonts(t, { fetch: down.fetch, cache, guessGoogle: true }),
+			resolveTemplateFonts(t, { fetch, cache, guessGoogle: true }),
 		]);
 		expect(first.missing).toEqual(["Inter"]);
 		expect(second.guessed).toEqual(["Inter"]);
 		expect(cache.size).toBe(1);
 
 		const fetched = urls.length;
-		const third = await resolveTemplateFonts(t, { fetch, cache });
+		const third = await resolveTemplateFonts(t, { fetch, cache, guessGoogle: true });
 		expect(third.fonts.get("Inter")).toBe(second.fonts.get("Inter"));
 		expect(urls.length).toBe(fetched);
 	});

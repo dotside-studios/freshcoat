@@ -89,7 +89,7 @@ export function createExportRunner(deps: ExportRunnerDeps = {}): ExportRunner {
 	const resolveFonts =
 		deps.resolveFonts ??
 		(async (template: Template) =>
-			(await resolveTemplateFonts(template, { cache: fontCache })).fonts);
+			(await resolveTemplateFonts(template, { cache: fontCache, guessGoogle: true })).fonts);
 	let pool: ReturnType<typeof createPool> | null = null;
 	let poolFonts: Map<string, Uint8Array[]> | null = null;
 	let controller: AbortController | null = null;

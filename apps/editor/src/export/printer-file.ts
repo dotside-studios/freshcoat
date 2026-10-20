@@ -124,7 +124,7 @@ export function usePrinterFile(
 			const own = pool.current;
 			if (own.template !== template) {
 				own.template = template;
-				own.fonts = resolveTemplateFonts(template, { cache: fontCache }).then(
+				own.fonts = resolveTemplateFonts(template, { cache: fontCache, guessGoogle: true }).then(
 					({ fonts }) => own.pool.init(fonts),
 				);
 			}

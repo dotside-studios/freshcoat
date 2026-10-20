@@ -250,6 +250,7 @@ export async function runWatermarkExport(opts: {
 	const pool = createWorkerPool(defaultPoolSize(largest));
 	const { fonts } = await resolveTemplateFonts(photoWatermark(), {
 		cache: fontCache,
+		guessGoogle: true,
 	});
 	await pool.init(fonts);
 

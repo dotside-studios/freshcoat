@@ -20,7 +20,7 @@ const loadExportPng = once(() => import("./export-png"));
 export async function renderThumbnail(t: Template): Promise<Blob> {
 	const [{ renderSidePng }, { fonts }] = await Promise.all([
 		loadExportPng(),
-		resolveTemplateFonts(t, { cache: fontCache }),
+		resolveTemplateFonts(t, { cache: fontCache, guessGoogle: true }),
 	]);
 	const { png } = await renderSidePng(t, {
 		side: 0,

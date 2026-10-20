@@ -56,7 +56,8 @@ export type ResolveTemplateFontsOptions = {
 	fetch?: FontFetch;
 	// Reads a `local` font file src that is neither data: nor http(s).
 	load?: ByteLoader;
-	// Look an undeclared family up on Google Fonts by name. Defaults to true.
+	// Look an undeclared family up on Google Fonts by name. Opt-in: it sends
+	// family names from the template to Google. Defaults to false.
 	guessGoogle?: boolean;
 	// Holds fetched bytes across calls. An empty result is deleted again, so a
 	// family that failed is retried on the next call.
@@ -77,13 +78,13 @@ export type ResolvedTemplateFonts = {
 // Load every font a template's text and barcodes need, in the base design and
 // each variant. A declared family loads from its descriptor. A family the
 // `fonts` block does not describe is looked up on Google Fonts by name, at the
-// weights the template uses it at, unless `guessGoogle` is false. One family
+// weights the template uses it at, when `guessGoogle` is true. One family
 // that fails never takes the others with it: it is reported as missing.
 export async function resolveTemplateFonts(
 	template: Template,
 	options: ResolveTemplateFontsOptions = {},
 ): Promise<ResolvedTemplateFonts> {
-	const { fetch, load, cache, guessGoogle = true } = options;
+	const { fetch, load, cache, guessGoogle = false } = options;
 	const usage = fontUsage(template);
 
 	const results = await Promise.all(

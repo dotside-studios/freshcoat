@@ -171,6 +171,7 @@ export async function runPreset(
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
 		load: createLoader(io, options.root),
+		guessGoogle: true,
 	});
 	warnAboutFonts(log, report);
 	const out = resolve(io.cwd, options.out);
