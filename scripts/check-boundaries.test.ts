@@ -126,6 +126,36 @@ export default {
 }`,
 	);
 	write("lib/biome.json", { extends: ["../app/biome.json"] });
+	for (const name of ["engine", "workspace", "test-utils"])
+		write(`packages/${name}/package.json`, { name: `@freshcoat-js/${name}` });
+	write("packages/for-print/package.json", {
+		name: "@freshcoat-js/for-print",
+		dependencies: {
+			"@freshcoat-js/engine": "workspace:*",
+			"@freshcoat-js/workspace": "workspace:*",
+		},
+		devDependencies: { "@freshcoat-js/test-utils": "workspace:*" },
+	});
+	write("packages/for-print/src/ok.ts", `import { x } from "@freshcoat-js/engine";\n`);
+	write("packages/for-print/src/up.ts", `import { y } from "@freshcoat-js/workspace";\n`);
+	write("packages/ui/package.json", {
+		name: "@freshcoat-js/ui",
+		devDependencies: { "@freshcoat-js/coatfile": "workspace:*" },
+	});
+	write("packages/ui/src/a.ts", `import { z } from "@freshcoat-js/coatfile";\n`);
+	write("packages/coatfile/package.json", {
+		name: "@freshcoat-js/coatfile",
+		dependencies: { "@freshcoat-js/test-utils": "workspace:*" },
+	});
+	for (const file of [
+		"src/lib.ts",
+		"src/lib.test.ts",
+		"src/lib.spec.tsx",
+		"tests/lib.ts",
+		"e2e/lib.ts",
+		"conformance/run.ts",
+	])
+		write(`packages/coatfile/${file}`, `import { f } from "@freshcoat-js/test-utils";\n`);
 	write("scripts/tool.ts", `import { join } from "node:path";\nimport ts from "typescript";\n`);
 });
 
@@ -200,6 +230,71 @@ describe("checkBoundaries", () => {
 	test("a file outside every package may import builtins only", () => {
 		expect(at(checkBoundaries(root), "scripts/tool.ts")).toEqual([
 			'2: "typescript" is imported outside any freshcoat package',
+		]);
+	});
+
+	test("allows an import along an allowed layering edge", () => {
+		expect(at(checkBoundaries(root), "packages/for-print/src/ok.ts")).toEqual([]);
+	});
+
+	test("rejects an upward import and declaration", () => {
+		const vs = checkBoundaries(root);
+		expect(at(vs, "packages/for-print/src/up.ts")).toEqual([
+			'1: "@freshcoat-js/workspace" may not be imported by @freshcoat-js/for-print, which depends on @freshcoat-js/engine',
+		]);
+		expect(at(vs, "packages/for-print/package.json")).toEqual([
+			'5: "@freshcoat-js/workspace" is not an allowed dependency of @freshcoat-js/for-print, which depends on @freshcoat-js/engine',
+		]);
+	});
+
+	test("ui may not depend on or import the core packages", () => {
+		const vs = checkBoundaries(root);
+		expect(at(vs, "packages/ui/src/a.ts")).toEqual([
+			'1: "@freshcoat-js/coatfile" may not be imported by @freshcoat-js/ui, which depends on no internal package',
+		]);
+		expect(at(vs, "packages/ui/package.json")).toEqual([
+			'4: "@freshcoat-js/coatfile" is not an allowed dependency of @freshcoat-js/ui, which depends on no internal package',
+		]);
+	});
+
+	test("test-utils is a dev dependency imported by test files only", () => {
+		const vs = checkBoundaries(root);
+		expect(at(vs, "packages/coatfile/package.json")).toEqual([
+			'4: "@freshcoat-js/test-utils" must be a devDependency only',
+		]);
+		expect(at(vs, "packages/for-print/package.json")).toEqual([
+			expect.stringContaining("@freshcoat-js/workspace"),
+		]);
+		expect(at(vs, "packages/coatfile/src/lib.ts")).toEqual([
+			'1: "@freshcoat-js/test-utils" is imported from non-test source; only test files may import it',
+		]);
+		for (const file of [
+			"src/lib.test.ts",
+			"src/lib.spec.tsx",
+			"tests/lib.ts",
+			"e2e/lib.ts",
+			"conformance/run.ts",
+		])
+			expect(at(vs, `packages/coatfile/${file}`)).toEqual([]);
+	});
+
+	test("an exact-path exemption lets non-test source import test-utils", () => {
+		const vs = checkBoundaries(root, {
+			"packages/coatfile/src/lib.ts": "fixture reuse",
+		});
+		expect(at(vs, "packages/coatfile/src/lib.ts")).toEqual([]);
+	});
+
+	test("an exemption is stale when the file is gone or no longer imports test-utils", () => {
+		const vs = checkBoundaries(root, {
+			"packages/coatfile/missing.ts": "gone",
+			"packages/for-print/src/ok.ts": "no import",
+		});
+		expect(at(vs, "packages/coatfile/missing.ts")).toEqual([
+			'1: Exemption for "@freshcoat-js/test-utils" is stale: the file no longer exists',
+		]);
+		expect(at(vs, "packages/for-print/src/ok.ts")).toEqual([
+			'1: Exemption for "@freshcoat-js/test-utils" is stale: the file no longer imports it',
 		]);
 	});
 
