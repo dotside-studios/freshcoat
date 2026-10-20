@@ -7,7 +7,7 @@ import {
 	workspace,
 } from "../test-fixtures";
 import type { ExportPreset, SheetLayout, Workspace } from "../types";
-import { presetReadiness } from "./readiness";
+import { presetReadiness, templateSpotInks } from "./readiness";
 
 const sheetsPreset: ExportPreset = {
 	...preset,
@@ -171,5 +171,100 @@ describe("presetReadiness", () => {
 		const r = presetReadiness(workspace, sheetsPreset);
 		expect(r.sheets?.imposition).toBeDefined();
 		expect(r.blocked).toBeNull();
+	});
+});
+
+describe("presetReadiness notices", () => {
+	const spotted: Workspace = {
+		...workspace,
+		templates: workspace.templates.map((t) =>
+			t.id === "t_member"
+				? {
+						...t,
+						template: {
+							...t.template,
+							template_data: t.template.template_data.map((f, i) =>
+								i === 0
+									? {
+											...f,
+											background: {
+												...f.background,
+												properties: {
+													...f.background?.properties,
+													spot: {
+														fill: { spot: "White" },
+														stroke: { spot: "Foil" },
+													},
+												},
+											},
+										}
+									: f,
+							),
+						} as typeof t.template,
+					}
+				: t,
+		),
+	};
+	const vector: ExportPreset = {
+		...preset,
+		format: "pdf",
+		pdfPageImage: "vector",
+	};
+	const printing: ExportPreset = { ...vector, print: { enabled: true } };
+
+	it("has none for a plain preset", () => {
+		expect(presetReadiness(workspace, preset).notices).toEqual([]);
+		expect(presetReadiness(workspace, vector).notices).toEqual([]);
+	});
+
+	it("says a print target draws vector pages as PNG", () => {
+		expect(
+			presetReadiness(workspace, printing).notices.map((n) => n.reason),
+		).toEqual(["print_raster"]);
+	});
+
+	it("says spot inks print as plain color off vector pages", () => {
+		expect(presetReadiness(spotted, vector).notices).toEqual([]);
+		const png = presetReadiness(spotted, preset).notices;
+		expect(png).toEqual([
+			expect.objectContaining({
+				reason: "spot_raster",
+				message: "Spot inks White, Foil print as plain color",
+			}),
+		]);
+		expect(
+			presetReadiness(spotted, printing).notices.map((n) => n.reason),
+		).toEqual(["print_raster", "spot_raster"]);
+	});
+
+	it("finds spot inks in layers and variants, each once", () => {
+		const template = spotted.templates.find((t) => t.id === "t_member")
+			?.template as Workspace["templates"][number]["template"];
+		expect(
+			templateSpotInks({
+				...template,
+				variants: [
+					{
+						id: "gold",
+						label: "Gold",
+						overrides: [
+							{
+								name: "front",
+								elements: [
+									{
+										id: "name",
+										properties: { spot: { fill: { spot: "Gold" } } },
+									},
+									{
+										id: "photo",
+										properties: { spot: { fill: { spot: "White" } } },
+									},
+								],
+							},
+						],
+					},
+				],
+			} as typeof template),
+		).toEqual(["White", "Foil", "Gold"]);
 	});
 });

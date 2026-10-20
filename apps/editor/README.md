@@ -96,7 +96,13 @@ covers shared checks and pull requests.
   embedded font. PDFs can lay cards out on sheets of paper with crop marks and
   duplex backs, and any export can include the template's bleed.
 - **Print:** an optional card printer path through `@freshcoat-js/for-print`, with measured
-  print profiles and a preview of the file sent to the printer.
+  print profiles, exported and imported as the JSON the CLI's `--print-profile`
+  takes, and a preview of the file sent to the printer.
+- **Checks:** before an export, what stops or changes it, such as a print
+  target that draws vector PDF pages as PNG or spot inks printed as plain
+  color; after one, its failed records and its render warnings, such as a
+  photo under the preset's Min DPI, grouped by code with a link to each
+  record.
 - **Starters:** a Davi card (landscape and portrait), a photo watermark and an
   event badge with Speaker and Staff variants, each with a preset ready to
   export.
@@ -154,7 +160,8 @@ covers shared checks and pull requests.
   section toolbars do not fit, and at 390px the page scrolls sideways.
 - Print output is for-print's correction for Davi's card printers, not ICC
   color management. A PDF declares an output intent, sRGB by default or a
-  print shop's ICC profile chosen under Print > Color, and tags its RGB as
+  print shop's ICC profile chosen under Print, with its condition identifier
+  such as FOGRA39, and tags its RGB as
   sRGB, so a RIP knows what it was made for; Studio does not convert colors to
   that profile, check gamut against it, or soft-proof. The printer file
   preview is the file that is sent, not a proof of the printed card.

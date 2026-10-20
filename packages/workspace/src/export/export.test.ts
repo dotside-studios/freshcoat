@@ -103,7 +103,9 @@ describe("createItemRenderer", () => {
 			images: [],
 			format: "png",
 		});
-		expect(out.warnings).toEqual([`Couldn't load image: ${ref}`]);
+		expect(out.warnings).toEqual([
+			{ code: "image_load_failed", message: `Couldn't load image: ${ref}` },
+		]);
 	});
 
 	it("leaves warnings unset on a clean render", async () => {
@@ -225,7 +227,11 @@ describe("rasterized layers", () => {
 			vector: { dpi: 300 },
 		});
 		expect(out.warnings).toEqual([
-			"Spot colour Pink lost: the fill of pink is drawn as an image in the PDF (shadow)",
+			{
+				code: "spot_rasterized",
+				message:
+					"Spot colour Pink lost: the fill of pink is drawn as an image in the PDF (shadow)",
+			},
 		]);
 		expect(out.rasterized).toEqual([
 			{ layer: "pink", feature: "shadow", spot: "Pink" },
@@ -329,7 +335,9 @@ describe("runExportJob on this thread", () => {
 		});
 		const front = result.items.find((i) => i.side === "front");
 		expect(front?.ok).toBe(true);
-		expect(front?.warnings).toEqual([`Couldn't load image: ${missing}`]);
+		expect(front?.warnings).toEqual([
+			{ code: "image_load_failed", message: `Couldn't load image: ${missing}` },
+		]);
 		const blob = result.file?.blob;
 		if (!blob) throw new Error("no zip");
 		const report = new TextDecoder().decode(
@@ -410,6 +418,19 @@ describe("runExportJob on this thread", () => {
 				identifier: "FOGRA39",
 				info: "Coated FOGRA39",
 			});
+			expect(
+				await intentFor(
+					{
+						...pdf,
+						outputIntent: {
+							kind: "profile",
+							sha256: read.profile.sha256,
+							identifier: " FOGRA51 ",
+						},
+					},
+					{ ...workspace, profiles: [read.profile] },
+				),
+			).toMatchObject({ identifier: "FOGRA51" });
 		});
 
 		it("refuses a missing profile before rendering", async () => {

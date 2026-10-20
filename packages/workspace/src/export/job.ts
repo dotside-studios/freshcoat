@@ -34,6 +34,7 @@ import {
 	assetsByRef,
 	type ItemRenderer,
 	type ItemSize,
+	type ItemWarning,
 	itemRequest,
 	PIECES_NEED_RASTER_PAGES,
 	type RasterizedLayer,
@@ -86,7 +87,7 @@ export type JobItemResult = {
 	/** required fields rendered with their defaults, as `ExportItem` says */
 	unfilled?: string[];
 	/** what the render warned about without failing */
-	warnings?: string[];
+	warnings?: ItemWarning[];
 	/** the layers its vector page drew as images */
 	rasterized?: RasterizedLayer[];
 };
@@ -300,7 +301,7 @@ export function reportCsv(items: JobItemResult[]): string {
 			item.print ?? "",
 			item.gamut ? `${item.gamut}%` : "",
 			item.unfilled?.join(" ") ?? "",
-			(item.warnings ?? []).join("; "),
+			(item.warnings ?? []).map((w) => w.message).join("; "),
 		]);
 	for (const side of rasterizedSides(items)) {
 		const line = describeRasterized(side);

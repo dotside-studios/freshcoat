@@ -66,9 +66,10 @@ export function presetOutputIntent(
 		throw new MissingProfileError(
 			`preset "${preset.name}": its output intent profile is not in the workspace`,
 		);
+	const identifier = intent.identifier?.trim() || profile.identifier;
 	return {
 		profile: profile.bytes,
-		...(profile.identifier ? { identifier: profile.identifier } : {}),
+		...(identifier ? { identifier } : {}),
 		...(profile.description ? { info: profile.description } : {}),
 	};
 }

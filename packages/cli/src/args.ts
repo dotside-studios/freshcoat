@@ -6,6 +6,7 @@ import {
 	PAPER_SIZES_MM,
 	type PaperName,
 	parseFilter,
+	portraitPaper,
 	type ViewFilter,
 } from "@freshcoat-js/workspace";
 
@@ -105,7 +106,7 @@ export function parsePaper(
 		throw new ArgumentError(
 			`Expected ${Object.keys(PAPER_SIZES_MM).join(", ")} or <width>x<height> in millimetres.`,
 		);
-	return { widthMm: Math.min(width, height), heightMm: Math.max(width, height) };
+	return portraitPaper({ widthMm: width, heightMm: height });
 }
 
 export function parseOffset(entry: string): { x: number; y: number } {

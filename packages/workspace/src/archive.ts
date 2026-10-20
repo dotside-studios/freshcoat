@@ -25,6 +25,7 @@ import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
+import { portraitPaper } from "./impose";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import { readOutputProfile, usedProfiles } from "./output-intent";
 import type {
@@ -155,10 +156,12 @@ const LayoutSchema = z.discriminatedUnion("kind", [
 		kind: z.literal("sheet"),
 		paper: z.union([
 			z.enum(["a4", "a5", "a6", "letter", "legal", "a3", "tabloid"]),
-			z.object({
-				widthMm: z.number().positive(),
-				heightMm: z.number().positive(),
-			}),
+			z
+				.object({
+					widthMm: z.number().positive(),
+					heightMm: z.number().positive(),
+				})
+				.transform(portraitPaper),
 		]),
 		orientation: z.enum(["portrait", "landscape", "auto"]),
 		marginMm: z.number().min(0),
@@ -194,7 +197,7 @@ const PresetSchema = z.object({
 			}),
 		])
 		.optional(),
-	quality: z.number().min(0).max(100).optional(),
+	quality: z.number().int().min(0).max(100).optional(),
 	pngAlpha: z.enum(["auto", "keep"]).optional(),
 	pdfPageImage: z.enum(["png", "jpeg", "vector"]).optional(),
 	pdfText: z.enum(["embed", "outline"]).optional(),
@@ -240,7 +243,11 @@ const PresetSchema = z.object({
 	outputIntent: z
 		.discriminatedUnion("kind", [
 			z.object({ kind: z.literal("srgb") }),
-			z.object({ kind: z.literal("profile"), sha256: z.string() }),
+			z.object({
+				kind: z.literal("profile"),
+				sha256: z.string(),
+				identifier: z.string().optional(),
+			}),
 			z.object({ kind: z.literal("none") }),
 		])
 		.optional(),

@@ -118,6 +118,14 @@ type Grid = {
 	rows: number;
 };
 
+/** A custom paper as it is kept: portrait, the short edge as its width. */
+export function portraitPaper(size: CardSizeMm): CardSizeMm {
+	return {
+		widthMm: Math.min(size.widthMm, size.heightMm),
+		heightMm: Math.max(size.widthMm, size.heightMm),
+	};
+}
+
 /** The paper's size in millimetres, portrait. */
 export function paperSize(layout: SheetLayout): CardSizeMm {
 	const size =
@@ -129,10 +137,7 @@ export function paperSize(layout: SheetLayout): CardSizeMm {
 	const { widthMm, heightMm } = size;
 	if (!(widthMm > 0 && heightMm > 0))
 		throw new SheetLayoutError("The paper needs a width and height above 0");
-	return {
-		widthMm: Math.min(widthMm, heightMm),
-		heightMm: Math.max(widthMm, heightMm),
-	};
+	return portraitPaper(size);
 }
 
 function countFitting(usable: number, card: number, gap: number): number {

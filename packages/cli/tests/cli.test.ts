@@ -2347,6 +2347,25 @@ describe("render print options", () => {
 		expect(await pages("fronts.pdf")).toHaveLength(1);
 	});
 
+	test("warns when a print target turns vector pages into PNG", async () => {
+		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko", "--pdf-pages", "vector", "--dpi", "72", "--out", "printed-vector.pdf");
+		expect(run.code).toBe(0);
+		expect(run.stderr).toContain("warning: print target draws PDF pages as PNG, not vector");
+	});
+
+	test("warns when spot inks print as plain color", async () => {
+		const spotted = card();
+		const background = spotted.template_data[0]?.background;
+		if (background) background.properties = { ...background.properties, spot: { fill: { spot: "White" } } };
+		await box.write("spotted.json", JSON.stringify({ ...spotted, format_version: "1.7" }));
+		const png = await box.run("render", "spotted.json", "--frame", "front", "--dpi", "72", "--out", "spotted.pdf");
+		expect(png.code).toBe(0);
+		expect(png.stderr).toContain("warning: spot ink White prints as plain color");
+		const vector = await box.run("render", "spotted.json", "--frame", "front", "--dpi", "72", "--pdf-pages", "vector", "--out", "spotted-vector.pdf");
+		expect(vector.code).toBe(0);
+		expect(vector.stderr).not.toContain("plain color");
+	});
+
 	test("takes the target from the profile when --print-target is left out", async () => {
 		const run = await box.run(...template, "--print-profile", "printer.json", "--out", "profile-only.zip");
 		expect(run.code).toBe(0);

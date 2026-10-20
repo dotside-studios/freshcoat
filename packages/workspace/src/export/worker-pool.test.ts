@@ -124,7 +124,9 @@ describe("worker pool", () => {
 			print: "fallback",
 			printError: "no SkSL",
 			gamut: [{ clipped: 0.1, pullback: 1 }],
-			warnings: ["Couldn't load image: logo.png"],
+			warnings: [
+				{ code: "image_load_failed", message: "Couldn't load image: logo.png" },
+			],
 			cut: { width: 10, height: 5, lines: [] },
 		});
 		expect(await out).toMatchObject({
@@ -132,7 +134,9 @@ describe("worker pool", () => {
 			print: "fallback",
 			printError: "no SkSL",
 			gamut: [{ clipped: 0.1, pullback: 1 }],
-			warnings: ["Couldn't load image: logo.png"],
+			warnings: [
+				{ code: "image_load_failed", message: "Couldn't load image: logo.png" },
+			],
 		});
 	});
 

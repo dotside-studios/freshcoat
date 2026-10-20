@@ -188,7 +188,7 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--back-offset <x,y>` | with `--sheets` and `--duplex`: move every back page this many millimetres, for a printer that drifts; `y` is measured down the page, so `0.5,-1` moves the backs right and up. Each is from -50 to 50, as in Studio, and an offset that moves a back off the paper is refused with exit code 2, naming the range that keeps them on |
 | `--blank-backs` | with `--sheets` and `--duplex`: give a one-sided template empty back pages, so every front lands on a front side |
 | `--print-target <none\|ymcko>` | correct the cards for a YMCKO dye-sublimation card printer, as an export preset's print target does in Studio; default the `--print-profile`'s target, or `none` |
-| `--print-profile <file>` | a measured printer profile, the JSON Studio saves from Measure; on its own it prints to the target it was measured on |
+| `--print-profile <file>` | a measured printer profile, the JSON Studio's Export profile… writes from Measure printer or from a preset's Print profile; on its own it prints to the target it was measured on |
 | `--output-intent <file>` | PDF only: declare this ICC profile, such as the print shop's FOGRA39 or GRACoL CMYK profile, as the PDF's output intent in place of sRGB. The cards stay RGB, tagged sRGB; the intent tells the printer what to convert them to |
 | `--output-intent-id <name>` | with `--output-intent`: the condition's identifier, such as `FOGRA39`; default the profile's description |
 | `--no-output-intent` | PDF only: declare no output intent and leave RGB untagged |
@@ -224,7 +224,11 @@ was measured on, and is refused when this build does not know that target;
 with `--print-target` too, a profile measured on another target warns. A card
 the path fails on is written uncorrected, and the report's `print` column says
 `fallback`. On their own, the print options export into the `--out` directory,
-the current one by default, with a report.
+the current one by default, with a report. The path corrects pixels, so with
+`--pdf-pages vector` the pages are PNG and the command warns
+`print target draws PDF pages as PNG, not vector`, as Studio's Checks do. A
+template whose layers print in spot inks warns `spot ink White prints as plain
+color` for any output but vector PDF pages.
 
 ```sh
 freshcoat render member.coat --data members.csv --print-profile shop-printer.json --out cards

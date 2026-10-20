@@ -77,11 +77,12 @@ the records, and **Export** turns templates and records into files.
   layer covers, after its crop and fit, on the axis with fewer: a 600 px wide
   image placed 3 in wide at 300 DPI prints at 200. The template is measured at
   the lowest DPI of its export presets, 300 without one, and checked against
-  their highest minimum; a preset's `minImageDpi` sets it, and 0 turns the
-  check off. An image bound to a field is checked as the record renders, and
-  shows under "Last render" as "Image prints at 200 DPI, under 300: photo".
-  An export lists the same warning for each item it applies to, in its
-  `export-report.csv`.
+  their highest minimum; a preset's Min DPI (in the Format section, 300 by
+  default, `--min-dpi` in the CLI) sets it, and 0 turns the check off. An
+  image bound to a field is checked as the record renders, and shows under
+  "Last render" as "Image prints at 200 DPI, under 300: photo". An export
+  lists the same warning for each item it applies to, in its
+  `export-report.csv` and the Warnings check.
 - **Print checks:** the Issues list's "Print hints" also name layers that
   may not print as they look, each with a link that selects the layer:
   text below 6 pt at print size (7 pt for a light weight or a Thin or Light
@@ -93,7 +94,7 @@ the records, and **Export** turns templates and records into files.
   DPI of the template's export presets, 300 without one. Text whose content or
   colour comes from a field, or that shrinks to fit, is checked as the record
   renders and shows under "Last render"; an export lists the same warnings in
-  its `export-report.csv`. The codes are `small_text`, `hairline_stroke`,
+  its `export-report.csv` and the Warnings check. The codes are `small_text`, `hairline_stroke`,
   `rich_black_text` and `short_of_bleed`, and for QR codes `qr_low_contrast`,
   `qr_inverted`, `qr_quiet_zone` and `qr_logo_large`, described in the
   [coatfile guide](../../../packages/coatfile/README.md#print-checks).
@@ -152,20 +153,28 @@ the records, and **Export** turns templates and records into files.
 - **Export:**
   - Presets name a template, which records (all, pending, failed or
     selected), which sides, the size (the template's, or each record's
-    photo), the format (PNG, JPEG or WebP zip, or PDF) with its quality
-    (or, for PNG, whether to keep the alpha channel of an opaque card),
+    photo), the format (PNG, JPEG or WebP zip, or PDF) with its quality,
+    a whole number from 0 to 100 (or, for PNG, whether to keep the alpha
+    channel of an opaque card), the minimum image DPI,
     where the files go, and a file name pattern such as
     `{{member_id}}-{{side}}`.
   - The settings are one column of collapsible sections: Records, Format,
     Size, Print, Files and Checks. Each header shows its value once
     collapsed ("PDF · 300 dpi", "Sheets · A4 · crop marks"), and the choice
-    is kept. Checks lists what stops or spoils an export: a block (which
-    disables Export), an unbound template, unfilled required fields,
-    characters the fonts can't draw and records that failed last time, each
-    with a link to the record or the setting. After a vector PDF, it warns
-    for each spot ink drawn as an image ("Spot colors lost in the last PDF,
-    drawn as images: Pink (pink)"), and notes once, without counting it as
-    an issue, the other layers drawn as images and why. A count beside the Export
+    is kept. Checks lists what stops or spoils an export, each with a link
+    to the record or the setting: a block (which disables Export), an
+    unbound template, unfilled required fields, characters the fonts can't
+    draw, what the export will do that the settings don't show (a print
+    target drawing vector PDF pages as PNG, spot inks printed as plain color
+    on PNG, JPEG or WebP output), records that failed last time, and the
+    last export's Warnings, grouped by code with a count each ("Low
+    resolution image ×3, Small text ×1") and a link to each record. An
+    invalid barcode value fails its record, so it is listed under failed
+    records with the encoder's reason. After a vector PDF, it warns for each
+    spot ink drawn as an image ("Spot colors lost in the last PDF, drawn as
+    images: Pink (pink)"), and notes once, without counting it as an issue,
+    the other layers drawn as images and why. The CLI prints the same
+    notices and warnings. A count beside the Export
     button opens the same list, and an estimate beside it says what the
     export will produce ("120 records · PDF · 1 file", "240 files · PNG
     zip"). Sizes are not estimated.
@@ -736,6 +745,8 @@ A PDF preset's Print section chooses **One per page** (the default) or
   marks start outside the bleed. Bleed needs Template size.
 
 - **Paper:** A4, A5, A6, Letter, Legal, A3, Tabloid, or Custom in millimeters.
+  A custom paper is kept portrait: a short edge typed as the height swaps the
+  two, as the CLI's `--sheets <w>x<h>` and an opened workspace do.
   Orientation is Auto, Portrait or Landscape; Auto takes whichever fits more
   cards, portrait on a tie. Margin (10 mm by default) and Gap (0) are in
   millimeters. The grid is centered inside the margins.
@@ -917,16 +928,26 @@ Presets saved before targets existed read as the card printer when print was
 on.
 
 - **Profile:** None, Measure…, or Import… of a `.json` print profile, shown
-  with its name and date and removable. A malformed one is refused with a
-  message. A profile measured on another print target than the preset's
+  with its name and date, exportable as `.json` and removable. A malformed one
+  is refused with a message. The file is for-print's JSON, the one the CLI's
+  `--print-profile` takes. A profile measured on another print target than the preset's
   shows a warning naming both; the export still runs.
 - **Measure printer:** Measure… opens a dialog that makes a profile from the
   printer itself. Download chart gives the gray balance chart as a PNG to print
   at 100% with color correction off. Choose photo… takes a photo of the printed
   card, and the four corner marks are clicked clockwise from top left (Clear
   corners starts over). Save profile needs a name; printer, ribbon and stock
-  are optional. The profile records the print target it was measured on. A photo that can't make a profile says why: overexposed,
-  uneven light, an uneven print, or patches outside the photo.
+  are optional. The profile records the print target it was measured on.
+  Export profile… downloads the measured profile as `.json` instead, and
+  Import profile… loads one. A photo that can't make a profile says why:
+  overexposed, uneven light, an uneven print, or patches outside the photo.
+- **Vector pages:** a print target corrects pixels, so a PDF preset with
+  vector pages and a print target renders its pages as PNG, and Checks says
+  so.
+- **Output intent:** a PDF preset declares sRGB, a custom ICC profile, or
+  nothing. With a custom profile, Identifier sets the condition the PDF
+  names, such as FOGRA39; left empty it is the profile's description. It is
+  kept in the preset, as the CLI's `--output-intent-id` sets it.
 - **Printer file:** the preview's "Printer file" toggle renders the current
   record through the same path. The note under it reads "Printer file, not
   a proof of the printed card", and adds how much photo color was pulled

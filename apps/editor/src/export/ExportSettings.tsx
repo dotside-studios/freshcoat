@@ -1,4 +1,5 @@
 import {
+	DEFAULT_MIN_IMAGE_DPI,
 	hasInsets,
 	type Template,
 	templateBleed,
@@ -47,6 +48,7 @@ import {
 	MAX_BACK_OFFSET_MM,
 	paperSize,
 	pdfLayout,
+	portraitPaper,
 	readOutputProfile,
 	sheetSummary,
 	unknownFileNameTokens,
@@ -69,11 +71,14 @@ import {
 } from "react-aria-components";
 import { useController } from "~/app/context";
 import { plural, VARIANT_EXPORT } from "~/app/copy";
+import { downloadBytes } from "~/app/download";
 import { TemplateBindingEditor } from "~/binding/BindingEditor";
 import { useEditor } from "~/state/hooks";
 import CloseIcon from "~icons/mingcute/close-line";
+import DownloadIcon from "~icons/mingcute/download-2-line";
 import { CalibrateDialog } from "./CalibrateDialog";
 import { ChecksList } from "./Checks";
+import { printProfileFile } from "./calibrate";
 import { type Check, type CheckTarget, checksSummary } from "./checks";
 import type { ExportCollapsed, SettingsSectionId } from "./collapsed";
 import {
@@ -532,7 +537,7 @@ export function ExportSettings({
 						<Slider
 							aria-label="Quality"
 							value={preset.quality ?? DEFAULT_QUALITY}
-							minValue={1}
+							minValue={0}
 							maxValue={100}
 							step={1}
 							onChange={(quality) => set({ quality })}
@@ -571,6 +576,21 @@ export function ExportSettings({
 						</Hint>
 					</>
 				) : null}
+				<Row label="Min DPI">
+					<NumberField
+						aria-label="Min image DPI"
+						value={preset.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI}
+						min={0}
+						step={1}
+						precision={0}
+						onChange={(minImageDpi) => set({ minImageDpi })}
+					/>
+				</Row>
+				<Hint testId="export-min-dpi-hint">
+					{(preset.minImageDpi ?? DEFAULT_MIN_IMAGE_DPI) > 0
+						? `Warns for images under this at ${preset.dpi} DPI`
+						: "No image resolution check"}
+				</Hint>
 			</SettingsSection>
 			<SettingsSection
 				id="size"
@@ -979,7 +999,7 @@ function PrintGroup({
 							className="flex min-h-fc-control min-w-0 items-center gap-1"
 							data-testid="export-print-profile"
 						>
-							{label ? (
+							{profile && label ? (
 								<>
 									<span
 										className="min-w-0 flex-1 truncate text-fc-base text-fc-text"
@@ -992,6 +1012,20 @@ function PrintGroup({
 											{label.date}
 										</span>
 									) : null}
+									<IconButton
+										aria-label="Export profile"
+										tooltip="Export profile…"
+										onPress={() => {
+											const file = printProfileFile(profile);
+											void downloadBytes(
+												file.text,
+												file.name,
+												"application/json",
+											);
+										}}
+									>
+										<DownloadIcon />
+									</IconButton>
 									<IconButton
 										aria-label="Remove profile"
 										tooltip="Remove profile"
@@ -1025,15 +1059,10 @@ function PrintGroup({
 					<CalibrateDialog
 						isOpen={measuring}
 						onOpenChange={setMeasuring}
+						target={print.target ?? DEFAULT_PRINT_TARGET.id}
 						onSave={(measured) => {
 							setError(null);
-							onChange({
-								...print,
-								profile: {
-									...measured,
-									target: print.target ?? DEFAULT_PRINT_TARGET.id,
-								},
-							});
+							onChange({ ...print, profile: measured });
 						}}
 					/>
 					{error ? (
@@ -1136,6 +1165,19 @@ function OutputIntentGroup({
 					<Button>Custom profile…</Button>
 				</FileTrigger>
 			</div>
+			{intent.kind === "profile" && profile ? (
+				<Row label="Identifier">
+					<TextField
+						aria-label="Output condition identifier"
+						value={intent.identifier ?? ""}
+						placeholder={profile.identifier || profile.description}
+						onChange={(identifier) => {
+							const { identifier: _, ...rest } = intent;
+							onChange(identifier.trim() ? { ...rest, identifier } : rest);
+						}}
+					/>
+				</Row>
+			) : null}
 			{error ? (
 				<p
 					role="alert"
@@ -1270,26 +1312,24 @@ function LayoutGroup({
 									label="W"
 									aria-label="Paper width"
 									value={custom.widthMm}
-									min={10}
-									max={2000}
+									min={0.1}
 									step={1}
 									precision={1}
 									unit="mm"
 									onChange={(widthMm) =>
-										patch({ paper: { ...custom, widthMm } })
+										patch({ paper: portraitPaper({ ...custom, widthMm }) })
 									}
 								/>
 								<NumberField
 									label="H"
 									aria-label="Paper height"
 									value={custom.heightMm}
-									min={10}
-									max={2000}
+									min={0.1}
 									step={1}
 									precision={1}
 									unit="mm"
 									onChange={(heightMm) =>
-										patch({ paper: { ...custom, heightMm } })
+										patch({ paper: portraitPaper({ ...custom, heightMm }) })
 									}
 								/>
 							</div>

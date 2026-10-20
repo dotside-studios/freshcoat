@@ -234,12 +234,13 @@ describe("export from a workspace file in Node", () => {
 			checked,
 			fileOutput(out),
 		);
+		const low = (message: string) => ({ code: "image_low_dpi", message });
 		expect(result.items.map((i) => i.warnings)).toEqual([
 			[
-				"Image prints at 12 DPI, under 300: photo",
-				"Image prints at 6 DPI, under 300: logo",
+				low("Image prints at 12 DPI, under 300: photo"),
+				low("Image prints at 6 DPI, under 300: logo"),
 			],
-			["Image prints at 6 DPI, under 300: logo"],
+			[low("Image prints at 6 DPI, under 300: logo")],
 		]);
 		const zip = unzipSync(new Uint8Array(await readFile(out)));
 		const rows = new TextDecoder()
@@ -249,6 +250,24 @@ describe("export from a workspace file in Node", () => {
 		expect(rows[2]?.endsWith(',"Image prints at 6 DPI, under 300: logo"')).toBe(
 			true,
 		);
+	});
+
+	it("fails a record whose barcode value the encoder refuses, with its reason", async () => {
+		const ws = fixture("logo.png");
+		const record = ws.datasets[0]?.records[1];
+		if (record) record.values.code = "😀";
+		const file = join(dir, "bad-code.coatworkspace");
+		await writeFile(file, await (await packWorkspace(ws)).bytes());
+		const out = join(dir, "bad-code.zip");
+		const { result } = await exportFrom(file, preset, fileOutput(out));
+		expect(result.items.map((i) => i.ok)).toEqual([true, false]);
+		expect(result.items[1]?.error).toMatch(/^Barcode: /);
+		const zip = unzipSync(new Uint8Array(await readFile(out)));
+		const rows = new TextDecoder()
+			.decode(zip[REPORT_FILE_NAME])
+			.trim()
+			.split("\r\n");
+		expect(rows[2]).toContain(",failed,Barcode: ");
 	});
 
 	it("reports print checks on field-bound text in the export report", async () => {
@@ -264,9 +283,12 @@ describe("export from a workspace file in Node", () => {
 		const { result } = await exportFrom(file, preset, fileOutput(out));
 		expect(result.items[0]?.warnings).toBeUndefined();
 		expect(result.items[1]?.warnings).toEqual([
-			expect.stringMatching(
-				/^Text is [\d.]+ pt at print size, below 6 pt: name$/,
-			),
+			{
+				code: "small_text",
+				message: expect.stringMatching(
+					/^Text is [\d.]+ pt at print size, below 6 pt: name$/,
+				),
+			},
 		]);
 		const zip = unzipSync(new Uint8Array(await readFile(out)));
 		const rows = new TextDecoder()
