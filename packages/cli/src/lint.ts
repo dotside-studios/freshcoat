@@ -2,6 +2,7 @@ import {
 	describePrintIssue,
 	type ImageDpiOptions,
 	type Template,
+	type TemplateHint,
 	templateHints,
 	validate,
 } from "@freshcoat-js/coatfile";
@@ -22,26 +23,33 @@ export type Findings = { errors: string[]; warnings: string[] };
 export type DpiCheck = { dpi?: number; min?: number };
 
 export function templateWarnings(template: Template, images: ImageDpiOptions = {}): string[] {
-	return templateHints(template, images).map((hint) => {
-		switch (hint.kind) {
-			case "variant":
-				return `${hint.issue.message} (${hint.issue.code})`;
-			case "safe_area": {
-				const { sideName, id, edges } = hint;
-				return `${sideName}: "${id}" has its ${andList(edges)} ${edges.length === 1 ? "edge" : "edges"} inside the safe area`;
-			}
-			case "image_dpi":
-				return `${hint.sideName}: "${hint.id}" prints at ${hint.dpi} DPI, under ${hint.min}`;
-			case "print":
-				return `${hint.sideName}: "${hint.id}": ${describePrintIssue(hint.issue)}`;
-			case "format_newer":
-				return newerFormatWarning(hint.declared);
-			case "format_low":
-				return `uses fields from format ${hint.needed} but declares ${hint.declared}; older readers drop them`;
-			case "slice_open_piece":
-				return `${hint.sideName}: "${hint.id}" is an open path, so it exports as a cut line, not a piece`;
+	return templateHints(template, images).map((hint) => `${hintText(hint)} (${hintCode(hint)})`);
+}
+
+/** The code Studio's Issues list gives a hint, to search the docs by. */
+export function hintCode(hint: TemplateHint): string {
+	return hint.kind === "variant" || hint.kind === "print" ? hint.issue.code : hint.kind;
+}
+
+function hintText(hint: TemplateHint): string {
+	switch (hint.kind) {
+		case "variant":
+			return hint.issue.message;
+		case "safe_area": {
+			const { sideName, id, edges } = hint;
+			return `${sideName}: "${id}" has its ${andList(edges)} ${edges.length === 1 ? "edge" : "edges"} inside the safe area`;
 		}
-	});
+		case "image_dpi":
+			return `${hint.sideName}: "${hint.id}" prints at ${hint.dpi} DPI, under ${hint.min}`;
+		case "print":
+			return `${hint.sideName}: "${hint.id}": ${describePrintIssue(hint.issue)}`;
+		case "format_newer":
+			return newerFormatWarning(hint.declared);
+		case "format_low":
+			return `uses fields from format ${hint.needed} but declares ${hint.declared}; older readers drop them`;
+		case "slice_open_piece":
+			return `${hint.sideName}: "${hint.id}" is an open path, so it exports as a cut line, not a piece`;
+	}
 }
 
 function andList(items: readonly string[]): string {

@@ -8,6 +8,7 @@ import {
 	type Template,
 	validateValues,
 } from "@freshcoat-js/coatfile";
+import { templateStem } from "@freshcoat-js/coatfile/coat";
 import { describeWarning, renderTemplate } from "@freshcoat-js/coatfile/render";
 import {
 	type AssetFile,
@@ -19,9 +20,16 @@ import {
 import { checkGlyphs } from "@freshcoat-js/workspace/export";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
-import { CliError, createLog, type Io } from "../io";
+import { CliError, createLog, type Io, type Log } from "../io";
 import { createLoader, openRenderer } from "../renderer";
-import { readBytes, readTemplate, warnLoad } from "../template-file";
+import {
+	isTemplateArchive,
+	readBytes,
+	readTemplate,
+	readTemplateArchive,
+	type TemplateFile,
+	warnLoad,
+} from "../template-file";
 
 const FORMATS = {
 	png: { format: "png", extension: "png" },
@@ -38,6 +46,7 @@ export type RenderOptions = {
 	scale?: number[];
 	format?: keyof typeof FORMATS;
 	pngAlpha?: "auto" | "keep";
+	dpi?: number;
 	minDpi?: number;
 	out?: string;
 	dryRun?: true;
@@ -50,17 +59,33 @@ export async function render(
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
-	const output = FORMATS[options.format ?? "png"];
-	const scales = options.scale ?? [1];
-
+	const out = options.out ?? ".";
+	if (isTemplateArchive(file)) {
+		for (const { name, file: loaded } of await readTemplateArchive(io, file)) {
+			warnLoad(log, `${file}: ${name}`, loaded);
+			await renderFrames(loaded, options, io, log, join(out, templateStem(name)));
+		}
+		return;
+	}
 	const loaded = await readTemplate(io, file);
 	warnLoad(log, file, loaded);
+	await renderFrames(loaded, options, io, log, out);
+}
+
+async function renderFrames(
+	loaded: TemplateFile,
+	options: RenderOptions,
+	io: Io,
+	log: Log,
+	directoryOut: string,
+): Promise<void> {
+	const output = FORMATS[options.format ?? "png"];
+	const scales = options.scale ?? [1];
 	const { template, directory } = loaded;
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
 	const read = await readValues(io, template, options.values, options.set ?? {});
 	const values = checkValues(template, read.values);
-	const directoryOut = options.out ?? ".";
 
 	if (options.dryRun) {
 		const names = new Set<string>();
@@ -87,10 +112,11 @@ export async function render(
 		assets: read.assets,
 	});
 	const minDpi = options.minDpi ?? DEFAULT_MIN_IMAGE_DPI;
+	const dpi = options.dpi ?? DEFAULT_IMAGE_DPI_UNITS;
 	try {
 		const frames = await renderTemplate(renderer, template, values, {
-			...(minDpi > 0 ? { imageDpi: { dpi: DEFAULT_IMAGE_DPI_UNITS, min: minDpi } } : {}),
-			printChecks: { dpi: DEFAULT_IMAGE_DPI_UNITS },
+			...(minDpi > 0 ? { imageDpi: { dpi, min: minDpi } } : {}),
+			printChecks: { dpi },
 			...(variantId ? { variantId } : {}),
 			...(frameNames ? { frameNames } : {}),
 			exports: scales.map((value) => ({

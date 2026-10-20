@@ -191,7 +191,7 @@ export {
 	presetImageDpi,
 	unknownFileNameTokens,
 } from "./plan";
-export { duplicatePreset, newPreset } from "./presets";
+export { duplicatePreset, newPreset, PRESET_SCALE } from "./presets";
 export {
 	mapDatasetRecords,
 	type RecordStatusExtra,

@@ -11,7 +11,13 @@ import { fileLoader } from "@freshcoat-js/engine/node";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { CliError, createLog, type Io, type Log } from "../io";
 import { type DpiCheck, type Findings, templateWarnings, workspaceFindings } from "../lint";
-import { readTemplate, warnLoad } from "../template-file";
+import {
+	isTemplateArchive,
+	readTemplate,
+	readTemplateArchive,
+	type TemplateFile,
+	warnLoad,
+} from "../template-file";
 import { readWorkspace } from "../workspace-file";
 
 export async function validateCommand(
@@ -26,7 +32,9 @@ export async function validateCommand(
 	};
 	const findings = file.toLowerCase().endsWith(WORKSPACE_EXTENSION)
 		? await checkWorkspace(io, file, dpi)
-		: await checkTemplate(io, log, file, dpi);
+		: isTemplateArchive(file)
+			? await checkArchive(io, log, file, dpi)
+			: await checkTemplate(io, log, file, dpi);
 	const { errors, warnings } = findings;
 	if (errors.length > 0)
 		throw new CliError(
@@ -49,15 +57,25 @@ export async function validateCommand(
 async function checkTemplate(io: Io, log: Log, file: string, dpi: DpiCheck): Promise<Findings> {
 	const loaded = await readTemplate(io, file);
 	warnLoad(log, file, loaded, { format: false });
+	return { errors: [], warnings: await loadedWarnings(loaded, dpi) };
+}
+
+async function checkArchive(io: Io, log: Log, file: string, dpi: DpiCheck): Promise<Findings> {
+	const warnings: string[] = [];
+	for (const { name, file: loaded } of await readTemplateArchive(io, file)) {
+		warnLoad(log, `${file}: ${name}`, loaded, { format: false });
+		warnings.push(...(await loadedWarnings(loaded, dpi)).map((w) => `${name}: ${w}`));
+	}
+	return { errors: [], warnings };
+}
+
+async function loadedWarnings(loaded: TemplateFile, dpi: DpiCheck): Promise<string[]> {
 	const sizes = await localImageSizes(loaded.template, loaded.directory);
-	return {
-		errors: [],
-		warnings: templateWarnings(loaded.template, {
-			dpi: dpi.dpi ?? DEFAULT_IMAGE_DPI_UNITS,
-			min: dpi.min ?? DEFAULT_MIN_IMAGE_DPI,
-			pixelSize: (src) => sizes.get(src),
-		}),
-	};
+	return templateWarnings(loaded.template, {
+		dpi: dpi.dpi ?? DEFAULT_IMAGE_DPI_UNITS,
+		min: dpi.min ?? DEFAULT_MIN_IMAGE_DPI,
+		pixelSize: (src) => sizes.get(src),
+	});
 }
 
 /** The pixel sizes of the images a template names by a path, read from

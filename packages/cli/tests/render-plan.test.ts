@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { planRender, type RenderInput } from "../src/commands/render-plan";
 import { UsageError } from "../src/io";
 
+const ARCHIVE_REFUSAL =
+	"a templates .zip renders each template's frames into a directory; --data, a .zip or .pdf --out and the export options need one template";
+
 const input = (options: Partial<RenderInput> = {}): RenderInput => ({
 	cropMarks: true,
 	quiet: false,
@@ -69,16 +72,16 @@ describe("planRender", () => {
 	});
 
 	test("exports a template through a print target into a directory, a zip or a PDF", () => {
-		expect(planRender("card.coat", input({ printTarget: "ymcko", printProfile: "printer.json" }))).toEqual({
+		expect(planRender("card.coat", input({ printTarget: "ymcko-dye-sub", printProfile: "printer.json" }))).toEqual({
 			kind: "batch",
-			options: { printTarget: "ymcko", printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
+			options: { printTarget: "ymcko-dye-sub", printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
 		});
 		expect(planRender("card.coat", input({ printProfile: "printer.json" }))).toEqual({
 			kind: "batch",
 			options: { printProfile: "printer.json", out: ".", cropMarks: true, quiet: false },
 		});
 		expect(planRender("card.coat", input({ printTarget: "none", out: "x.zip" })).kind).toBe("batch");
-		expect(planRender("card.coat", input({ printTarget: "ymcko", out: "x.pdf" })).kind).toBe("batch");
+		expect(planRender("card.coat", input({ printTarget: "ymcko-dye-sub", out: "x.pdf" })).kind).toBe("batch");
 	});
 
 	test("takes a back offset and blank backs with --sheets and --duplex", () => {
@@ -128,7 +131,21 @@ describe("planRender", () => {
 			["card.coat", { preset: "All", records: "all" }, "--preset, --records need a .coatworkspace file"],
 			["card.coat", { name: "x", out: "dir" }, "--name needs --data or a .zip or .pdf --out"],
 			["card.coat", { data: "people.csv" }, "--data needs --out <dir|file.zip|file.pdf>"],
-			["card.coat", { out: "x.zip", dpi: 72 }, "--dpi applies only to a .pdf"],
+			["card.coat", { out: "x.zip", maxEdge: 800 }, "--max-edge needs --size-from"],
+			["card.coat", { out: "x.zip", sizeFrom: "photo", scale: [2] }, "--scale does not go with --size-from, which sizes each file by its photo"],
+			["card.coat", { out: "x.pdf", sizeFrom: "photo", bleed: true, sheets: "a4" }, "--bleed, --sheets do not go with --size-from, which sizes each file by its photo"],
+			["card.coat", { sizeFrom: "photo" }, "--size-from needs --data or a .zip or .pdf --out"],
+			["card.coat", { out: "x.pdf", orientation: "landscape" }, "--orientation needs --sheets"],
+			["card.coat", { out: "x.zip", orientation: "landscape" }, "--orientation applies only to a .pdf"],
+			["club.coatworkspace", { out: "x.zip", sizeFrom: "photo" }, "--size-from applies only to templates"],
+			["card.coat", { out: "x.zip", analyze: false }, "--no-analyze needs --print-target or --print-profile"],
+			["card.coat", { out: "x.zip", analyze: false, printTarget: "none" }, "--no-analyze needs --print-target or --print-profile"],
+			["club.coatworkspace", { out: "x.zip", printTarget: "ymcko-dye-sub", analyze: false }, "--print-target, --no-analyze apply only to templates"],
+			["club.coatworkspace", { out: "x.zip", dpi: 600 }, "--dpi applies only to templates"],
+			["templates.zip", { data: "people.csv", out: "cards" }, ARCHIVE_REFUSAL],
+			["templates.zip", { out: "cards.pdf" }, ARCHIVE_REFUSAL],
+			["templates.zip", { pieces: true }, ARCHIVE_REFUSAL],
+			["templates.zip", { name: "x" }, "--name needs --data or a .zip or .pdf --out"],
 			["card.coat", { out: "x.pdf", cropMarks: false, margin: 2 }, "--no-crop-marks, --margin need --sheets"],
 			["card.coat", { out: "x.pdf", marks: ["slug"] }, "--marks needs --sheets"],
 			["card.coat", { out: "x.zip", marks: ["slug"] }, "--marks applies only to a .pdf"],
@@ -162,11 +179,47 @@ describe("planRender", () => {
 			["card.coat", { out: "x.pdf", blankBacks: true }, "--blank-backs needs --sheets"],
 			["card.coat", { out: "x.pdf", sheets: "a4", backOffset: { x: 1, y: 0 }, blankBacks: true }, "--back-offset, --blank-backs need --duplex"],
 			["card.coat", { printTarget: "none", printProfile: "printer.json" }, "--print-profile does not go with --print-target none"],
-			["club.coatworkspace", { out: "x.zip", printTarget: "ymcko" }, "--print-target applies only to templates"],
+			["club.coatworkspace", { out: "x.zip", printTarget: "ymcko-dye-sub" }, "--print-target applies only to templates"],
 			["club.coatworkspace", { out: "x.pdf", backOffset: { x: 1, y: 0 } }, "--back-offset applies only to templates"],
 		];
 		for (const [file, options, message] of cases)
 			expect({ file, options, message: refusal(file, options) }).toEqual({ file, options, message });
+	});
+
+	test("takes --dpi for a template, an export to images and a PDF", () => {
+		expect(planRender("card.coat", input({ dpi: 600 }))).toEqual({
+			kind: "template",
+			options: { dpi: 600, quiet: false },
+		});
+		expect(planRender("card.coat", input({ dpi: 600, out: "x.zip" })).kind).toBe("batch");
+		expect(planRender("card.coat", input({ dpi: 600, out: "x.pdf" })).kind).toBe("batch");
+	});
+
+	test("renders each template of a templates .zip into a directory", () => {
+		expect(planRender("templates.zip", input({ out: "out", dpi: 600, scale: [2] }))).toEqual({
+			kind: "template",
+			options: { out: "out", dpi: 600, scale: [2], quiet: false },
+		});
+	});
+
+	test("passes the photo size, orientation and analysis to the preset", () => {
+		expect(
+			planRender("card.coat", input({ data: "people.csv", out: "x.zip", sizeFrom: "photo", maxEdge: 800 })).kind,
+		).toBe("batch");
+		expect(planRender("card.coat", input({ out: "x.pdf", sheets: "a4", orientation: "landscape" })).kind).toBe(
+			"batch",
+		);
+		expect(planRender("card.coat", input({ printTarget: "ymcko-dye-sub", analyze: false }))).toEqual({
+			kind: "batch",
+			options: { printTarget: "ymcko-dye-sub", analyze: false, out: ".", cropMarks: true, quiet: false },
+		});
+	});
+
+	test("counts analysis as given only when it is turned off", () => {
+		expect(planRender("card.coat", input({ analyze: true }))).toEqual({ kind: "template", options: { quiet: false } });
+		expect(planRender("club.coatworkspace", input({ preset: "All", out: "x.zip", analyze: true })).kind).toBe(
+			"workspace",
+		);
 	});
 
 	test("counts crop marks as given only when they are turned off", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { PRESET_SCALE } from "@freshcoat-js/workspace";
 import {
 	ArgumentError,
 	collectFilter,
@@ -9,15 +10,21 @@ import {
 	parseCopies,
 	parseLength,
 	parseMarks,
+	parseMaxEdge,
 	parseOffset,
 	parsePaper,
 	parseQuality,
+	parseScale,
 } from "../src/args";
 
 describe("argument parsers", () => {
 	test("read the values they take", () => {
 		expect(collectSetting("name=Ana=B", { motto: "Hi" })).toEqual({ motto: "Hi", name: "Ana=B" });
 		expect(collectScale("2", [1])).toEqual([1, 2]);
+		expect(parseScale(String(PRESET_SCALE.min))).toBe(PRESET_SCALE.min);
+		expect(parseScale("2.5")).toBe(2.5);
+		expect(parseScale(String(PRESET_SCALE.max))).toBe(PRESET_SCALE.max);
+		expect(parseMaxEdge("2048")).toBe(2048);
 		expect(collectFilter("points>=10", [{ column: "tier", op: "empty" }])).toEqual([
 			{ column: "tier", op: "empty" },
 			{ column: "points", op: "gte", value: "10" },
@@ -43,7 +50,11 @@ describe("argument parsers", () => {
 		const refusals: [() => unknown, string][] = [
 			[() => collectSetting("name"), "Expected key=value."],
 			[() => collectFilter("tier"), "Expected <column><op><value>, with = != ~ !~ < <= > or >= as the op."],
-			[() => collectScale("0"), "Expected a positive number."],
+			[() => collectScale("0"), "Expected a number from 1 to 4."],
+			[() => collectScale("4.5"), "Expected a number from 1 to 4."],
+			[() => parseScale(""), "Expected a number from 1 to 4."],
+			[() => parseMaxEdge("0"), "Expected a whole number of pixels, 1 or more."],
+			[() => parseMaxEdge("1.5"), "Expected a whole number of pixels, 1 or more."],
 			[() => parseQuality("101"), "Expected a whole number from 0 to 100."],
 			[() => parseJobs("1.5"), "Expected a whole number, 1 or more."],
 			[() => parseLength("-1"), "Expected millimetres, 0 or more."],

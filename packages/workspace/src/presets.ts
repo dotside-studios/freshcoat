@@ -2,6 +2,9 @@ import { newId, uniqueName } from "./ids";
 import { DEFAULT_DPI, DEFAULT_FILE_NAME_PATTERN } from "./plan";
 import type { ExportPreset } from "./types";
 
+/** The pixel densities a preset's `scale` takes. */
+export const PRESET_SCALE = { min: 1, max: 4 } as const;
+
 /** A preset for a template with the spec's defaults: every record but the
  *  skipped ones, every side, a PNG zip at 1×, 300 dpi, the default file name,
  *  and marking what exports. */

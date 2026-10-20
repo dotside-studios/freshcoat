@@ -6,6 +6,7 @@ import { decodePixels } from "@freshcoat-js/engine";
 import { SRGB_PROFILE } from "@freshcoat-js/engine/icc";
 import { DEFAULT_SHEET_LAYOUT, type Workspace } from "@freshcoat-js/workspace";
 import { REPORT_FILE_NAME } from "@freshcoat-js/workspace/export";
+import { PRINT_TARGETS } from "@freshcoat-js/for-print";
 import { iccProfile, loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { unzipSync } from "fflate";
 import {
@@ -233,7 +234,8 @@ describe("render a template", () => {
 			[["render"], 2, "missing required argument 'file'"],
 			[["render", "a.json", "b.json"], 2, "too many arguments for 'render'"],
 			[["render", "badge.json", "--format", "gif"], 2, "Allowed choices are png, jpeg, jpg, webp"],
-			[["render", "badge.json", "--scale", "0"], 2, "Expected a positive number"],
+			[["render", "badge.json", "--scale", "0"], 2, "Expected a number from 1 to 4"],
+			[["render", "badge.json", "--scale", "0.5"], 2, "Expected a number from 1 to 4"],
 			[["render", "badge.json", "--set", "name"], 2, "Expected key=value"],
 			[["render", "badge.json", "--bogus"], 2, "unknown option '--bogus'"],
 			[["render", "badge.json", "--out"], 2, "option '--out <path>' argument missing"],
@@ -543,6 +545,26 @@ describe("render image values", () => {
 		expect(off.stderr).not.toContain("DPI");
 		const lower = await box.run("render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "low-dpi", "--min-dpi", "20");
 		expect(lower.stderr).not.toContain("DPI");
+	});
+
+	test("measures a photo at --dpi", async () => {
+		const base = ["render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "--out", "dpi"];
+		expect((await box.run(...base, "--dpi", "150")).stderr).toContain(
+			"warning: front: Image prints at 15 DPI, under 300: front_logo",
+		);
+		expect((await box.run(...base, "--dpi", "3000")).stderr).not.toContain("DPI");
+	});
+
+	test("sizes each file as its photo with --size-from and --max-edge", async () => {
+		const base = ["render", "templates/photo.json", "--set", "photo=red.png", "--frame", "front", "-q"];
+		const front = async (zip: string) => {
+			const pixels = decodePixels(ck, unzipSync(new Uint8Array(await readFile(box.path(zip))))["front.png"] as Uint8Array);
+			return [pixels?.width, pixels?.height];
+		};
+		expect((await box.run(...base, "--size-from", "photo", "--out", "sized.zip")).code).toBe(0);
+		expect(await front("sized.zip")).toEqual([4, 4]);
+		expect((await box.run(...base, "--size-from", "photo", "--max-edge", "2", "--out", "capped.zip")).code).toBe(0);
+		expect(await front("capped.zip")).toEqual([2, 2]);
 	});
 
 	test("lists a low-DPI photo in an export's warnings and report", async () => {
@@ -1111,7 +1133,10 @@ describe("render export options", () => {
 		const cases: [string[], string][] = [
 			[["badge.json", "--name", "x", "--out", "dir"], "--name needs --data or a .zip or .pdf --out"],
 			[["badge.json", "--bleed", "--quality", "50"], "--bleed, --quality need --data or a .zip or .pdf --out"],
-			[["badge.json", "--dpi", "72", "--out", "x.zip"], "--dpi applies only to a .pdf"],
+			[["badge.json", "--max-edge", "800", "--out", "x.zip"], "--max-edge needs --size-from"],
+			[["badge.json", "--orientation", "sideways", "--sheets", "a4", "--out", "x.pdf"], "Allowed choices are auto, portrait, landscape"],
+			[["badge.json", "--no-analyze", "--out", "x.zip"], "--no-analyze needs --print-target or --print-profile"],
+			[["badge.json", "--scale", "5", "--out", "x.zip"], "Expected a number from 1 to 4"],
 			[["badge.json", "--pdf-text", "outline", "--out", "x.pdf"], "--pdf-text needs --pdf-pages vector"],
 			[["badge.json", "--duplex", "long", "--out", "x.pdf"], "--duplex needs --sheets"],
 			[["badge.json", "--no-crop-marks", "--margin", "2", "--out", "x.pdf"], "--no-crop-marks, --margin need --sheets"],
@@ -1276,11 +1301,12 @@ describe("validate warnings", () => {
 		for (const line of [
 			'warning: variant "wide" changes "ghost", which is not on side "front" (variant_orphan_override)',
 			'warning: variant "wide" has a change to "front_name" that changes nothing (variant_empty_override)',
-			'warning: front: "front_name" has its left, top and right edges inside the safe area',
-			'warning: back: "back_logo" has its right and bottom edges inside the safe area',
-			"warning: uses fields from format 1.6 but declares 1.2; older readers drop them",
+			'warning: front: "front_name" has its left, top and right edges inside the safe area (safe_area)',
+			'warning: back: "back_logo" has its right and bottom edges inside the safe area (safe_area)',
+			"warning: uses fields from format 1.6 but declares 1.2; older readers drop them (format_low)",
 		])
 			expect(run.stderr).toContain(line);
+		for (const line of run.stderr.trimEnd().split("\n")) expect(line).toMatch(/ \([a-z_]+\)$/);
 		const strict = await box.run("validate", "linted.json", "--strict", "-q");
 		expect(strict).toEqual({
 			code: 1,
@@ -1312,7 +1338,7 @@ describe("validate warnings for a CR80 card", () => {
 		const run = await box.run("validate", "cr80.json");
 		expect(run.code).toBe(0);
 		expect(run.stderr).toBe(
-			'warning: front: "tight" has its left edge inside the safe area\n',
+			'warning: front: "tight" has its left edge inside the safe area (safe_area)\n',
 		);
 		expect(run.stdout).toBe("cr80.json is valid, with 1 warning\n");
 	});
@@ -1340,7 +1366,7 @@ describe("validate warnings for image resolution", () => {
 	test("warns for a 600 px image placed 3 in wide at 300 DPI", async () => {
 		const run = await box.run("validate", "low-dpi.json");
 		expect(run.code).toBe(0);
-		expect(run.stderr).toBe('warning: front: "front_logo" prints at 200 DPI, under 300\n');
+		expect(run.stderr).toBe('warning: front: "front_logo" prints at 200 DPI, under 300 (image_dpi)\n');
 		expect(run.stdout).toBe("low-dpi.json is valid, with 1 warning\n");
 		const strict = await box.run("validate", "low-dpi.json", "--strict", "-q");
 		expect(strict.code).toBe(1);
@@ -1352,7 +1378,7 @@ describe("validate warnings for image resolution", () => {
 		expect((await box.run("validate", "low-dpi.json", "--min-dpi", "0", "--strict")).code).toBe(0);
 		expect((await box.run("validate", "low-dpi.json", "--dpi", "450")).stderr).not.toContain("DPI");
 		expect((await box.run("validate", "low-dpi.json", "--dpi", "150")).stderr).toBe(
-			'warning: front: "front_logo" prints at 100 DPI, under 300\nwarning: back: "back_logo" prints at 150 DPI, under 300\n',
+			'warning: front: "front_logo" prints at 100 DPI, under 300 (image_dpi)\nwarning: back: "back_logo" prints at 150 DPI, under 300 (image_dpi)\n',
 		);
 	});
 });
@@ -1398,9 +1424,9 @@ describe("print checks", () => {
 		const run = await box.run("validate", "print.json");
 		expect(run.code).toBe(0);
 		for (const line of [
-			'warning: front: "band": Runs to the trim on the left, top and right but not into the bleed; a cut that drifts shows a white edge',
-			'warning: front: "rule": Stroke is 0.12 pt at print size, below 0.25 pt; it may not print',
-			'warning: front: "fine": Text is 2.88 pt at print size, below 6 pt',
+			'warning: front: "band": Runs to the trim on the left, top and right but not into the bleed; a cut that drifts shows a white edge (short_of_bleed)',
+			'warning: front: "rule": Stroke is 0.12 pt at print size, below 0.25 pt; it may not print (hairline_stroke)',
+			'warning: front: "fine": Text is 2.88 pt at print size, below 6 pt (small_text)',
 		])
 			expect(run.stderr).toContain(line);
 		expect(run.stderr).not.toContain('"ink"');
@@ -1462,7 +1488,7 @@ describe("validate warnings for slices", () => {
 		const run = await box.run("validate", "open-slice.json");
 		expect(run.code).toBe(0);
 		expect(run.stderr).toBe(
-			'warning: front: "fold" is an open path, so it exports as a cut line, not a piece\n',
+			'warning: front: "fold" is an open path, so it exports as a cut line, not a piece (slice_open_piece)\n',
 		);
 		expect(run.stdout).toBe("open-slice.json is valid, with 1 warning\n");
 	});
@@ -1797,6 +1823,44 @@ describe("pack", () => {
 		expect(new TextDecoder().decode((await readFile(box.path("one.coat"))).subarray(0, 2))).toBe("PK");
 	});
 
+	test("validates and renders each template of a templates zip", async () => {
+		const workspace = workspaceOf(card());
+		const badge = workspace.templates[0] as Workspace["templates"][number];
+		workspace.templates.push({
+			...badge,
+			id: "t_tight",
+			fileName: "Tight.coat",
+			template: card({ id: "tight", safeArea: 20 } as never),
+		});
+		await box.write("two.coatworkspace", await workspaceBytes(workspace));
+		expect((await box.run("pack", "two.coatworkspace", "--out", "two.zip")).code).toBe(0);
+
+		const checked = await box.run("validate", "two.zip");
+		expect(checked.code).toBe(0);
+		expect(checked.stdout).toBe("two.zip is valid, with 4 warnings\n");
+		expect(checked.stderr).toContain(
+			'warning: Tight.coat: front: "front_name" has its left, top and right edges inside the safe area (safe_area)',
+		);
+		expect((await box.run("validate", "two.zip", "--strict", "-q")).code).toBe(1);
+
+		const rendered = await box.run("render", "two.zip", "--frame", "front", "--out", "unpacked");
+		expect(rendered.code).toBe(0);
+		expect(rendered.stdout).toBe("unpacked/Badge/front.png\nunpacked/Tight/front.png\n");
+		expect(await size(box.path("unpacked", "Tight", "front.png"))).toEqual([200, 100]);
+
+		const exported = await box.run("render", "two.zip", "--data", "people.csv", "--out", "x");
+		expect(exported.code).toBe(2);
+		expect(exported.stderr).toContain("a templates .zip renders each template's frames into a directory");
+
+		await box.write("junk.zip", "not a zip");
+		const junk = await box.run("validate", "junk.zip");
+		expect(junk.code).toBe(1);
+		expect(junk.stderr).toContain("junk.zip: not a readable zip");
+		const empty = await box.run("render", "badges.zip");
+		expect(empty.code).toBe(1);
+		expect(empty.stderr).toContain("cannot read badges.zip: no such file");
+	});
+
 	test("refuses outputs and templates it cannot write", async () => {
 		const cases: [string[], number, string][] = [
 			[["badge.json", "--out", "badge.png"], 2, "--out names a .coat or .coat.json file"],
@@ -1912,6 +1976,21 @@ describe("the command line", () => {
 		expect(short.stdout).toContain("Run freshcoat render --help-all");
 		expect(all.stdout).not.toContain("--help-all");
 		expect(all.stdout).toContain("Sheet options, with --sheets:");
+	});
+
+	test("offers every print target for-print has, by id and short name", async () => {
+		const help = (await box.run("render", "--help")).stdout.replace(/\s+/g, " ");
+		expect(PRINT_TARGETS.length).toBeGreaterThan(0);
+		for (const target of PRINT_TARGETS) expect(help).toContain(`${target.id} (${target.shortName ?? target.name})`);
+		const run = await box.run("render", "badge.json", "--print-target", "nope");
+		expect(run.code).toBe(2);
+		expect(run.stderr).toContain(`Allowed choices are ${["none", ...PRINT_TARGETS.map((t) => t.id)].join(", ")}`);
+	});
+
+	test("describes --dpi the same way for render and validate", async () => {
+		const dpi = "--dpi <n> design units per inch, the print size that image resolution, print checks and PDF pages are measured at; default 300";
+		for (const name of ["render", "validate"])
+			expect((await box.run(name, "--help")).stdout.replace(/\s+/g, " ")).toContain(dpi);
 	});
 
 	test("prints help for the tool and each command", async () => {
@@ -2268,7 +2347,7 @@ describe("render print options", () => {
 
 	test("corrects for the printer as a preset's print target and profile do", async () => {
 		const runs = [
-			await box.run(...template, "--print-target", "ymcko", "--print-profile", "printer.json", "--out", "print.zip"),
+			await box.run(...template, "--print-target", "ymcko-dye-sub", "--print-profile", "printer.json", "--out", "print.zip"),
 			await preset("p_print", "print-preset.zip"),
 			await box.run(...template, "--print-target", "none", "--out", "plain.zip"),
 		];
@@ -2288,7 +2367,7 @@ describe("render print options", () => {
 	});
 
 	test("writes corrected images into the --out directory on its own", async () => {
-		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko", "--out", "print-dir", "-q");
+		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko-dye-sub", "--out", "print-dir", "-q");
 		expect(run.code).toBe(0);
 		expect((await readdir(box.path("print-dir"))).sort()).toEqual(["export-report.csv", "front.png"]);
 	});
@@ -2348,7 +2427,7 @@ describe("render print options", () => {
 	});
 
 	test("warns when a print target turns vector pages into PNG", async () => {
-		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko", "--pdf-pages", "vector", "--dpi", "72", "--out", "printed-vector.pdf");
+		const run = await box.run("render", "badge.json", "--frame", "front", "--print-target", "ymcko-dye-sub", "--pdf-pages", "vector", "--dpi", "72", "--out", "printed-vector.pdf");
 		expect(run.code).toBe(0);
 		expect(run.stderr).toContain("warning: print target draws PDF pages as PNG, not vector");
 	});
@@ -2384,7 +2463,7 @@ describe("render print options", () => {
 
 	test("warns about a profile measured on another target", async () => {
 		await box.write("other.json", JSON.stringify({ ...profile, target: "thermal" }));
-		const run = await box.run("render", "badge.json", "--print-target", "ymcko", "--print-profile", "other.json", "--out", "other.zip");
+		const run = await box.run("render", "badge.json", "--print-target", "ymcko-dye-sub", "--print-profile", "other.json", "--out", "other.zip");
 		expect(run.code).toBe(0);
 		expect(run.stderr).toContain(
 			"--print-profile other.json was measured on thermal, not Card printer (YMCKO dye-sub)",
@@ -2393,9 +2472,24 @@ describe("render print options", () => {
 
 	test("refuses a file that is not a print profile", async () => {
 		await box.write("cast.json", JSON.stringify({ ...profile, balance: { r: 9, g: 1, b: 1 } }));
-		const run = await box.run("render", "badge.json", "--print-target", "ymcko", "--print-profile", "cast.json", "--out", "cast.zip");
+		const run = await box.run("render", "badge.json", "--print-target", "ymcko-dye-sub", "--print-profile", "cast.json", "--out", "cast.zip");
 		expect(run.code).toBe(1);
 		expect(run.stderr).toContain("--print-profile cast.json: balance.r is 9, outside the");
+	});
+
+	test("turns off the per-photo analysis with --no-analyze", async () => {
+		const run = await box.run(...template, "--print-target", "ymcko-dye-sub", "--no-analyze", "--out", "fixed.zip");
+		expect(run.code).toBe(0);
+		expect(Object.keys(await images("fixed.zip"))).toEqual(Object.keys(await images("print.zip")));
+	});
+
+	test("turns the sheets with --orientation", async () => {
+		const sheets = ["render", "badge.json", "--frame", "front", "--sheets", "a5", "-q"];
+		expect((await box.run(...sheets, "--orientation", "landscape", "--out", "landscape.pdf")).code).toBe(0);
+		expect((await box.run(...sheets, "--orientation", "portrait", "--out", "portrait.pdf")).code).toBe(0);
+		const [landscape, portrait] = [await pages("landscape.pdf"), await pages("portrait.pdf")];
+		expect(landscape[0]?.split("\n")[0]).toBe("595x420");
+		expect(portrait[0]?.split("\n")[0]).toBe("420x595");
 	});
 
 	test("refuses print and back options that do not fit", async () => {
@@ -2406,8 +2500,8 @@ describe("render print options", () => {
 			[["badge.json", "--back-offset", "1", "--sheets", "a4", "--duplex", "long", "--out", "x.pdf"], "Expected <x>,<y> in millimetres, such as 0.5,-1"],
 			[["badge.json", "--blank-backs"], "--blank-backs needs --data or a .zip or .pdf --out"],
 			[["badge.json", "--print-target", "none", "--print-profile", "printer.json"], "--print-profile does not go with --print-target none"],
-			[["badge.json", "--print-target", "cmyk"], "Allowed choices are none, ymcko"],
-			[["printing.coatworkspace", "--preset", "p_print", "--print-target", "ymcko", "--out", "x.zip"], "--print-target applies only to templates"],
+			[["badge.json", "--print-target", "cmyk"], "Allowed choices are none, ymcko-dye-sub"],
+			[["printing.coatworkspace", "--preset", "p_print", "--print-target", "ymcko-dye-sub", "--out", "x.zip"], "--print-target applies only to templates"],
 		];
 		for (const [argv, message] of cases) {
 			const run = await box.run("render", ...argv);

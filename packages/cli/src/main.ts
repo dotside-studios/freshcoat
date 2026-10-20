@@ -15,12 +15,15 @@ import {
 	parseJobs,
 	parseLength,
 	parseMarks,
+	parseMaxEdge,
 	parseMinDpi,
 	parseOffset,
 	parsePaper,
 	parsePositive,
 	parseQuality,
 } from "./args";
+import { PRINT_TARGETS } from "@freshcoat-js/for-print";
+import { PRESET_SCALE } from "@freshcoat-js/workspace";
 import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
@@ -29,6 +32,9 @@ import { CliError, type Io, processIo, UsageError } from "./io";
 import { version } from "./version";
 
 export { version };
+
+const DPI_HELP =
+	"design units per inch, the print size that image resolution, print checks and PDF pages are measured at; default 300";
 
 export async function main(
 	argv: string[],
@@ -97,9 +103,9 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 	const render = command("render")
 		.summary("render a template, a template per spreadsheet row, or a workspace preset")
 		.description(
-			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON or a .coatworkspace.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
+			"Render each frame of a template to an image, or run an export preset from a\n.coatworkspace. <file> is a .coat file, template JSON, a .coatworkspace or a\ntemplates .zip from pack, whose templates each render into a directory.\nTemplate frames are named after the frame, with the scale as a suffix for\nanything but 1x: front.png, front@2x.png. An --out ending in .zip or .pdf\nwrites a zip of images and a report, or a PDF, instead. With --data, a\ntemplate renders once per row of a spreadsheet into a zip, a PDF or a\ndirectory of images and a report; a workspace preset writes the same.",
 		)
-		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
+		.argument("<file>", "a .coat file, template JSON, a .coatworkspace or a templates .zip")
 		.option(
 			"--out <path>",
 			"a directory, default the current one, or a .zip or .pdf file; --data and a workspace need one",
@@ -115,6 +121,7 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"warn for an image that prints below this many pixels per inch; default 300, 0 for none",
 			arg(parseMinDpi),
 		)
+		.option("--dpi <n>", `${DPI_HELP}; not for a workspace`, arg(parsePositive))
 		.optionsGroup("Template options:")
 		.option("--data <file>", "CSV, TSV, Excel, .ods or JSON; the first row names the fields")
 		.option("--values <file>", "JSON file of field values")
@@ -125,7 +132,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.option("--variant <id>", "render a variant of the template")
 		.option("--frame <name>", "render only this frame; repeatable", arg(collect))
-		.option("--scale <n>", "pixel density, default 1; repeatable into a directory", arg(collectScale))
+		.option(
+			"--scale <n>",
+			`pixel density, ${PRESET_SCALE.min} to ${PRESET_SCALE.max}, default 1; repeatable into a directory`,
+			arg(collectScale),
+		)
 		.addOption(
 			new Option("--format <format>", "image format, default png").choices([
 				"png",
@@ -149,6 +160,15 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.option("--quality <n>", "JPEG and WebP quality, 0 to 100, default 90", arg(parseQuality))
 		.option("--bleed", "include the template's bleed around each card")
+		.option(
+			"--size-from <field>",
+			"size each file as the photo in this image field, as Studio's Match image does, in place of --scale",
+		)
+		.option(
+			"--max-edge <px>",
+			"with --size-from, cap each file's long edge at this many pixels",
+			arg(parseMaxEdge),
+		)
 		.option("--pieces", "write each slice of a frame as its own file; a frame with none is written whole")
 		.addOption(
 			new Option(
@@ -157,7 +177,6 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			).choices(["svg", "dxf"] as const),
 		)
 		.optionsGroup("PDF options:")
-		.option("--dpi <n>", "pixels per inch, which sets the page size; default 300", arg(parsePositive))
 		.addOption(
 			new Option("--pdf-pages <kind>", "what each page holds, default png").choices([
 				"png",
@@ -193,6 +212,12 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.optionsGroup("Sheet options, with --sheets:")
 		.addOption(
+			new Option(
+				"--orientation <way>",
+				"turn the paper this way; default auto, whichever fits more cards",
+			).choices(["auto", "portrait", "landscape"] as const),
+		)
+		.addOption(
 			new Option("--duplex <edge>", "print backs behind fronts, flipped on this edge").choices([
 				"long",
 				"short",
@@ -223,12 +248,16 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.addOption(
 			new Option(
 				"--print-target <target>",
-				"correct the cards for this printer, as a preset's print target does; default the profile's, or none",
-			).choices(["none", "ymcko"] as const),
+				`correct the cards for this printer, as a preset's print target does: ${PRINT_TARGETS.map((t) => `${t.id} (${t.shortName ?? t.name})`).join(", ")}; default the profile's, or none`,
+			).choices(["none", ...PRINT_TARGETS.map((t) => t.id)]),
 		)
 		.option(
 			"--print-profile <file>",
 			"a measured printer profile, as Studio saves it; implies the target it was measured on",
+		)
+		.option(
+			"--no-analyze",
+			"apply the target's fixed correction instead of correcting each photo from its own analysis",
 		)
 		.optionsGroup("Workspace options:")
 		.option(
@@ -262,15 +291,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 	command("validate")
 		.summary("check a template or workspace")
 		.description(
-			"Check a template against the format, or a workspace's templates, bindings and\npresets. Exits 0 when it is valid and 1 when it is not, listing each issue.\nWarnings name what Studio's Issues list does: variant changes that change\nnothing or name a missing layer, layers inside the safe area, images that\nprint below --min-dpi, and a format version that does not match the fields\nin use; for a workspace also required fields no column fills. An image bound\nto a field is checked when it renders. --quiet prints nothing when it is\nvalid.",
+			"Check a template against the format, each template of a templates .zip, or a\nworkspace's templates, bindings and presets. Exits 0 when it is valid and 1\nwhen it is not, listing each issue. Warnings name what Studio's Issues list\ndoes, each with its code: variant changes that change nothing or name a\nmissing layer, layers inside the safe area, images that print below\n--min-dpi, print hints, and a format version that does not match the fields\nin use; for a workspace also required fields no column fills. An image bound\nto a field is checked when it renders. --quiet prints nothing when it is\nvalid.",
 		)
-		.argument("<file>", "a .coat file, template JSON or a .coatworkspace")
+		.argument("<file>", "a .coat file, template JSON, a .coatworkspace or a templates .zip")
 		.option("--strict", "exit 1 on warnings too")
-		.option(
-			"--dpi <n>",
-			"design units per inch the images are checked at; default 300, or a workspace preset's",
-			arg(parsePositive),
-		)
+		.option("--dpi <n>", `${DPI_HELP}, or a workspace preset's lowest`, arg(parsePositive))
 		.option(
 			"--min-dpi <n>",
 			"warn for an image that prints below this many pixels per inch; default 300, or a workspace preset's; 0 for none",

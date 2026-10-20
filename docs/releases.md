@@ -42,6 +42,13 @@ These land in the next release's notes.
   the layer and the ink, as the separation is lost. The rest are listed once
   per side: in `JobResult.rasterized`, as an `info` row per side in
   `export-report.csv`, after a CLI export, and in Studio's export checks.
+- **CLI parity with Studio.** `render` takes `--orientation`, `--size-from`
+  and `--max-edge` (Studio's Match image) and `--no-analyze`, writing the
+  preset fields Studio writes; `--print-target` takes for-print's target ids,
+  such as `ymcko-dye-sub`; `--scale` takes 1 to 4, as presets do; `--dpi`
+  works for a template render and an export to images too; every `validate`
+  warning ends in its code; and `render` and `validate` read the templates
+  `.zip` that `pack` and Studio's Export all templates write.
 
 ## Prepare and check a release
 

@@ -16,8 +16,10 @@ import { describe, expect, it } from "vitest";
 import {
 	packTemplates,
 	packWorkspace,
+	unpackTemplates,
 	unpackWorkspace,
 	WORKSPACE_MEDIA_TYPE,
+	WorkspaceReadError,
 } from "./archive";
 import { DEFAULT_SHEET_LAYOUT } from "./impose";
 import { readOutputProfile } from "./output-intent";
@@ -1119,6 +1121,23 @@ describe("packTemplates", () => {
 			await unpackTemplate(zip["templates/Member card.coat"] as Uint8Array),
 		).toEqual(memberCard);
 		expect(await packTemplates(twins)).toEqual(await packTemplates(twins));
+	});
+
+	it("reads back as the templates it packed", async () => {
+		const packed = await unpackTemplates(await packTemplates(ws));
+		expect(packed.map((t) => t.fileName)).toEqual([
+			"Member card.coat",
+			"Plain.coat",
+		]);
+		expect(await unpackTemplate(packed[0]?.bytes as Uint8Array)).toEqual(
+			memberCard,
+		);
+		await expect(unpackTemplates(zipSync({}))).rejects.toThrow(
+			WorkspaceReadError,
+		);
+		await expect(
+			unpackTemplates(new Uint8Array([1, 2, 3])),
+		).rejects.toMatchObject({ code: "not_a_zip" });
 	});
 });
 
