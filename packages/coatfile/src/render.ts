@@ -551,6 +551,8 @@ export function describeWarning(w: FrameWarning): string {
 			return `Curved text radius raised to its font size${w.layer ? `: ${w.layer}` : ""}`;
 		case "vector_rasterized":
 			return `Drawn as an image in the PDF: ${w.feature}${w.layer ? ` (${w.layer})` : ""}`;
+		case "font_embedding_restricted":
+			return `Font ${w.family} does not allow embedding, so its text is drawn as outlines in the PDF${w.layer ? ` (${w.layer})` : ""}`;
 		case "spot_rasterized":
 			return `Spot colour ${w.spot} lost: the ${w.paint} of ${w.layer ?? "a layer"} is drawn as an image in the PDF (${w.feature})`;
 		case "pattern_unsupported":
