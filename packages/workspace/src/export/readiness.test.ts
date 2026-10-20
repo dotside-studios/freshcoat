@@ -143,7 +143,9 @@ describe("presetReadiness", () => {
 		};
 		const r = presetReadiness(workspace, drifting);
 		expect(r.sheets?.field).toBe("backOffset");
-		expect(r.sheets?.error).toMatch(/^The back offset \(50 mm, 0 mm\) moves the backs off the paper/);
+		expect(r.sheets?.error).toMatch(
+			/^The back offset \(50 mm, 0 mm\) moves the backs off the paper/,
+		);
 		expect(r.blocked?.message).toBe("Back offset out of range");
 	});
 

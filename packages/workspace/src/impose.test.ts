@@ -616,7 +616,9 @@ describe("imposeSheets", () => {
 						layout({ paper: "letter", marginMm: 120 }),
 					),
 				).message,
-			).toMatch(/^The margins \(120 mm\) leave no room on Letter: 215.9 mm wide/);
+			).toMatch(
+				/^The margins \(120 mm\) leave no room on Letter: 215.9 mm wide/,
+			);
 			expect(
 				error(() =>
 					imposeSheets(

@@ -102,11 +102,7 @@ export const MAX_BACK_OFFSET_MM = 50;
 export class SheetLayoutError extends Error {
 	readonly axis?: SheetLayoutAxis;
 	readonly field?: "backOffset";
-	constructor(
-		message: string,
-		axis?: SheetLayoutAxis,
-		field?: "backOffset",
-	) {
+	constructor(message: string, axis?: SheetLayoutAxis, field?: "backOffset") {
 		super(message);
 		this.name = "SheetLayoutError";
 		if (axis !== undefined) this.axis = axis;
