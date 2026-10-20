@@ -153,6 +153,8 @@ export {
 	collectFontBytes,
 	collectFontRequests,
 	type FontCache,
+	type FontFallback,
+	googleFonts,
 	type ResolvedTemplateFonts,
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,

@@ -12,7 +12,6 @@ defaults now refuse that. This lands in the release after 0.4.
 |---|---|
 | `fetchLoader` fetched any URL that was not `data:` | it loads `data:`, `blob:` and `https:` only; every other scheme throws |
 | fonts with an `http:` `src` or stylesheet `url` were fetched by the global `fetch` | the default font fetch takes `https:` only |
-| `resolveTemplateFonts` looked up undeclared families on Google Fonts | it does so only with `guessGoogle: true` |
 
 `http:` is refused on purpose: it is plaintext, and it is how internal
 services answer. `createFetchLoader({ unsafeAllowHttp: true })` opts in; see
@@ -64,12 +63,14 @@ Fonts go through `load` for local files and through `fetch` (the
 `resolveTemplateFonts` option, or `fontBytes`'s third argument) for http(s)
 sources. A `fetch` passed explicitly is not restricted.
 
-A host that relied on the Google Fonts lookup for undeclared families passes
-`guessGoogle: true` to `resolveTemplateFonts`, or `fontOptions: { guessGoogle:
-true }` to `exportWorkspace`. Without it those families are reported in
-`missing` and their text paints with a fallback face. The lookup sends family
-names from the template to Google, which is why it is opt-in.
+`resolveTemplateFonts` still looks up undeclared families on Google Fonts by
+default, through `googleFonts()`, and that lookup sends family names from the
+template to Google. A server host that does not want outbound requests to
+Google passes `fallback: null` (or `fontOptions: { fallback: null }` to
+`exportWorkspace`), and those families are reported in `missing` with their text
+painted in a fallback face. It can also pass its own `FontFallback`, such as one
+backed by an internal mirror. The old `guessGoogle` option is gone: replace
+`guessGoogle: false` with `fallback: null` and drop `guessGoogle: true`.
 
-Studio and the CLI pass `guessGoogle: true`. The CLI is a local tool that runs
-on inputs its user chose, so it opts in with `unsafeAllowHttp` for images and
-fonts and keeps fetching `http:` as before.
+The CLI is a local tool that runs on inputs its user chose, so it opts in with
+`unsafeAllowHttp` for images and fonts and keeps fetching `http:` as before.

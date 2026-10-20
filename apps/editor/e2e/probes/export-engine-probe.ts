@@ -87,7 +87,6 @@ async function setup(ws: Workspace) {
 	const t0 = performance.now();
 	const { fonts } = await resolveTemplateFonts(ws.templates[0].template, {
 		cache: fontCache,
-		guessGoogle: true,
 	});
 	await pool.init(fonts);
 	return { pool, initMs: performance.now() - t0 };

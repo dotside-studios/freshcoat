@@ -51,14 +51,42 @@ export type FontCache = {
 	delete(key: string): unknown;
 };
 
+export type FontFallback = {
+	// Namespaces cache keys, so two fallbacks never share entries.
+	id: string;
+	load(family: string, weights: number[]): Promise<Uint8Array[]>;
+};
+
+export function googleFonts(
+	opts: { fetch?: FontFetch; load?: ByteLoader } = {},
+): FontFallback {
+	return {
+		id: "google",
+		load: (family, weights) =>
+			fontBytes(
+				{
+					kind: "descriptor",
+					descriptor: {
+						kind: "google",
+						family,
+						url: googleCss2Url(family, weights),
+					},
+				},
+				opts.load,
+				opts.fetch,
+			),
+	};
+}
+
 export type ResolveTemplateFontsOptions = {
 	// Every http(s) request goes through it; the global fetch when omitted.
 	fetch?: FontFetch;
 	// Reads a `local` font file src that is neither data: nor http(s).
 	load?: ByteLoader;
-	// Look an undeclared family up on Google Fonts by name. Opt-in: it sends
-	// family names from the template to Google. Defaults to false.
-	guessGoogle?: boolean;
+	// Looks up a family the `fonts` block does not declare. Google Fonts when
+	// omitted, which sends those family names to Google; null disables the
+	// lookup.
+	fallback?: FontFallback | null;
 	// Holds fetched bytes across calls. An empty result is deleted again, so a
 	// family that failed is retried on the next call.
 	cache?: FontCache;
@@ -69,7 +97,7 @@ export type ResolvedTemplateFonts = {
 	fonts: Map<string, Uint8Array[]>;
 	// Families the template declares in its `fonts` block.
 	declared: string[];
-	// Undeclared families Google Fonts had under that name.
+	// Undeclared families the fallback had under that name.
 	guessed: string[];
 	// Families nothing produced bytes for. Their text paints with a fallback face.
 	missing: string[];
@@ -77,14 +105,18 @@ export type ResolvedTemplateFonts = {
 
 // Load every font a template's text and barcodes need, in the base design and
 // each variant. A declared family loads from its descriptor. A family the
-// `fonts` block does not describe is looked up on Google Fonts by name, at the
-// weights the template uses it at, when `guessGoogle` is true. One family
+// `fonts` block does not describe is looked up by name through the fallback
+// (Google Fonts by default), at the weights the template uses it at. One family
 // that fails never takes the others with it: it is reported as missing.
 export async function resolveTemplateFonts(
 	template: Template,
 	options: ResolveTemplateFontsOptions = {},
 ): Promise<ResolvedTemplateFonts> {
-	const { fetch, load, cache, guessGoogle = false } = options;
+	const { fetch, load, cache } = options;
+	const fallback =
+		options.fallback === undefined
+			? googleFonts({ fetch, load })
+			: options.fallback;
 	const usage = fontUsage(template);
 
 	const results = await Promise.all(
@@ -95,25 +127,13 @@ export async function resolveTemplateFonts(
 				);
 				return { family: request.family, bytes, guessed: false };
 			}
-			if (!guessGoogle)
+			if (!fallback)
 				return { family: request.family, bytes: [], guessed: true };
 			const wanted = usage.get(request.family)?.weights ?? [400];
 			const bytes = await cached(
 				cache,
-				`g:${request.family}:${wanted.join(",")}`,
-				() =>
-					fontBytes(
-						{
-							kind: "descriptor",
-							descriptor: {
-								kind: "google",
-								family: request.family,
-								url: googleCss2Url(request.family, wanted),
-							},
-						},
-						load,
-						fetch,
-					),
+				`g:${fallback.id}:${request.family}:${wanted.join(",")}`,
+				() => fallback.load(request.family, wanted),
 			);
 			return { family: request.family, bytes, guessed: true };
 		}),
@@ -141,13 +161,13 @@ export async function resolveTemplateFonts(
 }
 
 // The declared-only resolution: the bytes of every family the `fonts` block
-// describes, with no Google guess and no report.
+// describes, with no fallback lookup and no report.
 export async function collectFontBytes(
 	template: Template,
-	options: Omit<ResolveTemplateFontsOptions, "guessGoogle"> = {},
+	options: Omit<ResolveTemplateFontsOptions, "fallback"> = {},
 ): Promise<Map<string, Uint8Array[]>> {
 	return (
-		await resolveTemplateFonts(template, { ...options, guessGoogle: false })
+		await resolveTemplateFonts(template, { ...options, fallback: null })
 	).fonts;
 }
 

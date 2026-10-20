@@ -102,7 +102,6 @@ async function renderFrames(
 	const { fonts, ...report } = await resolveTemplateFonts(template, {
 		...withFetch(fontFetch(io)),
 		load: createLoader(io, directory),
-		guessGoogle: true,
 	});
 	warnAboutFonts(log, report);
 

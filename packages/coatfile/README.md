@@ -1425,22 +1425,40 @@ server gets the same result:
 ```ts
 import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 
-const { fonts, declared, guessed, missing } = await resolveTemplateFonts(template, {
-  guessGoogle: true,
-});
+const { fonts, declared, guessed, missing } = await resolveTemplateFonts(template);
 // fonts: Map<family, bytes[]>
 // declared: families the `fonts` block describes
-// guessed: undeclared families found on Google Fonts by name
+// guessed: undeclared families the fallback found by name (Google Fonts by default)
 // missing: families nothing produced bytes for; their text uses a fallback face
 ```
 
-Without `guessGoogle`, only declared fonts load and an undeclared family is
-reported as missing. With `guessGoogle: true`, a family the `fonts` block does
-not describe is looked up on Google Fonts by name, at only the weights the
-template uses it at (text, spans, barcodes, in the base design and every
-variant). The lookup is off by default because it sends family names from the
-template to Google. A family that fails to load is reported as missing and never
-takes the others with it.
+A family the `fonts` block does not describe is looked up through the
+`fallback` option, by name and at only the weights the template uses it at
+(text, spans, barcodes, in the base design and every variant). The default
+fallback is `googleFonts({ fetch, load })`, built from the same `fetch` and
+`load` options, so the lookup is on by default and sends family names from the
+template to Google. Pass `fallback: null` to turn it off: only declared fonts
+load and an undeclared family is reported as missing. A family that fails to
+load is reported as missing and never takes the others with it.
+
+A fallback is `{ id, load(family, weights) }`, where `load` resolves to the
+font bytes and `id` namespaces the cache keys, so two fallbacks never share
+cache entries. A host that must not send requests to Google can pass its own,
+for instance one that reads from an internal mirror:
+
+```ts
+import { type FontFallback, resolveTemplateFonts } from "@freshcoat-js/coatfile";
+
+const mirror: FontFallback = {
+  id: "mirror",
+  load: async (family) => {
+    const res = await fetch(`https://fonts.internal/${encodeURIComponent(family)}.ttf`);
+    return res.ok ? [new Uint8Array(await res.arrayBuffer())] : [];
+  },
+};
+
+await resolveTemplateFonts(template, { fallback: mirror });
+```
 
 The options leave network and storage to the host:
 
@@ -1481,7 +1499,7 @@ const diskCache: FontCache = {
 
 const { fonts, missing } = await resolveTemplateFonts(template, {
   cache: diskCache,
-  guessGoogle: !process.env.OFFLINE,
+  fallback: process.env.OFFLINE ? null : undefined,
 });
 if (missing.length) console.warn("no font for", missing.join(", "));
 
@@ -1499,7 +1517,7 @@ warning. It does not guess. Fonts given to the renderer first, through its
 first and handing the map over is how a render gets the Google guess.
 
 `collectFontBytes(template, options)` is the declared-only form: the `fonts`
-map of `resolveTemplateFonts` with `guessGoogle: false`.
+map of `resolveTemplateFonts` with `fallback: null`.
 
 A `google` / `fontsource` descriptor points at a **stylesheet**, not a font
 file, and what that stylesheet contains depends on who asks. Servers send an old

@@ -56,7 +56,7 @@ export function useDocumentFonts(template: Template | null): DocumentFonts {
 			return;
 		}
 		let cancelled = false;
-		resolveTemplateFonts(current, { cache: fontCache, guessGoogle: true })
+		resolveTemplateFonts(current, { cache: fontCache })
 			.then((report) => {
 				if (!cancelled) setState({ key, report });
 			})

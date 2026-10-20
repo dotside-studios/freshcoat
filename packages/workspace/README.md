@@ -188,8 +188,8 @@ const result = await exportWorkspace(workspace, preset, {
 (`findPreset` does that lookup). Unless `fonts` is given, it resolves the
 template's fonts with `resolveTemplateFonts`, passing it `fontOptions`, and
 reports the families it found no bytes for as `result.fonts.missing`. Undeclared
-families are not looked up on Google Fonts unless `fontOptions` sets
-`guessGoogle: true`. It
+families are looked up on Google Fonts unless `fontOptions` sets
+`fallback: null` or a fallback of its own. It
 renders one item at a time on the calling thread, or through `pool`, a
 `JobPool` of the host's own, such as worker threads that each hold a
 `createItemRenderer` and the fonts; `renderer` still checks glyphs then. The renderer is the host's, so its `load`
