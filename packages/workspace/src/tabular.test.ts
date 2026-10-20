@@ -255,6 +255,110 @@ describe("writeTable", () => {
 		}
 	});
 
+	describe("formula escaping", () => {
+		const withValues = (
+			values: Dataset["records"][number]["values"],
+			columns: Dataset["columns"] = dataset.columns,
+		): Dataset => ({
+			...dataset,
+			columns,
+			records: [{ id: "r_1", status: "pending", values }],
+		});
+		const body = async (
+			data: Dataset,
+			format: "csv" | "tsv",
+			options?: { escapeFormulas?: boolean },
+		) =>
+			text((await writeTable(data, format, options)).bytes)
+				.replace(/^﻿/, "")
+				.split("\r\n");
+
+		it.each([
+			["=", "=1+1"],
+			["+", "+cmd"],
+			["-", "-2+3"],
+			["@", "@SUM(A1)"],
+		])("prefixes a quote to a text cell starting with %s", async (_n, raw) => {
+			for (const [format, sep] of [
+				["csv", ","],
+				["tsv", "\t"],
+			] as const) {
+				const lines = await body(withValues({ name: raw }), format);
+				expect(lines[1]?.split(sep)[0]).toBe(`'${raw}`);
+			}
+		});
+
+		it("prefixes a quote to a text cell starting with a tab", async () => {
+			expect((await body(withValues({ name: "\tx" }), "csv"))[1]).toMatch(
+				/^'\tx,/,
+			);
+			expect((await body(withValues({ name: "\tx" }), "tsv"))[1]).toMatch(
+				/^"'\tx"\t/,
+			);
+		});
+
+		it("prefixes a quote to a cell starting with a carriage return", async () => {
+			for (const format of ["csv", "tsv"] as const) {
+				const out = await writeTable(withValues({ name: "\rx" }), format);
+				expect(text(out.bytes)).toContain(`\r\n"'\rx"`);
+			}
+		});
+
+		it("leaves numbers stored as numbers unchanged", async () => {
+			const data = withValues({ name: "n", points: -5, delta: 3.2, gain: 3.2 });
+			const columns = [
+				...dataset.columns,
+				{ key: "delta", type: "number" },
+				{ key: "gain", type: "number" },
+			] as Dataset["columns"];
+			const csv = await body({ ...data, columns }, "csv");
+			expect(csv[1]).toBe("n,,,,,,-5,3.2,3.2");
+			const signed = withValues({ name: "n", points: -5 });
+			expect((await body(signed, "tsv"))[1]).toBe("n\t\t\t\t\t\t-5");
+		});
+
+		it("escapes a numeric-looking string", async () => {
+			const csv = await body(withValues({ name: "-5", points: "+3" }), "csv");
+			expect(csv[1]).toBe("'-5,,,,,,'+3");
+		});
+
+		it("escapes headers", async () => {
+			const columns = [
+				{ key: "=HYPERLINK", type: "text" },
+				{ key: "plain", type: "text" },
+			] as Dataset["columns"];
+			const csv = await body(withValues({ plain: "x" }, columns), "csv");
+			expect(csv[0]).toBe("'=HYPERLINK,plain");
+			const tsv = await body(withValues({ plain: "x" }, columns), "tsv");
+			expect(tsv[0]).toBe("'=HYPERLINK\tplain");
+		});
+
+		it("escapes before quoting", async () => {
+			const csv = await body(withValues({ name: '=a,"b"' }), "csv");
+			expect(csv[1]?.startsWith(`"'=a,""b"""`)).toBe(true);
+		});
+
+		it("leaves cells unchanged when escapeFormulas is false", async () => {
+			const columns = [{ key: "=h", type: "text" }] as Dataset["columns"];
+			const data = withValues({ "=h": "@x" }, columns);
+			for (const format of ["csv", "tsv"] as const) {
+				expect(await body(data, format, { escapeFormulas: false })).toEqual([
+					"=h",
+					"@x",
+					"",
+				]);
+			}
+		});
+
+		it("keeps the quote when the file is read back", async () => {
+			for (const format of ["csv", "tsv"] as const) {
+				const out = await writeTable(withValues({ name: "=1+1" }), format);
+				const { sheets } = await readTable(out.bytes, `x.${format}`);
+				expect(sheets[0]?.rows[1]?.[0]).toBe("'=1+1");
+			}
+		});
+	});
+
 	it("writes JSON and NDJSON with typed values", async () => {
 		const json = JSON.parse(text((await writeTable(dataset, "json")).bytes));
 		expect(json[0]).toEqual({

@@ -6,6 +6,7 @@ import type {
 	Dataset,
 	TableFormat,
 	TableSheet,
+	WriteTableOptions,
 	WrittenTable,
 } from "./types";
 import {
@@ -329,16 +330,29 @@ function exportValue(
 	return value;
 }
 
-function delimited(dataset: Dataset, separator: string): string {
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+function delimited(
+	dataset: Dataset,
+	separator: string,
+	escapeFormulas: boolean,
+): string {
 	const quote = (text: string) =>
 		text.includes(separator) || /["\r\n]/.test(text)
 			? `"${text.replace(/"/g, '""')}"`
 			: text;
+	const guard = (text: string, value: CellValue | undefined) =>
+		escapeFormulas && typeof value !== "number" && FORMULA_TRIGGER.test(text)
+			? `'${text}`
+			: text;
 	const lines = [
-		dataset.columns.map((c) => quote(c.key)).join(separator),
+		dataset.columns.map((c) => quote(guard(c.key, c.key))).join(separator),
 		...dataset.records.map((record) =>
 			dataset.columns
-				.map((c) => quote(exportText(dataset, c, record.values[c.key])))
+				.map((c) => {
+					const value = record.values[c.key];
+					return quote(guard(exportText(dataset, c, value), value));
+				})
 				.join(separator),
 		),
 	];
@@ -394,19 +408,29 @@ async function workbookBytes(
 	);
 }
 
-/** The dataset as a file. The header row is the column keys. */
+/**
+ * The dataset as a file. The header row is the column keys.
+ *
+ * In CSV and TSV, string cells and headers starting with `=`, `+`, `-`, `@`,
+ * tab or CR get a leading `'` so spreadsheets do not run them as formulas;
+ * numbers are left alone. Set `escapeFormulas: false` for machine consumers.
+ * Reading the file back keeps the `'`, because it cannot be told apart from a
+ * value that began with one.
+ */
 export async function writeTable(
 	dataset: Dataset,
 	format: TableFormat,
+	options: WriteTableOptions = {},
 ): Promise<WrittenTable> {
+	const escapeFormulas = options.escapeFormulas ?? true;
 	const encode = (text: string) => new TextEncoder().encode(text);
 	let bytes: Uint8Array;
 	switch (format) {
 		case "csv":
-			bytes = encode(delimited(dataset, ","));
+			bytes = encode(delimited(dataset, ",", escapeFormulas));
 			break;
 		case "tsv":
-			bytes = encode(delimited(dataset, "\t"));
+			bytes = encode(delimited(dataset, "\t", escapeFormulas));
 			break;
 		case "json":
 			bytes = encode(`${JSON.stringify(recordObjects(dataset), null, 2)}\n`);
