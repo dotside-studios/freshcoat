@@ -620,6 +620,9 @@ export type PaintWarning =
 	// A backend that writes vectors drew a layer as an image because it has no
 	// vector equivalent for part of it, such as a shadow in a PDF.
 	| { kind: "vector_rasterized"; feature: string; layer?: string }
+	// A font's license (OS/2 fsType) forbids embedding it in a PDF, so its text
+	// is drawn as outlines.
+	| { kind: "font_embedding_restricted"; family: string; layer?: string }
 	// The same, for a layer that paints a spot ink: the image loses the
 	// Separation, so the ink does not print.
 	| {

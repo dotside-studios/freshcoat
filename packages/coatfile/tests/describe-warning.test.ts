@@ -47,6 +47,23 @@ describe("describeWarning", () => {
 		).toBe("Pattern shader failed, painted solid: dots");
 	});
 
+	it("says why text was outlined in a PDF", () => {
+		expect(
+			describeWarning({
+				kind: "font_embedding_restricted",
+				family: "Inter",
+				layer: "title",
+			}),
+		).toBe(
+			"Font Inter does not allow embedding, so its text is drawn as outlines in the PDF (title)",
+		);
+		expect(
+			describeWarning({ kind: "font_embedding_restricted", family: "Inter" }),
+		).toBe(
+			"Font Inter does not allow embedding, so its text is drawn as outlines in the PDF",
+		);
+	});
+
 	it("gives a refused barcode the encoder's reason", () => {
 		expect(
 			describeWarning({

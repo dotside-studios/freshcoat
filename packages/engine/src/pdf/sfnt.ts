@@ -24,6 +24,8 @@ export type SfntInfo = {
 	italicAngle: number;
 	weight: number;
 	italic: boolean;
+	// The OS/2 licensing flags, or null when the font has no OS/2 table.
+	fsType: number | null;
 	axes: SfntAxis[];
 	advance(glyph: number): number;
 };
@@ -31,8 +33,17 @@ export type SfntInfo = {
 export const tagAt = (b: Uint8Array, o: number) =>
 	String.fromCharCode(b[o] ?? 0, b[o + 1] ?? 0, b[o + 2] ?? 0, b[o + 3] ?? 0);
 
+// fsType bits 1 (restricted license), 8 (no subsetting) and 9 (bitmap
+// embedding only) forbid what the writer does: embedding a subset as a vector
+// font. Preview & print and editable licenses allow it, and so does a font
+// with no OS/2 table.
+const FS_TYPE_BLOCKS = 0x0302;
+
+export const embeddingRestricted = (info: SfntInfo) =>
+	((info.fsType ?? 0) & FS_TYPE_BLOCKS) !== 0;
+
 export const embeddable = (info: SfntInfo) =>
-	!info.collection && info.outlines !== "cff2";
+	!info.collection && info.outlines !== "cff2" && !embeddingRestricted(info);
 
 // Where a font's table directory starts: past the header of a collection.
 export function faceOffset(bytes: Uint8Array): number {
@@ -103,6 +114,7 @@ export function readSfnt(bytes: Uint8Array): SfntInfo | null {
 				os2 !== undefined
 					? (dv.getUint16(os2 + 62) & 1) === 1
 					: (dv.getUint16(head + 44) & 2) === 2,
+			fsType: os2 !== undefined ? dv.getUint16(os2 + 8) : null,
 			axes,
 			advance: (glyph) =>
 				dv.getUint16(hmtx + 4 * Math.min(glyph, Math.max(0, metrics - 1))),

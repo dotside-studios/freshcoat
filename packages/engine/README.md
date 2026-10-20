@@ -373,6 +373,13 @@ Outlined text cannot be selected or searched.
 Text in a font a PDF cannot embed, the first face of a font collection or a
 CFF2 variable font, is drawn as outlines without asking.
 
+A font's OS/2 `fsType` licensing flags are honoured too. A font with the
+restricted license bit (0x0002), the no subsetting bit (0x0100, as the writer
+always subsets) or the bitmap embedding only bit (0x0200) is not embedded: its
+text is drawn as outlines, with a `font_embedding_restricted` warning naming the
+family and layer. Preview & Print (0x0004), Editable (0x0008), installable (0)
+and a font with no OS/2 table, which is common practice to allow, are embedded.
+
 ### Output intent
 
 Every PDF declares an output intent in its catalog's `/OutputIntents`: a

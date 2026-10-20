@@ -200,6 +200,7 @@ type TextPlan = {
 	bands: PlacedTextBand[];
 	outline: boolean;
 	reason?: string;
+	restricted: Set<string>;
 };
 
 // The text each glyph stands for. A cluster drawn with one glyph gives it all
@@ -733,6 +734,7 @@ class PageBuilder {
 			lines: [],
 			bands: placed?.bands ?? [],
 			outline: forced,
+			restricted: new Set(),
 		};
 		const why = new Map<TextRun, string>();
 		for (const line of lines) {
@@ -768,6 +770,7 @@ class PageBuilder {
 					if ("reason" in file) {
 						plan.outline = true;
 						why.set(entry, file.reason);
+						if (file.restricted) plan.restricted.add(file.restricted);
 					} else entry.file = file;
 				}
 				runs.push(entry);
@@ -792,6 +795,12 @@ class PageBuilder {
 						plan.reason ??=
 							why.get(entry) ?? `outlines of font ${entry.match.file.family}`;
 				}
+		for (const family of plan.restricted)
+			this.report({
+				kind: "font_embedding_restricted",
+				family,
+				...(cmd.id ? { layer: cmd.id } : {}),
+			});
 		this.texts.set(cmd, plan);
 		return plan;
 	}
