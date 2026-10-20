@@ -1,4 +1,4 @@
-import { ownValue } from "./own";
+import { ownValue, setOwn } from "./own";
 
 export const FIELD_ID = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -155,7 +155,7 @@ export function substitute(
 	if (value !== null && typeof value === "object") {
 		const out: Record<string, unknown> = {};
 		for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-			out[k] = substitute(v, ctx);
+			setOwn(out, k, substitute(v, ctx));
 		}
 		return out;
 	}

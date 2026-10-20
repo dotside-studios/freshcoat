@@ -298,3 +298,17 @@ describe("inherited properties", () => {
 		expect(substitute("{{name}}", ctx)).toBe("");
 	});
 });
+
+describe("substitute with __proto__ keys", () => {
+	test("an own __proto__ key stays an own key of the output", () => {
+		const input = JSON.parse('{"__proto__": {"x": "{{name}}"}, "a": "{{name}}"}');
+		const out = substitute(input, { name: "Ana" }) as Record<string, unknown>;
+		expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+		expect(Object.keys(out)).toEqual(["__proto__", "a"]);
+		expect(out.a).toBe("Ana");
+		expect(Object.getOwnPropertyDescriptor(out, "__proto__")?.value).toEqual({
+			x: "Ana",
+		});
+		expect(({} as Record<string, unknown>).x).toBeUndefined();
+	});
+});
