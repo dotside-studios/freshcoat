@@ -174,7 +174,7 @@ const { parseImageInfo } = loaded.get("@freshcoat-js/workspace/image-info");
 assert.equal(parseImageInfo(files["1-front@0.25x.png"]).width, 253);
 const schema = JSON.parse(readFileSync(require.resolve("@freshcoat-js/coatfile/schema/coatfile.v1.schema.json"), "utf8"));
 assert.ok(schema.$id);
-assert.equal(schema.$id, "https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@${manifest("packages/coatfile").version}/schema/coatfile.v1.schema.json");
+assert.equal(schema.$id, "https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile/schema/coatfile.v1.schema.json");
 console.log("All public imports, scene, text and barcode rendering, print analysis, archives, fixtures, schema and a workspace export job passed in Node");
 `;
 	console.log(
