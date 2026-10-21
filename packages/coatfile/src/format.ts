@@ -3,6 +3,8 @@ import {
 	formatMinor,
 	formatVersionStatus,
 } from "./format-version";
+import { schemaFormatMinor } from "./format-walk";
+import { ElementSchema, TemplateSchema } from "./schemas";
 import type { Template } from "./types";
 
 // The wire format's own version, as `format_version` carries it.
@@ -324,6 +326,57 @@ function usesTextLayout(properties: unknown): boolean {
 		hasFeatures(p.font) ||
 		(Array.isArray(p.spans) && p.spans.some((span) => hasFeatures(span?.font)))
 	);
+}
+
+/** `minimumFormatVersion`, read from the schema's `formatHistory` tags. */
+export function minimumFormatVersionFromSchema(template: Template): string {
+	let minor = schemaFormatMinor(TemplateSchema, template);
+	for (const override of OVERRIDES) minor = Math.max(minor, override(template));
+	return `${FORMAT_MAJOR}.${minor}`;
+}
+
+// What a tag cannot say, because it turns on a key being absent or on another
+// part of the template.
+const OVERRIDES: ((template: Template) => number)[] = [
+	// 1.1 made `product` and `version` optional.
+	(t) => (t.product === undefined || t.version === undefined ? 1 : 0),
+	// A delta's `properties` is a bare record: read it as the properties of the
+	// element it targets.
+	(t) => {
+		const types = elementTypes(t);
+		let minor = 0;
+		for (const variant of t.variants ?? [])
+			for (const override of variant.overrides)
+				for (const delta of override.elements ?? [])
+					for (const type of types.get(delta.id) ?? [])
+						minor = Math.max(
+							minor,
+							schemaFormatMinor(ElementSchema, {
+								type,
+								properties: delta.properties,
+							}),
+						);
+		return minor;
+	},
+];
+
+// Each element id's type, wherever in the template the element sits.
+function elementTypes(template: Template): Map<string, Set<string>> {
+	const types = new Map<string, Set<string>>();
+	const visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (node === null || typeof node !== "object") return;
+		const o = node as Record<string, unknown>;
+		if (typeof o.id === "string" && typeof o.type === "string")
+			types.set(o.id, (types.get(o.id) ?? new Set()).add(o.type));
+		for (const value of Object.values(o)) visit(value);
+	};
+	visit(template.template_data);
+	visit(template.variants);
+	return types;
 }
 
 /**
