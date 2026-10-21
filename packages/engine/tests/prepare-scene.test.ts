@@ -4,7 +4,7 @@
 // every layer inside that container slides off its box. A caller that needs the
 // absolute tree before compiling therefore prepares once and compiles with
 // `prepared: true`; these tests pin both halves of that contract.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	approxEngine,
 	compileScene,

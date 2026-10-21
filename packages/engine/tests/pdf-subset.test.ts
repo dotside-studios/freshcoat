@@ -1,3 +1,4 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -9,7 +10,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createText } from "../src/node";
 import { readSfnt } from "../src/pdf/sfnt";
 import { mergeFontSubsets, subsetFont } from "../src/pdf/subset";
@@ -562,7 +562,7 @@ describe("mergeFontSubsets", () => {
 		const a = subsetFont(font, [1, 3]) as Uint8Array;
 		const b = subsetFont(font, [3, 4]) as Uint8Array;
 		const out = mergeFontSubsets([a, b]) as Uint8Array;
-		expect(out).toEqual(subsetFont(font, [1, 3, 4]));
+		expect(out).toEqual(subsetFont(font, [1, 3, 4]) as Uint8Array);
 		checked(out);
 		expect(render(out, [0, 1, 3, 4])).toEqual(render(font, [0, 1, 3, 4]));
 		for (const g of [2, 5]) expect(blank(render(out, [g]))).toBe(true);

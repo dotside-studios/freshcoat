@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compile } from "../src/compile";
 import { effectsOf } from "../src/effects";
 import { generateMatrix } from "../src/qr";
@@ -582,7 +582,7 @@ describe("compile (frame → group)", () => {
 			radius: [8, 0, 4, 0],
 			smoothing: 0.6,
 		};
-		expect(content!.clip).toEqual(shape);
+		expect(content!.clip as unknown).toEqual(shape);
 		const bg = (content as { children: DrawCommand[] })
 			.children[0] as DrawRectCommand;
 		expect(bg.cornerSmoothing).toBe(0.6);

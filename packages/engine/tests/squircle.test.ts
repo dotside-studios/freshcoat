@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { squircleSvg } from "../src/squircle";
 
 // How far each corner's outline runs along its edges, read from the lines

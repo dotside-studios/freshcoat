@@ -1,7 +1,7 @@
 // Every committed fixture, and a template that reaches every element kind,
 // compiles to exactly the render tree recorded in __snapshots__. Options a
 // template does not use must not move a single number of what it draws.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { compile } from "../src/compile";
 import type { CompiledTemplate, Template } from "../src/types";

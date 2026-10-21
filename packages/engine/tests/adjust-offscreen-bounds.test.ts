@@ -3,11 +3,12 @@
 // bounded offscreen must reproduce it. Undithered gradients may move by a level
 // or two under the offscreen's whole-pixel shift, as Skia evaluates them in
 // lower precision.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds } from "../src/canvaskit";
 import { decodePixels } from "../src/decode";

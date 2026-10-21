@@ -8,9 +8,9 @@
 // a registration point that doesn't land on its mark would all pass there and
 // fail here.
 
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { profileFromPhoto } from "../src/calibrate";
 import {
 	type ChartSpec,

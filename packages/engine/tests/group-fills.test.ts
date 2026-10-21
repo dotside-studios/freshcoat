@@ -1,8 +1,9 @@
 // A group paints its own background, so a hug-height container does not need a
 // sibling rect sized to it — which is what forced a caller to resolve the layout
 // once to learn the height and again to paint.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";

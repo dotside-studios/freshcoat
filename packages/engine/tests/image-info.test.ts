@@ -1,3 +1,4 @@
+import { describe, expect, it } from "bun:test";
 import {
 	gifHeader,
 	jpegHeader,
@@ -6,7 +7,6 @@ import {
 	webpVp8l,
 	webpVp8x,
 } from "@freshcoat-js/test-utils";
-import { describe, expect, it } from "vitest";
 import {
 	iccComponents,
 	jpegIccProfile,

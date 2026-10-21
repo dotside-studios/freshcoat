@@ -1729,7 +1729,7 @@ compile outputs for snapshot testing in consumers.
 
 ## Test runner
 
-`bun test` runs the suite (vitest-style tests, run natively by bun).
+`bun test` runs the suite.
 
 ## License
 

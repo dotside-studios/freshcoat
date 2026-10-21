@@ -1,5 +1,5 @@
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
 import type { Command, DrawQrCommand } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";

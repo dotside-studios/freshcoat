@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { defaultFontFamily } from "../src/font-usage";
 import { collectFontRequests } from "../src/fonts";
 import type { Template } from "../src/types";

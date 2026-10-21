@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds, setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";

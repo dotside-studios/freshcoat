@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { describeWarning, renderCompiledPdf } from "../src/render";
 import type { Template } from "../src/types";

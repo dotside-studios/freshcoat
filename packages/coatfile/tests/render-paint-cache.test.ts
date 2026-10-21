@@ -1,13 +1,13 @@
 // A PaintCache on the render runtime: a batch of records that share images
 // decodes each shared one once, and paints exactly what an uncached render does.
 
+import { describe, expect, test } from "bun:test";
 import {
 	createRenderer,
 	mapLoader,
 	type PaintCacheOptions,
 } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 

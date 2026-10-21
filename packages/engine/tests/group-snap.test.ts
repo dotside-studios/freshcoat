@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { drawableBounds, makeBin } from "../src/canvaskit";
 import {
 	approxEngine,

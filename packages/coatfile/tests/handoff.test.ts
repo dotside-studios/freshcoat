@@ -1,8 +1,8 @@
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "fflate";
-import { describe, expect, test } from "vitest";
 import {
 	decodeHandoff,
 	encodeHandoff,

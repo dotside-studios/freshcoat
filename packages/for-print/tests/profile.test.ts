@@ -1,6 +1,6 @@
 // Parsing a profile from a deploy, and the cache key that keeps a re-measured
 // printer from serving cards corrected the old way.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { grayBalanceChart } from "../src/chart";
 import type { ChartReading, PatchReading } from "../src/measure";
 import {
@@ -35,7 +35,10 @@ const neutralReading = (): ChartReading => {
 
 describe("parsePrintProfile", () => {
 	test("takes a JSON string or an object", () => {
-		const expected = { version: 1, name: "IDP Smart-51 / batch A / Zebra PVC" };
+		const expected = {
+			version: 1 as const,
+			name: "IDP Smart-51 / batch A / Zebra PVC",
+		};
 		expect(parsePrintProfile(JSON.stringify(expected))).toEqual({
 			ok: true,
 			profile: expected,

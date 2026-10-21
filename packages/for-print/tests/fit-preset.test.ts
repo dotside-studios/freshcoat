@@ -1,6 +1,6 @@
 // Fitting a target preset from simulated printers whose behaviour is known, then
 // running the preset through printAdjust to see the print come back.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	type ChartSpec,
 	chromaRampChart,

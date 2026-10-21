@@ -4,9 +4,10 @@
 // reused across every weight row of the stylesheet). Without the `wght` axis a
 // 700 span therefore matches that 400 face and gets Skia's synthetic bold: 400's
 // advances, so text that is both too light and wrapped as if it were regular.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { createParagraphEngine } from "../src/paragraph-layout";
 
 const VARIABLE = testFontPath("VendSans-Variable-latin.woff2");

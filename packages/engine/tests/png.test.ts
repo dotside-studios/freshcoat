@@ -3,9 +3,10 @@
 // which is both the correctness check and the proof that the filter and CRC
 // arithmetic is right, since a wrong byte anywhere fails to decode or decodes
 // to different pixels.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { createFrame, createRect, createText } from "../src/node";
 import { encodePng } from "../src/png";

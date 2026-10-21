@@ -1,5 +1,5 @@
 // CSS→IR helpers: color string → hex, linear-gradient → ResolvedFill.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { oklchToHex, parseCssColor, parseLinearGradient } from "../src/css";
 
 describe("oklchToHex / parseCssColor", () => {

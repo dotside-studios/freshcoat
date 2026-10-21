@@ -1,9 +1,10 @@
 // Untrusted bytes are checked against size limits before they are decoded: an
 // image's declared pixels, and the sizes a WOFF or WOFF2 file says it unpacks to.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { compress } from "brotli/compress";
 import { zlibSync } from "fflate";
-import { beforeAll, describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import {
 	assertDecodableImage,

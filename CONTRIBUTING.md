@@ -57,6 +57,19 @@ declarations.
 The root `dev` and `build` scripts target Studio. They are convenience aliases,
 not prerequisites for SDK or plugin development.
 
+## Tests
+
+The runner follows the package type. Packages without a DOM (cli, coatfile,
+engine, for-print, test-utils) run with `bun test` and import `describe`,
+`expect`, `test`, `mock` and `spyOn` from `bun:test`, never from `vitest`.
+DOM and React packages (ui, workspace, figma-plugin, editor) run with
+`vitest run`. Their `vitest` and `jsdom` versions come from the
+`catalog` in the root `package.json`; depend on them as `"catalog:"` instead of
+a version range. The editor also runs its server test with `bun test`.
+
+Run every package's tests with `bun run test` from the repository root, or one
+package with `bun run --cwd <directory> test`.
+
 ## Tests and compatibility
 
 Add tests next to the behavior you change. SDK changes should test public

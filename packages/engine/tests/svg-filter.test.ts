@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene, createImage } from "../src/index";
 import type { ImageNode } from "../src/node";
 import { createHeadlessEnv } from "./helpers/headless";

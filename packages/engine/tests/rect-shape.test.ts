@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { outlineGeometry, outlineIsPath, rectShape } from "../src/outline";
 import { squircleSvg } from "../src/squircle";
 

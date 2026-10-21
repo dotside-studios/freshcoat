@@ -1,7 +1,8 @@
 // A bitmap's `role`: lowered onto its command, checked by validateCommands, and,
 // for a barcode, snapped to whole output pixels by the painter.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	approxEngine,
 	type BitmapRole,

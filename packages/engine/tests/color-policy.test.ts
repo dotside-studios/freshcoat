@@ -1,5 +1,5 @@
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { brightnessMatrix, buildAdjust } from "../src/adjust";
 import { imageInfo, resolvePrecision } from "../src/color-policy";
 import { compileScene } from "../src/compile-scene";

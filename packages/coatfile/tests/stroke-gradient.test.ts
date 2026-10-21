@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compile } from "../src/compile";
 import type { RectNode, Template } from "../src/types";
 import { validate } from "../src/validate";

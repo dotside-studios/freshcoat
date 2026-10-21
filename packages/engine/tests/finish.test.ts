@@ -1,7 +1,8 @@
 // FrameFinish: the whole-frame, post-composite output pass — white-clamp,
 // black-extract, and dither — run through an SkSL pass on the final surface.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { setCpuFinish } from "../src/canvaskit";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";

@@ -1,7 +1,8 @@
 // Work the painter does once per cached line, scene or paint rather than once
 // per span, run or nesting level, counted through spies on CanvasKit.
+
+import { afterEach, beforeAll, describe, expect, test, vi } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { drawableBounds, makeBin, paintScene } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { createSharedFontProvider } from "../src/font-collection";

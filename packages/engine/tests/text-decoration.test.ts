@@ -1,5 +1,5 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";

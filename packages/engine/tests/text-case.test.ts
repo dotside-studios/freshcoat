@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { applyCase, applySpanCase } from "../src/text-case";
 
 describe("applyCase", () => {

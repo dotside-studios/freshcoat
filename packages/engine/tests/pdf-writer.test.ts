@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createRect } from "../src/node";
 import { md5 } from "../src/pdf/md5";
 import { num, PdfBytes, PdfWriter } from "../src/pdf/writer";

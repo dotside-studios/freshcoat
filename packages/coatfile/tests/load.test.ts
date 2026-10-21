@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { assetUri, bytesToBase64 } from "../src/assets";
 import { packTemplate, pruneUnusedAssets } from "../src/coat";

@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { parseTrimValue, resolveStrokeTrim } from "../src/stroke-trim";
 import type {
 	Command,

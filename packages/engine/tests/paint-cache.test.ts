@@ -1,7 +1,7 @@
+import { beforeAll, describe, expect, test, vi } from "bun:test";
 import { createHash } from "node:crypto";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { Image } from "canvaskit-wasm";
-import { beforeAll, describe, expect, test, vi } from "vitest";
 import { buildAdjust, composeAdjust } from "../src/adjust";
 import { paintScene } from "../src/canvaskit";
 import { clearFontBytesCache } from "../src/font-bytes";

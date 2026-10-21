@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compile } from "../src/compile";
 import { FORMAT_VERSION, minimumFormatVersion } from "../src/format";
 import { resolveSlices, sliceLayers } from "../src/slices";

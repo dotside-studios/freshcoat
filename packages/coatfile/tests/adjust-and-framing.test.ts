@@ -1,3 +1,4 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import {
 	buildAdjust,
 	createRenderer,
@@ -6,7 +7,6 @@ import {
 	type ImageNode,
 } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { formatImageFocus, parseImageFocus } from "../src/image-focus";
 import { renderTemplate } from "../src/render";

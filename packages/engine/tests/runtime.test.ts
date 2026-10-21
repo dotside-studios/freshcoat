@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { applyDisposePolicy } from "../src/runtime";
 import type { CanvasLike, PaintOutput } from "../src/runtime-types";
 

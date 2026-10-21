@@ -1,8 +1,8 @@
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { strToU8, unzipSync, zipSync } from "fflate";
-import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import {
 	assetUri,

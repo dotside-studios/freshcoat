@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { normalizeDash } from "../src/dash";
 import { createGroup, createRect } from "../src/node";
 import { renderSceneToPng } from "./helpers/headless";

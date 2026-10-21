@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import type { Template } from "../src/types";
 
 const frameTemplate = {

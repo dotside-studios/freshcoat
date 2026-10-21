@@ -1,6 +1,7 @@
 // Effect layers bounded to their content paint what an unbounded layer paints.
+
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";

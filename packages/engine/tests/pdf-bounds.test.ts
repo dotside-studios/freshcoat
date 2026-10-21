@@ -1,9 +1,10 @@
 // A layer painted over the area drawableBounds gives it matches the same layer
 // painted over the whole page, and nothing lies outside that area.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	drawableBounds,
 	makeBin,

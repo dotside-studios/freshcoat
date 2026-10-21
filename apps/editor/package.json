@@ -56,11 +56,11 @@
 		"@types/react-dom": "^19.2.0",
 		"@vitejs/plugin-react": "^6.0.1",
 		"fake-indexeddb": "^6.2.5",
-		"jsdom": "^28.1.0",
+		"jsdom": "catalog:",
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.7.2",
 		"unplugin-icons": "^23.0.1",
 		"vite": "^8.0.0",
-		"vitest": "^3.0.5"
+		"vitest": "catalog:"
 	}
 }

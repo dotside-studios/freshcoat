@@ -1,7 +1,8 @@
 // PathNode.fillRule keeps a two-subpath ring's hole, and every BlendMode reaches
 // Skia as a real mode rather than falling back to normal compositing.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	compileScene,
 	createFrame,

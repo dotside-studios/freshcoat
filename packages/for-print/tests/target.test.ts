@@ -1,10 +1,10 @@
+import { describe, expect, test } from "bun:test";
 import {
 	createGroup,
 	createImage,
 	createText,
 	type Node,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
 import { analyzePixels, buildRecommendation } from "../src/analyze";
 import {
 	analyzeScene,

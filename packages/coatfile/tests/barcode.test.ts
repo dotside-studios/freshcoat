@@ -3,6 +3,7 @@
 // CanvasKit's pixels, so a module lost anywhere between bwip-js and the painter
 // fails here rather than at a till.
 
+import { beforeAll, describe, expect, test } from "bun:test";
 import {
 	type BitmapNode,
 	createRenderer,
@@ -22,7 +23,6 @@ import {
 	PDF417Reader,
 	RGBLuminanceSource,
 } from "@zxing/library";
-import { beforeAll, describe, expect, test } from "vitest";
 import { encodeBarcode } from "../src/barcode";
 import { compile } from "../src/compile";
 import { resizeTemplate } from "../src/constraints";

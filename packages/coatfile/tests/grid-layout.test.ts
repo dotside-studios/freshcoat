@@ -1,10 +1,10 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import {
 	createRenderer,
 	decodePixels,
 	type GroupNode,
 } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { renderTemplate } from "../src/render";
 import type {

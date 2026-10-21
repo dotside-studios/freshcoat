@@ -6,8 +6,8 @@
 // that step outside the scaled canvas matrix — the frame finish and the adjust
 // offscreen — still cover the whole frame.
 
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";

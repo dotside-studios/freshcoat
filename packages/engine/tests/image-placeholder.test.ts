@@ -1,8 +1,9 @@
 // A missing/undecodable image paints freshcoat's placeholder. When the image
 // node carries a shape mask (e.g. a circular avatar), the placeholder must be
 // clipped to that shape too — not left as a bare square.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compileScene, createImage } from "../src/index";
 import { createHeadlessEnv } from "./helpers/headless";
 
@@ -57,8 +58,9 @@ describe("painting a placeholder is reported as a warning", () => {
 		});
 		const commands = compileScene(scene, { width: 40, height: 40 });
 		const result = await createHeadlessEnv().paint(commands, k);
-		const warnings = (result as { warnings: { kind: string; src?: string }[] })
-			.warnings;
+		const warnings = (
+			result as { warnings: { kind: string; src?: string; error?: string }[] }
+		).warnings;
 		const imageWarnings = warnings.filter(
 			(w) => w.kind === "image_load_failed",
 		);
@@ -85,8 +87,9 @@ describe("painting a placeholder is reported as a warning", () => {
 		expect(commands.some((c) => c.op === "loadImages")).toBe(false);
 
 		const result = await createHeadlessEnv().paint(commands, k);
-		const warnings = (result as { warnings: { kind: string; src?: string }[] })
-			.warnings;
+		const warnings = (
+			result as { warnings: { kind: string; src?: string; error?: string }[] }
+		).warnings;
 		expect(warnings).toContainEqual({
 			kind: "image_load_failed",
 			src: "https://example.com/never-loaded.png",

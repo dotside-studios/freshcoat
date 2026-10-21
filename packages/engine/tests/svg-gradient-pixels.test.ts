@@ -1,7 +1,8 @@
 // Focal points and spread methods of SVG gradients, painted through the image
 // path and compared against analytically computed samples.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene, createImage } from "../src/index";
 import { createHeadlessEnv } from "./helpers/headless";
 

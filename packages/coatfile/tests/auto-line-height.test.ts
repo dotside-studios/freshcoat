@@ -1,10 +1,11 @@
 // `lineHeight: "auto"` — a template saying "the font decides", the way a design
 // tool's Auto does. compile() marks the node and keeps a usable fallback; the
 // render resolves it against the family's real metrics.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createRenderer, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import type { DrawTextCommand, Node, Template, TextNode } from "../src/types";
 import { validate } from "../src/validate";

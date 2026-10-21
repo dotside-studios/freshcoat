@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { isPrintedCard, printGuideMetrics, printGuidesFor } from "../src/bleed";
 import { imageDpiHints, safeAreaHints, templateHints } from "../src/hints";

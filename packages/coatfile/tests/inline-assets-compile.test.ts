@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { assetUri, attachAssets, type PendingAsset } from "../src/assets";
 import { compile } from "../src/compile";
 import type { Template } from "../src/types";

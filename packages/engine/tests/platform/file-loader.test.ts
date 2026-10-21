@@ -1,9 +1,9 @@
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { afterAll, describe, expect, test } from "vitest";
 import { fileLoader } from "../../src/platform/file-loader";
 import type { EncodedPaintResult } from "../../src/runtime-types";
 import type { Command } from "../../src/types";

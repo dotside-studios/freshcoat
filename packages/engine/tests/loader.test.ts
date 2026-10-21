@@ -1,5 +1,5 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
 import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
 import {
 	assertLoadableUrl,
@@ -24,7 +24,7 @@ const local = (src: string): FontResolution => ({
 	},
 });
 
-// `bun test`'s vitest shim has no vi.stubGlobal; swap the globals by hand.
+// bun:test has no vi.stubGlobal; swap the globals by hand.
 const realFetch = globalThis.fetch;
 const realLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
 
