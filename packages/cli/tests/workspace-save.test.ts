@@ -3,7 +3,14 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Workspace } from "@freshcoat-js/workspace";
 import { saveWorkspace } from "../src/commands/workspace";
-import { card, type Sandbox, sandbox, solidPng, workspaceBytes, workspaceOf } from "./helpers";
+import {
+	card,
+	type Sandbox,
+	sandbox,
+	solidPng,
+	workspaceBytes,
+	workspaceOf,
+} from "./helpers";
 
 let box: Sandbox;
 
@@ -18,18 +25,28 @@ async function withAsset(blob: Blob): Promise<Workspace> {
 	const [dataset] = workspace.datasets;
 	if (!dataset) throw new Error("no dataset");
 	dataset.assets = [
-		{ sha256: "a".repeat(64), contentType: "image/png", name: "a.png", size: blob.size, blob },
+		{
+			sha256: "a".repeat(64),
+			contentType: "image/png",
+			name: "a.png",
+			size: blob.size,
+			blob,
+		},
 	];
 	return workspace;
 }
 
 async function files(): Promise<string[]> {
-	return (await readdir(box.dir)).filter((name) => name.endsWith(".coatworkspace") || name.endsWith(".tmp"));
+	return (await readdir(box.dir)).filter(
+		(name) => name.endsWith(".coatworkspace") || name.endsWith(".tmp"),
+	);
 }
 
 describe("saveWorkspace", () => {
 	test("writes the same bytes as packing to a Blob", async () => {
-		const workspace = await withAsset(new Blob([(await solidPng(300, 300, [9, 99, 199])) as BlobPart]));
+		const workspace = await withAsset(
+			new Blob([(await solidPng(300, 300, [9, 99, 199])) as BlobPart]),
+		);
 		const path = join(box.dir, "saved.coatworkspace");
 		await saveWorkspace(path, workspace);
 		const expected = await workspaceBytes(workspace);
@@ -41,7 +58,9 @@ describe("saveWorkspace", () => {
 		const path = await box.write("saved.coatworkspace", "old");
 		const workspace = workspaceOf(card());
 		await saveWorkspace(path, workspace);
-		expect((await readFile(path)).equals(await workspaceBytes(workspace))).toBe(true);
+		expect((await readFile(path)).equals(await workspaceBytes(workspace))).toBe(
+			true,
+		);
 	});
 
 	test("a failure while packing leaves the original and no temp file", async () => {

@@ -2,9 +2,9 @@
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
-import { createFrame, createRect, createText } from "../src/index";
 import { deriveFontMetrics } from "../src/font-metrics";
+import { createFrame, createRect, createText } from "../src/index";
+import { renderSceneToPng } from "./helpers/headless";
 
 const FONT = testFontPath("Geist-Regular.ttf");
 

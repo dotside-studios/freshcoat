@@ -178,7 +178,10 @@ export function removeStop(
 /** The colour the gradient paints at `offset`, blended in sRGB between the
  *  stops either side. A stop that is not a colour (a binding) is taken as it
  *  is from the nearer side. */
-export function colorAt(stops: readonly GradientStop[], offset: number): string {
+export function colorAt(
+	stops: readonly GradientStop[],
+	offset: number,
+): string {
 	const sorted = sortedStops(stops);
 	const first = sorted[0];
 	const last = sorted.at(-1);

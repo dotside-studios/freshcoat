@@ -3,13 +3,13 @@
 // Geist. Structural (not pixel) so it needs no native-canvas backend: it drives
 // compile with the engine and checks the laid-out text IR.
 import { readFileSync } from "node:fs";
-import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import {
 	createRenderer,
 	type FontVMetrics,
 	type Renderer,
 	readFontMetrics,
 } from "@freshcoat-js/engine";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { DrawTextCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";

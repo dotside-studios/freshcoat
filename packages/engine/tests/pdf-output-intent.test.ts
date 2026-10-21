@@ -57,7 +57,9 @@ function catalog(pdf: Uint8Array) {
 }
 
 const iccStreams = (pdf: Uint8Array) =>
-	new Set([...source(pdf).matchAll(/\[\/ICCBased (\d+) 0 R\]/g)].map((m) => m[1]));
+	new Set(
+		[...source(pdf).matchAll(/\[\/ICCBased (\d+) 0 R\]/g)].map((m) => m[1]),
+	);
 
 describe("readIccProfile", () => {
 	test("reads the bundled sRGB profile", () => {
@@ -80,7 +82,9 @@ describe("readIccProfile", () => {
 	});
 
 	test("reads a v4 description", () => {
-		const read = readIccProfile(iccProfile({ version: 4, description: "Coated FOGRA39" }));
+		const read = readIccProfile(
+			iccProfile({ version: 4, description: "Coated FOGRA39" }),
+		);
 		expect(read.ok && read.info).toMatchObject({
 			version: "4.1",
 			colorSpace: "CMYK",
@@ -91,15 +95,31 @@ describe("readIccProfile", () => {
 
 	test.each([
 		["a short file", new Uint8Array(100), /too short/],
-		["no signature", (() => {
-			const b = iccProfile();
-			b.set([0, 0, 0, 0], 36);
-			return b;
-		})(), /acsp/],
+		[
+			"no signature",
+			(() => {
+				const b = iccProfile();
+				b.set([0, 0, 0, 0], 36);
+				return b;
+			})(),
+			/acsp/,
+		],
 		["a size that disagrees", iccProfile().slice(0, -1), /header says/],
-		["an abstract profile", iccProfile({ deviceClass: "abst" }), /"abst" profile/],
-		["an input profile", iccProfile({ deviceClass: "scnr", space: "RGB " }), /"scnr" profile/],
-		["a Lab profile", iccProfile({ space: "Lab " }), /"Lab" is not gray, RGB or CMYK/],
+		[
+			"an abstract profile",
+			iccProfile({ deviceClass: "abst" }),
+			/"abst" profile/,
+		],
+		[
+			"an input profile",
+			iccProfile({ deviceClass: "scnr", space: "RGB " }),
+			/"scnr" profile/,
+		],
+		[
+			"a Lab profile",
+			iccProfile({ space: "Lab " }),
+			/"Lab" is not gray, RGB or CMYK/,
+		],
 		["iccMAX", iccProfile({ version: 5 }), /version 5/],
 	])("refuses %s", (_, bytes, message) => {
 		const read = readIccProfile(bytes);
@@ -115,13 +135,16 @@ describe("readIccProfile", () => {
 			info: "Test CMYK",
 		});
 		expect(resolveOutputIntent(false)).toBeNull();
-		expect(resolveOutputIntent(undefined)?.identifier).toBe(SRGB_OUTPUT_INTENT.identifier);
+		expect(resolveOutputIntent(undefined)?.identifier).toBe(
+			SRGB_OUTPUT_INTENT.identifier,
+		);
 	});
 });
 
 describe("PDF output intent", () => {
 	test("declares sRGB by default, its profile written once", async () => {
-		const pdf = (await renderer.renderPdf(scene(), { width: W, height: H })).bytes;
+		const pdf = (await renderer.renderPdf(scene(), { width: W, height: H }))
+			.bytes;
 		const root = catalog(pdf);
 		expect(root).toContain("/OutputIntents [<<");
 		expect(root).toContain("/Type /OutputIntent");
@@ -135,19 +158,27 @@ describe("PDF output intent", () => {
 		expect(profile.data).toEqual(SRGB_PROFILE);
 		// DeviceRGB content is read as sRGB, through the same stream.
 		expect(source(pdf)).toContain(`/DefaultRGB [/ICCBased ${dest} 0 R]`);
-		expect(source(pdf)).toContain(`/Group <</S /Transparency /CS [/ICCBased ${dest} 0 R]>>`);
+		expect(source(pdf)).toContain(
+			`/Group <</S /Transparency /CS [/ICCBased ${dest} 0 R]>>`,
+		);
 		expect(iccStreams(pdf)).toEqual(new Set([dest]));
 		// Nothing claims PDF/X or PDF/A conformance.
 		expect(source(pdf)).not.toMatch(/GTS_PDFXVersion|pdfaid/);
 	});
 
 	test("declares a caller's CMYK profile, content still sRGB", async () => {
-		const cmyk = iccProfile({ description: "Coated FOGRA39 (ISO 12647-2:2004)" });
+		const cmyk = iccProfile({
+			description: "Coated FOGRA39 (ISO 12647-2:2004)",
+		});
 		const pdf = (
 			await renderer.renderPdf(scene(), {
 				width: W,
 				height: H,
-				outputIntent: { profile: cmyk, identifier: "FOGRA39", registry: "http://www.color.org" },
+				outputIntent: {
+					profile: cmyk,
+					identifier: "FOGRA39",
+					registry: "http://www.color.org",
+				},
 			})
 		).bytes;
 		const root = catalog(pdf);
@@ -157,25 +188,37 @@ describe("PDF output intent", () => {
 		const profile = object(pdf, dest);
 		expect(profile.dict).toMatch(/\/N 4\b/);
 		expect(profile.data).toEqual(cmyk);
-		const rgb = /\/DefaultRGB \[\/ICCBased (\d+) 0 R\]/.exec(source(pdf))?.[1] as string;
+		const rgb = /\/DefaultRGB \[\/ICCBased (\d+) 0 R\]/.exec(
+			source(pdf),
+		)?.[1] as string;
 		expect(rgb).not.toBe(dest);
 		expect(object(pdf, rgb).data).toEqual(SRGB_PROFILE);
 	});
 
 	test("shares one stream between the intent and images with the same profile", async () => {
-		const jpeg = new Uint8Array(readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")));
+		const jpeg = new Uint8Array(
+			readFileSync(join(__dirname, "fixtures/pdf/display-p3.jpg")),
+		);
 		const images = new Map([
 			["a.jpg", jpeg],
 			["b.jpg", jpeg.slice()],
 		]);
 		const image = (src: string, x: number) =>
-			createImage({ pos: { x, y: 0 }, size: { width: 80, height: 80 }, src, fit: "fill" });
+			createImage({
+				pos: { x, y: 0 },
+				size: { width: 80, height: 80 },
+				src,
+				fit: "fill",
+			});
 		const pdf = (
-			await renderer.renderPdf(scene([image("a.jpg", 0), image("b.jpg", 100)]), {
-				width: W,
-				height: H,
-				images,
-			})
+			await renderer.renderPdf(
+				scene([image("a.jpg", 0), image("b.jpg", 100)]),
+				{
+					width: W,
+					height: H,
+					images,
+				},
+			)
 		).bytes;
 		// The photos' Display P3 profile and sRGB, each once.
 		const streams = [...iccStreams(pdf)].map((id) => object(pdf, id).data);
@@ -184,8 +227,13 @@ describe("PDF output intent", () => {
 	});
 
 	test("false leaves the intent and the tagging out", async () => {
-		const pdf = (await renderer.renderPdf(scene(), { width: W, height: H, outputIntent: false }))
-			.bytes;
+		const pdf = (
+			await renderer.renderPdf(scene(), {
+				width: W,
+				height: H,
+				outputIntent: false,
+			})
+		).bytes;
 		expect(catalog(pdf)).not.toContain("OutputIntents");
 		expect(source(pdf)).not.toContain("ICCBased");
 		expect(source(pdf)).not.toContain("DefaultRGB");
@@ -199,6 +247,8 @@ describe("PDF output intent", () => {
 				height: H,
 				outputIntent: { profile: iccProfile({ deviceClass: "abst" }) },
 			}),
-		).rejects.toThrow(/output intent profile: an? "abst" profile does not describe an output device/);
+		).rejects.toThrow(
+			/output intent profile: an? "abst" profile does not describe an output device/,
+		);
 	});
 });

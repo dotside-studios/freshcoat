@@ -7,8 +7,8 @@ import {
 	packages,
 	publishedManifest,
 	releaseVersion,
-	root,
 	rewriteModuleSpecifiers,
+	root,
 } from "./release-packages";
 
 describe("release packaging", () => {
@@ -26,7 +26,9 @@ describe("release packaging", () => {
 		for (const [directory, name] of names) {
 			const data = manifest(directory);
 			expect(data.name).toBe(name);
-			for (const [dependency, version] of Object.entries(data.dependencies ?? {})) {
+			for (const [dependency, version] of Object.entries(
+				data.dependencies ?? {},
+			)) {
 				if (version.startsWith("workspace:"))
 					expect([...names.values()]).toContain(dependency);
 			}
@@ -34,7 +36,9 @@ describe("release packaging", () => {
 	});
 
 	test("publishes workspace after the packages it depends on", () => {
-		const names = packages.map((directory) => manifest(`packages/${directory}`).name);
+		const names = packages.map(
+			(directory) => manifest(`packages/${directory}`).name,
+		);
 		for (const [index, directory] of packages.entries()) {
 			for (const dependency of Object.keys(
 				manifest(`packages/${directory}`).dependencies ?? {},
@@ -58,7 +62,9 @@ describe("release packaging", () => {
 			"./export",
 			"./node",
 		]);
-		expect(entryPoints(data.exports).some((path) => /test|fixture/.test(path))).toBe(false);
+		expect(
+			entryPoints(data.exports).some((path) => /test|fixture/.test(path)),
+		).toBe(false);
 		for (const version of Object.values(data.dependencies ?? {}))
 			expect(version).not.toMatch(/^https?:/);
 	});
@@ -70,13 +76,19 @@ describe("release packaging", () => {
 			"./src/index.ts",
 			"./src/bin.ts",
 		]);
-		const published = publishedManifest(data, new Map(
-			packages.map((name) => [manifest(`packages/${name}`).name, data.version]),
-		));
-		expect(published.bin).toEqual({ freshcoat: "./src/bin.js" });
-		expect(readFileSync(join(root, "packages/cli/src/bin.ts"), "utf8")).toStartWith(
-			"#!/usr/bin/env node\n",
+		const published = publishedManifest(
+			data,
+			new Map(
+				packages.map((name) => [
+					manifest(`packages/${name}`).name,
+					data.version,
+				]),
+			),
 		);
+		expect(published.bin).toEqual({ freshcoat: "./src/bin.js" });
+		expect(
+			readFileSync(join(root, "packages/cli/src/bin.ts"), "utf8"),
+		).toStartWith("#!/usr/bin/env node\n");
 	});
 
 	test("compiles only what the exports reach", () => {

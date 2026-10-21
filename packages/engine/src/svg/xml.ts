@@ -124,7 +124,8 @@ export function parseXml(src: string): XmlElement {
 			i++;
 			skipSpace();
 			const quote = src[i];
-			if (quote !== '"' && quote !== "'") fail(`attribute "${key}" is unquoted`);
+			if (quote !== '"' && quote !== "'")
+				fail(`attribute "${key}" is unquoted`);
 			const end = src.indexOf(quote as string, i + 1);
 			if (end < 0) fail(`attribute "${key}" is unterminated`);
 			if (key in attrs) fail(`attribute "${key}" is repeated`);

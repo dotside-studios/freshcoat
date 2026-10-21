@@ -40,7 +40,10 @@ describe("parsePrintProfile", () => {
 			ok: true,
 			profile: expected,
 		});
-		expect(parsePrintProfile(expected)).toEqual({ ok: true, profile: expected });
+		expect(parsePrintProfile(expected)).toEqual({
+			ok: true,
+			profile: expected,
+		});
 	});
 
 	test("keeps a measured balance and its provenance", () => {

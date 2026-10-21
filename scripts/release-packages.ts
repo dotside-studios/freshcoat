@@ -44,8 +44,9 @@ export function manifest(directory: string): Manifest {
 export function releaseVersion(tag?: string): string {
 	const versions = packages.map((name) => manifest(`packages/${name}`).version);
 	versions.push(manifest("apps/figma-plugin").version);
-	const version = versions[0]!;
+	const version = versions[0];
 	if (
+		!version ||
 		!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) ||
 		version === "0.0.0"
 	) {
@@ -283,7 +284,10 @@ export async function buildPackages(tag?: string): Promise<void> {
 		}
 		// Later packages read these declarations, whose imports resolve through
 		// the package's own isolated dependencies.
-		symlinkSync(join(packageRoot, "node_modules"), join(output, "node_modules"));
+		symlinkSync(
+			join(packageRoot, "node_modules"),
+			join(output, "node_modules"),
+		);
 		console.log(`Built ${data.name}@${data.version}`);
 	}
 	for (const directory of packages)

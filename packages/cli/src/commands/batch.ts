@@ -15,31 +15,34 @@ import {
 	type Column,
 	type ColumnMapping,
 	type CutSpots,
-	DEFAULT_FILE_NAME_PATTERN,
-	DEFAULT_SHEET_LAYOUT,
 	type Dataset,
 	type DatasetAsset,
+	DEFAULT_FILE_NAME_PATTERN,
+	DEFAULT_SHEET_LAYOUT,
 	type ExportPreset,
 	fileNameTokens,
 	headersOf,
+	type IccProfileAsset,
 	imageFields,
 	importDefaults,
-	type IccProfileAsset,
 	newPreset,
 	type PaperName,
 	type PresetPrint,
 	prepareAssets,
-	type SheetLayout,
 	readOutputProfile,
+	type SheetLayout,
 	unfilledRequired,
 	unknownFileNameTokens,
+	type ViewFilter,
+	type Workspace,
 	withFieldSource,
 	withVariantSource,
-	type ViewFilter,
 	withView,
-	type Workspace,
 } from "@freshcoat-js/workspace";
-import { columnsFromTemplate, emptyDataset } from "@freshcoat-js/workspace/dataset";
+import {
+	columnsFromTemplate,
+	emptyDataset,
+} from "@freshcoat-js/workspace/dataset";
 import { printProfileMismatch } from "@freshcoat-js/workspace/export";
 import {
 	DEFAULT_TABLE_LIMITS,
@@ -121,7 +124,12 @@ export async function renderBatch(
 	io: Io,
 ): Promise<void> {
 	const log = createLog(io, options.quiet);
-	const { workspace, preset, directory } = await batchPreset(file, options, io, log);
+	const { workspace, preset, directory } = await batchPreset(
+		file,
+		options,
+		io,
+		log,
+	);
 	await runPreset(
 		workspace,
 		preset,
@@ -130,7 +138,9 @@ export async function renderBatch(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.maxPdfPages !== undefined ? { maxPdfPages: options.maxPdfPages } : {}),
+			...(options.maxPdfPages !== undefined
+				? { maxPdfPages: options.maxPdfPages }
+				: {}),
 			...(options.sheets ? { layoutFlags: true } : {}),
 		},
 		log,
@@ -152,15 +162,26 @@ export async function batchPreset(
 	const variantId = pickVariant(template, options.variant);
 	const frameNames = pickFrames(template, options.frame);
 	if (options.name !== undefined) checkName(template, options.name);
-	if (options.bleed && !Object.values(templateBleed(template)).some((side) => side > 0))
+	if (
+		options.bleed &&
+		!Object.values(templateBleed(template)).some((side) => side > 0)
+	)
 		throw new CliError("--bleed needs a template with a bleed");
-	if (options.sizeFrom !== undefined) checkSizeField(template, options.sizeFrom);
-	const constants = await readValues(io, template, options.values, options.set ?? {});
+	if (options.sizeFrom !== undefined)
+		checkSizeField(template, options.sizeFrom);
+	const constants = await readValues(
+		io,
+		template,
+		options.values,
+		options.set ?? {},
+	);
 	const read =
 		options.data === undefined
 			? {
 					...emptyDataset("values", []),
-					records: [{ id: "r_00000001", values: {}, status: "pending" as const }],
+					records: [
+						{ id: "r_00000001", values: {}, status: "pending" as const },
+					],
 				}
 			: await readDataset(io, log, template, options.data);
 	if (options.data === undefined) checkValues(template, constants.values);
@@ -172,7 +193,8 @@ export async function batchPreset(
 			kind: "constant",
 			value: typeof value === "string" ? value : JSON.stringify(value),
 		});
-	if (variantId) binding = withVariantSource(binding, { kind: "fixed", id: variantId });
+	if (variantId)
+		binding = withVariantSource(binding, { kind: "fixed", id: variantId });
 	if (options.where) binding = withView(binding, { filters: options.where });
 
 	const profile =
@@ -180,14 +202,24 @@ export async function batchPreset(
 			? await readProfile(io, options.outputIntent, options.outputIntentId)
 			: undefined;
 
-	const chosen = await readPrint(io, log, options.printTarget, options.printProfile);
-	const print = chosen && options.analyze === false ? { ...chosen, analyze: false } : chosen;
+	const chosen = await readPrint(
+		io,
+		log,
+		options.printTarget,
+		options.printProfile,
+	);
+	const print =
+		chosen && options.analyze === false
+			? { ...chosen, analyze: false }
+			: chosen;
 
 	const templateId = "t_template";
 	const workspace: Workspace = {
 		formatVersion: "1.0",
 		name: template.name,
-		templates: [{ id: templateId, fileName: basename(file), template, binding }],
+		templates: [
+			{ id: templateId, fileName: basename(file), template, binding },
+		],
 		datasets: [dataset],
 		presets: [],
 		...(profile ? { profiles: [profile] } : {}),
@@ -201,7 +233,8 @@ export async function batchPreset(
 			`no column or --set fills the required ${missing.length === 1 ? "field" : "fields"} ${missing.join(", ")}; ${missing.length === 1 ? "it uses its" : "they use their"} default`,
 		);
 
-	const pdf = writesFile(options.out) && options.out.toLowerCase().endsWith(".pdf");
+	const pdf =
+		writesFile(options.out) && options.out.toLowerCase().endsWith(".pdf");
 	const preset: ExportPreset = {
 		...newPreset(templateId, []),
 		name: template.name.trim() || basename(options.out).replace(/\.[^.]*$/, ""),
@@ -209,7 +242,8 @@ export async function batchPreset(
 		scale: options.scale?.[0] ?? 1,
 		markExported: false,
 		fileName:
-			options.name ?? (options.data === undefined ? "{{side}}" : DEFAULT_FILE_NAME_PATTERN),
+			options.name ??
+			(options.data === undefined ? "{{side}}" : DEFAULT_FILE_NAME_PATTERN),
 		...(frameNames ? { sides: frameNames } : {}),
 		...(options.quality !== undefined ? { quality: options.quality } : {}),
 		...(options.pngAlpha ? { pngAlpha: options.pngAlpha } : {}),
@@ -219,7 +253,9 @@ export async function batchPreset(
 					size: {
 						kind: "image" as const,
 						field: options.sizeFrom,
-						...(options.maxEdge !== undefined ? { maxEdge: options.maxEdge } : {}),
+						...(options.maxEdge !== undefined
+							? { maxEdge: options.maxEdge }
+							: {}),
 					},
 				}
 			: {}),
@@ -242,14 +278,21 @@ export async function batchPreset(
 					layout: {
 						...DEFAULT_SHEET_LAYOUT,
 						paper: options.sheets,
-						...(options.orientation ? { orientation: options.orientation } : {}),
+						...(options.orientation
+							? { orientation: options.orientation }
+							: {}),
 						cropMarks:
-							options.cropMarks !== false && (options.marks?.includes("crop") ?? true),
-						...(options.marks?.includes("registration") ? { registrationMarks: true } : {}),
+							options.cropMarks !== false &&
+							(options.marks?.includes("crop") ?? true),
+						...(options.marks?.includes("registration")
+							? { registrationMarks: true }
+							: {}),
 						...(options.marks?.includes("colorbar") ? { colorBar: true } : {}),
 						...(options.marks?.includes("slug") ? { slug: true } : {}),
 						duplex: options.duplex ? `${options.duplex}-edge` : "none",
-						...(options.margin !== undefined ? { marginMm: options.margin } : {}),
+						...(options.margin !== undefined
+							? { marginMm: options.margin }
+							: {}),
 						...(options.gap !== undefined ? { gapMm: options.gap } : {}),
 						...(options.backOffset ? { backOffsetMm: options.backOffset } : {}),
 						...(options.blankBacks ? { blankBacks: true } : {}),
@@ -266,7 +309,11 @@ async function readProfile(
 	file: string,
 	identifier: string | undefined,
 ): Promise<IccProfileAsset> {
-	const read = await readOutputProfile(await readBytes(io, file), basename(file), identifier);
+	const read = await readOutputProfile(
+		await readBytes(io, file),
+		basename(file),
+		identifier,
+	);
 	if (!read.ok) throw new CliError(`--output-intent ${file}: ${read.message}`);
 	return read.profile;
 }
@@ -277,8 +324,10 @@ async function readPrint(
 	target: BatchOptions["printTarget"],
 	file: string | undefined,
 ): Promise<PresetPrint | undefined> {
-	if (target === "none" || (target === undefined && file === undefined)) return undefined;
-	const profile = file !== undefined ? await readPrintProfile(io, file) : undefined;
+	if (target === "none" || (target === undefined && file === undefined))
+		return undefined;
+	const profile =
+		file !== undefined ? await readPrintProfile(io, file) : undefined;
 	const id = target ?? profileTarget(profile as PrintProfile);
 	if (!printTarget(id))
 		throw new CliError(
@@ -298,8 +347,11 @@ async function readPrint(
 }
 
 async function readPrintProfile(io: Io, file: string): Promise<PrintProfile> {
-	const parsed = parsePrintProfile(new TextDecoder().decode(await readBytes(io, file)));
-	if (!parsed.ok) throw new CliError(`--print-profile ${file}: ${parsed.message}`);
+	const parsed = parsePrintProfile(
+		new TextDecoder().decode(await readBytes(io, file)),
+	);
+	if (!parsed.ok)
+		throw new CliError(`--print-profile ${file}: ${parsed.message}`);
 	return parsed.profile;
 }
 
@@ -319,7 +371,11 @@ function checkName(template: Template, pattern: string): void {
 	const unknown = unknownFileNameTokens(pattern, template);
 	if (unknown.length > 0)
 		throw new CliError(
-			`--name has no ${unknown.map((token) => `{{${token}}}`).join(", ")}; it takes ${fileNameTokens(template).map((token) => `{{${token}}}`).join(", ")}`,
+			`--name has no ${unknown.map((token) => `{{${token}}}`).join(", ")}; it takes ${fileNameTokens(
+				template,
+			)
+				.map((token) => `{{${token}}}`)
+				.join(", ")}`,
 		);
 }
 
@@ -331,13 +387,21 @@ async function readDataset(
 ): Promise<Dataset> {
 	let sheets: Awaited<ReturnType<typeof readTable>>["sheets"];
 	try {
-		const { size } = await stat(resolve(io.cwd, file)).catch(() => ({ size: 0 }));
+		const { size } = await stat(resolve(io.cwd, file)).catch(() => ({
+			size: 0,
+		}));
 		if (size > DEFAULT_TABLE_LIMITS.maxBytes)
-			throw new TableLimitError("bytes", size, DEFAULT_TABLE_LIMITS.maxBytes, file);
+			throw new TableLimitError(
+				"bytes",
+				size,
+				DEFAULT_TABLE_LIMITS.maxBytes,
+				file,
+			);
 		({ sheets } = await readTable(await readBytes(io, file), file));
 	} catch (error) {
 		if (error instanceof TableLimitError) throw new CliError(error.message);
-		if (error instanceof TabularError) throw new CliError(`${file}: ${error.message}`);
+		if (error instanceof TabularError)
+			throw new CliError(`${file}: ${error.message}`);
 		throw error;
 	}
 	const wanted = columnsFromTemplate(template);
@@ -369,7 +433,12 @@ async function readDataset(
 	const directory = dirname(resolve(io.cwd, file));
 	const empty = {
 		...emptyDataset(basename(file), columns),
-		assets: await readPhotos(directory, sheet.rows.slice(headerRow + 1), mapping, columns),
+		assets: await readPhotos(
+			directory,
+			sheet.rows.slice(headerRow + 1),
+			mapping,
+			columns,
+		),
 	};
 	const { dataset, issues } = applyMapping(empty, sheet.rows, {
 		headerRow,
@@ -378,10 +447,13 @@ async function readDataset(
 		dateOrder: start.dateOrder,
 	});
 	for (const issue of issues.slice(0, MAX_ISSUES))
-		log.warn(`${file}: row ${issue.row + 1}, ${issue.column}: ${issue.message}`);
+		log.warn(
+			`${file}: row ${issue.row + 1}, ${issue.column}: ${issue.message}`,
+		);
 	if (issues.length > MAX_ISSUES)
 		log.warn(`${file}: ${issues.length - MAX_ISSUES} more issues`);
-	if (dataset.records.length === 0) throw new CliError(`${file} has no records`);
+	if (dataset.records.length === 0)
+		throw new CliError(`${file} has no records`);
 	return dataset;
 }
 
@@ -392,7 +464,9 @@ async function readPhotos(
 	columns: readonly Column[],
 ): Promise<DatasetAsset[]> {
 	const images = new Set(
-		columns.filter((column) => column.type === "image").map((column) => column.key),
+		columns
+			.filter((column) => column.type === "image")
+			.map((column) => column.key),
 	);
 	const names = new Set<string>();
 	mapping.forEach((entry, i) => {

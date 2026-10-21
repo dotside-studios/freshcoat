@@ -1,5 +1,4 @@
 import { describe, expect, test } from "vitest";
-import type { Template } from "../src/types";
 import {
 	PATTERN_INPUT_MAX_LENGTH,
 	PATTERN_MAX_LENGTH,
@@ -10,6 +9,7 @@ import {
 	PATTERN_CACHE_MAX,
 	patternProblem,
 } from "../src/text-rules";
+import type { Template } from "../src/types";
 import { validate, validateValues } from "../src/validate";
 
 const minimalValid: Template = {
@@ -65,9 +65,11 @@ describe("validate (top-level)", () => {
 		expect(r.ok).toBe(true);
 		if (r.ok)
 			expect(
-				(r.value.template_data[0].elements[0].properties as {
-					cornerRadius: unknown;
-				}).cornerRadius,
+				(
+					r.value.template_data[0].elements[0].properties as {
+						cornerRadius: unknown;
+					}
+				).cornerRadius,
 			).toEqual([8, 0, 8, 0]);
 		expect(validate(withFrame([8, 0])).ok).toBe(false);
 	});
@@ -593,11 +595,7 @@ describe("validate (mustache references)", () => {
 					.map((e) => [e.path, e.field, e.role]),
 			).toEqual([
 				["/variants/0/overrides/0/background/properties/src", "photo", "src"],
-				[
-					"/variants/0/overrides/0/elements/0/properties/value",
-					"nope",
-					"text",
-				],
+				["/variants/0/overrides/0/elements/0/properties/value", "nope", "text"],
 			]);
 		}
 		bad.fields.properties = {
@@ -945,28 +943,25 @@ describe("validate (effects)", () => {
 		expect(r.ok).toBe(true);
 	});
 
-	test.each(["shadow", "blur", "backdropBlur"])(
-		"rejects effects together with %s",
-		(key) => {
-			const legacy =
-				key === "shadow"
-					? { color: "#000", dx: 0, dy: 1, blur: 2 }
-					: 3;
-			const r = validate(withEffects({ effects: [], [key]: legacy }));
-			expect(r.ok).toBe(false);
-			if (!r.ok)
-				expect(r.errors.map((e) => e.code)).toContain("effects_with_legacy_field");
-		},
-	);
+	test.each([
+		"shadow",
+		"blur",
+		"backdropBlur",
+	])("rejects effects together with %s", (key) => {
+		const legacy =
+			key === "shadow" ? { color: "#000", dx: 0, dy: 1, blur: 2 } : 3;
+		const r = validate(withEffects({ effects: [], [key]: legacy }));
+		expect(r.ok).toBe(false);
+		if (!r.ok)
+			expect(r.errors.map((e) => e.code)).toContain(
+				"effects_with_legacy_field",
+			);
+	});
 
 	test.each(["blur", "backdropBlur"])("rejects a second %s effect", (type) => {
 		const r = validate(
 			withEffects({
-				effects: [
-					{ type, radius: 1 },
-					shadow,
-					{ type, radius: 2 },
-				],
+				effects: [{ type, radius: 1 }, shadow, { type, radius: 2 }],
 			}),
 		);
 		expect(r.ok).toBe(false);
@@ -1008,7 +1003,10 @@ describe("validate (effects)", () => {
 		["grain size of 0", { type: "grain", amount: 0.5, size: 0 }],
 		["fractional seed", { type: "grain", amount: 0.5, seed: 1.5 }],
 		["seed above 65535", { type: "grain", amount: 0.5, seed: 65536 }],
-		["unknown grain blend", { type: "grain", amount: 0.5, blendMode: "darken" }],
+		[
+			"unknown grain blend",
+			{ type: "grain", amount: 0.5, blendMode: "darken" },
+		],
 		["halftone without a cell size", { type: "halftone" }],
 		["negative cell size", { type: "halftone", cellSize: -2 }],
 		["unknown shape", { type: "halftone", cellSize: 4, shape: "star" }],
@@ -1021,9 +1019,7 @@ describe("validate (effects)", () => {
 
 	test.each(["grain", "halftone"])("rejects a second %s effect", (type) => {
 		const effect =
-			type === "grain"
-				? { type, amount: 0.5 }
-				: { type, cellSize: 4 };
+			type === "grain" ? { type, amount: 0.5 } : { type, cellSize: 4 };
 		const r = validate(withEffects({ effects: [effect, effect] }));
 		expect(r.ok).toBe(false);
 		if (!r.ok)

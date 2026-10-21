@@ -58,8 +58,7 @@ export function pruneHiddenElements(
 ): Element[] {
 	const out: Element[] = [];
 	for (const el of elements) {
-		if (el.hidden === true || !isElementVisible(el, values, fields))
-			continue;
+		if (el.hidden === true || !isElementVisible(el, values, fields)) continue;
 		if (el.type === "frame" || el.type === "mask") {
 			// A mask's shape is not shown, so only what it masks is pruned.
 			out.push({

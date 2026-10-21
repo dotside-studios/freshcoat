@@ -5,9 +5,6 @@ import { setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import { deriveFontMetrics } from "../src/font-metrics";
-import { createHeadlessEnv } from "./helpers/headless";
-import { createParagraphEngine } from "../src/paragraph-layout";
-import type { EncodedPaintResult } from "../src/runtime-types";
 import {
 	createBitmap,
 	createEllipse,
@@ -18,6 +15,9 @@ import {
 	createText,
 	type Node,
 } from "../src/node";
+import { createParagraphEngine } from "../src/paragraph-layout";
+import type { EncodedPaintResult } from "../src/runtime-types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const W = 240;
 const H = 180;
@@ -40,8 +40,7 @@ const ROUNDED_TOLERANCE = 32;
 // A snapped module edge on a pixel boundary can gain a sliver of coverage.
 const SNAPPED_TOLERANCE = 1;
 
-const FONTS = () =>
-	new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
+const FONTS = () => new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);
 
 // Laid out with every font, painted with `fonts`.
 async function render(
@@ -274,7 +273,10 @@ describe("bounded effect layers", () => {
 		const n = 25;
 		return createGroup(
 			[
-				createRect({ ...box(x, y, side + 16, side + 16), fills: solid("#fff") }),
+				createRect({
+					...box(x, y, side + 16, side + 16),
+					fills: solid("#fff"),
+				}),
 				createGroup(
 					[
 						createPath({
@@ -291,11 +293,11 @@ describe("bounded effect layers", () => {
 			{ ...box(x, y, side + 16, side + 16), shadow: shadow(0, 14, 32) },
 		);
 	};
-	const squares = Array.from({ length: 25 }, (_, y) =>
+	const squares = `${Array.from({ length: 25 }, (_, y) =>
 		Array.from({ length: 25 }, (_, x) =>
 			(x * 31 + y * 17) % 3 ? "" : `M${x} ${y}H${x + 1}V${y + 1}H${x}Z`,
 		).join(""),
-	).join("") + "M0 0H7V7H0ZM1 1H6V6H1ZM2 2H5V5H2Z";
+	).join("")}M0 0H7V7H0ZM1 1H6V6H1ZM2 2H5V5H2Z`;
 
 	for (const scale of [1, 2, 1.37, 3.1])
 		test(`snapped square QR modules at ${scale}x`, async () => {

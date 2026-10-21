@@ -135,9 +135,8 @@ export function tokenize(src: string): {
 		if (c === "/" && src[i + 1] === "/") {
 			const end = src.indexOf("\n", i);
 			const text = src.slice(i, end === -1 ? n : end);
-			const ref = /^\/\/\/\s*<reference\s+(types|path)\s*=\s*["']([^"']+)["']/.exec(
-				text,
-			);
+			const ref =
+				/^\/\/\/\s*<reference\s+(types|path)\s*=\s*["']([^"']+)["']/.exec(text);
 			if (ref)
 				references.push({
 					spec: ref[2],
@@ -214,7 +213,10 @@ export function tokenize(src: string): {
 		if (c === "{") braces++;
 		if (c === "}") {
 			braces--;
-			if (templateDepth.length && templateDepth[templateDepth.length - 1] === braces) {
+			if (
+				templateDepth.length &&
+				templateDepth[templateDepth.length - 1] === braces
+			) {
 				templateDepth.pop();
 				i++;
 				readTemplate();
@@ -291,9 +293,7 @@ export function scriptRefs(src: string): Ref[] {
 // roots, `resolve(__dirname, "..")`), so every relative string in one counts.
 export function configPathRefs(src: string): Ref[] {
 	return tokenize(src)
-		.tokens.filter(
-			(tok) => tok.t === "str" && /^\.\.?(?:[/\\]|$)/.test(tok.v),
-		)
+		.tokens.filter((tok) => tok.t === "str" && /^\.\.?(?:[/\\]|$)/.test(tok.v))
 		.map((tok) => ({ spec: tok.v, line: tok.line, kind: "path" as const }));
 }
 
@@ -305,9 +305,7 @@ export function cssRefs(src: string): Ref[] {
 	const lines = text.split("\n");
 	lines.forEach((l, idx) => {
 		const line = idx + 1;
-		for (const m of l.matchAll(
-			/@import\s+(?:url\(\s*)?["']([^"']+)["']/g,
-		))
+		for (const m of l.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g))
 			refs.push({ spec: m[1], line, kind: "module" });
 		for (const m of l.matchAll(/@plugin\s+["']([^"']+)["']/g))
 			refs.push({ spec: m[1], line, kind: "module" });
@@ -347,7 +345,10 @@ function isKit(name: string): boolean {
 
 function inside(root: string, target: string): boolean {
 	const rel = relative(root, target);
-	return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-z]:/i.test(rel));
+	return (
+		rel === "" ||
+		(!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-z]:/i.test(rel))
+	);
 }
 
 function typesName(name: string): string {
@@ -382,12 +383,7 @@ function checkPath(
 		report(ctx, file, line, `${what} "${spec}" reaches outside the repository`);
 }
 
-function checkModule(
-	ctx: Ctx,
-	file: string,
-	pkg: Pkg | undefined,
-	ref: Ref,
-) {
+function checkModule(ctx: Ctx, file: string, pkg: Pkg | undefined, ref: Ref) {
 	const spec = ref.spec.replace(/[?#].*$/, "");
 	if (ref.kind === "path" || /^\.\.?(?:\/|$)/.test(spec)) {
 		checkPath(ctx, file, dirname(file), spec, ref.line, "Path");
@@ -404,7 +400,12 @@ function checkModule(
 		return;
 	if (ref.kind !== "types" && isBuiltin(spec)) return;
 	if (/^[a-z][a-z0-9+.-]*:/i.test(spec)) {
-		report(ctx, file, ref.line, `Import "${ref.spec}" is not a package or a path`);
+		report(
+			ctx,
+			file,
+			ref.line,
+			`Import "${ref.spec}" is not a package or a path`,
+		);
 		return;
 	}
 	const name = packageName(spec);
@@ -420,7 +421,8 @@ function checkModule(
 	}
 	const declared =
 		pkg &&
-		(pkg.deps.has(name) || (ref.kind === "types" && pkg.deps.has(typesName(name))));
+		(pkg.deps.has(name) ||
+			(ref.kind === "types" && pkg.deps.has(typesName(name))));
 	if (!declared) {
 		report(
 			ctx,
@@ -446,16 +448,30 @@ function checkPackageJson(ctx: Ctx, pkg: Pkg, text: string) {
 					ctx,
 					file,
 					line,
-				`"${name}" is a workspace package outside this repository`,
+					`"${name}" is a workspace package outside this repository`,
 				);
 		} else if (/^(?:file|link|portal):/.test(version)) {
-			checkPath(ctx, file, pkg.dir, version.replace(/^\w+:/, ""), line, "Dependency");
+			checkPath(
+				ctx,
+				file,
+				pkg.dir,
+				version.replace(/^\w+:/, ""),
+				line,
+				"Dependency",
+			);
 		}
 	}
 	for (const [name, command] of Object.entries(json.scripts ?? {})) {
 		for (const word of command.split(/[\s=]+/)) {
 			if (!/^\.\.?\//.test(word)) continue;
-			checkPath(ctx, file, pkg.dir, word, lineOf(text, `"${name}"`), `Script "${name}" path`);
+			checkPath(
+				ctx,
+				file,
+				pkg.dir,
+				word,
+				lineOf(text, `"${name}"`),
+				`Script "${name}" path`,
+			);
 		}
 	}
 }
@@ -497,12 +513,24 @@ function checkTsconfig(ctx: Ctx, file: string, pkg: Pkg | undefined) {
 		path(spec, "Pattern");
 	for (const r of json.references ?? []) path(r.path, "Reference");
 	const co = json.compilerOptions ?? {};
-	for (const dir of [co.baseUrl, co.rootDir, ...(co.rootDirs ?? []), ...(co.typeRoots ?? [])])
+	for (const dir of [
+		co.baseUrl,
+		co.rootDir,
+		...(co.rootDirs ?? []),
+		...(co.typeRoots ?? []),
+	])
 		if (dir) path(dir, "Directory");
 	const pathBase = co.baseUrl ? resolve(base, co.baseUrl) : base;
 	for (const targets of Object.values(co.paths ?? {}))
 		for (const t of targets)
-			checkPath(ctx, file, pathBase, t, lineOf(text, JSON.stringify(t)), "Path mapping");
+			checkPath(
+				ctx,
+				file,
+				pathBase,
+				t,
+				lineOf(text, JSON.stringify(t)),
+				"Path mapping",
+			);
 	for (const t of co.types ?? [])
 		checkModule(ctx, file, pkg, {
 			spec: t,
@@ -518,8 +546,16 @@ function checkBiome(ctx: Ctx, file: string, pkg: Pkg | undefined) {
 		const line = lineOf(text, JSON.stringify(ext));
 		if (ext === "//") {
 			// "//" is the enclosing root config, which must then be freshcoat's.
-			if (!existsSync(join(ctx.root, "biome.json")) && !existsSync(join(ctx.root, "biome.jsonc")))
-				report(ctx, file, line, `extends "//" reaches the monorepo's root config`);
+			if (
+				!existsSync(join(ctx.root, "biome.json")) &&
+				!existsSync(join(ctx.root, "biome.jsonc"))
+			)
+				report(
+					ctx,
+					file,
+					line,
+					`extends "//" reaches the monorepo's root config`,
+				);
 		} else if (/^\.\.?\//.test(ext) || ext.startsWith("/"))
 			checkPath(ctx, file, dirname(file), ext, line, "extends");
 		else checkModule(ctx, file, pkg, { spec: ext, line, kind: "module" });
@@ -608,7 +644,11 @@ export function checkBoundaries(rootDir: string): Violation[] {
 		pkgs.find((p) => p.dir === root);
 
 	for (const pkg of pkgs)
-		checkPackageJson(ctx, pkg, readFileSync(join(pkg.dir, "package.json"), "utf8"));
+		checkPackageJson(
+			ctx,
+			pkg,
+			readFileSync(join(pkg.dir, "package.json"), "utf8"),
+		);
 
 	for (const file of files) {
 		const pkg = owner(file);
@@ -626,7 +666,8 @@ export function checkBoundaries(rootDir: string): Violation[] {
 			const src = readFileSync(file, "utf8");
 			refs = scriptRefs(src);
 			if (CONFIG.test(file)) refs.push(...configPathRefs(src));
-		} else if (file.endsWith(".css")) refs = cssRefs(readFileSync(file, "utf8"));
+		} else if (file.endsWith(".css"))
+			refs = cssRefs(readFileSync(file, "utf8"));
 		else if (file.endsWith(".html")) {
 			refs = htmlRefs(readFileSync(file, "utf8"));
 			for (const ref of refs)
@@ -647,12 +688,15 @@ export function checkBoundaries(rootDir: string): Violation[] {
 if (import.meta.main) {
 	const root = resolve(process.argv[2] ?? join(import.meta.dir, ".."));
 	const violations = checkBoundaries(root);
-	for (const v of violations) console.error(`${v.file}:${v.line}: ${v.message}`);
+	for (const v of violations)
+		console.error(`${v.file}:${v.line}: ${v.message}`);
 	if (violations.length) {
 		console.error(
 			`\n${violations.length} boundary violation${violations.length === 1 ? "" : "s"} in ${root}`,
 		);
 		process.exit(1);
 	}
-	console.log(`Boundaries OK: nothing in ${basename(root)}/ reaches outside it`);
+	console.log(
+		`Boundaries OK: nothing in ${basename(root)}/ reaches outside it`,
+	);
 }

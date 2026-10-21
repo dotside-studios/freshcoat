@@ -95,19 +95,6 @@ export {
 	templateSafeArea,
 } from "./bleed";
 export {
-	formatLength,
-	isLengthUnit,
-	LENGTH_UNITS,
-	type LengthUnit,
-	parseLength,
-	pxPerUnit,
-	pxToUnit,
-	resolveUnitSuffixes,
-	roundForUnit,
-	unitPrecision,
-	unitToPx,
-} from "./units";
-export {
 	applyBooleans,
 	cachePathOp,
 	canvasKitPathOp,
@@ -120,7 +107,6 @@ export {
 	writableTemplate,
 } from "./coat";
 export { compile } from "./compile";
-export { defineTemplate, type TemplateModule } from "./define";
 export {
 	barcodeBox,
 	constrainBox,
@@ -130,6 +116,8 @@ export {
 	resizeVectorBoolean,
 	resizeVectorPath,
 } from "./constraints";
+export { defineTemplate, type TemplateModule } from "./define";
+export { effectsOf } from "./effects";
 export {
 	defaultFieldValues,
 	elementFieldRefs,
@@ -159,7 +147,6 @@ export {
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "./fonts";
-export { effectsOf } from "./effects";
 export {
 	FORMAT_MAJOR,
 	FORMAT_MINOR,
@@ -192,22 +179,6 @@ export {
 	inlineImageSize,
 } from "./image-dpi";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
-export {
-	describePrintIssue,
-	isLightFace,
-	isRichBlack,
-	POINTS_PER_INCH,
-	PRINT_CHECK_DEFAULTS,
-	type PrintCheckOptions,
-	type PrintCheckWarning,
-	type PrintHint,
-	type PrintIssue,
-	type PrintIssueCode,
-	printCheckWarnings,
-	printHints,
-	unitsToMm,
-	unitsToPt,
-} from "./print-checks";
 export { type LoadTemplateResult, loadTemplate } from "./load";
 export {
 	FIELD_FORMATS,
@@ -232,18 +203,28 @@ export {
 	uniquifyElementIds,
 	uniquifyElementIdsDeep,
 } from "./normalize";
+export { pieceSize, pieceSpec } from "./piece";
 export {
 	fieldContext,
 	type PrepareOptions,
 	prepareTemplate,
 } from "./prepare";
-export { pieceSize, pieceSpec } from "./piece";
 export {
-	type ResolvedSlice,
-	type ResolveSlicesOptions,
-	resolveSlices,
-	sliceLayers,
-} from "./slices";
+	describePrintIssue,
+	isLightFace,
+	isRichBlack,
+	POINTS_PER_INCH,
+	PRINT_CHECK_DEFAULTS,
+	type PrintCheckOptions,
+	type PrintCheckWarning,
+	type PrintHint,
+	type PrintIssue,
+	type PrintIssueCode,
+	printCheckWarnings,
+	printHints,
+	unitsToMm,
+	unitsToPt,
+} from "./print-checks";
 export { generateMatrix, MAX_QR_LOGO_SIZE, QR_LOGO_H_COVERAGE } from "./qr";
 export {
 	describeQrIssue,
@@ -253,18 +234,24 @@ export {
 	qrIssues,
 } from "./qr-checks";
 export {
+	PATTERN_INPUT_MAX_LENGTH,
+	PATTERN_MAX_LENGTH,
+	type UnsafePatternReason,
+	unsafePatternReason,
+} from "./safe-regex";
+export {
+	type ResolvedSlice,
+	type ResolveSlicesOptions,
+	resolveSlices,
+	sliceLayers,
+} from "./slices";
+export {
 	parseTrimValue,
 	type ResolvedStrokeTrim,
 	resolveStrokeTrim,
 	type StrokeTrimInput,
 } from "./stroke-trim";
 export { strokeSides, widestStroke } from "./stroke-width";
-export {
-	PATTERN_INPUT_MAX_LENGTH,
-	PATTERN_MAX_LENGTH,
-	type UnsafePatternReason,
-	unsafePatternReason,
-} from "./safe-regex";
 export {
 	compiledPattern,
 	PATTERN_CACHE_MAX,
@@ -275,11 +262,11 @@ export {
 } from "./text-rules";
 export { allElements, childElements, walkElements } from "./tree";
 export type {
+	BackdropBlurEffect,
 	Background,
 	BakedTextLayout,
 	BarcodeElement,
 	BarcodeProperties,
-	BackdropBlurEffect,
 	BearerBars,
 	BitmapRole,
 	BlendMode,
@@ -382,6 +369,19 @@ export type {
 	VectorProperties,
 	VisibilityCondition,
 } from "./types";
+export {
+	formatLength,
+	isLengthUnit,
+	LENGTH_UNITS,
+	type LengthUnit,
+	parseLength,
+	pxPerUnit,
+	pxToUnit,
+	resolveUnitSuffixes,
+	roundForUnit,
+	unitPrecision,
+	unitToPx,
+} from "./units";
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,

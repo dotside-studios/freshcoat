@@ -153,7 +153,13 @@ describe("roundCorners", () => {
 
 describe("polygon outline", () => {
 	test("rounds every vertex by cornerRadius", () => {
-		const sharp = outlineGeometry({ kind: "polygon", sides: 3 }, 0, 0, 100, 100);
+		const sharp = outlineGeometry(
+			{ kind: "polygon", sides: 3 },
+			0,
+			0,
+			100,
+			100,
+		);
 		const zero = outlineGeometry(
 			{ kind: "polygon", sides: 3, cornerRadius: 0 },
 			0,

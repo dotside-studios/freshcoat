@@ -4,13 +4,13 @@
 // 100×100 node fills the far corner; without the viewBox it stays at native size.
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createFrame,
 	createPath,
 	createRect,
 } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 

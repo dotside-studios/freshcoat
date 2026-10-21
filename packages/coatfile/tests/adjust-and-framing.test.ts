@@ -89,11 +89,7 @@ describe("element adjust", () => {
 	});
 
 	test("rejects out-of-range factors", () => {
-		for (const adjust of [
-			{ saturation: -1 },
-			{ gamma: 0 },
-			{ sharpen: -0.5 },
-		])
+		for (const adjust of [{ saturation: -1 }, { gamma: 0 }, { sharpen: -0.5 }])
 			expect(errorCodes(template([photo({}, { adjust })]))).toContain(
 				"invalid_shape",
 			);
@@ -115,7 +111,10 @@ describe("image focus and crop", () => {
 	});
 
 	test("a field can supply the focal point per record", () => {
-		const tpl = template([photo({ focus: "{{photo_focus}}" })], ["photo_focus"]);
+		const tpl = template(
+			[photo({ focus: "{{photo_focus}}" })],
+			["photo_focus"],
+		);
 		expect(validate(tpl).ok).toBe(true);
 		expect(compiledImage(tpl, { photo_focus: "0.2, 0.9" }).focus).toEqual({
 			x: 0.2,
@@ -159,7 +158,6 @@ describe("image focus and crop", () => {
 });
 
 describe("adjust and framing paint", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 	let ck: any;
 	let bands: string;
 	beforeAll(async () => {
@@ -186,12 +184,12 @@ describe("adjust and framing paint", () => {
 
 	async function centre(el: Element, values: Record<string, unknown> = {}) {
 		const tpl = template([el], ["photo_focus"]);
-		const [frame] = (await renderTemplate(
+		const [frame] = await renderTemplate(
 			await createRenderer({ ck, cache: false }),
 			tpl,
 			values,
 			{ width: 40, height: 40 },
-		));
+		);
 		const d = decodePixels(ck, frame.bytes);
 		if (!d) throw new Error("decode failed");
 		const i = (20 * d.width + 20) * 4;
@@ -199,7 +197,9 @@ describe("adjust and framing paint", () => {
 	}
 
 	const near = (actual: number[], want: number[]) =>
-		want.forEach((v, i) => expect(Math.abs(actual[i] - v)).toBeLessThan(12));
+		want.forEach((v, i) => {
+			expect(Math.abs(actual[i] - v)).toBeLessThan(12);
+		});
 
 	test("focus chooses which band a square cover shows", async () => {
 		near(await centre(photo({ src: bands, focus: [0, 0.5] })), [255, 0, 0]);
@@ -227,10 +227,7 @@ describe("adjust and framing paint", () => {
 
 	test("adjust desaturates the painted layer", async () => {
 		const [r, g, b] = await centre(
-			photo(
-				{ src: bands, focus: [0, 0.5] },
-				{ adjust: { saturation: 0 } },
-			),
+			photo({ src: bands, focus: [0, 0.5] }, { adjust: { saturation: 0 } }),
 		);
 		expect(Math.abs(r - g)).toBeLessThan(3);
 		expect(Math.abs(g - b)).toBeLessThan(3);

@@ -34,10 +34,7 @@ jobs:
       - run: bun run check:links
       - run: bun run check:notices
       - run: bun run test:scripts
-      - run: bun run --cwd packages/ui check
-      - run: bun run --cwd packages/workspace check
-      - run: bun run --cwd apps/editor check
-      - run: bun run --cwd apps/figma-plugin check
+      - run: bun run check
       - run: bun run build
 
   typecheck:

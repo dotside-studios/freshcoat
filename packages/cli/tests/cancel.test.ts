@@ -1,9 +1,15 @@
-import { spawn } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { listenForCancel } from "../src/cancel";
 import { main } from "../src/main";
-import { card, type Sandbox, sandbox, workspaceBytes, workspaceOf } from "./helpers";
+import {
+	card,
+	type Sandbox,
+	sandbox,
+	workspaceBytes,
+	workspaceOf,
+} from "./helpers";
 
 let box: Sandbox;
 
@@ -80,8 +86,22 @@ describe("cancellation", () => {
 		const controller = new AbortController();
 		controller.abort();
 		const code = await main(
-			["render", "badge.json", "--data", "people.csv", "--out", "early.zip", "-q"],
-			{ stdout() {}, stderr() {}, cwd: box.dir, fetch: box.fetch, signal: controller.signal },
+			[
+				"render",
+				"badge.json",
+				"--data",
+				"people.csv",
+				"--out",
+				"early.zip",
+				"-q",
+			],
+			{
+				stdout() {},
+				stderr() {},
+				cwd: box.dir,
+				fetch: box.fetch,
+				signal: controller.signal,
+			},
 		);
 		expect(code).toBe(130);
 		expect(existsSync(box.path("early.zip"))).toBe(false);
@@ -118,14 +138,20 @@ describe("cancellation", () => {
 
 describe("listenForCancel", () => {
 	test("aborts on SIGTERM with 143 and removes its listeners", () => {
-		const before = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")];
+		const before = [
+			process.listenerCount("SIGINT"),
+			process.listenerCount("SIGTERM"),
+		];
 		const cancel = listenForCancel();
 		expect(process.listenerCount("SIGTERM")).toBe(before[1]! + 1);
 		process.emit("SIGTERM");
 		expect(cancel.signal.aborted).toBe(true);
 		expect(cancel.code).toBe(143);
 		cancel.dispose();
-		expect([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]).toEqual(before);
+		expect([
+			process.listenerCount("SIGINT"),
+			process.listenerCount("SIGTERM"),
+		]).toEqual(before);
 	});
 
 	test("aborts on SIGINT with 130", () => {
@@ -169,7 +195,9 @@ describe("signals", () => {
 			],
 			{ cwd: box.dir, stdio: ["ignore", "ignore", "pipe"] },
 		);
-		const exited = new Promise<number | null>((done) => child.on("exit", (code) => done(code)));
+		const exited = new Promise<number | null>((done) =>
+			child.on("exit", (code) => done(code)),
+		);
 		let stderr = "";
 		let sent = false;
 		child.stderr.on("data", (chunk) => {

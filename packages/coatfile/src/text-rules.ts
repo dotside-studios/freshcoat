@@ -55,7 +55,10 @@ function compile(pattern: string, flags: string): RegExp | null {
 	}
 }
 
-export function textRuleBreaks(rules: TextRules, value: string): TextRuleBreak[] {
+export function textRuleBreaks(
+	rules: TextRules,
+	value: string,
+): TextRuleBreak[] {
 	const breaks: TextRuleBreak[] = [];
 	if (rules.minLength !== undefined && value.length < rules.minLength) {
 		breaks.push("too_short");

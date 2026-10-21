@@ -1,12 +1,12 @@
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
+import { compile } from "../src/compile";
 import {
 	describeWarning,
 	renderCompiledPdf,
 	renderTemplate,
 } from "../src/render";
-import { compile } from "../src/compile";
 import type { Template } from "../src/types";
 
 let ck: any;
@@ -64,7 +64,13 @@ describe("image DPI at render time", () => {
 		);
 		const low = frame?.warnings.filter((w) => w.kind === "image_low_dpi");
 		expect(low).toEqual([
-			{ kind: "image_low_dpi", layer: "photo", src: "ws:small", dpi: 200, min: 300 },
+			{
+				kind: "image_low_dpi",
+				layer: "photo",
+				src: "ws:small",
+				dpi: 200,
+				min: 300,
+			},
 		]);
 		expect(describeWarning(low![0]!)).toBe(
 			"Image prints at 200 DPI, under 300: photo",
@@ -126,17 +132,23 @@ describe("image DPI at render time", () => {
 	test("checks a vector PDF page too", async () => {
 		const renderer = await createRenderer({ ck, cache: false });
 		const images = new Map([["ws:small", png(600, 400)]]);
-		const compiled = compile(template, { photo: "ws:small" }, {
-			width: 1012,
-			height: 638,
-		});
+		const compiled = compile(
+			template,
+			{ photo: "ws:small" },
+			{
+				width: 1012,
+				height: 638,
+			},
+		);
 		const [page] = await renderCompiledPdf(renderer, compiled, {
 			images,
 			dpi: 300,
 			imageDpi: { dpi: 300 },
 		});
 		expect(
-			page?.warnings.filter((w) => w.kind === "image_low_dpi").map((w) => w.dpi),
+			page?.warnings
+				.filter((w) => w.kind === "image_low_dpi")
+				.map((w) => w.dpi),
 		).toEqual([200]);
 	});
 });

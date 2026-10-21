@@ -1,7 +1,7 @@
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
-import { createHeadlessEnv } from "./helpers/headless";
+import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	type Command,
 	compileScene,
@@ -9,9 +9,9 @@ import {
 	createPaintCache,
 	createText,
 } from "../src/index";
-import { deriveFontMetrics } from "../src/font-metrics";
 import type { Node } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const GEIST = testFontBytes("Geist-Regular.ttf");
 const VEND = testFontBytes("VendSans-Variable-latin.woff2");

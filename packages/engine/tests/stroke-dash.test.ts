@@ -61,8 +61,6 @@ describe("stroke dash rendering", () => {
 	test("[0, 0] renders like a solid stroke", async () => {
 		const zero = await render([0, 0]);
 		const solid = await render([]);
-		expect(Buffer.from(zero.bytes).equals(Buffer.from(solid.bytes))).toBe(
-			true,
-		);
+		expect(Buffer.from(zero.bytes).equals(Buffer.from(solid.bytes))).toBe(true);
 	});
 });

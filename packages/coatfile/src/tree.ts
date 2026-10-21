@@ -16,6 +16,7 @@ export function childElements(el: Element | Background): Element[] {
  *  false skips that element's contents. */
 export function walkElements(
 	elements: readonly Element[],
+	// biome-ignore lint/suspicious/noConfusingVoidType: callers pass visitors that return nothing
 	visit: (el: Element) => boolean | void,
 ): void {
 	for (const el of elements)

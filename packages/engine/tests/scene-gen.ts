@@ -23,12 +23,7 @@ import type {
 	Stroke,
 } from "../src/types";
 
-const SRCS = [
-	"img://quarters",
-	"img://checker",
-	"img://wide",
-	"img://alpha",
-];
+const SRCS = ["img://quarters", "img://checker", "img://wide", "img://alpha"];
 
 export async function fuzzImages(): Promise<Map<string, Uint8Array>> {
 	const images = new Map<string, Uint8Array>();

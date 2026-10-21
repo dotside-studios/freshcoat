@@ -23,9 +23,9 @@ describe("describeWarning", () => {
 	});
 
 	it("names the layer when the warning carries one", () => {
-		expect(describeWarning({ kind: "text_path_overflow", layer: "title" })).toBe(
-			"Text runs past the end of its path: title",
-		);
+		expect(
+			describeWarning({ kind: "text_path_overflow", layer: "title" }),
+		).toBe("Text runs past the end of its path: title");
 		expect(describeWarning({ kind: "text_path_overflow" })).toBe(
 			"Text runs past the end of its path",
 		);

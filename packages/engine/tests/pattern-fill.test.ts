@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
+import type { Node, PatternKind, ResolvedFill } from "../src/index";
 import {
 	createPath,
 	createRect,
@@ -12,8 +12,8 @@ import {
 	patternFill,
 	validateCommands,
 } from "../src/index";
-import type { Node, PatternKind, ResolvedFill } from "../src/index";
 import { patternMean } from "../src/pattern";
+import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = 80;
 const GOLDENS = join(
@@ -342,13 +342,17 @@ describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
 		);
 	});
 
-	test("a 1x render matches a 3x render reduced to 1x", async () => {
-		const one = await shot(1);
-		const three = reduce(await shot(3), 3);
-		expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
-		expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
-		expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
-	}, TONE_TIMEOUT_MS);
+	test(
+		"a 1x render matches a 3x render reduced to 1x",
+		async () => {
+			const one = await shot(1);
+			const three = reduce(await shot(3), 3);
+			expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
+			expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
+			expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
+		},
+		TONE_TIMEOUT_MS,
+	);
 });
 
 describe("pattern compile failure", () => {

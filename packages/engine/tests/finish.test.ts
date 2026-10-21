@@ -3,10 +3,10 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { setCpuFinish } from "../src/canvaskit";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { FrameFinish } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 type RGB = [number, number, number];
 

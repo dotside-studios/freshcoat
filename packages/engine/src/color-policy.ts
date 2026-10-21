@@ -1,9 +1,4 @@
-import type {
-	Canvas,
-	CanvasKit,
-	ImageInfo,
-	Surface,
-} from "canvaskit-wasm";
+import type { Canvas, CanvasKit, ImageInfo, Surface } from "canvaskit-wasm";
 
 // The bit depth of the engine's intermediate surfaces (see README "Color
 // policy"). "u8" composites in RGBA_8888 everywhere; "f16" composites the scene

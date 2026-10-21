@@ -149,7 +149,8 @@ function interpolate(xs: number[], ys: number[], x: number): number {
 type ToneKnobs = { gamma: number; darkness: number };
 
 // The printer's own floor: what it returns for black, when black was sent.
-const floorOf = (curve: ToneCurve) => (curve.levels[0] <= 8 ? curve.values[0] : 0);
+const floorOf = (curve: ToneCurve) =>
+	curve.levels[0] <= 8 ? curve.values[0] : 0;
 
 // The mean distance, in levels, between what the printer would return for a
 // level run through this correction and what it can actually make of that level.
@@ -325,7 +326,10 @@ export function fitTargetPreset(
 	const preset: PrintOptimizeOptions = { ...NEUTRAL, ...options.defaults };
 	const fitted: FittedKnob[] = [];
 	const notes: string[] = [];
-	const summary: { tone?: { before: number; after: number }; retainedChroma?: number } = {};
+	const summary: {
+		tone?: { before: number; after: number };
+		retainedChroma?: number;
+	} = {};
 	let curve: ToneCurve | null = null;
 
 	if (tone) {
@@ -352,7 +356,10 @@ export function fitTargetPreset(
 		notes.push(
 			`Tone: ${curve.levels.length} levels read. Gamma ${preset.gamma} ${direction}, cutting the mean error from ${summary.tone.before} to ${summary.tone.after} levels.`,
 		);
-		if (fit.gamma <= GAMMA_RANGE[0] * 1.03 || fit.gamma >= GAMMA_RANGE[1] / 1.03) {
+		if (
+			fit.gamma <= GAMMA_RANGE[0] * 1.03 ||
+			fit.gamma >= GAMMA_RANGE[1] / 1.03
+		) {
 			notes.push(
 				"Gamma ended at the edge of its range, so the printer's curve is unusual; check the chart.",
 			);
@@ -386,7 +393,8 @@ export function fitTargetPreset(
 			);
 		}
 		const wanted = 1 / fit.retained;
-		const saturation = Math.abs(wanted - 1) < SNAP ? 1 : clamp(wanted, SATURATION_RANGE);
+		const saturation =
+			Math.abs(wanted - 1) < SNAP ? 1 : clamp(wanted, SATURATION_RANGE);
 		preset.saturation = round(saturation);
 		fitted.push("saturation");
 		summary.retainedChroma = round(fit.retained);
@@ -396,9 +404,12 @@ export function fitTargetPreset(
 				: `Chroma: a hue sweep shows no gamut edge, so the upper quartile of ${fit.hues} hues' retention (${percent(fit.retained)}) stands in for the unclipped value. A chroma ramp gives a firmer number.`,
 		);
 		if (saturation !== wanted && Math.abs(wanted - 1) >= SNAP) {
-			notes.push(`Saturation ${round(wanted)} was clamped to ${preset.saturation}.`);
+			notes.push(
+				`Saturation ${round(wanted)} was clamped to ${preset.saturation}.`,
+			);
 		}
-		if (curve) notes.push("Chroma was read after undoing the measured tone response.");
+		if (curve)
+			notes.push("Chroma was read after undoing the measured tone response.");
 	} else {
 		notes.push("No chroma chart: saturation left at its default.");
 	}

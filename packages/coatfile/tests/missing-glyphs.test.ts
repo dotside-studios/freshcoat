@@ -66,7 +66,12 @@ describe("findMissingGlyphs", () => {
 		expect(
 			check({ name: "Hana 山田", city: "Kyoto", motto: "Ship it 🚀" }),
 		).toEqual([
-			{ frame: "front", id: "name", text: "Hana 山田", codepoints: [0x5c71, 0x7530] },
+			{
+				frame: "front",
+				id: "name",
+				text: "Hana 山田",
+				codepoints: [0x5c71, 0x7530],
+			},
 			{ frame: "back", id: "motto", text: "Ship it 🚀", codepoints: [0x1f680] },
 		]);
 	});

@@ -231,8 +231,7 @@ export function jpegIccProfile(b: Uint8Array): Uint8Array | "none" | "invalid" {
  *  RGB, 4 for CMYK, or null when the header is not a profile's or names
  *  another space. */
 export function iccComponents(profile: Uint8Array): number | null {
-	if (profile.length < 128 || u32be(profile, 0) !== profile.length)
-		return null;
+	if (profile.length < 128 || u32be(profile, 0) !== profile.length) return null;
 	if (ascii(profile, 36, 4) !== "acsp") return null;
 	switch (ascii(profile, 16, 4)) {
 		case "GRAY":

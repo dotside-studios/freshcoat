@@ -22,7 +22,6 @@ import { createRenderer, type Renderer } from "../src/renderer";
 import type { GradientFill } from "../src/types";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
 const geist = testFontBytes("Geist-Regular.ttf");
@@ -119,11 +118,20 @@ const content = (bytes: Uint8Array) =>
 const pdftoppm = spawnSync("pdftoppm", ["-v"]).status === 0;
 const pdftotext = spawnSync("pdftotext", ["-v"]).status === 0;
 
-function poppler(tool: string, args: string[], bytes: Uint8Array, out?: string) {
+function poppler(
+	tool: string,
+	args: string[],
+	bytes: Uint8Array,
+	out?: string,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "freshcoat-pdf-"));
 	try {
 		writeFileSync(join(dir, "page.pdf"), bytes);
-		const run = spawnSync(tool, [...args, join(dir, "page.pdf"), out ? join(dir, out) : "-"]);
+		const run = spawnSync(tool, [
+			...args,
+			join(dir, "page.pdf"),
+			out ? join(dir, out) : "-",
+		]);
 		expect(run.status).toBe(0);
 		return out
 			? new Uint8Array(readFileSync(join(dir, `${out}.png`)))
@@ -142,13 +150,19 @@ async function difference(
 	const opts = { width: W, height: H, images };
 	const png = await renderer.render(node, opts);
 	const pdf = await renderer.renderPdf(node, opts);
-	const page = poppler("pdftoppm", ["-png", "-r", "72", "-singlefile"], pdf.bytes, "page");
+	const page = poppler(
+		"pdftoppm",
+		["-png", "-r", "72", "-singlefile"],
+		pdf.bytes,
+		"page",
+	);
 	const a = decodePixels(ck, png.bytes);
 	const b = decodePixels(ck, page);
 	if (!a || !b) throw new Error("decode failed");
 	let sum = 0;
 	for (let i = 0; i < a.data.length; i++)
-		if (i % 4 !== 3) sum += Math.abs((a.data[i] as number) - (b.data[i] as number));
+		if (i % 4 !== 3)
+			sum += Math.abs((a.data[i] as number) - (b.data[i] as number));
 	return sum / ((a.data.length / 4) * 3);
 }
 
@@ -204,14 +218,24 @@ describe("gradients as shadings", () => {
 		stops: stops("#ffffff", "#2a9d8f"),
 	};
 	const radials = frame([
-		createRect({ pos: { x: 5, y: 10 }, size: { width: 90, height: 100 }, fills: [ellipse] }),
-		createRect({ pos: { x: 105, y: 10 }, size: { width: 90, height: 100 }, fills: [focal] }),
+		createRect({
+			pos: { x: 5, y: 10 },
+			size: { width: 90, height: 100 },
+			fills: [ellipse],
+		}),
+		createRect({
+			pos: { x: 105, y: 10 },
+			size: { width: 90, height: 100 },
+			fills: [focal],
+		}),
 	]);
 
 	test("draws an elliptical gradient as a circle under a matrix, and a focal one from its focus", async () => {
 		const { body, page } = await vectors(radials);
 		expect(body).toContain("/ShadingType 3 /Coords [50 60 0 50 60 50]");
-		expect(page).toMatch(/0\.866 0\.5 -0\.5 0\.866 [-\d.]+ [-\d.]+ cm\n1 0 0 0\.4 0 36 cm\n\/S\d+ sh/);
+		expect(page).toMatch(
+			/0\.866 0\.5 -0\.5 0\.866 [-\d.]+ [-\d.]+ cm\n1 0 0 0\.4 0 36 cm\n\/S\d+ sh/,
+		);
 		expect(body).toContain("/ShadingType 3 /Coords [132 45 5 150 60 40]");
 	});
 
@@ -238,7 +262,13 @@ describe("strokes", () => {
 			pos: { x: 90, y: 10 },
 			size: { width: 90, height: 40 },
 			cornerRadius: 8,
-			stroke: { color: "#000", width: 4, gradient, dash: [10, 4, 2, 4], cap: "round" },
+			stroke: {
+				color: "#000",
+				width: 4,
+				gradient,
+				dash: [10, 4, 2, 4],
+				cap: "round",
+			},
 		}),
 		createRect({
 			pos: { x: 10, y: 80 },
@@ -248,7 +278,13 @@ describe("strokes", () => {
 		createEllipse({
 			pos: { x: 90, y: 60 },
 			size: { width: 50, height: 50 },
-			stroke: { color: "#e76f51", width: 4, trimStart: 0.1, trimEnd: 0.7, trimOffset: 0.6 },
+			stroke: {
+				color: "#e76f51",
+				width: 4,
+				trimStart: 0.1,
+				trimEnd: 0.7,
+				trimOffset: 0.6,
+			},
 		}),
 		createPath({
 			pos: { x: 150, y: 60 },
@@ -260,13 +296,21 @@ describe("strokes", () => {
 
 	test("draws gradient strokes as the gradient through the stroke's outline", async () => {
 		const { page } = await vectors(stroked);
-		expect(page.match(/ c\n(?:[^\n]* [lc]\n)*h\n(?:[^\n]*\n)*?W n\n(?:[^\n]* cm\n)*(?:\/G\d+ gs\n)?\/S\d+ sh/g)?.length).toBe(3);
+		expect(
+			page.match(
+				/ c\n(?:[^\n]* [lc]\n)*h\n(?:[^\n]*\n)*?W n\n(?:[^\n]* cm\n)*(?:\/G\d+ gs\n)?\/S\d+ sh/g,
+			)?.length,
+		).toBe(3);
 	});
 
 	test("draws a trimmed stroke as the cut outline, stroked", async () => {
 		const { page } = await vectors(stroked);
-		expect(page).toContain("0.149 0.2745 0.3255 RG\n3 w 1 J 0 j 4 M\n10 80 m\n70 80 l\n70 110 l\n52 110 l\nS");
-		expect(page).toMatch(/0\.9059 0\.4353 0\.3176 RG\n4 w 0 J 0 j 4 M\n[-\d.]+ [-\d.]+ m\n(?:[^\n]* c\n)+S/);
+		expect(page).toContain(
+			"0.149 0.2745 0.3255 RG\n3 w 1 J 0 j 4 M\n10 80 m\n70 80 l\n70 110 l\n52 110 l\nS",
+		);
+		expect(page).toMatch(
+			/0\.9059 0\.4353 0\.3176 RG\n4 w 0 J 0 j 4 M\n[-\d.]+ [-\d.]+ m\n(?:[^\n]* c\n)+S/,
+		);
 	});
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {
@@ -316,7 +360,9 @@ describe("spot colours", () => {
 		);
 		expect(body).toContain("/CS1 [/Separation /White /DeviceRGB");
 		expect(body.match(/\/Separation /g)?.length).toBe(2);
-		expect(body).toMatch(/\/ColorSpace <<\/DefaultRGB \[\/ICCBased \d+ 0 R\] \/CS0/);
+		expect(body).toMatch(
+			/\/ColorSpace <<\/DefaultRGB \[\/ICCBased \d+ 0 R\] \/CS0/,
+		);
 		expect(body).toMatch(/\/G\d+ <<\/OP true \/op true \/OPM 1>>/);
 	});
 
@@ -324,13 +370,18 @@ describe("spot colours", () => {
 		const { page } = await vectors(inked);
 		expect(page).toMatch(/\/G\d+ gs\n\/CS0 cs 1 scn\n10 10 80 40 re\nf\n/);
 		expect(page).toContain("q\n/CS1 CS 0.5 SCN\n2 w");
-		expect(page).toMatch(/\/G\d+ gs\n\/CS0 cs 1 scn\n(?:[^\n]* [ml]\n|h\n)+f\*\n/);
+		expect(page).toMatch(
+			/\/G\d+ gs\n\/CS0 cs 1 scn\n(?:[^\n]* [ml]\n|h\n)+f\*\n/,
+		);
 		expect(page).not.toContain("0.8314 0.6863 0.2157 rg");
 	});
 
-	test.skipIf(!pdftoppm)("matches the raster render in the alternate", async () => {
-		expect(await difference(inked)).toBeLessThan(2);
-	});
+	test.skipIf(!pdftoppm)(
+		"matches the raster render in the alternate",
+		async () => {
+			expect(await difference(inked)).toBeLessThan(2);
+		},
+	);
 
 	test("a raster render paints the alternate at the tint", async () => {
 		const png = await renderer.render(
@@ -464,25 +515,40 @@ describe("smoothed corners", () => {
 					...smoothed,
 				}),
 			],
-			{ pos: { x: 5, y: 10 }, size: { width: 90, height: 100 }, clip: true, ...smoothed },
+			{
+				pos: { x: 5, y: 10 },
+				size: { width: 90, height: 100 },
+				clip: true,
+				...smoothed,
+			},
 		),
 		createImage({
 			pos: { x: 105, y: 10 },
 			size: { width: 90, height: 100 },
 			src: "logo.svg",
 			fit: "cover",
-			mask: { kind: "rounded-rect", radius: smoothed.cornerRadius, smoothing: 0.6 },
+			mask: {
+				kind: "rounded-rect",
+				radius: smoothed.cornerRadius,
+				smoothing: 0.6,
+			},
 			stroke: { color: "#000", width: 3 },
 		}),
 	]);
 	const images = new Map([["logo.svg", logo]]);
 
 	test("keeps a smoothed frame and image outline as vector paths", async () => {
-		const pdf = await renderer.renderPdf(scene, { width: W, height: H, images });
+		const pdf = await renderer.renderPdf(scene, {
+			width: W,
+			height: H,
+			images,
+		});
 		expect(pdf.warnings).toEqual([]);
 		expect(latin1(pdf.bytes)).not.toContain("/Subtype /Image");
 		const page = streams(pdf.bytes).join("\n");
-		expect(page.match(/ c\n(?:[^\n]* [lc]\n)*h\n(?:[^\n]*\n)*?W n\n/g)?.length).toBeGreaterThanOrEqual(2);
+		expect(
+			page.match(/ c\n(?:[^\n]* [lc]\n)*h\n(?:[^\n]*\n)*?W n\n/g)?.length,
+		).toBeGreaterThanOrEqual(2);
 	});
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {
@@ -506,7 +572,12 @@ describe("per-side strokes", () => {
 				color: "#000",
 				width: 14,
 				sides,
-				gradient: { kind: "linear", from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, stops: stops("#e63946", "#457b9d") },
+				gradient: {
+					kind: "linear",
+					from: { x: 0, y: 0 },
+					to: { x: 1, y: 1 },
+					stops: stops("#e63946", "#457b9d"),
+				},
 			},
 		}),
 		createRect({
@@ -519,19 +590,29 @@ describe("per-side strokes", () => {
 		createRect({
 			pos: { x: 110, y: 70 },
 			size: { width: 80, height: 40 },
-			stroke: { color: "#e76f51", width: 14, sides, dash: [8, 4], align: "inside" },
+			stroke: {
+				color: "#e76f51",
+				width: 14,
+				sides,
+				dash: [8, 4],
+				align: "inside",
+			},
 		}),
 	]);
 
 	test("fills the band as one even-odd path", async () => {
 		const { page } = await vectors(banded);
-		expect(page).toContain("0.1137 0.2078 0.3412 rg\n10 10 m\n90 10 l\n90 50 l\n10 50 l\n10 10 l\nh\n10 12 m\n82 12 l\n82 36 l\n10 36 l\n10 12 l\nh\nf*");
+		expect(page).toContain(
+			"0.1137 0.2078 0.3412 rg\n10 10 m\n90 10 l\n90 50 l\n10 50 l\n10 10 l\nh\n10 12 m\n82 12 l\n82 36 l\n10 36 l\n10 12 l\nh\nf*",
+		);
 		expect(page).toMatch(/W\* n\n(?:[^\n]* cm\n)*\/S\d+ sh/);
 	});
 
 	test("dashes along the band, clipped to it", async () => {
 		const { page } = await vectors(banded);
-		expect(page).toMatch(/h\nW\* n\nq\n[^\n]* RG\n28 w 0 J 0 j 4 M\n\[8 4\] 0 d\n/);
+		expect(page).toMatch(
+			/h\nW\* n\nq\n[^\n]* RG\n28 w 0 J 0 j 4 M\n\[8 4\] 0 d\n/,
+		);
 	});
 
 	test.skipIf(!pdftoppm)("matches the raster render", async () => {
@@ -540,7 +621,12 @@ describe("per-side strokes", () => {
 });
 
 describe("text in WOFF and variable fonts", () => {
-	const line = (family: string, weight: 300 | 400 | 700, value: string, y: number) =>
+	const line = (
+		family: string,
+		weight: 300 | 400 | 700,
+		value: string,
+		y: number,
+	) =>
 		createText({
 			pos: { x: 8, y },
 			size: { width: 184, height: 30 },
@@ -588,7 +674,13 @@ describe("text in WOFF and variable fonts", () => {
 });
 
 describe("text on a curve", () => {
-	const font = { family: "Geist", weight: 400, style: "normal", size: 16, lineHeight: 1.2 } as const;
+	const font = {
+		family: "Geist",
+		weight: 400,
+		style: "normal",
+		size: 16,
+		lineHeight: 1.2,
+	} as const;
 	const scene = frame([
 		createText({
 			pos: { x: 10, y: 10 },
@@ -604,21 +696,32 @@ describe("text on a curve", () => {
 			text: "Wavy",
 			font: { ...font, family: "Vend", weight: 700 },
 			color: "#1d3557",
-			path: { d: "M0 60 C20 0 60 0 80 60", startOffset: 0, side: "left", align: "start" },
+			path: {
+				d: "M0 60 C20 0 60 0 80 60",
+				startOffset: 0,
+				side: "left",
+				align: "start",
+			},
 		}),
 	]);
 
 	test("places each glyph along the curve in its embedded font", async () => {
 		const { body, page } = await vectors(scene);
 		expect(body.match(/\/FontFile2/g)).toHaveLength(2);
-		const placed = page.match(/[-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ Tm\n\[<[0-9a-f]{4}>\] TJ/g);
+		const placed = page.match(
+			/[-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ Tm\n\[<[0-9a-f]{4}>\] TJ/g,
+		);
 		expect(placed?.length).toBe("Around the ring".length + "Wavy".length);
-		expect(page).toMatch(/RG\n[\d.]+ w 0 J 0 j 4 M\n[-\d.]+ [-\d.]+ m\n(?:[^\n]* c\n)+S/);
+		expect(page).toMatch(
+			/RG\n[\d.]+ w 0 J 0 j 4 M\n[-\d.]+ [-\d.]+ m\n(?:[^\n]* c\n)+S/,
+		);
 	});
 
 	test.skipIf(!pdftotext)("keeps the text selectable", async () => {
 		const pdf = await renderer.renderPdf(scene, { width: W, height: H });
-		const text = new TextDecoder().decode(poppler("pdftotext", [], pdf.bytes)).replace(/\s/g, "");
+		const text = new TextDecoder()
+			.decode(poppler("pdftotext", [], pdf.bytes))
+			.replace(/\s/g, "");
 		expect(text).toContain("Wavy");
 	});
 
@@ -633,16 +736,30 @@ describe("stroked text", () => {
 			pos: { x: 10, y },
 			size: { width: 180, height: 36 },
 			text: `Ink ${align}`,
-			font: { family: "Geist", weight: 400, style: "normal", size: 28, lineHeight: 1.2 },
+			font: {
+				family: "Geist",
+				weight: 400,
+				style: "normal",
+				size: 28,
+				lineHeight: 1.2,
+			},
 			color: "#1d3557",
 			stroke: { color: "#e63946", width: 1.5, join: "round", align },
 		});
-	const scene = frame([stroked("center", 2), stroked("outside", 40), stroked("inside", 78)]);
+	const scene = frame([
+		stroked("center", 2),
+		stroked("outside", 40),
+		stroked("inside", 78),
+	]);
 
 	test("strokes the glyphs with a text render mode", async () => {
 		const { page } = await vectors(scene);
-		expect(page).toContain("0.902 0.2235 0.2745 RG\n1.5 w 0 J 1 j 4 M\nBT\n1 Tr\n");
-		expect(page).toContain("0.902 0.2235 0.2745 RG\n3 w 0 J 1 j 4 M\nBT\n1 Tr\n");
+		expect(page).toContain(
+			"0.902 0.2235 0.2745 RG\n1.5 w 0 J 1 j 4 M\nBT\n1 Tr\n",
+		);
+		expect(page).toContain(
+			"0.902 0.2235 0.2745 RG\n3 w 0 J 1 j 4 M\nBT\n1 Tr\n",
+		);
 		expect(page).toMatch(/BT\n7 Tr\n(?:[^\n]*\n)*?ET\nq\n[^\n]* RG\n3 w/);
 	});
 
@@ -653,20 +770,35 @@ describe("stroked text", () => {
 					pos: { x: 10, y: 10 },
 					size: { width: 180, height: 36 },
 					text: "Ink",
-					font: { family: "Geist", weight: 400, style: "normal", size: 28, lineHeight: 1.2 },
+					font: {
+						family: "Geist",
+						weight: 400,
+						style: "normal",
+						size: 28,
+						lineHeight: 1.2,
+					},
 					color: "#1d3557",
 					id: "ink",
 					stroke: {
 						color: "#000",
 						width: 2,
-						gradient: { kind: "linear", from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, stops: stops("#000", "#fff") },
+						gradient: {
+							kind: "linear",
+							from: { x: 0, y: 0 },
+							to: { x: 1, y: 0 },
+							stops: stops("#000", "#fff"),
+						},
 					},
 				}),
 			]),
 			{ width: W, height: H },
 		);
 		expect(pdf.warnings).toEqual([
-			{ kind: "vector_rasterized", feature: "gradient text stroke", layer: "ink" },
+			{
+				kind: "vector_rasterized",
+				feature: "gradient text stroke",
+				layer: "ink",
+			},
 		]);
 	});
 

@@ -54,9 +54,9 @@ Follow the [repository guide](../../CONTRIBUTING.md) for setup and review checks
    colors, so both themes work.
 3. The package's wildcard exports expose components as `@freshcoat-js/ui/<name>`.
    Show the component in `src/gallery.tsx`, Studio's `/kit` route, in both themes.
-4. Test behavior beyond markup under `src/tests/`. Run `test`, `typecheck`
-   and `check` from this directory, plus relevant Studio tests when a shared
-   interaction changes.
+4. Test behavior beyond markup under `src/tests/`. Run `test` and `typecheck`
+   from this directory and `bun run check` from the repository root, plus
+   relevant Studio tests when a shared interaction changes.
 
 ## License
 

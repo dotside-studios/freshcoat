@@ -89,12 +89,16 @@ type ShapeGeometry = { segs: Segment[]; box?: Box | null };
 // bounds and lowering never re-read its `d`.
 const geometries = new WeakMap<SvgShape, ShapeGeometry>();
 
-function makeShape(segs: Segment[], fields: Omit<SvgShape, "kind" | "d">): SvgShape {
+function makeShape(
+	segs: Segment[],
+	fields: Omit<SvgShape, "kind" | "d">,
+): SvgShape {
 	let d: string | undefined;
 	const shape: SvgShape = {
 		kind: "shape",
 		get d() {
-			return (d ??= serializePath(segs));
+			d ??= serializePath(segs);
+			return d;
 		},
 		...fields,
 	};
@@ -104,7 +108,10 @@ function makeShape(segs: Segment[], fields: Omit<SvgShape, "kind" | "d">): SvgSh
 
 function geometryOf(shape: SvgShape): ShapeGeometry {
 	let g = geometries.get(shape);
-	if (!g) geometries.set(shape, (g = { segs: normalizePath(shape.d) }));
+	if (!g) {
+		g = { segs: normalizePath(shape.d) };
+		geometries.set(shape, g);
+	}
 	return g;
 }
 
@@ -173,7 +180,12 @@ export type SvgFilterPrimitive = { linear: boolean } & (
 			in: SvgFilterInput;
 			in2: SvgFilterInput;
 	  }
-	| { kind: "blend"; mode: SvgBlendMode; in: SvgFilterInput; in2: SvgFilterInput }
+	| {
+			kind: "blend";
+			mode: SvgBlendMode;
+			in: SvgFilterInput;
+			in2: SvgFilterInput;
+	  }
 );
 
 export type SvgFilter = {
@@ -376,9 +388,10 @@ export function parseLength(
 	axis: Axis,
 	viewport: Viewport,
 ): number | undefined {
-	const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*([a-z%]*)\s*$/i.exec(
-		value ?? "",
-	);
+	const m =
+		/^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*([a-z%]*)\s*$/i.exec(
+			value ?? "",
+		);
 	if (!m) return undefined;
 	const n = Number(m[1]);
 	const unit = (m[2] ?? "").toLowerCase();
@@ -396,7 +409,10 @@ export function parseLength(
 }
 
 function parseViewBox(value: string | undefined): Box | null {
-	const parts = (value ?? "").trim().split(/[\s,]+/).map(Number);
+	const parts = (value ?? "")
+		.trim()
+		.split(/[\s,]+/)
+		.map(Number);
 	if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null;
 	const [x = 0, y = 0, width = 0, height = 0] = parts;
 	return width > 0 && height > 0 ? { x, y, width, height } : null;
@@ -464,7 +480,12 @@ function itemBounds(item: SvgItem): Box | null {
 		case "text": {
 			const size = Math.max(...item.runs.map((r) => r.font.size));
 			const width = estimateTextWidth(item.runs);
-			const shift = item.anchor === "middle" ? width / 2 : item.anchor === "end" ? width : 0;
+			const shift =
+				item.anchor === "middle"
+					? width / 2
+					: item.anchor === "end"
+						? width
+						: 0;
 			return { x: item.x - shift, y: item.y - size, width, height: size * 1.2 };
 		}
 	}
@@ -613,7 +634,10 @@ export function parseSvg(markup: string): SvgDrawing {
 			if (!Number.isFinite(offset)) offset = 0;
 			offset = Math.max(last, Math.min(1, Math.max(0, offset)));
 			last = offset;
-			const color = parseColor(style["stop-color"] ?? "black", currentColor(style));
+			const color = parseColor(
+				style["stop-color"] ?? "black",
+				currentColor(style),
+			);
 			const rgba: Rgba = Array.isArray(color) ? color : [0, 0, 0, 0];
 			stops.push({
 				offset,
@@ -633,7 +657,8 @@ export function parseSvg(markup: string): SvgDrawing {
 	): SvgPaint | undefined => {
 		const chain = gradientChain(el);
 		const attr = (name: string) => {
-			for (const g of chain) if (g.attrs[name] !== undefined) return g.attrs[name];
+			for (const g of chain)
+				if (g.attrs[name] !== undefined) return g.attrs[name];
 			return undefined;
 		};
 		const stops = gradientStops(chain, opacity, style);
@@ -746,7 +771,8 @@ export function parseSvg(markup: string): SvgDrawing {
 		);
 		if (!paint) return undefined;
 		const k = lengthScale(m);
-		const width = (parseLength(style["stroke-width"] ?? "1", "d", viewport) ?? 1) * k;
+		const width =
+			(parseLength(style["stroke-width"] ?? "1", "d", viewport) ?? 1) * k;
 		if (!(width > 0)) return undefined;
 		const stroke: SvgStroke =
 			paint.kind === "solid"
@@ -799,7 +825,8 @@ export function parseSvg(markup: string): SvgDrawing {
 			family,
 			size: size * k,
 			weight,
-			style: fontStyle === "italic" || fontStyle === "oblique" ? "italic" : "normal",
+			style:
+				fontStyle === "italic" || fontStyle === "oblique" ? "italic" : "normal",
 		};
 	};
 
@@ -811,7 +838,10 @@ export function parseSvg(markup: string): SvgDrawing {
 	): SvgText[] => {
 		const { sx, sy, rotation, similar } = decompose(m);
 		if (!similar || Math.abs(sx - sy) > 1e-9 * Math.max(1, sx))
-			warn("text-transform", "skewed, mirrored or stretched text is drawn upright");
+			warn(
+				"text-transform",
+				"skewed, mirrored or stretched text is drawn upright",
+			);
 		const k = Math.sqrt(sx * sy);
 		type Line = {
 			x: number;
@@ -823,10 +853,18 @@ export function parseSvg(markup: string): SvgDrawing {
 		const lines: Line[] = [];
 		let line: Line | null = null;
 		const first = (node: XmlElement, attr: string, axis: Axis) => {
-			const values = (node.attrs[attr] ?? "").trim().split(/[\s,]+/).filter(Boolean);
+			const values = (node.attrs[attr] ?? "")
+				.trim()
+				.split(/[\s,]+/)
+				.filter(Boolean);
 			if (values.length > 1)
-				warn("text-glyph-position", "per-character positions use the first only");
-			return values[0] === undefined ? undefined : parseLength(values[0], axis, ctx.viewport);
+				warn(
+					"text-glyph-position",
+					"per-character positions use the first only",
+				);
+			return values[0] === undefined
+				? undefined
+				: parseLength(values[0], axis, ctx.viewport);
 		};
 		const anchorOf = (s: Declarations): SvgText["anchor"] => {
 			const a = s["text-anchor"];
@@ -837,10 +875,15 @@ export function parseSvg(markup: string): SvgDrawing {
 			if (node.attrs.path !== undefined) segs = normalizePath(node.attrs.path);
 			else {
 				const href = (node.attrs.href ?? node.attrs["xlink:href"])?.trim();
-				const target = href?.startsWith("#") ? byId.get(href.slice(1)) : undefined;
+				const target = href?.startsWith("#")
+					? byId.get(href.slice(1))
+					: undefined;
 				const name = target ? localName(target.name) : "";
 				if (!target || !TEXT_PATH_SHAPES.has(name)) {
-					warn("textPath", `<textPath> "${href ?? ""}" is not a shape in the document; its text is skipped`);
+					warn(
+						"textPath",
+						`<textPath> "${href ?? ""}" is not a shape in the document; its text is skipped`,
+					);
 					return null;
 				}
 				segs = shapeSegments(target, name, ctx.viewport);
@@ -874,7 +917,10 @@ export function parseSvg(markup: string): SvgDrawing {
 			if (!line || moved) {
 				const drawn = line?.runs.some((r) => r.text.trim()) ?? false;
 				if (line && drawn && x === undefined)
-					warn("text-position", "a tspan placed after text on its line starts at the line's x");
+					warn(
+						"text-position",
+						"a tspan placed after text on its line starts at the line's x",
+					);
 				const next: Line = {
 					x: (x ?? line?.x ?? 0) + dx,
 					y: (y ?? line?.y ?? 0) + dy,
@@ -887,7 +933,8 @@ export function parseSvg(markup: string): SvgDrawing {
 			}
 			for (const c of node.children) {
 				if ("text" in c) {
-					if (own.visibility === "hidden" || own.visibility === "collapse") continue;
+					if (own.visibility === "hidden" || own.visibility === "collapse")
+						continue;
 					const paint = resolvePaint(
 						own.fill ?? "black",
 						opacityOf(own["fill-opacity"]),
@@ -915,7 +962,13 @@ export function parseSvg(markup: string): SvgDrawing {
 					const path = textPathOf(c);
 					if (!path) continue;
 					const before: Line = line;
-					line = { x: before.x, y: before.y, anchor: anchorOf(childStyle), runs: [], path };
+					line = {
+						x: before.x,
+						y: before.y,
+						anchor: anchorOf(childStyle),
+						runs: [],
+						path,
+					};
 					lines.push(line);
 					visit(c, childStyle, depth + 1);
 					line = { x: before.x, y: before.y, anchor: before.anchor, runs: [] };
@@ -968,7 +1021,12 @@ export function parseSvg(markup: string): SvgDrawing {
 			return href.includes(";base64,") ? href.replace(/\s+/g, "") : href;
 		if (href.startsWith("#")) {
 			const target = byId.get(href.slice(1));
-			if (target && target !== el && depth < MAX_DEPTH && localName(target.name) === "image")
+			if (
+				target &&
+				target !== el &&
+				depth < MAX_DEPTH &&
+				localName(target.name) === "image"
+			)
 				return imageHref(target, depth + 1);
 			warn("image-missing", `"${href}" is not an image in the document`);
 			return undefined;
@@ -1001,13 +1059,23 @@ export function parseSvg(markup: string): SvgDrawing {
 		let width = w * sx;
 		let height = h * sy;
 		if (!similar) {
-			warn("image-transform", "skewed or mirrored images are drawn upright in their bounds");
+			warn(
+				"image-transform",
+				"skewed or mirrored images are drawn upright in their bounds",
+			);
 			const b = pathBounds(
 				transformPath(normalizePath(`M${x} ${y}H${x + w}V${y + h}H${x}Z`), m),
 			) as Box;
-			[cx, cy, width, height] = [b.x + b.width / 2, b.y + b.height / 2, b.width, b.height];
+			[cx, cy, width, height] = [
+				b.x + b.width / 2,
+				b.y + b.height / 2,
+				b.width,
+				b.height,
+			];
 		}
-		const [align = "xMidYMid", meetOrSlice = "meet"] = (el.attrs.preserveAspectRatio ?? "")
+		const [align = "xMidYMid", meetOrSlice = "meet"] = (
+			el.attrs.preserveAspectRatio ?? ""
+		)
 			.trim()
 			.split(/\s+/)
 			.filter(Boolean);
@@ -1020,7 +1088,12 @@ export function parseSvg(markup: string): SvgDrawing {
 			y: cy - height / 2,
 			width,
 			height,
-			fit: align === "none" ? "fill" : meetOrSlice === "slice" ? "cover" : "contain",
+			fit:
+				align === "none"
+					? "fill"
+					: meetOrSlice === "slice"
+						? "cover"
+						: "contain",
 		};
 		if (el.attrs.id) image.id = el.attrs.id;
 		if (similar && rotation) image.rotation = rotation;
@@ -1036,7 +1109,8 @@ export function parseSvg(markup: string): SvgDrawing {
 	): SvgGroup | null => {
 		const chain = hrefChain(el, (name) => name === "pattern");
 		const attr = (name: string) => {
-			for (const p of chain) if (p.attrs[name] !== undefined) return p.attrs[name];
+			for (const p of chain)
+				if (p.attrs[name] !== undefined) return p.attrs[name];
 			return undefined;
 		};
 		const content = chain.find((p) => p.children.some((c) => !("text" in c)));
@@ -1080,7 +1154,10 @@ export function parseSvg(markup: string): SvgDrawing {
 		const j0 = Math.floor((Math.min(...ys) - y) / h);
 		const j1 = Math.ceil((Math.max(...ys) - y) / h);
 		if ((i1 - i0) * (j1 - j0) > MAX_TILES) {
-			warn("pattern-tiles", `patterns of more than ${MAX_TILES} tiles use their fallback color`);
+			warn(
+				"pattern-tiles",
+				`patterns of more than ${MAX_TILES} tiles use their fallback color`,
+			);
 			return null;
 		}
 		const contentStyle = computeStyle(content, rootStyle);
@@ -1090,7 +1167,13 @@ export function parseSvg(markup: string): SvgDrawing {
 				children.push(
 					...walkChildren(content, {
 						...ctx,
-						m: multiply(m, multiply(pt, multiply(translate(x + i * w, y + j * h), contentMatrix))),
+						m: multiply(
+							m,
+							multiply(
+								pt,
+								multiply(translate(x + i * w, y + j * h), contentMatrix),
+							),
+						),
 						style: contentStyle,
 						depth: ctx.depth + 1,
 						viewport: vb ?? ctx.viewport,
@@ -1115,7 +1198,8 @@ export function parseSvg(markup: string): SvgDrawing {
 	): SvgItem[] => {
 		const vertices = markerVertices(local);
 		if (vertices.length === 0) return [];
-		const strokeWidth = parseLength(style["stroke-width"] ?? "1", "d", ctx.viewport) ?? 1;
+		const strokeWidth =
+			parseLength(style["stroke-width"] ?? "1", "d", ctx.viewport) ?? 1;
 		const out: SvgItem[] = [];
 		const place = (position: "start" | "mid" | "end", at: MarkerVertex[]) => {
 			const ref = urlRef(style[`marker-${position}`] ?? style.marker);
@@ -1124,12 +1208,19 @@ export function parseSvg(markup: string): SvgDrawing {
 			if (!marker || localName(marker.name) !== "marker") return;
 			const key = `marker:${ref.id}`;
 			if (ctx.uses.has(key)) return;
-			const markerWidth = parseLength(marker.attrs.markerWidth ?? "3", "x", ctx.viewport) ?? 3;
-			const markerHeight = parseLength(marker.attrs.markerHeight ?? "3", "y", ctx.viewport) ?? 3;
+			const markerWidth =
+				parseLength(marker.attrs.markerWidth ?? "3", "x", ctx.viewport) ?? 3;
+			const markerHeight =
+				parseLength(marker.attrs.markerHeight ?? "3", "y", ctx.viewport) ?? 3;
 			if (!(markerWidth > 0 && markerHeight > 0)) return;
 			const vb = parseViewBox(marker.attrs.viewBox);
 			const vbm = vb
-				? viewBoxMatrix(vb, markerWidth, markerHeight, marker.attrs.preserveAspectRatio)
+				? viewBoxMatrix(
+						vb,
+						markerWidth,
+						markerHeight,
+						marker.attrs.preserveAspectRatio,
+					)
 				: IDENTITY;
 			const markerViewport = vb ?? { width: markerWidth, height: markerHeight };
 			const [refX, refY] = applyMatrix(
@@ -1137,7 +1228,8 @@ export function parseSvg(markup: string): SvgDrawing {
 				parseLength(marker.attrs.refX, "x", markerViewport) ?? 0,
 				parseLength(marker.attrs.refY, "y", markerViewport) ?? 0,
 			);
-			const units = marker.attrs.markerUnits === "userSpaceOnUse" ? 1 : strokeWidth;
+			const units =
+				marker.attrs.markerUnits === "userSpaceOnUse" ? 1 : strokeWidth;
 			const orient = (marker.attrs.orient ?? "0").trim();
 			const fixed = parseAngle(orient);
 			const markerStyle = computeStyle(marker, rootStyle);
@@ -1155,7 +1247,10 @@ export function parseSvg(markup: string): SvgDrawing {
 					m,
 					multiply(
 						translate(v.x, v.y),
-						multiply(rotate(angle), multiply(scale(units), multiply(translate(-refX, -refY), vbm))),
+						multiply(
+							rotate(angle),
+							multiply(scale(units), multiply(translate(-refX, -refY), vbm)),
+						),
 					),
 				);
 				out.push(
@@ -1233,7 +1328,8 @@ export function parseSvg(markup: string): SvgDrawing {
 				}
 				if (pts.length < 4) return [];
 				let d = `M${pts[0]} ${pts[1]}`;
-				for (let i = 2; i + 1 < pts.length; i += 2) d += `L${pts[i]} ${pts[i + 1]}`;
+				for (let i = 2; i + 1 < pts.length; i += 2)
+					d += `L${pts[i]} ${pts[i + 1]}`;
 				return normalizePath(name === "polygon" ? `${d}Z` : d);
 			}
 		}
@@ -1299,23 +1395,36 @@ export function parseSvg(markup: string): SvgDrawing {
 		const clip = ref?.id ? byId.get(ref.id) : undefined;
 		if (!clip || localName(clip.name) !== "clipPath") return undefined;
 		let cm = m;
-		if (clip.attrs.transform) cm = multiply(cm, parseTransform(clip.attrs.transform));
+		if (clip.attrs.transform)
+			cm = multiply(cm, parseTransform(clip.attrs.transform));
 		if (clip.attrs.clipPathUnits === "objectBoundingBox") {
 			const b = boundsOf(content);
 			if (!b) return [];
-			cm = multiply(bboxMatrix(b), clip.attrs.transform ? parseTransform(clip.attrs.transform) : IDENTITY);
+			cm = multiply(
+				bboxMatrix(b),
+				clip.attrs.transform ? parseTransform(clip.attrs.transform) : IDENTITY,
+			);
 		}
 		const clipStyle = computeStyle(clip, ctx.style);
 		const out: SvgShape[] = [];
-		const collect = (el: XmlElement, style: Declarations, mm: Matrix, depth: number) => {
+		const collect = (
+			el: XmlElement,
+			style: Declarations,
+			mm: Matrix,
+			depth: number,
+		) => {
 			if (depth > MAX_DEPTH) return;
 			const name = localName(el.name);
 			const own = computeStyle(el, style);
 			if (own.display === "none") return;
-			const em = el.attrs.transform ? multiply(mm, parseTransform(el.attrs.transform)) : mm;
+			const em = el.attrs.transform
+				? multiply(mm, parseTransform(el.attrs.transform))
+				: mm;
 			if (name === "use") {
 				const href = el.attrs.href ?? el.attrs["xlink:href"];
-				const target = href?.startsWith("#") ? byId.get(href.slice(1)) : undefined;
+				const target = href?.startsWith("#")
+					? byId.get(href.slice(1))
+					: undefined;
 				if (!target || target === el) return;
 				const x = parseLength(el.attrs.x, "x", ctx.viewport) ?? 0;
 				const y = parseLength(el.attrs.y, "y", ctx.viewport) ?? 0;
@@ -1375,7 +1484,9 @@ export function parseSvg(markup: string): SvgDrawing {
 				else if (item.kind === "shape") add(segmentsOf(item));
 				else {
 					const b = itemBounds(item) as Box;
-					add(normalizePath(`M${b.x} ${b.y}h${b.width}v${b.height}h${-b.width}Z`));
+					add(
+						normalizePath(`M${b.x} ${b.y}h${b.width}v${b.height}h${-b.width}Z`),
+					);
 				}
 			}
 		};
@@ -1404,7 +1515,8 @@ export function parseSvg(markup: string): SvgDrawing {
 		}
 		const chain = hrefChain(target, (name) => name === "filter");
 		const attr = (name: string) => {
-			for (const f of chain) if (f.attrs[name] !== undefined) return f.attrs[name];
+			for (const f of chain)
+				if (f.attrs[name] !== undefined) return f.attrs[name];
 			return undefined;
 		};
 		const owner = chain.find((f) => f.children.some((c) => !("text" in c)));
@@ -1417,16 +1529,20 @@ export function parseSvg(markup: string): SvgDrawing {
 			return bbox;
 		};
 		const fraction = (raw: string) =>
-			raw.trim().endsWith("%") ? Number.parseFloat(raw) / 100 : (numberOf(raw) ?? 0);
+			raw.trim().endsWith("%")
+				? Number.parseFloat(raw) / 100
+				: (numberOf(raw) ?? 0);
 
 		let region: Box;
-		const regionAttr = (name: string, fallback: string) => attr(name) ?? fallback;
+		const regionAttr = (name: string, fallback: string) =>
+			attr(name) ?? fallback;
 		if (attr("filterUnits") === "userSpaceOnUse") {
 			region = {
 				x: parseLength(regionAttr("x", "-10%"), "x", ctx.viewport) ?? 0,
 				y: parseLength(regionAttr("y", "-10%"), "y", ctx.viewport) ?? 0,
 				width: parseLength(regionAttr("width", "120%"), "x", ctx.viewport) ?? 0,
-				height: parseLength(regionAttr("height", "120%"), "y", ctx.viewport) ?? 0,
+				height:
+					parseLength(regionAttr("height", "120%"), "y", ctx.viewport) ?? 0,
 			};
 		} else {
 			const b = bounds();
@@ -1447,8 +1563,15 @@ export function parseSvg(markup: string): SvgDrawing {
 		}
 		const unitX = () => (bboxUnits ? (bounds() as Box).width : 1);
 		const unitY = () => (bboxUnits ? (bounds() as Box).height : 1);
-		const pair = (raw: string | undefined, fallback: number): [number, number] => {
-			const n = (raw ?? "").trim().split(/[\s,]+/).filter(Boolean).map(Number);
+		const pair = (
+			raw: string | undefined,
+			fallback: number,
+		): [number, number] => {
+			const n = (raw ?? "")
+				.trim()
+				.split(/[\s,]+/)
+				.filter(Boolean)
+				.map(Number);
 			const a = n[0] !== undefined && Number.isFinite(n[0]) ? n[0] : fallback;
 			const b = n[1] !== undefined && Number.isFinite(n[1]) ? n[1] : a;
 			return [a, b];
@@ -1458,12 +1581,16 @@ export function parseSvg(markup: string): SvgDrawing {
 		const primitives: SvgFilterPrimitive[] = [];
 		const results = new Map<string, number>();
 		const unsupported = (feature: string, what: string) => {
-			warn(`filter-${feature}`, `${what} is not supported, so the filter is not applied`);
+			warn(
+				`filter-${feature}`,
+				`${what} is not supported, so the filter is not applied`,
+			);
 			return undefined;
 		};
 		const input = (raw: string | undefined): SvgFilterInput | string => {
 			const v = raw?.trim();
-			const previous = primitives.length > 0 ? primitives.length - 1 : "SourceGraphic";
+			const previous =
+				primitives.length > 0 ? primitives.length - 1 : "SourceGraphic";
 			if (!v) return previous;
 			if (v === "SourceGraphic" || v === "SourceAlpha") return v;
 			if (FILTER_SOURCES.has(v)) return v;
@@ -1474,7 +1601,9 @@ export function parseSvg(markup: string): SvgDrawing {
 			const name = localName(c.name);
 			if (!name.startsWith("fe")) continue;
 			const own = computeStyle(c, ownerStyle);
-			const space = (own["color-interpolation-filters"] ?? "linearRGB").toLowerCase();
+			const space = (
+				own["color-interpolation-filters"] ?? "linearRGB"
+			).toLowerCase();
 			const linear = space !== "srgb" && space !== "auto";
 			const inputs: (SvgFilterInput | string)[] = [];
 			const take = (raw: string | undefined) => {
@@ -1483,15 +1612,27 @@ export function parseSvg(markup: string): SvgDrawing {
 				return i as SvgFilterInput;
 			};
 			const flood = () => {
-				const color = parseColor(own["flood-color"] ?? "black", currentColor(own));
-				return toHex(Array.isArray(color) ? color : [0, 0, 0, 1], opacityOf(own["flood-opacity"]));
+				const color = parseColor(
+					own["flood-color"] ?? "black",
+					currentColor(own),
+				);
+				return toHex(
+					Array.isArray(color) ? color : [0, 0, 0, 1],
+					opacityOf(own["flood-opacity"]),
+				);
 			};
 			let p: SvgFilterPrimitive;
 			switch (name) {
 				case "feGaussianBlur": {
 					let [sx, sy] = pair(c.attrs.stdDeviation, 0);
 					if (sx < 0 || sy < 0) [sx, sy] = [0, 0];
-					p = { kind: "blur", in: take(c.attrs.in), sx: sx * unitX(), sy: sy * unitY(), linear };
+					p = {
+						kind: "blur",
+						in: take(c.attrs.in),
+						sx: sx * unitX(),
+						sy: sy * unitY(),
+						linear,
+					};
 					break;
 				}
 				case "feOffset":
@@ -1538,7 +1679,11 @@ export function parseSvg(markup: string): SvgDrawing {
 				}
 				case "feComposite": {
 					const operator = (c.attrs.operator ?? "over").trim();
-					if (operator === "arithmetic") return unsupported("feComposite-arithmetic", '<feComposite operator="arithmetic">');
+					if (operator === "arithmetic")
+						return unsupported(
+							"feComposite-arithmetic",
+							'<feComposite operator="arithmetic">',
+						);
 					p = {
 						kind: "composite",
 						operator: COMPOSITE_OPERATORS.has(operator)
@@ -1564,7 +1709,9 @@ export function parseSvg(markup: string): SvgDrawing {
 				default:
 					return unsupported(name, `<${name}>`);
 			}
-			const source = inputs.find((i) => typeof i === "string" && FILTER_SOURCES.has(i));
+			const source = inputs.find(
+				(i) => typeof i === "string" && FILTER_SOURCES.has(i),
+			);
 			if (source) return unsupported(source as string, `in="${source}"`);
 			if (c.attrs.result) results.set(c.attrs.result.trim(), primitives.length);
 			primitives.push(p);
@@ -1595,7 +1742,14 @@ export function parseSvg(markup: string): SvgDrawing {
 		if (!group && !filter && content.length === 1 && only.kind !== "group") {
 			if (opacity < 1) only.opacity = opacity;
 			if (!clip && !mask) return content;
-			return [{ kind: "group", ...(clip ? { clip } : {}), ...(mask ? { mask } : {}), children: content }];
+			return [
+				{
+					kind: "group",
+					...(clip ? { clip } : {}),
+					...(mask ? { mask } : {}),
+					children: content,
+				},
+			];
 		}
 		if (!group && !filter && !clip && !mask && opacity === 1) return content;
 		const g: SvgGroup = { kind: "group", children: content };
@@ -1659,12 +1813,16 @@ export function parseSvg(markup: string): SvgDrawing {
 				const x = parseLength(el.attrs.x, "x", ctx.viewport) ?? 0;
 				const y = parseLength(el.attrs.y, "y", ctx.viewport) ?? 0;
 				const w = parseLength(el.attrs.width ?? "100%", "x", ctx.viewport) ?? 0;
-				const h = parseLength(el.attrs.height ?? "100%", "y", ctx.viewport) ?? 0;
+				const h =
+					parseLength(el.attrs.height ?? "100%", "y", ctx.viewport) ?? 0;
 				if (!(w > 0 && h > 0)) return [];
 				const own = parseViewBox(el.attrs.viewBox);
 				const origin = multiply(ctx.m, translate(x, y));
 				const nm = own
-					? multiply(origin, viewBoxMatrix(own, w, h, el.attrs.preserveAspectRatio))
+					? multiply(
+							origin,
+							viewBoxMatrix(own, w, h, el.attrs.preserveAspectRatio),
+						)
 					: origin;
 				const children = walkChildren(el, {
 					...inner,
@@ -1703,18 +1861,33 @@ export function parseSvg(markup: string): SvgDrawing {
 				const y = parseLength(el.attrs.y, "y", ctx.viewport) ?? 0;
 				let um = multiply(m, translate(x, y));
 				const uses = new Set(ctx.uses);
-				for (let e: XmlElement | undefined = target; e && !uses.has(e); e = parents.get(e))
+				for (
+					let e: XmlElement | undefined = target;
+					e && !uses.has(e);
+					e = parents.get(e)
+				)
 					uses.add(e);
 				let content: SvgItem[];
 				if (localName(target.name) === "symbol") {
 					const tStyle = computeStyle(target, style);
 					const own = parseViewBox(target.attrs.viewBox);
 					const w =
-						parseLength(el.attrs.width ?? target.attrs.width ?? "100%", "x", ctx.viewport) ?? 0;
+						parseLength(
+							el.attrs.width ?? target.attrs.width ?? "100%",
+							"x",
+							ctx.viewport,
+						) ?? 0;
 					const h =
-						parseLength(el.attrs.height ?? target.attrs.height ?? "100%", "y", ctx.viewport) ?? 0;
+						parseLength(
+							el.attrs.height ?? target.attrs.height ?? "100%",
+							"y",
+							ctx.viewport,
+						) ?? 0;
 					if (own && w > 0 && h > 0)
-						um = multiply(um, viewBoxMatrix(own, w, h, target.attrs.preserveAspectRatio));
+						um = multiply(
+							um,
+							viewBoxMatrix(own, w, h, target.attrs.preserveAspectRatio),
+						);
 					content = walkChildren(target, {
 						...inner,
 						m: um,
@@ -1757,7 +1930,12 @@ export function parseSvg(markup: string): SvgDrawing {
 	return drawing;
 }
 
-const FILTER_SOURCES = new Set(["BackgroundImage", "BackgroundAlpha", "FillPaint", "StrokePaint"]);
+const FILTER_SOURCES = new Set([
+	"BackgroundImage",
+	"BackgroundAlpha",
+	"FillPaint",
+	"StrokePaint",
+]);
 
 const COMPOSITE_OPERATORS = new Set(["over", "in", "out", "atop", "xor"]);
 
@@ -1780,20 +1958,46 @@ const BLEND_MODES = new Set<string>([
 	"luminosity",
 ]);
 
-const IDENTITY_COLOR_MATRIX = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+const IDENTITY_COLOR_MATRIX = [
+	1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+];
 
 // feColorMatrix as 20 row-major values, with the offsets in 0..1.
-function colorMatrix(type: string | undefined, values: string | undefined): number[] {
-	const v = (values ?? "").trim().split(/[\s,]+/).filter(Boolean).map(Number);
-	const one = v.length === 1 && Number.isFinite(v[0]) ? (v[0] as number) : undefined;
+function colorMatrix(
+	type: string | undefined,
+	values: string | undefined,
+): number[] {
+	const v = (values ?? "")
+		.trim()
+		.split(/[\s,]+/)
+		.filter(Boolean)
+		.map(Number);
+	const one =
+		v.length === 1 && Number.isFinite(v[0]) ? (v[0] as number) : undefined;
 	switch ((type ?? "matrix").trim()) {
 		case "saturate": {
 			const s = one ?? 1;
 			return [
-				0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0, 0,
-				0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0, 0,
-				0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s, 0, 0,
-				0, 0, 0, 1, 0,
+				0.213 + 0.787 * s,
+				0.715 - 0.715 * s,
+				0.072 - 0.072 * s,
+				0,
+				0,
+				0.213 - 0.213 * s,
+				0.715 + 0.285 * s,
+				0.072 - 0.072 * s,
+				0,
+				0,
+				0.213 - 0.213 * s,
+				0.715 - 0.715 * s,
+				0.072 + 0.928 * s,
+				0,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
 			];
 		}
 		case "hueRotate": {
@@ -1801,16 +2005,37 @@ function colorMatrix(type: string | undefined, values: string | undefined): numb
 			const cos = Math.cos(a);
 			const sin = Math.sin(a);
 			return [
-				0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928, 0, 0,
-				0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.14, 0.072 - cos * 0.072 - sin * 0.283, 0, 0,
-				0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072, 0, 0,
-				0, 0, 0, 1, 0,
+				0.213 + cos * 0.787 - sin * 0.213,
+				0.715 - cos * 0.715 - sin * 0.715,
+				0.072 - cos * 0.072 + sin * 0.928,
+				0,
+				0,
+				0.213 - cos * 0.213 + sin * 0.143,
+				0.715 + cos * 0.285 + sin * 0.14,
+				0.072 - cos * 0.072 - sin * 0.283,
+				0,
+				0,
+				0.213 - cos * 0.213 - sin * 0.787,
+				0.715 - cos * 0.715 + sin * 0.715,
+				0.072 + cos * 0.928 + sin * 0.072,
+				0,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
 			];
 		}
 		case "luminanceToAlpha":
-			return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2125, 0.7154, 0.0721, 0, 0];
+			return [
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2125, 0.7154, 0.0721, 0,
+				0,
+			];
 		default:
-			return v.length === 20 && v.every(Number.isFinite) ? v : [...IDENTITY_COLOR_MATRIX];
+			return v.length === 20 && v.every(Number.isFinite)
+				? v
+				: [...IDENTITY_COLOR_MATRIX];
 	}
 }
 
@@ -1830,14 +2055,25 @@ type MarkerVertex = { x: number; y: number; angle: number };
 // Every vertex a marker can sit on, with the direction SVG gives it: the
 // bisector of the incoming and outgoing tangents, or whichever one exists.
 function markerVertices(segs: Segment[]): MarkerVertex[] {
-	type Vertex = { x: number; y: number; in?: [number, number]; out?: [number, number] };
+	type Vertex = {
+		x: number;
+		y: number;
+		in?: [number, number];
+		out?: [number, number];
+	};
 	const vertices: Vertex[] = [];
 	let cx = 0;
 	let cy = 0;
 	let start: Vertex | null = null;
 	const nonzero = (...dirs: [number, number][]) =>
-		dirs.find(([dx, dy]) => Math.hypot(dx, dy) > 1e-12) ?? dirs[dirs.length - 1];
-	const to = (x: number, y: number, out: [number, number], inDir: [number, number]) => {
+		dirs.find(([dx, dy]) => Math.hypot(dx, dy) > 1e-12) ??
+		dirs[dirs.length - 1];
+	const to = (
+		x: number,
+		y: number,
+		out: [number, number],
+		inDir: [number, number],
+	) => {
 		const last = vertices[vertices.length - 1];
 		if (last && !last.out) last.out = out;
 		const v: Vertex = { x, y, in: inDir };
@@ -1856,8 +2092,16 @@ function markerVertices(segs: Segment[]): MarkerVertex[] {
 			const d: [number, number] = [s.x - cx, s.y - cy];
 			to(s.x, s.y, d, d);
 		} else if (s.op === "C") {
-			const out = nonzero([s.x1 - cx, s.y1 - cy], [s.x2 - cx, s.y2 - cy], [s.x - cx, s.y - cy]) as [number, number];
-			const inDir = nonzero([s.x - s.x2, s.y - s.y2], [s.x - s.x1, s.y - s.y1], [s.x - cx, s.y - cy]) as [number, number];
+			const out = nonzero(
+				[s.x1 - cx, s.y1 - cy],
+				[s.x2 - cx, s.y2 - cy],
+				[s.x - cx, s.y - cy],
+			) as [number, number];
+			const inDir = nonzero(
+				[s.x - s.x2, s.y - s.y2],
+				[s.x - s.x1, s.y - s.y1],
+				[s.x - cx, s.y - cy],
+			) as [number, number];
 			to(s.x, s.y, out, inDir);
 		} else if (start) {
 			const d: [number, number] = [start.x - cx, start.y - cy];
@@ -1881,7 +2125,10 @@ function markerVertices(segs: Segment[]): MarkerVertex[] {
 
 // An SVG <angle>: degrees unless it names rad, grad or turn.
 function parseAngle(value: string): number {
-	const m = /^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(deg|rad|grad|turn)?$/i.exec(value);
+	const m =
+		/^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(deg|rad|grad|turn)?$/i.exec(
+			value,
+		);
 	if (!m) return 0;
 	const n = Number(m[1]);
 	switch ((m[2] ?? "deg").toLowerCase()) {

@@ -7,7 +7,11 @@ import {
 	newPreset,
 	type Workspace,
 } from "@freshcoat-js/workspace";
-import { assetsByRef, itemRequest, presetReadiness } from "@freshcoat-js/workspace/export";
+import {
+	assetsByRef,
+	itemRequest,
+	presetReadiness,
+} from "@freshcoat-js/workspace/export";
 import { type BatchOptions, batchPreset } from "../src/commands/batch";
 import { createLog } from "../src/io";
 import { card, type Sandbox, sandbox, solidPng } from "./helpers";
@@ -31,7 +35,12 @@ afterAll(() => box.cleanup());
 
 async function fromCli(options: Omit<BatchOptions, "quiet">) {
 	const io = { stdout: () => {}, stderr: () => {}, cwd: box.dir };
-	return batchPreset("photo.json", { ...options, quiet: true }, io, createLog(io, true));
+	return batchPreset(
+		"photo.json",
+		{ ...options, quiet: true },
+		io,
+		createLog(io, true),
+	);
 }
 
 /** What the export renders for each item of a preset: the plan, each item's
@@ -42,7 +51,9 @@ function rendered(workspace: Workspace, preset: ExportPreset) {
 	const assets = assetsByRef(workspace.datasets[0]?.assets);
 	return {
 		plan,
-		requests: plan.map((item) => itemRequest(entry.template, preset, item, assets)),
+		requests: plan.map((item) =>
+			itemRequest(entry.template, preset, item, assets),
+		),
 		sheets,
 	};
 }
@@ -73,13 +84,21 @@ describe("a preset built from flags", () => {
 		expect(studio.fileName).toBe(DEFAULT_FILE_NAME_PATTERN);
 		const cli = rendered(workspace, preset);
 		expect(cli).toEqual(rendered(workspace, studio));
-		expect(cli.requests.map((r) => ("size" in r ? [r.size.width, r.size.height] : r))).toEqual([
+		expect(
+			cli.requests.map((r) =>
+				"size" in r ? [r.size.width, r.size.height] : r,
+			),
+		).toEqual([
 			[200, 133],
 			[200, 133],
 			[100, 200],
 			[100, 200],
 		]);
-		expect(cli.requests.every((r) => "request" in r && r.request.print?.analyze === false)).toBe(true);
+		expect(
+			cli.requests.every(
+				(r) => "request" in r && r.request.print?.analyze === false,
+			),
+		).toBe(true);
 	});
 
 	test("lays out sheets as Studio's preset with the same orientation", async () => {
@@ -94,17 +113,29 @@ describe("a preset built from flags", () => {
 			...newPreset(workspace.templates[0]?.id as string, []),
 			format: "pdf",
 			markExported: false,
-			layout: { ...DEFAULT_SHEET_LAYOUT, paper: "a5", orientation: "landscape" },
+			layout: {
+				...DEFAULT_SHEET_LAYOUT,
+				paper: "a5",
+				orientation: "landscape",
+			},
 		};
 		const cli = rendered(workspace, preset);
 		expect(cli).toEqual(rendered(workspace, studio));
 		expect(cli.sheets?.imposition?.paper.orientation).toBe("landscape");
-		const auto = await fromCli({ data: "people.csv", out: "sheets.pdf", sheets: "a5" });
-		expect(rendered(auto.workspace, auto.preset).sheets?.layout.orientation).toBe("auto");
+		const auto = await fromCli({
+			data: "people.csv",
+			out: "sheets.pdf",
+			sheets: "a5",
+		});
+		expect(
+			rendered(auto.workspace, auto.preset).sheets?.layout.orientation,
+		).toBe("auto");
 	});
 
 	test("refuses a photo size from a field that holds no image", async () => {
-		await expect(fromCli({ data: "people.csv", out: "cards.zip", sizeFrom: "name" })).rejects.toThrow(
+		await expect(
+			fromCli({ data: "people.csv", out: "cards.zip", sizeFrom: "name" }),
+		).rejects.toThrow(
 			"--size-from needs an image field; the template's are photo",
 		);
 	});

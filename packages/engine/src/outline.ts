@@ -316,7 +316,8 @@ export function sideStrokeGeometry(
 	) as Insets;
 	const widest = Math.max(...widths);
 	if (!(widest > 0) || !(w > 0) || !(h > 0)) return null;
-	const k = stroke.align === "inside" ? 0 : stroke.align === "outside" ? 1 : 0.5;
+	const k =
+		stroke.align === "inside" ? 0 : stroke.align === "outside" ? 1 : 0.5;
 	const outer = widths.map((v) => -v * k) as Insets;
 	const inner = widths.map((v, i) => outer[i] + v) as Insets;
 	const mid = widths.map((v, i) => outer[i] + v / 2) as Insets;
