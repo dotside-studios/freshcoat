@@ -1,8 +1,9 @@
 // One order for a drawable's layer effects on every paint path: content, clip
 // and mask, color adjust, sharpen, layer blur, shadows, opacity, blend. See
 // README.md's "Layer effect order".
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
 import { createFrame, createGroup, createRect, type Node } from "../src/node";

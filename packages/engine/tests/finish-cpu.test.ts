@@ -1,7 +1,8 @@
 // The finishing pass on the CPU against the shader it stands in for, byte for
 // byte, on frames that cover every 8-bit value.
+
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { setCpuFinish } from "../src/canvaskit";
 import { deriveFontMetrics } from "../src/font-metrics";
 import {

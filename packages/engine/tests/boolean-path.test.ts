@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
-import { beforeAll, describe, expect, test } from "vitest";
 import { type BooleanOperand, combineShapes } from "../src/boolean-path";
 import { squircleSvg } from "../src/squircle";
 

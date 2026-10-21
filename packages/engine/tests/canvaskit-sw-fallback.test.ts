@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "bun:test";
 import { paintScene } from "../src/canvaskit";
 import type { PaintRuntime } from "../src/runtime-types";
 import type { Command } from "../src/types";

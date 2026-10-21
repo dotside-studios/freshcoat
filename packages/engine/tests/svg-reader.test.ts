@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { parseColor } from "../src/color";
 import { applyMatrix, multiply, parseTransform } from "../src/svg/matrix";
 import {

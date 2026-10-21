@@ -1,9 +1,10 @@
 // validateCommands: IR well-formedness, independent of any backend. The two
 // halves that matter are that it flags a malformed scene with a usable path, and
 // that it stays silent on the scenes compileScene actually emits.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	buildAdjust,
 	compileScene,

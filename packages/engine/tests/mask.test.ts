@@ -1,8 +1,9 @@
 // Phase 4: the unified mask node. Lowering picks the implementation by what the
 // mask IS — a single opaque shape → a drawGroup with a clipPath (fast), anything
 // else → a drawMasked offscreen-coverage command (general). Both render.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import type { MeasureText } from "../src/index";
 import {
 	autoLayout,

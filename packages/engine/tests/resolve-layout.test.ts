@@ -3,7 +3,7 @@
 // gap/padding, hug/fill/grow sizing, justify/align, wrap, nesting, and the
 // text width→height coupling — with a deterministic stub `measure` so the
 // geometry is exact (no font/CanvasKit dependency).
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import type { MeasureText, ResolvedFont } from "../src/index";
 import {
 	autoLayout,

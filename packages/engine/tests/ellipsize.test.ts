@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { ellipsize } from "../src/bake-text";
 import { createParagraphEngine } from "../src/paragraph-layout";

@@ -4,8 +4,9 @@
 // (3) end to end through paint: the output size is unchanged, edge coverage that
 // a same-size render can only approximate is resolved, and the frame finish still
 // runs at output resolution rather than being averaged away by the reduction.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import {

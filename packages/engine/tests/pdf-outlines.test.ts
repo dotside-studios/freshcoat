@@ -1,9 +1,9 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
 	loadCanvasKit,
 	type TestFont,
 	testFontBytes,
 } from "@freshcoat-js/test-utils";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { type GlyphPath, readOutlines } from "../src/pdf/outlines";
 import { sfntBytes } from "../src/woff";
 

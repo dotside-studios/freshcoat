@@ -1,8 +1,9 @@
 // encodePng output is pinned byte for byte: the memory work in the encoder
 // (candidates deflated one at a time, the IDAT written straight into the final
 // buffer) must not change a single output byte at any effort level.
+
+import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { describe, expect, test } from "vitest";
 import { encodePng, type PngEffort } from "../src/png";
 
 const W = 96;

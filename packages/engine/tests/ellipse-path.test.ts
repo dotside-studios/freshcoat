@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compileScene } from "../src/compile-scene";
 import { createEllipse } from "../src/node";
 import { ellipsePath, isEllipsePath } from "../src/outline";

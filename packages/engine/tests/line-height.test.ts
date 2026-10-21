@@ -2,9 +2,10 @@
 // A design tool's "Auto" is not a constant — Vend Sans is 1.48 — so a font
 // marked `autoLineHeight` carries only a fallback number until the metrics for
 // its family turn up.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { autoLineHeight, FALLBACK_LINE_HEIGHT } from "../src/line-height";
 import { createFrame, createText } from "../src/node";

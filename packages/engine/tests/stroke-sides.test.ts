@@ -1,5 +1,5 @@
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";

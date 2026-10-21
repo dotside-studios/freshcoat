@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene, createImage, createPaintCache } from "../src/index";
 import type { ImageNode, MaskNode, PathNode } from "../src/node";
 import { parseSvg, svgToNode } from "../src/svg";

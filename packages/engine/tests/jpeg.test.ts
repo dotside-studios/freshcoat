@@ -1,8 +1,9 @@
 // JPEG encoding. Only CanvasKit's `full` build carries the JPEG encoder (the
 // worker pins it for WebP), so the round trip runs on that build and the
 // fallback on the default one, which answers in PNG and says so.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { flattenOverWhite } from "../src/jpeg";
 import { createFrame, createRect } from "../src/node";
 import { renderSceneToPng } from "./helpers/headless";

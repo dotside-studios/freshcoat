@@ -1,6 +1,7 @@
 // decodePixels: encoded image bytes → raw RGBA via CanvasKit.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { decodePixels, sampleImageNode } from "../src/decode";
 import { createImage } from "../src/node";
 

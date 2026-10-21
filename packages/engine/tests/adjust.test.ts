@@ -2,8 +2,9 @@
 // color-correction steps (saturation matrix, contrast matrix, gamma LUT), proven
 // in pure JS against reference formulas. What the field DOES once painted is the
 // conformance corpus's subject, not this file's.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import {
 	applyAdjustColor,
 	buildAdjust,

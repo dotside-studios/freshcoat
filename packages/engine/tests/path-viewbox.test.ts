@@ -2,8 +2,9 @@
 // viewBox → viewport). Structural: the viewBox threads onto the drawPath command
 // only when set. Behavioral: a 10-unit path with a 10×10 viewBox scaled into a
 // 100×100 node fills the far corner; without the viewBox it stays at native size.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import {
 	compileScene,
 	createFrame,

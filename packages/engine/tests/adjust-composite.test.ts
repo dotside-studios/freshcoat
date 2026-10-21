@@ -1,7 +1,8 @@
 // The adjust offscreen renders a layer's content; its blend and opacity
 // composite the adjusted snapshot onto the real destination.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { createFrame, createGroup, createRect } from "../src/node";
 import type { Adjust, BlendMode } from "../src/types";

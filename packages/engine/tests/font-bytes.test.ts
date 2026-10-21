@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
 	clearFontBytesCache,
 	FONT_MEMO_MAX,
@@ -7,7 +7,7 @@ import {
 } from "../src/font-bytes";
 import type { FontResolution } from "../src/types";
 
-// `bun test`'s vitest shim has no vi.stubGlobal; swap the global by hand.
+// bun:test has no vi.stubGlobal; swap the global by hand.
 const realFetch = globalThis.fetch;
 afterEach(() => {
 	globalThis.fetch = realFetch;

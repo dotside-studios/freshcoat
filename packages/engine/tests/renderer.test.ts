@@ -1,10 +1,10 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { dirname } from "node:path";
 import {
 	loadCanvasKit,
 	testFontBytes,
 	testFontPath,
 } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { createFrame, createImage, createRect, createText } from "../src/node";
 import { fileLoader } from "../src/platform/file-loader";

@@ -1,8 +1,8 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { gammaLut } from "../src/adjust";
 import { createGroup, createRect, createText, type Node } from "../src/node";
 import { createRenderer } from "../src/renderer";

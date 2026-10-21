@@ -1,5 +1,5 @@
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
 import { createSharedFontProvider } from "../src/font-collection";
 import { deriveFontMetrics } from "../src/font-metrics";

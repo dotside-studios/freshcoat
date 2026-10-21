@@ -3,9 +3,10 @@
 // o'clock, so the rotation is a shader local matrix about the centre rather
 // than a start angle: a start angle other than 0 leaves part of the circle
 // outside the swept window, where the clamp paints an end stop.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createRect } from "../src/index";
 import type { ResolvedFill } from "../src/types";
 import { renderSceneToPng } from "./helpers/headless";

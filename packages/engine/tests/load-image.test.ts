@@ -1,7 +1,8 @@
 // A runtime that owns its decoded images lends them to paint through
 // loadImage: paint draws them and leaves freeing them to the runtime.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compileScene, createImage } from "../src/index";
 import { createHeadlessEnv } from "./helpers/headless";
 
@@ -84,7 +85,7 @@ describe("PaintRuntime.loadImage", () => {
 		const result = (await env.paint(
 			compileScene(scene, { width: 20, height: 20 }),
 			k,
-		)) as { warnings: { kind: string; src?: string }[] };
+		)) as { warnings: { kind: string; src?: string; error?: string }[] };
 		expect(result.warnings).toEqual([
 			{ kind: "image_load_failed", src: "ws:gone", error: "decode failed" },
 		]);

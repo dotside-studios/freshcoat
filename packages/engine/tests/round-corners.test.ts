@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { Canvas, CanvasKit } from "canvaskit-wasm";
-import { beforeAll, describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { createGroup, createPath, createRect, type Node } from "../src/node";
 import { outlineGeometry } from "../src/outline";

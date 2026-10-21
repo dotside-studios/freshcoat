@@ -2,9 +2,10 @@
 // paint against a fresh uncached one, pixels and warnings byte for byte.
 // FUZZ_ITERATIONS runs more sequences and FUZZ_SEED moves the first seed, so
 // `FUZZ_SEED=<seed> FUZZ_ITERATIONS=1` replays a failure.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
-import { beforeAll, describe, expect, test } from "vitest";
 import { paintScene } from "../src/canvaskit";
 import { deriveFontMetrics } from "../src/font-metrics";
 import { compileScene, createPaintCache, type PaintCache } from "../src/index";

@@ -1,8 +1,8 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { iccProfile, loadCanvasKit } from "@freshcoat-js/test-utils";
 import { unzlibSync } from "fflate";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	readIccProfile,
 	resolveOutputIntent,
@@ -78,7 +78,7 @@ describe("readIccProfile", () => {
 
 	test("the bundled profile is the file shipped in icc/", () => {
 		const file = readFileSync(join(__dirname, "../icc/sRGB-v2-magic.icc"));
-		expect(new Uint8Array(file)).toEqual(SRGB_PROFILE);
+		expect<Uint8Array>(new Uint8Array(file)).toEqual(SRGB_PROFILE);
 	});
 
 	test("reads a v4 description", () => {

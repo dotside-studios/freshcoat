@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { outlineGeometry, outlineSvg, rectShape } from "../src/outline";
 import { normalizePath, pathBounds } from "../src/svg/path";
 
