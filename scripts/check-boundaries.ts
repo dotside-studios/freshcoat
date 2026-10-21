@@ -4,6 +4,9 @@
 //   - an npm package declared in the importing package's own package.json;
 //   - one of the three core packages (coatfile, engine, for-print), declared;
 //   - a Node or Bun builtin, or the `~/` and `~icons/` aliases.
+// Internal packages are also held to the layering in ARCHITECTURE.md: each
+// may depend only on the internal packages listed for it in ALLOWED, and
+// test-utils is a dev dependency imported by test files alone.
 // tsconfig, Vite, Vitest, Playwright and Biome configs, and package.json
 // dependency specs and scripts, are held to the same rule.
 //
@@ -23,6 +26,47 @@ export const KITS = [
 	"@freshcoat-js/for-print",
 ] as const;
 
+const TEST_UTILS = "@freshcoat-js/test-utils";
+
+export const ALLOWED: Record<string, readonly string[]> = {
+	"@freshcoat-js/engine": [],
+	"@freshcoat-js/for-print": ["@freshcoat-js/engine"],
+	"@freshcoat-js/coatfile": ["@freshcoat-js/engine", "@freshcoat-js/for-print"],
+	"@freshcoat-js/workspace": [
+		"@freshcoat-js/coatfile",
+		"@freshcoat-js/engine",
+		"@freshcoat-js/for-print",
+	],
+	"@freshcoat-js/cli": [
+		"@freshcoat-js/coatfile",
+		"@freshcoat-js/engine",
+		"@freshcoat-js/for-print",
+		"@freshcoat-js/workspace",
+	],
+	"@freshcoat-js/ui": [],
+	[TEST_UTILS]: ["@freshcoat-js/engine"],
+	"@freshcoat-js/editor": [
+		"@freshcoat-js/coatfile",
+		"@freshcoat-js/engine",
+		"@freshcoat-js/for-print",
+		"@freshcoat-js/ui",
+		"@freshcoat-js/workspace",
+	],
+	"@freshcoat-js/figma-plugin": [
+		"@freshcoat-js/coatfile",
+		"@freshcoat-js/engine",
+		"@freshcoat-js/for-print",
+		"@freshcoat-js/ui",
+		"@freshcoat-js/workspace",
+	],
+};
+
+// Non-test files that may import test-utils, by exact repo-relative path.
+export const TEST_UTILS_EXEMPTIONS: Record<string, string> = {
+	"apps/editor/scripts/bench-render.ts":
+		"render benchmark reuses CanvasKit and font fixtures",
+};
+
 export type Violation = { file: string; line: number; message: string };
 
 const SKIP_DIRS = new Set([
@@ -34,12 +78,16 @@ const SKIP_DIRS = new Set([
 	".turbo",
 ]);
 const CODE = /\.(?:[cm]?[jt]s|tsx|jsx)$/;
+const TEST_DIRS = new Set(["tests", "e2e", "conformance"]);
+const TEST_FILE = /\.(?:test|spec)\.tsx?$/;
 const CONFIG = /(?:^|[/\\])(?:vite|vitest|playwright)\.config\.[cm]?[jt]s$/;
 
 type Pkg = {
 	dir: string;
 	name: string | undefined;
 	deps: Map<string, string>;
+	runtime: Set<string>;
+	dev: Set<string>;
 };
 
 type Ref = {
@@ -351,6 +399,19 @@ function inside(root: string, target: string): boolean {
 	);
 }
 
+function isTestFile(rel: string): boolean {
+	const parts = rel.split(sep);
+	return (
+		TEST_FILE.test(parts[parts.length - 1]) ||
+		parts.slice(0, -1).some((part) => TEST_DIRS.has(part))
+	);
+}
+
+function allowedList(name: string): string {
+	const allowed = ALLOWED[name].filter((dep) => dep !== TEST_UTILS);
+	return allowed.length ? allowed.join(", ") : "no internal package";
+}
+
 function typesName(name: string): string {
 	return name.startsWith("@")
 		? `@types/${name.slice(1).replace("/", "__")}`
@@ -360,6 +421,8 @@ function typesName(name: string): string {
 type Ctx = {
 	root: string;
 	freshcoatPackages: Set<string>;
+	exemptions: Record<string, string>;
+	exempted: Set<string>;
 	violations: Violation[];
 };
 
@@ -419,6 +482,30 @@ function checkModule(ctx: Ctx, file: string, pkg: Pkg | undefined, ref: Ref) {
 		);
 		return;
 	}
+	if (Object.hasOwn(ALLOWED, name) && pkg?.name !== name) {
+		if (name === TEST_UTILS) {
+			const rel = relative(ctx.root, file);
+			if (Object.hasOwn(ctx.exemptions, rel)) ctx.exempted.add(rel);
+			else if (!isTestFile(rel))
+				report(
+					ctx,
+					file,
+					ref.line,
+					`"${name}" is imported from non-test source; only test files may import it`,
+				);
+		} else if (
+			pkg?.name &&
+			Object.hasOwn(ALLOWED, pkg.name) &&
+			!ALLOWED[pkg.name].includes(name)
+		) {
+			report(
+				ctx,
+				file,
+				ref.line,
+				`"${name}" may not be imported by ${pkg.name}, which depends on ${allowedList(pkg.name)}`,
+			);
+		}
+	}
 	const declared =
 		pkg &&
 		(pkg.deps.has(name) ||
@@ -460,6 +547,24 @@ function checkPackageJson(ctx: Ctx, pkg: Pkg, text: string) {
 				"Dependency",
 			);
 		}
+	}
+	for (const name of [...pkg.runtime, ...pkg.dev]) {
+		if (!Object.hasOwn(ALLOWED, name) || name === pkg.name) continue;
+		const line = lineOf(text, `"${name}"`);
+		if (name === TEST_UTILS) {
+			if (pkg.runtime.has(name))
+				report(ctx, file, line, `"${name}" must be a devDependency only`);
+		} else if (
+			pkg.name &&
+			Object.hasOwn(ALLOWED, pkg.name) &&
+			!ALLOWED[pkg.name].includes(name)
+		)
+			report(
+				ctx,
+				file,
+				line,
+				`"${name}" is not an allowed dependency of ${pkg.name}, which depends on ${allowedList(pkg.name)}`,
+			);
 	}
 	for (const [name, command] of Object.entries(json.scripts ?? {})) {
 		for (const word of command.split(/[\s=]+/)) {
@@ -624,10 +729,23 @@ function readPkg(dir: string): Pkg {
 		json.dependencies,
 	])
 		for (const [k, v] of Object.entries(field ?? {})) deps.set(k, v);
-	return { dir, name: json.name, deps };
+	return {
+		dir,
+		name: json.name,
+		deps,
+		runtime: new Set([
+			...Object.keys(json.dependencies ?? {}),
+			...Object.keys(json.peerDependencies ?? {}),
+			...Object.keys(json.optionalDependencies ?? {}),
+		]),
+		dev: new Set(Object.keys(json.devDependencies ?? {})),
+	};
 }
 
-export function checkBoundaries(rootDir: string): Violation[] {
+export function checkBoundaries(
+	rootDir: string,
+	exemptions: Record<string, string> = TEST_UTILS_EXEMPTIONS,
+): Violation[] {
 	const root = resolve(rootDir);
 	const files = [...walk(root)];
 	const pkgs = files
@@ -637,6 +755,8 @@ export function checkBoundaries(rootDir: string): Violation[] {
 	const ctx: Ctx = {
 		root,
 		freshcoatPackages: new Set(pkgs.flatMap((p) => (p.name ? [p.name] : []))),
+		exemptions,
+		exempted: new Set(),
 		violations: [],
 	};
 	const owner = (file: string) =>
@@ -679,6 +799,23 @@ export function checkBoundaries(rootDir: string): Violation[] {
 			continue;
 		} else continue;
 		for (const ref of refs) checkModule(ctx, file, pkg, ref);
+	}
+	for (const rel of Object.keys(exemptions)) {
+		const file = join(root, rel);
+		if (!existsSync(file))
+			report(
+				ctx,
+				file,
+				1,
+				`Exemption for "${TEST_UTILS}" is stale: the file no longer exists`,
+			);
+		else if (!ctx.exempted.has(rel))
+			report(
+				ctx,
+				file,
+				1,
+				`Exemption for "${TEST_UTILS}" is stale: the file no longer imports it`,
+			);
 	}
 	return ctx.violations.sort(
 		(a, b) => a.file.localeCompare(b.file) || a.line - b.line,

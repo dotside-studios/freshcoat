@@ -62,6 +62,13 @@ both. Workspace builds on coatfile, for-print and the engine. The UI package
 has no dependency on the template or rendering model. Test suites share fixtures
 through `test-utils`, which packages list only as a dev dependency.
 
+`bun run check:boundaries` ([`scripts/check-boundaries.ts`](scripts/check-boundaries.ts))
+enforces this layering from each package's declared dependencies and its
+imports, and fails on test-utils imports from non-test source. The one
+exemption is the editor's render benchmark, `apps/editor/scripts/bench-render.ts`,
+which reuses CanvasKit and font fixtures; the check fails if that exemption goes
+stale.
+
 The `cli` package sits on top of all three: it only reads files, parses
 arguments and reports, and calls the packages above for the work.
 
