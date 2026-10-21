@@ -472,6 +472,14 @@ version, leaves a `"newer"` or `"unsupported"` one untouched, and returns `t`
 itself when nothing changes. Call it before `packTemplate` or
 `serializeTemplate`.
 
+`minimumFormatVersion` reads each minor from `formatHistory` tags on the zod
+schema in `src/schemas.ts`. A variant delta's `properties` count as the
+properties of the element it targets, so a key that element's type does not
+have counts nothing. A field, union member or enum value added in a new minor is
+tagged with it, as `.register(formatHistory, { since: "1.8" })` or
+`{ values: { name: "1.8" } }` for an enum value, and listed in `FORMAT_HISTORY`;
+a test fails until both are done.
+
 ```ts
 import { raiseFormatVersion } from "@freshcoat-js/coatfile";
 
@@ -484,8 +492,8 @@ drifts. Its `$id` is the copy the npm CDN serves from the published package,
 `https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile/schema/coatfile.v1.schema.json`,
 which is also what a template's `$schema` should point at. The URL carries no
 package version and resolves to the latest published package, and the file name
-carries the template format major. The file is exported
-as `@freshcoat-js/coatfile/schema/coatfile.v1.schema.json` for a host that serves
+carries the template format major. The file is exported as
+`@freshcoat-js/coatfile/schema/coatfile.v1.schema.json` for a host that serves
 its own copy.
 
 ## Reading a file in
