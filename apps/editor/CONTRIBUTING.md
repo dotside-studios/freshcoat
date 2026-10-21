@@ -22,6 +22,7 @@ these commands from `apps/editor/`:
 | `bun run test` | Unit tests with Vitest and jsdom |
 | `bun run typecheck` | TypeScript checks |
 | `bun run e2e` | Browser end-to-end tests, without the benchmark |
+| `bun run e2e:desktop` | Every Chromium test, as the nightly CI job runs them |
 | `bun run e2e:smoke` | The browser subset used by CI, including the Firefox and WebKit smoke tests |
 | `bun run e2e:cross-browser` | Only the Firefox and WebKit smoke tests |
 | `bun run fonts:update` | Refreshes `src/fonts/google-fonts.json` |

@@ -7,6 +7,20 @@ const port = Number(process.env.FRESHCOAT_PORT ?? 3010);
 const preview = !!process.env.FRESHCOAT_PREVIEW;
 
 const BENCH = /bench\.spec\.ts$/;
+// FRESHCOAT_SMOKE=1 narrows desktop to the subset e2e:smoke runs, so one
+// server serves it and the cross-browser projects.
+const SMOKE = [
+	"smoke",
+	"inspector",
+	"workspace",
+	"data",
+	"export",
+	"starters",
+	"barcode",
+	"sheets",
+	"url",
+	"handoff",
+].map((name) => `${name}.spec.ts`);
 const chromium = {
 	...devices["Desktop Chrome"],
 	viewport: { width: 1440, height: 900 },
@@ -34,6 +48,7 @@ export default defineConfig({
 	projects: [
 		{
 			name: "desktop",
+			...(process.env.FRESHCOAT_SMOKE ? { testMatch: SMOKE } : {}),
 			testIgnore: BENCH,
 			use: chromium,
 		},
