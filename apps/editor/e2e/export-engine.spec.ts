@@ -68,7 +68,10 @@ test("a 20-record png-zip renders every side through the worker pool", async ({
 	expect(report[0]).toBe(
 		"file,record,side,status,error,print,gamut,unfilled,warnings",
 	);
-	expect(report[1]).toBe("LC-0001-0000-front.png,r_0001,front,ok,,off,,,");
+	// The print checks report small text and hairlines with print off too.
+	expect(report[1]).toBe(
+		'LC-0001-0000-front.png,r_0001,front,ok,,off,,,"Text is 5.76 pt at print size, below 6 pt: wordmark; Stroke is 0.24 pt at print size, below 0.25 pt; it may not print: tier-chip; Text is 3.6 pt at print size, below 6 pt: tier; Stroke is 0.24 pt at print size, below 0.25 pt; it may not print: verified-badge; Text is 2.88 pt at print size, below 6 pt: verified-label; Text is 4.8 pt at print size, below 6 pt: since; Text is 4.32 pt at print size, below 6 pt: member-id"',
+	);
 	expect(out.progressEvents).toBe(40);
 	expect(out.lastProgress).toMatchObject({
 		done: 40,
