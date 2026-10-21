@@ -1,12 +1,11 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import jsQR from "jsqr";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { renderCompiledPdf, renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit's test handle
 let ck: any;
 let logoSrc: string;
 
@@ -111,18 +110,22 @@ describe("styled QR codes decode", () => {
 			LOGOS.map((logo) => ({ moduleShape, finderOuter, finderInner, logo })),
 		),
 	);
-	test.each(matrix)(
-		"$moduleShape modules, $finderOuter/$finderInner finders, logo $logo",
-		async ({ moduleShape, finderOuter, finderInner, logo }) => {
-			const png = await renderPng({
-				moduleShape,
-				finderOuter,
-				finderInner,
-				...(logo ? { logo: { src: logoSrc, size: logo } } : {}),
-			});
-			expect(decodePng(png)).toBe(VALUE);
-		},
-	);
+	test.each(
+		matrix,
+	)("$moduleShape modules, $finderOuter/$finderInner finders, logo $logo", async ({
+		moduleShape,
+		finderOuter,
+		finderInner,
+		logo,
+	}) => {
+		const png = await renderPng({
+			moduleShape,
+			finderOuter,
+			finderInner,
+			...(logo ? { logo: { src: logoSrc, size: logo } } : {}),
+		});
+		expect(decodePng(png)).toBe(VALUE);
+	});
 
 	test("a linear gradient decodes", async () => {
 		const png = await renderPng({
@@ -181,11 +184,14 @@ describe("styled QR codes decode", () => {
 	});
 });
 
-
 describe("styled QR codes in PDF", () => {
 	const pdf = async (properties: Record<string, unknown>) => {
 		const renderer = await createRenderer({ ck });
-		const compiled = compile(template(properties), {}, { width: 120, height: 120 });
+		const compiled = compile(
+			template(properties),
+			{},
+			{ width: 120, height: 120 },
+		);
 		const [page] = await renderCompiledPdf(renderer, compiled, { dpi: 72 });
 		const text = new TextDecoder("latin1").decode(page?.bytes);
 		return {

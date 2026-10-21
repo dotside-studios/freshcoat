@@ -1,5 +1,5 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import {
 	compileScene,
 	createFrame,
@@ -112,10 +112,7 @@ describe("missingGlyphs", () => {
 		const commands = compileScene(
 			scene(
 				text("greeting", "", {
-					spans: [
-						{ text: "Hello " },
-						{ text: "世界", font: { weight: 700 } },
-					],
+					spans: [{ text: "Hello " }, { text: "世界", font: { weight: 700 } }],
 				}),
 			),
 			{ width: 400, height: 200, textEngine: engine },

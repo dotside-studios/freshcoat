@@ -136,13 +136,22 @@ export default {
 		},
 		devDependencies: { "@freshcoat-js/test-utils": "workspace:*" },
 	});
-	write("packages/for-print/src/ok.ts", `import { x } from "@freshcoat-js/engine";\n`);
-	write("packages/for-print/src/up.ts", `import { y } from "@freshcoat-js/workspace";\n`);
+	write(
+		"packages/for-print/src/ok.ts",
+		`import { x } from "@freshcoat-js/engine";\n`,
+	);
+	write(
+		"packages/for-print/src/up.ts",
+		`import { y } from "@freshcoat-js/workspace";\n`,
+	);
 	write("packages/ui/package.json", {
 		name: "@freshcoat-js/ui",
 		devDependencies: { "@freshcoat-js/coatfile": "workspace:*" },
 	});
-	write("packages/ui/src/a.ts", `import { z } from "@freshcoat-js/coatfile";\n`);
+	write(
+		"packages/ui/src/a.ts",
+		`import { z } from "@freshcoat-js/coatfile";\n`,
+	);
 	write("packages/coatfile/package.json", {
 		name: "@freshcoat-js/coatfile",
 		dependencies: { "@freshcoat-js/test-utils": "workspace:*" },
@@ -155,8 +164,14 @@ export default {
 		"e2e/lib.ts",
 		"conformance/run.ts",
 	])
-		write(`packages/coatfile/${file}`, `import { f } from "@freshcoat-js/test-utils";\n`);
-	write("scripts/tool.ts", `import { join } from "node:path";\nimport ts from "typescript";\n`);
+		write(
+			`packages/coatfile/${file}`,
+			`import { f } from "@freshcoat-js/test-utils";\n`,
+		);
+	write(
+		"scripts/tool.ts",
+		`import { join } from "node:path";\nimport ts from "typescript";\n`,
+	);
 });
 
 afterAll(() => {
@@ -234,7 +249,9 @@ describe("checkBoundaries", () => {
 	});
 
 	test("allows an import along an allowed layering edge", () => {
-		expect(at(checkBoundaries(root), "packages/for-print/src/ok.ts")).toEqual([]);
+		expect(at(checkBoundaries(root), "packages/for-print/src/ok.ts")).toEqual(
+			[],
+		);
 	});
 
 	test("rejects an upward import and declaration", () => {
@@ -325,14 +342,17 @@ export type { T } from "types-only";
 
 	test("keeps its place after template substitutions and regexes", () => {
 		const refs = scriptRefs(
-			"const a = `x ${`y ${1}`} z`;\nconst r = /['\"]/g;\nimport q from \"after\";\n",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: source text for the scanner, not a template
+			'const a = `x ${`y ${1}`} z`;\nconst r = /[\'"]/g;\nimport q from "after";\n',
 		);
 		expect(refs.map((r) => [r.spec, r.line])).toEqual([["after", 3]]);
 	});
 });
 
 test("packageName keeps the scope", () => {
-	expect(packageName("@freshcoat-js/coatfile/render")).toBe("@freshcoat-js/coatfile");
+	expect(packageName("@freshcoat-js/coatfile/render")).toBe(
+		"@freshcoat-js/coatfile",
+	);
 	expect(packageName("react-dom/client")).toBe("react-dom");
 });
 

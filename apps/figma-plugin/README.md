@@ -497,7 +497,6 @@ Run these commands from `apps/figma-plugin`:
 - `bun run watch`: rebuild on change (sub-second).
 - `bun run test`: unit tests (reader, bundle, transpiler, hand-off).
 - `bun run typecheck`: the plugin and the harness.
-- `bun run check`: Biome, lint and format.
 - `bun run harness`: build, then serve the UI harness on port 5803
   (`HARNESS_PORT` for another).
 - `bun run harness:test`: build, then run the harness's Playwright tests.

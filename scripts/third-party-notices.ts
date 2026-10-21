@@ -34,7 +34,8 @@ const PACKAGES = [
  *  own dependencies are still walked, since Freshcoat's build bundles them. */
 const KITS: Record<string, string> = {
 	"@freshcoat-js/coatfile": "compiles templates, QR codes and barcodes",
-	"@freshcoat-js/engine": "the coat engine, which lays out and paints with CanvasKit",
+	"@freshcoat-js/engine":
+		"the coat engine, which lays out and paints with CanvasKit",
 	"@freshcoat-js/for-print":
 		"the card printer path: photo analysis and the finish",
 	"@freshcoat-js/workspace":

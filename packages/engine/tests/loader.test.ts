@@ -1,11 +1,10 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
 import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
-import { createHeadlessEnv, renderSceneToPng } from "./helpers/headless";
 import {
+	assertLoadableUrl,
 	base64ToBytes,
 	bytesToBase64,
-	assertLoadableUrl,
 	createFetchLoader,
 	dataUrlToBytes,
 	fetchLoader,
@@ -14,6 +13,7 @@ import {
 import { createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { Command, FontResolution } from "../src/types";
+import { createHeadlessEnv, renderSceneToPng } from "./helpers/headless";
 
 const local = (src: string): FontResolution => ({
 	kind: "descriptor",
@@ -24,7 +24,7 @@ const local = (src: string): FontResolution => ({
 	},
 });
 
-// `bun test`'s vitest shim has no vi.stubGlobal; swap the globals by hand.
+// bun:test has no vi.stubGlobal; swap the globals by hand.
 const realFetch = globalThis.fetch;
 const realLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
 
@@ -131,9 +131,7 @@ describe("fetchLoader", () => {
 		expect(fetch).toEqual([]);
 		const unsafe = createFetchLoader({ unsafeAllowHttp: true });
 		expect([...(await unsafe("http://example.com/a.png"))]).toEqual([9]);
-		expect(fetch).toEqual([
-			"http://example.com/a.png",
-		]);
+		expect(fetch).toEqual(["http://example.com/a.png"]);
 	});
 
 	test("unsafeAllowHttp does not open other schemes", async () => {
@@ -205,15 +203,16 @@ describe("default font fetch", () => {
 
 	test("follows the loader's unsafeAllowHttp for http: fonts", async () => {
 		const fetch = stubFetch();
-		const load = mapLoader(undefined, createFetchLoader({ unsafeAllowHttp: true }));
+		const load = mapLoader(
+			undefined,
+			createFetchLoader({ unsafeAllowHttp: true }),
+		);
 		const [bytes] = await fontBytes(local("http://fonts.local/a.ttf"), load);
 		expect([...(bytes as Uint8Array)]).toEqual([9]);
-		expect(fetch).toEqual([
-			"http://fonts.local/a.ttf",
-		]);
-		await expect(
-			fontBytes(local("http://fonts.local/a.ttf")),
-		).rejects.toThrow(/"http:"/);
+		expect(fetch).toEqual(["http://fonts.local/a.ttf"]);
+		await expect(fontBytes(local("http://fonts.local/a.ttf"))).rejects.toThrow(
+			/"http:"/,
+		);
 		await expect(fontBytes(local("file:///x"), load)).rejects.toThrow(
 			/"file:"/,
 		);
@@ -222,15 +221,19 @@ describe("default font fetch", () => {
 	test("a fetcher passed by the host is not restricted", async () => {
 		const fetch = stubFetch();
 		const seen: string[] = [];
-		const [bytes] = await fontBytes(local("http://mirror.local/a.ttf"), undefined, async (url) => {
-			seen.push(url);
-			return {
-				ok: true,
-				status: 200,
-				text: async () => "",
-				arrayBuffer: async () => new Uint8Array([5]).buffer,
-			};
-		});
+		const [bytes] = await fontBytes(
+			local("http://mirror.local/a.ttf"),
+			undefined,
+			async (url) => {
+				seen.push(url);
+				return {
+					ok: true,
+					status: 200,
+					text: async () => "",
+					arrayBuffer: async () => new Uint8Array([5]).buffer,
+				};
+			},
+		);
 		expect([...(bytes as Uint8Array)]).toEqual([5]);
 		expect(seen).toEqual(["http://mirror.local/a.ttf"]);
 		expect(fetch).toEqual([]);
@@ -326,9 +329,7 @@ describe("createHeadlessEnv({ load })", () => {
 						descriptor: {
 							kind: "local",
 							family: "Geist",
-							files: [
-								{ src: "fonts/geist.ttf", weight: 400, style: "normal" },
-							],
+							files: [{ src: "fonts/geist.ttf", weight: 400, style: "normal" }],
 						},
 					},
 				],
@@ -344,7 +345,9 @@ describe("createHeadlessEnv({ load })", () => {
 describe("base64 round-trip", () => {
 	test("survives high bytes and zeroes", () => {
 		const bytes = [1, 2, 3, 250, 0, 255];
-		expect([...base64ToBytes(bytesToBase64(new Uint8Array(bytes)))]).toEqual(bytes);
+		expect([...base64ToBytes(bytesToBase64(new Uint8Array(bytes)))]).toEqual(
+			bytes,
+		);
 	});
 
 	test("handles a payload longer than one encode chunk", () => {

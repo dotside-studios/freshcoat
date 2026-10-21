@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	CR80_LONG_MM,
 	CR80_SHORT_MM,

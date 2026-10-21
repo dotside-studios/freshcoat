@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import { ElementSchema } from "../src/schemas";
 import { svgToElements } from "../src/svg";
@@ -77,7 +77,9 @@ describe("svgToElements", () => {
 	});
 
 	test("content past the box clips the root", () => {
-		const { element } = svgToElements(svg('<rect x="90" width="20" height="10"/>'));
+		const { element } = svgToElements(
+			svg('<rect x="90" width="20" height="10"/>'),
+		);
 		expect(element.properties.clipsContent).toBe(true);
 	});
 
@@ -116,7 +118,9 @@ describe("svgToElements", () => {
 	test("ids are made unique, through the caller when given", () => {
 		const taken = new Set(["vector"]);
 		const { element } = svgToElements(
-			svg('<path id="a" d="M0 0H5V5Z"/><path id="a" d="M0 0H5V5Z"/><path d="M0 0H5V5Z"/>'),
+			svg(
+				'<path id="a" d="M0 0H5V5Z"/><path id="a" d="M0 0H5V5Z"/><path d="M0 0H5V5Z"/>',
+			),
 			{
 				id: "art",
 				uniqueId: (base) => {
@@ -174,7 +178,10 @@ describe("svgToElements", () => {
 			focusRadius: 0.1,
 			spread: "repeat",
 		});
-		expect(lin?.properties.fill).toMatchObject({ kind: "linear", spread: "reflect" });
+		expect(lin?.properties.fill).toMatchObject({
+			kind: "linear",
+			spread: "reflect",
+		});
 		expect(ElementSchema.safeParse(element).success).toBe(true);
 	});
 
@@ -220,7 +227,11 @@ describe("svgToElements", () => {
 			pos: { x: 10, y: 10 },
 			size: { width: 40, height: 40 },
 			properties: {
-				mask: { type: "vector", pos: { x: 0, y: 0 }, size: { width: 20, height: 20 } },
+				mask: {
+					type: "vector",
+					pos: { x: 0, y: 0 },
+					size: { width: 20, height: 20 },
+				},
 				children: [{ type: "vector", pos: { x: 0, y: 0 } }],
 			},
 		});
@@ -236,7 +247,9 @@ describe("svgToElements", () => {
 
 	test("filters warn, since layers cannot carry them", () => {
 		const { element, warnings } = svgToElements(
-			svg('<filter id="f"><feGaussianBlur stdDeviation="2"/></filter><rect width="10" height="10" fill="red" filter="url(#f)"/>'),
+			svg(
+				'<filter id="f"><feGaussianBlur stdDeviation="2"/></filter><rect width="10" height="10" fill="red" filter="url(#f)"/>',
+			),
 		);
 		expect(element.properties.children).toHaveLength(1);
 		expect(warnings.map((w) => w.feature)).toEqual(["filter"]);
@@ -318,7 +331,9 @@ describe("svgToElements", () => {
 
 	test("rotated text turns about its baseline start", () => {
 		const { element } = svgToElements(
-			svg('<text transform="translate(50 50) rotate(90)" font-size="10">ab</text>'),
+			svg(
+				'<text transform="translate(50 50) rotate(90)" font-size="10">ab</text>',
+			),
 		);
 		const text = element.properties.children[0] as TextElement;
 		expect(text.rotation).toBe(90);
@@ -408,19 +423,22 @@ function template(element: Element, extra: Element[] = []): Template {
 	};
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
 });
 
 async function pixels(tpl: Template, markup = ICON) {
-	const [frame] = (await renderTemplate(
+	const [frame] = await renderTemplate(
 		await createRenderer({ ck, cache: false }),
 		tpl,
 		{},
-		{ width: 96, height: 96, images: new Map([["icon.svg", new TextEncoder().encode(markup)]]) },
-	));
+		{
+			width: 96,
+			height: 96,
+			images: new Map([["icon.svg", new TextEncoder().encode(markup)]]),
+		},
+	);
 	if (!frame) throw new Error("no frame");
 	const d = decodePixels(ck, frame.bytes);
 	if (!d) throw new Error("decode failed");
@@ -462,7 +480,10 @@ describe("layers and image sources agree", () => {
 				'<circle cx="24" cy="34" r="10" fill="url(#p)"/>',
 			'width="96" height="96" viewBox="0 0 48 48"',
 		);
-		const layers = await pixels(template(svgToElements(markup).element), markup);
+		const layers = await pixels(
+			template(svgToElements(markup).element),
+			markup,
+		);
 		const image = await pixels(
 			template({
 				id: "img",

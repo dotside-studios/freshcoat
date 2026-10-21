@@ -1,13 +1,13 @@
 // Work the painter does once per cached line, scene or paint rather than once
 // per span, run or nesting level, counted through spies on CanvasKit.
+
+import { afterEach, beforeAll, describe, expect, test, vi } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { drawableBounds, makeBin, paintScene } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
-import { deriveFontMetrics } from "../src/font-metrics";
 import { createSharedFontProvider } from "../src/font-collection";
+import { deriveFontMetrics } from "../src/font-metrics";
 import { createPaintCache, type PaintCache } from "../src/index";
-import { encodePng } from "../src/png";
 import {
 	createFrame,
 	createImage,
@@ -17,6 +17,7 @@ import {
 } from "../src/node";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
+import { encodePng } from "../src/png";
 import type { Command, FrameFinish, ResolvedFont } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 
@@ -276,6 +277,7 @@ describe("shaping that throws", () => {
 			(c) => c.op === "drawGroup",
 		);
 		const Font = ck.Font;
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.Font = function () {
 			throw new Error("no font");
 		};
@@ -405,7 +407,11 @@ describe("tiled images", () => {
 	}
 
 	// Calls to `method` of `proto` while `run` goes.
-	async function countCalls(proto: any, method: string, run: () => Promise<void>) {
+	async function countCalls(
+		proto: any,
+		method: string,
+		run: () => Promise<void>,
+	) {
 		const real = proto[method];
 		let n = 0;
 		proto[method] = function (...args: unknown[]) {
@@ -421,7 +427,9 @@ describe("tiled images", () => {
 	}
 
 	test("build a raster's shader once for the cache", async () => {
-		const px = new Uint8Array(4 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : i * 9));
+		const px = new Uint8Array(4 * 4 * 4).map((_, i) =>
+			i % 4 === 3 ? 255 : i * 9,
+		);
 		const png = await encodePng(px, 4, 4);
 		const made = await countCalls(ck.Image.prototype, "makeShaderOptions", () =>
 			tiles("img://tile.png", png),

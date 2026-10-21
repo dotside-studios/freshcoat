@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	parseSvg,
 	type SvgGroup,
@@ -204,7 +204,12 @@ describe("text", () => {
 		);
 		const [a, b] = ofKind(d.children, "text");
 		expect(d.warnings).toEqual([]);
-		expect(a?.path).toEqual({ d: "M0 20L100 20", startOffset: 50, percent: true, side: "right" });
+		expect(a?.path).toEqual({
+			d: "M0 20L100 20",
+			startOffset: 50,
+			percent: true,
+			side: "right",
+		});
 		expect(a?.anchor).toBe("middle");
 		expect(a?.runs.map((r) => r.text)).toEqual(["on a ", "path"]);
 		expect(a?.runs[0]?.font.size).toBeCloseTo(16);

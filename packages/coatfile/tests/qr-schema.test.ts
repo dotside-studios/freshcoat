@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { assetUri, collectAssetRefs, resolveAssetSrcs } from "../src/assets";
 import { minimumFormatVersion } from "../src/format";
 import { templateHints } from "../src/hints";
@@ -129,7 +129,11 @@ describe("QR style schema", () => {
 describe("QR logo error correction", () => {
 	const value = "https://freshcoat.app/c/AB12CD?ref=logo";
 	const withLogo = (logoSize: number, padding = 1) =>
-		qrSymbol(value, "L", { ...DEFAULT_QR_STYLE, logoSize, logoPadding: padding });
+		qrSymbol(value, "L", {
+			...DEFAULT_QR_STYLE,
+			logoSize,
+			logoPadding: padding,
+		});
 
 	test("a small logo raises the level to Q", () => {
 		const s = withLogo(0.1);
@@ -154,7 +158,9 @@ describe("QR logo error correction", () => {
 
 	test("the logo is capped and stays clear of the finder patterns", () => {
 		const capped = withLogo(0.9, 0);
-		expect(capped.logo?.side).toBeLessThanOrEqual(MAX_QR_LOGO_SIZE * capped.size);
+		expect(capped.logo?.side).toBeLessThanOrEqual(
+			MAX_QR_LOGO_SIZE * capped.size,
+		);
 		const tiny = qrSymbol("1", "L", {
 			...DEFAULT_QR_STYLE,
 			logoSize: 0.3,
@@ -170,7 +176,9 @@ describe("QR logo error correction", () => {
 describe("QR hints", () => {
 	const codes = (properties: Record<string, unknown>) =>
 		templateHints(template(properties)).flatMap((h) =>
-			h.kind === "print" && h.issue.code.startsWith("qr_") ? [h.issue.code] : [],
+			h.kind === "print" && h.issue.code.startsWith("qr_")
+				? [h.issue.code]
+				: [],
 		);
 
 	test("a well-made styled code has none", () => {

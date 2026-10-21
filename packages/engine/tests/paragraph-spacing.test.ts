@@ -1,6 +1,6 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { bakeText } from "../src/bake-text";
 import { createGroup, createText, type TextNode } from "../src/node";

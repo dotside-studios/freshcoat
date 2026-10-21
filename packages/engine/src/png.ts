@@ -112,7 +112,8 @@ export async function encodePng(
 			if (!best || streams[j].total < best.stream.total)
 				best = { stream: streams[j], channels: pair[j].channels };
 	}
-	return assemble(best!.stream, width, height, best!.channels);
+	if (!best) throw new Error("No PNG encoding plan");
+	return assemble(best.stream, width, height, best.channels);
 }
 
 // Read a frame's pixels straight out of a decode and encode them. The pairing
@@ -360,7 +361,10 @@ const SRGB_CHUNKS = (() => {
 		const chunk = new Uint8Array(12 + length);
 		const view = new DataView(chunk.buffer);
 		if (type === "sRGB") chunk[8] = values[0];
-		else values.forEach((v, i) => view.setUint32(8 + i * 4, v));
+		else
+			values.forEach((v, i) => {
+				view.setUint32(8 + i * 4, v);
+			});
 		sealChunk(chunk, 0, type, length);
 		return chunk;
 	});

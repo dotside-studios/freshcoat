@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { parseTrimValue, resolveStrokeTrim } from "../src/stroke-trim";
 import type {
 	Command,
@@ -51,7 +51,10 @@ const ring = (stroke: Record<string, unknown>): Element =>
 		type: "vector",
 		pos: { x: 10, y: 10 },
 		size: { width: 80, height: 80 },
-		properties: { d: ELLIPSE, stroke: { color: "#000000", width: 8, ...stroke } },
+		properties: {
+			d: ELLIPSE,
+			stroke: { color: "#000000", width: 8, ...stroke },
+		},
 	}) as Element;
 
 function draws(t: Template, values: Record<string, unknown>): DrawCommand[] {
@@ -100,8 +103,11 @@ describe("data-bound trim", () => {
 	test("a field drives trimEnd", () => {
 		const t = card(ring({ trimEnd: "{{progress}}" }));
 		const at = (progress: string) =>
-			(draws(t, { progress }).find((c) => c.op === "drawPath") as DrawPathCommand)
-				.stroke;
+			(
+				draws(t, { progress }).find(
+					(c) => c.op === "drawPath",
+				) as DrawPathCommand
+			).stroke;
 		expect(at("0.25")?.trimEnd).toBe(0.25);
 		expect(at("60%")?.trimEnd).toBe(0.6);
 		expect(at("")).not.toHaveProperty("trimEnd");
@@ -119,7 +125,11 @@ describe("data-bound trim", () => {
 		const strokeOf = (el: Element, values = {}) =>
 			(draws(card(el), values).find((c) => c.id === "r") as DrawRectCommand)
 				.stroke;
-		expect(strokeOf(rect({ trimStart: 0.1, trimEnd: "{{progress}}" }), { progress: 0.9 })).toMatchObject({
+		expect(
+			strokeOf(rect({ trimStart: 0.1, trimEnd: "{{progress}}" }), {
+				progress: 0.9,
+			}),
+		).toMatchObject({
 			trimStart: 0.1,
 			trimEnd: 0.9,
 		});
@@ -142,10 +152,14 @@ describe("data-bound trim", () => {
 		const ck = await loadCanvasKit();
 		const renderer = await createRenderer({ ck });
 		const t = card(ring({ trimEnd: "{{progress}}" }));
-		const commands = compileToCommands(t, { progress: "25%" }, {
-			width: SIZE,
-			height: SIZE,
-		})[0]!.commands;
+		const commands = compileToCommands(
+			t,
+			{ progress: "25%" },
+			{
+				width: SIZE,
+				height: SIZE,
+			},
+		)[0]!.commands;
 		const { bytes } = await renderer.paint(commands);
 		const pixels = decodePixels(ck, bytes);
 		if (!pixels) throw new Error("decode failed");

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	isSvg,
 	parseSvg,
@@ -37,7 +37,9 @@ describe("isSvg", () => {
 
 describe("document size", () => {
 	test("width and height with a viewBox", () => {
-		const d = parseSvg(svg("", 'width="200" height="100" viewBox="10 20 40 20"'));
+		const d = parseSvg(
+			svg("", 'width="200" height="100" viewBox="10 20 40 20"'),
+		);
 		expect([d.width, d.height]).toEqual([200, 100]);
 		expect(d.viewBox).toEqual({ x: 10, y: 20, width: 40, height: 20 });
 	});
@@ -61,7 +63,9 @@ describe("document size", () => {
 		expect(d.viewBox).toEqual({ x: 0, y: 0, width: 300, height: 150 });
 	});
 	test("a percentage size reads as unset", () => {
-		const d = parseSvg(svg("", 'width="100%" height="100%" viewBox="0 0 24 24"'));
+		const d = parseSvg(
+			svg("", 'width="100%" height="100%" viewBox="0 0 24 24"'),
+		);
 		expect([d.width, d.height]).toEqual([24, 24]);
 	});
 	test("not an svg root throws", () => {
@@ -94,9 +98,9 @@ describe("shapes", () => {
 		);
 	});
 	test("line, polyline and polygon", () => {
-		expect(only(svg('<line x1="0" y1="0" x2="5" y2="5" stroke="red"/>')).d).toBe(
-			"M0 0L5 5",
-		);
+		expect(
+			only(svg('<line x1="0" y1="0" x2="5" y2="5" stroke="red"/>')).d,
+		).toBe("M0 0L5 5");
 		expect(only(svg('<polyline points="0,0 5,0 5,5"/>')).d).toBe(
 			"M0 0L5 0L5 5",
 		);
@@ -177,9 +181,9 @@ describe("paint", () => {
 		expect(d.children).toEqual([]);
 	});
 	test("fill-rule evenodd", () => {
-		expect(only(svg('<path d="M0 0H1V1Z" fill-rule="evenodd"/>')).fillRule).toBe(
-			"evenodd",
-		);
+		expect(
+			only(svg('<path d="M0 0H1V1Z" fill-rule="evenodd"/>')).fillRule,
+		).toBe("evenodd");
 	});
 });
 
@@ -228,7 +232,9 @@ describe("use and defs", () => {
 	});
 	test("use inherits style from the use element", () => {
 		const d = parseSvg(
-			svg('<defs><path id="p" d="M0 0H1V1Z"/></defs><use href="#p" fill="red"/>'),
+			svg(
+				'<defs><path id="p" d="M0 0H1V1Z"/></defs><use href="#p" fill="red"/>',
+			),
 		);
 		expect(shapes(d.children)[0]?.fill).toEqual({
 			kind: "solid",
@@ -255,7 +261,9 @@ describe("use and defs", () => {
 	});
 	test("a symbol referencing itself is cut", () => {
 		const d = parseSvg(
-			svg('<symbol id="s"><path d="M0 0H10V10Z"/><use href="#s"/></symbol><use href="#s"/>'),
+			svg(
+				'<symbol id="s"><path d="M0 0H10V10Z"/><use href="#s"/></symbol><use href="#s"/>',
+			),
 		);
 		expect(shapes(d.children)).toHaveLength(1);
 		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
@@ -271,15 +279,27 @@ describe("use and defs", () => {
 	});
 	test("a reference to the root is cut", () => {
 		const d = parseSvg(
-			svg('<path d="M0 0H1V1Z"/><use href="#r"/>', 'id="r" width="100" height="100"'),
+			svg(
+				'<path d="M0 0H1V1Z"/><use href="#r"/>',
+				'id="r" width="100" height="100"',
+			),
 		);
 		expect(shapes(d.children)).toHaveLength(1);
 		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
 	});
 	test("many references to a large group stay fast", () => {
-		const paths = Array.from({ length: 100 }, (_, i) => `<path d="M${i} 0h1v1Z"/>`).join("");
-		const uses = Array.from({ length: 100 }, () => '<use href="#big"/>').join("");
-		const d = parseSvg(svg(`<defs><g id="big">${paths}</g></defs>${uses}<g id="a"><use href="#a"/></g>`));
+		const paths = Array.from(
+			{ length: 100 },
+			(_, i) => `<path d="M${i} 0h1v1Z"/>`,
+		).join("");
+		const uses = Array.from({ length: 100 }, () => '<use href="#big"/>').join(
+			"",
+		);
+		const d = parseSvg(
+			svg(
+				`<defs><g id="big">${paths}</g></defs>${uses}<g id="a"><use href="#a"/></g>`,
+			),
+		);
 		expect(shapes(d.children)).toHaveLength(10000);
 		expect(d.warnings.map((w) => w.feature)).toEqual(["use-cycle"]);
 	});
@@ -481,9 +501,7 @@ describe("gradients", () => {
 	});
 	test("pattern paint warns and falls back", () => {
 		const d = parseSvg(
-			svg(
-				'<pattern id="p"/><rect width="1" height="1" fill="url(#p) blue"/>',
-			),
+			svg('<pattern id="p"/><rect width="1" height="1" fill="url(#p) blue"/>'),
 		);
 		expect(shapes(d.children)[0]?.fill).toEqual({
 			kind: "solid",
@@ -564,7 +582,8 @@ describe("unsupported content and limits", () => {
 	test("use expansion of empty content stops at the walk limit", () => {
 		let body = '<g id="l0"/>';
 		const uses = (id: string) => `<use href="#${id}"/>`.repeat(10);
-		for (let i = 1; i <= 10; i++) body += `<g id="l${i}">${uses(`l${i - 1}`)}</g>`;
+		for (let i = 1; i <= 10; i++)
+			body += `<g id="l${i}">${uses(`l${i - 1}`)}</g>`;
 		const start = performance.now();
 		const d = parseSvg(svg(`<defs>${body}</defs><use href="#l10"/>`));
 		expect(performance.now() - start).toBeLessThan(5000);
@@ -608,7 +627,13 @@ describe("filters", () => {
 				linear: false,
 			},
 			{ kind: "blend", mode: "normal", in: 5, in2: 0, linear: false },
-			{ kind: "blend", mode: "normal", in: "SourceGraphic", in2: 6, linear: false },
+			{
+				kind: "blend",
+				mode: "normal",
+				in: "SourceGraphic",
+				in2: 6,
+				linear: false,
+			},
 		]);
 	});
 
@@ -621,7 +646,16 @@ describe("filters", () => {
 		expect(f.region).toEqual({ x: 5, y: 16, width: 60, height: 48 });
 		expect(f.primitives).toEqual([
 			{ kind: "blur", in: "SourceGraphic", sx: 2, sy: 3, linear: true },
-			{ kind: "dropShadow", in: 0, dx: 2, dy: 2, sx: 2, sy: 2, color: "#ff000080", linear: true },
+			{
+				kind: "dropShadow",
+				in: 0,
+				dx: 2,
+				dy: 2,
+				sx: 2,
+				sy: 2,
+				color: "#ff000080",
+				linear: true,
+			},
 		]);
 	});
 
@@ -644,8 +678,11 @@ describe("filters", () => {
 				'<filter id="b"><feGaussianBlur stdDeviation="1"/></filter><g transform="translate(5 5) rotate(90)"><rect width="10" height="20" filter="url(#b)"/></g>',
 			),
 		);
-		const f = ((d.children[0] as SvgGroup).children[0] as SvgGroup).filter as SvgFilter;
-		expect(f.transform.map((v) => Math.round(v * 1e9) / 1e9 + 0)).toEqual([0, 1, -1, 0, 5, 5]);
+		const f = ((d.children[0] as SvgGroup).children[0] as SvgGroup)
+			.filter as SvgFilter;
+		expect(f.transform.map((v) => Math.round(v * 1e9) / 1e9 + 0)).toEqual([
+			0, 1, -1, 0, 5, 5,
+		]);
 		expect(f.region.x).toBeCloseTo(-1);
 		expect(f.region.y).toBeCloseTo(-2);
 		expect(f.region.width).toBeCloseTo(12);
@@ -656,15 +693,20 @@ describe("filters", () => {
 		const matrix = (attrs: string) =>
 			(
 				filterOf(
-					svg(`<filter id="c"><feColorMatrix ${attrs}/></filter><rect width="10" height="10" filter="url(#c)"/>`),
+					svg(
+						`<filter id="c"><feColorMatrix ${attrs}/></filter><rect width="10" height="10" filter="url(#c)"/>`,
+					),
 				).primitives[0] as { matrix: number[] }
 			).matrix.map((v) => Math.round(v * 1000) / 1000 + 0);
-		const identity = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+		const identity = [
+			1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+		];
 		expect(matrix('type="saturate" values="1"')).toEqual(identity);
 		expect(matrix('type="hueRotate" values="0"')).toEqual(identity);
 		expect(matrix('type="matrix" values="1 2 3"')).toEqual(identity);
 		expect(matrix('type="saturate" values="0"')).toEqual([
-			0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072, 0, 0, 0, 0, 0, 1, 0,
+			0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072, 0, 0, 0.213, 0.715, 0.072,
+			0, 0, 0, 0, 0, 1, 0,
 		]);
 		expect(matrix('type="luminanceToAlpha"')).toEqual([
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.213, 0.715, 0.072, 0, 0,
@@ -677,14 +719,24 @@ describe("filters", () => {
 				'<filter id="m"><feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/><feOffset in="blur" dx="4" dy="4" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter><rect width="10" height="10" filter="url(#m)"/>',
 			),
 		);
-		expect(f.primitives.at(-1)).toEqual({ kind: "merge", in: [1, "SourceGraphic"], linear: true });
+		expect(f.primitives.at(-1)).toEqual({
+			kind: "merge",
+			in: [1, "SourceGraphic"],
+			linear: true,
+		});
 	});
 
 	test("an empty filter or an empty region draws nothing", () => {
-		expect(parseSvg(svg('<filter id="f"/><rect width="10" height="10" filter="url(#f)"/>')).children).toEqual([]);
 		expect(
 			parseSvg(
-				svg('<filter id="f" width="0"><feOffset/></filter><rect width="10" height="10" filter="url(#f)"/>'),
+				svg('<filter id="f"/><rect width="10" height="10" filter="url(#f)"/>'),
+			).children,
+		).toEqual([]);
+		expect(
+			parseSvg(
+				svg(
+					'<filter id="f" width="0"><feOffset/></filter><rect width="10" height="10" filter="url(#f)"/>',
+				),
 			).children,
 		).toEqual([]);
 	});
@@ -713,8 +765,11 @@ describe("filters", () => {
 			expect(d.warnings.map((w) => w.feature)).toEqual([feature]);
 		}
 		expect(
-			parseSvg(svg('<filter id="f"><feMorphology/></filter><rect width="10" height="10" filter="url(#f)"/>'))
-				.warnings[0]?.message,
+			parseSvg(
+				svg(
+					'<filter id="f"><feMorphology/></filter><rect width="10" height="10" filter="url(#f)"/>',
+				),
+			).warnings[0]?.message,
 		).toContain("<feMorphology>");
 	});
 });

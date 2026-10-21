@@ -1,3 +1,4 @@
+import { linearGradientAngle } from "@freshcoat-js/engine";
 import {
 	type Box,
 	estimateTextWidth,
@@ -18,7 +19,6 @@ import {
 	transformPath,
 	viewBoxMatrix,
 } from "@freshcoat-js/engine/svg";
-import { linearGradientAngle } from "@freshcoat-js/engine";
 import type {
 	Element,
 	Fill,
@@ -150,7 +150,10 @@ export function svgToElements(
 
 	const fill = (p: SvgPaint, b: Box): Fill => {
 		if (p.kind === "solid") return color(p.color);
-		const stops = p.stops.map((s) => ({ offset: s.offset, color: color(s.color) }));
+		const stops = p.stops.map((s) => ({
+			offset: s.offset,
+			color: color(s.color),
+		}));
 		const w = b.width || 1;
 		const h = b.height || 1;
 		const at = (x: number, y: number): [number, number] => [
@@ -222,7 +225,11 @@ export function svgToElements(
 
 	// A box turned about `pivot` by `rotation`, as an element turned about its
 	// own centre.
-	const turned = (box: Box, rotation: number | undefined, pivot: [number, number]): Box => {
+	const turned = (
+		box: Box,
+		rotation: number | undefined,
+		pivot: [number, number],
+	): Box => {
 		if (!rotation) return box;
 		const r = (rotation * Math.PI) / 180;
 		const cx = box.x + box.width / 2 - pivot[0];
@@ -236,7 +243,12 @@ export function svgToElements(
 
 	const image = (i: SvgImage): Placed => {
 		const [x, y] = at(i.x, i.y);
-		const box = { x, y, width: i.width * Math.abs(sx), height: i.height * Math.abs(sy) };
+		const box = {
+			x,
+			y,
+			width: i.width * Math.abs(sx),
+			height: i.height * Math.abs(sy),
+		};
 		const element: ImageElement = {
 			id: uniqueId(i.id ?? "image"),
 			type: "image",
@@ -265,7 +277,12 @@ export function svgToElements(
 					? anchor[0] - width
 					: anchor[0];
 		const box = turned(
-			{ x: left, y: anchor[1] - BASELINE * size, width, height: LINE_HEIGHT * size },
+			{
+				x: left,
+				y: anchor[1] - BASELINE * size,
+				width,
+				height: LINE_HEIGHT * size,
+			},
 			t.rotation,
 			anchor,
 		);
@@ -286,7 +303,12 @@ export function svgToElements(
 
 	// The element's box is the path's bounds grown by a line on every side, so
 	// the glyphs on it fall inside, kept within the drawing.
-	const pathText = (t: SvgText, path: SvgTextPath, runs: TextRuns, size: number): Placed | null => {
+	const pathText = (
+		t: SvgText,
+		path: SvgTextPath,
+		runs: TextRuns,
+		size: number,
+	): Placed | null => {
 		const segs = transformPath(normalizePath(path.d), m);
 		const b = pathBounds(segs);
 		if (!b) return null;
@@ -298,15 +320,29 @@ export function svgToElements(
 		const box =
 			x1 > x0 && y1 > y0
 				? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
-				: { x: b.x - pad, y: b.y - pad, width: b.width + 2 * pad, height: b.height + 2 * pad };
+				: {
+						x: b.x - pad,
+						y: b.y - pad,
+						width: b.width + 2 * pad,
+						height: b.height + 2 * pad,
+					};
 		const properties = textProperties(runs);
 		properties.path = {
 			d: serializePath(transformPath(segs, [1, 0, 0, 1, -box.x, -box.y])),
 			...(path.startOffset
-				? { startOffset: path.percent ? `${round(path.startOffset)}%` : round(path.startOffset * k) }
+				? {
+						startOffset: path.percent
+							? `${round(path.startOffset)}%`
+							: round(path.startOffset * k),
+					}
 				: {}),
 			...(path.side === "right" ? { side: "right" as const } : {}),
-			...(t.anchor !== "start" ? { align: t.anchor === "middle" ? ("center" as const) : ("end" as const) } : {}),
+			...(t.anchor !== "start"
+				? {
+						align:
+							t.anchor === "middle" ? ("center" as const) : ("end" as const),
+					}
+				: {}),
 		};
 		const element: TextElement = {
 			id: uniqueId(t.id ?? "text"),
@@ -346,8 +382,17 @@ export function svgToElements(
 		if (it.kind === "image") return image(it);
 		if (it.kind === "text") return text(it);
 		if (it.filter && !warnings.some((w) => w.feature === "filter"))
-			warnings.push({ feature: "filter", message: "filters are not applied to editable layers" });
-		if (!it.id && it.opacity === undefined && !it.clip && !it.mask && it.children.length === 1)
+			warnings.push({
+				feature: "filter",
+				message: "filters are not applied to editable layers",
+			});
+		if (
+			!it.id &&
+			it.opacity === undefined &&
+			!it.clip &&
+			!it.mask &&
+			it.children.length === 1
+		)
 			return item(it.children[0] as SvgItem);
 		const children = it.children.map(item).filter((p): p is Placed => !!p);
 		const box = union(children.map((p) => p.box));
@@ -355,7 +400,12 @@ export function svgToElements(
 		const size = { width: round(box.width), height: round(box.height) };
 		const pos = { x: round(box.x), y: round(box.y) };
 		let placed: Placed | null = null;
-		const maskOf = (content: Placed[], id: string, luminance: boolean, inner: Placed[]): Placed | null => {
+		const maskOf = (
+			content: Placed[],
+			id: string,
+			luminance: boolean,
+			inner: Placed[],
+		): Placed | null => {
 			const cover = single(content, id);
 			if (!cover) return null;
 			const element: MaskElement = {
@@ -372,12 +422,19 @@ export function svgToElements(
 			return { element, box };
 		};
 		if (it.clip) {
-			const clips = it.clip.map((c) => shape(c)).filter((p): p is Placed => !!p);
+			const clips = it.clip
+				.map((c) => shape(c))
+				.filter((p): p is Placed => !!p);
 			placed = maskOf(clips, "clip", false, children);
 		}
 		if (it.mask) {
 			const content = it.mask.map(item).filter((p): p is Placed => !!p);
-			placed = maskOf(content, "mask-content", true, placed ? [placed] : children);
+			placed = maskOf(
+				content,
+				"mask-content",
+				true,
+				placed ? [placed] : children,
+			);
 		}
 		if (!placed)
 			placed = {

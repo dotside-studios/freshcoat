@@ -55,8 +55,7 @@ export function fitRect(
 	dh: number;
 } {
 	const { ox, oy, cw, ch } = cropRegion(iw, ih, opts?.crop);
-	if (fit === "fill")
-		return { sx: ox, sy: oy, sw: cw, sh: ch, dx, dy, dw, dh };
+	if (fit === "fill") return { sx: ox, sy: oy, sw: cw, sh: ch, dx, dy, dw, dh };
 	const ir = cw / ch;
 	const dr = dw / dh;
 	if (fit === "cover") {

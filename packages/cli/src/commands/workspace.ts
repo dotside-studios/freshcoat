@@ -3,6 +3,7 @@ import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Writable } from "node:stream";
 import type { Template } from "@freshcoat-js/coatfile";
+import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
 import {
 	type CutSpots,
 	type ExportPreset,
@@ -12,8 +13,8 @@ import {
 	SheetLayoutError,
 	sheetSummary,
 	type ViewFilter,
-	withView,
 	type Workspace,
+	withView,
 } from "@freshcoat-js/workspace";
 import { packWorkspace } from "@freshcoat-js/workspace/archive";
 import {
@@ -28,14 +29,13 @@ import {
 	sheetLayout,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
-import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { fontFetch, withFetch } from "../font-cache";
+import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log, UsageError } from "../io";
 import { createLoader, openRenderer } from "../renderer";
 import { version } from "../version";
-import { readWorkspace } from "../workspace-file";
 import { poolSize, startWorkerPool } from "../worker-pool";
-import { resolveTemplateFonts } from "@freshcoat-js/coatfile";
+import { readWorkspace } from "../workspace-file";
 
 /** A PDF holds every rendered page in memory until it is assembled. */
 export const DEFAULT_MAX_PDF_PAGES = 2000;
@@ -73,7 +73,8 @@ export async function renderWorkspace(
 			`a .coatworkspace needs --preset <name|id>${presetList(workspace.presets)}`,
 		);
 	const preset = findPreset(workspace, options.preset);
-	if (!preset) throw new CliError(presetMessage(workspace.presets, options.preset));
+	if (!preset)
+		throw new CliError(presetMessage(workspace.presets, options.preset));
 
 	const chosen: ExportPreset = {
 		...preset,
@@ -82,7 +83,9 @@ export async function renderWorkspace(
 		...(options.pieces ? { split: "pieces" as const } : {}),
 		...(options.cut ? { cutFile: options.cut } : {}),
 		...(options.cutLines || options.cutSpot ? { cutLines: true } : {}),
-		...(options.cutSpot ? { cutSpots: { ...preset.cutSpots, ...options.cutSpot } } : {}),
+		...(options.cutSpot
+			? { cutSpots: { ...preset.cutSpots, ...options.cutSpot } }
+			: {}),
 		...(options.minDpi !== undefined ? { minImageDpi: options.minDpi } : {}),
 	};
 	const sheets = sheetLayout(preset);
@@ -91,13 +94,21 @@ export async function renderWorkspace(
 			`--pieces does not go with double-sided sheets; "${preset.name}" prints duplex`,
 		);
 	if (options.cut && preset.format === "pdf")
-		throw new CliError(`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`);
+		throw new CliError(
+			`--cut applies only to an image preset; "${preset.name}" is a PDF, which takes --cut-lines`,
+		);
 	if (options.cutLines && preset.format !== "pdf")
-		throw new CliError(`--cut-lines applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
+		throw new CliError(
+			`--cut-lines applies only to a PDF preset; "${preset.name}" writes images, which take --cut`,
+		);
 	if (options.cutSpot && preset.format !== "pdf")
-		throw new CliError(`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`);
+		throw new CliError(
+			`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`,
+		);
 	if (options.maxPdfPages !== undefined && preset.format !== "pdf")
-		throw new CliError(`--max-pdf-pages applies only to a PDF preset; "${preset.name}" writes images`);
+		throw new CliError(
+			`--max-pdf-pages applies only to a PDF preset; "${preset.name}" writes images`,
+		);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,
@@ -106,11 +117,16 @@ export async function renderWorkspace(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.maxPdfPages !== undefined ? { maxPdfPages: options.maxPdfPages } : {}),
+			...(options.maxPdfPages !== undefined
+				? { maxPdfPages: options.maxPdfPages }
+				: {}),
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
-							await saveWorkspace(path, { ...workspace, datasets: next.datasets });
+							await saveWorkspace(path, {
+								...workspace,
+								datasets: next.datasets,
+							});
 							log.info(`saved the record statuses to ${file}`);
 						},
 					}
@@ -131,21 +147,34 @@ function withFilters(
 	const entry = workspace.templates.find((t) => t.id === preset.templateId);
 	const binding = entry?.binding;
 	if (!entry || !readsDataset(binding))
-		throw new CliError(`--where needs the template of preset "${preset.name}" to be bound to a dataset`);
+		throw new CliError(
+			`--where needs the template of preset "${preset.name}" to be bound to a dataset`,
+		);
 	const view = binding.view ?? { filters: [] };
-	const next = { ...entry, binding: withView(binding, { ...view, filters: [...view.filters, ...filters] }) };
+	const next = {
+		...entry,
+		binding: withView(binding, {
+			...view,
+			filters: [...view.filters, ...filters],
+		}),
+	};
 	return {
 		...workspace,
 		templates: workspace.templates.map((t) => (t === entry ? next : t)),
 	};
 }
 
-export async function saveWorkspace(path: string, workspace: Workspace): Promise<void> {
+export async function saveWorkspace(
+	path: string,
+	workspace: Workspace,
+): Promise<void> {
 	const temporary = `${path}.${process.pid}.tmp`;
 	try {
 		await packWorkspace(
 			workspace,
-			Writable.toWeb(createWriteStream(temporary)) as WritableStream<Uint8Array>,
+			Writable.toWeb(
+				createWriteStream(temporary),
+			) as WritableStream<Uint8Array>,
 		);
 		await rename(temporary, path);
 	} catch (err) {
@@ -183,8 +212,15 @@ export async function runPreset(
 	checkPieces(preset, readiness, log);
 	warnNotices(readiness, log);
 	const { entry, plan } = readiness;
-	if (!entry) throw new CliError(`preset "${preset.name}": its template is not in the workspace`);
-	checkPdfPages(preset, plan.length, options.maxPdfPages ?? DEFAULT_MAX_PDF_PAGES);
+	if (!entry)
+		throw new CliError(
+			`preset "${preset.name}": its template is not in the workspace`,
+		);
+	checkPdfPages(
+		preset,
+		plan.length,
+		options.maxPdfPages ?? DEFAULT_MAX_PDF_PAGES,
+	);
 	checkCuts(preset, entry.template, log);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
@@ -196,7 +232,11 @@ export async function runPreset(
 	const out = resolve(io.cwd, options.out);
 	const file = writesFile(options.out);
 	await mkdir(file ? dirname(out) : out, { recursive: true });
-	const threads = poolSize(plan.length, largestImagePixels(workspace, preset, plan), options.jobs);
+	const threads = poolSize(
+		plan.length,
+		largestImagePixels(workspace, preset, plan),
+		options.jobs,
+	);
 	const pool =
 		threads > 1
 			? await startWorkerPool(threads, options.root, fonts, signal)
@@ -233,7 +273,8 @@ export async function runPreset(
 		}
 		await options.save?.(result.workspace);
 		for (const item of result.items)
-			for (const warning of item.warnings ?? []) log.warn(`${item.fileName}: ${warning.message}`);
+			for (const warning of item.warnings ?? [])
+				log.warn(`${item.fileName}: ${warning.message}`);
 		for (const side of result.rasterized ?? []) {
 			const line = describeRasterized(side);
 			if (line) log.info(`${side.side}: ${line}`);
@@ -279,7 +320,9 @@ function planPreset(
 	checkPieces(preset, readiness, log);
 	warnNotices(readiness, log);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
-	const layout = sheets?.imposition ? `, ${sheetSummary(sheets.imposition)}` : "";
+	const layout = sheets?.imposition
+		? `, ${sheetSummary(sheets.imposition)}`
+		: "";
 	log.out(
 		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
 	);
@@ -310,7 +353,10 @@ function checkPieces(
 		log.warn("no slices to split; exporting whole sides");
 }
 
-function warnNotices(readiness: Pick<PresetReadiness, "notices">, log: Log): void {
+function warnNotices(
+	readiness: Pick<PresetReadiness, "notices">,
+	log: Log,
+): void {
 	for (const { message } of readiness.notices)
 		log.warn(`${message.charAt(0).toLowerCase()}${message.slice(1)}`);
 }
@@ -318,7 +364,10 @@ function warnNotices(readiness: Pick<PresetReadiness, "notices">, log: Log): voi
 /** Warns when cut files are asked of a template whose slices have no edge. */
 function checkCuts(preset: ExportPreset, template: Template, log: Log): void {
 	const asked = exportCutFile(preset) !== "none" || exportCutLines(preset);
-	if (asked && !/"edge":"(through|kiss|score|perforate)"/.test(JSON.stringify(template)))
+	if (
+		asked &&
+		!/"edge":"(through|kiss|score|perforate)"/.test(JSON.stringify(template))
+	)
 		log.warn("no slice has an edge to cut; writing no cut lines");
 }
 
@@ -345,7 +394,10 @@ function presetList(presets: readonly { id: string; name: string }[]): string {
 	return `\nPresets:\n${presets.map((p) => `  ${p.name}  (${p.id})`).join("\n")}`;
 }
 
-function progressReporter(log: Log, sheets: boolean): (progress: JobProgress) => void {
+function progressReporter(
+	log: Log,
+	sheets: boolean,
+): (progress: JobProgress) => void {
 	let lastTenth = -1;
 	return ({ done, failed, total, assembling }) => {
 		const text = assembling

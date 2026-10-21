@@ -1,9 +1,8 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createRect, createText, type Node } from "../src/node";
 import { createRenderer } from "../src/renderer";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -42,14 +41,23 @@ const page = (id?: string): Node =>
 				pos: { x: 8, y: 8 },
 				size: { width: 184, height: 40 },
 				text: "Licensed",
-				font: { family: "Licensed", weight: 400, style: "normal", size: 22, lineHeight: 1.2 },
+				font: {
+					family: "Licensed",
+					weight: 400,
+					style: "normal",
+					size: 22,
+					lineHeight: 1.2,
+				},
 				color: "#1d3557",
 			}),
 		],
 	});
 
 async function render(fsType: number | null, id?: string) {
-	const renderer = await createRenderer({ ck, fonts: { Licensed: [withFsType(fsType)] } });
+	const renderer = await createRenderer({
+		ck,
+		fonts: { Licensed: [withFsType(fsType)] },
+	});
 	return renderer.renderPdf(page(id), { width: W, height: H });
 }
 
@@ -84,12 +92,21 @@ describe("OS/2 fsType in vector PDFs", () => {
 
 	test("leaves the layer out of the warning when the text has no id", async () => {
 		const pdf = await render(0x0002);
-		expect(pdf.warnings).toEqual([{ kind: "font_embedding_restricted", family: "Geist" }]);
+		expect(pdf.warnings).toEqual([
+			{ kind: "font_embedding_restricted", family: "Geist" },
+		]);
 	});
 
 	test("does not warn when text is outlined by request", async () => {
-		const renderer = await createRenderer({ ck, fonts: { Licensed: [withFsType(0x0002)] } });
-		const pdf = await renderer.renderPdf(page(), { width: W, height: H, text: "outline" });
+		const renderer = await createRenderer({
+			ck,
+			fonts: { Licensed: [withFsType(0x0002)] },
+		});
+		const pdf = await renderer.renderPdf(page(), {
+			width: W,
+			height: H,
+			text: "outline",
+		});
 		expect(pdf.warnings).toEqual([]);
 	});
 });

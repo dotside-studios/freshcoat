@@ -1,11 +1,12 @@
 // Shadows: drop and inner, with spread, singly and stacked. Asserted on real
 // painted pixels — the filter graph is CanvasKit's, so only the output proves it.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { Shadows } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const W = 80;
 const H = 80;

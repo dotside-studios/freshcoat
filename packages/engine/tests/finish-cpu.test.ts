@@ -1,9 +1,10 @@
 // The finishing pass on the CPU against the shader it stands in for, byte for
 // byte, on frames that cover every 8-bit value.
+
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { setCpuFinish } from "../src/canvaskit";
-import { createHeadlessEnv } from "./helpers/headless";
+import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	compileScene,
 	createFrame,
@@ -12,10 +13,10 @@ import {
 	encodePng,
 	type PaintCache,
 } from "../src/index";
-import { deriveFontMetrics } from "../src/font-metrics";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { FrameFinish } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 type Size = { width: number; height: number };
 
@@ -107,18 +108,18 @@ describe("the finish on the CPU", () => {
 		for (const size of SIZES) await expectSame(size, finish);
 	});
 
-	test.each(["per-channel", "monochrome"] as const)(
-		"matches the shader with %s dither",
-		async (mode) => {
-			for (const size of SIZES)
-				for (const seed of SEEDS)
-					for (const extra of [{}, { whiteClamp: 240, blackExtract: 16 }])
-						await expectSame(size, {
-							dither: { amount: seed === 1 ? 12 : 4, seed, mode },
-							...extra,
-						});
-		},
-	);
+	test.each([
+		"per-channel",
+		"monochrome",
+	] as const)("matches the shader with %s dither", async (mode) => {
+		for (const size of SIZES)
+			for (const seed of SEEDS)
+				for (const extra of [{}, { whiteClamp: 240, blackExtract: 16 }])
+					await expectSame(size, {
+						dither: { amount: seed === 1 ? 12 : 4, seed, mode },
+						...extra,
+					});
+	});
 
 	test("matches the shader with a curve", async () => {
 		const curve = {

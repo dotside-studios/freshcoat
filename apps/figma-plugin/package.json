@@ -29,7 +29,6 @@
 		"build": "build-figma-plugin --typecheck --minify",
 		"watch": "build-figma-plugin --typecheck --watch",
 		"test": "vitest run",
-		"check": "biome check",
 		"typecheck": "tsc --noEmit && tsc --noEmit -p harness",
 		"harness": "build-figma-plugin && bun harness/serve.ts",
 		"harness:test": "build-figma-plugin && playwright test -c harness/playwright.config.ts"
@@ -43,13 +42,12 @@
 		"preact": "^10.29.2"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.5",
 		"@create-figma-plugin/build": "^4.0.3",
 		"@figma/plugin-typings": "^1.100.0",
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@playwright/test": "^1.56.1",
 		"@types/node": "^26.6.3",
 		"typescript": "^5.7.2",
-		"vitest": "^3.0.5"
+		"vitest": "catalog:"
 	}
 }

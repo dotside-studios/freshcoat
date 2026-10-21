@@ -1,6 +1,10 @@
-import { createRenderer, decodePixels, type GroupNode } from "@freshcoat-js/engine";
+import { beforeAll, describe, expect, test } from "bun:test";
+import {
+	createRenderer,
+	decodePixels,
+	type GroupNode,
+} from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { renderTemplate } from "../src/render";
 import type {
@@ -123,14 +127,11 @@ describe("grid layout", () => {
 
 	test("children flow row by row, spans cover several tracks", () => {
 		const r = boxes(
-			gridTemplate(
-				{ type: "grid", columns: [40, 40, 40], rows: [30, 30] },
-				[
-					cell("wide", "#f00", { column: [1, 2], height: "fill" }),
-					cell("c", "#0f0"),
-					cell("d", "#00f"),
-				],
-			),
+			gridTemplate({ type: "grid", columns: [40, 40, 40], rows: [30, 30] }, [
+				cell("wide", "#f00", { column: [1, 2], height: "fill" }),
+				cell("c", "#0f0"),
+				cell("d", "#00f"),
+			]),
 		);
 		expect(r.wide.pos).toEqual({ x: 0, y: 0 });
 		expect(r.wide.size).toEqual({ width: 10, height: 30 });
@@ -177,9 +178,7 @@ describe("grid layout", () => {
 		).toEqual([]);
 		for (const columns of [[], ["1px"], ["fr"], [-4], ["auto", "1 fr"]])
 			expect(
-				codes(
-					gridTemplate({ type: "grid", columns } as unknown as Layout, []),
-				),
+				codes(gridTemplate({ type: "grid", columns } as unknown as Layout, [])),
 			).toContain("invalid_shape");
 		expect(
 			codes(
@@ -211,7 +210,6 @@ describe("grid layout", () => {
 });
 
 describe("grid layout paint", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 	let ck: any;
 	beforeAll(async () => {
 		ck = await loadCanvasKit();
@@ -226,16 +224,18 @@ describe("grid layout paint", () => {
 				cell("c", "#00ff00", { ...FILL, column: [1, 2] }),
 			],
 		);
-		const [frame] = (await renderTemplate(
+		const [frame] = await renderTemplate(
 			await createRenderer({ ck, cache: false }),
 			tpl,
 			{},
 			{ width: 120, height: 60 },
-		));
+		);
 		const d = decodePixels(ck, frame.bytes);
 		if (!d) throw new Error("decode failed");
 		const at = (x: number, y: number) =>
-			Array.from(d.data.slice((y * d.width + x) * 4, (y * d.width + x) * 4 + 3));
+			Array.from(
+				d.data.slice((y * d.width + x) * 4, (y * d.width + x) * 4 + 3),
+			);
 		expect(at(20, 15)).toEqual([255, 0, 0]);
 		expect(at(80, 15)).toEqual([0, 0, 255]);
 		expect(at(20, 45)).toEqual([0, 255, 0]);

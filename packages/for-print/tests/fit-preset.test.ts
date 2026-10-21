@@ -1,9 +1,9 @@
 // Fitting a target preset from simulated printers whose behaviour is known, then
 // running the preset through printAdjust to see the print come back.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
-	chromaRampChart,
 	type ChartSpec,
+	chromaRampChart,
 	grayBalanceChart,
 	hueSweepChart,
 	type RGB,
@@ -24,7 +24,8 @@ const readingFrom = (
 	patches: spec.patches
 		.filter((p) => p.role !== "fiducial")
 		.map((p) => {
-			const measured = p.role === "stock" ? ([255, 255, 255] as RGB) : printer(p.rgb);
+			const measured =
+				p.role === "stock" ? ([255, 255, 255] as RGB) : printer(p.rgb);
 			return {
 				id: p.id,
 				role: p.role,
@@ -49,7 +50,9 @@ const noisy = (printer: Printer, amplitude: number): Printer => {
 		return (seed / 4294967296) * 2 - 1;
 	};
 	return (sent) =>
-		printer(sent).map((v) => Math.min(255, Math.max(0, v + rand() * amplitude))) as RGB;
+		printer(sent).map((v) =>
+			Math.min(255, Math.max(0, v + rand() * amplitude)),
+		) as RGB;
 };
 
 const power =
@@ -72,7 +75,11 @@ const fadedPrinter =
 
 // Run a pixel through the preset the way the planner renders it (matrix, then
 // the tone LUT), then through the printer.
-function printed(preset: Parameters<typeof printAdjust>[0], printer: Printer, rgb: RGB): RGB {
+function printed(
+	preset: Parameters<typeof printAdjust>[0],
+	printer: Printer,
+	rgb: RGB,
+): RGB {
 	const adjust = printAdjust(preset);
 	let v = rgb.map((c) => c / 255);
 	const m = adjust.colorMatrix;
@@ -80,12 +87,20 @@ function printed(preset: Parameters<typeof printAdjust>[0], printer: Printer, rg
 		v = [0, 1, 2].map((r) =>
 			Math.min(
 				1,
-				Math.max(0, m[r * 5] * v[0] + m[r * 5 + 1] * v[1] + m[r * 5 + 2] * v[2] + m[r * 5 + 4]),
+				Math.max(
+					0,
+					m[r * 5] * v[0] +
+						m[r * 5 + 1] * v[1] +
+						m[r * 5 + 2] * v[2] +
+						m[r * 5 + 4],
+				),
 			),
 		);
 	}
 	const lut = adjust.lut?.r;
-	const sent = v.map((c) => (lut ? lut[Math.round(c * 255)] : Math.round(c * 255))) as RGB;
+	const sent = v.map((c) =>
+		lut ? lut[Math.round(c * 255)] : Math.round(c * 255),
+	) as RGB;
 	return printer(sent);
 }
 
@@ -100,7 +115,9 @@ describe("tone", () => {
 		["a light printer", 0.75],
 	])("%s: the preset brings sent grays back", (_, k) => {
 		const printer = power(k);
-		const fit = unwrap(fitTargetPreset({ tone: readingFrom(toneWedgeChart(), printer) }));
+		const fit = unwrap(
+			fitTargetPreset({ tone: readingFrom(toneWedgeChart(), printer) }),
+		);
 		expect(fit.fitted).toEqual(["gamma"]);
 		expect(fit.preset.gamma).toBeCloseTo(1 / k, 1);
 		for (let v = 32; v <= 224; v += 32) {
@@ -111,8 +128,12 @@ describe("tone", () => {
 	});
 
 	test("the direction: a dark printer gets gamma below 1, a light one above 1", () => {
-		const dark = unwrap(fitTargetPreset({ tone: readingFrom(toneWedgeChart(), power(1.5)) }));
-		const light = unwrap(fitTargetPreset({ tone: readingFrom(toneWedgeChart(), power(0.7)) }));
+		const dark = unwrap(
+			fitTargetPreset({ tone: readingFrom(toneWedgeChart(), power(1.5)) }),
+		);
+		const light = unwrap(
+			fitTargetPreset({ tone: readingFrom(toneWedgeChart(), power(0.7)) }),
+		);
 		expect(dark.preset.gamma).toBeLessThan(1);
 		expect(light.preset.gamma).toBeGreaterThan(1);
 		const mid = printAdjust(dark.preset).lut?.r[128] ?? 0;
@@ -121,7 +142,9 @@ describe("tone", () => {
 
 	test("a gray ramp works as well as a wedge", () => {
 		const printer = power(1.3);
-		const fit = unwrap(fitTargetPreset({ tone: readingFrom(grayBalanceChart(16), printer) }));
+		const fit = unwrap(
+			fitTargetPreset({ tone: readingFrom(grayBalanceChart(16), printer) }),
+		);
 		expect(fit.preset.gamma).toBeCloseTo(1 / 1.3, 1);
 	});
 
@@ -133,18 +156,24 @@ describe("tone", () => {
 		const printer: Printer = (sent) =>
 			sent.map((v) => {
 				let best = 0;
-				for (let i = 0; i < 256; i++) if (Math.abs(lut[i] - v) < Math.abs(lut[best] - v)) best = i;
+				for (let i = 0; i < 256; i++)
+					if (Math.abs(lut[i] - v) < Math.abs(lut[best] - v)) best = i;
 				return best;
 			}) as RGB;
-		const fit = unwrap(fitTargetPreset({ tone: readingFrom(toneWedgeChart(17), printer) }));
+		const fit = unwrap(
+			fitTargetPreset({ tone: readingFrom(toneWedgeChart(17), printer) }),
+		);
 		expect(fit.fitted).toContain("darkness");
 		expect(fit.preset.darkness).toBeGreaterThan(0.1);
 		expect(fit.tone?.after).toBeLessThan(2);
 	});
 
 	test("a printer that cannot reach black is not given a contrast boost", () => {
-		const printer: Printer = (sent) => sent.map((v) => 40 + (v / 255) * 215) as RGB;
-		const fit = unwrap(fitTargetPreset({ tone: readingFrom(toneWedgeChart(), printer) }));
+		const printer: Printer = (sent) =>
+			sent.map((v) => 40 + (v / 255) * 215) as RGB;
+		const fit = unwrap(
+			fitTargetPreset({ tone: readingFrom(toneWedgeChart(), printer) }),
+		);
 		expect(fit.preset.contrast).toBe(1);
 		expect(fit.notes.join(" ")).toMatch(/black is out of reach/);
 	});
@@ -156,13 +185,21 @@ describe("tone", () => {
 				chroma: readingFrom(chromaRampChart(), fadedPrinter(1)),
 			}),
 		);
-		expect(fit.preset).toEqual({ saturation: 1, contrast: 1, sharpness: 0, gamma: 1, darkness: 0 });
+		expect(fit.preset).toEqual({
+			saturation: 1,
+			contrast: 1,
+			sharpness: 0,
+			gamma: 1,
+			darkness: 0,
+		});
 	});
 
 	test("noisy readings still land close", () => {
 		const printer = power(1.35);
 		const fit = unwrap(
-			fitTargetPreset({ tone: readingFrom(toneWedgeChart(), noisy(printer, 3)) }),
+			fitTargetPreset({
+				tone: readingFrom(toneWedgeChart(), noisy(printer, 3)),
+			}),
 		);
 		expect(fit.preset.gamma).toBeGreaterThan(0.68);
 		expect(fit.preset.gamma).toBeLessThan(0.8);
@@ -176,29 +213,38 @@ function printAdjustless() {
 describe("chroma", () => {
 	test("restores the chroma the printer drops below its gamut edge", () => {
 		const printer = fadedPrinter(0.75, 150);
-		const fit = unwrap(fitTargetPreset({ chroma: readingFrom(chromaRampChart(), printer) }));
+		const fit = unwrap(
+			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), printer) }),
+		);
 		expect(fit.fitted).toEqual(["saturation"]);
 		expect(fit.retainedChroma).toBeCloseTo(0.75, 2);
 		expect(fit.preset.saturation).toBeCloseTo(1 / 0.75, 1);
 		// Below the edge (sent chroma 100 -> 75 kept) the print returns to what was sent.
 		const sent: RGB = [180, 100, 80];
 		const got = printed(fit.preset, printer, sent);
-		for (let c = 0; c < 3; c++) expect(Math.abs(got[c] - sent[c])).toBeLessThan(4);
+		for (let c = 0; c < 3; c++)
+			expect(Math.abs(got[c] - sent[c])).toBeLessThan(4);
 	});
 
 	test("patches at and past the gamut edge do not drag the fit", () => {
 		const ceilinged = unwrap(
-			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8, 90)) }),
+			fitTargetPreset({
+				chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8, 90)),
+			}),
 		);
 		const open = unwrap(
-			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8)) }),
+			fitTargetPreset({
+				chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8)),
+			}),
 		);
 		expect(ceilinged.preset.saturation).toBeCloseTo(open.preset.saturation, 2);
 	});
 
 	test("a hue sweep gives a fit, with a note that it is weaker", () => {
 		const fit = unwrap(
-			fitTargetPreset({ chroma: readingFrom(hueSweepChart(), fadedPrinter(0.8)) }),
+			fitTargetPreset({
+				chroma: readingFrom(hueSweepChart(), fadedPrinter(0.8)),
+			}),
 		);
 		expect(fit.preset.saturation).toBeCloseTo(1.25, 1);
 		expect(fit.notes.join(" ")).toMatch(/hue sweep/);
@@ -206,7 +252,12 @@ describe("chroma", () => {
 
 	test("noisy readings still land close", () => {
 		const fit = unwrap(
-			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), noisy(fadedPrinter(0.8, 170), 2)) }),
+			fitTargetPreset({
+				chroma: readingFrom(
+					chromaRampChart(),
+					noisy(fadedPrinter(0.8, 170), 2),
+				),
+			}),
 		);
 		expect(fit.preset.saturation).toBeGreaterThan(1.18);
 		expect(fit.preset.saturation).toBeLessThan(1.32);
@@ -214,7 +265,9 @@ describe("chroma", () => {
 
 	test("saturation is clamped to a sane range, and the note says so", () => {
 		const fit = unwrap(
-			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), fadedPrinter(0.4)) }),
+			fitTargetPreset({
+				chroma: readingFrom(chromaRampChart(), fadedPrinter(0.4)),
+			}),
 		);
 		expect(fit.preset.saturation).toBe(1.6);
 		expect(fit.notes.join(" ")).toMatch(/clamped/);
@@ -248,7 +301,9 @@ describe("what is left alone", () => {
 		expect(toneOnly.preset.sharpness).toBe(0.3);
 
 		const chromaOnly = unwrap(
-			fitTargetPreset({ chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8)) }),
+			fitTargetPreset({
+				chroma: readingFrom(chromaRampChart(), fadedPrinter(0.8)),
+			}),
 		);
 		expect(chromaOnly.fitted).toEqual(["saturation"]);
 		expect(chromaOnly.preset.gamma).toBe(1);
@@ -268,16 +323,23 @@ describe("what is left alone", () => {
 
 describe("refusals", () => {
 	test("no charts", () => {
-		expect(fitTargetPreset({})).toMatchObject({ ok: false, reason: "no-charts" });
+		expect(fitTargetPreset({})).toMatchObject({
+			ok: false,
+			reason: "no-charts",
+		});
 	});
 
 	test("an unsafe reading is refused, not fitted around", () => {
-		const bad = readingFrom(toneWedgeChart(), power(1.4), { stockClipped: true });
+		const bad = readingFrom(toneWedgeChart(), power(1.4), {
+			stockClipped: true,
+		});
 		expect(fitTargetPreset({ tone: bad })).toMatchObject({
 			ok: false,
 			reason: "unsafe-reading",
 		});
-		const uneven = readingFrom(chromaRampChart(), fadedPrinter(0.8), { missed: ["chroma-250-3"] });
+		const uneven = readingFrom(chromaRampChart(), fadedPrinter(0.8), {
+			missed: ["chroma-250-3"],
+		});
 		expect(fitTargetPreset({ chroma: uneven })).toMatchObject({
 			ok: false,
 			reason: "unsafe-reading",
@@ -307,7 +369,9 @@ describe("refusals", () => {
 	});
 
 	test("allowUnsafe lets diagnostics through", () => {
-		const bad = readingFrom(toneWedgeChart(), power(1.4), { stockClipped: true });
+		const bad = readingFrom(toneWedgeChart(), power(1.4), {
+			stockClipped: true,
+		});
 		expect(fitTargetPreset({ tone: bad }, { allowUnsafe: true }).ok).toBe(true);
 	});
 });

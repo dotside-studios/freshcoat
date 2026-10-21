@@ -7,9 +7,11 @@
 // patch actually is — an off-by-one in the layout, an antialiased patch edge, or
 // a registration point that doesn't land on its mark would all pass there and
 // fail here.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { profileFromPhoto } from "../src/calibrate";
 import {
 	type ChartSpec,
 	chartScene,
@@ -20,7 +22,6 @@ import {
 	type Point,
 	toneWedgeChart,
 } from "../src/chart";
-import { profileFromPhoto } from "../src/calibrate";
 import { grayCast, readChart, repeatSpread } from "../src/measure";
 import type { PixelData } from "../src/types";
 
@@ -137,8 +138,9 @@ describe("profileFromPhoto", () => {
 			height: 1,
 		};
 		const p = { x: 0, y: 0 };
-		expect(
-			profileFromPhoto(photo, [p, p, p, p], { name: "p" }, spec),
-		).toEqual({ ok: false, reason: "unreadable-corners" });
+		expect(profileFromPhoto(photo, [p, p, p, p], { name: "p" }, spec)).toEqual({
+			ok: false,
+			reason: "unreadable-corners",
+		});
 	});
 });

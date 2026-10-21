@@ -1,14 +1,15 @@
 // A group's isolation decides what its blended children mix with: Figma's Normal
 // keeps them to the group's own content, pass-through lets them reach whatever
 // lies under the group.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { createGroup, createRect, type Node } from "../src/node";
 import type { DrawGroupCommand } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
+import { renderSceneToPng } from "./helpers/headless";
 
 let ck: any;
 beforeAll(async () => {
@@ -95,9 +96,9 @@ describe("group isolation", () => {
 				cmd as never,
 			]).map((i) => i.code);
 		const box = { pos: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
-		expect(codes({ op: "drawGroup", ...box, children: [], isolate: 1 })).toEqual(
-			["bad_isolate"],
-		);
+		expect(
+			codes({ op: "drawGroup", ...box, children: [], isolate: 1 }),
+		).toEqual(["bad_isolate"]);
 		expect(codes({ op: "drawRect", ...box, isolate: true })).toEqual([
 			"isolate_not_group",
 		]);

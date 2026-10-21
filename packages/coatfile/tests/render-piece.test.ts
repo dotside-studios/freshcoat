@@ -1,8 +1,9 @@
 // Rendering one slice piece: the box grown by its bleed, cut from the whole
 // side's composite, and masked to the outline grown by that bleed.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Element, Template } from "../src/types";
 
@@ -72,8 +73,7 @@ const sliceOver = (
 	height = 40,
 	props: Record<string, unknown> = {},
 	rest: Record<string, unknown> = {},
-) =>
-	rect("right", "#00000000", x, y, width, height, { slice, ...props }, rest);
+) => rect("right", "#00000000", x, y, width, height, { slice, ...props }, rest);
 
 async function piece(
 	template: Template,
@@ -101,7 +101,12 @@ const CLEAR = [0, 0, 0, 0];
 
 describe("render a slice piece", () => {
 	test("is the box grown by the bleed, at any scale", async () => {
-		const t = card([sliceOver({ name: "right", bleed: { top: 2, right: 3, bottom: 4, left: 5 } })]);
+		const t = card([
+			sliceOver({
+				name: "right",
+				bleed: { top: 2, right: 3, bottom: 4, left: 5 },
+			}),
+		]);
 		const one = await piece(t, "right");
 		expect([one.width, one.height]).toEqual([48, 46]);
 		expect(one.frame.piece).toEqual({ x: 5, y: 2, width: 40, height: 40 });
@@ -153,7 +158,9 @@ describe("render a slice piece", () => {
 	});
 
 	test("a rounded slice is transparent at its corners", async () => {
-		const t = card([sliceOver({ name: "right" }, 40, 0, 40, 40, { cornerRadius: 16 })]);
+		const t = card([
+			sliceOver({ name: "right" }, 40, 0, 40, 40, { cornerRadius: 16 }),
+		]);
 		const p = await piece(t, "right");
 		expect(p.at(0, 0)).toEqual(CLEAR);
 		expect(p.at(39, 39)).toEqual(CLEAR);
@@ -161,17 +168,23 @@ describe("render a slice piece", () => {
 	});
 
 	test("a rotated slice is transparent outside its outline", async () => {
-		const t = card(
-			[sliceOver({ name: "right" }, 50, 5, 20, 30, {}, { rotation: 45 })],
-		);
+		const t = card([
+			sliceOver({ name: "right" }, 50, 5, 20, 30, {}, { rotation: 45 }),
+		]);
 		const p = await piece(t, "right");
 		expect(p.width).toBeGreaterThan(30);
 		expect(p.at(0, 0)).toEqual(CLEAR);
-		expect(p.at(Math.floor(p.width / 2), Math.floor(p.height / 2))).toEqual(BLUE);
+		expect(p.at(Math.floor(p.width / 2), Math.floor(p.height / 2))).toEqual(
+			BLUE,
+		);
 	});
 
 	test("the bleed band takes in the art around the shape", async () => {
-		const t = card([sliceOver({ name: "right", bleed: 6 }, 20, 10, 40, 20, { cornerRadius: 8 })]);
+		const t = card([
+			sliceOver({ name: "right", bleed: 6 }, 20, 10, 40, 20, {
+				cornerRadius: 8,
+			}),
+		]);
 		const p = await piece(t, "right");
 		expect([p.width, p.height]).toEqual([52, 32]);
 		expect(p.at(8, 16)).toEqual(RED);
@@ -208,7 +221,9 @@ describe("render a slice piece", () => {
 						overrides: [
 							{
 								name: "front",
-								elements: [{ id: "right", properties: {}, pos: { x: 0, y: 0 } }],
+								elements: [
+									{ id: "right", properties: {}, pos: { x: 0, y: 0 } },
+								],
 							},
 						],
 					},
@@ -216,7 +231,9 @@ describe("render a slice piece", () => {
 			},
 		);
 		await expect(piece(t, "right")).rejects.toThrow(/no slice "right"/);
-		expect((await piece(t, "right", {}, { on: "true" })).at(5, 5)).toEqual(BLUE);
+		expect((await piece(t, "right", {}, { on: "true" })).at(5, 5)).toEqual(
+			BLUE,
+		);
 		expect(
 			(await piece(t, "right", { variantId: "left" }, { on: "true" })).at(5, 5),
 		).toEqual(RED);

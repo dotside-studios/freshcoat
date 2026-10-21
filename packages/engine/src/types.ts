@@ -148,7 +148,12 @@ export type Grain = {
 	seed: number;
 };
 
-export type GrainBlend = "normal" | "overlay" | "soft-light" | "multiply" | "screen";
+export type GrainBlend =
+	| "normal"
+	| "overlay"
+	| "soft-light"
+	| "multiply"
+	| "screen";
 
 // "cmyk" multiplies four screens at C 15°, M 75°, Y 0° and K 45°, each plus
 // `angle`: a look, not separations.

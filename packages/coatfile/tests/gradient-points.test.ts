@@ -1,6 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
+import {
+	linearGradientAngle,
+	linearGradientPoints,
+} from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
-import { linearGradientAngle, linearGradientPoints } from "@freshcoat-js/engine";
 import { templateJsonSchema } from "../src/json-schema";
 import type { Fill, RectNode, Template } from "../src/types";
 import { validate } from "../src/validate";
@@ -91,7 +94,13 @@ describe("linear gradient points", () => {
 
 	test("points outside the box validate", () => {
 		const v = validate(
-			withFill({ kind: "linear", angle: 0, from: [-2, 0.5], to: [3, 0.5], stops }),
+			withFill({
+				kind: "linear",
+				angle: 0,
+				from: [-2, 0.5],
+				to: [3, 0.5],
+				stops,
+			}),
 		);
 		expect(v.ok).toBe(true);
 	});

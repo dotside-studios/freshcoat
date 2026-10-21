@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { minimumFormatVersion } from "../src/format";
 import { renderCompiledPdf } from "../src/render";
@@ -89,7 +89,9 @@ describe("spot validation", () => {
 			["invalid_spot", "/template_data/0/elements/0/properties/spot/fill/alt"],
 		]);
 		expect(
-			codes(withLayers(rect({ spot: { fill: { spot: "W", tint: 2 } } })))[0]?.[0],
+			codes(
+				withLayers(rect({ spot: { fill: { spot: "W", tint: 2 } } })),
+			)[0]?.[0],
 		).toBe("invalid_shape");
 	});
 

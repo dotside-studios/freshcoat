@@ -1,5 +1,5 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { clearFontBytesCache, type FontFetch } from "@freshcoat-js/engine";
-import { afterEach, describe, expect, test } from "vitest";
 import { fontUsage } from "../src/font-usage";
 import { type FontFallback, resolveTemplateFonts } from "../src/fonts";
 import type { Template } from "../src/types";
@@ -41,7 +41,10 @@ const text = (family: string, weight?: number, spans?: unknown[]) => ({
 	},
 });
 
-function template(elements: unknown[], extra: Partial<Template> = {}): Template {
+function template(
+	elements: unknown[],
+	extra: Partial<Template> = {},
+): Template {
 	return {
 		format_version: "1.0",
 		name: "T",

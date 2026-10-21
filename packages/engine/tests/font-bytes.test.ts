@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, test } from "vitest";
-import type { FontResolution } from "../src/types";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
 	clearFontBytesCache,
 	FONT_MEMO_MAX,
 	type FontFetch,
 	fontBytes,
 } from "../src/font-bytes";
+import type { FontResolution } from "../src/types";
 
-// `bun test`'s vitest shim has no vi.stubGlobal; swap the global by hand.
+// bun:test has no vi.stubGlobal; swap the global by hand.
 const realFetch = globalThis.fetch;
 afterEach(() => {
 	globalThis.fetch = realFetch;
@@ -224,10 +224,9 @@ describe("fontBytes memo", () => {
 	});
 
 	test("the stylesheet memo evicts past its cap", async () => {
-		const requested = stubFetch(
-			"@font-face { src: url(https://f/a.ttf); }",
-			{ "https://f/a.ttf": 1 },
-		);
+		const requested = stubFetch("@font-face { src: url(https://f/a.ttf); }", {
+			"https://f/a.ttf": 1,
+		});
 		for (let i = 0; i <= FONT_MEMO_MAX; i++)
 			await fontBytes(google(`https://css/${i}`));
 		await fontBytes(google("https://css/0"));

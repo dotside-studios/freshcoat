@@ -1,15 +1,14 @@
 // JPEG encoding. Only CanvasKit's `full` build carries the JPEG encoder (the
 // worker pins it for WebP), so the round trip runs on that build and the
 // fallback on the default one, which answers in PNG and says so.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
 import { flattenOverWhite } from "../src/jpeg";
 import { createFrame, createRect } from "../src/node";
+import { renderSceneToPng } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instances
 let full: any;
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instances
 let base: any;
 
 beforeAll(async () => {
@@ -34,7 +33,6 @@ const scene = () =>
 		],
 	});
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 function pixelAt(ck: any, bytes: Uint8Array, x: number, y: number) {
 	const img = ck.MakeImageFromEncoded(bytes);
 	const w = img.width();

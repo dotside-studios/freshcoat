@@ -22,13 +22,20 @@ export type Findings = { errors: string[]; warnings: string[] };
  *  flagging images under `min`. */
 export type DpiCheck = { dpi?: number; min?: number };
 
-export function templateWarnings(template: Template, images: ImageDpiOptions = {}): string[] {
-	return templateHints(template, images).map((hint) => `${hintText(hint)} (${hintCode(hint)})`);
+export function templateWarnings(
+	template: Template,
+	images: ImageDpiOptions = {},
+): string[] {
+	return templateHints(template, images).map(
+		(hint) => `${hintText(hint)} (${hintCode(hint)})`,
+	);
 }
 
 /** The code Studio's Issues list gives a hint, to search the docs by. */
 export function hintCode(hint: TemplateHint): string {
-	return hint.kind === "variant" || hint.kind === "print" ? hint.issue.code : hint.kind;
+	return hint.kind === "variant" || hint.kind === "print"
+		? hint.issue.code
+		: hint.kind;
 }
 
 function hintText(hint: TemplateHint): string {
@@ -58,28 +65,51 @@ function andList(items: readonly string[]): string {
 		: `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
-export function workspaceFindings(workspace: Workspace, dpi: DpiCheck = {}): Findings {
+export function workspaceFindings(
+	workspace: Workspace,
+	dpi: DpiCheck = {},
+): Findings {
 	const errors: string[] = [];
 	const warnings: string[] = [];
 	for (const entry of workspace.templates) {
 		const checked = validate(entry.template);
 		if (!checked.ok)
-			errors.push(...checked.errors.map((issue) => `${entry.fileName}: ${formatIssue(issue)}`));
+			errors.push(
+				...checked.errors.map(
+					(issue) => `${entry.fileName}: ${formatIssue(issue)}`,
+				),
+			);
 		const images = { ...presetImageDpi(workspace.presets, entry.id), ...dpi };
-		warnings.push(...templateWarnings(entry.template, images).map((w) => `${entry.fileName}: ${w}`));
+		warnings.push(
+			...templateWarnings(entry.template, images).map(
+				(w) => `${entry.fileName}: ${w}`,
+			),
+		);
 		const binding = entry.binding;
 		if (!readsDataset(binding)) continue;
-		if (!workspace.datasets.some((dataset) => dataset.id === binding.datasetId)) {
-			errors.push(`${entry.fileName}: bound to a dataset the workspace does not have`);
+		if (
+			!workspace.datasets.some((dataset) => dataset.id === binding.datasetId)
+		) {
+			errors.push(
+				`${entry.fileName}: bound to a dataset the workspace does not have`,
+			);
 			continue;
 		}
 		const view = bindingView(binding, workspace.datasets);
-		errors.push(...(view?.problems ?? []).map((p) => `${entry.fileName}: records view: ${p}`));
+		errors.push(
+			...(view?.problems ?? []).map(
+				(p) => `${entry.fileName}: records view: ${p}`,
+			),
+		);
 		if (view && view.duplicateKeys.length > 0)
 			warnings.push(
 				`${entry.fileName}: records view: the joined dataset has more than one record for ${view.duplicateKeys.map((k) => `"${k}"`).join(", ")}; the first is used`,
 			);
-		const unfilled = unfilledRequired(entry.template, binding, workspace.datasets);
+		const unfilled = unfilledRequired(
+			entry.template,
+			binding,
+			workspace.datasets,
+		);
 		if (unfilled.length > 0)
 			warnings.push(
 				`${entry.fileName}: no column fills the required ${unfilled.length === 1 ? "field" : "fields"} ${unfilled.join(", ")}`,
@@ -88,7 +118,9 @@ export function workspaceFindings(workspace: Workspace, dpi: DpiCheck = {}): Fin
 	for (const preset of workspace.presets) {
 		const { blocked, sheets } = presetReadiness(workspace, preset);
 		if (blocked?.reason === "missing_template") {
-			errors.push(`preset "${preset.name}": its template is not in the workspace`);
+			errors.push(
+				`preset "${preset.name}": its template is not in the workspace`,
+			);
 			continue;
 		}
 		if (sheets?.error !== undefined)

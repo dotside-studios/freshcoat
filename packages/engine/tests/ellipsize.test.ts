@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { approxEngine } from "../src/approx-layout";
 import { ellipsize } from "../src/bake-text";
 import { createParagraphEngine } from "../src/paragraph-layout";
@@ -98,7 +98,6 @@ let ck: TextEngine & { dispose(): void };
 beforeAll(async () => {
 	const bytes = new Uint8Array(readFileSync(FONT));
 	const kit = await loadCanvasKit();
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 	ck = createParagraphEngine(kit as any, new Map([["Geist", [bytes]]]));
 });
 

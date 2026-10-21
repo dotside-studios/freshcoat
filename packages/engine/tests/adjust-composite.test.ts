@@ -1,11 +1,12 @@
 // The adjust offscreen renders a layer's content; its blend and opacity
 // composite the adjusted snapshot onto the real destination.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createGroup, createRect } from "../src/node";
 import type { Adjust, BlendMode } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const IDENTITY = Uint8Array.from({ length: 256 }, (_, i) => i);
 const LUT: Adjust = { lut: { r: IDENTITY, g: IDENTITY, b: IDENTITY } };
@@ -62,8 +63,7 @@ async function pixels(top: Props, group?: Props): Promise<Uint8Array> {
 
 function maxDiff(a: Uint8Array, b: Uint8Array): number {
 	let max = 0;
-	for (let i = 0; i < a.length; i++)
-		max = Math.max(max, Math.abs(a[i] - b[i]));
+	for (let i = 0; i < a.length; i++) max = Math.max(max, Math.abs(a[i] - b[i]));
 	return max;
 }
 

@@ -6,8 +6,8 @@
 // that step outside the scaled canvas matrix — the frame finish and the adjust
 // offscreen — still cover the whole frame.
 
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
@@ -17,10 +17,10 @@ import {
 	resolveExportScale,
 	withExportScale,
 } from "../src/export-scale";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect, createText } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { EncodedPaintResult } from "../src/runtime-types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = { width: 100, height: 50 };
 
@@ -188,12 +188,7 @@ describe("text baked for an export scale", () => {
 	test("line advances snap to the exported pixel grid, not the design one", async () => {
 		const ck = await ckInit();
 		const fonts = new Map([
-			[
-				"Vend Sans",
-				[
-					testFontBytes("VendSans-Variable-latin.woff2"),
-				],
-			],
+			["Vend Sans", [testFontBytes("VendSans-Variable-latin.woff2")]],
 		]);
 		const textEngine = createParagraphEngine(ck, fonts);
 		try {

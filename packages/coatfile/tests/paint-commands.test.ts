@@ -1,6 +1,6 @@
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { Template } from "../src/types";
 
 const frameTemplate = {
@@ -32,7 +32,11 @@ describe("renderer.paint", () => {
 	test("paints compiled frame commands offscreen to PNG", async () => {
 		const ck = await loadCanvasKit();
 		const { compileToCommands } = await import("./helpers/compile-commands");
-		const frames = compileToCommands(frameTemplate, {}, { width: 40, height: 40 });
+		const frames = compileToCommands(
+			frameTemplate,
+			{},
+			{ width: 40, height: 40 },
+		);
 		const renderer = await createRenderer({ ck });
 		const result = await renderer.paint(frames[0]?.commands ?? []);
 		// PNG magic number.

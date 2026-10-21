@@ -2,7 +2,7 @@
 // bare-stock correction that cancels the camera. The round-trip test is the one
 // that matters — a synthetic "photograph" of a known chart, read back through the
 // real path, has to return what was printed.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	type ChartSpec,
 	grayBalanceChart,

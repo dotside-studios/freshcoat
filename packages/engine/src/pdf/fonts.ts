@@ -12,7 +12,12 @@ import type { FontVariations } from "../types";
 import { sfntBytes } from "../woff";
 import { instanceFont } from "./instance";
 import { type GlyphOutlines, readOutlines } from "./outlines";
-import { embeddable, embeddingRestricted, readSfnt, type SfntInfo } from "./sfnt";
+import {
+	embeddable,
+	embeddingRestricted,
+	readSfnt,
+	type SfntInfo,
+} from "./sfnt";
 import { subsetFont } from "./subset";
 import { name, type PdfDict, type PdfRef, type PdfWriter } from "./writer";
 

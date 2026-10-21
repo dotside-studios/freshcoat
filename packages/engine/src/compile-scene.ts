@@ -35,8 +35,8 @@ import {
 } from "./svg/matrix";
 import { normalizePath, serializePath, transformPath } from "./svg/path";
 import type { TextEngine } from "./text-engine";
-import { strokeTrim } from "./trim";
 import type { MeasureText } from "./text-types";
+import { strokeTrim } from "./trim";
 import type {
 	BakedTextLayout,
 	Command,
@@ -415,7 +415,9 @@ function refPathData(
 		),
 	);
 	if (!back) return "";
-	return serializePath(transformPath(normalizePath(target.d), multiply(back, m)));
+	return serializePath(
+		transformPath(normalizePath(target.d), multiply(back, m)),
+	);
 }
 
 function aboutCenter(
@@ -426,7 +428,10 @@ function aboutCenter(
 	if (!rotation) return [1, 0, 0, 1, 0, 0];
 	const cx = pos.x + size.width / 2;
 	const cy = pos.y + size.height / 2;
-	return multiply(translate(cx, cy), multiply(rotate(rotation), translate(-cx, -cy)));
+	return multiply(
+		translate(cx, cy),
+		multiply(rotate(rotation), translate(-cx, -cy)),
+	);
 }
 
 const ARC_LINE_WIDTH = 1e6;
@@ -452,8 +457,7 @@ function resolveArc(node: TextNode, layout: BakedTextLayout): TextArc {
 	const direction = arc.direction ?? "outside";
 	let radius = arc.radius;
 	if (radius === undefined) {
-		const half =
-			Math.min(node.size?.width ?? 0, node.size?.height ?? 0) / 2;
+		const half = Math.min(node.size?.width ?? 0, node.size?.height ?? 0) / 2;
 		const first = layout.lines[0];
 		const last = layout.lines[layout.lines.length - 1];
 		const lineBox = layout.font.size * layout.font.lineHeight;
@@ -605,10 +609,7 @@ function ellipseSvg(size: Size): string {
 
 // An inside/outside stroke on an ellipse follows the ellipse inset or outset
 // by half the stroke width. A trimmed one starts at the top.
-function ellipseStroke(
-	node: EllipseNode,
-	size: Size,
-): { strokeD?: string } {
+function ellipseStroke(node: EllipseNode, size: Size): { strokeD?: string } {
 	const inset = node.stroke ? strokeInset(node.stroke) : 0;
 	const trimmed = node.stroke ? strokeTrim(node.stroke) !== null : false;
 	if (inset === 0 && !trimmed) return {};

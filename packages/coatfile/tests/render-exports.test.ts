@@ -1,13 +1,14 @@
 // Export settings on renderTemplate(): the compile size decides the layout, each export
 // setting decides the density that layout is rasterized at — so one call can
 // return the same side at several sizes, each tagged with what it is.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
+import { describe, expect, test } from "bun:test";
 import {
 	createRenderer,
 	decodePixels,
 	type ExportSetting,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { renderTemplate, type TemplateFrame } from "../src/render";
 import type { Template } from "../src/types";
 
@@ -47,16 +48,13 @@ const pngSize = (ck: any, png: Uint8Array) => {
 	return [d.width, d.height];
 };
 
-const renderAt = async (
-	ck: any,
-	exports?: ExportSetting[],
-) =>
-	(await renderTemplate(
+const renderAt = async (ck: any, exports?: ExportSetting[]) =>
+	await renderTemplate(
 		await createRenderer({ ck, cache: false }),
 		template,
 		{},
 		{ width: 40, height: 20, exports },
-	));
+	);
 
 describe("renderTemplate() export settings", () => {
 	test("no settings = one 1× result per frame, tagged with its pixel size", async () => {
@@ -155,7 +153,7 @@ describe("renderTemplate() export settings", () => {
 
 	test("frameNames still restricts which sides are exported", async () => {
 		const ck = await ckInit();
-		const results = (await renderTemplate(
+		const results = await renderTemplate(
 			await createRenderer({ ck, cache: false }),
 			template,
 			{},
@@ -165,7 +163,7 @@ describe("renderTemplate() export settings", () => {
 				frameNames: ["back"],
 				exports: [{ constraint: { kind: "scale", value: 3 } }],
 			},
-		));
+		);
 		expect(results.map((r) => [r.name, r.width, r.height])).toEqual([
 			["back", 120, 60],
 		]);

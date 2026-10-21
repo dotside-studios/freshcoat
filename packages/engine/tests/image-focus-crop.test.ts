@@ -1,6 +1,5 @@
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	compileScene,
 	createImage,
@@ -8,12 +7,11 @@ import {
 	type ImageNode,
 	validateCommands,
 } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 async function initCk() {
-	if (!ck)
-		ck = await loadCanvasKit();
+	if (!ck) ck = await loadCanvasKit();
 	return ck;
 }
 
@@ -79,7 +77,9 @@ async function paint(
 }
 
 function expectNear(actual: number[], rgb: [number, number, number]) {
-	rgb.forEach((v, i) => expect(Math.abs(actual[i] - v)).toBeLessThan(12));
+	rgb.forEach((v, i) => {
+		expect(Math.abs(actual[i] - v)).toBeLessThan(12);
+	});
 }
 
 describe("fitRect focus and crop", () => {

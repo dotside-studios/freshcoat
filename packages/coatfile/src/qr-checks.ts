@@ -59,7 +59,11 @@ export function qrIssues(el: QrCodeElement): QrIssue[] {
 			});
 	}
 	if (p.logo && (p.logo.size ?? 0) > MAX_QR_LOGO_SIZE)
-		out.push({ code: "qr_logo_large", size: p.logo.size ?? 0, max: MAX_QR_LOGO_SIZE });
+		out.push({
+			code: "qr_logo_large",
+			size: p.logo.size ?? 0,
+			max: MAX_QR_LOGO_SIZE,
+		});
 	return out;
 }
 

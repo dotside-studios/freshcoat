@@ -352,8 +352,7 @@ function ellipsizeMeasured(
 		width: widths.get(s) ?? engine.measureText(s, font, null).width,
 	});
 	if (fits(text)) return done(`${text}${ell}`);
-	if (!engine.clusterAdvances)
-		return done(bisectEllipsize(text, ell, fits));
+	if (!engine.clusterAdvances) return done(bisectEllipsize(text, ell, fits));
 
 	const xAt = new Map<number, number>([[0, 0]]);
 	const clusters = engine.clusterAdvances(text, font);

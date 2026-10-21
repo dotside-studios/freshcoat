@@ -39,6 +39,8 @@ Run these commands from the repository root:
 |---|---|
 | `bun run test` | Runs the workspace packages' unit tests |
 | `bun run typecheck` | Runs packages that define a type-check script |
+| `bun run check` | Runs Biome lint and format checks across the repository |
+| `bun run format` | Applies Biome formatting, import ordering and safe lint fixes |
 | `bun run test:scripts` | Tests repository tooling and documentation links |
 | `bun run check:boundaries` | Checks declared dependencies and repository boundaries |
 | `bun run check:links` | Checks relative Markdown links and heading anchors |
@@ -47,12 +49,26 @@ Run these commands from the repository root:
 | `bun run release:check` | Checks those tarballs in an isolated npm consumer |
 
 Not every package defines every script. Inspect its `package.json` or README
-and use `bun run --cwd <directory> <script>` for focused checks. UI, workspace,
-Studio and the Figma plugin define Biome `check` scripts. The core SDKs use
-Bun tests; release compilation and consumer checks also verify their declarations.
+and use `bun run --cwd <directory> <script>` for focused checks. Biome is
+configured once at the repository root and covers every package. The core SDKs
+use Bun tests; release compilation and consumer checks also verify their
+declarations.
 
 The root `dev` and `build` scripts target Studio. They are convenience aliases,
 not prerequisites for SDK or plugin development.
+
+## Tests
+
+The runner follows the package type. Packages without a DOM (cli, coatfile,
+engine, for-print, test-utils) run with `bun test` and import `describe`,
+`expect`, `test`, `mock` and `spyOn` from `bun:test`, never from `vitest`.
+DOM and React packages (ui, workspace, figma-plugin, editor) run with
+`vitest run`. Their `vitest` and `jsdom` versions come from the
+`catalog` in the root `package.json`; depend on them as `"catalog:"` instead of
+a version range. The editor also runs its server test with `bun test`.
+
+Run every package's tests with `bun run test` from the repository root, or one
+package with `bun run --cwd <directory> test`.
 
 ## Tests and compatibility
 
@@ -157,7 +173,7 @@ baseline to match the hosted runners.
 ## Code and documentation
 
 - Use strict TypeScript and the package's existing formatting conventions.
-  Biome uses tabs, double quotes and organized imports where configured.
+  Biome uses tabs, double quotes and organized imports.
 - Keep imports within declared package dependencies. Put reusable model or
   rendering behavior in the owning package; keep host storage, scheduling
   and interaction code in the application.
@@ -186,7 +202,7 @@ change per commit. Use a scope that identifies the component: `engine`,
 
 Before opening a pull request:
 
-- Run the tests, type checks and lint scripts that the changed packages define.
+- Run `bun run check`, plus the tests and type checks that the changed packages define.
 - Run repository link, boundary and notice checks.
 - Add tests for new behavior and compatibility-sensitive changes.
 - For UI changes, run relevant browser specs and include screenshots in both themes.

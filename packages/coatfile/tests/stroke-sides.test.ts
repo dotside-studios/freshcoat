@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compile } from "../src/compile";
 import { minimumFormatVersion } from "../src/format";
 import type {
@@ -59,7 +59,9 @@ const element = (type: "image" | "vector", width: unknown): Element =>
 		pos: { x: 0, y: 0 },
 		size: { width: 10, height: 10 },
 		properties: {
-			...(type === "image" ? { src: "a.png", fit: "cover" } : { d: "M0 0 L10 10" }),
+			...(type === "image"
+				? { src: "a.png", fit: "cover" }
+				: { d: "M0 0 L10 10" }),
 			stroke: { color: "#000", width },
 		},
 	}) as Element;
@@ -118,7 +120,12 @@ describe("per-side stroke compile", () => {
 		const clipped = root(template(frame(sides, true))).children[1] as GroupNode;
 		const ring = clipped.children[1] as RectNode;
 		expect(ring.kind).toBe("rect");
-		expect(ring.stroke?.sides).toEqual({ top: 1, right: 2, bottom: 3, left: 0 });
+		expect(ring.stroke?.sides).toEqual({
+			top: 1,
+			right: 2,
+			bottom: 3,
+			left: 0,
+		});
 	});
 });
 

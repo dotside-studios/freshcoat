@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer, type Renderer } from "@freshcoat-js/engine";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { findMissingGlyphs } from "../src/render";
 import type { Template } from "../src/types";
@@ -66,7 +66,12 @@ describe("findMissingGlyphs", () => {
 		expect(
 			check({ name: "Hana 山田", city: "Kyoto", motto: "Ship it 🚀" }),
 		).toEqual([
-			{ frame: "front", id: "name", text: "Hana 山田", codepoints: [0x5c71, 0x7530] },
+			{
+				frame: "front",
+				id: "name",
+				text: "Hana 山田",
+				codepoints: [0x5c71, 0x7530],
+			},
 			{ frame: "back", id: "motto", text: "Ship it 🚀", codepoints: [0x1f680] },
 		]);
 	});

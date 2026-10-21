@@ -20,7 +20,7 @@ type Parsed = ImageInfo | null | "more";
 const FIRST_READ = 64 * 1024;
 
 /** The header facts of an image Blob, or null for anything this does not
- *  recognise as a PNG, JPEG, GIF or WebP. */
+ *  recognise as a PNG, JPEG, GIF, WebP, BMP, ICO, WBMP or AVIF. */
 export async function readImageInfo(blob: Blob): Promise<ImageInfo | null> {
 	let length = Math.min(blob.size, FIRST_READ);
 	for (;;) {
@@ -38,12 +38,13 @@ export function parseImageInfo(bytes: Uint8Array): ImageInfo | null {
 	return parsed === "more" ? null : parsed;
 }
 
-/** Default most pixels an image may declare before it is decoded: a square at
- *  the export edge cap, 8192 by 8192. */
-export const DEFAULT_MAX_IMAGE_DECODE_PIXELS = 8192 * 8192;
+/** Default most pixels an image may declare before it is decoded: 200 MP, so
+ *  100+ MP camera files pass. About 800 MB of RGBA against CanvasKit's 2 GiB
+ *  WASM heap, which also holds the encoded bytes and a working copy. */
+export const DEFAULT_MAX_IMAGE_DECODE_PIXELS = 200_000_000;
 
-/** Throws unless the header of `bytes` names a PNG, JPEG, GIF or WebP of at
- *  most `maxPixels` pixels (default DEFAULT_MAX_IMAGE_DECODE_PIXELS). Meant to
+/** Throws unless the header of `bytes` names a PNG, JPEG, GIF, WebP, BMP, ICO,
+ *  WBMP or AVIF of at most `maxPixels` pixels (default DEFAULT_MAX_IMAGE_DECODE_PIXELS). Meant to
  *  run before the bytes reach a decoder, which allocates what the header says. */
 export function assertDecodableImage(
 	bytes: Uint8Array,
@@ -69,7 +70,8 @@ export function orientedSize(info: {
 		: { width: info.width, height: info.height };
 }
 
-/** The media type of a PNG, JPEG, GIF, WebP or AVIF from its magic number. */
+/** The media type of a PNG, JPEG, GIF, WebP, BMP, ICO, WBMP or AVIF from its
+ *  magic number. */
 export function sniffImageType(b: Uint8Array): string | null {
 	const at = (i: number, ...values: number[]) =>
 		values.every((v, j) => b[i + j] === v);
@@ -78,7 +80,10 @@ export function sniffImageType(b: Uint8Array): string | null {
 	if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
 	if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
 		return "image/webp";
-	if (at(4, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66)) return "image/avif";
+	if (hasAvifBrand(b)) return "image/avif";
+	if (at(0, 0x42, 0x4d) && bmpHeaderSize(b) !== null) return "image/bmp";
+	if (icoCount(b) > 0) return "image/x-icon";
+	if (wbmpHeader(b)) return "image/vnd.wap.wbmp";
 	return null;
 }
 
@@ -226,8 +231,7 @@ export function jpegIccProfile(b: Uint8Array): Uint8Array | "none" | "invalid" {
  *  RGB, 4 for CMYK, or null when the header is not a profile's or names
  *  another space. */
 export function iccComponents(profile: Uint8Array): number | null {
-	if (profile.length < 128 || u32be(profile, 0) !== profile.length)
-		return null;
+	if (profile.length < 128 || u32be(profile, 0) !== profile.length) return null;
 	if (ascii(profile, 36, 4) !== "acsp") return null;
 	switch (ascii(profile, 16, 4)) {
 		case "GRAY":
@@ -253,6 +257,14 @@ function parse(b: Uint8Array): Parsed {
 			return parseGif(b);
 		case "image/webp":
 			return parseWebp(b);
+		case "image/bmp":
+			return parseBmp(b);
+		case "image/x-icon":
+			return parseIco(b);
+		case "image/vnd.wap.wbmp":
+			return parseWbmp(b);
+		case "image/avif":
+			return parseAvif(b);
 		default:
 			return null;
 	}
@@ -271,6 +283,10 @@ const u16le = (b: Uint8Array, i: number) =>
 	(b[i] as number) | ((b[i + 1] as number) << 8);
 const u24le = (b: Uint8Array, i: number) =>
 	u16le(b, i) | ((b[i + 2] as number) << 16);
+const u32le = (b: Uint8Array, i: number) =>
+	(u16le(b, i) | (u16le(b, i + 2) << 16)) >>> 0;
+const i32le = (b: Uint8Array, i: number) =>
+	u16le(b, i) | (u16le(b, i + 2) << 16);
 const u32be = (b: Uint8Array, i: number) =>
 	((b[i] as number) * 0x1000000 +
 		(((b[i + 1] as number) << 16) |
@@ -320,6 +336,264 @@ function parseWebp(b: Uint8Array): Parsed {
 	if (chunk === "VP8X")
 		return b.length < 30 ? "more" : webp(u24le(b, 24) + 1, u24le(b, 27) + 1);
 	return null;
+}
+
+const BMP_HEADER_SIZES = [12, 40, 52, 56, 64, 108, 124];
+
+function bmpHeaderSize(b: Uint8Array): number | null {
+	if (b.length < 18) return null;
+	const size = u32le(b, 14);
+	return BMP_HEADER_SIZES.includes(size) ? size : null;
+}
+
+function parseBmp(b: Uint8Array): Parsed {
+	const size = bmpHeaderSize(b);
+	if (size === null) return null;
+	let width: number;
+	let height: number;
+	if (size === 12) {
+		if (b.length < 22) return "more";
+		width = u16le(b, 18);
+		height = u16le(b, 20);
+	} else {
+		if (b.length < 26) return "more";
+		width = i32le(b, 18);
+		// A negative height is a top-down bitmap.
+		height = Math.abs(i32le(b, 22));
+	}
+	if (width <= 0 || height <= 0) return null;
+	return { contentType: "image/bmp", width, height };
+}
+
+const ICO_MAX_ENTRIES = 256;
+
+/** The entry count of an ICO or CUR directory, or 0 when `b` does not open
+ *  like one. */
+function icoCount(b: Uint8Array): number {
+	if (b.length < 6 || b[0] !== 0 || b[1] !== 0 || b[3] !== 0) return 0;
+	if (b[2] !== 1 && b[2] !== 2) return 0;
+	const count = u16le(b, 4);
+	if (count < 1 || count > ICO_MAX_ENTRIES) return 0;
+	if (b.length >= 22) {
+		if (b[9] !== 0 || u32le(b, 18) < 6 + 16 * count) return 0;
+	}
+	return count;
+}
+
+function parseIco(b: Uint8Array): Parsed {
+	const count = icoCount(b);
+	const dirEnd = 6 + 16 * count;
+	if (count === 0) return null;
+	if (b.length < dirEnd) return "more";
+	let best = { width: 0, height: 0 };
+	for (let n = 0; n < count; n++) {
+		const at = 6 + 16 * n;
+		if (b[at + 3] !== 0) return null;
+		const size = u32le(b, at + 8);
+		const offset = u32le(b, at + 12);
+		if (size === 0 || offset < dirEnd) return null;
+		let width = b[at] || 256;
+		let height = b[at + 1] || 256;
+		// An entry holds either a BMP without its file header or a whole PNG.
+		if (offset + 8 > b.length) return "more";
+		if (at32(b, offset) === PNG_SIGNATURE) {
+			if (size < 24) return null;
+			if (offset + 24 > b.length) return "more";
+			if (ascii(b, offset + 12, 4) !== "IHDR") return null;
+			width = u32be(b, offset + 16);
+			height = u32be(b, offset + 20);
+		}
+		if (width * height > best.width * best.height) best = { width, height };
+	}
+	if (best.width <= 0 || best.height <= 0) return null;
+	return { contentType: "image/x-icon", ...best };
+}
+
+const PNG_SIGNATURE = "\x89PNG\r\n\x1a\n";
+const at32 = (b: Uint8Array, i: number) => ascii(b, i, 8);
+
+/** The size in a WBMP header: two zero bytes, then width and height as
+ *  multi-byte integers of 7 bits per byte. */
+function wbmpHeader(b: Uint8Array): { width: number; height: number } | null {
+	if (b.length < 4 || b[0] !== 0 || b[1] !== 0) return null;
+	const sizes: number[] = [];
+	let at = 2;
+	for (let k = 0; k < 2; k++) {
+		let value = 0;
+		for (let n = 0; ; n++) {
+			if (at >= b.length || n === 3) return null;
+			const byte = b[at++] as number;
+			value = value * 128 + (byte & 0x7f);
+			if (!(byte & 0x80)) break;
+		}
+		if (value < 1 || value > 0xffff) return null;
+		sizes.push(value);
+	}
+	return { width: sizes[0] as number, height: sizes[1] as number };
+}
+
+function parseWbmp(b: Uint8Array): Parsed {
+	const size = wbmpHeader(b);
+	return size && { contentType: "image/vnd.wap.wbmp", ...size };
+}
+
+/** Whether the ftyp box names avif or avis as its major or a compatible brand. */
+function hasAvifBrand(b: Uint8Array): boolean {
+	if (b.length < 12 || ascii(b, 4, 4) !== "ftyp") return false;
+	const isAvif = (i: number) => {
+		const brand = ascii(b, i, 4);
+		return brand === "avif" || brand === "avis";
+	};
+	if (isAvif(8)) return true;
+	const end = Math.min(u32be(b, 0), b.length, 512);
+	for (let i = 16; i + 4 <= end; i += 4) if (isAvif(i)) return true;
+	return false;
+}
+
+const AVIF_MAX_BOXES = 1024;
+
+type IsoBox = { type: string; body: number; end: number };
+
+/** The boxes in b[start, end). `open` when `end` is only where the buffer
+ *  stops, so a box running past it is a truncation, not a malformed file.
+ *  null when a size is below its header, past a closed `end`, or the shared
+ *  box budget is spent. */
+function isoBoxes(
+	b: Uint8Array,
+	start: number,
+	end: number,
+	open: boolean,
+	budget: { left: number },
+): { boxes: IsoBox[]; more: boolean } | null {
+	const boxes: IsoBox[] = [];
+	const cut = open ? { boxes, more: true } : null;
+	for (let at = start; at < end; ) {
+		if (--budget.left < 0) return null;
+		if (at + 8 > end) return cut;
+		let size = u32be(b, at);
+		let head = 8;
+		if (size === 1) {
+			if (at + 16 > end) return cut;
+			size = u32be(b, at + 8) * 0x100000000 + u32be(b, at + 12);
+			head = 16;
+		} else if (size === 0) {
+			size = end - at;
+		}
+		if (size < head) return null;
+		if (at + size > end) return cut;
+		boxes.push({ type: ascii(b, at + 4, 4), body: at + head, end: at + size });
+		at += size;
+	}
+	return { boxes, more: false };
+}
+
+type AvifScan = {
+	budget: { left: number };
+	more: boolean;
+	found: boolean;
+	primary?: number;
+	props: ({ width: number; height: number } | null)[];
+	hasProps: boolean;
+	associations: Map<number, number[]>;
+};
+
+/** Walks to the item properties. Only meta, iprp and ipco are entered, one
+ *  level each, so the depth is at most three; the box budget bounds the rest.
+ *  False when the file is malformed. */
+function scanAvif(
+	b: Uint8Array,
+	start: number,
+	end: number,
+	parent: "" | "meta" | "iprp" | "ipco",
+	st: AvifScan,
+): boolean {
+	const list = isoBoxes(b, start, end, parent === "", st.budget);
+	if (!list) return false;
+	if (list.more) st.more = true;
+	for (const box of list.boxes) {
+		const { body } = box;
+		if (parent === "") {
+			// meta is a FullBox: version and flags come before its children.
+			if (box.type === "meta" && !st.found) {
+				st.found = true;
+				if (body + 4 > box.end || !scanAvif(b, body + 4, box.end, "meta", st))
+					return false;
+			}
+		} else if (parent === "meta") {
+			if (box.type === "pitm" && body + 6 <= box.end) {
+				st.primary = b[body] === 0 ? u16be(b, body + 4) : u32be(b, body + 4);
+			} else if (box.type === "iprp") {
+				if (!scanAvif(b, body, box.end, "iprp", st)) return false;
+			}
+		} else if (parent === "iprp") {
+			if (box.type === "ipco" && !st.hasProps) {
+				st.hasProps = true;
+				if (!scanAvif(b, body, box.end, "ipco", st)) return false;
+			} else if (box.type === "ipma") {
+				readIpma(b, box, st.associations);
+			}
+		} else if (box.type === "ispe" && body + 12 <= box.end) {
+			const width = u32be(b, body + 4);
+			const height = u32be(b, body + 8);
+			st.props.push(width > 0 && height > 0 ? { width, height } : null);
+		} else {
+			st.props.push(null);
+		}
+	}
+	return true;
+}
+
+/** The property indices each item is associated with, first entry per item. */
+function readIpma(
+	b: Uint8Array,
+	box: IsoBox,
+	out: Map<number, number[]>,
+): void {
+	const { body, end } = box;
+	if (body + 8 > end) return;
+	const wide = (b[body + 3] as number) & 1;
+	const idSize = b[body] === 0 ? 2 : 4;
+	const count = Math.min(u32be(b, body + 4), AVIF_MAX_BOXES);
+	let at = body + 8;
+	for (let n = 0; n < count && at + idSize + 1 <= end; n++) {
+		const id = idSize === 2 ? u16be(b, at) : u32be(b, at);
+		const links = b[at + idSize] as number;
+		at += idSize + 1;
+		if (at + links * (1 + wide) > end) return;
+		const indices: number[] = [];
+		for (let k = 0; k < links; k++, at += 1 + wide)
+			indices.push(wide ? u16be(b, at) & 0x7fff : (b[at] as number) & 0x7f);
+		if (!out.has(id)) out.set(id, indices);
+	}
+}
+
+function parseAvif(b: Uint8Array): Parsed {
+	const st: AvifScan = {
+		budget: { left: AVIF_MAX_BOXES },
+		more: false,
+		found: false,
+		props: [],
+		hasProps: false,
+		associations: new Map(),
+	};
+	if (!scanAvif(b, 0, b.length, "", st)) return null;
+	if (!st.found) return st.more ? "more" : null;
+	// The primary item (pitm) names its properties through ipma, and its ispe
+	// is the image's size. When that cannot be resolved, the largest ispe is
+	// used, which is the full image rather than a thumbnail or tile.
+	let size: { width: number; height: number } | null | undefined;
+	const linked =
+		st.primary === undefined ? undefined : st.associations.get(st.primary);
+	for (const index of linked ?? []) {
+		size = st.props[index - 1];
+		if (size) break;
+	}
+	if (!size) {
+		for (const p of st.props)
+			if (p && (!size || p.width * p.height > size.width * size.height))
+				size = p;
+	}
+	return size ? { contentType: "image/avif", ...size } : null;
 }
 
 function isSof(marker: number): boolean {

@@ -1,9 +1,10 @@
 // Untrusted bytes are checked against size limits before they are decoded: an
 // image's declared pixels, and the sizes a WOFF or WOFF2 file says it unpacks to.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { compress } from "brotli/compress";
 import { zlibSync } from "fflate";
-import { beforeAll, describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import {
 	assertDecodableImage,
@@ -13,7 +14,6 @@ import { createFrame, createImage } from "../src/node";
 import { createRenderer } from "../src/renderer";
 import { MAX_UNPACKED_FONT_BYTES, sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -63,8 +63,8 @@ const scene = (src: string) =>
 	});
 
 describe("image pixel limit", () => {
-	test("the default is a square at the export edge cap", () => {
-		expect(DEFAULT_MAX_IMAGE_DECODE_PIXELS).toBe(8192 * 8192);
+	test("the default admits 100+ MP camera files", () => {
+		expect(DEFAULT_MAX_IMAGE_DECODE_PIXELS).toBe(200_000_000);
 	});
 
 	test("a tiny PNG declaring 30000x30000 is refused with a warning", async () => {
@@ -133,7 +133,9 @@ describe("image pixel limit", () => {
 	});
 
 	test("decodePixels checks before decoding", () => {
-		expect(() => decodePixels(ck, pngHeader(30000, 30000))).toThrow(/30000x30000/);
+		expect(() => decodePixels(ck, pngHeader(30000, 30000))).toThrow(
+			/30000x30000/,
+		);
 		expect(() => decodePixels(ck, new Uint8Array(8))).toThrow(/header/);
 		expect(decodePixels(ck, smallPng())?.width).toBe(2);
 		expect(() => assertDecodableImage(smallPng(), 3)).toThrow();
@@ -267,5 +269,8 @@ function woff2Tables(lengths: number[], payload: Uint8Array): Uint8Array {
 	return out;
 }
 
-const woff2Single = (origLength: number, _length: number, payload: Uint8Array) =>
-	woff2Tables([origLength], payload);
+const woff2Single = (
+	origLength: number,
+	_length: number,
+	payload: Uint8Array,
+) => woff2Tables([origLength], payload);

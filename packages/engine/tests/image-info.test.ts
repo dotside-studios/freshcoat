@@ -1,3 +1,4 @@
+import { describe, expect, it } from "bun:test";
 import {
 	gifHeader,
 	jpegHeader,
@@ -6,7 +7,6 @@ import {
 	webpVp8l,
 	webpVp8x,
 } from "@freshcoat-js/test-utils";
-import { describe, expect, it } from "vitest";
 import {
 	iccComponents,
 	jpegIccProfile,
@@ -153,7 +153,12 @@ function profile(size: number, space = "RGB "): Uint8Array {
 	return p;
 }
 
-const app2 = (data: Uint8Array, seq: number, count: number, length?: number) => {
+const app2 = (
+	data: Uint8Array,
+	seq: number,
+	count: number,
+	length?: number,
+) => {
 	const head = [...new TextEncoder().encode("ICC_PROFILE"), 0, seq, count];
 	const len = length ?? 2 + head.length + data.length;
 	return [0xff, 0xe2, len >> 8, len & 0xff, ...head, ...data];
@@ -185,9 +190,17 @@ describe("jpegIccProfile", () => {
 	const icc = profile(300);
 
 	it("joins a profile split across segments in sequence order", () => {
-		const parts = [icc.subarray(0, 100), icc.subarray(100, 250), icc.subarray(250)];
+		const parts = [
+			icc.subarray(0, 100),
+			icc.subarray(100, 250),
+			icc.subarray(250),
+		];
 		const out = jpegIccProfile(
-			jpegWith(app2(parts[2], 3, 3), app2(parts[0], 1, 3), app2(parts[1], 2, 3)),
+			jpegWith(
+				app2(parts[2], 3, 3),
+				app2(parts[0], 1, 3),
+				app2(parts[1], 2, 3),
+			),
 		);
 		expect(out).toEqual(icc);
 		expect(iccComponents(out as Uint8Array)).toBe(3);

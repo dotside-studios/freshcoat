@@ -1,5 +1,5 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { clearFontBytesCache } from "@freshcoat-js/engine";
-import { afterEach, describe, expect, test } from "vitest";
 import { collectFontBytes } from "../src/fonts";
 import type { Template } from "../src/types";
 
@@ -9,9 +9,8 @@ afterEach(() => {
 	clearFontBytesCache();
 });
 
-/** Swap in a fetch that answers by URL. Assigned directly rather than through a
- *  runner's global-stubbing helper so the suite runs under both `vitest` and the
- *  package's own `bun test`. */
+/** Swap in a fetch that answers by URL. Assigned directly because bun:test has
+ *  no global-stubbing helper. */
 function stubFetch(handler: (url: string) => unknown): void {
 	globalThis.fetch = ((input: RequestInfo | URL) =>
 		Promise.resolve(handler(String(input)))) as typeof fetch;

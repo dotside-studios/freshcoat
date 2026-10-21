@@ -1,6 +1,6 @@
 // analyzePixels / analyzeStats / buildRecommendation — pure analysis over a
 // decoded RGBA buffer (percentiles from a histogram, no canvas).
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	analyzePixels,
 	analyzeStats,

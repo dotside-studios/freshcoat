@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	FIELD_ID,
 	fieldKeyFrom,
@@ -96,9 +96,7 @@ describe("tokenIds", () => {
 	});
 
 	test("skips invalid identifiers", () => {
-		expect(tokenIds("{{1abc}} {{a-b}} {{a.b}} {{ok_one}}")).toEqual([
-			"ok_one",
-		]);
+		expect(tokenIds("{{1abc}} {{a-b}} {{a.b}} {{ok_one}}")).toEqual(["ok_one"]);
 	});
 
 	test("returns nothing for plain text", () => {
@@ -205,7 +203,22 @@ describe("parseMustache", () => {
 describe("parser matches the reference regex", () => {
 	const TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 	const WHOLE = new RegExp(`^${TOKEN.source}$`);
-	const ALPHABET = ["{", "}", "{{", "}}", "a", "Z", "_", "1", "-", ".", " ", "\t", "\u00a0", "x"];
+	const ALPHABET = [
+		"{",
+		"}",
+		"{{",
+		"}}",
+		"a",
+		"Z",
+		"_",
+		"1",
+		"-",
+		".",
+		" ",
+		"\t",
+		"\u00a0",
+		"x",
+	];
 
 	let seed = 0x2545f491;
 	const next = () => {
@@ -230,10 +243,15 @@ describe("parser matches the reference regex", () => {
 			expect(wholeToken(s)).toBe(WHOLE.exec(s)?.[1]);
 			expect(hasToken(s)).toBe(new RegExp(TOKEN.source).test(s));
 			expect(substitute(s, ctx)).toBe(
-				s.replace(TOKEN, (_m, id: string) => (ctx as Record<string, string>)[id] ?? ""),
+				s.replace(
+					TOKEN,
+					(_m, id: string) => (ctx as Record<string, string>)[id] ?? "",
+				),
 			);
 			expect(renameToken(s, "a", "b")).toBe(
-				s.replace(TOKEN, (m, id: string) => (id === "a" ? m.replace(id, "b") : m)),
+				s.replace(TOKEN, (m, id: string) =>
+					id === "a" ? m.replace(id, "b") : m,
+				),
 			);
 		}
 	});
@@ -301,7 +319,9 @@ describe("inherited properties", () => {
 
 describe("substitute with __proto__ keys", () => {
 	test("an own __proto__ key stays an own key of the output", () => {
-		const input = JSON.parse('{"__proto__": {"x": "{{name}}"}, "a": "{{name}}"}');
+		const input = JSON.parse(
+			'{"__proto__": {"x": "{{name}}"}, "a": "{{name}}"}',
+		);
 		const out = substitute(input, { name: "Ana" }) as Record<string, unknown>;
 		expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
 		expect(Object.keys(out)).toEqual(["__proto__", "a"]);

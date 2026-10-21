@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { fixtures } from "../fixtures";
 import { templateHints } from "../src/hints";
 import {
@@ -16,7 +16,10 @@ import { describeWarning, renderTemplate } from "../src/render";
 import type { Element, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
-function card(extra: Partial<Template> = {}, elements: Element[] = []): Template {
+function card(
+	extra: Partial<Template> = {},
+	elements: Element[] = [],
+): Template {
 	return {
 		format_version: "1.6",
 		id: "t",
@@ -240,10 +243,21 @@ describe("printHints", () => {
 		).toEqual([]);
 		const partial = printHints(
 			card({ bleed: 24 }, [
-				box("partial", -10, 300, 400, 100, { src: "a.png", fit: "cover" }, "image"),
+				box(
+					"partial",
+					-10,
+					300,
+					400,
+					100,
+					{ src: "a.png", fit: "cover" },
+					"image",
+				),
 			]),
 		);
-		expect(partial[0]?.issue).toEqual({ code: "short_of_bleed", edges: ["left"] });
+		expect(partial[0]?.issue).toEqual({
+			code: "short_of_bleed",
+			edges: ["left"],
+		});
 		expect(
 			printHints(
 				card({ bleed: { top: 0, right: 0, bottom: 0, left: 24 } }, [
@@ -269,14 +283,19 @@ describe("printHints", () => {
 		const hints = templateHints(fixtures.printPreflightCard);
 		expect(hints.filter((h) => h.kind === "print")).toHaveLength(5);
 		expect(
-			templateHints(fixtures.printPreflightCard, {}, { minTextPt: 1, minLightTextPt: 1 })
-				.filter((h) => h.kind === "print" && h.issue.code === "small_text"),
+			templateHints(
+				fixtures.printPreflightCard,
+				{},
+				{ minTextPt: 1, minLightTextPt: 1 },
+			).filter((h) => h.kind === "print" && h.issue.code === "small_text"),
 		).toEqual([]);
 	});
 
 	test("take the image check's DPI unless they set their own", () => {
 		const t = card({}, [text("t", 30)]);
-		expect(templateHints(t, { dpi: 600 }).map((h) => h.kind)).toEqual(["print"]);
+		expect(templateHints(t, { dpi: 600 }).map((h) => h.kind)).toEqual([
+			"print",
+		]);
 		expect(templateHints(t, { dpi: 600 }, { dpi: 300 })).toEqual([]);
 	});
 
@@ -320,7 +339,9 @@ describe("printCheckWarnings", () => {
 		]);
 		expect(printCheckWarnings(commandsOf(t, { name: "Ada" }))).toEqual([]);
 		const long = printCheckWarnings(
-			commandsOf(t, { name: "A much longer name than the box can hold at size" }),
+			commandsOf(t, {
+				name: "A much longer name than the box can hold at size",
+			}),
 		);
 		expect(long.map((w) => w.issue.code)).toEqual(["small_text"]);
 	});
@@ -375,7 +396,10 @@ describe("printCheckWarnings", () => {
 		]);
 		const warnings = printCheckWarnings(commandsOf(t));
 		expect(warnings).toHaveLength(1);
-		expect(warnings[0]?.issue).toMatchObject({ code: "small_text", sizePt: 2.4 });
+		expect(warnings[0]?.issue).toMatchObject({
+			code: "small_text",
+			sizePt: 2.4,
+		});
 	});
 
 	test("come out of a render as warnings when asked for", async () => {
@@ -383,9 +407,12 @@ describe("printCheckWarnings", () => {
 		const renderer = await createRenderer({ ck: ck as never, cache: false });
 		const t = card({}, [text("fine", 20)]);
 		const quiet = await renderTemplate(renderer, t, {});
-		expect(quiet[0]?.warnings.filter((w) => w.kind === "print_check")).toEqual([]);
+		expect(quiet[0]?.warnings.filter((w) => w.kind === "print_check")).toEqual(
+			[],
+		);
 		const [frame] = await renderTemplate(renderer, t, {}, { printChecks: {} });
-		const checks = frame?.warnings.filter((w) => w.kind === "print_check") ?? [];
+		const checks =
+			frame?.warnings.filter((w) => w.kind === "print_check") ?? [];
 		expect(checks).toHaveLength(1);
 		expect(describeWarning(checks[0] as never)).toBe(
 			"Text is 4.8 pt at print size, below 6 pt: fine",

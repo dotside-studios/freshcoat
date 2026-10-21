@@ -2,15 +2,16 @@
 // production render path now uses. Offline + deterministic via the vendored OFL
 // Geist. Structural (not pixel) so it needs no native-canvas backend: it drives
 // compile with the engine and checks the laid-out text IR.
+
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import {
 	createRenderer,
 	type FontVMetrics,
 	type Renderer,
 	readFontMetrics,
 } from "@freshcoat-js/engine";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import type { DrawTextCommand, Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 

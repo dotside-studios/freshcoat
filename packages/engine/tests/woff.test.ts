@@ -1,11 +1,10 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { zlibSync } from "fflate";
-import { beforeAll, describe, expect, test } from "vitest";
 import { readFontMetrics } from "../src/font-metrics";
 import { readSfnt, tagAt } from "../src/pdf/sfnt";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

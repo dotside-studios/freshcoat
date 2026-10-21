@@ -1,12 +1,13 @@
 // A PaintCache on the render runtime: a batch of records that share images
 // decodes each shared one once, and paints exactly what an uncached render does.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
+import { describe, expect, test } from "bun:test";
 import {
 	createRenderer,
 	mapLoader,
 	type PaintCacheOptions,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
@@ -144,15 +145,23 @@ describe("renderTemplate() with a paint cache", () => {
 			cache: { maxImagePixels: 1_000_000 },
 		});
 		for (const values of RECORDS)
-			await renderTemplate(renderer, template, values, { width: 48, height: 20 });
+			await renderTemplate(renderer, template, values, {
+				width: 48,
+				height: 20,
+			});
 		expect(live.size).toBe(3);
 		renderer.dispose();
 		expect(live.size).toBe(0);
 		await expect(
-			renderTemplate(renderer, template, RECORDS[0] as Record<string, unknown>, {
-				width: 48,
-				height: 20,
-			}),
+			renderTemplate(
+				renderer,
+				template,
+				RECORDS[0] as Record<string, unknown>,
+				{
+					width: 48,
+					height: 20,
+				},
+			),
 		).rejects.toThrow("disposed");
 	});
 });

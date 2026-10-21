@@ -27,10 +27,7 @@ describe("length units", () => {
 	test("px to unit and back keeps the px value", () => {
 		for (const unit of ["px", "mm", "in", "pt"] as const)
 			for (const px of [0, 1, 37.5, 1012, 1234.567])
-				expect(unitToPx(pxToUnit(px, unit, 300), unit, 300)).toBeCloseTo(
-					px,
-					9,
-				);
+				expect(unitToPx(pxToUnit(px, unit, 300), unit, 300)).toBeCloseTo(px, 9);
 	});
 
 	test("px stays exact", () => {
@@ -39,7 +36,7 @@ describe("length units", () => {
 	});
 
 	test("rounds display values per unit", () => {
-		expect(roundForUnit(3.14159, "mm")).toBe(3.14);
+		expect(roundForUnit(3.14259, "mm")).toBe(3.14);
 		expect(roundForUnit(0.12549, "in")).toBe(0.125);
 		expect(roundForUnit(-0.0001, "px")).toBe(0);
 		expect(formatLength(37.5, "in", 300, { suffix: false })).toBe("0.125");

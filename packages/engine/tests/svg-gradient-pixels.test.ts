@@ -1,11 +1,11 @@
 // Focal points and spread methods of SVG gradients, painted through the image
 // path and compared against analytically computed samples.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
-import { compileScene, createImage } from "../src/index";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
+import { beforeAll, describe, expect, test } from "bun:test";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { compileScene, createImage } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
+
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compileScene } from "../src/compile-scene";
 import { createEllipse } from "../src/node";
 import { ellipsePath, isEllipsePath } from "../src/outline";
@@ -23,7 +23,10 @@ describe("ellipsePath", () => {
 
 	test("matches the path an ellipse node draws", () => {
 		const size = { width: 80, height: 40 };
-		const commands = compileScene(createEllipse({ pos: { x: 0, y: 0 }, size }), size);
+		const commands = compileScene(
+			createEllipse({ pos: { x: 0, y: 0 }, size }),
+			size,
+		);
 		const draw = commands.find((c) => c.op === "drawPath");
 		expect(draw && isEllipsePath(draw.d, 80, 40)).toBe(true);
 	});

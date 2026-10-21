@@ -141,7 +141,7 @@ export function halftoneSksl(
 		{ length: screens },
 		(_, i) => `
 		{
-			float d = clamp(screenValue(q, own, edge, rot[${i}], float4(${[0,1,2,3].map((c) => (c === i ? 1 : 0)).join(", ")})), 0.0, 1.0);
+			float d = clamp(screenValue(q, own, edge, rot[${i}], float4(${[0, 1, 2, 3].map((c) => (c === i ? 1 : 0)).join(", ")})), 0.0, 1.0);
 			float2 s = rotate(q, float2(rot[${i}].x, -rot[${i}].y)) / cellSize;
 			float m = d > 0.0 ? dotMask(d, fract(s) - 0.5) * clip : 0.0;
 			half3 sc = half3(inks[${i}]) * half(m);

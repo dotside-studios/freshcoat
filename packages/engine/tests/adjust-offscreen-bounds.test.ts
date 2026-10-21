@@ -3,15 +3,15 @@
 // bounded offscreen must reproduce it. Undithered gradients may move by a level
 // or two under the offscreen's whole-pixel shift, as Skia evaluates them in
 // lower precision.
+
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
-import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { auditAdjustedBounds } from "../src/canvaskit";
+import { decodePixels } from "../src/decode";
 import {
 	createFrame,
 	createGroup,
@@ -20,6 +20,7 @@ import {
 	createText,
 } from "../src/node";
 import { BOUNDS_CASES } from "./fixtures/adjust-bounds/scenes";
+import { renderSceneToPng } from "./helpers/headless";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const GOLDENS = join(HERE, "fixtures", "adjust-bounds");
@@ -102,6 +103,7 @@ describe("adjust offscreen sized to the layer", () => {
 	function countRecorders(ck: any) {
 		const Real = ck.PictureRecorder;
 		const made: { deleted: boolean }[] = [];
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.PictureRecorder = function () {
 			const recorder = new Real();
 			const entry = { deleted: false };
@@ -186,7 +188,8 @@ describe("adjust offscreen sized to the layer", () => {
 
 	test("predicted bounds hold the recorded ones", async () => {
 		const ck = await ckInit();
-		const pairs: { name: string; predicted: number[]; recorded: number[] }[] = [];
+		const pairs: { name: string; predicted: number[]; recorded: number[] }[] =
+			[];
 		let name = "";
 		auditAdjustedBounds((predicted, recorded) => {
 			expect(predicted, name).not.toBeNull();

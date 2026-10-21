@@ -1,7 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { fixtures } from "../fixtures";
 import { compile } from "../src/compile";
+import { resizeTemplate } from "../src/constraints";
+import { minimumFormatVersion } from "../src/format";
 import type {
 	Element,
 	FrameElement,
@@ -13,9 +15,6 @@ import type {
 	VectorElement,
 } from "../src/types";
 import { validate } from "../src/validate";
-import { resizeTemplate } from "../src/constraints";
-import { minimumFormatVersion } from "../src/format";
-import { pruneHiddenElements } from "../src/visibility";
 import {
 	activeVariantId,
 	applyVariant,
@@ -37,6 +36,7 @@ import {
 	variantIdFor,
 	variantSize,
 } from "../src/variants";
+import { pruneHiddenElements } from "../src/visibility";
 
 const rect = (id: string, fill: string): RectElement => ({
 	id,
@@ -471,9 +471,7 @@ describe("base hidden", () => {
 		expect(drawn(t)).not.toContain("title");
 		expect(drawn(t, "v")).not.toContain("title");
 		expect(byId(frame(t, "front").elements, "title")?.hidden).toBe(true);
-		expect(hiddenElementIds(t, undefined, "front")).toEqual(
-			new Set(["title"]),
-		);
+		expect(hiddenElementIds(t, undefined, "front")).toEqual(new Set(["title"]));
 		expect(hiddenElementIds(t, "v", "front")).toEqual(new Set(["title"]));
 	});
 
@@ -539,9 +537,9 @@ describe("base hidden", () => {
 			})),
 		});
 		expect(drawn(when({ field: "displayName" }), "v")).toContain("title");
-		expect(
-			drawn(when({ field: "displayName", not: true }), "v"),
-		).not.toContain("title");
+		expect(drawn(when({ field: "displayName", not: true }), "v")).not.toContain(
+			"title",
+		);
 		expect(drawn(when({ field: "displayName" }))).not.toContain("title");
 	});
 

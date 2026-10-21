@@ -30,6 +30,7 @@ export function assertLoadableUrl(
 	const allowed = policy.unsafeAllowHttp
 		? [...BASE_SCHEMES, "http:"]
 		: BASE_SCHEMES;
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: strips the control characters browsers ignore before a scheme
 	const trimmed = src.replace(/^[\u0000-\u0020]+/, "");
 	const scheme = SCHEME.exec(trimmed)?.[1]?.toLowerCase();
 	if (scheme) {

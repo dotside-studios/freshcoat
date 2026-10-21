@@ -1,9 +1,10 @@
 // A renderer that holds the fonts map, with a paint cache: records that hide a field
 // set in its own family keep the font provider, and paint what an uncached
 // render does.
-import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
+
+import { describe, expect, test } from "bun:test";
 import { createRenderer, type PaintCacheOptions } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 

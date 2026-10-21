@@ -2,7 +2,7 @@
 // corpus exists to enforce. The reference backend passing is the least of it:
 // what matters is that a backend cannot claim a profile it does not implement,
 // and cannot decline a feature quietly.
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
 	createFixture,
 	type Fixture,

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "bun:test";
 import { paintScene } from "../src/canvaskit";
 import type { PaintRuntime } from "../src/runtime-types";
 import type { Command } from "../src/types";
@@ -121,8 +121,12 @@ describe("paintScene frees what it made when the paint throws", () => {
 			},
 		});
 		const providerDelete = vi.fn();
-		(ck as { TypefaceFontProvider: { Make: unknown } }).TypefaceFontProvider.Make =
-			() => ({ registerFont: vi.fn(), delete: providerDelete });
+		(
+			ck as { TypefaceFontProvider: { Make: unknown } }
+		).TypefaceFontProvider.Make = () => ({
+			registerFont: vi.fn(),
+			delete: providerDelete,
+		});
 		const imageDelete = vi.fn();
 		(ck as { MakeImageFromEncoded: unknown }).MakeImageFromEncoded = () => ({
 			delete: imageDelete,

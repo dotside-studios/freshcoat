@@ -71,7 +71,10 @@ function collectingContext() {
 	};
 }
 
-type Render = (opts: never, ctx: ReturnType<typeof collectingContext>) => Drawing;
+type Render = (
+	opts: never,
+	ctx: ReturnType<typeof collectingContext>,
+) => Drawing;
 
 const RENDERERS: Record<Symbology, { bcid: string; render: Render }> = {
 	code128: { bcid: "code128", render: code128 as Render },
@@ -95,12 +98,13 @@ function gs1CheckDigit(digits: string): number {
 	return (10 - (sum % 10)) % 10;
 }
 
-const GS1_LENGTH: Partial<Record<Symbology, { length: number; label: string }>> =
-	{
-		ean13: { length: 13, label: "EAN-13" },
-		upca: { length: 12, label: "UPC-A" },
-		itf14: { length: 14, label: "ITF-14" },
-	};
+const GS1_LENGTH: Partial<
+	Record<Symbology, { length: number; label: string }>
+> = {
+	ean13: { length: 13, label: "EAN-13" },
+	upca: { length: 12, label: "UPC-A" },
+	itf14: { length: 14, label: "ITF-14" },
+};
 
 // The text bwip-js is given and the human-readable line under the bars. A GS1
 // number arrives with or without its check digit and always leaves with it; a

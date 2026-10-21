@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { mixColor } from "../src/color";
 
 describe("mixColor", () => {
@@ -9,7 +9,11 @@ describe("mixColor", () => {
 	});
 
 	test("is either end at 0 and 1", () => {
-		expect(mixColor([10, 20, 30, 1], [40, 50, 60, 0], 0)).toEqual([10, 20, 30, 1]);
-		expect(mixColor([10, 20, 30, 1], [40, 50, 60, 0], 1)).toEqual([40, 50, 60, 0]);
+		expect(mixColor([10, 20, 30, 1], [40, 50, 60, 0], 0)).toEqual([
+			10, 20, 30, 1,
+		]);
+		expect(mixColor([10, 20, 30, 1], [40, 50, 60, 0], 1)).toEqual([
+			40, 50, 60, 0,
+		]);
 	});
 });

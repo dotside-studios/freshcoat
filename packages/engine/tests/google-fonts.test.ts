@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fontRequestKey, googleCss2Url } from "../src/font-bytes";
 
 describe("googleCss2Url", () => {

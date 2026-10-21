@@ -9,9 +9,10 @@
 // ICU still assigns codepoint properties + cluster boundaries, so the slicing
 // paths are fully exercised. (A CJK/emoji font would additionally validate glyph
 // rendering + realistic advances — not vendored here; none is available offline.)
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { TextEngine } from "../src/text-engine";
 import type { ResolvedFont } from "../src/types";

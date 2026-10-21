@@ -1,5 +1,5 @@
+import { describe, expect, test } from "bun:test";
 import { PATTERN_DEFAULTS } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import type { Fill, RectNode, Template } from "../src/types";
 import { validate } from "../src/validate";

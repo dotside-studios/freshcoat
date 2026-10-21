@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { assetUri, bytesToBase64 } from "../src/assets";
 import { packTemplate, pruneUnusedAssets } from "../src/coat";
@@ -27,7 +27,9 @@ function withElements(elements: unknown[]): Template {
 	return {
 		...base,
 		template_data: base.template_data.map((frame, i) =>
-			i === 0 ? { ...frame, elements: [...frame.elements, ...elements] } : frame,
+			i === 0
+				? { ...frame, elements: [...frame.elements, ...elements] }
+				: frame,
 		),
 	} as Template;
 }
@@ -43,11 +45,10 @@ describe("loadTemplate", () => {
 	});
 
 	test("heals duplicate element ids and says which it renamed", async () => {
-		const dupes = withElements([
-			image("photo", "a"),
-			image("photo", "a"),
-		]);
-		const r = await loadTemplate(JSON.stringify({ ...dupes, assets: [png("a")] }));
+		const dupes = withElements([image("photo", "a"), image("photo", "a")]);
+		const r = await loadTemplate(
+			JSON.stringify({ ...dupes, assets: [png("a")] }),
+		);
 		expect(r.ok).toBe(true);
 		if (!r.ok) return;
 		expect(r.healed).toBe(true);
@@ -62,12 +63,18 @@ describe("loadTemplate", () => {
 		);
 		expect(r.ok).toBe(false);
 		expect(!r.ok && r.reason).toBe("invalid");
-		expect(!r.ok && r.reason === "invalid" && r.errors.length).toBeGreaterThan(0);
+		expect(!r.ok && r.reason === "invalid" && r.errors.length).toBeGreaterThan(
+			0,
+		);
 	});
 
 	test("is unreadable for text that is not JSON", async () => {
 		const r = await loadTemplate("not json");
-		expect(r).toMatchObject({ ok: false, reason: "unreadable", code: "invalid_json" });
+		expect(r).toMatchObject({
+			ok: false,
+			reason: "unreadable",
+			code: "invalid_json",
+		});
 	});
 });
 
@@ -106,9 +113,15 @@ describe("pruneUnusedAssets", () => {
 	});
 
 	test("returns the template when nothing is unused, and drops an empty list", () => {
-		const t = { ...withElements([image("photo", "used")]), assets: [png("used")] };
+		const t = {
+			...withElements([image("photo", "used")]),
+			assets: [png("used")],
+		};
 		expect(pruneUnusedAssets(t)).toBe(t);
-		const none = { ...fixtures.minimalCard, assets: [png("unused")] } as Template;
+		const none = {
+			...fixtures.minimalCard,
+			assets: [png("unused")],
+		} as Template;
 		expect("assets" in pruneUnusedAssets(none)).toBe(false);
 	});
 });

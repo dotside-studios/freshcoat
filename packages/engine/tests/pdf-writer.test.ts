@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { createFrame, createRect } from "../src/node";
 import { md5 } from "../src/pdf/md5";
 import { num, PdfBytes, PdfWriter } from "../src/pdf/writer";
@@ -24,11 +24,23 @@ const scene = createFrame({
 const date = new Date("2026-01-01T00:00:00Z");
 const source = (bytes: Uint8Array) => new TextDecoder("latin1").decode(bytes);
 const render = async (title?: string) =>
-	source((await renderer.renderPdf(scene, { width: 40, height: 40, dpi: 72, date, title })).bytes);
+	source(
+		(
+			await renderer.renderPdf(scene, {
+				width: 40,
+				height: 40,
+				dpi: 72,
+				date,
+				title,
+			})
+		).bytes,
+	);
 
 describe("pdf text strings", () => {
 	test("keeps printable ASCII literal and escaped", async () => {
-		expect(await render("Plain (a\\b)")).toContain("/Title (Plain \\(a\\\\b\\))");
+		expect(await render("Plain (a\\b)")).toContain(
+			"/Title (Plain \\(a\\\\b\\))",
+		);
 	});
 
 	test("encodes accented and CJK titles as UTF-16BE", async () => {
@@ -54,10 +66,22 @@ describe("pdf text strings", () => {
 
 describe("pdf trailer ID", () => {
 	test("is a pair of equal digests, stable for the same input", async () => {
-		const a = await renderer.renderPdf(scene, { width: 40, height: 40, dpi: 72, date });
-		const b = await renderer.renderPdf(scene, { width: 40, height: 40, dpi: 72, date });
+		const a = await renderer.renderPdf(scene, {
+			width: 40,
+			height: 40,
+			dpi: 72,
+			date,
+		});
+		const b = await renderer.renderPdf(scene, {
+			width: 40,
+			height: 40,
+			dpi: 72,
+			date,
+		});
 		expect(b.bytes).toEqual(a.bytes);
-		const m = /\/ID \[<([0-9a-f]{32})> <([0-9a-f]{32})>\]/.exec(source(a.bytes));
+		const m = /\/ID \[<([0-9a-f]{32})> <([0-9a-f]{32})>\]/.exec(
+			source(a.bytes),
+		);
 		expect(m).not.toBeNull();
 		expect(m?.[1]).toBe(m?.[2]);
 	});

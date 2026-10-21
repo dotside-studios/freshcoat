@@ -4,8 +4,9 @@
 // (3) end to end through paint: the output size is unchanged, edge coverage that
 // a same-size render can only approximate is resolved, and the frame finish still
 // runs at output resolution rather than being averaged away by the reduction.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import {
@@ -13,9 +14,9 @@ import {
 	MAX_SUPERSAMPLE,
 	resolveSupersample,
 } from "../src/export-scale";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createPath, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = { width: 100, height: 50 };
 

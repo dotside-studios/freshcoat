@@ -1,6 +1,8 @@
 // The planner: classification, the PrintOptimizeOptions → Adjust mapping (proven
 // against the canonical color formulas), the sync tree walk, and the async
 // per-image analyzeScene driven by an injected sampler (no canvas in for-print).
+
+import { describe, expect, test } from "bun:test";
 import {
 	type Adjust,
 	buildAdjust,
@@ -12,7 +14,6 @@ import {
 	createText,
 	type Node,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
 import { analyzePixels } from "../src/analyze";
 import {
 	type AnalysisCache,
@@ -461,8 +462,14 @@ describe("analyzeScene (sampler)", () => {
 		const report = (_a: unknown, node: { src: string }) =>
 			reports.push(node.src);
 		const tree = createGroup([imageNode("a.png"), imageNode("b.png")]);
-		const first = await analyzeScene(sample, tree, { onAnalysis: report, cache });
-		const second = await analyzeScene(sample, tree, { onAnalysis: report, cache });
+		const first = await analyzeScene(sample, tree, {
+			onAnalysis: report,
+			cache,
+		});
+		const second = await analyzeScene(sample, tree, {
+			onAnalysis: report,
+			cache,
+		});
 		expect(calls).toBe(2);
 		expect(cache.size).toBe(2);
 		expect(second).toEqual(first);
@@ -486,9 +493,9 @@ describe("analyzeScene (sampler)", () => {
 		};
 		const cache: AnalysisCache = new Map();
 		const tree = createGroup([imageNode("x.png")]);
-		await expect(
-			analyzeScene(sample, tree, { cache }),
-		).rejects.toThrow("decode failed");
+		await expect(analyzeScene(sample, tree, { cache })).rejects.toThrow(
+			"decode failed",
+		);
 		await Promise.resolve();
 		expect(cache.size).toBe(0);
 		await analyzeScene(sample, tree, { cache });
@@ -518,14 +525,10 @@ describe("analyzeScene (sampler)", () => {
 
 	test("no analysis, no report: an explicit photo policy never calls back", async () => {
 		const seen: string[] = [];
-		await analyzeScene(
-			async () => brightBuffer(),
-			createGroup([imageNode()]),
-			{
-				policy: { photo: null },
-				onAnalysis: (_a, node) => seen.push(node.src),
-			},
-		);
+		await analyzeScene(async () => brightBuffer(), createGroup([imageNode()]), {
+			policy: { photo: null },
+			onAnalysis: (_a, node) => seen.push(node.src),
+		});
 		expect(seen).toEqual([]);
 	});
 

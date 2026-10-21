@@ -1,15 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
-import {
-	isPrintedCard,
-	printGuideMetrics,
-	printGuidesFor,
-} from "../src/bleed";
+import { isPrintedCard, printGuideMetrics, printGuidesFor } from "../src/bleed";
 import { imageDpiHints, safeAreaHints, templateHints } from "../src/hints";
 import { effectiveImageDpi } from "../src/image-dpi";
 import type { Element, Template } from "../src/types";
 
-function card(extra: Partial<Template> = {}, elements: Element[] = []): Template {
+function card(
+	extra: Partial<Template> = {},
+	elements: Element[] = [],
+): Template {
 	return {
 		format_version: "1.6",
 		id: "t",
@@ -83,7 +82,9 @@ describe("templateHints", () => {
 		const t = card({ product: "card_cr80" }, [rect("near", 10, 100, 100, 50)]);
 		const hints = safeAreaHints(t);
 		expect(hints.map((h) => [h.id, h.edges])).toEqual([["near", ["left"]]]);
-		expect(safeAreaHints(card({}, [rect("near", 10, 100, 100, 50)]))).toEqual([]);
+		expect(safeAreaHints(card({}, [rect("near", 10, 100, 100, 50)]))).toEqual(
+			[],
+		);
 	});
 
 	test("lists an open path set as a slice piece, not a cut line or a closed one", () => {
@@ -100,7 +101,12 @@ describe("templateHints", () => {
 			vector("loop", "M0 0 L9 0 L9 9 Z", {}),
 			vector("bad", "M0 1 L40 1", {}),
 			vector("worse", "M0 0 L9 0 L9 9 Z M20 0 L30 0", { output: "piece" }),
-			vector("live", "M0 1 L40 1", {}, { boolean: { op: "union", operands: [] } }),
+			vector(
+				"live",
+				"M0 1 L40 1",
+				{},
+				{ boolean: { op: "union", operands: [] } },
+			),
 		]);
 		expect(templateHints(t)).toEqual([
 			{ kind: "slice_open_piece", side: 0, sideName: "front", id: "bad" },
@@ -186,9 +192,9 @@ describe("effectiveImageDpi", () => {
 	test("counts only the source a crop or a cover keeps", () => {
 		const placed = { width: 300, height: 300 };
 		const pixels = { width: 1200, height: 600 };
-		expect(effectiveImageDpi(pixels, placed, 300, { fit: "cover" })).toBeCloseTo(
-			600,
-		);
+		expect(
+			effectiveImageDpi(pixels, placed, 300, { fit: "cover" }),
+		).toBeCloseTo(600);
 		expect(
 			effectiveImageDpi(pixels, placed, 300, { fit: "contain" }),
 		).toBeCloseTo(1200);
@@ -218,7 +224,11 @@ describe("imageDpiHints", () => {
 		card(
 			{
 				assets: [
-					{ sha256: sha, base64: pngHeader(600, 400), contentType: "image/png" },
+					{
+						sha256: sha,
+						base64: pngHeader(600, 400),
+						contentType: "image/png",
+					},
 				],
 			},
 			elements,
@@ -256,7 +266,12 @@ describe("imageDpiHints", () => {
 				size: { width: 1012, height: 638 },
 				properties: {
 					children: [
-						image("inline", `data:image/png;base64,${pngHeader(100, 100)}`, 300, 300),
+						image(
+							"inline",
+							`data:image/png;base64,${pngHeader(100, 100)}`,
+							300,
+							300,
+						),
 						image("file", "photo.jpg", 300, 300),
 						image("unknown", "other.jpg", 300, 300),
 					],

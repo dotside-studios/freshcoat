@@ -1,9 +1,9 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
+import type { Node, PatternKind, ResolvedFill } from "../src/index";
 import {
 	createPath,
 	createRect,
@@ -12,8 +12,8 @@ import {
 	patternFill,
 	validateCommands,
 } from "../src/index";
-import type { Node, PatternKind, ResolvedFill } from "../src/index";
 import { patternMean } from "../src/pattern";
+import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = 80;
 const GOLDENS = join(
@@ -146,7 +146,7 @@ function kindFill(
 	return patternFill(pattern, { colors: INK, ...params });
 }
 
-describe.each(PATTERN_KINDS)("%s pattern", (pattern) => {
+describe.each([...PATTERN_KINDS])("%s pattern", (pattern) => {
 	const fill = kindFill(pattern, pattern === "noise" ? { scale: 4 } : {});
 
 	test("paints the same pixels on every render", async () => {
@@ -205,7 +205,7 @@ describe.each(PATTERN_KINDS)("%s pattern", (pattern) => {
 });
 
 // Regenerate with UPDATE_GOLDENS=1 after an intended change to a pattern.
-describe.each(PATTERN_KINDS)("%s golden", (pattern) => {
+describe.each([...PATTERN_KINDS])("%s golden", (pattern) => {
 	test.each([1, 2])("matches at %dx", async (scale) => {
 		const fill = patternFill(pattern, {
 			angle: pattern === "hatching" ? 30 : 15,
@@ -293,7 +293,7 @@ describe.each(["noise", "paper"] as const)("%s seed", (pattern) => {
 // parallel run.
 const TONE_TIMEOUT_MS = 30_000;
 
-describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
+describe.each([...PATTERN_KINDS])("%s tone", (pattern) => {
 	const AREA = 320;
 	const fill = kindFill(pattern);
 	const full = 255 * (1 - patternMean(pattern, fill.density));
@@ -342,13 +342,17 @@ describe.each(PATTERN_KINDS)("%s tone", (pattern) => {
 		);
 	});
 
-	test("a 1x render matches a 3x render reduced to 1x", async () => {
-		const one = await shot(1);
-		const three = reduce(await shot(3), 3);
-		expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
-		expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
-		expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
-	}, TONE_TIMEOUT_MS);
+	test(
+		"a 1x render matches a 3x render reduced to 1x",
+		async () => {
+			const one = await shot(1);
+			const three = reduce(await shot(3), 3);
+			expect(Math.abs(mean(one) - mean(three))).toBeLessThan(meanTolerance);
+			expect(deviation(one)).toBeGreaterThan(deviation(three) * 0.9);
+			expect(deviation(one)).toBeLessThan(deviation(three) * 1.1);
+		},
+		TONE_TIMEOUT_MS,
+	);
 });
 
 describe("pattern compile failure", () => {

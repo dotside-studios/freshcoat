@@ -1,13 +1,13 @@
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import { afterAll, describe, expect, test } from "vitest";
 import { fileLoader } from "../../src/platform/file-loader";
-import { createHeadlessEnv } from "../helpers/headless";
 import type { EncodedPaintResult } from "../../src/runtime-types";
 import type { Command } from "../../src/types";
+import { createHeadlessEnv } from "../helpers/headless";
 
 const root = mkdtempSync(join(tmpdir(), "file-loader-"));
 mkdirSync(join(root, "fonts"));
@@ -25,7 +25,9 @@ describe("fileLoader", () => {
 
 	test("refuses paths outside the root", async () => {
 		const load = fileLoader({ root: join(root, "fonts") });
-		await expect(load("../outside.bin")).rejects.toThrow(/outside the loader root/);
+		await expect(load("../outside.bin")).rejects.toThrow(
+			/outside the loader root/,
+		);
 		await expect(load(pathToFileURL(join(root, "x.bin")).href)).rejects.toThrow(
 			/outside the loader root/,
 		);

@@ -1,6 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import type { Canvas, CanvasKit } from "canvaskit-wasm";
-import { beforeAll, describe, expect, test } from "vitest";
 import { decodePixels } from "../src/decode";
 import { createGroup, createPath, createRect, type Node } from "../src/node";
 import { outlineGeometry } from "../src/outline";
@@ -153,7 +153,13 @@ describe("roundCorners", () => {
 
 describe("polygon outline", () => {
 	test("rounds every vertex by cornerRadius", () => {
-		const sharp = outlineGeometry({ kind: "polygon", sides: 3 }, 0, 0, 100, 100);
+		const sharp = outlineGeometry(
+			{ kind: "polygon", sides: 3 },
+			0,
+			0,
+			100,
+			100,
+		);
 		const zero = outlineGeometry(
 			{ kind: "polygon", sides: 3, cornerRadius: 0 },
 			0,

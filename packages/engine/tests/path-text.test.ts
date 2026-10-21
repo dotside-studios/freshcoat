@@ -1,15 +1,10 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { placeOnPath } from "../src/arc-text";
 import { auditAdjustedBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
-import {
-	createFrame,
-	createText,
-	type Node,
-	type TextNode,
-} from "../src/node";
+import { createFrame, createText, type Node, type TextNode } from "../src/node";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import { withPathMeasure } from "../src/path-measure";
 import { makeRuntime, paintCanvasKit } from "../src/runtime";
@@ -26,7 +21,6 @@ const font: ResolvedFont = {
 };
 const CUBIC = "M10 150 C 60 20 140 20 190 150";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;
@@ -156,7 +150,11 @@ const evenRun = (n: number) =>
 		),
 	}) as never;
 
-function place(d: string, spec: Partial<Parameters<typeof placeOnPath>[1]>, n: number) {
+function place(
+	d: string,
+	spec: Partial<Parameters<typeof placeOnPath>[1]>,
+	n: number,
+) {
 	const path = ck.Path.MakeFromSVGString(d);
 	try {
 		return withPathMeasure(ck, path, (m) => ({
@@ -190,8 +188,16 @@ describe("text on a path", () => {
 		const cubic = (t: number) => {
 			const u = 1 - t;
 			return {
-				x: u * u * u * 10 + 3 * u * u * t * 60 + 3 * u * t * t * 140 + t * t * t * 190,
-				y: u * u * u * 150 + 3 * u * u * t * 20 + 3 * u * t * t * 20 + t * t * t * 150,
+				x:
+					u * u * u * 10 +
+					3 * u * u * t * 60 +
+					3 * u * t * t * 140 +
+					t * t * t * 190,
+				y:
+					u * u * u * 150 +
+					3 * u * u * t * 20 +
+					3 * u * t * t * 20 +
+					t * t * t * 150,
 				dx: 3 * u * u * 50 + 6 * u * t * 80 + 3 * t * t * 50,
 				dy: 3 * u * u * -130 + 0 + 3 * t * t * 130,
 			};
@@ -215,7 +221,11 @@ describe("text on a path", () => {
 		const line = "M0 0 L200 0";
 		const start = place(line, { startOffset: 50 }, 4).xforms;
 		expect(centre(start, 0).x).toBeCloseTo(55, 4);
-		const middle = place(line, { startOffset: 50, percent: true, align: "center" }, 4).xforms;
+		const middle = place(
+			line,
+			{ startOffset: 50, percent: true, align: "center" },
+			4,
+		).xforms;
 		expect(centre(middle, 0).x).toBeCloseTo(85, 4);
 		expect(centre(middle, 3).x).toBeCloseTo(115, 4);
 		const end = place(line, { startOffset: 100, align: "end" }, 4).xforms;
@@ -241,28 +251,46 @@ describe("text on a path", () => {
 	test("glyphs past an open path's end are hidden", () => {
 		const { xforms } = place("M0 0 L42 0", {}, 8);
 		expect(hidden(xforms)).toBe(4);
-		const before = place("M0 0 L200 0", { startOffset: 100, align: "end" }, 12).xforms;
+		const before = place(
+			"M0 0 L200 0",
+			{ startOffset: 100, align: "end" },
+			12,
+		).xforms;
 		expect(hidden(before)).toBe(2);
 	});
 
 	test("paints text along a cubic", async () => {
-		const { px, warnings } = await paint(pathText("ALONG A CURVE", { d: CUBIC, startOffset: "50%", align: "center" }));
+		const { px, warnings } = await paint(
+			pathText("ALONG A CURVE", {
+				d: CUBIC,
+				startOffset: "50%",
+				align: "center",
+			}),
+		);
 		expect(warnings).toEqual([]);
 		let ink = 0;
-		for (let i = 3; i < px.data.length; i += 4) if ((px.data[i] as number) > 128) ink++;
+		for (let i = 3; i < px.data.length; i += 4)
+			if ((px.data[i] as number) > 128) ink++;
 		expect(ink).toBeGreaterThan(50);
 	});
 
 	test("overflow hides glyphs and reports the layer", async () => {
 		const text = "MUCH TOO LONG FOR THIS PATH";
-		const { glyphs, warnings } = await drawnGlyphs(pathText(text, { d: "M20 100 L80 100" }));
+		const { glyphs, warnings } = await drawnGlyphs(
+			pathText(text, { d: "M20 100 L80 100" }),
+		);
 		expect(glyphs.length).toBeGreaterThan(0);
 		expect(glyphs.length).toBeLessThan(shapedGlyphs(text).length);
-		expect(warnings).toContainEqual({ kind: "text_path_overflow", layer: "label" });
+		expect(warnings).toContainEqual({
+			kind: "text_path_overflow",
+			layer: "label",
+		});
 	});
 
 	test("a path too short for any glyph draws nothing", async () => {
-		const { glyphs, warnings } = await drawnGlyphs(pathText("A", { ref: "missing" }));
+		const { glyphs, warnings } = await drawnGlyphs(
+			pathText("A", { ref: "missing" }),
+		);
 		expect(glyphs).toEqual([]);
 		expect(warnings.map((w) => w.kind)).toContain("text_path_overflow");
 	});
@@ -276,7 +304,9 @@ describe("text on a path", () => {
 
 	test("falls back per glyph across scripts", async () => {
 		const text = "ab שלום";
-		const { glyphs, warnings } = await drawnGlyphs(pathText(text, { d: CUBIC, startOffset: 30 }));
+		const { glyphs, warnings } = await drawnGlyphs(
+			pathText(text, { d: CUBIC, startOffset: 30 }),
+		);
 		expect(warnings).toEqual([]);
 		expect(glyphs).not.toContain(0);
 		expect([...glyphs].sort()).toEqual([...shapedGlyphs(text)].sort());
@@ -285,6 +315,7 @@ describe("text on a path", () => {
 	test("deletes every ContourMeasure and iterator", async () => {
 		const Iter = ck.ContourMeasureIter;
 		const made: { isDeleted(): boolean }[] = [];
+		// biome-ignore lint/complexity/useArrowFunction: replaces a constructor that is called with new
 		ck.ContourMeasureIter = function (...args: unknown[]) {
 			const iter = new Iter(...args);
 			const next = iter.next.bind(iter);
@@ -298,7 +329,9 @@ describe("text on a path", () => {
 		};
 		try {
 			await paint(
-				pathText("ONE\nTWO", { d: "M10 40 H190 M10 120 C 60 60 140 60 190 120" }),
+				pathText("ONE\nTWO", {
+					d: "M10 40 H190 M10 120 C 60 60 140 60 190 120",
+				}),
 			);
 		} finally {
 			ck.ContourMeasureIter = Iter;
@@ -315,7 +348,10 @@ describe("text on a path", () => {
 			size: { width: 100, height: 0 },
 			d: "M0 0 L100 0",
 		};
-		const cmd = textCommand(vector, pathText("X", { ref: "curve" }, { pos: { x: 10, y: 20 } }));
+		const cmd = textCommand(
+			vector,
+			pathText("X", { ref: "curve" }, { pos: { x: 10, y: 20 } }),
+		);
 		expect(cmd.path?.d).toBe("M40 40L140 40");
 		expect(cmd.arc).toBeUndefined();
 		const turned = textCommand(
@@ -326,15 +362,32 @@ describe("text on a path", () => {
 	});
 
 	test("percent and numeric offsets resolve onto the command", () => {
-		const pct = textCommand(pathText("X", { d: CUBIC, startOffset: "25%", side: "right" }));
-		expect(pct.path).toEqual({ d: CUBIC, startOffset: 25, percent: true, side: "right", align: "start" });
-		const px = textCommand(pathText("X", { d: CUBIC, startOffset: 12, align: "end" }));
-		expect(px.path).toEqual({ d: CUBIC, startOffset: 12, side: "left", align: "end" });
+		const pct = textCommand(
+			pathText("X", { d: CUBIC, startOffset: "25%", side: "right" }),
+		);
+		expect(pct.path).toEqual({
+			d: CUBIC,
+			startOffset: 25,
+			percent: true,
+			side: "right",
+			align: "start",
+		});
+		const px = textCommand(
+			pathText("X", { d: CUBIC, startOffset: 12, align: "end" }),
+		);
+		expect(px.path).toEqual({
+			d: CUBIC,
+			startOffset: 12,
+			side: "left",
+			align: "end",
+		});
 	});
 
 	test("predicted layer bounds hold the drawn glyphs", async () => {
 		const pairs: { predicted: number[] | null; recorded: number[] }[] = [];
-		auditAdjustedBounds((predicted, recorded) => pairs.push({ predicted, recorded }));
+		auditAdjustedBounds((predicted, recorded) =>
+			pairs.push({ predicted, recorded }),
+		);
 		try {
 			for (const side of ["left", "right"] as const)
 				await paint(
@@ -361,7 +414,13 @@ describe("text on a path", () => {
 	test("validation rejects a bad text path", () => {
 		const cmd = textCommand(pathText("X", { d: CUBIC }));
 		const issues = validateCommands([
-			{ ...cmd, path: { ...(cmd.path as NonNullable<DrawTextCommand["path"]>), startOffset: Number.NaN } },
+			{
+				...cmd,
+				path: {
+					...(cmd.path as NonNullable<DrawTextCommand["path"]>),
+					startOffset: Number.NaN,
+				},
+			},
 		]);
 		expect(issues.map((i) => i.code)).toContain("bad_text_path");
 	});

@@ -1,8 +1,7 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import {
 	createEllipse,
 	createGroup,
@@ -13,6 +12,7 @@ import {
 } from "../src/node";
 import type { DrawGroupCommand, DrawPathCommand, Stroke } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
+import { renderSceneToPng } from "./helpers/headless";
 
 const W = 100;
 const H = 100;
@@ -206,10 +206,10 @@ describe("image stroke alignment", () => {
 describe("per-corner group clip", () => {
 	test("lowers to a per-corner rounded-rect clip", () => {
 		const group = (cornerRadius: [number, number, number, number]) =>
-			compileScene(
-				createGroup([], { ...box, clip: true, cornerRadius }),
-				{ width: W, height: H },
-			).find((c) => c.op === "drawGroup") as DrawGroupCommand;
+			compileScene(createGroup([], { ...box, clip: true, cornerRadius }), {
+				width: W,
+				height: H,
+			}).find((c) => c.op === "drawGroup") as DrawGroupCommand;
 		expect(group([8, 0, 4, 0]).clip).toEqual({
 			kind: "rounded-rect",
 			radius: [8, 0, 4, 0],

@@ -1,7 +1,6 @@
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { drawableBounds, makeBin } from "../src/canvaskit";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	approxEngine,
 	type Command,
@@ -13,8 +12,8 @@ import {
 	type SnapGrid,
 	validateCommands,
 } from "../src/index";
+import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -92,9 +91,7 @@ describe("group snap", () => {
 		const commands = bars({ columns: 4, rows: 1 });
 		expect(validateCommands(commands)).toEqual([]);
 		(snapped(commands) as { snap: SnapGrid }).snap.columns = 2.5;
-		expect(validateCommands(commands).map((i) => i.code)).toContain(
-			"bad_snap",
-		);
+		expect(validateCommands(commands).map((i) => i.code)).toContain("bad_snap");
 	});
 
 	test("its modules land on whole, equal pixels", async () => {

@@ -5,7 +5,7 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
-		"types": ["@figma/plugin-typings"],
+		"types": ["@figma/plugin-typings", "node"],
 		"jsx": "react-jsx",
 		"jsxImportSource": "preact",
 		"moduleResolution": "bundler",

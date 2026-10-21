@@ -2,8 +2,9 @@
 // color-correction steps (saturation matrix, contrast matrix, gamma LUT), proven
 // in pure JS against reference formulas. What the field DOES once painted is the
 // conformance corpus's subject, not this file's.
+
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import {
 	applyAdjustColor,
 	buildAdjust,
@@ -13,8 +14,8 @@ import {
 	identityLut3d,
 	saturationMatrix,
 } from "../src/adjust";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect } from "../src/node";
+import { renderSceneToPng } from "./helpers/headless";
 
 // ── reference formulas (the canonical per-pixel color steps, in 0–255 space) ──
 // These mirror the well-known dye-sub color-correction steps; the builder must
@@ -182,7 +183,9 @@ describe("composeAdjust", () => {
 		for (const c of samples) {
 			const want = applyAdjustColor(second, applyAdjustColor(first, c));
 			const got = applyAdjustColor(both, c);
-			got.forEach((v, i) => expect(Math.abs(v - want[i])).toBeLessThan(0.03));
+			got.forEach((v, i) => {
+				expect(Math.abs(v - want[i])).toBeLessThan(0.03);
+			});
 		}
 	});
 
@@ -209,10 +212,9 @@ describe("composeAdjust", () => {
 			composeAdjust({ sharpen: 0.3 }, buildAdjust({ saturation: 1.2 })),
 		).toEqual({ ...buildAdjust({ saturation: 1.2 }), sharpen: 0.3 });
 		expect(
-			composeAdjust(
-				buildAdjust({ contrast: 1.1, sharpen: 0.2 }),
-				{ sharpen: 0.5 },
-			),
+			composeAdjust(buildAdjust({ contrast: 1.1, sharpen: 0.2 }), {
+				sharpen: 0.5,
+			}),
 		).toEqual({ ...buildAdjust({ contrast: 1.1 }), sharpen: 0.5 });
 	});
 });

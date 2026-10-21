@@ -1,10 +1,11 @@
 // The print toggle on renderTemplate(): off = passthrough; on = the frame is
 // planned and the whole-frame finish is applied. Uses a near-white background so the finish's
 // white-clamp is observable without needing image assets.
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
+
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { type PrintTarget, YMCKO_DYE_SUB } from "@freshcoat-js/for-print";
-import { describe, expect, test } from "vitest";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 

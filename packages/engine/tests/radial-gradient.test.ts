@@ -1,11 +1,12 @@
 // An elliptical radial gradient: Skia only draws circles, so anything other
 // than a circle is that circle under a shader local matrix. These paint one and
 // read the pixels back to check the reach along each axis.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
-import { renderSceneToPng } from "./helpers/headless";
 import { createRect } from "../src/index";
 import type { ResolvedFill } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = 200;
 

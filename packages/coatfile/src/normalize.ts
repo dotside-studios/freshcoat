@@ -158,7 +158,11 @@ export function uniquifyElementIdsDeep<T extends { id: string }>(
 				? (operation.operands as Node[])
 				: undefined;
 			const operands = before?.map(visit);
-			if (!operation || !operands || operands.every((o, i) => o === before?.[i]))
+			if (
+				!operation ||
+				!operands ||
+				operands.every((o, i) => o === before?.[i])
+			)
 				return renamed;
 			return {
 				...renamed,
@@ -214,7 +218,8 @@ export type HealOptions = {
 function collectIds(els: readonly Node[], used: Set<string>): void {
 	for (const el of els) {
 		used.add(el.id);
-		if (el.type !== "vector") for (const list of nestedOf(el)) collectIds(list, used);
+		if (el.type !== "vector")
+			for (const list of nestedOf(el)) collectIds(list, used);
 	}
 }
 
@@ -254,7 +259,10 @@ function healOperandIds<T extends { id: string }>(
 			? (props.children as Node[])
 			: undefined;
 		const children = before?.map(visit);
-		if (mask === props.mask && (children ?? []).every((c, i) => c === before?.[i]))
+		if (
+			mask === props.mask &&
+			(children ?? []).every((c, i) => c === before?.[i])
+		)
 			return el;
 		return {
 			...el,

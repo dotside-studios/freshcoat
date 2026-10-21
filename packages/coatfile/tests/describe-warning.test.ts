@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { describeWarning } from "../src/render";
 
 describe("describeWarning", () => {
@@ -23,9 +23,9 @@ describe("describeWarning", () => {
 	});
 
 	it("names the layer when the warning carries one", () => {
-		expect(describeWarning({ kind: "text_path_overflow", layer: "title" })).toBe(
-			"Text runs past the end of its path: title",
-		);
+		expect(
+			describeWarning({ kind: "text_path_overflow", layer: "title" }),
+		).toBe("Text runs past the end of its path: title");
 		expect(describeWarning({ kind: "text_path_overflow" })).toBe(
 			"Text runs past the end of its path",
 		);

@@ -2,8 +2,16 @@
 // proof that what renders scans. Every symbology is decoded back with ZXing from
 // CanvasKit's pixels, so a module lost anywhere between bwip-js and the painter
 // fails here rather than at a till.
+
+import { beforeAll, describe, expect, test } from "bun:test";
+import {
+	type BitmapNode,
+	createRenderer,
+	decodePixels,
+	type Node,
+} from "@freshcoat-js/engine";
 import { planScene } from "@freshcoat-js/for-print";
-import { type BitmapNode, createRenderer, decodePixels, type Node } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import {
 	AztecCodeReader,
 	BarcodeFormat,
@@ -15,8 +23,6 @@ import {
 	PDF417Reader,
 	RGBLuminanceSource,
 } from "@zxing/library";
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { encodeBarcode } from "../src/barcode";
 import { compile } from "../src/compile";
 import { resizeTemplate } from "../src/constraints";
@@ -30,7 +36,6 @@ import type {
 } from "../src/types";
 import { validate } from "../src/validate";
 
-// biome-ignore lint/suspicious/noExplicitAny: ck is the untyped WASM instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -105,7 +110,7 @@ async function paint(
 	scale = 1,
 	supersample = 1,
 ) {
-	const [frame] = (await renderTemplate(
+	const [frame] = await renderTemplate(
 		await createRenderer({ ck, cache: false }),
 		tpl,
 		values,
@@ -119,7 +124,7 @@ async function paint(
 				},
 			],
 		},
-	));
+	);
 	const pixels = decodePixels(ck, frame.bytes);
 	if (!pixels) throw new Error("decode failed");
 	return { frame, pixels };
@@ -137,7 +142,11 @@ const ZXING_FORMAT: Record<Symbology, BarcodeFormat> = {
 };
 
 function scan(
-	pixels: { data: Uint8Array | Uint8ClampedArray; width: number; height: number },
+	pixels: {
+		data: Uint8Array | Uint8ClampedArray;
+		width: number;
+		height: number;
+	},
 	symbology: Symbology,
 ): string {
 	const { data, width, height } = pixels;
@@ -317,11 +326,7 @@ describe("decode round trip", () => {
 	];
 	for (const { symbology, value, decoded, box, card } of cases) {
 		test(`${symbology}: ${value.length > 30 ? `${value.length} characters` : value}`, async () => {
-			const tpl = barcodeTemplate(
-				{ symbology, showText: false },
-				box,
-				card,
-			);
+			const tpl = barcodeTemplate({ symbology, showText: false }, box, card);
 			const { frame, pixels } = await paint(tpl, { code: value }, 3);
 			expect(frame.warnings).toEqual([]);
 			expect(scan(pixels, symbology)).toBe(decoded ?? value);

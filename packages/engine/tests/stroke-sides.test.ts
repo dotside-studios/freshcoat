@@ -1,13 +1,13 @@
+import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { createGroup, createRect } from "../src/node";
-import { renderSceneToPng } from "./helpers/headless";
 import { sideStrokeGeometry } from "../src/outline";
 import type { StrokeSides } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
+import { renderSceneToPng } from "./helpers/headless";
 
 const sides: StrokeSides = { top: 2, right: 4, bottom: 6, left: 0 };
 
@@ -30,9 +30,9 @@ describe("sideStrokeGeometry", () => {
 			sideStrokeGeometry(10, 20, 100, 50, 0, 0, { align: "outside", sides })
 				?.band,
 		).toBe("M 10 18 H 114 V 76 H 10 V 18 Z M 10 20 H 110 V 70 H 10 V 20 Z");
-		expect(
-			sideStrokeGeometry(10, 20, 100, 50, 0, 0, { sides })?.ltrb,
-		).toEqual([10, 19, 112, 73]);
+		expect(sideStrokeGeometry(10, 20, 100, 50, 0, 0, { sides })?.ltrb).toEqual([
+			10, 19, 112, 73,
+		]);
 	});
 
 	test("a rounded corner moves by each adjacent width on its own axis", () => {

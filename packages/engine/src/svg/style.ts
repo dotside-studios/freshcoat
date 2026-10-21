@@ -53,11 +53,23 @@ export function parseStyleSheet(css: string): StyleRule[] {
 			const m = SIMPLE.exec(sel.trim());
 			if (!m) continue;
 			if (m[1])
-				rules.push({ selector: { kind: "type", name: m[1] }, specificity: 1, decls });
+				rules.push({
+					selector: { kind: "type", name: m[1] },
+					specificity: 1,
+					decls,
+				});
 			else if (m[2])
-				rules.push({ selector: { kind: "class", name: m[2] }, specificity: 10, decls });
+				rules.push({
+					selector: { kind: "class", name: m[2] },
+					specificity: 10,
+					decls,
+				});
 			else if (m[3])
-				rules.push({ selector: { kind: "id", name: m[3] }, specificity: 100, decls });
+				rules.push({
+					selector: { kind: "id", name: m[3] },
+					specificity: 100,
+					decls,
+				});
 		}
 	}
 	return rules;
