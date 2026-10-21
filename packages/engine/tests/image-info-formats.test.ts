@@ -1,9 +1,10 @@
 // BMP, ICO, WBMP and AVIF sizes read from hand-built headers, and what the
 // renderer does with the real files CanvasKit can and cannot decode.
+
+import { beforeAll, describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadCanvasKit, pngHeader } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, it } from "vitest";
 import {
 	assertDecodableImage,
 	parseImageInfo,
