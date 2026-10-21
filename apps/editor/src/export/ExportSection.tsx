@@ -54,7 +54,7 @@ import { type CheckTarget, exportChecks, warningGroups } from "./checks";
 import { useExportCollapsed } from "./collapsed";
 import { ExportItemPreview, type PreviewItem } from "./ExportPreview";
 import { ExportSettings } from "./ExportSettings";
-import { useExportJobs } from "./export-jobs";
+import { useLastExportResult } from "./export-jobs";
 import {
 	exportEstimate,
 	labelColumn,
@@ -185,7 +185,6 @@ export function ExportSection() {
 				: null,
 		[wsState, present, guides],
 	);
-	const jobs = useExportJobs();
 	const narrow = useNarrow();
 	const [rail, setRail] = useRail();
 	const [overlay, setOverlay] = useState<"presets" | "settings" | null>(null);
@@ -329,7 +328,7 @@ export function ExportSection() {
 		}
 		return { ids, sides, stops, set: idSet };
 	}, [plan, everyVariant]);
-	const lastResult = jobs.snapshot.lastResult;
+	const lastResult = useLastExportResult();
 	const failedIds = useMemo(
 		() => new Set(lastResult ? recordOutcome(lastResult).failed : []),
 		[lastResult],
@@ -1031,8 +1030,6 @@ export function ExportSection() {
 				) : null}
 			</div>
 			<JobBar
-				jobs={jobs}
-				snapshot={jobs.snapshot}
 				preset={preset}
 				count={runCount}
 				blocked={blocked?.message ?? null}

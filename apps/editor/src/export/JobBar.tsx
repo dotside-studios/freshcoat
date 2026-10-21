@@ -26,7 +26,7 @@ import RetryIcon from "~icons/mingcute/refresh-2-line";
 import ExportIconFill from "~icons/mingcute/upload-2-fill";
 import ExportIcon from "~icons/mingcute/upload-2-line";
 import WarningIcon from "~icons/mingcute/warning-line";
-import type { ExportJobs, ExportJobsSnapshot } from "./export-jobs";
+import { useExportJobs } from "./export-jobs";
 import {
 	DESTINATION_LABEL,
 	formatDuration,
@@ -135,8 +135,6 @@ function useRate(done: number | undefined, running: boolean): number | null {
 }
 
 export function JobBar({
-	jobs,
-	snapshot,
 	preset,
 	count,
 	blocked,
@@ -149,8 +147,6 @@ export function JobBar({
 	hideRun,
 	onDismiss,
 }: {
-	jobs: ExportJobs;
-	snapshot: ExportJobsSnapshot;
 	preset: ExportPreset | undefined;
 	/** files the active preset plans */
 	count: number;
@@ -173,7 +169,9 @@ export function JobBar({
 	/** puts the bar away until the next job */
 	onDismiss?: () => void;
 }) {
-	const { runner, job, lastPreset, lastResult, unwritten, history } = snapshot;
+	const jobs = useExportJobs();
+	const { runner, job, lastPreset, lastResult, unwritten, history } =
+		jobs.snapshot;
 	const running = runner.state === "running";
 	const progress = runner.progress;
 	const rate = useRate(progress?.done, running);

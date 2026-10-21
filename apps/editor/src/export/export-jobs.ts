@@ -289,6 +289,14 @@ export function exportJobsFor(
 	return jobs;
 }
 
+/** The last finished job's result: unlike the snapshot, it holds still while
+ *  a job reports progress. */
+export function useLastExportResult(): ExportJobsSnapshot["lastResult"] {
+	const jobs = exportJobsFor(useController());
+	const read = () => jobs.getSnapshot().lastResult;
+	return useSyncExternalStore(jobs.subscribe, read, read);
+}
+
 export function useExportJobs(): ExportJobs & { snapshot: ExportJobsSnapshot } {
 	const controller = useController();
 	const jobs = exportJobsFor(controller);
