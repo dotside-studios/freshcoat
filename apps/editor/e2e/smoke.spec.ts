@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { stubGoogleFonts } from "./helpers";
 
-test("the editor boots without console errors", async ({ page }) => {
+test("the editor boots without console errors", { tag: "@smoke" }, async ({
+	page,
+}) => {
 	const errors: string[] = [];
 	page.on("console", (m) => {
 		if (m.type() === "error") errors.push(m.text());
 	});
 	page.on("pageerror", (e) => errors.push(String(e)));
+	await stubGoogleFonts(page);
 	await page.goto("/");
 	await expect(
 		page.getByRole("heading", { name: "Freshcoat Studio" }),
