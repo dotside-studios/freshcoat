@@ -36,15 +36,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/setup
-      - run: bun run --cwd packages/ui typecheck
-      - run: bun run --cwd packages/workspace typecheck
-      - run: bun run --cwd packages/cli typecheck
-      - run: bun run --cwd packages/engine typecheck
-      - run: bun run --cwd packages/for-print typecheck
-      - run: bun run --cwd packages/coatfile typecheck
-      - run: bun run --cwd packages/test-utils typecheck
-      - run: bun run --cwd apps/editor typecheck
-      - run: bun run --cwd apps/figma-plugin typecheck
+      - run: bun run typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -53,15 +45,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/setup
-      - run: bun run --cwd packages/test-utils test
-      - run: bun run --cwd packages/engine test
-      - run: bun run --cwd packages/coatfile test
-      - run: bun run --cwd packages/for-print test
-      - run: bun run --cwd packages/ui test
-      - run: bun run --cwd packages/workspace test
-      - run: bun run --cwd packages/cli test
-      - run: bun run --cwd apps/editor test
-      - run: bun run --cwd apps/figma-plugin test
+      - run: bun run test
 
   bench:
     runs-on: ubuntu-latest
