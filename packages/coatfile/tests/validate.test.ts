@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	PATTERN_INPUT_MAX_LENGTH,
 	PATTERN_MAX_LENGTH,
@@ -1069,7 +1069,7 @@ describe("unsafe field patterns", () => {
 			["a".repeat(PATTERN_MAX_LENGTH + 1), "too_long"],
 		];
 		for (const [pattern, reason] of unsafe) {
-			expect(unsafePatternReason(pattern)).toBe(reason);
+			expect<string | null>(unsafePatternReason(pattern)).toBe(reason);
 			expect(compiledPattern(pattern)).toBeNull();
 			expect(patternProblem(pattern)).toContain("Unsafe");
 		}

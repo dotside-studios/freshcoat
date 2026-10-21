@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { validate } from "../src/validate";
 
 const baseTemplateNoFonts = {
@@ -57,7 +57,7 @@ describe("fonts block — descriptor parsing", () => {
 		const result = validate(tpl);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value.fonts).toEqual(tpl.fonts);
+			expect(result.value.fonts as unknown).toEqual(tpl.fonts);
 		}
 	});
 

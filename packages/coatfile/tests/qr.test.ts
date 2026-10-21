@@ -1,10 +1,10 @@
+import { describe, expect, test } from "bun:test";
 import {
 	BinaryBitmap,
 	HybridBinarizer,
 	QRCodeReader,
 	RGBLuminanceSource,
 } from "@zxing/library";
-import { describe, expect, test } from "vitest";
 import {
 	DEFAULT_QR_STYLE,
 	generateMatrix,

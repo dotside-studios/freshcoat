@@ -1,8 +1,9 @@
 // Rendering one slice piece: the box grown by its bleed, cut from the whole
 // side's composite, and masked to the outline grown by that bleed.
+
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Element, Template } from "../src/types";
 

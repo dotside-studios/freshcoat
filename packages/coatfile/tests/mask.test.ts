@@ -1,9 +1,9 @@
 // The mask element: a shape (or any element) whose coverage decides how much of
 // the content shows. Positions are relative to the mask element, like a frame's.
 
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { renderTemplate } from "../src/render";
 import type { Element, MaskElement, Template } from "../src/types";

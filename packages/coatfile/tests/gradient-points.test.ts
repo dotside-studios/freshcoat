@@ -1,8 +1,8 @@
+import { describe, expect, test } from "bun:test";
 import {
 	linearGradientAngle,
 	linearGradientPoints,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { templateJsonSchema } from "../src/json-schema";
 import type { Fill, RectNode, Template } from "../src/types";

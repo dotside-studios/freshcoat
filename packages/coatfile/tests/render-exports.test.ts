@@ -2,13 +2,13 @@
 // setting decides the density that layout is rasterized at — so one call can
 // return the same side at several sizes, each tagged with what it is.
 
+import { describe, expect, test } from "bun:test";
 import {
 	createRenderer,
 	decodePixels,
 	type ExportSetting,
 } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { renderTemplate, type TemplateFrame } from "../src/render";
 import type { Template } from "../src/types";
 

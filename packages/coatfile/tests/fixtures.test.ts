@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { validate } from "../src";
 import type { Command, DrawCommand } from "../src/types";

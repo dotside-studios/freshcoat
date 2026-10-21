@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { fixtures } from "../fixtures";
 import { defineTemplate } from "../src/define";
 import type { Template } from "../src/types";

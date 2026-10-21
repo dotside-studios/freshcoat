@@ -1,6 +1,6 @@
+import { afterEach, describe, expect, test, vi } from "bun:test";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { afterEach, describe, expect, test, vi } from "vitest";
 import { compile } from "../src/compile";
 import { prepareTemplate } from "../src/prepare";
 import { renderCompiled } from "../src/render";

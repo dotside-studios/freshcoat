@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { compile } from "../src/compile";
 import { fieldContext } from "../src/prepare";
 import type { Element, GroupNode, Template } from "../src/types";

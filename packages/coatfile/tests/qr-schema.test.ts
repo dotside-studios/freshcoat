@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { assetUri, collectAssetRefs, resolveAssetSrcs } from "../src/assets";
 import { minimumFormatVersion } from "../src/format";
 import { templateHints } from "../src/hints";

@@ -1,8 +1,9 @@
 // A vector's live boolean operation: validation, the walkers that reach its
 // operands, and the path compile rebuilds from them.
+
+import { beforeAll, describe, expect, test, vi } from "bun:test";
 import { type BooleanOperand, createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { beforeAll, describe, expect, test, vi } from "vitest";
 import {
 	applyBooleans,
 	cachePathOp,

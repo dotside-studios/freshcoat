@@ -2,9 +2,9 @@
 // analyzes it, and attaches a per-image correction — so the painted image differs
 // from the un-optimized render. finish:false isolates the per-layer adjust.
 
+import { describe, expect, test } from "bun:test";
 import { createRenderer, decodePixels } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { describe, expect, test } from "vitest";
 import { renderTemplate } from "../src/render";
 import type { Template } from "../src/types";
 
