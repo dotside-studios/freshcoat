@@ -1,50 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { fixtures } from "../fixtures";
-import { FORMAT_MINOR, minimumFormatVersion } from "../src/format";
+import {
+	spliceHistoryComment,
+	spliceHistoryTable,
+} from "../scripts/format-history";
+import { FORMAT_HISTORY, minimumFormatVersion } from "../src/format";
 import type { Element, Template } from "../src/types";
 
-// Each minor's backticked names, from the history comment in format.ts and
-// the README's "Format versions" table.
-function historyComment(): Map<number, Set<string>> {
-	const source = readFileSync(
-		new URL("../src/format.ts", import.meta.url),
-		"utf8",
-	);
-	const byMinor = new Map<number, string>();
-	let minor: number | undefined;
-	for (const line of source.split("\n")) {
-		const entry = /^\/\/ {3}1\.(\d+) {2}(.*)$/.exec(line);
-		if (entry) {
-			minor = Number(entry[1]);
-			byMinor.set(minor, entry[2]);
-		} else if (minor !== undefined && /^\/\/ {8}/.test(line)) {
-			byMinor.set(minor, `${byMinor.get(minor)} ${line.slice(2).trim()}`);
-		} else if (minor !== undefined) {
-			break;
-		}
-	}
-	return names(byMinor);
-}
-
-function readmeTable(): Map<number, Set<string>> {
-	const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-	const byMinor = new Map<number, string>();
-	for (const line of readme.split("\n")) {
-		const row = /^\| 1\.(\d+) \| (.*) \|$/.exec(line);
-		if (row) byMinor.set(Number(row[1]), row[2]);
-	}
-	return names(byMinor);
-}
-
-function names(byMinor: Map<number, string>): Map<number, Set<string>> {
-	return new Map(
-		[...byMinor].map(([minor, text]) => [
+// Each minor's backticked names, from FORMAT_HISTORY.
+const listedNames = (): Map<number, Set<string>> =>
+	new Map(
+		FORMAT_HISTORY.map((text, minor) => [
 			minor,
-			new Set([...text.matchAll(/`([^`]+)`/g)].map((m) => m[1])),
+			new Set([...text.matchAll(/`([^`]+)`/g)].map((m) => m[1] as string)),
 		]),
 	);
-}
+
+const read = (path: string) =>
+	readFileSync(new URL(path, import.meta.url), "utf8");
 
 const base = (): Template => structuredClone(fixtures.minimalCard);
 
@@ -506,16 +480,21 @@ const baseMinor = (element: Element) =>
 	Number(minimumFormatVersion(withElement(element)).split(".")[1]);
 
 describe("format history", () => {
-	test("the README table lists what the history comment lists", () => {
-		expect(readmeTable()).toEqual(historyComment());
-	});
-
-	test("the history comment ends at FORMAT_MINOR", () => {
-		expect(Math.max(...historyComment().keys())).toBe(FORMAT_MINOR);
+	test("README.md and src/format.ts match FORMAT_HISTORY", () => {
+		const hint = "run `bun run schema` in packages/coatfile";
+		expect(
+			read("../README.md") === spliceHistoryTable(read("../README.md")),
+			`README.md is out of date: ${hint}`,
+		).toBe(true);
+		expect(
+			read("../src/format.ts") ===
+				spliceHistoryComment(read("../src/format.ts")),
+			`src/format.ts is out of date: ${hint}`,
+		).toBe(true);
 	});
 
 	test("every listed field has a detection case, and every case is listed", () => {
-		const listed = [...historyComment()].flatMap(([minor, fields]) =>
+		const listed = [...listedNames()].flatMap(([minor, fields]) =>
 			[...fields].map((field) => `1.${minor} ${field}`),
 		);
 		const covered = new Set(cases.map((c) => `1.${c.minor} ${c.field}`));

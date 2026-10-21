@@ -15,9 +15,9 @@ import type { Template } from "./types";
 // before it does that.
 //
 //   1.0  the original format
-//   1.1  `product` and `version` optional; `$schema` recognised
+//   1.1  `product` and `version` optional; `$schema` kept
 //   1.2  linear fill `from` / `to`; element `constraints`
-//   1.3  `barcode` element
+//   1.3  the `barcode` element
 //   1.4  variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden`
 //   1.5  `grid` layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
@@ -30,9 +30,8 @@ import type { Template } from "./types";
 //        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
 //        and image `cornerSmoothing`; rect and frame stroke `width` per side;
 //        element `effects`, with `grain` and `halftone` (and its `anchor`);
-//        rect and vector `spot`;
-//        QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`,
-//        `gradient` and `logo`
+//        rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`,
+//        `finderInner`, `gradient` and `logo`
 
 export {
 	FORMAT_HISTORY,
