@@ -1,6 +1,6 @@
 // Chart specs: geometry that fits the card, colors that sweep the axis they
 // claim to, and a spec the reader can round-trip against.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import {
 	chartScene,
 	chromaRampChart,

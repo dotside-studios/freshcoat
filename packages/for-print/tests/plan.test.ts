@@ -1,6 +1,8 @@
 // The planner: classification, the PrintOptimizeOptions → Adjust mapping (proven
 // against the canonical color formulas), the sync tree walk, and the async
 // per-image analyzeScene driven by an injected sampler (no canvas in for-print).
+
+import { describe, expect, test } from "bun:test";
 import {
 	type Adjust,
 	buildAdjust,
@@ -12,7 +14,6 @@ import {
 	createText,
 	type Node,
 } from "@freshcoat-js/engine";
-import { describe, expect, test } from "vitest";
 import { analyzePixels } from "../src/analyze";
 import {
 	type AnalysisCache,

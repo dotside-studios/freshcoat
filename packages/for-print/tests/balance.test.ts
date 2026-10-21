@@ -4,7 +4,7 @@
 // with a known cast, fit a balance off what it produced, then run the SAME
 // printer with that balance applied and check the neutrals came back neutral.
 // A fit that merely returns plausible numbers would pass everything above it.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { assessCalibration } from "../src/assess";
 import { fitChannelBalance, isBalanceMeaningful } from "../src/balance";
 import { grayBalanceChart, type RGB } from "../src/chart";
