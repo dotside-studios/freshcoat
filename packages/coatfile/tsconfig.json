@@ -1,6 +1,6 @@
 {
 	"extends": "../../tsconfig.base.json",
-	"include": ["src/**/*", "fixtures/**/*", "tests/**/*"],
+	"include": ["src/**/*", "fixtures/**/*", "scripts/**/*", "tests/**/*"],
 	"compilerOptions": {
 		"resolveJsonModule": true,
 		"types": ["bun"]

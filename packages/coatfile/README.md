@@ -460,6 +460,9 @@ what that minor added.
 | 1.6 | frame `isolate`; text `arc` and `path`; element `backdropBlur`; gradient stroke `color`; variant `size`; vector `boolean` |
 | 1.7 | rect and vector `slice`; element `hidden`; text `stroke` and `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius` and image `cornerSmoothing`; rect and frame stroke `width` per side; element `effects`, with `grain` and `halftone` (and its `anchor`); rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`, `gradient` and `logo` |
 
+This table and the history comment in `src/format.ts` are generated from
+`FORMAT_HISTORY` by `bun run schema`.
+
 A writer that re-saves a template it did not create keeps the version the file
 was opened with, so a 1.2 file that gains a barcode would still say 1.2, and a
 1.2 kit would re-save it and drop the barcode. `minimumFormatVersion(t)` names
@@ -468,6 +471,14 @@ stamps it when it is higher than `t.format_version`. It never lowers the
 version, leaves a `"newer"` or `"unsupported"` one untouched, and returns `t`
 itself when nothing changes. Call it before `packTemplate` or
 `serializeTemplate`.
+
+`minimumFormatVersion` reads each minor from `formatHistory` tags on the zod
+schema in `src/schemas.ts`. A variant delta's `properties` count as the
+properties of the element it targets, so a key that element's type does not
+have counts nothing. A field, union member or enum value added in a new minor is
+tagged with it, as `.register(formatHistory, { since: "1.8" })` or
+`{ values: { name: "1.8" } }` for an enum value, and listed in `FORMAT_HISTORY`;
+a test fails until both are done.
 
 ```ts
 import { raiseFormatVersion } from "@freshcoat-js/coatfile";
@@ -478,10 +489,11 @@ const bytes = await packTemplate(raiseFormatVersion(template));
 `schema/coatfile.v1.schema.json` is the JSON Schema derived from the zod schema
 `validate` runs. `bun run schema` regenerates it, and a test fails when it
 drifts. Its `$id` is the copy the npm CDN serves from the published package,
-`https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile@0.1.0/schema/coatfile.v1.schema.json`,
-which is also what a template's `$schema` should point at. The package version
-in this URL is independent of the template format version. The file is exported
-as `@freshcoat-js/coatfile/schema/coatfile.v1.schema.json` for a host that serves
+`https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile/schema/coatfile.v1.schema.json`,
+which is also what a template's `$schema` should point at. The URL carries no
+package version and resolves to the latest published package, and the file name
+carries the template format major. The file is exported as
+`@freshcoat-js/coatfile/schema/coatfile.v1.schema.json` for a host that serves
 its own copy.
 
 ## Reading a file in

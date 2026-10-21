@@ -1,3 +1,10 @@
+import {
+	FORMAT_MAJOR,
+	formatMinor,
+	formatVersionStatus,
+} from "./format-version";
+import { schemaFormatMinor } from "./format-walk";
+import { ElementSchema, TemplateSchema } from "./schemas";
 import type { Template } from "./types";
 
 // The wire format's own version, as `format_version` carries it.
@@ -10,9 +17,9 @@ import type { Template } from "./types";
 // before it does that.
 //
 //   1.0  the original format
-//   1.1  `product` and `version` optional; `$schema` recognised
+//   1.1  `product` and `version` optional; `$schema` kept
 //   1.2  linear fill `from` / `to`; element `constraints`
-//   1.3  `barcode` element
+//   1.3  the `barcode` element
 //   1.4  variant deltas: `pos`, `size`, `rotation`, `opacity`, `hidden`
 //   1.5  `grid` layout; element `adjust`; image `focus` and `crop`; template
 //        `bleed` and `safeArea`; text `justify`, `start` and `end` alignment,
@@ -25,55 +32,57 @@ import type { Template } from "./types";
 //        `pdfText`; frame `cornerSmoothing`; per-corner image `cornerRadius`
 //        and image `cornerSmoothing`; rect and frame stroke `width` per side;
 //        element `effects`, with `grain` and `halftone` (and its `anchor`);
-//        rect and vector `spot`;
-//        QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`,
-//        `gradient` and `logo`
+//        rect and vector `spot`; QR `quietZone`, `moduleShape`, `finderOuter`,
+//        `finderInner`, `gradient` and `logo`
 
-export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 7;
+export {
+	FORMAT_HISTORY,
+	FORMAT_MAJOR,
+	FORMAT_MINOR,
+	FORMAT_VERSION,
+	type FormatVersionStatus,
+	formatMinor,
+	formatVersionStatus,
+} from "./format-version";
 
-/** What a writer puts in `format_version` for a template it produced. */
-export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
-
-export type FormatVersionStatus =
-	/** This kit reads and writes it without losing anything. */
-	| "current"
-	/** Readable, but written by a newer kit: re-saving it may drop fields. */
-	| "newer"
-	/** A major version, or a string, this kit does not read at all. */
-	| "unsupported";
-
-export function formatVersionStatus(
-	formatVersion: unknown,
-): FormatVersionStatus {
-	if (typeof formatVersion !== "string") return "unsupported";
-	const match = /^(\d+)(?:\.(\d+))?$/.exec(formatVersion.trim());
-	if (!match) return "unsupported";
-	if (Number(match[1]) !== FORMAT_MAJOR) return "unsupported";
-	const minor = match[2] === undefined ? 0 : Number(match[2]);
-	return minor > FORMAT_MINOR ? "newer" : "current";
+/**
+ * The lowest 1.x a reader needs to keep every field `template` uses, from the
+ * minors `formatHistory` tags in the schema.
+ */
+export function minimumFormatVersion(template: Template): string {
+	let minor = schemaFormatMinor(TemplateSchema, template);
+	for (const override of OVERRIDES) minor = Math.max(minor, override(template));
+	return `${FORMAT_MAJOR}.${minor}`;
 }
 
-/** The lowest 1.x a reader needs to keep every field `template` uses. */
-export function minimumFormatVersion(template: Template): string {
-	let minor = 0;
-	const need = (m: number) => {
-		if (m > minor) minor = m;
-	};
+// What a tag cannot say, because it turns on a key being absent or on another
+// part of the template.
+const OVERRIDES: ((template: Template) => number)[] = [
+	// 1.1 made `product` and `version` optional.
+	(t) => (t.product === undefined || t.version === undefined ? 1 : 0),
+	// A delta's `properties` is a bare record: read it as the properties of the
+	// element it targets.
+	(t) => {
+		const types = elementTypes(t);
+		let minor = 0;
+		for (const variant of t.variants ?? [])
+			for (const override of variant.overrides)
+				for (const delta of override.elements ?? [])
+					for (const type of types.get(delta.id) ?? [])
+						minor = Math.max(
+							minor,
+							schemaFormatMinor(ElementSchema, {
+								type,
+								properties: delta.properties,
+							}),
+						);
+		return minor;
+	},
+];
 
-	if (
-		template.$schema !== undefined ||
-		template.product === undefined ||
-		template.version === undefined
-	)
-		need(1);
-	if (template.bleed !== undefined || template.safeArea !== undefined) need(5);
-
-	const barcodeIds = new Set<string>();
-	const frameIds = new Set<string>();
-	const imageIds = new Set<string>();
-	const textIds = new Set<string>();
-	const qrIds = new Set<string>();
+// Each element id's type, wherever in the template the element sits.
+function elementTypes(template: Template): Map<string, Set<string>> {
+	const types = new Map<string, Set<string>>();
 	const visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
 			for (const item of node) visit(item);
@@ -81,260 +90,13 @@ export function minimumFormatVersion(template: Template): string {
 		}
 		if (node === null || typeof node !== "object") return;
 		const o = node as Record<string, unknown>;
-		if (o.kind === "linear" && (o.from !== undefined || o.to !== undefined))
-			need(2);
-		if (typeof o.id === "string" && typeof o.type === "string") {
-			if (o.constraints !== undefined) need(2);
-			if (o.adjust !== undefined) need(5);
-			if (usesGridPlacement(o.layoutChild)) need(5);
-			if (o.hidden !== undefined) need(7);
-			if (o.effects !== undefined) need(7);
-			if (o.type === "barcode") {
-				barcodeIds.add(o.id);
-				need(3);
-				if (usesBearerBars(o.properties)) need(5);
-			}
-			if (o.type === "text") textIds.add(o.id);
-			if (o.type === "qr_code") {
-				qrIds.add(o.id);
-				if (usesQrStyle(o.properties)) need(7);
-			}
-			if (usesSlice(o.properties)) need(7);
-			if (usesSpot(o.properties)) need(7);
-			if (usesSideStroke(o.properties)) need(7);
-			if (o.type === "text" && usesTextLayout(o.properties)) need(5);
-			if (o.type === "text" && usesArc(o.properties)) need(6);
-			if (o.type === "text" && usesTextPath(o.properties)) need(6);
-			if (o.type === "text" && usesTextStroke(o.properties)) need(7);
-			if (o.type === "text" && usesPdfText(o.properties)) need(7);
-			if (o.type === "vector" && usesBoolean(o.properties)) need(6);
-			if (o.type === "frame") {
-				frameIds.add(o.id);
-				if (usesPerCornerRadius(o.properties)) need(5);
-				if (usesGridLayout(o.properties)) need(5);
-				if (usesIsolate(o.properties)) need(6);
-				if (usesCornerSmoothing(o.properties)) need(7);
-			}
-			if (o.type === "image") {
-				imageIds.add(o.id);
-				if (usesImageFraming(o.properties)) need(5);
-				if (usesImageCorners(o.properties)) need(7);
-			}
-		}
-		if (o.blendMode === "linear-burn") need(5);
-		if (o.backdropBlur !== undefined) need(6);
-		if (usesGradientStroke(o)) need(6);
+		if (typeof o.id === "string" && typeof o.type === "string")
+			types.set(o.id, (types.get(o.id) ?? new Set()).add(o.type));
 		for (const value of Object.values(o)) visit(value);
 	};
 	visit(template.template_data);
 	visit(template.variants);
-
-	for (const variant of template.variants ?? []) {
-		if (variant.size !== undefined) need(6);
-		for (const override of variant.overrides) {
-			for (const delta of override.elements ?? []) {
-				if (
-					delta.pos !== undefined ||
-					delta.size !== undefined ||
-					delta.rotation !== undefined ||
-					delta.opacity !== undefined ||
-					delta.hidden !== undefined
-				)
-					need(4);
-				if (textIds.has(delta.id) && usesTextLayout(delta.properties)) need(5);
-				if (usesArc(delta.properties)) need(6);
-				if (usesTextPath(delta.properties)) need(6);
-				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
-					need(5);
-				if (frameIds.has(delta.id) && usesGridLayout(delta.properties)) need(5);
-				if (imageIds.has(delta.id) && usesImageFraming(delta.properties))
-					need(5);
-				if (barcodeIds.has(delta.id) && usesBearerBars(delta.properties))
-					need(5);
-				if (frameIds.has(delta.id) && usesIsolate(delta.properties)) need(6);
-				if (frameIds.has(delta.id) && usesCornerSmoothing(delta.properties))
-					need(7);
-				if (imageIds.has(delta.id) && usesImageCorners(delta.properties))
-					need(7);
-				if (usesBoolean(delta.properties)) need(6);
-				if (usesSlice(delta.properties)) need(7);
-				if (usesSpot(delta.properties)) need(7);
-				if (textIds.has(delta.id) && usesTextStroke(delta.properties)) need(7);
-				if (textIds.has(delta.id) && usesPdfText(delta.properties)) need(7);
-				if (usesSideStroke(delta.properties)) need(7);
-				if (qrIds.has(delta.id) && usesQrStyle(delta.properties)) need(7);
-			}
-		}
-	}
-
-	return `${FORMAT_MAJOR}.${minor}`;
-}
-
-function usesGradientStroke(o: Record<string, unknown>): boolean {
-	const stroke = o.stroke as Record<string, unknown> | null | undefined;
-	return (
-		stroke !== null &&
-		typeof stroke === "object" &&
-		stroke.color !== null &&
-		typeof stroke.color === "object"
-	);
-}
-
-function usesGridLayout(properties: unknown): boolean {
-	if (properties === null || typeof properties !== "object") return false;
-	const layout = (properties as Record<string, unknown>).layout;
-	return (
-		layout !== null &&
-		typeof layout === "object" &&
-		(layout as Record<string, unknown>).type === "grid"
-	);
-}
-
-function usesGridPlacement(layoutChild: unknown): boolean {
-	if (layoutChild === null || typeof layoutChild !== "object") return false;
-	const lc = layoutChild as Record<string, unknown>;
-	return lc.column !== undefined || lc.row !== undefined;
-}
-
-function usesImageFraming(properties: unknown): boolean {
-	if (properties === null || typeof properties !== "object") return false;
-	const p = properties as Record<string, unknown>;
-	return p.focus !== undefined || p.crop !== undefined;
-}
-
-function usesBearerBars(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).bearerBars !== undefined
-	);
-}
-
-function usesPerCornerRadius(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		Array.isArray((properties as Record<string, unknown>).cornerRadius)
-	);
-}
-
-function usesCornerSmoothing(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).cornerSmoothing !== undefined
-	);
-}
-
-function usesImageCorners(properties: unknown): boolean {
-	return usesPerCornerRadius(properties) || usesCornerSmoothing(properties);
-}
-
-function usesBoolean(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).boolean !== undefined
-	);
-}
-
-function usesSlice(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).slice !== undefined
-	);
-}
-
-function usesSpot(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).spot !== undefined
-	);
-}
-
-function usesTextStroke(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).stroke !== undefined
-	);
-}
-
-function usesPdfText(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).pdfText !== undefined
-	);
-}
-
-function usesSideStroke(properties: unknown): boolean {
-	if (properties === null || typeof properties !== "object") return false;
-	const stroke = (properties as Record<string, unknown>).stroke;
-	if (stroke === null || typeof stroke !== "object") return false;
-	const width = (stroke as Record<string, unknown>).width;
-	return width !== null && typeof width === "object";
-}
-
-const QR_STYLE_1_7 = [
-	"quietZone",
-	"moduleShape",
-	"finderOuter",
-	"finderInner",
-	"gradient",
-	"logo",
-];
-
-function usesQrStyle(properties: unknown): boolean {
-	if (properties === null || typeof properties !== "object") return false;
-	const p = properties as Record<string, unknown>;
-	return QR_STYLE_1_7.some((key) => p[key] !== undefined);
-}
-
-function usesIsolate(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).isolate !== undefined
-	);
-}
-
-function usesArc(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).arc !== undefined
-	);
-}
-
-function usesTextPath(properties: unknown): boolean {
-	return (
-		properties !== null &&
-		typeof properties === "object" &&
-		(properties as Record<string, unknown>).path !== undefined
-	);
-}
-
-const TEXT_ALIGN_1_5 = new Set(["justify", "start", "end"]);
-
-// Text properties 1.5 added, on an element or a variant delta's properties.
-function usesTextLayout(properties: unknown): boolean {
-	if (properties === null || typeof properties !== "object") return false;
-	const p = properties as Record<string, unknown>;
-	const hasFeatures = (font: unknown) =>
-		font !== null &&
-		typeof font === "object" &&
-		(font as Record<string, unknown>).features !== undefined;
-	return (
-		TEXT_ALIGN_1_5.has(p.align as string) ||
-		p.alignLast !== undefined ||
-		p.direction !== undefined ||
-		p.paragraphSpacing !== undefined ||
-		hasFeatures(p.font) ||
-		(Array.isArray(p.spans) && p.spans.some((span) => hasFeatures(span?.font)))
-	);
+	return types;
 }
 
 /**
@@ -350,10 +112,4 @@ export function raiseFormatVersion<T extends Template>(template: T): T {
 	return formatMinor(needed) > formatMinor(template.format_version)
 		? { ...template, format_version: needed }
 		: template;
-}
-
-/** The minor of a `1.x` version; 0 when there is none. */
-export function formatMinor(formatVersion: string): number {
-	const minor = /^\d+\.(\d+)$/.exec(formatVersion.trim())?.[1];
-	return minor === undefined ? 0 : Number(minor);
 }
