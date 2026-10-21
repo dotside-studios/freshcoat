@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, expect, type Page, test } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
-import { mod, probePath, state } from "./helpers";
+import { mod, probePath, settingsTab, state } from "./helpers";
 import { pickGeneratedPhotos, runWatermarkExport } from "./photo-folder";
 
 const PROBE = probePath("watermark-probe");
@@ -120,6 +120,12 @@ test("watermarking 40 photos keeps each at its own size, upright, with the mark"
 
 	await page.keyboard.press(`${mod}+3`);
 	await expect(page.getByTestId("section-export")).toBeVisible();
+	// The starter exports each variant's size at 2x; this exports the photos'.
+	await settingsTab(page, "Size");
+	await page
+		.getByRole("radiogroup", { name: "Size" })
+		.getByRole("radio", { name: "Match image" })
+		.click();
 	const exportButton = page.getByRole("button", { name: "Export 40 files" });
 	await expect(exportButton).toBeEnabled();
 	const [download] = await Promise.all([
