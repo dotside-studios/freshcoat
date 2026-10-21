@@ -7,6 +7,7 @@ const port = Number(process.env.FRESHCOAT_PORT ?? 3010);
 const preview = !!process.env.FRESHCOAT_PREVIEW;
 
 const BENCH = /bench\.spec\.ts$/;
+const TIMING = /data-scale\.spec\.ts$/;
 // FRESHCOAT_SMOKE=1 narrows desktop to the subset e2e:smoke runs, so one
 // server serves it and the cross-browser projects.
 const SMOKE = [
@@ -49,7 +50,16 @@ export default defineConfig({
 		{
 			name: "desktop",
 			...(process.env.FRESHCOAT_SMOKE ? { testMatch: SMOKE } : {}),
-			testIgnore: BENCH,
+			testIgnore: [BENCH, TIMING],
+			use: chromium,
+		},
+		// Main-thread budgets, which hold only with the machine to themselves:
+		// after desktop, one test at a time.
+		{
+			name: "desktop-timing",
+			testMatch: TIMING,
+			dependencies: ["desktop"],
+			workers: 1,
 			use: chromium,
 		},
 		// Timings for e2e:bench: slow and machine-bound, so not in desktop.

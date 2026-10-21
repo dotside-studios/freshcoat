@@ -86,6 +86,9 @@ bun run e2e:bench
 bunx vitest bench --run src/tests/perf
 ```
 
+`e2e/data-scale.spec.ts` holds main-thread budgets, so the
+`desktop-timing` project runs it after `desktop`, one test at a time; add
+`--no-deps` to run it alone.
 `e2e:bench` runs `e2e/bench.spec.ts`, the `bench` project, against the
 production build; the `desktop` project leaves it out. The running app also
 exposes `/bench?sample=<id>&frames=<n>`.
