@@ -76,7 +76,7 @@ jobs:
           fi
 
   attach-assets:
-    needs: validate
+    needs: [validate, publish]
     if: github.event_name == 'release' || !inputs.dry_run
     runs-on: ubuntu-latest
     permissions:
