@@ -1,6 +1,11 @@
 import { parseColor } from "@freshcoat-js/engine";
 import { z } from "zod";
-import { FORMAT_MAJOR, formatVersionStatus } from "./format";
+import {
+	FORMAT_MAJOR,
+	type FormatVersion,
+	formatHistory,
+	formatVersionStatus,
+} from "./format-version";
 import { parseImageFocus } from "./image-focus";
 import { FIELD_FORMATS, tokenIds } from "./mustache";
 import { UNSAFE_PATTERN_MESSAGES, unsafePatternReason } from "./safe-regex";
@@ -24,26 +29,28 @@ export const SizeSchema = z.object({
 	height: z.number(),
 });
 
-export const BlendModeSchema = z.enum([
-	"normal",
-	"multiply",
-	"screen",
-	"overlay",
-	"darken",
-	"lighten",
-	"color-dodge",
-	"color-burn",
-	"hard-light",
-	"soft-light",
-	"difference",
-	"exclusion",
-	"hue",
-	"saturation",
-	"color",
-	"luminosity",
-	"plus",
-	"linear-burn",
-]);
+export const BlendModeSchema = z
+	.enum([
+		"normal",
+		"multiply",
+		"screen",
+		"overlay",
+		"darken",
+		"lighten",
+		"color-dodge",
+		"color-burn",
+		"hard-light",
+		"soft-light",
+		"difference",
+		"exclusion",
+		"hue",
+		"saturation",
+		"color",
+		"luminosity",
+		"plus",
+		"linear-burn",
+	])
+	.register(formatHistory, { values: { "linear-burn": "1.5" } });
 
 export const FontWeightSchema = z.union([
 	z.literal(100),
@@ -145,8 +152,14 @@ export const GradientSchema = z.union([
 		// set they place the gradient and `angle` is only what a reader without
 		// them draws, so a writer keeps it pointing along `to - from`. Either may
 		// lie outside [0, 1]: a gradient can start beyond the box.
-		from: z.tuple([z.number(), z.number()]).optional(),
-		to: z.tuple([z.number(), z.number()]).optional(),
+		from: z
+			.tuple([z.number(), z.number()])
+			.optional()
+			.register(formatHistory, { since: "1.2" }),
+		to: z
+			.tuple([z.number(), z.number()])
+			.optional()
+			.register(formatHistory, { since: "1.2" }),
 		stops: z.array(GradientStopSchema),
 		spread: GradientSpreadSchema.optional(),
 	}),
@@ -230,7 +243,9 @@ const FontDescriptorObjectSchema = z.object({
 	// Merged over the element's own axes.
 	variations: FontVariationsSchema.optional(),
 	// Merged over the element's own features.
-	features: FontFeaturesSchema.optional(),
+	features: FontFeaturesSchema.optional().register(formatHistory, {
+		since: "1.5",
+	}),
 });
 
 // One styled segment within a mixed-style text element. Only the fields
@@ -259,7 +274,9 @@ export const TextPropertiesSchema = z.object({
 		decoration: z.enum(["underline", "line-through"]).optional(),
 		skipInk: z.boolean().optional(),
 		variations: FontVariationsSchema.optional(),
-		features: FontFeaturesSchema.optional(),
+		features: FontFeaturesSchema.optional().register(formatHistory, {
+			since: "1.5",
+		}),
 	}),
 	// Solid color; optional when a gradient `fill` is provided (compile defaults
 	// to #000 when neither is set).
@@ -267,20 +284,31 @@ export const TextPropertiesSchema = z.object({
 	// Optional gradient fill for the text (mapped to the element box). `color`
 	// remains the solid fallback.
 	fill: FillSchema.optional(),
-	stroke: TextStrokeSchema.optional(),
+	stroke: TextStrokeSchema.optional().register(formatHistory, { since: "1.7" }),
 	// start and end follow `direction`.
 	align: z
 		.enum(["left", "center", "right", "justify", "start", "end"])
+		.register(formatHistory, {
+			values: { justify: "1.5", start: "1.5", end: "1.5" },
+		})
 		.optional(),
 	// How a justified paragraph sets its last line. Default start.
 	alignLast: z
 		.enum(["left", "center", "right", "justify", "start", "end"])
-		.optional(),
+		.optional()
+		.register(formatHistory, { since: "1.5" }),
 	// Extra space after each hard line break (a newline), in design units.
-	paragraphSpacing: z.number().min(0).optional(),
+	paragraphSpacing: z
+		.number()
+		.min(0)
+		.optional()
+		.register(formatHistory, { since: "1.5" }),
 	// Base direction for bidi ordering; auto takes the first strong character
 	// of the resolved text. Default ltr.
-	direction: z.enum(["ltr", "rtl", "auto"]).optional(),
+	direction: z
+		.enum(["ltr", "rtl", "auto"])
+		.optional()
+		.register(formatHistory, { since: "1.5" }),
 	verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
 	// shrink scales the font down until the text fits the box; with spans,
 	// every span's size scales by the same factor.
@@ -297,7 +325,10 @@ export const TextPropertiesSchema = z.object({
 	maxLines: z.number().int().positive().optional(),
 	// "outline" draws the text in a PDF as the outlines of its glyphs, with no
 	// font, whatever the export asks for.
-	pdfText: z.literal("outline").optional(),
+	pdfText: z
+		.literal("outline")
+		.optional()
+		.register(formatHistory, { since: "1.7" }),
 	// Sets the text along a circle centered on the box, for seals and badges.
 	// Each hard line is one ring and nothing wraps. Angles are degrees clockwise
 	// from 12 o'clock.
@@ -319,7 +350,8 @@ export const TextPropertiesSchema = z.object({
 			// Without it, such a ring overlaps itself and the render warns.
 			fit: z.literal("shrink").optional(),
 		})
-		.optional(),
+		.optional()
+		.register(formatHistory, { since: "1.6" }),
 	// Sets the text along a path, as SVG's <textPath>. Wins over `arc`. Each hard
 	// line is one baseline below the last; nothing wraps. Glyphs that run past
 	// an open path's ends, or a whole lap of a closed one, are hidden.
@@ -342,7 +374,8 @@ export const TextPropertiesSchema = z.object({
 		.refine((p) => p.d !== undefined || p.ref !== undefined, {
 			message: "a text path needs `d` or `ref`",
 		})
-		.optional(),
+		.optional()
+		.register(formatHistory, { since: "1.6" }),
 });
 
 export const ImageMaskSchema = z.union([
@@ -363,7 +396,14 @@ export const ImageMaskSchema = z.union([
 // native alignment). Every stroked element honors it.
 export const StrokeSchema = z.object({
 	// A solid colour, or a gradient placed in the element's box as a fill is.
-	color: z.union([z.string(), ...GradientSchema.options]),
+	color: z.union([
+		z.string(),
+		...GradientSchema.options.map((gradient) =>
+			gradient
+				.clone()
+				.register(formatHistory, { since: "1.6", feature: "color" }),
+		),
+	]),
 	width: z.number({
 		error: (issue) =>
 			issue.input !== null && typeof issue.input === "object"
@@ -392,7 +432,10 @@ export const StrokeSideWidthsSchema = z.object({
 
 // A rect or frame stroke, whose width can differ per side.
 export const BoxStrokeSchema = StrokeSchema.extend({
-	width: z.union([z.number(), StrokeSideWidthsSchema]),
+	width: z.union([
+		z.number(),
+		StrokeSideWidthsSchema.register(formatHistory, { since: "1.7" }),
+	]),
 });
 
 // Fractions of the source image's width and height.
@@ -403,11 +446,22 @@ export const ImageCropSchema = z.object({
 	height: z.number().gt(0).max(1),
 });
 
-// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
-export const CornerRadiusSchema = z.union([
+const PerCornerRadiusSchema = z.tuple([
 	z.number(),
-	z.tuple([z.number(), z.number(), z.number(), z.number()]),
+	z.number(),
+	z.number(),
+	z.number(),
 ]);
+
+// Uniform radius or per-corner [topLeft, topRight, bottomRight, bottomLeft].
+export const CornerRadiusSchema = z.union([z.number(), PerCornerRadiusSchema]);
+
+// A frame's or image's, which took per-corner radii later than a rect.
+const cornerRadiusSince = (since: FormatVersion) =>
+	z.union([
+		z.number(),
+		PerCornerRadiusSchema.clone().register(formatHistory, { since }),
+	]);
 
 export const ImagePropertiesSchema = z.object({
 	src: z.string(),
@@ -420,12 +474,18 @@ export const ImagePropertiesSchema = z.object({
 			z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
 			z.string(),
 		])
-		.optional(),
+		.optional()
+		.register(formatHistory, { since: "1.5" }),
 	// The part of the source that is drawn, before `fit` places it. Ignored by
 	// `tile`.
-	crop: ImageCropSchema.optional(),
-	cornerRadius: CornerRadiusSchema.optional(),
-	cornerSmoothing: z.number().min(0).max(1).optional(),
+	crop: ImageCropSchema.optional().register(formatHistory, { since: "1.5" }),
+	cornerRadius: cornerRadiusSince("1.7").optional(),
+	cornerSmoothing: z
+		.number()
+		.min(0)
+		.max(1)
+		.optional()
+		.register(formatHistory, { since: "1.7" }),
 	mask: ImageMaskSchema.optional(),
 	stroke: StrokeSchema.optional(),
 });
@@ -457,10 +517,22 @@ export const QrCodePropertiesSchema = z.object({
 	// Design px inside the box, around the quiet zone.
 	margin: z.number().optional(),
 	// Modules each side, inside the margin. Default 0.
-	quietZone: z.number().int().min(0).max(20).optional(),
-	moduleShape: QrModuleShapeSchema.optional(),
-	finderOuter: QrFinderOuterSchema.optional(),
-	finderInner: QrFinderInnerSchema.optional(),
+	quietZone: z
+		.number()
+		.int()
+		.min(0)
+		.max(20)
+		.optional()
+		.register(formatHistory, { since: "1.7" }),
+	moduleShape: QrModuleShapeSchema.optional().register(formatHistory, {
+		since: "1.7",
+	}),
+	finderOuter: QrFinderOuterSchema.optional().register(formatHistory, {
+		since: "1.7",
+	}),
+	finderInner: QrFinderInnerSchema.optional().register(formatHistory, {
+		since: "1.7",
+	}),
 	gradient: z
 		.object({
 			kind: z.literal("linear"),
@@ -473,8 +545,9 @@ export const QrCodePropertiesSchema = z.object({
 				)
 				.min(2),
 		})
-		.optional(),
-	logo: QrLogoSchema.optional(),
+		.optional()
+		.register(formatHistory, { since: "1.7" }),
+	logo: QrLogoSchema.optional().register(formatHistory, { since: "1.7" }),
 });
 
 export const SymbologySchema = z.enum([
@@ -506,7 +579,9 @@ export const BarcodePropertiesSchema = z.object({
 	// pdf417: level 0 to 8. aztec: percent 5 to 95. Ignored elsewhere.
 	errorCorrection: z.number().optional(),
 	// itf14 only. Default "none".
-	bearerBars: BearerBarsSchema.optional(),
+	bearerBars: BearerBarsSchema.optional().register(formatHistory, {
+		since: "1.5",
+	}),
 });
 
 /** An inset from each edge of the trim, in design units: one number for every
@@ -555,8 +630,10 @@ export const RectPropertiesSchema = z.object({
 	cornerRadius: CornerRadiusSchema.optional(),
 	// Figma corner smoothing in [0, 1]; renders a superellipse corner.
 	cornerSmoothing: z.number().min(0).max(1).optional(),
-	slice: SliceModifierSchema.optional(),
-	spot: LayerSpotSchema.optional(),
+	slice: SliceModifierSchema.optional().register(formatHistory, {
+		since: "1.7",
+	}),
+	spot: LayerSpotSchema.optional().register(formatHistory, { since: "1.7" }),
 });
 
 export const BooleanOpSchema = z.enum([
@@ -577,7 +654,7 @@ export const VectorBasePropertiesSchema = z.object({
 	cornerRadius: z.number().min(0).optional(),
 	fill: FillsSchema.optional(),
 	stroke: StrokeSchema.optional(),
-	spot: LayerSpotSchema.optional(),
+	spot: LayerSpotSchema.optional().register(formatHistory, { since: "1.7" }),
 });
 
 // A live boolean operation: `operands`, rects or vectors positioned relative
@@ -591,8 +668,12 @@ export const VectorBooleanSchema: z.ZodType<VectorBoolean> = z.lazy(() =>
 ) as z.ZodType<VectorBoolean>;
 
 export const VectorPropertiesSchema = VectorBasePropertiesSchema.extend({
-	boolean: VectorBooleanSchema.optional(),
-	slice: SliceModifierSchema.optional(),
+	boolean: VectorBooleanSchema.optional().register(formatHistory, {
+		since: "1.6",
+	}),
+	slice: SliceModifierSchema.optional().register(formatHistory, {
+		since: "1.7",
+	}),
 });
 
 export const ShadowSchema = z.object({
@@ -636,17 +717,19 @@ export const BackdropBlurEffectSchema = z.object({
 
 // Film grain from a seeded hash: one seed paints the same pixels everywhere.
 // `size` is one grain's side in design px.
-export const GrainEffectSchema = z.object({
-	type: z.literal("grain"),
-	amount: z.number().min(0).max(1),
-	size: z.number().positive().optional(),
-	monochrome: z.boolean().optional(),
-	blendMode: z
-		.enum(["normal", "overlay", "soft-light", "multiply", "screen"])
-		.optional(),
-	seed: z.number().int().min(0).max(65535).optional(),
-	hidden: z.boolean().optional(),
-});
+export const GrainEffectSchema = z
+	.object({
+		type: z.literal("grain"),
+		amount: z.number().min(0).max(1),
+		size: z.number().positive().optional(),
+		monochrome: z.boolean().optional(),
+		blendMode: z
+			.enum(["normal", "overlay", "soft-light", "multiply", "screen"])
+			.optional(),
+		seed: z.number().int().min(0).max(65535).optional(),
+		hidden: z.boolean().optional(),
+	})
+	.register(formatHistory, { since: "1.7" });
 
 // The layer redrawn as a halftone screen with `cellSize` design px cells. "cmyk"
 // overlays four multiplied screens at C 15°, M 75°, Y 0° and K 45°, turned by
@@ -654,18 +737,23 @@ export const GrainEffectSchema = z.object({
 // screen over the whole side, so neighbouring elements share a grid and a
 // rotated element keeps the screen angle; "element" starts the grid at the
 // element's own origin and turns it with the element.
-export const HalftoneEffectSchema = z.object({
-	type: z.literal("halftone"),
-	mode: z.enum(["mono", "cmyk"]).optional(),
-	shape: z.enum(["round", "line", "square"]).optional(),
-	cellSize: z.number().positive(),
-	angle: z.number().optional(),
-	anchor: z.enum(["page", "element"]).optional(),
-	invert: z.boolean().optional(),
-	color: z.string().optional(),
-	background: z.string().optional(),
-	hidden: z.boolean().optional(),
-});
+export const HalftoneEffectSchema = z
+	.object({
+		type: z.literal("halftone"),
+		mode: z.enum(["mono", "cmyk"]).optional(),
+		shape: z.enum(["round", "line", "square"]).optional(),
+		cellSize: z.number().positive(),
+		angle: z.number().optional(),
+		anchor: z
+			.enum(["page", "element"])
+			.optional()
+			.register(formatHistory, { since: "1.7" }),
+		invert: z.boolean().optional(),
+		color: z.string().optional(),
+		background: z.string().optional(),
+		hidden: z.boolean().optional(),
+	})
+	.register(formatHistory, { since: "1.7" });
 
 export const EffectSchema = z.discriminatedUnion("type", [
 	ShadowEffectSchema,
@@ -711,16 +799,21 @@ export const GridTrackSchema = z.union([
 
 // Children fill cells row by row unless their `layoutChild` names a column or
 // row. Rows beyond `rows` are added as "auto".
-export const GridLayoutSchema = z.object({
-	type: z.literal("grid"),
-	columns: z.array(GridTrackSchema).min(1),
-	rows: z.array(GridTrackSchema).optional(),
-	// One gap for both axes, or [row gap, column gap].
-	gap: z
-		.union([z.number().min(0), z.tuple([z.number().min(0), z.number().min(0)])])
-		.optional(),
-	padding: LayoutPaddingSchema.optional(),
-});
+export const GridLayoutSchema = z
+	.object({
+		type: z.literal("grid"),
+		columns: z.array(GridTrackSchema).min(1),
+		rows: z.array(GridTrackSchema).optional(),
+		// One gap for both axes, or [row gap, column gap].
+		gap: z
+			.union([
+				z.number().min(0),
+				z.tuple([z.number().min(0), z.number().min(0)]),
+			])
+			.optional(),
+		padding: LayoutPaddingSchema.optional(),
+	})
+	.register(formatHistory, { since: "1.5" });
 
 export const LayoutSchema = z.union([FlexLayoutSchema, GridLayoutSchema]);
 
@@ -743,8 +836,14 @@ export const LayoutChildSchema = z.object({
 		.object({ width: z.number().optional(), height: z.number().optional() })
 		.optional(),
 	// Grid placement; ignored in a flex layout.
-	column: GridLineSchema.optional(),
-	row: GridLineSchema.optional(),
+	column: GridLineSchema.optional().register(formatHistory, {
+		since: "1.5",
+		feature: "grid",
+	}),
+	row: GridLineSchema.optional().register(formatHistory, {
+		since: "1.5",
+		feature: "grid",
+	}),
 });
 
 // Per-layer tone. Each factor is 1 for no change; `sharpen` is 0 for none.
@@ -795,15 +894,24 @@ const elementShellShape = {
 	blendMode: BlendModeSchema.optional(),
 	shadow: ShadowsSchema.optional(),
 	blur: z.number().optional(),
-	backdropBlur: z.number().min(0).optional(),
+	backdropBlur: z
+		.number()
+		.min(0)
+		.optional()
+		.register(formatHistory, { since: "1.6" }),
 	// Replaces `shadow`, `blur` and `backdropBlur`; an element sets one form or
 	// the other.
-	effects: z.array(EffectSchema).optional(),
-	adjust: AdjustSchema.optional(),
+	effects: z
+		.array(EffectSchema)
+		.optional()
+		.register(formatHistory, { since: "1.7" }),
+	adjust: AdjustSchema.optional().register(formatHistory, { since: "1.5" }),
 	layoutChild: LayoutChildSchema.optional(),
-	constraints: ConstraintsSchema.optional(),
+	constraints: ConstraintsSchema.optional().register(formatHistory, {
+		since: "1.2",
+	}),
 	// Kept in the file but not drawn; a variant delta's `hidden: false` shows it.
-	hidden: z.boolean().optional(),
+	hidden: z.boolean().optional().register(formatHistory, { since: "1.7" }),
 	// Several conditions must all hold.
 	visibleWhen: z
 		.union([VisibilityConditionSchema, z.array(VisibilityConditionSchema)])
@@ -828,11 +936,13 @@ export const QrCodeElementSchema = z.object({
 	properties: QrCodePropertiesSchema,
 });
 
-export const BarcodeElementSchema = z.object({
-	...elementShellShape,
-	type: z.literal("barcode"),
-	properties: BarcodePropertiesSchema,
-});
+export const BarcodeElementSchema = z
+	.object({
+		...elementShellShape,
+		type: z.literal("barcode"),
+		properties: BarcodePropertiesSchema,
+	})
+	.register(formatHistory, { since: "1.3" });
 
 export const RectElementSchema = z.object({
 	...elementShellShape,
@@ -869,14 +979,19 @@ export const FramePropertiesSchema: z.ZodType<FrameProperties> = z.lazy(() =>
 	z.object({
 		fill: FillsSchema.optional(),
 		stroke: BoxStrokeSchema.optional(),
-		cornerRadius: CornerRadiusSchema.optional(),
-		cornerSmoothing: z.number().min(0).max(1).optional(),
+		cornerRadius: cornerRadiusSince("1.5").optional(),
+		cornerSmoothing: z
+			.number()
+			.min(0)
+			.max(1)
+			.optional()
+			.register(formatHistory, { since: "1.7" }),
 		// Figma's `clipsContent`. When true, children are clipped to the frame,
 		// honoring cornerRadius. An outside stroke stays unclipped.
 		clipsContent: z.boolean().optional(),
 		// Figma's Normal on a frame: children blend only with the frame's own
 		// content. Unset is pass-through.
-		isolate: z.boolean().optional(),
+		isolate: z.boolean().optional().register(formatHistory, { since: "1.6" }),
 		layout: LayoutSchema.optional(),
 		children: z.array(ElementSchema),
 	}),
@@ -919,7 +1034,7 @@ export const VariantSchema = z.object({
 	label: z.string(),
 	swatch: z.string().optional(),
 	// Drawn at this size, with the base laid out to it by its constraints.
-	size: SizeSchema.optional(),
+	size: SizeSchema.optional().register(formatHistory, { since: "1.6" }),
 	overrides: z.array(
 		z.object({
 			name: z.string(),
@@ -931,13 +1046,28 @@ export const VariantSchema = z.object({
 						// Required so a 1.3 reader accepts a 1.4 delta; `{}` when only
 						// the shell changes.
 						properties: z.record(z.string(), z.unknown()),
-						pos: Vec2Schema.optional(),
-						size: SizeSchema.optional(),
-						rotation: z.number().optional(),
-						opacity: z.number().min(0).max(1).optional(),
+						pos: Vec2Schema.optional().register(formatHistory, {
+							since: "1.4",
+						}),
+						size: SizeSchema.optional().register(formatHistory, {
+							since: "1.4",
+						}),
+						rotation: z
+							.number()
+							.optional()
+							.register(formatHistory, { since: "1.4" }),
+						opacity: z
+							.number()
+							.min(0)
+							.max(1)
+							.optional()
+							.register(formatHistory, { since: "1.4" }),
 						// `true` leaves the element out of the variant; `false` shows one
 						// the base hides.
-						hidden: z.boolean().optional(),
+						hidden: z
+							.boolean()
+							.optional()
+							.register(formatHistory, { since: "1.4" }),
 					}),
 				)
 				.optional(),
@@ -976,7 +1106,7 @@ export const TemplateSourceSchema = z.looseObject({ kind: z.string() });
 
 export const TemplateSchema = z
 	.object({
-		$schema: z.string().optional(),
+		$schema: z.string().optional().register(formatHistory, { since: "1.1" }),
 		format_version: z.string(),
 		version: z.string().optional(),
 		id: z.string(),
@@ -993,9 +1123,9 @@ export const TemplateSchema = z
 		width: z.number(),
 		height: z.number(),
 		// Artwork past the trim, drawn when a render asks for it and cut away.
-		bleed: InsetsSchema.optional(),
+		bleed: InsetsSchema.optional().register(formatHistory, { since: "1.5" }),
 		// What must survive the cut. A guide only; it does not change a render.
-		safeArea: InsetsSchema.optional(),
+		safeArea: InsetsSchema.optional().register(formatHistory, { since: "1.5" }),
 		fields: FieldsSchemaSchema,
 		fonts: z.array(FontDescriptorSchema).optional(),
 		template_data: z.array(TemplateFrameSchema),

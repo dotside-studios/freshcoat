@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FORMAT_MAJOR } from "./format";
+import { FORMAT_MAJOR } from "./format-version";
 import { TemplateSchema } from "./schemas";
 
 // Served by the npm CDN from the published package, so the address needs no

@@ -1,3 +1,8 @@
+import {
+	FORMAT_MAJOR,
+	formatMinor,
+	formatVersionStatus,
+} from "./format-version";
 import type { Template } from "./types";
 
 // The wire format's own version, as `format_version` carries it.
@@ -29,30 +34,15 @@ import type { Template } from "./types";
 //        QR `quietZone`, `moduleShape`, `finderOuter`, `finderInner`,
 //        `gradient` and `logo`
 
-export const FORMAT_MAJOR = 1;
-export const FORMAT_MINOR = 7;
-
-/** What a writer puts in `format_version` for a template it produced. */
-export const FORMAT_VERSION = `${FORMAT_MAJOR}.${FORMAT_MINOR}`;
-
-export type FormatVersionStatus =
-	/** This kit reads and writes it without losing anything. */
-	| "current"
-	/** Readable, but written by a newer kit: re-saving it may drop fields. */
-	| "newer"
-	/** A major version, or a string, this kit does not read at all. */
-	| "unsupported";
-
-export function formatVersionStatus(
-	formatVersion: unknown,
-): FormatVersionStatus {
-	if (typeof formatVersion !== "string") return "unsupported";
-	const match = /^(\d+)(?:\.(\d+))?$/.exec(formatVersion.trim());
-	if (!match) return "unsupported";
-	if (Number(match[1]) !== FORMAT_MAJOR) return "unsupported";
-	const minor = match[2] === undefined ? 0 : Number(match[2]);
-	return minor > FORMAT_MINOR ? "newer" : "current";
-}
+export {
+	FORMAT_HISTORY,
+	FORMAT_MAJOR,
+	FORMAT_MINOR,
+	FORMAT_VERSION,
+	type FormatVersionStatus,
+	formatMinor,
+	formatVersionStatus,
+} from "./format-version";
 
 /** The lowest 1.x a reader needs to keep every field `template` uses. */
 export function minimumFormatVersion(template: Template): string {
@@ -350,10 +340,4 @@ export function raiseFormatVersion<T extends Template>(template: T): T {
 	return formatMinor(needed) > formatMinor(template.format_version)
 		? { ...template, format_version: needed }
 		: template;
-}
-
-/** The minor of a `1.x` version; 0 when there is none. */
-export function formatMinor(formatVersion: string): number {
-	const minor = /^\d+\.(\d+)$/.exec(formatVersion.trim())?.[1];
-	return minor === undefined ? 0 : Number(minor);
 }
