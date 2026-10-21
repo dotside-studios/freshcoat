@@ -322,13 +322,17 @@ export function recordLabel(
 	return v === null || v === undefined || v === "" ? record.id : String(v);
 }
 
+export function matchesFilter(record: DataRecord, filter: StatusFilter) {
+	return filter === "all" || record.status === filter;
+}
+
 export function filterRecords(
 	records: readonly DataRecord[],
 	filter: StatusFilter,
 ): DataRecord[] {
 	return filter === "all"
 		? [...records]
-		: records.filter((r) => r.status === filter);
+		: records.filter((r) => matchesFilter(r, filter));
 }
 
 /** The ids a list selection names. "all" is every row the list shows; a set

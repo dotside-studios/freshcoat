@@ -20,9 +20,9 @@ import { formatNumber } from "~/app/format";
 import ChevronIcon from "~icons/mingcute/down-line";
 import {
 	bulkStatusAction,
-	filterRecords,
 	formatTime,
 	labelColumn,
+	matchesFilter,
 	recordLabel,
 	SETTABLE_STATUSES,
 	STATUS_FILTERS,
@@ -94,17 +94,19 @@ export function RecordsList({
 }) {
 	const controller = useController();
 	const label = labelColumn(dataset);
-	const rows = useMemo(() => {
-		const index = new Map(dataset.records.map((r, i) => [r.id, i]));
-		return filterRecords(dataset.records, filter).map(
-			(record): Row => ({ record, index: index.get(record.id) ?? 0 }),
-		);
+	const { rows, rowById, rowKeys } = useMemo(() => {
+		const rows: Row[] = [];
+		const rowById = new Map<string, Row>();
+		const rowKeys: string[] = [];
+		dataset.records.forEach((record, index) => {
+			if (!matchesFilter(record, filter)) return;
+			const row: Row = { record, index };
+			rows.push(row);
+			rowById.set(record.id, row);
+			rowKeys.push(record.id);
+		});
+		return { rows, rowById, rowKeys };
 	}, [dataset.records, filter]);
-	const rowById = useMemo(
-		() => new Map(rows.map((r) => [r.record.id, r])),
-		[rows],
-	);
-	const rowKeys = useMemo(() => rows.map((r) => r.record.id), [rows]);
 	const columns = useMemo(
 		() =>
 			COLUMNS.map((c) =>
